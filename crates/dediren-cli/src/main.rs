@@ -70,8 +70,9 @@ fn main() -> anyhow::Result<()> {
             input,
         }) => {
             let text = dediren_core::io::read_json_input(input.as_deref())?;
-            print_plugin_result(dediren_core::plugins::run_plugin(
+            print_plugin_result(dediren_core::plugins::run_plugin_for_capability(
                 &plugin,
+                "projection",
                 &["project", "--target", &target, "--view", &view],
                 &text,
             ))
@@ -86,12 +87,15 @@ fn main() -> anyhow::Result<()> {
                     options.allowed_env.push((name.to_string(), value));
                 }
             }
-            print_plugin_result(dediren_core::plugins::run_plugin_with_options(
-                &plugin,
-                &["layout"],
-                &serde_json::to_string(&request)?,
-                options,
-            ))
+            print_plugin_result(
+                dediren_core::plugins::run_plugin_for_capability_with_options(
+                    &plugin,
+                    "layout",
+                    &["layout"],
+                    &serde_json::to_string(&request)?,
+                    options,
+                ),
+            )
         }
         Some(Commands::ValidateLayout { input }) => {
             let text = dediren_core::io::read_json_input(input.as_deref())?;
@@ -115,8 +119,9 @@ fn main() -> anyhow::Result<()> {
                 "layout_result": layout_result,
                 "policy": serde_json::from_str::<serde_json::Value>(&policy_text)?
             });
-            print_plugin_result(dediren_core::plugins::run_plugin(
+            print_plugin_result(dediren_core::plugins::run_plugin_for_capability(
                 &plugin,
+                "render",
                 &["render"],
                 &serde_json::to_string(&render_input)?,
             ))
@@ -144,8 +149,9 @@ fn main() -> anyhow::Result<()> {
                 policy,
             };
 
-            print_plugin_result(dediren_core::plugins::run_plugin(
+            print_plugin_result(dediren_core::plugins::run_plugin_for_capability(
                 &plugin,
+                "export",
                 &["export"],
                 &serde_json::to_string(&export_input)?,
             ))
@@ -157,21 +163,25 @@ fn main() -> anyhow::Result<()> {
     }
 }
 
-fn print_plugin_result(result: anyhow::Result<String>) -> anyhow::Result<()> {
+fn print_plugin_result(
+    result: Result<
+        dediren_core::plugins::PluginRunOutcome,
+        dediren_core::plugins::PluginExecutionError,
+    >,
+) -> anyhow::Result<()> {
     match result {
-        Ok(output) => {
-            print!("{output}");
-            Ok(())
+        Ok(outcome) => {
+            print!("{}", outcome.stdout);
+            if outcome.exit_code == 0 {
+                Ok(())
+            } else {
+                std::process::exit(outcome.exit_code);
+            }
         }
         Err(error) => {
-            let diagnostic = dediren_contracts::Diagnostic {
-                code: "DEDIREN_PLUGIN_ERROR".to_string(),
-                severity: dediren_contracts::DiagnosticSeverity::Error,
-                message: error.to_string(),
-                path: None,
-            };
-            let envelope =
-                dediren_contracts::CommandEnvelope::<serde_json::Value>::error(vec![diagnostic]);
+            let envelope = dediren_contracts::CommandEnvelope::<serde_json::Value>::error(vec![
+                error.diagnostic(),
+            ]);
             println!("{}", serde_json::to_string(&envelope)?);
             std::process::exit(3);
         }

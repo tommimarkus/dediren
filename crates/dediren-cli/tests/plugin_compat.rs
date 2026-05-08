@@ -36,8 +36,27 @@ fn unknown_plugin_failure_is_structured_by_cli() {
         .arg(workspace_file("fixtures/layout-request/basic.json"));
     cmd.assert()
         .failure()
-        .stdout(predicate::str::contains("DEDIREN_PLUGIN_ERROR"))
+        .stdout(predicate::str::contains("DEDIREN_PLUGIN_UNKNOWN"))
         .stdout(predicate::str::contains("unknown plugin id"));
+}
+
+#[test]
+fn plugin_error_envelope_is_preserved_by_cli() {
+    let plugin = workspace_binary("dediren-plugin-elk-layout", "dediren-plugin-elk-layout");
+    let mut cmd = Command::cargo_bin("dediren").unwrap();
+    cmd.current_dir(workspace_root())
+        .env("DEDIREN_PLUGIN_ELK_LAYOUT", plugin)
+        .env("DEDIREN_PLUGIN_DIRS", workspace_file("fixtures/plugins"))
+        .arg("layout")
+        .arg("--plugin")
+        .arg("elk-layout")
+        .arg("--input")
+        .arg(workspace_file("fixtures/layout-request/basic.json"));
+    cmd.assert()
+        .failure()
+        .stdout(predicate::str::contains("DEDIREN_ELK_RUNTIME_UNAVAILABLE"))
+        .stdout(predicate::str::contains("\"status\":\"error\""))
+        .stdout(predicate::str::contains("DEDIREN_PLUGIN_ERROR").not());
 }
 
 fn workspace_binary(package: &str, binary: &str) -> PathBuf {
