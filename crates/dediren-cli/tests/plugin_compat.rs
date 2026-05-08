@@ -47,6 +47,8 @@ fn plugin_error_envelope_is_preserved_by_cli() {
     cmd.current_dir(workspace_root())
         .env("DEDIREN_PLUGIN_ELK_LAYOUT", plugin)
         .env("DEDIREN_PLUGIN_DIRS", workspace_file("fixtures/plugins"))
+        .env_remove("DEDIREN_ELK_COMMAND")
+        .env_remove("DEDIREN_ELK_RESULT_FIXTURE")
         .arg("layout")
         .arg("--plugin")
         .arg("elk-layout")
