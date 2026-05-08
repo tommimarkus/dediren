@@ -294,6 +294,7 @@ dependencies = [
  "jsonschema",
  "serde",
  "serde_json",
+ "tempfile",
  "thiserror",
 ]
 
@@ -332,6 +333,14 @@ dependencies = [
  "dediren-contracts",
  "predicates",
  "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "dediren-plugin-runtime-testbed"
+version = "0.1.0"
+dependencies = [
+ "dediren-contracts",
  "serde_json",
 ]
 
