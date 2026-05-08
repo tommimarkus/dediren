@@ -1,0 +1,17 @@
+[package]
+name = "dediren-plugin-runtime-testbed"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+publish = false
+
+[[bin]]
+name = "dediren-plugin-runtime-testbed"
+path = "src/main.rs"
+
+[dependencies]
+dediren-contracts = { path = "../dediren-contracts" }
+serde_json.workspace = true

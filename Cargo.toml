@@ -7,6 +7,7 @@ members = [
   "crates/dediren-plugin-elk-layout",
   "crates/dediren-plugin-svg-render",
   "crates/dediren-plugin-archimate-oef-export",
+  "crates/dediren-plugin-runtime-testbed",
 ]
 resolver = "2"
 
