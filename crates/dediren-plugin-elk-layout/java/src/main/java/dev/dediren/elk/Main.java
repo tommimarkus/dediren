@@ -14,18 +14,26 @@ public final class Main {
 
     static int run(InputStream stdin, PrintStream stdout) throws Exception {
         ObjectMapper mapper = JsonContracts.objectMapper();
+        JsonContracts.LayoutRequest request;
         try {
-            mapper.readValue(stdin, JsonContracts.LayoutRequest.class);
-            stdout.println(EnvelopeWriter.error(
-                mapper,
-                "DEDIREN_ELK_NOT_IMPLEMENTED",
-                "ELK layout engine has not been wired yet"));
-            return 3;
+            request = mapper.readValue(stdin, JsonContracts.LayoutRequest.class);
         } catch (Exception error) {
             stdout.println(EnvelopeWriter.error(
                 mapper,
                 "DEDIREN_ELK_INPUT_INVALID_JSON",
                 "layout request JSON is invalid: " + error.getMessage()));
+            return 3;
+        }
+
+        try {
+            JsonContracts.LayoutResult result = new ElkLayoutEngine().layout(request);
+            stdout.println(EnvelopeWriter.ok(mapper, result));
+            return 0;
+        } catch (Exception error) {
+            stdout.println(EnvelopeWriter.error(
+                mapper,
+                "DEDIREN_ELK_LAYOUT_FAILED",
+                "ELK layout failed: " + error.getMessage()));
             return 3;
         }
     }
