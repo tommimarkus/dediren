@@ -70,32 +70,15 @@ fn main() -> anyhow::Result<()> {
             input,
         }) => {
             let text = dediren_core::io::read_json_input(input.as_deref())?;
-            print_plugin_result(dediren_core::plugins::run_plugin_for_capability(
-                &plugin,
-                "projection",
-                &["project", "--target", &target, "--view", &view],
-                &text,
+            print_plugin_result(dediren_core::commands::project_command(
+                &plugin, &target, &view, &text,
             ))
         }
         Some(Commands::Layout { plugin, input }) => {
             let text = dediren_core::io::read_json_input(input.as_deref())?;
-            let request: dediren_contracts::LayoutRequest =
-                dediren_core::io::parse_command_data(&text)?;
-            let mut options = dediren_core::plugins::PluginRunOptions::default();
-            for name in ["DEDIREN_ELK_COMMAND", "DEDIREN_ELK_RESULT_FIXTURE"] {
-                if let Ok(value) = std::env::var(name) {
-                    options.allowed_env.push((name.to_string(), value));
-                }
-            }
-            print_plugin_result(
-                dediren_core::plugins::run_plugin_for_capability_with_options(
-                    &plugin,
-                    "layout",
-                    &["layout"],
-                    &serde_json::to_string(&request)?,
-                    options,
-                ),
-            )
+            print_plugin_result(dediren_core::commands::layout_command_from_env(
+                &plugin, &text,
+            ))
         }
         Some(Commands::ValidateLayout { input }) => {
             let text = dediren_core::io::read_json_input(input.as_deref())?;
@@ -113,17 +96,10 @@ fn main() -> anyhow::Result<()> {
         }) => {
             let layout_text = dediren_core::io::read_json_input(input.as_deref())?;
             let policy_text = std::fs::read_to_string(policy)?;
-            let layout_result: dediren_contracts::LayoutResult =
-                dediren_core::io::parse_command_data(&layout_text)?;
-            let render_input = serde_json::json!({
-                "layout_result": layout_result,
-                "policy": serde_json::from_str::<serde_json::Value>(&policy_text)?
-            });
-            print_plugin_result(dediren_core::plugins::run_plugin_for_capability(
+            print_plugin_result(dediren_core::commands::render_command(
                 &plugin,
-                "render",
-                &["render"],
-                &serde_json::to_string(&render_input)?,
+                &policy_text,
+                &layout_text,
             ))
         }
         Some(Commands::Export {
@@ -136,24 +112,11 @@ fn main() -> anyhow::Result<()> {
             let policy_text = std::fs::read_to_string(policy)?;
             let layout_text = std::fs::read_to_string(layout)?;
 
-            let source_doc: dediren_contracts::SourceDocument = serde_json::from_str(&source_text)?;
-            let layout_result: dediren_contracts::LayoutResult =
-                dediren_core::io::parse_command_data(&layout_text)?;
-            let policy: dediren_contracts::OefExportPolicy = serde_json::from_str(&policy_text)?;
-
-            let export_input = dediren_contracts::OefExportInput {
-                export_request_schema_version: dediren_contracts::EXPORT_REQUEST_SCHEMA_VERSION
-                    .to_string(),
-                source: source_doc,
-                layout_result,
-                policy,
-            };
-
-            print_plugin_result(dediren_core::plugins::run_plugin_for_capability(
+            print_plugin_result(dediren_core::commands::export_command(
                 &plugin,
-                "export",
-                &["export"],
-                &serde_json::to_string(&export_input)?,
+                &policy_text,
+                &source_text,
+                &layout_text,
             ))
         }
         None => {

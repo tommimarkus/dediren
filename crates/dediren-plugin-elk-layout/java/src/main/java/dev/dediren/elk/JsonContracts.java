@@ -45,7 +45,13 @@ final class JsonContracts {
         String id,
         String label,
         List<String> members,
-        Object provenance) {
+        GroupProvenance provenance) {
+    }
+
+    record GroupProvenance(SemanticBacked semantic_backed) {
+    }
+
+    record SemanticBacked(String source_id) {
     }
 
     record LayoutLabel(String owner_id, String text) {

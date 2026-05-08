@@ -1,6 +1,6 @@
 use dediren_contracts::{
-    CommandEnvelope, Diagnostic, DiagnosticSeverity, LayoutRequest, RenderPolicy, RenderResult,
-    SourceDocument,
+    CommandEnvelope, Diagnostic, DiagnosticSeverity, GroupProvenance, LayoutRequest, RenderPolicy,
+    RenderResult, SourceDocument,
 };
 use std::path::PathBuf;
 
@@ -46,6 +46,36 @@ fn layout_request_roundtrips() {
     let encoded = serde_json::to_string(&request).unwrap();
     let decoded: LayoutRequest = serde_json::from_str(&encoded).unwrap();
     assert_eq!(decoded.view_id, "main");
+}
+
+#[test]
+fn layout_group_provenance_uses_schema_owned_object_shape() {
+    let request: LayoutRequest = serde_json::from_str(
+        r#"{
+          "layout_request_schema_version": "layout-request.schema.v1",
+          "view_id": "main",
+          "nodes": [],
+          "edges": [],
+          "groups": [
+            {
+              "id": "group-1",
+              "label": "Group",
+              "members": [],
+              "provenance": { "semantic_backed": { "source_id": "system-group" } }
+            }
+          ],
+          "labels": [],
+          "constraints": []
+        }"#,
+    )
+    .unwrap();
+
+    assert_eq!(
+        GroupProvenance::SemanticBacked {
+            source_id: "system-group".to_string()
+        },
+        request.groups[0].provenance
+    );
 }
 
 #[test]

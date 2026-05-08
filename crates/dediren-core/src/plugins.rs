@@ -58,6 +58,14 @@ pub enum PluginExecutionError {
     OutputInvalidJson { plugin_id: String, message: String },
     #[error("plugin {plugin_id} stdout does not match the command envelope schema: {message}")]
     OutputInvalidEnvelope { plugin_id: String, message: String },
+    #[error("plugin {plugin_id} successful {capability} output data does not match the capability schema: {message}")]
+    OutputInvalidData {
+        plugin_id: String,
+        capability: String,
+        message: String,
+    },
+    #[error("command {command} input is invalid: {message}")]
+    CommandInputInvalid { command: String, message: String },
     #[error("plugin {plugin_id} I/O error: {message}")]
     Io { plugin_id: String, message: String },
 }
@@ -71,6 +79,7 @@ struct LoadedPluginManifest {
 struct ValidatedEnvelope {
     stdout: String,
     status: String,
+    value: serde_json::Value,
 }
 
 impl PluginExecutionError {
@@ -97,6 +106,8 @@ impl PluginExecutionError {
             Self::ProcessFailed { .. } => "DEDIREN_PLUGIN_PROCESS_FAILED",
             Self::OutputInvalidJson { .. } => "DEDIREN_PLUGIN_OUTPUT_INVALID_JSON",
             Self::OutputInvalidEnvelope { .. } => "DEDIREN_PLUGIN_OUTPUT_INVALID_ENVELOPE",
+            Self::OutputInvalidData { .. } => "DEDIREN_PLUGIN_OUTPUT_INVALID_DATA",
+            Self::CommandInputInvalid { .. } => "DEDIREN_COMMAND_INPUT_INVALID",
             Self::Io { .. } => "DEDIREN_PLUGIN_IO_ERROR",
         }
     }
@@ -115,7 +126,9 @@ impl PluginExecutionError {
             | Self::ProcessFailed { plugin_id, .. }
             | Self::OutputInvalidJson { plugin_id, .. }
             | Self::OutputInvalidEnvelope { plugin_id, .. }
+            | Self::OutputInvalidData { plugin_id, .. }
             | Self::Io { plugin_id, .. } => format!("plugin:{plugin_id}"),
+            Self::CommandInputInvalid { command, .. } => format!("command:{command}"),
         }
     }
 }
@@ -131,6 +144,12 @@ impl Default for PluginRunOptions {
 
 impl PluginRegistry {
     pub fn bundled() -> Self {
+        Self {
+            manifest_dirs: Self::bundled_dirs(),
+        }
+    }
+
+    pub fn bundled_dirs() -> Vec<PathBuf> {
         let mut manifest_dirs = vec![
             PathBuf::from("fixtures/plugins"),
             PathBuf::from(".dediren/plugins"),
@@ -138,7 +157,7 @@ impl PluginRegistry {
         if let Ok(configured) = std::env::var("DEDIREN_PLUGIN_DIRS") {
             manifest_dirs.extend(std::env::split_paths(&configured));
         }
-        Self { manifest_dirs }
+        manifest_dirs
     }
 
     pub fn from_dirs(manifest_dirs: Vec<PathBuf>) -> Self {
@@ -320,7 +339,7 @@ pub fn run_plugin_for_capability_with_registry(
     if is_capabilities_command {
         return normalize_capability_output(plugin_id, output);
     }
-    normalize_plugin_output(plugin_id, output)
+    normalize_plugin_output(plugin_id, required_capability, output)
 }
 
 fn supports_capability(manifest: &PluginManifest, required_capability: &str) -> bool {
@@ -580,7 +599,11 @@ fn validate_command_envelope_json(
             message: error.to_string(),
         }
     })?;
-    Ok(ValidatedEnvelope { stdout, status })
+    Ok(ValidatedEnvelope {
+        stdout,
+        status,
+        value,
+    })
 }
 
 fn validate_value_against_schema(
@@ -595,6 +618,7 @@ fn validate_value_against_schema(
 
 fn normalize_plugin_output(
     plugin_id: &str,
+    required_capability: &str,
     output: Output,
 ) -> Result<PluginRunOutcome, PluginExecutionError> {
     let exit_code = output.status.code().unwrap_or(3);
@@ -607,6 +631,7 @@ fn normalize_plugin_output(
     }
 
     if output.status.success() {
+        validate_success_data(plugin_id, required_capability, &envelope.value)?;
         return Ok(PluginRunOutcome {
             stdout: envelope.stdout,
             exit_code: 0,
@@ -618,6 +643,40 @@ fn normalize_plugin_output(
         status: exit_code,
         stderr: String::from_utf8_lossy(&output.stderr).to_string(),
     })
+}
+
+fn validate_success_data(
+    plugin_id: &str,
+    required_capability: &str,
+    envelope: &serde_json::Value,
+) -> Result<(), PluginExecutionError> {
+    let Some(schema_text) = capability_result_schema(required_capability) else {
+        return Ok(());
+    };
+    let data = envelope
+        .get("data")
+        .ok_or_else(|| PluginExecutionError::OutputInvalidData {
+            plugin_id: plugin_id.to_string(),
+            capability: required_capability.to_string(),
+            message: "successful envelope does not contain data".to_string(),
+        })?;
+    validate_value_against_schema(schema_text, data).map_err(|message| {
+        PluginExecutionError::OutputInvalidData {
+            plugin_id: plugin_id.to_string(),
+            capability: required_capability.to_string(),
+            message,
+        }
+    })
+}
+
+fn capability_result_schema(required_capability: &str) -> Option<&'static str> {
+    match required_capability {
+        "projection" => Some(include_str!("../../../schemas/layout-request.schema.json")),
+        "layout" => Some(include_str!("../../../schemas/layout-result.schema.json")),
+        "render" => Some(include_str!("../../../schemas/render-result.schema.json")),
+        "export" => Some(include_str!("../../../schemas/export-result.schema.json")),
+        _ => None,
+    }
 }
 
 fn normalize_capability_output(

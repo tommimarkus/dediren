@@ -1,3 +1,4 @@
+pub mod commands;
 pub mod io;
 pub mod plugins;
 pub mod quality;

@@ -46,7 +46,20 @@
         "id": { "type": "string" },
         "label": { "type": "string" },
         "members": { "type": "array", "items": { "type": "string" } },
-        "provenance": { "type": "object", "additionalProperties": true }
+        "provenance": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "semantic_backed": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["source_id"],
+              "properties": {
+                "source_id": { "type": "string" }
+              }
+            }
+          }
+        }
       }
     },
     "label": {

@@ -175,16 +175,14 @@ final class ElkLayoutEngine {
         return groups;
     }
 
-    private static String semanticBackedSourceId(Object provenance, String fallback) {
-        if (!(provenance instanceof Map<?, ?> provenanceMap)) {
+    private static String semanticBackedSourceId(
+        JsonContracts.GroupProvenance provenance,
+        String fallback) {
+        if (provenance == null || provenance.semantic_backed() == null) {
             return fallback;
         }
-        Object semanticBacked = provenanceMap.get("semantic_backed");
-        if (!(semanticBacked instanceof Map<?, ?> semanticBackedMap)) {
-            return fallback;
-        }
-        Object sourceId = semanticBackedMap.get("source_id");
-        return sourceId instanceof String sourceIdText ? sourceIdText : fallback;
+        String sourceId = provenance.semantic_backed().source_id();
+        return sourceId == null ? fallback : sourceId;
     }
 
     private static void validate(JsonContracts.LayoutRequest request) {
@@ -262,23 +260,12 @@ final class ElkLayoutEngine {
         }
     }
 
-    private static void validateProvenance(Object provenance, String path) {
-        if (!(provenance instanceof Map<?, ?> provenanceMap)) {
-            throw new IllegalArgumentException("value at " + path + " must be an object");
-        }
-
-        if (!provenanceMap.containsKey("semantic_backed")) {
+    private static void validateProvenance(JsonContracts.GroupProvenance provenance, String path) {
+        if (provenance.semantic_backed() == null) {
             return;
         }
-
-        Object semanticBacked = provenanceMap.get("semantic_backed");
         String semanticBackedPath = path + ".semantic_backed";
-        if (!(semanticBacked instanceof Map<?, ?> semanticBackedMap)) {
-            throw new IllegalArgumentException("value at " + semanticBackedPath + " must be an object");
-        }
-
-        Object sourceId = semanticBackedMap.get("source_id");
-        if (!(sourceId instanceof String)) {
+        if (provenance.semantic_backed().source_id() == null) {
             throw new IllegalArgumentException(
                 "required string value is missing at " + semanticBackedPath + ".source_id");
         }

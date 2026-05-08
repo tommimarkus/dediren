@@ -225,7 +225,7 @@ fn plugin_large_stderr_is_drained_while_running() {
     .expect("plugin output pipes should be drained while the plugin runs");
 
     assert_eq!(outcome.exit_code, 0);
-    assert!(outcome.stdout.contains("\"accepted\":true"));
+    assert!(outcome.stdout.contains("\"render_result_schema_version\""));
 }
 
 #[test]
@@ -257,7 +257,7 @@ fn plugin_large_stdout_is_drained_while_running() {
     .expect("plugin stdout should be drained while the plugin runs");
 
     assert_eq!(outcome.exit_code, 0);
-    assert!(outcome.stdout.contains("\"accepted\":true"));
+    assert!(outcome.stdout.contains("\"render_result_schema_version\""));
 }
 
 #[test]
@@ -295,6 +295,25 @@ fn invalid_success_envelope_is_structured() {
     assert_eq!(
         error.diagnostic().code,
         "DEDIREN_PLUGIN_OUTPUT_INVALID_ENVELOPE"
+    );
+}
+
+#[test]
+fn successful_plugin_data_must_match_capability_schema() {
+    let temp = TempDir::new().unwrap();
+    write_manifest(
+        temp.path(),
+        "runtime-testbed",
+        testbed_binary().to_str().unwrap(),
+        &["render"],
+    );
+
+    let error = run_with_mode(temp.path(), "invalid-data", "render", &["render"])
+        .expect_err("render plugins must return render-result data in successful envelopes");
+
+    assert_eq!(
+        error.diagnostic().code,
+        "DEDIREN_PLUGIN_OUTPUT_INVALID_DATA"
     );
 }
 

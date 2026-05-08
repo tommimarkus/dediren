@@ -4,7 +4,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
-import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 class ElkLayoutEngineTest {
@@ -56,7 +55,8 @@ class ElkLayoutEngineTest {
                 "group-1",
                 "Group",
                 List.of("client", "missing"),
-                Map.of("semantic_backed", Map.of("source_id", "system-group")))),
+                new JsonContracts.GroupProvenance(
+                    new JsonContracts.SemanticBacked("system-group")))),
             List.of(),
             List.of());
 

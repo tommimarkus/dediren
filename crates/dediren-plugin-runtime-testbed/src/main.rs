@@ -54,6 +54,7 @@ fn capabilities() -> anyhow_free_result::Result {
 }
 
 fn run_command() -> anyhow_free_result::Result {
+    let args: Vec<String> = std::env::args().collect();
     if mode().as_str() == "no-read-stdin" {
         std::thread::sleep(Duration::from_secs(2));
         return Ok(());
@@ -67,9 +68,9 @@ fn run_command() -> anyhow_free_result::Result {
             println!(
                 "{}",
                 serde_json::to_string(&CommandEnvelope::ok(serde_json::json!({
-                    "accepted": true,
-                    "input_length": input.len(),
-                    "padding": "x".repeat(1024 * 1024)
+                    "render_result_schema_version": "render-result.schema.v1",
+                    "artifact_kind": "svg",
+                    "content": "x".repeat(1024 * 1024)
                 })))
                 .unwrap()
             );
@@ -85,6 +86,17 @@ fn run_command() -> anyhow_free_result::Result {
         }
         "invalid-envelope" => {
             println!(r#"{{"status":"ok"}}"#);
+            return Ok(());
+        }
+        "invalid-data" => {
+            println!(
+                "{}",
+                serde_json::to_string(&CommandEnvelope::ok(serde_json::json!({
+                    "accepted": true,
+                    "input_length": input.len()
+                })))
+                .unwrap()
+            );
             return Ok(());
         }
         "leak-stdout-child" => {
@@ -103,13 +115,36 @@ fn run_command() -> anyhow_free_result::Result {
 
     println!(
         "{}",
-        serde_json::to_string(&CommandEnvelope::ok(serde_json::json!({
-            "accepted": true,
-            "input_length": input.len()
-        })))
-        .unwrap()
+        serde_json::to_string(&CommandEnvelope::ok(success_data(&args, input.len()))).unwrap()
     );
     Ok(())
+}
+
+fn success_data(args: &[String], input_length: usize) -> serde_json::Value {
+    match args.get(1).map(String::as_str) {
+        Some("render") => serde_json::json!({
+            "render_result_schema_version": "render-result.schema.v1",
+            "artifact_kind": "svg",
+            "content": format!("<svg data-input-length=\"{input_length}\"></svg>")
+        }),
+        Some("layout") => serde_json::json!({
+            "layout_result_schema_version": "layout-result.schema.v1",
+            "view_id": "test",
+            "nodes": [],
+            "edges": [],
+            "groups": [],
+            "warnings": []
+        }),
+        Some("export") => serde_json::json!({
+            "export_result_schema_version": "export-result.schema.v1",
+            "artifact_kind": "archimate-oef+xml",
+            "content": "<model></model>"
+        }),
+        _ => serde_json::json!({
+            "accepted": true,
+            "input_length": input_length
+        }),
+    }
 }
 
 fn print_error_envelope() {
