@@ -1,9 +1,15 @@
 use std::io::{Read, Write};
+use std::process::{Command, Stdio};
 use std::time::Duration;
 
 use dediren_contracts::{CommandEnvelope, Diagnostic, DiagnosticSeverity, PLUGIN_PROTOCOL_VERSION};
 
 fn main() -> anyhow_free_result::Result {
+    if std::env::var_os("DEDIREN_TEST_PLUGIN_PIPE_LEAK_CHILD").is_some() {
+        std::thread::sleep(Duration::from_secs(2));
+        return Ok(());
+    }
+
     let args: Vec<String> = std::env::args().collect();
     match args.get(1).map(String::as_str) {
         Some("capabilities") => capabilities(),
@@ -81,21 +87,17 @@ fn run_command() -> anyhow_free_result::Result {
             println!(r#"{{"status":"ok"}}"#);
             return Ok(());
         }
+        "leak-stdout-child" => {
+            spawn_pipe_leak_child()?;
+            std::thread::sleep(Duration::from_secs(2));
+        }
         "error-envelope" => {
-            let diagnostic = Diagnostic {
-                code: "DEDIREN_TESTBED_ERROR".to_string(),
-                severity: DiagnosticSeverity::Error,
-                message: "fixture plugin returned a structured error".to_string(),
-                path: Some("$.testbed".to_string()),
-            };
-            println!(
-                "{}",
-                serde_json::to_string(&CommandEnvelope::<serde_json::Value>::error(vec![
-                    diagnostic
-                ]))
-                .unwrap()
-            );
+            print_error_envelope();
             std::process::exit(3);
+        }
+        "error-envelope-zero" => {
+            print_error_envelope();
+            return Ok(());
         }
         _ => {}
     }
@@ -108,6 +110,32 @@ fn run_command() -> anyhow_free_result::Result {
         })))
         .unwrap()
     );
+    Ok(())
+}
+
+fn print_error_envelope() {
+    let diagnostic = Diagnostic {
+        code: "DEDIREN_TESTBED_ERROR".to_string(),
+        severity: DiagnosticSeverity::Error,
+        message: "fixture plugin returned a structured error".to_string(),
+        path: Some("$.testbed".to_string()),
+    };
+    println!(
+        "{}",
+        serde_json::to_string(&CommandEnvelope::<serde_json::Value>::error(vec![
+            diagnostic
+        ]))
+        .unwrap()
+    );
+}
+
+fn spawn_pipe_leak_child() -> anyhow_free_result::Result {
+    Command::new(std::env::current_exe()?)
+        .env("DEDIREN_TEST_PLUGIN_PIPE_LEAK_CHILD", "1")
+        .stdin(Stdio::null())
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
+        .spawn()?;
     Ok(())
 }
 

@@ -378,7 +378,6 @@ fn run_executable_with_timeout(
         if Instant::now() >= deadline {
             let _ = child.kill();
             let _ = child.wait();
-            join_io_threads_after_timeout(stdin_thread, stdout_thread, stderr_thread);
             return Err(PluginExecutionError::Timeout {
                 plugin_id: plugin_id.to_string(),
                 timeout_ms: options.timeout.as_millis(),
@@ -439,22 +438,6 @@ fn join_pipe_thread(
                 message: error.to_string(),
             }),
         None => Ok(Vec::new()),
-    }
-}
-
-fn join_io_threads_after_timeout(
-    stdin_thread: Option<JoinHandle<std::io::Result<()>>>,
-    stdout_thread: Option<JoinHandle<std::io::Result<Vec<u8>>>>,
-    stderr_thread: Option<JoinHandle<std::io::Result<Vec<u8>>>>,
-) {
-    if let Some(thread) = stdin_thread {
-        let _ = thread.join();
-    }
-    if let Some(thread) = stdout_thread {
-        let _ = thread.join();
-    }
-    if let Some(thread) = stderr_thread {
-        let _ = thread.join();
     }
 }
 
@@ -574,17 +557,17 @@ fn normalize_plugin_output(
 ) -> Result<PluginRunOutcome, PluginExecutionError> {
     let exit_code = output.status.code().unwrap_or(3);
     let envelope = validate_command_envelope_json(plugin_id, &output.stdout)?;
+    if envelope.status == "error" {
+        return Ok(PluginRunOutcome {
+            stdout: envelope.stdout,
+            exit_code: if exit_code == 0 { 3 } else { exit_code },
+        });
+    }
+
     if output.status.success() {
         return Ok(PluginRunOutcome {
             stdout: envelope.stdout,
             exit_code: 0,
-        });
-    }
-
-    if envelope.status == "error" {
-        return Ok(PluginRunOutcome {
-            stdout: envelope.stdout,
-            exit_code,
         });
     }
 

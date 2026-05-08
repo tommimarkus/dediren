@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use dediren_core::plugins::{
     run_plugin, run_plugin_for_capability_with_registry, PluginExecutionError, PluginRegistry,
@@ -125,6 +125,43 @@ fn plugin_timeout_is_structured() {
     .expect_err("slow plugin should time out");
 
     assert_eq!(error.diagnostic().code, "DEDIREN_PLUGIN_TIMEOUT");
+}
+
+#[test]
+fn plugin_timeout_does_not_wait_for_inherited_pipe_descendant() {
+    let temp = TempDir::new().unwrap();
+    write_manifest(
+        temp.path(),
+        "runtime-testbed",
+        testbed_binary().to_str().unwrap(),
+        &["render"],
+    );
+
+    let mut options = PluginRunOptions::default();
+    options.timeout = Duration::from_millis(50);
+    options.allowed_env.push((
+        "DEDIREN_TEST_PLUGIN_MODE".to_string(),
+        "leak-stdout-child".to_string(),
+    ));
+
+    let registry = PluginRegistry::from_dirs(vec![temp.path().to_path_buf()]);
+    let started = Instant::now();
+    let error = run_plugin_for_capability_with_registry(
+        &registry,
+        "runtime-testbed",
+        "render",
+        &["render"],
+        "{}",
+        options,
+    )
+    .expect_err("plugin with inherited pipe descendant should time out");
+    let elapsed = started.elapsed();
+
+    assert_eq!(error.diagnostic().code, "DEDIREN_PLUGIN_TIMEOUT");
+    assert!(
+        elapsed < Duration::from_millis(750),
+        "timeout cleanup waited for inherited pipe handles for {elapsed:?}"
+    );
 }
 
 #[test]
@@ -272,6 +309,23 @@ fn structured_plugin_error_envelope_is_preserved() {
     );
 
     let outcome = run_with_mode(temp.path(), "error-envelope", "render", &["render"])
+        .expect("valid error envelope should be returned to the CLI");
+
+    assert_eq!(outcome.exit_code, 3);
+    assert!(outcome.stdout.contains("DEDIREN_TESTBED_ERROR"));
+}
+
+#[test]
+fn error_envelope_with_zero_exit_is_reported_nonzero() {
+    let temp = TempDir::new().unwrap();
+    write_manifest(
+        temp.path(),
+        "runtime-testbed",
+        testbed_binary().to_str().unwrap(),
+        &["render"],
+    );
+
+    let outcome = run_with_mode(temp.path(), "error-envelope-zero", "render", &["render"])
         .expect("valid error envelope should be returned to the CLI");
 
     assert_eq!(outcome.exit_code, 3);
