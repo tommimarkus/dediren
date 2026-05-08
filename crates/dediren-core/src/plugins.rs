@@ -191,7 +191,10 @@ pub fn run_plugin_with_options(
     input: &str,
     options: PluginRunOptions,
 ) -> anyhow::Result<String> {
-    let required_capability = args.first().copied().unwrap_or("capability");
+    let required_capability = args
+        .first()
+        .map(|command| legacy_command_capability(command))
+        .unwrap_or("capability");
     let outcome = run_plugin_for_capability_with_options(
         plugin_id,
         required_capability,
@@ -207,6 +210,16 @@ pub fn run_plugin_with_options(
             outcome.exit_code,
             outcome.stdout
         ))
+    }
+}
+
+fn legacy_command_capability(command: &str) -> &str {
+    match command {
+        "project" => "projection",
+        "layout" => "layout",
+        "render" => "render",
+        "export" => "export",
+        unknown => unknown,
     }
 }
 
