@@ -11,6 +11,10 @@ fn first_party_plugins_report_capabilities() {
         ),
         ("dediren-plugin-elk-layout", "dediren-plugin-elk-layout"),
         ("dediren-plugin-svg-render", "dediren-plugin-svg-render"),
+        (
+            "dediren-plugin-archimate-oef-export",
+            "dediren-plugin-archimate-oef-export",
+        ),
     ] {
         let mut cmd = Command::new(workspace_binary(binary.0, binary.1));
         cmd.arg("capabilities");

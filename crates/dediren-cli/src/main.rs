@@ -42,6 +42,16 @@ enum Commands {
         #[arg(long)]
         input: Option<String>,
     },
+    Export {
+        #[arg(long)]
+        plugin: String,
+        #[arg(long)]
+        policy: String,
+        #[arg(long)]
+        source: String,
+        #[arg(long)]
+        layout: String,
+    },
 }
 
 fn main() -> anyhow::Result<()> {
@@ -109,6 +119,35 @@ fn main() -> anyhow::Result<()> {
                 &plugin,
                 &["render"],
                 &serde_json::to_string(&render_input)?,
+            ))
+        }
+        Some(Commands::Export {
+            plugin,
+            policy,
+            source,
+            layout,
+        }) => {
+            let source_text = std::fs::read_to_string(source)?;
+            let policy_text = std::fs::read_to_string(policy)?;
+            let layout_text = std::fs::read_to_string(layout)?;
+
+            let source_doc: dediren_contracts::SourceDocument = serde_json::from_str(&source_text)?;
+            let layout_result: dediren_contracts::LayoutResult =
+                dediren_core::io::parse_command_data(&layout_text)?;
+            let policy: dediren_contracts::OefExportPolicy = serde_json::from_str(&policy_text)?;
+
+            let export_input = dediren_contracts::OefExportInput {
+                export_request_schema_version: dediren_contracts::EXPORT_REQUEST_SCHEMA_VERSION
+                    .to_string(),
+                source: source_doc,
+                layout_result,
+                policy,
+            };
+
+            print_plugin_result(dediren_core::plugins::run_plugin(
+                &plugin,
+                &["export"],
+                &serde_json::to_string(&export_input)?,
             ))
         }
         None => {
