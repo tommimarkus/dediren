@@ -66,13 +66,33 @@ reserved for human debugging and is not required for repair loops.
 
 ## ELK Runtime
 
-The bundled ELK layout plugin is an external-process adapter. In production it
-expects `DEDIREN_ELK_COMMAND` to be configured as a command line that reads a
-layout request JSON document from stdin. The command may return either a raw
-`layout-result.schema.v1` JSON document or a JSON command envelope whose `.data`
-is a layout result. Valid external error envelopes are preserved and returned
-with a non-zero exit status.
+The bundled `elk-layout` plugin is a Rust external-process adapter. The real ELK
+layered runtime is a Java helper under
+`crates/dediren-plugin-elk-layout/java` and is built with SDKMAN-managed Java and
+Gradle.
 
-Tests use `DEDIREN_ELK_RESULT_FIXTURE` to exercise the plugin contract without
-requiring a Java runtime. Fixture mode takes precedence over
+```bash
+source "$HOME/.sdkman/bin/sdkman-init.sh"
+cd crates/dediren-plugin-elk-layout/java
+sdk env install
+sdk env
+cd ../../..
+crates/dediren-plugin-elk-layout/java/scripts/build-elk-layout.sh
+DEDIREN_ELK_COMMAND=crates/dediren-plugin-elk-layout/java/scripts/elk-layout.sh \
+  dediren layout --plugin elk-layout --input fixtures/layout-request/basic.json
+```
+
+The runtime wrapper requires SDKMAN. When plugin execution starts with a minimal
+environment that clears `HOME`, it resolves `HOME` through the current Linux
+user account before loading SDKMAN.
+
+The Java helper reads a `layout-request.schema.v1` document from stdin and
+returns a JSON command envelope whose `.data` is a `layout-result.schema.v1`
+document. The helper uses Eclipse ELK Layered (`org.eclipse.elk.layered`) and
+the Gradle build pins Maven dependencies through dependency locking.
+
+Tests may still use `DEDIREN_ELK_RESULT_FIXTURE` to exercise the Rust plugin
+contract without Java. Fixture mode takes precedence over
 `DEDIREN_ELK_COMMAND` for deterministic compatibility tests.
+Real Java helper integration tests are ignored by default and require building
+the helper before running ignored tests.
