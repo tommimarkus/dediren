@@ -138,6 +138,23 @@ fn elk_plugin_accepts_fixture_runtime_output() {
         .stdout(predicate::str::contains("\"projection_id\":\"client\""));
 }
 
+#[test]
+#[ignore = "requires SDKMAN Java helper build"]
+fn elk_plugin_invokes_real_java_helper() {
+    let input =
+        std::fs::read_to_string(workspace_file("fixtures/layout-request/basic.json")).unwrap();
+    let helper = workspace_file("crates/dediren-plugin-elk-layout/java/scripts/elk-layout.sh");
+    let mut cmd = Command::cargo_bin("dediren-plugin-elk-layout").unwrap();
+    cmd.env("DEDIREN_ELK_COMMAND", helper)
+        .arg("layout")
+        .write_stdin(input);
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains("\"status\":\"ok\""))
+        .stdout(predicate::str::contains("\"layout_result_schema_version\""))
+        .stdout(predicate::str::contains("\"client-calls-api\""));
+}
+
 fn workspace_file(path: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../..")

@@ -43,6 +43,25 @@ fn layout_invokes_elk_plugin_with_external_command() {
 }
 
 #[test]
+#[ignore = "requires SDKMAN Java helper build"]
+fn layout_invokes_real_java_elk_helper() {
+    let plugin = workspace_binary("dediren-plugin-elk-layout", "dediren-plugin-elk-layout");
+    let helper = workspace_file("crates/dediren-plugin-elk-layout/java/scripts/elk-layout.sh");
+    let mut cmd = Command::cargo_bin("dediren").unwrap();
+    cmd.current_dir(workspace_root())
+        .env("DEDIREN_PLUGIN_ELK_LAYOUT", plugin)
+        .env("DEDIREN_PLUGIN_DIRS", workspace_file("fixtures/plugins"))
+        .env("DEDIREN_ELK_COMMAND", helper)
+        .args(["layout", "--plugin", "elk-layout", "--input"])
+        .arg(workspace_file("fixtures/layout-request/basic.json"));
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains("\"status\":\"ok\""))
+        .stdout(predicate::str::contains("\"layout_result_schema_version\""))
+        .stdout(predicate::str::contains("\"client-calls-api\""));
+}
+
+#[test]
 fn validate_layout_reports_quality() {
     let mut cmd = Command::cargo_bin("dediren").unwrap();
     cmd.arg("validate-layout")
