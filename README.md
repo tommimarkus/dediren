@@ -67,6 +67,12 @@ reserved for human debugging and is not required for repair loops.
 ## ELK Runtime
 
 The bundled ELK layout plugin is an external-process adapter. In production it
-expects an ELK executable or JAR to be configured. Tests use
-`DEDIREN_ELK_RESULT_FIXTURE` to exercise the plugin contract without requiring a
-Java runtime.
+expects `DEDIREN_ELK_COMMAND` to be configured as a command line that reads a
+layout request JSON document from stdin. The command may return either a raw
+`layout-result.schema.v1` JSON document or a JSON command envelope whose `.data`
+is a layout result. Valid external error envelopes are preserved and returned
+with a non-zero exit status.
+
+Tests use `DEDIREN_ELK_RESULT_FIXTURE` to exercise the plugin contract without
+requiring a Java runtime. Fixture mode takes precedence over
+`DEDIREN_ELK_COMMAND` for deterministic compatibility tests.
