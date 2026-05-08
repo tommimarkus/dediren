@@ -1,7 +1,8 @@
 use dediren_contracts::{Diagnostic, DiagnosticSeverity, PluginManifest, RuntimeCapabilities};
-use std::io::{Read, Write};
+use std::io::{ErrorKind, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
+use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
 #[derive(Debug, Clone)]
@@ -160,7 +161,21 @@ impl PluginRegistry {
                         plugin_id: plugin_id.to_string(),
                         message: error.to_string(),
                     })?;
-                let manifest: PluginManifest = serde_json::from_str(&text).map_err(|error| {
+                let value: serde_json::Value = serde_json::from_str(&text).map_err(|error| {
+                    PluginExecutionError::ManifestInvalid {
+                        plugin_id: plugin_id.to_string(),
+                        message: error.to_string(),
+                    }
+                })?;
+                validate_value_against_schema(
+                    include_str!("../../../schemas/plugin-manifest.schema.json"),
+                    &value,
+                )
+                .map_err(|message| PluginExecutionError::ManifestInvalid {
+                    plugin_id: plugin_id.to_string(),
+                    message,
+                })?;
+                let manifest: PluginManifest = serde_json::from_value(value).map_err(|error| {
                     PluginExecutionError::ManifestInvalid {
                         plugin_id: plugin_id.to_string(),
                         message: error.to_string(),
@@ -215,6 +230,7 @@ pub fn run_plugin_with_options(
 
 fn legacy_command_capability(command: &str) -> &str {
     match command {
+        "capabilities" => "capability",
         "project" => "projection",
         "layout" => "layout",
         "render" => "render",
@@ -265,7 +281,8 @@ pub fn run_plugin_for_capability_with_registry(
     options: PluginRunOptions,
 ) -> Result<PluginRunOutcome, PluginExecutionError> {
     let loaded = registry.load_manifest_with_path(plugin_id)?;
-    if !supports_capability(&loaded.manifest, required_capability) {
+    let is_capabilities_command = args.first().copied() == Some("capabilities");
+    if !is_capabilities_command && !supports_capability(&loaded.manifest, required_capability) {
         return Err(PluginExecutionError::UnsupportedCapability {
             plugin_id: plugin_id.to_string(),
             capability: required_capability.to_string(),
@@ -287,10 +304,11 @@ pub fn run_plugin_for_capability_with_registry(
             runtime_id: capabilities.id,
         });
     }
-    if !capabilities
-        .capabilities
-        .iter()
-        .any(|capability| capability == required_capability)
+    if !is_capabilities_command
+        && !capabilities
+            .capabilities
+            .iter()
+            .any(|capability| capability == required_capability)
     {
         return Err(PluginExecutionError::UnsupportedCapability {
             plugin_id: plugin_id.to_string(),
@@ -299,6 +317,9 @@ pub fn run_plugin_for_capability_with_registry(
     }
 
     let output = run_executable_with_timeout(plugin_id, &executable, args, input, &options)?;
+    if is_capabilities_command {
+        return normalize_capability_output(plugin_id, output);
+    }
     normalize_plugin_output(plugin_id, output)
 }
 
@@ -316,6 +337,7 @@ fn run_executable_with_timeout(
     input: &str,
     options: &PluginRunOptions,
 ) -> Result<Output, PluginExecutionError> {
+    let deadline = Instant::now() + options.timeout;
     let mut child = Command::new(executable)
         .args(args)
         .env_clear()
@@ -329,17 +351,23 @@ fn run_executable_with_timeout(
             message: error.to_string(),
         })?;
 
-    if let Some(stdin) = child.stdin.as_mut() {
-        stdin
-            .write_all(input.as_bytes())
-            .map_err(|error| PluginExecutionError::Io {
-                plugin_id: plugin_id.to_string(),
-                message: error.to_string(),
-            })?;
-    }
-    drop(child.stdin.take());
+    let stdin_thread = child.stdin.take().map(|mut stdin| {
+        let input = input.as_bytes().to_vec();
+        std::thread::spawn(move || match stdin.write_all(&input) {
+            Ok(()) => Ok(()),
+            Err(error) if error.kind() == ErrorKind::BrokenPipe => Ok(()),
+            Err(error) => Err(error),
+        })
+    });
+    let stdout_thread = child
+        .stdout
+        .take()
+        .map(|stdout| std::thread::spawn(move || read_pipe_to_end(stdout)));
+    let stderr_thread = child
+        .stderr
+        .take()
+        .map(|stderr| std::thread::spawn(move || read_pipe_to_end(stderr)));
 
-    let deadline = Instant::now() + options.timeout;
     let status = loop {
         if let Some(status) = child.try_wait().map_err(|error| PluginExecutionError::Io {
             plugin_id: plugin_id.to_string(),
@@ -350,6 +378,7 @@ fn run_executable_with_timeout(
         if Instant::now() >= deadline {
             let _ = child.kill();
             let _ = child.wait();
+            join_io_threads_after_timeout(stdin_thread, stdout_thread, stderr_thread);
             return Err(PluginExecutionError::Timeout {
                 plugin_id: plugin_id.to_string(),
                 timeout_ms: options.timeout.as_millis(),
@@ -358,28 +387,75 @@ fn run_executable_with_timeout(
         std::thread::sleep(Duration::from_millis(10));
     };
 
-    let mut stdout = Vec::new();
-    if let Some(mut pipe) = child.stdout.take() {
-        pipe.read_to_end(&mut stdout)
-            .map_err(|error| PluginExecutionError::Io {
-                plugin_id: plugin_id.to_string(),
-                message: error.to_string(),
-            })?;
-    }
-    let mut stderr = Vec::new();
-    if let Some(mut pipe) = child.stderr.take() {
-        pipe.read_to_end(&mut stderr)
-            .map_err(|error| PluginExecutionError::Io {
-                plugin_id: plugin_id.to_string(),
-                message: error.to_string(),
-            })?;
-    }
+    join_stdin_thread(plugin_id, stdin_thread)?;
+    let stdout = join_pipe_thread(plugin_id, stdout_thread)?;
+    let stderr = join_pipe_thread(plugin_id, stderr_thread)?;
 
     Ok(Output {
         status,
         stdout,
         stderr,
     })
+}
+
+fn read_pipe_to_end<R: Read>(mut pipe: R) -> std::io::Result<Vec<u8>> {
+    let mut output = Vec::new();
+    pipe.read_to_end(&mut output)?;
+    Ok(output)
+}
+
+fn join_stdin_thread(
+    plugin_id: &str,
+    thread: Option<JoinHandle<std::io::Result<()>>>,
+) -> Result<(), PluginExecutionError> {
+    match thread {
+        Some(thread) => thread
+            .join()
+            .map_err(|_| PluginExecutionError::Io {
+                plugin_id: plugin_id.to_string(),
+                message: "stdin writer thread panicked".to_string(),
+            })?
+            .map_err(|error| PluginExecutionError::Io {
+                plugin_id: plugin_id.to_string(),
+                message: error.to_string(),
+            }),
+        None => Ok(()),
+    }
+}
+
+fn join_pipe_thread(
+    plugin_id: &str,
+    thread: Option<JoinHandle<std::io::Result<Vec<u8>>>>,
+) -> Result<Vec<u8>, PluginExecutionError> {
+    match thread {
+        Some(thread) => thread
+            .join()
+            .map_err(|_| PluginExecutionError::Io {
+                plugin_id: plugin_id.to_string(),
+                message: "pipe reader thread panicked".to_string(),
+            })?
+            .map_err(|error| PluginExecutionError::Io {
+                plugin_id: plugin_id.to_string(),
+                message: error.to_string(),
+            }),
+        None => Ok(Vec::new()),
+    }
+}
+
+fn join_io_threads_after_timeout(
+    stdin_thread: Option<JoinHandle<std::io::Result<()>>>,
+    stdout_thread: Option<JoinHandle<std::io::Result<Vec<u8>>>>,
+    stderr_thread: Option<JoinHandle<std::io::Result<Vec<u8>>>>,
+) {
+    if let Some(thread) = stdin_thread {
+        let _ = thread.join();
+    }
+    if let Some(thread) = stdout_thread {
+        let _ = thread.join();
+    }
+    if let Some(thread) = stderr_thread {
+        let _ = thread.join();
+    }
 }
 
 fn executable_path(loaded: &LoadedPluginManifest) -> Result<PathBuf, PluginExecutionError> {
@@ -516,5 +592,28 @@ fn normalize_plugin_output(
         plugin_id: plugin_id.to_string(),
         status: exit_code,
         stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+    })
+}
+
+fn normalize_capability_output(
+    plugin_id: &str,
+    output: Output,
+) -> Result<PluginRunOutcome, PluginExecutionError> {
+    if !output.status.success() {
+        return Err(PluginExecutionError::CapabilityProbeFailed {
+            plugin_id: plugin_id.to_string(),
+            message: String::from_utf8_lossy(&output.stderr).to_string(),
+        });
+    }
+    validate_runtime_capabilities_json(plugin_id, &output.stdout)?;
+    let stdout = String::from_utf8(output.stdout).map_err(|error| {
+        PluginExecutionError::CapabilityInvalidJson {
+            plugin_id: plugin_id.to_string(),
+            message: error.to_string(),
+        }
+    })?;
+    Ok(PluginRunOutcome {
+        stdout,
+        exit_code: 0,
     })
 }

@@ -3,7 +3,8 @@ use std::process::Command;
 use std::time::Duration;
 
 use dediren_core::plugins::{
-    run_plugin_for_capability_with_registry, PluginExecutionError, PluginRegistry, PluginRunOptions,
+    run_plugin, run_plugin_for_capability_with_registry, PluginExecutionError, PluginRegistry,
+    PluginRunOptions,
 };
 use tempfile::TempDir;
 
@@ -127,6 +128,102 @@ fn plugin_timeout_is_structured() {
 }
 
 #[test]
+fn plugin_that_never_reads_large_stdin_times_out() {
+    let temp = TempDir::new().unwrap();
+    write_manifest(
+        temp.path(),
+        "runtime-testbed",
+        testbed_binary().to_str().unwrap(),
+        &["render"],
+    );
+
+    let mut options = PluginRunOptions::default();
+    options.timeout = Duration::from_millis(50);
+    options.allowed_env.push((
+        "DEDIREN_TEST_PLUGIN_MODE".to_string(),
+        "no-read-stdin".to_string(),
+    ));
+
+    let registry = PluginRegistry::from_dirs(vec![temp.path().to_path_buf()]);
+    let input = "x".repeat(1024 * 1024);
+    let error = run_plugin_for_capability_with_registry(
+        &registry,
+        "runtime-testbed",
+        "render",
+        &["render"],
+        &input,
+        options,
+    )
+    .expect_err("plugin that does not read stdin should time out");
+
+    assert_eq!(error.diagnostic().code, "DEDIREN_PLUGIN_TIMEOUT");
+}
+
+#[test]
+fn plugin_large_stderr_is_drained_while_running() {
+    let temp = TempDir::new().unwrap();
+    write_manifest(
+        temp.path(),
+        "runtime-testbed",
+        testbed_binary().to_str().unwrap(),
+        &["render"],
+    );
+
+    let mut options = PluginRunOptions::default();
+    options.timeout = Duration::from_secs(1);
+    options.allowed_env.push((
+        "DEDIREN_TEST_PLUGIN_MODE".to_string(),
+        "large-output".to_string(),
+    ));
+
+    let registry = PluginRegistry::from_dirs(vec![temp.path().to_path_buf()]);
+    let outcome = run_plugin_for_capability_with_registry(
+        &registry,
+        "runtime-testbed",
+        "render",
+        &["render"],
+        "{}",
+        options,
+    )
+    .expect("plugin output pipes should be drained while the plugin runs");
+
+    assert_eq!(outcome.exit_code, 0);
+    assert!(outcome.stdout.contains("\"accepted\":true"));
+}
+
+#[test]
+fn plugin_large_stdout_is_drained_while_running() {
+    let temp = TempDir::new().unwrap();
+    write_manifest(
+        temp.path(),
+        "runtime-testbed",
+        testbed_binary().to_str().unwrap(),
+        &["render"],
+    );
+
+    let mut options = PluginRunOptions::default();
+    options.timeout = Duration::from_secs(1);
+    options.allowed_env.push((
+        "DEDIREN_TEST_PLUGIN_MODE".to_string(),
+        "large-stdout".to_string(),
+    ));
+
+    let registry = PluginRegistry::from_dirs(vec![temp.path().to_path_buf()]);
+    let outcome = run_plugin_for_capability_with_registry(
+        &registry,
+        "runtime-testbed",
+        "render",
+        &["render"],
+        "{}",
+        options,
+    )
+    .expect("plugin stdout should be drained while the plugin runs");
+
+    assert_eq!(outcome.exit_code, 0);
+    assert!(outcome.stdout.contains("\"accepted\":true"));
+}
+
+#[test]
 fn invalid_success_output_is_structured() {
     let temp = TempDir::new().unwrap();
     write_manifest(
@@ -181,6 +278,51 @@ fn structured_plugin_error_envelope_is_preserved() {
     assert!(outcome.stdout.contains("DEDIREN_TESTBED_ERROR"));
 }
 
+#[test]
+fn legacy_capabilities_command_bypasses_command_capability_requirement() {
+    let temp = TempDir::new().unwrap();
+    write_manifest(
+        temp.path(),
+        "runtime-testbed",
+        testbed_binary().to_str().unwrap(),
+        &["render"],
+    );
+
+    let plugin_dirs = std::env::join_paths([temp.path()]).unwrap();
+    let previous = std::env::var_os("DEDIREN_PLUGIN_DIRS");
+    std::env::set_var("DEDIREN_PLUGIN_DIRS", &plugin_dirs);
+    let result = run_plugin("runtime-testbed", &["capabilities"], "");
+    match previous {
+        Some(value) => std::env::set_var("DEDIREN_PLUGIN_DIRS", value),
+        None => std::env::remove_var("DEDIREN_PLUGIN_DIRS"),
+    }
+
+    let output = result.expect("legacy capabilities command should remain supported");
+    assert!(output.contains("\"capabilities\""));
+}
+
+#[test]
+fn manifest_schema_validation_rejects_wrong_schema_version() {
+    let temp = TempDir::new().unwrap();
+    let manifest = serde_json::json!({
+        "plugin_manifest_schema_version": "plugin-manifest.schema.v2",
+        "id": "runtime-testbed",
+        "version": "0.1.0",
+        "executable": testbed_binary(),
+        "capabilities": ["render"]
+    });
+    std::fs::write(
+        temp.path().join("runtime-testbed.manifest.json"),
+        serde_json::to_string_pretty(&manifest).unwrap(),
+    )
+    .unwrap();
+
+    let error = run_with_mode(temp.path(), "ok", "render", &["render"])
+        .expect_err("manifest schema violations should fail before execution");
+
+    assert_eq!(error.diagnostic().code, "DEDIREN_PLUGIN_MANIFEST_INVALID");
+}
+
 fn run_with_mode(
     manifest_dir: &Path,
     mode: &str,
@@ -203,18 +345,16 @@ fn run_with_mode(
 }
 
 fn write_manifest(dir: &Path, id: &str, executable: &str, capabilities: &[&str]) {
-    let capabilities_json = serde_json::to_string(capabilities).unwrap();
+    let manifest = serde_json::json!({
+        "plugin_manifest_schema_version": "plugin-manifest.schema.v1",
+        "id": id,
+        "version": "0.1.0",
+        "executable": executable,
+        "capabilities": capabilities
+    });
     std::fs::write(
         dir.join(format!("{id}.manifest.json")),
-        format!(
-            r#"{{
-  "plugin_manifest_schema_version": "plugin-manifest.schema.v1",
-  "id": "{id}",
-  "version": "0.1.0",
-  "executable": "{executable}",
-  "capabilities": {capabilities_json}
-}}"#
-        ),
+        serde_json::to_string_pretty(&manifest).unwrap(),
     )
     .unwrap();
 }

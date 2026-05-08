@@ -1,4 +1,4 @@
-use std::io::Read;
+use std::io::{Read, Write};
 use std::time::Duration;
 
 use dediren_contracts::{CommandEnvelope, Diagnostic, DiagnosticSeverity, PLUGIN_PROTOCOL_VERSION};
@@ -48,10 +48,31 @@ fn capabilities() -> anyhow_free_result::Result {
 }
 
 fn run_command() -> anyhow_free_result::Result {
+    if mode().as_str() == "no-read-stdin" {
+        std::thread::sleep(Duration::from_secs(2));
+        return Ok(());
+    }
+
     let mut input = String::new();
     std::io::stdin().read_to_string(&mut input).unwrap();
     match mode().as_str() {
         "sleep" => std::thread::sleep(Duration::from_secs(2)),
+        "large-stdout" => {
+            println!(
+                "{}",
+                serde_json::to_string(&CommandEnvelope::ok(serde_json::json!({
+                    "accepted": true,
+                    "input_length": input.len(),
+                    "padding": "x".repeat(1024 * 1024)
+                })))
+                .unwrap()
+            );
+            return Ok(());
+        }
+        "large-output" => {
+            let noise = vec![b'x'; 1024 * 1024];
+            std::io::stderr().write_all(&noise).unwrap();
+        }
         "invalid-json" => {
             println!("not-json");
             return Ok(());
