@@ -79,7 +79,7 @@ Update `.gitignore` to this complete content:
 
 ```gitignore
 /target/
-/.cache/
+/.cache/gradle/
 crates/dediren-plugin-elk-layout/java/.gradle/
 crates/dediren-plugin-elk-layout/java/build/
 **/*.svg
@@ -203,7 +203,7 @@ Run:
 crates/dediren-plugin-elk-layout/java/scripts/build-elk-layout.sh
 ```
 
-Expected: FAIL with a Gradle compile or application main-class error because `dev.dediren.elk.Main` does not exist yet.
+Expected: PASS or NO-SOURCE for the empty Java skeleton. Gradle does not require the configured application main class until Java sources are present, so the real compile check begins in Task 2.
 
 - [ ] **Step 10: Commit the skeleton**
 
