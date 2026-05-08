@@ -6,6 +6,7 @@ members = [
   "crates/dediren-plugin-generic-graph",
   "crates/dediren-plugin-elk-layout",
   "crates/dediren-plugin-svg-render",
+  "crates/dediren-plugin-archimate-oef-export",
 ]
 resolver = "2"
 

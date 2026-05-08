@@ -174,6 +174,7 @@ fn bundled_plugin_manifests_match_schema() {
         "fixtures/plugins/generic-graph.manifest.json",
         "fixtures/plugins/elk-layout.manifest.json",
         "fixtures/plugins/svg-render.manifest.json",
+        "fixtures/plugins/archimate-oef.manifest.json",
     ] {
         assert_valid("schemas/plugin-manifest.schema.json", path);
     }
