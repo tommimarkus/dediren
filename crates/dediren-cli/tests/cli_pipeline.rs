@@ -3,7 +3,7 @@ use assert_fs::prelude::*;
 use std::path::PathBuf;
 
 #[test]
-fn full_pipeline_produces_svg() {
+fn full_pipeline_produces_svg_and_oef() {
     let temp = assert_fs::TempDir::new().unwrap();
     let request = temp.child("request.json");
     let result = temp.child("result.json");
@@ -14,6 +14,10 @@ fn full_pipeline_produces_svg() {
     );
     let elk_plugin = workspace_binary("dediren-plugin-elk-layout", "dediren-plugin-elk-layout");
     let svg_plugin = workspace_binary("dediren-plugin-svg-render", "dediren-plugin-svg-render");
+    let oef_plugin = workspace_binary(
+        "dediren-plugin-archimate-oef-export",
+        "dediren-plugin-archimate-oef-export",
+    );
     let elk_fixture = workspace_file("fixtures/layout-result/basic.json");
 
     let project_output = Command::cargo_bin("dediren")
@@ -84,6 +88,34 @@ fn full_pipeline_produces_svg() {
     assert!(svg_text.contains("<svg"));
     assert!(svg_text.contains("Client"));
     assert!(svg_text.contains("API"));
+
+    let export_output = Command::cargo_bin("dediren")
+        .unwrap()
+        .current_dir(workspace_root())
+        .env("DEDIREN_PLUGIN_ARCHIMATE_OEF", &oef_plugin)
+        .env("DEDIREN_PLUGIN_DIRS", workspace_file("fixtures/plugins"))
+        .args(["export", "--plugin", "archimate-oef", "--policy"])
+        .arg(workspace_file("fixtures/export-policy/default-oef.json"))
+        .arg("--source")
+        .arg(workspace_file("fixtures/source/valid-archimate-oef.json"))
+        .arg("--layout")
+        .arg(workspace_file(
+            "fixtures/layout-result/archimate-oef-basic.json",
+        ))
+        .output()
+        .unwrap();
+    assert!(export_output.status.success());
+
+    let export_envelope: serde_json::Value = serde_json::from_slice(&export_output.stdout).unwrap();
+    assert_eq!(export_envelope["status"], "ok");
+    assert_eq!(
+        export_envelope["data"]["artifact_kind"],
+        "archimate-oef+xml"
+    );
+    assert!(export_envelope["data"]["content"]
+        .as_str()
+        .unwrap()
+        .contains("xsi:type=\"Diagram\""));
 }
 
 fn workspace_binary(package: &str, binary: &str) -> PathBuf {
