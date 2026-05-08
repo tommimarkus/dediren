@@ -51,6 +51,19 @@ source graph semantics plus generated layout result geometry. It does not run
 external OEF XSD validation; import the XML into Archi or run an explicit schema
 validator when tool-conformance evidence is required.
 
+## Plugin Runtime Errors
+
+Plugin failures are reported as JSON command envelopes. If a plugin returns a
+valid error envelope, the CLI preserves that envelope and exits non-zero. If the
+runtime boundary fails before a plugin can return a valid envelope, the CLI
+normalizes the failure into a `CommandEnvelope` diagnostic such as
+`DEDIREN_PLUGIN_MISSING_EXECUTABLE`, `DEDIREN_PLUGIN_TIMEOUT`,
+`DEDIREN_PLUGIN_UNSUPPORTED_CAPABILITY`, or
+`DEDIREN_PLUGIN_OUTPUT_INVALID_JSON`.
+
+Agents should read stdout JSON for success and failure decisions. `stderr` is
+reserved for human debugging and is not required for repair loops.
+
 ## ELK Runtime
 
 The bundled ELK layout plugin is an external-process adapter. In production it
