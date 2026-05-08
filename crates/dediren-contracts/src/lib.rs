@@ -8,6 +8,9 @@ pub const LAYOUT_REQUEST_SCHEMA_VERSION: &str = "layout-request.schema.v1";
 pub const LAYOUT_RESULT_SCHEMA_VERSION: &str = "layout-result.schema.v1";
 pub const RENDER_RESULT_SCHEMA_VERSION: &str = "render-result.schema.v1";
 pub const SVG_RENDER_POLICY_SCHEMA_VERSION: &str = "svg-render-policy.schema.v1";
+pub const EXPORT_REQUEST_SCHEMA_VERSION: &str = "export-request.schema.v1";
+pub const EXPORT_RESULT_SCHEMA_VERSION: &str = "export-result.schema.v1";
+pub const OEF_EXPORT_POLICY_SCHEMA_VERSION: &str = "oef-export-policy.schema.v1";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -277,6 +280,34 @@ pub struct Margin {
 #[serde(deny_unknown_fields)]
 pub struct RenderResult {
     pub render_result_schema_version: String,
+    pub artifact_kind: String,
+    pub content: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct OefExportPolicy {
+    pub oef_export_policy_schema_version: String,
+    pub model_identifier: String,
+    pub model_name: String,
+    pub view_identifier: String,
+    pub view_name: String,
+    pub viewpoint: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct OefExportInput {
+    pub export_request_schema_version: String,
+    pub source: SourceDocument,
+    pub layout_result: LayoutResult,
+    pub policy: OefExportPolicy,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ExportResult {
+    pub export_result_schema_version: String,
     pub artifact_kind: String,
     pub content: String,
 }

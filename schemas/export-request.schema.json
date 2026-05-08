@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dediren.dev/schemas/export-request.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["export_request_schema_version", "source", "layout_result", "policy"],
+  "properties": {
+    "export_request_schema_version": { "const": "export-request.schema.v1" },
+    "source": {
+      "type": "object",
+      "required": ["model_schema_version"],
+      "additionalProperties": true
+    },
+    "layout_result": {
+      "type": "object",
+      "required": ["layout_result_schema_version"],
+      "additionalProperties": true
+    },
+    "policy": {
+      "type": "object",
+      "required": ["oef_export_policy_schema_version"],
+      "additionalProperties": true
+    }
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "model_schema_version": "model.schema.v1",
+  "required_plugins": [
+    {
+      "id": "generic-graph",
+      "version": "0.1.0"
+    },
+    {
+      "id": "archimate-oef",
+      "version": "0.1.0"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "orders-component",
+      "type": "ApplicationComponent",
+      "label": "Orders Component",
+      "properties": {}
+    },
+    {
+      "id": "orders-service",
+      "type": "ApplicationService",
+      "label": "Orders Service",
+      "properties": {}
+    }
+  ],
+  "relationships": [
+    {
+      "id": "orders-realizes-service",
+      "type": "Realization",
+      "source": "orders-component",
+      "target": "orders-service",
+      "label": "realizes",
+      "properties": {}
+    }
+  ],
+  "plugins": {
+    "generic-graph": {
+      "views": [
+        {
+          "id": "main",
+          "label": "Main",
+          "nodes": ["orders-component", "orders-service"],
+          "relationships": ["orders-realizes-service"]
+        }
+      ]
+    }
+  }
+}

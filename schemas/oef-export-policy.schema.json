@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dediren.dev/schemas/oef-export-policy.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "oef_export_policy_schema_version",
+    "model_identifier",
+    "model_name",
+    "view_identifier",
+    "view_name",
+    "viewpoint"
+  ],
+  "properties": {
+    "oef_export_policy_schema_version": { "const": "oef-export-policy.schema.v1" },
+    "model_identifier": { "type": "string", "minLength": 1 },
+    "model_name": { "type": "string", "minLength": 1 },
+    "view_identifier": { "type": "string", "minLength": 1 },
+    "view_name": { "type": "string", "minLength": 1 },
+    "viewpoint": { "type": "string", "minLength": 1 }
+  }
+}

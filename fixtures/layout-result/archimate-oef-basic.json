@@ -1,0 +1,48 @@
+{
+  "layout_result_schema_version": "layout-result.schema.v1",
+  "view_id": "main",
+  "nodes": [
+    {
+      "id": "orders-component",
+      "source_id": "orders-component",
+      "projection_id": "orders-component",
+      "x": 40,
+      "y": 40,
+      "width": 180,
+      "height": 80,
+      "label": "Orders Component"
+    },
+    {
+      "id": "orders-service",
+      "source_id": "orders-service",
+      "projection_id": "orders-service",
+      "x": 300,
+      "y": 40,
+      "width": 180,
+      "height": 80,
+      "label": "Orders Service"
+    }
+  ],
+  "edges": [
+    {
+      "id": "orders-realizes-service",
+      "source": "orders-component",
+      "target": "orders-service",
+      "source_id": "orders-realizes-service",
+      "projection_id": "orders-realizes-service",
+      "points": [
+        {
+          "x": 220,
+          "y": 80
+        },
+        {
+          "x": 300,
+          "y": 80
+        }
+      ],
+      "label": "realizes"
+    }
+  ],
+  "groups": [],
+  "warnings": []
+}

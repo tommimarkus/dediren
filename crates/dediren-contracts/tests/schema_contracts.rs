@@ -35,6 +35,9 @@ fn all_public_schemas_compile() {
         "schemas/layout-result.schema.json",
         "schemas/svg-render-policy.schema.json",
         "schemas/render-result.schema.json",
+        "schemas/export-request.schema.json",
+        "schemas/export-result.schema.json",
+        "schemas/oef-export-policy.schema.json",
         "schemas/plugin-manifest.schema.json",
         "schemas/runtime-capability.schema.json",
     ] {
@@ -117,6 +120,51 @@ fn layout_fixtures_match_schemas() {
     assert_valid(
         "schemas/layout-result.schema.json",
         "fixtures/layout-result/basic.json",
+    );
+}
+
+#[test]
+fn export_contracts_match_schemas() {
+    assert_valid(
+        "schemas/oef-export-policy.schema.json",
+        "fixtures/export-policy/default-oef.json",
+    );
+
+    assert_json_valid(
+        "schemas/export-request.schema.json",
+        json!({
+            "export_request_schema_version": "export-request.schema.v1",
+            "source": serde_json::from_str::<serde_json::Value>(
+                &std::fs::read_to_string(workspace_file("fixtures/source/valid-archimate-oef.json")).unwrap()
+            ).unwrap(),
+            "layout_result": serde_json::from_str::<serde_json::Value>(
+                &std::fs::read_to_string(workspace_file("fixtures/layout-result/archimate-oef-basic.json")).unwrap()
+            ).unwrap(),
+            "policy": serde_json::from_str::<serde_json::Value>(
+                &std::fs::read_to_string(workspace_file("fixtures/export-policy/default-oef.json")).unwrap()
+            ).unwrap()
+        }),
+    );
+
+    assert_json_valid(
+        "schemas/export-result.schema.json",
+        json!({
+            "export_result_schema_version": "export-result.schema.v1",
+            "artifact_kind": "archimate-oef+xml",
+            "content": "<model/>"
+        }),
+    );
+}
+
+#[test]
+fn archimate_oef_fixtures_match_existing_contracts() {
+    assert_valid(
+        "schemas/model.schema.json",
+        "fixtures/source/valid-archimate-oef.json",
+    );
+    assert_valid(
+        "schemas/layout-result.schema.json",
+        "fixtures/layout-result/archimate-oef-basic.json",
     );
 }
 

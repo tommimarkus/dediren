@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dediren.dev/schemas/export-result.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["export_result_schema_version", "artifact_kind", "content"],
+  "properties": {
+    "export_result_schema_version": { "const": "export-result.schema.v1" },
+    "artifact_kind": { "const": "archimate-oef+xml" },
+    "content": { "type": "string" }
+  }
+}

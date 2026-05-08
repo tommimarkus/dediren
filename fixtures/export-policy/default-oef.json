@@ -1,0 +1,8 @@
+{
+  "oef_export_policy_schema_version": "oef-export-policy.schema.v1",
+  "model_identifier": "id-dediren-oef-basic-model",
+  "model_name": "Dediren OEF Basic",
+  "view_identifier": "id-view-main",
+  "view_name": "Main",
+  "viewpoint": "Application Cooperation"
+}
