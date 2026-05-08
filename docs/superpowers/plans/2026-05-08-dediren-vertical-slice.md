@@ -6,39 +6,35 @@
 
 **Architecture:** Use a Rust Cargo workspace with a small contracts crate shared by the CLI, core, and first-party executable plugins. The core owns schema/envelope/plugin orchestration and backend-neutral validation; semantic projection, ELK layout, and SVG rendering stay in executable plugins. Public JSON schemas and fixtures lead the implementation.
 
-**Tech Stack:** Rust 2021, Cargo workspace, `serde`, `serde_json`, `clap`, `thiserror`, `anyhow`, `schemars`, `jsonschema`, `assert_cmd`, `assert_fs`, `predicates`, `tempfile`.
+**Tech Stack:** Rust 2021, Cargo workspace, `serde`, `serde_json`, `clap`, `thiserror`, `anyhow`, `jsonschema`, `assert_cmd`, `assert_fs`, `predicates`, `tempfile`.
 
 ---
 
 ## File Structure
 
-- `Cargo.toml`: workspace members, shared dependency versions, workspace package metadata.
-- Root binary aliases in `Cargo.toml`: expose workspace binaries to root integration tests.
+- `Cargo.toml`: virtual workspace members, shared dependency versions, workspace package metadata.
 - `LICENSE`: MIT license.
 - `README.md`: user-facing contract summary, commands, local install, plugin lookup paths.
-- `schemas/*.schema.json`: public JSON Schema contracts exported from Rust types and checked into the repo.
+- `schemas/*.schema.json`: canonical public JSON Schema contracts checked into the repo.
 - `fixtures/source/valid-basic.json`: valid source graph with generic plugin view.
 - `fixtures/source/invalid-absolute-geometry.json`: invalid source graph that tries to author geometry.
 - `fixtures/layout-request/basic.json`: expected projection output fixture.
 - `fixtures/layout-result/basic.json`: deterministic layout output fixture.
 - `fixtures/render-policy/default-svg.json`: minimal SVG render policy fixture.
 - `fixtures/plugins/*.json`: static plugin manifests for bundled first-party plugins.
-- `src/lib.rs`: empty root package so workspace-level integration tests under `tests/` run.
-- `crates/dediren-contracts/src/lib.rs`: public contract structs, schema export helpers, diagnostic/envelope helpers.
+- `crates/dediren-contracts/src/lib.rs`: public contract structs, diagnostic/envelope helpers, and schema-version constants.
 - `crates/dediren-core/src/lib.rs`: core orchestration modules.
 - `crates/dediren-core/src/io.rs`: stdin/input/output helpers.
-- `crates/dediren-core/src/schema.rs`: schema validation facade.
 - `crates/dediren-core/src/plugins.rs`: plugin discovery, manifest loading, runtime execution.
 - `crates/dediren-core/src/quality.rs`: backend-neutral layout quality metrics and policies.
 - `crates/dediren-cli/src/main.rs`: CLI entrypoint and pipeline commands.
 - `crates/dediren-plugin-generic-graph/src/main.rs`: semantic validation and `layout-request` projection plugin.
 - `crates/dediren-plugin-elk-layout/src/main.rs`: external ELK process adapter plugin.
 - `crates/dediren-plugin-svg-render/src/main.rs`: SVG renderer plugin.
-- `tests/schema_contracts.rs`: validates fixtures against schemas.
-- `tests/cli_pipeline.rs`: end-to-end CLI pipeline tests with stdin/stdout JSON.
-- `tests/plugin_compat.rs`: executable plugin manifest/capability/envelope tests.
-- `tests/layout_quality.rs`: backend-neutral metric tests.
-- `tests/support/fake_elk.rs`: test helper binary source for deterministic ELK-style layout output.
+- `crates/dediren-contracts/tests/schema_contracts.rs`: validates fixtures against canonical schemas.
+- `crates/dediren-cli/tests/cli_pipeline.rs`: end-to-end CLI pipeline tests with stdin/stdout JSON.
+- `crates/dediren-cli/tests/plugin_compat.rs`: executable plugin manifest/capability/envelope tests.
+- `crates/dediren-core/tests/layout_quality.rs`: backend-neutral metric tests.
 
 ## Task 1: Bootstrap Workspace, License, And Metadata
 
@@ -46,7 +42,6 @@
 - Create: `Cargo.toml`
 - Create: `LICENSE`
 - Create: `README.md`
-- Create: `src/lib.rs`
 - Create: `crates/dediren-contracts/Cargo.toml`
 - Create: `crates/dediren-contracts/src/lib.rs`
 - Create: `crates/dediren-core/Cargo.toml`
@@ -65,33 +60,6 @@
 Write `Cargo.toml`:
 
 ```toml
-[package]
-name = "dediren-workspace"
-version.workspace = true
-edition.workspace = true
-license.workspace = true
-repository.workspace = true
-homepage.workspace = true
-readme.workspace = true
-rust-version.workspace = true
-publish = false
-
-[[bin]]
-name = "dediren"
-path = "crates/dediren-cli/src/main.rs"
-
-[[bin]]
-name = "dediren-plugin-generic-graph"
-path = "crates/dediren-plugin-generic-graph/src/main.rs"
-
-[[bin]]
-name = "dediren-plugin-elk-layout"
-path = "crates/dediren-plugin-elk-layout/src/main.rs"
-
-[[bin]]
-name = "dediren-plugin-svg-render"
-path = "crates/dediren-plugin-svg-render/src/main.rs"
-
 [workspace]
 members = [
   "crates/dediren-contracts",
@@ -119,28 +87,11 @@ assert_fs = "1"
 clap = { version = "4", features = ["derive"] }
 jsonschema = "0.33"
 predicates = "3"
-schemars = { version = "1", features = ["derive"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tempfile = "3"
 thiserror = "2"
-
-[dependencies]
-anyhow.workspace = true
-clap.workspace = true
-dediren-contracts = { path = "crates/dediren-contracts" }
-dediren-core = { path = "crates/dediren-core" }
-serde.workspace = true
-serde_json.workspace = true
-
-[dev-dependencies]
-assert_cmd.workspace = true
-assert_fs.workspace = true
-dediren-contracts = { path = "crates/dediren-contracts" }
-dediren-core = { path = "crates/dediren-core" }
-jsonschema.workspace = true
-predicates.workspace = true
-serde_json.workspace = true
+wait-timeout = "0.2"
 ```
 
 - [ ] **Step 2: Add MIT license text**
@@ -175,7 +126,7 @@ SOFTWARE.
 
 Write `README.md`:
 
-```markdown
+````markdown
 # dediren
 
 `dediren` is a structured-data-first diagram rendering CLI for agentic tools.
@@ -205,7 +156,7 @@ The CLI discovers plugins explicitly:
 3. user-configured plugin directories.
 
 The CLI does not discover plugins implicitly from `PATH`.
-```
+````
 
 - [ ] **Step 4: Create minimal crate manifests and entrypoints**
 
@@ -222,7 +173,6 @@ homepage.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-schemars.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 ```
@@ -254,6 +204,7 @@ jsonschema.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
+wait-timeout.workspace = true
 ```
 
 Write `crates/dediren-core/src/lib.rs`:
@@ -283,7 +234,14 @@ path = "src/main.rs"
 [dependencies]
 anyhow.workspace = true
 clap.workspace = true
+dediren-contracts = { path = "../dediren-contracts" }
 dediren-core = { path = "../dediren-core" }
+serde_json.workspace = true
+
+[dev-dependencies]
+assert_cmd.workspace = true
+assert_fs.workspace = true
+predicates.workspace = true
 ```
 
 Write `crates/dediren-cli/src/main.rs`:
@@ -315,6 +273,10 @@ anyhow.workspace = true
 dediren-contracts = { path = "../dediren-contracts" }
 serde.workspace = true
 serde_json.workspace = true
+
+[dev-dependencies]
+assert_cmd.workspace = true
+predicates.workspace = true
 ```
 
 Use the same pattern for `dediren-plugin-elk-layout` and `dediren-plugin-svg-render`, changing only the package and binary names.
@@ -324,14 +286,6 @@ Write each plugin `src/main.rs`:
 ```rust
 fn main() {
     println!("{} {}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
-}
-```
-
-Write `src/lib.rs`:
-
-```rust
-pub fn workspace_package_marker() -> &'static str {
-    "dediren-workspace"
 }
 ```
 
@@ -349,7 +303,7 @@ Expected: both commands exit `0`.
 - [ ] **Step 6: Commit bootstrap**
 
 ```bash
-git add Cargo.toml LICENSE README.md src crates
+git add Cargo.toml LICENSE README.md crates
 git commit -m "chore: bootstrap rust workspace"
 ```
 
@@ -359,21 +313,25 @@ git commit -m "chore: bootstrap rust workspace"
 - Modify: `crates/dediren-contracts/src/lib.rs`
 - Create: `fixtures/source/valid-basic.json`
 - Create: `fixtures/source/invalid-absolute-geometry.json`
+- Create: `fixtures/source/invalid-duplicate-id.json`
+- Create: `fixtures/source/invalid-dangling-relationship.json`
 - Create: `fixtures/render-policy/default-svg.json`
-- Create: `tests/contract_roundtrip.rs`
+- Create: `crates/dediren-contracts/tests/contract_roundtrip.rs`
 
 - [ ] **Step 1: Write failing contract roundtrip tests**
 
-Create `tests/contract_roundtrip.rs`:
+Create `crates/dediren-contracts/tests/contract_roundtrip.rs`:
 
 ```rust
 use dediren_contracts::{
-    CommandEnvelope, Diagnostic, DiagnosticSeverity, LayoutRequest, RenderPolicy, SourceDocument,
+    CommandEnvelope, Diagnostic, DiagnosticSeverity, LayoutRequest, RenderPolicy, RenderResult,
+    SourceDocument,
 };
+use std::path::PathBuf;
 
 #[test]
 fn source_document_roundtrips() {
-    let text = std::fs::read_to_string("fixtures/source/valid-basic.json").unwrap();
+    let text = std::fs::read_to_string(workspace_file("fixtures/source/valid-basic.json")).unwrap();
     let doc: SourceDocument = serde_json::from_str(&text).unwrap();
     assert_eq!(doc.model_schema_version, "model.schema.v1");
     assert_eq!(doc.nodes[0].id, "client");
@@ -417,17 +375,36 @@ fn layout_request_roundtrips() {
 
 #[test]
 fn render_policy_roundtrips() {
-    let text = std::fs::read_to_string("fixtures/render-policy/default-svg.json").unwrap();
+    let text =
+        std::fs::read_to_string(workspace_file("fixtures/render-policy/default-svg.json")).unwrap();
     let policy: RenderPolicy = serde_json::from_str(&text).unwrap();
     assert_eq!(policy.svg_render_policy_schema_version, "svg-render-policy.schema.v1");
     assert_eq!(policy.page.width, 1200.0);
+}
+
+#[test]
+fn render_result_roundtrips() {
+    let result = RenderResult {
+        render_result_schema_version: "render-result.schema.v1".to_string(),
+        artifact_kind: "svg".to_string(),
+        content: "<svg></svg>".to_string(),
+    };
+    let encoded = serde_json::to_string(&result).unwrap();
+    let decoded: RenderResult = serde_json::from_str(&encoded).unwrap();
+    assert_eq!(decoded.artifact_kind, "svg");
+}
+
+fn workspace_file(path: &str) -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .join(path)
 }
 ```
 
 Run:
 
 ```bash
-cargo test --test contract_roundtrip
+cargo test -p dediren-contracts --test contract_roundtrip
 ```
 
 Expected: FAIL because the contract types do not exist.
@@ -437,7 +414,6 @@ Expected: FAIL because the contract types do not exist.
 Replace `crates/dediren-contracts/src/lib.rs` with:
 
 ```rust
-use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
@@ -446,9 +422,10 @@ pub const ENVELOPE_SCHEMA_VERSION: &str = "envelope.schema.v1";
 pub const PLUGIN_PROTOCOL_VERSION: &str = "plugin.protocol.v1";
 pub const LAYOUT_REQUEST_SCHEMA_VERSION: &str = "layout-request.schema.v1";
 pub const LAYOUT_RESULT_SCHEMA_VERSION: &str = "layout-result.schema.v1";
+pub const RENDER_RESULT_SCHEMA_VERSION: &str = "render-result.schema.v1";
 pub const SVG_RENDER_POLICY_SCHEMA_VERSION: &str = "svg-render-policy.schema.v1";
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum DiagnosticSeverity {
     Info,
@@ -456,7 +433,7 @@ pub enum DiagnosticSeverity {
     Error,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Diagnostic {
     pub code: String,
     pub severity: DiagnosticSeverity,
@@ -465,7 +442,7 @@ pub struct Diagnostic {
     pub path: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CommandEnvelope<T> {
     pub envelope_schema_version: String,
     pub status: String,
@@ -495,7 +472,8 @@ impl<T> CommandEnvelope<T> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct SourceDocument {
     pub model_schema_version: String,
     #[serde(default)]
@@ -508,13 +486,15 @@ pub struct SourceDocument {
     pub plugins: Map<String, Value>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct PluginRequirement {
     pub id: String,
     pub version: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct SourceNode {
     pub id: String,
     #[serde(rename = "type")]
@@ -524,7 +504,8 @@ pub struct SourceNode {
     pub properties: Map<String, Value>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct SourceRelationship {
     pub id: String,
     #[serde(rename = "type")]
@@ -536,12 +517,14 @@ pub struct SourceRelationship {
     pub properties: Map<String, Value>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct GenericGraphPluginData {
     pub views: Vec<GenericGraphView>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct GenericGraphView {
     pub id: String,
     pub label: String,
@@ -549,7 +532,8 @@ pub struct GenericGraphView {
     pub relationships: Vec<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct LayoutRequest {
     pub layout_request_schema_version: String,
     pub view_id: String,
@@ -565,7 +549,8 @@ pub struct LayoutRequest {
     pub constraints: Vec<LayoutConstraint>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct LayoutNode {
     pub id: String,
     pub label: String,
@@ -576,7 +561,8 @@ pub struct LayoutNode {
     pub height_hint: Option<f64>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct LayoutEdge {
     pub id: String,
     pub source: String,
@@ -585,7 +571,8 @@ pub struct LayoutEdge {
     pub source_id: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct LayoutGroup {
     pub id: String,
     pub label: String,
@@ -593,27 +580,30 @@ pub struct LayoutGroup {
     pub provenance: GroupProvenance,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum GroupProvenance {
     VisualOnly,
     SemanticBacked { source_id: String },
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct LayoutLabel {
     pub owner_id: String,
     pub text: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct LayoutConstraint {
     pub id: String,
     pub kind: String,
     pub subjects: Vec<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct LayoutResult {
     pub layout_result_schema_version: String,
     pub view_id: String,
@@ -622,10 +612,13 @@ pub struct LayoutResult {
     #[serde(default)]
     pub edges: Vec<LaidOutEdge>,
     #[serde(default)]
+    pub groups: Vec<LaidOutGroup>,
+    #[serde(default)]
     pub warnings: Vec<Diagnostic>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct LaidOutNode {
     pub id: String,
     pub source_id: String,
@@ -637,40 +630,89 @@ pub struct LaidOutNode {
     pub label: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct LaidOutEdge {
     pub id: String,
+    pub source: String,
+    pub target: String,
     pub source_id: String,
     pub projection_id: String,
     pub points: Vec<Point>,
     pub label: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LaidOutGroup {
+    pub id: String,
+    pub source_id: String,
+    pub projection_id: String,
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub height: f64,
+    pub members: Vec<String>,
+    pub label: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Point {
     pub x: f64,
     pub y: f64,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct RenderPolicy {
     pub svg_render_policy_schema_version: String,
     pub page: Page,
     pub margin: Margin,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Page {
     pub width: f64,
     pub height: f64,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Margin {
     pub top: f64,
     pub right: f64,
     pub bottom: f64,
     pub left: f64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RenderResult {
+    pub render_result_schema_version: String,
+    pub artifact_kind: String,
+    pub content: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PluginManifest {
+    pub plugin_manifest_schema_version: String,
+    pub id: String,
+    pub version: String,
+    pub executable: String,
+    pub capabilities: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RuntimeCapabilities {
+    pub plugin_protocol_version: String,
+    pub id: String,
+    pub capabilities: Vec<String>,
+    #[serde(default)]
+    pub runtime: Option<Value>,
 }
 ```
 
@@ -746,6 +788,57 @@ Create `fixtures/source/invalid-absolute-geometry.json`:
 }
 ```
 
+Create `fixtures/source/invalid-duplicate-id.json`:
+
+```json
+{
+  "model_schema_version": "model.schema.v1",
+  "nodes": [
+    {
+      "id": "client",
+      "type": "generic.actor",
+      "label": "Client",
+      "properties": {}
+    },
+    {
+      "id": "client",
+      "type": "generic.component",
+      "label": "Duplicate",
+      "properties": {}
+    }
+  ],
+  "relationships": [],
+  "plugins": {}
+}
+```
+
+Create `fixtures/source/invalid-dangling-relationship.json`:
+
+```json
+{
+  "model_schema_version": "model.schema.v1",
+  "nodes": [
+    {
+      "id": "client",
+      "type": "generic.actor",
+      "label": "Client",
+      "properties": {}
+    }
+  ],
+  "relationships": [
+    {
+      "id": "client-calls-api",
+      "type": "generic.calls",
+      "source": "client",
+      "target": "api",
+      "label": "calls",
+      "properties": {}
+    }
+  ],
+  "plugins": {}
+}
+```
+
 Create `fixtures/render-policy/default-svg.json`:
 
 ```json
@@ -769,7 +862,7 @@ Create `fixtures/render-policy/default-svg.json`:
 Run:
 
 ```bash
-cargo test --test contract_roundtrip
+cargo test -p dediren-contracts --test contract_roundtrip
 ```
 
 Expected: PASS.
@@ -777,70 +870,381 @@ Expected: PASS.
 - [ ] **Step 5: Commit contracts**
 
 ```bash
-git add crates/dediren-contracts fixtures tests/contract_roundtrip.rs
+git add crates/dediren-contracts fixtures crates/dediren-contracts/tests/contract_roundtrip.rs
 git commit -m "feat: define initial json contracts"
 ```
 
 ## Task 3: Add JSON Schemas And Schema Tests
 
 **Files:**
-- Modify: `crates/dediren-contracts/src/lib.rs`
-- Create: `crates/dediren-contracts/src/bin/export_schemas.rs`
 - Create: `schemas/model.schema.json`
 - Create: `schemas/envelope.schema.json`
 - Create: `schemas/layout-request.schema.json`
 - Create: `schemas/layout-result.schema.json`
+- Create: `schemas/render-result.schema.json`
 - Create: `schemas/svg-render-policy.schema.json`
-- Create: `tests/schema_contracts.rs`
+- Create: `schemas/plugin-manifest.schema.json`
+- Create: `schemas/runtime-capability.schema.json`
+- Create: `crates/dediren-contracts/tests/schema_contracts.rs`
 
-- [ ] **Step 1: Add schema export binary**
+- [ ] **Step 1: Write canonical schema files**
 
-Create `crates/dediren-contracts/src/bin/export_schemas.rs`:
+Create `schemas/model.schema.json`:
 
-```rust
-use dediren_contracts::{
-    CommandEnvelope, LayoutRequest, LayoutResult, RenderPolicy, SourceDocument,
-};
-use schemars::schema_for;
-
-fn main() -> anyhow::Result<()> {
-    std::fs::create_dir_all("schemas")?;
-    write_schema("schemas/model.schema.json", &schema_for!(SourceDocument))?;
-    write_schema(
-        "schemas/envelope.schema.json",
-        &schema_for!(CommandEnvelope<serde_json::Value>),
-    )?;
-    write_schema("schemas/layout-request.schema.json", &schema_for!(LayoutRequest))?;
-    write_schema("schemas/layout-result.schema.json", &schema_for!(LayoutResult))?;
-    write_schema("schemas/svg-render-policy.schema.json", &schema_for!(RenderPolicy))?;
-    Ok(())
-}
-
-fn write_schema(path: &str, schema: &schemars::Schema) -> anyhow::Result<()> {
-    let text = serde_json::to_string_pretty(schema)?;
-    std::fs::write(path, format!("{text}\n"))?;
-    Ok(())
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dediren.dev/schemas/model.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["model_schema_version", "nodes", "relationships", "plugins"],
+  "properties": {
+    "model_schema_version": { "const": "model.schema.v1" },
+    "required_plugins": { "type": "array", "items": { "$ref": "#/$defs/pluginRequirement" } },
+    "nodes": { "type": "array", "items": { "$ref": "#/$defs/sourceNode" } },
+    "relationships": { "type": "array", "items": { "$ref": "#/$defs/sourceRelationship" } },
+    "plugins": { "type": "object", "additionalProperties": true }
+  },
+  "$defs": {
+    "pluginRequirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" },
+        "version": { "type": "string", "minLength": 1 }
+      }
+    },
+    "sourceNode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "label", "properties"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" },
+        "type": { "type": "string", "minLength": 1 },
+        "label": { "type": "string" },
+        "properties": { "type": "object", "additionalProperties": true }
+      }
+    },
+    "sourceRelationship": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "source", "target", "label", "properties"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" },
+        "type": { "type": "string", "minLength": 1 },
+        "source": { "type": "string" },
+        "target": { "type": "string" },
+        "label": { "type": "string" },
+        "properties": { "type": "object", "additionalProperties": true }
+      }
+    }
+  }
 }
 ```
 
-Add `anyhow.workspace = true` to `crates/dediren-contracts/Cargo.toml`.
+Create `schemas/envelope.schema.json`:
 
-- [ ] **Step 2: Generate schemas**
-
-Run:
-
-```bash
-cargo run -p dediren-contracts --bin export_schemas
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dediren.dev/schemas/envelope.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["envelope_schema_version", "status", "diagnostics"],
+  "properties": {
+    "envelope_schema_version": { "const": "envelope.schema.v1" },
+    "status": { "enum": ["ok", "warning", "error"] },
+    "data": true,
+    "diagnostics": { "type": "array", "items": { "$ref": "#/$defs/diagnostic" } }
+  },
+  "$defs": {
+    "diagnostic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "severity", "message"],
+      "properties": {
+        "code": { "type": "string", "minLength": 1 },
+        "severity": { "enum": ["info", "warning", "error"] },
+        "message": { "type": "string" },
+        "path": { "type": "string" }
+      }
+    }
+  }
+}
 ```
 
-Expected: command exits `0` and writes the five schema files under `schemas/`.
+Create `schemas/layout-request.schema.json`:
 
-- [ ] **Step 3: Write schema validation tests**
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dediren.dev/schemas/layout-request.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["layout_request_schema_version", "view_id", "nodes", "edges", "groups", "labels", "constraints"],
+  "properties": {
+    "layout_request_schema_version": { "const": "layout-request.schema.v1" },
+    "view_id": { "type": "string" },
+    "nodes": { "type": "array", "items": { "$ref": "#/$defs/node" } },
+    "edges": { "type": "array", "items": { "$ref": "#/$defs/edge" } },
+    "groups": { "type": "array", "items": { "$ref": "#/$defs/group" } },
+    "labels": { "type": "array", "items": { "$ref": "#/$defs/label" } },
+    "constraints": { "type": "array", "items": { "$ref": "#/$defs/constraint" } }
+  },
+  "$defs": {
+    "node": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label", "source_id"],
+      "properties": {
+        "id": { "type": "string" },
+        "label": { "type": "string" },
+        "source_id": { "type": "string" },
+        "width_hint": { "type": "number", "exclusiveMinimum": 0 },
+        "height_hint": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
+    "edge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "source", "target", "label", "source_id"],
+      "properties": {
+        "id": { "type": "string" },
+        "source": { "type": "string" },
+        "target": { "type": "string" },
+        "label": { "type": "string" },
+        "source_id": { "type": "string" }
+      }
+    },
+    "group": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label", "members", "provenance"],
+      "properties": {
+        "id": { "type": "string" },
+        "label": { "type": "string" },
+        "members": { "type": "array", "items": { "type": "string" } },
+        "provenance": { "type": "object", "additionalProperties": true }
+      }
+    },
+    "label": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["owner_id", "text"],
+      "properties": {
+        "owner_id": { "type": "string" },
+        "text": { "type": "string" }
+      }
+    },
+    "constraint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "subjects"],
+      "properties": {
+        "id": { "type": "string" },
+        "kind": { "type": "string" },
+        "subjects": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}
+```
 
-Create `tests/schema_contracts.rs`:
+Create `schemas/layout-result.schema.json`:
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dediren.dev/schemas/layout-result.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["layout_result_schema_version", "view_id", "nodes", "edges", "groups", "warnings"],
+  "properties": {
+    "layout_result_schema_version": { "const": "layout-result.schema.v1" },
+    "view_id": { "type": "string" },
+    "nodes": { "type": "array", "items": { "$ref": "#/$defs/node" } },
+    "edges": { "type": "array", "items": { "$ref": "#/$defs/edge" } },
+    "groups": { "type": "array", "items": { "$ref": "#/$defs/group" } },
+    "warnings": { "type": "array", "items": { "$ref": "#/$defs/diagnostic" } }
+  },
+  "$defs": {
+    "node": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "source_id", "projection_id", "x", "y", "width", "height", "label"],
+      "properties": {
+        "id": { "type": "string" },
+        "source_id": { "type": "string" },
+        "projection_id": { "type": "string" },
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "width": { "type": "number", "exclusiveMinimum": 0 },
+        "height": { "type": "number", "exclusiveMinimum": 0 },
+        "label": { "type": "string" }
+      }
+    },
+    "edge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "source", "target", "source_id", "projection_id", "points", "label"],
+      "properties": {
+        "id": { "type": "string" },
+        "source": { "type": "string" },
+        "target": { "type": "string" },
+        "source_id": { "type": "string" },
+        "projection_id": { "type": "string" },
+        "points": { "type": "array", "items": { "$ref": "#/$defs/point" } },
+        "label": { "type": "string" }
+      }
+    },
+    "group": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "source_id", "projection_id", "x", "y", "width", "height", "members", "label"],
+      "properties": {
+        "id": { "type": "string" },
+        "source_id": { "type": "string" },
+        "projection_id": { "type": "string" },
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "width": { "type": "number", "exclusiveMinimum": 0 },
+        "height": { "type": "number", "exclusiveMinimum": 0 },
+        "members": { "type": "array", "items": { "type": "string" } },
+        "label": { "type": "string" }
+      }
+    },
+    "point": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y"],
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" }
+      }
+    },
+    "diagnostic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "severity", "message"],
+      "properties": {
+        "code": { "type": "string" },
+        "severity": { "enum": ["info", "warning", "error"] },
+        "message": { "type": "string" },
+        "path": { "type": "string" }
+      }
+    }
+  }
+}
+```
+
+Create `schemas/svg-render-policy.schema.json`:
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dediren.dev/schemas/svg-render-policy.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["svg_render_policy_schema_version", "page", "margin"],
+  "properties": {
+    "svg_render_policy_schema_version": { "const": "svg-render-policy.schema.v1" },
+    "page": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["width", "height"],
+      "properties": {
+        "width": { "type": "number", "exclusiveMinimum": 0 },
+        "height": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
+    "margin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["top", "right", "bottom", "left"],
+      "properties": {
+        "top": { "type": "number", "minimum": 0 },
+        "right": { "type": "number", "minimum": 0 },
+        "bottom": { "type": "number", "minimum": 0 },
+        "left": { "type": "number", "minimum": 0 }
+      }
+    }
+  }
+}
+```
+
+Create `schemas/render-result.schema.json`:
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dediren.dev/schemas/render-result.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["render_result_schema_version", "artifact_kind", "content"],
+  "properties": {
+    "render_result_schema_version": { "const": "render-result.schema.v1" },
+    "artifact_kind": { "const": "svg" },
+    "content": { "type": "string" }
+  }
+}
+```
+
+Create `schemas/plugin-manifest.schema.json`:
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dediren.dev/schemas/plugin-manifest.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["plugin_manifest_schema_version", "id", "version", "executable", "capabilities"],
+  "properties": {
+    "plugin_manifest_schema_version": { "const": "plugin-manifest.schema.v1" },
+    "id": { "type": "string" },
+    "version": { "type": "string" },
+    "executable": { "type": "string" },
+    "capabilities": { "type": "array", "items": { "type": "string" } }
+  }
+}
+```
+
+Create `schemas/runtime-capability.schema.json`:
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dediren.dev/schemas/runtime-capability.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["plugin_protocol_version", "id", "capabilities"],
+  "properties": {
+    "plugin_protocol_version": { "const": "plugin.protocol.v1" },
+    "id": { "type": "string" },
+    "capabilities": { "type": "array", "items": { "type": "string" } },
+    "runtime": { "type": "object", "additionalProperties": true }
+  }
+}
+```
+
+Do not generate schemas from Rust structs; Rust types must conform to these
+checked-in schema files.
+
+- [ ] **Step 2: Write schema validation tests**
+
+Add this dev-dependency to `crates/dediren-contracts/Cargo.toml`:
+
+```toml
+[dev-dependencies]
+jsonschema.workspace = true
+```
+
+Create `crates/dediren-contracts/tests/schema_contracts.rs`:
 
 ```rust
 use jsonschema::Validator;
+use serde_json::json;
+use std::path::PathBuf;
 
 #[test]
 fn valid_source_matches_model_schema() {
@@ -863,6 +1267,88 @@ fn default_svg_policy_matches_schema() {
     );
 }
 
+#[test]
+fn all_public_schemas_compile() {
+    for path in [
+        "schemas/model.schema.json",
+        "schemas/envelope.schema.json",
+        "schemas/layout-request.schema.json",
+        "schemas/layout-result.schema.json",
+        "schemas/svg-render-policy.schema.json",
+        "schemas/render-result.schema.json",
+        "schemas/plugin-manifest.schema.json",
+        "schemas/runtime-capability.schema.json",
+    ] {
+        let _ = validator(path);
+    }
+}
+
+#[test]
+fn render_result_matches_schema() {
+    assert_json_valid(
+        "schemas/render-result.schema.json",
+        json!({
+            "render_result_schema_version": "render-result.schema.v1",
+            "artifact_kind": "svg",
+            "content": "<svg></svg>"
+        }),
+    );
+}
+
+#[test]
+fn plugin_manifest_matches_schema() {
+    assert_json_valid(
+        "schemas/plugin-manifest.schema.json",
+        json!({
+            "plugin_manifest_schema_version": "plugin-manifest.schema.v1",
+            "id": "svg-render",
+            "version": "0.1.0",
+            "executable": "dediren-plugin-svg-render",
+            "capabilities": ["render"]
+        }),
+    );
+}
+
+#[test]
+fn runtime_capabilities_match_schema() {
+    assert_json_valid(
+        "schemas/runtime-capability.schema.json",
+        json!({
+            "plugin_protocol_version": "plugin.protocol.v1",
+            "id": "svg-render",
+            "capabilities": ["render"],
+            "runtime": { "artifact_kind": "svg" }
+        }),
+    );
+}
+
+#[test]
+fn layout_contracts_match_schemas() {
+    assert_json_valid(
+        "schemas/layout-request.schema.json",
+        json!({
+            "layout_request_schema_version": "layout-request.schema.v1",
+            "view_id": "main",
+            "nodes": [],
+            "edges": [],
+            "groups": [],
+            "labels": [],
+            "constraints": []
+        }),
+    );
+    assert_json_valid(
+        "schemas/layout-result.schema.json",
+        json!({
+            "layout_result_schema_version": "layout-result.schema.v1",
+            "view_id": "main",
+            "nodes": [],
+            "edges": [],
+            "groups": [],
+            "warnings": []
+        }),
+    );
+}
+
 fn assert_valid(schema_path: &str, instance_path: &str) {
     let validator = validator(schema_path);
     let instance = json_file(instance_path);
@@ -877,34 +1363,41 @@ fn assert_invalid(schema_path: &str, instance_path: &str) {
     assert!(result.is_err(), "{instance_path} should fail validation");
 }
 
+fn assert_json_valid(schema_path: &str, instance: serde_json::Value) {
+    let validator = validator(schema_path);
+    let result = validator.validate(&instance);
+    assert!(result.is_ok(), "{schema_path} should validate supplied JSON");
+}
+
 fn validator(path: &str) -> Validator {
     let schema = json_file(path);
     jsonschema::validator_for(&schema).unwrap()
 }
 
 fn json_file(path: &str) -> serde_json::Value {
-    let text = std::fs::read_to_string(path).unwrap();
+    let text = std::fs::read_to_string(workspace_file(path)).unwrap();
     serde_json::from_str(&text).unwrap()
+}
+
+fn workspace_file(path: &str) -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .join(path)
 }
 ```
 
-- [ ] **Step 4: Tighten schema shape so authored geometry fails**
-
-Add `#[serde(deny_unknown_fields)]` to `SourceDocument`, `SourceNode`, `SourceRelationship`, and all render policy structs in `crates/dediren-contracts/src/lib.rs`.
-
-Run:
+- [ ] **Step 3: Run schema tests**
 
 ```bash
-cargo run -p dediren-contracts --bin export_schemas
-cargo test --test schema_contracts
+cargo test -p dediren-contracts --test schema_contracts
 ```
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit schemas**
+- [ ] **Step 4: Commit schemas**
 
 ```bash
-git add crates/dediren-contracts schemas tests/schema_contracts.rs
+git add schemas crates/dediren-contracts/tests/schema_contracts.rs
 git commit -m "feat: publish initial json schemas"
 ```
 
@@ -915,20 +1408,23 @@ git commit -m "feat: publish initial json schemas"
 - Create: `crates/dediren-core/src/validate.rs`
 - Modify: `crates/dediren-core/src/lib.rs`
 - Modify: `crates/dediren-cli/src/main.rs`
-- Create: `tests/cli_validate.rs`
+- Create: `crates/dediren-cli/tests/cli_validate.rs`
 
 - [ ] **Step 1: Write failing CLI validate tests**
 
-Create `tests/cli_validate.rs`:
+Create `crates/dediren-cli/tests/cli_validate.rs`:
 
 ```rust
 use assert_cmd::Command;
 use predicates::prelude::*;
+use std::path::PathBuf;
 
 #[test]
 fn validate_accepts_valid_source_from_file() {
     let mut cmd = Command::cargo_bin("dediren").unwrap();
-    cmd.args(["validate", "--input", "fixtures/source/valid-basic.json"]);
+    cmd.arg("validate")
+        .arg("--input")
+        .arg(workspace_file("fixtures/source/valid-basic.json"));
     cmd.assert()
         .success()
         .stdout(predicate::str::contains("\"status\":\"ok\""));
@@ -937,21 +1433,47 @@ fn validate_accepts_valid_source_from_file() {
 #[test]
 fn validate_rejects_authored_geometry() {
     let mut cmd = Command::cargo_bin("dediren").unwrap();
-    cmd.args([
-        "validate",
-        "--input",
-        "fixtures/source/invalid-absolute-geometry.json",
-    ]);
+    cmd.arg("validate")
+        .arg("--input")
+        .arg(workspace_file("fixtures/source/invalid-absolute-geometry.json"));
     cmd.assert()
         .failure()
         .stdout(predicate::str::contains("DEDIREN_SCHEMA_INVALID"));
+}
+
+#[test]
+fn validate_rejects_duplicate_ids() {
+    let mut cmd = Command::cargo_bin("dediren").unwrap();
+    cmd.arg("validate")
+        .arg("--input")
+        .arg(workspace_file("fixtures/source/invalid-duplicate-id.json"));
+    cmd.assert()
+        .failure()
+        .stdout(predicate::str::contains("DEDIREN_DUPLICATE_ID"));
+}
+
+#[test]
+fn validate_rejects_dangling_relationship_endpoint() {
+    let mut cmd = Command::cargo_bin("dediren").unwrap();
+    cmd.arg("validate")
+        .arg("--input")
+        .arg(workspace_file("fixtures/source/invalid-dangling-relationship.json"));
+    cmd.assert()
+        .failure()
+        .stdout(predicate::str::contains("DEDIREN_DANGLING_ENDPOINT"));
+}
+
+fn workspace_file(path: &str) -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .join(path)
 }
 ```
 
 Run:
 
 ```bash
-cargo test --test cli_validate
+cargo test -p dediren --test cli_validate
 ```
 
 Expected: FAIL because the CLI has no `validate` command.
@@ -996,13 +1518,37 @@ pub fn parse_command_data<T: DeserializeOwned>(text: &str) -> anyhow::Result<T> 
 Create `crates/dediren-core/src/validate.rs`:
 
 ```rust
+use std::collections::HashSet;
+
 use dediren_contracts::{
-    CommandEnvelope, Diagnostic, DiagnosticSeverity, SourceDocument, ENVELOPE_SCHEMA_VERSION,
+    CommandEnvelope, Diagnostic, DiagnosticSeverity, SourceDocument,
 };
 
 pub fn validate_source_json(text: &str) -> (i32, CommandEnvelope<serde_json::Value>) {
-    match serde_json::from_str::<SourceDocument>(text) {
-        Ok(doc) => {
+    let value: serde_json::Value = match serde_json::from_str(text) {
+        Ok(value) => value,
+        Err(error) => {
+            return (2, CommandEnvelope::error(vec![schema_error(error.to_string())]));
+        }
+    };
+
+    let schema: serde_json::Value =
+        serde_json::from_str(include_str!("../../../schemas/model.schema.json"))
+            .expect("model schema must be valid JSON");
+    let validator = jsonschema::validator_for(&schema).expect("model schema must compile");
+    if let Err(error) = validator.validate(&value) {
+        return (2, CommandEnvelope::error(vec![schema_error(error.to_string())]));
+    }
+
+    let doc: SourceDocument = match serde_json::from_value(value) {
+        Ok(doc) => doc,
+        Err(error) => {
+            return (2, CommandEnvelope::error(vec![schema_error(error.to_string())]));
+        }
+    };
+
+    match validate_source_document(&doc) {
+        Ok(()) => {
             let data = serde_json::json!({
                 "model_schema_version": doc.model_schema_version,
                 "node_count": doc.nodes.len(),
@@ -1010,23 +1556,78 @@ pub fn validate_source_json(text: &str) -> (i32, CommandEnvelope<serde_json::Val
             });
             (0, CommandEnvelope::ok(data))
         }
-        Err(error) => {
-            let diagnostic = Diagnostic {
-                code: "DEDIREN_SCHEMA_INVALID".to_string(),
-                severity: DiagnosticSeverity::Error,
-                message: error.to_string(),
-                path: None,
-            };
-            (
-                2,
-                CommandEnvelope {
-                    envelope_schema_version: ENVELOPE_SCHEMA_VERSION.to_string(),
-                    status: "error".to_string(),
-                    data: None,
-                    diagnostics: vec![diagnostic],
-                },
-            )
+        Err(diagnostics) => (2, CommandEnvelope::error(diagnostics)),
+    }
+}
+
+fn schema_error(message: String) -> Diagnostic {
+    Diagnostic {
+        code: "DEDIREN_SCHEMA_INVALID".to_string(),
+        severity: DiagnosticSeverity::Error,
+        message,
+        path: None,
+    }
+}
+
+fn validate_source_document(doc: &SourceDocument) -> Result<(), Vec<Diagnostic>> {
+    let mut diagnostics = Vec::new();
+    let mut ids = HashSet::new();
+    let mut node_ids = HashSet::new();
+
+    for node in &doc.nodes {
+        if !ids.insert(node.id.clone()) {
+            diagnostics.push(error(
+                "DEDIREN_DUPLICATE_ID",
+                format!("duplicate id '{}'", node.id),
+                Some(format!("$.nodes[?(@.id=='{}')]", node.id)),
+            ));
         }
+        node_ids.insert(node.id.clone());
+    }
+
+    for relationship in &doc.relationships {
+        if !ids.insert(relationship.id.clone()) {
+            diagnostics.push(error(
+                "DEDIREN_DUPLICATE_ID",
+                format!("duplicate id '{}'", relationship.id),
+                Some(format!("$.relationships[?(@.id=='{}')]", relationship.id)),
+            ));
+        }
+        if !node_ids.contains(&relationship.source) {
+            diagnostics.push(error(
+                "DEDIREN_DANGLING_ENDPOINT",
+                format!(
+                    "relationship '{}' references missing source '{}'",
+                    relationship.id, relationship.source
+                ),
+                Some(format!("$.relationships[?(@.id=='{}')].source", relationship.id)),
+            ));
+        }
+        if !node_ids.contains(&relationship.target) {
+            diagnostics.push(error(
+                "DEDIREN_DANGLING_ENDPOINT",
+                format!(
+                    "relationship '{}' references missing target '{}'",
+                    relationship.id, relationship.target
+                ),
+                Some(format!("$.relationships[?(@.id=='{}')].target", relationship.id)),
+            ));
+        }
+    }
+
+    if diagnostics.is_empty() {
+        Ok(())
+    } else {
+        Err(diagnostics)
+    }
+}
+
+fn error(code: &str, message: String, path: Option<String>) -> Diagnostic {
+    Diagnostic {
+        code: code.to_string(),
+        severity: DiagnosticSeverity::Error,
+        message,
+        path,
     }
 }
 ```
@@ -1082,14 +1683,12 @@ fn main() -> anyhow::Result<()> {
 }
 ```
 
-Add `serde_json.workspace = true` to `crates/dediren-cli/Cargo.toml`.
-
 - [ ] **Step 4: Verify validate command**
 
 Run:
 
 ```bash
-cargo test --test cli_validate
+cargo test -p dediren --test cli_validate
 ```
 
 Expected: PASS.
@@ -1097,7 +1696,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit validate command**
 
 ```bash
-git add crates/dediren-core crates/dediren-cli tests/cli_validate.rs
+git add crates/dediren-core crates/dediren-cli crates/dediren-cli/tests/cli_validate.rs
 git commit -m "feat: add validate command"
 ```
 
@@ -1106,19 +1705,20 @@ git commit -m "feat: add validate command"
 **Files:**
 - Modify: `crates/dediren-plugin-generic-graph/src/main.rs`
 - Create: `fixtures/layout-request/basic.json`
-- Create: `tests/generic_graph_plugin.rs`
+- Create: `crates/dediren-plugin-generic-graph/tests/generic_graph_plugin.rs`
 
 - [ ] **Step 1: Write failing plugin projection test**
 
-Create `tests/generic_graph_plugin.rs`:
+Create `crates/dediren-plugin-generic-graph/tests/generic_graph_plugin.rs`:
 
 ```rust
 use assert_cmd::Command;
 use predicates::prelude::*;
+use std::path::PathBuf;
 
 #[test]
 fn generic_graph_projects_basic_view() {
-    let input = std::fs::read_to_string("fixtures/source/valid-basic.json").unwrap();
+    let input = std::fs::read_to_string(workspace_file("fixtures/source/valid-basic.json")).unwrap();
     let mut cmd = Command::cargo_bin("dediren-plugin-generic-graph").unwrap();
     cmd.args(["project", "--target", "layout-request", "--view", "main"])
         .write_stdin(input);
@@ -1127,12 +1727,18 @@ fn generic_graph_projects_basic_view() {
         .stdout(predicate::str::contains("\"layout_request_schema_version\""))
         .stdout(predicate::str::contains("\"view_id\":\"main\""));
 }
+
+fn workspace_file(path: &str) -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .join(path)
+}
 ```
 
 Run:
 
 ```bash
-cargo test --test generic_graph_plugin
+cargo test -p dediren-plugin-generic-graph --test generic_graph_plugin
 ```
 
 Expected: FAIL because the plugin has no `project` command.
@@ -1309,7 +1915,7 @@ Create `fixtures/layout-request/basic.json`:
 Run:
 
 ```bash
-cargo test --test generic_graph_plugin
+cargo test -p dediren-plugin-generic-graph --test generic_graph_plugin
 ```
 
 Expected: PASS.
@@ -1317,7 +1923,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit generic graph plugin**
 
 ```bash
-git add crates/dediren-plugin-generic-graph fixtures/layout-request tests/generic_graph_plugin.rs
+git add crates/dediren-plugin-generic-graph fixtures/layout-request crates/dediren-plugin-generic-graph/tests/generic_graph_plugin.rs
 git commit -m "feat: add generic graph projection plugin"
 ```
 
@@ -1325,45 +1931,73 @@ git commit -m "feat: add generic graph projection plugin"
 
 **Files:**
 - Create: `fixtures/plugins/generic-graph.manifest.json`
+- Create: `fixtures/plugins/elk-layout.manifest.json`
+- Create: `fixtures/plugins/svg-render.manifest.json`
 - Create: `crates/dediren-core/src/plugins.rs`
 - Modify: `crates/dediren-core/src/lib.rs`
 - Modify: `crates/dediren-cli/src/main.rs`
-- Create: `tests/cli_project.rs`
+- Create: `crates/dediren-cli/tests/cli_project.rs`
 
 - [ ] **Step 1: Write failing CLI project test**
 
-Create `tests/cli_project.rs`:
+Create `crates/dediren-cli/tests/cli_project.rs`:
 
 ```rust
 use assert_cmd::Command;
 use predicates::prelude::*;
+use std::path::PathBuf;
 
 #[test]
 fn project_invokes_generic_graph_plugin() {
-    let plugin = assert_cmd::cargo::cargo_bin("dediren-plugin-generic-graph");
+    let plugin = workspace_binary("dediren-plugin-generic-graph", "dediren-plugin-generic-graph");
     let mut cmd = Command::cargo_bin("dediren").unwrap();
-    cmd.env("DEDIREN_PLUGIN_GENERIC_GRAPH", plugin);
-    cmd.args([
-        "project",
-        "--target",
-        "layout-request",
-        "--plugin",
-        "generic-graph",
-        "--view",
-        "main",
-        "--input",
-        "fixtures/source/valid-basic.json",
-    ]);
+    cmd.current_dir(workspace_root())
+        .env("DEDIREN_PLUGIN_GENERIC_GRAPH", plugin)
+        .env("DEDIREN_PLUGIN_DIRS", workspace_file("fixtures/plugins"))
+        .args([
+            "project",
+            "--target",
+            "layout-request",
+            "--plugin",
+            "generic-graph",
+            "--view",
+            "main",
+            "--input",
+        ])
+        .arg(workspace_file("fixtures/source/valid-basic.json"));
     cmd.assert()
         .success()
         .stdout(predicate::str::contains("\"layout_request_schema_version\""));
+}
+
+fn workspace_binary(package: &str, binary: &str) -> PathBuf {
+    let status = std::process::Command::new("cargo")
+        .current_dir(workspace_root())
+        .args(["build", "-p", package, "--bin", binary])
+        .status()
+        .unwrap();
+    assert!(status.success());
+    let executable = if cfg!(windows) {
+        format!("{binary}.exe")
+    } else {
+        binary.to_string()
+    };
+    workspace_root().join("target/debug").join(executable)
+}
+
+fn workspace_file(path: &str) -> PathBuf {
+    workspace_root().join(path)
+}
+
+fn workspace_root() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..")
 }
 ```
 
 Run:
 
 ```bash
-cargo test --test cli_project
+cargo test -p dediren --test cli_project
 ```
 
 Expected: FAIL because the CLI has no `project` command.
@@ -1382,44 +2016,114 @@ Create `fixtures/plugins/generic-graph.manifest.json`:
 }
 ```
 
+Create `fixtures/plugins/elk-layout.manifest.json`:
+
+```json
+{
+  "plugin_manifest_schema_version": "plugin-manifest.schema.v1",
+  "id": "elk-layout",
+  "version": "0.1.0",
+  "executable": "dediren-plugin-elk-layout",
+  "capabilities": ["layout"]
+}
+```
+
+Create `fixtures/plugins/svg-render.manifest.json`:
+
+```json
+{
+  "plugin_manifest_schema_version": "plugin-manifest.schema.v1",
+  "id": "svg-render",
+  "version": "0.1.0",
+  "executable": "dediren-plugin-svg-render",
+  "capabilities": ["render"]
+}
+```
+
 - [ ] **Step 3: Implement plugin execution helper**
 
 Create `crates/dediren-core/src/plugins.rs`:
 
 ```rust
-use std::io::Write;
-use std::process::{Command, Stdio};
+use dediren_contracts::{PluginManifest, RuntimeCapabilities};
+use std::io::{Read, Write};
+use std::path::{Path, PathBuf};
+use std::process::{Command, Output, Stdio};
+use std::time::Duration;
+use wait_timeout::ChildExt;
 
-pub fn bundled_executable(plugin_id: &str) -> anyhow::Result<std::path::PathBuf> {
-    let (env_name, binary_name) = match plugin_id {
-        "generic-graph" => ("DEDIREN_PLUGIN_GENERIC_GRAPH", "dediren-plugin-generic-graph"),
-        "elk-layout" => ("DEDIREN_PLUGIN_ELK_LAYOUT", "dediren-plugin-elk-layout"),
-        "svg-render" => ("DEDIREN_PLUGIN_SVG_RENDER", "dediren-plugin-svg-render"),
-        _ => anyhow::bail!("unknown plugin id: {plugin_id}"),
-    };
+#[derive(Debug, Clone)]
+pub struct PluginRegistry {
+    manifest_dirs: Vec<PathBuf>,
+}
 
-    if let Ok(path) = std::env::var(env_name) {
-        return Ok(std::path::PathBuf::from(path));
+#[derive(Debug, Clone)]
+pub struct PluginRunOptions {
+    pub timeout: Duration,
+    pub allowed_env: Vec<(String, String)>,
+}
+
+impl Default for PluginRunOptions {
+    fn default() -> Self {
+        Self {
+            timeout: Duration::from_secs(10),
+            allowed_env: Vec::new(),
+        }
+    }
+}
+
+impl PluginRegistry {
+    pub fn bundled() -> Self {
+        let mut manifest_dirs = vec![
+            PathBuf::from("fixtures/plugins"),
+            PathBuf::from(".dediren/plugins"),
+        ];
+        if let Ok(configured) = std::env::var("DEDIREN_PLUGIN_DIRS") {
+            manifest_dirs.extend(std::env::split_paths(&configured));
+        }
+        Self {
+            manifest_dirs,
+        }
     }
 
-    let current = std::env::current_exe()?;
-    Ok(current.with_file_name(binary_name))
+    pub fn load_manifest(&self, plugin_id: &str) -> anyhow::Result<PluginManifest> {
+        for dir in &self.manifest_dirs {
+            let path = dir.join(format!("{plugin_id}.manifest.json"));
+            if path.exists() {
+                let text = std::fs::read_to_string(path)?;
+                let manifest: PluginManifest = serde_json::from_str(&text)?;
+                if manifest.id == plugin_id {
+                    return Ok(manifest);
+                }
+            }
+        }
+        anyhow::bail!("unknown plugin id: {plugin_id}")
+    }
 }
 
 pub fn run_plugin(plugin_id: &str, args: &[&str], input: &str) -> anyhow::Result<String> {
-    let executable = bundled_executable(plugin_id)?;
-    let mut child = Command::new(executable)
-        .args(args)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()?;
+    run_plugin_with_options(plugin_id, args, input, PluginRunOptions::default())
+}
 
-    if let Some(stdin) = child.stdin.as_mut() {
-        stdin.write_all(input.as_bytes())?;
+pub fn run_plugin_with_options(
+    plugin_id: &str,
+    args: &[&str],
+    input: &str,
+    options: PluginRunOptions,
+) -> anyhow::Result<String> {
+    let registry = PluginRegistry::bundled();
+    let manifest = registry.load_manifest(plugin_id)?;
+    let executable = executable_path(&manifest)?;
+    let capabilities = probe_capabilities(&executable, &options)?;
+    if capabilities.id != manifest.id {
+        anyhow::bail!(
+            "plugin capability id '{}' did not match manifest id '{}'",
+            capabilities.id,
+            manifest.id
+        );
     }
 
-    let output = child.wait_with_output()?;
+    let output = run_executable_with_timeout(&executable, args, input, &options)?;
     if !output.status.success() {
         return Err(anyhow::anyhow!(
             "plugin {plugin_id} exited with status {:?}: {}",
@@ -1429,6 +2133,73 @@ pub fn run_plugin(plugin_id: &str, args: &[&str], input: &str) -> anyhow::Result
     }
 
     Ok(String::from_utf8(output.stdout)?)
+}
+
+fn run_executable_with_timeout(
+    executable: &Path,
+    args: &[&str],
+    input: &str,
+    options: &PluginRunOptions,
+) -> anyhow::Result<Output> {
+    let mut child = Command::new(executable)
+        .args(args)
+        .env_clear()
+        .envs(options.allowed_env.iter().cloned())
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()?;
+
+    if let Some(stdin) = child.stdin.as_mut() {
+        stdin.write_all(input.as_bytes())?;
+    }
+    drop(child.stdin.take());
+
+    let Some(status) = child.wait_timeout(options.timeout)? else {
+        let _ = child.kill();
+        let _ = child.wait();
+        anyhow::bail!("plugin process timed out after {:?}", options.timeout);
+    };
+
+    let mut stdout = Vec::new();
+    if let Some(mut pipe) = child.stdout.take() {
+        pipe.read_to_end(&mut stdout)?;
+    }
+    let mut stderr = Vec::new();
+    if let Some(mut pipe) = child.stderr.take() {
+        pipe.read_to_end(&mut stderr)?;
+    }
+
+    Ok(Output {
+        status,
+        stdout,
+        stderr,
+    })
+}
+
+fn executable_path(manifest: &PluginManifest) -> anyhow::Result<PathBuf> {
+    let env_name = format!(
+        "DEDIREN_PLUGIN_{}",
+        manifest.id.to_ascii_uppercase().replace('-', "_")
+    );
+    if let Ok(path) = std::env::var(env_name) {
+        return Ok(PathBuf::from(path));
+    }
+    Ok(std::env::current_exe()?.with_file_name(&manifest.executable))
+}
+
+fn probe_capabilities(
+    executable: &Path,
+    options: &PluginRunOptions,
+) -> anyhow::Result<RuntimeCapabilities> {
+    let output = run_executable_with_timeout(executable, &["capabilities"], "", options)?;
+    if !output.status.success() {
+        anyhow::bail!(
+            "plugin capability probe failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+    Ok(serde_json::from_slice(&output.stdout)?)
 }
 ```
 
@@ -1471,13 +2242,36 @@ Some(Commands::Project {
     input,
 }) => {
     let text = dediren_core::io::read_json_input(input.as_deref())?;
-    let output = dediren_core::plugins::run_plugin(
+    print_plugin_result(dediren_core::plugins::run_plugin(
         &plugin,
         &["project", "--target", &target, "--view", &view],
         &text,
-    )?;
-    print!("{output}");
-    Ok(())
+    ))
+}
+```
+
+Add this helper function to `crates/dediren-cli/src/main.rs`:
+
+```rust
+fn print_plugin_result(result: anyhow::Result<String>) -> anyhow::Result<()> {
+    match result {
+        Ok(output) => {
+            print!("{output}");
+            Ok(())
+        }
+        Err(error) => {
+            let diagnostic = dediren_contracts::Diagnostic {
+                code: "DEDIREN_PLUGIN_ERROR".to_string(),
+                severity: dediren_contracts::DiagnosticSeverity::Error,
+                message: error.to_string(),
+                path: None,
+            };
+            let envelope =
+                dediren_contracts::CommandEnvelope::<serde_json::Value>::error(vec![diagnostic]);
+            println!("{}", serde_json::to_string(&envelope)?);
+            std::process::exit(3);
+        }
+    }
 }
 ```
 
@@ -1486,7 +2280,7 @@ Some(Commands::Project {
 Run:
 
 ```bash
-cargo test --test cli_project
+cargo test -p dediren --test cli_project
 ```
 
 Expected: PASS.
@@ -1494,7 +2288,7 @@ Expected: PASS.
 - [ ] **Step 6: Commit project orchestration**
 
 ```bash
-git add crates/dediren-core crates/dediren-cli fixtures/plugins tests/cli_project.rs
+git add crates/dediren-core crates/dediren-cli fixtures/plugins crates/dediren-cli/tests/cli_project.rs
 git commit -m "feat: orchestrate projection plugins"
 ```
 
@@ -1502,20 +2296,22 @@ git commit -m "feat: orchestrate projection plugins"
 
 **Files:**
 - Modify: `crates/dediren-plugin-elk-layout/src/main.rs`
-- Create: `tests/elk_layout_plugin.rs`
+- Create: `crates/dediren-plugin-elk-layout/tests/elk_layout_plugin.rs`
 - Create: `fixtures/layout-result/basic.json`
 
 - [ ] **Step 1: Write failing ELK plugin tests**
 
-Create `tests/elk_layout_plugin.rs`:
+Create `crates/dediren-plugin-elk-layout/tests/elk_layout_plugin.rs`:
 
 ```rust
 use assert_cmd::Command;
 use predicates::prelude::*;
+use std::path::PathBuf;
 
 #[test]
 fn elk_plugin_reports_missing_runtime() {
-    let input = std::fs::read_to_string("fixtures/layout-request/basic.json").unwrap();
+    let input =
+        std::fs::read_to_string(workspace_file("fixtures/layout-request/basic.json")).unwrap();
     let mut cmd = Command::cargo_bin("dediren-plugin-elk-layout").unwrap();
     cmd.arg("layout").write_stdin(input);
     cmd.assert()
@@ -1525,10 +2321,9 @@ fn elk_plugin_reports_missing_runtime() {
 
 #[test]
 fn elk_plugin_accepts_fixture_runtime_output() {
-    let input = std::fs::read_to_string("fixtures/layout-request/basic.json").unwrap();
-    let fake = std::env::current_dir()
-        .unwrap()
-        .join("fixtures/layout-result/basic.json");
+    let input =
+        std::fs::read_to_string(workspace_file("fixtures/layout-request/basic.json")).unwrap();
+    let fake = workspace_file("fixtures/layout-result/basic.json");
     let mut cmd = Command::cargo_bin("dediren-plugin-elk-layout").unwrap();
     cmd.env("DEDIREN_ELK_RESULT_FIXTURE", fake)
         .arg("layout")
@@ -1538,12 +2333,18 @@ fn elk_plugin_accepts_fixture_runtime_output() {
         .stdout(predicate::str::contains("\"layout_result_schema_version\""))
         .stdout(predicate::str::contains("\"projection_id\":\"client\""));
 }
+
+fn workspace_file(path: &str) -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .join(path)
+}
 ```
 
 Run:
 
 ```bash
-cargo test --test elk_layout_plugin
+cargo test -p dediren-plugin-elk-layout --test elk_layout_plugin
 ```
 
 Expected: FAIL because the plugin has no `layout` command.
@@ -1581,6 +2382,8 @@ Create `fixtures/layout-result/basic.json`:
   "edges": [
     {
       "id": "client-calls-api",
+      "source": "client",
+      "target": "api",
       "source_id": "client-calls-api",
       "projection_id": "client-calls-api",
       "points": [
@@ -1596,6 +2399,7 @@ Create `fixtures/layout-result/basic.json`:
       "label": "calls"
     }
   ],
+  "groups": [],
   "warnings": []
 }
 ```
@@ -1664,7 +2468,7 @@ fn main() -> anyhow::Result<()> {
 Run:
 
 ```bash
-cargo test --test elk_layout_plugin
+cargo test -p dediren-plugin-elk-layout --test elk_layout_plugin
 ```
 
 Expected: PASS.
@@ -1672,7 +2476,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit ELK plugin**
 
 ```bash
-git add crates/dediren-plugin-elk-layout fixtures/layout-result tests/elk_layout_plugin.rs
+git add crates/dediren-plugin-elk-layout fixtures/layout-result crates/dediren-plugin-elk-layout/tests/elk_layout_plugin.rs
 git commit -m "feat: add elk layout plugin contract"
 ```
 
@@ -1682,22 +2486,28 @@ git commit -m "feat: add elk layout plugin contract"
 - Create: `crates/dediren-core/src/quality.rs`
 - Modify: `crates/dediren-core/src/lib.rs`
 - Modify: `crates/dediren-cli/src/main.rs`
-- Create: `tests/layout_quality.rs`
-- Create: `tests/cli_layout.rs`
+- Create: `crates/dediren-core/tests/layout_quality.rs`
+- Create: `crates/dediren-cli/tests/cli_layout.rs`
 
 - [ ] **Step 1: Write failing quality tests**
 
-Create `tests/layout_quality.rs`:
+Create `crates/dediren-core/tests/layout_quality.rs`:
 
 ```rust
-use dediren_contracts::{LaidOutNode, LayoutResult};
+use dediren_contracts::{LaidOutEdge, LaidOutGroup, LaidOutNode, LayoutResult, Point};
+use std::path::PathBuf;
 
 #[test]
 fn non_overlapping_layout_has_zero_overlaps() {
-    let text = std::fs::read_to_string("fixtures/layout-result/basic.json").unwrap();
+    let text =
+        std::fs::read_to_string(workspace_file("fixtures/layout-result/basic.json")).unwrap();
     let result: LayoutResult = serde_json::from_str(&text).unwrap();
     let report = dediren_core::quality::validate_layout(&result);
     assert_eq!(report.overlap_count, 0);
+    assert_eq!(report.connector_through_node_count, 0);
+    assert_eq!(report.invalid_route_count, 0);
+    assert_eq!(report.group_boundary_issue_count, 0);
+    assert_eq!(report.policy_name, "draft");
     assert_eq!(report.status, "ok");
 }
 
@@ -1708,6 +2518,7 @@ fn overlapping_nodes_are_counted() {
         view_id: "main".to_string(),
         nodes: vec![],
         edges: vec![],
+        groups: vec![],
         warnings: vec![],
     };
     result.nodes.push(node("a", 0.0, 0.0));
@@ -1715,6 +2526,72 @@ fn overlapping_nodes_are_counted() {
     let report = dediren_core::quality::validate_layout(&result);
     assert_eq!(report.overlap_count, 1);
     assert_eq!(report.status, "warning");
+}
+
+#[test]
+fn invalid_routes_are_counted() {
+    let mut result = empty_result();
+    result.edges.push(LaidOutEdge {
+        id: "edge".to_string(),
+        source: "a".to_string(),
+        target: "b".to_string(),
+        source_id: "edge".to_string(),
+        projection_id: "edge".to_string(),
+        points: vec![Point { x: 10.0, y: 10.0 }],
+        label: "broken".to_string(),
+    });
+    let report = dediren_core::quality::validate_layout(&result);
+    assert_eq!(report.invalid_route_count, 1);
+    assert_eq!(report.status, "warning");
+}
+
+#[test]
+fn connector_through_unrelated_node_is_counted() {
+    let mut result = empty_result();
+    result.nodes.push(node("a", 0.0, 0.0));
+    result.nodes.push(node("b", 300.0, 0.0));
+    result.nodes.push(node("middle", 140.0, 20.0));
+    result.edges.push(LaidOutEdge {
+        id: "edge".to_string(),
+        source: "a".to_string(),
+        target: "b".to_string(),
+        source_id: "edge".to_string(),
+        projection_id: "edge".to_string(),
+        points: vec![Point { x: 100.0, y: 40.0 }, Point { x: 300.0, y: 40.0 }],
+        label: "crosses".to_string(),
+    });
+    let report = dediren_core::quality::validate_layout(&result);
+    assert_eq!(report.connector_through_node_count, 1);
+}
+
+#[test]
+fn group_boundary_issues_are_counted() {
+    let mut result = empty_result();
+    result.nodes.push(node("member", 200.0, 200.0));
+    result.groups.push(LaidOutGroup {
+        id: "group".to_string(),
+        source_id: "group".to_string(),
+        projection_id: "group".to_string(),
+        x: 0.0,
+        y: 0.0,
+        width: 100.0,
+        height: 100.0,
+        members: vec!["member".to_string()],
+        label: "Group".to_string(),
+    });
+    let report = dediren_core::quality::validate_layout(&result);
+    assert_eq!(report.group_boundary_issue_count, 1);
+}
+
+fn empty_result() -> LayoutResult {
+    LayoutResult {
+        layout_result_schema_version: "layout-result.schema.v1".to_string(),
+        view_id: "main".to_string(),
+        nodes: vec![],
+        edges: vec![],
+        groups: vec![],
+        warnings: vec![],
+    }
 }
 
 fn node(id: &str, x: f64, y: f64) -> LaidOutNode {
@@ -1729,12 +2606,18 @@ fn node(id: &str, x: f64, y: f64) -> LaidOutNode {
         label: id.to_string(),
     }
 }
+
+fn workspace_file(path: &str) -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .join(path)
+}
 ```
 
 Run:
 
 ```bash
-cargo test --test layout_quality
+cargo test -p dediren-core --test layout_quality
 ```
 
 Expected: FAIL because `quality` does not exist.
@@ -1750,14 +2633,54 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LayoutQualityReport {
     pub status: String,
+    pub policy_name: String,
     pub overlap_count: usize,
+    pub connector_through_node_count: usize,
+    pub invalid_route_count: usize,
+    pub group_boundary_issue_count: usize,
     pub warning_count: usize,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LayoutQualityPolicy {
+    pub name: String,
+    pub max_overlap_count: usize,
+    pub max_connector_through_node_count: usize,
+    pub max_invalid_route_count: usize,
+    pub max_group_boundary_issue_count: usize,
+}
+
+impl Default for LayoutQualityPolicy {
+    fn default() -> Self {
+        Self {
+            name: "draft".to_string(),
+            max_overlap_count: 0,
+            max_connector_through_node_count: 0,
+            max_invalid_route_count: 0,
+            max_group_boundary_issue_count: 0,
+        }
+    }
+}
+
 pub fn validate_layout(result: &LayoutResult) -> LayoutQualityReport {
+    validate_layout_with_policy(result, &LayoutQualityPolicy::default())
+}
+
+pub fn validate_layout_with_policy(
+    result: &LayoutResult,
+    policy: &LayoutQualityPolicy,
+) -> LayoutQualityReport {
     let overlap_count = count_overlaps(result);
+    let connector_through_node_count = count_connector_through_nodes(result);
+    let invalid_route_count = result.edges.iter().filter(|edge| edge.points.len() < 2).count();
+    let group_boundary_issue_count = count_group_boundary_issues(result);
     let warning_count = result.warnings.len();
-    let status = if overlap_count == 0 && warning_count == 0 {
+    let status = if overlap_count <= policy.max_overlap_count
+        && connector_through_node_count <= policy.max_connector_through_node_count
+        && invalid_route_count <= policy.max_invalid_route_count
+        && group_boundary_issue_count <= policy.max_group_boundary_issue_count
+        && warning_count == 0
+    {
         "ok"
     } else {
         "warning"
@@ -1765,7 +2688,11 @@ pub fn validate_layout(result: &LayoutResult) -> LayoutQualityReport {
 
     LayoutQualityReport {
         status: status.to_string(),
+        policy_name: policy.name.clone(),
         overlap_count,
+        connector_through_node_count,
+        invalid_route_count,
+        group_boundary_issue_count,
         warning_count,
     }
 }
@@ -1776,6 +2703,51 @@ fn count_overlaps(result: &LayoutResult) -> usize {
         for right in result.nodes.iter().skip(index + 1) {
             if rectangles_overlap(left.x, left.y, left.width, left.height, right.x, right.y, right.width, right.height) {
                 count += 1;
+            }
+        }
+    }
+    count
+}
+
+fn count_connector_through_nodes(result: &LayoutResult) -> usize {
+    let mut count = 0;
+    for edge in &result.edges {
+        for segment in edge.points.windows(2) {
+            for node in &result.nodes {
+                if node.id != edge.source
+                    && node.id != edge.target
+                    && segment_intersects_rect(
+                        segment[0].x,
+                        segment[0].y,
+                        segment[1].x,
+                        segment[1].y,
+                        node.x,
+                        node.y,
+                        node.width,
+                        node.height,
+                    )
+                {
+                    count += 1;
+                    break;
+                }
+            }
+        }
+    }
+    count
+}
+
+fn count_group_boundary_issues(result: &LayoutResult) -> usize {
+    let mut count = 0;
+    for group in &result.groups {
+        for member_id in &group.members {
+            if let Some(node) = result.nodes.iter().find(|node| &node.id == member_id) {
+                let inside = node.x >= group.x
+                    && node.y >= group.y
+                    && node.x + node.width <= group.x + group.width
+                    && node.y + node.height <= group.y + group.height;
+                if !inside {
+                    count += 1;
+                }
             }
         }
     }
@@ -1797,6 +2769,32 @@ fn rectangles_overlap(
         && left_y < right_y + right_height
         && left_y + left_height > right_y
 }
+
+fn segment_intersects_rect(
+    x1: f64,
+    y1: f64,
+    x2: f64,
+    y2: f64,
+    rect_x: f64,
+    rect_y: f64,
+    rect_width: f64,
+    rect_height: f64,
+) -> bool {
+    let min_x = x1.min(x2);
+    let max_x = x1.max(x2);
+    let min_y = y1.min(y2);
+    let max_y = y1.max(y2);
+    rectangles_overlap(
+        min_x,
+        min_y,
+        (max_x - min_x).max(1.0),
+        (max_y - min_y).max(1.0),
+        rect_x,
+        rect_y,
+        rect_width,
+        rect_height,
+    )
+}
 ```
 
 Modify `crates/dediren-core/src/lib.rs`:
@@ -1814,28 +2812,29 @@ pub fn version() -> &'static str {
 
 - [ ] **Step 3: Add CLI layout and validate-layout tests**
 
-Create `tests/cli_layout.rs`:
+Create `crates/dediren-cli/tests/cli_layout.rs`:
 
 ```rust
 use assert_cmd::Command;
 use predicates::prelude::*;
+use std::path::PathBuf;
 
 #[test]
 fn layout_invokes_elk_plugin_with_fixture_runtime() {
-    let plugin = assert_cmd::cargo::cargo_bin("dediren-plugin-elk-layout");
-    let fixture = std::env::current_dir()
-        .unwrap()
-        .join("fixtures/layout-result/basic.json");
+    let plugin = workspace_binary("dediren-plugin-elk-layout", "dediren-plugin-elk-layout");
+    let fixture = workspace_file("fixtures/layout-result/basic.json");
     let mut cmd = Command::cargo_bin("dediren").unwrap();
-    cmd.env("DEDIREN_PLUGIN_ELK_LAYOUT", plugin)
+    cmd.current_dir(workspace_root())
+        .env("DEDIREN_PLUGIN_ELK_LAYOUT", plugin)
+        .env("DEDIREN_PLUGIN_DIRS", workspace_file("fixtures/plugins"))
         .env("DEDIREN_ELK_RESULT_FIXTURE", fixture)
         .args([
             "layout",
             "--plugin",
             "elk-layout",
             "--input",
-            "fixtures/layout-request/basic.json",
-        ]);
+        ])
+        .arg(workspace_file("fixtures/layout-request/basic.json"));
     cmd.assert()
         .success()
         .stdout(predicate::str::contains("\"layout_result_schema_version\""));
@@ -1844,17 +2843,42 @@ fn layout_invokes_elk_plugin_with_fixture_runtime() {
 #[test]
 fn validate_layout_reports_quality() {
     let mut cmd = Command::cargo_bin("dediren").unwrap();
-    cmd.args(["validate-layout", "--input", "fixtures/layout-result/basic.json"]);
+    cmd.arg("validate-layout")
+        .arg("--input")
+        .arg(workspace_file("fixtures/layout-result/basic.json"));
     cmd.assert()
         .success()
         .stdout(predicate::str::contains("\"overlap_count\":0"));
+}
+
+fn workspace_binary(package: &str, binary: &str) -> PathBuf {
+    let status = std::process::Command::new("cargo")
+        .current_dir(workspace_root())
+        .args(["build", "-p", package, "--bin", binary])
+        .status()
+        .unwrap();
+    assert!(status.success());
+    let executable = if cfg!(windows) {
+        format!("{binary}.exe")
+    } else {
+        binary.to_string()
+    };
+    workspace_root().join("target/debug").join(executable)
+}
+
+fn workspace_file(path: &str) -> PathBuf {
+    workspace_root().join(path)
+}
+
+fn workspace_root() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..")
 }
 ```
 
 Run:
 
 ```bash
-cargo test --test cli_layout
+cargo test -p dediren --test cli_layout
 ```
 
 Expected: FAIL because the CLI has no `layout` or `validate-layout` commands.
@@ -1883,13 +2907,18 @@ Some(Commands::Layout { plugin, input }) => {
     let text = dediren_core::io::read_json_input(input.as_deref())?;
     let request: dediren_contracts::LayoutRequest =
         dediren_core::io::parse_command_data(&text)?;
-    let output = dediren_core::plugins::run_plugin(
+    let mut options = dediren_core::plugins::PluginRunOptions::default();
+    for name in ["DEDIREN_ELK_COMMAND", "DEDIREN_ELK_RESULT_FIXTURE"] {
+        if let Ok(value) = std::env::var(name) {
+            options.allowed_env.push((name.to_string(), value));
+        }
+    }
+    print_plugin_result(dediren_core::plugins::run_plugin_with_options(
         &plugin,
         &["layout"],
         &serde_json::to_string(&request)?,
-    )?;
-    print!("{output}");
-    Ok(())
+        options,
+    ))
 }
 Some(Commands::ValidateLayout { input }) => {
     let text = dediren_core::io::read_json_input(input.as_deref())?;
@@ -1902,15 +2931,13 @@ Some(Commands::ValidateLayout { input }) => {
 }
 ```
 
-Add `dediren-contracts = { path = "../dediren-contracts" }` to `crates/dediren-cli/Cargo.toml`.
-
 - [ ] **Step 5: Verify layout commands**
 
 Run:
 
 ```bash
-cargo test --test layout_quality
-cargo test --test cli_layout
+cargo test -p dediren-core --test layout_quality
+cargo test -p dediren --test cli_layout
 ```
 
 Expected: PASS.
@@ -1918,7 +2945,7 @@ Expected: PASS.
 - [ ] **Step 6: Commit layout validation**
 
 ```bash
-git add crates/dediren-core crates/dediren-cli tests/layout_quality.rs tests/cli_layout.rs
+git add crates/dediren-core crates/dediren-cli crates/dediren-core/tests/layout_quality.rs crates/dediren-cli/tests/cli_layout.rs
 git commit -m "feat: add layout command and quality validation"
 ```
 
@@ -1927,41 +2954,49 @@ git commit -m "feat: add layout command and quality validation"
 **Files:**
 - Modify: `crates/dediren-plugin-svg-render/src/main.rs`
 - Modify: `crates/dediren-cli/src/main.rs`
-- Create: `tests/svg_render_plugin.rs`
-- Create: `tests/cli_render.rs`
+- Create: `crates/dediren-plugin-svg-render/tests/svg_render_plugin.rs`
+- Create: `crates/dediren-cli/tests/cli_render.rs`
 
 - [ ] **Step 1: Write failing SVG plugin test**
 
-Create `tests/svg_render_plugin.rs`:
+Create `crates/dediren-plugin-svg-render/tests/svg_render_plugin.rs`:
 
 ```rust
 use assert_cmd::Command;
 use predicates::prelude::*;
+use std::path::PathBuf;
 
 #[test]
 fn svg_renderer_outputs_svg() {
     let input = serde_json::json!({
         "layout_result": serde_json::from_str::<serde_json::Value>(
-            &std::fs::read_to_string("fixtures/layout-result/basic.json").unwrap()
+            &std::fs::read_to_string(workspace_file("fixtures/layout-result/basic.json")).unwrap()
         ).unwrap(),
         "policy": serde_json::from_str::<serde_json::Value>(
-            &std::fs::read_to_string("fixtures/render-policy/default-svg.json").unwrap()
+            &std::fs::read_to_string(workspace_file("fixtures/render-policy/default-svg.json")).unwrap()
         ).unwrap()
     });
     let mut cmd = Command::cargo_bin("dediren-plugin-svg-render").unwrap();
     cmd.arg("render").write_stdin(serde_json::to_string(&input).unwrap());
     cmd.assert()
         .success()
+        .stdout(predicate::str::contains("\"render_result_schema_version\""))
         .stdout(predicate::str::contains("<svg"))
         .stdout(predicate::str::contains("Client"))
         .stdout(predicate::str::contains("API"));
+}
+
+fn workspace_file(path: &str) -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .join(path)
 }
 ```
 
 Run:
 
 ```bash
-cargo test --test svg_render_plugin
+cargo test -p dediren-plugin-svg-render --test svg_render_plugin
 ```
 
 Expected: FAIL because the renderer has no `render` command.
@@ -1973,7 +3008,10 @@ Replace `crates/dediren-plugin-svg-render/src/main.rs` with:
 ```rust
 use std::io::Read;
 
-use dediren_contracts::{LayoutResult, Point, RenderPolicy};
+use dediren_contracts::{
+    CommandEnvelope, LayoutResult, Point, RenderPolicy, RenderResult,
+    RENDER_RESULT_SCHEMA_VERSION,
+};
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
@@ -1991,7 +3029,7 @@ fn main() -> anyhow::Result<()> {
                 "plugin_protocol_version": "plugin.protocol.v1",
                 "id": "svg-render",
                 "capabilities": ["render"],
-                "artifact": "svg"
+                "runtime": { "artifact_kind": "svg" }
             })
         );
         return Ok(());
@@ -2004,7 +3042,12 @@ fn main() -> anyhow::Result<()> {
     let mut input = String::new();
     std::io::stdin().read_to_string(&mut input)?;
     let render_input: RenderInput = serde_json::from_str(&input)?;
-    print!("{}", render_svg(&render_input.layout_result, &render_input.policy));
+    let result = RenderResult {
+        render_result_schema_version: RENDER_RESULT_SCHEMA_VERSION.to_string(),
+        artifact_kind: "svg".to_string(),
+        content: render_svg(&render_input.layout_result, &render_input.policy),
+    };
+    println!("{}", serde_json::to_string(&CommandEnvelope::ok(result))?);
     Ok(())
 }
 
@@ -2055,7 +3098,7 @@ fn edge_path(points: &[Point]) -> String {
         data.push_str(&format!(" L {:.1} {:.1}", point.x, point.y));
     }
     format!(
-        r#"<path d="{data}" fill="none" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/>"#
+        r#"<path d="{data}" fill="none" stroke="#64748b" stroke-width="1.5"/>"#
     )
 }
 
@@ -2070,37 +3113,59 @@ fn escape(value: &str) -> String {
 
 - [ ] **Step 3: Write failing CLI render test**
 
-Create `tests/cli_render.rs`:
+Create `crates/dediren-cli/tests/cli_render.rs`:
 
 ```rust
 use assert_cmd::Command;
 use predicates::prelude::*;
+use std::path::PathBuf;
 
 #[test]
 fn render_invokes_svg_plugin() {
-    let plugin = assert_cmd::cargo::cargo_bin("dediren-plugin-svg-render");
+    let plugin = workspace_binary("dediren-plugin-svg-render", "dediren-plugin-svg-render");
     let mut cmd = Command::cargo_bin("dediren").unwrap();
-    cmd.env("DEDIREN_PLUGIN_SVG_RENDER", plugin);
-    cmd.args([
-        "render",
-        "--plugin",
-        "svg-render",
-        "--policy",
-        "fixtures/render-policy/default-svg.json",
-        "--input",
-        "fixtures/layout-result/basic.json",
-    ]);
+    cmd.current_dir(workspace_root())
+        .env("DEDIREN_PLUGIN_SVG_RENDER", plugin)
+        .env("DEDIREN_PLUGIN_DIRS", workspace_file("fixtures/plugins"))
+        .args(["render", "--plugin", "svg-render", "--policy"])
+        .arg(workspace_file("fixtures/render-policy/default-svg.json"))
+        .arg("--input")
+        .arg(workspace_file("fixtures/layout-result/basic.json"));
     cmd.assert()
         .success()
+        .stdout(predicate::str::contains("\"render_result_schema_version\""))
         .stdout(predicate::str::contains("<svg"))
         .stdout(predicate::str::contains("Client"));
+}
+
+fn workspace_binary(package: &str, binary: &str) -> PathBuf {
+    let status = std::process::Command::new("cargo")
+        .current_dir(workspace_root())
+        .args(["build", "-p", package, "--bin", binary])
+        .status()
+        .unwrap();
+    assert!(status.success());
+    let executable = if cfg!(windows) {
+        format!("{binary}.exe")
+    } else {
+        binary.to_string()
+    };
+    workspace_root().join("target/debug").join(executable)
+}
+
+fn workspace_file(path: &str) -> PathBuf {
+    workspace_root().join(path)
+}
+
+fn workspace_root() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..")
 }
 ```
 
 Run:
 
 ```bash
-cargo test --test cli_render
+cargo test -p dediren --test cli_render
 ```
 
 Expected: FAIL because the CLI has no `render` command.
@@ -2136,13 +3201,11 @@ Some(Commands::Render {
         "layout_result": layout_result,
         "policy": serde_json::from_str::<serde_json::Value>(&policy_text)?
     });
-    let output = dediren_core::plugins::run_plugin(
+    print_plugin_result(dediren_core::plugins::run_plugin(
         &plugin,
         &["render"],
         &serde_json::to_string(&render_input)?,
-    )?;
-    print!("{output}");
-    Ok(())
+    ))
 }
 ```
 
@@ -2151,8 +3214,8 @@ Some(Commands::Render {
 Run:
 
 ```bash
-cargo test --test svg_render_plugin
-cargo test --test cli_render
+cargo test -p dediren-plugin-svg-render --test svg_render_plugin
+cargo test -p dediren --test cli_render
 ```
 
 Expected: PASS.
@@ -2160,22 +3223,23 @@ Expected: PASS.
 - [ ] **Step 6: Commit render plugin**
 
 ```bash
-git add crates/dediren-plugin-svg-render crates/dediren-cli tests/svg_render_plugin.rs tests/cli_render.rs
+git add crates/dediren-plugin-svg-render crates/dediren-cli crates/dediren-plugin-svg-render/tests/svg_render_plugin.rs crates/dediren-cli/tests/cli_render.rs
 git commit -m "feat: add svg render plugin"
 ```
 
 ## Task 10: Add Full Pipeline Test
 
 **Files:**
-- Create: `tests/cli_pipeline.rs`
+- Create: `crates/dediren-cli/tests/cli_pipeline.rs`
 
 - [ ] **Step 1: Write full pipeline test using intermediate files**
 
-Create `tests/cli_pipeline.rs`:
+Create `crates/dediren-cli/tests/cli_pipeline.rs`:
 
 ```rust
 use assert_cmd::Command;
 use assert_fs::prelude::*;
+use std::path::PathBuf;
 
 #[test]
 fn full_pipeline_produces_svg() {
@@ -2183,16 +3247,16 @@ fn full_pipeline_produces_svg() {
     let request = temp.child("request.json");
     let result = temp.child("result.json");
     let svg = temp.child("diagram.svg");
-    let generic_plugin = assert_cmd::cargo::cargo_bin("dediren-plugin-generic-graph");
-    let elk_plugin = assert_cmd::cargo::cargo_bin("dediren-plugin-elk-layout");
-    let svg_plugin = assert_cmd::cargo::cargo_bin("dediren-plugin-svg-render");
-    let elk_fixture = std::env::current_dir()
-        .unwrap()
-        .join("fixtures/layout-result/basic.json");
+    let generic_plugin = workspace_binary("dediren-plugin-generic-graph", "dediren-plugin-generic-graph");
+    let elk_plugin = workspace_binary("dediren-plugin-elk-layout", "dediren-plugin-elk-layout");
+    let svg_plugin = workspace_binary("dediren-plugin-svg-render", "dediren-plugin-svg-render");
+    let elk_fixture = workspace_file("fixtures/layout-result/basic.json");
 
     let project_output = Command::cargo_bin("dediren")
         .unwrap()
+        .current_dir(workspace_root())
         .env("DEDIREN_PLUGIN_GENERIC_GRAPH", &generic_plugin)
+        .env("DEDIREN_PLUGIN_DIRS", workspace_file("fixtures/plugins"))
         .args([
             "project",
             "--target",
@@ -2202,8 +3266,8 @@ fn full_pipeline_produces_svg() {
             "--view",
             "main",
             "--input",
-            "fixtures/source/valid-basic.json",
         ])
+        .arg(workspace_file("fixtures/source/valid-basic.json"))
         .assert()
         .success()
         .get_output()
@@ -2213,7 +3277,9 @@ fn full_pipeline_produces_svg() {
 
     let layout_output = Command::cargo_bin("dediren")
         .unwrap()
+        .current_dir(workspace_root())
         .env("DEDIREN_PLUGIN_ELK_LAYOUT", &elk_plugin)
+        .env("DEDIREN_PLUGIN_DIRS", workspace_file("fixtures/plugins"))
         .env("DEDIREN_ELK_RESULT_FIXTURE", elk_fixture)
         .args(["layout", "--plugin", "elk-layout", "--input"])
         .arg(request.path())
@@ -2226,6 +3292,7 @@ fn full_pipeline_produces_svg() {
 
     Command::cargo_bin("dediren")
         .unwrap()
+        .current_dir(workspace_root())
         .args(["validate-layout", "--input"])
         .arg(result.path())
         .assert()
@@ -2233,43 +3300,63 @@ fn full_pipeline_produces_svg() {
 
     let render_output = Command::cargo_bin("dediren")
         .unwrap()
+        .current_dir(workspace_root())
         .env("DEDIREN_PLUGIN_SVG_RENDER", &svg_plugin)
-        .args([
-            "render",
-            "--plugin",
-            "svg-render",
-            "--policy",
-            "fixtures/render-policy/default-svg.json",
-            "--input",
-        ])
+        .env("DEDIREN_PLUGIN_DIRS", workspace_file("fixtures/plugins"))
+        .args(["render", "--plugin", "svg-render", "--policy"])
+        .arg(workspace_file("fixtures/render-policy/default-svg.json"))
+        .arg("--input")
         .arg(result.path())
         .assert()
         .success()
         .get_output()
         .stdout
         .clone();
-    svg.write_binary(&render_output).unwrap();
+    let render_envelope: serde_json::Value = serde_json::from_slice(&render_output).unwrap();
+    let svg_content = render_envelope["data"]["content"].as_str().unwrap();
+    svg.write_str(svg_content).unwrap();
 
     let svg_text = std::fs::read_to_string(svg.path()).unwrap();
     assert!(svg_text.contains("<svg"));
     assert!(svg_text.contains("Client"));
     assert!(svg_text.contains("API"));
 }
+
+fn workspace_binary(package: &str, binary: &str) -> PathBuf {
+    let status = std::process::Command::new("cargo")
+        .current_dir(workspace_root())
+        .args(["build", "-p", package, "--bin", binary])
+        .status()
+        .unwrap();
+    assert!(status.success());
+    let executable = if cfg!(windows) {
+        format!("{binary}.exe")
+    } else {
+        binary.to_string()
+    };
+    workspace_root().join("target/debug").join(executable)
+}
+
+fn workspace_file(path: &str) -> PathBuf {
+    workspace_root().join(path)
+}
+
+fn workspace_root() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..")
+}
 ```
 
-- [ ] **Step 2: Confirm test dependencies are available**
+- [ ] **Step 2: Confirm CLI test dependencies are available**
 
-The root `Cargo.toml` from Task 1 already includes these dev-dependencies:
+`crates/dediren-cli/Cargo.toml` from Task 1 already includes the test
+dependencies used by this integration test. Keep the virtual workspace root
+free of root-package dev-dependencies.
 
 ```toml
 [dev-dependencies]
 assert_cmd.workspace = true
 assert_fs.workspace = true
-dediren-contracts = { path = "crates/dediren-contracts" }
-dediren-core = { path = "crates/dediren-core" }
-jsonschema.workspace = true
 predicates.workspace = true
-serde_json.workspace = true
 ```
 
 - [ ] **Step 3: Run pipeline test**
@@ -2277,7 +3364,7 @@ serde_json.workspace = true
 Run:
 
 ```bash
-cargo test --test cli_pipeline
+cargo test -p dediren --test cli_pipeline
 ```
 
 Expected: PASS.
@@ -2285,31 +3372,32 @@ Expected: PASS.
 - [ ] **Step 4: Commit pipeline test**
 
 ```bash
-git add tests/cli_pipeline.rs Cargo.toml crates/dediren-cli/Cargo.toml
+git add crates/dediren-cli/tests/cli_pipeline.rs
 git commit -m "test: cover full diagram pipeline"
 ```
 
 ## Task 11: Add Plugin Capability And Failure Tests
 
 **Files:**
-- Create: `tests/plugin_compat.rs`
+- Create: `crates/dediren-cli/tests/plugin_compat.rs`
 
 - [ ] **Step 1: Write capability tests**
 
-Create `tests/plugin_compat.rs`:
+Create `crates/dediren-cli/tests/plugin_compat.rs`:
 
 ```rust
 use assert_cmd::Command;
 use predicates::prelude::*;
+use std::path::PathBuf;
 
 #[test]
 fn first_party_plugins_report_capabilities() {
     for binary in [
-        "dediren-plugin-generic-graph",
-        "dediren-plugin-elk-layout",
-        "dediren-plugin-svg-render",
+        ("dediren-plugin-generic-graph", "dediren-plugin-generic-graph"),
+        ("dediren-plugin-elk-layout", "dediren-plugin-elk-layout"),
+        ("dediren-plugin-svg-render", "dediren-plugin-svg-render"),
     ] {
-        let mut cmd = Command::cargo_bin(binary).unwrap();
+        let mut cmd = Command::new(workspace_binary(binary.0, binary.1));
         cmd.arg("capabilities");
         cmd.assert()
             .success()
@@ -2321,33 +3409,56 @@ fn first_party_plugins_report_capabilities() {
 #[test]
 fn unknown_plugin_failure_is_structured_by_cli() {
     let mut cmd = Command::cargo_bin("dediren").unwrap();
-    cmd.args([
-        "layout",
-        "--plugin",
-        "missing-plugin",
-        "--input",
-        "fixtures/layout-request/basic.json",
-    ]);
+    cmd.current_dir(workspace_root())
+        .arg("layout")
+        .arg("--plugin")
+        .arg("missing-plugin")
+        .arg("--input")
+        .arg(workspace_file("fixtures/layout-request/basic.json"));
     cmd.assert()
         .failure()
-        .stderr(predicate::str::contains("unknown plugin id"));
+        .stdout(predicate::str::contains("DEDIREN_PLUGIN_ERROR"))
+        .stdout(predicate::str::contains("unknown plugin id"));
+}
+
+fn workspace_binary(package: &str, binary: &str) -> PathBuf {
+    let status = std::process::Command::new("cargo")
+        .current_dir(workspace_root())
+        .args(["build", "-p", package, "--bin", binary])
+        .status()
+        .unwrap();
+    assert!(status.success());
+    let executable = if cfg!(windows) {
+        format!("{binary}.exe")
+    } else {
+        binary.to_string()
+    };
+    workspace_root().join("target/debug").join(executable)
+}
+
+fn workspace_file(path: &str) -> PathBuf {
+    workspace_root().join(path)
+}
+
+fn workspace_root() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..")
 }
 ```
 
 Run:
 
 ```bash
-cargo test --test plugin_compat
+cargo test -p dediren --test plugin_compat
 ```
 
-Expected: PASS. The CLI already returns `anyhow::Result<()>` from `main`, so unknown plugin errors are printed to stderr and the process exits non-zero.
+Expected: PASS. Unknown plugin errors are reported in a JSON command envelope on stdout and the process exits non-zero.
 
 - [ ] **Step 2: Run compatibility tests**
 
 Run:
 
 ```bash
-cargo test --test plugin_compat
+cargo test -p dediren --test plugin_compat
 ```
 
 Expected: PASS.
@@ -2355,7 +3466,7 @@ Expected: PASS.
 - [ ] **Step 3: Commit compatibility tests**
 
 ```bash
-git add crates/dediren-cli crates/dediren-core tests/plugin_compat.rs
+git add crates/dediren-cli crates/dediren-core crates/dediren-cli/tests/plugin_compat.rs
 git commit -m "test: verify plugin compatibility surfaces"
 ```
 
@@ -2379,7 +3490,7 @@ Create `.gitignore`:
 
 Replace `README.md` with:
 
-```markdown
+````markdown
 # dediren
 
 `dediren` is a structured-data-first diagram rendering CLI for agentic tools.
@@ -2404,6 +3515,9 @@ dediren validate-layout --input fixtures/layout-result/basic.json
 dediren render --plugin svg-render --policy fixtures/render-policy/default-svg.json --input fixtures/layout-result/basic.json
 ```
 
+`render` returns a JSON command envelope by default. The SVG text is in
+`.data.content`; this first slice does not expose a raw-output mode.
+
 ## Local Install
 
 ```bash
@@ -2426,7 +3540,7 @@ The bundled ELK layout plugin is an external-process adapter. In production it
 expects an ELK executable or JAR to be configured. Tests use
 `DEDIREN_ELK_RESULT_FIXTURE` to exercise the plugin contract without requiring a
 Java runtime.
-```
+````
 
 - [ ] **Step 3: Run final verification**
 
@@ -2456,5 +3570,6 @@ git commit -m "docs: document initial pipeline"
 ## Self-Review Notes
 
 - Spec coverage: this plan covers the Rust workspace, MIT license, JSON-only contracts, no source geometry, plugin-typed source graph, pipeline commands, external executable plugins, generic projection, ELK layout adapter contract, layout quality validation, SVG render plugin, schema fixtures, executable compatibility tests, local install docs, and plugin lookup docs.
+- Software-design review fixes: schemas are canonical checked-in JSON files; core validates duplicate ids and dangling endpoints; integration tests build member binaries through explicit Cargo package targets; plugin execution uses manifests, capability probes, timeout controls, and env allowlists; render output is a JSON command envelope; layout quality covers overlap, connector-through-node, invalid routes, group boundary issues, warning counts, and deterministic status.
 - Deferred scope: OEF export implementation, PNG rendering, rich SVG policy, non-ELK layout backends, schema-to-Rust codegen, plugin signing, and release binaries remain outside this first implementation plan.
 - Type consistency: the plan consistently uses `SourceDocument`, `LayoutRequest`, `LayoutResult`, `RenderPolicy`, and `CommandEnvelope`.
