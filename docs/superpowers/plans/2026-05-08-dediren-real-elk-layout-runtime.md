@@ -140,6 +140,7 @@ dependencies {
     implementation("org.eclipse.xtext:org.eclipse.xtext.xbase.lib:2.32.0")
 
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.3")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
 tasks.test {
