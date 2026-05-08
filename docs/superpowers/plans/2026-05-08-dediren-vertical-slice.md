@@ -91,7 +91,6 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tempfile = "3"
 thiserror = "2"
-wait-timeout = "0.2"
 ```
 
 - [ ] **Step 2: Add MIT license text**
@@ -204,7 +203,6 @@ jsonschema.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
-wait-timeout.workspace = true
 ```
 
 Write `crates/dediren-core/src/lib.rs`:

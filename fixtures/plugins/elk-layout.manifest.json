@@ -1,0 +1,7 @@
+{
+  "plugin_manifest_schema_version": "plugin-manifest.schema.v1",
+  "id": "elk-layout",
+  "version": "0.1.0",
+  "executable": "dediren-plugin-elk-layout",
+  "capabilities": ["layout"]
+}

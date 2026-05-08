@@ -1,0 +1,110 @@
+use assert_cmd::Command;
+use assert_fs::prelude::*;
+use std::path::PathBuf;
+
+#[test]
+fn full_pipeline_produces_svg() {
+    let temp = assert_fs::TempDir::new().unwrap();
+    let request = temp.child("request.json");
+    let result = temp.child("result.json");
+    let svg = temp.child("diagram.svg");
+    let generic_plugin = workspace_binary(
+        "dediren-plugin-generic-graph",
+        "dediren-plugin-generic-graph",
+    );
+    let elk_plugin = workspace_binary("dediren-plugin-elk-layout", "dediren-plugin-elk-layout");
+    let svg_plugin = workspace_binary("dediren-plugin-svg-render", "dediren-plugin-svg-render");
+    let elk_fixture = workspace_file("fixtures/layout-result/basic.json");
+
+    let project_output = Command::cargo_bin("dediren")
+        .unwrap()
+        .current_dir(workspace_root())
+        .env("DEDIREN_PLUGIN_GENERIC_GRAPH", &generic_plugin)
+        .env("DEDIREN_PLUGIN_DIRS", workspace_file("fixtures/plugins"))
+        .args([
+            "project",
+            "--target",
+            "layout-request",
+            "--plugin",
+            "generic-graph",
+            "--view",
+            "main",
+            "--input",
+        ])
+        .arg(workspace_file("fixtures/source/valid-basic.json"))
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    request.write_binary(&project_output).unwrap();
+
+    let layout_output = Command::cargo_bin("dediren")
+        .unwrap()
+        .current_dir(workspace_root())
+        .env("DEDIREN_PLUGIN_ELK_LAYOUT", &elk_plugin)
+        .env("DEDIREN_PLUGIN_DIRS", workspace_file("fixtures/plugins"))
+        .env("DEDIREN_ELK_RESULT_FIXTURE", elk_fixture)
+        .args(["layout", "--plugin", "elk-layout", "--input"])
+        .arg(request.path())
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    result.write_binary(&layout_output).unwrap();
+
+    Command::cargo_bin("dediren")
+        .unwrap()
+        .current_dir(workspace_root())
+        .args(["validate-layout", "--input"])
+        .arg(result.path())
+        .assert()
+        .success();
+
+    let render_output = Command::cargo_bin("dediren")
+        .unwrap()
+        .current_dir(workspace_root())
+        .env("DEDIREN_PLUGIN_SVG_RENDER", &svg_plugin)
+        .env("DEDIREN_PLUGIN_DIRS", workspace_file("fixtures/plugins"))
+        .args(["render", "--plugin", "svg-render", "--policy"])
+        .arg(workspace_file("fixtures/render-policy/default-svg.json"))
+        .arg("--input")
+        .arg(result.path())
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let render_envelope: serde_json::Value = serde_json::from_slice(&render_output).unwrap();
+    let svg_content = render_envelope["data"]["content"].as_str().unwrap();
+    svg.write_str(svg_content).unwrap();
+
+    let svg_text = std::fs::read_to_string(svg.path()).unwrap();
+    assert!(svg_text.contains("<svg"));
+    assert!(svg_text.contains("Client"));
+    assert!(svg_text.contains("API"));
+}
+
+fn workspace_binary(package: &str, binary: &str) -> PathBuf {
+    let status = std::process::Command::new("cargo")
+        .current_dir(workspace_root())
+        .args(["build", "-p", package, "--bin", binary])
+        .status()
+        .unwrap();
+    assert!(status.success());
+    let executable = if cfg!(windows) {
+        format!("{binary}.exe")
+    } else {
+        binary.to_string()
+    };
+    workspace_root().join("target/debug").join(executable)
+}
+
+fn workspace_file(path: &str) -> PathBuf {
+    workspace_root().join(path)
+}
+
+fn workspace_root() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..")
+}

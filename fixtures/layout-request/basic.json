@@ -1,0 +1,41 @@
+{
+  "layout_request_schema_version": "layout-request.schema.v1",
+  "view_id": "main",
+  "nodes": [
+    {
+      "id": "client",
+      "label": "Client",
+      "source_id": "client",
+      "width_hint": 160,
+      "height_hint": 80
+    },
+    {
+      "id": "api",
+      "label": "API",
+      "source_id": "api",
+      "width_hint": 160,
+      "height_hint": 80
+    }
+  ],
+  "edges": [
+    {
+      "id": "client-calls-api",
+      "source": "client",
+      "target": "api",
+      "label": "calls",
+      "source_id": "client-calls-api"
+    }
+  ],
+  "groups": [],
+  "labels": [
+    {
+      "owner_id": "client",
+      "text": "Client"
+    },
+    {
+      "owner_id": "api",
+      "text": "API"
+    }
+  ],
+  "constraints": []
+}

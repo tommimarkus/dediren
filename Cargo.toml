@@ -1,0 +1,30 @@
+[workspace]
+members = [
+  "crates/dediren-contracts",
+  "crates/dediren-core",
+  "crates/dediren-cli",
+  "crates/dediren-plugin-generic-graph",
+  "crates/dediren-plugin-elk-layout",
+  "crates/dediren-plugin-svg-render",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/souroldgeezer/dediren"
+homepage = "https://github.com/souroldgeezer/dediren"
+rust-version = "1.93"
+
+[workspace.dependencies]
+anyhow = "1"
+assert_cmd = "2"
+assert_fs = "1"
+clap = { version = "4", features = ["derive"] }
+jsonschema = "0.33"
+predicates = "3"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tempfile = "3"
+thiserror = "2"

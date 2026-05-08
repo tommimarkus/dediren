@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dediren.dev/schemas/layout-request.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["layout_request_schema_version", "view_id", "nodes", "edges", "groups", "labels", "constraints"],
+  "properties": {
+    "layout_request_schema_version": { "const": "layout-request.schema.v1" },
+    "view_id": { "type": "string" },
+    "nodes": { "type": "array", "items": { "$ref": "#/$defs/node" } },
+    "edges": { "type": "array", "items": { "$ref": "#/$defs/edge" } },
+    "groups": { "type": "array", "items": { "$ref": "#/$defs/group" } },
+    "labels": { "type": "array", "items": { "$ref": "#/$defs/label" } },
+    "constraints": { "type": "array", "items": { "$ref": "#/$defs/constraint" } }
+  },
+  "$defs": {
+    "node": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label", "source_id"],
+      "properties": {
+        "id": { "type": "string" },
+        "label": { "type": "string" },
+        "source_id": { "type": "string" },
+        "width_hint": { "type": "number", "exclusiveMinimum": 0 },
+        "height_hint": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
+    "edge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "source", "target", "label", "source_id"],
+      "properties": {
+        "id": { "type": "string" },
+        "source": { "type": "string" },
+        "target": { "type": "string" },
+        "label": { "type": "string" },
+        "source_id": { "type": "string" }
+      }
+    },
+    "group": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label", "members", "provenance"],
+      "properties": {
+        "id": { "type": "string" },
+        "label": { "type": "string" },
+        "members": { "type": "array", "items": { "type": "string" } },
+        "provenance": { "type": "object", "additionalProperties": true }
+      }
+    },
+    "label": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["owner_id", "text"],
+      "properties": {
+        "owner_id": { "type": "string" },
+        "text": { "type": "string" }
+      }
+    },
+    "constraint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "subjects"],
+      "properties": {
+        "id": { "type": "string" },
+        "kind": { "type": "string" },
+        "subjects": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}

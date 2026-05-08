@@ -1,0 +1,22 @@
+[package]
+name = "dediren-plugin-svg-render"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "dediren-plugin-svg-render"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+dediren-contracts = { path = "../dediren-contracts" }
+serde.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+assert_cmd.workspace = true
+predicates.workspace = true

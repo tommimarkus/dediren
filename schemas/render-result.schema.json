@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dediren.dev/schemas/render-result.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["render_result_schema_version", "artifact_kind", "content"],
+  "properties": {
+    "render_result_schema_version": { "const": "render-result.schema.v1" },
+    "artifact_kind": { "const": "svg" },
+    "content": { "type": "string" }
+  }
+}

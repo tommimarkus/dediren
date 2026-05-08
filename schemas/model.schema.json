@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dediren.dev/schemas/model.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["model_schema_version", "nodes", "relationships", "plugins"],
+  "properties": {
+    "model_schema_version": { "const": "model.schema.v1" },
+    "required_plugins": { "type": "array", "items": { "$ref": "#/$defs/pluginRequirement" } },
+    "nodes": { "type": "array", "items": { "$ref": "#/$defs/sourceNode" } },
+    "relationships": { "type": "array", "items": { "$ref": "#/$defs/sourceRelationship" } },
+    "plugins": { "type": "object", "additionalProperties": true }
+  },
+  "$defs": {
+    "pluginRequirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" },
+        "version": { "type": "string", "minLength": 1 }
+      }
+    },
+    "sourceNode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "label", "properties"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" },
+        "type": { "type": "string", "minLength": 1 },
+        "label": { "type": "string" },
+        "properties": { "type": "object", "additionalProperties": true }
+      }
+    },
+    "sourceRelationship": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "source", "target", "label", "properties"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" },
+        "type": { "type": "string", "minLength": 1 },
+        "source": { "type": "string" },
+        "target": { "type": "string" },
+        "label": { "type": "string" },
+        "properties": { "type": "object", "additionalProperties": true }
+      }
+    }
+  }
+}

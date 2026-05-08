@@ -1,0 +1,19 @@
+{
+  "model_schema_version": "model.schema.v1",
+  "nodes": [
+    {
+      "id": "client",
+      "type": "generic.actor",
+      "label": "Client",
+      "properties": {}
+    },
+    {
+      "id": "client",
+      "type": "generic.component",
+      "label": "Duplicate",
+      "properties": {}
+    }
+  ],
+  "relationships": [],
+  "plugins": {}
+}

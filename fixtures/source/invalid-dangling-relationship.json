@@ -1,0 +1,22 @@
+{
+  "model_schema_version": "model.schema.v1",
+  "nodes": [
+    {
+      "id": "client",
+      "type": "generic.actor",
+      "label": "Client",
+      "properties": {}
+    }
+  ],
+  "relationships": [
+    {
+      "id": "client-calls-api",
+      "type": "generic.calls",
+      "source": "client",
+      "target": "api",
+      "label": "calls",
+      "properties": {}
+    }
+  ],
+  "plugins": {}
+}

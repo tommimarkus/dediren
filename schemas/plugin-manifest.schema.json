@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dediren.dev/schemas/plugin-manifest.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["plugin_manifest_schema_version", "id", "version", "executable", "capabilities"],
+  "properties": {
+    "plugin_manifest_schema_version": { "const": "plugin-manifest.schema.v1" },
+    "id": { "type": "string" },
+    "version": { "type": "string" },
+    "executable": { "type": "string" },
+    "capabilities": { "type": "array", "items": { "type": "string" } }
+  }
+}
