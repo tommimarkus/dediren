@@ -128,7 +128,7 @@ fn plugin_timeout_is_structured() {
 }
 
 #[test]
-fn plugin_timeout_does_not_wait_for_inherited_pipe_descendant() {
+fn plugin_timeout_covers_pipe_drain_after_parent_exits() {
     let temp = TempDir::new().unwrap();
     write_manifest(
         temp.path(),

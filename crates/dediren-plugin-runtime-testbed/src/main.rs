@@ -89,7 +89,6 @@ fn run_command() -> anyhow_free_result::Result {
         }
         "leak-stdout-child" => {
             spawn_pipe_leak_child()?;
-            std::thread::sleep(Duration::from_secs(2));
         }
         "error-envelope" => {
             print_error_envelope();

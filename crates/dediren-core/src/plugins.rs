@@ -2,7 +2,7 @@ use dediren_contracts::{Diagnostic, DiagnosticSeverity, PluginManifest, RuntimeC
 use std::io::{ErrorKind, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
-use std::thread::JoinHandle;
+use std::sync::mpsc::{self, Receiver, RecvTimeoutError};
 use std::time::{Duration, Instant};
 
 #[derive(Debug, Clone)]
@@ -351,22 +351,12 @@ fn run_executable_with_timeout(
             message: error.to_string(),
         })?;
 
-    let stdin_thread = child.stdin.take().map(|mut stdin| {
-        let input = input.as_bytes().to_vec();
-        std::thread::spawn(move || match stdin.write_all(&input) {
-            Ok(()) => Ok(()),
-            Err(error) if error.kind() == ErrorKind::BrokenPipe => Ok(()),
-            Err(error) => Err(error),
-        })
-    });
-    let stdout_thread = child
-        .stdout
+    let stdin_result = child
+        .stdin
         .take()
-        .map(|stdout| std::thread::spawn(move || read_pipe_to_end(stdout)));
-    let stderr_thread = child
-        .stderr
-        .take()
-        .map(|stderr| std::thread::spawn(move || read_pipe_to_end(stderr)));
+        .map(|stdin| write_stdin_async(stdin, input.as_bytes().to_vec()));
+    let stdout_result = child.stdout.take().map(read_pipe_to_end_async);
+    let stderr_result = child.stderr.take().map(read_pipe_to_end_async);
 
     let status = loop {
         if let Some(status) = child.try_wait().map_err(|error| PluginExecutionError::Io {
@@ -386,9 +376,9 @@ fn run_executable_with_timeout(
         std::thread::sleep(Duration::from_millis(10));
     };
 
-    join_stdin_thread(plugin_id, stdin_thread)?;
-    let stdout = join_pipe_thread(plugin_id, stdout_thread)?;
-    let stderr = join_pipe_thread(plugin_id, stderr_thread)?;
+    receive_stdin_result(plugin_id, stdin_result, deadline, options.timeout)?;
+    let stdout = receive_pipe_result(plugin_id, stdout_result, deadline, options.timeout)?;
+    let stderr = receive_pipe_result(plugin_id, stderr_result, deadline, options.timeout)?;
 
     Ok(Output {
         status,
@@ -403,41 +393,93 @@ fn read_pipe_to_end<R: Read>(mut pipe: R) -> std::io::Result<Vec<u8>> {
     Ok(output)
 }
 
-fn join_stdin_thread(
+fn write_stdin_async<W: Write + Send + 'static>(
+    mut stdin: W,
+    input: Vec<u8>,
+) -> Receiver<std::io::Result<()>> {
+    let (sender, receiver) = mpsc::channel();
+    std::thread::spawn(move || {
+        let result = match stdin.write_all(&input) {
+            Ok(()) => Ok(()),
+            Err(error) if error.kind() == ErrorKind::BrokenPipe => Ok(()),
+            Err(error) => Err(error),
+        };
+        let _ = sender.send(result);
+    });
+    receiver
+}
+
+fn read_pipe_to_end_async<R: Read + Send + 'static>(pipe: R) -> Receiver<std::io::Result<Vec<u8>>> {
+    let (sender, receiver) = mpsc::channel();
+    std::thread::spawn(move || {
+        let _ = sender.send(read_pipe_to_end(pipe));
+    });
+    receiver
+}
+
+fn receive_stdin_result(
     plugin_id: &str,
-    thread: Option<JoinHandle<std::io::Result<()>>>,
+    receiver: Option<Receiver<std::io::Result<()>>>,
+    deadline: Instant,
+    timeout: Duration,
 ) -> Result<(), PluginExecutionError> {
-    match thread {
-        Some(thread) => thread
-            .join()
-            .map_err(|_| PluginExecutionError::Io {
-                plugin_id: plugin_id.to_string(),
-                message: "stdin writer thread panicked".to_string(),
-            })?
-            .map_err(|error| PluginExecutionError::Io {
-                plugin_id: plugin_id.to_string(),
-                message: error.to_string(),
-            }),
-        None => Ok(()),
+    receive_thread_result(
+        plugin_id,
+        receiver,
+        deadline,
+        timeout,
+        "stdin writer thread ended without result",
+    )
+    .map(|_| ())
+}
+
+fn receive_pipe_result(
+    plugin_id: &str,
+    receiver: Option<Receiver<std::io::Result<Vec<u8>>>>,
+    deadline: Instant,
+    timeout: Duration,
+) -> Result<Vec<u8>, PluginExecutionError> {
+    receive_thread_result(
+        plugin_id,
+        receiver,
+        deadline,
+        timeout,
+        "pipe reader thread ended without result",
+    )
+    .map(|output| output.unwrap_or_default())
+}
+
+fn receive_thread_result<T>(
+    plugin_id: &str,
+    receiver: Option<Receiver<std::io::Result<T>>>,
+    deadline: Instant,
+    timeout: Duration,
+    disconnected_message: &str,
+) -> Result<Option<T>, PluginExecutionError> {
+    let Some(receiver) = receiver else {
+        return Ok(None);
+    };
+    let Some(remaining) = deadline.checked_duration_since(Instant::now()) else {
+        return Err(timeout_error(plugin_id, timeout));
+    };
+    match receiver.recv_timeout(remaining) {
+        Ok(Ok(value)) => Ok(Some(value)),
+        Ok(Err(error)) => Err(PluginExecutionError::Io {
+            plugin_id: plugin_id.to_string(),
+            message: error.to_string(),
+        }),
+        Err(RecvTimeoutError::Timeout) => Err(timeout_error(plugin_id, timeout)),
+        Err(RecvTimeoutError::Disconnected) => Err(PluginExecutionError::Io {
+            plugin_id: plugin_id.to_string(),
+            message: disconnected_message.to_string(),
+        }),
     }
 }
 
-fn join_pipe_thread(
-    plugin_id: &str,
-    thread: Option<JoinHandle<std::io::Result<Vec<u8>>>>,
-) -> Result<Vec<u8>, PluginExecutionError> {
-    match thread {
-        Some(thread) => thread
-            .join()
-            .map_err(|_| PluginExecutionError::Io {
-                plugin_id: plugin_id.to_string(),
-                message: "pipe reader thread panicked".to_string(),
-            })?
-            .map_err(|error| PluginExecutionError::Io {
-                plugin_id: plugin_id.to_string(),
-                message: error.to_string(),
-            }),
-        None => Ok(Vec::new()),
+fn timeout_error(plugin_id: &str, timeout: Duration) -> PluginExecutionError {
+    PluginExecutionError::Timeout {
+        plugin_id: plugin_id.to_string(),
+        timeout_ms: timeout.as_millis(),
     }
 }
 
