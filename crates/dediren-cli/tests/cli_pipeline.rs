@@ -140,6 +140,111 @@ fn full_pipeline_produces_svg_and_oef() {
         .contains("xsi:type=\"Diagram\""));
 }
 
+#[test]
+#[ignore = "requires built Java ELK helper"]
+fn real_elk_pipeline_renders_rich_source() {
+    let temp = assert_fs::TempDir::new().unwrap();
+    let request = temp.child("rich-layout-request.json");
+    let result = temp.child("rich-layout-result.json");
+    let svg = temp.child("rich.svg");
+    let generic_plugin = workspace_binary(
+        "dediren-plugin-generic-graph",
+        "dediren-plugin-generic-graph",
+    );
+    let elk_plugin = workspace_binary("dediren-plugin-elk-layout", "dediren-plugin-elk-layout");
+    let svg_plugin = workspace_binary("dediren-plugin-svg-render", "dediren-plugin-svg-render");
+    let elk_helper = workspace_file("crates/dediren-plugin-elk-layout/java/scripts/elk-layout.sh");
+
+    let project_output = Command::cargo_bin("dediren")
+        .unwrap()
+        .current_dir(workspace_root())
+        .env("DEDIREN_PLUGIN_GENERIC_GRAPH", &generic_plugin)
+        .env("DEDIREN_PLUGIN_DIRS", workspace_file("fixtures/plugins"))
+        .args([
+            "project",
+            "--target",
+            "layout-request",
+            "--plugin",
+            "generic-graph",
+            "--view",
+            "main",
+            "--input",
+        ])
+        .arg(workspace_file("fixtures/source/valid-pipeline-rich.json"))
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    request.write_binary(&project_output).unwrap();
+    let project_envelope: serde_json::Value = serde_json::from_slice(&project_output).unwrap();
+    assert_eq!(
+        project_envelope["data"]["groups"]
+            .as_array()
+            .expect("projected groups should be an array")
+            .len(),
+        2
+    );
+
+    let layout_output = Command::cargo_bin("dediren")
+        .unwrap()
+        .current_dir(workspace_root())
+        .env("DEDIREN_PLUGIN_ELK_LAYOUT", &elk_plugin)
+        .env("DEDIREN_ELK_COMMAND", elk_helper)
+        .env("DEDIREN_PLUGIN_DIRS", workspace_file("fixtures/plugins"))
+        .args(["layout", "--plugin", "elk-layout", "--input"])
+        .arg(request.path())
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    result.write_binary(&layout_output).unwrap();
+    let layout_envelope: serde_json::Value = serde_json::from_slice(&layout_output).unwrap();
+    assert_eq!(
+        layout_envelope["data"]["nodes"]
+            .as_array()
+            .expect("laid out nodes should be an array")
+            .len(),
+        6
+    );
+    assert_eq!(
+        layout_envelope["data"]["edges"]
+            .as_array()
+            .expect("laid out edges should be an array")
+            .len(),
+        6
+    );
+    assert_eq!(
+        layout_envelope["data"]["groups"]
+            .as_array()
+            .expect("laid out groups should be an array")
+            .len(),
+        2
+    );
+
+    let render_output = Command::cargo_bin("dediren")
+        .unwrap()
+        .current_dir(workspace_root())
+        .env("DEDIREN_PLUGIN_SVG_RENDER", &svg_plugin)
+        .env("DEDIREN_PLUGIN_DIRS", workspace_file("fixtures/plugins"))
+        .args(["render", "--plugin", "svg-render", "--policy"])
+        .arg(workspace_file("fixtures/render-policy/rich-svg.json"))
+        .arg("--input")
+        .arg(result.path())
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let render_envelope: serde_json::Value = serde_json::from_slice(&render_output).unwrap();
+    let content = render_envelope["data"]["content"].as_str().unwrap();
+    assert!(content.contains("data-dediren-group-id=\"application-services\""));
+    assert!(content.contains("data-dediren-group-id=\"external-dependencies\""));
+    assert!(content.contains("viewBox=\"-"));
+    svg.write_str(content).unwrap();
+}
+
 fn workspace_binary(package: &str, binary: &str) -> PathBuf {
     let status = std::process::Command::new("cargo")
         .current_dir(workspace_root())
