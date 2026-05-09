@@ -13,11 +13,20 @@ fn render_invokes_svg_plugin() {
         .arg(workspace_file("fixtures/render-policy/default-svg.json"))
         .arg("--input")
         .arg(workspace_file("fixtures/layout-result/basic.json"));
-    cmd.assert()
+    let output = cmd
+        .assert()
         .success()
         .stdout(predicate::str::contains("\"render_result_schema_version\""))
         .stdout(predicate::str::contains("<svg"))
-        .stdout(predicate::str::contains("Client"));
+        .stdout(predicate::str::contains("Client"))
+        .get_output()
+        .stdout
+        .clone();
+    let envelope: serde_json::Value = serde_json::from_slice(&output).unwrap();
+    write_render_artifact(
+        "render_invokes_svg_plugin",
+        envelope["data"]["content"].as_str().unwrap(),
+    );
 }
 
 #[test]
@@ -33,6 +42,9 @@ fn render_invokes_svg_plugin_with_rich_policy() {
     let output = cmd.assert().success().get_output().stdout.clone();
     let envelope: serde_json::Value = serde_json::from_slice(&output).unwrap();
     let content = envelope["data"]["content"].as_str().unwrap();
+    let artifact = render_artifact_path("render_invokes_svg_plugin_with_rich_policy");
+    let _ = std::fs::remove_file(&artifact);
+    write_render_artifact("render_invokes_svg_plugin_with_rich_policy", content);
     assert!(envelope["data"]
         .get("render_result_schema_version")
         .is_some());
@@ -45,6 +57,7 @@ fn render_invokes_svg_plugin_with_rich_policy() {
     let calls_edge = semantic_group(&doc, "data-dediren-edge-id", "client-calls-api");
     let calls_path = child_element(calls_edge, "path");
     assert_eq!(calls_path.attribute("stroke"), Some("#7c3aed"));
+    assert!(artifact.exists());
 }
 
 fn svg_doc(content: &str) -> roxmltree::Document<'_> {
@@ -74,6 +87,17 @@ fn child_element<'a, 'input>(
                 tag_name
             )
         })
+}
+
+fn write_render_artifact(test_name: &str, content: &str) -> PathBuf {
+    let path = render_artifact_path(test_name);
+    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+    std::fs::write(&path, content).unwrap();
+    path
+}
+
+fn render_artifact_path(test_name: &str) -> PathBuf {
+    workspace_file(&format!(".test-output/renders/cli-render/{test_name}.svg"))
 }
 
 fn workspace_binary(package: &str, binary: &str) -> PathBuf {

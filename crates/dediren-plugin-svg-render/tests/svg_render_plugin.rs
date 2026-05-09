@@ -21,6 +21,9 @@ fn svg_renderer_outputs_svg() {
         .stdout(predicate::str::contains("<svg"))
         .stdout(predicate::str::contains("Client"))
         .stdout(predicate::str::contains("API"));
+
+    let content = render_content(input);
+    assert!(write_render_artifact(&current_test_name(), &content).exists());
 }
 
 #[test]
@@ -502,7 +505,9 @@ fn render_content(input: serde_json::Value) -> String {
         .write_stdin(serde_json::to_string(&input).unwrap());
     let output = cmd.assert().success().get_output().stdout.clone();
     let envelope: serde_json::Value = serde_json::from_slice(&output).unwrap();
-    envelope["data"]["content"].as_str().unwrap().to_string()
+    let content = envelope["data"]["content"].as_str().unwrap().to_string();
+    write_render_artifact(&current_test_name(), &content);
+    content
 }
 
 fn styled_inline_input(
@@ -556,6 +561,25 @@ fn child_element<'a, 'input>(
                 tag_name
             )
         })
+}
+
+fn write_render_artifact(test_name: &str, content: &str) -> PathBuf {
+    let path = workspace_file(&format!(
+        ".test-output/renders/svg-render-plugin/{test_name}.svg"
+    ));
+    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+    std::fs::write(&path, content).unwrap();
+    path
+}
+
+fn current_test_name() -> String {
+    std::thread::current()
+        .name()
+        .unwrap_or("unknown-test")
+        .rsplit("::")
+        .next()
+        .unwrap_or("unknown-test")
+        .to_string()
 }
 
 fn workspace_file(path: &str) -> PathBuf {

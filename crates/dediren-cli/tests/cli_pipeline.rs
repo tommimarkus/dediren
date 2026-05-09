@@ -98,6 +98,7 @@ fn full_pipeline_produces_svg_and_oef() {
     let render_envelope: serde_json::Value = serde_json::from_slice(&render_output).unwrap();
     let svg_content = render_envelope["data"]["content"].as_str().unwrap();
     svg.write_str(svg_content).unwrap();
+    write_render_artifact("full_pipeline_produces_svg_and_oef", svg_content);
 
     let svg_text = std::fs::read_to_string(svg.path()).unwrap();
     assert!(svg_text.contains("<svg"));
@@ -243,6 +244,16 @@ fn real_elk_pipeline_renders_rich_source() {
     assert!(content.contains("data-dediren-group-id=\"external-dependencies\""));
     assert!(content.contains("viewBox=\"-"));
     svg.write_str(content).unwrap();
+    write_render_artifact("real_elk_pipeline_renders_rich_source", content);
+}
+
+fn write_render_artifact(test_name: &str, content: &str) -> PathBuf {
+    let path = workspace_file(&format!(
+        ".test-output/renders/cli-pipeline/{test_name}.svg"
+    ));
+    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+    std::fs::write(&path, content).unwrap();
+    path
 }
 
 fn workspace_binary(package: &str, binary: &str) -> PathBuf {
