@@ -2,8 +2,8 @@ use std::io::Read;
 
 use anyhow::{bail, Context};
 use dediren_contracts::{
-    CommandEnvelope, GenericGraphPluginData, LayoutEdge, LayoutLabel, LayoutNode, LayoutRequest,
-    SourceDocument, LAYOUT_REQUEST_SCHEMA_VERSION,
+    CommandEnvelope, GenericGraphPluginData, GroupProvenance, LayoutEdge, LayoutGroup,
+    LayoutLabel, LayoutNode, LayoutRequest, SourceDocument, LAYOUT_REQUEST_SCHEMA_VERSION,
 };
 
 fn main() -> anyhow::Result<()> {
@@ -83,6 +83,26 @@ fn main() -> anyhow::Result<()> {
         })
         .collect::<anyhow::Result<Vec<_>>>()?;
 
+    let groups = selected_view
+        .groups
+        .iter()
+        .map(|group| {
+            for member in &group.members {
+                if !selected_view.nodes.iter().any(|node_id| node_id == member) {
+                    bail!("group {} references node outside view: {member}", group.id);
+                }
+            }
+            Ok(LayoutGroup {
+                id: group.id.clone(),
+                label: group.label.clone(),
+                members: group.members.clone(),
+                provenance: GroupProvenance::SemanticBacked {
+                    source_id: group.id.clone(),
+                },
+            })
+        })
+        .collect::<anyhow::Result<Vec<_>>>()?;
+
     let labels = nodes
         .iter()
         .map(|node| LayoutLabel {
@@ -96,7 +116,7 @@ fn main() -> anyhow::Result<()> {
         view_id: selected_view.id.clone(),
         nodes,
         edges,
-        groups: Vec::new(),
+        groups,
         labels,
         constraints: Vec::new(),
     };

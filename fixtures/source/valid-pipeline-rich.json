@@ -115,6 +115,18 @@
             "api-authorizes-payment",
             "api-publishes-job",
             "worker-reads-database"
+          ],
+          "groups": [
+            {
+              "id": "application-services",
+              "label": "Application Services",
+              "members": ["web-app", "orders-api", "worker"]
+            },
+            {
+              "id": "external-dependencies",
+              "label": "External Dependencies",
+              "members": ["payments", "database"]
+            }
           ]
         }
       ]

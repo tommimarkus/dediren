@@ -120,6 +120,16 @@ pub struct GenericGraphView {
     pub label: String,
     pub nodes: Vec<String>,
     pub relationships: Vec<String>,
+    #[serde(default)]
+    pub groups: Vec<GenericGraphViewGroup>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GenericGraphViewGroup {
+    pub id: String,
+    pub label: String,
+    pub members: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
