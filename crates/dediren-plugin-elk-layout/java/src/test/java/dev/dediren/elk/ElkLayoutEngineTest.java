@@ -71,4 +71,59 @@ class ElkLayoutEngineTest {
                 warning.code().equals("DEDIREN_ELK_MISSING_GROUP_MEMBER")
                     && warning.path().equals("$.groups[0].members[1]")));
     }
+
+    @Test
+    void groupedMembersProduceGroupBoundsAroundGeneratedNodeGeometry() {
+        JsonContracts.LayoutRequest request = new JsonContracts.LayoutRequest(
+            "layout-request.schema.v1",
+            "main",
+            List.of(
+                new JsonContracts.LayoutNode("web-app", "Web App", "web-app", 160.0, 80.0),
+                new JsonContracts.LayoutNode("orders-api", "Orders API", "orders-api", 160.0, 80.0),
+                new JsonContracts.LayoutNode("worker", "Fulfillment Worker", "worker", 160.0, 80.0),
+                new JsonContracts.LayoutNode("payments", "Payments Provider", "payments", 160.0, 80.0),
+                new JsonContracts.LayoutNode("database", "PostgreSQL", "database", 160.0, 80.0)),
+            List.of(
+                new JsonContracts.LayoutEdge(
+                    "web-app-calls-api", "web-app", "orders-api", "calls API", "web-app-calls-api"),
+                new JsonContracts.LayoutEdge(
+                    "api-authorizes-payment", "orders-api", "payments", "authorizes payment", "api-authorizes-payment"),
+                new JsonContracts.LayoutEdge(
+                    "api-writes-database", "orders-api", "database", "writes orders", "api-writes-database"),
+                new JsonContracts.LayoutEdge(
+                    "api-publishes-job", "orders-api", "worker", "publishes fulfillment", "api-publishes-job"),
+                new JsonContracts.LayoutEdge(
+                    "worker-reads-database", "worker", "database", "loads order", "worker-reads-database")),
+            List.of(
+                new JsonContracts.LayoutGroup(
+                    "application-services",
+                    "Application Services",
+                    List.of("web-app", "orders-api", "worker"),
+                    new JsonContracts.GroupProvenance(
+                        new JsonContracts.SemanticBacked("application-services"))),
+                new JsonContracts.LayoutGroup(
+                    "external-dependencies",
+                    "External Dependencies",
+                    List.of("payments", "database"),
+                    new JsonContracts.GroupProvenance(
+                        new JsonContracts.SemanticBacked("external-dependencies")))),
+            List.of(),
+            List.of());
+
+        JsonContracts.LayoutResult result = new ElkLayoutEngine().layout(request);
+
+        assertEquals(2, result.groups().size());
+        JsonContracts.LaidOutGroup application = result.groups().stream()
+            .filter(group -> group.id().equals("application-services"))
+            .findFirst()
+            .orElseThrow();
+        JsonContracts.LaidOutGroup external = result.groups().stream()
+            .filter(group -> group.id().equals("external-dependencies"))
+            .findFirst()
+            .orElseThrow();
+
+        assertEquals(List.of("web-app", "orders-api", "worker"), application.members());
+        assertEquals(List.of("payments", "database"), external.members());
+        assertTrue(external.x() > application.x(), "external dependency group should render to the right");
+    }
 }
