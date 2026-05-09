@@ -2,8 +2,8 @@ use std::io::Read;
 
 use anyhow::{bail, Context};
 use dediren_contracts::{
-    CommandEnvelope, GenericGraphPluginData, GroupProvenance, LayoutEdge, LayoutGroup,
-    LayoutLabel, LayoutNode, LayoutRequest, SourceDocument, LAYOUT_REQUEST_SCHEMA_VERSION,
+    CommandEnvelope, GenericGraphPluginData, GroupProvenance, LayoutEdge, LayoutGroup, LayoutLabel,
+    LayoutNode, LayoutRequest, SourceDocument, LAYOUT_REQUEST_SCHEMA_VERSION,
 };
 
 fn main() -> anyhow::Result<()> {

@@ -19,9 +19,8 @@ fn generic_graph_projects_basic_view() {
 
 #[test]
 fn generic_graph_projects_rich_view_groups() {
-    let input =
-        std::fs::read_to_string(workspace_file("fixtures/source/valid-pipeline-rich.json"))
-            .unwrap();
+    let input = std::fs::read_to_string(workspace_file("fixtures/source/valid-pipeline-rich.json"))
+        .unwrap();
     let mut cmd = Command::cargo_bin("dediren-plugin-generic-graph").unwrap();
     let output = cmd
         .args(["project", "--target", "layout-request", "--view", "main"])

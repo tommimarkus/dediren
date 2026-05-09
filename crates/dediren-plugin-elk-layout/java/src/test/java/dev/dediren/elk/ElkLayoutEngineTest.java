@@ -125,5 +125,8 @@ class ElkLayoutEngineTest {
         assertEquals(List.of("web-app", "orders-api", "worker"), application.members());
         assertEquals(List.of("payments", "database"), external.members());
         assertTrue(external.x() > application.x(), "external dependency group should render to the right");
+        assertTrue(
+            application.x() + application.width() <= external.x(),
+            "group bounds should not overlap horizontally");
     }
 }

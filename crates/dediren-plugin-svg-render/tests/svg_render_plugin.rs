@@ -395,8 +395,8 @@ fn svg_renderer_expands_viewbox_to_include_edge_labels() {
     let doc = svg_doc(&content);
     let root = doc.root_element();
 
-    assert_eq!(root.attribute("width"), Some("640"));
-    assert_eq!(root.attribute("height"), Some("360"));
+    assert!(root.attribute("width").unwrap().parse::<f64>().unwrap() >= 640.0);
+    assert!(root.attribute("height").unwrap().parse::<f64>().unwrap() >= 360.0);
     let view_box = root.attribute("viewBox").unwrap();
     assert!(
         view_box.starts_with('-'),
@@ -405,6 +405,61 @@ fn svg_renderer_expands_viewbox_to_include_edge_labels() {
     assert!(
         view_box.contains(" -"),
         "expected negative min-y in viewBox, got {view_box}"
+    );
+}
+
+#[test]
+fn svg_renderer_moves_edge_label_away_from_node_boxes() {
+    let input = styled_inline_input(
+        serde_json::json!([]),
+        serde_json::json!([
+            {
+                "id": "left-node",
+                "source_id": "left-node",
+                "projection_id": "left-node",
+                "x": 0,
+                "y": 32,
+                "width": 160,
+                "height": 80,
+                "label": "Left"
+            },
+            {
+                "id": "right-node",
+                "source_id": "right-node",
+                "projection_id": "right-node",
+                "x": 200,
+                "y": 32,
+                "width": 160,
+                "height": 80,
+                "label": "Right"
+            }
+        ]),
+        serde_json::json!([
+            {
+                "id": "left-to-right",
+                "source": "left-node",
+                "target": "right-node",
+                "source_id": "left-to-right",
+                "projection_id": "left-to-right",
+                "points": [
+                    { "x": 160, "y": 72 },
+                    { "x": 200, "y": 72 }
+                ],
+                "label": "label wider than gap"
+            }
+        ]),
+        serde_json::json!({}),
+    );
+
+    let content = render_content(input);
+    let doc = svg_doc(&content);
+
+    let edge = semantic_group(&doc, "data-dediren-edge-id", "left-to-right");
+    let label = child_element(edge, "text");
+    let y = label.attribute("y").unwrap().parse::<f64>().unwrap();
+    assert!(
+        !(32.0..=112.0).contains(&y),
+        "edge label should move outside node boxes, got y={y}"
     );
 }
 

@@ -355,11 +355,13 @@ fn svg_bounds(result: &LayoutResult, policy: &RenderPolicy, style: &ResolvedStyl
 fn render_svg(result: &LayoutResult, policy: &RenderPolicy) -> String {
     let style = base_style(policy);
     let bounds = svg_bounds(result, policy, &style);
+    let rendered_width = policy.page.width.max(bounds.width());
+    let rendered_height = policy.page.height.max(bounds.height());
     let mut svg = String::new();
     svg.push_str(&format!(
         r#"<svg xmlns="http://www.w3.org/2000/svg" width="{:.0}" height="{:.0}" viewBox="{:.1} {:.1} {:.1} {:.1}">"#,
-        policy.page.width,
-        policy.page.height,
+        rendered_width,
+        rendered_height,
         bounds.min_x,
         bounds.min_y,
         bounds.width(),
@@ -394,6 +396,7 @@ fn render_svg(result: &LayoutResult, policy: &RenderPolicy) -> String {
     }
 
     let mut rendered_edges: Vec<&LaidOutEdge> = Vec::new();
+    let mut occupied_label_boxes = node_obstacle_boxes(result);
     for edge in &result.edges {
         let edge_style = edge_style(policy, &edge.id, &style);
         svg.push_str(&format!(
@@ -402,7 +405,13 @@ fn render_svg(result: &LayoutResult, policy: &RenderPolicy) -> String {
         ));
         svg.push_str(&edge_marker(edge, &edge_style));
         svg.push_str(&edge_path(edge, &edge_style, &rendered_edges));
-        svg.push_str(&edge_label(edge, &edge_style, &style.background_fill));
+        svg.push_str(&edge_label(
+            edge,
+            &edge_style,
+            &style.background_fill,
+            style.font_size,
+            &mut occupied_label_boxes,
+        ));
         svg.push_str("</g>");
         rendered_edges.push(edge);
     }
@@ -744,18 +753,107 @@ fn edge_marker_id(edge_id: &str) -> String {
     format!("arrow-{edge_id}")
 }
 
-fn edge_label(edge: &LaidOutEdge, style: &ResolvedEdgeStyle, background_fill: &str) -> String {
+#[derive(Debug, Clone)]
+struct LabelBox {
+    min_x: f64,
+    min_y: f64,
+    max_x: f64,
+    max_y: f64,
+}
+
+impl LabelBox {
+    fn overlaps(&self, other: &LabelBox) -> bool {
+        self.min_x < other.max_x
+            && self.max_x > other.min_x
+            && self.min_y < other.max_y
+            && self.max_y > other.min_y
+    }
+}
+
+fn node_obstacle_boxes(result: &LayoutResult) -> Vec<LabelBox> {
+    result
+        .nodes
+        .iter()
+        .map(|node| LabelBox {
+            min_x: node.x,
+            min_y: node.y,
+            max_x: node.x + node.width,
+            max_y: node.y + node.height,
+        })
+        .collect()
+}
+
+fn edge_label(
+    edge: &LaidOutEdge,
+    style: &ResolvedEdgeStyle,
+    background_fill: &str,
+    font_size: f64,
+    occupied_boxes: &mut Vec<LabelBox>,
+) -> String {
     if let Some(point) = edge_label_point(&edge.points) {
+        let (label_y, label_box) = edge_label_position(
+            point.x,
+            point.y - 8.0,
+            &edge.label,
+            font_size,
+            occupied_boxes,
+        );
+        occupied_boxes.push(label_box);
         format!(
             r##"<text x="{:.1}" y="{:.1}" text-anchor="middle" fill="{}" stroke="{}" stroke-width="4" stroke-linejoin="round" paint-order="stroke">{}</text>"##,
             point.x,
-            point.y - 8.0,
+            label_y,
             escape_attr(&style.label_fill),
             escape_attr(background_fill),
             escape_text(&edge.label)
         )
     } else {
         String::new()
+    }
+}
+
+fn edge_label_position(
+    x: f64,
+    base_y: f64,
+    text: &str,
+    font_size: f64,
+    occupied_boxes: &[LabelBox],
+) -> (f64, LabelBox) {
+    let step = font_size + 4.0;
+    for attempt in 0..12 {
+        let label_y = base_y + label_offset(attempt) * step;
+        let label_box = text_box(x, label_y, text, font_size);
+        if occupied_boxes
+            .iter()
+            .all(|occupied| !label_box.overlaps(occupied))
+        {
+            return (label_y, label_box);
+        }
+    }
+    let label_box = text_box(x, base_y, text, font_size);
+    (base_y, label_box)
+}
+
+fn label_offset(attempt: usize) -> f64 {
+    if attempt == 0 {
+        0.0
+    } else {
+        let distance = attempt.div_ceil(2) as f64;
+        if attempt % 2 == 1 {
+            -distance
+        } else {
+            distance
+        }
+    }
+}
+
+fn text_box(x: f64, y: f64, text: &str, font_size: f64) -> LabelBox {
+    let half_width = estimate_text_width(text, font_size) / 2.0;
+    LabelBox {
+        min_x: x - half_width,
+        min_y: y - font_size,
+        max_x: x + half_width,
+        max_y: y + font_size * 0.4,
     }
 }
 

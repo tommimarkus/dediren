@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.eclipse.elk.alg.layered.options.LayeredOptions;
 import org.eclipse.elk.core.RecursiveGraphLayoutEngine;
 import org.eclipse.elk.core.options.CoreOptions;
 import org.eclipse.elk.core.options.Direction;
@@ -18,14 +19,22 @@ final class ElkLayoutEngine {
     private static final double DEFAULT_WIDTH = 160.0;
     private static final double DEFAULT_HEIGHT = 80.0;
     private static final double GROUP_PADDING = 24.0;
+    private static final double NODE_SPACING = 120.0;
+    private static final double EDGE_NODE_SPACING = 32.0;
+    private static final double EDGE_EDGE_SPACING = 20.0;
 
     JsonContracts.LayoutResult layout(JsonContracts.LayoutRequest request) {
         validate(request);
+        if (!list(request.groups()).isEmpty()) {
+            return layoutGrouped(request);
+        }
 
+        return layoutFlat(request);
+    }
+
+    private static JsonContracts.LayoutResult layoutFlat(JsonContracts.LayoutRequest request) {
         ElkNode root = ElkGraphUtil.createGraph();
-        root.setProperty(CoreOptions.ALGORITHM, "org.eclipse.elk.layered");
-        root.setProperty(CoreOptions.DIRECTION, Direction.RIGHT);
-        root.setProperty(CoreOptions.EDGE_ROUTING, EdgeRouting.ORTHOGONAL);
+        configureRoot(root);
 
         Map<String, ElkNode> elkNodes = new HashMap<>();
         for (JsonContracts.LayoutNode node : list(request.nodes())) {
@@ -102,6 +111,387 @@ final class ElkLayoutEngine {
             edges,
             groups,
             warnings);
+    }
+
+    private static JsonContracts.LayoutResult layoutGrouped(JsonContracts.LayoutRequest request) {
+        List<JsonContracts.Diagnostic> warnings = new ArrayList<>();
+        Map<String, JsonContracts.LayoutNode> requestNodes = requestNodesById(request);
+        Map<String, String> ownerByNode = ownerByNode(request);
+        Map<String, InternalLayout> internalLayouts = new HashMap<>();
+        List<JsonContracts.LayoutNode> macroNodes = new ArrayList<>();
+
+        for (JsonContracts.LayoutGroup group : list(request.groups())) {
+            List<JsonContracts.LayoutNode> members = list(group.members()).stream()
+                .map(requestNodes::get)
+                .filter(node -> node != null)
+                .toList();
+            if (members.isEmpty()) {
+                continue;
+            }
+            List<JsonContracts.LayoutEdge> internalEdges = list(request.edges()).stream()
+                .filter(edge -> group.id().equals(ownerByNode.get(edge.source()))
+                    && group.id().equals(ownerByNode.get(edge.target())))
+                .toList();
+            InternalLayout internalLayout = internalLayout(members, internalEdges);
+            internalLayouts.put(group.id(), internalLayout);
+            macroNodes.add(new JsonContracts.LayoutNode(
+                group.id(),
+                group.label(),
+                semanticBackedSourceId(group.provenance(), group.id()),
+                internalLayout.width() + (GROUP_PADDING * 2.0),
+                internalLayout.height() + (GROUP_PADDING * 2.0)));
+        }
+
+        for (JsonContracts.LayoutNode node : list(request.nodes())) {
+            if (!ownerByNode.containsKey(node.id())) {
+                macroNodes.add(node);
+            }
+        }
+
+        List<JsonContracts.LayoutEdge> macroEdges = new ArrayList<>();
+        for (JsonContracts.LayoutEdge edge : list(request.edges())) {
+            String source = macroId(edge.source(), ownerByNode);
+            String target = macroId(edge.target(), ownerByNode);
+            if (source == null || target == null || source.equals(target)) {
+                continue;
+            }
+            macroEdges.add(new JsonContracts.LayoutEdge(
+                edge.id(),
+                source,
+                target,
+                edge.label(),
+                edge.source_id()));
+        }
+
+        GraphLayout macroLayout = graphLayout(macroNodes, macroEdges);
+        Map<String, JsonContracts.LaidOutNode> finalNodes = new HashMap<>();
+        List<JsonContracts.LaidOutNode> nodes = new ArrayList<>();
+        for (JsonContracts.LayoutNode node : list(request.nodes())) {
+            String owner = ownerByNode.get(node.id());
+            JsonContracts.LaidOutNode laidOutNode;
+            if (owner == null) {
+                laidOutNode = macroLayout.nodes().get(node.id());
+            } else {
+                JsonContracts.LaidOutNode groupNode = macroLayout.nodes().get(owner);
+                InternalLayout internalLayout = internalLayouts.get(owner);
+                JsonContracts.LaidOutNode internalNode =
+                    internalLayout == null ? null : internalLayout.nodes().get(node.id());
+                laidOutNode = groupNode == null || internalNode == null ? null : offsetNode(
+                    internalNode,
+                    groupNode.x() + GROUP_PADDING,
+                    groupNode.y() + GROUP_PADDING);
+            }
+            if (laidOutNode != null) {
+                finalNodes.put(node.id(), laidOutNode);
+                nodes.add(laidOutNode);
+            }
+        }
+
+        List<JsonContracts.LaidOutEdge> edges = new ArrayList<>();
+        for (JsonContracts.LayoutEdge edge : list(request.edges())) {
+            String sourceOwner = ownerByNode.get(edge.source());
+            String targetOwner = ownerByNode.get(edge.target());
+            JsonContracts.LaidOutEdge laidOutEdge = null;
+            if (sourceOwner != null && sourceOwner.equals(targetOwner)) {
+                JsonContracts.LaidOutNode groupNode = macroLayout.nodes().get(sourceOwner);
+                InternalLayout internalLayout = internalLayouts.get(sourceOwner);
+                JsonContracts.LaidOutEdge internalEdge =
+                    internalLayout == null ? null : internalLayout.edges().get(edge.id());
+                if (groupNode != null && internalEdge != null) {
+                    laidOutEdge = offsetEdge(
+                        internalEdge,
+                        groupNode.x() + GROUP_PADDING,
+                        groupNode.y() + GROUP_PADDING);
+                }
+            }
+            if (laidOutEdge == null) {
+                JsonContracts.LaidOutNode source = finalNodes.get(edge.source());
+                JsonContracts.LaidOutNode target = finalNodes.get(edge.target());
+                if (source == null || target == null) {
+                    warnings.add(new JsonContracts.Diagnostic(
+                        "DEDIREN_ELK_DANGLING_EDGE",
+                        "warning",
+                        "edge " + edge.id() + " references a missing endpoint",
+                        null));
+                    continue;
+                }
+                laidOutEdge = new JsonContracts.LaidOutEdge(
+                    edge.id(),
+                    edge.source(),
+                    edge.target(),
+                    edge.source_id(),
+                    edge.id(),
+                    routeBetween(source, target),
+                    edge.label());
+            }
+            edges.add(laidOutEdge);
+        }
+
+        List<JsonContracts.LaidOutGroup> groups =
+            groupedBounds(request, macroLayout.nodes(), internalLayouts, warnings);
+
+        return new JsonContracts.LayoutResult(
+            "layout-result.schema.v1",
+            request.view_id(),
+            nodes,
+            edges,
+            groups,
+            warnings);
+    }
+
+    private record GraphLayout(
+        Map<String, JsonContracts.LaidOutNode> nodes,
+        Map<String, JsonContracts.LaidOutEdge> edges) {
+    }
+
+    private record InternalLayout(
+        Map<String, JsonContracts.LaidOutNode> nodes,
+        Map<String, JsonContracts.LaidOutEdge> edges,
+        double width,
+        double height) {
+    }
+
+    private static InternalLayout internalLayout(
+        List<JsonContracts.LayoutNode> nodes,
+        List<JsonContracts.LayoutEdge> edges) {
+        GraphLayout layout = graphLayout(nodes, edges);
+        double minX = layout.nodes().values().stream().mapToDouble(JsonContracts.LaidOutNode::x).min().orElse(0.0);
+        double minY = layout.nodes().values().stream().mapToDouble(JsonContracts.LaidOutNode::y).min().orElse(0.0);
+        double maxX = layout.nodes().values().stream().mapToDouble(node -> node.x() + node.width()).max().orElse(0.0);
+        double maxY = layout.nodes().values().stream().mapToDouble(node -> node.y() + node.height()).max().orElse(0.0);
+
+        Map<String, JsonContracts.LaidOutNode> normalizedNodes = new HashMap<>();
+        for (Map.Entry<String, JsonContracts.LaidOutNode> entry : layout.nodes().entrySet()) {
+            normalizedNodes.put(entry.getKey(), offsetNode(entry.getValue(), -minX, -minY));
+        }
+
+        Map<String, JsonContracts.LaidOutEdge> normalizedEdges = new HashMap<>();
+        for (Map.Entry<String, JsonContracts.LaidOutEdge> entry : layout.edges().entrySet()) {
+            normalizedEdges.put(entry.getKey(), offsetEdge(entry.getValue(), -minX, -minY));
+        }
+
+        return new InternalLayout(
+            normalizedNodes,
+            normalizedEdges,
+            maxX - minX,
+            maxY - minY);
+    }
+
+    private static GraphLayout graphLayout(
+        List<JsonContracts.LayoutNode> requestNodes,
+        List<JsonContracts.LayoutEdge> requestEdges) {
+        ElkNode root = ElkGraphUtil.createGraph();
+        configureRoot(root);
+
+        Map<String, ElkNode> elkNodes = new HashMap<>();
+        for (JsonContracts.LayoutNode node : requestNodes) {
+            ElkNode elkNode = ElkGraphUtil.createNode(root);
+            elkNode.setIdentifier(node.id());
+            elkNode.setDimensions(
+                positiveOrDefault(node.width_hint(), DEFAULT_WIDTH),
+                positiveOrDefault(node.height_hint(), DEFAULT_HEIGHT));
+            ElkGraphUtil.createLabel(elkNode).setText(node.label());
+            elkNodes.put(node.id(), elkNode);
+        }
+
+        Map<String, ElkEdge> elkEdges = new HashMap<>();
+        for (JsonContracts.LayoutEdge edge : requestEdges) {
+            ElkNode source = elkNodes.get(edge.source());
+            ElkNode target = elkNodes.get(edge.target());
+            if (source == null || target == null) {
+                continue;
+            }
+            ElkEdge elkEdge = ElkGraphUtil.createSimpleEdge(source, target);
+            elkEdge.setIdentifier(edge.id());
+            ElkGraphUtil.createLabel(elkEdge).setText(edge.label());
+            elkEdges.put(edge.id(), elkEdge);
+        }
+
+        new RecursiveGraphLayoutEngine().layout(root, new BasicProgressMonitor());
+
+        Map<String, JsonContracts.LaidOutNode> nodes = new HashMap<>();
+        for (JsonContracts.LayoutNode node : requestNodes) {
+            ElkNode elkNode = elkNodes.get(node.id());
+            if (elkNode != null) {
+                nodes.put(node.id(), new JsonContracts.LaidOutNode(
+                    node.id(),
+                    node.source_id(),
+                    node.id(),
+                    elkNode.getX(),
+                    elkNode.getY(),
+                    elkNode.getWidth(),
+                    elkNode.getHeight(),
+                    node.label()));
+            }
+        }
+
+        Map<String, JsonContracts.LaidOutEdge> edges = new HashMap<>();
+        for (JsonContracts.LayoutEdge edge : requestEdges) {
+            ElkEdge elkEdge = elkEdges.get(edge.id());
+            if (elkEdge != null) {
+                edges.put(edge.id(), new JsonContracts.LaidOutEdge(
+                    edge.id(),
+                    edge.source(),
+                    edge.target(),
+                    edge.source_id(),
+                    edge.id(),
+                    points(elkEdge),
+                    edge.label()));
+            }
+        }
+
+        return new GraphLayout(nodes, edges);
+    }
+
+    private static void configureRoot(ElkNode root) {
+        root.setProperty(CoreOptions.ALGORITHM, "org.eclipse.elk.layered");
+        root.setProperty(CoreOptions.DIRECTION, Direction.RIGHT);
+        root.setProperty(CoreOptions.EDGE_ROUTING, EdgeRouting.ORTHOGONAL);
+        root.setProperty(CoreOptions.SPACING_NODE_NODE, NODE_SPACING);
+        root.setProperty(CoreOptions.SPACING_EDGE_NODE, EDGE_NODE_SPACING);
+        root.setProperty(CoreOptions.SPACING_EDGE_EDGE, EDGE_EDGE_SPACING);
+        root.setProperty(LayeredOptions.SPACING_NODE_NODE_BETWEEN_LAYERS, NODE_SPACING);
+        root.setProperty(LayeredOptions.SPACING_EDGE_NODE_BETWEEN_LAYERS, EDGE_NODE_SPACING);
+        root.setProperty(LayeredOptions.SPACING_EDGE_EDGE_BETWEEN_LAYERS, EDGE_EDGE_SPACING);
+    }
+
+    private static JsonContracts.LaidOutNode offsetNode(
+        JsonContracts.LaidOutNode node,
+        double offsetX,
+        double offsetY) {
+        return new JsonContracts.LaidOutNode(
+            node.id(),
+            node.source_id(),
+            node.projection_id(),
+            node.x() + offsetX,
+            node.y() + offsetY,
+            node.width(),
+            node.height(),
+            node.label());
+    }
+
+    private static JsonContracts.LaidOutEdge offsetEdge(
+        JsonContracts.LaidOutEdge edge,
+        double offsetX,
+        double offsetY) {
+        return new JsonContracts.LaidOutEdge(
+            edge.id(),
+            edge.source(),
+            edge.target(),
+            edge.source_id(),
+            edge.projection_id(),
+            edge.points().stream()
+                .map(point -> new JsonContracts.Point(point.x() + offsetX, point.y() + offsetY))
+                .toList(),
+            edge.label());
+    }
+
+    private static Map<String, JsonContracts.LayoutNode> requestNodesById(
+        JsonContracts.LayoutRequest request) {
+        Map<String, JsonContracts.LayoutNode> byId = new HashMap<>();
+        for (JsonContracts.LayoutNode node : list(request.nodes())) {
+            byId.put(node.id(), node);
+        }
+        return byId;
+    }
+
+    private static Map<String, String> ownerByNode(JsonContracts.LayoutRequest request) {
+        Map<String, String> ownerByNode = new HashMap<>();
+        for (JsonContracts.LayoutGroup group : list(request.groups())) {
+            for (String member : list(group.members())) {
+                ownerByNode.putIfAbsent(member, group.id());
+            }
+        }
+        return ownerByNode;
+    }
+
+    private static String macroId(String nodeId, Map<String, String> ownerByNode) {
+        return ownerByNode.getOrDefault(nodeId, nodeId);
+    }
+
+    private static List<JsonContracts.Point> routeBetween(
+        JsonContracts.LaidOutNode source,
+        JsonContracts.LaidOutNode target) {
+        double sourceCenterX = source.x() + source.width() / 2.0;
+        double sourceCenterY = source.y() + source.height() / 2.0;
+        double targetCenterX = target.x() + target.width() / 2.0;
+        double targetCenterY = target.y() + target.height() / 2.0;
+
+        double startX;
+        double endX;
+        if (targetCenterX >= sourceCenterX) {
+            startX = source.x() + source.width();
+            endX = target.x();
+        } else {
+            startX = source.x();
+            endX = target.x() + target.width();
+        }
+
+        double midX = startX + (endX - startX) / 2.0;
+        List<JsonContracts.Point> points = new ArrayList<>();
+        addPoint(points, startX, sourceCenterY);
+        addPoint(points, midX, sourceCenterY);
+        addPoint(points, midX, targetCenterY);
+        addPoint(points, endX, targetCenterY);
+        return points;
+    }
+
+    private static void addPoint(List<JsonContracts.Point> points, double x, double y) {
+        if (!points.isEmpty()) {
+            JsonContracts.Point last = points.get(points.size() - 1);
+            if (last.x() == x && last.y() == y) {
+                return;
+            }
+        }
+        points.add(new JsonContracts.Point(x, y));
+    }
+
+    private static List<JsonContracts.LaidOutGroup> groupedBounds(
+        JsonContracts.LayoutRequest request,
+        Map<String, JsonContracts.LaidOutNode> macroNodes,
+        Map<String, InternalLayout> internalLayouts,
+        List<JsonContracts.Diagnostic> warnings) {
+        List<JsonContracts.LaidOutGroup> groups = new ArrayList<>();
+        List<JsonContracts.LayoutGroup> requestGroups = list(request.groups());
+        for (int groupIndex = 0; groupIndex < requestGroups.size(); groupIndex++) {
+            JsonContracts.LayoutGroup group = requestGroups.get(groupIndex);
+            JsonContracts.LaidOutNode groupNode = macroNodes.get(group.id());
+            InternalLayout internalLayout = internalLayouts.get(group.id());
+            List<String> memberIds = new ArrayList<>();
+            List<String> requestedMembers = list(group.members());
+            for (int memberIndex = 0; memberIndex < requestedMembers.size(); memberIndex++) {
+                String memberId = requestedMembers.get(memberIndex);
+                if (internalLayout == null || !internalLayout.nodes().containsKey(memberId)) {
+                    warnings.add(new JsonContracts.Diagnostic(
+                        "DEDIREN_ELK_MISSING_GROUP_MEMBER",
+                        "warning",
+                        "group " + group.id() + " references missing member " + memberId,
+                        "$.groups[" + groupIndex + "].members[" + memberIndex + "]"));
+                    continue;
+                }
+                memberIds.add(memberId);
+            }
+            if (groupNode == null || memberIds.isEmpty()) {
+                warnings.add(new JsonContracts.Diagnostic(
+                    "DEDIREN_ELK_EMPTY_GROUP",
+                    "warning",
+                    "group " + group.id() + " has no laid out members",
+                    "$.groups[" + groupIndex + "]"));
+                continue;
+            }
+
+            groups.add(new JsonContracts.LaidOutGroup(
+                group.id(),
+                semanticBackedSourceId(group.provenance(), group.id()),
+                group.id(),
+                groupNode.x(),
+                groupNode.y(),
+                groupNode.width(),
+                groupNode.height(),
+                memberIds,
+                group.label()));
+        }
+        return groups;
     }
 
     private static List<JsonContracts.Point> points(ElkEdge edge) {
