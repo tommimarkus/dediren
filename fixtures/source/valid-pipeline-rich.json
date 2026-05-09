@@ -1,0 +1,123 @@
+{
+  "model_schema_version": "model.schema.v1",
+  "required_plugins": [
+    {
+      "id": "generic-graph",
+      "version": "0.1.0"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "client",
+      "type": "generic.actor",
+      "label": "Client",
+      "properties": {}
+    },
+    {
+      "id": "web-app",
+      "type": "generic.component",
+      "label": "Web App",
+      "properties": {}
+    },
+    {
+      "id": "orders-api",
+      "type": "generic.component",
+      "label": "Orders API",
+      "properties": {}
+    },
+    {
+      "id": "database",
+      "type": "generic.datastore",
+      "label": "PostgreSQL",
+      "properties": {}
+    },
+    {
+      "id": "worker",
+      "type": "generic.component",
+      "label": "Fulfillment Worker",
+      "properties": {}
+    },
+    {
+      "id": "payments",
+      "type": "generic.external-service",
+      "label": "Payments Provider",
+      "properties": {}
+    }
+  ],
+  "relationships": [
+    {
+      "id": "client-submits-order",
+      "type": "generic.calls",
+      "source": "client",
+      "target": "web-app",
+      "label": "submits order",
+      "properties": {}
+    },
+    {
+      "id": "web-app-calls-api",
+      "type": "generic.calls",
+      "source": "web-app",
+      "target": "orders-api",
+      "label": "calls API",
+      "properties": {}
+    },
+    {
+      "id": "api-writes-database",
+      "type": "generic.writes",
+      "source": "orders-api",
+      "target": "database",
+      "label": "writes orders",
+      "properties": {}
+    },
+    {
+      "id": "api-authorizes-payment",
+      "type": "generic.calls",
+      "source": "orders-api",
+      "target": "payments",
+      "label": "authorizes payment",
+      "properties": {}
+    },
+    {
+      "id": "api-publishes-job",
+      "type": "generic.publishes",
+      "source": "orders-api",
+      "target": "worker",
+      "label": "publishes fulfillment",
+      "properties": {}
+    },
+    {
+      "id": "worker-reads-database",
+      "type": "generic.reads",
+      "source": "worker",
+      "target": "database",
+      "label": "loads order",
+      "properties": {}
+    }
+  ],
+  "plugins": {
+    "generic-graph": {
+      "views": [
+        {
+          "id": "main",
+          "label": "Order Processing",
+          "nodes": [
+            "client",
+            "web-app",
+            "orders-api",
+            "database",
+            "worker",
+            "payments"
+          ],
+          "relationships": [
+            "client-submits-order",
+            "web-app-calls-api",
+            "api-writes-database",
+            "api-authorizes-payment",
+            "api-publishes-job",
+            "worker-reads-database"
+          ]
+        }
+      ]
+    }
+  }
+}

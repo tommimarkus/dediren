@@ -18,7 +18,7 @@ fn full_pipeline_produces_svg_and_oef() {
         "dediren-plugin-archimate-oef-export",
         "dediren-plugin-archimate-oef-export",
     );
-    let elk_fixture = workspace_file("fixtures/layout-result/basic.json");
+    let elk_fixture = workspace_file("fixtures/layout-result/pipeline-rich.json");
 
     let project_output = Command::cargo_bin("dediren")
         .unwrap()
@@ -35,13 +35,28 @@ fn full_pipeline_produces_svg_and_oef() {
             "main",
             "--input",
         ])
-        .arg(workspace_file("fixtures/source/valid-basic.json"))
+        .arg(workspace_file("fixtures/source/valid-pipeline-rich.json"))
         .assert()
         .success()
         .get_output()
         .stdout
         .clone();
     request.write_binary(&project_output).unwrap();
+    let project_envelope: serde_json::Value = serde_json::from_slice(&project_output).unwrap();
+    assert_eq!(
+        project_envelope["data"]["nodes"]
+            .as_array()
+            .expect("projected nodes should be an array")
+            .len(),
+        6
+    );
+    assert_eq!(
+        project_envelope["data"]["edges"]
+            .as_array()
+            .expect("projected edges should be an array")
+            .len(),
+        6
+    );
 
     let layout_output = Command::cargo_bin("dediren")
         .unwrap()
@@ -87,7 +102,14 @@ fn full_pipeline_produces_svg_and_oef() {
     let svg_text = std::fs::read_to_string(svg.path()).unwrap();
     assert!(svg_text.contains("<svg"));
     assert!(svg_text.contains("Client"));
-    assert!(svg_text.contains("API"));
+    assert!(svg_text.contains("Web App"));
+    assert!(svg_text.contains("Orders API"));
+    assert!(svg_text.contains("PostgreSQL"));
+    assert!(svg_text.contains("Payments Provider"));
+    assert!(svg_text.contains("Application Services"));
+    assert!(svg_text.contains("data-dediren-group-id=\"application-services\""));
+    assert!(svg_text.contains("submits order"));
+    assert!(svg_text.contains("authorizes payment"));
 
     let export_output = Command::cargo_bin("dediren")
         .unwrap()

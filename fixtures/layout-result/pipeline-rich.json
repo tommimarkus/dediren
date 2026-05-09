@@ -1,0 +1,246 @@
+{
+  "layout_result_schema_version": "layout-result.schema.v1",
+  "view_id": "main",
+  "nodes": [
+    {
+      "id": "client",
+      "source_id": "client",
+      "projection_id": "client",
+      "x": 40,
+      "y": 170,
+      "width": 160,
+      "height": 80,
+      "label": "Client"
+    },
+    {
+      "id": "web-app",
+      "source_id": "web-app",
+      "projection_id": "web-app",
+      "x": 280,
+      "y": 90,
+      "width": 170,
+      "height": 80,
+      "label": "Web App"
+    },
+    {
+      "id": "orders-api",
+      "source_id": "orders-api",
+      "projection_id": "orders-api",
+      "x": 560,
+      "y": 90,
+      "width": 180,
+      "height": 80,
+      "label": "Orders API"
+    },
+    {
+      "id": "database",
+      "source_id": "database",
+      "projection_id": "database",
+      "x": 860,
+      "y": 40,
+      "width": 180,
+      "height": 80,
+      "label": "PostgreSQL"
+    },
+    {
+      "id": "worker",
+      "source_id": "worker",
+      "projection_id": "worker",
+      "x": 560,
+      "y": 260,
+      "width": 180,
+      "height": 80,
+      "label": "Fulfillment Worker"
+    },
+    {
+      "id": "payments",
+      "source_id": "payments",
+      "projection_id": "payments",
+      "x": 860,
+      "y": 210,
+      "width": 180,
+      "height": 80,
+      "label": "Payments Provider"
+    }
+  ],
+  "edges": [
+    {
+      "id": "client-submits-order",
+      "source": "client",
+      "target": "web-app",
+      "source_id": "client-submits-order",
+      "projection_id": "client-submits-order",
+      "points": [
+        {
+          "x": 200,
+          "y": 210
+        },
+        {
+          "x": 240,
+          "y": 210
+        },
+        {
+          "x": 240,
+          "y": 130
+        },
+        {
+          "x": 280,
+          "y": 130
+        }
+      ],
+      "label": "submits order"
+    },
+    {
+      "id": "web-app-calls-api",
+      "source": "web-app",
+      "target": "orders-api",
+      "source_id": "web-app-calls-api",
+      "projection_id": "web-app-calls-api",
+      "points": [
+        {
+          "x": 450,
+          "y": 130
+        },
+        {
+          "x": 560,
+          "y": 130
+        }
+      ],
+      "label": "calls API"
+    },
+    {
+      "id": "api-writes-database",
+      "source": "orders-api",
+      "target": "database",
+      "source_id": "api-writes-database",
+      "projection_id": "api-writes-database",
+      "points": [
+        {
+          "x": 740,
+          "y": 130
+        },
+        {
+          "x": 800,
+          "y": 130
+        },
+        {
+          "x": 800,
+          "y": 80
+        },
+        {
+          "x": 860,
+          "y": 80
+        }
+      ],
+      "label": "writes orders"
+    },
+    {
+      "id": "api-authorizes-payment",
+      "source": "orders-api",
+      "target": "payments",
+      "source_id": "api-authorizes-payment",
+      "projection_id": "api-authorizes-payment",
+      "points": [
+        {
+          "x": 740,
+          "y": 130
+        },
+        {
+          "x": 800,
+          "y": 130
+        },
+        {
+          "x": 800,
+          "y": 250
+        },
+        {
+          "x": 860,
+          "y": 250
+        }
+      ],
+      "label": "authorizes payment"
+    },
+    {
+      "id": "api-publishes-job",
+      "source": "orders-api",
+      "target": "worker",
+      "source_id": "api-publishes-job",
+      "projection_id": "api-publishes-job",
+      "points": [
+        {
+          "x": 650,
+          "y": 170
+        },
+        {
+          "x": 650,
+          "y": 260
+        }
+      ],
+      "label": "publishes fulfillment"
+    },
+    {
+      "id": "worker-reads-database",
+      "source": "worker",
+      "target": "database",
+      "source_id": "worker-reads-database",
+      "projection_id": "worker-reads-database",
+      "points": [
+        {
+          "x": 740,
+          "y": 300
+        },
+        {
+          "x": 780,
+          "y": 300
+        },
+        {
+          "x": 780,
+          "y": 80
+        },
+        {
+          "x": 860,
+          "y": 80
+        }
+      ],
+      "label": "loads order"
+    }
+  ],
+  "groups": [
+    {
+      "id": "application-services",
+      "source_id": "application-services",
+      "projection_id": "application-services",
+      "x": 250,
+      "y": 50,
+      "width": 520,
+      "height": 330,
+      "members": [
+        "web-app",
+        "orders-api",
+        "worker"
+      ],
+      "label": "Application Services"
+    },
+    {
+      "id": "external-dependencies",
+      "source_id": "external-dependencies",
+      "projection_id": "external-dependencies",
+      "x": 830,
+      "y": 10,
+      "width": 240,
+      "height": 320,
+      "members": [
+        "database",
+        "payments"
+      ],
+      "label": "External Dependencies"
+    }
+  ],
+  "warnings": [
+    {
+      "code": "DEDIREN_LAYOUT_FIXTURE",
+      "severity": "info",
+      "message": "Fixture layout exercises routed edges, groups, and external dependencies."
+    }
+  ]
+}

@@ -8,6 +8,10 @@ fn valid_source_matches_model_schema() {
         "schemas/model.schema.json",
         "fixtures/source/valid-basic.json",
     );
+    assert_valid(
+        "schemas/model.schema.json",
+        "fixtures/source/valid-pipeline-rich.json",
+    );
 }
 
 #[test]
@@ -178,6 +182,10 @@ fn layout_fixtures_match_schemas() {
     assert_valid(
         "schemas/layout-result.schema.json",
         "fixtures/layout-result/basic.json",
+    );
+    assert_valid(
+        "schemas/layout-result.schema.json",
+        "fixtures/layout-result/pipeline-rich.json",
     );
 }
 
