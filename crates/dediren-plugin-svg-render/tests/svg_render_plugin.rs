@@ -229,8 +229,17 @@ fn svg_renderer_places_edge_label_near_route_midpoint_for_vertical_route() {
 
     let edge = semantic_group(&doc, "data-dediren-edge-id", "routed-edge");
     let label = child_element(edge, "text");
-    assert_eq!(label.attribute("x"), Some("100.0"));
+    let x = label.attribute("x").unwrap().parse::<f64>().unwrap();
+    let y = label.attribute("y").unwrap().parse::<f64>().unwrap();
+    assert!(
+        (x - 100.0).abs() > 20.0,
+        "vertical route label should move off the route segment, got x={x}"
+    );
     assert_eq!(label.attribute("y"), Some("92.0"));
+    assert!(
+        (y - 92.0).abs() <= 1.0,
+        "vertical route label should stay near the route midpoint, got y={y}"
+    );
     assert_eq!(label.attribute("text-anchor"), Some("middle"));
 }
 
@@ -533,6 +542,44 @@ fn svg_renderer_moves_edge_label_away_from_node_boxes() {
 }
 
 #[test]
+fn svg_renderer_moves_edge_label_away_from_route_segments() {
+    let input = styled_inline_input(
+        serde_json::json!([]),
+        serde_json::json!([]),
+        serde_json::json!([
+            {
+                "id": "vertical-edge",
+                "source": "orders-api",
+                "target": "worker",
+                "source_id": "vertical-edge",
+                "projection_id": "vertical-edge",
+                "points": [
+                    { "x": 220, "y": 80 },
+                    { "x": 220, "y": 260 }
+                ],
+                "label": "publishes fulfillment"
+            }
+        ]),
+        serde_json::json!({}),
+    );
+
+    let content = render_content(input);
+    let doc = svg_doc(&content);
+    let edge = semantic_group(&doc, "data-dediren-edge-id", "vertical-edge");
+    let label = child_element(edge, "text");
+    let label_box = text_box_from_svg(label, 14.0);
+
+    assert!(
+        !box_contains_point(
+            label_box,
+            220.0,
+            label.attribute("y").unwrap().parse::<f64>().unwrap()
+        ),
+        "label box should not sit on top of its vertical route segment"
+    );
+}
+
+#[test]
 fn svg_renderer_rejects_unsafe_policy_color_before_rendering() {
     let input = styled_inline_input(
         serde_json::json!([]),
@@ -627,6 +674,23 @@ fn child_element<'a, 'input>(
                 tag_name
             )
         })
+}
+
+fn text_box_from_svg(label: roxmltree::Node<'_, '_>, font_size: f64) -> (f64, f64, f64, f64) {
+    let x = label.attribute("x").unwrap().parse::<f64>().unwrap();
+    let y = label.attribute("y").unwrap().parse::<f64>().unwrap();
+    let text = label.text().unwrap_or("");
+    let half_width = text.chars().count() as f64 * font_size * 0.62 / 2.0;
+    (
+        x - half_width,
+        y - font_size,
+        x + half_width,
+        y + font_size * 0.4,
+    )
+}
+
+fn box_contains_point(bounds: (f64, f64, f64, f64), x: f64, y: f64) -> bool {
+    x >= bounds.0 && x <= bounds.2 && y >= bounds.1 && y <= bounds.3
 }
 
 fn write_render_artifact(test_name: &str, content: &str) -> PathBuf {
