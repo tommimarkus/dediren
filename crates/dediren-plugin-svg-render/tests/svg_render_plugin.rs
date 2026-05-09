@@ -200,6 +200,155 @@ fn svg_renderer_applies_base_and_override_group_styles_to_group_elements() {
 }
 
 #[test]
+fn svg_renderer_places_edge_label_near_route_midpoint_for_vertical_route() {
+    let input = styled_inline_input(
+        serde_json::json!([]),
+        serde_json::json!([]),
+        serde_json::json!([
+            {
+                "id": "routed-edge",
+                "source": "source-node",
+                "target": "target-node",
+                "source_id": "routed-edge",
+                "projection_id": "routed-edge",
+                "points": [
+                    { "x": 100, "y": 0 },
+                    { "x": 100, "y": 100 },
+                    { "x": 100, "y": 200 }
+                ],
+                "label": "routed label"
+            }
+        ]),
+        serde_json::json!({}),
+    );
+    let content = render_content(input);
+    let doc = svg_doc(&content);
+
+    let edge = semantic_group(&doc, "data-dediren-edge-id", "routed-edge");
+    let label = child_element(edge, "text");
+    assert_eq!(label.attribute("x"), Some("100.0"));
+    assert_eq!(label.attribute("y"), Some("92.0"));
+    assert_eq!(label.attribute("text-anchor"), Some("middle"));
+}
+
+#[test]
+fn svg_renderer_prefers_horizontal_segment_for_edge_label() {
+    let input = styled_inline_input(
+        serde_json::json!([]),
+        serde_json::json!([]),
+        serde_json::json!([
+            {
+                "id": "mostly-vertical-edge",
+                "source": "source-node",
+                "target": "target-node",
+                "source_id": "mostly-vertical-edge",
+                "projection_id": "mostly-vertical-edge",
+                "points": [
+                    { "x": 0, "y": 0 },
+                    { "x": 0, "y": 300 },
+                    { "x": 100, "y": 300 },
+                    { "x": 100, "y": 500 }
+                ],
+                "label": "horizontal label"
+            }
+        ]),
+        serde_json::json!({}),
+    );
+    let content = render_content(input);
+    let doc = svg_doc(&content);
+
+    let edge = semantic_group(&doc, "data-dediren-edge-id", "mostly-vertical-edge");
+    let label = child_element(edge, "text");
+    assert_eq!(label.attribute("x"), Some("50.0"));
+    assert_eq!(label.attribute("y"), Some("292.0"));
+}
+
+#[test]
+fn svg_renderer_paints_edge_label_with_background_halo() {
+    let input = styled_inline_input(
+        serde_json::json!([]),
+        serde_json::json!([]),
+        serde_json::json!([
+            {
+                "id": "labeled-edge",
+                "source": "source-node",
+                "target": "target-node",
+                "source_id": "labeled-edge",
+                "projection_id": "labeled-edge",
+                "points": [
+                    { "x": 0, "y": 100 },
+                    { "x": 200, "y": 100 }
+                ],
+                "label": "clear label"
+            }
+        ]),
+        serde_json::json!({
+            "background": { "fill": "#f8fafc" }
+        }),
+    );
+    let content = render_content(input);
+    let doc = svg_doc(&content);
+
+    let edge = semantic_group(&doc, "data-dediren-edge-id", "labeled-edge");
+    let path = child_element(edge, "path");
+    let label = child_element(edge, "text");
+    assert_eq!(
+        path.attribute("marker-end"),
+        Some("url(#arrow-labeled-edge)")
+    );
+    assert_eq!(label.attribute("paint-order"), Some("stroke"));
+    assert_eq!(label.attribute("stroke"), Some("#f8fafc"));
+    assert_eq!(label.attribute("stroke-width"), Some("4"));
+}
+
+#[test]
+fn svg_renderer_adds_line_jump_for_later_crossing_edge() {
+    let input = styled_inline_input(
+        serde_json::json!([]),
+        serde_json::json!([]),
+        serde_json::json!([
+            {
+                "id": "first-edge",
+                "source": "left",
+                "target": "right",
+                "source_id": "first-edge",
+                "projection_id": "first-edge",
+                "points": [
+                    { "x": 0, "y": 100 },
+                    { "x": 200, "y": 100 }
+                ],
+                "label": "first"
+            },
+            {
+                "id": "front-edge",
+                "source": "top",
+                "target": "bottom",
+                "source_id": "front-edge",
+                "projection_id": "front-edge",
+                "points": [
+                    { "x": 100, "y": 0 },
+                    { "x": 100, "y": 200 }
+                ],
+                "label": "front"
+            }
+        ]),
+        serde_json::json!({}),
+    );
+    let content = render_content(input);
+    let doc = svg_doc(&content);
+
+    let first_edge = semantic_group(&doc, "data-dediren-edge-id", "first-edge");
+    let first_path = child_element(first_edge, "path");
+    assert!(!first_path.attribute("d").unwrap().contains(" Q "));
+
+    let front_edge = semantic_group(&doc, "data-dediren-edge-id", "front-edge");
+    let front_path = child_element(front_edge, "path");
+    let data = front_path.attribute("d").unwrap();
+    assert!(data.contains("L 100.0 94.0"));
+    assert!(data.contains("Q 106.0 100.0 100.0 106.0"));
+}
+
+#[test]
 fn svg_renderer_rejects_unsafe_policy_color_before_rendering() {
     let input = styled_inline_input(
         serde_json::json!([]),

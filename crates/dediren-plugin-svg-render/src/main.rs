@@ -287,15 +287,18 @@ fn render_svg(result: &LayoutResult, policy: &RenderPolicy) -> String {
         svg.push_str("</g>");
     }
 
+    let mut rendered_edges: Vec<&LaidOutEdge> = Vec::new();
     for edge in &result.edges {
         let edge_style = edge_style(policy, &edge.id, &style);
         svg.push_str(&format!(
             r#"<g data-dediren-edge-id="{}">"#,
             escape_attr(&edge.id)
         ));
-        svg.push_str(&edge_path(&edge.points, &edge_style));
-        svg.push_str(&edge_label(edge, &edge_style));
+        svg.push_str(&edge_marker(edge, &edge_style));
+        svg.push_str(&edge_path(edge, &edge_style, &rendered_edges));
+        svg.push_str(&edge_label(edge, &edge_style, &style.background_fill));
         svg.push_str("</g>");
+        rendered_edges.push(edge);
     }
 
     for node in &result.nodes {
@@ -490,34 +493,233 @@ fn node_label(node: &LaidOutNode, style: &ResolvedNodeStyle) -> String {
     )
 }
 
-fn edge_path(points: &[Point], style: &ResolvedEdgeStyle) -> String {
-    if points.len() < 2 {
-        return String::new();
-    }
-    let mut data = format!("M {:.1} {:.1}", points[0].x, points[0].y);
-    for point in points.iter().skip(1) {
-        data.push_str(&format!(" L {:.1} {:.1}", point.x, point.y));
-    }
+fn edge_marker(edge: &LaidOutEdge, style: &ResolvedEdgeStyle) -> String {
     format!(
-        r##"<path d="{}" fill="none" stroke="{}" stroke-width="{}"/>"##,
-        escape_attr(&data),
-        escape_attr(&style.stroke),
-        svg_style_number(style.stroke_width)
+        r##"<defs><marker id="{}" markerWidth="8" markerHeight="8" refX="8" refY="4" orient="auto" markerUnits="strokeWidth"><path d="M 0 0 L 8 4 L 0 8 z" fill="{}"/></marker></defs>"##,
+        escape_attr(&edge_marker_id(&edge.id)),
+        escape_attr(&style.stroke)
     )
 }
 
-fn edge_label(edge: &LaidOutEdge, style: &ResolvedEdgeStyle) -> String {
-    if let Some(point) = edge.points.first() {
+fn edge_path(
+    edge: &LaidOutEdge,
+    style: &ResolvedEdgeStyle,
+    earlier_edges: &[&LaidOutEdge],
+) -> String {
+    let points = &edge.points;
+    if points.len() < 2 {
+        return String::new();
+    }
+    let data = edge_path_data(points, earlier_edges);
+    format!(
+        r##"<path d="{}" fill="none" stroke="{}" stroke-width="{}" marker-end="url(#{})"/>"##,
+        escape_attr(&data),
+        escape_attr(&style.stroke),
+        svg_style_number(style.stroke_width),
+        escape_attr(&edge_marker_id(&edge.id))
+    )
+}
+
+fn edge_path_data(points: &[Point], earlier_edges: &[&LaidOutEdge]) -> String {
+    let mut data = format!("M {:.1} {:.1}", points[0].x, points[0].y);
+    for segment in points.windows(2) {
+        let start = &segment[0];
+        let end = &segment[1];
+        let jumps = line_jump_points(start, end, earlier_edges);
+        if jumps.is_empty() {
+            data.push_str(&format!(" L {:.1} {:.1}", end.x, end.y));
+            continue;
+        }
+        for jump in jumps {
+            append_line_jump(&mut data, start, end, &jump);
+        }
+        data.push_str(&format!(" L {:.1} {:.1}", end.x, end.y));
+    }
+    data
+}
+
+#[derive(Debug)]
+struct LineJump {
+    point: Point,
+    distance: f64,
+}
+
+fn line_jump_points(start: &Point, end: &Point, earlier_edges: &[&LaidOutEdge]) -> Vec<LineJump> {
+    let mut jumps = Vec::new();
+    for earlier_edge in earlier_edges {
+        for earlier_segment in earlier_edge.points.windows(2) {
+            if let Some(point) =
+                crossing_point(start, end, &earlier_segment[0], &earlier_segment[1])
+            {
+                let distance = segment_length(start, &point);
+                if distance > LINE_JUMP_SIZE && segment_length(&point, end) > LINE_JUMP_SIZE {
+                    jumps.push(LineJump { point, distance });
+                }
+            }
+        }
+    }
+    jumps.sort_by(|left, right| left.distance.total_cmp(&right.distance));
+    jumps
+}
+
+const LINE_JUMP_SIZE: f64 = 6.0;
+
+fn crossing_point(
+    start: &Point,
+    end: &Point,
+    other_start: &Point,
+    other_end: &Point,
+) -> Option<Point> {
+    let current_horizontal = start.y == end.y && start.x != end.x;
+    let current_vertical = start.x == end.x && start.y != end.y;
+    let other_horizontal = other_start.y == other_end.y && other_start.x != other_end.x;
+    let other_vertical = other_start.x == other_end.x && other_start.y != other_end.y;
+
+    match (
+        current_horizontal,
+        current_vertical,
+        other_horizontal,
+        other_vertical,
+    ) {
+        (true, false, false, true) => perpendicular_crossing(start, end, other_start, other_end),
+        (false, true, true, false) => perpendicular_crossing(other_start, other_end, start, end),
+        _ => None,
+    }
+}
+
+fn perpendicular_crossing(
+    horizontal_start: &Point,
+    horizontal_end: &Point,
+    vertical_start: &Point,
+    vertical_end: &Point,
+) -> Option<Point> {
+    let x = vertical_start.x;
+    let y = horizontal_start.y;
+    if between_exclusive(x, horizontal_start.x, horizontal_end.x)
+        && between_exclusive(y, vertical_start.y, vertical_end.y)
+    {
+        Some(Point { x, y })
+    } else {
+        None
+    }
+}
+
+fn between_exclusive(value: f64, start: f64, end: f64) -> bool {
+    value > start.min(end) && value < start.max(end)
+}
+
+fn append_line_jump(data: &mut String, start: &Point, end: &Point, jump: &LineJump) {
+    if start.y == end.y {
+        let direction = (end.x - start.x).signum();
+        data.push_str(&format!(
+            " L {:.1} {:.1} Q {:.1} {:.1} {:.1} {:.1}",
+            jump.point.x - direction * LINE_JUMP_SIZE,
+            jump.point.y,
+            jump.point.x,
+            jump.point.y - LINE_JUMP_SIZE,
+            jump.point.x + direction * LINE_JUMP_SIZE,
+            jump.point.y
+        ));
+    } else if start.x == end.x {
+        let direction = (end.y - start.y).signum();
+        data.push_str(&format!(
+            " L {:.1} {:.1} Q {:.1} {:.1} {:.1} {:.1}",
+            jump.point.x,
+            jump.point.y - direction * LINE_JUMP_SIZE,
+            jump.point.x + LINE_JUMP_SIZE,
+            jump.point.y,
+            jump.point.x,
+            jump.point.y + direction * LINE_JUMP_SIZE
+        ));
+    }
+}
+
+fn edge_marker_id(edge_id: &str) -> String {
+    format!("arrow-{edge_id}")
+}
+
+fn edge_label(edge: &LaidOutEdge, style: &ResolvedEdgeStyle, background_fill: &str) -> String {
+    if let Some(point) = edge_label_point(&edge.points) {
         format!(
-            r##"<text x="{:.1}" y="{:.1}" fill="{}">{}</text>"##,
+            r##"<text x="{:.1}" y="{:.1}" text-anchor="middle" fill="{}" stroke="{}" stroke-width="4" stroke-linejoin="round" paint-order="stroke">{}</text>"##,
             point.x,
             point.y - 8.0,
             escape_attr(&style.label_fill),
+            escape_attr(background_fill),
             escape_text(&edge.label)
         )
     } else {
         String::new()
     }
+}
+
+fn edge_label_point(points: &[Point]) -> Option<Point> {
+    longest_horizontal_segment_midpoint(points).or_else(|| route_midpoint(points))
+}
+
+fn longest_horizontal_segment_midpoint(points: &[Point]) -> Option<Point> {
+    let mut longest: Option<(&Point, &Point, f64)> = None;
+    for segment in points.windows(2) {
+        let start = &segment[0];
+        let end = &segment[1];
+        if start.y != end.y || start.x == end.x {
+            continue;
+        }
+        let length = (end.x - start.x).abs();
+        if longest
+            .as_ref()
+            .is_none_or(|(_, _, longest_length)| length > *longest_length)
+        {
+            longest = Some((start, end, length));
+        }
+    }
+
+    longest.map(|(start, end, _)| Point {
+        x: start.x + (end.x - start.x) / 2.0,
+        y: start.y,
+    })
+}
+
+fn route_midpoint(points: &[Point]) -> Option<Point> {
+    if points.is_empty() {
+        return None;
+    }
+    if points.len() == 1 {
+        return Some(points[0].clone());
+    }
+
+    let total_length: f64 = points
+        .windows(2)
+        .map(|segment| segment_length(&segment[0], &segment[1]))
+        .sum();
+    if total_length == 0.0 {
+        return Some(points[0].clone());
+    }
+
+    let midpoint = total_length / 2.0;
+    let mut traversed = 0.0;
+    for segment in points.windows(2) {
+        let start = &segment[0];
+        let end = &segment[1];
+        let segment_length = segment_length(start, end);
+        if segment_length == 0.0 {
+            continue;
+        }
+        if traversed + segment_length >= midpoint {
+            let ratio = (midpoint - traversed) / segment_length;
+            return Some(Point {
+                x: start.x + (end.x - start.x) * ratio,
+                y: start.y + (end.y - start.y) * ratio,
+            });
+        }
+        traversed += segment_length;
+    }
+
+    points.last().cloned()
+}
+
+fn segment_length(start: &Point, end: &Point) -> f64 {
+    ((end.x - start.x).powi(2) + (end.y - start.y).powi(2)).sqrt()
 }
 
 fn escape_text(value: &str) -> String {

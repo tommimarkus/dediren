@@ -7,7 +7,7 @@
       "source_id": "client",
       "projection_id": "client",
       "x": 40,
-      "y": 170,
+      "y": 160,
       "width": 160,
       "height": 80,
       "label": "Client"
@@ -16,8 +16,8 @@
       "id": "web-app",
       "source_id": "web-app",
       "projection_id": "web-app",
-      "x": 280,
-      "y": 90,
+      "x": 310,
+      "y": 160,
       "width": 170,
       "height": 80,
       "label": "Web App"
@@ -26,8 +26,8 @@
       "id": "orders-api",
       "source_id": "orders-api",
       "projection_id": "orders-api",
-      "x": 560,
-      "y": 90,
+      "x": 590,
+      "y": 160,
       "width": 180,
       "height": 80,
       "label": "Orders API"
@@ -36,8 +36,8 @@
       "id": "database",
       "source_id": "database",
       "projection_id": "database",
-      "x": 860,
-      "y": 40,
+      "x": 940,
+      "y": 350,
       "width": 180,
       "height": 80,
       "label": "PostgreSQL"
@@ -46,8 +46,8 @@
       "id": "worker",
       "source_id": "worker",
       "projection_id": "worker",
-      "x": 560,
-      "y": 260,
+      "x": 590,
+      "y": 350,
       "width": 180,
       "height": 80,
       "label": "Fulfillment Worker"
@@ -56,8 +56,8 @@
       "id": "payments",
       "source_id": "payments",
       "projection_id": "payments",
-      "x": 860,
-      "y": 210,
+      "x": 940,
+      "y": 160,
       "width": 180,
       "height": 80,
       "label": "Payments Provider"
@@ -73,19 +73,11 @@
       "points": [
         {
           "x": 200,
-          "y": 210
+          "y": 200
         },
         {
-          "x": 240,
-          "y": 210
-        },
-        {
-          "x": 240,
-          "y": 130
-        },
-        {
-          "x": 280,
-          "y": 130
+          "x": 310,
+          "y": 200
         }
       ],
       "label": "submits order"
@@ -98,12 +90,12 @@
       "projection_id": "web-app-calls-api",
       "points": [
         {
-          "x": 450,
-          "y": 130
+          "x": 480,
+          "y": 200
         },
         {
-          "x": 560,
-          "y": 130
+          "x": 590,
+          "y": 200
         }
       ],
       "label": "calls API"
@@ -116,20 +108,20 @@
       "projection_id": "api-writes-database",
       "points": [
         {
-          "x": 740,
-          "y": 130
+          "x": 770,
+          "y": 230
         },
         {
-          "x": 800,
-          "y": 130
+          "x": 900,
+          "y": 230
         },
         {
-          "x": 800,
-          "y": 80
+          "x": 900,
+          "y": 390
         },
         {
-          "x": 860,
-          "y": 80
+          "x": 940,
+          "y": 390
         }
       ],
       "label": "writes orders"
@@ -142,20 +134,12 @@
       "projection_id": "api-authorizes-payment",
       "points": [
         {
-          "x": 740,
-          "y": 130
+          "x": 770,
+          "y": 200
         },
         {
-          "x": 800,
-          "y": 130
-        },
-        {
-          "x": 800,
-          "y": 250
-        },
-        {
-          "x": 860,
-          "y": 250
+          "x": 940,
+          "y": 200
         }
       ],
       "label": "authorizes payment"
@@ -168,12 +152,12 @@
       "projection_id": "api-publishes-job",
       "points": [
         {
-          "x": 650,
-          "y": 170
+          "x": 680,
+          "y": 240
         },
         {
-          "x": 650,
-          "y": 260
+          "x": 680,
+          "y": 350
         }
       ],
       "label": "publishes fulfillment"
@@ -186,20 +170,12 @@
       "projection_id": "worker-reads-database",
       "points": [
         {
-          "x": 740,
-          "y": 300
+          "x": 770,
+          "y": 390
         },
         {
-          "x": 780,
-          "y": 300
-        },
-        {
-          "x": 780,
-          "y": 80
-        },
-        {
-          "x": 860,
-          "y": 80
+          "x": 940,
+          "y": 390
         }
       ],
       "label": "loads order"
@@ -211,9 +187,9 @@
       "source_id": "application-services",
       "projection_id": "application-services",
       "x": 250,
-      "y": 50,
-      "width": 520,
-      "height": 330,
+      "y": 70,
+      "width": 590,
+      "height": 450,
       "members": [
         "web-app",
         "orders-api",
@@ -225,10 +201,10 @@
       "id": "external-dependencies",
       "source_id": "external-dependencies",
       "projection_id": "external-dependencies",
-      "x": 830,
-      "y": 10,
+      "x": 910,
+      "y": 80,
       "width": 240,
-      "height": 320,
+      "height": 420,
       "members": [
         "database",
         "payments"
