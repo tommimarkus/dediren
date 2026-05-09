@@ -129,4 +129,49 @@ class ElkLayoutEngineTest {
             application.x() + application.width() <= external.x(),
             "group bounds should not overlap horizontally");
     }
+
+    @Test
+    void groupedPipelineLayoutKeepsReadableAspectRatio() {
+        JsonContracts.LayoutRequest request = new JsonContracts.LayoutRequest(
+            "layout-request.schema.v1",
+            "main",
+            List.of(
+                new JsonContracts.LayoutNode("client", "Client", "client", 160.0, 80.0),
+                new JsonContracts.LayoutNode("web-app", "Web App", "web-app", 160.0, 80.0),
+                new JsonContracts.LayoutNode("orders-api", "Orders API", "orders-api", 160.0, 80.0),
+                new JsonContracts.LayoutNode("worker", "Fulfillment Worker", "worker", 160.0, 80.0),
+                new JsonContracts.LayoutNode("payments", "Payments Provider", "payments", 160.0, 80.0),
+                new JsonContracts.LayoutNode("database", "PostgreSQL", "database", 160.0, 80.0)),
+            List.of(
+                new JsonContracts.LayoutEdge("client-submits-order", "client", "web-app", "submits order", "client-submits-order"),
+                new JsonContracts.LayoutEdge("web-app-calls-api", "web-app", "orders-api", "calls API", "web-app-calls-api"),
+                new JsonContracts.LayoutEdge("api-authorizes-payment", "orders-api", "payments", "authorizes payment", "api-authorizes-payment"),
+                new JsonContracts.LayoutEdge("api-writes-database", "orders-api", "database", "writes orders", "api-writes-database"),
+                new JsonContracts.LayoutEdge("api-publishes-job", "orders-api", "worker", "publishes fulfillment", "api-publishes-job"),
+                new JsonContracts.LayoutEdge("worker-reads-database", "worker", "database", "loads order", "worker-reads-database")),
+            List.of(
+                new JsonContracts.LayoutGroup(
+                    "application-services",
+                    "Application Services",
+                    List.of("web-app", "orders-api", "worker"),
+                    new JsonContracts.GroupProvenance(new JsonContracts.SemanticBacked("application-services"))),
+                new JsonContracts.LayoutGroup(
+                    "external-dependencies",
+                    "External Dependencies",
+                    List.of("payments", "database"),
+                    new JsonContracts.GroupProvenance(new JsonContracts.SemanticBacked("external-dependencies")))),
+            List.of(),
+            List.of());
+
+        JsonContracts.LayoutResult result = new ElkLayoutEngine().layout(request);
+        double minX = result.nodes().stream().mapToDouble(JsonContracts.LaidOutNode::x).min().orElse(0.0);
+        double maxX = result.nodes().stream().mapToDouble(node -> node.x() + node.width()).max().orElse(0.0);
+        double minY = result.nodes().stream().mapToDouble(JsonContracts.LaidOutNode::y).min().orElse(0.0);
+        double maxY = result.nodes().stream().mapToDouble(node -> node.y() + node.height()).max().orElse(0.0);
+        double aspect = (maxX - minX) / (maxY - minY);
+
+        assertTrue(
+            aspect < 3.2,
+            "grouped rich pipeline should not render as a long horizontal strip, aspect=" + aspect);
+    }
 }

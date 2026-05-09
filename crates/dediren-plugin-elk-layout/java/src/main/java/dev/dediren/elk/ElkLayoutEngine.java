@@ -34,7 +34,7 @@ final class ElkLayoutEngine {
 
     private static JsonContracts.LayoutResult layoutFlat(JsonContracts.LayoutRequest request) {
         ElkNode root = ElkGraphUtil.createGraph();
-        configureRoot(root);
+        configureRoot(root, Direction.RIGHT);
 
         Map<String, ElkNode> elkNodes = new HashMap<>();
         for (JsonContracts.LayoutNode node : list(request.nodes())) {
@@ -163,7 +163,7 @@ final class ElkLayoutEngine {
                 edge.source_id()));
         }
 
-        GraphLayout macroLayout = graphLayout(macroNodes, macroEdges);
+        GraphLayout macroLayout = graphLayout(macroNodes, macroEdges, Direction.RIGHT);
         Map<String, JsonContracts.LaidOutNode> finalNodes = new HashMap<>();
         List<JsonContracts.LaidOutNode> nodes = new ArrayList<>();
         for (JsonContracts.LayoutNode node : list(request.nodes())) {
@@ -254,7 +254,7 @@ final class ElkLayoutEngine {
     private static InternalLayout internalLayout(
         List<JsonContracts.LayoutNode> nodes,
         List<JsonContracts.LayoutEdge> edges) {
-        GraphLayout layout = graphLayout(nodes, edges);
+        GraphLayout layout = graphLayout(nodes, edges, internalDirection(nodes, edges));
         double minX = layout.nodes().values().stream().mapToDouble(JsonContracts.LaidOutNode::x).min().orElse(0.0);
         double minY = layout.nodes().values().stream().mapToDouble(JsonContracts.LaidOutNode::y).min().orElse(0.0);
         double maxX = layout.nodes().values().stream().mapToDouble(node -> node.x() + node.width()).max().orElse(0.0);
@@ -279,9 +279,10 @@ final class ElkLayoutEngine {
 
     private static GraphLayout graphLayout(
         List<JsonContracts.LayoutNode> requestNodes,
-        List<JsonContracts.LayoutEdge> requestEdges) {
+        List<JsonContracts.LayoutEdge> requestEdges,
+        Direction direction) {
         ElkNode root = ElkGraphUtil.createGraph();
-        configureRoot(root);
+        configureRoot(root, direction);
 
         Map<String, ElkNode> elkNodes = new HashMap<>();
         for (JsonContracts.LayoutNode node : requestNodes) {
@@ -343,9 +344,9 @@ final class ElkLayoutEngine {
         return new GraphLayout(nodes, edges);
     }
 
-    private static void configureRoot(ElkNode root) {
+    private static void configureRoot(ElkNode root, Direction direction) {
         root.setProperty(CoreOptions.ALGORITHM, "org.eclipse.elk.layered");
-        root.setProperty(CoreOptions.DIRECTION, Direction.RIGHT);
+        root.setProperty(CoreOptions.DIRECTION, direction);
         root.setProperty(CoreOptions.EDGE_ROUTING, EdgeRouting.ORTHOGONAL);
         root.setProperty(CoreOptions.SPACING_NODE_NODE, NODE_SPACING);
         root.setProperty(CoreOptions.SPACING_EDGE_NODE, EDGE_NODE_SPACING);
@@ -353,6 +354,15 @@ final class ElkLayoutEngine {
         root.setProperty(LayeredOptions.SPACING_NODE_NODE_BETWEEN_LAYERS, NODE_SPACING);
         root.setProperty(LayeredOptions.SPACING_EDGE_NODE_BETWEEN_LAYERS, EDGE_NODE_SPACING);
         root.setProperty(LayeredOptions.SPACING_EDGE_EDGE_BETWEEN_LAYERS, EDGE_EDGE_SPACING);
+    }
+
+    private static Direction internalDirection(
+        List<JsonContracts.LayoutNode> nodes,
+        List<JsonContracts.LayoutEdge> edges) {
+        if (nodes.size() < 3) {
+            return Direction.RIGHT;
+        }
+        return Direction.DOWN;
     }
 
     private static JsonContracts.LaidOutNode offsetNode(
