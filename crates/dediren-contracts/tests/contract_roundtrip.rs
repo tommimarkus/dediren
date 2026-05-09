@@ -91,6 +91,40 @@ fn render_policy_roundtrips() {
 }
 
 #[test]
+fn rich_render_policy_roundtrips() {
+    let text =
+        std::fs::read_to_string(workspace_file("fixtures/render-policy/rich-svg.json")).unwrap();
+    let policy: RenderPolicy = serde_json::from_str(&text).unwrap();
+    assert_eq!(
+        policy
+            .style
+            .as_ref()
+            .unwrap()
+            .node
+            .as_ref()
+            .unwrap()
+            .fill
+            .as_deref(),
+        Some("#ffffff")
+    );
+    assert_eq!(
+        policy
+            .style
+            .as_ref()
+            .unwrap()
+            .node_overrides
+            .get("api")
+            .unwrap()
+            .stroke
+            .as_deref(),
+        Some("#0891b2")
+    );
+    let serialized = serde_json::to_string(&policy).unwrap();
+    let reparsed: RenderPolicy = serde_json::from_str(&serialized).unwrap();
+    assert_eq!(reparsed, policy);
+}
+
+#[test]
 fn render_result_roundtrips() {
     let result = RenderResult {
         render_result_schema_version: "render-result.schema.v1".to_string(),

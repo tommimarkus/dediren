@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
+use std::collections::BTreeMap;
 
 pub const MODEL_SCHEMA_VERSION: &str = "model.schema.v1";
 pub const ENVELOPE_SCHEMA_VERSION: &str = "envelope.schema.v1";
@@ -258,6 +259,8 @@ pub struct RenderPolicy {
     pub svg_render_policy_schema_version: String,
     pub page: Page,
     pub margin: Margin,
+    #[serde(default)]
+    pub style: Option<SvgStylePolicy>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -274,6 +277,86 @@ pub struct Margin {
     pub right: f64,
     pub bottom: f64,
     pub left: f64,
+}
+
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SvgStylePolicy {
+    #[serde(default)]
+    pub background: Option<SvgBackgroundStyle>,
+    #[serde(default)]
+    pub font: Option<SvgFontStyle>,
+    #[serde(default)]
+    pub node: Option<SvgNodeStyle>,
+    #[serde(default)]
+    pub edge: Option<SvgEdgeStyle>,
+    #[serde(default)]
+    pub group: Option<SvgGroupStyle>,
+    #[serde(default)]
+    pub node_overrides: BTreeMap<String, SvgNodeStyle>,
+    #[serde(default)]
+    pub edge_overrides: BTreeMap<String, SvgEdgeStyle>,
+    #[serde(default)]
+    pub group_overrides: BTreeMap<String, SvgGroupStyle>,
+}
+
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SvgBackgroundStyle {
+    #[serde(default)]
+    pub fill: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SvgFontStyle {
+    #[serde(default)]
+    pub family: Option<String>,
+    #[serde(default)]
+    pub size: Option<f64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SvgNodeStyle {
+    #[serde(default)]
+    pub fill: Option<String>,
+    #[serde(default)]
+    pub stroke: Option<String>,
+    #[serde(default)]
+    pub stroke_width: Option<f64>,
+    #[serde(default)]
+    pub rx: Option<f64>,
+    #[serde(default)]
+    pub label_fill: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SvgEdgeStyle {
+    #[serde(default)]
+    pub stroke: Option<String>,
+    #[serde(default)]
+    pub stroke_width: Option<f64>,
+    #[serde(default)]
+    pub label_fill: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SvgGroupStyle {
+    #[serde(default)]
+    pub fill: Option<String>,
+    #[serde(default)]
+    pub stroke: Option<String>,
+    #[serde(default)]
+    pub stroke_width: Option<f64>,
+    #[serde(default)]
+    pub rx: Option<f64>,
+    #[serde(default)]
+    pub label_fill: Option<String>,
+    #[serde(default)]
+    pub label_size: Option<f64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
