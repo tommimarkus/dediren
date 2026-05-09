@@ -252,12 +252,118 @@ fn validate_string_len(
     Ok(())
 }
 
+#[derive(Debug, Clone)]
+struct SvgBounds {
+    min_x: f64,
+    min_y: f64,
+    max_x: f64,
+    max_y: f64,
+}
+
+impl SvgBounds {
+    fn new(policy: &RenderPolicy) -> Self {
+        Self {
+            min_x: 0.0,
+            min_y: 0.0,
+            max_x: policy.page.width,
+            max_y: policy.page.height,
+        }
+    }
+
+    fn include_rect(&mut self, x: f64, y: f64, width: f64, height: f64) {
+        self.min_x = self.min_x.min(x);
+        self.min_y = self.min_y.min(y);
+        self.max_x = self.max_x.max(x + width);
+        self.max_y = self.max_y.max(y + height);
+    }
+
+    fn include_point(&mut self, x: f64, y: f64) {
+        self.min_x = self.min_x.min(x);
+        self.min_y = self.min_y.min(y);
+        self.max_x = self.max_x.max(x);
+        self.max_y = self.max_y.max(y);
+    }
+
+    fn include_label(&mut self, x: f64, y: f64, text: &str, font_size: f64) {
+        let half_width = estimate_text_width(text, font_size) / 2.0;
+        self.include_rect(
+            x - half_width,
+            y - font_size,
+            half_width * 2.0,
+            font_size * 1.4,
+        );
+    }
+
+    fn padded(&self, policy: &RenderPolicy) -> Self {
+        Self {
+            min_x: self.min_x - policy.margin.left,
+            min_y: self.min_y - policy.margin.top,
+            max_x: self.max_x + policy.margin.right,
+            max_y: self.max_y + policy.margin.bottom,
+        }
+    }
+
+    fn width(&self) -> f64 {
+        self.max_x - self.min_x
+    }
+
+    fn height(&self) -> f64 {
+        self.max_y - self.min_y
+    }
+}
+
+fn estimate_text_width(text: &str, font_size: f64) -> f64 {
+    text.chars().count() as f64 * font_size * 0.62
+}
+
+fn svg_bounds(result: &LayoutResult, policy: &RenderPolicy, style: &ResolvedStyle) -> SvgBounds {
+    let mut bounds = SvgBounds::new(policy);
+
+    for group in &result.groups {
+        let group_style = group_style(policy, &group.id, style);
+        bounds.include_rect(group.x, group.y, group.width, group.height);
+        bounds.include_rect(
+            group.x + 8.0,
+            group.y + 4.0,
+            estimate_text_width(&group.label, group_style.label_size),
+            group_style.label_size * 1.4,
+        );
+    }
+
+    for edge in &result.edges {
+        for point in &edge.points {
+            bounds.include_point(point.x, point.y);
+        }
+        if let Some(point) = edge_label_point(&edge.points) {
+            bounds.include_label(point.x, point.y - 8.0, &edge.label, style.font_size);
+        }
+    }
+
+    for node in &result.nodes {
+        bounds.include_rect(node.x, node.y, node.width, node.height);
+        bounds.include_label(
+            node.x + node.width / 2.0,
+            node.y + node.height / 2.0,
+            &node.label,
+            style.font_size,
+        );
+    }
+
+    bounds.padded(policy)
+}
+
 fn render_svg(result: &LayoutResult, policy: &RenderPolicy) -> String {
     let style = base_style(policy);
+    let bounds = svg_bounds(result, policy, &style);
     let mut svg = String::new();
     svg.push_str(&format!(
-        r#"<svg xmlns="http://www.w3.org/2000/svg" width="{:.0}" height="{:.0}" viewBox="0 0 {:.0} {:.0}">"#,
-        policy.page.width, policy.page.height, policy.page.width, policy.page.height
+        r#"<svg xmlns="http://www.w3.org/2000/svg" width="{:.0}" height="{:.0}" viewBox="{:.1} {:.1} {:.1} {:.1}">"#,
+        policy.page.width,
+        policy.page.height,
+        bounds.min_x,
+        bounds.min_y,
+        bounds.width(),
+        bounds.height()
     ));
     svg.push_str(&format!(
         r##"<rect width="100%" height="100%" fill="{}"/>"##,

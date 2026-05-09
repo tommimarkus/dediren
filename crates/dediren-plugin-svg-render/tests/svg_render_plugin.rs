@@ -349,6 +349,66 @@ fn svg_renderer_adds_line_jump_for_later_crossing_edge() {
 }
 
 #[test]
+fn svg_renderer_expands_viewbox_to_include_edge_labels() {
+    let input = styled_inline_input(
+        serde_json::json!([]),
+        serde_json::json!([
+            {
+                "id": "left-node",
+                "source_id": "left-node",
+                "projection_id": "left-node",
+                "x": 12,
+                "y": 32,
+                "width": 160,
+                "height": 80,
+                "label": "Left"
+            },
+            {
+                "id": "right-node",
+                "source_id": "right-node",
+                "projection_id": "right-node",
+                "x": 212,
+                "y": 32,
+                "width": 160,
+                "height": 80,
+                "label": "Right"
+            }
+        ]),
+        serde_json::json!([
+            {
+                "id": "left-to-right",
+                "source": "left-node",
+                "target": "right-node",
+                "source_id": "left-to-right",
+                "projection_id": "left-to-right",
+                "points": [
+                    { "x": 172, "y": 72 },
+                    { "x": 212, "y": 72 }
+                ],
+                "label": "very long clipped edge label"
+            }
+        ]),
+        serde_json::json!({}),
+    );
+
+    let content = render_content(input);
+    let doc = svg_doc(&content);
+    let root = doc.root_element();
+
+    assert_eq!(root.attribute("width"), Some("640"));
+    assert_eq!(root.attribute("height"), Some("360"));
+    let view_box = root.attribute("viewBox").unwrap();
+    assert!(
+        view_box.starts_with('-'),
+        "expected negative min-x in viewBox, got {view_box}"
+    );
+    assert!(
+        view_box.contains(" -"),
+        "expected negative min-y in viewBox, got {view_box}"
+    );
+}
+
+#[test]
 fn svg_renderer_rejects_unsafe_policy_color_before_rendering() {
     let input = styled_inline_input(
         serde_json::json!([]),
