@@ -111,6 +111,7 @@ fn full_pipeline_produces_svg_and_oef() {
     assert!(svg_text.contains("data-dediren-group-id=\"application-services\""));
     assert!(svg_text.contains("submits order"));
     assert!(svg_text.contains("authorizes payment"));
+    assert_reasonable_svg_aspect(&svg_text, 2.8);
 
     let export_output = Command::cargo_bin("dediren")
         .unwrap()
@@ -243,8 +244,32 @@ fn real_elk_pipeline_renders_rich_source() {
     assert!(content.contains("data-dediren-group-id=\"application-services\""));
     assert!(content.contains("data-dediren-group-id=\"external-dependencies\""));
     assert!(content.contains("viewBox=\"-"));
+    assert_reasonable_svg_aspect(content, 3.2);
     svg.write_str(content).unwrap();
     write_render_artifact("real_elk_pipeline_renders_rich_source", content);
+}
+
+fn parse_view_box(content: &str) -> [f64; 4] {
+    let doc = roxmltree::Document::parse(content).unwrap();
+    let values: Vec<f64> = doc
+        .root_element()
+        .attribute("viewBox")
+        .unwrap()
+        .split_whitespace()
+        .map(|value| value.parse::<f64>().unwrap())
+        .collect();
+    assert_eq!(values.len(), 4);
+    [values[0], values[1], values[2], values[3]]
+}
+
+fn assert_reasonable_svg_aspect(content: &str, max_aspect: f64) {
+    let view_box = parse_view_box(content);
+    let aspect = view_box[2] / view_box[3];
+    assert!(
+        aspect <= max_aspect,
+        "rendered SVG aspect ratio should be <= {max_aspect}, got {aspect} from viewBox {:?}",
+        view_box
+    );
 }
 
 fn write_render_artifact(test_name: &str, content: &str) -> PathBuf {
