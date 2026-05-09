@@ -25,6 +25,118 @@
         "bottom": { "type": "number", "minimum": 0 },
         "left": { "type": "number", "minimum": 0 }
       }
+    },
+    "style": { "$ref": "#/$defs/style" }
+  },
+  "$defs": {
+    "color": {
+      "type": "string",
+      "pattern": "^#[0-9a-fA-F]{6}$"
+    },
+    "font": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "family": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "size": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 96
+        }
+      }
+    },
+    "background": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "fill": { "$ref": "#/$defs/color" }
+      }
+    },
+    "nodeStyle": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "fill": { "$ref": "#/$defs/color" },
+        "stroke": { "$ref": "#/$defs/color" },
+        "stroke_width": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 24
+        },
+        "rx": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 80
+        },
+        "label_fill": { "$ref": "#/$defs/color" }
+      }
+    },
+    "edgeStyle": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "stroke": { "$ref": "#/$defs/color" },
+        "stroke_width": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 24
+        },
+        "label_fill": { "$ref": "#/$defs/color" }
+      }
+    },
+    "groupStyle": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "fill": { "$ref": "#/$defs/color" },
+        "stroke": { "$ref": "#/$defs/color" },
+        "stroke_width": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 24
+        },
+        "rx": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 80
+        },
+        "label_fill": { "$ref": "#/$defs/color" },
+        "label_size": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 96
+        }
+      }
+    },
+    "nodeOverrideMap": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/nodeStyle" }
+    },
+    "edgeOverrideMap": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/edgeStyle" }
+    },
+    "groupOverrideMap": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/groupStyle" }
+    },
+    "style": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "background": { "$ref": "#/$defs/background" },
+        "font": { "$ref": "#/$defs/font" },
+        "node": { "$ref": "#/$defs/nodeStyle" },
+        "edge": { "$ref": "#/$defs/edgeStyle" },
+        "group": { "$ref": "#/$defs/groupStyle" },
+        "node_overrides": { "$ref": "#/$defs/nodeOverrideMap" },
+        "edge_overrides": { "$ref": "#/$defs/edgeOverrideMap" },
+        "group_overrides": { "$ref": "#/$defs/groupOverrideMap" }
+      }
     }
   }
 }

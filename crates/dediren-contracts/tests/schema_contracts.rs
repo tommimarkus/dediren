@@ -27,6 +27,14 @@ fn default_svg_policy_matches_schema() {
 }
 
 #[test]
+fn rich_svg_policy_matches_schema() {
+    assert_valid(
+        "schemas/svg-render-policy.schema.json",
+        "fixtures/render-policy/rich-svg.json",
+    );
+}
+
+#[test]
 fn all_public_schemas_compile() {
     for path in [
         "schemas/model.schema.json",

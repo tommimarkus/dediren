@@ -1,0 +1,57 @@
+{
+  "svg_render_policy_schema_version": "svg-render-policy.schema.v1",
+  "page": {
+    "width": 1200,
+    "height": 800
+  },
+  "margin": {
+    "top": 32,
+    "right": 32,
+    "bottom": 32,
+    "left": 32
+  },
+  "style": {
+    "background": {
+      "fill": "#f8fafc"
+    },
+    "font": {
+      "family": "Inter, Arial, sans-serif",
+      "size": 14
+    },
+    "node": {
+      "fill": "#ffffff",
+      "stroke": "#1f2937",
+      "stroke_width": 1.5,
+      "rx": 8,
+      "label_fill": "#111827"
+    },
+    "edge": {
+      "stroke": "#475569",
+      "stroke_width": 1.5,
+      "label_fill": "#334155"
+    },
+    "group": {
+      "fill": "#e0f2fe",
+      "stroke": "#0284c7",
+      "stroke_width": 1,
+      "rx": 10,
+      "label_fill": "#0c4a6e",
+      "label_size": 12
+    },
+    "node_overrides": {
+      "api": {
+        "fill": "#ecfeff",
+        "stroke": "#0891b2",
+        "label_fill": "#164e63"
+      }
+    },
+    "edge_overrides": {
+      "client-calls-api": {
+        "stroke": "#7c3aed",
+        "stroke_width": 2,
+        "label_fill": "#5b21b6"
+      }
+    },
+    "group_overrides": {}
+  }
+}
