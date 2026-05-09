@@ -21,6 +21,7 @@ dediren project --target layout-request --plugin generic-graph --view main --inp
 DEDIREN_ELK_RESULT_FIXTURE=fixtures/layout-result/basic.json dediren layout --plugin elk-layout --input fixtures/layout-request/basic.json
 dediren validate-layout --input fixtures/layout-result/basic.json
 dediren render --plugin svg-render --policy fixtures/render-policy/default-svg.json --input fixtures/layout-result/basic.json
+dediren render --plugin svg-render --policy fixtures/render-policy/rich-svg.json --input fixtures/layout-result/basic.json
 dediren export --plugin archimate-oef --policy fixtures/export-policy/default-oef.json --source fixtures/source/valid-archimate-oef.json --layout fixtures/layout-result/archimate-oef-basic.json
 ```
 
@@ -29,6 +30,17 @@ dediren export --plugin archimate-oef --policy fixtures/export-policy/default-oe
 
 `export` returns a JSON command envelope by default. The ArchiMate OEF XML text
 is in `.data.content`; this slice does not expose a raw-output mode.
+
+## SVG Styling
+
+SVG styling is owned by the render policy. Source graph JSON and layout result
+JSON stay presentation-free; they do not carry colors, fonts, shapes, or style
+hints.
+
+`fixtures/render-policy/default-svg.json` uses renderer defaults.
+`fixtures/render-policy/rich-svg.json` shows optional styling for background,
+font, nodes, edges, groups, and per-layout-id overrides. Per-id override keys
+match ids in the layout result, for example `api` or `client-calls-api`.
 
 ## Local Install
 
