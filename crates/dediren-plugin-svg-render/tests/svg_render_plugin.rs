@@ -103,6 +103,27 @@ fn svg_renderer_preserves_style_number_precision() {
 }
 
 #[test]
+fn svg_renderer_allows_schema_valid_non_ascii_font_family() {
+    let font_family = "Å".repeat(120);
+    let input = styled_inline_input(
+        serde_json::json!([]),
+        serde_json::json!([]),
+        serde_json::json!([]),
+        serde_json::json!({
+            "font": { "family": font_family, "size": 14 }
+        }),
+    );
+    let content = render_content(input);
+    let doc = svg_doc(&content);
+
+    let viewport = child_element(doc.root_element(), "g");
+    assert_eq!(
+        viewport.attribute("font-family"),
+        Some(font_family.as_str())
+    );
+}
+
+#[test]
 fn svg_renderer_applies_base_and_override_group_styles_to_group_elements() {
     let input = styled_inline_input(
         serde_json::json!([

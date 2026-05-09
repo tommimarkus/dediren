@@ -242,7 +242,8 @@ fn validate_string_len(
     let Some(value) = value else {
         return Ok(());
     };
-    if value.len() < min || value.len() > max {
+    let character_count = value.chars().count();
+    if character_count < min || character_count > max {
         return Err(PolicyValidationError {
             path: path.to_string(),
             message: format!("SVG render policy {path} length is outside the allowed range"),

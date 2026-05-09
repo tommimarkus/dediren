@@ -1085,7 +1085,7 @@ SVG styling is owned by the render policy. Source graph JSON and layout result
 JSON stay presentation-free; they do not carry colors, fonts, shapes, or style
 hints.
 
-`fixtures/render-policy/default-svg.json` uses renderer defaults. 
+`fixtures/render-policy/default-svg.json` uses renderer defaults.
 `fixtures/render-policy/rich-svg.json` shows optional styling for background,
 font, nodes, edges, groups, and per-layout-id overrides. Per-id override keys
 match ids in the layout result, for example `api` or `client-calls-api`.
