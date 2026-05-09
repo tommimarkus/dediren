@@ -398,16 +398,82 @@ fn svg_renderer_expands_viewbox_to_include_edge_labels() {
     let doc = svg_doc(&content);
     let root = doc.root_element();
 
-    assert!(root.attribute("width").unwrap().parse::<f64>().unwrap() >= 640.0);
-    assert!(root.attribute("height").unwrap().parse::<f64>().unwrap() >= 360.0);
+    let width = root.attribute("width").unwrap().parse::<f64>().unwrap();
+    let height = root.attribute("height").unwrap().parse::<f64>().unwrap();
     let view_box = root.attribute("viewBox").unwrap();
+    let view_box_values: Vec<f64> = view_box
+        .split_whitespace()
+        .map(|value| value.parse::<f64>().unwrap())
+        .collect();
+    assert_eq!(view_box_values.len(), 4);
+    assert!(
+        width >= 380.0,
+        "expanded bounds should include node geometry and long edge label, got {width}"
+    );
+    assert!(
+        height >= 100.0,
+        "expanded bounds should include label height and node geometry, got {height}"
+    );
     assert!(
         view_box.starts_with('-'),
         "expected negative min-x in viewBox, got {view_box}"
     );
     assert!(
-        view_box.contains(" -"),
-        "expected negative min-y in viewBox, got {view_box}"
+        view_box_values[1] <= 16.0,
+        "expected top margin in viewBox, got {view_box}"
+    );
+}
+
+#[test]
+fn svg_renderer_crops_small_diagram_to_content_bounds() {
+    let input = styled_inline_input(
+        serde_json::json!([]),
+        serde_json::json!([
+            {
+                "id": "only-node",
+                "source_id": "only-node",
+                "projection_id": "only-node",
+                "x": 32,
+                "y": 40,
+                "width": 160,
+                "height": 80,
+                "label": "Only Node"
+            }
+        ]),
+        serde_json::json!([]),
+        serde_json::json!({}),
+    );
+
+    let content = render_content(input);
+    let doc = svg_doc(&content);
+    let root = doc.root_element();
+    let width = root.attribute("width").unwrap().parse::<f64>().unwrap();
+    let height = root.attribute("height").unwrap().parse::<f64>().unwrap();
+    let view_box: Vec<f64> = root
+        .attribute("viewBox")
+        .unwrap()
+        .split_whitespace()
+        .map(|value| value.parse::<f64>().unwrap())
+        .collect();
+
+    assert_eq!(view_box.len(), 4);
+    assert!(
+        width < 260.0,
+        "single-node render should not keep the 640px policy width, got {width}"
+    );
+    assert!(
+        height < 180.0,
+        "single-node render should not keep the 360px policy height, got {height}"
+    );
+    assert!(
+        view_box[0] <= 16.0,
+        "left margin should be included, got min-x {}",
+        view_box[0]
+    );
+    assert!(
+        view_box[1] <= 24.0,
+        "top margin should be included, got min-y {}",
+        view_box[1]
     );
 }
 

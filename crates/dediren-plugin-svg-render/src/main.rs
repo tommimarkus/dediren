@@ -261,7 +261,23 @@ struct SvgBounds {
 }
 
 impl SvgBounds {
-    fn new(policy: &RenderPolicy) -> Self {
+    fn new_empty() -> Self {
+        Self {
+            min_x: f64::INFINITY,
+            min_y: f64::INFINITY,
+            max_x: f64::NEG_INFINITY,
+            max_y: f64::NEG_INFINITY,
+        }
+    }
+
+    fn is_empty(&self) -> bool {
+        !self.min_x.is_finite()
+            || !self.min_y.is_finite()
+            || !self.max_x.is_finite()
+            || !self.max_y.is_finite()
+    }
+
+    fn fallback(policy: &RenderPolicy) -> Self {
         Self {
             min_x: 0.0,
             min_y: 0.0,
@@ -317,7 +333,7 @@ fn estimate_text_width(text: &str, font_size: f64) -> f64 {
 }
 
 fn svg_bounds(result: &LayoutResult, policy: &RenderPolicy, style: &ResolvedStyle) -> SvgBounds {
-    let mut bounds = SvgBounds::new(policy);
+    let mut bounds = SvgBounds::new_empty();
 
     for group in &result.groups {
         let group_style = group_style(policy, &group.id, style);
@@ -349,14 +365,18 @@ fn svg_bounds(result: &LayoutResult, policy: &RenderPolicy, style: &ResolvedStyl
         );
     }
 
-    bounds.padded(policy)
+    if bounds.is_empty() {
+        SvgBounds::fallback(policy).padded(policy)
+    } else {
+        bounds.padded(policy)
+    }
 }
 
 fn render_svg(result: &LayoutResult, policy: &RenderPolicy) -> String {
     let style = base_style(policy);
     let bounds = svg_bounds(result, policy, &style);
-    let rendered_width = policy.page.width.max(bounds.width());
-    let rendered_height = policy.page.height.max(bounds.height());
+    let rendered_width = bounds.width();
+    let rendered_height = bounds.height();
     let mut svg = String::new();
     svg.push_str(&format!(
         r#"<svg xmlns="http://www.w3.org/2000/svg" width="{:.0}" height="{:.0}" viewBox="{:.1} {:.1} {:.1} {:.1}">"#,
