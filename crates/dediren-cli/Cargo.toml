@@ -22,3 +22,4 @@ serde_json.workspace = true
 assert_cmd.workspace = true
 assert_fs.workspace = true
 predicates.workspace = true
+roxmltree.workspace = true

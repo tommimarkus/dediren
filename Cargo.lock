@@ -273,6 +273,7 @@ dependencies = [
  "dediren-contracts",
  "dediren-core",
  "predicates",
+ "roxmltree",
  "serde_json",
 ]
 

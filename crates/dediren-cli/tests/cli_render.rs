@@ -36,8 +36,44 @@ fn render_invokes_svg_plugin_with_rich_policy() {
     assert!(envelope["data"]
         .get("render_result_schema_version")
         .is_some());
-    assert!(content.contains(r##"fill="#ecfeff""##));
-    assert!(content.contains(r##"stroke="#7c3aed""##));
+    let doc = svg_doc(content);
+
+    let api_node = semantic_group(&doc, "data-dediren-node-id", "api");
+    let api_rect = child_element(api_node, "rect");
+    assert_eq!(api_rect.attribute("fill"), Some("#ecfeff"));
+
+    let calls_edge = semantic_group(&doc, "data-dediren-edge-id", "client-calls-api");
+    let calls_path = child_element(calls_edge, "path");
+    assert_eq!(calls_path.attribute("stroke"), Some("#7c3aed"));
+}
+
+fn svg_doc(content: &str) -> roxmltree::Document<'_> {
+    roxmltree::Document::parse(content).unwrap()
+}
+
+fn semantic_group<'a, 'input>(
+    doc: &'a roxmltree::Document<'input>,
+    data_attr: &str,
+    id: &str,
+) -> roxmltree::Node<'a, 'input> {
+    doc.descendants()
+        .find(|node| node.has_tag_name("g") && node.attribute(data_attr) == Some(id))
+        .unwrap_or_else(|| panic!("expected SVG to contain <g {data_attr}=\"{id}\">"))
+}
+
+fn child_element<'a, 'input>(
+    node: roxmltree::Node<'a, 'input>,
+    tag_name: &str,
+) -> roxmltree::Node<'a, 'input> {
+    node.children()
+        .find(|child| child.has_tag_name(tag_name))
+        .unwrap_or_else(|| {
+            panic!(
+                "expected <{}> to contain <{}>",
+                node.tag_name().name(),
+                tag_name
+            )
+        })
 }
 
 fn workspace_binary(package: &str, binary: &str) -> PathBuf {
