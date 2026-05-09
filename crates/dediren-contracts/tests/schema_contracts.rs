@@ -35,6 +35,56 @@ fn rich_svg_policy_matches_schema() {
 }
 
 #[test]
+fn svg_policy_schema_rejects_invalid_style_cells() {
+    for (name, style) in [
+        (
+            "invalid color",
+            json!({
+                "node": {
+                    "fill": "url(https://attacker.example/x.svg#p)"
+                }
+            }),
+        ),
+        (
+            "out-of-range numeric style value",
+            json!({
+                "node": {
+                    "stroke_width": 24.01
+                }
+            }),
+        ),
+        (
+            "unknown style field",
+            json!({
+                "node": {
+                    "fill": "#ffffff",
+                    "blend_mode": "screen"
+                }
+            }),
+        ),
+        (
+            "invalid override object shape",
+            json!({
+                "node_overrides": {
+                    "api": "#ffffff"
+                }
+            }),
+        ),
+    ] {
+        assert_json_invalid(
+            "schemas/svg-render-policy.schema.json",
+            json!({
+                "svg_render_policy_schema_version": "svg-render-policy.schema.v1",
+                "page": { "width": 640, "height": 360 },
+                "margin": { "top": 16, "right": 16, "bottom": 16, "left": 16 },
+                "style": style
+            }),
+            name,
+        );
+    }
+}
+
+#[test]
 fn all_public_schemas_compile() {
     for path in [
         "schemas/model.schema.json",
@@ -209,6 +259,12 @@ fn assert_json_valid(schema_path: &str, instance: serde_json::Value) {
         result.is_ok(),
         "{schema_path} should validate supplied JSON"
     );
+}
+
+fn assert_json_invalid(schema_path: &str, instance: serde_json::Value, name: &str) {
+    let validator = validator(schema_path);
+    let result = validator.validate(&instance);
+    assert!(result.is_err(), "{schema_path} should reject {name}");
 }
 
 fn validator(path: &str) -> Validator {

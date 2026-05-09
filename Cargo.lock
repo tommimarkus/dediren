@@ -352,6 +352,7 @@ dependencies = [
  "assert_cmd",
  "dediren-contracts",
  "predicates",
+ "roxmltree",
  "serde",
  "serde_json",
 ]

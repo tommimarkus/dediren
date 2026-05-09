@@ -34,20 +34,26 @@ fn svg_renderer_applies_rich_policy_styles() {
         ).unwrap()
     });
     let content = render_content(input);
+    let doc = svg_doc(&content);
 
-    assert!(content.contains(r##"fill="#f8fafc""##));
+    let background = child_element(doc.root_element(), "rect");
+    assert_eq!(background.attribute("fill"), Some("#f8fafc"));
 
-    let api_node = element_group(&content, "data-dediren-node-id", "api");
-    assert!(api_node.contains(r##"fill="#ecfeff""##));
-    assert!(api_node.contains(r##"stroke="#0891b2""##));
+    let api_node = semantic_group(&doc, "data-dediren-node-id", "api");
+    let api_rect = child_element(api_node, "rect");
+    assert_eq!(api_rect.attribute("fill"), Some("#ecfeff"));
+    assert_eq!(api_rect.attribute("stroke"), Some("#0891b2"));
 
-    let client_node = element_group(&content, "data-dediren-node-id", "client");
-    assert!(client_node.contains(r##"fill="#ffffff""##));
-    assert!(client_node.contains(r##"stroke="#1f2937""##));
+    let client_node = semantic_group(&doc, "data-dediren-node-id", "client");
+    let client_rect = child_element(client_node, "rect");
+    assert_eq!(client_rect.attribute("fill"), Some("#ffffff"));
+    assert_eq!(client_rect.attribute("stroke"), Some("#1f2937"));
 
-    let calls_edge = element_group(&content, "data-dediren-edge-id", "client-calls-api");
-    assert!(calls_edge.contains(r##"stroke="#7c3aed""##));
-    assert!(calls_edge.contains(r##"fill="#5b21b6""##));
+    let calls_edge = semantic_group(&doc, "data-dediren-edge-id", "client-calls-api");
+    let calls_path = child_element(calls_edge, "path");
+    let calls_label = child_element(calls_edge, "text");
+    assert_eq!(calls_path.attribute("stroke"), Some("#7c3aed"));
+    assert_eq!(calls_label.attribute("fill"), Some("#5b21b6"));
 }
 
 #[test]
@@ -84,12 +90,16 @@ fn svg_renderer_preserves_style_number_precision() {
         }),
     );
     let content = render_content(input);
+    let doc = svg_doc(&content);
 
-    assert!(content.contains(r#"font-family="Inter" font-size="13.5""#));
+    let viewport = child_element(doc.root_element(), "g");
+    assert_eq!(viewport.attribute("font-family"), Some("Inter"));
+    assert_eq!(viewport.attribute("font-size"), Some("13.5"));
 
-    let node = element_group(&content, "data-dediren-node-id", "node-a");
-    assert!(node.contains(r#"rx="0.5""#));
-    assert!(node.contains(r#"stroke-width="1.25""#));
+    let node = semantic_group(&doc, "data-dediren-node-id", "node-a");
+    let node_rect = child_element(node, "rect");
+    assert_eq!(node_rect.attribute("rx"), Some("0.5"));
+    assert_eq!(node_rect.attribute("stroke-width"), Some("1.25"));
 }
 
 #[test]
@@ -143,22 +153,62 @@ fn svg_renderer_applies_base_and_override_group_styles_to_group_elements() {
         }),
     );
     let content = render_content(input);
+    let doc = svg_doc(&content);
 
-    let base_group = element_group(&content, "data-dediren-group-id", "base-group");
-    assert!(base_group.contains(r##"fill="#e0f2fe""##));
-    assert!(base_group.contains(r##"stroke="#0284c7""##));
-    assert!(base_group.contains(r#"stroke-width="1.25""#));
-    assert!(base_group.contains(r#"rx="6.5""#));
-    assert!(base_group.contains(r##"fill="#0c4a6e" font-size="13.5""##));
-    assert!(base_group.contains(">Base Group</text>"));
+    let base_group = semantic_group(&doc, "data-dediren-group-id", "base-group");
+    let base_rect = child_element(base_group, "rect");
+    let base_label = child_element(base_group, "text");
+    assert_eq!(base_rect.attribute("fill"), Some("#e0f2fe"));
+    assert_eq!(base_rect.attribute("stroke"), Some("#0284c7"));
+    assert_eq!(base_rect.attribute("stroke-width"), Some("1.25"));
+    assert_eq!(base_rect.attribute("rx"), Some("6.5"));
+    assert_eq!(base_label.attribute("fill"), Some("#0c4a6e"));
+    assert_eq!(base_label.attribute("font-size"), Some("13.5"));
+    assert_eq!(base_label.text(), Some("Base Group"));
 
-    let override_group = element_group(&content, "data-dediren-group-id", "override-group");
-    assert!(override_group.contains(r##"fill="#fef3c7""##));
-    assert!(override_group.contains(r##"stroke="#d97706""##));
-    assert!(override_group.contains(r#"stroke-width="2.5""#));
-    assert!(override_group.contains(r#"rx="3.25""#));
-    assert!(override_group.contains(r##"fill="#78350f" font-size="15.75""##));
-    assert!(override_group.contains(">Override Group</text>"));
+    let override_group = semantic_group(&doc, "data-dediren-group-id", "override-group");
+    let override_rect = child_element(override_group, "rect");
+    let override_label = child_element(override_group, "text");
+    assert_eq!(override_rect.attribute("fill"), Some("#fef3c7"));
+    assert_eq!(override_rect.attribute("stroke"), Some("#d97706"));
+    assert_eq!(override_rect.attribute("stroke-width"), Some("2.5"));
+    assert_eq!(override_rect.attribute("rx"), Some("3.25"));
+    assert_eq!(override_label.attribute("fill"), Some("#78350f"));
+    assert_eq!(override_label.attribute("font-size"), Some("15.75"));
+    assert_eq!(override_label.text(), Some("Override Group"));
+}
+
+#[test]
+fn svg_renderer_rejects_unsafe_policy_color_before_rendering() {
+    let input = styled_inline_input(
+        serde_json::json!([]),
+        serde_json::json!([
+            {
+                "id": "node-a",
+                "source_id": "node-a",
+                "projection_id": "node-a",
+                "x": 32,
+                "y": 40,
+                "width": 160,
+                "height": 80,
+                "label": "Node A"
+            }
+        ]),
+        serde_json::json!([]),
+        serde_json::json!({
+            "node": {
+                "fill": "url(https://attacker.example/x.svg#p)"
+            }
+        }),
+    );
+
+    let mut cmd = Command::cargo_bin("dediren-plugin-svg-render").unwrap();
+    cmd.arg("render")
+        .write_stdin(serde_json::to_string(&input).unwrap());
+    cmd.assert()
+        .failure()
+        .stdout(predicate::str::contains("\"status\":\"error\""))
+        .stdout(predicate::str::contains("DEDIREN_SVG_POLICY_INVALID"));
 }
 
 fn render_content(input: serde_json::Value) -> String {
@@ -194,16 +244,33 @@ fn styled_inline_input(
     })
 }
 
-fn element_group<'a>(content: &'a str, data_attr: &str, id: &str) -> &'a str {
-    let marker = format!(r#"<g {data_attr}="{id}">"#);
-    let start = content.find(&marker).unwrap_or_else(|| {
-        panic!("expected SVG to contain element group marker {marker:?}:\n{content}")
-    });
-    let remaining = &content[start..];
-    let end = remaining
-        .find("</g>")
-        .unwrap_or_else(|| panic!("expected SVG element group {marker:?} to close:\n{content}"));
-    &remaining[..end + "</g>".len()]
+fn svg_doc(content: &str) -> roxmltree::Document<'_> {
+    roxmltree::Document::parse(content).unwrap()
+}
+
+fn semantic_group<'a, 'input>(
+    doc: &'a roxmltree::Document<'input>,
+    data_attr: &str,
+    id: &str,
+) -> roxmltree::Node<'a, 'input> {
+    doc.descendants()
+        .find(|node| node.has_tag_name("g") && node.attribute(data_attr) == Some(id))
+        .unwrap_or_else(|| panic!("expected SVG to contain <g {data_attr}=\"{id}\">"))
+}
+
+fn child_element<'a, 'input>(
+    node: roxmltree::Node<'a, 'input>,
+    tag_name: &str,
+) -> roxmltree::Node<'a, 'input> {
+    node.children()
+        .find(|child| child.has_tag_name(tag_name))
+        .unwrap_or_else(|| {
+            panic!(
+                "expected <{}> to contain <{}>",
+                node.tag_name().name(),
+                tag_name
+            )
+        })
 }
 
 fn workspace_file(path: &str) -> PathBuf {

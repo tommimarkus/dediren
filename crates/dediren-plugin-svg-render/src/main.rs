@@ -1,8 +1,9 @@
 use std::io::Read;
 
 use dediren_contracts::{
-    CommandEnvelope, LaidOutEdge, LaidOutGroup, LaidOutNode, LayoutResult, Point, RenderPolicy,
-    RenderResult, SvgEdgeStyle, SvgGroupStyle, SvgNodeStyle, RENDER_RESULT_SCHEMA_VERSION,
+    CommandEnvelope, Diagnostic, DiagnosticSeverity, LaidOutEdge, LaidOutGroup, LaidOutNode,
+    LayoutResult, Point, RenderPolicy, RenderResult, SvgEdgeStyle, SvgGroupStyle, SvgNodeStyle,
+    RENDER_RESULT_SCHEMA_VERSION,
 };
 use serde::Deserialize;
 
@@ -70,12 +71,183 @@ fn main() -> anyhow::Result<()> {
     let mut input = String::new();
     std::io::stdin().read_to_string(&mut input)?;
     let render_input: RenderInput = serde_json::from_str(&input)?;
+    if let Err(error) = validate_render_policy(&render_input.policy) {
+        exit_with_diagnostic(
+            "DEDIREN_SVG_POLICY_INVALID",
+            &error.message,
+            Some(error.path),
+        );
+    }
     let result = RenderResult {
         render_result_schema_version: RENDER_RESULT_SCHEMA_VERSION.to_string(),
         artifact_kind: "svg".to_string(),
         content: render_svg(&render_input.layout_result, &render_input.policy),
     };
     println!("{}", serde_json::to_string(&CommandEnvelope::ok(result))?);
+    Ok(())
+}
+
+#[derive(Debug)]
+struct PolicyValidationError {
+    path: String,
+    message: String,
+}
+
+fn validate_render_policy(policy: &RenderPolicy) -> Result<(), PolicyValidationError> {
+    let Some(style) = policy.style.as_ref() else {
+        return Ok(());
+    };
+
+    if let Some(background) = style.background.as_ref() {
+        validate_color(&background.fill, "style.background.fill")?;
+    }
+    if let Some(font) = style.font.as_ref() {
+        validate_string_len(&font.family, "style.font.family", 1, 120)?;
+        validate_number(
+            &font.size,
+            "style.font.size",
+            Bound::ExclusiveMin(0.0),
+            96.0,
+        )?;
+    }
+    validate_node_style(style.node.as_ref(), "style.node")?;
+    validate_edge_style(style.edge.as_ref(), "style.edge")?;
+    validate_group_style(style.group.as_ref(), "style.group")?;
+
+    for (id, node_style) in &style.node_overrides {
+        validate_node_style(Some(node_style), &format!("style.node_overrides.{id}"))?;
+    }
+    for (id, edge_style) in &style.edge_overrides {
+        validate_edge_style(Some(edge_style), &format!("style.edge_overrides.{id}"))?;
+    }
+    for (id, group_style) in &style.group_overrides {
+        validate_group_style(Some(group_style), &format!("style.group_overrides.{id}"))?;
+    }
+
+    Ok(())
+}
+
+fn validate_node_style(
+    style: Option<&SvgNodeStyle>,
+    path: &str,
+) -> Result<(), PolicyValidationError> {
+    let Some(style) = style else {
+        return Ok(());
+    };
+    validate_color(&style.fill, &format!("{path}.fill"))?;
+    validate_color(&style.stroke, &format!("{path}.stroke"))?;
+    validate_number(
+        &style.stroke_width,
+        &format!("{path}.stroke_width"),
+        Bound::Min(0.0),
+        24.0,
+    )?;
+    validate_number(&style.rx, &format!("{path}.rx"), Bound::Min(0.0), 80.0)?;
+    validate_color(&style.label_fill, &format!("{path}.label_fill"))
+}
+
+fn validate_edge_style(
+    style: Option<&SvgEdgeStyle>,
+    path: &str,
+) -> Result<(), PolicyValidationError> {
+    let Some(style) = style else {
+        return Ok(());
+    };
+    validate_color(&style.stroke, &format!("{path}.stroke"))?;
+    validate_number(
+        &style.stroke_width,
+        &format!("{path}.stroke_width"),
+        Bound::Min(0.0),
+        24.0,
+    )?;
+    validate_color(&style.label_fill, &format!("{path}.label_fill"))
+}
+
+fn validate_group_style(
+    style: Option<&SvgGroupStyle>,
+    path: &str,
+) -> Result<(), PolicyValidationError> {
+    let Some(style) = style else {
+        return Ok(());
+    };
+    validate_color(&style.fill, &format!("{path}.fill"))?;
+    validate_color(&style.stroke, &format!("{path}.stroke"))?;
+    validate_number(
+        &style.stroke_width,
+        &format!("{path}.stroke_width"),
+        Bound::Min(0.0),
+        24.0,
+    )?;
+    validate_number(&style.rx, &format!("{path}.rx"), Bound::Min(0.0), 80.0)?;
+    validate_color(&style.label_fill, &format!("{path}.label_fill"))?;
+    validate_number(
+        &style.label_size,
+        &format!("{path}.label_size"),
+        Bound::ExclusiveMin(0.0),
+        96.0,
+    )
+}
+
+enum Bound {
+    Min(f64),
+    ExclusiveMin(f64),
+}
+
+fn validate_number(
+    value: &Option<f64>,
+    path: &str,
+    lower_bound: Bound,
+    max: f64,
+) -> Result<(), PolicyValidationError> {
+    let Some(value) = value else {
+        return Ok(());
+    };
+    let lower_bound_valid = match lower_bound {
+        Bound::Min(min) => *value >= min,
+        Bound::ExclusiveMin(min) => *value > min,
+    };
+    if !value.is_finite() || !lower_bound_valid || *value > max {
+        return Err(PolicyValidationError {
+            path: path.to_string(),
+            message: format!("SVG render policy {path} is outside the allowed range"),
+        });
+    }
+    Ok(())
+}
+
+fn validate_color(value: &Option<String>, path: &str) -> Result<(), PolicyValidationError> {
+    let Some(value) = value else {
+        return Ok(());
+    };
+    let is_hex_color = value.len() == 7
+        && value.starts_with('#')
+        && value[1..]
+            .chars()
+            .all(|character| character.is_ascii_hexdigit());
+    if !is_hex_color {
+        return Err(PolicyValidationError {
+            path: path.to_string(),
+            message: format!("SVG render policy {path} must be a #RRGGBB hex color"),
+        });
+    }
+    Ok(())
+}
+
+fn validate_string_len(
+    value: &Option<String>,
+    path: &str,
+    min: usize,
+    max: usize,
+) -> Result<(), PolicyValidationError> {
+    let Some(value) = value else {
+        return Ok(());
+    };
+    if value.len() < min || value.len() > max {
+        return Err(PolicyValidationError {
+            path: path.to_string(),
+            message: format!("SVG render policy {path} length is outside the allowed range"),
+        });
+    }
     Ok(())
 }
 
@@ -363,4 +535,21 @@ fn svg_style_number(value: f64) -> String {
         return "0".to_string();
     }
     serde_json::to_string(&value).expect("finite SVG style number")
+}
+
+fn exit_with_diagnostic(code: &str, message: &str, path: Option<String>) -> ! {
+    let diagnostic = Diagnostic {
+        code: code.to_string(),
+        severity: DiagnosticSeverity::Error,
+        message: message.to_string(),
+        path,
+    };
+    println!(
+        "{}",
+        serde_json::to_string(&CommandEnvelope::<serde_json::Value>::error(vec![
+            diagnostic
+        ]))
+        .unwrap()
+    );
+    std::process::exit(3);
 }
