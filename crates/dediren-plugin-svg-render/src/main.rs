@@ -839,8 +839,13 @@ fn edge_label(
     occupied_boxes: &mut Vec<LabelBox>,
 ) -> String {
     if let Some(point) = edge_label_point(&edge.points) {
-        let (label_x, label_y, label_box) =
-            edge_label_position(point.x, point.y - 8.0, &edge.label, font_size, occupied_boxes);
+        let (label_x, label_y, label_box) = edge_label_position(
+            point.x,
+            point.y - 8.0,
+            &edge.label,
+            font_size,
+            occupied_boxes,
+        );
         occupied_boxes.push(label_box);
         format!(
             r##"<text x="{:.1}" y="{:.1}" text-anchor="middle" fill="{}" stroke="{}" stroke-width="4" stroke-linejoin="round" paint-order="stroke">{}</text>"##,
