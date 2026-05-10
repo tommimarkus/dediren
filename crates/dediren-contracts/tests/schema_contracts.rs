@@ -175,6 +175,58 @@ fn svg_policy_schema_accepts_semantic_type_overrides() {
 }
 
 #[test]
+fn svg_policy_schema_accepts_archimate_decorators_and_edge_notation() {
+    assert_json_valid(
+        "schemas/svg-render-policy.schema.json",
+        json!({
+            "svg_render_policy_schema_version": "svg-render-policy.schema.v1",
+            "semantic_profile": "archimate",
+            "page": { "width": 640, "height": 360 },
+            "margin": { "top": 24, "right": 24, "bottom": 24, "left": 24 },
+            "style": {
+                "node_type_overrides": {
+                    "ApplicationComponent": {
+                        "fill": "#fff2cc",
+                        "stroke": "#7a5c00",
+                        "decorator": "archimate_application_component"
+                    },
+                    "ApplicationService": {
+                        "fill": "#e0f2fe",
+                        "stroke": "#0369a1",
+                        "decorator": "archimate_application_service"
+                    }
+                },
+                "edge_type_overrides": {
+                    "Realization": {
+                        "stroke": "#374151",
+                        "line_style": "dashed",
+                        "marker_end": "hollow_triangle"
+                    }
+                }
+            }
+        }),
+    );
+}
+
+#[test]
+fn svg_policy_schema_rejects_unknown_node_decorator() {
+    assert_json_invalid(
+        "schemas/svg-render-policy.schema.json",
+        json!({
+            "svg_render_policy_schema_version": "svg-render-policy.schema.v1",
+            "page": { "width": 640, "height": 360 },
+            "margin": { "top": 24, "right": 24, "bottom": 24, "left": 24 },
+            "style": {
+                "node": {
+                    "decorator": "unknown_archimate_shape"
+                }
+            }
+        }),
+        "unknown node decorator",
+    );
+}
+
+#[test]
 fn all_public_schemas_compile() {
     for path in [
         "schemas/model.schema.json",

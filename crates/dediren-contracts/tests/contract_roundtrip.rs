@@ -1,7 +1,10 @@
 use dediren_contracts::{
-    CommandEnvelope, Diagnostic, DiagnosticSeverity, GroupProvenance, LayoutRequest,
+    CommandEnvelope, Diagnostic, DiagnosticSeverity, GroupProvenance, LayoutRequest, Margin, Page,
     RenderMetadata, RenderMetadataSelector, RenderPolicy, RenderResult, SourceDocument,
+    SvgEdgeLineStyle, SvgEdgeMarkerEnd, SvgEdgeStyle, SvgNodeDecorator, SvgNodeStyle,
+    SvgStylePolicy, SVG_RENDER_POLICY_SCHEMA_VERSION,
 };
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 #[test]
@@ -152,6 +155,59 @@ fn render_metadata_round_trips() {
     assert!(json.contains("\"type\":\"ApplicationComponent\""));
     let decoded: RenderMetadata = serde_json::from_str(&json).unwrap();
     assert_eq!(decoded, metadata);
+}
+
+#[test]
+fn svg_policy_decorator_fields_round_trip() {
+    let policy = RenderPolicy {
+        svg_render_policy_schema_version: SVG_RENDER_POLICY_SCHEMA_VERSION.to_string(),
+        semantic_profile: Some("archimate".to_string()),
+        page: Page {
+            width: 640.0,
+            height: 360.0,
+        },
+        margin: Margin {
+            top: 24.0,
+            right: 24.0,
+            bottom: 24.0,
+            left: 24.0,
+        },
+        style: Some(SvgStylePolicy {
+            node_type_overrides: BTreeMap::from([(
+                "ApplicationComponent".to_string(),
+                SvgNodeStyle {
+                    decorator: Some(SvgNodeDecorator::ArchimateApplicationComponent),
+                    ..SvgNodeStyle::default()
+                },
+            )]),
+            edge_type_overrides: BTreeMap::from([(
+                "Realization".to_string(),
+                SvgEdgeStyle {
+                    line_style: Some(SvgEdgeLineStyle::Dashed),
+                    marker_end: Some(SvgEdgeMarkerEnd::HollowTriangle),
+                    ..SvgEdgeStyle::default()
+                },
+            )]),
+            ..SvgStylePolicy::default()
+        }),
+    };
+
+    let json = serde_json::to_value(&policy).expect("serialize policy");
+    assert_eq!(
+        json["style"]["node_type_overrides"]["ApplicationComponent"]["decorator"],
+        "archimate_application_component"
+    );
+    assert_eq!(
+        json["style"]["edge_type_overrides"]["Realization"]["line_style"],
+        "dashed"
+    );
+    assert_eq!(
+        json["style"]["edge_type_overrides"]["Realization"]["marker_end"],
+        "hollow_triangle"
+    );
+
+    let round_tripped: RenderPolicy = serde_json::from_value(json).expect("deserialize policy");
+    assert_eq!(round_tripped, policy);
 }
 
 #[test]

@@ -78,7 +78,14 @@
           "minimum": 0,
           "maximum": 80
         },
-        "label_fill": { "$ref": "#/$defs/color" }
+        "label_fill": { "$ref": "#/$defs/color" },
+        "decorator": {
+          "type": "string",
+          "enum": [
+            "archimate_application_component",
+            "archimate_application_service"
+          ]
+        }
       }
     },
     "edgeStyle": {
@@ -92,6 +99,14 @@
           "maximum": 24
         },
         "label_fill": { "$ref": "#/$defs/color" },
+        "line_style": {
+          "type": "string",
+          "enum": ["solid", "dashed"]
+        },
+        "marker_end": {
+          "type": "string",
+          "enum": ["filled_arrow", "hollow_triangle", "none"]
+        },
         "label_horizontal_position": {
           "type": "string",
           "enum": ["near_start", "center", "near_end"]

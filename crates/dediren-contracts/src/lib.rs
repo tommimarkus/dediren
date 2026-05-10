@@ -365,6 +365,8 @@ pub struct SvgNodeStyle {
     pub rx: Option<f64>,
     #[serde(default)]
     pub label_fill: Option<String>,
+    #[serde(default)]
+    pub decorator: Option<SvgNodeDecorator>,
 }
 
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
@@ -377,6 +379,10 @@ pub struct SvgEdgeStyle {
     #[serde(default)]
     pub label_fill: Option<String>,
     #[serde(default)]
+    pub line_style: Option<SvgEdgeLineStyle>,
+    #[serde(default)]
+    pub marker_end: Option<SvgEdgeMarkerEnd>,
+    #[serde(default)]
     pub label_horizontal_position: Option<SvgEdgeLabelHorizontalPosition>,
     #[serde(default)]
     pub label_horizontal_side: Option<SvgEdgeLabelHorizontalSide>,
@@ -384,6 +390,28 @@ pub struct SvgEdgeStyle {
     pub label_vertical_position: Option<SvgEdgeLabelVerticalPosition>,
     #[serde(default)]
     pub label_vertical_side: Option<SvgEdgeLabelVerticalSide>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SvgNodeDecorator {
+    ArchimateApplicationComponent,
+    ArchimateApplicationService,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SvgEdgeLineStyle {
+    Solid,
+    Dashed,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SvgEdgeMarkerEnd {
+    FilledArrow,
+    HollowTriangle,
+    None,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
