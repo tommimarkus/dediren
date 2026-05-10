@@ -111,6 +111,61 @@ fn svg_renderer_applies_archimate_node_decorators_from_type_overrides() {
 }
 
 #[test]
+fn svg_renderer_applies_archimate_realization_edge_notation() {
+    let mut input = archimate_style_input();
+    input["policy"]["style"]["edge_type_overrides"]["Realization"]["line_style"] =
+        serde_json::json!("dashed");
+    input["policy"]["style"]["edge_type_overrides"]["Realization"]["marker_end"] =
+        serde_json::json!("hollow_triangle");
+
+    let content = render_content(input);
+    let doc = svg_doc(&content);
+
+    let edge = semantic_group(&doc, "data-dediren-edge-id", "orders-realizes-service");
+    let path = child_element(edge, "path");
+    assert_eq!(path.attribute("stroke-dasharray"), Some("8 5"));
+    assert_eq!(
+        path.attribute("marker-end"),
+        Some("url(#marker-end-orders-realizes-service)")
+    );
+
+    let marker = doc
+        .descendants()
+        .find(|node| {
+            node.has_tag_name("marker")
+                && node.attribute("id") == Some("marker-end-orders-realizes-service")
+                && node.attribute("data-dediren-edge-marker-end") == Some("hollow_triangle")
+        })
+        .expect("hollow triangle marker");
+    let marker_path = child_element(marker, "path");
+    assert_eq!(marker_path.attribute("fill"), Some("#ffffff"));
+    assert_eq!(marker_path.attribute("stroke"), Some("#374151"));
+}
+
+#[test]
+fn svg_renderer_edge_id_override_can_disable_marker() {
+    let mut input = archimate_style_input();
+    input["policy"]["style"]["edge_type_overrides"]["Realization"]["line_style"] =
+        serde_json::json!("dashed");
+    input["policy"]["style"]["edge_type_overrides"]["Realization"]["marker_end"] =
+        serde_json::json!("hollow_triangle");
+    input["policy"]["style"]["edge_overrides"] = serde_json::json!({
+        "orders-realizes-service": {
+            "marker_end": "none",
+            "line_style": "solid"
+        }
+    });
+
+    let content = render_content(input);
+    let doc = svg_doc(&content);
+
+    let edge = semantic_group(&doc, "data-dediren-edge-id", "orders-realizes-service");
+    let path = child_element(edge, "path");
+    assert_eq!(path.attribute("marker-end"), None);
+    assert_eq!(path.attribute("stroke-dasharray"), None);
+}
+
+#[test]
 fn svg_renderer_id_override_wins_over_type_override() {
     let mut input = archimate_style_input();
     input["policy"]["style"]["node_overrides"] = serde_json::json!({
@@ -676,7 +731,7 @@ fn svg_renderer_paints_edge_label_with_background_halo() {
     let label = child_element(edge, "text");
     assert_eq!(
         path.attribute("marker-end"),
-        Some("url(#arrow-labeled-edge)")
+        Some("url(#marker-end-labeled-edge)")
     );
     assert_eq!(label.attribute("paint-order"), Some("stroke"));
     assert_eq!(label.attribute("stroke"), Some("#f8fafc"));

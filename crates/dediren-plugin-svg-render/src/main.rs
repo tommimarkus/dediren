@@ -4,8 +4,8 @@ use dediren_contracts::{
     CommandEnvelope, Diagnostic, DiagnosticSeverity, LaidOutEdge, LaidOutGroup, LaidOutNode,
     LayoutResult, Point, RenderMetadata, RenderPolicy, RenderResult,
     SvgEdgeLabelHorizontalPosition, SvgEdgeLabelHorizontalSide, SvgEdgeLabelVerticalPosition,
-    SvgEdgeLabelVerticalSide, SvgEdgeStyle, SvgGroupStyle, SvgNodeDecorator, SvgNodeStyle,
-    RENDER_RESULT_SCHEMA_VERSION,
+    SvgEdgeLabelVerticalSide, SvgEdgeLineStyle, SvgEdgeMarkerEnd, SvgEdgeStyle, SvgGroupStyle,
+    SvgNodeDecorator, SvgNodeStyle, RENDER_RESULT_SCHEMA_VERSION,
 };
 use serde::Deserialize;
 
@@ -42,6 +42,8 @@ struct ResolvedEdgeStyle {
     stroke: String,
     stroke_width: f64,
     label_fill: String,
+    line_style: SvgEdgeLineStyle,
+    marker_end: SvgEdgeMarkerEnd,
     label_horizontal_position: SvgEdgeLabelHorizontalPosition,
     label_horizontal_side: SvgEdgeLabelHorizontalSide,
     label_vertical_position: SvgEdgeLabelVerticalPosition,
@@ -579,6 +581,8 @@ fn base_style(policy: &RenderPolicy) -> ResolvedStyle {
         stroke: "#64748b".to_string(),
         stroke_width: 1.5,
         label_fill: "#374151".to_string(),
+        line_style: SvgEdgeLineStyle::Solid,
+        marker_end: SvgEdgeMarkerEnd::FilledArrow,
         label_horizontal_position: SvgEdgeLabelHorizontalPosition::NearStart,
         label_horizontal_side: SvgEdgeLabelHorizontalSide::Auto,
         label_vertical_position: SvgEdgeLabelVerticalPosition::Center,
@@ -714,6 +718,8 @@ fn merge_edge_style(
                 .label_fill
                 .clone()
                 .unwrap_or_else(|| base.label_fill.clone()),
+            line_style: style.line_style.unwrap_or(base.line_style),
+            marker_end: style.marker_end.unwrap_or(base.marker_end),
             label_horizontal_position: style
                 .label_horizontal_position
                 .unwrap_or(base.label_horizontal_position),
@@ -864,11 +870,19 @@ fn node_label(node: &LaidOutNode, style: &ResolvedNodeStyle) -> String {
 }
 
 fn edge_marker(edge: &LaidOutEdge, style: &ResolvedEdgeStyle) -> String {
-    format!(
-        r##"<defs><marker id="{}" markerWidth="8" markerHeight="8" refX="8" refY="4" orient="auto" markerUnits="strokeWidth"><path d="M 0 0 L 8 4 L 0 8 z" fill="{}"/></marker></defs>"##,
-        escape_attr(&edge_marker_id(&edge.id)),
-        escape_attr(&style.stroke)
-    )
+    match style.marker_end {
+        SvgEdgeMarkerEnd::FilledArrow => format!(
+            r##"<defs><marker id="{}" data-dediren-edge-marker-end="filled_arrow" markerWidth="8" markerHeight="8" refX="8" refY="4" orient="auto" markerUnits="strokeWidth"><path d="M 0 0 L 8 4 L 0 8 z" fill="{}"/></marker></defs>"##,
+            escape_attr(&edge_marker_id(&edge.id)),
+            escape_attr(&style.stroke)
+        ),
+        SvgEdgeMarkerEnd::HollowTriangle => format!(
+            r##"<defs><marker id="{}" data-dediren-edge-marker-end="hollow_triangle" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="strokeWidth"><path d="M 1 1 L 9 5 L 1 9 z" fill="#ffffff" stroke="{}" stroke-width="1.2"/></marker></defs>"##,
+            escape_attr(&edge_marker_id(&edge.id)),
+            escape_attr(&style.stroke)
+        ),
+        SvgEdgeMarkerEnd::None => String::new(),
+    }
 }
 
 fn edge_path(
@@ -881,12 +895,26 @@ fn edge_path(
         return String::new();
     }
     let data = edge_path_data(points, earlier_edges);
+    let dash_attr = match style.line_style {
+        SvgEdgeLineStyle::Solid => String::new(),
+        SvgEdgeLineStyle::Dashed => r#" stroke-dasharray="8 5""#.to_string(),
+    };
+    let marker_attr = match style.marker_end {
+        SvgEdgeMarkerEnd::None => String::new(),
+        SvgEdgeMarkerEnd::FilledArrow | SvgEdgeMarkerEnd::HollowTriangle => {
+            format!(
+                r#" marker-end="url(#{})""#,
+                escape_attr(&edge_marker_id(&edge.id))
+            )
+        }
+    };
     format!(
-        r##"<path d="{}" fill="none" stroke="{}" stroke-width="{}" marker-end="url(#{})"/>"##,
+        r##"<path d="{}" fill="none" stroke="{}" stroke-width="{}"{}{}/>"##,
         escape_attr(&data),
         escape_attr(&style.stroke),
         svg_style_number(style.stroke_width),
-        escape_attr(&edge_marker_id(&edge.id))
+        dash_attr,
+        marker_attr
     )
 }
 
@@ -1005,7 +1033,7 @@ fn append_line_jump(data: &mut String, start: &Point, end: &Point, jump: &LineJu
 }
 
 fn edge_marker_id(edge_id: &str) -> String {
-    format!("arrow-{edge_id}")
+    format!("marker-end-{edge_id}")
 }
 
 #[derive(Debug, Clone)]
