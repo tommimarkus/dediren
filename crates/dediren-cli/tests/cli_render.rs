@@ -89,6 +89,22 @@ fn render_invokes_svg_plugin_with_archimate_policy_and_metadata() {
     let component = semantic_group(&doc, "data-dediren-node-id", "orders-component");
     let rect = child_element(component, "rect");
     assert_eq!(rect.attribute("fill"), Some("#fff2cc"));
+    assert!(
+        content.contains(r#"data-dediren-node-decorator="archimate_application_component""#),
+        "expected ApplicationComponent decorator in ArchiMate SVG"
+    );
+    assert!(
+        content.contains(r#"data-dediren-node-decorator="archimate_application_service""#),
+        "expected ApplicationService decorator in ArchiMate SVG"
+    );
+    assert!(
+        content.contains(r#"data-dediren-edge-marker-end="hollow_triangle""#),
+        "expected Realization hollow triangle marker in ArchiMate SVG"
+    );
+    assert!(
+        content.contains(r#"stroke-dasharray="8 5""#),
+        "expected Realization dashed line in ArchiMate SVG"
+    );
 }
 
 fn svg_doc(content: &str) -> roxmltree::Document<'_> {

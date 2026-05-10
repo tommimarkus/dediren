@@ -47,19 +47,23 @@
       "ApplicationComponent": {
         "fill": "#fff2cc",
         "stroke": "#7a5c00",
-        "label_fill": "#3f3000"
+        "label_fill": "#3f3000",
+        "decorator": "archimate_application_component"
       },
       "ApplicationService": {
         "fill": "#e0f2fe",
         "stroke": "#0369a1",
-        "label_fill": "#0c4a6e"
+        "label_fill": "#0c4a6e",
+        "decorator": "archimate_application_service"
       }
     },
     "edge_type_overrides": {
       "Realization": {
         "stroke": "#374151",
         "stroke_width": 1.5,
-        "label_fill": "#374151"
+        "label_fill": "#374151",
+        "line_style": "dashed",
+        "marker_end": "hollow_triangle"
       }
     },
     "node_overrides": {},

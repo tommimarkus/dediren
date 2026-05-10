@@ -48,7 +48,28 @@ Per-id override keys match ids in the layout result, for example `api` or
 ArchiMate styling uses the same SVG render policy system as the default and rich
 styles. The separate render metadata artifact carries only semantic selectors
 such as node and relationship types; it does not carry colors, fonts, shapes, or
-layout data.
+layout data. ArchiMate-oriented SVG notation is still configured through the
+SVG render policy. The policy may attach decorators and relationship notation to
+those exact types:
+
+```json
+{
+  "semantic_profile": "archimate",
+  "style": {
+    "node_type_overrides": {
+      "ApplicationComponent": {
+        "decorator": "archimate_application_component"
+      }
+    },
+    "edge_type_overrides": {
+      "Realization": {
+        "line_style": "dashed",
+        "marker_end": "hollow_triangle"
+      }
+    }
+  }
+}
+```
 
 By default, horizontal edge labels are placed near the start of the selected
 horizontal segment. The renderer chooses above or below from the route shape:
