@@ -787,14 +787,61 @@ fn node_rect(node: &LaidOutNode, style: &ResolvedNodeStyle) -> String {
 
 fn node_decorator(node: &LaidOutNode, style: &ResolvedNodeStyle) -> String {
     match style.decorator {
+        Some(SvgNodeDecorator::ArchimateBusinessActor) => {
+            archimate_business_actor_decorator(node, style)
+        }
         Some(SvgNodeDecorator::ArchimateApplicationComponent) => {
             archimate_application_component_decorator(node, style)
         }
         Some(SvgNodeDecorator::ArchimateApplicationService) => {
             archimate_application_service_decorator(node, style)
         }
+        Some(SvgNodeDecorator::ArchimateDataObject) => archimate_data_object_decorator(node, style),
+        Some(SvgNodeDecorator::ArchimateTechnologyNode) => {
+            archimate_technology_node_decorator(node, style)
+        }
         None => String::new(),
     }
+}
+
+fn archimate_business_actor_decorator(node: &LaidOutNode, style: &ResolvedNodeStyle) -> String {
+    let size = node.width.min(node.height).min(22.0).max(14.0);
+    let cx = node.x + node.width - size * 0.5 - 8.0;
+    let top = node.y + 8.0;
+    let head_r = size * 0.18;
+    let head_cy = top + head_r;
+    let body_top = top + head_r * 2.0 + size * 0.08;
+    let body_bottom = top + size * 0.72;
+    let arm_y = body_top + size * 0.12;
+    format!(
+        r##"<g data-dediren-node-decorator="archimate_business_actor"><circle cx="{:.1}" cy="{:.1}" r="{:.1}" fill="{}" stroke="{}" stroke-width="{}"/><path d="M {:.1} {:.1} L {:.1} {:.1} M {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1} M {:.1} {:.1} L {:.1} {:.1} M {:.1} {:.1} L {:.1} {:.1}" fill="none" stroke="{}" stroke-width="{}" stroke-linecap="round" stroke-linejoin="round"/></g>"##,
+        cx,
+        head_cy,
+        head_r,
+        escape_attr(&style.fill),
+        escape_attr(&style.stroke),
+        svg_style_number(style.stroke_width),
+        cx,
+        body_top,
+        cx,
+        body_bottom,
+        cx - size * 0.28,
+        arm_y,
+        cx,
+        body_top + size * 0.1,
+        cx + size * 0.28,
+        arm_y,
+        cx,
+        body_bottom,
+        cx - size * 0.24,
+        top + size,
+        cx,
+        body_bottom,
+        cx + size * 0.24,
+        top + size,
+        escape_attr(&style.stroke),
+        svg_style_number(style.stroke_width)
+    )
 }
 
 fn archimate_application_component_decorator(
@@ -837,23 +884,76 @@ fn archimate_application_service_decorator(
     style: &ResolvedNodeStyle,
 ) -> String {
     let size = node.width.min(node.height).min(22.0).max(14.0);
-    let cx = node.x + node.width - size * 0.75 - 8.0;
-    let cy = node.y + size * 0.75 + 8.0;
-    let r = size * 0.36;
+    let x = node.x + node.width - size - 8.0;
+    let y = node.y + 8.0;
     format!(
-        r##"<g data-dediren-node-decorator="archimate_application_service"><circle cx="{:.1}" cy="{:.1}" r="{:.1}" fill="{}" stroke="{}" stroke-width="{}"/><path d="M {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1}" fill="none" stroke="{}" stroke-width="{}" stroke-linecap="round" stroke-linejoin="round"/></g>"##,
-        cx,
-        cy,
-        r,
+        r##"<g data-dediren-node-decorator="archimate_application_service"><rect x="{:.1}" y="{:.1}" width="{:.1}" height="{:.1}" rx="{:.1}" fill="{}" stroke="{}" stroke-width="{}"/></g>"##,
+        x,
+        y,
+        size,
+        size * 0.62,
+        size * 0.18,
+        escape_attr(&style.fill),
+        escape_attr(&style.stroke),
+        svg_style_number(style.stroke_width)
+    )
+}
+
+fn archimate_data_object_decorator(node: &LaidOutNode, style: &ResolvedNodeStyle) -> String {
+    let size = node.width.min(node.height).min(22.0).max(14.0);
+    let x = node.x + node.width - size - 8.0;
+    let y = node.y + 8.0;
+    let fold = size * 0.28;
+    format!(
+        r##"<g data-dediren-node-decorator="archimate_data_object"><rect x="{:.1}" y="{:.1}" width="{:.1}" height="{:.1}" rx="1.2" fill="{}" stroke="{}" stroke-width="{}"/><path d="M {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1}" fill="none" stroke="{}" stroke-width="{}" stroke-linejoin="round"/></g>"##,
+        x,
+        y,
+        size,
+        size * 0.72,
         escape_attr(&style.fill),
         escape_attr(&style.stroke),
         svg_style_number(style.stroke_width),
-        cx - r * 0.45,
-        cy,
-        cx - r * 0.05,
-        cy + r * 0.38,
-        cx + r * 0.55,
-        cy - r * 0.45,
+        x + size - fold,
+        y,
+        x + size - fold,
+        y + fold,
+        x + size,
+        y + fold,
+        escape_attr(&style.stroke),
+        svg_style_number(style.stroke_width)
+    )
+}
+
+fn archimate_technology_node_decorator(node: &LaidOutNode, style: &ResolvedNodeStyle) -> String {
+    let size = node.width.min(node.height).min(22.0).max(14.0);
+    let x = node.x + node.width - size - 8.0;
+    let y = node.y + 8.0 + size * 0.18;
+    let depth = size * 0.18;
+    format!(
+        r##"<g data-dediren-node-decorator="archimate_technology_node"><rect x="{:.1}" y="{:.1}" width="{:.1}" height="{:.1}" rx="1.5" fill="{}" stroke="{}" stroke-width="{}"/><path d="M {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1} M {:.1} {:.1} L {:.1} {:.1} M {:.1} {:.1} L {:.1} {:.1}" fill="none" stroke="{}" stroke-width="{}" stroke-linejoin="round"/></g>"##,
+        x,
+        y,
+        size - depth,
+        size * 0.58,
+        escape_attr(&style.fill),
+        escape_attr(&style.stroke),
+        svg_style_number(style.stroke_width),
+        x,
+        y,
+        x + depth,
+        y - depth,
+        x + size,
+        y - depth,
+        x + size - depth,
+        y,
+        x + size - depth,
+        y,
+        x + size,
+        y - depth,
+        x + size - depth,
+        y + size * 0.58,
+        x + size,
+        y + size * 0.58 - depth,
         escape_attr(&style.stroke),
         svg_style_number(style.stroke_width)
     )

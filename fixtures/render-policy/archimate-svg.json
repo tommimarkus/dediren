@@ -44,10 +44,16 @@
       "label_size": 12
     },
     "node_type_overrides": {
-      "ApplicationComponent": {
+      "BusinessActor": {
         "fill": "#fff2cc",
-        "stroke": "#7a5c00",
+        "stroke": "#d6b656",
         "label_fill": "#3f3000",
+        "decorator": "archimate_business_actor"
+      },
+      "ApplicationComponent": {
+        "fill": "#e0f2fe",
+        "stroke": "#0369a1",
+        "label_fill": "#0c4a6e",
         "decorator": "archimate_application_component"
       },
       "ApplicationService": {
@@ -55,6 +61,18 @@
         "stroke": "#0369a1",
         "label_fill": "#0c4a6e",
         "decorator": "archimate_application_service"
+      },
+      "DataObject": {
+        "fill": "#e0f2fe",
+        "stroke": "#0369a1",
+        "label_fill": "#0c4a6e",
+        "decorator": "archimate_data_object"
+      },
+      "TechnologyNode": {
+        "fill": "#d5e8d4",
+        "stroke": "#4d7c0f",
+        "label_fill": "#365314",
+        "decorator": "archimate_technology_node"
       }
     },
     "edge_type_overrides": {

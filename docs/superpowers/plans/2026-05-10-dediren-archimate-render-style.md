@@ -81,7 +81,7 @@ fn render_metadata_schema_rejects_style_fields() {
                 "orders-component": {
                     "type": "ApplicationComponent",
                     "source_id": "orders-component",
-                    "fill": "#fff2cc"
+                    "fill": "#e0f2fe"
                 }
             },
             "edges": {}
@@ -101,8 +101,8 @@ fn svg_policy_schema_accepts_semantic_type_overrides() {
             "style": {
                 "node_type_overrides": {
                     "ApplicationComponent": {
-                        "fill": "#fff2cc",
-                        "stroke": "#7a5c00"
+                        "fill": "#e0f2fe",
+                        "stroke": "#0369a1"
                     }
                 },
                 "edge_type_overrides": {
@@ -552,8 +552,8 @@ fn svg_renderer_applies_archimate_type_styles() {
 
     let component = semantic_group(&doc, "data-dediren-node-id", "orders-component");
     let component_rect = child_element(component, "rect");
-    assert_eq!(component_rect.attribute("fill"), Some("#fff2cc"));
-    assert_eq!(component_rect.attribute("stroke"), Some("#7a5c00"));
+    assert_eq!(component_rect.attribute("fill"), Some("#e0f2fe"));
+    assert_eq!(component_rect.attribute("stroke"), Some("#0369a1"));
 
     let service = semantic_group(&doc, "data-dediren-node-id", "orders-service");
     let service_rect = child_element(service, "rect");
@@ -686,15 +686,33 @@ Create `fixtures/render-policy/archimate-svg.json`:
       "label_size": 12
     },
     "node_type_overrides": {
-      "ApplicationComponent": {
+      "BusinessActor": {
         "fill": "#fff2cc",
-        "stroke": "#7a5c00",
-        "label_fill": "#3f3000"
+        "stroke": "#d6b656",
+        "label_fill": "#3f3000",
+        "decorator": "archimate_business_actor"
+      },
+      "ApplicationComponent": {
+        "fill": "#e0f2fe",
+        "stroke": "#0369a1",
+        "label_fill": "#0c4a6e"
       },
       "ApplicationService": {
         "fill": "#e0f2fe",
         "stroke": "#0369a1",
         "label_fill": "#0c4a6e"
+      },
+      "DataObject": {
+        "fill": "#e0f2fe",
+        "stroke": "#0369a1",
+        "label_fill": "#0c4a6e",
+        "decorator": "archimate_data_object"
+      },
+      "TechnologyNode": {
+        "fill": "#d5e8d4",
+        "stroke": "#4d7c0f",
+        "label_fill": "#365314",
+        "decorator": "archimate_technology_node"
       }
     },
     "edge_type_overrides": {
@@ -1016,7 +1034,7 @@ fn render_invokes_svg_plugin_with_archimate_policy_and_metadata() {
     let doc = roxmltree::Document::parse(content).unwrap();
     let component = semantic_group(&doc, "data-dediren-node-id", "orders-component");
     let rect = child_element(component, "rect");
-    assert_eq!(rect.attribute("fill"), Some("#fff2cc"));
+    assert_eq!(rect.attribute("fill"), Some("#e0f2fe"));
 }
 ```
 

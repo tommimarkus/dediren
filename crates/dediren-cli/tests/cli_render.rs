@@ -88,7 +88,7 @@ fn render_invokes_svg_plugin_with_archimate_policy_and_metadata() {
     let doc = svg_doc(content);
     let component = semantic_group(&doc, "data-dediren-node-id", "orders-component");
     let rect = child_element(component, "rect");
-    assert_eq!(rect.attribute("fill"), Some("#fff2cc"));
+    assert_eq!(rect.attribute("fill"), Some("#e0f2fe"));
     assert!(
         content.contains(r#"data-dediren-node-decorator="archimate_application_component""#),
         "expected ApplicationComponent decorator in ArchiMate SVG"

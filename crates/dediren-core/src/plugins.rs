@@ -339,7 +339,7 @@ pub fn run_plugin_for_capability_with_registry(
     if is_capabilities_command {
         return normalize_capability_output(plugin_id, output);
     }
-    normalize_plugin_output(plugin_id, required_capability, output)
+    normalize_plugin_output(plugin_id, required_capability, args, output)
 }
 
 fn supports_capability(manifest: &PluginManifest, required_capability: &str) -> bool {
@@ -619,6 +619,7 @@ fn validate_value_against_schema(
 fn normalize_plugin_output(
     plugin_id: &str,
     required_capability: &str,
+    args: &[&str],
     output: Output,
 ) -> Result<PluginRunOutcome, PluginExecutionError> {
     let exit_code = output.status.code().unwrap_or(3);
@@ -631,7 +632,7 @@ fn normalize_plugin_output(
     }
 
     if output.status.success() {
-        validate_success_data(plugin_id, required_capability, &envelope.value)?;
+        validate_success_data(plugin_id, required_capability, args, &envelope.value)?;
         return Ok(PluginRunOutcome {
             stdout: envelope.stdout,
             exit_code: 0,
@@ -648,9 +649,10 @@ fn normalize_plugin_output(
 fn validate_success_data(
     plugin_id: &str,
     required_capability: &str,
+    args: &[&str],
     envelope: &serde_json::Value,
 ) -> Result<(), PluginExecutionError> {
-    let Some(schema_text) = capability_result_schema(required_capability) else {
+    let Some(schema_text) = capability_result_schema(required_capability, args) else {
         return Ok(());
     };
     let data = envelope
@@ -669,14 +671,23 @@ fn validate_success_data(
     })
 }
 
-fn capability_result_schema(required_capability: &str) -> Option<&'static str> {
+fn capability_result_schema(required_capability: &str, args: &[&str]) -> Option<&'static str> {
     match required_capability {
+        "projection" if arg_value(args, "--target") == Some("render-metadata") => {
+            Some(include_str!("../../../schemas/render-metadata.schema.json"))
+        }
         "projection" => Some(include_str!("../../../schemas/layout-request.schema.json")),
         "layout" => Some(include_str!("../../../schemas/layout-result.schema.json")),
         "render" => Some(include_str!("../../../schemas/render-result.schema.json")),
         "export" => Some(include_str!("../../../schemas/export-result.schema.json")),
         _ => None,
     }
+}
+
+fn arg_value<'a>(args: &'a [&str], flag: &str) -> Option<&'a str> {
+    args.windows(2)
+        .find(|window| window[0] == flag)
+        .map(|window| window[1])
 }
 
 fn normalize_capability_output(

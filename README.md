@@ -57,8 +57,25 @@ those exact types:
   "semantic_profile": "archimate",
   "style": {
     "node_type_overrides": {
+      "BusinessActor": {
+        "fill": "#fff2cc",
+        "stroke": "#d6b656",
+        "decorator": "archimate_business_actor"
+      },
       "ApplicationComponent": {
+        "fill": "#e0f2fe",
+        "stroke": "#0369a1",
         "decorator": "archimate_application_component"
+      },
+      "DataObject": {
+        "fill": "#e0f2fe",
+        "stroke": "#0369a1",
+        "decorator": "archimate_data_object"
+      },
+      "TechnologyNode": {
+        "fill": "#d5e8d4",
+        "stroke": "#4d7c0f",
+        "decorator": "archimate_technology_node"
       }
     },
     "edge_type_overrides": {

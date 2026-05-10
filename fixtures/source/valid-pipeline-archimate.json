@@ -1,0 +1,139 @@
+{
+  "model_schema_version": "model.schema.v1",
+  "required_plugins": [
+    {
+      "id": "generic-graph",
+      "version": "0.1.0"
+    },
+    {
+      "id": "archimate-oef",
+      "version": "0.1.0"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "client",
+      "type": "BusinessActor",
+      "label": "Customer",
+      "properties": {}
+    },
+    {
+      "id": "web-app",
+      "type": "ApplicationComponent",
+      "label": "Web App",
+      "properties": {}
+    },
+    {
+      "id": "orders-api",
+      "type": "ApplicationComponent",
+      "label": "Orders API",
+      "properties": {}
+    },
+    {
+      "id": "database",
+      "type": "TechnologyNode",
+      "label": "PostgreSQL",
+      "properties": {}
+    },
+    {
+      "id": "worker",
+      "type": "ApplicationComponent",
+      "label": "Fulfillment Worker",
+      "properties": {}
+    },
+    {
+      "id": "payments",
+      "type": "ApplicationService",
+      "label": "Payments Service",
+      "properties": {}
+    }
+  ],
+  "relationships": [
+    {
+      "id": "client-submits-order",
+      "type": "Serving",
+      "source": "web-app",
+      "target": "client",
+      "label": "serves order UI",
+      "properties": {}
+    },
+    {
+      "id": "web-app-calls-api",
+      "type": "Realization",
+      "source": "orders-api",
+      "target": "client",
+      "label": "realizes portal service",
+      "properties": {}
+    },
+    {
+      "id": "api-writes-database",
+      "type": "Access",
+      "source": "orders-api",
+      "target": "database",
+      "label": "writes orders",
+      "properties": {}
+    },
+    {
+      "id": "api-authorizes-payment",
+      "type": "Serving",
+      "source": "payments",
+      "target": "orders-api",
+      "label": "authorizes payment",
+      "properties": {}
+    },
+    {
+      "id": "api-publishes-job",
+      "type": "Triggering",
+      "source": "orders-api",
+      "target": "worker",
+      "label": "publishes fulfillment",
+      "properties": {}
+    },
+    {
+      "id": "worker-reads-database",
+      "type": "Access",
+      "source": "worker",
+      "target": "database",
+      "label": "loads order",
+      "properties": {}
+    }
+  ],
+  "plugins": {
+    "generic-graph": {
+      "views": [
+        {
+          "id": "main",
+          "label": "Order Processing",
+          "nodes": [
+            "client",
+            "web-app",
+            "orders-api",
+            "database",
+            "worker",
+            "payments"
+          ],
+          "relationships": [
+            "client-submits-order",
+            "web-app-calls-api",
+            "api-writes-database",
+            "api-authorizes-payment",
+            "api-publishes-job",
+            "worker-reads-database"
+          ],
+          "groups": [
+            {
+              "id": "application-services",
+              "label": "Application Services",
+              "members": ["web-app", "orders-api", "worker"]
+            },
+            {
+              "id": "external-dependencies",
+              "label": "External Dependencies",
+              "members": ["payments", "database"]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

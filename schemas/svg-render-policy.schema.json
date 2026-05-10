@@ -82,8 +82,11 @@
         "decorator": {
           "type": "string",
           "enum": [
+            "archimate_business_actor",
             "archimate_application_component",
-            "archimate_application_service"
+            "archimate_application_service",
+            "archimate_data_object",
+            "archimate_technology_node"
           ]
         }
       }

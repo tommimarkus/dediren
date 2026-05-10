@@ -395,8 +395,11 @@ pub struct SvgEdgeStyle {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SvgNodeDecorator {
+    ArchimateBusinessActor,
     ArchimateApplicationComponent,
     ArchimateApplicationService,
+    ArchimateDataObject,
+    ArchimateTechnologyNode,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

@@ -143,6 +143,203 @@ fn full_pipeline_produces_svg_and_oef() {
 }
 
 #[test]
+fn archimate_pipeline_renders_policy_notation_from_projected_metadata() {
+    let temp = assert_fs::TempDir::new().unwrap();
+    let request = temp.child("archimate-layout-request.json");
+    let metadata = temp.child("archimate-render-metadata.json");
+    let result = temp.child("archimate-layout-result.json");
+    let generic_plugin = workspace_binary(
+        "dediren-plugin-generic-graph",
+        "dediren-plugin-generic-graph",
+    );
+    let elk_plugin = workspace_binary("dediren-plugin-elk-layout", "dediren-plugin-elk-layout");
+    let svg_plugin = workspace_binary("dediren-plugin-svg-render", "dediren-plugin-svg-render");
+    let source = workspace_file("fixtures/source/valid-pipeline-archimate.json");
+    let elk_fixture = workspace_file("fixtures/layout-result/pipeline-rich.json");
+
+    let project_output = Command::cargo_bin("dediren")
+        .unwrap()
+        .current_dir(workspace_root())
+        .env("DEDIREN_PLUGIN_GENERIC_GRAPH", &generic_plugin)
+        .env("DEDIREN_PLUGIN_DIRS", workspace_file("fixtures/plugins"))
+        .args([
+            "project",
+            "--target",
+            "layout-request",
+            "--plugin",
+            "generic-graph",
+            "--view",
+            "main",
+            "--input",
+        ])
+        .arg(&source)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    request.write_binary(&project_output).unwrap();
+
+    let metadata_output = Command::cargo_bin("dediren")
+        .unwrap()
+        .current_dir(workspace_root())
+        .env("DEDIREN_PLUGIN_GENERIC_GRAPH", &generic_plugin)
+        .env("DEDIREN_PLUGIN_DIRS", workspace_file("fixtures/plugins"))
+        .args([
+            "project",
+            "--target",
+            "render-metadata",
+            "--plugin",
+            "generic-graph",
+            "--view",
+            "main",
+            "--input",
+        ])
+        .arg(&source)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    metadata.write_binary(&metadata_output).unwrap();
+    let metadata_envelope: serde_json::Value = serde_json::from_slice(&metadata_output).unwrap();
+    assert_eq!(metadata_envelope["data"]["semantic_profile"], "archimate");
+    assert_eq!(
+        metadata_envelope["data"]["nodes"]
+            .as_object()
+            .expect("projected metadata nodes should be an object")
+            .len(),
+        6
+    );
+    assert_eq!(
+        metadata_envelope["data"]["edges"]
+            .as_object()
+            .expect("projected metadata edges should be an object")
+            .len(),
+        6
+    );
+    assert_eq!(
+        metadata_envelope["data"]["nodes"]["orders-api"]["type"],
+        "ApplicationComponent"
+    );
+    assert_eq!(
+        metadata_envelope["data"]["nodes"]["client"]["type"],
+        "BusinessActor"
+    );
+    assert_eq!(
+        metadata_envelope["data"]["nodes"]["payments"]["type"],
+        "ApplicationService"
+    );
+    assert_eq!(
+        metadata_envelope["data"]["nodes"]["database"]["type"],
+        "TechnologyNode"
+    );
+    assert_eq!(
+        metadata_envelope["data"]["edges"]["web-app-calls-api"]["type"],
+        "Realization"
+    );
+
+    let layout_output = Command::cargo_bin("dediren")
+        .unwrap()
+        .current_dir(workspace_root())
+        .env("DEDIREN_PLUGIN_ELK_LAYOUT", &elk_plugin)
+        .env("DEDIREN_PLUGIN_DIRS", workspace_file("fixtures/plugins"))
+        .env("DEDIREN_ELK_RESULT_FIXTURE", elk_fixture)
+        .args(["layout", "--plugin", "elk-layout", "--input"])
+        .arg(request.path())
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    result.write_binary(&layout_output).unwrap();
+
+    let render_output = Command::cargo_bin("dediren")
+        .unwrap()
+        .current_dir(workspace_root())
+        .env("DEDIREN_PLUGIN_SVG_RENDER", &svg_plugin)
+        .env("DEDIREN_PLUGIN_DIRS", workspace_file("fixtures/plugins"))
+        .args(["render", "--plugin", "svg-render", "--policy"])
+        .arg(workspace_file("fixtures/render-policy/archimate-svg.json"))
+        .arg("--metadata")
+        .arg(metadata.path())
+        .arg("--input")
+        .arg(result.path())
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let render_envelope: serde_json::Value = serde_json::from_slice(&render_output).unwrap();
+    let content = render_envelope["data"]["content"].as_str().unwrap();
+    let doc = svg_doc(content);
+    for node_id in ["web-app", "orders-api", "worker"] {
+        let component = semantic_group(&doc, "data-dediren-node-id", node_id);
+        let component_rect = child_element(component, "rect");
+        assert_eq!(component_rect.attribute("fill"), Some("#e0f2fe"));
+        assert_eq!(component_rect.attribute("stroke"), Some("#0369a1"));
+        assert!(child_group_with_attr(
+            component,
+            "data-dediren-node-decorator",
+            "archimate_application_component"
+        )
+        .is_some());
+    }
+
+    let business = semantic_group(&doc, "data-dediren-node-id", "client");
+    let business_rect = child_element(business, "rect");
+    assert_eq!(business_rect.attribute("fill"), Some("#fff2cc"));
+    assert_eq!(business_rect.attribute("stroke"), Some("#d6b656"));
+    assert!(child_group_with_attr(
+        business,
+        "data-dediren-node-decorator",
+        "archimate_business_actor"
+    )
+    .is_some());
+
+    for node_id in ["payments"] {
+        let service = semantic_group(&doc, "data-dediren-node-id", node_id);
+        assert!(child_group_with_attr(
+            service,
+            "data-dediren-node-decorator",
+            "archimate_application_service"
+        )
+        .is_some());
+    }
+
+    let technology = semantic_group(&doc, "data-dediren-node-id", "database");
+    let technology_rect = child_element(technology, "rect");
+    assert_eq!(technology_rect.attribute("fill"), Some("#d5e8d4"));
+    assert_eq!(technology_rect.attribute("stroke"), Some("#4d7c0f"));
+    assert!(child_group_with_attr(
+        technology,
+        "data-dediren-node-decorator",
+        "archimate_technology_node"
+    )
+    .is_some());
+
+    assert!(content.contains("Application Services"));
+    assert!(content.contains("External Dependencies"));
+    assert!(content.contains("publishes fulfillment"));
+    assert!(content.contains("loads order"));
+    assert_reasonable_svg_aspect(content, 2.8);
+
+    let realization = semantic_group(&doc, "data-dediren-edge-id", "web-app-calls-api");
+    let path = child_element(realization, "path");
+    assert_eq!(path.attribute("stroke-dasharray"), Some("8 5"));
+    assert_eq!(
+        path.attribute("marker-end"),
+        Some("url(#marker-end-web-app-calls-api)")
+    );
+    assert!(content.contains(r#"data-dediren-edge-marker-end="hollow_triangle""#));
+    write_render_artifact(
+        "archimate_pipeline_renders_policy_notation_from_projected_metadata",
+        content,
+    );
+}
+
+#[test]
 #[ignore = "requires built Java ELK helper"]
 fn real_elk_pipeline_renders_rich_source() {
     let temp = assert_fs::TempDir::new().unwrap();
@@ -270,6 +467,45 @@ fn assert_reasonable_svg_aspect(content: &str, max_aspect: f64) {
         "rendered SVG aspect ratio should be <= {max_aspect}, got {aspect} from viewBox {:?}",
         view_box
     );
+}
+
+fn svg_doc(content: &str) -> roxmltree::Document<'_> {
+    roxmltree::Document::parse(content).unwrap()
+}
+
+fn semantic_group<'a, 'input>(
+    doc: &'a roxmltree::Document<'input>,
+    data_attr: &str,
+    id: &str,
+) -> roxmltree::Node<'a, 'input> {
+    doc.descendants()
+        .find(|node| node.has_tag_name("g") && node.attribute(data_attr) == Some(id))
+        .unwrap_or_else(|| panic!("expected SVG to contain <g {data_attr}=\"{id}\">"))
+}
+
+fn child_element<'a, 'input>(
+    node: roxmltree::Node<'a, 'input>,
+    tag_name: &str,
+) -> roxmltree::Node<'a, 'input> {
+    node.children()
+        .find(|child| child.has_tag_name(tag_name))
+        .unwrap_or_else(|| {
+            panic!(
+                "expected <{}> to contain <{}>",
+                node.tag_name().name(),
+                tag_name
+            )
+        })
+}
+
+fn child_group_with_attr<'a, 'input>(
+    parent: roxmltree::Node<'a, 'input>,
+    attr_name: &str,
+    attr_value: &str,
+) -> Option<roxmltree::Node<'a, 'input>> {
+    parent
+        .children()
+        .find(|child| child.has_tag_name("g") && child.attribute(attr_name) == Some(attr_value))
 }
 
 fn write_render_artifact(test_name: &str, content: &str) -> PathBuf {

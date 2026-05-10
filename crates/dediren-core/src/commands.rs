@@ -87,9 +87,12 @@ pub fn render_command(
     let policy = serde_json::from_str::<serde_json::Value>(policy_text)
         .map_err(command_input_error("render"))?;
     let render_metadata = metadata_text
-        .map(|text| serde_json::from_str::<dediren_contracts::RenderMetadata>(text))
+        .map(crate::io::parse_command_data::<dediren_contracts::RenderMetadata>)
         .transpose()
-        .map_err(command_input_error("render"))?;
+        .map_err(|error| PluginExecutionError::CommandInputInvalid {
+            command: "render".to_string(),
+            message: error.to_string(),
+        })?;
 
     let mut render_input = serde_json::json!({
         "layout_result": layout_result,

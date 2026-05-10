@@ -40,8 +40,11 @@ Use these enum values for the first slice:
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SvgNodeDecorator {
+    ArchimateBusinessActor,
     ArchimateApplicationComponent,
     ArchimateApplicationService,
+    ArchimateDataObject,
+    ArchimateTechnologyNode,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -89,8 +92,8 @@ fn svg_policy_schema_accepts_archimate_decorators_and_edge_notation() {
             "style": {
                 "node_type_overrides": {
                     "ApplicationComponent": {
-                        "fill": "#fff2cc",
-                        "stroke": "#7a5c00",
+                        "fill": "#e0f2fe",
+                        "stroke": "#0369a1",
                         "decorator": "archimate_application_component"
                     },
                     "ApplicationService": {
@@ -146,11 +149,14 @@ In `schemas/svg-render-policy.schema.json`, add these properties to the node sty
 ```json
 "decorator": {
   "type": "string",
-  "enum": [
-    "archimate_application_component",
-    "archimate_application_service"
-  ]
-}
+          "enum": [
+            "archimate_business_actor",
+            "archimate_application_component",
+            "archimate_application_service",
+            "archimate_data_object",
+            "archimate_technology_node"
+          ]
+        }
 ```
 
 Add these properties to the edge style definition:
@@ -761,10 +767,16 @@ Update `fixtures/render-policy/archimate-svg.json` type overrides:
 
 ```json
 "node_type_overrides": {
-  "ApplicationComponent": {
+  "BusinessActor": {
     "fill": "#fff2cc",
-    "stroke": "#7a5c00",
+    "stroke": "#d6b656",
     "label_fill": "#3f3000",
+    "decorator": "archimate_business_actor"
+  },
+  "ApplicationComponent": {
+    "fill": "#e0f2fe",
+    "stroke": "#0369a1",
+    "label_fill": "#0c4a6e",
     "decorator": "archimate_application_component"
   },
   "ApplicationService": {
@@ -772,6 +784,18 @@ Update `fixtures/render-policy/archimate-svg.json` type overrides:
     "stroke": "#0369a1",
     "label_fill": "#0c4a6e",
     "decorator": "archimate_application_service"
+  },
+  "DataObject": {
+    "fill": "#e0f2fe",
+    "stroke": "#0369a1",
+    "label_fill": "#0c4a6e",
+    "decorator": "archimate_data_object"
+  },
+  "TechnologyNode": {
+    "fill": "#d5e8d4",
+    "stroke": "#4d7c0f",
+    "label_fill": "#365314",
+    "decorator": "archimate_technology_node"
   }
 },
 "edge_type_overrides": {

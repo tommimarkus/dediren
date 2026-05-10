@@ -12,6 +12,10 @@ fn valid_source_matches_model_schema() {
         "schemas/model.schema.json",
         "fixtures/source/valid-pipeline-rich.json",
     );
+    assert_valid(
+        "schemas/model.schema.json",
+        "fixtures/source/valid-pipeline-archimate.json",
+    );
 }
 
 #[test]
@@ -138,7 +142,7 @@ fn render_metadata_schema_rejects_style_fields() {
                 "orders-component": {
                     "type": "ApplicationComponent",
                     "source_id": "orders-component",
-                    "fill": "#fff2cc"
+                    "fill": "#e0f2fe"
                 }
             },
             "edges": {}
@@ -159,8 +163,8 @@ fn svg_policy_schema_accepts_semantic_type_overrides() {
             "style": {
                 "node_type_overrides": {
                     "ApplicationComponent": {
-                        "fill": "#fff2cc",
-                        "stroke": "#7a5c00"
+                        "fill": "#e0f2fe",
+                        "stroke": "#0369a1"
                     }
                 },
                 "edge_type_overrides": {
@@ -185,15 +189,30 @@ fn svg_policy_schema_accepts_archimate_decorators_and_edge_notation() {
             "margin": { "top": 24, "right": 24, "bottom": 24, "left": 24 },
             "style": {
                 "node_type_overrides": {
-                    "ApplicationComponent": {
+                    "BusinessActor": {
                         "fill": "#fff2cc",
-                        "stroke": "#7a5c00",
+                        "stroke": "#d6b656",
+                        "decorator": "archimate_business_actor"
+                    },
+                    "ApplicationComponent": {
+                        "fill": "#e0f2fe",
+                        "stroke": "#0369a1",
                         "decorator": "archimate_application_component"
                     },
                     "ApplicationService": {
                         "fill": "#e0f2fe",
                         "stroke": "#0369a1",
                         "decorator": "archimate_application_service"
+                    },
+                    "DataObject": {
+                        "fill": "#e0f2fe",
+                        "stroke": "#0369a1",
+                        "decorator": "archimate_data_object"
+                    },
+                    "TechnologyNode": {
+                        "fill": "#d5e8d4",
+                        "stroke": "#4d7c0f",
+                        "decorator": "archimate_technology_node"
                     }
                 },
                 "edge_type_overrides": {

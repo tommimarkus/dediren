@@ -67,8 +67,8 @@ fn svg_renderer_applies_archimate_type_styles() {
 
     let component = semantic_group(&doc, "data-dediren-node-id", "orders-component");
     let component_rect = child_element(component, "rect");
-    assert_eq!(component_rect.attribute("fill"), Some("#fff2cc"));
-    assert_eq!(component_rect.attribute("stroke"), Some("#7a5c00"));
+    assert_eq!(component_rect.attribute("fill"), Some("#e0f2fe"));
+    assert_eq!(component_rect.attribute("stroke"), Some("#0369a1"));
 
     let service = semantic_group(&doc, "data-dediren-node-id", "orders-service");
     let service_rect = child_element(service, "rect");
@@ -107,7 +107,127 @@ fn svg_renderer_applies_archimate_node_decorators_from_type_overrides() {
     );
 
     assert!(child_elements(component_decorator, "rect").count() >= 2);
-    assert!(child_elements(service_decorator, "path").count() >= 1);
+    assert!(child_elements(service_decorator, "rect").count() >= 1);
+    assert_eq!(child_elements(service_decorator, "path").count(), 0);
+}
+
+#[test]
+fn svg_renderer_applies_archimate_business_actor_decorator() {
+    let mut input = archimate_style_input();
+    input["layout_result"]["nodes"]
+        .as_array_mut()
+        .unwrap()
+        .push(serde_json::json!({
+            "id": "customer",
+            "source_id": "customer",
+            "projection_id": "customer",
+            "x": 560,
+            "y": 40,
+            "width": 180,
+            "height": 80,
+            "label": "Customer"
+        }));
+    input["render_metadata"]["nodes"]["customer"] = serde_json::json!({
+        "type": "BusinessActor",
+        "source_id": "customer"
+    });
+
+    let content = render_content(input);
+    let doc = svg_doc(&content);
+
+    let actor = semantic_group(&doc, "data-dediren-node-id", "customer");
+    let actor_rect = child_element(actor, "rect");
+    assert_eq!(actor_rect.attribute("fill"), Some("#fff2cc"));
+    assert_eq!(actor_rect.attribute("stroke"), Some("#d6b656"));
+
+    let actor_decorator = child_group_with_attr(
+        actor,
+        "data-dediren-node-decorator",
+        "archimate_business_actor",
+    );
+    assert!(child_elements(actor_decorator, "circle").count() >= 1);
+    assert!(child_elements(actor_decorator, "path").count() >= 1);
+}
+
+#[test]
+fn svg_renderer_applies_archimate_data_object_decorator() {
+    let mut input = archimate_style_input();
+    input["layout_result"]["nodes"]
+        .as_array_mut()
+        .unwrap()
+        .push(serde_json::json!({
+            "id": "order-data",
+            "source_id": "order-data",
+            "projection_id": "order-data",
+            "x": 560,
+            "y": 40,
+            "width": 180,
+            "height": 80,
+            "label": "Order Data"
+        }));
+    input["render_metadata"]["nodes"]["order-data"] = serde_json::json!({
+        "type": "DataObject",
+        "source_id": "order-data"
+    });
+    input["policy"]["style"]["node_type_overrides"]["DataObject"] = serde_json::json!({
+        "fill": "#e0f2fe",
+        "stroke": "#0369a1",
+        "decorator": "archimate_data_object"
+    });
+
+    let content = render_content(input);
+    let doc = svg_doc(&content);
+
+    let data_object = semantic_group(&doc, "data-dediren-node-id", "order-data");
+    let data_object_rect = child_element(data_object, "rect");
+    assert_eq!(data_object_rect.attribute("fill"), Some("#e0f2fe"));
+    assert_eq!(data_object_rect.attribute("stroke"), Some("#0369a1"));
+
+    let data_object_decorator = child_group_with_attr(
+        data_object,
+        "data-dediren-node-decorator",
+        "archimate_data_object",
+    );
+    assert!(child_elements(data_object_decorator, "rect").count() >= 1);
+    assert!(child_elements(data_object_decorator, "path").count() >= 1);
+}
+
+#[test]
+fn svg_renderer_applies_archimate_technology_node_decorator() {
+    let mut input = archimate_style_input();
+    input["layout_result"]["nodes"]
+        .as_array_mut()
+        .unwrap()
+        .push(serde_json::json!({
+            "id": "postgres",
+            "source_id": "postgres",
+            "projection_id": "postgres",
+            "x": 560,
+            "y": 40,
+            "width": 180,
+            "height": 80,
+            "label": "PostgreSQL"
+        }));
+    input["render_metadata"]["nodes"]["postgres"] = serde_json::json!({
+        "type": "TechnologyNode",
+        "source_id": "postgres"
+    });
+
+    let content = render_content(input);
+    let doc = svg_doc(&content);
+
+    let technology_node = semantic_group(&doc, "data-dediren-node-id", "postgres");
+    let technology_rect = child_element(technology_node, "rect");
+    assert_eq!(technology_rect.attribute("fill"), Some("#d5e8d4"));
+    assert_eq!(technology_rect.attribute("stroke"), Some("#4d7c0f"));
+
+    let technology_decorator = child_group_with_attr(
+        technology_node,
+        "data-dediren-node-decorator",
+        "archimate_technology_node",
+    );
+    assert!(child_elements(technology_decorator, "rect").count() >= 1);
+    assert!(child_elements(technology_decorator, "path").count() >= 1);
 }
 
 #[test]
