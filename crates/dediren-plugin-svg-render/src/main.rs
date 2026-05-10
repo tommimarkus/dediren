@@ -780,10 +780,28 @@ fn group_rect(group: &LaidOutGroup, style: &ResolvedGroupStyle) -> String {
 }
 
 fn node_shape(node: &LaidOutNode, style: &ResolvedNodeStyle) -> String {
-    if style
-        .decorator
-        .is_some_and(is_archimate_motivation_decorator)
-    {
+    if let Some(decorator) = style.decorator {
+        return archimate_rectangular_node_shape(node, style, decorator);
+    }
+    format!(
+        r##"<rect data-dediren-node-shape="archimate_rectangle" x="{:.1}" y="{:.1}" width="{:.1}" height="{:.1}" rx="{}" fill="{}" stroke="{}" stroke-width="{}"/>"##,
+        node.x,
+        node.y,
+        node.width,
+        node.height,
+        svg_style_number(style.rx),
+        escape_attr(&style.fill),
+        escape_attr(&style.stroke),
+        svg_style_number(style.stroke_width)
+    )
+}
+
+fn archimate_rectangular_node_shape(
+    node: &LaidOutNode,
+    style: &ResolvedNodeStyle,
+    decorator: SvgNodeDecorator,
+) -> String {
+    if is_archimate_cut_corner_rectangle(decorator) {
         let corner = node.width.min(node.height) * 0.14;
         let corner = corner.clamp(8.0, 14.0);
         return format!(
@@ -809,20 +827,27 @@ fn node_shape(node: &LaidOutNode, style: &ResolvedNodeStyle) -> String {
             svg_style_number(style.stroke_width)
         );
     }
+
+    let (shape_name, rx) = if is_archimate_rounded_rectangle(decorator) {
+        ("archimate_rounded_rectangle", style.rx.max(1.0))
+    } else {
+        ("archimate_rectangle", 0.0)
+    };
     format!(
-        r##"<rect data-dediren-node-shape="archimate_rectangle" x="{:.1}" y="{:.1}" width="{:.1}" height="{:.1}" rx="{}" fill="{}" stroke="{}" stroke-width="{}"/>"##,
+        r##"<rect data-dediren-node-shape="{}" x="{:.1}" y="{:.1}" width="{:.1}" height="{:.1}" rx="{}" fill="{}" stroke="{}" stroke-width="{}"/>"##,
+        shape_name,
         node.x,
         node.y,
         node.width,
         node.height,
-        svg_style_number(style.rx),
+        svg_style_number(rx),
         escape_attr(&style.fill),
         escape_attr(&style.stroke),
         svg_style_number(style.stroke_width)
     )
 }
 
-fn is_archimate_motivation_decorator(decorator: SvgNodeDecorator) -> bool {
+fn is_archimate_cut_corner_rectangle(decorator: SvgNodeDecorator) -> bool {
     matches!(
         decorator,
         SvgNodeDecorator::ArchimateStakeholder
@@ -838,6 +863,28 @@ fn is_archimate_motivation_decorator(decorator: SvgNodeDecorator) -> bool {
     )
 }
 
+fn is_archimate_rounded_rectangle(decorator: SvgNodeDecorator) -> bool {
+    matches!(
+        decorator,
+        SvgNodeDecorator::ArchimateWorkPackage
+            | SvgNodeDecorator::ArchimateImplementationEvent
+            | SvgNodeDecorator::ArchimateCourseOfAction
+            | SvgNodeDecorator::ArchimateValueStream
+            | SvgNodeDecorator::ArchimateCapability
+            | SvgNodeDecorator::ArchimateBusinessService
+            | SvgNodeDecorator::ArchimateBusinessFunction
+            | SvgNodeDecorator::ArchimateBusinessProcess
+            | SvgNodeDecorator::ArchimateBusinessEvent
+            | SvgNodeDecorator::ArchimateApplicationService
+            | SvgNodeDecorator::ArchimateApplicationFunction
+            | SvgNodeDecorator::ArchimateApplicationProcess
+            | SvgNodeDecorator::ArchimateApplicationEvent
+            | SvgNodeDecorator::ArchimateTechnologyService
+            | SvgNodeDecorator::ArchimateTechnologyFunction
+            | SvgNodeDecorator::ArchimateTechnologyProcess
+            | SvgNodeDecorator::ArchimateTechnologyEvent
+    )
+}
 fn node_decorator(node: &LaidOutNode, style: &ResolvedNodeStyle) -> String {
     match style.decorator {
         Some(SvgNodeDecorator::ArchimateBusinessActor) => {
@@ -907,6 +954,7 @@ enum ArchimateIconKind {
     Node,
     Material,
     Network,
+    DistributionNetwork,
     Path,
 }
 
@@ -955,6 +1003,7 @@ impl ArchimateIconKind {
             ArchimateIconKind::Node => "node",
             ArchimateIconKind::Material => "material",
             ArchimateIconKind::Network => "network",
+            ArchimateIconKind::DistributionNetwork => "distribution_network",
             ArchimateIconKind::Path => "path",
         }
     }
@@ -1025,8 +1074,8 @@ fn archimate_icon_kind(decorator: SvgNodeDecorator) -> ArchimateIconKind {
         SvgNodeDecorator::ArchimateEquipment => ArchimateIconKind::Equipment,
         SvgNodeDecorator::ArchimateTechnologyNode => ArchimateIconKind::Node,
         SvgNodeDecorator::ArchimateMaterial => ArchimateIconKind::Material,
-        SvgNodeDecorator::ArchimateCommunicationNetwork
-        | SvgNodeDecorator::ArchimateDistributionNetwork => ArchimateIconKind::Network,
+        SvgNodeDecorator::ArchimateCommunicationNetwork => ArchimateIconKind::Network,
+        SvgNodeDecorator::ArchimateDistributionNetwork => ArchimateIconKind::DistributionNetwork,
         SvgNodeDecorator::ArchimatePath => ArchimateIconKind::Path,
         SvgNodeDecorator::ArchimateBusinessActor => ArchimateIconKind::Actor,
         SvgNodeDecorator::ArchimateApplicationComponent => ArchimateIconKind::Component,
@@ -1045,8 +1094,8 @@ struct ArchimateIconBox {
 
 fn archimate_icon_box(node: &LaidOutNode) -> ArchimateIconBox {
     ArchimateIconBox {
-        x: node.x + node.width - ARCHIMATE_ICON_SIZE - 8.0,
-        y: node.y + 8.0,
+        x: node.x + node.width - ARCHIMATE_ICON_SIZE - 6.0,
+        y: node.y + 9.0,
         size: ARCHIMATE_ICON_SIZE,
     }
 }
@@ -1111,6 +1160,7 @@ fn archimate_actor_icon_body(
 enum TargetIconStyle {
     Bullseye,
     Arrow,
+    Handle,
 }
 
 fn archimate_target_icon_body(
@@ -1150,7 +1200,7 @@ fn archimate_target_icon_body(
             width
         ),
         TargetIconStyle::Arrow => format!(
-            r#"<ellipse cx="{:.1}" cy="{:.1}" rx="{:.1}" ry="{:.1}" fill="{}" stroke="{}" stroke-width="{}"/><ellipse cx="{:.1}" cy="{:.1}" rx="{:.1}" ry="{:.1}" fill="none" stroke="{}" stroke-width="{}"/><ellipse cx="{:.1}" cy="{:.1}" rx="{:.1}" ry="{:.1}" fill="none" stroke="{}" stroke-width="{}"/><path data-dediren-icon-part="target-arrow" d="M {:.1} {:.1} L {:.1} {:.1} M {:.1} {:.1} L {:.1} {:.1} M {:.1} {:.1} L {:.1} {:.1}" fill="none" stroke="{}" stroke-width="{}" stroke-linecap="round"/>"#,
+            r#"<ellipse cx="{:.1}" cy="{:.1}" rx="{:.1}" ry="{:.1}" fill="{}" stroke="{}" stroke-width="{}"/><ellipse cx="{:.1}" cy="{:.1}" rx="{:.1}" ry="{:.1}" fill="none" stroke="{}" stroke-width="{}"/><ellipse cx="{:.1}" cy="{:.1}" rx="{:.1}" ry="{:.1}" fill="none" stroke="{}" stroke-width="{}"/><path data-dediren-icon-part="target-arrow" d="M {:.1} {:.1} L {:.1} {:.1} M {:.1} {:.1} L {:.1} {:.1} M {:.1} {:.1} L {:.1} {:.1} M {:.1} {:.1} L {:.1} {:.1}" fill="none" stroke="{}" stroke-width="{}" stroke-linecap="round"/>"#,
             center_x,
             center_y,
             outer,
@@ -1170,18 +1220,50 @@ fn archimate_target_icon_body(
             size * 0.05,
             stroke,
             width,
-            x + size * 0.92,
-            y + size * 0.02,
-            center_x + size * 0.12,
-            center_y - size * 0.1,
-            center_x + size * 0.28,
-            center_y - size * 0.2,
-            center_x + size * 0.12,
-            center_y - size * 0.1,
-            center_x + size * 0.22,
-            center_y + size * 0.04,
-            center_x + size * 0.12,
-            center_y - size * 0.1,
+            center_x,
+            center_y,
+            x + size * 0.82,
+            y + size * 0.08,
+            x + size * 0.82,
+            y + size * 0.04,
+            x + size * 0.82,
+            y + size * 0.13,
+            x + size * 0.78,
+            y + size * 0.12,
+            x + size * 0.86,
+            y + size * 0.05,
+            x + size * 0.82,
+            y + size * 0.08,
+            x + size * 0.88,
+            y + size * 0.01,
+            stroke,
+            width
+        ),
+        TargetIconStyle::Handle => format!(
+            r#"<ellipse cx="{:.1}" cy="{:.1}" rx="{:.1}" ry="{:.1}" fill="{}" stroke="{}" stroke-width="{}"/><ellipse cx="{:.1}" cy="{:.1}" rx="{:.1}" ry="{:.1}" fill="none" stroke="{}" stroke-width="{}"/><ellipse cx="{:.1}" cy="{:.1}" rx="{:.1}" ry="{:.1}" fill="none" stroke="{}" stroke-width="{}"/><path data-dediren-icon-part="course-of-action-handle" d="M {:.1} {:.1} L {:.1} {:.1}" fill="none" stroke="{}" stroke-width="{}" stroke-linecap="round"/>"#,
+            center_x,
+            center_y,
+            outer,
+            outer,
+            fill,
+            stroke,
+            width,
+            center_x,
+            center_y,
+            inner,
+            inner,
+            stroke,
+            width,
+            center_x,
+            center_y,
+            size * 0.05,
+            size * 0.05,
+            stroke,
+            width,
+            center_x - size * 0.22,
+            center_y + size * 0.2,
+            x + size * 0.06,
+            y + size * 0.72,
             stroke,
             width
         ),
@@ -1249,6 +1331,128 @@ fn archimate_document_icon_body(
     )
 }
 
+fn archimate_folded_document_icon_body(
+    part: &str,
+    x: f64,
+    y: f64,
+    size: f64,
+    fill: &str,
+    stroke: &str,
+    width: &str,
+) -> String {
+    format!(
+        r#"<path data-dediren-icon-part="{}" d="M {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1} Z M {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1}" fill="{}" stroke="{}" stroke-width="{}"/>"#,
+        escape_attr(part),
+        x + size * 0.1,
+        y,
+        x + size * 0.58,
+        y,
+        x + size * 0.86,
+        y + size * 0.28,
+        x + size * 0.86,
+        y + size * 0.9,
+        x + size * 0.1,
+        y + size * 0.9,
+        x + size * 0.58,
+        y,
+        x + size * 0.58,
+        y + size * 0.28,
+        x + size * 0.86,
+        y + size * 0.28,
+        fill,
+        stroke,
+        width
+    )
+}
+
+fn archimate_contract_icon_body(
+    x: f64,
+    y: f64,
+    size: f64,
+    fill: &str,
+    stroke: &str,
+    width: &str,
+) -> String {
+    format!(
+        r#"<path data-dediren-icon-part="contract-document-body" d="M {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1} Z" fill="{}" stroke="{}" stroke-width="{}"/><path data-dediren-icon-part="contract-lines" d="M {:.1} {:.1} L {:.1} {:.1} M {:.1} {:.1} L {:.1} {:.1}" fill="none" stroke="{}" stroke-width="{}"/>"#,
+        x,
+        y,
+        x + size * 0.92,
+        y,
+        x + size * 0.92,
+        y + size * 0.72,
+        x,
+        y + size * 0.72,
+        fill,
+        stroke,
+        width,
+        x,
+        y + size * 0.24,
+        x + size * 0.92,
+        y + size * 0.24,
+        x,
+        y + size * 0.48,
+        x + size * 0.92,
+        y + size * 0.48,
+        stroke,
+        width
+    )
+}
+
+fn archimate_gear_path(
+    part: &str,
+    cx: f64,
+    cy: f64,
+    radius: f64,
+    fill: &str,
+    stroke: &str,
+    width: &str,
+) -> String {
+    let points = [
+        (cx, cy - radius),
+        (cx + radius * 0.18, cy - radius * 0.72),
+        (cx + radius * 0.42, cy - radius * 0.9),
+        (cx + radius * 0.52, cy - radius * 0.58),
+        (cx + radius * 0.84, cy - radius * 0.54),
+        (cx + radius * 0.72, cy - radius * 0.18),
+        (cx + radius, cy),
+        (cx + radius * 0.72, cy + radius * 0.18),
+        (cx + radius * 0.84, cy + radius * 0.54),
+        (cx + radius * 0.52, cy + radius * 0.58),
+        (cx + radius * 0.42, cy + radius * 0.9),
+        (cx + radius * 0.18, cy + radius * 0.72),
+        (cx, cy + radius),
+        (cx - radius * 0.18, cy + radius * 0.72),
+        (cx - radius * 0.42, cy + radius * 0.9),
+        (cx - radius * 0.52, cy + radius * 0.58),
+        (cx - radius * 0.84, cy + radius * 0.54),
+        (cx - radius * 0.72, cy + radius * 0.18),
+        (cx - radius, cy),
+        (cx - radius * 0.72, cy - radius * 0.18),
+        (cx - radius * 0.84, cy - radius * 0.54),
+        (cx - radius * 0.52, cy - radius * 0.58),
+        (cx - radius * 0.42, cy - radius * 0.9),
+        (cx - radius * 0.18, cy - radius * 0.72),
+    ];
+    let d = points
+        .iter()
+        .enumerate()
+        .map(|(index, (x, y))| {
+            let command = if index == 0 { "M" } else { "L" };
+            format!("{command} {x:.1} {y:.1}")
+        })
+        .collect::<Vec<_>>()
+        .join(" ");
+    format!(
+        r#"<path data-dediren-icon-part="{}" d="{} Z" fill="{}" stroke="{}" stroke-width="{}"/>"#,
+        escape_attr(part),
+        d,
+        fill,
+        stroke,
+        width
+    )
+}
+
 fn archimate_symbol_decorator(
     node: &LaidOutNode,
     style: &ResolvedNodeStyle,
@@ -1281,22 +1485,34 @@ fn archimate_symbol_decorator(
             width
         ),
         ArchimateIconKind::Collaboration => format!(
-            r#"<circle data-dediren-icon-part="collaboration-circles" cx="{:.1}" cy="{:.1}" r="{:.1}" fill="{}" stroke="{}" stroke-width="{}"/><circle data-dediren-icon-part="collaboration-circles" cx="{:.1}" cy="{:.1}" r="{:.1}" fill="{}" stroke="{}" stroke-width="{}"/>"#,
-            x + size * 0.42,
+            r#"<circle data-dediren-icon-part="collaboration-circles" cx="{:.1}" cy="{:.1}" r="{:.1}" fill="{}" stroke="none"/><circle data-dediren-icon-part="collaboration-circles" cx="{:.1}" cy="{:.1}" r="{:.1}" fill="{}" stroke="none"/><circle data-dediren-icon-part="collaboration-circles" cx="{:.1}" cy="{:.1}" r="{:.1}" fill="none" stroke="{}" stroke-width="{}"/><circle data-dediren-icon-part="collaboration-circles" cx="{:.1}" cy="{:.1}" r="{:.1}" fill="none" stroke="{}" stroke-width="{}"/>"#,
+            x + size * 0.38,
             y + size * 0.38,
             size * 0.26,
             fill,
+            x + size * 0.62,
+            y + size * 0.38,
+            size * 0.26,
+            fill,
+            x + size * 0.38,
+            y + size * 0.38,
+            size * 0.26,
             stroke,
             width,
-            x + size * 0.58,
+            x + size * 0.62,
             y + size * 0.38,
             size * 0.26,
-            fill,
             stroke,
             width
         ),
         ArchimateIconKind::Role => format!(
-            r#"<path data-dediren-icon-part="side-cylinder" d="M {:.1} {:.1} L {:.1} {:.1} M {:.1} {:.1} L {:.1} {:.1}" fill="none" stroke="{}" stroke-width="{}"/><ellipse data-dediren-icon-part="side-cylinder-end" cx="{:.1}" cy="{:.1}" rx="{:.1}" ry="{:.1}" fill="{}" stroke="{}" stroke-width="{}"/>"#,
+            r#"<path data-dediren-icon-part="side-cylinder" d="M {:.1} {:.1} A {:.1} {:.1} 0 0 0 {:.1} {:.1} M {:.1} {:.1} L {:.1} {:.1} M {:.1} {:.1} L {:.1} {:.1}" fill="none" stroke="{}" stroke-width="{}"/><ellipse data-dediren-icon-part="side-cylinder-end" cx="{:.1}" cy="{:.1}" rx="{:.1}" ry="{:.1}" fill="{}" stroke="{}" stroke-width="{}"/>"#,
+            x + size * 0.1,
+            y + size * 0.2,
+            size * 0.16,
+            size * 0.16,
+            x + size * 0.1,
+            y + size * 0.52,
             x + size * 0.1,
             y + size * 0.2,
             x + size * 0.7,
@@ -1327,13 +1543,15 @@ fn archimate_symbol_decorator(
             width
         ),
         ArchimateIconKind::Interaction => format!(
-            r#"<path data-dediren-icon-part="interaction-half" d="M {:.1} {:.1} A {:.1} {:.1} 0 0 0 {:.1} {:.1}" fill="none" stroke="{}" stroke-width="{}"/><path data-dediren-icon-part="interaction-half" d="M {:.1} {:.1} A {:.1} {:.1} 0 0 1 {:.1} {:.1}" fill="none" stroke="{}" stroke-width="{}"/>"#,
+            r#"<path data-dediren-icon-part="interaction-half" d="M {:.1} {:.1} A {:.1} {:.1} 0 0 0 {:.1} {:.1} L {:.1} {:.1}" fill="none" stroke="{}" stroke-width="{}"/><path data-dediren-icon-part="interaction-half" d="M {:.1} {:.1} A {:.1} {:.1} 0 0 1 {:.1} {:.1} L {:.1} {:.1}" fill="none" stroke="{}" stroke-width="{}"/>"#,
             x + size * 0.42,
             y + size * 0.12,
             size * 0.24,
             size * 0.24,
             x + size * 0.42,
             y + size * 0.6,
+            x + size * 0.42,
+            y + size * 0.12,
             stroke,
             width,
             x + size * 0.58,
@@ -1342,19 +1560,25 @@ fn archimate_symbol_decorator(
             size * 0.24,
             x + size * 0.58,
             y + size * 0.6,
+            x + size * 0.58,
+            y + size * 0.12,
             stroke,
             width
         ),
         ArchimateIconKind::Function => format!(
-            r#"<path data-dediren-icon-part="function-chevron-up" d="M {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1} Z" fill="{}" stroke="{}" stroke-width="{}"/>"#,
+            r#"<path data-dediren-icon-part="function-bookmark" d="M {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1} Z" fill="{}" stroke="{}" stroke-width="{}"/>"#,
             x + size * 0.18,
-            y + size * 0.72,
+            y + size * 0.2,
             x + size * 0.5,
-            y,
+            y + size * 0.06,
             x + size * 0.82,
-            y + size * 0.72,
+            y + size * 0.2,
+            x + size * 0.82,
+            y + size * 0.7,
             x + size * 0.5,
-            y + size * 0.36,
+            y + size * 0.56,
+            x + size * 0.18,
+            y + size * 0.7,
             fill,
             stroke,
             width
@@ -1380,7 +1604,7 @@ fn archimate_symbol_decorator(
             width
         ),
         ArchimateIconKind::CourseOfAction => {
-            archimate_target_icon_body(x, y, size, &fill, &stroke, &width, TargetIconStyle::Arrow)
+            archimate_target_icon_body(x, y, size, &fill, &stroke, &width, TargetIconStyle::Handle)
         }
         ArchimateIconKind::Event => format!(
             r#"<path data-dediren-icon-part="event-pill" d="M {:.1} {:.1} L {:.1} {:.1} C {:.1} {:.1}, {:.1} {:.1}, {:.1} {:.1} C {:.1} {:.1}, {:.1} {:.1}, {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1} Z" fill="{}" stroke="{}" stroke-width="{}"/>"#,
@@ -1410,9 +1634,18 @@ fn archimate_symbol_decorator(
             stroke,
             width
         ),
-        ArchimateIconKind::Object | ArchimateIconKind::Artifact => {
+        ArchimateIconKind::Object => {
             archimate_document_icon_body(x, y, size, &fill, &stroke, &width, false)
         }
+        ArchimateIconKind::Artifact => archimate_folded_document_icon_body(
+            "artifact-document",
+            x,
+            y - 1.0,
+            size,
+            &fill,
+            &stroke,
+            &width,
+        ),
         ArchimateIconKind::Component => format!(
             r#"<path data-dediren-icon-part="document-fold" d="M {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1} Z M {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1}" fill="{}" stroke="{}" stroke-width="{}"/><path data-dediren-icon-part="document-header" d="M {:.1} {:.1} L {:.1} {:.1}" fill="none" stroke="{}" stroke-width="{}"/>"#,
             x,
@@ -1467,30 +1700,9 @@ fn archimate_symbol_decorator(
             stroke,
             width
         ),
-        ArchimateIconKind::Contract => format!(
-            r#"<rect x="{:.1}" y="{:.1}" width="{:.1}" height="{:.1}" rx="1.2" fill="{}" stroke="{}" stroke-width="{}"/><path data-dediren-icon-part="contract-lines" d="M {:.1} {:.1} L {:.1} {:.1} M {:.1} {:.1} L {:.1} {:.1} M {:.1} {:.1} L {:.1} {:.1}" fill="none" stroke="{}" stroke-width="{}"/>"#,
-            x,
-            y,
-            size,
-            size * 0.72,
-            fill,
-            stroke,
-            width,
-            x + size * 0.18,
-            y + size * 0.22,
-            x + size * 0.82,
-            y + size * 0.22,
-            x + size * 0.18,
-            y + size * 0.38,
-            x + size * 0.82,
-            y + size * 0.38,
-            x + size * 0.18,
-            y + size * 0.54,
-            x + size * 0.82,
-            y + size * 0.54,
-            stroke,
-            width
-        ),
+        ArchimateIconKind::Contract => {
+            archimate_contract_icon_body(x, y, size, &fill, &stroke, &width)
+        }
         ArchimateIconKind::Product => format!(
             r#"<path data-dediren-icon-part="product-tab" d="M {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1} Z M {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1}" fill="{}" stroke="{}" stroke-width="{}" stroke-linejoin="round"/>"#,
             x,
@@ -1540,33 +1752,54 @@ fn archimate_symbol_decorator(
             fill,
             stroke,
             width,
-            x + size * 0.18,
-            y + size * 0.12,
-            x + size * 0.02,
-            y + size * 0.64,
+            x + size * 0.32,
+            y,
+            x + size * 0.1,
+            y + size * 0.72,
             stroke,
             width
         ),
         ArchimateIconKind::Capability => format!(
-            r#"<rect data-dediren-icon-part="capability-step" x="{:.1}" y="{:.1}" width="{:.1}" height="{:.1}" fill="{}" stroke="{}" stroke-width="{}"/><rect data-dediren-icon-part="capability-step" x="{:.1}" y="{:.1}" width="{:.1}" height="{:.1}" fill="{}" stroke="{}" stroke-width="{}"/><rect data-dediren-icon-part="capability-step" x="{:.1}" y="{:.1}" width="{:.1}" height="{:.1}" fill="{}" stroke="{}" stroke-width="{}"/>"#,
-            x + size * 0.08,
-            y + size * 0.5,
-            size * 0.28,
-            size * 0.22,
+            r#"<rect data-dediren-icon-part="capability-step" x="{:.1}" y="{:.1}" width="{:.1}" height="{:.1}" fill="{}" stroke="{}" stroke-width="{}"/><rect data-dediren-icon-part="capability-step" x="{:.1}" y="{:.1}" width="{:.1}" height="{:.1}" fill="{}" stroke="{}" stroke-width="{}"/><rect data-dediren-icon-part="capability-step" x="{:.1}" y="{:.1}" width="{:.1}" height="{:.1}" fill="{}" stroke="{}" stroke-width="{}"/><rect data-dediren-icon-part="capability-step" x="{:.1}" y="{:.1}" width="{:.1}" height="{:.1}" fill="{}" stroke="{}" stroke-width="{}"/><rect data-dediren-icon-part="capability-step" x="{:.1}" y="{:.1}" width="{:.1}" height="{:.1}" fill="{}" stroke="{}" stroke-width="{}"/><rect data-dediren-icon-part="capability-step" x="{:.1}" y="{:.1}" width="{:.1}" height="{:.1}" fill="{}" stroke="{}" stroke-width="{}"/>"#,
+            x + size * 0.2,
+            y + size * 0.52,
+            size * 0.2,
+            size * 0.2,
             fill,
             stroke,
             width,
-            x + size * 0.36,
-            y + size * 0.28,
-            size * 0.28,
-            size * 0.22,
+            x + size * 0.4,
+            y + size * 0.52,
+            size * 0.2,
+            size * 0.2,
             fill,
             stroke,
             width,
-            x + size * 0.64,
-            y + size * 0.06,
-            size * 0.28,
-            size * 0.22,
+            x + size * 0.4,
+            y + size * 0.32,
+            size * 0.2,
+            size * 0.2,
+            fill,
+            stroke,
+            width,
+            x + size * 0.6,
+            y + size * 0.52,
+            size * 0.2,
+            size * 0.2,
+            fill,
+            stroke,
+            width,
+            x + size * 0.6,
+            y + size * 0.32,
+            size * 0.2,
+            size * 0.2,
+            fill,
+            stroke,
+            width,
+            x + size * 0.6,
+            y + size * 0.12,
+            size * 0.2,
+            size * 0.2,
             fill,
             stroke,
             width
@@ -1601,26 +1834,29 @@ fn archimate_symbol_decorator(
             stroke,
             width
         ),
-        ArchimateIconKind::Location => format!(
-            r#"<path d="M {:.1} {:.1} C {:.1} {:.1}, {:.1} {:.1}, {:.1} {:.1} C {:.1} {:.1}, {:.1} {:.1}, {:.1} {:.1} Z" fill="{}" stroke="{}" stroke-width="{}"/>"#,
-            x + size * 0.5,
-            y + size,
-            x + size * 0.04,
-            y + size * 0.5,
-            x + size * 0.14,
-            y,
-            x + size * 0.5,
-            y,
-            x + size * 0.86,
-            y,
-            x + size * 0.96,
-            y + size * 0.5,
-            x + size * 0.5,
-            y + size,
-            fill,
-            stroke,
-            width
-        ),
+        ArchimateIconKind::Location => {
+            let y = y - 3.0;
+            format!(
+                r#"<path d="M {:.1} {:.1} C {:.1} {:.1}, {:.1} {:.1}, {:.1} {:.1} C {:.1} {:.1}, {:.1} {:.1}, {:.1} {:.1} Z" fill="{}" stroke="{}" stroke-width="{}"/>"#,
+                x + size * 0.5,
+                y + size,
+                x + size * 0.04,
+                y + size * 0.5,
+                x + size * 0.14,
+                y,
+                x + size * 0.5,
+                y,
+                x + size * 0.86,
+                y,
+                x + size * 0.96,
+                y + size * 0.5,
+                x + size * 0.5,
+                y + size,
+                fill,
+                stroke,
+                width
+            )
+        }
         ArchimateIconKind::Grouping => format!(
             r#"<rect x="{:.1}" y="{:.1}" width="{:.1}" height="{:.1}" rx="1.2" fill="none" stroke="{}" stroke-width="{}" stroke-dasharray="3 2"/>"#,
             x,
@@ -1631,7 +1867,13 @@ fn archimate_symbol_decorator(
             width
         ),
         ArchimateIconKind::Stakeholder => format!(
-            r#"<path data-dediren-icon-part="side-cylinder" d="M {:.1} {:.1} L {:.1} {:.1} M {:.1} {:.1} L {:.1} {:.1}" fill="none" stroke="{}" stroke-width="{}"/><ellipse data-dediren-icon-part="side-cylinder-end" cx="{:.1}" cy="{:.1}" rx="{:.1}" ry="{:.1}" fill="{}" stroke="{}" stroke-width="{}"/>"#,
+            r#"<path data-dediren-icon-part="side-cylinder" d="M {:.1} {:.1} A {:.1} {:.1} 0 0 0 {:.1} {:.1} M {:.1} {:.1} L {:.1} {:.1} M {:.1} {:.1} L {:.1} {:.1}" fill="none" stroke="{}" stroke-width="{}"/><ellipse data-dediren-icon-part="side-cylinder-end" cx="{:.1}" cy="{:.1}" rx="{:.1}" ry="{:.1}" fill="{}" stroke="{}" stroke-width="{}"/>"#,
+            x + size * 0.1,
+            y + size * 0.2,
+            size * 0.16,
+            size * 0.16,
+            x + size * 0.1,
+            y + size * 0.52,
             x + size * 0.1,
             y + size * 0.2,
             x + size * 0.7,
@@ -1678,7 +1920,7 @@ fn archimate_symbol_decorator(
             width,
             x + size * 0.5,
             y + size * 0.36,
-            size * 0.08,
+            size * 0.12,
             size * 0.08,
             stroke,
             stroke,
@@ -1773,57 +2015,51 @@ fn archimate_symbol_decorator(
             stroke
         ),
         ArchimateIconKind::Resource => format!(
-            r#"<rect x="{:.1}" y="{:.1}" width="{:.1}" height="{:.1}" rx="1.2" fill="{}" stroke="{}" stroke-width="{}"/><path data-dediren-icon-part="resource-bars" d="M {:.1} {:.1} L {:.1} {:.1} M {:.1} {:.1} L {:.1} {:.1} M {:.1} {:.1} L {:.1} {:.1}" stroke="{}" stroke-width="{}"/><path data-dediren-icon-part="resource-handle" d="M {:.1} {:.1} C {:.1} {:.1}, {:.1} {:.1}, {:.1} {:.1} L {:.1} {:.1}" fill="none" stroke="{}" stroke-width="{}"/>"#,
-            x,
-            y,
+            r#"<rect data-dediren-icon-part="resource-capsule" x="{:.1}" y="{:.1}" width="{:.1}" height="{:.1}" rx="{:.1}" fill="{}" stroke="{}" stroke-width="{}"/><rect data-dediren-icon-part="resource-tab" x="{:.1}" y="{:.1}" width="{:.1}" height="{:.1}" rx="0.8" fill="{}" stroke="{}" stroke-width="{}"/><path data-dediren-icon-part="resource-bars" d="M {:.1} {:.1} L {:.1} {:.1} M {:.1} {:.1} L {:.1} {:.1} M {:.1} {:.1} L {:.1} {:.1}" stroke="{}" stroke-width="{}" stroke-linecap="round"/>"#,
+            x + size * 0.04,
+            y + size * 0.18,
             size * 0.78,
-            size * 0.72,
+            size * 0.4,
+            size * 0.12,
             fill,
             stroke,
             width,
-            x + size * 0.33,
-            y,
-            x + size * 0.33,
-            y + size * 0.72,
-            x + size * 0.66,
-            y,
-            x + size * 0.66,
-            y + size * 0.72,
-            x + size * 0.5,
-            y,
-            x + size * 0.5,
-            y + size * 0.72,
+            x + size * 0.82,
+            y + size * 0.3,
+            size * 0.08,
+            size * 0.2,
+            fill,
             stroke,
             width,
-            x + size * 0.78,
-            y + size * 0.22,
-            x + size * 0.96,
-            y + size * 0.22,
-            x + size * 0.96,
-            y + size * 0.5,
-            x + size * 0.78,
-            y + size * 0.5,
-            x + size * 0.78,
-            y + size * 0.5,
+            x + size * 0.2,
+            y + size * 0.28,
+            x + size * 0.2,
+            y + size * 0.52,
+            x + size * 0.34,
+            y + size * 0.28,
+            x + size * 0.34,
+            y + size * 0.52,
+            x + size * 0.48,
+            y + size * 0.28,
+            x + size * 0.48,
+            y + size * 0.52,
             stroke,
             width
         ),
         ArchimateIconKind::ValueStream => format!(
-            r#"<path data-dediren-icon-part="value-stream-chevron" d="M {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1} Z" fill="{}" stroke="{}" stroke-width="{}"/>"#,
+            r#"<path data-dediren-icon-part="value-stream-chevron" d="M {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1} Z" fill="{}" stroke="{}" stroke-width="{}"/>"#,
             x,
-            y + size * 0.18,
-            x + size * 0.62,
-            y + size * 0.18,
-            x + size * 0.7,
-            y,
+            y + size * 0.08,
+            x + size * 0.68,
+            y + size * 0.08,
             x + size,
             y + size * 0.36,
-            x + size * 0.7,
-            y + size * 0.72,
-            x + size * 0.62,
-            y + size * 0.54,
+            x + size * 0.68,
+            y + size * 0.64,
             x,
-            y + size * 0.54,
+            y + size * 0.64,
+            x + size * 0.24,
+            y + size * 0.36,
             fill,
             stroke,
             width
@@ -1845,30 +2081,34 @@ fn archimate_symbol_decorator(
             stroke,
             width
         ),
-        ArchimateIconKind::WorkPackage => format!(
-            r#"<path data-dediren-icon-part="work-package-loop-arrow" d="M {:.1} {:.1} A {:.1} {:.1} 0 1 0 {:.1} {:.1} L {:.1} {:.1} M {:.1} {:.1} L {:.1} {:.1} M {:.1} {:.1} L {:.1} {:.1}" fill="none" stroke="{}" stroke-width="{}" stroke-linecap="round" stroke-linejoin="round"/>"#,
-            x + size * 0.58,
-            y + size * 0.52,
-            size * 0.26,
-            size * 0.26,
-            x + size * 0.54,
-            y + size * 0.72,
-            x + size * 0.86,
-            y + size * 0.72,
-            x + size * 0.86,
-            y + size * 0.72,
-            x + size * 0.74,
-            y + size * 0.62,
-            x + size * 0.86,
-            y + size * 0.72,
-            x + size * 0.74,
-            y + size * 0.82,
-            stroke,
-            width
-        ),
+        ArchimateIconKind::WorkPackage => {
+            let x = x - size * 0.14;
+            let y = y - size * 0.3;
+            format!(
+                r#"<path data-dediren-icon-part="work-package-loop-arrow" d="M {:.1} {:.1} A {:.1} {:.1} 0 1 0 {:.1} {:.1} L {:.1} {:.1} M {:.1} {:.1} L {:.1} {:.1} M {:.1} {:.1} L {:.1} {:.1}" fill="none" stroke="{}" stroke-width="{}" stroke-linecap="round" stroke-linejoin="round"/>"#,
+                x + size * 0.58,
+                y + size * 0.52,
+                size * 0.26,
+                size * 0.26,
+                x + size * 0.54,
+                y + size * 0.72,
+                x + size * 0.86,
+                y + size * 0.72,
+                x + size * 0.86,
+                y + size * 0.72,
+                x + size * 0.74,
+                y + size * 0.62,
+                x + size * 0.86,
+                y + size * 0.72,
+                x + size * 0.74,
+                y + size * 0.82,
+                stroke,
+                width
+            )
+        }
         ArchimateIconKind::Gap => format!(
             r#"<ellipse cx="{:.1}" cy="{:.1}" rx="{:.1}" ry="{:.1}" fill="none" stroke="{}" stroke-width="{}"/><path data-dediren-icon-part="gap-lines" d="M {:.1} {:.1} L {:.1} {:.1} M {:.1} {:.1} L {:.1} {:.1}" fill="none" stroke="{}" stroke-width="{}" stroke-linecap="round"/>"#,
-            x + size * 0.72,
+            x + size * 0.52,
             y + size * 0.34,
             size * 0.22,
             size * 0.22,
@@ -1922,81 +2162,61 @@ fn archimate_symbol_decorator(
             width
         ),
         ArchimateIconKind::Facility => format!(
-            r#"<path data-dediren-icon-part="factory-roof" d="M {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1} Z" fill="{}" stroke="{}" stroke-width="{}"/><path data-dediren-icon-part="factory-pipe" d="M {:.1} {:.1} L {:.1} {:.1} M {:.1} {:.1} L {:.1} {:.1}" stroke="{}" stroke-width="{}"/>"#,
-            x,
+            r#"<path data-dediren-icon-part="factory-silhouette" d="M {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1} Z" fill="{}" stroke="{}" stroke-width="{}"/>"#,
+            x + size * 0.08,
             y + size * 0.72,
-            x,
-            y + size * 0.18,
-            x + size * 0.16,
+            x + size * 0.08,
+            y + size * 0.08,
+            x + size * 0.22,
+            y + size * 0.08,
+            x + size * 0.22,
             y + size * 0.48,
-            x + size * 0.34,
+            x + size * 0.42,
             y + size * 0.34,
-            x + size * 0.34,
+            x + size * 0.42,
             y + size * 0.48,
-            x + size * 0.52,
+            x + size * 0.62,
             y + size * 0.34,
-            x + size * 0.52,
+            x + size * 0.62,
             y + size * 0.48,
-            x + size * 0.72,
+            x + size * 0.84,
             y + size * 0.34,
-            x + size,
+            x + size * 0.84,
+            y + size * 0.72,
+            x + size * 0.08,
             y + size * 0.72,
             fill,
-            stroke,
-            width,
-            x + size * 0.05,
-            y + size * 0.34,
-            x + size * 0.05,
-            y + size * 0.72,
-            x + size * 0.1,
-            y + size * 0.58,
-            x + size * 0.1,
-            y + size * 0.72,
             stroke,
             width
         ),
         ArchimateIconKind::Equipment => format!(
-            r#"<circle data-dediren-icon-part="equipment-cog-large" cx="{:.1}" cy="{:.1}" r="{:.1}" fill="none" stroke="{}" stroke-width="{}"/><circle cx="{:.1}" cy="{:.1}" r="{:.1}" fill="{}"/><path data-dediren-icon-part="equipment-spokes" d="M {:.1} {:.1} L {:.1} {:.1} M {:.1} {:.1} L {:.1} {:.1} M {:.1} {:.1} L {:.1} {:.1}" stroke="{}" stroke-width="{}"/><circle data-dediren-icon-part="equipment-cog-small" cx="{:.1}" cy="{:.1}" r="{:.1}" fill="none" stroke="{}" stroke-width="{}"/><circle cx="{:.1}" cy="{:.1}" r="{:.1}" fill="{}"/><path data-dediren-icon-part="equipment-spokes" d="M {:.1} {:.1} L {:.1} {:.1} M {:.1} {:.1} L {:.1} {:.1}" stroke="{}" stroke-width="{}"/>"#,
-            x + size * 0.38,
-            y + size * 0.5,
-            size * 0.22,
+            r#"{}<circle data-dediren-icon-part="equipment-gear-hole" cx="{:.1}" cy="{:.1}" r="{:.1}" fill="none" stroke="{}" stroke-width="{}"/>{}<circle data-dediren-icon-part="equipment-gear-hole" cx="{:.1}" cy="{:.1}" r="{:.1}" fill="none" stroke="{}" stroke-width="{}"/>"#,
+            archimate_gear_path(
+                "equipment-gear-large",
+                x + size * 0.34,
+                y + size * 0.52,
+                size * 0.24,
+                &fill,
+                &stroke,
+                &width
+            ),
+            x + size * 0.34,
+            y + size * 0.52,
+            size * 0.06,
             stroke,
             width,
-            x + size * 0.38,
-            y + size * 0.5,
-            size * 0.05,
-            stroke,
-            x + size * 0.2,
-            y + size * 0.5,
-            x + size * 0.56,
-            y + size * 0.5,
-            x + size * 0.38,
-            y + size * 0.32,
-            x + size * 0.38,
-            y + size * 0.68,
-            x + size * 0.26,
-            y + size * 0.38,
-            x + size * 0.5,
-            y + size * 0.62,
-            stroke,
-            width,
-            x + size * 0.66,
-            y + size * 0.28,
-            size * 0.16,
-            stroke,
-            width,
-            x + size * 0.66,
-            y + size * 0.28,
+            archimate_gear_path(
+                "equipment-gear-small",
+                x + size * 0.68,
+                y + size * 0.24,
+                size * 0.16,
+                &fill,
+                &stroke,
+                &width
+            ),
+            x + size * 0.68,
+            y + size * 0.24,
             size * 0.04,
-            stroke,
-            x + size * 0.54,
-            y + size * 0.28,
-            x + size * 0.78,
-            y + size * 0.28,
-            x + size * 0.66,
-            y + size * 0.16,
-            x + size * 0.66,
-            y + size * 0.4,
             stroke,
             width
         ),
@@ -2008,7 +2228,7 @@ fn archimate_symbol_decorator(
             ),
         ),
         ArchimateIconKind::Material => format!(
-            r#"<path data-dediren-icon-part="material-hexagon" d="M {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1} Z" fill="{}" stroke="{}" stroke-width="{}"/><path data-dediren-icon-part="material-lines" d="M {:.1} {:.1} L {:.1} {:.1} M {:.1} {:.1} L {:.1} {:.1} M {:.1} {:.1} L {:.1} {:.1}" fill="none" stroke="{}" stroke-width="{}"/>"#,
+            r#"<path data-dediren-icon-part="material-hexagon" d="M {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1} Z" fill="{}" stroke="{}" stroke-width="{}"/><path data-dediren-icon-part="material-lines" d="M {:.1} {:.1} L {:.1} {:.1} M {:.1} {:.1} L {:.1} {:.1} M {:.1} {:.1} L {:.1} {:.1}" fill="none" stroke="{}" stroke-width="{}" stroke-linecap="round"/>"#,
             x + size * 0.25,
             y,
             x + size * 0.75,
@@ -2024,18 +2244,18 @@ fn archimate_symbol_decorator(
             fill,
             stroke,
             width,
-            x + size * 0.25,
-            y + size * 0.24,
-            x + size * 0.75,
-            y + size * 0.24,
-            x + size * 0.16,
-            y + size * 0.36,
-            x + size * 0.84,
-            y + size * 0.36,
-            x + size * 0.25,
-            y + size * 0.48,
-            x + size * 0.75,
-            y + size * 0.48,
+            x + size * 0.36,
+            y + size * 0.16,
+            x + size * 0.64,
+            y + size * 0.16,
+            x + size * 0.78,
+            y + size * 0.28,
+            x + size * 0.62,
+            y + size * 0.52,
+            x + size * 0.22,
+            y + size * 0.28,
+            x + size * 0.38,
+            y + size * 0.52,
             stroke,
             width
         ),
@@ -2061,6 +2281,32 @@ fn archimate_symbol_decorator(
             y + size * 0.58,
             x + size * 0.22,
             y + size * 0.58,
+            stroke,
+            width
+        ),
+        ArchimateIconKind::DistributionNetwork => format!(
+            r#"<path data-dediren-icon-part="distribution-network-arrows" d="M {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1} Z" fill="{}" stroke="{}" stroke-width="{}" stroke-linejoin="round"/>"#,
+            x + size * 0.12,
+            y + size * 0.36,
+            x + size * 0.3,
+            y + size * 0.22,
+            x + size * 0.3,
+            y + size * 0.3,
+            x + size * 0.7,
+            y + size * 0.3,
+            x + size * 0.7,
+            y + size * 0.22,
+            x + size * 0.88,
+            y + size * 0.36,
+            x + size * 0.7,
+            y + size * 0.5,
+            x + size * 0.7,
+            y + size * 0.42,
+            x + size * 0.3,
+            y + size * 0.42,
+            x + size * 0.3,
+            y + size * 0.5,
+            fill,
             stroke,
             width
         ),
@@ -2107,7 +2353,7 @@ fn archimate_business_actor_decorator(node: &LaidOutNode, style: &ResolvedNodeSt
     let icon_box = archimate_icon_box(node);
     let body = archimate_actor_icon_body(
         icon_box.x,
-        icon_box.y,
+        icon_box.y - 3.0,
         icon_box.size,
         &escape_attr(&style.fill),
         &escape_attr(&style.stroke),
@@ -2128,29 +2374,32 @@ fn archimate_application_component_decorator(
     let size = icon_box.size;
     let x = icon_box.x;
     let y = icon_box.y;
-    let tab_width = size * 0.42;
+    let tab_x = x;
+    let tab_width = size * 0.36;
     let tab_height = size * 0.26;
+    let body_x = x + tab_width / 2.0;
+    let body_width = size - tab_width / 2.0;
     format!(
         r##"<g {}><rect x="{:.1}" y="{:.1}" width="{:.1}" height="{:.1}" rx="1.5" fill="{}" stroke="{}" stroke-width="{}"/><rect x="{:.1}" y="{:.1}" width="{:.1}" height="{:.1}" rx="1.2" fill="{}" stroke="{}" stroke-width="{}"/><rect x="{:.1}" y="{:.1}" width="{:.1}" height="{:.1}" rx="1.2" fill="{}" stroke="{}" stroke-width="{}"/></g>"##,
         archimate_decorator_group_attrs(
             "archimate_application_component",
             ArchimateIconKind::Component
         ),
-        x,
+        body_x,
         y,
-        size,
+        body_width,
         size * 0.72,
         escape_attr(&style.fill),
         escape_attr(&style.stroke),
         svg_style_number(style.stroke_width),
-        x - tab_width * 0.28,
+        tab_x,
         y + size * 0.12,
         tab_width,
         tab_height,
         escape_attr(&style.fill),
         escape_attr(&style.stroke),
         svg_style_number(style.stroke_width),
-        x - tab_width * 0.28,
+        tab_x,
         y + size * 0.44,
         tab_width,
         tab_height,
