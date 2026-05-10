@@ -350,8 +350,16 @@ fn svg_bounds(result: &LayoutResult, policy: &RenderPolicy, style: &ResolvedStyl
         for point in &edge.points {
             bounds.include_point(point.x, point.y);
         }
-        if let Some(point) = edge_label_point(&edge.points) {
-            bounds.include_label(point.x, point.y - 8.0, &edge.label, style.font_size);
+    }
+
+    let mut occupied_label_boxes = node_obstacle_boxes(result);
+    occupied_label_boxes.extend(route_obstacle_boxes(result, style.font_size));
+    for edge in &result.edges {
+        if let Some((label_x, label_y, label_box)) =
+            edge_label_position_for_edge(edge, style.font_size, &occupied_label_boxes)
+        {
+            bounds.include_label(label_x, label_y, &edge.label, style.font_size);
+            occupied_label_boxes.push(label_box);
         }
     }
 
@@ -831,13 +839,8 @@ fn edge_label(
     occupied_boxes: &mut Vec<LabelBox>,
 ) -> String {
     if let Some(point) = edge_label_point(&edge.points) {
-        let (label_x, label_y, label_box) = edge_label_position(
-            point.x,
-            point.y - 8.0,
-            &edge.label,
-            font_size,
-            occupied_boxes,
-        );
+        let (label_x, label_y, label_box) =
+            edge_label_position(point.x, point.y - 8.0, &edge.label, font_size, occupied_boxes);
         occupied_boxes.push(label_box);
         format!(
             r##"<text x="{:.1}" y="{:.1}" text-anchor="middle" fill="{}" stroke="{}" stroke-width="4" stroke-linejoin="round" paint-order="stroke">{}</text>"##,
@@ -850,6 +853,22 @@ fn edge_label(
     } else {
         String::new()
     }
+}
+
+fn edge_label_position_for_edge(
+    edge: &LaidOutEdge,
+    font_size: f64,
+    occupied_boxes: &[LabelBox],
+) -> Option<(f64, f64, LabelBox)> {
+    edge_label_point(&edge.points).map(|point| {
+        edge_label_position(
+            point.x,
+            point.y - 8.0,
+            &edge.label,
+            font_size,
+            occupied_boxes,
+        )
+    })
 }
 
 fn edge_label_position(

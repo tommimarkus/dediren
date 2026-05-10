@@ -431,6 +431,13 @@ fn svg_renderer_expands_viewbox_to_include_edge_labels() {
         view_box_values[1] <= 16.0,
         "expected top margin in viewBox, got {view_box}"
     );
+    let edge = semantic_group(&doc, "data-dediren-edge-id", "left-to-right");
+    let label = child_element(edge, "text");
+    let label_y = label.attribute("y").unwrap().parse::<f64>().unwrap();
+    assert!(
+        view_box_values[1] + view_box_values[3] >= label_y + 8.0,
+        "viewBox should include adjusted edge label baseline, got {view_box} and y={label_y}"
+    );
 }
 
 #[test]
