@@ -381,6 +381,8 @@ pub struct SvgEdgeStyle {
     #[serde(default)]
     pub line_style: Option<SvgEdgeLineStyle>,
     #[serde(default)]
+    pub marker_start: Option<SvgEdgeMarkerEnd>,
+    #[serde(default)]
     pub marker_end: Option<SvgEdgeMarkerEnd>,
     #[serde(default)]
     pub label_horizontal_position: Option<SvgEdgeLabelHorizontalPosition>,
@@ -395,11 +397,66 @@ pub struct SvgEdgeStyle {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SvgNodeDecorator {
+    ArchimatePlateau,
+    ArchimateWorkPackage,
+    ArchimateDeliverable,
+    ArchimateImplementationEvent,
+    ArchimateGap,
+    ArchimateGrouping,
+    ArchimateLocation,
+    ArchimateStakeholder,
+    ArchimateDriver,
+    ArchimateAssessment,
+    ArchimateGoal,
+    ArchimateOutcome,
+    ArchimateValue,
+    ArchimateMeaning,
+    ArchimateConstraint,
+    ArchimateRequirement,
+    ArchimatePrinciple,
+    ArchimateCourseOfAction,
+    ArchimateResource,
+    ArchimateValueStream,
+    ArchimateCapability,
+    ArchimateBusinessInterface,
+    ArchimateBusinessCollaboration,
     ArchimateBusinessActor,
+    ArchimateBusinessRole,
+    ArchimateBusinessService,
+    ArchimateBusinessInteraction,
+    ArchimateBusinessFunction,
+    ArchimateBusinessProcess,
+    ArchimateBusinessEvent,
+    ArchimateProduct,
+    ArchimateBusinessObject,
+    ArchimateContract,
+    ArchimateRepresentation,
+    ArchimateApplicationInterface,
+    ArchimateApplicationCollaboration,
     ArchimateApplicationComponent,
     ArchimateApplicationService,
+    ArchimateApplicationInteraction,
+    ArchimateApplicationFunction,
+    ArchimateApplicationProcess,
+    ArchimateApplicationEvent,
     ArchimateDataObject,
+    ArchimateTechnologyInterface,
+    ArchimateTechnologyCollaboration,
     ArchimateTechnologyNode,
+    ArchimateSystemSoftware,
+    ArchimateDevice,
+    ArchimateFacility,
+    ArchimateEquipment,
+    ArchimatePath,
+    ArchimateTechnologyService,
+    ArchimateTechnologyInteraction,
+    ArchimateTechnologyFunction,
+    ArchimateTechnologyProcess,
+    ArchimateTechnologyEvent,
+    ArchimateArtifact,
+    ArchimateMaterial,
+    ArchimateCommunicationNetwork,
+    ArchimateDistributionNetwork,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -413,7 +470,12 @@ pub enum SvgEdgeLineStyle {
 #[serde(rename_all = "snake_case")]
 pub enum SvgEdgeMarkerEnd {
     FilledArrow,
+    OpenArrow,
     HollowTriangle,
+    FilledDiamond,
+    HollowDiamond,
+    FilledCircle,
+    HollowCircle,
     None,
 }
 

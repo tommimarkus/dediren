@@ -51,6 +51,44 @@ fn archimate_svg_policy_matches_schema() {
 }
 
 #[test]
+fn archimate_svg_policy_covers_square_nodes_and_relationships() {
+    let policy: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(workspace_file("fixtures/render-policy/archimate-svg.json"))
+            .unwrap(),
+    )
+    .unwrap();
+    let node_types = policy["style"]["node_type_overrides"]
+        .as_object()
+        .expect("node type overrides should be an object");
+    for node_type in ARCHIMATE_SQUARE_NODE_TYPES {
+        let node_style = node_types
+            .get(*node_type)
+            .unwrap_or_else(|| panic!("missing ArchiMate node style for {node_type}"));
+        assert!(
+            node_style.get("fill").is_some(),
+            "expected fill color for {node_type}"
+        );
+        assert!(
+            node_style.get("stroke").is_some(),
+            "expected stroke color for {node_type}"
+        );
+        assert!(
+            node_style.get("decorator").is_some(),
+            "expected icon decorator for {node_type}"
+        );
+    }
+
+    let edge_types = policy["style"]["edge_type_overrides"]
+        .as_object()
+        .expect("edge type overrides should be an object");
+    for relationship_type in ARCHIMATE_RELATIONSHIP_TYPES {
+        edge_types.get(*relationship_type).unwrap_or_else(|| {
+            panic!("missing ArchiMate relationship style for {relationship_type}")
+        });
+    }
+}
+
+#[test]
 fn archimate_render_metadata_matches_schema() {
     assert_valid(
         "schemas/render-metadata.schema.json",
@@ -216,6 +254,10 @@ fn svg_policy_schema_accepts_archimate_decorators_and_edge_notation() {
                     }
                 },
                 "edge_type_overrides": {
+                    "Composition": {
+                        "marker_start": "filled_diamond",
+                        "marker_end": "none"
+                    },
                     "Realization": {
                         "stroke": "#374151",
                         "line_style": "dashed",
@@ -448,3 +490,80 @@ fn workspace_file(path: &str) -> PathBuf {
         .join("../..")
         .join(path)
 }
+
+const ARCHIMATE_SQUARE_NODE_TYPES: &[&str] = &[
+    "Plateau",
+    "WorkPackage",
+    "Deliverable",
+    "ImplementationEvent",
+    "Gap",
+    "Grouping",
+    "Location",
+    "Stakeholder",
+    "Driver",
+    "Assessment",
+    "Goal",
+    "Outcome",
+    "Value",
+    "Meaning",
+    "Constraint",
+    "Requirement",
+    "Principle",
+    "CourseOfAction",
+    "Resource",
+    "ValueStream",
+    "Capability",
+    "BusinessInterface",
+    "BusinessCollaboration",
+    "BusinessActor",
+    "BusinessRole",
+    "BusinessService",
+    "BusinessInteraction",
+    "BusinessFunction",
+    "BusinessProcess",
+    "BusinessEvent",
+    "Product",
+    "BusinessObject",
+    "Contract",
+    "Representation",
+    "ApplicationInterface",
+    "ApplicationCollaboration",
+    "ApplicationComponent",
+    "ApplicationService",
+    "ApplicationInteraction",
+    "ApplicationFunction",
+    "ApplicationProcess",
+    "ApplicationEvent",
+    "DataObject",
+    "TechnologyInterface",
+    "TechnologyCollaboration",
+    "Node",
+    "SystemSoftware",
+    "Device",
+    "Facility",
+    "Equipment",
+    "Path",
+    "TechnologyService",
+    "TechnologyInteraction",
+    "TechnologyFunction",
+    "TechnologyProcess",
+    "TechnologyEvent",
+    "Artifact",
+    "Material",
+    "CommunicationNetwork",
+    "DistributionNetwork",
+];
+
+const ARCHIMATE_RELATIONSHIP_TYPES: &[&str] = &[
+    "Composition",
+    "Aggregation",
+    "Assignment",
+    "Realization",
+    "Specialization",
+    "Serving",
+    "Access",
+    "Influence",
+    "Association",
+    "Triggering",
+    "Flow",
+];

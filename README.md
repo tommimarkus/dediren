@@ -50,7 +50,10 @@ styles. The separate render metadata artifact carries only semantic selectors
 such as node and relationship types; it does not carry colors, fonts, shapes, or
 layout data. ArchiMate-oriented SVG notation is still configured through the
 SVG render policy. The policy may attach decorators and relationship notation to
-those exact types:
+those exact types. The built-in ArchiMate policy covers the square element
+notation for implementation/migration, composite, motivation, strategy,
+business, application, and technology layers; non-square alternate shapes are
+not part of the built-in renderer.
 
 ```json
 {
@@ -79,9 +82,16 @@ those exact types:
       }
     },
     "edge_type_overrides": {
+      "Composition": {
+        "marker_start": "filled_diamond",
+        "marker_end": "none"
+      },
       "Realization": {
         "line_style": "dashed",
         "marker_end": "hollow_triangle"
+      },
+      "Serving": {
+        "marker_end": "open_arrow"
       }
     }
   }
