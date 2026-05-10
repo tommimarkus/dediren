@@ -54,6 +54,40 @@ fn generic_graph_projects_rich_view_groups() {
     );
 }
 
+#[test]
+fn generic_graph_projects_render_metadata() {
+    let input = std::fs::read_to_string(workspace_file("fixtures/source/valid-archimate-oef.json"))
+        .unwrap();
+    let mut cmd = Command::cargo_bin("dediren-plugin-generic-graph").unwrap();
+    let output = cmd
+        .args(["project", "--target", "render-metadata", "--view", "main"])
+        .write_stdin(input)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let envelope: serde_json::Value = serde_json::from_slice(&output).unwrap();
+    assert_eq!(
+        envelope["data"]["render_metadata_schema_version"],
+        "render-metadata.schema.v1"
+    );
+    assert_eq!(envelope["data"]["semantic_profile"], "archimate");
+    assert_eq!(
+        envelope["data"]["nodes"]["orders-component"]["type"],
+        "ApplicationComponent"
+    );
+    assert_eq!(
+        envelope["data"]["nodes"]["orders-service"]["type"],
+        "ApplicationService"
+    );
+    assert_eq!(
+        envelope["data"]["edges"]["orders-realizes-service"]["type"],
+        "Realization"
+    );
+}
+
 fn workspace_file(path: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../..")

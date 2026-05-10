@@ -40,6 +40,8 @@ enum Commands {
         #[arg(long)]
         policy: String,
         #[arg(long)]
+        metadata: Option<String>,
+        #[arg(long)]
         input: Option<String>,
     },
     Export {
@@ -92,13 +94,19 @@ fn main() -> anyhow::Result<()> {
         Some(Commands::Render {
             plugin,
             policy,
+            metadata,
             input,
         }) => {
             let layout_text = dediren_core::io::read_json_input(input.as_deref())?;
             let policy_text = std::fs::read_to_string(policy)?;
+            let metadata_text = metadata
+                .as_deref()
+                .map(std::fs::read_to_string)
+                .transpose()?;
             print_plugin_result(dediren_core::commands::render_command(
                 &plugin,
                 &policy_text,
+                metadata_text.as_deref(),
                 &layout_text,
             ))
         }

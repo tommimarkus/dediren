@@ -76,6 +76,7 @@ pub fn project_command(
 pub fn render_command(
     plugin: &str,
     policy_text: &str,
+    metadata_text: Option<&str>,
     layout_text: &str,
 ) -> Result<PluginRunOutcome, PluginExecutionError> {
     let layout_result: dediren_contracts::LayoutResult = crate::io::parse_command_data(layout_text)
@@ -83,11 +84,21 @@ pub fn render_command(
             command: "render".to_string(),
             message: error.to_string(),
         })?;
-    let render_input = serde_json::json!({
+    let policy = serde_json::from_str::<serde_json::Value>(policy_text)
+        .map_err(command_input_error("render"))?;
+    let render_metadata = metadata_text
+        .map(|text| serde_json::from_str::<dediren_contracts::RenderMetadata>(text))
+        .transpose()
+        .map_err(command_input_error("render"))?;
+
+    let mut render_input = serde_json::json!({
         "layout_result": layout_result,
-        "policy": serde_json::from_str::<serde_json::Value>(policy_text)
-            .map_err(command_input_error("render"))?
+        "policy": policy
     });
+    if let Some(render_metadata) = render_metadata {
+        render_input["render_metadata"] =
+            serde_json::to_value(render_metadata).map_err(command_input_error("render"))?;
+    }
     crate::plugins::run_plugin_for_capability(
         plugin,
         "render",

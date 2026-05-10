@@ -6,6 +6,12 @@
   "required": ["svg_render_policy_schema_version", "page", "margin"],
   "properties": {
     "svg_render_policy_schema_version": { "const": "svg-render-policy.schema.v1" },
+    "semantic_profile": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
     "page": {
       "type": "object",
       "additionalProperties": false,
@@ -85,7 +91,23 @@
           "minimum": 0,
           "maximum": 24
         },
-        "label_fill": { "$ref": "#/$defs/color" }
+        "label_fill": { "$ref": "#/$defs/color" },
+        "label_horizontal_position": {
+          "type": "string",
+          "enum": ["near_start", "center", "near_end"]
+        },
+        "label_horizontal_side": {
+          "type": "string",
+          "enum": ["auto", "above", "below"]
+        },
+        "label_vertical_position": {
+          "type": "string",
+          "enum": ["near_start", "center", "near_end"]
+        },
+        "label_vertical_side": {
+          "type": "string",
+          "enum": ["left", "right"]
+        }
       }
     },
     "groupStyle": {
@@ -133,6 +155,8 @@
         "node": { "$ref": "#/$defs/nodeStyle" },
         "edge": { "$ref": "#/$defs/edgeStyle" },
         "group": { "$ref": "#/$defs/groupStyle" },
+        "node_type_overrides": { "$ref": "#/$defs/nodeOverrideMap" },
+        "edge_type_overrides": { "$ref": "#/$defs/edgeOverrideMap" },
         "node_overrides": { "$ref": "#/$defs/nodeOverrideMap" },
         "edge_overrides": { "$ref": "#/$defs/edgeOverrideMap" },
         "group_overrides": { "$ref": "#/$defs/groupOverrideMap" }

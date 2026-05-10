@@ -9,6 +9,7 @@ pub const LAYOUT_REQUEST_SCHEMA_VERSION: &str = "layout-request.schema.v1";
 pub const LAYOUT_RESULT_SCHEMA_VERSION: &str = "layout-result.schema.v1";
 pub const RENDER_RESULT_SCHEMA_VERSION: &str = "render-result.schema.v1";
 pub const SVG_RENDER_POLICY_SCHEMA_VERSION: &str = "svg-render-policy.schema.v1";
+pub const RENDER_METADATA_SCHEMA_VERSION: &str = "render-metadata.schema.v1";
 pub const EXPORT_REQUEST_SCHEMA_VERSION: &str = "export-request.schema.v1";
 pub const EXPORT_RESULT_SCHEMA_VERSION: &str = "export-result.schema.v1";
 pub const OEF_EXPORT_POLICY_SCHEMA_VERSION: &str = "oef-export-policy.schema.v1";
@@ -267,10 +268,31 @@ pub struct Point {
 #[serde(deny_unknown_fields)]
 pub struct RenderPolicy {
     pub svg_render_policy_schema_version: String,
+    #[serde(default)]
+    pub semantic_profile: Option<String>,
     pub page: Page,
     pub margin: Margin,
     #[serde(default)]
     pub style: Option<SvgStylePolicy>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RenderMetadata {
+    pub render_metadata_schema_version: String,
+    pub semantic_profile: String,
+    #[serde(default)]
+    pub nodes: BTreeMap<String, RenderMetadataSelector>,
+    #[serde(default)]
+    pub edges: BTreeMap<String, RenderMetadataSelector>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RenderMetadataSelector {
+    #[serde(rename = "type")]
+    pub selector_type: String,
+    pub source_id: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -302,6 +324,10 @@ pub struct SvgStylePolicy {
     pub edge: Option<SvgEdgeStyle>,
     #[serde(default)]
     pub group: Option<SvgGroupStyle>,
+    #[serde(default)]
+    pub node_type_overrides: BTreeMap<String, SvgNodeStyle>,
+    #[serde(default)]
+    pub edge_type_overrides: BTreeMap<String, SvgEdgeStyle>,
     #[serde(default)]
     pub node_overrides: BTreeMap<String, SvgNodeStyle>,
     #[serde(default)]
@@ -350,6 +376,45 @@ pub struct SvgEdgeStyle {
     pub stroke_width: Option<f64>,
     #[serde(default)]
     pub label_fill: Option<String>,
+    #[serde(default)]
+    pub label_horizontal_position: Option<SvgEdgeLabelHorizontalPosition>,
+    #[serde(default)]
+    pub label_horizontal_side: Option<SvgEdgeLabelHorizontalSide>,
+    #[serde(default)]
+    pub label_vertical_position: Option<SvgEdgeLabelVerticalPosition>,
+    #[serde(default)]
+    pub label_vertical_side: Option<SvgEdgeLabelVerticalSide>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SvgEdgeLabelHorizontalPosition {
+    NearStart,
+    Center,
+    NearEnd,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SvgEdgeLabelHorizontalSide {
+    Auto,
+    Above,
+    Below,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SvgEdgeLabelVerticalPosition {
+    NearStart,
+    Center,
+    NearEnd,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SvgEdgeLabelVerticalSide {
+    Left,
+    Right,
 }
 
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]

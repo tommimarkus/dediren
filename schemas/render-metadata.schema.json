@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dediren.dev/schemas/render-metadata.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["render_metadata_schema_version", "semantic_profile", "nodes", "edges"],
+  "properties": {
+    "render_metadata_schema_version": { "const": "render-metadata.schema.v1" },
+    "semantic_profile": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "nodes": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/selector" }
+    },
+    "edges": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/selector" }
+    }
+  },
+  "$defs": {
+    "selector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "source_id"],
+      "properties": {
+        "type": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "source_id": { "type": "string", "minLength": 1, "maxLength": 200 }
+      }
+    }
+  }
+}

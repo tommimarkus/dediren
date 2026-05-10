@@ -60,6 +60,37 @@ fn render_invokes_svg_plugin_with_rich_policy() {
     assert!(artifact.exists());
 }
 
+#[test]
+fn render_invokes_svg_plugin_with_archimate_policy_and_metadata() {
+    let plugin = workspace_binary("dediren-plugin-svg-render", "dediren-plugin-svg-render");
+    let mut cmd = Command::cargo_bin("dediren").unwrap();
+    let output = cmd
+        .env("DEDIREN_PLUGIN_SVG_RENDER", plugin)
+        .env("DEDIREN_PLUGIN_DIRS", workspace_file("fixtures/plugins"))
+        .args(["render", "--plugin", "svg-render", "--policy"])
+        .arg(workspace_file("fixtures/render-policy/archimate-svg.json"))
+        .args(["--metadata"])
+        .arg(workspace_file(
+            "fixtures/render-metadata/archimate-basic.json",
+        ))
+        .args(["--input"])
+        .arg(workspace_file(
+            "fixtures/layout-result/archimate-oef-basic.json",
+        ))
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let envelope: serde_json::Value = serde_json::from_slice(&output).unwrap();
+    let content = envelope["data"]["content"].as_str().unwrap();
+    let doc = svg_doc(content);
+    let component = semantic_group(&doc, "data-dediren-node-id", "orders-component");
+    let rect = child_element(component, "rect");
+    assert_eq!(rect.attribute("fill"), Some("#fff2cc"));
+}
+
 fn svg_doc(content: &str) -> roxmltree::Document<'_> {
     roxmltree::Document::parse(content).unwrap()
 }

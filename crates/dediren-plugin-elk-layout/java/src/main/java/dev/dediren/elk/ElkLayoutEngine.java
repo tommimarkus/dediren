@@ -1,6 +1,7 @@
 package dev.dediren.elk;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -19,6 +20,7 @@ final class ElkLayoutEngine {
     private static final double DEFAULT_WIDTH = 160.0;
     private static final double DEFAULT_HEIGHT = 80.0;
     private static final double GROUP_PADDING = 24.0;
+    private static final double PORT_MARGIN = 16.0;
     private static final double NODE_SPACING = 120.0;
     private static final double EDGE_NODE_SPACING = 32.0;
     private static final double EDGE_EDGE_SPACING = 20.0;
@@ -188,6 +190,7 @@ final class ElkLayoutEngine {
         }
 
         List<JsonContracts.LaidOutEdge> edges = new ArrayList<>();
+        Map<String, EdgePorts> edgePorts = edgePorts(list(request.edges()), finalNodes);
         for (JsonContracts.LayoutEdge edge : list(request.edges())) {
             String sourceOwner = ownerByNode.get(edge.source());
             String targetOwner = ownerByNode.get(edge.target());
@@ -221,7 +224,7 @@ final class ElkLayoutEngine {
                     edge.target(),
                     edge.source_id(),
                     edge.id(),
-                    routeBetween(source, target),
+                    routeBetween(source, target, edgePorts.get(edge.id())),
                     edge.label());
             }
             edges.add(laidOutEdge);
@@ -249,6 +252,23 @@ final class ElkLayoutEngine {
         Map<String, JsonContracts.LaidOutEdge> edges,
         double width,
         double height) {
+    }
+
+    private enum PortSide {
+        LEFT,
+        RIGHT
+    }
+
+    private record PortKey(String nodeId, PortSide side) {
+    }
+
+    private record PortRef(PortSide side, int index, int count) {
+    }
+
+    private record EdgePorts(PortRef source, PortRef target) {
+    }
+
+    private record PortAssignment(String edgeId, double sortY, PortSide side, boolean source) {
     }
 
     private static InternalLayout internalLayout(
@@ -421,29 +441,110 @@ final class ElkLayoutEngine {
 
     private static List<JsonContracts.Point> routeBetween(
         JsonContracts.LaidOutNode source,
-        JsonContracts.LaidOutNode target) {
+        JsonContracts.LaidOutNode target,
+        EdgePorts ports) {
         double sourceCenterX = source.x() + source.width() / 2.0;
-        double sourceCenterY = source.y() + source.height() / 2.0;
         double targetCenterX = target.x() + target.width() / 2.0;
-        double targetCenterY = target.y() + target.height() / 2.0;
 
-        double startX;
-        double endX;
-        if (targetCenterX >= sourceCenterX) {
-            startX = source.x() + source.width();
-            endX = target.x();
-        } else {
-            startX = source.x();
-            endX = target.x() + target.width();
+        EdgePorts effectivePorts = ports == null
+            ? defaultPorts(targetCenterX >= sourceCenterX)
+            : ports;
+        JsonContracts.Point start = portPoint(source, effectivePorts.source());
+        JsonContracts.Point end = portPoint(target, effectivePorts.target());
+
+        double midX = start.x() + (end.x() - start.x()) / 2.0;
+        List<JsonContracts.Point> points = new ArrayList<>();
+        addPoint(points, start.x(), start.y());
+        addPoint(points, midX, start.y());
+        addPoint(points, midX, end.y());
+        addPoint(points, end.x(), end.y());
+        return points;
+    }
+
+    private static Map<String, EdgePorts> edgePorts(
+        List<JsonContracts.LayoutEdge> edges,
+        Map<String, JsonContracts.LaidOutNode> nodes) {
+        Map<PortKey, List<PortAssignment>> assignments = new HashMap<>();
+        for (JsonContracts.LayoutEdge edge : edges) {
+            JsonContracts.LaidOutNode source = nodes.get(edge.source());
+            JsonContracts.LaidOutNode target = nodes.get(edge.target());
+            if (source == null || target == null) {
+                continue;
+            }
+            PortSide sourceSide = sourceSide(source, target);
+            PortSide targetSide = opposite(sourceSide);
+            assignments
+                .computeIfAbsent(new PortKey(source.id(), sourceSide), ignored -> new ArrayList<>())
+                .add(new PortAssignment(edge.id(), nodeCenterY(target), sourceSide, true));
+            assignments
+                .computeIfAbsent(new PortKey(target.id(), targetSide), ignored -> new ArrayList<>())
+                .add(new PortAssignment(edge.id(), nodeCenterY(source), targetSide, false));
         }
 
-        double midX = startX + (endX - startX) / 2.0;
-        List<JsonContracts.Point> points = new ArrayList<>();
-        addPoint(points, startX, sourceCenterY);
-        addPoint(points, midX, sourceCenterY);
-        addPoint(points, midX, targetCenterY);
-        addPoint(points, endX, targetCenterY);
-        return points;
+        Map<String, PortRef> sourcePorts = new HashMap<>();
+        Map<String, PortRef> targetPorts = new HashMap<>();
+        for (Map.Entry<PortKey, List<PortAssignment>> entry : assignments.entrySet()) {
+            List<PortAssignment> portAssignments = entry.getValue();
+            portAssignments.sort(Comparator
+                .comparingDouble(PortAssignment::sortY)
+                .thenComparing(PortAssignment::edgeId));
+            for (int index = 0; index < portAssignments.size(); index++) {
+                PortAssignment assignment = portAssignments.get(index);
+                PortRef port = new PortRef(assignment.side(), index, portAssignments.size());
+                if (assignment.source()) {
+                    sourcePorts.put(assignment.edgeId(), port);
+                } else {
+                    targetPorts.put(assignment.edgeId(), port);
+                }
+            }
+        }
+
+        Map<String, EdgePorts> portsByEdge = new HashMap<>();
+        for (JsonContracts.LayoutEdge edge : edges) {
+            PortRef sourcePort = sourcePorts.get(edge.id());
+            PortRef targetPort = targetPorts.get(edge.id());
+            if (sourcePort != null && targetPort != null) {
+                portsByEdge.put(edge.id(), new EdgePorts(sourcePort, targetPort));
+            }
+        }
+        return portsByEdge;
+    }
+
+    private static EdgePorts defaultPorts(boolean targetIsRightOfSource) {
+        PortSide sourceSide = targetIsRightOfSource ? PortSide.RIGHT : PortSide.LEFT;
+        return new EdgePorts(
+            new PortRef(sourceSide, 0, 1),
+            new PortRef(opposite(sourceSide), 0, 1));
+    }
+
+    private static PortSide sourceSide(
+        JsonContracts.LaidOutNode source,
+        JsonContracts.LaidOutNode target) {
+        double sourceCenterX = source.x() + source.width() / 2.0;
+        double targetCenterX = target.x() + target.width() / 2.0;
+        return targetCenterX >= sourceCenterX ? PortSide.RIGHT : PortSide.LEFT;
+    }
+
+    private static double nodeCenterY(JsonContracts.LaidOutNode node) {
+        return node.y() + node.height() / 2.0;
+    }
+
+    private static PortSide opposite(PortSide side) {
+        return side == PortSide.RIGHT ? PortSide.LEFT : PortSide.RIGHT;
+    }
+
+    private static JsonContracts.Point portPoint(JsonContracts.LaidOutNode node, PortRef port) {
+        double x = port.side() == PortSide.RIGHT ? node.x() + node.width() : node.x();
+        return new JsonContracts.Point(x, portY(node, port.index(), port.count()));
+    }
+
+    private static double portY(JsonContracts.LaidOutNode node, int index, int count) {
+        if (count <= 1) {
+            return node.y() + node.height() / 2.0;
+        }
+        double margin = Math.min(PORT_MARGIN, node.height() / 4.0);
+        double available = node.height() - (margin * 2.0);
+        return node.y() + margin + (available * index / (count - 1.0));
     }
 
     private static void addPoint(List<JsonContracts.Point> points, double x, double y) {

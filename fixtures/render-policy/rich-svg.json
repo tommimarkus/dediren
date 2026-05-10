@@ -28,7 +28,11 @@
     "edge": {
       "stroke": "#475569",
       "stroke_width": 1.5,
-      "label_fill": "#334155"
+      "label_fill": "#334155",
+      "label_horizontal_position": "near_start",
+      "label_horizontal_side": "auto",
+      "label_vertical_position": "center",
+      "label_vertical_side": "left"
     },
     "group": {
       "fill": "#e0f2fe",

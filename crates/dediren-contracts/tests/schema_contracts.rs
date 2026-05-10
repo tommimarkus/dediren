@@ -39,6 +39,22 @@ fn rich_svg_policy_matches_schema() {
 }
 
 #[test]
+fn archimate_svg_policy_matches_schema() {
+    assert_valid(
+        "schemas/svg-render-policy.schema.json",
+        "fixtures/render-policy/archimate-svg.json",
+    );
+}
+
+#[test]
+fn archimate_render_metadata_matches_schema() {
+    assert_valid(
+        "schemas/render-metadata.schema.json",
+        "fixtures/render-metadata/archimate-basic.json",
+    );
+}
+
+#[test]
 fn svg_policy_schema_rejects_invalid_style_cells() {
     for (name, style) in [
         (
@@ -89,6 +105,76 @@ fn svg_policy_schema_rejects_invalid_style_cells() {
 }
 
 #[test]
+fn render_metadata_schema_accepts_valid_fixture() {
+    assert_json_valid(
+        "schemas/render-metadata.schema.json",
+        json!({
+            "render_metadata_schema_version": "render-metadata.schema.v1",
+            "semantic_profile": "archimate",
+            "nodes": {
+                "orders-component": {
+                    "type": "ApplicationComponent",
+                    "source_id": "orders-component"
+                }
+            },
+            "edges": {
+                "orders-realizes-service": {
+                    "type": "Realization",
+                    "source_id": "orders-realizes-service"
+                }
+            }
+        }),
+    );
+}
+
+#[test]
+fn render_metadata_schema_rejects_style_fields() {
+    assert_json_invalid(
+        "schemas/render-metadata.schema.json",
+        json!({
+            "render_metadata_schema_version": "render-metadata.schema.v1",
+            "semantic_profile": "archimate",
+            "nodes": {
+                "orders-component": {
+                    "type": "ApplicationComponent",
+                    "source_id": "orders-component",
+                    "fill": "#fff2cc"
+                }
+            },
+            "edges": {}
+        }),
+        "style fields in render metadata",
+    );
+}
+
+#[test]
+fn svg_policy_schema_accepts_semantic_type_overrides() {
+    assert_json_valid(
+        "schemas/svg-render-policy.schema.json",
+        json!({
+            "svg_render_policy_schema_version": "svg-render-policy.schema.v1",
+            "semantic_profile": "archimate",
+            "page": { "width": 640, "height": 360 },
+            "margin": { "top": 24, "right": 24, "bottom": 24, "left": 24 },
+            "style": {
+                "node_type_overrides": {
+                    "ApplicationComponent": {
+                        "fill": "#fff2cc",
+                        "stroke": "#7a5c00"
+                    }
+                },
+                "edge_type_overrides": {
+                    "Realization": {
+                        "stroke": "#374151",
+                        "stroke_width": 1.5
+                    }
+                }
+            }
+        }),
+    );
+}
+
+#[test]
 fn all_public_schemas_compile() {
     for path in [
         "schemas/model.schema.json",
@@ -96,6 +182,7 @@ fn all_public_schemas_compile() {
         "schemas/layout-request.schema.json",
         "schemas/layout-result.schema.json",
         "schemas/svg-render-policy.schema.json",
+        "schemas/render-metadata.schema.json",
         "schemas/render-result.schema.json",
         "schemas/export-request.schema.json",
         "schemas/export-result.schema.json",

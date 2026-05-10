@@ -1,0 +1,20 @@
+{
+  "render_metadata_schema_version": "render-metadata.schema.v1",
+  "semantic_profile": "archimate",
+  "nodes": {
+    "orders-component": {
+      "type": "ApplicationComponent",
+      "source_id": "orders-component"
+    },
+    "orders-service": {
+      "type": "ApplicationService",
+      "source_id": "orders-service"
+    }
+  },
+  "edges": {
+    "orders-realizes-service": {
+      "type": "Realization",
+      "source_id": "orders-realizes-service"
+    }
+  }
+}

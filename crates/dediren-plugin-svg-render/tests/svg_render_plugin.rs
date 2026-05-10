@@ -60,6 +60,72 @@ fn svg_renderer_applies_rich_policy_styles() {
 }
 
 #[test]
+fn svg_renderer_applies_archimate_type_styles() {
+    let input = archimate_style_input();
+    let content = render_content(input);
+    let doc = svg_doc(&content);
+
+    let component = semantic_group(&doc, "data-dediren-node-id", "orders-component");
+    let component_rect = child_element(component, "rect");
+    assert_eq!(component_rect.attribute("fill"), Some("#fff2cc"));
+    assert_eq!(component_rect.attribute("stroke"), Some("#7a5c00"));
+
+    let service = semantic_group(&doc, "data-dediren-node-id", "orders-service");
+    let service_rect = child_element(service, "rect");
+    assert_eq!(service_rect.attribute("fill"), Some("#e0f2fe"));
+    assert_eq!(service_rect.attribute("stroke"), Some("#0369a1"));
+
+    let edge = semantic_group(&doc, "data-dediren-edge-id", "orders-realizes-service");
+    let path = child_element(edge, "path");
+    assert_eq!(path.attribute("stroke"), Some("#374151"));
+    assert_eq!(path.attribute("stroke-width"), Some("1.5"));
+}
+
+#[test]
+fn svg_renderer_id_override_wins_over_type_override() {
+    let mut input = archimate_style_input();
+    input["policy"]["style"]["node_overrides"] = serde_json::json!({
+        "orders-component": {
+            "fill": "#fce7f3",
+            "stroke": "#be185d"
+        }
+    });
+
+    let content = render_content(input);
+    let doc = svg_doc(&content);
+    let component = semantic_group(&doc, "data-dediren-node-id", "orders-component");
+    let rect = child_element(component, "rect");
+    assert_eq!(rect.attribute("fill"), Some("#fce7f3"));
+    assert_eq!(rect.attribute("stroke"), Some("#be185d"));
+}
+
+#[test]
+fn svg_renderer_rejects_profile_mismatch() {
+    let mut input = archimate_style_input();
+    input["render_metadata"]["semantic_profile"] = serde_json::json!("bpmn2");
+
+    let mut cmd = Command::cargo_bin("dediren-plugin-svg-render").unwrap();
+    cmd.arg("render")
+        .write_stdin(serde_json::to_string(&input).unwrap());
+    cmd.assert().failure().stdout(predicate::str::contains(
+        "DEDIREN_RENDER_METADATA_PROFILE_MISMATCH",
+    ));
+}
+
+#[test]
+fn svg_renderer_rejects_type_policy_without_metadata() {
+    let mut input = archimate_style_input();
+    input.as_object_mut().unwrap().remove("render_metadata");
+
+    let mut cmd = Command::cargo_bin("dediren-plugin-svg-render").unwrap();
+    cmd.arg("render")
+        .write_stdin(serde_json::to_string(&input).unwrap());
+    cmd.assert()
+        .failure()
+        .stdout(predicate::str::contains("DEDIREN_RENDER_METADATA_REQUIRED"));
+}
+
+#[test]
 fn svg_renderer_preserves_style_number_precision() {
     let input = styled_inline_input(
         serde_json::json!([]),
@@ -229,18 +295,68 @@ fn svg_renderer_places_edge_label_near_route_midpoint_for_vertical_route() {
 
     let edge = semantic_group(&doc, "data-dediren-edge-id", "routed-edge");
     let label = child_element(edge, "text");
-    let x = label.attribute("x").unwrap().parse::<f64>().unwrap();
-    let y = label.attribute("y").unwrap().parse::<f64>().unwrap();
+    let label_box = text_box_from_svg(label, 14.0);
+    let center_y = box_center_y(label_box);
+    let route_gap = horizontal_gap_to_x(label_box, 100.0);
     assert!(
-        (x - 100.0).abs() > 20.0,
-        "vertical route label should move off the route segment, got x={x}"
+        route_gap <= 3.0,
+        "vertical route label should stay close to the route, got gap={route_gap}"
     );
-    assert_eq!(label.attribute("y"), Some("92.0"));
     assert!(
-        (y - 92.0).abs() <= 1.0,
-        "vertical route label should stay near the route midpoint, got y={y}"
+        (center_y - 100.0).abs() <= 6.0,
+        "vertical route label should be visually centered near the route midpoint, got center_y={center_y}"
     );
-    assert_eq!(label.attribute("text-anchor"), Some("middle"));
+    assert_eq!(label.attribute("text-anchor"), Some("end"));
+}
+
+#[test]
+fn svg_renderer_aligns_vertical_edge_labels_by_text_edge() {
+    let input = styled_inline_input(
+        serde_json::json!([]),
+        serde_json::json!([]),
+        serde_json::json!([
+            {
+                "id": "short-vertical",
+                "source": "web-app",
+                "target": "orders-api",
+                "source_id": "short-vertical",
+                "projection_id": "short-vertical",
+                "points": [
+                    { "x": 200, "y": 40 },
+                    { "x": 200, "y": 220 }
+                ],
+                "label": "calls API"
+            },
+            {
+                "id": "long-vertical",
+                "source": "orders-api",
+                "target": "worker",
+                "source_id": "long-vertical",
+                "projection_id": "long-vertical",
+                "points": [
+                    { "x": 200, "y": 260 },
+                    { "x": 200, "y": 440 }
+                ],
+                "label": "publishes fulfillment"
+            }
+        ]),
+        serde_json::json!({}),
+    );
+    let content = render_content(input);
+    let doc = svg_doc(&content);
+
+    let short = child_element(
+        semantic_group(&doc, "data-dediren-edge-id", "short-vertical"),
+        "text",
+    );
+    let long = child_element(
+        semantic_group(&doc, "data-dediren-edge-id", "long-vertical"),
+        "text",
+    );
+
+    assert_eq!(short.attribute("text-anchor"), Some("end"));
+    assert_eq!(long.attribute("text-anchor"), Some("end"));
+    assert_eq!(short.attribute("x"), long.attribute("x"));
 }
 
 #[test]
@@ -271,8 +387,233 @@ fn svg_renderer_prefers_horizontal_segment_for_edge_label() {
 
     let edge = semantic_group(&doc, "data-dediren-edge-id", "mostly-vertical-edge");
     let label = child_element(edge, "text");
-    assert_eq!(label.attribute("x"), Some("50.0"));
-    assert_eq!(label.attribute("y"), Some("292.0"));
+    let y = label.attribute("y").unwrap().parse::<f64>().unwrap();
+    assert!(
+        (y - 300.0).abs() <= 18.0,
+        "edge label should stay near the preferred horizontal segment, got y={y}"
+    );
+}
+
+#[test]
+fn svg_renderer_defaults_horizontal_edge_label_near_start() {
+    let input = styled_inline_input(
+        serde_json::json!([]),
+        serde_json::json!([]),
+        serde_json::json!([
+            {
+                "id": "horizontal-edge",
+                "source": "source-node",
+                "target": "target-node",
+                "source_id": "horizontal-edge",
+                "projection_id": "horizontal-edge",
+                "points": [
+                    { "x": 0, "y": 120 },
+                    { "x": 100, "y": 120 }
+                ],
+                "label": "start"
+            }
+        ]),
+        serde_json::json!({}),
+    );
+    let content = render_content(input);
+    let doc = svg_doc(&content);
+
+    let edge = semantic_group(&doc, "data-dediren-edge-id", "horizontal-edge");
+    let label = child_element(edge, "text");
+    let x = label.attribute("x").unwrap().parse::<f64>().unwrap();
+
+    assert!(
+        (x - 18.0).abs() <= 1.0,
+        "default horizontal edge label should be near the segment start, got x={x}"
+    );
+}
+
+#[test]
+fn svg_renderer_defaults_horizontal_edge_label_below_downward_bend() {
+    let input = styled_inline_input(
+        serde_json::json!([]),
+        serde_json::json!([]),
+        serde_json::json!([
+            {
+                "id": "downward-bend",
+                "source": "source-node",
+                "target": "target-node",
+                "source_id": "downward-bend",
+                "projection_id": "downward-bend",
+                "points": [
+                    { "x": 0, "y": 120 },
+                    { "x": 120, "y": 120 },
+                    { "x": 120, "y": 220 }
+                ],
+                "label": "down"
+            }
+        ]),
+        serde_json::json!({}),
+    );
+    let content = render_content(input);
+    let doc = svg_doc(&content);
+
+    let edge = semantic_group(&doc, "data-dediren-edge-id", "downward-bend");
+    let label = child_element(edge, "text");
+    let y = label.attribute("y").unwrap().parse::<f64>().unwrap();
+
+    assert!(
+        y > 120.0,
+        "default horizontal edge label should move below a downward bend, got y={y}"
+    );
+}
+
+#[test]
+fn svg_renderer_defaults_horizontal_edge_label_near_first_horizontal_segment() {
+    let input = styled_inline_input(
+        serde_json::json!([]),
+        serde_json::json!([]),
+        serde_json::json!([
+            {
+                "id": "two-segment-edge",
+                "source": "source-node",
+                "target": "target-node",
+                "source_id": "two-segment-edge",
+                "projection_id": "two-segment-edge",
+                "points": [
+                    { "x": 100, "y": 120 },
+                    { "x": 220, "y": 120 },
+                    { "x": 220, "y": 180 },
+                    { "x": 340, "y": 180 }
+                ],
+                "label": "first segment"
+            }
+        ]),
+        serde_json::json!({}),
+    );
+    let content = render_content(input);
+    let doc = svg_doc(&content);
+
+    let edge = semantic_group(&doc, "data-dediren-edge-id", "two-segment-edge");
+    let label = child_element(edge, "text");
+    let x = label.attribute("x").unwrap().parse::<f64>().unwrap();
+    let y = label.attribute("y").unwrap().parse::<f64>().unwrap();
+
+    assert!(
+        x < 220.0,
+        "default horizontal edge label should prefer the first horizontal segment, got x={x}"
+    );
+    assert!(
+        y > 120.0,
+        "default horizontal edge label should use the first segment bend side, got y={y}"
+    );
+}
+
+#[test]
+fn svg_renderer_defaults_horizontal_edge_label_above_upward_bend() {
+    let input = styled_inline_input(
+        serde_json::json!([]),
+        serde_json::json!([]),
+        serde_json::json!([
+            {
+                "id": "upward-bend",
+                "source": "source-node",
+                "target": "target-node",
+                "source_id": "upward-bend",
+                "projection_id": "upward-bend",
+                "points": [
+                    { "x": 0, "y": 220 },
+                    { "x": 120, "y": 220 },
+                    { "x": 120, "y": 120 }
+                ],
+                "label": "up"
+            }
+        ]),
+        serde_json::json!({}),
+    );
+    let content = render_content(input);
+    let doc = svg_doc(&content);
+
+    let edge = semantic_group(&doc, "data-dediren-edge-id", "upward-bend");
+    let label = child_element(edge, "text");
+    let y = label.attribute("y").unwrap().parse::<f64>().unwrap();
+
+    assert!(
+        y < 220.0,
+        "default horizontal edge label should stay above an upward bend, got y={y}"
+    );
+}
+
+#[test]
+fn svg_renderer_allows_horizontal_edge_label_side_override_by_policy() {
+    let input = styled_inline_input(
+        serde_json::json!([]),
+        serde_json::json!([]),
+        serde_json::json!([
+            {
+                "id": "downward-bend",
+                "source": "source-node",
+                "target": "target-node",
+                "source_id": "downward-bend",
+                "projection_id": "downward-bend",
+                "points": [
+                    { "x": 0, "y": 120 },
+                    { "x": 120, "y": 120 },
+                    { "x": 120, "y": 220 }
+                ],
+                "label": "forced above"
+            }
+        ]),
+        serde_json::json!({
+            "edge": {
+                "label_horizontal_side": "above"
+            }
+        }),
+    );
+    let content = render_content(input);
+    let doc = svg_doc(&content);
+
+    let edge = semantic_group(&doc, "data-dediren-edge-id", "downward-bend");
+    let label = child_element(edge, "text");
+    let y = label.attribute("y").unwrap().parse::<f64>().unwrap();
+
+    assert!(
+        y < 120.0,
+        "configured horizontal edge label side should override auto routing, got y={y}"
+    );
+}
+
+#[test]
+fn svg_renderer_allows_centered_horizontal_edge_labels_by_policy() {
+    let input = styled_inline_input(
+        serde_json::json!([]),
+        serde_json::json!([]),
+        serde_json::json!([
+            {
+                "id": "horizontal-edge",
+                "source": "source-node",
+                "target": "target-node",
+                "source_id": "horizontal-edge",
+                "projection_id": "horizontal-edge",
+                "points": [
+                    { "x": 0, "y": 120 },
+                    { "x": 100, "y": 120 }
+                ],
+                "label": "center label"
+            }
+        ]),
+        serde_json::json!({
+            "edge": {
+                "label_horizontal_position": "center"
+            }
+        }),
+    );
+    let content = render_content(input);
+    let doc = svg_doc(&content);
+
+    let edge = semantic_group(&doc, "data-dediren-edge-id", "horizontal-edge");
+    let label = child_element(edge, "text");
+    let x = label.attribute("x").unwrap().parse::<f64>().unwrap();
+
+    assert!(
+        (x - 50.0).abs() <= 1.0,
+        "configured centered horizontal label should use segment midpoint, got x={x}"
+    );
 }
 
 #[test]
@@ -494,6 +835,81 @@ fn svg_renderer_crops_small_diagram_to_content_bounds() {
 }
 
 #[test]
+fn svg_renderer_background_covers_positive_origin_viewbox() {
+    let input = styled_inline_input(
+        serde_json::json!([
+            {
+                "id": "group",
+                "source_id": "group",
+                "projection_id": "group",
+                "x": 250,
+                "y": 70,
+                "width": 590,
+                "height": 450,
+                "members": ["node"],
+                "label": "Application Services"
+            }
+        ]),
+        serde_json::json!([
+            {
+                "id": "node",
+                "source_id": "node",
+                "projection_id": "node",
+                "x": 310,
+                "y": 160,
+                "width": 170,
+                "height": 80,
+                "label": "Web App"
+            }
+        ]),
+        serde_json::json!([]),
+        serde_json::json!({}),
+    );
+
+    let content = render_content(input);
+    let doc = svg_doc(&content);
+    let root = doc.root_element();
+    let view_box: Vec<f64> = root
+        .attribute("viewBox")
+        .unwrap()
+        .split_whitespace()
+        .map(|value| value.parse::<f64>().unwrap())
+        .collect();
+    let background = child_element(root, "rect");
+
+    assert_eq!(view_box.len(), 4);
+    assert!(
+        view_box[0] > 0.0 && view_box[1] > 0.0,
+        "test needs a positive-origin viewBox, got {:?}",
+        view_box
+    );
+    assert_eq!(
+        background.attribute("x").unwrap().parse::<f64>().unwrap(),
+        view_box[0]
+    );
+    assert_eq!(
+        background.attribute("y").unwrap().parse::<f64>().unwrap(),
+        view_box[1]
+    );
+    assert_eq!(
+        background
+            .attribute("width")
+            .unwrap()
+            .parse::<f64>()
+            .unwrap(),
+        view_box[2]
+    );
+    assert_eq!(
+        background
+            .attribute("height")
+            .unwrap()
+            .parse::<f64>()
+            .unwrap(),
+        view_box[3]
+    );
+}
+
+#[test]
 fn svg_renderer_moves_edge_label_away_from_node_boxes() {
     let input = styled_inline_input(
         serde_json::json!([]),
@@ -549,6 +965,66 @@ fn svg_renderer_moves_edge_label_away_from_node_boxes() {
 }
 
 #[test]
+fn svg_renderer_centers_horizontal_edge_label_when_near_start_overlaps_adjacent_nodes() {
+    let input = styled_inline_input(
+        serde_json::json!([]),
+        serde_json::json!([
+            {
+                "id": "client",
+                "source_id": "client",
+                "projection_id": "client",
+                "x": 40,
+                "y": 160,
+                "width": 160,
+                "height": 80,
+                "label": "Client"
+            },
+            {
+                "id": "web-app",
+                "source_id": "web-app",
+                "projection_id": "web-app",
+                "x": 310,
+                "y": 160,
+                "width": 170,
+                "height": 80,
+                "label": "Web App"
+            }
+        ]),
+        serde_json::json!([
+            {
+                "id": "client-submits-order",
+                "source": "client",
+                "target": "web-app",
+                "source_id": "client-submits-order",
+                "projection_id": "client-submits-order",
+                "points": [
+                    { "x": 200, "y": 200 },
+                    { "x": 310, "y": 200 }
+                ],
+                "label": "submits order"
+            }
+        ]),
+        serde_json::json!({}),
+    );
+
+    let content = render_content(input);
+    let doc = svg_doc(&content);
+    let edge = semantic_group(&doc, "data-dediren-edge-id", "client-submits-order");
+    let label = child_element(edge, "text");
+    let x = label.attribute("x").unwrap().parse::<f64>().unwrap();
+    let y = label.attribute("y").unwrap().parse::<f64>().unwrap();
+
+    assert!(
+        (x - 255.0).abs() <= 2.0,
+        "label should use the available gap center when near-start overlaps nodes, got x={x}"
+    );
+    assert!(
+        (y - 200.0).abs() <= 18.0,
+        "label should stay close to the short horizontal edge, got y={y}"
+    );
+}
+
+#[test]
 fn svg_renderer_moves_edge_label_away_from_route_segments() {
     let input = styled_inline_input(
         serde_json::json!([]),
@@ -583,6 +1059,169 @@ fn svg_renderer_moves_edge_label_away_from_route_segments() {
             label.attribute("y").unwrap().parse::<f64>().unwrap()
         ),
         "label box should not sit on top of its vertical route segment"
+    );
+}
+
+#[test]
+fn svg_renderer_keeps_horizontal_edge_label_close_to_route() {
+    let input = styled_inline_input(
+        serde_json::json!([]),
+        serde_json::json!([]),
+        serde_json::json!([
+            {
+                "id": "horizontal-edge",
+                "source": "orders-api",
+                "target": "payments",
+                "source_id": "horizontal-edge",
+                "projection_id": "horizontal-edge",
+                "points": [
+                    { "x": 100, "y": 160 },
+                    { "x": 320, "y": 160 }
+                ],
+                "label": "authorizes payment"
+            }
+        ]),
+        serde_json::json!({}),
+    );
+
+    let content = render_content(input);
+    let doc = svg_doc(&content);
+    let edge = semantic_group(&doc, "data-dediren-edge-id", "horizontal-edge");
+    let label = child_element(edge, "text");
+    let y = label.attribute("y").unwrap().parse::<f64>().unwrap();
+
+    assert!(
+        (y - 160.0).abs() <= 18.0,
+        "horizontal edge label should stay close to its route, got y={y}"
+    );
+}
+
+#[test]
+fn svg_renderer_separates_labels_for_parallel_horizontal_edges() {
+    let input = styled_inline_input(
+        serde_json::json!([]),
+        serde_json::json!([]),
+        serde_json::json!([
+            {
+                "id": "upper-edge",
+                "source": "orders-api",
+                "target": "payments",
+                "source_id": "upper-edge",
+                "projection_id": "upper-edge",
+                "points": [
+                    { "x": 100, "y": 160 },
+                    { "x": 320, "y": 160 }
+                ],
+                "label": "writes orders"
+            },
+            {
+                "id": "lower-edge",
+                "source": "orders-api",
+                "target": "database",
+                "source_id": "lower-edge",
+                "projection_id": "lower-edge",
+                "points": [
+                    { "x": 100, "y": 172 },
+                    { "x": 320, "y": 172 }
+                ],
+                "label": "authorizes payment"
+            }
+        ]),
+        serde_json::json!({}),
+    );
+
+    let content = render_content(input);
+    let doc = svg_doc(&content);
+    let upper = child_element(
+        semantic_group(&doc, "data-dediren-edge-id", "upper-edge"),
+        "text",
+    );
+    let lower = child_element(
+        semantic_group(&doc, "data-dediren-edge-id", "lower-edge"),
+        "text",
+    );
+
+    assert!(
+        !boxes_overlap(
+            text_box_from_svg(upper, 14.0),
+            text_box_from_svg(lower, 14.0)
+        ),
+        "parallel edge labels should not overlap"
+    );
+}
+
+#[test]
+fn svg_renderer_separates_labels_for_adjacent_multisegment_routes() {
+    let input = styled_inline_input(
+        serde_json::json!([]),
+        serde_json::json!([]),
+        serde_json::json!([
+            {
+                "id": "writes-orders",
+                "source": "orders-api",
+                "target": "database",
+                "source_id": "writes-orders",
+                "projection_id": "writes-orders",
+                "points": [
+                    { "x": 596, "y": 384 },
+                    { "x": 740, "y": 384 },
+                    { "x": 740, "y": 438 },
+                    { "x": 884, "y": 438 }
+                ],
+                "label": "writes orders"
+            },
+            {
+                "id": "authorizes-payment",
+                "source": "orders-api",
+                "target": "payments",
+                "source_id": "authorizes-payment",
+                "projection_id": "authorizes-payment",
+                "points": [
+                    { "x": 596, "y": 396 },
+                    { "x": 740, "y": 396 },
+                    { "x": 740, "y": 346 },
+                    { "x": 884, "y": 346 }
+                ],
+                "label": "authorizes payment"
+            }
+        ]),
+        serde_json::json!({}),
+    );
+
+    let content = render_content(input);
+    let doc = svg_doc(&content);
+    let writes = child_element(
+        semantic_group(&doc, "data-dediren-edge-id", "writes-orders"),
+        "text",
+    );
+    let authorizes = child_element(
+        semantic_group(&doc, "data-dediren-edge-id", "authorizes-payment"),
+        "text",
+    );
+    let authorizes_y = authorizes.attribute("y").unwrap().parse::<f64>().unwrap();
+
+    assert!(
+        !boxes_overlap(
+            text_box_from_svg(writes, 14.0),
+            text_box_from_svg(authorizes, 14.0)
+        ),
+        "labels for adjacent multi-segment routes should not overlap"
+    );
+    assert!(
+        (authorizes_y - 396.0)
+            .abs()
+            .min((authorizes_y - 346.0).abs())
+            <= 32.0,
+        "fallback label should stay close to the crowded edge, got y={authorizes_y}"
+    );
+    assert!(
+        !box_intersects_horizontal_segment(
+            text_box_from_svg(authorizes, 14.0),
+            740.0,
+            884.0,
+            422.0
+        ),
+        "fallback label should not sit on another edge route"
     );
 }
 
@@ -628,6 +1267,20 @@ fn render_content(input: serde_json::Value) -> String {
     let content = envelope["data"]["content"].as_str().unwrap().to_string();
     write_render_artifact(&current_test_name(), &content);
     content
+}
+
+fn archimate_style_input() -> serde_json::Value {
+    serde_json::json!({
+        "layout_result": serde_json::from_str::<serde_json::Value>(
+            &std::fs::read_to_string(workspace_file("fixtures/layout-result/archimate-oef-basic.json")).unwrap()
+        ).unwrap(),
+        "render_metadata": serde_json::from_str::<serde_json::Value>(
+            &std::fs::read_to_string(workspace_file("fixtures/render-metadata/archimate-basic.json")).unwrap()
+        ).unwrap(),
+        "policy": serde_json::from_str::<serde_json::Value>(
+            &std::fs::read_to_string(workspace_file("fixtures/render-policy/archimate-svg.json")).unwrap()
+        ).unwrap()
+    })
 }
 
 fn styled_inline_input(
@@ -688,16 +1341,48 @@ fn text_box_from_svg(label: roxmltree::Node<'_, '_>, font_size: f64) -> (f64, f6
     let y = label.attribute("y").unwrap().parse::<f64>().unwrap();
     let text = label.text().unwrap_or("");
     let half_width = text.chars().count() as f64 * font_size * 0.62 / 2.0;
-    (
-        x - half_width,
-        y - font_size,
-        x + half_width,
-        y + font_size * 0.4,
-    )
+    let width = half_width * 2.0;
+    match label.attribute("text-anchor") {
+        Some("end") => (x - width, y - font_size, x, y + font_size * 0.4),
+        Some("start") => (x, y - font_size, x + width, y + font_size * 0.4),
+        _ => (
+            x - half_width,
+            y - font_size,
+            x + half_width,
+            y + font_size * 0.4,
+        ),
+    }
 }
 
 fn box_contains_point(bounds: (f64, f64, f64, f64), x: f64, y: f64) -> bool {
     x >= bounds.0 && x <= bounds.2 && y >= bounds.1 && y <= bounds.3
+}
+
+fn box_center_y(bounds: (f64, f64, f64, f64)) -> f64 {
+    (bounds.1 + bounds.3) / 2.0
+}
+
+fn horizontal_gap_to_x(bounds: (f64, f64, f64, f64), x: f64) -> f64 {
+    if bounds.2 < x {
+        x - bounds.2
+    } else if bounds.0 > x {
+        bounds.0 - x
+    } else {
+        0.0
+    }
+}
+
+fn boxes_overlap(left: (f64, f64, f64, f64), right: (f64, f64, f64, f64)) -> bool {
+    left.0 < right.2 && left.2 > right.0 && left.1 < right.3 && left.3 > right.1
+}
+
+fn box_intersects_horizontal_segment(
+    bounds: (f64, f64, f64, f64),
+    start_x: f64,
+    end_x: f64,
+    y: f64,
+) -> bool {
+    bounds.0 < end_x && bounds.2 > start_x && bounds.1 < y && bounds.3 > y
 }
 
 fn write_render_artifact(test_name: &str, content: &str) -> PathBuf {

@@ -1,6 +1,6 @@
 use dediren_contracts::{
-    CommandEnvelope, Diagnostic, DiagnosticSeverity, GroupProvenance, LayoutRequest, RenderPolicy,
-    RenderResult, SourceDocument,
+    CommandEnvelope, Diagnostic, DiagnosticSeverity, GroupProvenance, LayoutRequest,
+    RenderMetadata, RenderMetadataSelector, RenderPolicy, RenderResult, SourceDocument,
 };
 use std::path::PathBuf;
 
@@ -122,6 +122,36 @@ fn rich_render_policy_roundtrips() {
     let serialized = serde_json::to_string(&policy).unwrap();
     let reparsed: RenderPolicy = serde_json::from_str(&serialized).unwrap();
     assert_eq!(reparsed, policy);
+}
+
+#[test]
+fn render_metadata_round_trips() {
+    let metadata = RenderMetadata {
+        render_metadata_schema_version: dediren_contracts::RENDER_METADATA_SCHEMA_VERSION
+            .to_string(),
+        semantic_profile: "archimate".to_string(),
+        nodes: [(
+            "orders-component".to_string(),
+            RenderMetadataSelector {
+                selector_type: "ApplicationComponent".to_string(),
+                source_id: "orders-component".to_string(),
+            },
+        )]
+        .into(),
+        edges: [(
+            "orders-realizes-service".to_string(),
+            RenderMetadataSelector {
+                selector_type: "Realization".to_string(),
+                source_id: "orders-realizes-service".to_string(),
+            },
+        )]
+        .into(),
+    };
+
+    let json = serde_json::to_string(&metadata).unwrap();
+    assert!(json.contains("\"type\":\"ApplicationComponent\""));
+    let decoded: RenderMetadata = serde_json::from_str(&json).unwrap();
+    assert_eq!(decoded, metadata);
 }
 
 #[test]

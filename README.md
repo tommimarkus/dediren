@@ -22,6 +22,8 @@ DEDIREN_ELK_RESULT_FIXTURE=fixtures/layout-result/basic.json dediren layout --pl
 dediren validate-layout --input fixtures/layout-result/basic.json
 dediren render --plugin svg-render --policy fixtures/render-policy/default-svg.json --input fixtures/layout-result/basic.json
 dediren render --plugin svg-render --policy fixtures/render-policy/rich-svg.json --input fixtures/layout-result/basic.json
+dediren project --target render-metadata --plugin generic-graph --view main --input fixtures/source/valid-archimate-oef.json > render-metadata.json
+dediren render --plugin svg-render --policy fixtures/render-policy/archimate-svg.json --metadata render-metadata.json --input fixtures/layout-result/archimate-oef-basic.json
 dediren export --plugin archimate-oef --policy fixtures/export-policy/default-oef.json --source fixtures/source/valid-archimate-oef.json --layout fixtures/layout-result/archimate-oef-basic.json
 ```
 
@@ -39,8 +41,23 @@ hints.
 
 `fixtures/render-policy/default-svg.json` uses renderer defaults.
 `fixtures/render-policy/rich-svg.json` shows optional styling for background,
-font, nodes, edges, groups, and per-layout-id overrides. Per-id override keys
-match ids in the layout result, for example `api` or `client-calls-api`.
+font, nodes, edges, groups, edge-label placement, and per-layout-id overrides.
+Per-id override keys match ids in the layout result, for example `api` or
+`client-calls-api`.
+
+ArchiMate styling uses the same SVG render policy system as the default and rich
+styles. The separate render metadata artifact carries only semantic selectors
+such as node and relationship types; it does not carry colors, fonts, shapes, or
+layout data.
+
+By default, horizontal edge labels are placed near the start of the selected
+horizontal segment. The renderer chooses above or below from the route shape:
+segments that bend down place the label below, while straight segments and
+segments that bend up place it above, with collision fallback when needed.
+Vertical edge labels are centered on the route and placed to the left side.
+Edge policy can override horizontal position (`near_start`, `center`,
+`near_end`), horizontal side (`auto`, `above`, `below`), vertical position
+(`near_start`, `center`, `near_end`), and vertical side (`left`, `right`).
 
 ## Local Install
 

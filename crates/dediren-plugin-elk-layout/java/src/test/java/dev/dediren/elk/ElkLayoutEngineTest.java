@@ -174,4 +174,90 @@ class ElkLayoutEngineTest {
             aspect < 3.2,
             "grouped rich pipeline should not render as a long horizontal strip, aspect=" + aspect);
     }
+
+    @Test
+    void groupedPipelineRoutesMultipleOutgoingEdgesThroughDistinctNodePorts() {
+        JsonContracts.LayoutRequest request = new JsonContracts.LayoutRequest(
+            "layout-request.schema.v1",
+            "main",
+            List.of(
+                new JsonContracts.LayoutNode("orders-api", "Orders API", "orders-api", 160.0, 80.0),
+                new JsonContracts.LayoutNode("payments", "Payments Provider", "payments", 160.0, 80.0),
+                new JsonContracts.LayoutNode("database", "PostgreSQL", "database", 160.0, 80.0)),
+            List.of(
+                new JsonContracts.LayoutEdge("api-writes-database", "orders-api", "database", "writes orders", "api-writes-database"),
+                new JsonContracts.LayoutEdge("api-authorizes-payment", "orders-api", "payments", "authorizes payment", "api-authorizes-payment")),
+            List.of(
+                new JsonContracts.LayoutGroup(
+                    "application-services",
+                    "Application Services",
+                    List.of("orders-api"),
+                    new JsonContracts.GroupProvenance(new JsonContracts.SemanticBacked("application-services"))),
+                new JsonContracts.LayoutGroup(
+                    "external-dependencies",
+                    "External Dependencies",
+                    List.of("payments", "database"),
+                    new JsonContracts.GroupProvenance(new JsonContracts.SemanticBacked("external-dependencies")))),
+            List.of(),
+            List.of());
+
+        JsonContracts.LayoutResult result = new ElkLayoutEngine().layout(request);
+        JsonContracts.LaidOutEdge paymentEdge = result.edges().stream()
+            .filter(edge -> edge.id().equals("api-authorizes-payment"))
+            .findFirst()
+            .orElseThrow();
+        JsonContracts.LaidOutEdge databaseEdge = result.edges().stream()
+            .filter(edge -> edge.id().equals("api-writes-database"))
+            .findFirst()
+            .orElseThrow();
+
+        assertTrue(
+            Math.abs(paymentEdge.points().get(0).y() - databaseEdge.points().get(0).y()) > 8.0,
+            "multiple outgoing edges from one node should use distinct source-side ports");
+        assertTrue(
+            paymentEdge.points().get(0).y() < databaseEdge.points().get(0).y(),
+            "edge to the upper target should leave from the upper source-side port");
+    }
+
+    @Test
+    void groupedPipelineRoutesMultipleIncomingEdgesThroughDistinctNodePorts() {
+        JsonContracts.LayoutRequest request = new JsonContracts.LayoutRequest(
+            "layout-request.schema.v1",
+            "main",
+            List.of(
+                new JsonContracts.LayoutNode("web-app", "Web App", "web-app", 160.0, 80.0),
+                new JsonContracts.LayoutNode("batch-worker", "Batch Worker", "batch-worker", 160.0, 80.0),
+                new JsonContracts.LayoutNode("orders-api", "Orders API", "orders-api", 160.0, 80.0)),
+            List.of(
+                new JsonContracts.LayoutEdge("web-calls-api", "web-app", "orders-api", "calls API", "web-calls-api"),
+                new JsonContracts.LayoutEdge("worker-updates-api", "batch-worker", "orders-api", "updates orders", "worker-updates-api")),
+            List.of(
+                new JsonContracts.LayoutGroup(
+                    "callers",
+                    "Callers",
+                    List.of("web-app", "batch-worker"),
+                    new JsonContracts.GroupProvenance(new JsonContracts.SemanticBacked("callers"))),
+                new JsonContracts.LayoutGroup(
+                    "application-services",
+                    "Application Services",
+                    List.of("orders-api"),
+                    new JsonContracts.GroupProvenance(new JsonContracts.SemanticBacked("application-services")))),
+            List.of(),
+            List.of());
+
+        JsonContracts.LayoutResult result = new ElkLayoutEngine().layout(request);
+        JsonContracts.LaidOutEdge webEdge = result.edges().stream()
+            .filter(edge -> edge.id().equals("web-calls-api"))
+            .findFirst()
+            .orElseThrow();
+        JsonContracts.LaidOutEdge workerEdge = result.edges().stream()
+            .filter(edge -> edge.id().equals("worker-updates-api"))
+            .findFirst()
+            .orElseThrow();
+
+        assertTrue(
+            Math.abs(webEdge.points().get(webEdge.points().size() - 1).y()
+                - workerEdge.points().get(workerEdge.points().size() - 1).y()) > 8.0,
+            "multiple incoming edges to one node should use distinct target-side ports");
+    }
 }
