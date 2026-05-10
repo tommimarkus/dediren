@@ -82,6 +82,35 @@ fn svg_renderer_applies_archimate_type_styles() {
 }
 
 #[test]
+fn svg_renderer_applies_archimate_node_decorators_from_type_overrides() {
+    let mut input = archimate_style_input();
+    input["policy"]["style"]["node_type_overrides"]["ApplicationComponent"]["decorator"] =
+        serde_json::json!("archimate_application_component");
+    input["policy"]["style"]["node_type_overrides"]["ApplicationService"]["decorator"] =
+        serde_json::json!("archimate_application_service");
+
+    let content = render_content(input);
+    let doc = svg_doc(&content);
+
+    let component = semantic_group(&doc, "data-dediren-node-id", "orders-component");
+    let service = semantic_group(&doc, "data-dediren-node-id", "orders-service");
+
+    let component_decorator = child_group_with_attr(
+        component,
+        "data-dediren-node-decorator",
+        "archimate_application_component",
+    );
+    let service_decorator = child_group_with_attr(
+        service,
+        "data-dediren-node-decorator",
+        "archimate_application_service",
+    );
+
+    assert!(child_elements(component_decorator, "rect").count() >= 2);
+    assert!(child_elements(service_decorator, "path").count() >= 1);
+}
+
+#[test]
 fn svg_renderer_id_override_wins_over_type_override() {
     let mut input = archimate_style_input();
     input["policy"]["style"]["node_overrides"] = serde_json::json!({
@@ -1334,6 +1363,26 @@ fn child_element<'a, 'input>(
                 tag_name
             )
         })
+}
+
+fn child_group_with_attr<'a, 'input>(
+    parent: roxmltree::Node<'a, 'input>,
+    attr_name: &str,
+    attr_value: &str,
+) -> roxmltree::Node<'a, 'input> {
+    parent
+        .children()
+        .find(|node| node.has_tag_name("g") && node.attribute(attr_name) == Some(attr_value))
+        .unwrap_or_else(|| panic!("missing child group with {attr_name}={attr_value}"))
+}
+
+fn child_elements<'a, 'input>(
+    parent: roxmltree::Node<'a, 'input>,
+    name: &'static str,
+) -> impl Iterator<Item = roxmltree::Node<'a, 'input>> {
+    parent
+        .children()
+        .filter(move |node| node.has_tag_name(name))
 }
 
 fn text_box_from_svg(label: roxmltree::Node<'_, '_>, font_size: f64) -> (f64, f64, f64, f64) {

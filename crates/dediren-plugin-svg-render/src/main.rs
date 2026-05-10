@@ -4,7 +4,7 @@ use dediren_contracts::{
     CommandEnvelope, Diagnostic, DiagnosticSeverity, LaidOutEdge, LaidOutGroup, LaidOutNode,
     LayoutResult, Point, RenderMetadata, RenderPolicy, RenderResult,
     SvgEdgeLabelHorizontalPosition, SvgEdgeLabelHorizontalSide, SvgEdgeLabelVerticalPosition,
-    SvgEdgeLabelVerticalSide, SvgEdgeStyle, SvgGroupStyle, SvgNodeStyle,
+    SvgEdgeLabelVerticalSide, SvgEdgeStyle, SvgGroupStyle, SvgNodeDecorator, SvgNodeStyle,
     RENDER_RESULT_SCHEMA_VERSION,
 };
 use serde::Deserialize;
@@ -34,6 +34,7 @@ struct ResolvedNodeStyle {
     stroke_width: f64,
     rx: f64,
     label_fill: String,
+    decorator: Option<SvgNodeDecorator>,
 }
 
 #[derive(Debug, Clone)]
@@ -556,6 +557,7 @@ fn render_svg(
             escape_attr(&node.id)
         ));
         svg.push_str(&node_rect(node, &node_style));
+        svg.push_str(&node_decorator(node, &node_style));
         svg.push_str(&node_label(node, &node_style));
         svg.push_str("</g>");
     }
@@ -571,6 +573,7 @@ fn base_style(policy: &RenderPolicy) -> ResolvedStyle {
         stroke_width: 1.5,
         rx: 6.0,
         label_fill: "#0f172a".to_string(),
+        decorator: None,
     };
     let default_edge = ResolvedEdgeStyle {
         stroke: "#64748b".to_string(),
@@ -693,6 +696,7 @@ fn merge_node_style(
                 .label_fill
                 .clone()
                 .unwrap_or_else(|| base.label_fill.clone()),
+            decorator: style.decorator.or(base.decorator),
         },
         None => base.clone(),
     }
@@ -770,6 +774,80 @@ fn node_rect(node: &LaidOutNode, style: &ResolvedNodeStyle) -> String {
         node.height,
         svg_style_number(style.rx),
         escape_attr(&style.fill),
+        escape_attr(&style.stroke),
+        svg_style_number(style.stroke_width)
+    )
+}
+
+fn node_decorator(node: &LaidOutNode, style: &ResolvedNodeStyle) -> String {
+    match style.decorator {
+        Some(SvgNodeDecorator::ArchimateApplicationComponent) => {
+            archimate_application_component_decorator(node, style)
+        }
+        Some(SvgNodeDecorator::ArchimateApplicationService) => {
+            archimate_application_service_decorator(node, style)
+        }
+        None => String::new(),
+    }
+}
+
+fn archimate_application_component_decorator(
+    node: &LaidOutNode,
+    style: &ResolvedNodeStyle,
+) -> String {
+    let size = node.width.min(node.height).min(22.0).max(14.0);
+    let x = node.x + node.width - size - 8.0;
+    let y = node.y + 8.0;
+    let tab_width = size * 0.42;
+    let tab_height = size * 0.26;
+    format!(
+        r##"<g data-dediren-node-decorator="archimate_application_component"><rect x="{:.1}" y="{:.1}" width="{:.1}" height="{:.1}" rx="1.5" fill="{}" stroke="{}" stroke-width="{}"/><rect x="{:.1}" y="{:.1}" width="{:.1}" height="{:.1}" rx="1.2" fill="{}" stroke="{}" stroke-width="{}"/><rect x="{:.1}" y="{:.1}" width="{:.1}" height="{:.1}" rx="1.2" fill="{}" stroke="{}" stroke-width="{}"/></g>"##,
+        x,
+        y,
+        size,
+        size * 0.72,
+        escape_attr(&style.fill),
+        escape_attr(&style.stroke),
+        svg_style_number(style.stroke_width),
+        x - tab_width * 0.28,
+        y + size * 0.12,
+        tab_width,
+        tab_height,
+        escape_attr(&style.fill),
+        escape_attr(&style.stroke),
+        svg_style_number(style.stroke_width),
+        x - tab_width * 0.28,
+        y + size * 0.44,
+        tab_width,
+        tab_height,
+        escape_attr(&style.fill),
+        escape_attr(&style.stroke),
+        svg_style_number(style.stroke_width)
+    )
+}
+
+fn archimate_application_service_decorator(
+    node: &LaidOutNode,
+    style: &ResolvedNodeStyle,
+) -> String {
+    let size = node.width.min(node.height).min(22.0).max(14.0);
+    let cx = node.x + node.width - size * 0.75 - 8.0;
+    let cy = node.y + size * 0.75 + 8.0;
+    let r = size * 0.36;
+    format!(
+        r##"<g data-dediren-node-decorator="archimate_application_service"><circle cx="{:.1}" cy="{:.1}" r="{:.1}" fill="{}" stroke="{}" stroke-width="{}"/><path d="M {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1}" fill="none" stroke="{}" stroke-width="{}" stroke-linecap="round" stroke-linejoin="round"/></g>"##,
+        cx,
+        cy,
+        r,
+        escape_attr(&style.fill),
+        escape_attr(&style.stroke),
+        svg_style_number(style.stroke_width),
+        cx - r * 0.45,
+        cy,
+        cx - r * 0.05,
+        cy + r * 0.38,
+        cx + r * 0.55,
+        cy - r * 0.45,
         escape_attr(&style.stroke),
         svg_style_number(style.stroke_width)
     )
