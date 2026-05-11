@@ -334,6 +334,24 @@ fn plugin_manifest_matches_schema() {
 }
 
 #[test]
+fn first_party_plugin_manifest_versions_match_workspace_version() {
+    for path in [
+        "fixtures/plugins/archimate-oef.manifest.json",
+        "fixtures/plugins/elk-layout.manifest.json",
+        "fixtures/plugins/generic-graph.manifest.json",
+        "fixtures/plugins/svg-render.manifest.json",
+    ] {
+        let text = std::fs::read_to_string(workspace_file(path)).unwrap();
+        let manifest: serde_json::Value = serde_json::from_str(&text).unwrap();
+        assert_eq!(
+            manifest["version"].as_str(),
+            Some(env!("CARGO_PKG_VERSION")),
+            "{path} version should match workspace package version"
+        );
+    }
+}
+
+#[test]
 fn runtime_capabilities_match_schema() {
     assert_json_valid(
         "schemas/runtime-capability.schema.json",
