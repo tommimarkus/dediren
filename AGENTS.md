@@ -8,6 +8,10 @@
   - Product boundary question: `docs/superpowers/specs/2026-05-08-dediren-design.md`
   - Existing slice or planned task: matching file under `docs/superpowers/plans/`
   - User-facing command or workflow: `README.md`
+- Treat `README.md` as the main user-facing document. Keep it current when
+  commands, workflows, plugin/runtime behavior, public artifacts, or examples
+  change; if a user-visible change intentionally does not need a README update,
+  say why in the handoff.
 - Treat plans as task guidance and implementation history. Live code and tests
   are the current truth when they disagree with a plan.
 
@@ -59,6 +63,9 @@
 - Plugin protocol or runtime changes: update manifests, runtime capability
   handling, plugin envelope validation, CLI behavior, README notes, and
   compatibility tests together.
+- User-facing command, workflow, install, or artifact-location changes: update
+  `README.md` in the same change so the public instructions match the live
+  behavior.
 - ELK layout changes: keep the Rust `elk-layout` adapter and Java helper
   contract aligned. The helper lives under
   `crates/dediren-plugin-elk-layout/java` and is invoked through
