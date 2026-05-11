@@ -8,6 +8,7 @@ use std::time::{Duration, Instant};
 #[derive(Debug, Clone)]
 pub struct PluginRegistry {
     manifest_dirs: Vec<PathBuf>,
+    binary_dir: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone)]
@@ -74,6 +75,7 @@ pub enum PluginExecutionError {
 struct LoadedPluginManifest {
     manifest: PluginManifest,
     path: PathBuf,
+    binary_dir: Option<PathBuf>,
 }
 
 struct ValidatedEnvelope {
@@ -144,12 +146,33 @@ impl Default for PluginRunOptions {
 
 impl PluginRegistry {
     pub fn bundled() -> Self {
-        Self {
-            manifest_dirs: Self::bundled_dirs(),
+        match std::env::current_exe() {
+            Ok(executable) => Self::for_executable(&executable),
+            Err(_) => Self::from_dirs(Self::fallback_manifest_dirs()),
         }
     }
 
     pub fn bundled_dirs() -> Vec<PathBuf> {
+        Self::bundled().manifest_dirs
+    }
+
+    pub fn for_executable(executable: &Path) -> Self {
+        let mut manifest_dirs = Vec::new();
+        let mut binary_dir = None;
+
+        if let Some(root) = installed_bundle_root(executable) {
+            manifest_dirs.push(root.join("plugins"));
+            binary_dir = executable.parent().map(Path::to_path_buf);
+        }
+
+        manifest_dirs.extend(Self::fallback_manifest_dirs());
+        Self {
+            manifest_dirs,
+            binary_dir,
+        }
+    }
+
+    fn fallback_manifest_dirs() -> Vec<PathBuf> {
         let mut manifest_dirs = vec![
             PathBuf::from("fixtures/plugins"),
             PathBuf::from(".dediren/plugins"),
@@ -161,7 +184,10 @@ impl PluginRegistry {
     }
 
     pub fn from_dirs(manifest_dirs: Vec<PathBuf>) -> Self {
-        Self { manifest_dirs }
+        Self {
+            manifest_dirs,
+            binary_dir: None,
+        }
     }
 
     pub fn load_manifest(&self, plugin_id: &str) -> anyhow::Result<PluginManifest> {
@@ -201,7 +227,11 @@ impl PluginRegistry {
                     }
                 })?;
                 if manifest.id == plugin_id {
-                    return Ok(LoadedPluginManifest { manifest, path });
+                    return Ok(LoadedPluginManifest {
+                        manifest,
+                        path,
+                        binary_dir: self.binary_dir.clone(),
+                    });
                 }
                 return Err(PluginExecutionError::ManifestInvalid {
                     plugin_id: plugin_id.to_string(),
@@ -212,6 +242,19 @@ impl PluginRegistry {
         Err(PluginExecutionError::UnknownPlugin {
             plugin_id: plugin_id.to_string(),
         })
+    }
+}
+
+fn installed_bundle_root(executable: &Path) -> Option<PathBuf> {
+    let bin_dir = executable.parent()?;
+    if bin_dir.file_name()? != "bin" {
+        return None;
+    }
+    let root = bin_dir.parent()?;
+    if root.join("plugins").is_dir() {
+        Some(root.to_path_buf())
+    } else {
+        None
     }
 }
 
@@ -521,6 +564,9 @@ fn executable_path(loaded: &LoadedPluginManifest) -> Result<PathBuf, PluginExecu
             .parent()
             .unwrap_or_else(|| Path::new("."))
             .join(executable));
+    }
+    if let Some(binary_dir) = &loaded.binary_dir {
+        return Ok(binary_dir.join(&loaded.manifest.executable));
     }
     Ok(std::env::current_exe()
         .map_err(|error| PluginExecutionError::Io {

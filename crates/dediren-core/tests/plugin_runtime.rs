@@ -1,3 +1,5 @@
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{Duration, Instant};
@@ -95,6 +97,58 @@ fn runtime_id_mismatch_is_structured() {
     .expect_err("runtime id mismatch should fail");
 
     assert_eq!(error.diagnostic().code, "DEDIREN_PLUGIN_ID_MISMATCH");
+}
+
+#[test]
+fn installed_bundle_registry_finds_manifest_and_binary_next_to_cli() {
+    let temp = TempDir::new().unwrap();
+    let bundle = temp
+        .path()
+        .join("dediren-agent-bundle-0.1.0-x86_64-unknown-linux-gnu");
+    let bin_dir = bundle.join("bin");
+    let plugin_dir = bundle.join("plugins");
+    std::fs::create_dir_all(&bin_dir).unwrap();
+    std::fs::create_dir_all(&plugin_dir).unwrap();
+
+    let plugin_binary = bin_dir.join(if cfg!(windows) {
+        "dediren-plugin-runtime-testbed.exe"
+    } else {
+        "dediren-plugin-runtime-testbed"
+    });
+    std::fs::copy(testbed_binary(), &plugin_binary).unwrap();
+    #[cfg(unix)]
+    {
+        let mut permissions = std::fs::metadata(&plugin_binary).unwrap().permissions();
+        permissions.set_mode(0o755);
+        std::fs::set_permissions(&plugin_binary, permissions).unwrap();
+    }
+
+    write_manifest(
+        &plugin_dir,
+        "runtime-testbed",
+        "dediren-plugin-runtime-testbed",
+        &["layout"],
+    );
+
+    let fake_cli = bin_dir.join("dediren");
+    let registry = PluginRegistry::for_executable(&fake_cli);
+    let mut options = PluginRunOptions::default();
+    options.allowed_env.push((
+        "DEDIREN_TEST_PLUGIN_CAPABILITIES".to_string(),
+        "layout".to_string(),
+    ));
+    let outcome = run_plugin_for_capability_with_registry(
+        &registry,
+        "runtime-testbed",
+        "layout",
+        &["layout"],
+        "{}",
+        options,
+    )
+    .expect("installed bundle registry should find plugin manifest and binary");
+
+    assert_eq!(outcome.exit_code, 0);
+    assert!(outcome.stdout.contains("\"layout_result_schema_version\""));
 }
 
 #[test]
