@@ -2,6 +2,7 @@
 set -euo pipefail
 
 ARCHIVE=${1:-}
+MIN_JAVA_MAJOR=21
 if [[ -z "$ARCHIVE" ]]; then
   echo "usage: scripts/smoke-dist.sh dist/dediren-agent-bundle-0.1.0-x86_64-unknown-linux-gnu.tar.gz" >&2
   exit 2
@@ -23,8 +24,8 @@ elif [[ "$JAVA_VERSION" =~ ^([0-9]+) ]]; then
 else
   JAVA_MAJOR=
 fi
-if [[ ! "$JAVA_MAJOR" =~ ^[0-9]+$ || "$JAVA_MAJOR" -lt 25 ]]; then
-  echo "Java 25 or newer is required on PATH for the bundled ELK helper" >&2
+if [[ ! "$JAVA_MAJOR" =~ ^[0-9]+$ || "$JAVA_MAJOR" -lt "$MIN_JAVA_MAJOR" ]]; then
+  echo "Java $MIN_JAVA_MAJOR or newer is required on PATH for the bundled ELK helper" >&2
   exit 2
 fi
 

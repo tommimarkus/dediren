@@ -9,6 +9,10 @@ java {
     }
 }
 
+tasks.withType<JavaCompile>().configureEach {
+    options.release.set(21)
+}
+
 application {
     mainClass.set("dev.dediren.elk.Main")
 }

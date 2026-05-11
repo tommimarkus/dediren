@@ -6,7 +6,7 @@ use dediren_contracts::{
     CommandEnvelope, Diagnostic, DiagnosticSeverity, LayoutRequest, LayoutResult,
 };
 
-const MINIMUM_BUNDLED_ELK_JAVA_MAJOR: u32 = 25;
+const MINIMUM_BUNDLED_ELK_JAVA_MAJOR: u32 = 21;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum RuntimeCommand {
@@ -439,6 +439,11 @@ mod tests {
     }
 
     #[test]
+    fn bundled_elk_runtime_accepts_java_21_as_minimum() {
+        assert_eq!(21, MINIMUM_BUNDLED_ELK_JAVA_MAJOR);
+    }
+
+    #[test]
     fn java_major_version_parses_modern_and_legacy_version_output() {
         assert_eq!(
             Some(25),
@@ -473,7 +478,7 @@ mod tests {
         assert!(!runtime_available_with_java_diagnostic(&command, || {
             Some((
                 "DEDIREN_ELK_JAVA_UNSUPPORTED",
-                "Java 25 or newer is required".to_string(),
+                "Java 21 or newer is required".to_string(),
             ))
         }));
     }
