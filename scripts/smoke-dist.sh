@@ -14,6 +14,17 @@ if ! command -v java >/dev/null 2>&1; then
   echo "java is required on PATH for the distribution smoke test" >&2
   exit 2
 fi
+JAVA_VERSION_OUTPUT=$(java -version 2>&1)
+JAVA_VERSION=$(printf '%s\n' "$JAVA_VERSION_OUTPUT" | sed -n 's/.* version "\([^"]*\)".*/\1/p' | head -n 1)
+JAVA_MAJOR=${JAVA_VERSION%%.*}
+if [[ "$JAVA_MAJOR" == "1" ]]; then
+  JAVA_MINOR=${JAVA_VERSION#1.}
+  JAVA_MAJOR=${JAVA_MINOR%%.*}
+fi
+if [[ ! "$JAVA_MAJOR" =~ ^[0-9]+$ || "$JAVA_MAJOR" -lt 25 ]]; then
+  echo "Java 25 or newer is required on PATH for the bundled ELK helper" >&2
+  exit 2
+fi
 
 TMP=$(mktemp -d)
 cleanup() {

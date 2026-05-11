@@ -6,6 +6,8 @@ use dediren_contracts::{
     CommandEnvelope, Diagnostic, DiagnosticSeverity, LayoutRequest, LayoutResult,
 };
 
+const MINIMUM_BUNDLED_ELK_JAVA_MAJOR: u32 = 25;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum RuntimeCommand {
     Fixture(String),
@@ -76,10 +78,10 @@ fn main() -> anyhow::Result<()> {
                     &format!("bundled ELK helper is missing: {}", helper.display()),
                 );
             }
-            if !java_runtime_available() {
+            if let Some((code, message)) = bundled_java_runtime_diagnostic() {
                 exit_with_diagnostic(
-                    "DEDIREN_ELK_JAVA_UNAVAILABLE",
-                    "Java runtime is required on PATH for the bundled ELK helper",
+                    code,
+                    &message,
                 );
             }
             let output = run_external_elk(&command_line_for_path(&helper), &input).unwrap_or_else(
@@ -126,15 +128,66 @@ fn bundled_elk_command_for_executable(executable: &Path) -> Option<PathBuf> {
     Some(root.join("runtimes/elk-layout-java/bin/dediren-elk-layout-java"))
 }
 
-fn java_runtime_available() -> bool {
-    Command::new("java")
+fn bundled_java_runtime_diagnostic() -> Option<(&'static str, String)> {
+    let output = match Command::new("java")
         .arg("-version")
         .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .map(|status| status.success())
-        .unwrap_or(false)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output()
+    {
+        Ok(output) => output,
+        Err(error) => {
+            return Some((
+                "DEDIREN_ELK_JAVA_UNAVAILABLE",
+                format!("Java {MINIMUM_BUNDLED_ELK_JAVA_MAJOR} or newer is required on PATH for the bundled ELK helper: {error}"),
+            ));
+        }
+    };
+
+    if !output.status.success() {
+        let exit_code = output.status.code().unwrap_or(3);
+        return Some((
+            "DEDIREN_ELK_JAVA_UNAVAILABLE",
+            format!("Java {MINIMUM_BUNDLED_ELK_JAVA_MAJOR} or newer is required on PATH for the bundled ELK helper; `java -version` exited with status {exit_code}"),
+        ));
+    }
+
+    let version_output = format!(
+        "{}\n{}",
+        String::from_utf8_lossy(&output.stderr),
+        String::from_utf8_lossy(&output.stdout)
+    );
+    match java_major_version_from_output(&version_output) {
+        Some(version) if version >= MINIMUM_BUNDLED_ELK_JAVA_MAJOR => None,
+        Some(version) => Some((
+            "DEDIREN_ELK_JAVA_UNSUPPORTED",
+            format!("Java {MINIMUM_BUNDLED_ELK_JAVA_MAJOR} or newer is required on PATH for the bundled ELK helper; found Java {version}"),
+        )),
+        None => Some((
+            "DEDIREN_ELK_JAVA_UNSUPPORTED",
+            format!("Java {MINIMUM_BUNDLED_ELK_JAVA_MAJOR} or newer is required on PATH for the bundled ELK helper; could not parse `java -version` output"),
+        )),
+    }
+}
+
+fn java_major_version_from_output(output: &str) -> Option<u32> {
+    output.lines().find_map(|line| {
+        let start = line.find('"')?;
+        let version = &line[start + 1..];
+        let end = version.find('"')?;
+        java_major_version_from_token(&version[..end])
+    })
+}
+
+fn java_major_version_from_token(version: &str) -> Option<u32> {
+    let mut parts = version.split('.');
+    let first = parts.next()?.parse::<u32>().ok()?;
+    if first == 1 {
+        parts.next()?.parse::<u32>().ok()
+    } else {
+        Some(first)
+    }
 }
 
 fn command_line_for_path(path: &Path) -> String {
@@ -355,6 +408,23 @@ mod tests {
             RuntimeCommand::Bundled(helper),
             runtime_command_from_env(&[], &executable)
         );
+    }
+
+    #[test]
+    fn java_major_version_parses_modern_and_legacy_version_output() {
+        assert_eq!(
+            Some(25),
+            java_major_version_from_output(r#"openjdk version "25.0.3" 2026-04-21"#)
+        );
+        assert_eq!(
+            Some(8),
+            java_major_version_from_output(r#"java version "1.8.0_392""#)
+        );
+    }
+
+    #[test]
+    fn java_major_version_rejects_unrecognized_output() {
+        assert_eq!(None, java_major_version_from_output("not a java version"));
     }
 
     struct TempBundle {
