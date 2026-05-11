@@ -121,6 +121,8 @@ Edge policy can override horizontal position (`near_start`, `center`,
 
 ## Local Install
 
+For development from a source checkout:
+
 ```bash
 cargo install --path crates/dediren-cli
 cargo install --path crates/dediren-plugin-generic-graph
@@ -129,14 +131,69 @@ cargo install --path crates/dediren-plugin-svg-render
 cargo install --path crates/dediren-plugin-archimate-oef-export
 ```
 
+This installs Rust binaries only. It does not create the agent-ready archive or
+bundle the ELK Java helper distribution.
+
+## Linux Distribution Archive
+
+The repo-local Linux distribution workflow builds an agent-ready archive under
+`dist/`. The archive can be unpacked anywhere and run from its own `bin/`
+directory without a source checkout.
+
+Build prerequisites:
+
+- Rust and Cargo matching the workspace toolchain.
+- SDKMAN and the Java/Gradle setup used by
+  `crates/dediren-plugin-elk-layout/java/scripts/build-elk-layout.sh`.
+- Linux x86_64 host.
+
+Runtime prerequisite:
+
+- Java 25 or newer available as `java` on `PATH`. The archive includes the
+  built ELK helper and its dependency jars, but it does not bundle a JRE.
+
+Build the archive:
+
+```bash
+scripts/build-dist.sh
+```
+
+The script creates:
+
+```text
+dist/dediren-agent-bundle-0.1.0-x86_64-unknown-linux-gnu/
+dist/dediren-agent-bundle-0.1.0-x86_64-unknown-linux-gnu.tar.gz
+```
+
+Smoke-test the archive:
+
+```bash
+scripts/smoke-dist.sh dist/dediren-agent-bundle-0.1.0-x86_64-unknown-linux-gnu.tar.gz
+```
+
+Unpack and run manually:
+
+```bash
+mkdir -p /tmp/dediren-dist
+tar -xzf dist/dediren-agent-bundle-0.1.0-x86_64-unknown-linux-gnu.tar.gz -C /tmp/dediren-dist
+/tmp/dediren-dist/dediren-agent-bundle-0.1.0-x86_64-unknown-linux-gnu/bin/dediren --help
+```
+
+The unpacked CLI discovers bundled first-party plugin manifests from
+`plugins/`, resolves first-party plugin binaries from `bin/`, and uses the
+bundled ELK helper under `runtimes/elk-layout-java/` when `DEDIREN_ELK_COMMAND`
+is not set.
+
 ## Plugin Lookup
 
 The CLI discovers plugins explicitly:
 
-1. repo fixture manifests in `fixtures/plugins` when running from the source
+1. bundled manifests under the installation root `plugins/` directory when
+   running from an unpacked distribution archive;
+2. repo fixture manifests in `fixtures/plugins` when running from the source
    checkout;
-2. project plugin directories such as `.dediren/plugins`;
-3. user-configured plugin directories from `DEDIREN_PLUGIN_DIRS`.
+3. project plugin directories such as `.dediren/plugins`;
+4. user-configured plugin directories from `DEDIREN_PLUGIN_DIRS`.
 
 The CLI does not discover plugins implicitly from `PATH`. A manifest executable
 can be an absolute path, a path relative to the manifest directory, or a binary
@@ -163,6 +220,10 @@ Agents should read stdout JSON for success and failure decisions. `stderr` is
 reserved for human debugging and is not required for repair loops.
 
 ## ELK Runtime
+
+When running from a Linux distribution archive, the `elk-layout` plugin uses the
+bundled helper at `runtimes/elk-layout-java/bin/dediren-elk-layout-java` if
+`DEDIREN_ELK_COMMAND` is not set. Java 25 or newer must be available on `PATH`.
 
 The first-party `elk-layout` plugin is a Rust external-process adapter. The real
 ELK layered runtime is a Java helper under
