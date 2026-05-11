@@ -28,10 +28,10 @@ dediren export --plugin archimate-oef --policy fixtures/export-policy/default-oe
 ```
 
 `render` returns a JSON command envelope by default. The SVG text is in
-`.data.content`; this first slice does not expose a raw-output mode.
+`.data.content`; there is no raw-output mode yet.
 
 `export` returns a JSON command envelope by default. The ArchiMate OEF XML text
-is in `.data.content`; this slice does not expose a raw-output mode.
+is in `.data.content`; there is no raw-output mode yet.
 
 ## SVG Styling
 
@@ -49,42 +49,47 @@ ArchiMate styling uses the same SVG render policy system as the default and rich
 styles. The separate render metadata artifact carries only semantic selectors
 such as node and relationship types; it does not carry colors, fonts, shapes, or
 layout data. ArchiMate-oriented SVG notation is still configured through the
-SVG render policy. The policy may attach decorators and relationship notation to
-those exact types. The built-in ArchiMate policy covers the square element
-notation for implementation/migration, composite, motivation, strategy,
-business, application, and technology layers; non-square alternate shapes are
-not part of the built-in renderer.
+SVG render policy. The policy may attach node decorators, relationship line
+styles, and start/end markers to exact semantic types.
+
+The bundled `fixtures/render-policy/archimate-svg.json` policy covers the
+supported ArchiMate element decorator set for implementation/migration,
+composite, motivation, strategy, business, application, technology, and physical
+types. Element shapes remain policy-driven SVG primitives: most render as
+rectangles with an icon, motivation elements use cut-corner rectangles, and
+selected strategy, implementation/migration, service, and behavior elements use
+rounded rectangles. It does not implement every alternate ArchiMate shape
+variant.
 
 ```json
 {
   "semantic_profile": "archimate",
   "style": {
     "node_type_overrides": {
-      "BusinessActor": {
-        "fill": "#fff2cc",
-        "stroke": "#d6b656",
-        "decorator": "archimate_business_actor"
-      },
       "ApplicationComponent": {
         "fill": "#e0f2fe",
         "stroke": "#0369a1",
         "decorator": "archimate_application_component"
       },
-      "DataObject": {
-        "fill": "#e0f2fe",
-        "stroke": "#0369a1",
-        "decorator": "archimate_data_object"
+      "Goal": {
+        "fill": "#d9d2e9",
+        "stroke": "#674ea7",
+        "decorator": "archimate_goal"
       },
-      "TechnologyNode": {
-        "fill": "#d5e8d4",
-        "stroke": "#4d7c0f",
-        "decorator": "archimate_technology_node"
+      "WorkPackage": {
+        "fill": "#f8cecc",
+        "stroke": "#b85450",
+        "decorator": "archimate_work_package"
       }
     },
     "edge_type_overrides": {
       "Composition": {
         "marker_start": "filled_diamond",
         "marker_end": "none"
+      },
+      "Assignment": {
+        "marker_start": "filled_circle",
+        "marker_end": "open_arrow"
       },
       "Realization": {
         "line_style": "dashed",
@@ -97,6 +102,13 @@ not part of the built-in renderer.
   }
 }
 ```
+
+For the full public policy surface, use
+`schemas/svg-render-policy.schema.json`. Rendered SVG includes stable semantic
+attributes such as `data-dediren-node-decorator`,
+`data-dediren-icon-kind`, `data-dediren-edge-marker-start`, and
+`data-dediren-edge-marker-end` so tests can assert notation without depending on
+raw geometry.
 
 By default, horizontal edge labels are placed near the start of the selected
 horizontal segment. The renderer chooses above or below from the route shape:
@@ -111,19 +123,28 @@ Edge policy can override horizontal position (`near_start`, `center`,
 
 ```bash
 cargo install --path crates/dediren-cli
+cargo install --path crates/dediren-plugin-generic-graph
+cargo install --path crates/dediren-plugin-elk-layout
+cargo install --path crates/dediren-plugin-svg-render
+cargo install --path crates/dediren-plugin-archimate-oef-export
 ```
 
 ## Plugin Lookup
 
 The CLI discovers plugins explicitly:
 
-1. bundled first-party plugins from the installed workspace;
+1. repo fixture manifests in `fixtures/plugins` when running from the source
+   checkout;
 2. project plugin directories such as `.dediren/plugins`;
-3. user-configured plugin directories.
+3. user-configured plugin directories from `DEDIREN_PLUGIN_DIRS`.
 
-The CLI does not discover plugins implicitly from `PATH`.
+The CLI does not discover plugins implicitly from `PATH`. A manifest executable
+can be an absolute path, a path relative to the manifest directory, or a binary
+name resolved next to the `dediren` executable. Override a specific executable
+with `DEDIREN_PLUGIN_<PLUGIN_ID>`, uppercased with dashes converted to
+underscores, for example `DEDIREN_PLUGIN_SVG_RENDER`.
 
-The bundled `archimate-oef` export plugin emits ArchiMate 3.2 OEF XML from
+The first-party `archimate-oef` export plugin emits ArchiMate 3.2 OEF XML from
 source graph semantics plus generated layout result geometry. It does not run
 external OEF XSD validation; import the XML into Archi or run an explicit schema
 validator when tool-conformance evidence is required.
@@ -143,8 +164,8 @@ reserved for human debugging and is not required for repair loops.
 
 ## ELK Runtime
 
-The bundled `elk-layout` plugin is a Rust external-process adapter. The real ELK
-layered runtime is a Java helper under
+The first-party `elk-layout` plugin is a Rust external-process adapter. The real
+ELK layered runtime is a Java helper under
 `crates/dediren-plugin-elk-layout/java` and is built with SDKMAN-managed Java and
 Gradle.
 
