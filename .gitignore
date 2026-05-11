@@ -1,4 +1,5 @@
 /target/
+/.worktrees/
 /.test-output/
 /.cache/gradle/
 crates/dediren-plugin-elk-layout/java/.gradle/
