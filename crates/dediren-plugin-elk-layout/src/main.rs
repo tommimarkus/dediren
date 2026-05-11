@@ -22,13 +22,12 @@ fn main() -> anyhow::Result<()> {
         let env = std::env::vars().collect::<Vec<_>>();
         let runtime_available = std::env::current_exe()
             .ok()
-            .map(
-                |executable| match runtime_command_from_env(&env, &executable) {
-                    RuntimeCommand::Fixture(_) | RuntimeCommand::Explicit(_) => true,
-                    RuntimeCommand::Bundled(helper) => helper.exists(),
-                    RuntimeCommand::Missing => false,
-                },
-            )
+            .map(|executable| {
+                runtime_available_with_java_diagnostic(
+                    &runtime_command_from_env(&env, &executable),
+                    bundled_java_runtime_diagnostic,
+                )
+            })
             .unwrap_or(false);
         println!(
             "{}",
@@ -182,11 +181,34 @@ fn java_major_version_from_output(output: &str) -> Option<u32> {
 
 fn java_major_version_from_token(version: &str) -> Option<u32> {
     let mut parts = version.split('.');
-    let first = parts.next()?.parse::<u32>().ok()?;
+    let first = leading_u32(parts.next()?)?;
     if first == 1 {
-        parts.next()?.parse::<u32>().ok()
+        leading_u32(parts.next()?)
     } else {
         Some(first)
+    }
+}
+
+fn leading_u32(value: &str) -> Option<u32> {
+    let digits = value
+        .chars()
+        .take_while(char::is_ascii_digit)
+        .collect::<String>();
+    if digits.is_empty() {
+        None
+    } else {
+        digits.parse::<u32>().ok()
+    }
+}
+
+fn runtime_available_with_java_diagnostic(
+    command: &RuntimeCommand,
+    java_diagnostic: impl FnOnce() -> Option<(&'static str, String)>,
+) -> bool {
+    match command {
+        RuntimeCommand::Fixture(_) | RuntimeCommand::Explicit(_) => true,
+        RuntimeCommand::Bundled(helper) => helper.exists() && java_diagnostic().is_none(),
+        RuntimeCommand::Missing => false,
     }
 }
 
@@ -417,6 +439,14 @@ mod tests {
             java_major_version_from_output(r#"openjdk version "25.0.3" 2026-04-21"#)
         );
         assert_eq!(
+            Some(25),
+            java_major_version_from_output(r#"openjdk version "25-ea" 2026-09-15"#)
+        );
+        assert_eq!(
+            Some(26),
+            java_major_version_from_output(r#"openjdk version "26-ea" 2027-03-16"#)
+        );
+        assert_eq!(
             Some(8),
             java_major_version_from_output(r#"java version "1.8.0_392""#)
         );
@@ -425,6 +455,21 @@ mod tests {
     #[test]
     fn java_major_version_rejects_unrecognized_output() {
         assert_eq!(None, java_major_version_from_output("not a java version"));
+    }
+
+    #[test]
+    fn bundled_runtime_availability_requires_helper_and_supported_java() {
+        let bundle = TempBundle::new();
+        let command = RuntimeCommand::Bundled(bundle.helper());
+        bundle.create();
+
+        assert!(runtime_available_with_java_diagnostic(&command, || None));
+        assert!(!runtime_available_with_java_diagnostic(&command, || {
+            Some((
+                "DEDIREN_ELK_JAVA_UNSUPPORTED",
+                "Java 25 or newer is required".to_string(),
+            ))
+        }));
     }
 
     struct TempBundle {

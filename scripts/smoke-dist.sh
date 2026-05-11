@@ -16,10 +16,12 @@ if ! command -v java >/dev/null 2>&1; then
 fi
 JAVA_VERSION_OUTPUT=$(java -version 2>&1)
 JAVA_VERSION=$(printf '%s\n' "$JAVA_VERSION_OUTPUT" | sed -n 's/.* version "\([^"]*\)".*/\1/p' | head -n 1)
-JAVA_MAJOR=${JAVA_VERSION%%.*}
-if [[ "$JAVA_MAJOR" == "1" ]]; then
-  JAVA_MINOR=${JAVA_VERSION#1.}
-  JAVA_MAJOR=${JAVA_MINOR%%.*}
+if [[ "$JAVA_VERSION" =~ ^1\.([0-9]+) ]]; then
+  JAVA_MAJOR=${BASH_REMATCH[1]}
+elif [[ "$JAVA_VERSION" =~ ^([0-9]+) ]]; then
+  JAVA_MAJOR=${BASH_REMATCH[1]}
+else
+  JAVA_MAJOR=
 fi
 if [[ ! "$JAVA_MAJOR" =~ ^[0-9]+$ || "$JAVA_MAJOR" -lt 25 ]]; then
   echo "Java 25 or newer is required on PATH for the bundled ELK helper" >&2
@@ -32,30 +34,42 @@ cleanup() {
 }
 trap cleanup EXIT
 
+run_bundle() {
+  env \
+    -u DEDIREN_PLUGIN_DIRS \
+    -u DEDIREN_PLUGIN_GENERIC_GRAPH \
+    -u DEDIREN_PLUGIN_ELK_LAYOUT \
+    -u DEDIREN_PLUGIN_SVG_RENDER \
+    -u DEDIREN_ELK_COMMAND \
+    -u DEDIREN_ELK_RESULT_FIXTURE \
+    "$@"
+}
+
 tar -xzf "$ARCHIVE" -C "$TMP"
 BUNDLE_DIR=$(find "$TMP" -maxdepth 1 -type d -name 'dediren-agent-bundle-*' | sort | tail -n 1)
 if [[ -z "$BUNDLE_DIR" ]]; then
   echo "archive did not contain a dediren-agent-bundle directory" >&2
   exit 2
 fi
+cd "$TMP"
 
 BIN="$BUNDLE_DIR/bin/dediren"
 REQUEST="$TMP/request.json"
 LAYOUT="$TMP/layout.json"
 RENDER="$TMP/render.json"
 
-"$BIN" --help >/dev/null
-"$BIN" project \
+run_bundle "$BIN" --help >/dev/null
+run_bundle "$BIN" project \
   --target layout-request \
   --plugin generic-graph \
   --view main \
   --input "$BUNDLE_DIR/fixtures/source/valid-pipeline-rich.json" \
   > "$REQUEST"
-"$BIN" layout \
+run_bundle "$BIN" layout \
   --plugin elk-layout \
   --input "$REQUEST" \
   > "$LAYOUT"
-"$BIN" render \
+run_bundle "$BIN" render \
   --plugin svg-render \
   --policy "$BUNDLE_DIR/fixtures/render-policy/rich-svg.json" \
   --input "$LAYOUT" \
