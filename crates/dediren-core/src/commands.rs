@@ -1,5 +1,3 @@
-use std::path::PathBuf;
-
 use dediren_contracts::{LayoutRequest, OefExportInput, OefExportPolicy, SourceDocument};
 
 use crate::plugins::{
@@ -10,9 +8,12 @@ use crate::plugins::{
 pub struct LayoutCommandInput<'a> {
     pub plugin: &'a str,
     pub input_text: &'a str,
-    pub plugin_dirs: Vec<PathBuf>,
+    pub registry: PluginRegistry,
     pub env: Vec<(String, String)>,
 }
+
+const LAYOUT_RUNTIME_ENV_ALLOWLIST: &[&str] =
+    &["DEDIREN_ELK_COMMAND", "DEDIREN_ELK_RESULT_FIXTURE", "PATH"];
 
 pub fn layout_command(
     input: LayoutCommandInput<'_>,
@@ -24,15 +25,14 @@ pub fn layout_command(
                 message: error.to_string(),
             }
         })?;
-    let registry = PluginRegistry::from_dirs(input.plugin_dirs);
     let mut options = PluginRunOptions::default();
     for (name, value) in input.env {
-        if name == "DEDIREN_ELK_COMMAND" || name == "DEDIREN_ELK_RESULT_FIXTURE" {
+        if LAYOUT_RUNTIME_ENV_ALLOWLIST.contains(&name.as_str()) {
             options.allowed_env.push((name, value));
         }
     }
     run_plugin_for_capability_with_registry(
-        &registry,
+        &input.registry,
         input.plugin,
         "layout",
         &["layout"],
@@ -46,15 +46,15 @@ pub fn layout_command_from_env(
     input_text: &str,
 ) -> Result<PluginRunOutcome, PluginExecutionError> {
     let mut env = Vec::new();
-    for name in ["DEDIREN_ELK_COMMAND", "DEDIREN_ELK_RESULT_FIXTURE"] {
+    for name in LAYOUT_RUNTIME_ENV_ALLOWLIST {
         if let Ok(value) = std::env::var(name) {
-            env.push((name.to_string(), value));
+            env.push(((*name).to_string(), value));
         }
     }
     layout_command(LayoutCommandInput {
         plugin,
         input_text,
-        plugin_dirs: PluginRegistry::bundled_dirs(),
+        registry: PluginRegistry::bundled(),
         env,
     })
 }

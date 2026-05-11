@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use dediren_core::commands::{layout_command, LayoutCommandInput};
+use dediren_core::plugins::PluginRegistry;
 use tempfile::TempDir;
 
 #[test]
@@ -15,13 +16,44 @@ fn layout_command_owns_elk_runtime_environment_allowlist() {
     let output = layout_command(LayoutCommandInput {
         plugin: "elk-layout",
         input_text: &request,
-        plugin_dirs: vec![plugin_dir.path().to_path_buf()],
+        registry: PluginRegistry::from_dirs(vec![plugin_dir.path().to_path_buf()]),
         env: vec![(
             "DEDIREN_ELK_RESULT_FIXTURE".to_string(),
             fixture.display().to_string(),
         )],
     })
     .expect("layout command orchestration should run through core");
+
+    assert_eq!(0, output.exit_code);
+    assert!(output.stdout.contains("\"layout_result_schema_version\""));
+}
+
+#[test]
+fn layout_command_allows_path_for_layout_runtime_environment() {
+    let plugin = workspace_binary("dediren-plugin-elk-layout", "dediren-plugin-elk-layout");
+    let fixture = workspace_file("fixtures/layout-result/basic.json");
+    let request = std::fs::read_to_string(workspace_file("fixtures/layout-request/basic.json"))
+        .expect("fixture must be readable");
+    let plugin_dir = TempDir::new().unwrap();
+    write_manifest(plugin_dir.path(), "elk-layout", &plugin, &["layout"]);
+    let allowed_path = "/usr/bin:/bin:/tmp/dediren-layout-allowlist";
+    let helper = format!(
+        "if [ \"$PATH\" = '{}' ]; then /bin/cat {}; else printf '%s\\n' '{{\"envelope_schema_version\":\"envelope.schema.v1\",\"status\":\"error\",\"diagnostics\":[{{\"code\":\"PATH_NOT_ALLOWED\",\"severity\":\"error\",\"message\":\"PATH was not passed to the layout runtime\"}}]}}'; exit 5; fi",
+        allowed_path,
+        shell_quote(&fixture.display().to_string())
+    );
+
+    let output = layout_command(LayoutCommandInput {
+        plugin: "elk-layout",
+        input_text: &request,
+        registry: PluginRegistry::from_dirs(vec![plugin_dir.path().to_path_buf()]),
+        env: vec![
+            ("DEDIREN_ELK_COMMAND".to_string(), helper),
+            ("PATH".to_string(), allowed_path.to_string()),
+            ("DEDIREN_UNRELATED".to_string(), "not-allowed".to_string()),
+        ],
+    })
+    .expect("layout command orchestration should pass the narrow runtime environment");
 
     assert_eq!(0, output.exit_code);
     assert!(output.stdout.contains("\"layout_result_schema_version\""));
@@ -67,4 +99,8 @@ fn workspace_file(path: &str) -> PathBuf {
 
 fn workspace_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..")
+}
+
+fn shell_quote(value: &str) -> String {
+    format!("'{}'", value.replace('\'', r#"'\''"#))
 }
