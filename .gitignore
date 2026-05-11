@@ -8,3 +8,6 @@ crates/dediren-plugin-elk-layout/java/.gradle/
 crates/dediren-plugin-elk-layout/java/build/
 **/*.svg
 !.github/**/*.svg
+.codex/rules/default.rules
+.codex/config.toml
+.mcp.json
