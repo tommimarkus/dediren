@@ -1,4 +1,5 @@
 /target/
+/dist/
 /.worktrees/
 /.test-output/
 /.cache/gradle/
