@@ -62,7 +62,13 @@ install -m 755 "$BIN_DIR/dediren-plugin-archimate-oef-export" "$BUNDLE_DIR/bin/d
 
 cp "$ROOT"/fixtures/plugins/*.manifest.json "$BUNDLE_DIR/plugins/"
 cp -R "$ROOT/schemas" "$BUNDLE_DIR/schemas"
-cp -R "$ROOT/fixtures" "$BUNDLE_DIR/fixtures"
+mkdir -p "$BUNDLE_DIR/fixtures"
+for fixture in "$ROOT"/fixtures/*; do
+  if [[ "$(basename -- "$fixture")" == "plugins" ]]; then
+    continue
+  fi
+  cp -R "$fixture" "$BUNDLE_DIR/fixtures/"
+done
 cp -R "$ROOT/crates/dediren-plugin-elk-layout/java/build/install/dediren-elk-layout-java" \
   "$BUNDLE_DIR/runtimes/elk-layout-java"
 

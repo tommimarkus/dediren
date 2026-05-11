@@ -124,6 +124,9 @@ fn bundled_elk_command_for_executable(executable: &Path) -> Option<PathBuf> {
         return None;
     }
     let root = bin_dir.parent()?;
+    if !root.join("bundle.json").is_file() || !root.join("plugins").is_dir() {
+        return None;
+    }
     Some(root.join("runtimes/elk-layout-java/bin/dediren-elk-layout-java"))
 }
 
@@ -375,22 +378,25 @@ mod tests {
 
     #[test]
     fn bundled_elk_command_is_relative_to_installed_bin() {
-        let executable = PathBuf::from(
-            "/tmp/dediren-agent-bundle-0.1.0-x86_64-unknown-linux-gnu/bin/dediren-plugin-elk-layout",
-        );
-        let helper = PathBuf::from(
-            "/tmp/dediren-agent-bundle-0.1.0-x86_64-unknown-linux-gnu/runtimes/elk-layout-java/bin/dediren-elk-layout-java",
-        );
+        let bundle = TempBundle::new();
+        bundle.create();
 
         assert_eq!(
-            Some(helper),
-            bundled_elk_command_for_executable(&executable)
+            Some(bundle.helper()),
+            bundled_elk_command_for_executable(&bundle.executable())
         );
     }
 
     #[test]
     fn target_debug_plugin_executable_has_no_bundled_helper_path() {
         let executable = PathBuf::from("/tmp/repo/target/debug/dediren-plugin-elk-layout");
+
+        assert_eq!(None, bundled_elk_command_for_executable(&executable));
+    }
+
+    #[test]
+    fn plain_bin_plugin_executable_has_no_bundled_helper_path() {
+        let executable = PathBuf::from("/tmp/home/.cargo/bin/dediren-plugin-elk-layout");
 
         assert_eq!(None, bundled_elk_command_for_executable(&executable));
     }
@@ -489,7 +495,9 @@ mod tests {
 
         fn create(&self) {
             std::fs::create_dir_all(self.root.join("bin")).unwrap();
+            std::fs::create_dir_all(self.root.join("plugins")).unwrap();
             std::fs::create_dir_all(self.root.join("runtimes/elk-layout-java/bin")).unwrap();
+            std::fs::write(self.root.join("bundle.json"), "{}").unwrap();
             std::fs::write(self.helper(), "").unwrap();
         }
 

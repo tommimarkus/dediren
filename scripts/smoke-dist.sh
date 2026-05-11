@@ -51,7 +51,11 @@ if [[ -z "$BUNDLE_DIR" ]]; then
   echo "archive did not contain a dediren-agent-bundle directory" >&2
   exit 2
 fi
-cd "$TMP"
+if [[ -e "$BUNDLE_DIR/fixtures/plugins" ]]; then
+  echo "archive must not include source fixture plugin manifests under fixtures/plugins" >&2
+  exit 2
+fi
+cd "$BUNDLE_DIR"
 
 BIN="$BUNDLE_DIR/bin/dediren"
 REQUEST="$TMP/request.json"
