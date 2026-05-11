@@ -5,8 +5,7 @@ use std::process::Command;
 use std::time::{Duration, Instant};
 
 use dediren_core::plugins::{
-    run_plugin, run_plugin_for_capability_with_registry, PluginExecutionError, PluginRegistry,
-    PluginRunOptions,
+    run_plugin_for_capability_with_registry, PluginExecutionError, PluginRegistry, PluginRunOptions,
 };
 use tempfile::TempDir;
 
@@ -415,17 +414,19 @@ fn legacy_capabilities_command_bypasses_command_capability_requirement() {
         &["render"],
     );
 
-    let plugin_dirs = std::env::join_paths([temp.path()]).unwrap();
-    let previous = std::env::var_os("DEDIREN_PLUGIN_DIRS");
-    std::env::set_var("DEDIREN_PLUGIN_DIRS", &plugin_dirs);
-    let result = run_plugin("runtime-testbed", &["capabilities"], "");
-    match previous {
-        Some(value) => std::env::set_var("DEDIREN_PLUGIN_DIRS", value),
-        None => std::env::remove_var("DEDIREN_PLUGIN_DIRS"),
-    }
+    let registry = PluginRegistry::from_dirs(vec![temp.path().to_path_buf()]);
+    let result = run_plugin_for_capability_with_registry(
+        &registry,
+        "runtime-testbed",
+        "capability",
+        &["capabilities"],
+        "",
+        PluginRunOptions::default(),
+    );
 
-    let output = result.expect("legacy capabilities command should remain supported");
-    assert!(output.contains("\"capabilities\""));
+    let outcome = result.expect("legacy capabilities command should remain supported");
+    assert_eq!(outcome.exit_code, 0);
+    assert!(outcome.stdout.contains("\"capabilities\""));
 }
 
 #[test]

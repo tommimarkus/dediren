@@ -30,6 +30,8 @@ scripts/build-dist.sh
 Build prerequisites:
 
 - Linux x86_64 host.
+- `flock` from util-linux, used by build scripts to serialize shared generated
+  outputs.
 - Rust and Cargo matching the workspace toolchain.
 - SDKMAN with the Java and Gradle versions declared by
   `crates/dediren-plugin-elk-layout/java/.sdkmanrc`.
@@ -51,6 +53,10 @@ newer:
 ```bash
 scripts/smoke-dist.sh dist/dediren-agent-bundle-0.1.0-x86_64-unknown-linux-gnu.tar.gz
 ```
+
+Concurrent `scripts/build-dist.sh` invocations serialize on a repo-local lock
+under `.cache/locks/` because release binaries, the ELK helper build, and
+`dist/` artifacts are shared generated outputs.
 
 Unpack and run it anywhere:
 
@@ -268,7 +274,8 @@ returns a command envelope whose `.data` is a `layout-result.schema.v1`
 document. The helper uses Eclipse ELK Layered (`org.eclipse.elk.layered`). The
 Gradle build keeps the SDKMAN Java 25 toolchain for ELK layout work, emits Java
 21-compatible bytecode for the distributed helper, and pins Maven dependencies
-through dependency locking.
+through dependency locking. Concurrent helper builds serialize on
+`.cache/locks/elk-layout-java-build.lock`.
 
 Real Java helper integration tests are ignored by default and require building
 the helper before running ignored tests.

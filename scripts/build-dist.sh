@@ -3,8 +3,21 @@ set -euo pipefail
 
 ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)
 TARGET=${DEDIREN_DIST_TARGET:-x86_64-unknown-linux-gnu}
+LOCK_DIR="$ROOT/.cache/locks"
 
 cd "$ROOT"
+
+if ! command -v flock >/dev/null 2>&1; then
+  echo "flock is required to serialize generated build outputs" >&2
+  exit 2
+fi
+
+mkdir -p "$LOCK_DIR"
+exec 9>"$LOCK_DIR/build-dist.lock"
+if ! flock -n 9; then
+  echo "another distribution build is running; waiting for $LOCK_DIR/build-dist.lock" >&2
+  flock 9
+fi
 
 if [[ "$TARGET" != "x86_64-unknown-linux-gnu" ]]; then
   echo "scripts/build-dist.sh supports only DEDIREN_DIST_TARGET=x86_64-unknown-linux-gnu" >&2

@@ -3,6 +3,7 @@
 /.worktrees/
 /.test-output/
 /.cache/gradle/
+/.cache/locks/
 crates/dediren-plugin-elk-layout/java/.gradle/
 crates/dediren-plugin-elk-layout/java/build/
 **/*.svg
