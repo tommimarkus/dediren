@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use assert_cmd::Command;
 use roxmltree::Document;
 use serde_json::Value;
@@ -61,7 +63,10 @@ pub fn stdout_json(output: &[u8]) -> Value {
 
 pub fn ok_data(output: &[u8]) -> Value {
     let envelope = stdout_json(output);
-    assert_eq!(envelope["status"], "ok", "command should return ok envelope");
+    assert_eq!(
+        envelope["status"], "ok",
+        "command should return ok envelope"
+    );
     assert!(
         envelope["diagnostics"]
             .as_array()
@@ -74,7 +79,10 @@ pub fn ok_data(output: &[u8]) -> Value {
 
 pub fn error_codes(output: &[u8]) -> Vec<String> {
     let envelope = stdout_json(output);
-    assert_eq!(envelope["status"], "error", "command should return error envelope");
+    assert_eq!(
+        envelope["status"], "error",
+        "command should return error envelope"
+    );
     envelope["diagnostics"]
         .as_array()
         .expect("diagnostics should be an array")

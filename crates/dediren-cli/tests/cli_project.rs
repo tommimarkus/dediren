@@ -1,17 +1,14 @@
-use assert_cmd::Command;
-use predicates::prelude::*;
-use std::path::PathBuf;
+mod common;
+
+use common::{ok_data, plugin_binary, workspace_file};
 
 #[test]
 fn project_invokes_generic_graph_plugin() {
-    let plugin = workspace_binary(
-        "dediren-plugin-generic-graph",
-        "dediren-plugin-generic-graph",
-    );
-    let mut cmd = Command::cargo_bin("dediren").unwrap();
-    cmd.current_dir(workspace_root())
-        .env("DEDIREN_PLUGIN_GENERIC_GRAPH", plugin)
-        .env("DEDIREN_PLUGIN_DIRS", workspace_file("fixtures/plugins"))
+    let output = common::dediren_command()
+        .env(
+            "DEDIREN_PLUGIN_GENERIC_GRAPH",
+            plugin_binary("dediren-plugin-generic-graph"),
+        )
         .args([
             "project",
             "--target",
@@ -22,31 +19,24 @@ fn project_invokes_generic_graph_plugin() {
             "main",
             "--input",
         ])
-        .arg(workspace_file("fixtures/source/valid-basic.json"));
-    cmd.assert().success().stdout(predicate::str::contains(
-        "\"layout_request_schema_version\"",
-    ));
-}
+        .arg(workspace_file("fixtures/source/valid-basic.json"))
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
 
-fn workspace_binary(package: &str, binary: &str) -> PathBuf {
-    let status = std::process::Command::new("cargo")
-        .current_dir(workspace_root())
-        .args(["build", "-p", package, "--bin", binary])
-        .status()
-        .unwrap();
-    assert!(status.success());
-    let executable = if cfg!(windows) {
-        format!("{binary}.exe")
-    } else {
-        binary.to_string()
-    };
-    workspace_root().join("target/debug").join(executable)
-}
-
-fn workspace_file(path: &str) -> PathBuf {
-    workspace_root().join(path)
-}
-
-fn workspace_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..")
+    let data = ok_data(&output);
+    assert_eq!(
+        data["layout_request_schema_version"],
+        "layout-request.schema.v1"
+    );
+    assert_eq!(data["view_id"], "main");
+    assert_eq!(
+        data["nodes"]
+            .as_array()
+            .expect("layout request nodes should be an array")
+            .len(),
+        2
+    );
 }

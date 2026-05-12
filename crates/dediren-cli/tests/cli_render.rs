@@ -1,53 +1,69 @@
-use assert_cmd::Command;
-use predicates::prelude::*;
-use std::path::PathBuf;
+mod common;
+
+use common::{
+    child_element, child_group_with_attr, ok_data, plugin_binary, semantic_group, svg_doc,
+    workspace_file, write_render_artifact,
+};
 
 #[test]
 fn render_invokes_svg_plugin() {
-    let plugin = workspace_binary("dediren-plugin-svg-render", "dediren-plugin-svg-render");
-    let mut cmd = Command::cargo_bin("dediren").unwrap();
-    cmd.current_dir(workspace_root())
-        .env("DEDIREN_PLUGIN_SVG_RENDER", plugin)
-        .env("DEDIREN_PLUGIN_DIRS", workspace_file("fixtures/plugins"))
+    let output = common::dediren_command()
+        .env(
+            "DEDIREN_PLUGIN_SVG_RENDER",
+            plugin_binary("dediren-plugin-svg-render"),
+        )
         .args(["render", "--plugin", "svg-render", "--policy"])
         .arg(workspace_file("fixtures/render-policy/default-svg.json"))
         .arg("--input")
-        .arg(workspace_file("fixtures/layout-result/basic.json"));
-    let output = cmd
+        .arg(workspace_file("fixtures/layout-result/basic.json"))
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"render_result_schema_version\""))
-        .stdout(predicate::str::contains("<svg"))
-        .stdout(predicate::str::contains("Client"))
         .get_output()
         .stdout
         .clone();
-    let envelope: serde_json::Value = serde_json::from_slice(&output).unwrap();
-    write_render_artifact(
-        "render_invokes_svg_plugin",
-        envelope["data"]["content"].as_str().unwrap(),
+
+    let data = ok_data(&output);
+    assert_eq!(
+        data["render_result_schema_version"],
+        "render-result.schema.v1"
     );
+    assert_eq!(data["artifact_kind"], "svg");
+    let content = data["content"]
+        .as_str()
+        .expect("render result content should be a string");
+    let doc = svg_doc(content);
+    let client_node = semantic_group(&doc, "data-dediren-node-id", "client");
+    let client_label = child_element(client_node, "text");
+    assert_eq!(client_label.text(), Some("Client"));
+    let artifact = write_render_artifact("cli-render", "render_invokes_svg_plugin", content);
+    assert!(artifact.exists());
 }
 
 #[test]
 fn render_invokes_svg_plugin_with_rich_policy() {
-    let plugin = workspace_binary("dediren-plugin-svg-render", "dediren-plugin-svg-render");
-    let mut cmd = Command::cargo_bin("dediren").unwrap();
-    cmd.env("DEDIREN_PLUGIN_SVG_RENDER", plugin)
-        .env("DEDIREN_PLUGIN_DIRS", workspace_file("fixtures/plugins"))
+    let output = common::dediren_command()
+        .env(
+            "DEDIREN_PLUGIN_SVG_RENDER",
+            plugin_binary("dediren-plugin-svg-render"),
+        )
         .args(["render", "--plugin", "svg-render", "--policy"])
         .arg(workspace_file("fixtures/render-policy/rich-svg.json"))
-        .args(["--input"])
-        .arg(workspace_file("fixtures/layout-result/basic.json"));
-    let output = cmd.assert().success().get_output().stdout.clone();
-    let envelope: serde_json::Value = serde_json::from_slice(&output).unwrap();
-    let content = envelope["data"]["content"].as_str().unwrap();
-    let artifact = render_artifact_path("render_invokes_svg_plugin_with_rich_policy");
-    let _ = std::fs::remove_file(&artifact);
-    write_render_artifact("render_invokes_svg_plugin_with_rich_policy", content);
-    assert!(envelope["data"]
-        .get("render_result_schema_version")
-        .is_some());
+        .arg("--input")
+        .arg(workspace_file("fixtures/layout-result/basic.json"))
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let data = ok_data(&output);
+    assert_eq!(
+        data["render_result_schema_version"],
+        "render-result.schema.v1"
+    );
+    let content = data["content"]
+        .as_str()
+        .expect("render result content should be a string");
     let doc = svg_doc(content);
 
     let api_node = semantic_group(&doc, "data-dediren-node-id", "api");
@@ -57,23 +73,29 @@ fn render_invokes_svg_plugin_with_rich_policy() {
     let calls_edge = semantic_group(&doc, "data-dediren-edge-id", "client-calls-api");
     let calls_path = child_element(calls_edge, "path");
     assert_eq!(calls_path.attribute("stroke"), Some("#7c3aed"));
+
+    let artifact = write_render_artifact(
+        "cli-render",
+        "render_invokes_svg_plugin_with_rich_policy",
+        content,
+    );
     assert!(artifact.exists());
 }
 
 #[test]
 fn render_invokes_svg_plugin_with_archimate_policy_and_metadata() {
-    let plugin = workspace_binary("dediren-plugin-svg-render", "dediren-plugin-svg-render");
-    let mut cmd = Command::cargo_bin("dediren").unwrap();
-    let output = cmd
-        .env("DEDIREN_PLUGIN_SVG_RENDER", plugin)
-        .env("DEDIREN_PLUGIN_DIRS", workspace_file("fixtures/plugins"))
+    let output = common::dediren_command()
+        .env(
+            "DEDIREN_PLUGIN_SVG_RENDER",
+            plugin_binary("dediren-plugin-svg-render"),
+        )
         .args(["render", "--plugin", "svg-render", "--policy"])
         .arg(workspace_file("fixtures/render-policy/archimate-svg.json"))
-        .args(["--metadata"])
+        .arg("--metadata")
         .arg(workspace_file(
             "fixtures/render-metadata/archimate-basic.json",
         ))
-        .args(["--input"])
+        .arg("--input")
         .arg(workspace_file(
             "fixtures/layout-result/archimate-oef-basic.json",
         ))
@@ -83,89 +105,56 @@ fn render_invokes_svg_plugin_with_archimate_policy_and_metadata() {
         .stdout
         .clone();
 
-    let envelope: serde_json::Value = serde_json::from_slice(&output).unwrap();
-    let content = envelope["data"]["content"].as_str().unwrap();
+    let data = ok_data(&output);
+    assert_eq!(
+        data["render_result_schema_version"],
+        "render-result.schema.v1"
+    );
+    let content = data["content"]
+        .as_str()
+        .expect("render result content should be a string");
     let doc = svg_doc(content);
+
     let component = semantic_group(&doc, "data-dediren-node-id", "orders-component");
     let rect = child_element(component, "rect");
     assert_eq!(rect.attribute("fill"), Some("#e0f2fe"));
     assert!(
-        content.contains(r#"data-dediren-node-decorator="archimate_application_component""#),
+        child_group_with_attr(
+            component,
+            "data-dediren-node-decorator",
+            "archimate_application_component"
+        )
+        .is_some(),
         "expected ApplicationComponent decorator in ArchiMate SVG"
     );
+
+    let service = semantic_group(&doc, "data-dediren-node-id", "orders-service");
     assert!(
-        content.contains(r#"data-dediren-node-decorator="archimate_application_service""#),
+        child_group_with_attr(
+            service,
+            "data-dediren-node-decorator",
+            "archimate_application_service"
+        )
+        .is_some(),
         "expected ApplicationService decorator in ArchiMate SVG"
+    );
+
+    let realization = semantic_group(&doc, "data-dediren-edge-id", "orders-realizes-service");
+    let path = child_element(realization, "path");
+    assert_eq!(path.attribute("stroke-dasharray"), Some("8 5"));
+    assert_eq!(
+        path.attribute("marker-end"),
+        Some("url(#marker-end-orders-realizes-service)")
     );
     assert!(
         content.contains(r#"data-dediren-edge-marker-end="hollow_triangle""#),
         "expected Realization hollow triangle marker in ArchiMate SVG"
     );
-    assert!(
-        content.contains(r#"stroke-dasharray="8 5""#),
-        "expected Realization dashed line in ArchiMate SVG"
+
+    let artifact = write_render_artifact(
+        "cli-render",
+        "render_invokes_svg_plugin_with_archimate_policy_and_metadata",
+        content,
     );
-}
-
-fn svg_doc(content: &str) -> roxmltree::Document<'_> {
-    roxmltree::Document::parse(content).unwrap()
-}
-
-fn semantic_group<'a, 'input>(
-    doc: &'a roxmltree::Document<'input>,
-    data_attr: &str,
-    id: &str,
-) -> roxmltree::Node<'a, 'input> {
-    doc.descendants()
-        .find(|node| node.has_tag_name("g") && node.attribute(data_attr) == Some(id))
-        .unwrap_or_else(|| panic!("expected SVG to contain <g {data_attr}=\"{id}\">"))
-}
-
-fn child_element<'a, 'input>(
-    node: roxmltree::Node<'a, 'input>,
-    tag_name: &str,
-) -> roxmltree::Node<'a, 'input> {
-    node.children()
-        .find(|child| child.has_tag_name(tag_name))
-        .unwrap_or_else(|| {
-            panic!(
-                "expected <{}> to contain <{}>",
-                node.tag_name().name(),
-                tag_name
-            )
-        })
-}
-
-fn write_render_artifact(test_name: &str, content: &str) -> PathBuf {
-    let path = render_artifact_path(test_name);
-    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
-    std::fs::write(&path, content).unwrap();
-    path
-}
-
-fn render_artifact_path(test_name: &str) -> PathBuf {
-    workspace_file(&format!(".test-output/renders/cli-render/{test_name}.svg"))
-}
-
-fn workspace_binary(package: &str, binary: &str) -> PathBuf {
-    let status = std::process::Command::new("cargo")
-        .current_dir(workspace_root())
-        .args(["build", "-p", package, "--bin", binary])
-        .status()
-        .unwrap();
-    assert!(status.success());
-    let executable = if cfg!(windows) {
-        format!("{binary}.exe")
-    } else {
-        binary.to_string()
-    };
-    workspace_root().join("target/debug").join(executable)
-}
-
-fn workspace_file(path: &str) -> PathBuf {
-    workspace_root().join(path)
-}
-
-fn workspace_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..")
+    assert!(artifact.exists());
 }

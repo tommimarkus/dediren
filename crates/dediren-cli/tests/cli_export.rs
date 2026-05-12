@@ -1,54 +1,49 @@
-use assert_cmd::Command;
+mod common;
+
 use assert_fs::prelude::*;
-use predicates::prelude::*;
-
-fn workspace_file(path: &str) -> String {
-    format!("{}/{}", env!("CARGO_MANIFEST_DIR"), path).replace("/crates/dediren-cli/", "/")
-}
-
-fn workspace_binary(package: &str, binary: &str) -> String {
-    let status = std::process::Command::new("cargo")
-        .args(["build", "-p", package, "--bin", binary])
-        .status()
-        .unwrap();
-    assert!(status.success());
-    workspace_file(&format!("target/debug/{binary}"))
-}
+use common::{assert_error_code, ok_data, plugin_binary, workspace_file};
 
 #[test]
 fn export_invokes_archimate_oef_plugin() {
-    let plugin = workspace_binary(
-        "dediren-plugin-archimate-oef-export",
-        "dediren-plugin-archimate-oef-export",
-    );
-    let mut cmd = Command::cargo_bin("dediren").unwrap();
-    cmd.env("DEDIREN_PLUGIN_ARCHIMATE_OEF", plugin)
-        .env("DEDIREN_PLUGIN_DIRS", workspace_file("fixtures/plugins"))
-        .args([
-            "export",
-            "--plugin",
-            "archimate-oef",
-            "--policy",
-            &workspace_file("fixtures/export-policy/default-oef.json"),
-            "--source",
-            &workspace_file("fixtures/source/valid-archimate-oef.json"),
-            "--layout",
-            &workspace_file("fixtures/layout-result/archimate-oef-basic.json"),
-        ])
+    let output = common::dediren_command()
+        .env(
+            "DEDIREN_PLUGIN_ARCHIMATE_OEF",
+            plugin_binary("dediren-plugin-archimate-oef-export"),
+        )
+        .arg("export")
+        .arg("--plugin")
+        .arg("archimate-oef")
+        .arg("--policy")
+        .arg(workspace_file("fixtures/export-policy/default-oef.json"))
+        .arg("--source")
+        .arg(workspace_file("fixtures/source/valid-archimate-oef.json"))
+        .arg("--layout")
+        .arg(workspace_file(
+            "fixtures/layout-result/archimate-oef-basic.json",
+        ))
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"export_result_schema_version\""))
-        .stdout(predicate::str::contains("archimate-oef+xml"))
-        .stdout(predicate::str::contains("<model"));
+        .get_output()
+        .stdout
+        .clone();
+
+    let data = ok_data(&output);
+    assert_eq!(
+        data["export_result_schema_version"],
+        "export-result.schema.v1"
+    );
+    assert_eq!(data["artifact_kind"], "archimate-oef+xml");
+    assert!(
+        data["content"]
+            .as_str()
+            .expect("export result content should be a string")
+            .contains("<model"),
+        "export content should contain OEF model XML"
+    );
 }
 
 #[test]
 fn export_rejects_invalid_archimate_relationship_endpoint() {
-    let plugin = workspace_binary(
-        "dediren-plugin-archimate-oef-export",
-        "dediren-plugin-archimate-oef-export",
-    );
-
     let mut source: serde_json::Value = serde_json::from_str(
         &std::fs::read_to_string(workspace_file("fixtures/source/valid-archimate-oef.json"))
             .unwrap(),
@@ -64,25 +59,30 @@ fn export_rejects_invalid_archimate_relationship_endpoint() {
         .write_str(&serde_json::to_string_pretty(&source).unwrap())
         .unwrap();
 
-    let mut cmd = Command::cargo_bin("dediren").unwrap();
-    cmd.env("DEDIREN_PLUGIN_ARCHIMATE_OEF", plugin)
-        .env("DEDIREN_PLUGIN_DIRS", workspace_file("fixtures/plugins"))
-        .args([
-            "export",
-            "--plugin",
-            "archimate-oef",
-            "--policy",
-            &workspace_file("fixtures/export-policy/default-oef.json"),
-            "--source",
-        ])
+    let output = common::dediren_command()
+        .env(
+            "DEDIREN_PLUGIN_ARCHIMATE_OEF",
+            plugin_binary("dediren-plugin-archimate-oef-export"),
+        )
+        .arg("export")
+        .arg("--plugin")
+        .arg("archimate-oef")
+        .arg("--policy")
+        .arg(workspace_file("fixtures/export-policy/default-oef.json"))
+        .arg("--source")
         .arg(source_file.path())
-        .args([
-            "--layout",
-            &workspace_file("fixtures/layout-result/archimate-oef-basic.json"),
-        ])
+        .arg("--layout")
+        .arg(workspace_file(
+            "fixtures/layout-result/archimate-oef-basic.json",
+        ))
         .assert()
         .failure()
-        .stdout(predicate::str::contains(
-            "DEDIREN_ARCHIMATE_RELATIONSHIP_ENDPOINT_UNSUPPORTED",
-        ));
+        .get_output()
+        .stdout
+        .clone();
+
+    assert_error_code(
+        &output,
+        "DEDIREN_ARCHIMATE_RELATIONSHIP_ENDPOINT_UNSUPPORTED",
+    );
 }
