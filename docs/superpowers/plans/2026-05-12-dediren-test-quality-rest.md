@@ -461,11 +461,17 @@ git diff --check
 Replace `crates/dediren-plugin-svg-render/tests/svg_render_plugin.rs` with:
 
 ```rust
-mod common;
+#[path = "svg_render_plugin/archimate_nodes.rs"]
 mod archimate_nodes;
+#[path = "svg_render_plugin/archimate_relationships.rs"]
 mod archimate_relationships;
+#[path = "svg_render_plugin/common.rs"]
+mod common;
+#[path = "svg_render_plugin/edge_labels.rs"]
 mod edge_labels;
+#[path = "svg_render_plugin/render_contracts.rs"]
 mod render_contracts;
+#[path = "svg_render_plugin/viewbox_routes.rs"]
 mod viewbox_routes;
 ```
 
@@ -607,13 +613,28 @@ use super::common::*;
 In `common.rs`, add:
 
 ```rust
-pub fn render_envelope(input: serde_json::Value) -> serde_json::Value {
+pub fn render_success_envelope(input: serde_json::Value) -> serde_json::Value {
     let mut cmd = assert_cmd::Command::cargo_bin("dediren-plugin-svg-render")
         .expect("svg render plugin binary should be built by Cargo");
     let output = cmd
         .arg("render")
         .write_stdin(input.to_string())
         .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    serde_json::from_slice(&output).expect("render stdout should be JSON")
+}
+
+pub fn render_failure_envelope(input: serde_json::Value) -> serde_json::Value {
+    let mut cmd = assert_cmd::Command::cargo_bin("dediren-plugin-svg-render")
+        .expect("svg render plugin binary should be built by Cargo");
+    let output = cmd
+        .arg("render")
+        .write_stdin(input.to_string())
+        .assert()
+        .failure()
         .get_output()
         .stdout
         .clone();
@@ -621,7 +642,7 @@ pub fn render_envelope(input: serde_json::Value) -> serde_json::Value {
 }
 
 pub fn render_ok_data(input: serde_json::Value) -> serde_json::Value {
-    let envelope = render_envelope(input);
+    let envelope = render_success_envelope(input);
     assert_eq!(envelope["status"], "ok", "render should return ok envelope");
     assert!(
         envelope["diagnostics"]
@@ -634,7 +655,7 @@ pub fn render_ok_data(input: serde_json::Value) -> serde_json::Value {
 }
 
 pub fn render_error(input: serde_json::Value, expected_code: &str) -> serde_json::Value {
-    let envelope = render_envelope(input);
+    let envelope = render_failure_envelope(input);
     assert_eq!(envelope["status"], "error", "render should return error envelope");
     let codes: Vec<&str> = envelope["diagnostics"]
         .as_array()
@@ -669,13 +690,13 @@ pub fn render_content(input: serde_json::Value) -> String {
 
 Update the renderer rejection tests to use `render_error` and assert parsed diagnostic messages. Use these expected diagnostic codes:
 
-- `svg_renderer_rejects_profile_mismatch`: `DEDIREN_SVG_POLICY_PROFILE_MISMATCH`
-- `svg_renderer_rejects_type_policy_without_metadata`: `DEDIREN_SVG_RENDER_METADATA_REQUIRED`
+- `svg_renderer_rejects_profile_mismatch`: `DEDIREN_RENDER_METADATA_PROFILE_MISMATCH`
+- `svg_renderer_rejects_type_policy_without_metadata`: `DEDIREN_RENDER_METADATA_REQUIRED`
 - `svg_renderer_rejects_unknown_archimate_node_type`: `DEDIREN_ARCHIMATE_ELEMENT_TYPE_UNSUPPORTED`
 - `svg_renderer_rejects_unknown_archimate_relationship_type`: `DEDIREN_ARCHIMATE_RELATIONSHIP_TYPE_UNSUPPORTED`
 - `svg_renderer_rejects_invalid_archimate_relationship_endpoint`: `DEDIREN_ARCHIMATE_RELATIONSHIP_ENDPOINT_UNSUPPORTED`
-- `svg_renderer_rejects_unknown_archimate_policy_node_type_override`: `DEDIREN_SVG_POLICY_ARCHIMATE_NODE_TYPE_UNSUPPORTED`
-- `svg_renderer_rejects_unknown_archimate_policy_relationship_type_override`: `DEDIREN_SVG_POLICY_ARCHIMATE_RELATIONSHIP_TYPE_UNSUPPORTED`
+- `svg_renderer_rejects_unknown_archimate_policy_node_type_override`: `DEDIREN_ARCHIMATE_ELEMENT_TYPE_UNSUPPORTED`
+- `svg_renderer_rejects_unknown_archimate_policy_relationship_type_override`: `DEDIREN_ARCHIMATE_RELATIONSHIP_TYPE_UNSUPPORTED`
 - `svg_renderer_rejects_unsafe_policy_color_before_rendering`: `DEDIREN_SVG_POLICY_INVALID`
 
 If the current implementation emits a different exact code, inspect the production diagnostic constant and use the production constant's current value. Do not relax the test to a substring over stdout.
