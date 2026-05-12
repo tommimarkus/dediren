@@ -1,7 +1,7 @@
 {
   "plugin_manifest_schema_version": "plugin-manifest.schema.v1",
   "id": "archimate-oef",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "executable": "dediren-plugin-archimate-oef-export",
   "capabilities": ["export"]
 }

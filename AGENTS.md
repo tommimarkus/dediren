@@ -41,6 +41,11 @@
   there.
 - First-party plugins are executable process-boundary plugins. They may depend
   on `dediren-contracts`; they must not depend on `dediren-core`.
+- Do not duplicate layout or routing features already provided by ELK. Express
+  layout intent through ELK graph structure, ports, hierarchy, and options, then
+  let ELK compute geometry and routes. Keep `dediren` code focused on contract
+  mapping, diagnostics, normalization, and regression coverage around ELK
+  behavior.
 
 ## Contract Boundaries
 

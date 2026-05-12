@@ -1,26 +1,30 @@
 package dev.dediren.elk;
 
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.eclipse.elk.alg.layered.options.LayeredOptions;
+import org.eclipse.elk.alg.layered.options.WrappingStrategy;
 import org.eclipse.elk.core.RecursiveGraphLayoutEngine;
+import org.eclipse.elk.core.math.ElkPadding;
 import org.eclipse.elk.core.options.CoreOptions;
 import org.eclipse.elk.core.options.Direction;
 import org.eclipse.elk.core.options.EdgeRouting;
+import org.eclipse.elk.core.options.HierarchyHandling;
+import org.eclipse.elk.core.options.PortConstraints;
+import org.eclipse.elk.core.options.PortSide;
 import org.eclipse.elk.core.util.BasicProgressMonitor;
 import org.eclipse.elk.graph.ElkEdge;
 import org.eclipse.elk.graph.ElkEdgeSection;
 import org.eclipse.elk.graph.ElkNode;
+import org.eclipse.elk.graph.ElkPort;
 import org.eclipse.elk.graph.util.ElkGraphUtil;
 
 final class ElkLayoutEngine {
     private static final double DEFAULT_WIDTH = 160.0;
     private static final double DEFAULT_HEIGHT = 80.0;
     private static final double GROUP_PADDING = 24.0;
-    private static final double PORT_MARGIN = 16.0;
     private static final double NODE_SPACING = 120.0;
     private static final double EDGE_NODE_SPACING = 32.0;
     private static final double EDGE_EDGE_SPACING = 20.0;
@@ -64,9 +68,7 @@ final class ElkLayoutEngine {
                     "$.edges[" + index + "]"));
                 continue;
             }
-            ElkEdge elkEdge = ElkGraphUtil.createSimpleEdge(source, target);
-            elkEdge.setIdentifier(edge.id());
-            ElkGraphUtil.createLabel(elkEdge).setText(edge.label());
+            ElkEdge elkEdge = createRoutedEdge(source, target, edge, Direction.RIGHT);
             elkEdges.put(edge.id(), elkEdge);
         }
 
@@ -119,9 +121,13 @@ final class ElkLayoutEngine {
         List<JsonContracts.Diagnostic> warnings = new ArrayList<>();
         Map<String, JsonContracts.LayoutNode> requestNodes = requestNodesById(request);
         Map<String, String> ownerByNode = ownerByNode(request);
-        Map<String, InternalLayout> internalLayouts = new HashMap<>();
-        List<JsonContracts.LayoutNode> macroNodes = new ArrayList<>();
+        ElkNode root = ElkGraphUtil.createGraph();
+        configureRoot(root, Direction.DOWN);
+        root.setProperty(CoreOptions.HIERARCHY_HANDLING, HierarchyHandling.INCLUDE_CHILDREN);
+        root.setProperty(CoreOptions.ASPECT_RATIO, 2.2);
+        root.setProperty(LayeredOptions.WRAPPING_STRATEGY, WrappingStrategy.MULTI_EDGE);
 
+        Map<String, ElkNode> elkGroups = new HashMap<>();
         for (JsonContracts.LayoutGroup group : list(request.groups())) {
             List<JsonContracts.LayoutNode> members = list(group.members()).stream()
                 .map(requestNodes::get)
@@ -134,179 +140,25 @@ final class ElkLayoutEngine {
                 .filter(edge -> group.id().equals(ownerByNode.get(edge.source()))
                     && group.id().equals(ownerByNode.get(edge.target())))
                 .toList();
-            InternalLayout internalLayout = internalLayout(members, internalEdges);
-            internalLayouts.put(group.id(), internalLayout);
-            macroNodes.add(new JsonContracts.LayoutNode(
-                group.id(),
-                group.label(),
-                semanticBackedSourceId(group.provenance(), group.id()),
-                internalLayout.width() + (GROUP_PADDING * 2.0),
-                internalLayout.height() + (GROUP_PADDING * 2.0)));
+
+            ElkNode elkGroup = ElkGraphUtil.createNode(root);
+            elkGroup.setIdentifier(group.id());
+            ElkGraphUtil.createLabel(elkGroup).setText(group.label());
+            configureRoot(elkGroup, internalDirection(members, internalEdges));
+            elkGroup.setProperty(CoreOptions.HIERARCHY_HANDLING, HierarchyHandling.INCLUDE_CHILDREN);
+            elkGroup.setProperty(CoreOptions.PADDING, new ElkPadding(GROUP_PADDING));
+            elkGroups.put(group.id(), elkGroup);
         }
-
-        for (JsonContracts.LayoutNode node : list(request.nodes())) {
-            if (!ownerByNode.containsKey(node.id())) {
-                macroNodes.add(node);
-            }
-        }
-
-        List<JsonContracts.LayoutEdge> macroEdges = new ArrayList<>();
-        for (JsonContracts.LayoutEdge edge : list(request.edges())) {
-            String source = macroId(edge.source(), ownerByNode);
-            String target = macroId(edge.target(), ownerByNode);
-            if (source == null || target == null || source.equals(target)) {
-                continue;
-            }
-            macroEdges.add(new JsonContracts.LayoutEdge(
-                edge.id(),
-                source,
-                target,
-                edge.label(),
-                edge.source_id()));
-        }
-
-        GraphLayout macroLayout = graphLayout(macroNodes, macroEdges, Direction.RIGHT);
-        Map<String, JsonContracts.LaidOutNode> finalNodes = new HashMap<>();
-        List<JsonContracts.LaidOutNode> nodes = new ArrayList<>();
-        for (JsonContracts.LayoutNode node : list(request.nodes())) {
-            String owner = ownerByNode.get(node.id());
-            JsonContracts.LaidOutNode laidOutNode;
-            if (owner == null) {
-                laidOutNode = macroLayout.nodes().get(node.id());
-            } else {
-                JsonContracts.LaidOutNode groupNode = macroLayout.nodes().get(owner);
-                InternalLayout internalLayout = internalLayouts.get(owner);
-                JsonContracts.LaidOutNode internalNode =
-                    internalLayout == null ? null : internalLayout.nodes().get(node.id());
-                laidOutNode = groupNode == null || internalNode == null ? null : offsetNode(
-                    internalNode,
-                    groupNode.x() + GROUP_PADDING,
-                    groupNode.y() + GROUP_PADDING);
-            }
-            if (laidOutNode != null) {
-                finalNodes.put(node.id(), laidOutNode);
-                nodes.add(laidOutNode);
-            }
-        }
-
-        List<JsonContracts.LaidOutEdge> edges = new ArrayList<>();
-        Map<String, EdgePorts> edgePorts = edgePorts(list(request.edges()), finalNodes);
-        for (JsonContracts.LayoutEdge edge : list(request.edges())) {
-            String sourceOwner = ownerByNode.get(edge.source());
-            String targetOwner = ownerByNode.get(edge.target());
-            JsonContracts.LaidOutEdge laidOutEdge = null;
-            if (sourceOwner != null && sourceOwner.equals(targetOwner)) {
-                JsonContracts.LaidOutNode groupNode = macroLayout.nodes().get(sourceOwner);
-                InternalLayout internalLayout = internalLayouts.get(sourceOwner);
-                JsonContracts.LaidOutEdge internalEdge =
-                    internalLayout == null ? null : internalLayout.edges().get(edge.id());
-                if (groupNode != null && internalEdge != null) {
-                    laidOutEdge = offsetEdge(
-                        internalEdge,
-                        groupNode.x() + GROUP_PADDING,
-                        groupNode.y() + GROUP_PADDING);
-                }
-            }
-            if (laidOutEdge == null) {
-                JsonContracts.LaidOutNode source = finalNodes.get(edge.source());
-                JsonContracts.LaidOutNode target = finalNodes.get(edge.target());
-                if (source == null || target == null) {
-                    warnings.add(new JsonContracts.Diagnostic(
-                        "DEDIREN_ELK_DANGLING_EDGE",
-                        "warning",
-                        "edge " + edge.id() + " references a missing endpoint",
-                        null));
-                    continue;
-                }
-                laidOutEdge = new JsonContracts.LaidOutEdge(
-                    edge.id(),
-                    edge.source(),
-                    edge.target(),
-                    edge.source_id(),
-                    edge.id(),
-                    routeBetween(source, target, edgePorts.get(edge.id())),
-                    edge.label());
-            }
-            edges.add(laidOutEdge);
-        }
-
-        List<JsonContracts.LaidOutGroup> groups =
-            groupedBounds(request, macroLayout.nodes(), internalLayouts, warnings);
-
-        return new JsonContracts.LayoutResult(
-            "layout-result.schema.v1",
-            request.view_id(),
-            nodes,
-            edges,
-            groups,
-            warnings);
-    }
-
-    private record GraphLayout(
-        Map<String, JsonContracts.LaidOutNode> nodes,
-        Map<String, JsonContracts.LaidOutEdge> edges) {
-    }
-
-    private record InternalLayout(
-        Map<String, JsonContracts.LaidOutNode> nodes,
-        Map<String, JsonContracts.LaidOutEdge> edges,
-        double width,
-        double height) {
-    }
-
-    private enum PortSide {
-        LEFT,
-        RIGHT
-    }
-
-    private record PortKey(String nodeId, PortSide side) {
-    }
-
-    private record PortRef(PortSide side, int index, int count) {
-    }
-
-    private record EdgePorts(PortRef source, PortRef target) {
-    }
-
-    private record PortAssignment(String edgeId, double sortY, PortSide side, boolean source) {
-    }
-
-    private static InternalLayout internalLayout(
-        List<JsonContracts.LayoutNode> nodes,
-        List<JsonContracts.LayoutEdge> edges) {
-        GraphLayout layout = graphLayout(nodes, edges, internalDirection(nodes, edges));
-        double minX = layout.nodes().values().stream().mapToDouble(JsonContracts.LaidOutNode::x).min().orElse(0.0);
-        double minY = layout.nodes().values().stream().mapToDouble(JsonContracts.LaidOutNode::y).min().orElse(0.0);
-        double maxX = layout.nodes().values().stream().mapToDouble(node -> node.x() + node.width()).max().orElse(0.0);
-        double maxY = layout.nodes().values().stream().mapToDouble(node -> node.y() + node.height()).max().orElse(0.0);
-
-        Map<String, JsonContracts.LaidOutNode> normalizedNodes = new HashMap<>();
-        for (Map.Entry<String, JsonContracts.LaidOutNode> entry : layout.nodes().entrySet()) {
-            normalizedNodes.put(entry.getKey(), offsetNode(entry.getValue(), -minX, -minY));
-        }
-
-        Map<String, JsonContracts.LaidOutEdge> normalizedEdges = new HashMap<>();
-        for (Map.Entry<String, JsonContracts.LaidOutEdge> entry : layout.edges().entrySet()) {
-            normalizedEdges.put(entry.getKey(), offsetEdge(entry.getValue(), -minX, -minY));
-        }
-
-        return new InternalLayout(
-            normalizedNodes,
-            normalizedEdges,
-            maxX - minX,
-            maxY - minY);
-    }
-
-    private static GraphLayout graphLayout(
-        List<JsonContracts.LayoutNode> requestNodes,
-        List<JsonContracts.LayoutEdge> requestEdges,
-        Direction direction) {
-        ElkNode root = ElkGraphUtil.createGraph();
-        configureRoot(root, direction);
 
         Map<String, ElkNode> elkNodes = new HashMap<>();
-        for (JsonContracts.LayoutNode node : requestNodes) {
-            ElkNode elkNode = ElkGraphUtil.createNode(root);
+        for (JsonContracts.LayoutNode node : list(request.nodes())) {
+            ElkNode parent = ownerByNode.containsKey(node.id())
+                ? elkGroups.get(ownerByNode.get(node.id()))
+                : root;
+            if (parent == null) {
+                continue;
+            }
+            ElkNode elkNode = ElkGraphUtil.createNode(parent);
             elkNode.setIdentifier(node.id());
             elkNode.setDimensions(
                 positiveOrDefault(node.width_hint(), DEFAULT_WIDTH),
@@ -316,41 +168,47 @@ final class ElkLayoutEngine {
         }
 
         Map<String, ElkEdge> elkEdges = new HashMap<>();
-        for (JsonContracts.LayoutEdge edge : requestEdges) {
+        List<JsonContracts.LayoutEdge> requestEdges = list(request.edges());
+        for (int index = 0; index < requestEdges.size(); index++) {
+            JsonContracts.LayoutEdge edge = requestEdges.get(index);
             ElkNode source = elkNodes.get(edge.source());
             ElkNode target = elkNodes.get(edge.target());
             if (source == null || target == null) {
+                warnings.add(new JsonContracts.Diagnostic(
+                    "DEDIREN_ELK_DANGLING_EDGE",
+                    "warning",
+                    "edge " + edge.id() + " references a missing endpoint",
+                    "$.edges[" + index + "]"));
                 continue;
             }
-            ElkEdge elkEdge = ElkGraphUtil.createSimpleEdge(source, target);
-            elkEdge.setIdentifier(edge.id());
-            ElkGraphUtil.createLabel(elkEdge).setText(edge.label());
+            ElkEdge elkEdge = createRoutedEdge(source, target, edge, Direction.DOWN);
+            ElkGraphUtil.updateContainment(elkEdge);
             elkEdges.put(edge.id(), elkEdge);
         }
 
         new RecursiveGraphLayoutEngine().layout(root, new BasicProgressMonitor());
 
-        Map<String, JsonContracts.LaidOutNode> nodes = new HashMap<>();
-        for (JsonContracts.LayoutNode node : requestNodes) {
+        List<JsonContracts.LaidOutNode> nodes = new ArrayList<>();
+        for (JsonContracts.LayoutNode node : list(request.nodes())) {
             ElkNode elkNode = elkNodes.get(node.id());
             if (elkNode != null) {
-                nodes.put(node.id(), new JsonContracts.LaidOutNode(
+                nodes.add(new JsonContracts.LaidOutNode(
                     node.id(),
                     node.source_id(),
                     node.id(),
-                    elkNode.getX(),
-                    elkNode.getY(),
+                    absoluteX(elkNode),
+                    absoluteY(elkNode),
                     elkNode.getWidth(),
                     elkNode.getHeight(),
                     node.label()));
             }
         }
 
-        Map<String, JsonContracts.LaidOutEdge> edges = new HashMap<>();
-        for (JsonContracts.LayoutEdge edge : requestEdges) {
+        List<JsonContracts.LaidOutEdge> edges = new ArrayList<>();
+        for (JsonContracts.LayoutEdge edge : list(request.edges())) {
             ElkEdge elkEdge = elkEdges.get(edge.id());
             if (elkEdge != null) {
-                edges.put(edge.id(), new JsonContracts.LaidOutEdge(
+                edges.add(new JsonContracts.LaidOutEdge(
                     edge.id(),
                     edge.source(),
                     edge.target(),
@@ -361,7 +219,16 @@ final class ElkLayoutEngine {
             }
         }
 
-        return new GraphLayout(nodes, edges);
+        List<JsonContracts.LaidOutGroup> groups =
+            groupedBounds(request, elkGroups, elkNodes, warnings);
+
+        return new JsonContracts.LayoutResult(
+            "layout-result.schema.v1",
+            request.view_id(),
+            nodes,
+            edges,
+            groups,
+            warnings);
     }
 
     private static void configureRoot(ElkNode root, Direction direction) {
@@ -385,35 +252,33 @@ final class ElkLayoutEngine {
         return Direction.DOWN;
     }
 
-    private static JsonContracts.LaidOutNode offsetNode(
-        JsonContracts.LaidOutNode node,
-        double offsetX,
-        double offsetY) {
-        return new JsonContracts.LaidOutNode(
-            node.id(),
-            node.source_id(),
-            node.projection_id(),
-            node.x() + offsetX,
-            node.y() + offsetY,
-            node.width(),
-            node.height(),
-            node.label());
+    private static ElkEdge createRoutedEdge(
+        ElkNode source,
+        ElkNode target,
+        JsonContracts.LayoutEdge edge,
+        Direction direction) {
+        source.setProperty(CoreOptions.PORT_CONSTRAINTS, PortConstraints.FIXED_SIDE);
+        target.setProperty(CoreOptions.PORT_CONSTRAINTS, PortConstraints.FIXED_SIDE);
+        ElkPort sourcePort = ElkGraphUtil.createPort(source);
+        sourcePort.setIdentifier(edge.id() + "-source");
+        sourcePort.setDimensions(0.0, 0.0);
+        sourcePort.setProperty(CoreOptions.PORT_SIDE, sourcePortSide(direction));
+        ElkPort targetPort = ElkGraphUtil.createPort(target);
+        targetPort.setIdentifier(edge.id() + "-target");
+        targetPort.setDimensions(0.0, 0.0);
+        targetPort.setProperty(CoreOptions.PORT_SIDE, targetPortSide(direction));
+        ElkEdge elkEdge = ElkGraphUtil.createSimpleEdge(sourcePort, targetPort);
+        elkEdge.setIdentifier(edge.id());
+        ElkGraphUtil.createLabel(elkEdge).setText(edge.label());
+        return elkEdge;
     }
 
-    private static JsonContracts.LaidOutEdge offsetEdge(
-        JsonContracts.LaidOutEdge edge,
-        double offsetX,
-        double offsetY) {
-        return new JsonContracts.LaidOutEdge(
-            edge.id(),
-            edge.source(),
-            edge.target(),
-            edge.source_id(),
-            edge.projection_id(),
-            edge.points().stream()
-                .map(point -> new JsonContracts.Point(point.x() + offsetX, point.y() + offsetY))
-                .toList(),
-            edge.label());
+    private static PortSide sourcePortSide(Direction direction) {
+        return direction == Direction.DOWN ? PortSide.SOUTH : PortSide.EAST;
+    }
+
+    private static PortSide targetPortSide(Direction direction) {
+        return direction == Direction.DOWN ? PortSide.NORTH : PortSide.WEST;
     }
 
     private static Map<String, JsonContracts.LayoutNode> requestNodesById(
@@ -435,144 +300,22 @@ final class ElkLayoutEngine {
         return ownerByNode;
     }
 
-    private static String macroId(String nodeId, Map<String, String> ownerByNode) {
-        return ownerByNode.getOrDefault(nodeId, nodeId);
-    }
-
-    private static List<JsonContracts.Point> routeBetween(
-        JsonContracts.LaidOutNode source,
-        JsonContracts.LaidOutNode target,
-        EdgePorts ports) {
-        double sourceCenterX = source.x() + source.width() / 2.0;
-        double targetCenterX = target.x() + target.width() / 2.0;
-
-        EdgePorts effectivePorts = ports == null
-            ? defaultPorts(targetCenterX >= sourceCenterX)
-            : ports;
-        JsonContracts.Point start = portPoint(source, effectivePorts.source());
-        JsonContracts.Point end = portPoint(target, effectivePorts.target());
-
-        double midX = start.x() + (end.x() - start.x()) / 2.0;
-        List<JsonContracts.Point> points = new ArrayList<>();
-        addPoint(points, start.x(), start.y());
-        addPoint(points, midX, start.y());
-        addPoint(points, midX, end.y());
-        addPoint(points, end.x(), end.y());
-        return points;
-    }
-
-    private static Map<String, EdgePorts> edgePorts(
-        List<JsonContracts.LayoutEdge> edges,
-        Map<String, JsonContracts.LaidOutNode> nodes) {
-        Map<PortKey, List<PortAssignment>> assignments = new HashMap<>();
-        for (JsonContracts.LayoutEdge edge : edges) {
-            JsonContracts.LaidOutNode source = nodes.get(edge.source());
-            JsonContracts.LaidOutNode target = nodes.get(edge.target());
-            if (source == null || target == null) {
-                continue;
-            }
-            PortSide sourceSide = sourceSide(source, target);
-            PortSide targetSide = opposite(sourceSide);
-            assignments
-                .computeIfAbsent(new PortKey(source.id(), sourceSide), ignored -> new ArrayList<>())
-                .add(new PortAssignment(edge.id(), nodeCenterY(target), sourceSide, true));
-            assignments
-                .computeIfAbsent(new PortKey(target.id(), targetSide), ignored -> new ArrayList<>())
-                .add(new PortAssignment(edge.id(), nodeCenterY(source), targetSide, false));
-        }
-
-        Map<String, PortRef> sourcePorts = new HashMap<>();
-        Map<String, PortRef> targetPorts = new HashMap<>();
-        for (Map.Entry<PortKey, List<PortAssignment>> entry : assignments.entrySet()) {
-            List<PortAssignment> portAssignments = entry.getValue();
-            portAssignments.sort(Comparator
-                .comparingDouble(PortAssignment::sortY)
-                .thenComparing(PortAssignment::edgeId));
-            for (int index = 0; index < portAssignments.size(); index++) {
-                PortAssignment assignment = portAssignments.get(index);
-                PortRef port = new PortRef(assignment.side(), index, portAssignments.size());
-                if (assignment.source()) {
-                    sourcePorts.put(assignment.edgeId(), port);
-                } else {
-                    targetPorts.put(assignment.edgeId(), port);
-                }
-            }
-        }
-
-        Map<String, EdgePorts> portsByEdge = new HashMap<>();
-        for (JsonContracts.LayoutEdge edge : edges) {
-            PortRef sourcePort = sourcePorts.get(edge.id());
-            PortRef targetPort = targetPorts.get(edge.id());
-            if (sourcePort != null && targetPort != null) {
-                portsByEdge.put(edge.id(), new EdgePorts(sourcePort, targetPort));
-            }
-        }
-        return portsByEdge;
-    }
-
-    private static EdgePorts defaultPorts(boolean targetIsRightOfSource) {
-        PortSide sourceSide = targetIsRightOfSource ? PortSide.RIGHT : PortSide.LEFT;
-        return new EdgePorts(
-            new PortRef(sourceSide, 0, 1),
-            new PortRef(opposite(sourceSide), 0, 1));
-    }
-
-    private static PortSide sourceSide(
-        JsonContracts.LaidOutNode source,
-        JsonContracts.LaidOutNode target) {
-        double sourceCenterX = source.x() + source.width() / 2.0;
-        double targetCenterX = target.x() + target.width() / 2.0;
-        return targetCenterX >= sourceCenterX ? PortSide.RIGHT : PortSide.LEFT;
-    }
-
-    private static double nodeCenterY(JsonContracts.LaidOutNode node) {
-        return node.y() + node.height() / 2.0;
-    }
-
-    private static PortSide opposite(PortSide side) {
-        return side == PortSide.RIGHT ? PortSide.LEFT : PortSide.RIGHT;
-    }
-
-    private static JsonContracts.Point portPoint(JsonContracts.LaidOutNode node, PortRef port) {
-        double x = port.side() == PortSide.RIGHT ? node.x() + node.width() : node.x();
-        return new JsonContracts.Point(x, portY(node, port.index(), port.count()));
-    }
-
-    private static double portY(JsonContracts.LaidOutNode node, int index, int count) {
-        if (count <= 1) {
-            return node.y() + node.height() / 2.0;
-        }
-        double margin = Math.min(PORT_MARGIN, node.height() / 4.0);
-        double available = node.height() - (margin * 2.0);
-        return node.y() + margin + (available * index / (count - 1.0));
-    }
-
-    private static void addPoint(List<JsonContracts.Point> points, double x, double y) {
-        if (!points.isEmpty()) {
-            JsonContracts.Point last = points.get(points.size() - 1);
-            if (last.x() == x && last.y() == y) {
-                return;
-            }
-        }
-        points.add(new JsonContracts.Point(x, y));
-    }
-
     private static List<JsonContracts.LaidOutGroup> groupedBounds(
         JsonContracts.LayoutRequest request,
-        Map<String, JsonContracts.LaidOutNode> macroNodes,
-        Map<String, InternalLayout> internalLayouts,
+        Map<String, ElkNode> elkGroups,
+        Map<String, ElkNode> elkNodes,
         List<JsonContracts.Diagnostic> warnings) {
         List<JsonContracts.LaidOutGroup> groups = new ArrayList<>();
         List<JsonContracts.LayoutGroup> requestGroups = list(request.groups());
         for (int groupIndex = 0; groupIndex < requestGroups.size(); groupIndex++) {
             JsonContracts.LayoutGroup group = requestGroups.get(groupIndex);
-            JsonContracts.LaidOutNode groupNode = macroNodes.get(group.id());
-            InternalLayout internalLayout = internalLayouts.get(group.id());
+            ElkNode groupNode = elkGroups.get(group.id());
             List<String> memberIds = new ArrayList<>();
             List<String> requestedMembers = list(group.members());
             for (int memberIndex = 0; memberIndex < requestedMembers.size(); memberIndex++) {
                 String memberId = requestedMembers.get(memberIndex);
-                if (internalLayout == null || !internalLayout.nodes().containsKey(memberId)) {
+                ElkNode memberNode = elkNodes.get(memberId);
+                if (memberNode == null || memberNode.getParent() != groupNode) {
                     warnings.add(new JsonContracts.Diagnostic(
                         "DEDIREN_ELK_MISSING_GROUP_MEMBER",
                         "warning",
@@ -595,25 +338,51 @@ final class ElkLayoutEngine {
                 group.id(),
                 semanticBackedSourceId(group.provenance(), group.id()),
                 group.id(),
-                groupNode.x(),
-                groupNode.y(),
-                groupNode.width(),
-                groupNode.height(),
+                absoluteX(groupNode),
+                absoluteY(groupNode),
+                groupNode.getWidth(),
+                groupNode.getHeight(),
                 memberIds,
                 group.label()));
         }
         return groups;
     }
 
+    private static double absoluteX(ElkNode node) {
+        double x = node.getX();
+        ElkNode parent = node.getParent();
+        while (parent != null) {
+            x += parent.getX();
+            parent = parent.getParent();
+        }
+        return x;
+    }
+
+    private static double absoluteY(ElkNode node) {
+        double y = node.getY();
+        ElkNode parent = node.getParent();
+        while (parent != null) {
+            y += parent.getY();
+            parent = parent.getParent();
+        }
+        return y;
+    }
+
     private static List<JsonContracts.Point> points(ElkEdge edge) {
         List<JsonContracts.Point> points = new ArrayList<>();
+        double offsetX = edge.getContainingNode() == null ? 0.0 : absoluteX(edge.getContainingNode());
+        double offsetY = edge.getContainingNode() == null ? 0.0 : absoluteY(edge.getContainingNode());
         for (ElkEdgeSection section : edge.getSections()) {
             if (points.isEmpty()) {
-                points.add(new JsonContracts.Point(section.getStartX(), section.getStartY()));
+                points.add(new JsonContracts.Point(
+                    section.getStartX() + offsetX,
+                    section.getStartY() + offsetY));
             }
             section.getBendPoints().forEach(bend ->
-                points.add(new JsonContracts.Point(bend.getX(), bend.getY())));
-            points.add(new JsonContracts.Point(section.getEndX(), section.getEndY()));
+                points.add(new JsonContracts.Point(bend.getX() + offsetX, bend.getY() + offsetY)));
+            points.add(new JsonContracts.Point(
+                section.getEndX() + offsetX,
+                section.getEndY() + offsetY));
         }
         return points;
     }

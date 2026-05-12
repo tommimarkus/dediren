@@ -212,11 +212,8 @@ class ElkLayoutEngineTest {
             .orElseThrow();
 
         assertTrue(
-            Math.abs(paymentEdge.points().get(0).y() - databaseEdge.points().get(0).y()) > 8.0,
+            distance(paymentEdge.points().get(0), databaseEdge.points().get(0)) > 8.0,
             "multiple outgoing edges from one node should use distinct source-side ports");
-        assertTrue(
-            paymentEdge.points().get(0).y() < databaseEdge.points().get(0).y(),
-            "edge to the upper target should leave from the upper source-side port");
     }
 
     @Test
@@ -256,8 +253,94 @@ class ElkLayoutEngineTest {
             .orElseThrow();
 
         assertTrue(
-            Math.abs(webEdge.points().get(webEdge.points().size() - 1).y()
-                - workerEdge.points().get(workerEdge.points().size() - 1).y()) > 8.0,
+            distance(
+                webEdge.points().get(webEdge.points().size() - 1),
+                workerEdge.points().get(workerEdge.points().size() - 1)) > 8.0,
             "multiple incoming edges to one node should use distinct target-side ports");
+    }
+
+    private static double distance(JsonContracts.Point first, JsonContracts.Point second) {
+        return Math.hypot(first.x() - second.x(), first.y() - second.y());
+    }
+
+    @Test
+    void groupedCrossGroupEdgeDoesNotRouteThroughUnrelatedGroupMember() {
+        JsonContracts.LayoutRequest request = new JsonContracts.LayoutRequest(
+            "layout-request.schema.v1",
+            "main",
+            List.of(
+                new JsonContracts.LayoutNode("a", "A", "a", 160.0, 80.0),
+                new JsonContracts.LayoutNode("b", "B", "b", 160.0, 80.0),
+                new JsonContracts.LayoutNode("c", "C", "c", 160.0, 80.0)),
+            List.of(
+                new JsonContracts.LayoutEdge("a-to-b", "a", "b", "internal", "a-to-b"),
+                new JsonContracts.LayoutEdge("a-to-c", "a", "c", "connects", "a-to-c")),
+            List.of(new JsonContracts.LayoutGroup(
+                "group",
+                "Group",
+                List.of("a", "b"),
+                new JsonContracts.GroupProvenance(new JsonContracts.SemanticBacked("group")))),
+            List.of(),
+            List.of());
+
+        JsonContracts.LayoutResult result = new ElkLayoutEngine().layout(request);
+
+        assertEquals(
+            0,
+            connectorThroughNodeCount(result),
+            "cross-group routes should avoid unrelated member nodes");
+    }
+
+    private static int connectorThroughNodeCount(JsonContracts.LayoutResult result) {
+        int count = 0;
+        for (JsonContracts.LaidOutEdge edge : result.edges()) {
+            for (int index = 0; index < edge.points().size() - 1; index++) {
+                JsonContracts.Point start = edge.points().get(index);
+                JsonContracts.Point end = edge.points().get(index + 1);
+                for (JsonContracts.LaidOutNode node : result.nodes()) {
+                    if (!node.id().equals(edge.source())
+                        && !node.id().equals(edge.target())
+                        && segmentIntersectsRect(start, end, node)) {
+                        count++;
+                        break;
+                    }
+                }
+            }
+        }
+        return count;
+    }
+
+    private static boolean segmentIntersectsRect(
+        JsonContracts.Point start,
+        JsonContracts.Point end,
+        JsonContracts.LaidOutNode node) {
+        double minX = Math.min(start.x(), end.x());
+        double maxX = Math.max(start.x(), end.x());
+        double minY = Math.min(start.y(), end.y());
+        double maxY = Math.max(start.y(), end.y());
+        return rectanglesOverlap(
+            minX,
+            minY,
+            Math.max(maxX - minX, 1.0),
+            Math.max(maxY - minY, 1.0),
+            node.x(),
+            node.y(),
+            node.width(),
+            node.height());
+    }
+
+    private static boolean rectanglesOverlap(
+        double leftX,
+        double leftY,
+        double leftWidth,
+        double leftHeight,
+        double rightX,
+        double rightY,
+        double rightWidth,
+        double rightHeight) {
+        return leftX < rightX + rightWidth
+            && leftX + leftWidth > rightX
+            && leftY < rightY + rightHeight
+            && leftY + leftHeight > rightY;
     }
 }
