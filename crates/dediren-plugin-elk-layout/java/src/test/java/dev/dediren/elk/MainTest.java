@@ -3,10 +3,12 @@ package dev.dediren.elk;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class MainTest {
@@ -20,8 +22,7 @@ class MainTest {
 
         String text = stdout.toString(StandardCharsets.UTF_8);
         assertEquals(3, exitCode);
-        assertTrue(text.contains("\"status\":\"error\""));
-        assertTrue(text.contains("DEDIREN_ELK_INPUT_INVALID_JSON"));
+        EnvelopeAssertions.errorEnvelope(text, "DEDIREN_ELK_INPUT_INVALID_JSON");
     }
 
     @Test
@@ -50,9 +51,9 @@ class MainTest {
 
         String text = stdout.toString(StandardCharsets.UTF_8);
         assertEquals(0, exitCode);
-        assertTrue(text.contains("\"status\":\"ok\""));
-        assertTrue(text.contains("\"layout_result_schema_version\":\"layout-result.schema.v1\""));
-        assertTrue(text.contains("\"client-calls-api\""));
+        JsonNode data = EnvelopeAssertions.okData(text);
+        assertEquals("layout-result.schema.v1", data.path("layout_result_schema_version").asText());
+        assertEquals("client-calls-api", data.path("edges").get(0).path("id").asText());
     }
 
     @Test
@@ -78,9 +79,7 @@ class MainTest {
 
         String text = stdout.toString(StandardCharsets.UTF_8);
         assertEquals(3, exitCode);
-        assertTrue(text.contains("\"status\":\"error\""));
-        assertTrue(text.contains("DEDIREN_ELK_LAYOUT_FAILED"));
-        assertTrue(!text.contains("\"status\":\"ok\""));
+        EnvelopeAssertions.errorEnvelope(text, "DEDIREN_ELK_LAYOUT_FAILED");
     }
 
     @Test
@@ -108,9 +107,7 @@ class MainTest {
 
         String text = stdout.toString(StandardCharsets.UTF_8);
         assertEquals(3, exitCode);
-        assertTrue(text.contains("\"status\":\"error\""));
-        assertTrue(text.contains("DEDIREN_ELK_INPUT_INVALID_JSON"));
-        assertTrue(!text.contains("\"status\":\"ok\""));
+        EnvelopeAssertions.errorEnvelope(text, "DEDIREN_ELK_INPUT_INVALID_JSON");
     }
 
     @Test
@@ -138,9 +135,7 @@ class MainTest {
 
         String text = stdout.toString(StandardCharsets.UTF_8);
         assertEquals(3, exitCode);
-        assertTrue(text.contains("\"status\":\"error\""));
-        assertTrue(text.contains("DEDIREN_ELK_INPUT_INVALID_JSON"));
-        assertTrue(!text.contains("\"status\":\"ok\""));
+        EnvelopeAssertions.errorEnvelope(text, "DEDIREN_ELK_INPUT_INVALID_JSON");
     }
 
     @Test
@@ -166,9 +161,13 @@ class MainTest {
 
         String text = stdout.toString(StandardCharsets.UTF_8);
         assertEquals(3, exitCode);
-        assertTrue(text.contains("\"status\":\"error\""));
-        assertTrue(text.contains("DEDIREN_ELK_LAYOUT_FAILED")
-            || text.contains("DEDIREN_ELK_INPUT_INVALID_JSON"));
-        assertTrue(!text.contains("\"status\":\"ok\""));
+        JsonNode envelope = EnvelopeAssertions.parseJson(text);
+        assertEquals("error", envelope.path("status").asText());
+        List<String> codes = EnvelopeAssertions.diagnosticCodes(envelope);
+        assertTrue(
+            codes.contains("DEDIREN_ELK_LAYOUT_FAILED")
+                || codes.contains("DEDIREN_ELK_INPUT_INVALID_JSON"),
+            "expected ELK layout or input diagnostic, got " + codes
+        );
     }
 }

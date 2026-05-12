@@ -1,8 +1,8 @@
 package dev.dediren.elk;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -41,8 +41,7 @@ class JsonContractsTest {
         String envelope = EnvelopeWriter.ok(mapper, result);
 
         assertEquals("main", request.view_id());
-        assertTrue(envelope.contains("\"envelope_schema_version\":\"envelope.schema.v1\""));
-        assertTrue(envelope.contains("\"status\":\"ok\""));
-        assertTrue(envelope.contains("\"layout_result_schema_version\":\"layout-result.schema.v1\""));
+        JsonNode data = EnvelopeAssertions.okData(envelope);
+        assertEquals("layout-result.schema.v1", data.path("layout_result_schema_version").asText());
     }
 }
