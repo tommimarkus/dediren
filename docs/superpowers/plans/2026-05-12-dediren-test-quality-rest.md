@@ -422,7 +422,7 @@ let capability_ids: Vec<&str> = capabilities["capabilities"]
     .expect("capabilities should be an array")
     .iter()
     .map(|capability| {
-        capability["id"]
+        capability
             .as_str()
             .expect("capability id should be a string")
     })
