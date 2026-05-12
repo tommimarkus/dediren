@@ -220,7 +220,7 @@ fn archimate_pipeline_renders_policy_notation_from_projected_metadata() {
     );
     assert_eq!(
         metadata_envelope["data"]["nodes"]["orders-api"]["type"],
-        "ApplicationComponent"
+        "ApplicationService"
     );
     assert_eq!(
         metadata_envelope["data"]["nodes"]["client"]["type"],
@@ -232,7 +232,7 @@ fn archimate_pipeline_renders_policy_notation_from_projected_metadata() {
     );
     assert_eq!(
         metadata_envelope["data"]["nodes"]["database"]["type"],
-        "Node"
+        "DataObject"
     );
     assert_eq!(
         metadata_envelope["data"]["edges"]["web-app-calls-api"]["type"],
@@ -274,7 +274,7 @@ fn archimate_pipeline_renders_policy_notation_from_projected_metadata() {
     let render_envelope: serde_json::Value = serde_json::from_slice(&render_output).unwrap();
     let content = render_envelope["data"]["content"].as_str().unwrap();
     let doc = svg_doc(content);
-    for node_id in ["web-app", "orders-api", "worker"] {
+    for node_id in ["web-app", "worker"] {
         let component = semantic_group(&doc, "data-dediren-node-id", node_id);
         let component_rect = child_element(component, "rect");
         assert_eq!(component_rect.attribute("fill"), Some("#e0f2fe"));
@@ -298,7 +298,7 @@ fn archimate_pipeline_renders_policy_notation_from_projected_metadata() {
     )
     .is_some());
 
-    for node_id in ["payments"] {
+    for node_id in ["orders-api", "payments"] {
         let service = semantic_group(&doc, "data-dediren-node-id", node_id);
         assert!(child_group_with_attr(
             service,
@@ -308,14 +308,14 @@ fn archimate_pipeline_renders_policy_notation_from_projected_metadata() {
         .is_some());
     }
 
-    let technology = semantic_group(&doc, "data-dediren-node-id", "database");
-    let technology_rect = child_element(technology, "rect");
-    assert_eq!(technology_rect.attribute("fill"), Some("#d5e8d4"));
-    assert_eq!(technology_rect.attribute("stroke"), Some("#4d7c0f"));
+    let data_object = semantic_group(&doc, "data-dediren-node-id", "database");
+    let data_object_rect = child_element(data_object, "rect");
+    assert_eq!(data_object_rect.attribute("fill"), Some("#e0f2fe"));
+    assert_eq!(data_object_rect.attribute("stroke"), Some("#0369a1"));
     assert!(child_group_with_attr(
-        technology,
+        data_object,
         "data-dediren-node-decorator",
-        "archimate_technology_node"
+        "archimate_data_object"
     )
     .is_some());
 

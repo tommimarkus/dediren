@@ -202,16 +202,33 @@ fn source_semantic_profile(source: &SourceDocument) -> &'static str {
 fn validate_archimate_source_types(
     source: &SourceDocument,
 ) -> Result<(), ArchimateTypeValidationError> {
+    let mut node_types = BTreeMap::new();
+
     for (index, node) in source.nodes.iter().enumerate() {
         dediren_archimate::validate_element_type(
             &node.node_type,
             format!("$.nodes[{index}].type"),
         )?;
+        node_types.insert(node.id.as_str(), node.node_type.as_str());
     }
     for (index, relationship) in source.relationships.iter().enumerate() {
         dediren_archimate::validate_relationship_type(
             &relationship.relationship_type,
             format!("$.relationships[{index}].type"),
+        )?;
+
+        let Some(source_type) = node_types.get(relationship.source.as_str()) else {
+            continue;
+        };
+        let Some(target_type) = node_types.get(relationship.target.as_str()) else {
+            continue;
+        };
+
+        dediren_archimate::validate_relationship_endpoint_types(
+            &relationship.relationship_type,
+            source_type,
+            target_type,
+            format!("$.relationships[{index}]"),
         )?;
     }
     Ok(())

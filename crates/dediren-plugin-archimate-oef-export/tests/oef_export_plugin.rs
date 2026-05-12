@@ -151,6 +151,27 @@ fn oef_export_plugin_rejects_unknown_archimate_relationship_type_with_error_enve
         .stdout(predicate::str::contains("ConnectsTo"));
 }
 
+#[test]
+fn oef_export_plugin_rejects_invalid_archimate_relationship_endpoint_with_error_envelope() {
+    let mut input = export_input();
+    input["source"]["nodes"][0]["type"] = serde_json::json!("ApplicationService");
+    input["source"]["nodes"][1]["type"] = serde_json::json!("ApplicationComponent");
+    input["source"]["relationships"][0]["type"] = serde_json::json!("Realization");
+
+    let mut cmd = Command::cargo_bin("dediren-plugin-archimate-oef-export").unwrap();
+    cmd.arg("export")
+        .write_stdin(serde_json::to_string(&input).unwrap())
+        .assert()
+        .failure()
+        .stdout(predicate::str::contains("\"status\":\"error\""))
+        .stdout(predicate::str::contains(
+            "DEDIREN_ARCHIMATE_RELATIONSHIP_ENDPOINT_UNSUPPORTED",
+        ))
+        .stdout(predicate::str::contains("ApplicationService"))
+        .stdout(predicate::str::contains("Realization"))
+        .stdout(predicate::str::contains("ApplicationComponent"));
+}
+
 fn export_input() -> serde_json::Value {
     serde_json::json!({
         "export_request_schema_version": "export-request.schema.v1",

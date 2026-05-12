@@ -99,7 +99,10 @@ fn main() -> anyhow::Result<()> {
     if let Err(error) = validate_archimate_policy_types(&render_input.policy) {
         exit_with_archimate_type_error(error);
     }
-    if let Err(error) = validate_archimate_render_metadata(render_input.render_metadata.as_ref()) {
+    if let Err(error) = validate_archimate_render_metadata(
+        &render_input.layout_result,
+        render_input.render_metadata.as_ref(),
+    ) {
         exit_with_archimate_type_error(error);
     }
     let result = RenderResult {
@@ -196,6 +199,7 @@ fn validate_archimate_policy_types(
 }
 
 fn validate_archimate_render_metadata(
+    layout_result: &LayoutResult,
     metadata: Option<&RenderMetadata>,
 ) -> Result<(), ArchimateTypeValidationError> {
     let Some(metadata) = metadata else {
@@ -215,6 +219,25 @@ fn validate_archimate_render_metadata(
         dediren_archimate::validate_relationship_type(
             &selector.selector_type,
             format!("render_metadata.edges.{edge_id}.type"),
+        )?;
+    }
+
+    for edge in &layout_result.edges {
+        let Some(edge_selector) = metadata.edges.get(&edge.id) else {
+            continue;
+        };
+        let Some(source_selector) = metadata.nodes.get(&edge.source) else {
+            continue;
+        };
+        let Some(target_selector) = metadata.nodes.get(&edge.target) else {
+            continue;
+        };
+
+        dediren_archimate::validate_relationship_endpoint_types(
+            &edge_selector.selector_type,
+            &source_selector.selector_type,
+            &target_selector.selector_type,
+            format!("render_metadata.edges.{}", edge.id),
         )?;
     }
     Ok(())

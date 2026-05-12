@@ -1,7 +1,14 @@
+mod relationship_rules;
+
+pub use relationship_rules::{
+    relationship_endpoint_triples, validate_relationship_endpoint_types, RelationshipEndpointTriple,
+};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ArchimateTypeKind {
     Element,
     Relationship,
+    RelationshipEndpoint,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -16,6 +23,9 @@ impl ArchimateTypeValidationError {
         match self.kind {
             ArchimateTypeKind::Element => "DEDIREN_ARCHIMATE_ELEMENT_TYPE_UNSUPPORTED",
             ArchimateTypeKind::Relationship => "DEDIREN_ARCHIMATE_RELATIONSHIP_TYPE_UNSUPPORTED",
+            ArchimateTypeKind::RelationshipEndpoint => {
+                "DEDIREN_ARCHIMATE_RELATIONSHIP_ENDPOINT_UNSUPPORTED"
+            }
         }
     }
 
@@ -26,6 +36,12 @@ impl ArchimateTypeValidationError {
             }
             ArchimateTypeKind::Relationship => {
                 format!("unsupported ArchiMate relationship type: {}", self.value)
+            }
+            ArchimateTypeKind::RelationshipEndpoint => {
+                format!(
+                    "unsupported ArchiMate relationship endpoint: {}",
+                    self.value
+                )
             }
         }
     }

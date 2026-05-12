@@ -1,7 +1,7 @@
 {
   "plugin_manifest_schema_version": "plugin-manifest.schema.v1",
   "id": "generic-graph",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "executable": "dediren-plugin-generic-graph",
   "capabilities": ["semantic-validation", "projection"]
 }

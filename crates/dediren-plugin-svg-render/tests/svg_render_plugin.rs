@@ -394,8 +394,8 @@ fn svg_renderer_applies_archimate_realization_edge_notation() {
 fn svg_renderer_applies_archimate_relationship_start_markers() {
     let mut input = archimate_style_input();
     input["render_metadata"]["edges"]["orders-realizes-service"]["type"] =
-        serde_json::json!("Composition");
-    input["policy"]["style"]["edge_type_overrides"]["Composition"] = serde_json::json!({
+        serde_json::json!("Assignment");
+    input["policy"]["style"]["edge_type_overrides"]["Assignment"] = serde_json::json!({
         "marker_start": "filled_diamond",
         "marker_end": "none"
     });
@@ -637,6 +637,29 @@ fn svg_renderer_rejects_unknown_archimate_relationship_type() {
             "DEDIREN_ARCHIMATE_RELATIONSHIP_TYPE_UNSUPPORTED",
         ))
         .stdout(predicate::str::contains("ConnectsTo"));
+}
+
+#[test]
+fn svg_renderer_rejects_invalid_archimate_relationship_endpoint() {
+    let mut input = archimate_style_input();
+    input["render_metadata"]["nodes"]["orders-component"]["type"] =
+        serde_json::json!("ApplicationService");
+    input["render_metadata"]["nodes"]["orders-service"]["type"] =
+        serde_json::json!("ApplicationComponent");
+    input["render_metadata"]["edges"]["orders-realizes-service"]["type"] =
+        serde_json::json!("Realization");
+
+    let mut cmd = Command::cargo_bin("dediren-plugin-svg-render").unwrap();
+    cmd.arg("render")
+        .write_stdin(serde_json::to_string(&input).unwrap());
+    cmd.assert()
+        .failure()
+        .stdout(predicate::str::contains(
+            "DEDIREN_ARCHIMATE_RELATIONSHIP_ENDPOINT_UNSUPPORTED",
+        ))
+        .stdout(predicate::str::contains("ApplicationService"))
+        .stdout(predicate::str::contains("Realization"))
+        .stdout(predicate::str::contains("ApplicationComponent"));
 }
 
 #[test]

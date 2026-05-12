@@ -25,13 +25,13 @@
     },
     {
       "id": "orders-api",
-      "type": "ApplicationComponent",
+      "type": "ApplicationService",
       "label": "Orders API",
       "properties": {}
     },
     {
       "id": "database",
-      "type": "Node",
+      "type": "DataObject",
       "label": "PostgreSQL",
       "properties": {}
     },
@@ -60,9 +60,9 @@
     {
       "id": "web-app-calls-api",
       "type": "Realization",
-      "source": "orders-api",
-      "target": "client",
-      "label": "realizes portal service",
+      "source": "web-app",
+      "target": "orders-api",
+      "label": "realizes API service",
       "properties": {}
     },
     {

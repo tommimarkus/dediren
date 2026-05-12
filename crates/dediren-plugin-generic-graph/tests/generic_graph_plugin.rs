@@ -120,17 +120,37 @@ fn generic_graph_rejects_unknown_archimate_relationship_type_for_render_metadata
         .stdout(predicate::str::contains("ConnectsTo"));
 }
 
+#[test]
+fn generic_graph_rejects_invalid_archimate_relationship_endpoint_for_render_metadata() {
+    let mut source = archimate_source();
+    source["nodes"][0]["type"] = serde_json::json!("ApplicationService");
+    source["nodes"][1]["type"] = serde_json::json!("ApplicationComponent");
+    source["relationships"][0]["type"] = serde_json::json!("Realization");
+
+    let mut cmd = Command::cargo_bin("dediren-plugin-generic-graph").unwrap();
+    cmd.args(["project", "--target", "render-metadata", "--view", "main"])
+        .write_stdin(serde_json::to_string(&source).unwrap());
+    cmd.assert()
+        .failure()
+        .stdout(predicate::str::contains(
+            "DEDIREN_ARCHIMATE_RELATIONSHIP_ENDPOINT_UNSUPPORTED",
+        ))
+        .stdout(predicate::str::contains("ApplicationService"))
+        .stdout(predicate::str::contains("Realization"))
+        .stdout(predicate::str::contains("ApplicationComponent"));
+}
+
 fn archimate_source() -> serde_json::Value {
     serde_json::json!({
         "model_schema_version": "model.schema.v1",
         "required_plugins": [
             {
                 "id": "generic-graph",
-                "version": "0.1.3"
+                "version": "0.1.4"
             },
             {
                 "id": "archimate-oef",
-                "version": "0.1.3"
+                "version": "0.1.4"
             }
         ],
         "nodes": [
