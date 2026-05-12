@@ -82,6 +82,50 @@
   fixtures, `dediren-plugin-archimate-oef-export`, CLI export tests, and README
   examples together.
 
+## Versioning (MUST)
+
+- Version bumps live in the same commit as the content change that requires
+  them. Do not defer the bump to a follow-up commit.
+- The product version is `Cargo.toml` `[workspace.package] version`.
+  First-party Rust crates inherit it, first-party plugin manifests under
+  `fixtures/plugins/*.manifest.json` must match it, distribution archive names
+  derive from it, and `bundle.json` reports it.
+- When bumping the product/plugin version, move all encoded release surfaces
+  together: `Cargo.toml`, `Cargo.lock`, `fixtures/plugins/*.manifest.json`,
+  README bundle examples, `scripts/smoke-dist.sh` usage text, and tests or
+  fixtures that assert version strings.
+- Use semver intent even while the project is pre-1.0:
+  - Major: backwards-incompatible public product or plugin contract changes,
+    such as removing or renaming a CLI command, plugin id, capability,
+    executable contract, schema family, command envelope field, diagnostic
+    code, or stable artifact path.
+  - Minor: additive compatible surface changes, such as adding a plugin,
+    capability, CLI command, schema field, command envelope data, bundled
+    artifact, or public fixture family.
+  - Patch: compatible fixes and no-op behavioral changes, such as bug fixes,
+    diagnostic wording, README/AGENTS clarifications, tests, and internal
+    refactors that do not change public contracts.
+- A version bump is mandatory when a commit changes shipped product/plugin
+  behavior or public contract surfaces: `schemas/**`,
+  `fixtures/plugins/*.manifest.json`, `dediren-contracts` protocol structs,
+  CLI JSON envelope shape, runtime capability output, first-party plugin
+  semantics, bundled runtime layout, or distribution artifact contents.
+- README/AGENTS-only edits do not require a version bump unless they document a
+  product behavior change that is shipping in the same commit.
+- Public schema ids such as `model.schema.v1` or `layout-result.schema.v1`
+  change only when the contract family intentionally changes; do not tie schema
+  ids to every product release.
+- If several content-changing commits landed at the same version, a catch-up
+  bump in the next content-change commit is acceptable. Note the catch-up in the
+  commit message.
+- Do not make bare version-increment commits. Amend the content commit before
+  pushing when practical; otherwise carry the catch-up in the next real content
+  commit.
+- If this repo later contains Codex/Claude plugin packages with
+  `.claude-plugin/plugin.json`, `.codex-plugin/plugin.json`, or
+  `marketplace.json`, keep those sibling version and description fields in sync
+  using the same bump rules.
+
 ## Plugin Runtime Rules
 
 - Plugins communicate with JSON stdin/stdout and command envelopes. Agents
