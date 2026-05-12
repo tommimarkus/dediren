@@ -1,7 +1,8 @@
+mod common;
+
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 use std::time::{Duration, Instant};
 
 use dediren_core::plugins::{
@@ -488,27 +489,8 @@ fn write_manifest(dir: &Path, id: &str, executable: &str, capabilities: &[&str])
 }
 
 fn testbed_binary() -> PathBuf {
-    let root = workspace_root();
-    let status = Command::new("cargo")
-        .current_dir(&root)
-        .args([
-            "build",
-            "-p",
-            "dediren-plugin-runtime-testbed",
-            "--bin",
-            "dediren-plugin-runtime-testbed",
-        ])
-        .status()
-        .unwrap();
-    assert!(status.success());
-    let executable = if cfg!(windows) {
-        "dediren-plugin-runtime-testbed.exe"
-    } else {
-        "dediren-plugin-runtime-testbed"
-    };
-    root.join("target/debug").join(executable)
-}
-
-fn workspace_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..")
+    common::workspace_binary(
+        "dediren-plugin-runtime-testbed",
+        "dediren-plugin-runtime-testbed",
+    )
 }

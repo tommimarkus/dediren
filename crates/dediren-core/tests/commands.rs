@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+mod common;
 
 use dediren_core::commands::{layout_command, LayoutCommandInput};
 use dediren_core::plugins::PluginRegistry;
@@ -6,10 +6,13 @@ use tempfile::TempDir;
 
 #[test]
 fn layout_command_owns_elk_runtime_environment_allowlist() {
-    let plugin = workspace_binary("dediren-plugin-elk-layout", "dediren-plugin-elk-layout");
-    let fixture = workspace_file("fixtures/layout-result/basic.json");
-    let request = std::fs::read_to_string(workspace_file("fixtures/layout-request/basic.json"))
-        .expect("fixture must be readable");
+    let plugin = common::workspace_binary("dediren-plugin-elk-layout", "dediren-plugin-elk-layout")
+        .display()
+        .to_string();
+    let fixture = common::workspace_file("fixtures/layout-result/basic.json");
+    let request =
+        std::fs::read_to_string(common::workspace_file("fixtures/layout-request/basic.json"))
+            .expect("fixture must be readable");
     let plugin_dir = TempDir::new().unwrap();
     write_manifest(plugin_dir.path(), "elk-layout", &plugin, &["layout"]);
 
@@ -30,10 +33,13 @@ fn layout_command_owns_elk_runtime_environment_allowlist() {
 
 #[test]
 fn layout_command_allows_path_for_layout_runtime_environment() {
-    let plugin = workspace_binary("dediren-plugin-elk-layout", "dediren-plugin-elk-layout");
-    let fixture = workspace_file("fixtures/layout-result/basic.json");
-    let request = std::fs::read_to_string(workspace_file("fixtures/layout-request/basic.json"))
-        .expect("fixture must be readable");
+    let plugin = common::workspace_binary("dediren-plugin-elk-layout", "dediren-plugin-elk-layout")
+        .display()
+        .to_string();
+    let fixture = common::workspace_file("fixtures/layout-result/basic.json");
+    let request =
+        std::fs::read_to_string(common::workspace_file("fixtures/layout-request/basic.json"))
+            .expect("fixture must be readable");
     let plugin_dir = TempDir::new().unwrap();
     write_manifest(plugin_dir.path(), "elk-layout", &plugin, &["layout"]);
     let allowed_path = "/usr/bin:/bin:/tmp/dediren-layout-allowlist";
@@ -59,25 +65,6 @@ fn layout_command_allows_path_for_layout_runtime_environment() {
     assert!(output.stdout.contains("\"layout_result_schema_version\""));
 }
 
-fn workspace_binary(package: &str, binary: &str) -> String {
-    let status = std::process::Command::new("cargo")
-        .current_dir(workspace_root())
-        .args(["build", "-p", package, "--bin", binary])
-        .status()
-        .unwrap();
-    assert!(status.success());
-    let executable = if cfg!(windows) {
-        format!("{binary}.exe")
-    } else {
-        binary.to_string()
-    };
-    workspace_root()
-        .join("target/debug")
-        .join(executable)
-        .display()
-        .to_string()
-}
-
 fn write_manifest(dir: &std::path::Path, id: &str, executable: &str, capabilities: &[&str]) {
     let manifest = serde_json::json!({
         "plugin_manifest_schema_version": "plugin-manifest.schema.v1",
@@ -91,14 +78,6 @@ fn write_manifest(dir: &std::path::Path, id: &str, executable: &str, capabilitie
         serde_json::to_string_pretty(&manifest).unwrap(),
     )
     .unwrap();
-}
-
-fn workspace_file(path: &str) -> PathBuf {
-    workspace_root().join(path)
-}
-
-fn workspace_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..")
 }
 
 fn shell_quote(value: &str) -> String {
