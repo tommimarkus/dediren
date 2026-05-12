@@ -38,6 +38,7 @@ pub fn render_failure_envelope(input: serde_json::Value) -> serde_json::Value {
 
 pub fn render_ok_data(input: serde_json::Value) -> serde_json::Value {
     let envelope = render_success_envelope(input);
+    assert_eq!(envelope["envelope_schema_version"], "envelope.schema.v1");
     assert_eq!(envelope["status"], "ok", "render should return ok envelope");
     assert!(
         envelope["diagnostics"]
@@ -51,6 +52,7 @@ pub fn render_ok_data(input: serde_json::Value) -> serde_json::Value {
 
 pub fn render_error(input: serde_json::Value, expected_code: &str) -> serde_json::Value {
     let envelope = render_failure_envelope(input);
+    assert_eq!(envelope["envelope_schema_version"], "envelope.schema.v1");
     assert_eq!(
         envelope["status"], "error",
         "render should return error envelope"

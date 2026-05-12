@@ -63,6 +63,7 @@ pub fn stdout_json(output: &[u8]) -> Value {
 
 pub fn ok_data(output: &[u8]) -> Value {
     let envelope = stdout_json(output);
+    assert_eq!(envelope["envelope_schema_version"], "envelope.schema.v1");
     assert_eq!(
         envelope["status"], "ok",
         "command should return ok envelope"
@@ -79,6 +80,7 @@ pub fn ok_data(output: &[u8]) -> Value {
 
 pub fn error_codes(output: &[u8]) -> Vec<String> {
     let envelope = stdout_json(output);
+    assert_eq!(envelope["envelope_schema_version"], "envelope.schema.v1");
     assert_eq!(
         envelope["status"], "error",
         "command should return error envelope"
