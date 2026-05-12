@@ -1,53 +1,68 @@
-use assert_cmd::Command;
-use predicates::prelude::*;
-use std::path::PathBuf;
+mod common;
+
+use common::{assert_error_code, ok_data, workspace_file};
 
 #[test]
 fn validate_accepts_valid_source_from_file() {
-    let mut cmd = Command::cargo_bin("dediren").unwrap();
-    cmd.arg("validate")
+    let output = common::dediren_command()
+        .arg("validate")
         .arg("--input")
-        .arg(workspace_file("fixtures/source/valid-basic.json"));
-    cmd.assert()
+        .arg(workspace_file("fixtures/source/valid-basic.json"))
+        .assert()
         .success()
-        .stdout(predicate::str::contains("\"status\":\"ok\""));
+        .get_output()
+        .stdout
+        .clone();
+
+    let data = ok_data(&output);
+    assert_eq!(data["model_schema_version"], "model.schema.v1");
 }
 
 #[test]
 fn validate_rejects_authored_geometry() {
-    let mut cmd = Command::cargo_bin("dediren").unwrap();
-    cmd.arg("validate").arg("--input").arg(workspace_file(
-        "fixtures/source/invalid-absolute-geometry.json",
-    ));
-    cmd.assert()
+    let output = common::dediren_command()
+        .arg("validate")
+        .arg("--input")
+        .arg(workspace_file(
+            "fixtures/source/invalid-absolute-geometry.json",
+        ))
+        .assert()
         .failure()
-        .stdout(predicate::str::contains("DEDIREN_SCHEMA_INVALID"));
+        .get_output()
+        .stdout
+        .clone();
+
+    assert_error_code(&output, "DEDIREN_SCHEMA_INVALID");
 }
 
 #[test]
 fn validate_rejects_duplicate_ids() {
-    let mut cmd = Command::cargo_bin("dediren").unwrap();
-    cmd.arg("validate")
+    let output = common::dediren_command()
+        .arg("validate")
         .arg("--input")
-        .arg(workspace_file("fixtures/source/invalid-duplicate-id.json"));
-    cmd.assert()
+        .arg(workspace_file("fixtures/source/invalid-duplicate-id.json"))
+        .assert()
         .failure()
-        .stdout(predicate::str::contains("DEDIREN_DUPLICATE_ID"));
+        .get_output()
+        .stdout
+        .clone();
+
+    assert_error_code(&output, "DEDIREN_DUPLICATE_ID");
 }
 
 #[test]
 fn validate_rejects_dangling_relationship_endpoint() {
-    let mut cmd = Command::cargo_bin("dediren").unwrap();
-    cmd.arg("validate").arg("--input").arg(workspace_file(
-        "fixtures/source/invalid-dangling-relationship.json",
-    ));
-    cmd.assert()
+    let output = common::dediren_command()
+        .arg("validate")
+        .arg("--input")
+        .arg(workspace_file(
+            "fixtures/source/invalid-dangling-relationship.json",
+        ))
+        .assert()
         .failure()
-        .stdout(predicate::str::contains("DEDIREN_DANGLING_ENDPOINT"));
-}
+        .get_output()
+        .stdout
+        .clone();
 
-fn workspace_file(path: &str) -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../..")
-        .join(path)
+    assert_error_code(&output, "DEDIREN_DANGLING_ENDPOINT");
 }
