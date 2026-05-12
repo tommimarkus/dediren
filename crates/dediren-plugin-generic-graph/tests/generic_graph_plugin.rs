@@ -1,27 +1,10 @@
-use assert_cmd::Command;
-use predicates::prelude::*;
-use std::path::PathBuf;
+mod common;
 
 #[test]
 fn generic_graph_projects_basic_view() {
-    let input =
-        std::fs::read_to_string(workspace_file("fixtures/source/valid-basic.json")).unwrap();
-    let mut cmd = Command::cargo_bin("dediren-plugin-generic-graph").unwrap();
-    cmd.args(["project", "--target", "layout-request", "--view", "main"])
-        .write_stdin(input);
-    cmd.assert()
-        .success()
-        .stdout(predicate::str::contains(
-            "\"layout_request_schema_version\"",
-        ))
-        .stdout(predicate::str::contains("\"view_id\":\"main\""));
-}
-
-#[test]
-fn generic_graph_projects_rich_view_groups() {
-    let input = std::fs::read_to_string(workspace_file("fixtures/source/valid-pipeline-rich.json"))
+    let input = std::fs::read_to_string(common::workspace_file("fixtures/source/valid-basic.json"))
         .unwrap();
-    let mut cmd = Command::cargo_bin("dediren-plugin-generic-graph").unwrap();
+    let mut cmd = common::plugin_command();
     let output = cmd
         .args(["project", "--target", "layout-request", "--view", "main"])
         .write_stdin(input)
@@ -31,8 +14,46 @@ fn generic_graph_projects_rich_view_groups() {
         .stdout
         .clone();
 
-    let envelope: serde_json::Value = serde_json::from_slice(&output).unwrap();
-    let groups = envelope["data"]["groups"].as_array().unwrap();
+    let data = common::ok_data(&output);
+    assert_eq!(
+        data["layout_request_schema_version"],
+        "layout-request.schema.v1"
+    );
+    assert_eq!(data["view_id"], "main");
+    assert_eq!(
+        data["nodes"]
+            .as_array()
+            .expect("nodes should be an array")
+            .len(),
+        2
+    );
+    assert_eq!(
+        data["edges"]
+            .as_array()
+            .expect("edges should be an array")
+            .len(),
+        1
+    );
+}
+
+#[test]
+fn generic_graph_projects_rich_view_groups() {
+    let input = std::fs::read_to_string(common::workspace_file(
+        "fixtures/source/valid-pipeline-rich.json",
+    ))
+    .unwrap();
+    let mut cmd = common::plugin_command();
+    let output = cmd
+        .args(["project", "--target", "layout-request", "--view", "main"])
+        .write_stdin(input)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let data = common::ok_data(&output);
+    let groups = data["groups"].as_array().unwrap();
 
     assert_eq!(groups.len(), 2);
     assert_eq!(groups[0]["id"], "application-services");
@@ -56,9 +77,11 @@ fn generic_graph_projects_rich_view_groups() {
 
 #[test]
 fn generic_graph_projects_render_metadata() {
-    let input = std::fs::read_to_string(workspace_file("fixtures/source/valid-archimate-oef.json"))
-        .unwrap();
-    let mut cmd = Command::cargo_bin("dediren-plugin-generic-graph").unwrap();
+    let input = std::fs::read_to_string(common::workspace_file(
+        "fixtures/source/valid-archimate-oef.json",
+    ))
+    .unwrap();
+    let mut cmd = common::plugin_command();
     let output = cmd
         .args(["project", "--target", "render-metadata", "--view", "main"])
         .write_stdin(input)
@@ -68,22 +91,22 @@ fn generic_graph_projects_render_metadata() {
         .stdout
         .clone();
 
-    let envelope: serde_json::Value = serde_json::from_slice(&output).unwrap();
+    let data = common::ok_data(&output);
     assert_eq!(
-        envelope["data"]["render_metadata_schema_version"],
+        data["render_metadata_schema_version"],
         "render-metadata.schema.v1"
     );
-    assert_eq!(envelope["data"]["semantic_profile"], "archimate");
+    assert_eq!(data["semantic_profile"], "archimate");
     assert_eq!(
-        envelope["data"]["nodes"]["orders-component"]["type"],
+        data["nodes"]["orders-component"]["type"],
         "ApplicationComponent"
     );
     assert_eq!(
-        envelope["data"]["nodes"]["orders-service"]["type"],
+        data["nodes"]["orders-service"]["type"],
         "ApplicationService"
     );
     assert_eq!(
-        envelope["data"]["edges"]["orders-realizes-service"]["type"],
+        data["edges"]["orders-realizes-service"]["type"],
         "Realization"
     );
 }
@@ -93,15 +116,21 @@ fn generic_graph_rejects_unknown_archimate_node_type_for_render_metadata() {
     let mut source = archimate_source();
     source["nodes"][0]["type"] = serde_json::json!("TechnologyNode");
 
-    let mut cmd = Command::cargo_bin("dediren-plugin-generic-graph").unwrap();
-    cmd.args(["project", "--target", "render-metadata", "--view", "main"])
-        .write_stdin(serde_json::to_string(&source).unwrap());
-    cmd.assert()
+    let mut cmd = common::plugin_command();
+    let output = cmd
+        .args(["project", "--target", "render-metadata", "--view", "main"])
+        .write_stdin(serde_json::to_string(&source).unwrap())
+        .assert()
         .failure()
-        .stdout(predicate::str::contains(
-            "DEDIREN_ARCHIMATE_ELEMENT_TYPE_UNSUPPORTED",
-        ))
-        .stdout(predicate::str::contains("TechnologyNode"));
+        .get_output()
+        .stdout
+        .clone();
+
+    let envelope = common::assert_error_code(&output, "DEDIREN_ARCHIMATE_ELEMENT_TYPE_UNSUPPORTED");
+    let message = envelope["diagnostics"][0]["message"]
+        .as_str()
+        .expect("diagnostic message should be a string");
+    assert!(message.contains("TechnologyNode"));
 }
 
 #[test]
@@ -109,15 +138,22 @@ fn generic_graph_rejects_unknown_archimate_relationship_type_for_render_metadata
     let mut source = archimate_source();
     source["relationships"][0]["type"] = serde_json::json!("ConnectsTo");
 
-    let mut cmd = Command::cargo_bin("dediren-plugin-generic-graph").unwrap();
-    cmd.args(["project", "--target", "render-metadata", "--view", "main"])
-        .write_stdin(serde_json::to_string(&source).unwrap());
-    cmd.assert()
+    let mut cmd = common::plugin_command();
+    let output = cmd
+        .args(["project", "--target", "render-metadata", "--view", "main"])
+        .write_stdin(serde_json::to_string(&source).unwrap())
+        .assert()
         .failure()
-        .stdout(predicate::str::contains(
-            "DEDIREN_ARCHIMATE_RELATIONSHIP_TYPE_UNSUPPORTED",
-        ))
-        .stdout(predicate::str::contains("ConnectsTo"));
+        .get_output()
+        .stdout
+        .clone();
+
+    let envelope =
+        common::assert_error_code(&output, "DEDIREN_ARCHIMATE_RELATIONSHIP_TYPE_UNSUPPORTED");
+    let message = envelope["diagnostics"][0]["message"]
+        .as_str()
+        .expect("diagnostic message should be a string");
+    assert!(message.contains("ConnectsTo"));
 }
 
 #[test]
@@ -127,17 +163,26 @@ fn generic_graph_rejects_invalid_archimate_relationship_endpoint_for_render_meta
     source["nodes"][1]["type"] = serde_json::json!("ApplicationComponent");
     source["relationships"][0]["type"] = serde_json::json!("Realization");
 
-    let mut cmd = Command::cargo_bin("dediren-plugin-generic-graph").unwrap();
-    cmd.args(["project", "--target", "render-metadata", "--view", "main"])
-        .write_stdin(serde_json::to_string(&source).unwrap());
-    cmd.assert()
+    let mut cmd = common::plugin_command();
+    let output = cmd
+        .args(["project", "--target", "render-metadata", "--view", "main"])
+        .write_stdin(serde_json::to_string(&source).unwrap())
+        .assert()
         .failure()
-        .stdout(predicate::str::contains(
-            "DEDIREN_ARCHIMATE_RELATIONSHIP_ENDPOINT_UNSUPPORTED",
-        ))
-        .stdout(predicate::str::contains("ApplicationService"))
-        .stdout(predicate::str::contains("Realization"))
-        .stdout(predicate::str::contains("ApplicationComponent"));
+        .get_output()
+        .stdout
+        .clone();
+
+    let envelope = common::assert_error_code(
+        &output,
+        "DEDIREN_ARCHIMATE_RELATIONSHIP_ENDPOINT_UNSUPPORTED",
+    );
+    let message = envelope["diagnostics"][0]["message"]
+        .as_str()
+        .expect("diagnostic message should be a string");
+    assert!(message.contains("ApplicationService"));
+    assert!(message.contains("Realization"));
+    assert!(message.contains("ApplicationComponent"));
 }
 
 fn archimate_source() -> serde_json::Value {
@@ -190,10 +235,4 @@ fn archimate_source() -> serde_json::Value {
             }
         }
     })
-}
-
-fn workspace_file(path: &str) -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../..")
-        .join(path)
 }
