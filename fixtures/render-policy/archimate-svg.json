@@ -90,7 +90,6 @@
       "TechnologyInterface": { "fill": "#d5e8d4", "stroke": "#4d7c0f", "label_fill": "#365314", "decorator": "archimate_technology_interface" },
       "TechnologyCollaboration": { "fill": "#d5e8d4", "stroke": "#4d7c0f", "label_fill": "#365314", "decorator": "archimate_technology_collaboration" },
       "Node": { "fill": "#d5e8d4", "stroke": "#4d7c0f", "label_fill": "#365314", "decorator": "archimate_technology_node" },
-      "TechnologyNode": { "fill": "#d5e8d4", "stroke": "#4d7c0f", "label_fill": "#365314", "decorator": "archimate_technology_node" },
       "SystemSoftware": { "fill": "#d5e8d4", "stroke": "#4d7c0f", "label_fill": "#365314", "decorator": "archimate_system_software" },
       "Device": { "fill": "#d5e8d4", "stroke": "#4d7c0f", "label_fill": "#365314", "decorator": "archimate_device" },
       "Facility": { "fill": "#d5e8d4", "stroke": "#4d7c0f", "label_fill": "#365314", "decorator": "archimate_facility" },

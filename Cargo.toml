@@ -1,5 +1,6 @@
 [workspace]
 members = [
+  "crates/dediren-archimate",
   "crates/dediren-contracts",
   "crates/dediren-core",
   "crates/dediren-cli",
@@ -12,7 +13,7 @@ members = [
 resolver = "2"
 
 [workspace.package]
-version = "0.1.2"
+version = "0.1.3"
 edition = "2021"
 license = "MIT"
 repository = "https://github.com/souroldgeezer/dediren"
@@ -24,6 +25,7 @@ anyhow = "1"
 assert_cmd = "2"
 assert_fs = "1"
 clap = { version = "4", features = ["derive"] }
+dediren-archimate = { path = "crates/dediren-archimate" }
 jsonschema = "0.33"
 predicates = "3"
 quick-xml = "0.38"

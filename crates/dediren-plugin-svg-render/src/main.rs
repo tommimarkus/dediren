@@ -1,5 +1,6 @@
 use std::io::Read;
 
+use dediren_archimate::ArchimateTypeValidationError;
 use dediren_contracts::{
     CommandEnvelope, Diagnostic, DiagnosticSeverity, LaidOutEdge, LaidOutGroup, LaidOutNode,
     LayoutResult, Point, RenderMetadata, RenderPolicy, RenderResult,
@@ -95,6 +96,12 @@ fn main() -> anyhow::Result<()> {
     {
         exit_with_diagnostic(&error.code, &error.message, Some(error.path));
     }
+    if let Err(error) = validate_archimate_policy_types(&render_input.policy) {
+        exit_with_archimate_type_error(error);
+    }
+    if let Err(error) = validate_archimate_render_metadata(render_input.render_metadata.as_ref()) {
+        exit_with_archimate_type_error(error);
+    }
     let result = RenderResult {
         render_result_schema_version: RENDER_RESULT_SCHEMA_VERSION.to_string(),
         artifact_kind: "svg".to_string(),
@@ -158,6 +165,57 @@ fn validate_render_metadata_usage(
                 metadata.semantic_profile, policy_profile
             ),
         });
+    }
+    Ok(())
+}
+
+fn validate_archimate_policy_types(
+    policy: &RenderPolicy,
+) -> Result<(), ArchimateTypeValidationError> {
+    if policy.semantic_profile.as_deref() != Some("archimate") {
+        return Ok(());
+    }
+
+    let Some(style) = policy.style.as_ref() else {
+        return Ok(());
+    };
+
+    for selector_type in style.node_type_overrides.keys() {
+        dediren_archimate::validate_element_type(
+            selector_type,
+            format!("policy.style.node_type_overrides.{selector_type}"),
+        )?;
+    }
+    for selector_type in style.edge_type_overrides.keys() {
+        dediren_archimate::validate_relationship_type(
+            selector_type,
+            format!("policy.style.edge_type_overrides.{selector_type}"),
+        )?;
+    }
+    Ok(())
+}
+
+fn validate_archimate_render_metadata(
+    metadata: Option<&RenderMetadata>,
+) -> Result<(), ArchimateTypeValidationError> {
+    let Some(metadata) = metadata else {
+        return Ok(());
+    };
+    if metadata.semantic_profile != "archimate" {
+        return Ok(());
+    }
+
+    for (node_id, selector) in &metadata.nodes {
+        dediren_archimate::validate_element_type(
+            &selector.selector_type,
+            format!("render_metadata.nodes.{node_id}.type"),
+        )?;
+    }
+    for (edge_id, selector) in &metadata.edges {
+        dediren_archimate::validate_relationship_type(
+            &selector.selector_type,
+            format!("render_metadata.edges.{edge_id}.type"),
+        )?;
     }
     Ok(())
 }
@@ -3587,4 +3645,8 @@ fn exit_with_diagnostic(code: &str, message: &str, path: Option<String>) -> ! {
         .unwrap()
     );
     std::process::exit(3);
+}
+
+fn exit_with_archimate_type_error(error: ArchimateTypeValidationError) -> ! {
+    exit_with_diagnostic(error.code(), &error.message(), Some(error.path));
 }

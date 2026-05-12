@@ -40,18 +40,18 @@ Runtime prerequisite:
 
 - Java 21 or newer available as `java` on `PATH`.
 
-For the current `0.1.2` version, the script creates:
+For the current `0.1.3` version, the script creates:
 
 ```text
-dist/dediren-agent-bundle-0.1.2-x86_64-unknown-linux-gnu/
-dist/dediren-agent-bundle-0.1.2-x86_64-unknown-linux-gnu.tar.gz
+dist/dediren-agent-bundle-0.1.3-x86_64-unknown-linux-gnu/
+dist/dediren-agent-bundle-0.1.3-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Run the smoke test from a shell where `java -version` resolves to Java 21 or
 newer:
 
 ```bash
-scripts/smoke-dist.sh dist/dediren-agent-bundle-0.1.2-x86_64-unknown-linux-gnu.tar.gz
+scripts/smoke-dist.sh dist/dediren-agent-bundle-0.1.3-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Concurrent `scripts/build-dist.sh` invocations serialize on a repo-local lock
@@ -62,8 +62,8 @@ Unpack and run it anywhere:
 
 ```bash
 mkdir -p /tmp/dediren-dist
-tar -xzf dist/dediren-agent-bundle-0.1.2-x86_64-unknown-linux-gnu.tar.gz -C /tmp/dediren-dist
-/tmp/dediren-dist/dediren-agent-bundle-0.1.2-x86_64-unknown-linux-gnu/bin/dediren --help
+tar -xzf dist/dediren-agent-bundle-0.1.3-x86_64-unknown-linux-gnu.tar.gz -C /tmp/dediren-dist
+/tmp/dediren-dist/dediren-agent-bundle-0.1.3-x86_64-unknown-linux-gnu/bin/dediren --help
 ```
 
 The archive includes first-party plugin manifests under `plugins/`, first-party
@@ -136,7 +136,9 @@ Commands:
   authored-geometry rules.
 - `project` asks a semantic/view plugin to produce a target artifact. The
   bundled `generic-graph` plugin supports `layout-request` and
-  `render-metadata`.
+  `render-metadata`. When projecting ArchiMate render metadata, it validates
+  source node and relationship type strings against the supported ArchiMate
+  vocabulary.
 - `layout` asks a layout plugin to generate a layout result. The bundled
   `elk-layout` plugin is a Rust adapter over the Java ELK helper.
 - `validate-layout` reports backend-neutral layout quality metrics.
@@ -180,6 +182,11 @@ ArchiMate SVG notation uses two artifacts:
 
 The render metadata artifact does not carry colors, fonts, shapes, or layout
 data. Visual notation still comes from SVG render policy.
+
+ArchiMate render and export paths reject unsupported ArchiMate element or
+relationship type strings with structured diagnostics. Use the ArchiMate/OEF
+element name `Node` for technology nodes; aliases such as `TechnologyNode` are
+not accepted in ArchiMate metadata or export source.
 
 Create render metadata, then render with the ArchiMate policy:
 
@@ -314,6 +321,8 @@ normalizes the failure into diagnostics such as:
 - `DEDIREN_ELK_RUNTIME_UNAVAILABLE`
 - `DEDIREN_ELK_JAVA_UNAVAILABLE`
 - `DEDIREN_ELK_JAVA_UNSUPPORTED`
+- `DEDIREN_ARCHIMATE_ELEMENT_TYPE_UNSUPPORTED`
+- `DEDIREN_ARCHIMATE_RELATIONSHIP_TYPE_UNSUPPORTED`
 
 Agents should read stdout JSON for success and failure decisions. `stderr` is
 reserved for human debugging.
@@ -333,7 +342,7 @@ newer:
 
 ```bash
 scripts/build-dist.sh
-scripts/smoke-dist.sh dist/dediren-agent-bundle-0.1.2-x86_64-unknown-linux-gnu.tar.gz
+scripts/smoke-dist.sh dist/dediren-agent-bundle-0.1.3-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Focused checks:

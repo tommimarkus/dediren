@@ -124,7 +124,7 @@ fn svg_renderer_covers_each_archimate_square_node_type() {
     let node_styles = node_styles.clone();
     let mut nodes = Vec::new();
     let mut metadata_nodes = serde_json::Map::new();
-    for (index, node_type) in ARCHIMATE_SQUARE_NODE_TYPES.iter().enumerate() {
+    for (index, node_type) in ARCHIMATE_NODE_TYPES.iter().enumerate() {
         let row = index / 6;
         let column = index % 6;
         let id = format!("archimate-node-{index}");
@@ -156,7 +156,7 @@ fn svg_renderer_covers_each_archimate_square_node_type() {
 
     let content = render_content(input);
     let doc = svg_doc(&content);
-    for (index, node_type) in ARCHIMATE_SQUARE_NODE_TYPES.iter().enumerate() {
+    for (index, node_type) in ARCHIMATE_NODE_TYPES.iter().enumerate() {
         let id = format!("archimate-node-{index}");
         let expected_style = node_styles
             .get(*node_type)
@@ -316,17 +316,17 @@ fn svg_renderer_applies_archimate_technology_node_decorator() {
         .as_array_mut()
         .unwrap()
         .push(serde_json::json!({
-            "id": "postgres",
-            "source_id": "postgres",
-            "projection_id": "postgres",
-            "x": 560,
-            "y": 40,
-            "width": 180,
-            "height": 80,
-            "label": "PostgreSQL"
+                "id": "postgres",
+                "source_id": "postgres",
+                "projection_id": "postgres",
+                "x": 560,
+                "y": 40,
+                "width": 180,
+                "height": 80,
+                "label": "PostgreSQL"
         }));
     input["render_metadata"]["nodes"]["postgres"] = serde_json::json!({
-        "type": "TechnologyNode",
+        "type": "Node",
         "source_id": "postgres"
     });
 
@@ -603,6 +603,74 @@ fn svg_renderer_rejects_type_policy_without_metadata() {
     cmd.assert()
         .failure()
         .stdout(predicate::str::contains("DEDIREN_RENDER_METADATA_REQUIRED"));
+}
+
+#[test]
+fn svg_renderer_rejects_unknown_archimate_node_type() {
+    let mut input = archimate_style_input();
+    input["render_metadata"]["nodes"]["orders-component"]["type"] =
+        serde_json::json!("TechnologyNode");
+
+    let mut cmd = Command::cargo_bin("dediren-plugin-svg-render").unwrap();
+    cmd.arg("render")
+        .write_stdin(serde_json::to_string(&input).unwrap());
+    cmd.assert()
+        .failure()
+        .stdout(predicate::str::contains(
+            "DEDIREN_ARCHIMATE_ELEMENT_TYPE_UNSUPPORTED",
+        ))
+        .stdout(predicate::str::contains("TechnologyNode"));
+}
+
+#[test]
+fn svg_renderer_rejects_unknown_archimate_relationship_type() {
+    let mut input = archimate_style_input();
+    input["render_metadata"]["edges"]["orders-realizes-service"]["type"] =
+        serde_json::json!("ConnectsTo");
+
+    let mut cmd = Command::cargo_bin("dediren-plugin-svg-render").unwrap();
+    cmd.arg("render")
+        .write_stdin(serde_json::to_string(&input).unwrap());
+    cmd.assert()
+        .failure()
+        .stdout(predicate::str::contains(
+            "DEDIREN_ARCHIMATE_RELATIONSHIP_TYPE_UNSUPPORTED",
+        ))
+        .stdout(predicate::str::contains("ConnectsTo"));
+}
+
+#[test]
+fn svg_renderer_rejects_unknown_archimate_policy_node_type_override() {
+    let mut input = archimate_style_input();
+    input["policy"]["style"]["node_type_overrides"]["TechnologyNode"] =
+        serde_json::json!({ "fill": "#d5e8d4" });
+
+    let mut cmd = Command::cargo_bin("dediren-plugin-svg-render").unwrap();
+    cmd.arg("render")
+        .write_stdin(serde_json::to_string(&input).unwrap());
+    cmd.assert()
+        .failure()
+        .stdout(predicate::str::contains(
+            "DEDIREN_ARCHIMATE_ELEMENT_TYPE_UNSUPPORTED",
+        ))
+        .stdout(predicate::str::contains("TechnologyNode"));
+}
+
+#[test]
+fn svg_renderer_rejects_unknown_archimate_policy_relationship_type_override() {
+    let mut input = archimate_style_input();
+    input["policy"]["style"]["edge_type_overrides"]["ConnectsTo"] =
+        serde_json::json!({ "stroke": "#374151" });
+
+    let mut cmd = Command::cargo_bin("dediren-plugin-svg-render").unwrap();
+    cmd.arg("render")
+        .write_stdin(serde_json::to_string(&input).unwrap());
+    cmd.assert()
+        .failure()
+        .stdout(predicate::str::contains(
+            "DEDIREN_ARCHIMATE_RELATIONSHIP_TYPE_UNSUPPORTED",
+        ))
+        .stdout(predicate::str::contains("ConnectsTo"));
 }
 
 #[test]
@@ -3523,7 +3591,7 @@ fn svg_path_number(token: &str) -> Option<f64> {
     token.trim_end_matches(',').parse::<f64>().ok()
 }
 
-const ARCHIMATE_SQUARE_NODE_TYPES: &[&str] = &[
+const ARCHIMATE_NODE_TYPES: &[&str] = &[
     "Plateau",
     "WorkPackage",
     "Deliverable",

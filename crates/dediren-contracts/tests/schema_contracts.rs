@@ -60,7 +60,13 @@ fn archimate_svg_policy_covers_square_nodes_and_relationships() {
     let node_types = policy["style"]["node_type_overrides"]
         .as_object()
         .expect("node type overrides should be an object");
-    for node_type in ARCHIMATE_SQUARE_NODE_TYPES {
+    for node_type in node_types.keys() {
+        assert!(
+            ARCHIMATE_NODE_TYPES.contains(&node_type.as_str()),
+            "unexpected ArchiMate node style for {node_type}"
+        );
+    }
+    for node_type in ARCHIMATE_NODE_TYPES {
         let node_style = node_types
             .get(*node_type)
             .unwrap_or_else(|| panic!("missing ArchiMate node style for {node_type}"));
@@ -81,6 +87,12 @@ fn archimate_svg_policy_covers_square_nodes_and_relationships() {
     let edge_types = policy["style"]["edge_type_overrides"]
         .as_object()
         .expect("edge type overrides should be an object");
+    for relationship_type in edge_types.keys() {
+        assert!(
+            ARCHIMATE_RELATIONSHIP_TYPES.contains(&relationship_type.as_str()),
+            "unexpected ArchiMate relationship style for {relationship_type}"
+        );
+    }
     for relationship_type in ARCHIMATE_RELATIONSHIP_TYPES {
         edge_types.get(*relationship_type).unwrap_or_else(|| {
             panic!("missing ArchiMate relationship style for {relationship_type}")
@@ -247,7 +259,7 @@ fn svg_policy_schema_accepts_archimate_decorators_and_edge_notation() {
                         "stroke": "#0369a1",
                         "decorator": "archimate_data_object"
                     },
-                    "TechnologyNode": {
+                    "Node": {
                         "fill": "#d5e8d4",
                         "stroke": "#4d7c0f",
                         "decorator": "archimate_technology_node"
@@ -509,7 +521,7 @@ fn workspace_file(path: &str) -> PathBuf {
         .join(path)
 }
 
-const ARCHIMATE_SQUARE_NODE_TYPES: &[&str] = &[
+const ARCHIMATE_NODE_TYPES: &[&str] = &[
     "Plateau",
     "WorkPackage",
     "Deliverable",

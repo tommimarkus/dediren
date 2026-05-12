@@ -2,10 +2,12 @@ use std::collections::BTreeMap;
 use std::io::Read;
 
 use anyhow::{bail, Context};
+use dediren_archimate::ArchimateTypeValidationError;
 use dediren_contracts::{
-    CommandEnvelope, GenericGraphPluginData, GroupProvenance, LayoutEdge, LayoutGroup, LayoutLabel,
-    LayoutNode, LayoutRequest, RenderMetadata, RenderMetadataSelector, SourceDocument,
-    LAYOUT_REQUEST_SCHEMA_VERSION, RENDER_METADATA_SCHEMA_VERSION,
+    CommandEnvelope, Diagnostic, DiagnosticSeverity, GenericGraphPluginData, GroupProvenance,
+    LayoutEdge, LayoutGroup, LayoutLabel, LayoutNode, LayoutRequest, RenderMetadata,
+    RenderMetadataSelector, SourceDocument, LAYOUT_REQUEST_SCHEMA_VERSION,
+    RENDER_METADATA_SCHEMA_VERSION,
 };
 
 fn main() -> anyhow::Result<()> {
@@ -48,6 +50,11 @@ fn main() -> anyhow::Result<()> {
         .with_context(|| format!("missing generic-graph view {view}"))?;
 
     if target == "render-metadata" {
+        if source_semantic_profile(&source) == "archimate" {
+            if let Err(error) = validate_archimate_source_types(&source) {
+                exit_with_archimate_type_error(error);
+            }
+        }
         let metadata = project_render_metadata(&source, selected_view)?;
         println!("{}", serde_json::to_string(&CommandEnvelope::ok(metadata))?);
         return Ok(());
@@ -137,17 +144,7 @@ fn project_render_metadata(
     source: &SourceDocument,
     selected_view: &dediren_contracts::GenericGraphView,
 ) -> anyhow::Result<RenderMetadata> {
-    let semantic_profile = if source
-        .required_plugins
-        .iter()
-        .any(|plugin| plugin.id == "archimate-oef")
-        || source.plugins.contains_key("archimate-oef")
-    {
-        "archimate"
-    } else {
-        "generic-graph"
-    }
-    .to_string();
+    let semantic_profile = source_semantic_profile(source).to_string();
 
     let mut nodes = BTreeMap::new();
     for id in &selected_view.nodes {
@@ -187,6 +184,54 @@ fn project_render_metadata(
         nodes,
         edges,
     })
+}
+
+fn source_semantic_profile(source: &SourceDocument) -> &'static str {
+    if source
+        .required_plugins
+        .iter()
+        .any(|plugin| plugin.id == "archimate-oef")
+        || source.plugins.contains_key("archimate-oef")
+    {
+        "archimate"
+    } else {
+        "generic-graph"
+    }
+}
+
+fn validate_archimate_source_types(
+    source: &SourceDocument,
+) -> Result<(), ArchimateTypeValidationError> {
+    for (index, node) in source.nodes.iter().enumerate() {
+        dediren_archimate::validate_element_type(
+            &node.node_type,
+            format!("$.nodes[{index}].type"),
+        )?;
+    }
+    for (index, relationship) in source.relationships.iter().enumerate() {
+        dediren_archimate::validate_relationship_type(
+            &relationship.relationship_type,
+            format!("$.relationships[{index}].type"),
+        )?;
+    }
+    Ok(())
+}
+
+fn exit_with_archimate_type_error(error: ArchimateTypeValidationError) -> ! {
+    let diagnostic = Diagnostic {
+        code: error.code().to_string(),
+        severity: DiagnosticSeverity::Error,
+        message: error.message(),
+        path: Some(error.path),
+    };
+    println!(
+        "{}",
+        serde_json::to_string(&CommandEnvelope::<serde_json::Value>::error(vec![
+            diagnostic
+        ]))
+        .unwrap()
+    );
+    std::process::exit(3);
 }
 
 fn value_after(args: &[String], flag: &str) -> Option<String> {

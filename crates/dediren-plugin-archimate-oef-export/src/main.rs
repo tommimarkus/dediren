@@ -2,9 +2,10 @@ use std::collections::{BTreeMap, HashSet};
 use std::io::{Cursor, Read};
 
 use anyhow::{bail, Context};
+use dediren_archimate::ArchimateTypeValidationError;
 use dediren_contracts::{
-    CommandEnvelope, ExportResult, OefExportInput, EXPORT_RESULT_SCHEMA_VERSION,
-    PLUGIN_PROTOCOL_VERSION,
+    CommandEnvelope, Diagnostic, DiagnosticSeverity, ExportResult, OefExportInput,
+    EXPORT_RESULT_SCHEMA_VERSION, PLUGIN_PROTOCOL_VERSION,
 };
 use quick_xml::events::{BytesEnd, BytesStart, BytesText, Event};
 use quick_xml::Writer;
@@ -41,6 +42,9 @@ fn export_from_stdin() -> anyhow::Result<()> {
     let mut input = String::new();
     std::io::stdin().read_to_string(&mut input)?;
     let request: OefExportInput = serde_json::from_str(&input)?;
+    if let Err(error) = validate_archimate_types(&request) {
+        exit_with_archimate_type_error(error);
+    }
     let content = build_oef(&request)?;
     let result = ExportResult {
         export_result_schema_version: EXPORT_RESULT_SCHEMA_VERSION.to_string(),
@@ -52,8 +56,6 @@ fn export_from_stdin() -> anyhow::Result<()> {
 }
 
 fn build_oef(request: &OefExportInput) -> anyhow::Result<String> {
-    validate_archimate_types(request)?;
-
     let mut ids = IdentifierMap::default();
     let element_ids: BTreeMap<_, _> = request
         .source
@@ -223,96 +225,37 @@ fn write_text_element(
     Ok(())
 }
 
-fn validate_archimate_types(request: &OefExportInput) -> anyhow::Result<()> {
-    let element_types = [
-        "Plateau",
-        "WorkPackage",
-        "Deliverable",
-        "ImplementationEvent",
-        "Gap",
-        "Grouping",
-        "Location",
-        "Stakeholder",
-        "Driver",
-        "Assessment",
-        "Goal",
-        "Outcome",
-        "Value",
-        "Meaning",
-        "Constraint",
-        "Requirement",
-        "Principle",
-        "CourseOfAction",
-        "Resource",
-        "ValueStream",
-        "Capability",
-        "BusinessInterface",
-        "BusinessCollaboration",
-        "BusinessActor",
-        "BusinessRole",
-        "BusinessProcess",
-        "BusinessService",
-        "BusinessInteraction",
-        "BusinessFunction",
-        "BusinessEvent",
-        "Product",
-        "BusinessObject",
-        "Contract",
-        "Representation",
-        "ApplicationInterface",
-        "ApplicationCollaboration",
-        "ApplicationComponent",
-        "ApplicationService",
-        "ApplicationInteraction",
-        "ApplicationFunction",
-        "ApplicationProcess",
-        "ApplicationEvent",
-        "DataObject",
-        "TechnologyInterface",
-        "TechnologyCollaboration",
-        "Node",
-        "SystemSoftware",
-        "Device",
-        "Facility",
-        "Equipment",
-        "Path",
-        "TechnologyService",
-        "TechnologyInteraction",
-        "TechnologyFunction",
-        "TechnologyProcess",
-        "TechnologyEvent",
-        "Artifact",
-        "Material",
-        "CommunicationNetwork",
-        "DistributionNetwork",
-    ];
-    let relationship_types = [
-        "Composition",
-        "Aggregation",
-        "Assignment",
-        "Realization",
-        "Specialization",
-        "Serving",
-        "Access",
-        "Influence",
-        "Flow",
-        "Triggering",
-        "Association",
-    ];
-    for node in &request.source.nodes {
-        if !element_types.contains(&node.node_type.as_str()) {
-            bail!("unsupported ArchiMate element type: {}", node.node_type);
-        }
+fn validate_archimate_types(request: &OefExportInput) -> Result<(), ArchimateTypeValidationError> {
+    for (index, node) in request.source.nodes.iter().enumerate() {
+        dediren_archimate::validate_element_type(
+            &node.node_type,
+            format!("$.source.nodes[{index}].type"),
+        )?;
     }
-    for relationship in &request.source.relationships {
-        if !relationship_types.contains(&relationship.relationship_type.as_str()) {
-            bail!(
-                "unsupported ArchiMate relationship type: {}",
-                relationship.relationship_type
-            );
-        }
+    for (index, relationship) in request.source.relationships.iter().enumerate() {
+        dediren_archimate::validate_relationship_type(
+            &relationship.relationship_type,
+            format!("$.source.relationships[{index}].type"),
+        )?;
     }
     Ok(())
+}
+
+fn exit_with_archimate_type_error(error: ArchimateTypeValidationError) -> ! {
+    let diagnostic = Diagnostic {
+        code: error.code().to_string(),
+        severity: DiagnosticSeverity::Error,
+        message: error.message(),
+        path: Some(error.path),
+    };
+    println!(
+        "{}",
+        serde_json::to_string(&CommandEnvelope::<serde_json::Value>::error(vec![
+            diagnostic
+        ]))
+        .unwrap()
+    );
+    std::process::exit(3);
 }
 
 fn format_number(value: f64) -> String {

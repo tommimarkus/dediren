@@ -116,3 +116,52 @@ fn oef_export_plugin_outputs_model_valid_oef_xml() {
         Some("id-vn-main-orders-service")
     );
 }
+
+#[test]
+fn oef_export_plugin_rejects_unknown_archimate_node_type_with_error_envelope() {
+    let mut input = export_input();
+    input["source"]["nodes"][0]["type"] = serde_json::json!("TechnologyNode");
+
+    let mut cmd = Command::cargo_bin("dediren-plugin-archimate-oef-export").unwrap();
+    cmd.arg("export")
+        .write_stdin(serde_json::to_string(&input).unwrap())
+        .assert()
+        .failure()
+        .stdout(predicate::str::contains("\"status\":\"error\""))
+        .stdout(predicate::str::contains(
+            "DEDIREN_ARCHIMATE_ELEMENT_TYPE_UNSUPPORTED",
+        ))
+        .stdout(predicate::str::contains("TechnologyNode"));
+}
+
+#[test]
+fn oef_export_plugin_rejects_unknown_archimate_relationship_type_with_error_envelope() {
+    let mut input = export_input();
+    input["source"]["relationships"][0]["type"] = serde_json::json!("ConnectsTo");
+
+    let mut cmd = Command::cargo_bin("dediren-plugin-archimate-oef-export").unwrap();
+    cmd.arg("export")
+        .write_stdin(serde_json::to_string(&input).unwrap())
+        .assert()
+        .failure()
+        .stdout(predicate::str::contains("\"status\":\"error\""))
+        .stdout(predicate::str::contains(
+            "DEDIREN_ARCHIMATE_RELATIONSHIP_TYPE_UNSUPPORTED",
+        ))
+        .stdout(predicate::str::contains("ConnectsTo"));
+}
+
+fn export_input() -> serde_json::Value {
+    serde_json::json!({
+        "export_request_schema_version": "export-request.schema.v1",
+        "source": serde_json::from_str::<serde_json::Value>(
+            &std::fs::read_to_string(workspace_file("fixtures/source/valid-archimate-oef.json")).unwrap()
+        ).unwrap(),
+        "layout_result": serde_json::from_str::<serde_json::Value>(
+            &std::fs::read_to_string(workspace_file("fixtures/layout-result/archimate-oef-basic.json")).unwrap()
+        ).unwrap(),
+        "policy": serde_json::from_str::<serde_json::Value>(
+            &std::fs::read_to_string(workspace_file("fixtures/export-policy/default-oef.json")).unwrap()
+        ).unwrap()
+    })
+}

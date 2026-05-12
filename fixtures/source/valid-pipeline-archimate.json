@@ -31,7 +31,7 @@
     },
     {
       "id": "database",
-      "type": "TechnologyNode",
+      "type": "Node",
       "label": "PostgreSQL",
       "properties": {}
     },

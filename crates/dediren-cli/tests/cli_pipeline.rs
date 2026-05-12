@@ -232,7 +232,7 @@ fn archimate_pipeline_renders_policy_notation_from_projected_metadata() {
     );
     assert_eq!(
         metadata_envelope["data"]["nodes"]["database"]["type"],
-        "TechnologyNode"
+        "Node"
     );
     assert_eq!(
         metadata_envelope["data"]["edges"]["web-app-calls-api"]["type"],

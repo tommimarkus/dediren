@@ -88,6 +88,90 @@ fn generic_graph_projects_render_metadata() {
     );
 }
 
+#[test]
+fn generic_graph_rejects_unknown_archimate_node_type_for_render_metadata() {
+    let mut source = archimate_source();
+    source["nodes"][0]["type"] = serde_json::json!("TechnologyNode");
+
+    let mut cmd = Command::cargo_bin("dediren-plugin-generic-graph").unwrap();
+    cmd.args(["project", "--target", "render-metadata", "--view", "main"])
+        .write_stdin(serde_json::to_string(&source).unwrap());
+    cmd.assert()
+        .failure()
+        .stdout(predicate::str::contains(
+            "DEDIREN_ARCHIMATE_ELEMENT_TYPE_UNSUPPORTED",
+        ))
+        .stdout(predicate::str::contains("TechnologyNode"));
+}
+
+#[test]
+fn generic_graph_rejects_unknown_archimate_relationship_type_for_render_metadata() {
+    let mut source = archimate_source();
+    source["relationships"][0]["type"] = serde_json::json!("ConnectsTo");
+
+    let mut cmd = Command::cargo_bin("dediren-plugin-generic-graph").unwrap();
+    cmd.args(["project", "--target", "render-metadata", "--view", "main"])
+        .write_stdin(serde_json::to_string(&source).unwrap());
+    cmd.assert()
+        .failure()
+        .stdout(predicate::str::contains(
+            "DEDIREN_ARCHIMATE_RELATIONSHIP_TYPE_UNSUPPORTED",
+        ))
+        .stdout(predicate::str::contains("ConnectsTo"));
+}
+
+fn archimate_source() -> serde_json::Value {
+    serde_json::json!({
+        "model_schema_version": "model.schema.v1",
+        "required_plugins": [
+            {
+                "id": "generic-graph",
+                "version": "0.1.3"
+            },
+            {
+                "id": "archimate-oef",
+                "version": "0.1.3"
+            }
+        ],
+        "nodes": [
+            {
+                "id": "orders-component",
+                "type": "ApplicationComponent",
+                "label": "Orders Component",
+                "properties": {}
+            },
+            {
+                "id": "orders-service",
+                "type": "ApplicationService",
+                "label": "Orders Service",
+                "properties": {}
+            }
+        ],
+        "relationships": [
+            {
+                "id": "orders-realizes-service",
+                "type": "Realization",
+                "source": "orders-component",
+                "target": "orders-service",
+                "label": "realizes",
+                "properties": {}
+            }
+        ],
+        "plugins": {
+            "generic-graph": {
+                "views": [
+                    {
+                        "id": "main",
+                        "label": "Main",
+                        "nodes": ["orders-component", "orders-service"],
+                        "relationships": ["orders-realizes-service"]
+                    }
+                ]
+            }
+        }
+    })
+}
+
 fn workspace_file(path: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../..")
