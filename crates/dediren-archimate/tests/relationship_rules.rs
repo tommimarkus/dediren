@@ -3,6 +3,22 @@ use dediren_archimate::{
     RELATIONSHIP_TYPES,
 };
 
+const REQUIRED_ALLOWED_RELATIONSHIPS: &[(&str, &str, &str)] = &[
+    ("Realization", "ApplicationComponent", "ApplicationService"),
+    ("Triggering", "BusinessProcess", "BusinessProcess"),
+    ("Serving", "ApplicationService", "ApplicationComponent"),
+    ("Access", "ApplicationFunction", "DataObject"),
+    ("Association", "BusinessActor", "DataObject"),
+];
+
+const REQUIRED_REJECTED_RELATIONSHIPS: &[(&str, &str, &str)] = &[
+    ("Realization", "ApplicationService", "ApplicationComponent"),
+    ("Triggering", "BusinessActor", "DataObject"),
+    ("Serving", "DataObject", "ApplicationService"),
+    ("Access", "ApplicationComponent", "ApplicationFunction"),
+    ("Flow", "BusinessObject", "ApplicationComponent"),
+];
+
 #[test]
 fn accepts_current_archimate_oef_fixture_relationship() {
     validate_relationship_endpoint_types(
@@ -63,6 +79,40 @@ fn accepts_same_behavior_triggering_relationship() {
 }
 
 #[test]
+fn accepts_curated_archimate_32_relationship_oracle() {
+    for (relationship_type, source_type, target_type) in REQUIRED_ALLOWED_RELATIONSHIPS {
+        validate_relationship_endpoint_types(
+            relationship_type,
+            source_type,
+            target_type,
+            "$.relationships[*]",
+        )
+        .unwrap_or_else(|error| {
+            panic!(
+                "expected {source_type} -{relationship_type}-> {target_type} to be allowed, got {error:?}"
+            )
+        });
+    }
+}
+
+#[test]
+fn rejects_curated_archimate_32_relationship_oracle() {
+    for (relationship_type, source_type, target_type) in REQUIRED_REJECTED_RELATIONSHIPS {
+        let error = validate_relationship_endpoint_types(
+            relationship_type,
+            source_type,
+            target_type,
+            "$.relationships[*]",
+        )
+        .unwrap_err();
+        assert_eq!(
+            error.code(),
+            "DEDIREN_ARCHIMATE_RELATIONSHIP_ENDPOINT_UNSUPPORTED"
+        );
+    }
+}
+
+#[test]
 fn derived_relationship_triples_only_reference_supported_names() {
     let triples = relationship_endpoint_triples();
     assert!(
@@ -85,6 +135,33 @@ fn derived_relationship_triples_only_reference_supported_names() {
             ELEMENT_TYPES.contains(&triple.target_type),
             "unknown target type in derived triple: {}",
             triple.target_type
+        );
+    }
+}
+
+#[test]
+fn derived_relationship_triples_are_accepted_by_validator() {
+    for triple in relationship_endpoint_triples() {
+        validate_relationship_endpoint_types(
+            triple.relationship_type,
+            triple.source_type,
+            triple.target_type,
+            "$.relationships[*]",
+        )
+        .unwrap_or_else(|error| panic!("derived triple should validate: {triple:?}: {error:?}"));
+    }
+}
+
+#[test]
+fn derived_relationship_triples_cover_every_relationship_type() {
+    let covered: std::collections::BTreeSet<&str> = relationship_endpoint_triples()
+        .iter()
+        .map(|triple| triple.relationship_type)
+        .collect();
+    for relationship_type in RELATIONSHIP_TYPES {
+        assert!(
+            covered.contains(relationship_type),
+            "relationship type {relationship_type} should have at least one derived endpoint triple"
         );
     }
 }
