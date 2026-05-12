@@ -1773,6 +1773,7 @@ fn svg_renderer_separates_labels_for_adjacent_multisegment_routes() {
         semantic_group(&doc, "data-dediren-edge-id", "authorizes-payment"),
         "path",
     );
+    let authorizes_data = authorizes_path.attribute("d").unwrap();
     let authorizes_y = authorizes.attribute("y").unwrap().parse::<f64>().unwrap();
 
     assert!(
@@ -1799,16 +1800,21 @@ fn svg_renderer_separates_labels_for_adjacent_multisegment_routes() {
         "fallback label should not sit on another edge route"
     );
     assert!(
-        authorizes_path
-            .attribute("d")
-            .is_some_and(|data| data.contains(" Q ")),
+        authorizes_data.contains(" Q "),
         "adjacent multi-segment routes should draw a line jump where they share a route segment"
     );
     assert!(
-        authorizes_path.attribute("d").is_some_and(|data| data
-            .contains("746.0 396.0")
-            && data.contains("L 746.0 384.0")),
+        path_data_contains_point(authorizes_data, 746.0, 396.0)
+            && path_data_contains_point(authorizes_data, 746.0, 384.0),
         "adjacent multi-segment routes should run on a parallel offset while their original route overlaps"
+    );
+    assert!(
+        !path_data_contains_point(authorizes_data, 740.0, 396.0),
+        "adjacent multi-segment route detour should not draw through the overlap entry; got {authorizes_data}"
+    );
+    assert!(
+        !path_data_contains_point(authorizes_data, 740.0, 384.0),
+        "adjacent multi-segment route detour should not rejoin at the overlap exit; got {authorizes_data}"
     );
 }
 
@@ -3543,6 +3549,12 @@ fn parse_svg_path_numbers(data: &str) -> Vec<f64> {
     data.split_whitespace()
         .filter_map(|token| token.parse::<f64>().ok())
         .collect()
+}
+
+fn path_data_contains_point(data: &str, x: f64, y: f64) -> bool {
+    parse_svg_path_numbers(data)
+        .chunks_exact(2)
+        .any(|point| (point[0] - x).abs() <= 0.1 && (point[1] - y).abs() <= 0.1)
 }
 
 fn point_bounds(points: &[(f64, f64)]) -> (f64, f64, f64, f64) {

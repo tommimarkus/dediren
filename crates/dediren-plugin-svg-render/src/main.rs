@@ -2821,27 +2821,59 @@ fn edge_path(
 }
 
 fn edge_path_data(points: &[Point], earlier_edges: &[&LaidOutEdge]) -> String {
+    let detours: Vec<Option<LineDetour>> = points
+        .windows(2)
+        .map(|segment| {
+            colinear_overlap_detours(&segment[0], &segment[1], earlier_edges)
+                .into_iter()
+                .next()
+        })
+        .collect();
     let mut data = format!("M {:.1} {:.1}", points[0].x, points[0].y);
-    for segment in points.windows(2) {
+    let mut current_point = points[0].clone();
+    for (index, segment) in points.windows(2).enumerate() {
         let start = &segment[0];
         let end = &segment[1];
-        if let Some(detour) = colinear_overlap_detours(start, end, earlier_edges)
-            .into_iter()
-            .next()
-        {
-            append_colinear_overlap_detour(&mut data, start, end, &detour);
-            data.push_str(&format!(" L {:.1} {:.1}", end.x, end.y));
+        if let Some(detour) = &detours[index] {
+            let previous = index
+                .checked_sub(1)
+                .and_then(|previous| points.get(previous));
+            let next = points.get(index + 2);
+            let detour_exit = append_colinear_overlap_detour(
+                &mut data,
+                &current_point,
+                start,
+                end,
+                previous,
+                next,
+                detour,
+            );
+            current_point = detour_exit.point;
+            if !detour_exit.continues_after_segment {
+                append_line_to(&mut data, &current_point, end);
+                current_point = end.clone();
+            }
             continue;
         }
-        let jumps = line_jump_points(start, end, earlier_edges);
+
+        let mut segment_end = end.clone();
+        if let Some(Some(next_detour)) = detours.get(index + 1) {
+            if same_point(&next_detour.entry, end) {
+                segment_end = shifted_toward(&next_detour.entry, &current_point, LINE_JUMP_SIZE);
+            }
+        }
+
+        let jumps = line_jump_points(&current_point, &segment_end, earlier_edges);
         if jumps.is_empty() {
-            data.push_str(&format!(" L {:.1} {:.1}", end.x, end.y));
+            append_line_to(&mut data, &current_point, &segment_end);
+            current_point = segment_end;
             continue;
         }
         for jump in jumps {
-            append_line_jump(&mut data, start, end, &jump);
+            append_line_jump(&mut data, &current_point, &segment_end, &jump);
         }
-        data.push_str(&format!(" L {:.1} {:.1}", end.x, end.y));
+        append_line_to(&mut data, &current_point, &segment_end);
+        current_point = segment_end;
     }
     data
 }
@@ -2859,6 +2891,12 @@ struct LineDetour {
     offset_entry: Point,
     offset_exit: Point,
     distance: f64,
+}
+
+#[derive(Debug)]
+struct DetourExit {
+    point: Point,
+    continues_after_segment: bool,
 }
 
 fn colinear_overlap_detours(
@@ -3057,13 +3095,21 @@ fn append_line_jump(data: &mut String, start: &Point, end: &Point, jump: &LineJu
 
 fn append_colinear_overlap_detour(
     data: &mut String,
+    current_point: &Point,
     start: &Point,
     end: &Point,
+    previous: Option<&Point>,
+    next: Option<&Point>,
     detour: &LineDetour,
-) {
-    data.push_str(&format!(" L {:.1} {:.1}", detour.entry.x, detour.entry.y));
+) -> DetourExit {
+    let approach = detour_entry_approach(current_point, start, previous, detour);
+    let detour_exit = detour_exit_departure(end, next, detour);
+    append_line_to(data, current_point, &approach);
     if start.y == end.y {
-        let direction = (end.x - start.x).signum();
+        let exit_control = Point {
+            x: detour_exit.point.x,
+            y: detour.offset_exit.y,
+        };
         data.push_str(&format!(
             " Q {:.1} {:.1} {:.1} {:.1} L {:.1} {:.1} Q {:.1} {:.1} {:.1} {:.1}",
             detour.entry.x,
@@ -3072,26 +3118,99 @@ fn append_colinear_overlap_detour(
             detour.offset_entry.y,
             detour.offset_exit.x,
             detour.offset_exit.y,
-            detour.exit.x + direction * LINE_JUMP_SIZE,
-            detour.exit.y - LINE_JUMP_SIZE,
-            detour.exit.x,
-            detour.exit.y
+            exit_control.x,
+            exit_control.y,
+            detour_exit.point.x,
+            detour_exit.point.y
         ));
     } else if start.x == end.x {
-        let direction = (end.y - start.y).signum();
+        let entry_control = if approach.y == detour.entry.y && approach.x != detour.entry.x {
+            Point {
+                x: detour.entry.x,
+                y: detour.entry.y - LINE_JUMP_SIZE,
+            }
+        } else {
+            Point {
+                x: detour.entry.x + LINE_JUMP_SIZE,
+                y: detour.entry.y,
+            }
+        };
+        let exit_control = Point {
+            x: detour.offset_exit.x,
+            y: detour_exit.point.y,
+        };
         data.push_str(&format!(
             " Q {:.1} {:.1} {:.1} {:.1} L {:.1} {:.1} Q {:.1} {:.1} {:.1} {:.1}",
-            detour.entry.x + LINE_JUMP_SIZE,
-            detour.entry.y,
+            entry_control.x,
+            entry_control.y,
             detour.offset_entry.x,
             detour.offset_entry.y,
             detour.offset_exit.x,
             detour.offset_exit.y,
-            detour.exit.x + LINE_JUMP_SIZE,
-            detour.exit.y + direction * LINE_JUMP_SIZE,
-            detour.exit.x,
-            detour.exit.y
+            exit_control.x,
+            exit_control.y,
+            detour_exit.point.x,
+            detour_exit.point.y
         ));
+    }
+    detour_exit
+}
+
+fn append_line_to(data: &mut String, current: &Point, target: &Point) {
+    if !same_point(current, target) {
+        data.push_str(&format!(" L {:.1} {:.1}", target.x, target.y));
+    }
+}
+
+fn same_point(left: &Point, right: &Point) -> bool {
+    left.x == right.x && left.y == right.y
+}
+
+fn shifted_toward(from: &Point, to: &Point, distance: f64) -> Point {
+    let length = segment_length(from, to);
+    if length == 0.0 {
+        return from.clone();
+    }
+    let ratio = distance.min(length) / length;
+    Point {
+        x: from.x + (to.x - from.x) * ratio,
+        y: from.y + (to.y - from.y) * ratio,
+    }
+}
+
+fn detour_entry_approach(
+    current_point: &Point,
+    start: &Point,
+    previous: Option<&Point>,
+    detour: &LineDetour,
+) -> Point {
+    if !same_point(current_point, start) {
+        return current_point.clone();
+    }
+    if same_point(&detour.entry, start) {
+        return previous
+            .map(|point| shifted_toward(&detour.entry, point, LINE_JUMP_SIZE))
+            .unwrap_or_else(|| detour.entry.clone());
+    }
+    shifted_toward(&detour.entry, start, LINE_JUMP_SIZE)
+}
+
+fn detour_exit_departure(end: &Point, next: Option<&Point>, detour: &LineDetour) -> DetourExit {
+    if same_point(&detour.exit, end) {
+        if let Some(next) = next {
+            return DetourExit {
+                point: shifted_toward(&detour.exit, next, LINE_JUMP_SIZE),
+                continues_after_segment: true,
+            };
+        }
+        return DetourExit {
+            point: detour.exit.clone(),
+            continues_after_segment: false,
+        };
+    }
+    DetourExit {
+        point: shifted_toward(&detour.exit, end, LINE_JUMP_SIZE),
+        continues_after_segment: false,
     }
 }
 
