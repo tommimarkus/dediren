@@ -143,6 +143,53 @@ pub fn child_group_with_attr<'a, 'input>(
         .find(|child| child.has_tag_name("g") && child.attribute(attr_name) == Some(attr_value))
 }
 
+pub fn parse_svg_view_box(content: &str) -> [f64; 4] {
+    let doc = svg_doc(content);
+    let svg = doc.root_element();
+    let view_box = svg.attribute("viewBox").expect("SVG should have viewBox");
+    let values: Vec<f64> = view_box
+        .split_whitespace()
+        .map(|value| {
+            value
+                .parse::<f64>()
+                .expect("viewBox should contain numbers")
+        })
+        .collect();
+    assert_eq!(values.len(), 4, "viewBox should contain four numbers");
+    [values[0], values[1], values[2], values[3]]
+}
+
+pub fn assert_reasonable_svg_aspect(content: &str, max_aspect: f64) {
+    let [_x, _y, width, height] = parse_svg_view_box(content);
+    assert!(width > 0.0, "viewBox width should be positive");
+    assert!(height > 0.0, "viewBox height should be positive");
+    let aspect = width.max(height) / width.min(height);
+    assert!(
+        aspect <= max_aspect,
+        "expected SVG aspect ratio <= {max_aspect}, got {aspect} from {width}x{height}"
+    );
+}
+
+pub fn svg_texts(doc: &Document<'_>) -> Vec<String> {
+    doc.descendants()
+        .filter(|node| node.has_tag_name("text"))
+        .filter_map(|node| node.text())
+        .map(str::trim)
+        .filter(|text| !text.is_empty())
+        .map(ToOwned::to_owned)
+        .collect()
+}
+
+pub fn assert_svg_texts_include(doc: &Document<'_>, expected: &[&str]) {
+    let actual = svg_texts(doc);
+    for expected_text in expected {
+        assert!(
+            actual.iter().any(|text| text == expected_text),
+            "expected SVG text {expected_text:?}, got {actual:?}"
+        );
+    }
+}
+
 pub fn write_render_artifact(group: &str, test_name: &str, content: &str) -> PathBuf {
     let path = workspace_file(&format!(".test-output/renders/{group}/{test_name}.svg"));
     std::fs::create_dir_all(path.parent().expect("artifact path should have parent"))
