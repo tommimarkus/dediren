@@ -4,7 +4,7 @@ set -euo pipefail
 ARCHIVE=${1:-}
 MIN_JAVA_MAJOR=21
 if [[ -z "$ARCHIVE" ]]; then
-  echo "usage: scripts/smoke-dist.sh dist/dediren-agent-bundle-0.1.0-x86_64-unknown-linux-gnu.tar.gz" >&2
+  echo "usage: scripts/smoke-dist.sh dist/dediren-agent-bundle-0.1.1-x86_64-unknown-linux-gnu.tar.gz" >&2
   exit 2
 fi
 if [[ ! -f "$ARCHIVE" ]]; then
