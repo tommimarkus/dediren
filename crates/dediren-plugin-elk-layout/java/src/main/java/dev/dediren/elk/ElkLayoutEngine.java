@@ -31,6 +31,8 @@ final class ElkLayoutEngine {
     private static final double ROUTE_DETOUR_RATIO = 1.5;
     private static final double ROUTE_DETOUR_EXCESS = 240.0;
     private static final double ROUTE_CHANNEL_PADDING = 32.0;
+    private static final double ROUTE_ENDPOINT_CLEARANCE = 32.0;
+    private static final double GEOMETRY_EPSILON = 0.001;
 
     JsonContracts.LayoutResult layout(JsonContracts.LayoutRequest request) {
         validate(request);
@@ -471,13 +473,15 @@ final class ElkLayoutEngine {
         List<JsonContracts.LaidOutNode> nodes) {
         JsonContracts.Point start = edge.points().get(0);
         JsonContracts.Point end = edge.points().get(edge.points().size() - 1);
+        JsonContracts.Point clearStart = clearancePoint(start, nodeById(nodes, edge.source()));
+        JsonContracts.Point clearEnd = clearancePoint(end, nodeById(nodes, edge.target()));
         List<List<JsonContracts.Point>> candidates = new ArrayList<>();
-        candidates.add(routeViaX(start, end, (start.x() + end.x()) / 2.0));
-        candidates.add(routeViaY(start, end, (start.y() + end.y()) / 2.0));
-        candidates.add(routeViaX(start, end, minNodeX(nodes) - ROUTE_CHANNEL_PADDING));
-        candidates.add(routeViaX(start, end, maxNodeX(nodes) + ROUTE_CHANNEL_PADDING));
-        candidates.add(routeViaY(start, end, minNodeY(nodes) - ROUTE_CHANNEL_PADDING));
-        candidates.add(routeViaY(start, end, maxNodeY(nodes) + ROUTE_CHANNEL_PADDING));
+        candidates.add(routeViaX(start, clearStart, clearEnd, end, (start.x() + end.x()) / 2.0));
+        candidates.add(routeViaY(start, clearStart, clearEnd, end, (start.y() + end.y()) / 2.0));
+        candidates.add(routeViaX(start, clearStart, clearEnd, end, minNodeX(nodes) - ROUTE_CHANNEL_PADDING));
+        candidates.add(routeViaX(start, clearStart, clearEnd, end, maxNodeX(nodes) + ROUTE_CHANNEL_PADDING));
+        candidates.add(routeViaY(start, clearStart, clearEnd, end, minNodeY(nodes) - ROUTE_CHANNEL_PADDING));
+        candidates.add(routeViaY(start, clearStart, clearEnd, end, maxNodeY(nodes) + ROUTE_CHANNEL_PADDING));
 
         List<JsonContracts.Point> best = List.of();
         double bestLength = Double.POSITIVE_INFINITY;
@@ -494,25 +498,56 @@ final class ElkLayoutEngine {
         return best;
     }
 
+    private static JsonContracts.Point clearancePoint(
+        JsonContracts.Point point,
+        JsonContracts.LaidOutNode node) {
+        if (node == null) {
+            return point;
+        }
+        double right = node.x() + node.width();
+        double bottom = node.y() + node.height();
+        if (sameCoordinate(point.x(), node.x())) {
+            return new JsonContracts.Point(node.x() - ROUTE_ENDPOINT_CLEARANCE, point.y());
+        }
+        if (sameCoordinate(point.x(), right)) {
+            return new JsonContracts.Point(right + ROUTE_ENDPOINT_CLEARANCE, point.y());
+        }
+        if (sameCoordinate(point.y(), node.y())) {
+            return new JsonContracts.Point(point.x(), node.y() - ROUTE_ENDPOINT_CLEARANCE);
+        }
+        if (sameCoordinate(point.y(), bottom)) {
+            return new JsonContracts.Point(point.x(), bottom + ROUTE_ENDPOINT_CLEARANCE);
+        }
+        return point;
+    }
+
     private static List<JsonContracts.Point> routeViaX(
         JsonContracts.Point start,
+        JsonContracts.Point clearStart,
+        JsonContracts.Point clearEnd,
         JsonContracts.Point end,
         double viaX) {
         return compactPoints(List.of(
             start,
-            new JsonContracts.Point(viaX, start.y()),
-            new JsonContracts.Point(viaX, end.y()),
+            clearStart,
+            new JsonContracts.Point(viaX, clearStart.y()),
+            new JsonContracts.Point(viaX, clearEnd.y()),
+            clearEnd,
             end));
     }
 
     private static List<JsonContracts.Point> routeViaY(
         JsonContracts.Point start,
+        JsonContracts.Point clearStart,
+        JsonContracts.Point clearEnd,
         JsonContracts.Point end,
         double viaY) {
         return compactPoints(List.of(
             start,
-            new JsonContracts.Point(start.x(), viaY),
-            new JsonContracts.Point(end.x(), viaY),
+            clearStart,
+            new JsonContracts.Point(clearStart.x(), viaY),
+            new JsonContracts.Point(clearEnd.x(), viaY),
+            clearEnd,
             end));
     }
 
@@ -527,8 +562,12 @@ final class ElkLayoutEngine {
     }
 
     private static boolean samePoint(JsonContracts.Point left, JsonContracts.Point right) {
-        return Double.compare(left.x(), right.x()) == 0
-            && Double.compare(left.y(), right.y()) == 0;
+        return sameCoordinate(left.x(), right.x())
+            && sameCoordinate(left.y(), right.y());
+    }
+
+    private static boolean sameCoordinate(double left, double right) {
+        return Math.abs(left - right) <= GEOMETRY_EPSILON;
     }
 
     private static boolean routeIntersectsUnrelatedNode(
@@ -625,6 +664,15 @@ final class ElkLayoutEngine {
             .mapToDouble(node -> node.y() + node.height())
             .max()
             .orElse(0.0);
+    }
+
+    private static JsonContracts.LaidOutNode nodeById(
+        List<JsonContracts.LaidOutNode> nodes,
+        String id) {
+        return nodes.stream()
+            .filter(node -> node.id().equals(id))
+            .findFirst()
+            .orElse(null);
     }
 
     private static List<JsonContracts.LaidOutGroup> groups(

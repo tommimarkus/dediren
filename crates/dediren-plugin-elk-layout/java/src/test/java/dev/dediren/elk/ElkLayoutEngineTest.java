@@ -364,7 +364,11 @@ class ElkLayoutEngineTest {
             0,
             excessiveRouteDetourCount(result),
             "reverse cross-group route should be normalized when ELK routes it around the diagram");
-        assertTrue(paymentEdge.points().size() <= 4, "normalized reverse route should stay compact");
+        assertEquals(
+            0,
+            endpointBoundaryOverlapCount(result, paymentEdge),
+            "normalized reverse route should leave endpoint nodes before turning");
+        assertTrue(paymentEdge.points().size() <= 6, "normalized reverse route should stay compact");
     }
 
     private static void assertRouted(JsonContracts.LaidOutEdge edge) {
@@ -493,6 +497,56 @@ class ElkLayoutEngineTest {
             length += Math.abs(start.x() - end.x()) + Math.abs(start.y() - end.y());
         }
         return length;
+    }
+
+    private static int endpointBoundaryOverlapCount(
+        JsonContracts.LayoutResult result,
+        JsonContracts.LaidOutEdge edge) {
+        return boundaryOverlapCount(nodeById(result, edge.source()), edge.points())
+            + boundaryOverlapCount(nodeById(result, edge.target()), edge.points());
+    }
+
+    private static int boundaryOverlapCount(
+        JsonContracts.LaidOutNode node,
+        List<JsonContracts.Point> points) {
+        int count = 0;
+        for (int index = 0; index < points.size() - 1; index++) {
+            JsonContracts.Point start = points.get(index);
+            JsonContracts.Point end = points.get(index + 1);
+            if (segmentOverlapsBoundary(start, end, node)) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    private static boolean segmentOverlapsBoundary(
+        JsonContracts.Point start,
+        JsonContracts.Point end,
+        JsonContracts.LaidOutNode node) {
+        double right = node.x() + node.width();
+        double bottom = node.y() + node.height();
+        if (Double.compare(start.x(), end.x()) == 0
+            && (Double.compare(start.x(), node.x()) == 0 || Double.compare(start.x(), right) == 0)) {
+            return overlapLength(start.y(), end.y(), node.y(), bottom) > 1.0;
+        }
+        if (Double.compare(start.y(), end.y()) == 0
+            && (Double.compare(start.y(), node.y()) == 0 || Double.compare(start.y(), bottom) == 0)) {
+            return overlapLength(start.x(), end.x(), node.x(), right) > 1.0;
+        }
+        return false;
+    }
+
+    private static double overlapLength(
+        double firstStart,
+        double firstEnd,
+        double secondStart,
+        double secondEnd) {
+        double firstMin = Math.min(firstStart, firstEnd);
+        double firstMax = Math.max(firstStart, firstEnd);
+        double secondMin = Math.min(secondStart, secondEnd);
+        double secondMax = Math.max(secondStart, secondEnd);
+        return Math.max(0.0, Math.min(firstMax, secondMax) - Math.max(firstMin, secondMin));
     }
 
     private static boolean segmentIntersectsRect(

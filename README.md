@@ -40,18 +40,18 @@ Runtime prerequisite:
 
 - Java 21 or newer available as `java` on `PATH`.
 
-For the current `0.1.6` version, the script creates:
+For the current `0.1.7` version, the script creates:
 
 ```text
-dist/dediren-agent-bundle-0.1.6-x86_64-unknown-linux-gnu/
-dist/dediren-agent-bundle-0.1.6-x86_64-unknown-linux-gnu.tar.gz
+dist/dediren-agent-bundle-0.1.7-x86_64-unknown-linux-gnu/
+dist/dediren-agent-bundle-0.1.7-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Run the smoke test from a shell where `java -version` resolves to Java 21 or
 newer:
 
 ```bash
-scripts/smoke-dist.sh dist/dediren-agent-bundle-0.1.6-x86_64-unknown-linux-gnu.tar.gz
+scripts/smoke-dist.sh dist/dediren-agent-bundle-0.1.7-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Concurrent `scripts/build-dist.sh` invocations serialize on a repo-local lock
@@ -62,8 +62,8 @@ Unpack and run it anywhere:
 
 ```bash
 mkdir -p /tmp/dediren-dist
-tar -xzf dist/dediren-agent-bundle-0.1.6-x86_64-unknown-linux-gnu.tar.gz -C /tmp/dediren-dist
-/tmp/dediren-dist/dediren-agent-bundle-0.1.6-x86_64-unknown-linux-gnu/bin/dediren --help
+tar -xzf dist/dediren-agent-bundle-0.1.7-x86_64-unknown-linux-gnu.tar.gz -C /tmp/dediren-dist
+/tmp/dediren-dist/dediren-agent-bundle-0.1.7-x86_64-unknown-linux-gnu/bin/dediren --help
 ```
 
 The archive includes first-party plugin manifests under `plugins/`, first-party
@@ -376,7 +376,7 @@ newer:
 
 ```bash
 scripts/build-dist.sh
-scripts/smoke-dist.sh dist/dediren-agent-bundle-0.1.6-x86_64-unknown-linux-gnu.tar.gz
+scripts/smoke-dist.sh dist/dediren-agent-bundle-0.1.7-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Focused checks:
