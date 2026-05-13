@@ -434,6 +434,16 @@ fn real_elk_renders_complex_multi_layer_system() {
             .len(),
         6
     );
+    assert_edges_have_at_most_corner_count(
+        &layout_data,
+        &[
+            "gateway-authenticates",
+            "gateway-queries-catalog",
+            "gateway-prices-cart",
+            "gateway-places-order",
+        ],
+        2,
+    );
 
     let default_svg = render_svg(&layout, "fixtures/render-policy/default-svg.json", None);
     let default_doc = svg_doc(&default_svg);
@@ -682,6 +692,74 @@ fn assert_complex_layout_quality_bounded(quality: &Value) {
         quality["route_close_parallel_count"], 0,
         "complex layout should keep parallel route channels readable: {quality}"
     );
+}
+
+fn assert_edges_have_at_most_corner_count(
+    layout_data: &Value,
+    edge_ids: &[&str],
+    max_corners: usize,
+) {
+    let edges = layout_data["edges"]
+        .as_array()
+        .expect("laid out edges should be an array");
+    for edge_id in edge_ids {
+        let edge = edges
+            .iter()
+            .find(|edge| edge["id"] == *edge_id)
+            .unwrap_or_else(|| panic!("expected laid out edge {edge_id}"));
+        let points = edge["points"]
+            .as_array()
+            .unwrap_or_else(|| panic!("{edge_id} points should be an array"));
+        let corners = corner_count(points);
+        assert!(
+            corners <= max_corners,
+            "{edge_id} should have at most {max_corners} corners, got {corners}: {points:?}"
+        );
+    }
+}
+
+fn corner_count(points: &[Value]) -> usize {
+    let mut corners = 0;
+    let mut previous = None;
+    for segment in points.windows(2) {
+        if let Some(current) = route_orientation(&segment[0], &segment[1]) {
+            if previous.is_some_and(|previous| previous != current) {
+                corners += 1;
+            }
+            previous = Some(current);
+        }
+    }
+    corners
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RouteOrientation {
+    Horizontal,
+    Vertical,
+}
+
+fn route_orientation(start: &Value, end: &Value) -> Option<RouteOrientation> {
+    let start_x = point_coordinate(start, "x");
+    let start_y = point_coordinate(start, "y");
+    let end_x = point_coordinate(end, "x");
+    let end_y = point_coordinate(end, "y");
+    if same_coordinate(start_y, end_y) && !same_coordinate(start_x, end_x) {
+        return Some(RouteOrientation::Horizontal);
+    }
+    if same_coordinate(start_x, end_x) && !same_coordinate(start_y, end_y) {
+        return Some(RouteOrientation::Vertical);
+    }
+    None
+}
+
+fn same_coordinate(left: f64, right: f64) -> bool {
+    (left - right).abs() <= 0.001
+}
+
+fn point_coordinate(point: &Value, key: &str) -> f64 {
+    point[key]
+        .as_f64()
+        .unwrap_or_else(|| panic!("point coordinate {key} should be a number: {point}"))
 }
 
 fn assert_complex_profile_svg(doc: &roxmltree::Document<'_>, svg: &str) {

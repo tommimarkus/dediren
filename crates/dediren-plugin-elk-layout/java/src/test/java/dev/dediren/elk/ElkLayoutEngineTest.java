@@ -274,6 +274,56 @@ class ElkLayoutEngineTest {
     }
 
     @Test
+    void groupedGatewayFanOutKeepsCompactDoglegs() {
+        JsonContracts.LayoutRequest request = new JsonContracts.LayoutRequest(
+            "layout-request.schema.v1",
+            "main",
+            List.of(
+                new JsonContracts.LayoutNode("web-frontend", "Web Frontend", "web-frontend", 160.0, 80.0),
+                new JsonContracts.LayoutNode("api-gateway", "API Gateway", "api-gateway", 160.0, 112.0),
+                new JsonContracts.LayoutNode("identity-service", "Identity Service", "identity-service", 160.0, 80.0),
+                new JsonContracts.LayoutNode("pricing-service", "Pricing Service", "pricing-service", 160.0, 80.0),
+                new JsonContracts.LayoutNode("order-service", "Order Service", "order-service", 160.0, 80.0),
+                new JsonContracts.LayoutNode("catalog-service", "Catalog Service", "catalog-service", 160.0, 80.0)),
+            List.of(
+                new JsonContracts.LayoutEdge("web-calls-gateway", "web-frontend", "api-gateway", "calls", "web-calls-gateway"),
+                new JsonContracts.LayoutEdge("gateway-authenticates", "api-gateway", "identity-service", "authenticates", "gateway-authenticates"),
+                new JsonContracts.LayoutEdge("gateway-prices-cart", "api-gateway", "pricing-service", "prices cart", "gateway-prices-cart"),
+                new JsonContracts.LayoutEdge("gateway-places-order", "api-gateway", "order-service", "places order", "gateway-places-order"),
+                new JsonContracts.LayoutEdge("gateway-queries-catalog", "api-gateway", "catalog-service", "queries catalog", "gateway-queries-catalog")),
+            List.of(
+                new JsonContracts.LayoutGroup(
+                    "edge-platform",
+                    "Edge Platform",
+                    List.of("web-frontend", "api-gateway"),
+                    new JsonContracts.GroupProvenance(new JsonContracts.SemanticBacked("edge-platform"))),
+                new JsonContracts.LayoutGroup(
+                    "core-services",
+                    "Core Services",
+                    List.of("identity-service", "pricing-service", "order-service", "catalog-service"),
+                    new JsonContracts.GroupProvenance(new JsonContracts.SemanticBacked("core-services")))),
+            List.of(),
+            List.of());
+
+        JsonContracts.LayoutResult result = new ElkLayoutEngine().layout(request);
+
+        assertEquals(
+            0,
+            connectorThroughNodeCount(result),
+            "compact gateway fan-out routes should still avoid unrelated service nodes");
+        for (String edgeId : List.of(
+            "gateway-authenticates",
+            "gateway-prices-cart",
+            "gateway-places-order",
+            "gateway-queries-catalog")) {
+            JsonContracts.LaidOutEdge edge = edgeById(result, edgeId);
+            assertTrue(
+                cornerCount(edge.points()) <= 2,
+                edgeId + " should use a compact dogleg, points=" + edge.points());
+        }
+    }
+
+    @Test
     void groupedPipelineProducesValidRoutesForMultipleIncomingEdges() {
         JsonContracts.LayoutRequest request = new JsonContracts.LayoutRequest(
             "layout-request.schema.v1",
@@ -527,6 +577,43 @@ class ElkLayoutEngineTest {
             length += Math.abs(start.x() - end.x()) + Math.abs(start.y() - end.y());
         }
         return length;
+    }
+
+    private static int cornerCount(List<JsonContracts.Point> points) {
+        int corners = 0;
+        RouteOrientation previous = null;
+        for (int index = 0; index < points.size() - 1; index++) {
+            JsonContracts.Point start = points.get(index);
+            JsonContracts.Point end = points.get(index + 1);
+            RouteOrientation current = routeOrientation(start, end);
+            if (current == null) {
+                continue;
+            }
+            if (previous != null && previous != current) {
+                corners++;
+            }
+            previous = current;
+        }
+        return corners;
+    }
+
+    private enum RouteOrientation {
+        HORIZONTAL,
+        VERTICAL
+    }
+
+    private static RouteOrientation routeOrientation(
+        JsonContracts.Point start,
+        JsonContracts.Point end) {
+        if (Double.compare(start.y(), end.y()) == 0
+            && Double.compare(start.x(), end.x()) != 0) {
+            return RouteOrientation.HORIZONTAL;
+        }
+        if (Double.compare(start.x(), end.x()) == 0
+            && Double.compare(start.y(), end.y()) != 0) {
+            return RouteOrientation.VERTICAL;
+        }
+        return null;
     }
 
     private static int endpointBoundaryOverlapCount(

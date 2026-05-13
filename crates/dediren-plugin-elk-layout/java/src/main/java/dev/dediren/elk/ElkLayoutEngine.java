@@ -555,24 +555,34 @@ final class ElkLayoutEngine {
         List<JsonContracts.LaidOutEdge> edges,
         List<JsonContracts.LaidOutNode> nodes) {
         List<JsonContracts.LaidOutEdge> normalized = new ArrayList<>();
-        for (JsonContracts.LaidOutEdge edge : edges) {
-            if (!hasExcessiveDetour(edge.points())) {
+        for (int edgeIndex = 0; edgeIndex < edges.size(); edgeIndex++) {
+            JsonContracts.LaidOutEdge edge = edges.get(edgeIndex);
+            List<JsonContracts.LaidOutEdge> comparisonEdges = new ArrayList<>(normalized);
+            comparisonEdges.addAll(edges.subList(edgeIndex + 1, edges.size()));
+            if (!hasExcessiveDetour(edge.points()) && cornerCount(edge.points()) <= 2) {
                 normalized.add(edge);
                 continue;
             }
-            List<JsonContracts.Point> replacement = shortestCleanOrthogonalRoute(edge, nodes, normalized);
+            List<JsonContracts.Point> replacement =
+                shortestCleanOrthogonalRoute(edge, nodes, comparisonEdges);
             if (replacement.isEmpty()) {
                 normalized.add(edge);
             } else {
-                int originalCloseParallelCount = closeParallelRouteCount(edge, edge.points(), normalized);
-                int replacementCloseParallelCount = closeParallelRouteCount(edge, replacement, normalized);
+                int originalCloseParallelCount =
+                    closeParallelRouteCount(edge, edge.points(), comparisonEdges);
+                int replacementCloseParallelCount =
+                    closeParallelRouteCount(edge, replacement, comparisonEdges);
+                int originalCornerCount = cornerCount(edge.points());
+                int replacementCornerCount = cornerCount(replacement);
+                boolean replacementDoesNotAddParallelRoutes =
+                    replacementCloseParallelCount <= originalCloseParallelCount;
                 boolean replacementImprovesReadability =
-                    replacementCloseParallelCount < originalCloseParallelCount;
+                    replacementCloseParallelCount < originalCloseParallelCount
+                        || replacementCornerCount < originalCornerCount;
                 boolean replacementIsShorter =
                     routeLength(replacement) < routeLength(edge.points());
-                if (!replacementImprovesReadability
-                    && !(replacementCloseParallelCount == originalCloseParallelCount
-                        && replacementIsShorter)) {
+                if (!replacementDoesNotAddParallelRoutes
+                    || (!replacementImprovesReadability && !replacementIsShorter)) {
                     normalized.add(edge);
                     continue;
                 }
@@ -611,6 +621,10 @@ final class ElkLayoutEngine {
         List<List<JsonContracts.Point>> candidates = new ArrayList<>();
         candidates.add(routeViaX(start, clearStart, clearEnd, end, (start.x() + end.x()) / 2.0));
         candidates.add(routeViaY(start, clearStart, clearEnd, end, (start.y() + end.y()) / 2.0));
+        candidates.add(routeViaX(start, clearStart, clearEnd, end, clearStart.x()));
+        candidates.add(routeViaX(start, clearStart, clearEnd, end, clearEnd.x()));
+        candidates.add(routeViaY(start, clearStart, clearEnd, end, clearStart.y()));
+        candidates.add(routeViaY(start, clearStart, clearEnd, end, clearEnd.y()));
         double minNodeX = minNodeX(nodes);
         double maxNodeX = maxNodeX(nodes);
         double minNodeY = minNodeY(nodes);
@@ -625,17 +639,24 @@ final class ElkLayoutEngine {
 
         List<JsonContracts.Point> best = List.of();
         int bestCloseParallelCount = Integer.MAX_VALUE;
+        int bestCornerCount = Integer.MAX_VALUE;
         double bestLength = Double.POSITIVE_INFINITY;
         for (List<JsonContracts.Point> candidate : candidates) {
             if (routeIntersectsUnrelatedNode(edge, candidate, nodes)) {
                 continue;
             }
             int closeParallelCount = closeParallelRouteCount(edge, candidate, existingEdges);
+            int candidateCornerCount = cornerCount(candidate);
             double candidateLength = routeLength(candidate);
             if (closeParallelCount < bestCloseParallelCount
-                || (closeParallelCount == bestCloseParallelCount && candidateLength < bestLength)) {
+                || (closeParallelCount == bestCloseParallelCount
+                    && candidateCornerCount < bestCornerCount)
+                || (closeParallelCount == bestCloseParallelCount
+                    && candidateCornerCount == bestCornerCount
+                    && candidateLength < bestLength)) {
                 best = candidate;
                 bestCloseParallelCount = closeParallelCount;
+                bestCornerCount = candidateCornerCount;
                 bestLength = candidateLength;
             }
         }
@@ -698,11 +719,30 @@ final class ElkLayoutEngine {
     private static List<JsonContracts.Point> compactPoints(List<JsonContracts.Point> points) {
         List<JsonContracts.Point> compacted = new ArrayList<>();
         for (JsonContracts.Point point : points) {
-            if (compacted.isEmpty() || !samePoint(compacted.get(compacted.size() - 1), point)) {
+            if (!compacted.isEmpty() && samePoint(compacted.get(compacted.size() - 1), point)) {
+                continue;
+            }
+            if (compacted.size() >= 2
+                && collinear(
+                    compacted.get(compacted.size() - 2),
+                    compacted.get(compacted.size() - 1),
+                    point)) {
+                compacted.set(compacted.size() - 1, point);
+            } else {
                 compacted.add(point);
             }
         }
         return compacted;
+    }
+
+    private static boolean collinear(
+        JsonContracts.Point first,
+        JsonContracts.Point second,
+        JsonContracts.Point third) {
+        return sameCoordinate(first.x(), second.x())
+            && sameCoordinate(second.x(), third.x())
+            || sameCoordinate(first.y(), second.y())
+                && sameCoordinate(second.y(), third.y());
     }
 
     private static boolean samePoint(JsonContracts.Point left, JsonContracts.Point right) {
@@ -774,6 +814,39 @@ final class ElkLayoutEngine {
             length += Math.abs(start.x() - end.x()) + Math.abs(start.y() - end.y());
         }
         return length;
+    }
+
+    private static int cornerCount(List<JsonContracts.Point> points) {
+        int corners = 0;
+        RouteOrientation previous = null;
+        for (int index = 0; index < points.size() - 1; index++) {
+            RouteOrientation current = routeOrientation(points.get(index), points.get(index + 1));
+            if (current == null) {
+                continue;
+            }
+            if (previous != null && previous != current) {
+                corners++;
+            }
+            previous = current;
+        }
+        return corners;
+    }
+
+    private enum RouteOrientation {
+        HORIZONTAL,
+        VERTICAL
+    }
+
+    private static RouteOrientation routeOrientation(
+        JsonContracts.Point start,
+        JsonContracts.Point end) {
+        if (horizontal(start, end)) {
+            return RouteOrientation.HORIZONTAL;
+        }
+        if (vertical(start, end)) {
+            return RouteOrientation.VERTICAL;
+        }
+        return null;
     }
 
     private static double directLength(List<JsonContracts.Point> points) {
