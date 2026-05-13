@@ -140,7 +140,7 @@ class ElkLayoutEngineTest {
     }
 
     @Test
-    void groupedPipelineLayoutKeepsReadableAspectRatio() {
+    void groupedPipelineKeepsReadableLeftToRightFlow() {
         JsonContracts.LayoutRequest request = new JsonContracts.LayoutRequest(
             "layout-request.schema.v1",
             "main",
@@ -173,6 +173,12 @@ class ElkLayoutEngineTest {
             List.of());
 
         JsonContracts.LayoutResult result = new ElkLayoutEngine().layout(request);
+        JsonContracts.LaidOutNode client = nodeById(result, "client");
+        JsonContracts.LaidOutNode webApp = nodeById(result, "web-app");
+        JsonContracts.LaidOutGroup application = groupById(result, "application-services");
+        JsonContracts.LaidOutEdge submitsOrder = edgeById(result, "client-submits-order");
+        JsonContracts.Point submitStart = submitsOrder.points().get(0);
+        JsonContracts.Point submitEnd = submitsOrder.points().get(submitsOrder.points().size() - 1);
         double minX = result.nodes().stream().mapToDouble(JsonContracts.LaidOutNode::x).min().orElse(0.0);
         double maxX = result.nodes().stream().mapToDouble(node -> node.x() + node.width()).max().orElse(0.0);
         double minY = result.nodes().stream().mapToDouble(JsonContracts.LaidOutNode::y).min().orElse(0.0);
@@ -180,8 +186,17 @@ class ElkLayoutEngineTest {
         double aspect = (maxX - minX) / (maxY - minY);
 
         assertTrue(
-            aspect < 3.2,
-            "grouped rich pipeline should not render as a long horizontal strip, aspect=" + aspect);
+            Math.abs(centerY(client) - centerY(webApp)) < 4.0,
+            "client-to-web cross-boundary flow should stay horizontally aligned");
+        assertTrue(
+            Math.abs(submitStart.y() - submitEnd.y()) < 4.0,
+            "client-to-web route should not loop around the group");
+        assertTrue(
+            application.width() > application.height(),
+            "application group should stay horizontal enough for cross-boundary routing");
+        assertTrue(
+            aspect < 4.2,
+            "grouped rich pipeline should keep a bounded readable aspect ratio, aspect=" + aspect);
     }
 
     @Test
@@ -272,10 +287,121 @@ class ElkLayoutEngineTest {
             "multiple incoming routes should avoid unrelated nodes");
     }
 
+    @Test
+    void groupedPipelineAvoidsExcessiveCrossGroupRouteDetours() {
+        JsonContracts.LayoutRequest request = new JsonContracts.LayoutRequest(
+            "layout-request.schema.v1",
+            "main",
+            List.of(
+                new JsonContracts.LayoutNode("client", "Client", "client", 160.0, 80.0),
+                new JsonContracts.LayoutNode("web-app", "Web App", "web-app", 160.0, 80.0),
+                new JsonContracts.LayoutNode("orders-api", "Orders API", "orders-api", 160.0, 80.0),
+                new JsonContracts.LayoutNode("worker", "Fulfillment Worker", "worker", 160.0, 80.0),
+                new JsonContracts.LayoutNode("payments", "Payments Provider", "payments", 160.0, 80.0),
+                new JsonContracts.LayoutNode("database", "PostgreSQL", "database", 160.0, 80.0)),
+            List.of(
+                new JsonContracts.LayoutEdge("client-submits-order", "client", "web-app", "submits order", "client-submits-order"),
+                new JsonContracts.LayoutEdge("web-app-calls-api", "web-app", "orders-api", "calls API", "web-app-calls-api"),
+                new JsonContracts.LayoutEdge("api-authorizes-payment", "orders-api", "payments", "authorizes payment", "api-authorizes-payment"),
+                new JsonContracts.LayoutEdge("api-writes-database", "orders-api", "database", "writes orders", "api-writes-database"),
+                new JsonContracts.LayoutEdge("api-publishes-job", "orders-api", "worker", "publishes fulfillment", "api-publishes-job"),
+                new JsonContracts.LayoutEdge("worker-reads-database", "worker", "database", "loads order", "worker-reads-database")),
+            List.of(
+                new JsonContracts.LayoutGroup(
+                    "application-services",
+                    "Application Services",
+                    List.of("web-app", "orders-api", "worker"),
+                    new JsonContracts.GroupProvenance(new JsonContracts.SemanticBacked("application-services"))),
+                new JsonContracts.LayoutGroup(
+                    "external-dependencies",
+                    "External Dependencies",
+                    List.of("payments", "database"),
+                    new JsonContracts.GroupProvenance(new JsonContracts.SemanticBacked("external-dependencies")))),
+            List.of(),
+            List.of());
+
+        JsonContracts.LayoutResult result = new ElkLayoutEngine().layout(request);
+
+        assertEquals(
+            0,
+            excessiveRouteDetourCount(result),
+            "grouped cross-boundary routes should not loop around the whole diagram");
+    }
+
+    @Test
+    void groupedReverseCrossGroupEdgeAvoidsExcessiveDetour() {
+        JsonContracts.LayoutRequest request = new JsonContracts.LayoutRequest(
+            "layout-request.schema.v1",
+            "main",
+            List.of(
+                new JsonContracts.LayoutNode("orders-api", "Orders API", "orders-api", 160.0, 80.0),
+                new JsonContracts.LayoutNode("worker", "Fulfillment Worker", "worker", 160.0, 80.0),
+                new JsonContracts.LayoutNode("payments", "Payments Provider", "payments", 160.0, 80.0),
+                new JsonContracts.LayoutNode("database", "PostgreSQL", "database", 160.0, 80.0)),
+            List.of(
+                new JsonContracts.LayoutEdge("api-writes-database", "orders-api", "database", "writes orders", "api-writes-database"),
+                new JsonContracts.LayoutEdge("payments-serves-api", "payments", "orders-api", "authorizes payment", "payments-serves-api"),
+                new JsonContracts.LayoutEdge("api-publishes-job", "orders-api", "worker", "publishes fulfillment", "api-publishes-job"),
+                new JsonContracts.LayoutEdge("worker-reads-database", "worker", "database", "loads order", "worker-reads-database")),
+            List.of(
+                new JsonContracts.LayoutGroup(
+                    "application-services",
+                    "Application Services",
+                    List.of("orders-api", "worker"),
+                    new JsonContracts.GroupProvenance(new JsonContracts.SemanticBacked("application-services"))),
+                new JsonContracts.LayoutGroup(
+                    "external-dependencies",
+                    "External Dependencies",
+                    List.of("payments", "database"),
+                    new JsonContracts.GroupProvenance(new JsonContracts.SemanticBacked("external-dependencies")))),
+            List.of(),
+            List.of());
+
+        JsonContracts.LayoutResult result = new ElkLayoutEngine().layout(request);
+        JsonContracts.LaidOutEdge paymentEdge = edgeById(result, "payments-serves-api");
+
+        assertEquals(
+            0,
+            excessiveRouteDetourCount(result),
+            "reverse cross-group route should be normalized when ELK routes it around the diagram");
+        assertTrue(paymentEdge.points().size() <= 4, "normalized reverse route should stay compact");
+    }
+
     private static void assertRouted(JsonContracts.LaidOutEdge edge) {
         assertTrue(
             edge.points().size() >= 2,
             "edge " + edge.id() + " should include ELK-generated route points");
+    }
+
+    private static JsonContracts.LaidOutNode nodeById(
+        JsonContracts.LayoutResult result,
+        String id) {
+        return result.nodes().stream()
+            .filter(node -> node.id().equals(id))
+            .findFirst()
+            .orElseThrow();
+    }
+
+    private static JsonContracts.LaidOutGroup groupById(
+        JsonContracts.LayoutResult result,
+        String id) {
+        return result.groups().stream()
+            .filter(group -> group.id().equals(id))
+            .findFirst()
+            .orElseThrow();
+    }
+
+    private static JsonContracts.LaidOutEdge edgeById(
+        JsonContracts.LayoutResult result,
+        String id) {
+        return result.edges().stream()
+            .filter(edge -> edge.id().equals(id))
+            .findFirst()
+            .orElseThrow();
+    }
+
+    private static double centerY(JsonContracts.LaidOutNode node) {
+        return node.y() + node.height() / 2.0;
     }
 
     private static void assertGroupContainsMembers(
@@ -340,6 +466,33 @@ class ElkLayoutEngineTest {
             }
         }
         return count;
+    }
+
+    private static int excessiveRouteDetourCount(JsonContracts.LayoutResult result) {
+        int count = 0;
+        for (JsonContracts.LaidOutEdge edge : result.edges()) {
+            if (edge.points().size() < 2) {
+                continue;
+            }
+            double routeLength = routeLength(edge.points());
+            JsonContracts.Point start = edge.points().get(0);
+            JsonContracts.Point end = edge.points().get(edge.points().size() - 1);
+            double directLength = Math.abs(start.x() - end.x()) + Math.abs(start.y() - end.y());
+            if (directLength > 0.0 && routeLength > directLength * 1.5 && routeLength - directLength > 240.0) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    private static double routeLength(List<JsonContracts.Point> points) {
+        double length = 0.0;
+        for (int index = 0; index < points.size() - 1; index++) {
+            JsonContracts.Point start = points.get(index);
+            JsonContracts.Point end = points.get(index + 1);
+            length += Math.abs(start.x() - end.x()) + Math.abs(start.y() - end.y());
+        }
+        return length;
     }
 
     private static boolean segmentIntersectsRect(

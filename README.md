@@ -40,18 +40,18 @@ Runtime prerequisite:
 
 - Java 21 or newer available as `java` on `PATH`.
 
-For the current `0.1.5` version, the script creates:
+For the current `0.1.6` version, the script creates:
 
 ```text
-dist/dediren-agent-bundle-0.1.5-x86_64-unknown-linux-gnu/
-dist/dediren-agent-bundle-0.1.5-x86_64-unknown-linux-gnu.tar.gz
+dist/dediren-agent-bundle-0.1.6-x86_64-unknown-linux-gnu/
+dist/dediren-agent-bundle-0.1.6-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Run the smoke test from a shell where `java -version` resolves to Java 21 or
 newer:
 
 ```bash
-scripts/smoke-dist.sh dist/dediren-agent-bundle-0.1.5-x86_64-unknown-linux-gnu.tar.gz
+scripts/smoke-dist.sh dist/dediren-agent-bundle-0.1.6-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Concurrent `scripts/build-dist.sh` invocations serialize on a repo-local lock
@@ -62,8 +62,8 @@ Unpack and run it anywhere:
 
 ```bash
 mkdir -p /tmp/dediren-dist
-tar -xzf dist/dediren-agent-bundle-0.1.5-x86_64-unknown-linux-gnu.tar.gz -C /tmp/dediren-dist
-/tmp/dediren-dist/dediren-agent-bundle-0.1.5-x86_64-unknown-linux-gnu/bin/dediren --help
+tar -xzf dist/dediren-agent-bundle-0.1.6-x86_64-unknown-linux-gnu.tar.gz -C /tmp/dediren-dist
+/tmp/dediren-dist/dediren-agent-bundle-0.1.6-x86_64-unknown-linux-gnu/bin/dediren --help
 ```
 
 The archive includes first-party plugin manifests under `plugins/`, first-party
@@ -141,7 +141,9 @@ Commands:
   endpoint legality against the supported ArchiMate vocabulary.
 - `layout` asks a layout plugin to generate a layout result. The bundled
   `elk-layout` plugin is a Rust adapter over the Java ELK helper.
-- `validate-layout` reports backend-neutral layout quality metrics.
+- `validate-layout` reports backend-neutral layout quality metrics, including
+  overlaps, connectors through unrelated nodes, invalid routes, route detours,
+  group boundary issues, and backend warnings.
 - `render` asks a render plugin to create a visual artifact. The bundled
   `svg-render` plugin returns SVG in a JSON command envelope.
 - `export` asks an export plugin to create a non-visual artifact. The bundled
@@ -374,7 +376,7 @@ newer:
 
 ```bash
 scripts/build-dist.sh
-scripts/smoke-dist.sh dist/dediren-agent-bundle-0.1.5-x86_64-unknown-linux-gnu.tar.gz
+scripts/smoke-dist.sh dist/dediren-agent-bundle-0.1.6-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Focused checks:

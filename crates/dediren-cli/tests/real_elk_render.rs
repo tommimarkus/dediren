@@ -155,7 +155,7 @@ fn real_elk_renders_archimate_metadata_notation() {
 
     let layout_output = real_elk_layout(&request);
     let layout = write_temp_bytes(&temp, "archimate-layout-result.json", &layout_output);
-    assert_archimate_fixture_quality_has_known_connector_warning(&validate_layout(&layout));
+    assert_layout_quality_ok(&validate_layout(&layout));
 
     let svg = render_svg(
         &layout,
@@ -273,7 +273,7 @@ fn real_elk_renders_cross_group_route_without_quality_warnings() {
     let svg = render_svg(&layout, "fixtures/render-policy/default-svg.json", None);
     let doc = svg_doc(&svg);
     assert_svg_texts_include(&doc, &["A", "B", "C", "connects"]);
-    assert_reasonable_svg_aspect(&svg, 3.2);
+    assert_reasonable_svg_aspect(&svg, 3.6);
     write_render_artifact(
         "real-elk",
         "real_elk_renders_cross_group_route_without_quality_warnings",
@@ -370,16 +370,7 @@ fn assert_layout_quality_ok(quality: &Value) {
     assert_eq!(quality["status"], "ok");
     assert_eq!(quality["overlap_count"], 0);
     assert_eq!(quality["connector_through_node_count"], 0);
-}
-
-fn assert_archimate_fixture_quality_has_known_connector_warning(quality: &Value) {
-    // The rich ArchiMate fixture is intentionally kept in this real-ELK lane
-    // because it covers semantic metadata notation that the clean smaller
-    // fixtures do not. Keep the known route-quality debt explicit so this test
-    // cannot silently accept unrelated layout warnings.
-    assert_eq!(quality["status"], "warning");
-    assert_eq!(quality["overlap_count"], 0);
-    assert_eq!(quality["connector_through_node_count"], 1);
+    assert_eq!(quality["route_detour_count"], 0);
     assert_eq!(quality["invalid_route_count"], 0);
     assert_eq!(quality["group_boundary_issue_count"], 0);
     assert_eq!(quality["warning_count"], 0);

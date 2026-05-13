@@ -1,6 +1,9 @@
 use dediren_contracts::LayoutResult;
 use serde::{Deserialize, Serialize};
 
+const ROUTE_DETOUR_RATIO: f64 = 1.5;
+const ROUTE_DETOUR_EXCESS: f64 = 240.0;
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LayoutQualityReport {
     pub status: String,
@@ -8,6 +11,7 @@ pub struct LayoutQualityReport {
     pub overlap_count: usize,
     pub connector_through_node_count: usize,
     pub invalid_route_count: usize,
+    pub route_detour_count: usize,
     pub group_boundary_issue_count: usize,
     pub warning_count: usize,
 }
@@ -18,6 +22,7 @@ pub struct LayoutQualityPolicy {
     pub max_overlap_count: usize,
     pub max_connector_through_node_count: usize,
     pub max_invalid_route_count: usize,
+    pub max_route_detour_count: usize,
     pub max_group_boundary_issue_count: usize,
 }
 
@@ -28,6 +33,7 @@ impl Default for LayoutQualityPolicy {
             max_overlap_count: 0,
             max_connector_through_node_count: 0,
             max_invalid_route_count: 0,
+            max_route_detour_count: 0,
             max_group_boundary_issue_count: 0,
         }
     }
@@ -48,11 +54,13 @@ pub fn validate_layout_with_policy(
         .iter()
         .filter(|edge| edge.points.len() < 2)
         .count();
+    let route_detour_count = count_route_detours(result);
     let group_boundary_issue_count = count_group_boundary_issues(result);
     let warning_count = result.warnings.len();
     let status = if overlap_count <= policy.max_overlap_count
         && connector_through_node_count <= policy.max_connector_through_node_count
         && invalid_route_count <= policy.max_invalid_route_count
+        && route_detour_count <= policy.max_route_detour_count
         && group_boundary_issue_count <= policy.max_group_boundary_issue_count
         && warning_count == 0
     {
@@ -67,6 +75,7 @@ pub fn validate_layout_with_policy(
         overlap_count,
         connector_through_node_count,
         invalid_route_count,
+        route_detour_count,
         group_boundary_issue_count,
         warning_count,
     }
@@ -136,6 +145,34 @@ fn count_group_boundary_issues(result: &LayoutResult) -> usize {
         }
     }
     count
+}
+
+fn count_route_detours(result: &LayoutResult) -> usize {
+    result
+        .edges
+        .iter()
+        .filter(|edge| has_excessive_detour(&edge.points))
+        .count()
+}
+
+fn has_excessive_detour(points: &[dediren_contracts::Point]) -> bool {
+    if points.len() < 2 {
+        return false;
+    }
+    let route_length = route_length(points);
+    let start = &points[0];
+    let end = &points[points.len() - 1];
+    let direct_length = (start.x - end.x).abs() + (start.y - end.y).abs();
+    direct_length > 0.0
+        && route_length > direct_length * ROUTE_DETOUR_RATIO
+        && route_length - direct_length > ROUTE_DETOUR_EXCESS
+}
+
+fn route_length(points: &[dediren_contracts::Point]) -> f64 {
+    points
+        .windows(2)
+        .map(|segment| (segment[0].x - segment[1].x).abs() + (segment[0].y - segment[1].y).abs())
+        .sum()
 }
 
 fn rectangles_overlap(

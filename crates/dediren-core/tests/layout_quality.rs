@@ -10,6 +10,7 @@ fn non_overlapping_layout_has_zero_overlaps() {
     assert_eq!(report.overlap_count, 0);
     assert_eq!(report.connector_through_node_count, 0);
     assert_eq!(report.invalid_route_count, 0);
+    assert_eq!(report.route_detour_count, 0);
     assert_eq!(report.group_boundary_issue_count, 0);
     assert_eq!(report.policy_name, "draft");
     assert_eq!(report.status, "ok");
@@ -59,6 +60,30 @@ fn connector_through_unrelated_node_is_counted() {
     });
     let report = dediren_core::quality::validate_layout(&result);
     assert_eq!(report.connector_through_node_count, 1);
+}
+
+#[test]
+fn excessive_route_detours_are_counted() {
+    let mut result = empty_result();
+    result.nodes.push(node("a", 0.0, 0.0));
+    result.nodes.push(node("b", 300.0, 0.0));
+    result.edges.push(LaidOutEdge {
+        id: "edge".to_string(),
+        source: "a".to_string(),
+        target: "b".to_string(),
+        source_id: "edge".to_string(),
+        projection_id: "edge".to_string(),
+        points: vec![
+            Point { x: 100.0, y: 40.0 },
+            Point { x: 100.0, y: 640.0 },
+            Point { x: 300.0, y: 640.0 },
+            Point { x: 300.0, y: 40.0 },
+        ],
+        label: "detours".to_string(),
+    });
+    let report = dediren_core::quality::validate_layout(&result);
+    assert_eq!(report.route_detour_count, 1);
+    assert_eq!(report.status, "warning");
 }
 
 #[test]
