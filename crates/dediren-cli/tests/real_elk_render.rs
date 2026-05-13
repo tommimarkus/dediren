@@ -281,6 +281,185 @@ fn real_elk_renders_cross_group_route_without_quality_warnings() {
     );
 }
 
+#[test]
+#[ignore = "run with --ignored after building the ELK Java helper; serialize real ELK runs"]
+fn real_elk_renders_complex_multi_layer_system() {
+    let _guard = real_elk_guard();
+    let temp = assert_fs::TempDir::new().unwrap();
+    let request = serde_json::json!({
+        "layout_request_schema_version": "layout-request.schema.v1",
+        "view_id": "main",
+        "nodes": [
+            { "id": "customer-mobile", "label": "Mobile App", "source_id": "customer-mobile", "width_hint": 160.0, "height_hint": 80.0 },
+            { "id": "customer-web", "label": "Web Customer", "source_id": "customer-web", "width_hint": 160.0, "height_hint": 80.0 },
+            { "id": "support-agent", "label": "Support Agent", "source_id": "support-agent", "width_hint": 160.0, "height_hint": 80.0 },
+            { "id": "cdn", "label": "CDN", "source_id": "cdn", "width_hint": 160.0, "height_hint": 80.0 },
+            { "id": "web-frontend", "label": "Web Frontend", "source_id": "web-frontend", "width_hint": 160.0, "height_hint": 80.0 },
+            { "id": "admin-portal", "label": "Admin Portal", "source_id": "admin-portal", "width_hint": 160.0, "height_hint": 80.0 },
+            { "id": "api-gateway", "label": "API Gateway", "source_id": "api-gateway", "width_hint": 160.0, "height_hint": 80.0 },
+            { "id": "identity-service", "label": "Identity Service", "source_id": "identity-service", "width_hint": 160.0, "height_hint": 80.0 },
+            { "id": "catalog-service", "label": "Catalog Service", "source_id": "catalog-service", "width_hint": 160.0, "height_hint": 80.0 },
+            { "id": "pricing-service", "label": "Pricing Service", "source_id": "pricing-service", "width_hint": 160.0, "height_hint": 80.0 },
+            { "id": "order-service", "label": "Order Service", "source_id": "order-service", "width_hint": 160.0, "height_hint": 80.0 },
+            { "id": "payment-service", "label": "Payment Service", "source_id": "payment-service", "width_hint": 160.0, "height_hint": 80.0 },
+            { "id": "fulfillment-service", "label": "Fulfillment Service", "source_id": "fulfillment-service", "width_hint": 160.0, "height_hint": 80.0 },
+            { "id": "notification-service", "label": "Notification Service", "source_id": "notification-service", "width_hint": 160.0, "height_hint": 80.0 },
+            { "id": "event-bus", "label": "Event Bus", "source_id": "event-bus", "width_hint": 160.0, "height_hint": 80.0 },
+            { "id": "order-worker", "label": "Order Worker", "source_id": "order-worker", "width_hint": 160.0, "height_hint": 80.0 },
+            { "id": "warehouse-adapter", "label": "Warehouse Adapter", "source_id": "warehouse-adapter", "width_hint": 160.0, "height_hint": 80.0 },
+            { "id": "email-worker", "label": "Email Worker", "source_id": "email-worker", "width_hint": 160.0, "height_hint": 80.0 },
+            { "id": "reporting-ingestor", "label": "Reporting Ingestor", "source_id": "reporting-ingestor", "width_hint": 160.0, "height_hint": 80.0 },
+            { "id": "session-cache", "label": "Session Cache", "source_id": "session-cache", "width_hint": 160.0, "height_hint": 80.0 },
+            { "id": "product-db", "label": "Product DB", "source_id": "product-db", "width_hint": 160.0, "height_hint": 80.0 },
+            { "id": "order-db", "label": "Order DB", "source_id": "order-db", "width_hint": 160.0, "height_hint": 80.0 },
+            { "id": "payment-ledger", "label": "Payment Ledger", "source_id": "payment-ledger", "width_hint": 160.0, "height_hint": 80.0 },
+            { "id": "warehouse-db", "label": "Warehouse DB", "source_id": "warehouse-db", "width_hint": 160.0, "height_hint": 80.0 },
+            { "id": "analytics-warehouse", "label": "Analytics Warehouse", "source_id": "analytics-warehouse", "width_hint": 160.0, "height_hint": 80.0 },
+            { "id": "identity-provider", "label": "Identity Provider", "source_id": "identity-provider", "width_hint": 160.0, "height_hint": 80.0 },
+            { "id": "payment-provider", "label": "Payment Provider", "source_id": "payment-provider", "width_hint": 160.0, "height_hint": 80.0 },
+            { "id": "carrier-api", "label": "Carrier API", "source_id": "carrier-api", "width_hint": 160.0, "height_hint": 80.0 },
+            { "id": "email-provider", "label": "Email Provider", "source_id": "email-provider", "width_hint": 160.0, "height_hint": 80.0 },
+            { "id": "erp", "label": "ERP", "source_id": "erp", "width_hint": 160.0, "height_hint": 80.0 }
+        ],
+        "edges": [
+            { "id": "mobile-enters-cdn", "source": "customer-mobile", "target": "cdn", "label": "uses", "source_id": "mobile-enters-cdn" },
+            { "id": "web-enters-cdn", "source": "customer-web", "target": "cdn", "label": "uses", "source_id": "web-enters-cdn" },
+            { "id": "support-opens-admin", "source": "support-agent", "target": "admin-portal", "label": "manages", "source_id": "support-opens-admin" },
+            { "id": "cdn-serves-web", "source": "cdn", "target": "web-frontend", "label": "serves", "source_id": "cdn-serves-web" },
+            { "id": "web-calls-gateway", "source": "web-frontend", "target": "api-gateway", "label": "calls", "source_id": "web-calls-gateway" },
+            { "id": "admin-calls-gateway", "source": "admin-portal", "target": "api-gateway", "label": "calls", "source_id": "admin-calls-gateway" },
+            { "id": "gateway-authenticates", "source": "api-gateway", "target": "identity-service", "label": "authenticates", "source_id": "gateway-authenticates" },
+            { "id": "gateway-queries-catalog", "source": "api-gateway", "target": "catalog-service", "label": "queries catalog", "source_id": "gateway-queries-catalog" },
+            { "id": "gateway-prices-cart", "source": "api-gateway", "target": "pricing-service", "label": "prices cart", "source_id": "gateway-prices-cart" },
+            { "id": "gateway-places-order", "source": "api-gateway", "target": "order-service", "label": "places order", "source_id": "gateway-places-order" },
+            { "id": "identity-federates", "source": "identity-service", "target": "identity-provider", "label": "federates", "source_id": "identity-federates" },
+            { "id": "identity-caches-session", "source": "identity-service", "target": "session-cache", "label": "caches session", "source_id": "identity-caches-session" },
+            { "id": "catalog-reads-products", "source": "catalog-service", "target": "product-db", "label": "reads products", "source_id": "catalog-reads-products" },
+            { "id": "pricing-reads-products", "source": "pricing-service", "target": "product-db", "label": "reads products", "source_id": "pricing-reads-products" },
+            { "id": "pricing-caches-quotes", "source": "pricing-service", "target": "session-cache", "label": "caches quotes", "source_id": "pricing-caches-quotes" },
+            { "id": "order-checks-catalog", "source": "order-service", "target": "catalog-service", "label": "checks catalog", "source_id": "order-checks-catalog" },
+            { "id": "order-requests-payment", "source": "order-service", "target": "payment-service", "label": "requests payment", "source_id": "order-requests-payment" },
+            { "id": "order-reserves-stock", "source": "order-service", "target": "fulfillment-service", "label": "reserves stock", "source_id": "order-reserves-stock" },
+            { "id": "order-writes-orders", "source": "order-service", "target": "order-db", "label": "writes orders", "source_id": "order-writes-orders" },
+            { "id": "order-publishes-events", "source": "order-service", "target": "event-bus", "label": "publishes events", "source_id": "order-publishes-events" },
+            { "id": "payment-authorizes", "source": "payment-service", "target": "payment-provider", "label": "authorizes", "source_id": "payment-authorizes" },
+            { "id": "payment-records-ledger", "source": "payment-service", "target": "payment-ledger", "label": "records ledger", "source_id": "payment-records-ledger" },
+            { "id": "fulfillment-ships", "source": "fulfillment-service", "target": "carrier-api", "label": "ships", "source_id": "fulfillment-ships" },
+            { "id": "fulfillment-syncs-warehouse", "source": "fulfillment-service", "target": "warehouse-adapter", "label": "syncs", "source_id": "fulfillment-syncs-warehouse" },
+            { "id": "fulfillment-writes-warehouse", "source": "fulfillment-service", "target": "warehouse-db", "label": "updates stock", "source_id": "fulfillment-writes-warehouse" },
+            { "id": "fulfillment-publishes-events", "source": "fulfillment-service", "target": "event-bus", "label": "publishes events", "source_id": "fulfillment-publishes-events" },
+            { "id": "event-bus-drives-order-worker", "source": "event-bus", "target": "order-worker", "label": "dispatches", "source_id": "event-bus-drives-order-worker" },
+            { "id": "event-bus-drives-email-worker", "source": "event-bus", "target": "email-worker", "label": "dispatches", "source_id": "event-bus-drives-email-worker" },
+            { "id": "event-bus-drives-reporting", "source": "event-bus", "target": "reporting-ingestor", "label": "streams", "source_id": "event-bus-drives-reporting" },
+            { "id": "order-worker-reads-orders", "source": "order-worker", "target": "order-db", "label": "reads orders", "source_id": "order-worker-reads-orders" },
+            { "id": "order-worker-syncs-erp", "source": "order-worker", "target": "erp", "label": "syncs orders", "source_id": "order-worker-syncs-erp" },
+            { "id": "warehouse-adapter-syncs-erp", "source": "warehouse-adapter", "target": "erp", "label": "syncs stock", "source_id": "warehouse-adapter-syncs-erp" },
+            { "id": "warehouse-adapter-writes-db", "source": "warehouse-adapter", "target": "warehouse-db", "label": "writes state", "source_id": "warehouse-adapter-writes-db" },
+            { "id": "email-worker-notifies", "source": "email-worker", "target": "notification-service", "label": "notifies", "source_id": "email-worker-notifies" },
+            { "id": "notification-sends-email", "source": "notification-service", "target": "email-provider", "label": "sends email", "source_id": "notification-sends-email" },
+            { "id": "reporting-reads-orders", "source": "reporting-ingestor", "target": "order-db", "label": "reads changes", "source_id": "reporting-reads-orders" },
+            { "id": "reporting-writes-analytics", "source": "reporting-ingestor", "target": "analytics-warehouse", "label": "loads facts", "source_id": "reporting-writes-analytics" }
+        ],
+        "groups": [
+            {
+                "id": "users",
+                "label": "Users",
+                "members": ["customer-mobile", "customer-web", "support-agent"],
+                "provenance": { "semantic_backed": { "source_id": "users" } }
+            },
+            {
+                "id": "edge-platform",
+                "label": "Edge Platform",
+                "members": ["cdn", "web-frontend", "admin-portal", "api-gateway"],
+                "provenance": { "semantic_backed": { "source_id": "edge-platform" } }
+            },
+            {
+                "id": "core-services",
+                "label": "Core Services",
+                "members": ["identity-service", "catalog-service", "pricing-service", "order-service", "payment-service", "fulfillment-service", "notification-service"],
+                "provenance": { "semantic_backed": { "source_id": "core-services" } }
+            },
+            {
+                "id": "async-processing",
+                "label": "Async Processing",
+                "members": ["event-bus", "order-worker", "warehouse-adapter", "email-worker", "reporting-ingestor"],
+                "provenance": { "semantic_backed": { "source_id": "async-processing" } }
+            },
+            {
+                "id": "data-platform",
+                "label": "Data Platform",
+                "members": ["session-cache", "product-db", "order-db", "payment-ledger", "warehouse-db", "analytics-warehouse"],
+                "provenance": { "semantic_backed": { "source_id": "data-platform" } }
+            },
+            {
+                "id": "external-systems",
+                "label": "External Systems",
+                "members": ["identity-provider", "payment-provider", "carrier-api", "email-provider", "erp"],
+                "provenance": { "semantic_backed": { "source_id": "external-systems" } }
+            }
+        ],
+        "labels": [],
+        "constraints": []
+    });
+    let request = write_temp_json(&temp, "complex-multi-layer-layout-request.json", &request);
+
+    let layout_output = real_elk_layout(&request);
+    let layout = write_temp_bytes(
+        &temp,
+        "complex-multi-layer-layout-result.json",
+        &layout_output,
+    );
+    assert_complex_layout_quality_bounded(&validate_layout(&layout));
+
+    let layout_data = ok_data(&layout_output);
+    assert_eq!(
+        layout_data["nodes"]
+            .as_array()
+            .expect("laid out nodes should be an array")
+            .len(),
+        30
+    );
+    assert_eq!(
+        layout_data["edges"]
+            .as_array()
+            .expect("laid out edges should be an array")
+            .len(),
+        37
+    );
+    assert_eq!(
+        layout_data["groups"]
+            .as_array()
+            .expect("laid out groups should be an array")
+            .len(),
+        6
+    );
+
+    let svg = render_svg(&layout, "fixtures/render-policy/rich-svg.json", None);
+    let doc = svg_doc(&svg);
+    assert_svg_texts_include(
+        &doc,
+        &[
+            "Mobile App",
+            "API Gateway",
+            "Order Service",
+            "Event Bus",
+            "External Systems",
+            "publishes events",
+        ],
+    );
+    assert!(svg.contains("data-dediren-node-id=\"analytics-warehouse\""));
+    assert!(svg.contains("data-dediren-node-id=\"reporting-ingestor\""));
+    assert!(svg.contains("data-dediren-group-id=\"core-services\""));
+    assert!(svg.contains("data-dediren-group-id=\"async-processing\""));
+    assert!(svg.contains("data-dediren-group-id=\"data-platform\""));
+    assert_reasonable_svg_aspect(&svg, 6.5);
+    write_render_artifact(
+        "real-elk",
+        "real_elk_renders_complex_multi_layer_system",
+        &svg,
+    );
+}
+
 fn real_elk_guard() -> MutexGuard<'static, ()> {
     REAL_ELK_LOCK
         .lock()
@@ -367,13 +546,46 @@ fn validate_layout(input: &Path) -> Value {
 }
 
 fn assert_layout_quality_ok(quality: &Value) {
-    assert_eq!(quality["status"], "ok");
-    assert_eq!(quality["overlap_count"], 0);
-    assert_eq!(quality["connector_through_node_count"], 0);
-    assert_eq!(quality["route_detour_count"], 0);
-    assert_eq!(quality["invalid_route_count"], 0);
-    assert_eq!(quality["group_boundary_issue_count"], 0);
-    assert_eq!(quality["warning_count"], 0);
+    assert_eq!(quality["status"], "ok", "layout quality: {quality}");
+    assert_eq!(quality["overlap_count"], 0, "layout quality: {quality}");
+    assert_eq!(
+        quality["connector_through_node_count"], 0,
+        "layout quality: {quality}"
+    );
+    assert_eq!(
+        quality["route_detour_count"], 0,
+        "layout quality: {quality}"
+    );
+    assert_eq!(
+        quality["invalid_route_count"], 0,
+        "layout quality: {quality}"
+    );
+    assert_eq!(
+        quality["group_boundary_issue_count"], 0,
+        "layout quality: {quality}"
+    );
+    assert_eq!(quality["warning_count"], 0, "layout quality: {quality}");
+}
+
+fn assert_complex_layout_quality_bounded(quality: &Value) {
+    assert_eq!(quality["overlap_count"], 0, "layout quality: {quality}");
+    assert_eq!(
+        quality["connector_through_node_count"], 0,
+        "layout quality: {quality}"
+    );
+    assert_eq!(
+        quality["invalid_route_count"], 0,
+        "layout quality: {quality}"
+    );
+    assert_eq!(
+        quality["group_boundary_issue_count"], 0,
+        "layout quality: {quality}"
+    );
+    assert_eq!(quality["warning_count"], 0, "layout quality: {quality}");
+    assert!(
+        quality["route_detour_count"].as_u64().unwrap_or(u64::MAX) <= 1,
+        "complex layout should not accumulate route detours: {quality}"
+    );
 }
 
 fn render_svg(layout_result: &Path, policy_fixture: &str, metadata: Option<&Path>) -> String {
