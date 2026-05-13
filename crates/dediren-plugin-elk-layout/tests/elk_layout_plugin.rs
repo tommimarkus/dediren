@@ -3,7 +3,7 @@ use predicates::prelude::*;
 use std::path::PathBuf;
 
 #[test]
-fn elk_plugin_invokes_external_command_and_wraps_raw_layout_result() {
+fn fake_elk_plugin_wraps_raw_layout_result() {
     let input =
         std::fs::read_to_string(workspace_file("fixtures/layout-request/basic.json")).unwrap();
     let helper = helper_command(&format!(
@@ -26,7 +26,7 @@ fn elk_plugin_invokes_external_command_and_wraps_raw_layout_result() {
 }
 
 #[test]
-fn elk_plugin_accepts_external_command_envelope() {
+fn fake_elk_plugin_accepts_external_command_envelope() {
     let input =
         std::fs::read_to_string(workspace_file("fixtures/layout-request/basic.json")).unwrap();
     let layout_result: serde_json::Value = serde_json::from_str(
@@ -55,7 +55,7 @@ fn elk_plugin_accepts_external_command_envelope() {
 }
 
 #[test]
-fn elk_plugin_preserves_external_error_envelope() {
+fn fake_elk_plugin_preserves_external_error_envelope() {
     let input =
         std::fs::read_to_string(workspace_file("fixtures/layout-request/basic.json")).unwrap();
     let envelope = serde_json::json!({
@@ -83,7 +83,7 @@ fn elk_plugin_preserves_external_error_envelope() {
 }
 
 #[test]
-fn elk_plugin_reports_external_runtime_failure() {
+fn fake_elk_plugin_reports_external_runtime_failure() {
     let input =
         std::fs::read_to_string(workspace_file("fixtures/layout-request/basic.json")).unwrap();
     let helper = helper_command("echo external failure >&2; exit 42");
@@ -98,7 +98,7 @@ fn elk_plugin_reports_external_runtime_failure() {
 }
 
 #[test]
-fn elk_plugin_reports_external_invalid_json_output() {
+fn fake_elk_plugin_reports_external_invalid_json_output() {
     let input =
         std::fs::read_to_string(workspace_file("fixtures/layout-request/basic.json")).unwrap();
     let helper = helper_command("printf '%s\\n' not-json");
@@ -113,7 +113,7 @@ fn elk_plugin_reports_external_invalid_json_output() {
 }
 
 #[test]
-fn elk_plugin_reports_missing_runtime() {
+fn fixture_elk_plugin_reports_missing_runtime() {
     let input =
         std::fs::read_to_string(workspace_file("fixtures/layout-request/basic.json")).unwrap();
     let mut cmd = Command::cargo_bin("dediren-plugin-elk-layout").unwrap();
@@ -124,7 +124,7 @@ fn elk_plugin_reports_missing_runtime() {
 }
 
 #[test]
-fn elk_plugin_accepts_fixture_runtime_output() {
+fn fixture_elk_plugin_accepts_fixture_runtime_output() {
     let input =
         std::fs::read_to_string(workspace_file("fixtures/layout-request/basic.json")).unwrap();
     let fake = workspace_file("fixtures/layout-result/basic.json");
@@ -140,7 +140,7 @@ fn elk_plugin_accepts_fixture_runtime_output() {
 
 #[test]
 #[ignore = "requires SDKMAN Java helper build"]
-fn elk_plugin_invokes_real_java_helper() {
+fn real_elk_plugin_invokes_java_helper() {
     let input =
         std::fs::read_to_string(workspace_file("fixtures/layout-request/basic.json")).unwrap();
     let helper = workspace_file("crates/dediren-plugin-elk-layout/java/scripts/elk-layout.sh");

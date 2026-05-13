@@ -4,7 +4,7 @@ use common::{ok_data, plugin_binary, workspace_file};
 use std::path::PathBuf;
 
 #[test]
-fn layout_invokes_elk_plugin_with_fixture_runtime() {
+fn fixture_elk_layout_uses_result_fixture() {
     let output = common::dediren_command()
         .env(
             "DEDIREN_PLUGIN_ELK_LAYOUT",
@@ -27,7 +27,7 @@ fn layout_invokes_elk_plugin_with_fixture_runtime() {
 }
 
 #[test]
-fn layout_invokes_elk_plugin_with_external_command() {
+fn fake_elk_layout_wraps_external_command() {
     let helper = helper_command(&format!(
         "cat {}",
         shell_quote(
@@ -56,7 +56,7 @@ fn layout_invokes_elk_plugin_with_external_command() {
 
 #[test]
 #[ignore = "requires SDKMAN Java helper build"]
-fn layout_invokes_real_java_elk_helper() {
+fn real_elk_layout_invokes_java_helper() {
     let output = common::dediren_command()
         .env(
             "DEDIREN_PLUGIN_ELK_LAYOUT",
@@ -91,7 +91,7 @@ fn layout_invokes_real_java_elk_helper() {
 
 #[test]
 #[ignore = "requires SDKMAN Java helper build"]
-fn validate_layout_accepts_real_grouped_cross_group_route() {
+fn real_elk_layout_validates_grouped_cross_group_route() {
     let request = serde_json::json!({
         "layout_request_schema_version": "layout-request.schema.v1",
         "view_id": "main",
@@ -172,7 +172,7 @@ fn validate_layout_accepts_real_grouped_cross_group_route() {
 }
 
 #[test]
-fn validate_layout_reports_quality() {
+fn fixture_layout_result_reports_quality() {
     let output = common::dediren_command()
         .arg("validate-layout")
         .arg("--input")

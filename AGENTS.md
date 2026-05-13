@@ -188,8 +188,10 @@ ELK helper changes:
 
 ```bash
 crates/dediren-plugin-elk-layout/java/scripts/build-elk-layout.sh
-cargo test -p dediren-plugin-elk-layout --test elk_layout_plugin -- --ignored
-cargo test -p dediren --test cli_layout -- --ignored
+cargo test -p dediren-plugin-elk-layout --test elk_layout_plugin real_elk_plugin_invokes_java_helper -- --ignored --exact --test-threads=1
+cargo test -p dediren --test cli_layout real_elk_layout_invokes_java_helper -- --ignored --exact --test-threads=1
+cargo test -p dediren --test cli_layout real_elk_layout_validates_grouped_cross_group_route -- --ignored --exact --test-threads=1
+cargo test -p dediren --test real_elk_render -- --ignored --test-threads=1
 ```
 
 SVG render changes:
