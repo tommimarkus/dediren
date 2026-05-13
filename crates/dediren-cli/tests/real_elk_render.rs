@@ -444,6 +444,11 @@ fn real_elk_renders_complex_multi_layer_system() {
         ],
         2,
     );
+    assert_edges_have_at_most_corner_count(
+        &layout_data,
+        &["fulfillment-writes-warehouse", "payment-records-ledger"],
+        4,
+    );
     assert_source_port_above(
         &layout_data,
         "identity-caches-session",

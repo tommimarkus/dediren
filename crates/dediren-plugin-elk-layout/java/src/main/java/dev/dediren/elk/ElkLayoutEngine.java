@@ -747,6 +747,13 @@ final class ElkLayoutEngine {
         candidates.add(routeViaX(start, clearStart, clearEnd, end, clearEnd.x()));
         candidates.add(routeViaY(start, clearStart, clearEnd, end, clearStart.y()));
         candidates.add(routeViaY(start, clearStart, clearEnd, end, clearEnd.y()));
+        addOriginalRouteLaneCandidates(
+            candidates,
+            edge.points(),
+            start,
+            clearStart,
+            clearEnd,
+            end);
         double minNodeX = minNodeX(nodes);
         double maxNodeX = maxNodeX(nodes);
         double minNodeY = minNodeY(nodes);
@@ -783,6 +790,24 @@ final class ElkLayoutEngine {
             }
         }
         return best;
+    }
+
+    private static void addOriginalRouteLaneCandidates(
+        List<List<JsonContracts.Point>> candidates,
+        List<JsonContracts.Point> originalPoints,
+        JsonContracts.Point start,
+        JsonContracts.Point clearStart,
+        JsonContracts.Point clearEnd,
+        JsonContracts.Point end) {
+        for (int index = 0; index < originalPoints.size() - 1; index++) {
+            JsonContracts.Point segmentStart = originalPoints.get(index);
+            JsonContracts.Point segmentEnd = originalPoints.get(index + 1);
+            if (vertical(segmentStart, segmentEnd)) {
+                candidates.add(routeViaX(start, clearStart, clearEnd, end, segmentStart.x()));
+            } else if (horizontal(segmentStart, segmentEnd)) {
+                candidates.add(routeViaY(start, clearStart, clearEnd, end, segmentStart.y()));
+            }
+        }
     }
 
     private static JsonContracts.Point clearancePoint(
