@@ -434,29 +434,74 @@ fn real_elk_renders_complex_multi_layer_system() {
         6
     );
 
-    let svg = render_svg(&layout, "fixtures/render-policy/rich-svg.json", None);
-    let doc = svg_doc(&svg);
-    assert_svg_texts_include(
-        &doc,
-        &[
-            "Mobile App",
-            "API Gateway",
-            "Order Service",
-            "Event Bus",
-            "External Systems",
-            "publishes events",
-        ],
-    );
-    assert!(svg.contains("data-dediren-node-id=\"analytics-warehouse\""));
-    assert!(svg.contains("data-dediren-node-id=\"reporting-ingestor\""));
-    assert!(svg.contains("data-dediren-group-id=\"core-services\""));
-    assert!(svg.contains("data-dediren-group-id=\"async-processing\""));
-    assert!(svg.contains("data-dediren-group-id=\"data-platform\""));
-    assert_reasonable_svg_aspect(&svg, 6.5);
+    let default_svg = render_svg(&layout, "fixtures/render-policy/default-svg.json", None);
+    let default_doc = svg_doc(&default_svg);
+    assert_complex_profile_svg(&default_doc, &default_svg);
     write_render_artifact(
         "real-elk",
-        "real_elk_renders_complex_multi_layer_system",
-        &svg,
+        "real_elk_renders_complex_multi_layer_system_default",
+        &default_svg,
+    );
+
+    let rich_svg = render_svg(&layout, "fixtures/render-policy/rich-svg.json", None);
+    let rich_doc = svg_doc(&rich_svg);
+    assert_complex_profile_svg(&rich_doc, &rich_svg);
+    write_render_artifact(
+        "real-elk",
+        "real_elk_renders_complex_multi_layer_system_rich",
+        &rich_svg,
+    );
+
+    let metadata = complex_archimate_render_metadata();
+    let metadata = write_temp_json(
+        &temp,
+        "complex-multi-layer-archimate-render-metadata.json",
+        &metadata,
+    );
+    let archimate_svg = render_svg(
+        &layout,
+        "fixtures/render-policy/archimate-svg.json",
+        Some(&metadata),
+    );
+    let archimate_doc = svg_doc(&archimate_svg);
+    assert_complex_profile_svg(&archimate_doc, &archimate_svg);
+
+    let business_actor = semantic_group(&archimate_doc, "data-dediren-node-id", "customer-mobile");
+    assert!(child_group_with_attr(
+        business_actor,
+        "data-dediren-node-decorator",
+        "archimate_business_actor",
+    )
+    .is_some());
+    let application_service =
+        semantic_group(&archimate_doc, "data-dediren-node-id", "order-service");
+    assert!(child_group_with_attr(
+        application_service,
+        "data-dediren-node-decorator",
+        "archimate_application_service",
+    )
+    .is_some());
+    let data_object = semantic_group(&archimate_doc, "data-dediren-node-id", "order-db");
+    assert!(child_group_with_attr(
+        data_object,
+        "data-dediren-node-decorator",
+        "archimate_data_object",
+    )
+    .is_some());
+    let technology_service = semantic_group(&archimate_doc, "data-dediren-node-id", "carrier-api");
+    assert!(child_group_with_attr(
+        technology_service,
+        "data-dediren-node-decorator",
+        "archimate_technology_service",
+    )
+    .is_some());
+    let association = semantic_group(&archimate_doc, "data-dediren-edge-id", "mobile-enters-cdn");
+    let path = child_element(association, "path");
+    assert_eq!(path.attribute("marker-end"), None);
+    write_render_artifact(
+        "real-elk",
+        "real_elk_renders_complex_multi_layer_system_archimate",
+        &archimate_svg,
     );
 }
 
@@ -586,6 +631,122 @@ fn assert_complex_layout_quality_bounded(quality: &Value) {
         quality["route_detour_count"].as_u64().unwrap_or(u64::MAX) <= 1,
         "complex layout should not accumulate route detours: {quality}"
     );
+}
+
+fn assert_complex_profile_svg(doc: &roxmltree::Document<'_>, svg: &str) {
+    assert_svg_texts_include(
+        doc,
+        &[
+            "Mobile App",
+            "API Gateway",
+            "Order Service",
+            "Event Bus",
+            "External Systems",
+            "publishes events",
+        ],
+    );
+    assert!(svg.contains("data-dediren-node-id=\"analytics-warehouse\""));
+    assert!(svg.contains("data-dediren-node-id=\"reporting-ingestor\""));
+    assert!(svg.contains("data-dediren-group-id=\"core-services\""));
+    assert!(svg.contains("data-dediren-group-id=\"async-processing\""));
+    assert!(svg.contains("data-dediren-group-id=\"data-platform\""));
+    assert_reasonable_svg_aspect(svg, 6.5);
+}
+
+fn complex_archimate_render_metadata() -> Value {
+    let node_types = [
+        ("customer-mobile", "BusinessActor"),
+        ("customer-web", "BusinessActor"),
+        ("support-agent", "BusinessActor"),
+        ("cdn", "TechnologyService"),
+        ("web-frontend", "ApplicationComponent"),
+        ("admin-portal", "ApplicationComponent"),
+        ("api-gateway", "ApplicationInterface"),
+        ("identity-service", "ApplicationService"),
+        ("catalog-service", "ApplicationService"),
+        ("pricing-service", "ApplicationService"),
+        ("order-service", "ApplicationService"),
+        ("payment-service", "ApplicationService"),
+        ("fulfillment-service", "ApplicationService"),
+        ("notification-service", "ApplicationService"),
+        ("event-bus", "ApplicationComponent"),
+        ("order-worker", "ApplicationProcess"),
+        ("warehouse-adapter", "ApplicationComponent"),
+        ("email-worker", "ApplicationProcess"),
+        ("reporting-ingestor", "ApplicationProcess"),
+        ("session-cache", "DataObject"),
+        ("product-db", "DataObject"),
+        ("order-db", "DataObject"),
+        ("payment-ledger", "DataObject"),
+        ("warehouse-db", "DataObject"),
+        ("analytics-warehouse", "DataObject"),
+        ("identity-provider", "ApplicationService"),
+        ("payment-provider", "BusinessService"),
+        ("carrier-api", "TechnologyService"),
+        ("email-provider", "TechnologyService"),
+        ("erp", "ApplicationComponent"),
+    ];
+    let edge_ids = [
+        "mobile-enters-cdn",
+        "web-enters-cdn",
+        "support-opens-admin",
+        "cdn-serves-web",
+        "web-calls-gateway",
+        "admin-calls-gateway",
+        "gateway-authenticates",
+        "gateway-queries-catalog",
+        "gateway-prices-cart",
+        "gateway-places-order",
+        "identity-federates",
+        "identity-caches-session",
+        "catalog-reads-products",
+        "pricing-reads-products",
+        "pricing-caches-quotes",
+        "order-checks-catalog",
+        "order-requests-payment",
+        "order-reserves-stock",
+        "order-writes-orders",
+        "order-publishes-events",
+        "payment-authorizes",
+        "payment-records-ledger",
+        "fulfillment-ships",
+        "fulfillment-syncs-warehouse",
+        "fulfillment-writes-warehouse",
+        "fulfillment-publishes-events",
+        "event-bus-drives-order-worker",
+        "event-bus-drives-email-worker",
+        "event-bus-drives-reporting",
+        "order-worker-reads-orders",
+        "order-worker-syncs-erp",
+        "warehouse-adapter-syncs-erp",
+        "warehouse-adapter-writes-db",
+        "email-worker-notifies",
+        "notification-sends-email",
+        "reporting-reads-orders",
+        "reporting-writes-analytics",
+    ];
+    let nodes = node_types
+        .into_iter()
+        .map(|(id, selector_type)| (id.to_string(), archimate_selector(selector_type, id)))
+        .collect::<serde_json::Map<String, Value>>();
+    let edges = edge_ids
+        .into_iter()
+        .map(|id| (id.to_string(), archimate_selector("Association", id)))
+        .collect::<serde_json::Map<String, Value>>();
+
+    serde_json::json!({
+        "render_metadata_schema_version": "render-metadata.schema.v1",
+        "semantic_profile": "archimate",
+        "nodes": nodes,
+        "edges": edges
+    })
+}
+
+fn archimate_selector(selector_type: &str, source_id: &str) -> Value {
+    serde_json::json!({
+        "type": selector_type,
+        "source_id": source_id
+    })
 }
 
 fn render_svg(layout_result: &Path, policy_fixture: &str, metadata: Option<&Path>) -> String {
