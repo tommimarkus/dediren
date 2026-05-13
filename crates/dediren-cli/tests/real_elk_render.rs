@@ -12,7 +12,7 @@ use std::sync::{Mutex, MutexGuard};
 static REAL_ELK_LOCK: Mutex<()> = Mutex::new(());
 
 #[test]
-#[ignore = "requires SDKMAN Java helper build; real ELK helper runs are serialized"]
+#[ignore = "run with --ignored after building the ELK Java helper; serialize real ELK runs"]
 fn real_elk_renders_basic_projected_graph() {
     let _guard = real_elk_guard();
     let temp = assert_fs::TempDir::new().unwrap();
@@ -48,7 +48,7 @@ fn real_elk_renders_basic_projected_graph() {
 }
 
 #[test]
-#[ignore = "requires SDKMAN Java helper build; real ELK helper runs are serialized"]
+#[ignore = "run with --ignored after building the ELK Java helper; serialize real ELK runs"]
 fn real_elk_renders_grouped_rich_graph() {
     let _guard = real_elk_guard();
     let temp = assert_fs::TempDir::new().unwrap();
@@ -125,7 +125,7 @@ fn real_elk_renders_grouped_rich_graph() {
 }
 
 #[test]
-#[ignore = "requires SDKMAN Java helper build; real ELK helper runs are serialized"]
+#[ignore = "run with --ignored after building the ELK Java helper; serialize real ELK runs"]
 fn real_elk_renders_archimate_metadata_notation() {
     let _guard = real_elk_guard();
     let temp = assert_fs::TempDir::new().unwrap();
@@ -227,7 +227,7 @@ fn real_elk_renders_archimate_metadata_notation() {
 }
 
 #[test]
-#[ignore = "requires SDKMAN Java helper build; real ELK helper runs are serialized"]
+#[ignore = "run with --ignored after building the ELK Java helper; serialize real ELK runs"]
 fn real_elk_renders_cross_group_route_without_quality_warnings() {
     let _guard = real_elk_guard();
     let temp = assert_fs::TempDir::new().unwrap();

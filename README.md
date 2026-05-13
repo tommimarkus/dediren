@@ -286,8 +286,36 @@ Gradle build keeps the SDKMAN Java 25 toolchain for ELK layout work, emits Java
 through dependency locking. Concurrent helper builds serialize on
 `.cache/locks/elk-layout-java-build.lock`.
 
-Real Java helper integration tests are ignored by default and require building
-the helper before running ignored tests.
+### ELK Test Lanes
+
+Test names use explicit lane prefixes so failures and artifacts are easy to
+classify:
+
+- `fixture_*` tests use checked-in JSON fixtures. They are deterministic and
+  are the right place for contract shape, ArchiMate node and relationship
+  vocabulary, and relationship-rule coverage.
+- `fake_*` tests exercise runtime boundary behavior with a test command instead
+  of the Java helper.
+- `real_elk_*` tests invoke the Java helper and are ignored by default. They are
+  the preferred coverage for generated geometry, route quality, and SVG render
+  evidence that depends on actual ELK output.
+
+The default `cargo test --workspace --locked` lane runs fixture and fake tests
+only. If Cargo prints `test ... ignored, run with --ignored after building the
+ELK Java helper`, the test did not run; rerun it with `-- --ignored` after
+building the helper.
+
+Generated render artifacts are written under `.test-output/renders/`:
+
+- `.test-output/renders/real-elk/` for real Java helper render tests.
+- `.test-output/renders/fixture-pipeline/` for fixture-backed CLI pipeline
+  tests, including deterministic ArchiMate node and relationship render
+  notation.
+- `.test-output/renders/svg-render-plugin/` for renderer policy and semantic
+  fixture tests that do not prove ELK geometry.
+
+Generated SVGs are ignored by git. Inspect them locally instead of committing
+them unless a tracked example fixture was deliberately requested.
 
 ## Contracts And Fixtures
 
@@ -356,6 +384,16 @@ cargo test -p dediren-core --test plugin_runtime
 cargo test -p dediren --test plugin_compat
 cargo test -p dediren-plugin-svg-render --test svg_render_plugin
 cargo test -p dediren-plugin-archimate-oef-export --test oef_export_plugin
+```
+
+Real ELK checks from a source checkout, after building the helper:
+
+```bash
+crates/dediren-plugin-elk-layout/java/scripts/build-elk-layout.sh
+cargo test --locked -p dediren-plugin-elk-layout --test elk_layout_plugin real_elk_plugin_invokes_java_helper -- --ignored --exact --test-threads=1
+cargo test --locked -p dediren --test cli_layout real_elk_layout_invokes_java_helper -- --ignored --exact --test-threads=1
+cargo test --locked -p dediren --test cli_layout real_elk_layout_validates_grouped_cross_group_route -- --ignored --exact --test-threads=1
+cargo test --locked -p dediren --test real_elk_render -- --ignored --test-threads=1
 ```
 
 ## Security

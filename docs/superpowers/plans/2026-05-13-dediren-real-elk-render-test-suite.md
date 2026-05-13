@@ -573,7 +573,7 @@ git commit -m "test: render real elk cross-group route"
 
 ---
 
-### Task 4: Make Fixture Pipeline Tests Visibly Fixture-Based And Lean
+### Task 4: Make Fixture Pipeline Tests Visibly Fixture-Based And Preserve ArchiMate Semantics
 
 **Files:**
 - Modify: `crates/dediren-cli/tests/cli_pipeline.rs`
@@ -612,15 +612,31 @@ write_render_artifact(
 );
 ```
 
-- [ ] **Step 2: Remove fixture-backed ArchiMate notation from the CLI pipeline suite**
+- [ ] **Step 2: Split fixture-backed ArchiMate notation into focused default CLI tests**
 
-Delete the whole function:
+Replace the old broad function:
 
 ```rust
 fn archimate_pipeline_renders_policy_notation_from_projected_metadata()
 ```
 
-Delete from its `#[test]` attribute through its final closing brace. The real ELK replacement is `real_elk_renders_archimate_metadata_notation`; exhaustive ArchiMate node and relationship semantics remain fixture-backed in `crates/dediren-plugin-svg-render/tests/svg_render_plugin/archimate_nodes.rs`, `crates/dediren-plugin-svg-render/tests/svg_render_plugin/archimate_relationships.rs`, and `crates/dediren-archimate/tests/relationship_rules.rs`.
+with focused tests:
+
+```rust
+fn fixture_archimate_pipeline_renders_node_notation()
+fn fixture_archimate_pipeline_renders_relationship_notation()
+```
+
+These tests should keep using projected ArchiMate render metadata plus
+`fixtures/layout-result/pipeline-rich.json`. They are not ELK geometry evidence;
+they are default deterministic coverage that the CLI render path still applies
+ArchiMate node decorators, node styles, relationship markers, and relationship
+labels from fixture-backed inputs. The real ELK replacement remains
+`real_elk_renders_archimate_metadata_notation`; exhaustive ArchiMate node and
+relationship semantics also remain fixture-backed in
+`crates/dediren-plugin-svg-render/tests/svg_render_plugin/archimate_nodes.rs`,
+`crates/dediren-plugin-svg-render/tests/svg_render_plugin/archimate_relationships.rs`,
+and `crates/dediren-archimate/tests/relationship_rules.rs`.
 
 - [ ] **Step 3: Remove the old real ELK test from `cli_pipeline.rs`**
 
@@ -634,19 +650,19 @@ Delete from its `#[test]` attribute through its final closing brace. The replace
 
 - [ ] **Step 4: Reduce the imports to the fixture pipeline needs**
 
-After the deletions, the top import block should be:
+After the changes, the top import block should include the semantic SVG helpers:
 
 ```rust
 mod common;
 
 use assert_fs::prelude::*;
 use common::{
-    assert_reasonable_svg_aspect, assert_svg_texts_include, ok_data, plugin_binary, svg_doc,
-    workspace_file, write_render_artifact,
+    assert_reasonable_svg_aspect, assert_svg_texts_include, child_element, child_group_with_attr,
+    ok_data, plugin_binary, semantic_group, svg_doc, workspace_file, write_render_artifact,
 };
 ```
 
-- [ ] **Step 5: Run the lean fixture pipeline test**
+- [ ] **Step 5: Run the fixture pipeline tests**
 
 Run:
 
@@ -657,8 +673,12 @@ cargo test -p dediren --test cli_pipeline --locked
 Expected:
 
 - Cargo reports `test fixture_pipeline_produces_svg_and_oef ... ok`.
+- Cargo reports `test fixture_archimate_pipeline_renders_node_notation ... ok`.
+- Cargo reports `test fixture_archimate_pipeline_renders_relationship_notation ... ok`.
 - No ignored tests remain in `cli_pipeline.rs`.
 - `.test-output/renders/fixture-pipeline/fixture_pipeline_produces_svg_and_oef.svg` exists after the test.
+- `.test-output/renders/fixture-pipeline/fixture_archimate_pipeline_renders_node_notation.svg` exists after the test.
+- `.test-output/renders/fixture-pipeline/fixture_archimate_pipeline_renders_relationship_notation.svg` exists after the test.
 
 - [ ] **Step 6: Commit the fixture-pipeline trim**
 
@@ -756,7 +776,7 @@ git commit -m "test: label elk test lanes"
 Replace the existing `CLI fixture pipeline` row with:
 
 ```markdown
-| CLI fixture pipeline | `crates/dediren-cli/tests/cli_pipeline.rs::fixture_pipeline_produces_svg_and_oef` | One deterministic fixture-backed smoke test covers CLI command wiring across project, layout fixture input, render, and OEF export. | Fixture layout does not prove ELK geometry quality and is intentionally not the render-confidence lane. | Keep this lane lean; add broad render confidence only under `real_elk_render.rs`. |
+| CLI fixture pipeline | `crates/dediren-cli/tests/cli_pipeline.rs::fixture_*` | Deterministic fixture-backed tests cover CLI command wiring across project, layout fixture input, render, OEF export, and ArchiMate node/relationship notation through projected metadata. | Fixture layout does not prove ELK geometry quality and is intentionally not the render-confidence lane. | Keep this lane lean, but preserve default ArchiMate node and relationship render checks; add broad render confidence only under `real_elk_render.rs`. |
 ```
 
 - [ ] **Step 2: Replace the real ELK render lane row**
@@ -779,7 +799,7 @@ Append this section after the matrix:
 - `fake_elk_*`: uses a shell helper to simulate external runtime envelopes or failures.
 - ArchiMate node/relationship fixture tests: deterministic semantic matrix coverage, intentionally retained as fixture-based tests.
 - `.test-output/renders/real-elk/*.svg`: real helper render artifacts.
-- `.test-output/renders/fixture-pipeline/*.svg`: fixture-backed broad pipeline artifacts.
+- `.test-output/renders/fixture-pipeline/*.svg`: fixture-backed CLI pipeline artifacts, including deterministic ArchiMate node and relationship render notation.
 - `.test-output/renders/svg-render-plugin/*.svg`: renderer policy artifacts from static layout inputs, not ELK geometry evidence.
 ```
 
@@ -882,7 +902,8 @@ Expected:
 Spec coverage:
 
 - Real ELK-heavy: Tasks 1-3 add four real-helper render cases and make them the preferred layout/render confidence lane.
-- Lean fixture side: Task 4 trims the broad fixture pipeline to one explicit smoke test.
+- Lean fixture side: Task 4 keeps the broad fixture pipeline explicit and restores
+  focused default ArchiMate node/relationship render checks.
 - Fixture carve-out: ArchiMate node/relationship and rule-table tests remain fixture/table-driven because they cover deterministic semantic matrices rather than layout geometry.
 - Quickly tell real vs fixture: Tasks 4-6 add file, name, artifact, and matrix signals.
 - Serial real helper behavior: Task 1 adds an in-binary mutex and Task 7 uses `--test-threads=1`.

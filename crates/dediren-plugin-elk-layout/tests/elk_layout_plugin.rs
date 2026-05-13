@@ -139,7 +139,7 @@ fn fixture_elk_plugin_accepts_fixture_runtime_output() {
 }
 
 #[test]
-#[ignore = "requires SDKMAN Java helper build"]
+#[ignore = "run with --ignored after building the ELK Java helper"]
 fn real_elk_plugin_invokes_java_helper() {
     let input =
         std::fs::read_to_string(workspace_file("fixtures/layout-request/basic.json")).unwrap();

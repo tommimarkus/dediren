@@ -55,7 +55,7 @@ fn fake_elk_layout_wraps_external_command() {
 }
 
 #[test]
-#[ignore = "requires SDKMAN Java helper build"]
+#[ignore = "run with --ignored after building the ELK Java helper"]
 fn real_elk_layout_invokes_java_helper() {
     let output = common::dediren_command()
         .env(
@@ -90,7 +90,7 @@ fn real_elk_layout_invokes_java_helper() {
 }
 
 #[test]
-#[ignore = "requires SDKMAN Java helper build"]
+#[ignore = "run with --ignored after building the ELK Java helper"]
 fn real_elk_layout_validates_grouped_cross_group_route() {
     let request = serde_json::json!({
         "layout_request_schema_version": "layout-request.schema.v1",
