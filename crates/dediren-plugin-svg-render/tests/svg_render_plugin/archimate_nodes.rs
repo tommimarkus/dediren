@@ -96,6 +96,11 @@ fn svg_renderer_covers_each_archimate_square_node_type() {
     );
 
     let content = render_content(input);
+    assert!(write_render_artifact(
+        "svg_renderer_covers_each_archimate_square_node_type",
+        &content,
+    )
+    .exists());
     let doc = svg_doc(&content);
     for (index, node_type) in ARCHIMATE_NODE_TYPES.iter().enumerate() {
         let id = format!("archimate-node-{index}");

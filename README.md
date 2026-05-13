@@ -312,7 +312,8 @@ Generated render artifacts are written under `.test-output/renders/`:
   tests, including deterministic ArchiMate node and relationship render
   notation.
 - `.test-output/renders/svg-render-plugin/` for renderer policy and semantic
-  fixture tests that do not prove ELK geometry.
+  fixture tests that do not prove ELK geometry, including the all-Archimate-node
+  and all-Archimate-relationship visual sheets.
 
 Generated SVGs are ignored by git. Inspect them locally instead of committing
 them unless a tracked example fixture was deliberately requested.

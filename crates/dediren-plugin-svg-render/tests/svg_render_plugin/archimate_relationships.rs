@@ -133,6 +133,11 @@ fn svg_renderer_covers_each_archimate_relationship_type() {
     );
 
     let content = render_content(input);
+    assert!(write_render_artifact(
+        "svg_renderer_covers_each_archimate_relationship_type",
+        &content,
+    )
+    .exists());
     let doc = svg_doc(&content);
     for (index, relationship_type) in ARCHIMATE_RELATIONSHIP_TYPES.iter().enumerate() {
         let edge_id = format!("relationship-edge-{index}");

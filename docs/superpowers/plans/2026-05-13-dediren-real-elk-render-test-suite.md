@@ -800,7 +800,7 @@ Append this section after the matrix:
 - ArchiMate node/relationship fixture tests: deterministic semantic matrix coverage, intentionally retained as fixture-based tests.
 - `.test-output/renders/real-elk/*.svg`: real helper render artifacts.
 - `.test-output/renders/fixture-pipeline/*.svg`: fixture-backed CLI pipeline artifacts, including deterministic ArchiMate node and relationship render notation.
-- `.test-output/renders/svg-render-plugin/*.svg`: renderer policy artifacts from static layout inputs, not ELK geometry evidence.
+- `.test-output/renders/svg-render-plugin/*.svg`: renderer policy artifacts from static layout inputs, including all-Archimate-node and all-Archimate-relationship visual sheets; not ELK geometry evidence.
 ```
 
 - [ ] **Step 4: Verify docs formatting**
