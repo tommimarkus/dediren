@@ -2790,7 +2790,7 @@ fn edge_path(
     if points.len() < 2 {
         return String::new();
     }
-    let data = edge_path_data(points, earlier_edges);
+    let data = edge_path_data(edge, earlier_edges);
     let dash_attr = match style.line_style {
         SvgEdgeLineStyle::Solid => String::new(),
         SvgEdgeLineStyle::Dashed => r#" stroke-dasharray="8 5""#.to_string(),
@@ -2820,11 +2820,12 @@ fn edge_path(
     )
 }
 
-fn edge_path_data(points: &[Point], earlier_edges: &[&LaidOutEdge]) -> String {
+fn edge_path_data(edge: &LaidOutEdge, earlier_edges: &[&LaidOutEdge]) -> String {
+    let points = &edge.points;
     let detours: Vec<Option<LineDetour>> = points
         .windows(2)
         .map(|segment| {
-            colinear_overlap_detours(&segment[0], &segment[1], earlier_edges)
+            colinear_overlap_detours(edge, &segment[0], &segment[1], earlier_edges)
                 .into_iter()
                 .next()
         })
@@ -2863,7 +2864,7 @@ fn edge_path_data(points: &[Point], earlier_edges: &[&LaidOutEdge]) -> String {
             }
         }
 
-        let jumps = line_jump_points(&current_point, &segment_end, earlier_edges);
+        let jumps = line_jump_points(edge, &current_point, &segment_end, earlier_edges);
         if jumps.is_empty() {
             append_line_to(&mut data, &current_point, &segment_end);
             current_point = segment_end;
@@ -2900,6 +2901,7 @@ struct DetourExit {
 }
 
 fn colinear_overlap_detours(
+    current_edge: &LaidOutEdge,
     start: &Point,
     end: &Point,
     earlier_edges: &[&LaidOutEdge],
@@ -2910,6 +2912,9 @@ fn colinear_overlap_detours(
             if let Some(detour) =
                 colinear_overlap_detour(start, end, &earlier_segment[0], &earlier_segment[1])
             {
+                if shared_junction_hint_matches(current_edge, earlier_edge) {
+                    continue;
+                }
                 detours.push(detour);
             }
         }
@@ -2918,9 +2923,44 @@ fn colinear_overlap_detours(
     detours
 }
 
-fn line_jump_points(start: &Point, end: &Point, earlier_edges: &[&LaidOutEdge]) -> Vec<LineJump> {
+fn shared_junction_hint_matches(current_edge: &LaidOutEdge, earlier_edge: &LaidOutEdge) -> bool {
+    (has_routing_hint(current_edge, SHARED_SOURCE_JUNCTION_HINT)
+        && (current_edge.source == earlier_edge.source
+            || same_route_start(current_edge, earlier_edge)))
+        || (has_routing_hint(current_edge, SHARED_TARGET_JUNCTION_HINT)
+            && (current_edge.target == earlier_edge.target
+                || same_route_end(current_edge, earlier_edge)))
+}
+
+fn has_routing_hint(edge: &LaidOutEdge, hint: &str) -> bool {
+    edge.routing_hints.iter().any(|candidate| candidate == hint)
+}
+
+fn same_route_start(left: &LaidOutEdge, right: &LaidOutEdge) -> bool {
+    left.points
+        .first()
+        .zip(right.points.first())
+        .is_some_and(|(left, right)| same_point(left, right))
+}
+
+fn same_route_end(left: &LaidOutEdge, right: &LaidOutEdge) -> bool {
+    left.points
+        .last()
+        .zip(right.points.last())
+        .is_some_and(|(left, right)| same_point(left, right))
+}
+
+fn line_jump_points(
+    current_edge: &LaidOutEdge,
+    start: &Point,
+    end: &Point,
+    earlier_edges: &[&LaidOutEdge],
+) -> Vec<LineJump> {
     let mut jumps = Vec::new();
     for earlier_edge in earlier_edges {
+        if shared_junction_hint_matches(current_edge, earlier_edge) {
+            continue;
+        }
         for earlier_segment in earlier_edge.points.windows(2) {
             if let Some(point) =
                 route_jump_point(start, end, &earlier_segment[0], &earlier_segment[1])
@@ -2937,6 +2977,8 @@ fn line_jump_points(start: &Point, end: &Point, earlier_edges: &[&LaidOutEdge]) 
 }
 
 const LINE_JUMP_SIZE: f64 = 6.0;
+const SHARED_SOURCE_JUNCTION_HINT: &str = "shared_source_junction";
+const SHARED_TARGET_JUNCTION_HINT: &str = "shared_target_junction";
 
 fn route_jump_point(
     start: &Point,

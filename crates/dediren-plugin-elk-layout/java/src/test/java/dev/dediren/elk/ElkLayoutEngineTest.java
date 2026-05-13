@@ -324,6 +324,56 @@ class ElkLayoutEngineTest {
     }
 
     @Test
+    void groupedGatewayFanOutUsesMergedJunctionRoute() {
+        JsonContracts.LayoutRequest request = new JsonContracts.LayoutRequest(
+            "layout-request.schema.v1",
+            "main",
+            List.of(
+                new JsonContracts.LayoutNode("web-frontend", "Web Frontend", "web-frontend", 160.0, 80.0),
+                new JsonContracts.LayoutNode("api-gateway", "API Gateway", "api-gateway", 160.0, 112.0),
+                new JsonContracts.LayoutNode("identity-service", "Identity Service", "identity-service", 160.0, 80.0),
+                new JsonContracts.LayoutNode("pricing-service", "Pricing Service", "pricing-service", 160.0, 80.0),
+                new JsonContracts.LayoutNode("order-service", "Order Service", "order-service", 160.0, 80.0),
+                new JsonContracts.LayoutNode("catalog-service", "Catalog Service", "catalog-service", 160.0, 80.0)),
+            List.of(
+                new JsonContracts.LayoutEdge("web-calls-gateway", "web-frontend", "api-gateway", "calls", "web-calls-gateway"),
+                new JsonContracts.LayoutEdge("gateway-authenticates", "api-gateway", "identity-service", "authenticates", "gateway-authenticates"),
+                new JsonContracts.LayoutEdge("gateway-prices-cart", "api-gateway", "pricing-service", "prices cart", "gateway-prices-cart"),
+                new JsonContracts.LayoutEdge("gateway-places-order", "api-gateway", "order-service", "places order", "gateway-places-order"),
+                new JsonContracts.LayoutEdge("gateway-queries-catalog", "api-gateway", "catalog-service", "queries catalog", "gateway-queries-catalog")),
+            List.of(
+                new JsonContracts.LayoutGroup(
+                    "edge-platform",
+                    "Edge Platform",
+                    List.of("web-frontend", "api-gateway"),
+                    new JsonContracts.GroupProvenance(new JsonContracts.SemanticBacked("edge-platform"))),
+                new JsonContracts.LayoutGroup(
+                    "core-services",
+                    "Core Services",
+                    List.of("identity-service", "pricing-service", "order-service", "catalog-service"),
+                    new JsonContracts.GroupProvenance(new JsonContracts.SemanticBacked("core-services")))),
+            List.of(),
+            List.of());
+
+        JsonContracts.LayoutResult result = new ElkLayoutEngine().layout(request);
+        List<JsonContracts.LaidOutEdge> fanOutEdges = List.of(
+            edgeById(result, "gateway-authenticates"),
+            edgeById(result, "gateway-prices-cart"),
+            edgeById(result, "gateway-places-order"),
+            edgeById(result, "gateway-queries-catalog"));
+
+        assertTrue(
+            hasSharedInteriorRoutePoint(fanOutEdges),
+            "same-source fan-out should use an ELK-merged junction route, edges=" + fanOutEdges);
+        for (JsonContracts.LaidOutEdge edge : fanOutEdges) {
+            assertEquals(
+                List.of("shared_source_junction"),
+                edge.routing_hints(),
+                "same-source fan-out should advise renderers about the merged source junction");
+        }
+    }
+
+    @Test
     void groupedSourcePortsFollowRemoteGroupOrder() {
         JsonContracts.LayoutRequest request = new JsonContracts.LayoutRequest(
             "layout-request.schema.v1",
@@ -408,6 +458,51 @@ class ElkLayoutEngineTest {
             0,
             connectorThroughNodeCount(result),
             "multiple incoming routes should avoid unrelated nodes");
+    }
+
+    @Test
+    void groupedFanInUsesMergedJunctionRoute() {
+        JsonContracts.LayoutRequest request = new JsonContracts.LayoutRequest(
+            "layout-request.schema.v1",
+            "main",
+            List.of(
+                new JsonContracts.LayoutNode("web-app", "Web App", "web-app", 160.0, 80.0),
+                new JsonContracts.LayoutNode("batch-worker", "Batch Worker", "batch-worker", 160.0, 80.0),
+                new JsonContracts.LayoutNode("support-console", "Support Console", "support-console", 160.0, 80.0),
+                new JsonContracts.LayoutNode("orders-api", "Orders API", "orders-api", 160.0, 112.0)),
+            List.of(
+                new JsonContracts.LayoutEdge("web-calls-api", "web-app", "orders-api", "calls API", "web-calls-api"),
+                new JsonContracts.LayoutEdge("worker-updates-api", "batch-worker", "orders-api", "updates orders", "worker-updates-api"),
+                new JsonContracts.LayoutEdge("console-reads-api", "support-console", "orders-api", "reads orders", "console-reads-api")),
+            List.of(
+                new JsonContracts.LayoutGroup(
+                    "callers",
+                    "Callers",
+                    List.of("web-app", "batch-worker", "support-console"),
+                    new JsonContracts.GroupProvenance(new JsonContracts.SemanticBacked("callers"))),
+                new JsonContracts.LayoutGroup(
+                    "application-services",
+                    "Application Services",
+                    List.of("orders-api"),
+                    new JsonContracts.GroupProvenance(new JsonContracts.SemanticBacked("application-services")))),
+            List.of(),
+            List.of());
+
+        JsonContracts.LayoutResult result = new ElkLayoutEngine().layout(request);
+        List<JsonContracts.LaidOutEdge> fanInEdges = List.of(
+            edgeById(result, "web-calls-api"),
+            edgeById(result, "worker-updates-api"),
+            edgeById(result, "console-reads-api"));
+
+        assertTrue(
+            hasSharedInteriorRoutePoint(fanInEdges),
+            "same-target fan-in should use an ELK-merged junction route, edges=" + fanInEdges);
+        for (JsonContracts.LaidOutEdge edge : fanInEdges) {
+            assertEquals(
+                List.of("shared_target_junction"),
+                edge.routing_hints(),
+                "same-target fan-in should advise renderers about the merged target junction");
+        }
     }
 
     @Test
@@ -642,6 +737,39 @@ class ElkLayoutEngineTest {
             previous = current;
         }
         return corners;
+    }
+
+    private static boolean hasSharedInteriorRoutePoint(List<JsonContracts.LaidOutEdge> edges) {
+        for (int edgeIndex = 0; edgeIndex < edges.size(); edgeIndex++) {
+            JsonContracts.LaidOutEdge edge = edges.get(edgeIndex);
+            for (int pointIndex = 1; pointIndex < edge.points().size() - 1; pointIndex++) {
+                JsonContracts.Point point = edge.points().get(pointIndex);
+                for (int otherIndex = edgeIndex + 1; otherIndex < edges.size(); otherIndex++) {
+                    if (containsInteriorPoint(edges.get(otherIndex), point)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    private static boolean containsInteriorPoint(
+        JsonContracts.LaidOutEdge edge,
+        JsonContracts.Point candidate) {
+        for (int index = 1; index < edge.points().size() - 1; index++) {
+            if (samePoint(edge.points().get(index), candidate)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean samePoint(
+        JsonContracts.Point left,
+        JsonContracts.Point right) {
+        return Math.abs(left.x() - right.x()) <= 0.001
+            && Math.abs(left.y() - right.y()) <= 0.001;
     }
 
     private enum RouteOrientation {

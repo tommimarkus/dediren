@@ -86,6 +86,7 @@ final class JsonContracts {
         String target,
         String source_id,
         String projection_id,
+        List<String> routing_hints,
         List<Point> points,
         String label) {
     }

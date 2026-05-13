@@ -36,6 +36,7 @@ fn invalid_routes_are_counted() {
         target: "b".to_string(),
         source_id: "edge".to_string(),
         projection_id: "edge".to_string(),
+        routing_hints: vec![],
         points: vec![Point { x: 10.0, y: 10.0 }],
         label: "broken".to_string(),
     });
@@ -56,6 +57,7 @@ fn connector_through_unrelated_node_is_counted() {
         target: "b".to_string(),
         source_id: "edge".to_string(),
         projection_id: "edge".to_string(),
+        routing_hints: vec![],
         points: vec![Point { x: 100.0, y: 40.0 }, Point { x: 300.0, y: 40.0 }],
         label: "crosses".to_string(),
     });
@@ -74,6 +76,7 @@ fn excessive_route_detours_are_counted() {
         target: "b".to_string(),
         source_id: "edge".to_string(),
         projection_id: "edge".to_string(),
+        routing_hints: vec![],
         points: vec![
             Point { x: 100.0, y: 40.0 },
             Point { x: 100.0, y: 640.0 },
@@ -136,6 +139,7 @@ fn shared_endpoint_fanout_route_segments_are_readable() {
         target: "left".to_string(),
         source_id: "to-left".to_string(),
         projection_id: "to-left".to_string(),
+        routing_hints: vec![],
         points: vec![Point { x: 0.0, y: 0.0 }, Point { x: 200.0, y: 0.0 }],
         label: "to-left".to_string(),
     });
@@ -145,6 +149,7 @@ fn shared_endpoint_fanout_route_segments_are_readable() {
         target: "right".to_string(),
         source_id: "to-right".to_string(),
         projection_id: "to-right".to_string(),
+        routing_hints: vec![],
         points: vec![Point { x: 0.0, y: 12.0 }, Point { x: 200.0, y: 12.0 }],
         label: "to-right".to_string(),
     });
@@ -205,6 +210,7 @@ fn edge(id: &str, points: Vec<Point>) -> LaidOutEdge {
         target: format!("{id}-target"),
         source_id: id.to_string(),
         projection_id: id.to_string(),
+        routing_hints: vec![],
         points,
         label: id.to_string(),
     }

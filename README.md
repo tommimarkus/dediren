@@ -38,18 +38,18 @@ Runtime prerequisite:
 
 - Java 21 or newer available as `java` on `PATH`.
 
-For the current `0.3.3` version, the xtask creates:
+For the current `0.4.0` version, the xtask creates:
 
 ```text
-dist/dediren-agent-bundle-0.3.3-x86_64-unknown-linux-gnu/
-dist/dediren-agent-bundle-0.3.3-x86_64-unknown-linux-gnu.tar.gz
+dist/dediren-agent-bundle-0.4.0-x86_64-unknown-linux-gnu/
+dist/dediren-agent-bundle-0.4.0-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Run the smoke test from a shell where `java -version` resolves to Java 21 or
 newer:
 
 ```bash
-cargo xtask dist smoke dist/dediren-agent-bundle-0.3.3-x86_64-unknown-linux-gnu.tar.gz
+cargo xtask dist smoke dist/dediren-agent-bundle-0.4.0-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Concurrent `cargo xtask dist build` invocations serialize on a repo-local lock
@@ -60,8 +60,8 @@ Unpack and run it anywhere:
 
 ```bash
 mkdir -p /tmp/dediren-dist
-tar -xzf dist/dediren-agent-bundle-0.3.3-x86_64-unknown-linux-gnu.tar.gz -C /tmp/dediren-dist
-/tmp/dediren-dist/dediren-agent-bundle-0.3.3-x86_64-unknown-linux-gnu/bin/dediren --help
+tar -xzf dist/dediren-agent-bundle-0.4.0-x86_64-unknown-linux-gnu.tar.gz -C /tmp/dediren-dist
+/tmp/dediren-dist/dediren-agent-bundle-0.4.0-x86_64-unknown-linux-gnu/bin/dediren --help
 ```
 
 The archive includes first-party plugin manifests under `plugins/`, first-party
@@ -286,6 +286,13 @@ Gradle build keeps the SDKMAN Java 25 toolchain for ELK layout work, emits Java
 through dependency locking. Concurrent helper builds serialize on
 `.cache/locks/elk-layout-java-build.lock`.
 
+For large same-side fan-in and fan-out groups, the helper lets ELK merge routes
+through shared junction trunks instead of assigning every relationship its own
+source or target port. Layout results expose that renderer advice through
+`routing_hints` values such as `shared_source_junction` and
+`shared_target_junction`, so SVG rendering preserves intentional shared endpoint
+trunks while still detouring unrelated route overlaps.
+
 ### ELK Test Lanes
 
 Test names use explicit lane prefixes so failures and artifacts are easy to
@@ -376,7 +383,7 @@ newer:
 
 ```bash
 cargo xtask dist build
-cargo xtask dist smoke dist/dediren-agent-bundle-0.3.3-x86_64-unknown-linux-gnu.tar.gz
+cargo xtask dist smoke dist/dediren-agent-bundle-0.4.0-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Focused checks:

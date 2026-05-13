@@ -444,6 +444,16 @@ fn real_elk_renders_complex_multi_layer_system() {
         ],
         2,
     );
+    assert_edges_include_routing_hint(
+        &layout_data,
+        &[
+            "gateway-authenticates",
+            "gateway-queries-catalog",
+            "gateway-prices-cart",
+            "gateway-places-order",
+        ],
+        "shared_source_junction",
+    );
     assert_edges_have_at_most_corner_count(
         &layout_data,
         &["fulfillment-writes-warehouse", "payment-records-ledger"],
@@ -724,6 +734,25 @@ fn assert_edges_have_at_most_corner_count(
         assert!(
             corners <= max_corners,
             "{edge_id} should have at most {max_corners} corners, got {corners}: {points:?}"
+        );
+    }
+}
+
+fn assert_edges_include_routing_hint(layout_data: &Value, edge_ids: &[&str], hint: &str) {
+    let edges = layout_data["edges"]
+        .as_array()
+        .expect("laid out edges should be an array");
+    for edge_id in edge_ids {
+        let edge = edges
+            .iter()
+            .find(|edge| edge["id"] == *edge_id)
+            .unwrap_or_else(|| panic!("expected laid out edge {edge_id}"));
+        let hints = edge["routing_hints"]
+            .as_array()
+            .unwrap_or_else(|| panic!("{edge_id} routing_hints should be an array"));
+        assert!(
+            hints.iter().any(|candidate| candidate == hint),
+            "{edge_id} should include routing hint {hint}, got {hints:?}"
         );
     }
 }

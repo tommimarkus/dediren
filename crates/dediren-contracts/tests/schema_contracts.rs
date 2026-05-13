@@ -531,6 +531,57 @@ fn layout_contracts_match_schemas() {
             "warnings": []
         }),
     );
+    assert_json_valid(
+        "schemas/layout-result.schema.json",
+        json!({
+            "layout_result_schema_version": "layout-result.schema.v1",
+            "view_id": "main",
+            "nodes": [],
+            "edges": [
+                {
+                    "id": "source-fans-out",
+                    "source": "source",
+                    "target": "target",
+                    "source_id": "source-fans-out",
+                    "projection_id": "source-fans-out",
+                    "routing_hints": ["shared_source_junction"],
+                    "points": [
+                        { "x": 0, "y": 0 },
+                        { "x": 100, "y": 0 }
+                    ],
+                    "label": "fans out"
+                }
+            ],
+            "groups": [],
+            "warnings": []
+        }),
+    );
+    assert_json_invalid(
+        "schemas/layout-result.schema.json",
+        json!({
+            "layout_result_schema_version": "layout-result.schema.v1",
+            "view_id": "main",
+            "nodes": [],
+            "edges": [
+                {
+                    "id": "bad-hint",
+                    "source": "source",
+                    "target": "target",
+                    "source_id": "bad-hint",
+                    "projection_id": "bad-hint",
+                    "routing_hints": ["shared_middle_junction"],
+                    "points": [
+                        { "x": 0, "y": 0 },
+                        { "x": 100, "y": 0 }
+                    ],
+                    "label": "bad hint"
+                }
+            ],
+            "groups": [],
+            "warnings": []
+        }),
+        "unknown routing hint",
+    );
 }
 
 #[test]

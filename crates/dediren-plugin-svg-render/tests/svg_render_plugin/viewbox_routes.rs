@@ -48,6 +48,163 @@ fn svg_renderer_adds_line_jump_for_later_crossing_edge() {
 }
 
 #[test]
+fn svg_renderer_preserves_shared_endpoint_merge_trunk() {
+    let input = styled_inline_input(
+        serde_json::json!([]),
+        serde_json::json!([]),
+        serde_json::json!([
+            {
+                "id": "first-edge",
+                "source": "shared-source",
+                "target": "top-target",
+                "source_id": "first-edge",
+                "projection_id": "first-edge",
+                "points": [
+                    { "x": 0, "y": 100 },
+                    { "x": 120, "y": 100 },
+                    { "x": 120, "y": 40 },
+                    { "x": 220, "y": 40 }
+                ],
+                "label": "first"
+            },
+            {
+                "id": "merged-edge",
+                "source": "shared-source",
+                "target": "bottom-target",
+                "source_id": "merged-edge",
+                "projection_id": "merged-edge",
+                "routing_hints": ["shared_source_junction"],
+                "points": [
+                    { "x": 0, "y": 100 },
+                    { "x": 140, "y": 100 },
+                    { "x": 140, "y": 180 },
+                    { "x": 220, "y": 180 }
+                ],
+                "label": "merged"
+            }
+        ]),
+        serde_json::json!({}),
+    );
+    let content = render_content(input);
+    let doc = svg_doc(&content);
+
+    let merged_edge = semantic_group(&doc, "data-dediren-edge-id", "merged-edge");
+    let merged_path = child_element(merged_edge, "path");
+    let data = merged_path.attribute("d").unwrap();
+
+    assert!(
+        data.contains("M 0.0 100.0 L 140.0 100.0"),
+        "shared endpoint trunk should remain merged in the SVG path, got {data}"
+    );
+    assert!(
+        !data.contains(" Q "),
+        "shared endpoint trunk should not be separated by overlap detours or line jumps, got {data}"
+    );
+}
+
+#[test]
+fn svg_renderer_suppresses_line_jump_between_shared_junction_edges() {
+    let input = styled_inline_input(
+        serde_json::json!([]),
+        serde_json::json!([]),
+        serde_json::json!([
+            {
+                "id": "first-edge",
+                "source": "shared-source",
+                "target": "top-target",
+                "source_id": "first-edge",
+                "projection_id": "first-edge",
+                "points": [
+                    { "x": 0, "y": 100 },
+                    { "x": 80, "y": 100 },
+                    { "x": 80, "y": 40 }
+                ],
+                "label": "first"
+            },
+            {
+                "id": "merged-edge",
+                "source": "shared-source",
+                "target": "bottom-target",
+                "source_id": "merged-edge",
+                "projection_id": "merged-edge",
+                "routing_hints": ["shared_source_junction"],
+                "points": [
+                    { "x": 0, "y": 90 },
+                    { "x": 120, "y": 90 }
+                ],
+                "label": "merged"
+            }
+        ]),
+        serde_json::json!({}),
+    );
+    let content = render_content(input);
+    let doc = svg_doc(&content);
+
+    let merged_edge = semantic_group(&doc, "data-dediren-edge-id", "merged-edge");
+    let merged_path = child_element(merged_edge, "path");
+    let data = merged_path.attribute("d").unwrap();
+
+    assert!(
+        !data.contains(" Q "),
+        "shared junction renderer advice should suppress line jumps between merged edges, got {data}"
+    );
+}
+
+#[test]
+fn svg_renderer_detours_shared_endpoint_overlap_without_merge_hint() {
+    let input = styled_inline_input(
+        serde_json::json!([]),
+        serde_json::json!([]),
+        serde_json::json!([
+            {
+                "id": "first-edge",
+                "source": "shared-source",
+                "target": "top-target",
+                "source_id": "first-edge",
+                "projection_id": "first-edge",
+                "points": [
+                    { "x": 0, "y": 100 },
+                    { "x": 120, "y": 100 },
+                    { "x": 120, "y": 40 },
+                    { "x": 220, "y": 40 }
+                ],
+                "label": "first"
+            },
+            {
+                "id": "overlapping-edge",
+                "source": "shared-source",
+                "target": "bottom-target",
+                "source_id": "overlapping-edge",
+                "projection_id": "overlapping-edge",
+                "points": [
+                    { "x": 0, "y": 100 },
+                    { "x": 140, "y": 100 },
+                    { "x": 140, "y": 180 },
+                    { "x": 220, "y": 180 }
+                ],
+                "label": "overlap"
+            }
+        ]),
+        serde_json::json!({}),
+    );
+    let content = render_content(input);
+    let doc = svg_doc(&content);
+
+    let overlapping_edge = semantic_group(&doc, "data-dediren-edge-id", "overlapping-edge");
+    let overlapping_path = child_element(overlapping_edge, "path");
+    let data = overlapping_path.attribute("d").unwrap();
+
+    assert!(
+        data.contains(" Q "),
+        "unhinted endpoint overlap should still use the renderer detour, got {data}"
+    );
+    assert!(
+        !data.contains("M 0.0 100.0 L 140.0 100.0"),
+        "unhinted endpoint overlap should not be treated as an ELK merge trunk, got {data}"
+    );
+}
+
+#[test]
 fn svg_renderer_expands_viewbox_to_include_edge_labels() {
     let input = styled_inline_input(
         serde_json::json!([]),

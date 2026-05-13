@@ -239,6 +239,8 @@ pub struct LaidOutEdge {
     pub target: String,
     pub source_id: String,
     pub projection_id: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub routing_hints: Vec<String>,
     pub points: Vec<Point>,
     pub label: String,
 }

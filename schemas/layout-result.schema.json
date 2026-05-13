@@ -38,6 +38,12 @@
         "target": { "type": "string" },
         "source_id": { "type": "string" },
         "projection_id": { "type": "string" },
+        "routing_hints": {
+          "type": "array",
+          "items": {
+            "enum": ["shared_source_junction", "shared_target_junction"]
+          }
+        },
         "points": { "type": "array", "items": { "$ref": "#/$defs/point" } },
         "label": { "type": "string" }
       }
