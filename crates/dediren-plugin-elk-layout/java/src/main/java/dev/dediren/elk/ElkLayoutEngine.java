@@ -84,7 +84,13 @@ final class ElkLayoutEngine {
                     "$.edges[" + index + "]"));
                 continue;
             }
-            ElkEdge elkEdge = createRoutedEdge(source, target, edge, Direction.RIGHT, portIndexes);
+            ElkEdge elkEdge = createRoutedEdge(
+                source,
+                target,
+                edge,
+                Direction.RIGHT,
+                nextPortIndex(portIndexes, edge.source(), sourcePortSide(Direction.RIGHT)),
+                nextPortIndex(portIndexes, edge.target(), targetPortSide(Direction.RIGHT)));
             elkEdges.put(edge.id(), elkEdge);
         }
 
@@ -197,7 +203,13 @@ final class ElkLayoutEngine {
         }
 
         Map<String, ElkEdge> elkEdges = new HashMap<>();
-        Map<String, EnumMap<PortSide, Integer>> portIndexes = new HashMap<>();
+        Map<String, EdgePortIndexes> edgePortIndexes = groupedEdgePortIndexes(
+            request,
+            requestEdges,
+            requestNodes,
+            ownerByNode,
+            groupDirectionById,
+            groupOrderById);
         for (int index = 0; index < requestEdges.size(); index++) {
             JsonContracts.LayoutEdge edge = requestEdges.get(index);
             ElkNode source = elkNodes.get(edge.source());
@@ -212,7 +224,14 @@ final class ElkLayoutEngine {
             }
             Direction edgeDirection =
                 edgeDirection(edge, ownerByNode, groupDirectionById, groupOrderById);
-            ElkEdge elkEdge = createRoutedEdge(source, target, edge, edgeDirection, portIndexes);
+            EdgePortIndexes portIndexes = edgePortIndexes.get(edge.id());
+            ElkEdge elkEdge = createRoutedEdge(
+                source,
+                target,
+                edge,
+                edgeDirection,
+                portIndexes == null ? 0 : portIndexes.sourceIndex(),
+                portIndexes == null ? 0 : portIndexes.targetIndex());
             ElkGraphUtil.updateContainment(elkEdge);
             elkEdges.put(edge.id(), elkEdge);
         }
@@ -315,7 +334,8 @@ final class ElkLayoutEngine {
         ElkNode target,
         JsonContracts.LayoutEdge edge,
         Direction direction,
-        Map<String, EnumMap<PortSide, Integer>> portIndexes) {
+        int sourcePortIndex,
+        int targetPortIndex) {
         source.setProperty(CoreOptions.PORT_CONSTRAINTS, PortConstraints.FIXED_ORDER);
         target.setProperty(CoreOptions.PORT_CONSTRAINTS, PortConstraints.FIXED_ORDER);
         PortSide sourceSide = sourcePortSide(direction);
@@ -324,16 +344,12 @@ final class ElkLayoutEngine {
         sourcePort.setIdentifier(edge.id() + "-source");
         sourcePort.setDimensions(0.0, 0.0);
         sourcePort.setProperty(CoreOptions.PORT_SIDE, sourceSide);
-        sourcePort.setProperty(
-            CoreOptions.PORT_INDEX,
-            nextPortIndex(portIndexes, edge.source(), sourceSide));
+        sourcePort.setProperty(CoreOptions.PORT_INDEX, sourcePortIndex);
         ElkPort targetPort = ElkGraphUtil.createPort(target);
         targetPort.setIdentifier(edge.id() + "-target");
         targetPort.setDimensions(0.0, 0.0);
         targetPort.setProperty(CoreOptions.PORT_SIDE, targetSide);
-        targetPort.setProperty(
-            CoreOptions.PORT_INDEX,
-            nextPortIndex(portIndexes, edge.target(), targetSide));
+        targetPort.setProperty(CoreOptions.PORT_INDEX, targetPortIndex);
         ElkEdge elkEdge = ElkGraphUtil.createSimpleEdge(sourcePort, targetPort);
         elkEdge.setIdentifier(edge.id());
         ElkGraphUtil.createLabel(elkEdge).setText(edge.label());
@@ -371,6 +387,102 @@ final class ElkLayoutEngine {
             countPort(portCounts, edge.target(), targetPortSide(direction));
         }
         return portCounts;
+    }
+
+    private static Map<String, EdgePortIndexes> groupedEdgePortIndexes(
+        JsonContracts.LayoutRequest request,
+        List<JsonContracts.LayoutEdge> edges,
+        Map<String, JsonContracts.LayoutNode> nodes,
+        Map<String, String> ownerByNode,
+        Map<String, Direction> groupDirectionById,
+        Map<String, Integer> groupOrderById) {
+        Map<String, Integer> nodeOrderById = groupedNodeOrderById(request, groupOrderById);
+        Map<PortGroupKey, List<PortCandidate>> candidatesByPortGroup = new HashMap<>();
+        for (int edgeIndex = 0; edgeIndex < edges.size(); edgeIndex++) {
+            JsonContracts.LayoutEdge edge = edges.get(edgeIndex);
+            if (!nodes.containsKey(edge.source()) || !nodes.containsKey(edge.target())) {
+                continue;
+            }
+            Direction direction =
+                edgeDirection(edge, ownerByNode, groupDirectionById, groupOrderById);
+            PortSide sourceSide = sourcePortSide(direction);
+            PortSide targetSide = targetPortSide(direction);
+            candidatesByPortGroup
+                .computeIfAbsent(new PortGroupKey(edge.source(), sourceSide), ignored -> new ArrayList<>())
+                .add(new PortCandidate(
+                    edge.id(),
+                    true,
+                    nodeOrderById.getOrDefault(edge.target(), Integer.MAX_VALUE),
+                    edgeIndex));
+            candidatesByPortGroup
+                .computeIfAbsent(new PortGroupKey(edge.target(), targetSide), ignored -> new ArrayList<>())
+                .add(new PortCandidate(
+                    edge.id(),
+                    false,
+                    nodeOrderById.getOrDefault(edge.source(), Integer.MAX_VALUE),
+                    edgeIndex));
+        }
+
+        Map<String, Integer> sourcePortIndexByEdge = new HashMap<>();
+        Map<String, Integer> targetPortIndexByEdge = new HashMap<>();
+        for (List<PortCandidate> candidates : candidatesByPortGroup.values()) {
+            candidates.sort((left, right) -> {
+                int remoteOrder = Integer.compare(left.remoteNodeOrder(), right.remoteNodeOrder());
+                if (remoteOrder != 0) {
+                    return remoteOrder;
+                }
+                int requestOrder = Integer.compare(left.requestEdgeIndex(), right.requestEdgeIndex());
+                if (requestOrder != 0) {
+                    return requestOrder;
+                }
+                return left.edgeId().compareTo(right.edgeId());
+            });
+            for (int portIndex = 0; portIndex < candidates.size(); portIndex++) {
+                PortCandidate candidate = candidates.get(portIndex);
+                if (candidate.sourceEndpoint()) {
+                    sourcePortIndexByEdge.put(candidate.edgeId(), portIndex);
+                } else {
+                    targetPortIndexByEdge.put(candidate.edgeId(), portIndex);
+                }
+            }
+        }
+
+        Map<String, EdgePortIndexes> portIndexesByEdge = new HashMap<>();
+        for (JsonContracts.LayoutEdge edge : edges) {
+            if (!nodes.containsKey(edge.source()) || !nodes.containsKey(edge.target())) {
+                continue;
+            }
+            portIndexesByEdge.put(edge.id(), new EdgePortIndexes(
+                sourcePortIndexByEdge.getOrDefault(edge.id(), 0),
+                targetPortIndexByEdge.getOrDefault(edge.id(), 0)));
+        }
+        return portIndexesByEdge;
+    }
+
+    private static Map<String, Integer> groupedNodeOrderById(
+        JsonContracts.LayoutRequest request,
+        Map<String, Integer> groupOrderById) {
+        Map<String, Integer> nodeOrderById = new HashMap<>();
+        int stride = Math.max(list(request.nodes()).size() + 1, 1);
+        List<JsonContracts.LayoutGroup> groups = list(request.groups());
+        for (int groupIndex = 0; groupIndex < groups.size(); groupIndex++) {
+            JsonContracts.LayoutGroup group = groups.get(groupIndex);
+            int groupOrder = groupOrderById.getOrDefault(group.id(), groupIndex);
+            List<String> members = list(group.members());
+            for (int memberIndex = 0; memberIndex < members.size(); memberIndex++) {
+                nodeOrderById.putIfAbsent(
+                    members.get(memberIndex),
+                    groupOrder * stride + memberIndex);
+            }
+        }
+
+        int ungroupedBase = groups.size() * stride;
+        List<JsonContracts.LayoutNode> nodes = list(request.nodes());
+        for (int nodeIndex = 0; nodeIndex < nodes.size(); nodeIndex++) {
+            JsonContracts.LayoutNode node = nodes.get(nodeIndex);
+            nodeOrderById.putIfAbsent(node.id(), ungroupedBase + nodeIndex);
+        }
+        return nodeOrderById;
     }
 
     private static void setGeneratedDimensions(
@@ -444,6 +556,16 @@ final class ElkLayoutEngine {
             default -> PortSide.WEST;
         };
     }
+
+    private record EdgePortIndexes(int sourceIndex, int targetIndex) {}
+
+    private record PortGroupKey(String nodeId, PortSide side) {}
+
+    private record PortCandidate(
+        String edgeId,
+        boolean sourceEndpoint,
+        int remoteNodeOrder,
+        int requestEdgeIndex) {}
 
     private static Map<String, JsonContracts.LayoutNode> requestNodesById(
         JsonContracts.LayoutRequest request) {

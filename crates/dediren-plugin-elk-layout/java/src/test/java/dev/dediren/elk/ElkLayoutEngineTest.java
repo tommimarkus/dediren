@@ -324,6 +324,49 @@ class ElkLayoutEngineTest {
     }
 
     @Test
+    void groupedSourcePortsFollowRemoteGroupOrder() {
+        JsonContracts.LayoutRequest request = new JsonContracts.LayoutRequest(
+            "layout-request.schema.v1",
+            "main",
+            List.of(
+                new JsonContracts.LayoutNode("identity-service", "Identity Service", "identity-service", 160.0, 80.0),
+                new JsonContracts.LayoutNode("session-cache", "Session Cache", "session-cache", 160.0, 80.0),
+                new JsonContracts.LayoutNode("identity-provider", "Identity Provider", "identity-provider", 160.0, 80.0)),
+            List.of(
+                new JsonContracts.LayoutEdge("identity-federates", "identity-service", "identity-provider", "federates", "identity-federates"),
+                new JsonContracts.LayoutEdge("identity-caches-session", "identity-service", "session-cache", "caches session", "identity-caches-session")),
+            List.of(
+                new JsonContracts.LayoutGroup(
+                    "core-services",
+                    "Core Services",
+                    List.of("identity-service"),
+                    new JsonContracts.GroupProvenance(new JsonContracts.SemanticBacked("core-services"))),
+                new JsonContracts.LayoutGroup(
+                    "data-platform",
+                    "Data Platform",
+                    List.of("session-cache"),
+                    new JsonContracts.GroupProvenance(new JsonContracts.SemanticBacked("data-platform"))),
+                new JsonContracts.LayoutGroup(
+                    "external-systems",
+                    "External Systems",
+                    List.of("identity-provider"),
+                    new JsonContracts.GroupProvenance(new JsonContracts.SemanticBacked("external-systems")))),
+            List.of(),
+            List.of());
+
+        JsonContracts.LayoutResult result = new ElkLayoutEngine().layout(request);
+        JsonContracts.LaidOutEdge cacheEdge = edgeById(result, "identity-caches-session");
+        JsonContracts.LaidOutEdge federatesEdge = edgeById(result, "identity-federates");
+
+        assertTrue(
+            sourcePortY(cacheEdge) < sourcePortY(federatesEdge),
+            "source ports should follow target group order, cache="
+                + cacheEdge.points()
+                + ", federates="
+                + federatesEdge.points());
+    }
+
+    @Test
     void groupedPipelineProducesValidRoutesForMultipleIncomingEdges() {
         JsonContracts.LayoutRequest request = new JsonContracts.LayoutRequest(
             "layout-request.schema.v1",
@@ -482,6 +525,10 @@ class ElkLayoutEngineTest {
             .filter(edge -> edge.id().equals(id))
             .findFirst()
             .orElseThrow();
+    }
+
+    private static double sourcePortY(JsonContracts.LaidOutEdge edge) {
+        return edge.points().get(0).y();
     }
 
     private static double centerY(JsonContracts.LaidOutNode node) {

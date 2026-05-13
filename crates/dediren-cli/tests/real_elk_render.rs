@@ -444,6 +444,11 @@ fn real_elk_renders_complex_multi_layer_system() {
         ],
         2,
     );
+    assert_source_port_above(
+        &layout_data,
+        "identity-caches-session",
+        "identity-federates",
+    );
 
     let default_svg = render_svg(&layout, "fixtures/render-policy/default-svg.json", None);
     let default_doc = svg_doc(&default_svg);
@@ -716,6 +721,32 @@ fn assert_edges_have_at_most_corner_count(
             "{edge_id} should have at most {max_corners} corners, got {corners}: {points:?}"
         );
     }
+}
+
+fn assert_source_port_above(layout_data: &Value, upper_edge_id: &str, lower_edge_id: &str) {
+    let upper_y = source_port_y(layout_data, upper_edge_id);
+    let lower_y = source_port_y(layout_data, lower_edge_id);
+    assert!(
+        upper_y < lower_y,
+        "{upper_edge_id} source port should be above {lower_edge_id}: {upper_y} >= {lower_y}"
+    );
+}
+
+fn source_port_y(layout_data: &Value, edge_id: &str) -> f64 {
+    let edges = layout_data["edges"]
+        .as_array()
+        .expect("laid out edges should be an array");
+    let edge = edges
+        .iter()
+        .find(|edge| edge["id"] == edge_id)
+        .unwrap_or_else(|| panic!("expected laid out edge {edge_id}"));
+    let points = edge["points"]
+        .as_array()
+        .unwrap_or_else(|| panic!("{edge_id} points should be an array"));
+    let source_port = points
+        .first()
+        .unwrap_or_else(|| panic!("{edge_id} should include a source port point"));
+    point_coordinate(source_port, "y")
 }
 
 fn corner_count(points: &[Value]) -> usize {
