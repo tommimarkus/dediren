@@ -9,11 +9,12 @@ members = [
   "crates/dediren-plugin-svg-render",
   "crates/dediren-plugin-archimate-oef-export",
   "crates/dediren-plugin-runtime-testbed",
+  "xtask",
 ]
 resolver = "2"
 
 [workspace.package]
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 license = "MIT"
 repository = "https://github.com/souroldgeezer/dediren"
@@ -27,6 +28,7 @@ assert_fs = "1"
 clap = { version = "4", features = ["derive"] }
 dediren-archimate = { path = "crates/dediren-archimate" }
 jsonschema = "0.33"
+libc = "0.2"
 predicates = "3"
 quick-xml = "0.38"
 roxmltree = "0.20"

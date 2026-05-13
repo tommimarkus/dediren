@@ -191,11 +191,11 @@ fn archimate_source() -> serde_json::Value {
         "required_plugins": [
             {
                 "id": "generic-graph",
-                "version": "0.2.0"
+                "version": "0.3.0"
             },
             {
                 "id": "archimate-oef",
-                "version": "0.2.0"
+                "version": "0.3.0"
             }
         ],
         "nodes": [

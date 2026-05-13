@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dediren.dev/schemas/bundle.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "bundle_schema_version",
+    "product",
+    "version",
+    "target",
+    "built_at_utc",
+    "plugins",
+    "schemas_dir",
+    "fixtures_dir",
+    "elk_helper"
+  ],
+  "properties": {
+    "bundle_schema_version": { "const": "dediren-bundle.schema.v1" },
+    "product": { "const": "dediren" },
+    "version": { "type": "string", "minLength": 1 },
+    "target": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "built_at_utc": { "type": "string", "minLength": 1 },
+    "plugins": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/bundledPlugin" }
+    },
+    "schemas_dir": { "type": "string", "minLength": 1 },
+    "fixtures_dir": { "type": "string", "minLength": 1 },
+    "elk_helper": { "type": "string", "minLength": 1 }
+  },
+  "$defs": {
+    "bundledPlugin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" },
+        "version": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

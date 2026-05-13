@@ -24,14 +24,12 @@ For an agent-ready local installation on Linux x86_64, build the repo-local
 distribution archive:
 
 ```bash
-scripts/build-dist.sh
+cargo xtask dist build
 ```
 
 Build prerequisites:
 
 - Linux x86_64 host.
-- `flock` from util-linux, used by build scripts to serialize shared generated
-  outputs.
 - Rust and Cargo matching the workspace toolchain.
 - SDKMAN with the Java and Gradle versions declared by
   `crates/dediren-plugin-elk-layout/java/.sdkmanrc`.
@@ -40,21 +38,21 @@ Runtime prerequisite:
 
 - Java 21 or newer available as `java` on `PATH`.
 
-For the current `0.2.0` version, the script creates:
+For the current `0.3.0` version, the xtask creates:
 
 ```text
-dist/dediren-agent-bundle-0.2.0-x86_64-unknown-linux-gnu/
-dist/dediren-agent-bundle-0.2.0-x86_64-unknown-linux-gnu.tar.gz
+dist/dediren-agent-bundle-0.3.0-x86_64-unknown-linux-gnu/
+dist/dediren-agent-bundle-0.3.0-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Run the smoke test from a shell where `java -version` resolves to Java 21 or
 newer:
 
 ```bash
-scripts/smoke-dist.sh dist/dediren-agent-bundle-0.2.0-x86_64-unknown-linux-gnu.tar.gz
+cargo xtask dist smoke dist/dediren-agent-bundle-0.3.0-x86_64-unknown-linux-gnu.tar.gz
 ```
 
-Concurrent `scripts/build-dist.sh` invocations serialize on a repo-local lock
+Concurrent `cargo xtask dist build` invocations serialize on a repo-local lock
 under `.cache/locks/` because release binaries, the ELK helper build, and
 `dist/` artifacts are shared generated outputs.
 
@@ -62,8 +60,8 @@ Unpack and run it anywhere:
 
 ```bash
 mkdir -p /tmp/dediren-dist
-tar -xzf dist/dediren-agent-bundle-0.2.0-x86_64-unknown-linux-gnu.tar.gz -C /tmp/dediren-dist
-/tmp/dediren-dist/dediren-agent-bundle-0.2.0-x86_64-unknown-linux-gnu/bin/dediren --help
+tar -xzf dist/dediren-agent-bundle-0.3.0-x86_64-unknown-linux-gnu.tar.gz -C /tmp/dediren-dist
+/tmp/dediren-dist/dediren-agent-bundle-0.3.0-x86_64-unknown-linux-gnu/bin/dediren --help
 ```
 
 The archive includes first-party plugin manifests under `plugins/`, first-party
@@ -331,10 +329,12 @@ Use the public schemas as the source of truth for JSON shape:
 - `schemas/svg-render-policy.schema.json`
 - `schemas/render-result.schema.json`
 - `schemas/oef-export-policy.schema.json`
+- `schemas/export-request.schema.json`
 - `schemas/export-result.schema.json`
 - `schemas/plugin-manifest.schema.json`
 - `schemas/runtime-capability.schema.json`
 - `schemas/envelope.schema.json`
+- `schemas/bundle.schema.json`
 
 The `fixtures/` tree provides small examples for source documents, layout
 requests/results, render policies, export policies, plugin manifests, and
@@ -375,8 +375,8 @@ Distribution checks from a shell where `java -version` resolves to Java 21 or
 newer:
 
 ```bash
-scripts/build-dist.sh
-scripts/smoke-dist.sh dist/dediren-agent-bundle-0.2.0-x86_64-unknown-linux-gnu.tar.gz
+cargo xtask dist build
+cargo xtask dist smoke dist/dediren-agent-bundle-0.3.0-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Focused checks:

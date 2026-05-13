@@ -92,8 +92,8 @@
   derive from it, and `bundle.json` reports it.
 - When bumping the product/plugin version, move all encoded release surfaces
   together: `Cargo.toml`, `Cargo.lock`, `fixtures/plugins/*.manifest.json`,
-  README bundle examples, `scripts/smoke-dist.sh` usage text, and tests or
-  fixtures that assert version strings.
+  README bundle examples, distribution xtask usage text, and tests or fixtures
+  that assert version strings.
 - Use semver intent even while the project is pre-1.0:
   - Major: backwards-incompatible public product or plugin contract changes,
     such as removing or renaming a CLI command, plugin id, capability,

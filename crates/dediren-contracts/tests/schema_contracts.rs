@@ -1,6 +1,50 @@
 use jsonschema::Validator;
 use serde_json::json;
+use std::collections::BTreeMap;
 use std::path::PathBuf;
+
+const PUBLIC_SCHEMA_PATHS: &[&str] = &[
+    "schemas/model.schema.json",
+    "schemas/envelope.schema.json",
+    "schemas/layout-request.schema.json",
+    "schemas/layout-result.schema.json",
+    "schemas/svg-render-policy.schema.json",
+    "schemas/render-metadata.schema.json",
+    "schemas/render-result.schema.json",
+    "schemas/export-request.schema.json",
+    "schemas/export-result.schema.json",
+    "schemas/oef-export-policy.schema.json",
+    "schemas/plugin-manifest.schema.json",
+    "schemas/runtime-capability.schema.json",
+    "schemas/bundle.schema.json",
+];
+
+const FIRST_PARTY_PLUGIN_MANIFEST_PATHS: &[&str] = &[
+    "fixtures/plugins/archimate-oef.manifest.json",
+    "fixtures/plugins/elk-layout.manifest.json",
+    "fixtures/plugins/generic-graph.manifest.json",
+    "fixtures/plugins/svg-render.manifest.json",
+];
+
+const SOURCE_FIXTURE_PATHS: &[&str] = &[
+    "fixtures/source/valid-basic.json",
+    "fixtures/source/valid-pipeline-rich.json",
+    "fixtures/source/valid-pipeline-archimate.json",
+    "fixtures/source/valid-archimate-oef.json",
+];
+
+const WORKSPACE_PACKAGE_NAMES: &[&str] = &[
+    "dediren",
+    "dediren-archimate",
+    "dediren-contracts",
+    "dediren-core",
+    "dediren-plugin-archimate-oef-export",
+    "dediren-plugin-elk-layout",
+    "dediren-plugin-generic-graph",
+    "dediren-plugin-runtime-testbed",
+    "dediren-plugin-svg-render",
+    "xtask",
+];
 
 #[test]
 fn valid_source_matches_model_schema() {
@@ -301,21 +345,16 @@ fn svg_policy_schema_rejects_unknown_node_decorator() {
 
 #[test]
 fn all_public_schemas_compile() {
-    for path in [
-        "schemas/model.schema.json",
-        "schemas/envelope.schema.json",
-        "schemas/layout-request.schema.json",
-        "schemas/layout-result.schema.json",
-        "schemas/svg-render-policy.schema.json",
-        "schemas/render-metadata.schema.json",
-        "schemas/render-result.schema.json",
-        "schemas/export-request.schema.json",
-        "schemas/export-result.schema.json",
-        "schemas/oef-export-policy.schema.json",
-        "schemas/plugin-manifest.schema.json",
-        "schemas/runtime-capability.schema.json",
-    ] {
+    for path in PUBLIC_SCHEMA_PATHS {
         let _ = validator(path);
+    }
+}
+
+#[test]
+fn readme_lists_all_public_schemas() {
+    let readme = std::fs::read_to_string(workspace_file("README.md")).unwrap();
+    for path in PUBLIC_SCHEMA_PATHS {
+        assert!(readme.contains(path), "README.md should list {path}");
     }
 }
 
@@ -347,18 +386,86 @@ fn plugin_manifest_matches_schema() {
 
 #[test]
 fn first_party_plugin_manifest_versions_match_workspace_version() {
-    for path in [
-        "fixtures/plugins/archimate-oef.manifest.json",
-        "fixtures/plugins/elk-layout.manifest.json",
-        "fixtures/plugins/generic-graph.manifest.json",
-        "fixtures/plugins/svg-render.manifest.json",
-    ] {
+    for path in FIRST_PARTY_PLUGIN_MANIFEST_PATHS {
         let text = std::fs::read_to_string(workspace_file(path)).unwrap();
         let manifest: serde_json::Value = serde_json::from_str(&text).unwrap();
         assert_eq!(
             manifest["version"].as_str(),
             Some(env!("CARGO_PKG_VERSION")),
             "{path} version should match workspace package version"
+        );
+    }
+}
+
+#[test]
+fn source_fixture_required_plugin_versions_match_first_party_manifests() {
+    let manifest_versions = first_party_plugin_versions();
+    for path in SOURCE_FIXTURE_PATHS {
+        let source = json_file(path);
+        let required_plugins = source["required_plugins"]
+            .as_array()
+            .unwrap_or_else(|| panic!("{path} should declare required_plugins"));
+        for plugin in required_plugins {
+            let id = string_property(plugin, "id");
+            let version = string_property(plugin, "version");
+            let expected = manifest_versions
+                .get(id)
+                .unwrap_or_else(|| panic!("{path} requires unknown first-party plugin {id}"));
+            assert_eq!(
+                version, expected,
+                "{path} should require {id} at the bundled first-party manifest version"
+            );
+        }
+    }
+}
+
+#[test]
+fn live_release_surfaces_match_workspace_version() {
+    let version = env!("CARGO_PKG_VERSION");
+    let target = "x86_64-unknown-linux-gnu";
+    let bundle_name = format!("dediren-agent-bundle-{version}-{target}");
+    let archive_name = format!("{bundle_name}.tar.gz");
+
+    let readme = std::fs::read_to_string(workspace_file("README.md")).unwrap();
+    assert!(
+        readme.contains(&bundle_name),
+        "README.md should mention {bundle_name}"
+    );
+    assert!(
+        readme.contains(&archive_name),
+        "README.md should mention {archive_name}"
+    );
+    assert!(
+        readme.contains("cargo xtask dist build"),
+        "README.md should document the xtask distribution build command"
+    );
+    assert!(
+        readme.contains("cargo xtask dist smoke"),
+        "README.md should document the xtask distribution smoke command"
+    );
+    assert!(
+        !readme.contains("scripts/build-dist.sh"),
+        "README.md should not document legacy distribution build wrappers"
+    );
+    assert!(
+        !readme.contains("scripts/smoke-dist.sh"),
+        "README.md should not document legacy distribution smoke wrappers"
+    );
+
+    for path in ["scripts/build-dist.sh", "scripts/smoke-dist.sh"] {
+        assert!(
+            !workspace_file(path).exists(),
+            "{path} should be removed; cargo xtask is the canonical distribution tooling"
+        );
+    }
+
+    let lock = std::fs::read_to_string(workspace_file("Cargo.lock")).unwrap();
+    for package_name in WORKSPACE_PACKAGE_NAMES {
+        let lock_version = cargo_lock_package_version(&lock, package_name)
+            .unwrap_or_else(|| panic!("Cargo.lock should contain package {package_name}"));
+        assert_eq!(
+            lock_version, version,
+            "Cargo.lock package {package_name} should match workspace version"
         );
     }
 }
@@ -372,6 +479,29 @@ fn runtime_capabilities_match_schema() {
             "id": "svg-render",
             "capabilities": ["render"],
             "runtime": { "artifact_kind": "svg" }
+        }),
+    );
+}
+
+#[test]
+fn bundle_metadata_matches_schema() {
+    assert_json_valid(
+        "schemas/bundle.schema.json",
+        json!({
+            "bundle_schema_version": "dediren-bundle.schema.v1",
+            "product": "dediren",
+            "version": env!("CARGO_PKG_VERSION"),
+            "target": "x86_64-unknown-linux-gnu",
+            "built_at_utc": "2026-05-13T00:00:00Z",
+            "plugins": [
+                { "id": "generic-graph", "version": env!("CARGO_PKG_VERSION") },
+                { "id": "elk-layout", "version": env!("CARGO_PKG_VERSION") },
+                { "id": "svg-render", "version": env!("CARGO_PKG_VERSION") },
+                { "id": "archimate-oef", "version": env!("CARGO_PKG_VERSION") }
+            ],
+            "schemas_dir": "schemas",
+            "fixtures_dir": "fixtures",
+            "elk_helper": "runtimes/elk-layout-java/bin/dediren-elk-layout-java"
         }),
     );
 }
@@ -466,14 +596,58 @@ fn archimate_oef_fixtures_match_existing_contracts() {
 
 #[test]
 fn bundled_plugin_manifests_match_schema() {
-    for path in [
-        "fixtures/plugins/generic-graph.manifest.json",
-        "fixtures/plugins/elk-layout.manifest.json",
-        "fixtures/plugins/svg-render.manifest.json",
-        "fixtures/plugins/archimate-oef.manifest.json",
-    ] {
+    for path in FIRST_PARTY_PLUGIN_MANIFEST_PATHS {
         assert_valid("schemas/plugin-manifest.schema.json", path);
     }
+}
+
+fn first_party_plugin_versions() -> BTreeMap<String, String> {
+    let mut versions = BTreeMap::new();
+    for path in FIRST_PARTY_PLUGIN_MANIFEST_PATHS {
+        let manifest = json_file(path);
+        let id = string_property(&manifest, "id").to_string();
+        let version = string_property(&manifest, "version").to_string();
+        versions.insert(id, version);
+    }
+    versions
+}
+
+fn string_property<'a>(value: &'a serde_json::Value, property: &str) -> &'a str {
+    value[property]
+        .as_str()
+        .unwrap_or_else(|| panic!("{property} should be a string"))
+}
+
+fn cargo_lock_package_version<'a>(lock: &'a str, package_name: &str) -> Option<&'a str> {
+    let mut in_package = false;
+    let mut matched_package = false;
+
+    for line in lock.lines() {
+        if line == "[[package]]" {
+            in_package = true;
+            matched_package = false;
+            continue;
+        }
+        if !in_package {
+            continue;
+        }
+        if let Some(name) = line
+            .strip_prefix("name = \"")
+            .and_then(|value| value.strip_suffix('"'))
+        {
+            matched_package = name == package_name;
+            continue;
+        }
+        if matched_package {
+            if let Some(version) = line
+                .strip_prefix("version = \"")
+                .and_then(|value| value.strip_suffix('"'))
+            {
+                return Some(version);
+            }
+        }
+    }
+    None
 }
 
 fn assert_valid(schema_path: &str, instance_path: &str) {
