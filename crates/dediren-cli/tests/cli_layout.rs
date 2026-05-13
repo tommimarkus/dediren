@@ -168,6 +168,7 @@ fn real_elk_layout_validates_grouped_cross_group_route() {
     let quality = ok_data(&validate_output);
     assert_eq!(quality["overlap_count"], 0);
     assert_eq!(quality["connector_through_node_count"], 0);
+    assert_eq!(quality["route_close_parallel_count"], 0);
     assert_eq!(quality["status"], "ok");
 }
 
@@ -186,6 +187,7 @@ fn fixture_layout_result_reports_quality() {
     let data = ok_data(&output);
     assert_eq!(data["overlap_count"], 0);
     assert_eq!(data["connector_through_node_count"], 0);
+    assert_eq!(data["route_close_parallel_count"], 0);
     assert_eq!(data["status"], "ok");
 }
 

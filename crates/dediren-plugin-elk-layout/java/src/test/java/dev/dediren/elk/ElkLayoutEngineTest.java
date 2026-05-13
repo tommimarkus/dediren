@@ -244,6 +244,36 @@ class ElkLayoutEngineTest {
     }
 
     @Test
+    void threeShortSidePortsKeepTheDefaultNodeSize() {
+        JsonContracts.LayoutRequest request = new JsonContracts.LayoutRequest(
+            "layout-request.schema.v1",
+            "main",
+            List.of(
+                new JsonContracts.LayoutNode("gateway", "API Gateway", "gateway", 160.0, 80.0),
+                new JsonContracts.LayoutNode("catalog", "Catalog", "catalog", 160.0, 80.0),
+                new JsonContracts.LayoutNode("pricing", "Pricing", "pricing", 160.0, 80.0),
+                new JsonContracts.LayoutNode("orders", "Orders", "orders", 160.0, 80.0)),
+            List.of(
+                new JsonContracts.LayoutEdge(
+                    "gateway-catalog", "gateway", "catalog", "queries", "gateway-catalog"),
+                new JsonContracts.LayoutEdge(
+                    "gateway-pricing", "gateway", "pricing", "prices", "gateway-pricing"),
+                new JsonContracts.LayoutEdge(
+                    "gateway-orders", "gateway", "orders", "orders", "gateway-orders")),
+            List.of(),
+            List.of(),
+            List.of());
+
+        JsonContracts.LayoutResult result = new ElkLayoutEngine().layout(request);
+        JsonContracts.LaidOutNode gateway = nodeById(result, "gateway");
+
+        assertEquals(
+            80.0,
+            gateway.height(),
+            "typical nodes should fit three short-side ports before generated resizing");
+    }
+
+    @Test
     void groupedPipelineProducesValidRoutesForMultipleIncomingEdges() {
         JsonContracts.LayoutRequest request = new JsonContracts.LayoutRequest(
             "layout-request.schema.v1",

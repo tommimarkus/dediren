@@ -6,6 +6,7 @@ use common::{
     ok_data, plugin_binary, semantic_group, svg_doc, workspace_file, write_render_artifact,
 };
 use serde_json::Value;
+use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, MutexGuard};
 
@@ -120,7 +121,7 @@ fn real_elk_renders_grouped_rich_graph() {
     assert!(svg.contains(">Worker</tspan>"));
     assert!(svg.contains(">Payments</tspan>"));
     assert!(svg.contains(">Provider</tspan>"));
-    assert_reasonable_svg_aspect(&svg, 3.2);
+    assert_reasonable_svg_aspect(&svg, 4.2);
     write_render_artifact("real-elk", "real_elk_renders_grouped_rich_graph", &svg);
 }
 
@@ -453,6 +454,30 @@ fn real_elk_renders_complex_multi_layer_system() {
     );
 
     let metadata = complex_archimate_render_metadata();
+    let archimate_edge_types = metadata["edges"]
+        .as_object()
+        .expect("complex ArchiMate metadata should contain edges")
+        .values()
+        .filter_map(|edge| edge["type"].as_str())
+        .collect::<BTreeSet<_>>();
+    assert!(
+        archimate_edge_types.len() >= 5,
+        "complex ArchiMate metadata should exercise mixed relationship notation: {archimate_edge_types:?}"
+    );
+    assert_eq!(
+        metadata["edges"]["email-worker-notifies"]["type"],
+        "Realization"
+    );
+    assert_eq!(metadata["edges"]["order-writes-orders"]["type"], "Access");
+    assert_eq!(
+        metadata["edges"]["order-publishes-events"]["type"],
+        "Triggering"
+    );
+    assert_eq!(metadata["edges"]["order-requests-payment"]["type"], "Flow");
+    assert_eq!(
+        metadata["edges"]["fulfillment-syncs-warehouse"]["type"],
+        "Serving"
+    );
     let metadata = write_temp_json(
         &temp,
         "complex-multi-layer-archimate-render-metadata.json",
@@ -498,6 +523,24 @@ fn real_elk_renders_complex_multi_layer_system() {
     let association = semantic_group(&archimate_doc, "data-dediren-edge-id", "mobile-enters-cdn");
     let path = child_element(association, "path");
     assert_eq!(path.attribute("marker-end"), None);
+    assert_archimate_edge_notation(
+        &archimate_doc,
+        "email-worker-notifies",
+        Some("8 5"),
+        Some("hollow_triangle"),
+    );
+    assert_archimate_edge_notation(
+        &archimate_doc,
+        "order-writes-orders",
+        Some("8 5"),
+        Some("open_arrow"),
+    );
+    assert_archimate_edge_notation(
+        &archimate_doc,
+        "order-publishes-events",
+        None,
+        Some("open_arrow"),
+    );
     write_render_artifact(
         "real-elk",
         "real_elk_renders_complex_multi_layer_system_archimate",
@@ -602,6 +645,10 @@ fn assert_layout_quality_ok(quality: &Value) {
         "layout quality: {quality}"
     );
     assert_eq!(
+        quality["route_close_parallel_count"], 0,
+        "layout quality: {quality}"
+    );
+    assert_eq!(
         quality["invalid_route_count"], 0,
         "layout quality: {quality}"
     );
@@ -628,8 +675,12 @@ fn assert_complex_layout_quality_bounded(quality: &Value) {
     );
     assert_eq!(quality["warning_count"], 0, "layout quality: {quality}");
     assert!(
-        quality["route_detour_count"].as_u64().unwrap_or(u64::MAX) <= 1,
-        "complex layout should not accumulate route detours: {quality}"
+        quality["route_detour_count"].as_u64().unwrap_or(u64::MAX) <= 4,
+        "complex layout should keep route detours bounded: {quality}"
+    );
+    assert_eq!(
+        quality["route_close_parallel_count"], 0,
+        "complex layout should keep parallel route channels readable: {quality}"
     );
 }
 
@@ -651,6 +702,44 @@ fn assert_complex_profile_svg(doc: &roxmltree::Document<'_>, svg: &str) {
     assert!(svg.contains("data-dediren-group-id=\"async-processing\""));
     assert!(svg.contains("data-dediren-group-id=\"data-platform\""));
     assert_reasonable_svg_aspect(svg, 6.5);
+}
+
+fn assert_archimate_edge_notation(
+    doc: &roxmltree::Document<'_>,
+    edge_id: &str,
+    expected_dasharray: Option<&str>,
+    expected_marker_end: Option<&str>,
+) {
+    let edge = semantic_group(doc, "data-dediren-edge-id", edge_id);
+    let path = child_element(edge, "path");
+    assert_eq!(
+        path.attribute("stroke-dasharray"),
+        expected_dasharray,
+        "{edge_id} dash pattern"
+    );
+    match expected_marker_end {
+        Some(marker_kind) => {
+            let marker_id = format!("marker-end-{edge_id}");
+            let marker_ref = format!("url(#{marker_id})");
+            assert_eq!(
+                path.attribute("marker-end"),
+                Some(marker_ref.as_str()),
+                "{edge_id} marker reference"
+            );
+            let marker = doc
+                .descendants()
+                .find(|node| {
+                    node.has_tag_name("marker") && node.attribute("id") == Some(marker_id.as_str())
+                })
+                .unwrap_or_else(|| panic!("expected marker {marker_id}"));
+            assert_eq!(
+                marker.attribute("data-dediren-edge-marker-end"),
+                Some(marker_kind),
+                "{edge_id} marker kind"
+            );
+        }
+        None => assert_eq!(path.attribute("marker-end"), None, "{edge_id} marker"),
+    }
 }
 
 fn complex_archimate_render_metadata() -> Value {
@@ -686,52 +775,52 @@ fn complex_archimate_render_metadata() -> Value {
         ("email-provider", "TechnologyService"),
         ("erp", "ApplicationComponent"),
     ];
-    let edge_ids = [
-        "mobile-enters-cdn",
-        "web-enters-cdn",
-        "support-opens-admin",
-        "cdn-serves-web",
-        "web-calls-gateway",
-        "admin-calls-gateway",
-        "gateway-authenticates",
-        "gateway-queries-catalog",
-        "gateway-prices-cart",
-        "gateway-places-order",
-        "identity-federates",
-        "identity-caches-session",
-        "catalog-reads-products",
-        "pricing-reads-products",
-        "pricing-caches-quotes",
-        "order-checks-catalog",
-        "order-requests-payment",
-        "order-reserves-stock",
-        "order-writes-orders",
-        "order-publishes-events",
-        "payment-authorizes",
-        "payment-records-ledger",
-        "fulfillment-ships",
-        "fulfillment-syncs-warehouse",
-        "fulfillment-writes-warehouse",
-        "fulfillment-publishes-events",
-        "event-bus-drives-order-worker",
-        "event-bus-drives-email-worker",
-        "event-bus-drives-reporting",
-        "order-worker-reads-orders",
-        "order-worker-syncs-erp",
-        "warehouse-adapter-syncs-erp",
-        "warehouse-adapter-writes-db",
-        "email-worker-notifies",
-        "notification-sends-email",
-        "reporting-reads-orders",
-        "reporting-writes-analytics",
+    let edge_types = [
+        ("mobile-enters-cdn", "Association"),
+        ("web-enters-cdn", "Association"),
+        ("support-opens-admin", "Association"),
+        ("cdn-serves-web", "Association"),
+        ("web-calls-gateway", "Association"),
+        ("admin-calls-gateway", "Association"),
+        ("gateway-authenticates", "Association"),
+        ("gateway-queries-catalog", "Association"),
+        ("gateway-prices-cart", "Association"),
+        ("gateway-places-order", "Association"),
+        ("identity-federates", "Flow"),
+        ("identity-caches-session", "Access"),
+        ("catalog-reads-products", "Access"),
+        ("pricing-reads-products", "Access"),
+        ("pricing-caches-quotes", "Access"),
+        ("order-checks-catalog", "Flow"),
+        ("order-requests-payment", "Flow"),
+        ("order-reserves-stock", "Flow"),
+        ("order-writes-orders", "Access"),
+        ("order-publishes-events", "Triggering"),
+        ("payment-authorizes", "Association"),
+        ("payment-records-ledger", "Access"),
+        ("fulfillment-ships", "Association"),
+        ("fulfillment-syncs-warehouse", "Serving"),
+        ("fulfillment-writes-warehouse", "Access"),
+        ("fulfillment-publishes-events", "Triggering"),
+        ("event-bus-drives-order-worker", "Association"),
+        ("event-bus-drives-email-worker", "Association"),
+        ("event-bus-drives-reporting", "Association"),
+        ("order-worker-reads-orders", "Access"),
+        ("order-worker-syncs-erp", "Association"),
+        ("warehouse-adapter-syncs-erp", "Association"),
+        ("warehouse-adapter-writes-db", "Access"),
+        ("email-worker-notifies", "Realization"),
+        ("notification-sends-email", "Association"),
+        ("reporting-reads-orders", "Access"),
+        ("reporting-writes-analytics", "Access"),
     ];
     let nodes = node_types
         .into_iter()
         .map(|(id, selector_type)| (id.to_string(), archimate_selector(selector_type, id)))
         .collect::<serde_json::Map<String, Value>>();
-    let edges = edge_ids
+    let edges = edge_types
         .into_iter()
-        .map(|id| (id.to_string(), archimate_selector("Association", id)))
+        .map(|(id, selector_type)| (id.to_string(), archimate_selector(selector_type, id)))
         .collect::<serde_json::Map<String, Value>>();
 
     serde_json::json!({

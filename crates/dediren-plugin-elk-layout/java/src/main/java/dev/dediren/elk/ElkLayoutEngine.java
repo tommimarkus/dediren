@@ -1,12 +1,14 @@
 package dev.dediren.elk;
 
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.eclipse.elk.alg.layered.options.LayeredOptions;
 import org.eclipse.elk.alg.layered.options.WrappingStrategy;
 import org.eclipse.elk.core.RecursiveGraphLayoutEngine;
+import org.eclipse.elk.core.math.ElkMargin;
 import org.eclipse.elk.core.math.ElkPadding;
 import org.eclipse.elk.core.options.CoreOptions;
 import org.eclipse.elk.core.options.Direction;
@@ -27,10 +29,17 @@ final class ElkLayoutEngine {
     private static final double GROUP_PADDING = 24.0;
     private static final double NODE_SPACING = 60.0;
     private static final double EDGE_NODE_SPACING = 32.0;
-    private static final double EDGE_EDGE_SPACING = 20.0;
+    private static final double EDGE_EDGE_SPACING = 40.0;
+    private static final double PORT_PORT_SPACING = 32.0;
+    private static final int DEFAULT_SHORT_SIDE_PORT_CAPACITY = 3;
+    private static final double PORT_SURROUNDING_SPACING = 16.0;
     private static final double ROUTE_DETOUR_RATIO = 1.5;
     private static final double ROUTE_DETOUR_EXCESS = 240.0;
     private static final double ROUTE_CHANNEL_PADDING = 32.0;
+    private static final double ROUTE_FALLBACK_LANE_SPACING = 48.0;
+    private static final int ROUTE_FALLBACK_LANE_COUNT = 4;
+    private static final double ROUTE_CLOSE_PARALLEL_DISTANCE = 20.0;
+    private static final double ROUTE_CLOSE_PARALLEL_MIN_OVERLAP = 40.0;
     private static final double ROUTE_ENDPOINT_CLEARANCE = 32.0;
     private static final double GEOMETRY_EPSILON = 0.001;
 
@@ -47,20 +56,22 @@ final class ElkLayoutEngine {
         ElkNode root = ElkGraphUtil.createGraph();
         configureRoot(root, Direction.RIGHT);
 
+        Map<String, JsonContracts.LayoutNode> requestNodes = requestNodesById(request);
+        List<JsonContracts.LayoutEdge> requestEdges = list(request.edges());
+        Map<String, EnumMap<PortSide, Integer>> portCounts =
+            flatPortCounts(requestEdges, requestNodes);
         Map<String, ElkNode> elkNodes = new HashMap<>();
         for (JsonContracts.LayoutNode node : list(request.nodes())) {
             ElkNode elkNode = ElkGraphUtil.createNode(root);
             elkNode.setIdentifier(node.id());
-            elkNode.setDimensions(
-                positiveOrDefault(node.width_hint(), DEFAULT_WIDTH),
-                positiveOrDefault(node.height_hint(), DEFAULT_HEIGHT));
+            setGeneratedDimensions(elkNode, node, portCounts.get(node.id()));
             ElkGraphUtil.createLabel(elkNode).setText(node.label());
             elkNodes.put(node.id(), elkNode);
         }
 
         Map<String, ElkEdge> elkEdges = new HashMap<>();
         List<JsonContracts.Diagnostic> warnings = new ArrayList<>();
-        List<JsonContracts.LayoutEdge> requestEdges = list(request.edges());
+        Map<String, EnumMap<PortSide, Integer>> portIndexes = new HashMap<>();
         for (int index = 0; index < requestEdges.size(); index++) {
             JsonContracts.LayoutEdge edge = requestEdges.get(index);
             ElkNode source = elkNodes.get(edge.source());
@@ -73,7 +84,7 @@ final class ElkLayoutEngine {
                     "$.edges[" + index + "]"));
                 continue;
             }
-            ElkEdge elkEdge = createRoutedEdge(source, target, edge, Direction.RIGHT);
+            ElkEdge elkEdge = createRoutedEdge(source, target, edge, Direction.RIGHT, portIndexes);
             elkEdges.put(edge.id(), elkEdge);
         }
 
@@ -163,6 +174,13 @@ final class ElkLayoutEngine {
             groupDirectionById.put(group.id(), groupDirection);
         }
 
+        List<JsonContracts.LayoutEdge> requestEdges = list(request.edges());
+        Map<String, EnumMap<PortSide, Integer>> portCounts = groupedPortCounts(
+            requestEdges,
+            requestNodes,
+            ownerByNode,
+            groupDirectionById,
+            groupOrderById);
         Map<String, ElkNode> elkNodes = new HashMap<>();
         for (JsonContracts.LayoutNode node : list(request.nodes())) {
             ElkNode parent = ownerByNode.containsKey(node.id())
@@ -173,15 +191,13 @@ final class ElkLayoutEngine {
             }
             ElkNode elkNode = ElkGraphUtil.createNode(parent);
             elkNode.setIdentifier(node.id());
-            elkNode.setDimensions(
-                positiveOrDefault(node.width_hint(), DEFAULT_WIDTH),
-                positiveOrDefault(node.height_hint(), DEFAULT_HEIGHT));
+            setGeneratedDimensions(elkNode, node, portCounts.get(node.id()));
             ElkGraphUtil.createLabel(elkNode).setText(node.label());
             elkNodes.put(node.id(), elkNode);
         }
 
         Map<String, ElkEdge> elkEdges = new HashMap<>();
-        List<JsonContracts.LayoutEdge> requestEdges = list(request.edges());
+        Map<String, EnumMap<PortSide, Integer>> portIndexes = new HashMap<>();
         for (int index = 0; index < requestEdges.size(); index++) {
             JsonContracts.LayoutEdge edge = requestEdges.get(index);
             ElkNode source = elkNodes.get(edge.source());
@@ -196,7 +212,7 @@ final class ElkLayoutEngine {
             }
             Direction edgeDirection =
                 edgeDirection(edge, ownerByNode, groupDirectionById, groupOrderById);
-            ElkEdge elkEdge = createRoutedEdge(source, target, edge, edgeDirection);
+            ElkEdge elkEdge = createRoutedEdge(source, target, edge, edgeDirection, portIndexes);
             ElkGraphUtil.updateContainment(elkEdge);
             elkEdges.put(edge.id(), elkEdge);
         }
@@ -254,6 +270,12 @@ final class ElkLayoutEngine {
         root.setProperty(CoreOptions.SPACING_NODE_NODE, NODE_SPACING);
         root.setProperty(CoreOptions.SPACING_EDGE_NODE, EDGE_NODE_SPACING);
         root.setProperty(CoreOptions.SPACING_EDGE_EDGE, EDGE_EDGE_SPACING);
+        root.setProperty(CoreOptions.SPACING_PORT_PORT, PORT_PORT_SPACING);
+        root.setProperty(CoreOptions.SPACING_PORTS_SURROUNDING, new ElkMargin(PORT_SURROUNDING_SPACING));
+        root.setProperty(LayeredOptions.SPACING_EDGE_EDGE, EDGE_EDGE_SPACING);
+        root.setProperty(LayeredOptions.SPACING_EDGE_NODE, EDGE_NODE_SPACING);
+        root.setProperty(LayeredOptions.SPACING_PORT_PORT, PORT_PORT_SPACING);
+        root.setProperty(LayeredOptions.SPACING_PORTS_SURROUNDING, new ElkMargin(PORT_SURROUNDING_SPACING));
         root.setProperty(LayeredOptions.SPACING_NODE_NODE_BETWEEN_LAYERS, NODE_SPACING);
         root.setProperty(LayeredOptions.SPACING_EDGE_NODE_BETWEEN_LAYERS, EDGE_NODE_SPACING);
         root.setProperty(LayeredOptions.SPACING_EDGE_EDGE_BETWEEN_LAYERS, EDGE_EDGE_SPACING);
@@ -292,21 +314,119 @@ final class ElkLayoutEngine {
         ElkNode source,
         ElkNode target,
         JsonContracts.LayoutEdge edge,
-        Direction direction) {
-        source.setProperty(CoreOptions.PORT_CONSTRAINTS, PortConstraints.FIXED_SIDE);
-        target.setProperty(CoreOptions.PORT_CONSTRAINTS, PortConstraints.FIXED_SIDE);
+        Direction direction,
+        Map<String, EnumMap<PortSide, Integer>> portIndexes) {
+        source.setProperty(CoreOptions.PORT_CONSTRAINTS, PortConstraints.FIXED_ORDER);
+        target.setProperty(CoreOptions.PORT_CONSTRAINTS, PortConstraints.FIXED_ORDER);
+        PortSide sourceSide = sourcePortSide(direction);
+        PortSide targetSide = targetPortSide(direction);
         ElkPort sourcePort = ElkGraphUtil.createPort(source);
         sourcePort.setIdentifier(edge.id() + "-source");
         sourcePort.setDimensions(0.0, 0.0);
-        sourcePort.setProperty(CoreOptions.PORT_SIDE, sourcePortSide(direction));
+        sourcePort.setProperty(CoreOptions.PORT_SIDE, sourceSide);
+        sourcePort.setProperty(
+            CoreOptions.PORT_INDEX,
+            nextPortIndex(portIndexes, edge.source(), sourceSide));
         ElkPort targetPort = ElkGraphUtil.createPort(target);
         targetPort.setIdentifier(edge.id() + "-target");
         targetPort.setDimensions(0.0, 0.0);
-        targetPort.setProperty(CoreOptions.PORT_SIDE, targetPortSide(direction));
+        targetPort.setProperty(CoreOptions.PORT_SIDE, targetSide);
+        targetPort.setProperty(
+            CoreOptions.PORT_INDEX,
+            nextPortIndex(portIndexes, edge.target(), targetSide));
         ElkEdge elkEdge = ElkGraphUtil.createSimpleEdge(sourcePort, targetPort);
         elkEdge.setIdentifier(edge.id());
         ElkGraphUtil.createLabel(elkEdge).setText(edge.label());
         return elkEdge;
+    }
+
+    private static Map<String, EnumMap<PortSide, Integer>> flatPortCounts(
+        List<JsonContracts.LayoutEdge> edges,
+        Map<String, JsonContracts.LayoutNode> nodes) {
+        Map<String, EnumMap<PortSide, Integer>> portCounts = new HashMap<>();
+        for (JsonContracts.LayoutEdge edge : edges) {
+            if (!nodes.containsKey(edge.source()) || !nodes.containsKey(edge.target())) {
+                continue;
+            }
+            countPort(portCounts, edge.source(), sourcePortSide(Direction.RIGHT));
+            countPort(portCounts, edge.target(), targetPortSide(Direction.RIGHT));
+        }
+        return portCounts;
+    }
+
+    private static Map<String, EnumMap<PortSide, Integer>> groupedPortCounts(
+        List<JsonContracts.LayoutEdge> edges,
+        Map<String, JsonContracts.LayoutNode> nodes,
+        Map<String, String> ownerByNode,
+        Map<String, Direction> groupDirectionById,
+        Map<String, Integer> groupOrderById) {
+        Map<String, EnumMap<PortSide, Integer>> portCounts = new HashMap<>();
+        for (JsonContracts.LayoutEdge edge : edges) {
+            if (!nodes.containsKey(edge.source()) || !nodes.containsKey(edge.target())) {
+                continue;
+            }
+            Direction direction =
+                edgeDirection(edge, ownerByNode, groupDirectionById, groupOrderById);
+            countPort(portCounts, edge.source(), sourcePortSide(direction));
+            countPort(portCounts, edge.target(), targetPortSide(direction));
+        }
+        return portCounts;
+    }
+
+    private static void setGeneratedDimensions(
+        ElkNode elkNode,
+        JsonContracts.LayoutNode node,
+        Map<PortSide, Integer> portCounts) {
+        double width = positiveOrDefault(node.width_hint(), DEFAULT_WIDTH);
+        double height = positiveOrDefault(node.height_hint(), DEFAULT_HEIGHT);
+        if (portCounts != null) {
+            width = Math.max(width, requiredPortSideLength(width, maxPortCount(
+                portCounts,
+                PortSide.NORTH,
+                PortSide.SOUTH)));
+            height = Math.max(height, requiredPortSideLength(height, maxPortCount(
+                portCounts,
+                PortSide.WEST,
+                PortSide.EAST)));
+        }
+        elkNode.setDimensions(width, height);
+    }
+
+    private static double requiredPortSideLength(double currentLength, int portCount) {
+        if (portCount <= DEFAULT_SHORT_SIDE_PORT_CAPACITY) {
+            return currentLength;
+        }
+        return currentLength
+            + ((portCount - DEFAULT_SHORT_SIDE_PORT_CAPACITY) * PORT_PORT_SPACING);
+    }
+
+    private static int maxPortCount(
+        Map<PortSide, Integer> portCounts,
+        PortSide first,
+        PortSide second) {
+        return Math.max(
+            portCounts.getOrDefault(first, 0),
+            portCounts.getOrDefault(second, 0));
+    }
+
+    private static void countPort(
+        Map<String, EnumMap<PortSide, Integer>> portCounts,
+        String nodeId,
+        PortSide side) {
+        EnumMap<PortSide, Integer> bySide =
+            portCounts.computeIfAbsent(nodeId, ignored -> new EnumMap<>(PortSide.class));
+        bySide.merge(side, 1, Integer::sum);
+    }
+
+    private static int nextPortIndex(
+        Map<String, EnumMap<PortSide, Integer>> portIndexes,
+        String nodeId,
+        PortSide side) {
+        EnumMap<PortSide, Integer> bySide =
+            portIndexes.computeIfAbsent(nodeId, ignored -> new EnumMap<>(PortSide.class));
+        int index = bySide.getOrDefault(side, 0);
+        bySide.put(side, index + 1);
+        return index;
     }
 
     private static PortSide sourcePortSide(Direction direction) {
@@ -440,10 +560,22 @@ final class ElkLayoutEngine {
                 normalized.add(edge);
                 continue;
             }
-            List<JsonContracts.Point> replacement = shortestCleanOrthogonalRoute(edge, nodes);
-            if (replacement.isEmpty() || routeLength(replacement) >= routeLength(edge.points())) {
+            List<JsonContracts.Point> replacement = shortestCleanOrthogonalRoute(edge, nodes, normalized);
+            if (replacement.isEmpty()) {
                 normalized.add(edge);
             } else {
+                int originalCloseParallelCount = closeParallelRouteCount(edge, edge.points(), normalized);
+                int replacementCloseParallelCount = closeParallelRouteCount(edge, replacement, normalized);
+                boolean replacementImprovesReadability =
+                    replacementCloseParallelCount < originalCloseParallelCount;
+                boolean replacementIsShorter =
+                    routeLength(replacement) < routeLength(edge.points());
+                if (!replacementImprovesReadability
+                    && !(replacementCloseParallelCount == originalCloseParallelCount
+                        && replacementIsShorter)) {
+                    normalized.add(edge);
+                    continue;
+                }
                 normalized.add(new JsonContracts.LaidOutEdge(
                     edge.id(),
                     edge.source(),
@@ -470,7 +602,8 @@ final class ElkLayoutEngine {
 
     private static List<JsonContracts.Point> shortestCleanOrthogonalRoute(
         JsonContracts.LaidOutEdge edge,
-        List<JsonContracts.LaidOutNode> nodes) {
+        List<JsonContracts.LaidOutNode> nodes,
+        List<JsonContracts.LaidOutEdge> existingEdges) {
         JsonContracts.Point start = edge.points().get(0);
         JsonContracts.Point end = edge.points().get(edge.points().size() - 1);
         JsonContracts.Point clearStart = clearancePoint(start, nodeById(nodes, edge.source()));
@@ -478,20 +611,31 @@ final class ElkLayoutEngine {
         List<List<JsonContracts.Point>> candidates = new ArrayList<>();
         candidates.add(routeViaX(start, clearStart, clearEnd, end, (start.x() + end.x()) / 2.0));
         candidates.add(routeViaY(start, clearStart, clearEnd, end, (start.y() + end.y()) / 2.0));
-        candidates.add(routeViaX(start, clearStart, clearEnd, end, minNodeX(nodes) - ROUTE_CHANNEL_PADDING));
-        candidates.add(routeViaX(start, clearStart, clearEnd, end, maxNodeX(nodes) + ROUTE_CHANNEL_PADDING));
-        candidates.add(routeViaY(start, clearStart, clearEnd, end, minNodeY(nodes) - ROUTE_CHANNEL_PADDING));
-        candidates.add(routeViaY(start, clearStart, clearEnd, end, maxNodeY(nodes) + ROUTE_CHANNEL_PADDING));
+        double minNodeX = minNodeX(nodes);
+        double maxNodeX = maxNodeX(nodes);
+        double minNodeY = minNodeY(nodes);
+        double maxNodeY = maxNodeY(nodes);
+        for (int lane = 0; lane < ROUTE_FALLBACK_LANE_COUNT; lane++) {
+            double offset = ROUTE_CHANNEL_PADDING + (lane * ROUTE_FALLBACK_LANE_SPACING);
+            candidates.add(routeViaX(start, clearStart, clearEnd, end, minNodeX - offset));
+            candidates.add(routeViaX(start, clearStart, clearEnd, end, maxNodeX + offset));
+            candidates.add(routeViaY(start, clearStart, clearEnd, end, minNodeY - offset));
+            candidates.add(routeViaY(start, clearStart, clearEnd, end, maxNodeY + offset));
+        }
 
         List<JsonContracts.Point> best = List.of();
+        int bestCloseParallelCount = Integer.MAX_VALUE;
         double bestLength = Double.POSITIVE_INFINITY;
         for (List<JsonContracts.Point> candidate : candidates) {
             if (routeIntersectsUnrelatedNode(edge, candidate, nodes)) {
                 continue;
             }
+            int closeParallelCount = closeParallelRouteCount(edge, candidate, existingEdges);
             double candidateLength = routeLength(candidate);
-            if (candidateLength < bestLength) {
+            if (closeParallelCount < bestCloseParallelCount
+                || (closeParallelCount == bestCloseParallelCount && candidateLength < bestLength)) {
                 best = candidate;
+                bestCloseParallelCount = closeParallelCount;
                 bestLength = candidateLength;
             }
         }
@@ -636,6 +780,79 @@ final class ElkLayoutEngine {
         JsonContracts.Point start = points.get(0);
         JsonContracts.Point end = points.get(points.size() - 1);
         return Math.abs(start.x() - end.x()) + Math.abs(start.y() - end.y());
+    }
+
+    private static int closeParallelRouteCount(
+        JsonContracts.LaidOutEdge candidateEdge,
+        List<JsonContracts.Point> candidate,
+        List<JsonContracts.LaidOutEdge> existingEdges) {
+        int count = 0;
+        for (int candidateIndex = 0; candidateIndex < candidate.size() - 1; candidateIndex++) {
+            JsonContracts.Point candidateStart = candidate.get(candidateIndex);
+            JsonContracts.Point candidateEnd = candidate.get(candidateIndex + 1);
+            for (JsonContracts.LaidOutEdge edge : existingEdges) {
+                if (shareEndpoint(candidateEdge, edge)) {
+                    continue;
+                }
+                for (int edgeIndex = 0; edgeIndex < edge.points().size() - 1; edgeIndex++) {
+                    if (closeParallelSegments(
+                        candidateStart,
+                        candidateEnd,
+                        edge.points().get(edgeIndex),
+                        edge.points().get(edgeIndex + 1))) {
+                        count++;
+                    }
+                }
+            }
+        }
+        return count;
+    }
+
+    private static boolean shareEndpoint(
+        JsonContracts.LaidOutEdge left,
+        JsonContracts.LaidOutEdge right) {
+        return left.source().equals(right.source())
+            || left.source().equals(right.target())
+            || left.target().equals(right.source())
+            || left.target().equals(right.target());
+    }
+
+    private static boolean closeParallelSegments(
+        JsonContracts.Point leftStart,
+        JsonContracts.Point leftEnd,
+        JsonContracts.Point rightStart,
+        JsonContracts.Point rightEnd) {
+        if (horizontal(leftStart, leftEnd) && horizontal(rightStart, rightEnd)) {
+            return Math.abs(leftStart.y() - rightStart.y()) < ROUTE_CLOSE_PARALLEL_DISTANCE
+                && overlapLength(leftStart.x(), leftEnd.x(), rightStart.x(), rightEnd.x())
+                    >= ROUTE_CLOSE_PARALLEL_MIN_OVERLAP;
+        }
+        if (vertical(leftStart, leftEnd) && vertical(rightStart, rightEnd)) {
+            return Math.abs(leftStart.x() - rightStart.x()) < ROUTE_CLOSE_PARALLEL_DISTANCE
+                && overlapLength(leftStart.y(), leftEnd.y(), rightStart.y(), rightEnd.y())
+                    >= ROUTE_CLOSE_PARALLEL_MIN_OVERLAP;
+        }
+        return false;
+    }
+
+    private static boolean horizontal(JsonContracts.Point start, JsonContracts.Point end) {
+        return sameCoordinate(start.y(), end.y()) && !sameCoordinate(start.x(), end.x());
+    }
+
+    private static boolean vertical(JsonContracts.Point start, JsonContracts.Point end) {
+        return sameCoordinate(start.x(), end.x()) && !sameCoordinate(start.y(), end.y());
+    }
+
+    private static double overlapLength(
+        double firstStart,
+        double firstEnd,
+        double secondStart,
+        double secondEnd) {
+        double firstMin = Math.min(firstStart, firstEnd);
+        double firstMax = Math.max(firstStart, firstEnd);
+        double secondMin = Math.min(secondStart, secondEnd);
+        double secondMax = Math.max(secondStart, secondEnd);
+        return Math.max(0.0, Math.min(firstMax, secondMax) - Math.max(firstMin, secondMin));
     }
 
     private static double minNodeX(List<JsonContracts.LaidOutNode> nodes) {

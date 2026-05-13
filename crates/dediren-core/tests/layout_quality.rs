@@ -11,6 +11,7 @@ fn non_overlapping_layout_has_zero_overlaps() {
     assert_eq!(report.connector_through_node_count, 0);
     assert_eq!(report.invalid_route_count, 0);
     assert_eq!(report.route_detour_count, 0);
+    assert_eq!(report.route_close_parallel_count, 0);
     assert_eq!(report.group_boundary_issue_count, 0);
     assert_eq!(report.policy_name, "draft");
     assert_eq!(report.status, "ok");
@@ -87,6 +88,74 @@ fn excessive_route_detours_are_counted() {
 }
 
 #[test]
+fn close_parallel_route_segments_are_counted() {
+    let mut result = empty_result();
+    result.edges.push(edge(
+        "primary",
+        vec![Point { x: 0.0, y: 0.0 }, Point { x: 200.0, y: 0.0 }],
+    ));
+    result.edges.push(edge(
+        "too-close",
+        vec![Point { x: 0.0, y: 16.0 }, Point { x: 200.0, y: 16.0 }],
+    ));
+    result.edges.push(edge(
+        "readable",
+        vec![Point { x: 0.0, y: 80.0 }, Point { x: 200.0, y: 80.0 }],
+    ));
+
+    let report = dediren_core::quality::validate_layout(&result);
+
+    assert_eq!(report.route_close_parallel_count, 1);
+    assert_eq!(report.status, "warning");
+}
+
+#[test]
+fn moderately_spaced_parallel_route_segments_are_readable() {
+    let mut result = empty_result();
+    result.edges.push(edge(
+        "primary",
+        vec![Point { x: 0.0, y: 0.0 }, Point { x: 200.0, y: 0.0 }],
+    ));
+    result.edges.push(edge(
+        "readable",
+        vec![Point { x: 0.0, y: 28.0 }, Point { x: 200.0, y: 28.0 }],
+    ));
+
+    let report = dediren_core::quality::validate_layout(&result);
+
+    assert_eq!(report.route_close_parallel_count, 0);
+    assert_eq!(report.status, "ok");
+}
+
+#[test]
+fn shared_endpoint_fanout_route_segments_are_readable() {
+    let mut result = empty_result();
+    result.edges.push(LaidOutEdge {
+        id: "to-left".to_string(),
+        source: "hub".to_string(),
+        target: "left".to_string(),
+        source_id: "to-left".to_string(),
+        projection_id: "to-left".to_string(),
+        points: vec![Point { x: 0.0, y: 0.0 }, Point { x: 200.0, y: 0.0 }],
+        label: "to-left".to_string(),
+    });
+    result.edges.push(LaidOutEdge {
+        id: "to-right".to_string(),
+        source: "hub".to_string(),
+        target: "right".to_string(),
+        source_id: "to-right".to_string(),
+        projection_id: "to-right".to_string(),
+        points: vec![Point { x: 0.0, y: 12.0 }, Point { x: 200.0, y: 12.0 }],
+        label: "to-right".to_string(),
+    });
+
+    let report = dediren_core::quality::validate_layout(&result);
+
+    assert_eq!(report.route_close_parallel_count, 0);
+    assert_eq!(report.status, "ok");
+}
+
+#[test]
 fn group_boundary_issues_are_counted() {
     let mut result = empty_result();
     result.nodes.push(node("member", 200.0, 200.0));
@@ -125,6 +194,18 @@ fn node(id: &str, x: f64, y: f64) -> LaidOutNode {
         y,
         width: 100.0,
         height: 80.0,
+        label: id.to_string(),
+    }
+}
+
+fn edge(id: &str, points: Vec<Point>) -> LaidOutEdge {
+    LaidOutEdge {
+        id: id.to_string(),
+        source: format!("{id}-source"),
+        target: format!("{id}-target"),
+        source_id: id.to_string(),
+        projection_id: id.to_string(),
+        points,
         label: id.to_string(),
     }
 }
