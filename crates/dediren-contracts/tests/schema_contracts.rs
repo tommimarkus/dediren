@@ -274,6 +274,75 @@ fn svg_policy_schema_accepts_semantic_type_overrides() {
 }
 
 #[test]
+fn layout_request_schema_accepts_visual_only_group_provenance() {
+    assert_json_valid(
+        "schemas/layout-request.schema.json",
+        json!({
+            "layout_request_schema_version": "layout-request.schema.v1",
+            "view_id": "main",
+            "nodes": [],
+            "edges": [],
+            "groups": [
+                {
+                    "id": "visual-column",
+                    "label": "Visual Column",
+                    "members": [],
+                    "provenance": { "visual_only": true }
+                }
+            ],
+            "labels": [],
+            "constraints": []
+        }),
+    );
+}
+
+#[test]
+fn layout_request_schema_rejects_ambiguous_group_provenance() {
+    assert_json_invalid(
+        "schemas/layout-request.schema.json",
+        json!({
+            "layout_request_schema_version": "layout-request.schema.v1",
+            "view_id": "main",
+            "nodes": [],
+            "edges": [],
+            "groups": [
+                {
+                    "id": "ambiguous",
+                    "label": "Ambiguous",
+                    "members": [],
+                    "provenance": {
+                        "visual_only": true,
+                        "semantic_backed": { "source_id": "ambiguous" }
+                    }
+                }
+            ],
+            "labels": [],
+            "constraints": []
+        }),
+        "layout request with ambiguous group provenance",
+    );
+}
+
+#[test]
+fn render_metadata_schema_accepts_group_selectors() {
+    assert_json_valid(
+        "schemas/render-metadata.schema.json",
+        json!({
+            "render_metadata_schema_version": "render-metadata.schema.v1",
+            "semantic_profile": "archimate",
+            "nodes": {},
+            "edges": {},
+            "groups": {
+                "customer-domain": {
+                    "type": "Grouping",
+                    "source_id": "customer-domain"
+                }
+            }
+        }),
+    );
+}
+
+#[test]
 fn svg_policy_schema_accepts_archimate_decorators_and_edge_notation() {
     assert_json_valid(
         "schemas/svg-render-policy.schema.json",

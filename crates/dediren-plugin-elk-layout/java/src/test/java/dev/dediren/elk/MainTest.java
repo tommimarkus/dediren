@@ -139,6 +139,42 @@ class MainTest {
     }
 
     @Test
+    void requestWithAmbiguousGroupProvenanceReturnsErrorEnvelope() throws Exception {
+        String request = """
+            {
+              "layout_request_schema_version": "layout-request.schema.v1",
+              "view_id": "main",
+              "nodes": [
+                {"id": "client", "label": "Client", "source_id": "client", "width_hint": 160, "height_hint": 80}
+              ],
+              "edges": [],
+              "groups": [
+                {
+                  "id": "group-1",
+                  "label": "Group",
+                  "members": ["client"],
+                  "provenance": {
+                    "visual_only": true,
+                    "semantic_backed": { "source_id": "group-1" }
+                  }
+                }
+              ],
+              "labels": [],
+              "constraints": []
+            }
+            """;
+        ByteArrayInputStream stdin =
+            new ByteArrayInputStream(request.getBytes(StandardCharsets.UTF_8));
+        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+
+        int exitCode = Main.run(stdin, new PrintStream(stdout, true, StandardCharsets.UTF_8));
+
+        String text = stdout.toString(StandardCharsets.UTF_8);
+        assertEquals(3, exitCode);
+        EnvelopeAssertions.errorEnvelope(text, "DEDIREN_ELK_LAYOUT_FAILED");
+    }
+
+    @Test
     void requestWithOverflowingWidthHintReturnsErrorEnvelope() throws Exception {
         String request = """
             {

@@ -19,6 +19,10 @@
     "edges": {
       "type": "object",
       "additionalProperties": { "$ref": "#/$defs/selector" }
+    },
+    "groups": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/selector" }
     }
   },
   "$defs": {

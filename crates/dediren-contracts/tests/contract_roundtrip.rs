@@ -1,9 +1,9 @@
 use dediren_contracts::{
-    CommandEnvelope, Diagnostic, DiagnosticSeverity, GroupProvenance, LayoutRequest, Margin, Page,
-    RenderMetadata, RenderMetadataSelector, RenderPolicy, RenderResult, SemanticValidationResult,
-    SourceDocument, SvgEdgeLineStyle, SvgEdgeMarkerEnd, SvgEdgeStyle, SvgNodeDecorator,
-    SvgNodeStyle, SvgStylePolicy, SEMANTIC_VALIDATION_RESULT_SCHEMA_VERSION,
-    SVG_RENDER_POLICY_SCHEMA_VERSION,
+    CommandEnvelope, Diagnostic, DiagnosticSeverity, GenericGraphPluginData,
+    GenericGraphViewGroupRole, GroupProvenance, LayoutRequest, Margin, Page, RenderMetadata,
+    RenderMetadataSelector, RenderPolicy, RenderResult, SemanticValidationResult, SourceDocument,
+    SvgEdgeLineStyle, SvgEdgeMarkerEnd, SvgEdgeStyle, SvgNodeDecorator, SvgNodeStyle,
+    SvgStylePolicy, SEMANTIC_VALIDATION_RESULT_SCHEMA_VERSION, SVG_RENDER_POLICY_SCHEMA_VERSION,
 };
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -75,11 +75,94 @@ fn layout_group_provenance_uses_schema_owned_object_shape() {
     .unwrap();
 
     assert_eq!(
-        GroupProvenance::SemanticBacked {
-            source_id: "system-group".to_string()
-        },
+        GroupProvenance::semantic_backed("system-group"),
         request.groups[0].provenance
     );
+}
+
+#[test]
+fn generic_graph_group_role_defaults_to_semantic_boundary() {
+    let data: GenericGraphPluginData = serde_json::from_str(
+        r#"{
+          "views": [
+            {
+              "id": "main",
+              "label": "Main",
+              "nodes": ["api"],
+              "relationships": [],
+              "groups": [
+                {
+                  "id": "application-services",
+                  "label": "Application Services",
+                  "members": ["api"]
+                }
+              ]
+            }
+          ]
+        }"#,
+    )
+    .unwrap();
+
+    assert_eq!(
+        GenericGraphViewGroupRole::SemanticBoundary,
+        data.views[0].groups[0].role
+    );
+    assert_eq!(None, data.views[0].groups[0].semantic_source_id);
+}
+
+#[test]
+fn generic_graph_group_role_round_trips_layout_only() {
+    let data: GenericGraphPluginData = serde_json::from_str(
+        r#"{
+          "views": [
+            {
+              "id": "main",
+              "label": "Main",
+              "nodes": ["api"],
+              "relationships": [],
+              "groups": [
+                {
+                  "id": "visual-column",
+                  "label": "Visual Column",
+                  "members": ["api"],
+                  "role": "layout-only"
+                }
+              ]
+            }
+          ]
+        }"#,
+    )
+    .unwrap();
+
+    assert_eq!(
+        GenericGraphViewGroupRole::LayoutOnly,
+        data.views[0].groups[0].role
+    );
+}
+
+#[test]
+fn layout_group_provenance_round_trips_visual_only_object_shape() {
+    let request: LayoutRequest = serde_json::from_str(
+        r#"{
+          "layout_request_schema_version": "layout-request.schema.v1",
+          "view_id": "main",
+          "nodes": [],
+          "edges": [],
+          "groups": [
+            {
+              "id": "visual-column",
+              "label": "Visual Column",
+              "members": [],
+              "provenance": { "visual_only": true }
+            }
+          ],
+          "labels": [],
+          "constraints": []
+        }"#,
+    )
+    .unwrap();
+
+    assert_eq!(GroupProvenance::visual_only(), request.groups[0].provenance);
 }
 
 #[test]
@@ -150,6 +233,7 @@ fn render_metadata_round_trips() {
             },
         )]
         .into(),
+        groups: BTreeMap::new(),
     };
 
     let json = serde_json::to_string(&metadata).unwrap();

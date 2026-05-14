@@ -226,7 +226,8 @@
           "type": "number",
           "exclusiveMinimum": 0,
           "maximum": 96
-        }
+        },
+        "decorator": { "$ref": "#/$defs/nodeStyle/properties/decorator" }
       }
     },
     "nodeOverrideMap": {
@@ -252,6 +253,7 @@
         "group": { "$ref": "#/$defs/groupStyle" },
         "node_type_overrides": { "$ref": "#/$defs/nodeOverrideMap" },
         "edge_type_overrides": { "$ref": "#/$defs/edgeOverrideMap" },
+        "group_type_overrides": { "$ref": "#/$defs/groupOverrideMap" },
         "node_overrides": { "$ref": "#/$defs/nodeOverrideMap" },
         "edge_overrides": { "$ref": "#/$defs/edgeOverrideMap" },
         "group_overrides": { "$ref": "#/$defs/groupOverrideMap" }

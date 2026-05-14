@@ -132,6 +132,23 @@ pub struct GenericGraphViewGroup {
     pub id: String,
     pub label: String,
     pub members: Vec<String>,
+    #[serde(default)]
+    pub role: GenericGraphViewGroupRole,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub semantic_source_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum GenericGraphViewGroupRole {
+    SemanticBoundary,
+    LayoutOnly,
+}
+
+impl Default for GenericGraphViewGroupRole {
+    fn default() -> Self {
+        Self::SemanticBoundary
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -183,10 +200,46 @@ pub struct LayoutGroup {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum GroupProvenance {
-    VisualOnly,
-    SemanticBacked { source_id: String },
+#[serde(deny_unknown_fields)]
+pub struct GroupProvenance {
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub visual_only: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub semantic_backed: Option<SemanticBackedGroupProvenance>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SemanticBackedGroupProvenance {
+    pub source_id: String,
+}
+
+impl GroupProvenance {
+    pub fn visual_only() -> Self {
+        Self {
+            visual_only: true,
+            semantic_backed: None,
+        }
+    }
+
+    pub fn semantic_backed(source_id: impl Into<String>) -> Self {
+        Self {
+            visual_only: false,
+            semantic_backed: Some(SemanticBackedGroupProvenance {
+                source_id: source_id.into(),
+            }),
+        }
+    }
+
+    pub fn semantic_source_id(&self) -> Option<&str> {
+        self.semantic_backed
+            .as_ref()
+            .map(|semantic| semantic.source_id.as_str())
+    }
+}
+
+fn is_false(value: &bool) -> bool {
+    !*value
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -261,6 +314,8 @@ pub struct LaidOutGroup {
     pub id: String,
     pub source_id: String,
     pub projection_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provenance: Option<GroupProvenance>,
     pub x: f64,
     pub y: f64,
     pub width: f64,
@@ -297,6 +352,8 @@ pub struct RenderMetadata {
     pub nodes: BTreeMap<String, RenderMetadataSelector>,
     #[serde(default)]
     pub edges: BTreeMap<String, RenderMetadataSelector>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub groups: BTreeMap<String, RenderMetadataSelector>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -340,6 +397,8 @@ pub struct SvgStylePolicy {
     pub node_type_overrides: BTreeMap<String, SvgNodeStyle>,
     #[serde(default)]
     pub edge_type_overrides: BTreeMap<String, SvgEdgeStyle>,
+    #[serde(default)]
+    pub group_type_overrides: BTreeMap<String, SvgGroupStyle>,
     #[serde(default)]
     pub node_overrides: BTreeMap<String, SvgNodeStyle>,
     #[serde(default)]
@@ -537,6 +596,8 @@ pub struct SvgGroupStyle {
     pub label_fill: Option<String>,
     #[serde(default)]
     pub label_size: Option<f64>,
+    #[serde(default)]
+    pub decorator: Option<SvgNodeDecorator>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

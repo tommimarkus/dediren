@@ -4,7 +4,7 @@ use std::io::{Cursor, Read};
 use anyhow::{bail, Context};
 use dediren_archimate::ArchimateTypeValidationError;
 use dediren_contracts::{
-    CommandEnvelope, Diagnostic, DiagnosticSeverity, ExportResult, OefExportInput,
+    CommandEnvelope, Diagnostic, DiagnosticSeverity, ExportResult, LaidOutGroup, OefExportInput,
     EXPORT_RESULT_SCHEMA_VERSION, PLUGIN_PROTOCOL_VERSION,
 };
 use quick_xml::events::{BytesEnd, BytesStart, BytesText, Event};
@@ -45,6 +45,9 @@ fn export_from_stdin() -> anyhow::Result<()> {
     if let Err(error) = validate_archimate_types(&request) {
         exit_with_archimate_type_error(error);
     }
+    if let Err(error) = validate_archimate_group_semantics(&request) {
+        exit_with_diagnostic(&error.code, &error.message, Some(error.path));
+    }
     let content = build_oef(&request)?;
     let result = ExportResult {
         export_result_schema_version: EXPORT_RESULT_SCHEMA_VERSION.to_string(),
@@ -69,6 +72,26 @@ fn build_oef(request: &OefExportInput) -> anyhow::Result<String> {
         .iter()
         .map(|relationship| (relationship.id.clone(), ids.oef_id("rel", &relationship.id)))
         .collect();
+    let source_nodes_by_id: BTreeMap<_, _> = request
+        .source
+        .nodes
+        .iter()
+        .map(|node| (node.id.as_str(), node))
+        .collect();
+    let semantic_groups: Vec<_> = request
+        .layout_result
+        .groups
+        .iter()
+        .filter_map(|group| {
+            let source_id = semantic_group_source_id(group)?;
+            let source_node = source_nodes_by_id.get(source_id)?;
+            if source_node.node_type == "Grouping" {
+                Some((group, source_id))
+            } else {
+                None
+            }
+        })
+        .collect();
     let view_node_ids: BTreeMap<_, _> = request
         .layout_result
         .nodes
@@ -77,6 +100,15 @@ fn build_oef(request: &OefExportInput) -> anyhow::Result<String> {
             (
                 node.id.clone(),
                 ids.oef_id(&format!("vn-{}", request.layout_result.view_id), &node.id),
+            )
+        })
+        .collect();
+    let group_view_node_ids: BTreeMap<_, _> = semantic_groups
+        .iter()
+        .map(|(group, _source_id)| {
+            (
+                group.id.clone(),
+                ids.oef_id(&format!("vg-{}", request.layout_result.view_id), &group.id),
             )
         })
         .collect();
@@ -148,6 +180,25 @@ fn build_oef(request: &OefExportInput) -> anyhow::Result<String> {
     view.push_attribute(("viewpoint", request.policy.viewpoint.as_str()));
     writer.write_event(Event::Start(view))?;
     write_text_element(&mut writer, "name", &request.policy.view_name)?;
+
+    for (group, source_id) in &semantic_groups {
+        let element_ref = element_ids
+            .get(*source_id)
+            .with_context(|| format!("layout group {} has missing semantic source", group.id))?;
+        let mut view_node = BytesStart::new("node");
+        let x = format_number(group.x);
+        let y = format_number(group.y);
+        let width = format_number(group.width);
+        let height = format_number(group.height);
+        view_node.push_attribute(("identifier", group_view_node_ids[&group.id].as_str()));
+        view_node.push_attribute(("xsi:type", "Element"));
+        view_node.push_attribute(("elementRef", element_ref.as_str()));
+        view_node.push_attribute(("x", x.as_str()));
+        view_node.push_attribute(("y", y.as_str()));
+        view_node.push_attribute(("w", width.as_str()));
+        view_node.push_attribute(("h", height.as_str()));
+        writer.write_event(Event::Empty(view_node))?;
+    }
 
     for node in &request.layout_result.nodes {
         let element_ref = element_ids
@@ -258,12 +309,61 @@ fn validate_archimate_types(request: &OefExportInput) -> Result<(), ArchimateTyp
     Ok(())
 }
 
+#[derive(Debug)]
+struct GroupSemanticValidationError {
+    code: &'static str,
+    path: String,
+    message: String,
+}
+
+fn validate_archimate_group_semantics(
+    request: &OefExportInput,
+) -> Result<(), GroupSemanticValidationError> {
+    let source_nodes_by_id: BTreeMap<_, _> = request
+        .source
+        .nodes
+        .iter()
+        .map(|node| (node.id.as_str(), node))
+        .collect();
+    for (index, group) in request.layout_result.groups.iter().enumerate() {
+        let Some(source_id) = semantic_group_source_id(group) else {
+            continue;
+        };
+        let Some(source_node) = source_nodes_by_id.get(source_id) else {
+            continue;
+        };
+        if source_node.node_type != "Grouping" {
+            return Err(GroupSemanticValidationError {
+                code: "DEDIREN_ARCHIMATE_GROUP_SOURCE_NOT_GROUPING",
+                path: format!("$.layout_result.groups[{index}].provenance"),
+                message: format!(
+                    "layout group {} semantic source {} has ArchiMate type {}, expected Grouping",
+                    group.id, source_id, source_node.node_type
+                ),
+            });
+        }
+    }
+    Ok(())
+}
+
+fn semantic_group_source_id(group: &LaidOutGroup) -> Option<&str> {
+    match group.provenance.as_ref() {
+        Some(provenance) if provenance.visual_only => None,
+        Some(provenance) => provenance.semantic_source_id(),
+        None => Some(group.source_id.as_str()),
+    }
+}
+
 fn exit_with_archimate_type_error(error: ArchimateTypeValidationError) -> ! {
+    exit_with_diagnostic(error.code(), &error.message(), Some(error.path));
+}
+
+fn exit_with_diagnostic(code: &str, message: &str, path: Option<String>) -> ! {
     let diagnostic = Diagnostic {
-        code: error.code().to_string(),
+        code: code.to_string(),
         severity: DiagnosticSeverity::Error,
-        message: error.message(),
-        path: Some(error.path),
+        message: message.to_string(),
+        path,
     };
     println!(
         "{}",

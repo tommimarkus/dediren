@@ -1,13 +1,13 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::io::Read;
 
 use anyhow::{bail, Context};
 use dediren_archimate::ArchimateTypeValidationError;
 use dediren_contracts::{
-    CommandEnvelope, Diagnostic, DiagnosticSeverity, GenericGraphPluginData, GroupProvenance,
-    LayoutEdge, LayoutGroup, LayoutLabel, LayoutNode, LayoutRequest, RenderMetadata,
-    RenderMetadataSelector, SemanticValidationResult, SourceDocument,
-    LAYOUT_REQUEST_SCHEMA_VERSION, RENDER_METADATA_SCHEMA_VERSION,
+    CommandEnvelope, Diagnostic, DiagnosticSeverity, GenericGraphPluginData,
+    GenericGraphViewGroupRole, GroupProvenance, LayoutEdge, LayoutGroup, LayoutLabel, LayoutNode,
+    LayoutRequest, RenderMetadata, RenderMetadataSelector, SemanticValidationResult,
+    SourceDocument, LAYOUT_REQUEST_SCHEMA_VERSION, RENDER_METADATA_SCHEMA_VERSION,
     SEMANTIC_VALIDATION_RESULT_SCHEMA_VERSION,
 };
 
@@ -101,6 +101,8 @@ fn main() -> anyhow::Result<()> {
         })
         .collect::<anyhow::Result<Vec<_>>>()?;
 
+    let source_node_ids: BTreeSet<_> = source.nodes.iter().map(|node| node.id.as_str()).collect();
+
     let groups = selected_view
         .groups
         .iter()
@@ -110,13 +112,32 @@ fn main() -> anyhow::Result<()> {
                     bail!("group {} references node outside view: {member}", group.id);
                 }
             }
+
+            let provenance = match group.role {
+                GenericGraphViewGroupRole::LayoutOnly => GroupProvenance::visual_only(),
+                GenericGraphViewGroupRole::SemanticBoundary => {
+                    let source_id = group
+                        .semantic_source_id
+                        .clone()
+                        .unwrap_or_else(|| group.id.clone());
+                    if group.semantic_source_id.is_some()
+                        && !source_node_ids.contains(source_id.as_str())
+                    {
+                        bail!(
+                            "group {} semantic_source_id references missing node: {}",
+                            group.id,
+                            source_id
+                        );
+                    }
+                    GroupProvenance::semantic_backed(source_id)
+                }
+            };
+
             Ok(LayoutGroup {
                 id: group.id.clone(),
                 label: group.label.clone(),
                 members: group.members.clone(),
-                provenance: GroupProvenance::SemanticBacked {
-                    source_id: group.id.clone(),
-                },
+                provenance,
             })
         })
         .collect::<anyhow::Result<Vec<_>>>()?;
@@ -215,11 +236,39 @@ fn project_render_metadata(
         );
     }
 
+    let mut groups = BTreeMap::new();
+    for group in &selected_view.groups {
+        if group.role != GenericGraphViewGroupRole::SemanticBoundary {
+            continue;
+        }
+        let Some(source_id) = group.semantic_source_id.as_ref() else {
+            continue;
+        };
+        let source_node = source
+            .nodes
+            .iter()
+            .find(|node| node.id == *source_id)
+            .with_context(|| {
+                format!(
+                    "group {} references missing semantic source {source_id}",
+                    group.id
+                )
+            })?;
+        groups.insert(
+            group.id.clone(),
+            RenderMetadataSelector {
+                selector_type: source_node.node_type.clone(),
+                source_id: source_node.id.clone(),
+            },
+        );
+    }
+
     Ok(RenderMetadata {
         render_metadata_schema_version: RENDER_METADATA_SCHEMA_VERSION.to_string(),
         semantic_profile,
         nodes,
         edges,
+        groups,
     })
 }
 

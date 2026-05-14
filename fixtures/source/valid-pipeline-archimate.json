@@ -3,11 +3,11 @@
   "required_plugins": [
     {
       "id": "generic-graph",
-      "version": "0.5.0"
+      "version": "0.6.0"
     },
     {
       "id": "archimate-oef",
-      "version": "0.5.0"
+      "version": "0.6.0"
     }
   ],
   "nodes": [
@@ -45,6 +45,12 @@
       "id": "payments",
       "type": "ApplicationService",
       "label": "Payments Service",
+      "properties": {}
+    },
+    {
+      "id": "application-landscape-grouping",
+      "type": "Grouping",
+      "label": "Application Landscape",
       "properties": {}
     }
   ],
@@ -124,11 +130,14 @@
             {
               "id": "application-services",
               "label": "Application Services",
+              "role": "semantic-boundary",
+              "semantic_source_id": "application-landscape-grouping",
               "members": ["web-app", "orders-api", "worker"]
             },
             {
               "id": "external-dependencies",
               "label": "External Dependencies",
+              "role": "layout-only",
               "members": ["payments", "database"]
             }
           ]

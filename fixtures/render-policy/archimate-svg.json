@@ -118,6 +118,14 @@
       "Triggering": { "marker_end": "open_arrow" },
       "Flow": { "marker_end": "open_arrow" }
     },
+    "group_type_overrides": {
+      "Grouping": {
+        "fill": "#ffffff",
+        "stroke": "#64748b",
+        "label_fill": "#334155",
+        "decorator": "archimate_grouping"
+      }
+    },
     "node_overrides": {},
     "edge_overrides": {},
     "group_overrides": {}

@@ -3,7 +3,7 @@
   "required_plugins": [
     {
       "id": "generic-graph",
-      "version": "0.5.0"
+      "version": "0.6.0"
     }
   ],
   "nodes": [
@@ -120,11 +120,13 @@
             {
               "id": "application-services",
               "label": "Application Services",
+              "role": "semantic-boundary",
               "members": ["web-app", "orders-api", "worker"]
             },
             {
               "id": "external-dependencies",
               "label": "External Dependencies",
+              "role": "semantic-boundary",
               "members": ["payments", "database"]
             }
           ]

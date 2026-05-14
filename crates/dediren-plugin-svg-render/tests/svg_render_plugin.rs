@@ -1,3 +1,5 @@
+#[path = "svg_render_plugin/archimate_groups.rs"]
+mod archimate_groups;
 #[path = "svg_render_plugin/archimate_nodes.rs"]
 mod archimate_nodes;
 #[path = "svg_render_plugin/archimate_relationships.rs"]

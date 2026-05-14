@@ -55,8 +55,7 @@ class ElkLayoutEngineTest {
                 "group-1",
                 "Group",
                 List.of("client", "missing"),
-                new JsonContracts.GroupProvenance(
-                    new JsonContracts.SemanticBacked("system-group")))),
+                new JsonContracts.GroupProvenance(null, new JsonContracts.SemanticBacked("system-group")))),
             List.of(),
             List.of());
 
@@ -70,6 +69,30 @@ class ElkLayoutEngineTest {
             .anyMatch(warning ->
                 warning.code().equals("DEDIREN_ELK_MISSING_GROUP_MEMBER")
                     && warning.path().equals("$.groups[0].members[1]")));
+    }
+
+    @Test
+    void layoutPreservesVisualOnlyGroupProvenance() {
+        JsonContracts.LayoutRequest request = new JsonContracts.LayoutRequest(
+            "layout-request.schema.v1",
+            "main",
+            List.of(new JsonContracts.LayoutNode("client", "Client", "client", 160.0, 80.0)),
+            List.of(),
+            List.of(new JsonContracts.LayoutGroup(
+                "visual-column",
+                "Visual Column",
+                List.of("client"),
+                new JsonContracts.GroupProvenance(true, null))),
+            List.of(),
+            List.of());
+
+        JsonContracts.LayoutResult result = new ElkLayoutEngine().layout(request);
+
+        JsonContracts.LaidOutGroup group = result.groups().get(0);
+
+        assertEquals("visual-column", group.source_id());
+        assertTrue(group.provenance().visual_only());
+        assertEquals(null, group.provenance().semantic_backed());
     }
 
     @Test
@@ -99,14 +122,12 @@ class ElkLayoutEngineTest {
                     "application-services",
                     "Application Services",
                     List.of("web-app", "orders-api", "worker"),
-                    new JsonContracts.GroupProvenance(
-                        new JsonContracts.SemanticBacked("application-services"))),
+                    new JsonContracts.GroupProvenance(null, new JsonContracts.SemanticBacked("application-services"))),
                 new JsonContracts.LayoutGroup(
                     "external-dependencies",
                     "External Dependencies",
                     List.of("payments", "database"),
-                    new JsonContracts.GroupProvenance(
-                        new JsonContracts.SemanticBacked("external-dependencies")))),
+                    new JsonContracts.GroupProvenance(null, new JsonContracts.SemanticBacked("external-dependencies")))),
             List.of(),
             List.of());
 
@@ -163,12 +184,12 @@ class ElkLayoutEngineTest {
                     "application-services",
                     "Application Services",
                     List.of("web-app", "orders-api", "worker"),
-                    new JsonContracts.GroupProvenance(new JsonContracts.SemanticBacked("application-services"))),
+                    new JsonContracts.GroupProvenance(null, new JsonContracts.SemanticBacked("application-services"))),
                 new JsonContracts.LayoutGroup(
                     "external-dependencies",
                     "External Dependencies",
                     List.of("payments", "database"),
-                    new JsonContracts.GroupProvenance(new JsonContracts.SemanticBacked("external-dependencies")))),
+                    new JsonContracts.GroupProvenance(null, new JsonContracts.SemanticBacked("external-dependencies")))),
             List.of(),
             List.of());
 
@@ -216,12 +237,12 @@ class ElkLayoutEngineTest {
                     "application-services",
                     "Application Services",
                     List.of("orders-api"),
-                    new JsonContracts.GroupProvenance(new JsonContracts.SemanticBacked("application-services"))),
+                    new JsonContracts.GroupProvenance(null, new JsonContracts.SemanticBacked("application-services"))),
                 new JsonContracts.LayoutGroup(
                     "external-dependencies",
                     "External Dependencies",
                     List.of("payments", "database"),
-                    new JsonContracts.GroupProvenance(new JsonContracts.SemanticBacked("external-dependencies")))),
+                    new JsonContracts.GroupProvenance(null, new JsonContracts.SemanticBacked("external-dependencies")))),
             List.of(),
             List.of());
 
@@ -296,12 +317,12 @@ class ElkLayoutEngineTest {
                     "edge-platform",
                     "Edge Platform",
                     List.of("web-frontend", "api-gateway"),
-                    new JsonContracts.GroupProvenance(new JsonContracts.SemanticBacked("edge-platform"))),
+                    new JsonContracts.GroupProvenance(null, new JsonContracts.SemanticBacked("edge-platform"))),
                 new JsonContracts.LayoutGroup(
                     "core-services",
                     "Core Services",
                     List.of("identity-service", "pricing-service", "order-service", "catalog-service"),
-                    new JsonContracts.GroupProvenance(new JsonContracts.SemanticBacked("core-services")))),
+                    new JsonContracts.GroupProvenance(null, new JsonContracts.SemanticBacked("core-services")))),
             List.of(),
             List.of());
 
@@ -346,12 +367,12 @@ class ElkLayoutEngineTest {
                     "edge-platform",
                     "Edge Platform",
                     List.of("web-frontend", "api-gateway"),
-                    new JsonContracts.GroupProvenance(new JsonContracts.SemanticBacked("edge-platform"))),
+                    new JsonContracts.GroupProvenance(null, new JsonContracts.SemanticBacked("edge-platform"))),
                 new JsonContracts.LayoutGroup(
                     "core-services",
                     "Core Services",
                     List.of("identity-service", "pricing-service", "order-service", "catalog-service"),
-                    new JsonContracts.GroupProvenance(new JsonContracts.SemanticBacked("core-services")))),
+                    new JsonContracts.GroupProvenance(null, new JsonContracts.SemanticBacked("core-services")))),
             List.of(),
             List.of());
 
@@ -390,17 +411,17 @@ class ElkLayoutEngineTest {
                     "core-services",
                     "Core Services",
                     List.of("identity-service"),
-                    new JsonContracts.GroupProvenance(new JsonContracts.SemanticBacked("core-services"))),
+                    new JsonContracts.GroupProvenance(null, new JsonContracts.SemanticBacked("core-services"))),
                 new JsonContracts.LayoutGroup(
                     "data-platform",
                     "Data Platform",
                     List.of("session-cache"),
-                    new JsonContracts.GroupProvenance(new JsonContracts.SemanticBacked("data-platform"))),
+                    new JsonContracts.GroupProvenance(null, new JsonContracts.SemanticBacked("data-platform"))),
                 new JsonContracts.LayoutGroup(
                     "external-systems",
                     "External Systems",
                     List.of("identity-provider"),
-                    new JsonContracts.GroupProvenance(new JsonContracts.SemanticBacked("external-systems")))),
+                    new JsonContracts.GroupProvenance(null, new JsonContracts.SemanticBacked("external-systems")))),
             List.of(),
             List.of());
 
@@ -433,12 +454,12 @@ class ElkLayoutEngineTest {
                     "callers",
                     "Callers",
                     List.of("web-app", "batch-worker"),
-                    new JsonContracts.GroupProvenance(new JsonContracts.SemanticBacked("callers"))),
+                    new JsonContracts.GroupProvenance(null, new JsonContracts.SemanticBacked("callers"))),
                 new JsonContracts.LayoutGroup(
                     "application-services",
                     "Application Services",
                     List.of("orders-api"),
-                    new JsonContracts.GroupProvenance(new JsonContracts.SemanticBacked("application-services")))),
+                    new JsonContracts.GroupProvenance(null, new JsonContracts.SemanticBacked("application-services")))),
             List.of(),
             List.of());
 
@@ -479,12 +500,12 @@ class ElkLayoutEngineTest {
                     "callers",
                     "Callers",
                     List.of("web-app", "batch-worker", "support-console"),
-                    new JsonContracts.GroupProvenance(new JsonContracts.SemanticBacked("callers"))),
+                    new JsonContracts.GroupProvenance(null, new JsonContracts.SemanticBacked("callers"))),
                 new JsonContracts.LayoutGroup(
                     "application-services",
                     "Application Services",
                     List.of("orders-api"),
-                    new JsonContracts.GroupProvenance(new JsonContracts.SemanticBacked("application-services")))),
+                    new JsonContracts.GroupProvenance(null, new JsonContracts.SemanticBacked("application-services")))),
             List.of(),
             List.of());
 
@@ -529,12 +550,12 @@ class ElkLayoutEngineTest {
                     "application-services",
                     "Application Services",
                     List.of("web-app", "orders-api", "worker"),
-                    new JsonContracts.GroupProvenance(new JsonContracts.SemanticBacked("application-services"))),
+                    new JsonContracts.GroupProvenance(null, new JsonContracts.SemanticBacked("application-services"))),
                 new JsonContracts.LayoutGroup(
                     "external-dependencies",
                     "External Dependencies",
                     List.of("payments", "database"),
-                    new JsonContracts.GroupProvenance(new JsonContracts.SemanticBacked("external-dependencies")))),
+                    new JsonContracts.GroupProvenance(null, new JsonContracts.SemanticBacked("external-dependencies")))),
             List.of(),
             List.of());
 
@@ -566,12 +587,12 @@ class ElkLayoutEngineTest {
                     "application-services",
                     "Application Services",
                     List.of("orders-api", "worker"),
-                    new JsonContracts.GroupProvenance(new JsonContracts.SemanticBacked("application-services"))),
+                    new JsonContracts.GroupProvenance(null, new JsonContracts.SemanticBacked("application-services"))),
                 new JsonContracts.LayoutGroup(
                     "external-dependencies",
                     "External Dependencies",
                     List.of("payments", "database"),
-                    new JsonContracts.GroupProvenance(new JsonContracts.SemanticBacked("external-dependencies")))),
+                    new JsonContracts.GroupProvenance(null, new JsonContracts.SemanticBacked("external-dependencies")))),
             List.of(),
             List.of());
 
@@ -663,7 +684,7 @@ class ElkLayoutEngineTest {
                 "group",
                 "Group",
                 List.of("a", "b"),
-                new JsonContracts.GroupProvenance(new JsonContracts.SemanticBacked("group")))),
+                new JsonContracts.GroupProvenance(null, new JsonContracts.SemanticBacked("group")))),
             List.of(),
             List.of());
 

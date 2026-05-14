@@ -850,6 +850,7 @@ final class ElkLayoutEngine {
                 group.id(),
                 semanticBackedSourceId(group.provenance(), group.id()),
                 group.id(),
+                group.provenance(),
                 absoluteX(groupNode),
                 absoluteY(groupNode),
                 groupNode.getWidth(),
@@ -1387,6 +1388,7 @@ final class ElkLayoutEngine {
                 group.id(),
                 semanticBackedSourceId(group.provenance(), group.id()),
                 group.id(),
+                group.provenance(),
                 minX - GROUP_PADDING,
                 minY - GROUP_PADDING,
                 (maxX - minX) + (GROUP_PADDING * 2.0),
@@ -1483,13 +1485,15 @@ final class ElkLayoutEngine {
     }
 
     private static void validateProvenance(JsonContracts.GroupProvenance provenance, String path) {
-        if (provenance.semantic_backed() == null) {
-            return;
-        }
-        String semanticBackedPath = path + ".semantic_backed";
-        if (provenance.semantic_backed().source_id() == null) {
+        boolean visualOnly = Boolean.TRUE.equals(provenance.visual_only());
+        boolean semanticBacked = provenance.semantic_backed() != null;
+        if (visualOnly == semanticBacked) {
             throw new IllegalArgumentException(
-                "required string value is missing at " + semanticBackedPath + ".source_id");
+                "group provenance must contain exactly one of visual_only or semantic_backed at " + path);
+        }
+        if (semanticBacked && provenance.semantic_backed().source_id() == null) {
+            throw new IllegalArgumentException(
+                "required string value is missing at " + path + ".semantic_backed.source_id");
         }
     }
 

@@ -76,6 +76,164 @@ fn generic_graph_projects_rich_view_groups() {
 }
 
 #[test]
+fn generic_graph_projects_group_roles_into_provenance() {
+    let input = serde_json::json!({
+        "model_schema_version": "model.schema.v1",
+        "nodes": [
+            { "id": "client", "type": "BusinessActor", "label": "Client", "properties": {} },
+            { "id": "api", "type": "ApplicationComponent", "label": "API", "properties": {} },
+            { "id": "domain-group", "type": "Grouping", "label": "Domain Group", "properties": {} }
+        ],
+        "relationships": [],
+        "plugins": {
+            "generic-graph": {
+                "views": [
+                    {
+                        "id": "main",
+                        "label": "Main",
+                        "nodes": ["client", "api"],
+                        "relationships": [],
+                        "groups": [
+                            {
+                                "id": "domain-boundary",
+                                "label": "Domain Boundary",
+                                "members": ["client", "api"],
+                                "role": "semantic-boundary",
+                                "semantic_source_id": "domain-group"
+                            },
+                            {
+                                "id": "visual-column",
+                                "label": "Visual Column",
+                                "members": ["api"],
+                                "role": "layout-only"
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    });
+
+    let mut cmd = common::plugin_command();
+    let output = cmd
+        .args(["project", "--target", "layout-request", "--view", "main"])
+        .write_stdin(serde_json::to_string(&input).unwrap())
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let data = common::ok_data(&output);
+    let groups = data["groups"].as_array().unwrap();
+    assert_eq!(
+        groups[0]["provenance"],
+        serde_json::json!({ "semantic_backed": { "source_id": "domain-group" } })
+    );
+    assert_eq!(
+        groups[1]["provenance"],
+        serde_json::json!({ "visual_only": true })
+    );
+}
+
+#[test]
+fn generic_graph_rejects_group_semantic_source_id_that_is_not_a_source_node() {
+    let input = serde_json::json!({
+        "model_schema_version": "model.schema.v1",
+        "nodes": [
+            { "id": "api", "type": "ApplicationComponent", "label": "API", "properties": {} }
+        ],
+        "relationships": [],
+        "plugins": {
+            "generic-graph": {
+                "views": [
+                    {
+                        "id": "main",
+                        "label": "Main",
+                        "nodes": ["api"],
+                        "relationships": [],
+                        "groups": [
+                            {
+                                "id": "bad-group",
+                                "label": "Bad Group",
+                                "members": ["api"],
+                                "role": "semantic-boundary",
+                                "semantic_source_id": "missing-grouping-node"
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    });
+
+    let mut cmd = common::plugin_command();
+    cmd.args(["project", "--target", "layout-request", "--view", "main"])
+        .write_stdin(serde_json::to_string(&input).unwrap())
+        .assert()
+        .failure()
+        .stderr(predicates::str::contains(
+            "group bad-group semantic_source_id references missing node",
+        ));
+}
+
+#[test]
+fn generic_graph_projects_group_render_metadata_for_semantic_source_id() {
+    let input = serde_json::json!({
+        "model_schema_version": "model.schema.v1",
+        "nodes": [
+            { "id": "api", "type": "ApplicationComponent", "label": "API", "properties": {} },
+            { "id": "domain-group", "type": "Grouping", "label": "Domain Group", "properties": {} }
+        ],
+        "relationships": [],
+        "plugins": {
+            "generic-graph": {
+                "views": [
+                    {
+                        "id": "main",
+                        "label": "Main",
+                        "nodes": ["api"],
+                        "relationships": [],
+                        "groups": [
+                            {
+                                "id": "domain-boundary",
+                                "label": "Domain Boundary",
+                                "members": ["api"],
+                                "role": "semantic-boundary",
+                                "semantic_source_id": "domain-group"
+                            },
+                            {
+                                "id": "visual-column",
+                                "label": "Visual Column",
+                                "members": ["api"],
+                                "role": "layout-only"
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    });
+
+    let mut cmd = common::plugin_command();
+    let output = cmd
+        .args(["project", "--target", "render-metadata", "--view", "main"])
+        .write_stdin(serde_json::to_string(&input).unwrap())
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let data = common::ok_data(&output);
+    assert_eq!(
+        data["groups"]["domain-boundary"],
+        serde_json::json!({ "type": "Grouping", "source_id": "domain-group" })
+    );
+    assert!(data["groups"].get("visual-column").is_none());
+}
+
+#[test]
 fn generic_graph_projects_render_metadata() {
     let input = std::fs::read_to_string(common::workspace_file(
         "fixtures/source/valid-archimate-oef.json",
@@ -268,11 +426,11 @@ fn archimate_source() -> serde_json::Value {
         "required_plugins": [
             {
                 "id": "generic-graph",
-                "version": "0.5.0"
+                "version": "0.6.0"
             },
             {
                 "id": "archimate-oef",
-                "version": "0.5.0"
+                "version": "0.6.0"
             }
         ],
         "nodes": [

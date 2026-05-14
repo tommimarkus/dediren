@@ -38,18 +38,18 @@ Runtime prerequisite:
 
 - Java 21 or newer available as `java` on `PATH`.
 
-For the current `0.5.0` version, the xtask creates:
+For the current `0.6.0` version, the xtask creates:
 
 ```text
-dist/dediren-agent-bundle-0.5.0-x86_64-unknown-linux-gnu/
-dist/dediren-agent-bundle-0.5.0-x86_64-unknown-linux-gnu.tar.gz
+dist/dediren-agent-bundle-0.6.0-x86_64-unknown-linux-gnu/
+dist/dediren-agent-bundle-0.6.0-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Run the smoke test from a shell where `java -version` resolves to Java 21 or
 newer:
 
 ```bash
-cargo xtask dist smoke dist/dediren-agent-bundle-0.5.0-x86_64-unknown-linux-gnu.tar.gz
+cargo xtask dist smoke dist/dediren-agent-bundle-0.6.0-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Concurrent `cargo xtask dist build` invocations serialize on a repo-local lock
@@ -60,8 +60,8 @@ Unpack and run it anywhere:
 
 ```bash
 mkdir -p /tmp/dediren-dist
-tar -xzf dist/dediren-agent-bundle-0.5.0-x86_64-unknown-linux-gnu.tar.gz -C /tmp/dediren-dist
-/tmp/dediren-dist/dediren-agent-bundle-0.5.0-x86_64-unknown-linux-gnu/bin/dediren --help
+tar -xzf dist/dediren-agent-bundle-0.6.0-x86_64-unknown-linux-gnu.tar.gz -C /tmp/dediren-dist
+/tmp/dediren-dist/dediren-agent-bundle-0.6.0-x86_64-unknown-linux-gnu/bin/dediren --help
 ```
 
 The archive includes first-party plugin manifests under `plugins/`, first-party
@@ -150,7 +150,8 @@ Commands:
   bundled `generic-graph` plugin supports `layout-request` and
   `render-metadata`. When projecting ArchiMate render metadata, it validates
   source node and relationship type strings and ArchiMate 3.2 relationship
-  endpoint legality against the supported ArchiMate vocabulary.
+  endpoint legality against the supported ArchiMate vocabulary. Render metadata
+  can contain node, relationship, and group selectors.
 - `layout` asks a layout plugin to generate a layout result. The bundled
   `elk-layout` plugin is a Rust adapter over the Java ELK helper.
 - `validate-layout` reports backend-neutral layout quality metrics, including
@@ -183,16 +184,17 @@ For the full public policy surface, use
 
 Rendered SVG includes stable semantic attributes such as
 `data-dediren-node-decorator`, `data-dediren-icon-kind`,
-`data-dediren-edge-marker-start`, and `data-dediren-edge-marker-end` so tests
-can assert notation without depending on raw geometry.
+`data-dediren-edge-marker-start`, `data-dediren-edge-marker-end`, and
+`data-dediren-group-decorator` so tests can assert notation without depending
+on raw geometry.
 
 ## ArchiMate SVG And OEF
 
 ArchiMate SVG notation uses two artifacts:
 
 1. layout result JSON for generated geometry;
-2. render metadata JSON for semantic selectors such as node and relationship
-   types.
+2. render metadata JSON for semantic selectors such as node, relationship, and
+   group types.
 
 The render metadata artifact does not carry colors, fonts, shapes, or layout
 data. Visual notation still comes from SVG render policy.
@@ -203,6 +205,22 @@ and target element types are not allowed by the ArchiMate 3.2 relationship
 rules. Use the ArchiMate/OEF element name `Node` for technology nodes; aliases
 such as `TechnologyNode` are not accepted in ArchiMate metadata or export
 source.
+
+### Groups
+
+`plugins.generic-graph.views[].groups` are layout containers. Give each group
+an explicit `role`:
+
+- `semantic-boundary` means the group carries architectural meaning. This is
+  the default for older source files.
+- `layout-only` means the group is only a layout aid and must not be exported as
+  an ArchiMate element.
+
+For ArchiMate `Grouping`, create a normal source node with `"type": "Grouping"`
+and point the view group at it with `semantic_source_id`. The layout group then
+uses generated geometry, SVG can render ArchiMate grouping notation, and OEF
+export can emit an ArchiMate Grouping view node. Do not use layout-only groups
+for ArchiMate semantic Grouping.
 
 Relationship connectors and junctions are not supported as first-class source
 concepts in `model.schema.v1`; source relationship endpoints must reference
@@ -339,7 +357,7 @@ Generated render artifacts are written under `.test-output/renders/`:
 
 - `.test-output/renders/real-elk/` for real Java helper render tests.
 - `.test-output/renders/fixture-pipeline/` for fixture-backed CLI pipeline
-  tests, including deterministic ArchiMate node and relationship render
+  tests, including deterministic ArchiMate node, relationship, and group render
   notation.
 - `.test-output/renders/svg-render-plugin/` for renderer policy and semantic
   fixture tests that do not prove ELK geometry, including the all-Archimate-node
@@ -411,7 +429,7 @@ newer:
 
 ```bash
 cargo xtask dist build
-cargo xtask dist smoke dist/dediren-agent-bundle-0.5.0-x86_64-unknown-linux-gnu.tar.gz
+cargo xtask dist smoke dist/dediren-agent-bundle-0.6.0-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Focused checks:

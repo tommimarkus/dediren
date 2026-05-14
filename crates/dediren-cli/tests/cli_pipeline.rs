@@ -163,6 +163,20 @@ fn fixture_archimate_pipeline_renders_node_notation() {
         "ApplicationService"
     );
     assert_eq!(metadata_data["nodes"]["database"]["type"], "DataObject");
+    assert_eq!(
+        metadata_data["groups"]
+            .as_object()
+            .expect("projected metadata groups should be an object")
+            .len(),
+        1
+    );
+    assert_eq!(
+        metadata_data["groups"]["application-services"]["type"],
+        "Grouping"
+    );
+    assert!(metadata_data["groups"]
+        .get("external-dependencies")
+        .is_none());
 
     for node_id in ["web-app", "worker"] {
         assert_node_notation(
@@ -200,6 +214,12 @@ fn fixture_archimate_pipeline_renders_node_notation() {
     assert_svg_texts_include(
         &doc,
         &["Application Services", "External Dependencies", "Client"],
+    );
+    let group = semantic_group(&doc, "data-dediren-group-id", "application-services");
+    assert_eq!(group.attribute("data-dediren-group-type"), Some("Grouping"));
+    assert!(
+        child_group_with_attr(group, "data-dediren-group-decorator", "archimate_grouping",)
+            .is_some()
     );
     assert_reasonable_svg_aspect(&svg, 2.8);
     write_render_artifact(

@@ -264,7 +264,7 @@ checksum = "d0a5c400df2834b80a4c3327b3aad3a4c4cd4de0629063962b03235697506a28"
 
 [[package]]
 name = "dediren"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -279,11 +279,11 @@ dependencies = [
 
 [[package]]
 name = "dediren-archimate"
-version = "0.5.0"
+version = "0.6.0"
 
 [[package]]
 name = "dediren-contracts"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "jsonschema",
  "serde",
@@ -292,7 +292,7 @@ dependencies = [
 
 [[package]]
 name = "dediren-core"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "anyhow",
  "dediren-contracts",
@@ -305,7 +305,7 @@ dependencies = [
 
 [[package]]
 name = "dediren-plugin-archimate-oef-export"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -320,7 +320,7 @@ dependencies = [
 
 [[package]]
 name = "dediren-plugin-elk-layout"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -332,7 +332,7 @@ dependencies = [
 
 [[package]]
 name = "dediren-plugin-generic-graph"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -345,7 +345,7 @@ dependencies = [
 
 [[package]]
 name = "dediren-plugin-runtime-testbed"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "dediren-contracts",
  "serde_json",
@@ -353,7 +353,7 @@ dependencies = [
 
 [[package]]
 name = "dediren-plugin-svg-render"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -1914,7 +1914,7 @@ checksum = "1ffae5123b2d3fc086436f8834ae3ab053a283cfac8fe0a0b8eaae044768a4c4"
 
 [[package]]
 name = "xtask"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "anyhow",
  "assert_fs",

@@ -48,7 +48,7 @@ final class JsonContracts {
         GroupProvenance provenance) {
     }
 
-    record GroupProvenance(SemanticBacked semantic_backed) {
+    record GroupProvenance(Boolean visual_only, SemanticBacked semantic_backed) {
     }
 
     record SemanticBacked(String source_id) {
@@ -95,6 +95,7 @@ final class JsonContracts {
         String id,
         String source_id,
         String projection_id,
+        GroupProvenance provenance,
         double x,
         double y,
         double width,

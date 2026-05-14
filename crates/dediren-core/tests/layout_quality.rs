@@ -168,6 +168,7 @@ fn group_boundary_issues_are_counted() {
         id: "group".to_string(),
         source_id: "group".to_string(),
         projection_id: "group".to_string(),
+        provenance: None,
         x: 0.0,
         y: 0.0,
         width: 100.0,

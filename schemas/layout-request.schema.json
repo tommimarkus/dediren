@@ -47,18 +47,31 @@
         "label": { "type": "string" },
         "members": { "type": "array", "items": { "type": "string" } },
         "provenance": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "semantic_backed": {
+          "oneOf": [
+            {
               "type": "object",
               "additionalProperties": false,
-              "required": ["source_id"],
+              "required": ["visual_only"],
               "properties": {
-                "source_id": { "type": "string" }
+                "visual_only": { "const": true }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["semantic_backed"],
+              "properties": {
+                "semantic_backed": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["source_id"],
+                  "properties": {
+                    "source_id": { "type": "string", "minLength": 1 }
+                  }
+                }
               }
             }
-          }
+          ]
         }
       }
     },

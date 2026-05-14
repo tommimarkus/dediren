@@ -60,6 +60,7 @@ struct ResolvedGroupStyle {
     rx: f64,
     label_fill: String,
     label_size: f64,
+    decorator: Option<SvgNodeDecorator>,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -138,7 +139,11 @@ fn validate_render_metadata_usage(
     let uses_type_overrides = policy
         .style
         .as_ref()
-        .map(|style| !style.node_type_overrides.is_empty() || !style.edge_type_overrides.is_empty())
+        .map(|style| {
+            !style.node_type_overrides.is_empty()
+                || !style.edge_type_overrides.is_empty()
+                || !style.group_type_overrides.is_empty()
+        })
         .unwrap_or(false);
 
     if !uses_type_overrides {
@@ -195,6 +200,12 @@ fn validate_archimate_policy_types(
             format!("policy.style.edge_type_overrides.{selector_type}"),
         )?;
     }
+    for selector_type in style.group_type_overrides.keys() {
+        dediren_archimate::validate_element_type(
+            selector_type,
+            format!("policy.style.group_type_overrides.{selector_type}"),
+        )?;
+    }
     Ok(())
 }
 
@@ -219,6 +230,12 @@ fn validate_archimate_render_metadata(
         dediren_archimate::validate_relationship_type(
             &selector.selector_type,
             format!("render_metadata.edges.{edge_id}.type"),
+        )?;
+    }
+    for (group_id, selector) in &metadata.groups {
+        dediren_archimate::validate_element_type(
+            &selector.selector_type,
+            format!("render_metadata.groups.{group_id}.type"),
         )?;
     }
 
@@ -284,6 +301,12 @@ fn validate_render_policy(policy: &RenderPolicy) -> Result<(), PolicyValidationE
     }
     for (id, group_style) in &style.group_overrides {
         validate_group_style(Some(group_style), &format!("style.group_overrides.{id}"))?;
+    }
+    for (selector_type, group_style) in &style.group_type_overrides {
+        validate_group_style(
+            Some(group_style),
+            &format!("style.group_type_overrides.{selector_type}"),
+        )?;
     }
 
     Ok(())
@@ -503,7 +526,7 @@ fn svg_bounds(
     let mut bounds = SvgBounds::new_empty();
 
     for group in &result.groups {
-        let group_style = group_style(policy, &group.id, style);
+        let group_style = group_style(policy, metadata, &group.id, style);
         bounds.include_rect(group.x, group.y, group.width, group.height);
         bounds.include_rect(
             group.x + 8.0,
@@ -593,12 +616,24 @@ fn render_svg(
     ));
 
     for group in &result.groups {
-        let group_style = group_style(policy, &group.id, &style);
+        let group_style = group_style(policy, metadata, &group.id, &style);
+        let selector = metadata.and_then(|metadata| metadata.groups.get(&group.id));
+        let group_type_attrs = selector
+            .map(|selector| {
+                format!(
+                    r#" data-dediren-group-type="{}" data-dediren-group-source-id="{}""#,
+                    escape_attr(&selector.selector_type),
+                    escape_attr(&selector.source_id)
+                )
+            })
+            .unwrap_or_default();
         svg.push_str(&format!(
-            r#"<g data-dediren-group-id="{}">"#,
-            escape_attr(&group.id)
+            r#"<g data-dediren-group-id="{}"{}>"#,
+            escape_attr(&group.id),
+            group_type_attrs
         ));
         svg.push_str(&group_rect(group, &group_style));
+        svg.push_str(&group_decorator(group, &group_style));
         svg.push_str(&format!(
             r##"<text x="{:.1}" y="{:.1}" fill="{}" font-size="{}">{}</text>"##,
             group.x + 8.0,
@@ -683,6 +718,7 @@ fn base_style(policy: &RenderPolicy) -> ResolvedStyle {
         rx: 8.0,
         label_fill: "#1e3a8a".to_string(),
         label_size: 12.0,
+        decorator: None,
     };
 
     let style_policy = policy.style.as_ref();
@@ -764,9 +800,23 @@ fn edge_style(
     )
 }
 
-fn group_style(policy: &RenderPolicy, group_id: &str, base: &ResolvedStyle) -> ResolvedGroupStyle {
+fn group_style(
+    policy: &RenderPolicy,
+    metadata: Option<&RenderMetadata>,
+    group_id: &str,
+    base: &ResolvedStyle,
+) -> ResolvedGroupStyle {
+    let type_style = metadata
+        .and_then(|metadata| metadata.groups.get(group_id))
+        .and_then(|selector| {
+            policy
+                .style
+                .as_ref()
+                .and_then(|style| style.group_type_overrides.get(&selector.selector_type))
+        });
+    let resolved = merge_group_style(&base.group, type_style);
     merge_group_style(
-        &base.group,
+        &resolved,
         policy
             .style
             .as_ref()
@@ -841,6 +891,7 @@ fn merge_group_style(
                 .clone()
                 .unwrap_or_else(|| base.label_fill.clone()),
             label_size: style.label_size.unwrap_or(base.label_size),
+            decorator: style.decorator.or(base.decorator),
         },
         None => base.clone(),
     }
@@ -857,6 +908,40 @@ fn group_rect(group: &LaidOutGroup, style: &ResolvedGroupStyle) -> String {
         escape_attr(&style.fill),
         escape_attr(&style.stroke),
         svg_style_number(style.stroke_width)
+    )
+}
+
+fn group_decorator(group: &LaidOutGroup, style: &ResolvedGroupStyle) -> String {
+    let Some(SvgNodeDecorator::ArchimateGrouping) = style.decorator else {
+        return String::new();
+    };
+    let synthetic_node = LaidOutNode {
+        id: group.id.clone(),
+        source_id: group.source_id.clone(),
+        projection_id: group.projection_id.clone(),
+        x: group.x,
+        y: group.y,
+        width: group.width,
+        height: group.height,
+        label: group.label.clone(),
+    };
+    let node_style = ResolvedNodeStyle {
+        fill: style.fill.clone(),
+        stroke: style.stroke.clone(),
+        stroke_width: style.stroke_width,
+        rx: style.rx,
+        label_fill: style.label_fill.clone(),
+        decorator: style.decorator,
+    };
+    archimate_symbol_decorator(
+        &synthetic_node,
+        &node_style,
+        "archimate_grouping",
+        ArchimateIconKind::Grouping,
+    )
+    .replace(
+        "data-dediren-node-decorator",
+        "data-dediren-group-decorator",
     )
 }
 

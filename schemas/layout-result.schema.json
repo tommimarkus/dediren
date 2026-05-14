@@ -56,6 +56,33 @@
         "id": { "type": "string" },
         "source_id": { "type": "string" },
         "projection_id": { "type": "string" },
+        "provenance": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["visual_only"],
+              "properties": {
+                "visual_only": { "const": true }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["semantic_backed"],
+              "properties": {
+                "semantic_backed": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["source_id"],
+                  "properties": {
+                    "source_id": { "type": "string", "minLength": 1 }
+                  }
+                }
+              }
+            }
+          ]
+        },
         "x": { "type": "number" },
         "y": { "type": "number" },
         "width": { "type": "number", "exclusiveMinimum": 0 },
