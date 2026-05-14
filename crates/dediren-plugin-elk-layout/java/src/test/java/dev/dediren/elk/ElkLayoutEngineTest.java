@@ -4,9 +4,26 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
+import org.eclipse.elk.alg.libavoid.options.LibavoidOptions;
+import org.eclipse.elk.graph.ElkNode;
 import org.junit.jupiter.api.Test;
 
 class ElkLayoutEngineTest {
+    @Test
+    void libavoidRootUsesDocumentedAestheticRoutingOptions() {
+        ElkNode root = ElkLayoutEngine.configuredLibavoidRoot();
+
+        assertEquals(50.0, root.getProperty(LibavoidOptions.SEGMENT_PENALTY));
+        assertEquals(16.0, root.getProperty(LibavoidOptions.IDEAL_NUDGING_DISTANCE));
+        assertEquals(16.0, root.getProperty(LibavoidOptions.SHAPE_BUFFER_DISTANCE));
+        assertEquals(
+            true,
+            root.getProperty(LibavoidOptions.NUDGE_ORTHOGONAL_SEGMENTS_CONNECTED_TO_SHAPES));
+        assertEquals(
+            false,
+            root.getProperty(LibavoidOptions.PENALISE_ORTHOGONAL_SHARED_PATHS_AT_CONN_ENDS));
+    }
+
     @Test
     void layeredLayoutPlacesTargetToTheRightAndRoutesTheEdge() {
         JsonContracts.LayoutRequest request = new JsonContracts.LayoutRequest(
@@ -42,6 +59,42 @@ class ElkLayoutEngineTest {
         assertTrue(api.x() > client.x(), "layered layout should place target after source");
         assertTrue(edge.points().size() >= 2, "layout must include start and end points");
         assertEquals(List.of(), result.warnings());
+    }
+
+    @Test
+    void libavoidRoutingPassAvoidsFixedNodeObstacles() {
+        JsonContracts.LaidOutNode source = new JsonContracts.LaidOutNode(
+            "source", "source", "source", 0.0, 0.0, 160.0, 80.0, "Source");
+        JsonContracts.LaidOutNode obstacle = new JsonContracts.LaidOutNode(
+            "obstacle", "obstacle", "obstacle", 220.0, -20.0, 160.0, 120.0, "Obstacle");
+        JsonContracts.LaidOutNode target = new JsonContracts.LaidOutNode(
+            "target", "target", "target", 440.0, 0.0, 160.0, 80.0, "Target");
+        JsonContracts.LayoutEdge edge = new JsonContracts.LayoutEdge(
+            "source-target", "source", "target", "calls", "source-target");
+
+        List<JsonContracts.Point> points = ElkLayoutEngine.routeWithLibavoid(
+            List.of(edge),
+            List.of(source, obstacle, target)).get("source-target");
+
+        assertTrue(points.size() >= 2, "Libavoid should return route points");
+        assertEquals(
+            0,
+            connectorThroughNodeCount(new JsonContracts.LayoutResult(
+                "layout-result.schema.v1",
+                "main",
+                List.of(source, obstacle, target),
+                List.of(new JsonContracts.LaidOutEdge(
+                    edge.id(),
+                    edge.source(),
+                    edge.target(),
+                    edge.source_id(),
+                    edge.id(),
+                    List.of(),
+                    points,
+                    edge.label())),
+                List.of(),
+                List.of())),
+            "Libavoid should route around fixed obstacle geometry");
     }
 
     @Test

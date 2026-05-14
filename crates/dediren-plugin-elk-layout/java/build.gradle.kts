@@ -26,6 +26,7 @@ dependencies {
     implementation("org.eclipse.elk:org.eclipse.elk.core:0.11.0")
     implementation("org.eclipse.elk:org.eclipse.elk.graph:0.11.0")
     implementation("org.eclipse.elk:org.eclipse.elk.alg.layered:0.11.0")
+    implementation("org.eclipse.elk:org.eclipse.elk.alg.libavoid:0.11.0")
     implementation("org.eclipse.xtext:org.eclipse.xtext.xbase.lib:2.32.0")
 
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.3")
