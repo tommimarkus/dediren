@@ -38,18 +38,18 @@ Runtime prerequisite:
 
 - Java 21 or newer available as `java` on `PATH`.
 
-For the current `0.7.0` version, the xtask creates:
+For the current `0.8.0` version, the xtask creates:
 
 ```text
-dist/dediren-agent-bundle-0.7.0-x86_64-unknown-linux-gnu/
-dist/dediren-agent-bundle-0.7.0-x86_64-unknown-linux-gnu.tar.gz
+dist/dediren-agent-bundle-0.8.0-x86_64-unknown-linux-gnu/
+dist/dediren-agent-bundle-0.8.0-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Run the smoke test from a shell where `java -version` resolves to Java 21 or
 newer:
 
 ```bash
-cargo xtask dist smoke dist/dediren-agent-bundle-0.7.0-x86_64-unknown-linux-gnu.tar.gz
+cargo xtask dist smoke dist/dediren-agent-bundle-0.8.0-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Concurrent `cargo xtask dist build` invocations serialize on a repo-local lock
@@ -60,8 +60,8 @@ Unpack and run it anywhere:
 
 ```bash
 mkdir -p /tmp/dediren-dist
-tar -xzf dist/dediren-agent-bundle-0.7.0-x86_64-unknown-linux-gnu.tar.gz -C /tmp/dediren-dist
-/tmp/dediren-dist/dediren-agent-bundle-0.7.0-x86_64-unknown-linux-gnu/bin/dediren --help
+tar -xzf dist/dediren-agent-bundle-0.8.0-x86_64-unknown-linux-gnu.tar.gz -C /tmp/dediren-dist
+/tmp/dediren-dist/dediren-agent-bundle-0.8.0-x86_64-unknown-linux-gnu/bin/dediren --help
 ```
 
 The archive includes first-party plugin manifests under `plugins/`, first-party
@@ -348,6 +348,15 @@ source or target port. Layout results expose that renderer advice through
 `shared_target_junction`, so SVG rendering preserves intentional shared endpoint
 trunks while still detouring unrelated route overlaps.
 
+Endpoint merging is keyed by relationship semantics. `layout-request.schema.v1`
+edges may carry an optional `relationship_type`; the ELK helper only merges
+same-side endpoints when at least three edges have the same non-empty
+relationship type. The `generic-graph` plugin projects `relationship_type` from
+each source relationship type, so different relationship types do not share
+generated junction trunks. Layout requests that omit `relationship_type` keep
+those endpoints separate. If the field is present, it must be a non-empty
+string.
+
 ### ELK Test Lanes
 
 Test names use explicit lane prefixes so failures and artifacts are easy to
@@ -443,7 +452,7 @@ newer:
 
 ```bash
 cargo xtask dist build
-cargo xtask dist smoke dist/dediren-agent-bundle-0.7.0-x86_64-unknown-linux-gnu.tar.gz
+cargo xtask dist smoke dist/dediren-agent-bundle-0.8.0-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Focused checks:

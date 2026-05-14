@@ -2934,8 +2934,10 @@ fn edge_path(
             escape_attr(&edge_marker_start_id(&edge.id))
         ),
     };
+    let jump_masks = line_jump_mask_group(edge, style, earlier_edges);
     format!(
-        r##"<path d="{}" fill="none" stroke="{}" stroke-width="{}"{}{}{}/>"##,
+        r##"{}<path d="{}" fill="none" stroke="{}" stroke-width="{}"{}{}{}/>"##,
+        jump_masks,
         escape_attr(&data),
         escape_attr(&style.stroke),
         svg_style_number(style.stroke_width),
@@ -2943,6 +2945,73 @@ fn edge_path(
         dash_attr,
         marker_attr
     )
+}
+
+fn line_jump_mask_group(
+    edge: &LaidOutEdge,
+    style: &ResolvedEdgeStyle,
+    earlier_edges: &[&LaidOutEdge],
+) -> String {
+    let mask_paths = line_jump_mask_path_data(edge, earlier_edges);
+    if mask_paths.is_empty() {
+        return String::new();
+    }
+    let stroke_width = svg_style_number(style.stroke_width + 4.0);
+    let mut content = format!(
+        r##"<g data-dediren-line-jump-masks="{}">"##,
+        escape_attr(&edge.id)
+    );
+    for mask_path in mask_paths {
+        content.push_str(&format!(
+            r##"<path d="{}" fill="none" stroke="#ffffff" stroke-width="{}" stroke-linecap="round" stroke-linejoin="round"/>"##,
+            escape_attr(&mask_path),
+            stroke_width
+        ));
+    }
+    content.push_str("</g>");
+    content
+}
+
+fn line_jump_mask_path_data(edge: &LaidOutEdge, earlier_edges: &[&LaidOutEdge]) -> Vec<String> {
+    let mut paths = Vec::new();
+    for segment in edge.points.windows(2) {
+        let start = &segment[0];
+        let end = &segment[1];
+        for jump in line_jump_points(edge, start, end, earlier_edges) {
+            if let Some(data) = line_jump_arc_path_data(start, end, &jump) {
+                paths.push(data);
+            }
+        }
+    }
+    paths
+}
+
+fn line_jump_arc_path_data(start: &Point, end: &Point, jump: &LineJump) -> Option<String> {
+    if start.y == end.y {
+        let direction = (end.x - start.x).signum();
+        return Some(format!(
+            "M {:.1} {:.1} Q {:.1} {:.1} {:.1} {:.1}",
+            jump.point.x - direction * LINE_JUMP_SIZE,
+            jump.point.y,
+            jump.point.x,
+            jump.point.y - LINE_JUMP_SIZE,
+            jump.point.x + direction * LINE_JUMP_SIZE,
+            jump.point.y
+        ));
+    }
+    if start.x == end.x {
+        let direction = (end.y - start.y).signum();
+        return Some(format!(
+            "M {:.1} {:.1} Q {:.1} {:.1} {:.1} {:.1}",
+            jump.point.x,
+            jump.point.y - direction * LINE_JUMP_SIZE,
+            jump.point.x + LINE_JUMP_SIZE,
+            jump.point.y,
+            jump.point.x,
+            jump.point.y + direction * LINE_JUMP_SIZE
+        ));
+    }
+    None
 }
 
 fn edge_path_data(edge: &LaidOutEdge, earlier_edges: &[&LaidOutEdge]) -> String {

@@ -9,6 +9,8 @@ import org.eclipse.elk.graph.ElkNode;
 import org.junit.jupiter.api.Test;
 
 class ElkLayoutEngineTest {
+    private static final double GEOMETRY_EPSILON = 0.001;
+
     @Test
     void libavoidRootUsesDocumentedAestheticRoutingOptions() {
         ElkNode root = ElkLayoutEngine.configuredLibavoidRoot();
@@ -361,10 +363,10 @@ class ElkLayoutEngineTest {
                 new JsonContracts.LayoutNode("catalog-service", "Catalog Service", "catalog-service", 160.0, 80.0)),
             List.of(
                 new JsonContracts.LayoutEdge("web-calls-gateway", "web-frontend", "api-gateway", "calls", "web-calls-gateway"),
-                new JsonContracts.LayoutEdge("gateway-authenticates", "api-gateway", "identity-service", "authenticates", "gateway-authenticates"),
-                new JsonContracts.LayoutEdge("gateway-prices-cart", "api-gateway", "pricing-service", "prices cart", "gateway-prices-cart"),
-                new JsonContracts.LayoutEdge("gateway-places-order", "api-gateway", "order-service", "places order", "gateway-places-order"),
-                new JsonContracts.LayoutEdge("gateway-queries-catalog", "api-gateway", "catalog-service", "queries catalog", "gateway-queries-catalog")),
+                new JsonContracts.LayoutEdge("gateway-authenticates", "api-gateway", "identity-service", "authenticates", "gateway-authenticates", "Serving"),
+                new JsonContracts.LayoutEdge("gateway-prices-cart", "api-gateway", "pricing-service", "prices cart", "gateway-prices-cart", "Serving"),
+                new JsonContracts.LayoutEdge("gateway-places-order", "api-gateway", "order-service", "places order", "gateway-places-order", "Serving"),
+                new JsonContracts.LayoutEdge("gateway-queries-catalog", "api-gateway", "catalog-service", "queries catalog", "gateway-queries-catalog", "Serving")),
             List.of(
                 new JsonContracts.LayoutGroup(
                     "edge-platform",
@@ -411,10 +413,10 @@ class ElkLayoutEngineTest {
                 new JsonContracts.LayoutNode("catalog-service", "Catalog Service", "catalog-service", 160.0, 80.0)),
             List.of(
                 new JsonContracts.LayoutEdge("web-calls-gateway", "web-frontend", "api-gateway", "calls", "web-calls-gateway"),
-                new JsonContracts.LayoutEdge("gateway-authenticates", "api-gateway", "identity-service", "authenticates", "gateway-authenticates"),
-                new JsonContracts.LayoutEdge("gateway-prices-cart", "api-gateway", "pricing-service", "prices cart", "gateway-prices-cart"),
-                new JsonContracts.LayoutEdge("gateway-places-order", "api-gateway", "order-service", "places order", "gateway-places-order"),
-                new JsonContracts.LayoutEdge("gateway-queries-catalog", "api-gateway", "catalog-service", "queries catalog", "gateway-queries-catalog")),
+                new JsonContracts.LayoutEdge("gateway-authenticates", "api-gateway", "identity-service", "authenticates", "gateway-authenticates", "Serving"),
+                new JsonContracts.LayoutEdge("gateway-prices-cart", "api-gateway", "pricing-service", "prices cart", "gateway-prices-cart", "Serving"),
+                new JsonContracts.LayoutEdge("gateway-places-order", "api-gateway", "order-service", "places order", "gateway-places-order", "Serving"),
+                new JsonContracts.LayoutEdge("gateway-queries-catalog", "api-gateway", "catalog-service", "queries catalog", "gateway-queries-catalog", "Serving")),
             List.of(
                 new JsonContracts.LayoutGroup(
                     "edge-platform",
@@ -448,7 +450,49 @@ class ElkLayoutEngineTest {
     }
 
     @Test
-    void groupedSourcePortsFollowRemoteGroupOrder() {
+    void groupedFanOutDoesNotMergeDifferentRelationshipTypes() {
+        JsonContracts.LayoutRequest request = new JsonContracts.LayoutRequest(
+            "layout-request.schema.v1",
+            "main",
+            List.of(
+                new JsonContracts.LayoutNode("api-gateway", "API Gateway", "api-gateway", 160.0, 112.0),
+                new JsonContracts.LayoutNode("identity-service", "Identity Service", "identity-service", 160.0, 80.0),
+                new JsonContracts.LayoutNode("pricing-service", "Pricing Service", "pricing-service", 160.0, 80.0),
+                new JsonContracts.LayoutNode("order-service", "Order Service", "order-service", 160.0, 80.0)),
+            List.of(
+                new JsonContracts.LayoutEdge("gateway-authenticates", "api-gateway", "identity-service", "authenticates", "gateway-authenticates", "Serving"),
+                new JsonContracts.LayoutEdge("gateway-prices-cart", "api-gateway", "pricing-service", "prices cart", "gateway-prices-cart", "Serving"),
+                new JsonContracts.LayoutEdge("gateway-places-order", "api-gateway", "order-service", "places order", "gateway-places-order", "Triggering")),
+            List.of(
+                new JsonContracts.LayoutGroup(
+                    "edge-platform",
+                    "Edge Platform",
+                    List.of("api-gateway"),
+                    new JsonContracts.GroupProvenance(null, new JsonContracts.SemanticBacked("edge-platform"))),
+                new JsonContracts.LayoutGroup(
+                    "core-services",
+                    "Core Services",
+                    List.of("identity-service", "pricing-service", "order-service"),
+                    new JsonContracts.GroupProvenance(null, new JsonContracts.SemanticBacked("core-services")))),
+            List.of(),
+            List.of());
+
+        JsonContracts.LayoutResult result = new ElkLayoutEngine().layout(request);
+
+        for (String edgeId : List.of(
+            "gateway-authenticates",
+            "gateway-prices-cart",
+            "gateway-places-order")) {
+            JsonContracts.LaidOutEdge edge = edgeById(result, edgeId);
+            assertEquals(
+                List.of(),
+                edge.routing_hints(),
+                "mixed relationship types must not be counted together for endpoint merging");
+        }
+    }
+
+    @Test
+    void groupedSourcePortsFollowDivergingRouteChannelOrder() {
         JsonContracts.LayoutRequest request = new JsonContracts.LayoutRequest(
             "layout-request.schema.v1",
             "main",
@@ -479,15 +523,107 @@ class ElkLayoutEngineTest {
             List.of());
 
         JsonContracts.LayoutResult result = new ElkLayoutEngine().layout(request);
+        JsonContracts.LaidOutNode source = nodeById(result, "identity-service");
         JsonContracts.LaidOutEdge cacheEdge = edgeById(result, "identity-caches-session");
         JsonContracts.LaidOutEdge federatesEdge = edgeById(result, "identity-federates");
 
         assertTrue(
-            sourcePortY(cacheEdge) < sourcePortY(federatesEdge),
-            "source ports should follow target group order, cache="
+            sourcePortY(federatesEdge) < sourcePortY(cacheEdge),
+            "source ports should keep diverging rightward channels from crossing, cache="
                 + cacheEdge.points()
                 + ", federates="
                 + federatesEdge.points());
+        assertEquals(
+            0,
+            routeCrossingCountNearSource(federatesEdge, cacheEdge, source),
+            "same-source routes should not cross immediately after leaving their source, cache="
+                + cacheEdge.points()
+                + ", federates="
+                + federatesEdge.points());
+    }
+
+    @Test
+    void groupedSameSourceDataRoutesDoNotCrossNearTheSource() {
+        JsonContracts.LayoutRequest request = new JsonContracts.LayoutRequest(
+            "layout-request.schema.v1",
+            "main",
+            List.of(
+                new JsonContracts.LayoutNode("pricing-service", "Pricing Service", "pricing-service", 160.0, 80.0),
+                new JsonContracts.LayoutNode("session-cache", "Session Cache", "session-cache", 160.0, 80.0),
+                new JsonContracts.LayoutNode("product-db", "Product DB", "product-db", 160.0, 80.0)),
+            List.of(
+                new JsonContracts.LayoutEdge("pricing-reads-products", "pricing-service", "product-db", "reads products", "pricing-reads-products"),
+                new JsonContracts.LayoutEdge("pricing-caches-quotes", "pricing-service", "session-cache", "caches quotes", "pricing-caches-quotes")),
+            List.of(
+                new JsonContracts.LayoutGroup(
+                    "core-services",
+                    "Core Services",
+                    List.of("pricing-service"),
+                    new JsonContracts.GroupProvenance(null, new JsonContracts.SemanticBacked("core-services"))),
+                new JsonContracts.LayoutGroup(
+                    "data-platform",
+                    "Data Platform",
+                    List.of("session-cache", "product-db"),
+                    new JsonContracts.GroupProvenance(null, new JsonContracts.SemanticBacked("data-platform")))),
+            List.of(),
+            List.of());
+
+        JsonContracts.LayoutResult result = new ElkLayoutEngine().layout(request);
+        JsonContracts.LaidOutNode source = nodeById(result, "pricing-service");
+        JsonContracts.LaidOutEdge readsEdge = edgeById(result, "pricing-reads-products");
+        JsonContracts.LaidOutEdge cacheEdge = edgeById(result, "pricing-caches-quotes");
+
+        assertTrue(
+            sourcePortY(readsEdge) < sourcePortY(cacheEdge),
+            "source ports should keep lower data-channel routes below upper source channels, reads="
+                + readsEdge.points()
+                + ", cache="
+                + cacheEdge.points());
+        assertEquals(
+            0,
+            routeCrossingCountNearSource(readsEdge, cacheEdge, source),
+            "same-source data routes should not cross immediately after leaving their source, reads="
+                + readsEdge.points()
+                + ", cache="
+                + cacheEdge.points());
+    }
+
+    @Test
+    void groupedConnectorFanOutCanUseDifferentSourceSidesInVerticalGroup() {
+        JsonContracts.LayoutRequest request = new JsonContracts.LayoutRequest(
+            "layout-request.schema.v1",
+            "main",
+            List.of(
+                new JsonContracts.LayoutNode("event-bus", "Event Bus", "event-bus", 160.0, 80.0),
+                new JsonContracts.LayoutNode("dispatch", "", "dispatch", 28.0, 28.0),
+                new JsonContracts.LayoutNode("order-worker", "Order Worker", "order-worker", 160.0, 80.0),
+                new JsonContracts.LayoutNode("email-worker", "Email Worker", "email-worker", 160.0, 80.0),
+                new JsonContracts.LayoutNode("reporting-ingestor", "Reporting Ingestor", "reporting-ingestor", 160.0, 80.0)),
+            List.of(
+                new JsonContracts.LayoutEdge("event-bus-dispatch", "event-bus", "dispatch", "dispatches", "event-bus-dispatch"),
+                new JsonContracts.LayoutEdge("dispatch-email", "dispatch", "email-worker", "email event", "dispatch-email"),
+                new JsonContracts.LayoutEdge("dispatch-reporting", "dispatch", "reporting-ingestor", "reporting event", "dispatch-reporting")),
+            List.of(new JsonContracts.LayoutGroup(
+                "async-processing",
+                "Async Processing",
+                List.of("event-bus", "dispatch", "order-worker", "email-worker", "reporting-ingestor"),
+                new JsonContracts.GroupProvenance(null, new JsonContracts.SemanticBacked("async-processing")))),
+            List.of(),
+            List.of());
+
+        JsonContracts.LayoutResult result = new ElkLayoutEngine().layout(request);
+        JsonContracts.LaidOutNode dispatch = nodeById(result, "dispatch");
+        JsonContracts.LaidOutEdge emailEdge = edgeById(result, "dispatch-email");
+        JsonContracts.LaidOutEdge reportingEdge = edgeById(result, "dispatch-reporting");
+
+        assertTrue(
+            sourcePortY(emailEdge) > centerY(dispatch),
+            "downward connector fan-out should be allowed to leave from the bottom side, email="
+                + emailEdge.points());
+        assertTrue(
+            sourcePortX(reportingEdge) > centerX(dispatch),
+            "connector fan-out should still be able to leave from the right side when that avoids the incoming side, reporting="
+                + reportingEdge.points());
     }
 
     @Test
@@ -545,9 +681,9 @@ class ElkLayoutEngineTest {
                 new JsonContracts.LayoutNode("support-console", "Support Console", "support-console", 160.0, 80.0),
                 new JsonContracts.LayoutNode("orders-api", "Orders API", "orders-api", 160.0, 112.0)),
             List.of(
-                new JsonContracts.LayoutEdge("web-calls-api", "web-app", "orders-api", "calls API", "web-calls-api"),
-                new JsonContracts.LayoutEdge("worker-updates-api", "batch-worker", "orders-api", "updates orders", "worker-updates-api"),
-                new JsonContracts.LayoutEdge("console-reads-api", "support-console", "orders-api", "reads orders", "console-reads-api")),
+                new JsonContracts.LayoutEdge("web-calls-api", "web-app", "orders-api", "calls API", "web-calls-api", "Serving"),
+                new JsonContracts.LayoutEdge("worker-updates-api", "batch-worker", "orders-api", "updates orders", "worker-updates-api", "Serving"),
+                new JsonContracts.LayoutEdge("console-reads-api", "support-console", "orders-api", "reads orders", "console-reads-api", "Serving")),
             List.of(
                 new JsonContracts.LayoutGroup(
                     "callers",
@@ -700,6 +836,14 @@ class ElkLayoutEngineTest {
         return edge.points().get(0).y();
     }
 
+    private static double sourcePortX(JsonContracts.LaidOutEdge edge) {
+        return edge.points().get(0).x();
+    }
+
+    private static double centerX(JsonContracts.LaidOutNode node) {
+        return node.x() + node.width() / 2.0;
+    }
+
     private static double centerY(JsonContracts.LaidOutNode node) {
         return node.y() + node.height() / 2.0;
     }
@@ -783,6 +927,64 @@ class ElkLayoutEngineTest {
             }
         }
         return count;
+    }
+
+    private static int routeCrossingCountNearSource(
+        JsonContracts.LaidOutEdge first,
+        JsonContracts.LaidOutEdge second,
+        JsonContracts.LaidOutNode source) {
+        int count = 0;
+        double nearSourceRight = source.x() + source.width() + 160.0;
+        for (int firstIndex = 0; firstIndex < first.points().size() - 1; firstIndex++) {
+            JsonContracts.Point firstStart = first.points().get(firstIndex);
+            JsonContracts.Point firstEnd = first.points().get(firstIndex + 1);
+            if (Math.min(firstStart.x(), firstEnd.x()) > nearSourceRight) {
+                continue;
+            }
+            for (int secondIndex = 0; secondIndex < second.points().size() - 1; secondIndex++) {
+                JsonContracts.Point secondStart = second.points().get(secondIndex);
+                JsonContracts.Point secondEnd = second.points().get(secondIndex + 1);
+                if (Math.min(secondStart.x(), secondEnd.x()) > nearSourceRight) {
+                    continue;
+                }
+                if (segmentsCross(firstStart, firstEnd, secondStart, secondEnd)) {
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
+
+    private static boolean segmentsCross(
+        JsonContracts.Point firstStart,
+        JsonContracts.Point firstEnd,
+        JsonContracts.Point secondStart,
+        JsonContracts.Point secondEnd) {
+        RouteOrientation firstOrientation = routeOrientation(firstStart, firstEnd);
+        RouteOrientation secondOrientation = routeOrientation(secondStart, secondEnd);
+        if (firstOrientation == null
+            || secondOrientation == null
+            || firstOrientation == secondOrientation) {
+            return false;
+        }
+        JsonContracts.Point horizontalStart =
+            firstOrientation == RouteOrientation.HORIZONTAL ? firstStart : secondStart;
+        JsonContracts.Point horizontalEnd =
+            firstOrientation == RouteOrientation.HORIZONTAL ? firstEnd : secondEnd;
+        JsonContracts.Point verticalStart =
+            firstOrientation == RouteOrientation.VERTICAL ? firstStart : secondStart;
+        JsonContracts.Point verticalEnd =
+            firstOrientation == RouteOrientation.VERTICAL ? firstEnd : secondEnd;
+        double minHorizontalX = Math.min(horizontalStart.x(), horizontalEnd.x());
+        double maxHorizontalX = Math.max(horizontalStart.x(), horizontalEnd.x());
+        double minVerticalY = Math.min(verticalStart.y(), verticalEnd.y());
+        double maxVerticalY = Math.max(verticalStart.y(), verticalEnd.y());
+        double crossingX = verticalStart.x();
+        double crossingY = horizontalStart.y();
+        return crossingX > minHorizontalX + GEOMETRY_EPSILON
+            && crossingX < maxHorizontalX - GEOMETRY_EPSILON
+            && crossingY > minVerticalY + GEOMETRY_EPSILON
+            && crossingY < maxVerticalY - GEOMETRY_EPSILON;
     }
 
     private static double routeLength(List<JsonContracts.Point> points) {

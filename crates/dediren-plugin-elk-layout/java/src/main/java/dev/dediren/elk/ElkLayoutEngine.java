@@ -32,6 +32,8 @@ final class ElkLayoutEngine {
     private static final String LIBAVOID_ALGORITHM = "org.eclipse.elk.alg.libavoid";
     private static final double DEFAULT_WIDTH = 160.0;
     private static final double DEFAULT_HEIGHT = 80.0;
+    private static final double CONNECTOR_SOURCE_MAX_WIDTH = 48.0;
+    private static final double CONNECTOR_SOURCE_MAX_HEIGHT = 48.0;
     private static final double GROUP_PADDING = 24.0;
     private static final double NODE_SPACING = 60.0;
     private static final double EDGE_NODE_SPACING = 32.0;
@@ -142,6 +144,7 @@ final class ElkLayoutEngine {
                 requestEdges,
                 nodes,
                 flatEdgeDirections(requestEdges),
+                Map.of(),
                 endpointMerges,
                 Map.of());
         for (JsonContracts.LayoutEdge edge : list(request.edges())) {
@@ -265,7 +268,7 @@ final class ElkLayoutEngine {
                 continue;
             }
             Direction edgeDirection =
-                edgeDirection(edge, ownerByNode, groupDirectionById, groupOrderById);
+                edgeDirection(edge, requestNodes, ownerByNode, groupDirectionById, groupOrderById);
             EdgeEndpointMerge endpointMerge =
                 endpointMerges.getOrDefault(edge.id(), NO_ENDPOINT_MERGE);
             EdgePortIndexes portIndexes = edgePortIndexes.get(edge.id());
@@ -307,16 +310,30 @@ final class ElkLayoutEngine {
         List<JsonContracts.LaidOutEdge> edges = new ArrayList<>();
         Map<String, Direction> libavoidDirections = groupedEdgeDirections(
             requestEdges,
+            requestNodes,
             ownerByNode,
             groupDirectionById,
             groupOrderById);
+        Map<String, PortSide> libavoidSourcePortSides = geometryAwareSourcePortSides(
+            requestEdges,
+            nodes,
+            libavoidDirections,
+            endpointMerges);
+        Map<String, EdgePortIndexes> libavoidEdgePortIndexes = geometryAwareSourcePortIndexes(
+            requestEdges,
+            nodes,
+            libavoidDirections,
+            libavoidSourcePortSides,
+            endpointMerges,
+            edgePortIndexes);
         Map<String, List<JsonContracts.Point>> libavoidRoutes =
             routeWithLibavoid(
                 requestEdges,
                 nodes,
                 libavoidDirections,
+                libavoidSourcePortSides,
                 endpointMerges,
-                edgePortIndexes);
+                libavoidEdgePortIndexes);
         for (JsonContracts.LayoutEdge edge : list(request.edges())) {
             ElkEdge elkEdge = elkEdges.get(edge.id());
             if (elkEdge != null) {
@@ -391,6 +408,7 @@ final class ElkLayoutEngine {
             edges,
             nodes,
             flatEdgeDirections(edges),
+            Map.of(),
             emptyEndpointMerges(edges),
             Map.of());
     }
@@ -399,6 +417,7 @@ final class ElkLayoutEngine {
         List<JsonContracts.LayoutEdge> edges,
         List<JsonContracts.LaidOutNode> nodes,
         Map<String, Direction> edgeDirections,
+        Map<String, PortSide> sourcePortSides,
         Map<String, EdgeEndpointMerge> endpointMerges,
         Map<String, EdgePortIndexes> edgePortIndexes) {
         ElkNode root = configuredLibavoidRoot();
@@ -422,6 +441,10 @@ final class ElkLayoutEngine {
                 continue;
             }
             Direction direction = edgeDirections.getOrDefault(edge.id(), Direction.RIGHT);
+            PortSide sourceSide = sourcePortSides.getOrDefault(
+                edge.id(),
+                sourcePortSide(direction));
+            PortSide targetSide = targetPortSide(direction);
             EdgeEndpointMerge endpointMerge =
                 endpointMerges.getOrDefault(edge.id(), NO_ENDPOINT_MERGE);
             EdgePortIndexes portIndexesForEdge = edgePortIndexes.get(edge.id());
@@ -429,16 +452,17 @@ final class ElkLayoutEngine {
                 source,
                 target,
                 edge,
-                direction,
+                sourceSide,
+                targetSide,
                 endpointMerge.sourceEndpoint()
                     ? 0
                     : portIndexesForEdge == null
-                        ? nextPortIndex(portIndexes, edge.source(), sourcePortSide(direction))
+                        ? nextPortIndex(portIndexes, edge.source(), sourceSide)
                         : portIndexesForEdge.sourceIndex(),
                 endpointMerge.targetEndpoint()
                     ? 0
                     : portIndexesForEdge == null
-                        ? nextPortIndex(portIndexes, edge.target(), targetPortSide(direction))
+                        ? nextPortIndex(portIndexes, edge.target(), targetSide)
                         : portIndexesForEdge.targetIndex(),
                 endpointMerge.sourceEndpoint(),
                 endpointMerge.targetEndpoint());
@@ -465,6 +489,7 @@ final class ElkLayoutEngine {
 
     private static Map<String, Direction> groupedEdgeDirections(
         List<JsonContracts.LayoutEdge> edges,
+        Map<String, JsonContracts.LayoutNode> nodes,
         Map<String, String> ownerByNode,
         Map<String, Direction> groupDirectionById,
         Map<String, Integer> groupOrderById) {
@@ -472,7 +497,7 @@ final class ElkLayoutEngine {
         for (JsonContracts.LayoutEdge edge : edges) {
             directions.put(
                 edge.id(),
-                edgeDirection(edge, ownerByNode, groupDirectionById, groupOrderById));
+                edgeDirection(edge, nodes, ownerByNode, groupDirectionById, groupOrderById));
         }
         return directions;
     }
@@ -505,12 +530,16 @@ final class ElkLayoutEngine {
 
     private static Direction edgeDirection(
         JsonContracts.LayoutEdge edge,
+        Map<String, JsonContracts.LayoutNode> nodes,
         Map<String, String> ownerByNode,
         Map<String, Direction> groupDirectionById,
         Map<String, Integer> groupOrderById) {
         String sourceOwner = ownerByNode.get(edge.source());
         String targetOwner = ownerByNode.get(edge.target());
         if (sourceOwner != null && sourceOwner.equals(targetOwner)) {
+            if (isConnectorSizedSource(nodes.get(edge.source()))) {
+                return Direction.RIGHT;
+            }
             return groupDirectionById.getOrDefault(sourceOwner, Direction.RIGHT);
         }
         if (sourceOwner != null && targetOwner != null) {
@@ -523,6 +552,15 @@ final class ElkLayoutEngine {
         return Direction.RIGHT;
     }
 
+    private static boolean isConnectorSizedSource(JsonContracts.LayoutNode node) {
+        if (node == null) {
+            return false;
+        }
+        double width = node.width_hint() == null ? DEFAULT_WIDTH : node.width_hint();
+        double height = node.height_hint() == null ? DEFAULT_HEIGHT : node.height_hint();
+        return width <= CONNECTOR_SOURCE_MAX_WIDTH && height <= CONNECTOR_SOURCE_MAX_HEIGHT;
+    }
+
     private static ElkEdge createRoutedEdge(
         ElkNode source,
         ElkNode target,
@@ -532,13 +570,34 @@ final class ElkLayoutEngine {
         int targetPortIndex,
         boolean mergeSourceEndpoint,
         boolean mergeTargetEndpoint) {
-        PortSide sourceSide = sourcePortSide(direction);
-        PortSide targetSide = targetPortSide(direction);
+        return createRoutedEdge(
+            source,
+            target,
+            edge,
+            sourcePortSide(direction),
+            targetPortSide(direction),
+            sourcePortIndex,
+            targetPortIndex,
+            mergeSourceEndpoint,
+            mergeTargetEndpoint);
+    }
+
+    private static ElkEdge createRoutedEdge(
+        ElkNode source,
+        ElkNode target,
+        JsonContracts.LayoutEdge edge,
+        PortSide sourceSide,
+        PortSide targetSide,
+        int sourcePortIndex,
+        int targetPortIndex,
+        boolean mergeSourceEndpoint,
+        boolean mergeTargetEndpoint) {
+        String relationshipType = relationshipType(edge);
         ElkConnectableShape sourceShape = mergeSourceEndpoint
-            ? sharedMergePort(source, sourceSide, true)
+            ? sharedMergePort(source, sourceSide, true, relationshipType)
             : createEdgePort(source, edge.id() + "-source", sourceSide, sourcePortIndex);
         ElkConnectableShape targetShape = mergeTargetEndpoint
-            ? sharedMergePort(target, targetSide, false)
+            ? sharedMergePort(target, targetSide, false, relationshipType)
             : createEdgePort(target, edge.id() + "-target", targetSide, targetPortIndex);
         ElkEdge elkEdge = ElkGraphUtil.createSimpleEdge(sourceShape, targetShape);
         elkEdge.setIdentifier(edge.id());
@@ -563,16 +622,31 @@ final class ElkLayoutEngine {
     private static ElkPort sharedMergePort(
         ElkNode node,
         PortSide side,
-        boolean sourceEndpoint) {
+        boolean sourceEndpoint,
+        String relationshipType) {
         String id = "__dediren_merge_"
             + (sourceEndpoint ? "source_" : "target_")
-            + side.name();
+            + side.name()
+            + "_"
+            + relationshipTypePortSuffix(relationshipType);
         for (ElkPort port : node.getPorts()) {
             if (id.equals(port.getIdentifier())) {
                 return port;
             }
         }
         return createEdgePort(node, id, side, nextExistingPortIndex(node, side));
+    }
+
+    private static String relationshipTypePortSuffix(String relationshipType) {
+        return Integer.toHexString(relationshipType.hashCode());
+    }
+
+    private static String relationshipType(JsonContracts.LayoutEdge edge) {
+        String relationshipType = edge.relationship_type();
+        if (relationshipType == null || relationshipType.isBlank()) {
+            return null;
+        }
+        return relationshipType;
     }
 
     private static int nextExistingPortIndex(ElkNode node, PortSide side) {
@@ -590,33 +664,38 @@ final class ElkLayoutEngine {
         Map<String, JsonContracts.LayoutNode> nodes) {
         Map<EdgeEndpointKey, Integer> endpointCounts = new HashMap<>();
         for (JsonContracts.LayoutEdge edge : edges) {
+            String relationshipType = relationshipType(edge);
             if (!nodes.containsKey(edge.source())
                 || !nodes.containsKey(edge.target())
-                || edge.source().equals(edge.target())) {
+                || edge.source().equals(edge.target())
+                || relationshipType == null) {
                 continue;
             }
             endpointCounts.merge(
-                new EdgeEndpointKey(edge.source(), sourcePortSide(Direction.RIGHT), true),
+                new EdgeEndpointKey(edge.source(), sourcePortSide(Direction.RIGHT), true, relationshipType),
                 1,
                 Integer::sum);
             endpointCounts.merge(
-                new EdgeEndpointKey(edge.target(), targetPortSide(Direction.RIGHT), false),
+                new EdgeEndpointKey(edge.target(), targetPortSide(Direction.RIGHT), false, relationshipType),
                 1,
                 Integer::sum);
         }
 
         Map<String, EdgeEndpointMerge> endpointMerges = new HashMap<>();
         for (JsonContracts.LayoutEdge edge : edges) {
+            String relationshipType = relationshipType(edge);
             if (!nodes.containsKey(edge.source()) || !nodes.containsKey(edge.target())) {
                 continue;
             }
             endpointMerges.put(edge.id(), new EdgeEndpointMerge(
-                endpointCounts.getOrDefault(
-                    new EdgeEndpointKey(edge.source(), sourcePortSide(Direction.RIGHT), true),
-                    0) >= MERGEABLE_ENDPOINT_EDGE_COUNT,
-                endpointCounts.getOrDefault(
-                    new EdgeEndpointKey(edge.target(), targetPortSide(Direction.RIGHT), false),
-                    0) >= MERGEABLE_ENDPOINT_EDGE_COUNT));
+                relationshipType != null
+                    && endpointCounts.getOrDefault(
+                        new EdgeEndpointKey(edge.source(), sourcePortSide(Direction.RIGHT), true, relationshipType),
+                        0) >= MERGEABLE_ENDPOINT_EDGE_COUNT,
+                relationshipType != null
+                    && endpointCounts.getOrDefault(
+                        new EdgeEndpointKey(edge.target(), targetPortSide(Direction.RIGHT), false, relationshipType),
+                        0) >= MERGEABLE_ENDPOINT_EDGE_COUNT));
         }
         return endpointMerges;
     }
@@ -629,37 +708,42 @@ final class ElkLayoutEngine {
         Map<String, Integer> groupOrderById) {
         Map<EdgeEndpointKey, Integer> endpointCounts = new HashMap<>();
         for (JsonContracts.LayoutEdge edge : edges) {
+            String relationshipType = relationshipType(edge);
             if (!nodes.containsKey(edge.source())
                 || !nodes.containsKey(edge.target())
-                || edge.source().equals(edge.target())) {
+                || edge.source().equals(edge.target())
+                || relationshipType == null) {
                 continue;
             }
             Direction direction =
-                edgeDirection(edge, ownerByNode, groupDirectionById, groupOrderById);
+                edgeDirection(edge, nodes, ownerByNode, groupDirectionById, groupOrderById);
             endpointCounts.merge(
-                new EdgeEndpointKey(edge.source(), sourcePortSide(direction), true),
+                new EdgeEndpointKey(edge.source(), sourcePortSide(direction), true, relationshipType),
                 1,
                 Integer::sum);
             endpointCounts.merge(
-                new EdgeEndpointKey(edge.target(), targetPortSide(direction), false),
+                new EdgeEndpointKey(edge.target(), targetPortSide(direction), false, relationshipType),
                 1,
                 Integer::sum);
         }
 
         Map<String, EdgeEndpointMerge> endpointMerges = new HashMap<>();
         for (JsonContracts.LayoutEdge edge : edges) {
+            String relationshipType = relationshipType(edge);
             if (!nodes.containsKey(edge.source()) || !nodes.containsKey(edge.target())) {
                 continue;
             }
             Direction direction =
-                edgeDirection(edge, ownerByNode, groupDirectionById, groupOrderById);
+                edgeDirection(edge, nodes, ownerByNode, groupDirectionById, groupOrderById);
             endpointMerges.put(edge.id(), new EdgeEndpointMerge(
-                endpointCounts.getOrDefault(
-                    new EdgeEndpointKey(edge.source(), sourcePortSide(direction), true),
-                    0) >= MERGEABLE_ENDPOINT_EDGE_COUNT,
-                endpointCounts.getOrDefault(
-                    new EdgeEndpointKey(edge.target(), targetPortSide(direction), false),
-                    0) >= MERGEABLE_ENDPOINT_EDGE_COUNT));
+                relationshipType != null
+                    && endpointCounts.getOrDefault(
+                        new EdgeEndpointKey(edge.source(), sourcePortSide(direction), true, relationshipType),
+                        0) >= MERGEABLE_ENDPOINT_EDGE_COUNT,
+                relationshipType != null
+                    && endpointCounts.getOrDefault(
+                        new EdgeEndpointKey(edge.target(), targetPortSide(direction), false, relationshipType),
+                        0) >= MERGEABLE_ENDPOINT_EDGE_COUNT));
         }
         return endpointMerges;
     }
@@ -697,6 +781,7 @@ final class ElkLayoutEngine {
                 edge.source(),
                 sourcePortSide(Direction.RIGHT),
                 true,
+                relationshipType(edge),
                 endpointMerge.sourceEndpoint());
             countPort(
                 portCounts,
@@ -704,6 +789,7 @@ final class ElkLayoutEngine {
                 edge.target(),
                 targetPortSide(Direction.RIGHT),
                 false,
+                relationshipType(edge),
                 endpointMerge.targetEndpoint());
         }
         return portCounts;
@@ -723,7 +809,7 @@ final class ElkLayoutEngine {
                 continue;
             }
             Direction direction =
-                edgeDirection(edge, ownerByNode, groupDirectionById, groupOrderById);
+                edgeDirection(edge, nodes, ownerByNode, groupDirectionById, groupOrderById);
             EdgeEndpointMerge endpointMerge =
                 endpointMerges.getOrDefault(edge.id(), NO_ENDPOINT_MERGE);
             countPort(
@@ -732,6 +818,7 @@ final class ElkLayoutEngine {
                 edge.source(),
                 sourcePortSide(direction),
                 true,
+                relationshipType(edge),
                 endpointMerge.sourceEndpoint());
             countPort(
                 portCounts,
@@ -739,6 +826,7 @@ final class ElkLayoutEngine {
                 edge.target(),
                 targetPortSide(direction),
                 false,
+                relationshipType(edge),
                 endpointMerge.targetEndpoint());
         }
         return portCounts;
@@ -760,7 +848,7 @@ final class ElkLayoutEngine {
                 continue;
             }
             Direction direction =
-                edgeDirection(edge, ownerByNode, groupDirectionById, groupOrderById);
+                edgeDirection(edge, nodes, ownerByNode, groupDirectionById, groupOrderById);
             PortSide sourceSide = sourcePortSide(direction);
             PortSide targetSide = targetPortSide(direction);
             EdgeEndpointMerge endpointMerge =
@@ -789,7 +877,11 @@ final class ElkLayoutEngine {
         Map<String, Integer> targetPortIndexByEdge = new HashMap<>();
         for (List<PortCandidate> candidates : candidatesByPortGroup.values()) {
             candidates.sort((left, right) -> {
-                int remoteOrder = Integer.compare(left.remoteNodeOrder(), right.remoteNodeOrder());
+                // Source-side order follows the diverging route channel order; target-side order
+                // still follows the remote endpoint order to keep arrivals stable.
+                int remoteOrder = left.sourceEndpoint() && right.sourceEndpoint()
+                    ? Integer.compare(right.remoteNodeOrder(), left.remoteNodeOrder())
+                    : Integer.compare(left.remoteNodeOrder(), right.remoteNodeOrder());
                 if (remoteOrder != 0) {
                     return remoteOrder;
                 }
@@ -819,6 +911,193 @@ final class ElkLayoutEngine {
                 targetPortIndexByEdge.getOrDefault(edge.id(), 0)));
         }
         return portIndexesByEdge;
+    }
+
+    private static Map<String, PortSide> geometryAwareSourcePortSides(
+        List<JsonContracts.LayoutEdge> edges,
+        List<JsonContracts.LaidOutNode> laidOutNodes,
+        Map<String, Direction> edgeDirections,
+        Map<String, EdgeEndpointMerge> endpointMerges) {
+        Map<String, JsonContracts.LaidOutNode> nodes = laidOutNodesById(laidOutNodes);
+        Map<String, Set<PortSide>> incomingTargetSides = incomingTargetPortSidesByNode(
+            edges,
+            nodes,
+            edgeDirections);
+        Map<String, PortSide> sourcePortSides = new HashMap<>();
+        for (JsonContracts.LayoutEdge edge : edges) {
+            Direction direction = edgeDirections.getOrDefault(edge.id(), Direction.RIGHT);
+            PortSide defaultSide = sourcePortSide(direction);
+            PortSide sourceSide = defaultSide;
+            EdgeEndpointMerge endpointMerge =
+                endpointMerges.getOrDefault(edge.id(), NO_ENDPOINT_MERGE);
+            JsonContracts.LaidOutNode source = nodes.get(edge.source());
+            JsonContracts.LaidOutNode target = nodes.get(edge.target());
+            if (source != null
+                && target != null
+                && !endpointMerge.sourceEndpoint()
+                && isConnectorSizedNode(source)) {
+                sourceSide = connectorSourcePortSide(
+                    source,
+                    target,
+                    defaultSide,
+                    incomingTargetSides.getOrDefault(edge.source(), Set.of()));
+            }
+            sourcePortSides.put(edge.id(), sourceSide);
+        }
+        return sourcePortSides;
+    }
+
+    private static Map<String, Set<PortSide>> incomingTargetPortSidesByNode(
+        List<JsonContracts.LayoutEdge> edges,
+        Map<String, JsonContracts.LaidOutNode> nodes,
+        Map<String, Direction> edgeDirections) {
+        Map<String, Set<PortSide>> incomingTargetSides = new HashMap<>();
+        for (JsonContracts.LayoutEdge edge : edges) {
+            if (!nodes.containsKey(edge.source()) || !nodes.containsKey(edge.target())) {
+                continue;
+            }
+            Direction direction = edgeDirections.getOrDefault(edge.id(), Direction.RIGHT);
+            incomingTargetSides
+                .computeIfAbsent(edge.target(), ignored -> new HashSet<>())
+                .add(targetPortSide(direction));
+        }
+        return incomingTargetSides;
+    }
+
+    private static Map<String, EdgePortIndexes> geometryAwareSourcePortIndexes(
+        List<JsonContracts.LayoutEdge> edges,
+        List<JsonContracts.LaidOutNode> laidOutNodes,
+        Map<String, Direction> edgeDirections,
+        Map<String, PortSide> sourcePortSides,
+        Map<String, EdgeEndpointMerge> endpointMerges,
+        Map<String, EdgePortIndexes> fallbackPortIndexes) {
+        Map<String, JsonContracts.LaidOutNode> nodes = laidOutNodesById(laidOutNodes);
+        Map<PortGroupKey, List<GeometryPortCandidate>> candidatesByPortGroup = new HashMap<>();
+        for (int edgeIndex = 0; edgeIndex < edges.size(); edgeIndex++) {
+            JsonContracts.LayoutEdge edge = edges.get(edgeIndex);
+            EdgeEndpointMerge endpointMerge =
+                endpointMerges.getOrDefault(edge.id(), NO_ENDPOINT_MERGE);
+            if (endpointMerge.sourceEndpoint()) {
+                continue;
+            }
+            JsonContracts.LaidOutNode source = nodes.get(edge.source());
+            JsonContracts.LaidOutNode target = nodes.get(edge.target());
+            if (source == null || target == null) {
+                continue;
+            }
+            Direction direction = edgeDirections.getOrDefault(edge.id(), Direction.RIGHT);
+            PortSide sourceSide = sourcePortSides.getOrDefault(
+                edge.id(),
+                sourcePortSide(direction));
+            SourcePortOrder order = sourcePortOrder(source, target, sourceSide);
+            candidatesByPortGroup
+                .computeIfAbsent(
+                    new PortGroupKey(edge.source(), sourceSide),
+                    ignored -> new ArrayList<>())
+                .add(new GeometryPortCandidate(edge.id(), order.band(), order.order(), edgeIndex));
+        }
+
+        Map<String, Integer> sourcePortIndexByEdge = new HashMap<>();
+        for (List<GeometryPortCandidate> candidates : candidatesByPortGroup.values()) {
+            candidates.sort((left, right) -> {
+                int bandOrder = Integer.compare(left.band(), right.band());
+                if (bandOrder != 0) {
+                    return bandOrder;
+                }
+                int geometryOrder = Double.compare(left.order(), right.order());
+                if (geometryOrder != 0) {
+                    return geometryOrder;
+                }
+                int requestOrder = Integer.compare(left.requestEdgeIndex(), right.requestEdgeIndex());
+                if (requestOrder != 0) {
+                    return requestOrder;
+                }
+                return left.edgeId().compareTo(right.edgeId());
+            });
+            for (int portIndex = 0; portIndex < candidates.size(); portIndex++) {
+                sourcePortIndexByEdge.put(candidates.get(portIndex).edgeId(), portIndex);
+            }
+        }
+
+        Map<String, EdgePortIndexes> portIndexesByEdge = new HashMap<>();
+        for (JsonContracts.LayoutEdge edge : edges) {
+            EdgePortIndexes fallback = fallbackPortIndexes.getOrDefault(
+                edge.id(),
+                new EdgePortIndexes(0, 0));
+            portIndexesByEdge.put(edge.id(), new EdgePortIndexes(
+                sourcePortIndexByEdge.getOrDefault(edge.id(), fallback.sourceIndex()),
+                fallback.targetIndex()));
+        }
+        return portIndexesByEdge;
+    }
+
+    private record SourcePortOrder(int band, double order) {}
+
+    private static PortSide connectorSourcePortSide(
+        JsonContracts.LaidOutNode source,
+        JsonContracts.LaidOutNode target,
+        PortSide defaultSide,
+        Set<PortSide> incomingTargetSides) {
+        double sourceX = centerX(source);
+        double sourceY = centerY(source);
+        double targetX = centerX(target);
+        double targetY = centerY(target);
+        double verticalDelta = targetY - sourceY;
+        if (Math.abs(verticalDelta) <= GEOMETRY_EPSILON) {
+            return defaultSide;
+        }
+
+        PortSide verticalSide = verticalDelta > 0.0 ? PortSide.SOUTH : PortSide.NORTH;
+        if (!incomingTargetSides.contains(verticalSide)) {
+            return verticalSide;
+        }
+        if (targetX < sourceX - GEOMETRY_EPSILON) {
+            return PortSide.WEST;
+        }
+        if (targetX > sourceX + GEOMETRY_EPSILON) {
+            return PortSide.EAST;
+        }
+        return defaultSide;
+    }
+
+    private static SourcePortOrder sourcePortOrder(
+        JsonContracts.LaidOutNode source,
+        JsonContracts.LaidOutNode target,
+        PortSide sourceSide) {
+        double sourceY = centerY(source);
+        double targetY = centerY(target);
+        if (sourceSide != PortSide.EAST && sourceSide != PortSide.WEST) {
+            return new SourcePortOrder(0, centerX(target));
+        }
+        if (targetY < sourceY - GEOMETRY_EPSILON) {
+            return new SourcePortOrder(0, targetY);
+        }
+        if (targetY > sourceY + GEOMETRY_EPSILON) {
+            return new SourcePortOrder(1, -targetY);
+        }
+        return new SourcePortOrder(0, targetY);
+    }
+
+    private static Map<String, JsonContracts.LaidOutNode> laidOutNodesById(
+        List<JsonContracts.LaidOutNode> nodes) {
+        Map<String, JsonContracts.LaidOutNode> byId = new HashMap<>();
+        for (JsonContracts.LaidOutNode node : nodes) {
+            byId.put(node.id(), node);
+        }
+        return byId;
+    }
+
+    private static boolean isConnectorSizedNode(JsonContracts.LaidOutNode node) {
+        return node.width() <= CONNECTOR_SOURCE_MAX_WIDTH
+            && node.height() <= CONNECTOR_SOURCE_MAX_HEIGHT;
+    }
+
+    private static double centerX(JsonContracts.LaidOutNode node) {
+        return node.x() + node.width() / 2.0;
+    }
+
+    private static double centerY(JsonContracts.LaidOutNode node) {
+        return node.y() + node.height() / 2.0;
     }
 
     private static Map<String, Integer> groupedNodeOrderById(
@@ -898,12 +1177,13 @@ final class ElkLayoutEngine {
         String nodeId,
         PortSide side,
         boolean sourceEndpoint,
+        String relationshipType,
         boolean mergeEndpoint) {
         if (!mergeEndpoint) {
             countPort(portCounts, nodeId, side);
             return;
         }
-        if (countedMergePorts.add(new EdgeEndpointKey(nodeId, side, sourceEndpoint))) {
+        if (countedMergePorts.add(new EdgeEndpointKey(nodeId, side, sourceEndpoint, relationshipType))) {
             countPort(portCounts, nodeId, side);
         }
     }
@@ -939,7 +1219,11 @@ final class ElkLayoutEngine {
 
     private record EdgeEndpointMerge(boolean sourceEndpoint, boolean targetEndpoint) {}
 
-    private record EdgeEndpointKey(String nodeId, PortSide side, boolean sourceEndpoint) {}
+    private record EdgeEndpointKey(
+        String nodeId,
+        PortSide side,
+        boolean sourceEndpoint,
+        String relationshipType) {}
 
     private record PortGroupKey(String nodeId, PortSide side) {}
 
@@ -947,6 +1231,12 @@ final class ElkLayoutEngine {
         String edgeId,
         boolean sourceEndpoint,
         int remoteNodeOrder,
+        int requestEdgeIndex) {}
+
+    private record GeometryPortCandidate(
+        String edgeId,
+        int band,
+        double order,
         int requestEdgeIndex) {}
 
     private static Map<String, JsonContracts.LayoutNode> requestNodesById(

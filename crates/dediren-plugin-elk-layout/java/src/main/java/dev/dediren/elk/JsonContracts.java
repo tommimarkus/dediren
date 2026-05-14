@@ -38,7 +38,16 @@ final class JsonContracts {
         String source,
         String target,
         String label,
-        String source_id) {
+        String source_id,
+        String relationship_type) {
+        LayoutEdge(
+            String id,
+            String source,
+            String target,
+            String label,
+            String source_id) {
+            this(id, source, target, label, source_id, null);
+        }
     }
 
     record LayoutGroup(

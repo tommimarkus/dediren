@@ -104,6 +104,7 @@ fn main() -> anyhow::Result<()> {
                 target: relationship.target.clone(),
                 label: relationship.label.clone(),
                 source_id: relationship.id.clone(),
+                relationship_type: Some(relationship.relationship_type.clone()),
             })
         })
         .collect::<anyhow::Result<Vec<_>>>()?;

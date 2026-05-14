@@ -45,6 +45,14 @@ fn svg_renderer_adds_line_jump_for_later_crossing_edge() {
     let data = front_path.attribute("d").unwrap();
     assert!(data.contains("L 100.0 94.0"));
     assert!(data.contains("Q 106.0 100.0 100.0 106.0"));
+
+    let masks = child_group_with_attr(front_edge, "data-dediren-line-jump-masks", "front-edge");
+    let mask_path = child_element(masks, "path");
+    assert_eq!(mask_path.attribute("stroke"), Some("#ffffff"));
+    assert!(mask_path
+        .attribute("d")
+        .unwrap()
+        .contains("M 100.0 94.0 Q 106.0 100.0 100.0 106.0"));
 }
 
 #[test]

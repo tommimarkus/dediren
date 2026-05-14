@@ -478,7 +478,8 @@ fn readme_documents_archimate_connector_junction_support_and_generated_hints() {
             && readme.contains("contiguous junction chains")
             && readme.contains("treated as")
             && readme.contains("containment")
-            && readme.contains("shared_source_junction"),
+            && readme.contains("shared_source_junction")
+            && readme.contains("relationship_type"),
         "README.md should document source junction support and generated route hints"
     );
 }

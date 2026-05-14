@@ -188,6 +188,8 @@ pub struct LayoutEdge {
     pub target: String,
     pub label: String,
     pub source_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub relationship_type: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

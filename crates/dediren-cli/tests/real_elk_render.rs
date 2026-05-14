@@ -397,10 +397,12 @@ fn real_elk_renders_complex_multi_layer_system() {
             { "id": "catalog-service", "label": "Catalog Service", "source_id": "catalog-service", "width_hint": 160.0, "height_hint": 80.0 },
             { "id": "pricing-service", "label": "Pricing Service", "source_id": "pricing-service", "width_hint": 160.0, "height_hint": 80.0 },
             { "id": "order-service", "label": "Order Service", "source_id": "order-service", "width_hint": 160.0, "height_hint": 80.0 },
+            { "id": "gateway-and-junction", "label": "", "source_id": "gateway-and-junction", "width_hint": 28.0, "height_hint": 28.0 },
             { "id": "payment-service", "label": "Payment Service", "source_id": "payment-service", "width_hint": 160.0, "height_hint": 80.0 },
             { "id": "fulfillment-service", "label": "Fulfillment Service", "source_id": "fulfillment-service", "width_hint": 160.0, "height_hint": 80.0 },
             { "id": "notification-service", "label": "Notification Service", "source_id": "notification-service", "width_hint": 160.0, "height_hint": 80.0 },
             { "id": "event-bus", "label": "Event Bus", "source_id": "event-bus", "width_hint": 160.0, "height_hint": 80.0 },
+            { "id": "event-dispatch-or-junction", "label": "", "source_id": "event-dispatch-or-junction", "width_hint": 28.0, "height_hint": 28.0 },
             { "id": "order-worker", "label": "Order Worker", "source_id": "order-worker", "width_hint": 160.0, "height_hint": 80.0 },
             { "id": "warehouse-adapter", "label": "Warehouse Adapter", "source_id": "warehouse-adapter", "width_hint": 160.0, "height_hint": 80.0 },
             { "id": "email-worker", "label": "Email Worker", "source_id": "email-worker", "width_hint": 160.0, "height_hint": 80.0 },
@@ -424,10 +426,11 @@ fn real_elk_renders_complex_multi_layer_system() {
             { "id": "cdn-serves-web", "source": "cdn", "target": "web-frontend", "label": "serves", "source_id": "cdn-serves-web" },
             { "id": "web-calls-gateway", "source": "web-frontend", "target": "api-gateway", "label": "calls", "source_id": "web-calls-gateway" },
             { "id": "admin-calls-gateway", "source": "admin-portal", "target": "api-gateway", "label": "calls", "source_id": "admin-calls-gateway" },
-            { "id": "gateway-authenticates", "source": "api-gateway", "target": "identity-service", "label": "authenticates", "source_id": "gateway-authenticates" },
-            { "id": "gateway-queries-catalog", "source": "api-gateway", "target": "catalog-service", "label": "queries catalog", "source_id": "gateway-queries-catalog" },
-            { "id": "gateway-prices-cart", "source": "api-gateway", "target": "pricing-service", "label": "prices cart", "source_id": "gateway-prices-cart" },
-            { "id": "gateway-places-order", "source": "api-gateway", "target": "order-service", "label": "places order", "source_id": "gateway-places-order" },
+            { "id": "gateway-to-and-junction", "source": "api-gateway", "target": "gateway-and-junction", "label": "routes", "source_id": "gateway-to-and-junction" },
+            { "id": "and-junction-authenticates", "source": "gateway-and-junction", "target": "identity-service", "label": "authenticates", "source_id": "and-junction-authenticates", "relationship_type": "Association" },
+            { "id": "and-junction-queries-catalog", "source": "gateway-and-junction", "target": "catalog-service", "label": "queries catalog", "source_id": "and-junction-queries-catalog", "relationship_type": "Association" },
+            { "id": "and-junction-prices-cart", "source": "gateway-and-junction", "target": "pricing-service", "label": "prices cart", "source_id": "and-junction-prices-cart", "relationship_type": "Association" },
+            { "id": "and-junction-places-order", "source": "gateway-and-junction", "target": "order-service", "label": "places order", "source_id": "and-junction-places-order", "relationship_type": "Association" },
             { "id": "identity-federates", "source": "identity-service", "target": "identity-provider", "label": "federates", "source_id": "identity-federates" },
             { "id": "identity-caches-session", "source": "identity-service", "target": "session-cache", "label": "caches session", "source_id": "identity-caches-session" },
             { "id": "catalog-reads-products", "source": "catalog-service", "target": "product-db", "label": "reads products", "source_id": "catalog-reads-products" },
@@ -444,9 +447,10 @@ fn real_elk_renders_complex_multi_layer_system() {
             { "id": "fulfillment-syncs-warehouse", "source": "fulfillment-service", "target": "warehouse-adapter", "label": "syncs", "source_id": "fulfillment-syncs-warehouse" },
             { "id": "fulfillment-writes-warehouse", "source": "fulfillment-service", "target": "warehouse-db", "label": "updates stock", "source_id": "fulfillment-writes-warehouse" },
             { "id": "fulfillment-publishes-events", "source": "fulfillment-service", "target": "event-bus", "label": "publishes events", "source_id": "fulfillment-publishes-events" },
-            { "id": "event-bus-drives-order-worker", "source": "event-bus", "target": "order-worker", "label": "dispatches", "source_id": "event-bus-drives-order-worker" },
-            { "id": "event-bus-drives-email-worker", "source": "event-bus", "target": "email-worker", "label": "dispatches", "source_id": "event-bus-drives-email-worker" },
-            { "id": "event-bus-drives-reporting", "source": "event-bus", "target": "reporting-ingestor", "label": "streams", "source_id": "event-bus-drives-reporting" },
+            { "id": "event-bus-to-or-junction", "source": "event-bus", "target": "event-dispatch-or-junction", "label": "dispatches", "source_id": "event-bus-to-or-junction" },
+            { "id": "event-bus-drives-order-worker", "source": "event-bus", "target": "order-worker", "label": "order event", "source_id": "event-bus-drives-order-worker" },
+            { "id": "or-junction-drives-email-worker", "source": "event-dispatch-or-junction", "target": "email-worker", "label": "email event", "source_id": "or-junction-drives-email-worker" },
+            { "id": "or-junction-drives-reporting", "source": "event-dispatch-or-junction", "target": "reporting-ingestor", "label": "reporting event", "source_id": "or-junction-drives-reporting" },
             { "id": "order-worker-reads-orders", "source": "order-worker", "target": "order-db", "label": "reads orders", "source_id": "order-worker-reads-orders" },
             { "id": "order-worker-syncs-erp", "source": "order-worker", "target": "erp", "label": "syncs orders", "source_id": "order-worker-syncs-erp" },
             { "id": "warehouse-adapter-syncs-erp", "source": "warehouse-adapter", "target": "erp", "label": "syncs stock", "source_id": "warehouse-adapter-syncs-erp" },
@@ -478,7 +482,7 @@ fn real_elk_renders_complex_multi_layer_system() {
             {
                 "id": "async-processing",
                 "label": "Async Processing",
-                "members": ["event-bus", "order-worker", "warehouse-adapter", "email-worker", "reporting-ingestor"],
+                "members": ["event-bus", "event-dispatch-or-junction", "order-worker", "warehouse-adapter", "email-worker", "reporting-ingestor"],
                 "provenance": { "semantic_backed": { "source_id": "async-processing" } }
             },
             {
@@ -507,6 +511,11 @@ fn real_elk_renders_complex_multi_layer_system() {
     );
     let layout_data = ok_data(&layout_output);
     let default_svg = render_svg(&layout, "fixtures/render-policy/default-svg.json", None);
+    write_render_artifact(
+        "real-elk",
+        "real_elk_renders_complex_multi_layer_system_default",
+        &default_svg,
+    );
     let route_quality_artifact = write_close_parallel_route_artifact(
         &default_svg,
         &layout_data,
@@ -522,14 +531,14 @@ fn real_elk_renders_complex_multi_layer_system() {
             .as_array()
             .expect("laid out nodes should be an array")
             .len(),
-        30
+        32
     );
     assert_eq!(
         layout_data["edges"]
             .as_array()
             .expect("laid out edges should be an array")
             .len(),
-        37
+        39
     );
     assert_eq!(
         layout_data["groups"]
@@ -541,20 +550,20 @@ fn real_elk_renders_complex_multi_layer_system() {
     assert_edges_have_at_most_corner_count(
         &layout_data,
         &[
-            "gateway-authenticates",
-            "gateway-queries-catalog",
-            "gateway-prices-cart",
-            "gateway-places-order",
+            "and-junction-authenticates",
+            "and-junction-queries-catalog",
+            "and-junction-prices-cart",
+            "and-junction-places-order",
         ],
         2,
     );
     assert_edges_include_routing_hint(
         &layout_data,
         &[
-            "gateway-authenticates",
-            "gateway-queries-catalog",
-            "gateway-prices-cart",
-            "gateway-places-order",
+            "and-junction-authenticates",
+            "and-junction-queries-catalog",
+            "and-junction-prices-cart",
+            "and-junction-places-order",
         ],
         "shared_source_junction",
     );
@@ -563,19 +572,49 @@ fn real_elk_renders_complex_multi_layer_system() {
         &["fulfillment-writes-warehouse", "payment-records-ledger"],
         4,
     );
-    assert_source_port_above(
+    assert_no_route_crossing_near_source(
         &layout_data,
-        "identity-caches-session",
+        "identity-service",
         "identity-federates",
+        "identity-caches-session",
+    );
+    assert_no_route_crossing_near_source(
+        &layout_data,
+        "pricing-service",
+        "pricing-reads-products",
+        "pricing-caches-quotes",
+    );
+    assert_source_port_below_node_center(
+        &layout_data,
+        "or-junction-drives-email-worker",
+        "event-dispatch-or-junction",
+    );
+    assert_source_port_right_of_node_center(
+        &layout_data,
+        "or-junction-drives-reporting",
+        "event-dispatch-or-junction",
+    );
+    assert_edges_have_at_most_corner_count(&layout_data, &["or-junction-drives-email-worker"], 1);
+    assert_junction_between_x(
+        &layout_data,
+        "gateway-and-junction",
+        &["api-gateway"],
+        &[
+            "identity-service",
+            "catalog-service",
+            "pricing-service",
+            "order-service",
+        ],
+    );
+    assert_junction_between_x(
+        &layout_data,
+        "event-dispatch-or-junction",
+        &["event-bus"],
+        &["email-worker", "reporting-ingestor"],
     );
 
     let default_doc = svg_doc(&default_svg);
     assert_complex_profile_svg(&default_doc, &default_svg);
-    write_render_artifact(
-        "real-elk",
-        "real_elk_renders_complex_multi_layer_system_default",
-        &default_svg,
-    );
 
     let rich_svg = render_svg(&layout, "fixtures/render-policy/rich-svg.json", None);
     let rich_doc = svg_doc(&rich_svg);
@@ -606,7 +645,22 @@ fn real_elk_renders_complex_multi_layer_system() {
         metadata["edges"]["order-publishes-events"]["type"],
         "Triggering"
     );
-    assert_eq!(metadata["edges"]["order-requests-payment"]["type"], "Flow");
+    assert_eq!(
+        metadata["nodes"]["gateway-and-junction"]["type"],
+        "AndJunction"
+    );
+    assert_eq!(
+        metadata["nodes"]["event-dispatch-or-junction"]["type"],
+        "OrJunction"
+    );
+    assert_eq!(
+        metadata["edges"]["gateway-to-and-junction"]["type"],
+        "Association"
+    );
+    assert_eq!(
+        metadata["edges"]["event-bus-to-or-junction"]["type"],
+        "Triggering"
+    );
     assert_eq!(
         metadata["edges"]["fulfillment-syncs-warehouse"]["type"],
         "Serving"
@@ -653,6 +707,16 @@ fn real_elk_renders_complex_multi_layer_system() {
         "archimate_technology_service",
     )
     .is_some());
+    assert_archimate_node_shape(
+        &archimate_doc,
+        "gateway-and-junction",
+        "archimate_and_junction",
+    );
+    assert_archimate_node_shape(
+        &archimate_doc,
+        "event-dispatch-or-junction",
+        "archimate_or_junction",
+    );
     let association = semantic_group(&archimate_doc, "data-dediren-edge-id", "mobile-enters-cdn");
     let path = child_element(association, "path");
     assert_eq!(path.attribute("marker-end"), None);
@@ -1059,6 +1123,66 @@ fn share_endpoint(left: &RouteSegment, right: &RouteSegment) -> bool {
         || left.target == right.target
 }
 
+fn assert_no_route_crossing_near_source(
+    layout_data: &Value,
+    source_id: &str,
+    left_edge_id: &str,
+    right_edge_id: &str,
+) {
+    let source = laid_out_node(layout_data, source_id);
+    let source_right = point_coordinate(source, "x") + point_coordinate(source, "width");
+    let near_source_right = source_right + 220.0;
+    let segments = route_segments(layout_data);
+    let mut crossings = Vec::new();
+    for left in segments
+        .iter()
+        .filter(|segment| segment.edge_id == left_edge_id)
+    {
+        for right in segments
+            .iter()
+            .filter(|segment| segment.edge_id == right_edge_id)
+        {
+            if let Some((crossing_x, crossing_y)) = segment_crossing(left, right) {
+                if crossing_x >= source_right && crossing_x <= near_source_right {
+                    crossings.push(format!(
+                        "{} {} {:?} crosses {} {} {:?} at ({crossing_x:.1}, {crossing_y:.1})",
+                        left.edge_id,
+                        orientation_name(left.orientation),
+                        segment_endpoints(left),
+                        right.edge_id,
+                        orientation_name(right.orientation),
+                        segment_endpoints(right)
+                    ));
+                }
+            }
+        }
+    }
+    assert!(
+        crossings.is_empty(),
+        "routes from {source_id} should not cross near the source:\n{}",
+        crossings.join("\n")
+    );
+}
+
+fn segment_crossing(left: &RouteSegment, right: &RouteSegment) -> Option<(f64, f64)> {
+    if left.orientation == right.orientation {
+        return None;
+    }
+    let (horizontal, vertical) = if left.orientation == RouteOrientation::Horizontal {
+        (left, right)
+    } else {
+        (right, left)
+    };
+    if vertical.fixed > horizontal.min
+        && vertical.fixed < horizontal.max
+        && horizontal.fixed > vertical.min
+        && horizontal.fixed < vertical.max
+    {
+        return Some((vertical.fixed, horizontal.fixed));
+    }
+    None
+}
+
 fn overlap_length(left_min: f64, left_max: f64, right_min: f64, right_max: f64) -> f64 {
     (left_max.min(right_max) - left_min.max(right_min)).max(0.0)
 }
@@ -1132,30 +1256,75 @@ fn assert_edges_include_routing_hint(layout_data: &Value, edge_ids: &[&str], hin
     }
 }
 
-fn assert_source_port_above(layout_data: &Value, upper_edge_id: &str, lower_edge_id: &str) {
-    let upper_y = source_port_y(layout_data, upper_edge_id);
-    let lower_y = source_port_y(layout_data, lower_edge_id);
+fn assert_junction_between_x(
+    layout_data: &Value,
+    junction_id: &str,
+    source_ids: &[&str],
+    target_ids: &[&str],
+) {
+    let junction_x = node_center_x(layout_data, junction_id);
+    let source_x = source_ids
+        .iter()
+        .map(|node_id| node_center_x(layout_data, node_id))
+        .fold(f64::NEG_INFINITY, f64::max);
+    let target_x = target_ids
+        .iter()
+        .map(|node_id| node_center_x(layout_data, node_id))
+        .fold(f64::INFINITY, f64::min);
     assert!(
-        upper_y < lower_y,
-        "{upper_edge_id} source port should be above {lower_edge_id}: {upper_y} >= {lower_y}"
+        source_x < junction_x && junction_x < target_x,
+        "{junction_id} should sit between source side x={source_x} and target side x={target_x}, got x={junction_x}"
     );
 }
 
-fn source_port_y(layout_data: &Value, edge_id: &str) -> f64 {
-    let edges = layout_data["edges"]
-        .as_array()
-        .expect("laid out edges should be an array");
-    let edge = edges
-        .iter()
-        .find(|edge| edge["id"] == edge_id)
-        .unwrap_or_else(|| panic!("expected laid out edge {edge_id}"));
+fn assert_source_port_right_of_node_center(layout_data: &Value, edge_id: &str, node_id: &str) {
+    let edge = laid_out_edge(layout_data, edge_id);
     let points = edge["points"]
         .as_array()
         .unwrap_or_else(|| panic!("{edge_id} points should be an array"));
-    let source_port = points
-        .first()
-        .unwrap_or_else(|| panic!("{edge_id} should include a source port point"));
-    point_coordinate(source_port, "y")
+    let source_port_x = point_coordinate(&points[0], "x");
+    let node_center = node_center_x(layout_data, node_id);
+    assert!(
+        source_port_x > node_center,
+        "{edge_id} should leave {node_id} from the right side, got source x={source_port_x}, node center x={node_center}"
+    );
+}
+
+fn assert_source_port_below_node_center(layout_data: &Value, edge_id: &str, node_id: &str) {
+    let edge = laid_out_edge(layout_data, edge_id);
+    let points = edge["points"]
+        .as_array()
+        .unwrap_or_else(|| panic!("{edge_id} points should be an array"));
+    let source_port_y = point_coordinate(&points[0], "y");
+    let node = laid_out_node(layout_data, node_id);
+    let node_center = point_coordinate(node, "y") + (point_coordinate(node, "height") / 2.0);
+    assert!(
+        source_port_y > node_center,
+        "{edge_id} should be able to leave {node_id} from the bottom side, got source y={source_port_y}, node center y={node_center}"
+    );
+}
+
+fn node_center_x(layout_data: &Value, node_id: &str) -> f64 {
+    let node = laid_out_node(layout_data, node_id);
+    point_coordinate(node, "x") + (point_coordinate(node, "width") / 2.0)
+}
+
+fn laid_out_edge<'a>(layout_data: &'a Value, edge_id: &str) -> &'a Value {
+    layout_data["edges"]
+        .as_array()
+        .expect("laid out edges should be an array")
+        .iter()
+        .find(|edge| edge["id"] == edge_id)
+        .unwrap_or_else(|| panic!("expected laid out edge {edge_id}"))
+}
+
+fn laid_out_node<'a>(layout_data: &'a Value, node_id: &str) -> &'a Value {
+    layout_data["nodes"]
+        .as_array()
+        .expect("laid out nodes should be an array")
+        .iter()
+        .find(|node| node["id"] == node_id)
+        .unwrap_or_else(|| panic!("expected laid out node {node_id}"))
 }
 
 fn corner_count(points: &[Value]) -> usize {
@@ -1222,6 +1391,15 @@ fn assert_complex_profile_svg(doc: &roxmltree::Document<'_>, svg: &str) {
     assert_reasonable_svg_aspect(svg, 6.5);
 }
 
+fn assert_archimate_node_shape(doc: &roxmltree::Document<'_>, node_id: &str, expected_shape: &str) {
+    let node = semantic_group(doc, "data-dediren-node-id", node_id);
+    assert!(
+        node.descendants()
+            .any(|child| child.attribute("data-dediren-node-shape") == Some(expected_shape)),
+        "{node_id} should render node shape {expected_shape}"
+    );
+}
+
 fn assert_archimate_edge_notation(
     doc: &roxmltree::Document<'_>,
     edge_id: &str,
@@ -1273,10 +1451,12 @@ fn complex_archimate_render_metadata() -> Value {
         ("catalog-service", "ApplicationService"),
         ("pricing-service", "ApplicationService"),
         ("order-service", "ApplicationService"),
+        ("gateway-and-junction", "AndJunction"),
         ("payment-service", "ApplicationService"),
         ("fulfillment-service", "ApplicationService"),
         ("notification-service", "ApplicationService"),
         ("event-bus", "ApplicationComponent"),
+        ("event-dispatch-or-junction", "OrJunction"),
         ("order-worker", "ApplicationProcess"),
         ("warehouse-adapter", "ApplicationComponent"),
         ("email-worker", "ApplicationProcess"),
@@ -1300,10 +1480,11 @@ fn complex_archimate_render_metadata() -> Value {
         ("cdn-serves-web", "Association"),
         ("web-calls-gateway", "Association"),
         ("admin-calls-gateway", "Association"),
-        ("gateway-authenticates", "Association"),
-        ("gateway-queries-catalog", "Association"),
-        ("gateway-prices-cart", "Association"),
-        ("gateway-places-order", "Association"),
+        ("gateway-to-and-junction", "Association"),
+        ("and-junction-authenticates", "Association"),
+        ("and-junction-queries-catalog", "Association"),
+        ("and-junction-prices-cart", "Association"),
+        ("and-junction-places-order", "Association"),
         ("identity-federates", "Flow"),
         ("identity-caches-session", "Access"),
         ("catalog-reads-products", "Access"),
@@ -1320,9 +1501,10 @@ fn complex_archimate_render_metadata() -> Value {
         ("fulfillment-syncs-warehouse", "Serving"),
         ("fulfillment-writes-warehouse", "Access"),
         ("fulfillment-publishes-events", "Triggering"),
-        ("event-bus-drives-order-worker", "Association"),
-        ("event-bus-drives-email-worker", "Association"),
-        ("event-bus-drives-reporting", "Association"),
+        ("event-bus-to-or-junction", "Triggering"),
+        ("event-bus-drives-order-worker", "Triggering"),
+        ("or-junction-drives-email-worker", "Triggering"),
+        ("or-junction-drives-reporting", "Triggering"),
         ("order-worker-reads-orders", "Access"),
         ("order-worker-syncs-erp", "Association"),
         ("warehouse-adapter-syncs-erp", "Association"),
