@@ -1,7 +1,8 @@
 use crate::{
-    validate_element_type, validate_relationship_type, ArchimateTypeKind,
-    ArchimateTypeValidationError,
+    is_relationship_connector_type, validate_element_type, validate_relationship_type,
+    ArchimateTypeKind, ArchimateTypeValidationError,
 };
+use std::collections::{BTreeMap, BTreeSet};
 
 // Source checked on 2026-05-12:
 // The Open Group ArchiMate 3.2 Specification, Section 5.7 and Appendix B.5
@@ -15,6 +16,27 @@ pub struct RelationshipEndpointTriple {
     pub target_type: &'static str,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct JunctionValidationNode {
+    pub id: String,
+    pub node_type: String,
+    pub path: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct JunctionValidationRelationship {
+    pub relationship_type: String,
+    pub source: String,
+    pub target: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ArchimateJunctionValidationError {
+    pub code: &'static str,
+    pub path: String,
+    pub message: String,
+}
+
 pub fn validate_relationship_endpoint_types(
     relationship_type: &str,
     source_type: &str,
@@ -26,6 +48,10 @@ pub fn validate_relationship_endpoint_types(
     validate_element_type(source_type, path.clone())?;
     validate_element_type(target_type, path.clone())?;
 
+    if is_relationship_connector_type(source_type) || is_relationship_connector_type(target_type) {
+        return Ok(());
+    }
+
     if is_relationship_endpoint_allowed(relationship_type, source_type, target_type) {
         Ok(())
     } else {
@@ -35,6 +61,180 @@ pub fn validate_relationship_endpoint_types(
             path,
         })
     }
+}
+
+pub fn validate_junction_relationship_semantics(
+    nodes: &[JunctionValidationNode],
+    relationships: &[JunctionValidationRelationship],
+) -> Result<(), ArchimateJunctionValidationError> {
+    let node_types: BTreeMap<&str, &str> = nodes
+        .iter()
+        .map(|node| (node.id.as_str(), node.node_type.as_str()))
+        .collect();
+    let node_paths: BTreeMap<&str, &str> = nodes
+        .iter()
+        .map(|node| (node.id.as_str(), node.path.as_str()))
+        .collect();
+
+    for node in nodes {
+        if !is_relationship_connector_type(&node.node_type) {
+            continue;
+        }
+
+        let incident_relationships: Vec<_> = relationships
+            .iter()
+            .filter(|relationship| relationship.source == node.id || relationship.target == node.id)
+            .filter(|relationship| !is_junction_containment_relationship(relationship, &node_types))
+            .collect();
+
+        let relationship_types: BTreeSet<_> = incident_relationships
+            .iter()
+            .map(|relationship| relationship.relationship_type.as_str())
+            .collect();
+        if relationship_types.len() > 1 {
+            return Err(ArchimateJunctionValidationError {
+                code: "DEDIREN_ARCHIMATE_JUNCTION_RELATIONSHIP_MIXED",
+                path: node.path.clone(),
+                message: format!(
+                    "ArchiMate junction {} connects multiple relationship types: {}",
+                    node.id,
+                    relationship_types
+                        .into_iter()
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ),
+            });
+        }
+
+        let has_incoming = incident_relationships
+            .iter()
+            .any(|relationship| relationship.target == node.id);
+        let has_outgoing = incident_relationships
+            .iter()
+            .any(|relationship| relationship.source == node.id);
+        if !has_incoming || !has_outgoing {
+            return Err(ArchimateJunctionValidationError {
+                code: "DEDIREN_ARCHIMATE_JUNCTION_DIRECTION_INCOMPLETE",
+                path: node.path.clone(),
+                message: format!(
+                    "ArchiMate junction {} must connect at least one incoming and at least one outgoing relationship",
+                    node.id
+                ),
+            });
+        }
+    }
+
+    for relationship in relationships
+        .iter()
+        .filter(|relationship| !is_junction_containment_relationship(relationship, &node_types))
+    {
+        let Some(source_type) = node_types.get(relationship.source.as_str()) else {
+            continue;
+        };
+        let Some(target_type) = node_types.get(relationship.target.as_str()) else {
+            continue;
+        };
+        if is_relationship_connector_type(source_type)
+            || !is_relationship_connector_type(target_type)
+        {
+            continue;
+        }
+
+        let path = node_paths
+            .get(relationship.target.as_str())
+            .copied()
+            .unwrap_or("$");
+        let mut visited = BTreeSet::new();
+        validate_junction_reachable_targets(
+            relationship.relationship_type.as_str(),
+            source_type,
+            relationship.target.as_str(),
+            path,
+            relationships,
+            &node_types,
+            &mut visited,
+        )?;
+    }
+
+    Ok(())
+}
+
+fn validate_junction_reachable_targets(
+    relationship_type: &str,
+    source_type: &str,
+    junction_id: &str,
+    path: &str,
+    relationships: &[JunctionValidationRelationship],
+    node_types: &BTreeMap<&str, &str>,
+    visited: &mut BTreeSet<String>,
+) -> Result<(), ArchimateJunctionValidationError> {
+    if !visited.insert(junction_id.to_string()) {
+        return Ok(());
+    }
+
+    for relationship in relationships.iter().filter(|relationship| {
+        relationship.source == junction_id
+            && relationship.relationship_type == relationship_type
+            && !is_junction_containment_relationship(relationship, node_types)
+    }) {
+        let Some(target_type) = node_types.get(relationship.target.as_str()) else {
+            continue;
+        };
+
+        if is_relationship_connector_type(target_type) {
+            validate_junction_reachable_targets(
+                relationship_type,
+                source_type,
+                relationship.target.as_str(),
+                path,
+                relationships,
+                node_types,
+                visited,
+            )?;
+            continue;
+        }
+
+        validate_relationship_endpoint_types(relationship_type, source_type, target_type, path)
+            .map_err(junction_endpoint_error)?;
+    }
+
+    Ok(())
+}
+
+fn junction_endpoint_error(
+    error: ArchimateTypeValidationError,
+) -> ArchimateJunctionValidationError {
+    ArchimateJunctionValidationError {
+        code: error.code(),
+        path: error.path.clone(),
+        message: error.message(),
+    }
+}
+
+fn is_junction_containment_relationship(
+    relationship: &JunctionValidationRelationship,
+    node_types: &BTreeMap<&str, &str>,
+) -> bool {
+    if !matches!(
+        relationship.relationship_type.as_str(),
+        "Aggregation" | "Composition"
+    ) {
+        return false;
+    }
+
+    let Some(source_type) = node_types.get(relationship.source.as_str()) else {
+        return false;
+    };
+    let Some(target_type) = node_types.get(relationship.target.as_str()) else {
+        return false;
+    };
+
+    (is_relationship_connector_type(source_type) && is_junction_container_type(target_type))
+        || (is_relationship_connector_type(target_type) && is_junction_container_type(source_type))
+}
+
+fn is_junction_container_type(node_type: &str) -> bool {
+    matches!(node_type, "Plateau" | "Grouping" | "Location")
 }
 
 pub fn relationship_endpoint_triples() -> Vec<RelationshipEndpointTriple> {

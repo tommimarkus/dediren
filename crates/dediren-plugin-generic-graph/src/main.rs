@@ -2,7 +2,10 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::io::Read;
 
 use anyhow::{bail, Context};
-use dediren_archimate::ArchimateTypeValidationError;
+use dediren_archimate::{
+    ArchimateJunctionValidationError, ArchimateTypeValidationError, JunctionValidationNode,
+    JunctionValidationRelationship,
+};
 use dediren_contracts::{
     CommandEnvelope, Diagnostic, DiagnosticSeverity, GenericGraphPluginData,
     GenericGraphViewGroupRole, GroupProvenance, LayoutEdge, LayoutGroup, LayoutLabel, LayoutNode,
@@ -52,12 +55,16 @@ fn main() -> anyhow::Result<()> {
         .find(|candidate| candidate.id == view)
         .with_context(|| format!("missing generic-graph view {view}"))?;
 
-    if target == "render-metadata" {
-        if source_semantic_profile(&source) == "archimate" {
-            if let Err(error) = validate_archimate_source_types(&source) {
-                exit_with_archimate_type_error(error);
-            }
+    if source_semantic_profile(&source) == "archimate" {
+        if let Err(error) = validate_archimate_source_types(&source) {
+            exit_with_archimate_type_error(error);
         }
+        if let Err(error) = validate_archimate_junction_semantics(&source) {
+            exit_with_diagnostic(&error.code, &error.message, Some(error.path));
+        }
+    }
+
+    if target == "render-metadata" {
         let metadata = project_render_metadata(&source, selected_view)?;
         println!("{}", serde_json::to_string(&CommandEnvelope::ok(metadata))?);
         return Ok(());
@@ -76,8 +83,8 @@ fn main() -> anyhow::Result<()> {
                 id: source_node.id.clone(),
                 label: source_node.label.clone(),
                 source_id: source_node.id.clone(),
-                width_hint: Some(160.0),
-                height_hint: Some(80.0),
+                width_hint: Some(layout_width_hint(&source, source_node)),
+                height_hint: Some(layout_height_hint(&source, source_node)),
             })
         })
         .collect::<anyhow::Result<Vec<_>>>()?;
@@ -186,6 +193,9 @@ fn validate_from_stdin(args: &[String]) -> anyhow::Result<()> {
     if let Err(error) = validate_archimate_source_types(&source) {
         exit_with_archimate_type_error(error);
     }
+    if let Err(error) = validate_archimate_junction_semantics(&source) {
+        exit_with_diagnostic(&error.code, &error.message, Some(error.path));
+    }
 
     let result = SemanticValidationResult {
         semantic_validation_result_schema_version: SEMANTIC_VALIDATION_RESULT_SCHEMA_VERSION
@@ -285,6 +295,26 @@ fn source_semantic_profile(source: &SourceDocument) -> &'static str {
     }
 }
 
+fn layout_width_hint(source: &SourceDocument, source_node: &dediren_contracts::SourceNode) -> f64 {
+    if source_semantic_profile(source) == "archimate"
+        && dediren_archimate::is_relationship_connector_type(&source_node.node_type)
+    {
+        28.0
+    } else {
+        160.0
+    }
+}
+
+fn layout_height_hint(source: &SourceDocument, source_node: &dediren_contracts::SourceNode) -> f64 {
+    if source_semantic_profile(source) == "archimate"
+        && dediren_archimate::is_relationship_connector_type(&source_node.node_type)
+    {
+        28.0
+    } else {
+        80.0
+    }
+}
+
 fn validate_archimate_source_types(
     source: &SourceDocument,
 ) -> Result<(), ArchimateTypeValidationError> {
@@ -318,6 +348,32 @@ fn validate_archimate_source_types(
         )?;
     }
     Ok(())
+}
+
+fn validate_archimate_junction_semantics(
+    source: &SourceDocument,
+) -> Result<(), ArchimateJunctionValidationError> {
+    let nodes = source
+        .nodes
+        .iter()
+        .enumerate()
+        .map(|(index, node)| JunctionValidationNode {
+            id: node.id.clone(),
+            node_type: node.node_type.clone(),
+            path: format!("$.nodes[{index}]"),
+        })
+        .collect::<Vec<_>>();
+    let relationships = source
+        .relationships
+        .iter()
+        .map(|relationship| JunctionValidationRelationship {
+            relationship_type: relationship.relationship_type.clone(),
+            source: relationship.source.clone(),
+            target: relationship.target.clone(),
+        })
+        .collect::<Vec<_>>();
+
+    dediren_archimate::validate_junction_relationship_semantics(&nodes, &relationships)
 }
 
 fn exit_with_archimate_type_error(error: ArchimateTypeValidationError) -> ! {

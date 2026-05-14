@@ -474,6 +474,8 @@ pub enum SvgNodeDecorator {
     ArchimateImplementationEvent,
     ArchimateGap,
     ArchimateGrouping,
+    ArchimateAndJunction,
+    ArchimateOrJunction,
     ArchimateLocation,
     ArchimateStakeholder,
     ArchimateDriver,

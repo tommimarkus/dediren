@@ -88,6 +88,8 @@
             "archimate_implementation_event",
             "archimate_gap",
             "archimate_grouping",
+            "archimate_and_junction",
+            "archimate_or_junction",
             "archimate_location",
             "archimate_stakeholder",
             "archimate_driver",

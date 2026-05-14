@@ -168,6 +168,65 @@ fn svg_renderer_covers_each_archimate_square_node_type() {
 }
 
 #[test]
+fn svg_renderer_renders_archimate_junction_nodes_as_circle_symbols() {
+    let policy = serde_json::from_str::<serde_json::Value>(
+        &std::fs::read_to_string(workspace_file("fixtures/render-policy/archimate-svg.json"))
+            .unwrap(),
+    )
+    .unwrap();
+    let input = archimate_render_input(
+        policy,
+        serde_json::json!([
+            {
+                "id": "and-junction",
+                "source_id": "and-junction",
+                "projection_id": "and-junction",
+                "x": 80,
+                "y": 80,
+                "width": 28,
+                "height": 28,
+                "label": ""
+            },
+            {
+                "id": "or-junction",
+                "source_id": "or-junction",
+                "projection_id": "or-junction",
+                "x": 160,
+                "y": 80,
+                "width": 28,
+                "height": 28,
+                "label": ""
+            }
+        ]),
+        serde_json::json!([]),
+        serde_json::json!({
+            "and-junction": { "type": "AndJunction", "source_id": "and-junction" },
+            "or-junction": { "type": "OrJunction", "source_id": "or-junction" }
+        }),
+        serde_json::json!({}),
+    );
+
+    let content = render_content(input);
+    let doc = svg_doc(&content);
+
+    let and_junction = semantic_group(&doc, "data-dediren-node-id", "and-junction");
+    let and_shape = child_node_shape(and_junction);
+    assert_eq!(
+        and_shape.attribute("data-dediren-node-shape"),
+        Some("archimate_and_junction")
+    );
+    assert_eq!(and_shape.attribute("fill"), Some("#111827"));
+
+    let or_junction = semantic_group(&doc, "data-dediren-node-id", "or-junction");
+    let or_shape = child_node_shape(or_junction);
+    assert_eq!(
+        or_shape.attribute("data-dediren-node-shape"),
+        Some("archimate_or_junction")
+    );
+    assert_eq!(or_shape.attribute("fill"), Some("#ffffff"));
+}
+
+#[test]
 fn svg_renderer_applies_archimate_business_actor_decorator() {
     let mut input = archimate_style_input();
     input["layout_result"]["nodes"]

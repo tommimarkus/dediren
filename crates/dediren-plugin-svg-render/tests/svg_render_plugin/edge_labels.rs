@@ -349,6 +349,52 @@ fn svg_renderer_allows_centered_horizontal_edge_labels_by_policy() {
 }
 
 #[test]
+fn svg_renderer_places_shared_source_junction_label_on_unique_branch() {
+    let input = styled_inline_input(
+        serde_json::json!([]),
+        serde_json::json!([]),
+        serde_json::json!([
+            {
+                "id": "gateway-prices-cart",
+                "source": "api-gateway",
+                "target": "pricing-service",
+                "source_id": "gateway-prices-cart",
+                "projection_id": "gateway-prices-cart",
+                "routing_hints": ["shared_source_junction"],
+                "points": [
+                    { "x": 0, "y": 120 },
+                    { "x": 100, "y": 120 },
+                    { "x": 100, "y": 40 },
+                    { "x": 300, "y": 40 }
+                ],
+                "label": "prices cart"
+            }
+        ]),
+        serde_json::json!({
+            "edge": {
+                "label_horizontal_position": "center"
+            }
+        }),
+    );
+    let content = render_content(input);
+    let doc = svg_doc(&content);
+
+    let edge = semantic_group(&doc, "data-dediren-edge-id", "gateway-prices-cart");
+    let label = child_element(edge, "text");
+    let x = label.attribute("x").unwrap().parse::<f64>().unwrap();
+    let y = label.attribute("y").unwrap().parse::<f64>().unwrap();
+
+    assert!(
+        (x - 200.0).abs() <= 1.0,
+        "shared-source labels should use the unique downstream branch, got x={x}"
+    );
+    assert!(
+        (y - 40.0).abs() <= 18.0,
+        "shared-source labels should stay close to the unique downstream branch, got y={y}"
+    );
+}
+
+#[test]
 fn svg_renderer_paints_edge_label_with_background_halo() {
     let input = styled_inline_input(
         serde_json::json!([]),

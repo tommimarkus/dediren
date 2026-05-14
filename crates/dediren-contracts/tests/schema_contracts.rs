@@ -468,13 +468,18 @@ fn plugin_manifest_matches_schema() {
 }
 
 #[test]
-fn readme_documents_archimate_connector_junction_boundary() {
+fn readme_documents_archimate_connector_junction_support_and_generated_hints() {
     let readme = std::fs::read_to_string(workspace_file("README.md")).unwrap();
     assert!(
-        readme.contains("Relationship connectors and junctions are not supported")
-            && readme.contains("first-class source")
+        readme.contains("Relationship connector junctions are supported")
+            && readme.contains("AndJunction")
+            && readme.contains("OrJunction")
+            && readme.contains("at least one incoming and one outgoing relationship")
+            && readme.contains("contiguous junction chains")
+            && readme.contains("treated as")
+            && readme.contains("containment")
             && readme.contains("shared_source_junction"),
-        "README.md should document the ArchiMate connector/junction source boundary"
+        "README.md should document source junction support and generated route hints"
     );
 }
 
@@ -847,6 +852,8 @@ const ARCHIMATE_NODE_TYPES: &[&str] = &[
     "ImplementationEvent",
     "Gap",
     "Grouping",
+    "AndJunction",
+    "OrJunction",
     "Location",
     "Stakeholder",
     "Driver",

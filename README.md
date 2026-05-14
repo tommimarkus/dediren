@@ -38,18 +38,18 @@ Runtime prerequisite:
 
 - Java 21 or newer available as `java` on `PATH`.
 
-For the current `0.6.0` version, the xtask creates:
+For the current `0.7.0` version, the xtask creates:
 
 ```text
-dist/dediren-agent-bundle-0.6.0-x86_64-unknown-linux-gnu/
-dist/dediren-agent-bundle-0.6.0-x86_64-unknown-linux-gnu.tar.gz
+dist/dediren-agent-bundle-0.7.0-x86_64-unknown-linux-gnu/
+dist/dediren-agent-bundle-0.7.0-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Run the smoke test from a shell where `java -version` resolves to Java 21 or
 newer:
 
 ```bash
-cargo xtask dist smoke dist/dediren-agent-bundle-0.6.0-x86_64-unknown-linux-gnu.tar.gz
+cargo xtask dist smoke dist/dediren-agent-bundle-0.7.0-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Concurrent `cargo xtask dist build` invocations serialize on a repo-local lock
@@ -60,8 +60,8 @@ Unpack and run it anywhere:
 
 ```bash
 mkdir -p /tmp/dediren-dist
-tar -xzf dist/dediren-agent-bundle-0.6.0-x86_64-unknown-linux-gnu.tar.gz -C /tmp/dediren-dist
-/tmp/dediren-dist/dediren-agent-bundle-0.6.0-x86_64-unknown-linux-gnu/bin/dediren --help
+tar -xzf dist/dediren-agent-bundle-0.7.0-x86_64-unknown-linux-gnu.tar.gz -C /tmp/dediren-dist
+/tmp/dediren-dist/dediren-agent-bundle-0.7.0-x86_64-unknown-linux-gnu/bin/dediren --help
 ```
 
 The archive includes first-party plugin manifests under `plugins/`, first-party
@@ -206,6 +206,21 @@ rules. Use the ArchiMate/OEF element name `Node` for technology nodes; aliases
 such as `TechnologyNode` are not accepted in ArchiMate metadata or export
 source.
 
+Relationship connector junctions are supported with the ArchiMate/OEF element
+types `AndJunction` and `OrJunction`. Author a junction as a source node,
+include it in the generic-graph view `nodes`, and connect relationships through
+that node. Validation allows relationship endpoints to touch junction nodes, but
+each junction must connect at least one incoming and one outgoing relationship,
+and non-containment relationships incident to one junction must use the same
+ArchiMate relationship type. Validation follows contiguous junction chains and
+rejects them when the equivalent direct relationship between the non-junction
+endpoint concepts is not allowed. `Composition` or `Aggregation` relationships
+between a junction and a `Plateau`, `Grouping`, or `Location` are treated as
+containment and do not count as the junction relationship type. Projection gives
+junction nodes compact layout size hints, SVG renders them as filled
+`AndJunction` and open `OrJunction` circles, and OEF export emits them as normal
+relationship connector elements and view nodes.
+
 ### Groups
 
 `plugins.generic-graph.views[].groups` are layout containers. Give each group
@@ -222,14 +237,10 @@ uses generated geometry, SVG can render ArchiMate grouping notation, and OEF
 export can emit an ArchiMate Grouping view node. Do not use layout-only groups
 for ArchiMate semantic Grouping.
 
-Relationship connectors and junctions are not supported as first-class source
-concepts in `model.schema.v1`; source relationship endpoints must reference
-source node IDs. Generated ELK layout results may carry
-`routing_hints` such as `shared_source_junction` and `shared_target_junction`,
-but those are renderer advice for generated route trunks, not source-authored
-ArchiMate connector or junction elements. Use direct relationships today; model
-connector/junction fan-in or fan-out only after a future source-schema slice adds
-explicit validation, projection, layout, render, and OEF export support.
+Generated ELK layout results may also carry `routing_hints` such as
+`shared_source_junction` and `shared_target_junction`. Those hints are renderer
+advice for generated route trunks and remain separate from source-authored
+ArchiMate `AndJunction` or `OrJunction` elements.
 
 Create render metadata, then render with the ArchiMate policy:
 
@@ -432,7 +443,7 @@ newer:
 
 ```bash
 cargo xtask dist build
-cargo xtask dist smoke dist/dediren-agent-bundle-0.6.0-x86_64-unknown-linux-gnu.tar.gz
+cargo xtask dist smoke dist/dediren-agent-bundle-0.7.0-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Focused checks:

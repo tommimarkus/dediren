@@ -947,6 +947,12 @@ fn group_decorator(group: &LaidOutGroup, style: &ResolvedGroupStyle) -> String {
 
 fn node_shape(node: &LaidOutNode, style: &ResolvedNodeStyle) -> String {
     if let Some(decorator) = style.decorator {
+        if matches!(
+            decorator,
+            SvgNodeDecorator::ArchimateAndJunction | SvgNodeDecorator::ArchimateOrJunction
+        ) {
+            return archimate_junction_node_shape(node, style, decorator);
+        }
         return archimate_rectangular_node_shape(node, style, decorator);
     }
     format!(
@@ -957,6 +963,31 @@ fn node_shape(node: &LaidOutNode, style: &ResolvedNodeStyle) -> String {
         node.height,
         svg_style_number(style.rx),
         escape_attr(&style.fill),
+        escape_attr(&style.stroke),
+        svg_style_number(style.stroke_width)
+    )
+}
+
+fn archimate_junction_node_shape(
+    node: &LaidOutNode,
+    style: &ResolvedNodeStyle,
+    decorator: SvgNodeDecorator,
+) -> String {
+    let center_x = node.x + node.width / 2.0;
+    let center_y = node.y + node.height / 2.0;
+    let radius = (node.width.min(node.height) / 2.0 - style.stroke_width).max(4.0);
+    let (shape_name, fill) = match decorator {
+        SvgNodeDecorator::ArchimateAndJunction => ("archimate_and_junction", style.stroke.as_str()),
+        SvgNodeDecorator::ArchimateOrJunction => ("archimate_or_junction", style.fill.as_str()),
+        _ => unreachable!("junction node shape only accepts junction decorators"),
+    };
+    format!(
+        r##"<circle data-dediren-node-shape="{}" cx="{:.1}" cy="{:.1}" r="{:.1}" fill="{}" stroke="{}" stroke-width="{}"/>"##,
+        shape_name,
+        center_x,
+        center_y,
+        radius,
+        escape_attr(fill),
         escape_attr(&style.stroke),
         svg_style_number(style.stroke_width)
     )
@@ -1053,6 +1084,9 @@ fn is_archimate_rounded_rectangle(decorator: SvgNodeDecorator) -> bool {
 }
 fn node_decorator(node: &LaidOutNode, style: &ResolvedNodeStyle) -> String {
     match style.decorator {
+        Some(SvgNodeDecorator::ArchimateAndJunction | SvgNodeDecorator::ArchimateOrJunction) => {
+            String::new()
+        }
         Some(SvgNodeDecorator::ArchimateBusinessActor) => {
             archimate_business_actor_decorator(node, style)
         }
@@ -1094,6 +1128,7 @@ enum ArchimateIconKind {
     Representation,
     Location,
     Grouping,
+    Junction,
     Stakeholder,
     Driver,
     Goal,
@@ -1143,6 +1178,7 @@ impl ArchimateIconKind {
             ArchimateIconKind::Representation => "representation",
             ArchimateIconKind::Location => "location",
             ArchimateIconKind::Grouping => "grouping",
+            ArchimateIconKind::Junction => "junction",
             ArchimateIconKind::Stakeholder => "stakeholder",
             ArchimateIconKind::Driver => "driver",
             ArchimateIconKind::Goal => "goal",
@@ -1217,6 +1253,9 @@ fn archimate_icon_kind(decorator: SvgNodeDecorator) -> ArchimateIconKind {
         SvgNodeDecorator::ArchimateRepresentation => ArchimateIconKind::Representation,
         SvgNodeDecorator::ArchimateLocation => ArchimateIconKind::Location,
         SvgNodeDecorator::ArchimateGrouping => ArchimateIconKind::Grouping,
+        SvgNodeDecorator::ArchimateAndJunction | SvgNodeDecorator::ArchimateOrJunction => {
+            ArchimateIconKind::Junction
+        }
         SvgNodeDecorator::ArchimateStakeholder => ArchimateIconKind::Stakeholder,
         SvgNodeDecorator::ArchimateDriver => ArchimateIconKind::Driver,
         SvgNodeDecorator::ArchimateGoal => ArchimateIconKind::Goal,
@@ -1633,6 +1672,7 @@ fn archimate_symbol_decorator(
     let fill = escape_attr(&style.fill);
     let width = svg_style_number(style.stroke_width);
     let body = match kind {
+        ArchimateIconKind::Junction => String::new(),
         ArchimateIconKind::Actor => archimate_actor_icon_body(x, y, size, &fill, &stroke, &width),
         ArchimateIconKind::Interface => format!(
             r#"<ellipse cx="{:.1}" cy="{:.1}" rx="{:.1}" ry="{:.1}" fill="{}" stroke="{}" stroke-width="{}"/><path d="M {:.1} {:.1} L {:.1} {:.1}" fill="none" stroke="{}" stroke-width="{}"/>"#,
@@ -3456,7 +3496,7 @@ fn edge_label_position_for_edge(
     style: &ResolvedEdgeStyle,
     occupied_boxes: &[LabelBox],
 ) -> Option<LabelPlacement> {
-    edge_label_anchors(&edge.points, style)
+    edge_label_anchors(edge, style)
         .into_iter()
         .map(|anchor| {
             let (label_x, label_y, label_box) = edge_label_position(
@@ -3726,10 +3766,11 @@ enum LabelAnchorOrientation {
     Vertical,
 }
 
-fn edge_label_anchors(points: &[Point], style: &ResolvedEdgeStyle) -> Vec<LabelAnchor> {
-    let mut anchors = horizontal_segment_anchors(points, style);
+fn edge_label_anchors(edge: &LaidOutEdge, style: &ResolvedEdgeStyle) -> Vec<LabelAnchor> {
+    let mut anchors = horizontal_segment_anchors(edge, style);
     if anchors.is_empty() {
-        if let Some(point) = route_point_by_vertical_position(points, style.label_vertical_position)
+        if let Some(point) =
+            route_point_by_vertical_position(&edge.points, style.label_vertical_position)
         {
             anchors.push(LabelAnchor {
                 point,
@@ -3745,7 +3786,8 @@ fn edge_label_anchors(points: &[Point], style: &ResolvedEdgeStyle) -> Vec<LabelA
     anchors
 }
 
-fn horizontal_segment_anchors(points: &[Point], style: &ResolvedEdgeStyle) -> Vec<LabelAnchor> {
+fn horizontal_segment_anchors(edge: &LaidOutEdge, style: &ResolvedEdgeStyle) -> Vec<LabelAnchor> {
+    let points = &edge.points;
     let mut segments: Vec<(usize, &Point, &Point, f64)> = Vec::new();
     for (index, segment) in points.windows(2).enumerate() {
         let start = &segment[0];
@@ -3757,21 +3799,31 @@ fn horizontal_segment_anchors(points: &[Point], style: &ResolvedEdgeStyle) -> Ve
         segments.push((index, start, end, length));
     }
 
+    let segment_count = segments.len();
+    let prefer_target_branch = has_routing_hint(edge, SHARED_SOURCE_JUNCTION_HINT)
+        && !has_routing_hint(edge, SHARED_TARGET_JUNCTION_HINT);
     segments
         .into_iter()
         .enumerate()
-        .map(|(route_order, (index, start, end, length))| LabelAnchor {
-            point: horizontal_label_point(start, end, length, style.label_horizontal_position),
-            orientation: LabelAnchorOrientation::Horizontal,
-            horizontal_side: Some(horizontal_side_for_segment(
-                points,
-                index,
-                style.label_horizontal_side,
-            )),
-            horizontal_direction: if end.x >= start.x { 1.0 } else { -1.0 },
-            horizontal_center_x: Some(start.x + (end.x - start.x) / 2.0),
-            vertical_side: None,
-            route_order,
+        .map(|(route_order, (index, start, end, length))| {
+            let route_order = if prefer_target_branch {
+                segment_count - route_order - 1
+            } else {
+                route_order
+            };
+            LabelAnchor {
+                point: horizontal_label_point(start, end, length, style.label_horizontal_position),
+                orientation: LabelAnchorOrientation::Horizontal,
+                horizontal_side: Some(horizontal_side_for_segment(
+                    points,
+                    index,
+                    style.label_horizontal_side,
+                )),
+                horizontal_direction: if end.x >= start.x { 1.0 } else { -1.0 },
+                horizontal_center_x: Some(start.x + (end.x - start.x) / 2.0),
+                vertical_side: None,
+                route_order,
+            }
         })
         .collect()
 }

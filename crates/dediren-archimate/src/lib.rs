@@ -1,7 +1,9 @@
 mod relationship_rules;
 
 pub use relationship_rules::{
-    relationship_endpoint_triples, validate_relationship_endpoint_types, RelationshipEndpointTriple,
+    relationship_endpoint_triples, validate_junction_relationship_semantics,
+    validate_relationship_endpoint_types, ArchimateJunctionValidationError, JunctionValidationNode,
+    JunctionValidationRelationship, RelationshipEndpointTriple,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -62,6 +64,10 @@ pub fn validate_element_type(
     }
 }
 
+pub fn is_relationship_connector_type(value: &str) -> bool {
+    RELATIONSHIP_CONNECTOR_TYPES.contains(&value)
+}
+
 pub fn validate_relationship_type(
     value: &str,
     path: impl Into<String>,
@@ -77,12 +83,16 @@ pub fn validate_relationship_type(
     }
 }
 
+pub const RELATIONSHIP_CONNECTOR_TYPES: &[&str] = &["AndJunction", "OrJunction"];
+
 pub const ELEMENT_TYPES: &[&str] = &[
     "Plateau",
     "WorkPackage",
     "Deliverable",
     "ImplementationEvent",
     "Gap",
+    "AndJunction",
+    "OrJunction",
     "Grouping",
     "Location",
     "Stakeholder",

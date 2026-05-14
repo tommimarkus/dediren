@@ -50,6 +50,8 @@
       "ImplementationEvent": { "fill": "#f8cecc", "stroke": "#b85450", "label_fill": "#5f1f1b", "decorator": "archimate_implementation_event" },
       "Gap": { "fill": "#f8cecc", "stroke": "#b85450", "label_fill": "#5f1f1b", "decorator": "archimate_gap" },
       "Grouping": { "fill": "#ffffff", "stroke": "#64748b", "label_fill": "#334155", "decorator": "archimate_grouping" },
+      "AndJunction": { "fill": "#ffffff", "stroke": "#111827", "label_fill": "#111827", "decorator": "archimate_and_junction" },
+      "OrJunction": { "fill": "#ffffff", "stroke": "#111827", "label_fill": "#111827", "decorator": "archimate_or_junction" },
       "Location": { "fill": "#ead1dc", "stroke": "#a64d79", "label_fill": "#741b47", "decorator": "archimate_location" },
       "Stakeholder": { "fill": "#d9d2e9", "stroke": "#674ea7", "label_fill": "#351c75", "decorator": "archimate_stakeholder" },
       "Driver": { "fill": "#d9d2e9", "stroke": "#674ea7", "label_fill": "#351c75", "decorator": "archimate_driver" },

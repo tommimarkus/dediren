@@ -20,6 +20,12 @@ const REQUIRED_REJECTED_RELATIONSHIPS: &[(&str, &str, &str)] = &[
 ];
 
 #[test]
+fn relationship_connector_types_are_supported_element_types() {
+    assert!(ELEMENT_TYPES.contains(&"AndJunction"));
+    assert!(ELEMENT_TYPES.contains(&"OrJunction"));
+}
+
+#[test]
 fn accepts_current_archimate_oef_fixture_relationship() {
     validate_relationship_endpoint_types(
         "Realization",
@@ -28,6 +34,25 @@ fn accepts_current_archimate_oef_fixture_relationship() {
         "$.relationships[0]",
     )
     .expect("ApplicationComponent should realize ApplicationService in ArchiMate 3.2");
+}
+
+#[test]
+fn relationship_connector_endpoints_are_allowed_for_supported_relationship_types() {
+    validate_relationship_endpoint_types(
+        "Flow",
+        "ApplicationComponent",
+        "AndJunction",
+        "$.relationships[0]",
+    )
+    .expect("relationships may target an ArchiMate relationship connector");
+
+    validate_relationship_endpoint_types(
+        "Flow",
+        "AndJunction",
+        "ApplicationService",
+        "$.relationships[1]",
+    )
+    .expect("relationships may source from an ArchiMate relationship connector");
 }
 
 #[test]

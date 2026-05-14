@@ -2,7 +2,10 @@ use std::collections::{BTreeMap, HashSet};
 use std::io::{Cursor, Read};
 
 use anyhow::{bail, Context};
-use dediren_archimate::ArchimateTypeValidationError;
+use dediren_archimate::{
+    ArchimateJunctionValidationError, ArchimateTypeValidationError, JunctionValidationNode,
+    JunctionValidationRelationship,
+};
 use dediren_contracts::{
     CommandEnvelope, Diagnostic, DiagnosticSeverity, ExportResult, LaidOutGroup, OefExportInput,
     EXPORT_RESULT_SCHEMA_VERSION, PLUGIN_PROTOCOL_VERSION,
@@ -44,6 +47,9 @@ fn export_from_stdin() -> anyhow::Result<()> {
     let request: OefExportInput = serde_json::from_str(&input)?;
     if let Err(error) = validate_archimate_types(&request) {
         exit_with_archimate_type_error(error);
+    }
+    if let Err(error) = validate_archimate_junction_semantics(&request) {
+        exit_with_diagnostic(&error.code, &error.message, Some(error.path));
     }
     if let Err(error) = validate_archimate_group_semantics(&request) {
         exit_with_diagnostic(&error.code, &error.message, Some(error.path));
@@ -307,6 +313,34 @@ fn validate_archimate_types(request: &OefExportInput) -> Result<(), ArchimateTyp
         )?;
     }
     Ok(())
+}
+
+fn validate_archimate_junction_semantics(
+    request: &OefExportInput,
+) -> Result<(), ArchimateJunctionValidationError> {
+    let nodes = request
+        .source
+        .nodes
+        .iter()
+        .enumerate()
+        .map(|(index, node)| JunctionValidationNode {
+            id: node.id.clone(),
+            node_type: node.node_type.clone(),
+            path: format!("$.source.nodes[{index}]"),
+        })
+        .collect::<Vec<_>>();
+    let relationships = request
+        .source
+        .relationships
+        .iter()
+        .map(|relationship| JunctionValidationRelationship {
+            relationship_type: relationship.relationship_type.clone(),
+            source: relationship.source.clone(),
+            target: relationship.target.clone(),
+        })
+        .collect::<Vec<_>>();
+
+    dediren_archimate::validate_junction_relationship_semantics(&nodes, &relationships)
 }
 
 #[derive(Debug)]

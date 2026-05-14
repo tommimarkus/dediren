@@ -234,6 +234,360 @@ fn generic_graph_projects_group_render_metadata_for_semantic_source_id() {
 }
 
 #[test]
+fn generic_graph_projects_archimate_junctions_as_small_layout_nodes() {
+    let input = serde_json::json!({
+        "model_schema_version": "model.schema.v1",
+        "required_plugins": [
+            { "id": "generic-graph", "version": "0.7.0" },
+            { "id": "archimate-oef", "version": "0.7.0" }
+        ],
+        "nodes": [
+            { "id": "api", "type": "ApplicationComponent", "label": "API", "properties": {} },
+            { "id": "flow-junction", "type": "AndJunction", "label": "", "properties": {} },
+            { "id": "orders", "type": "ApplicationService", "label": "Orders", "properties": {} },
+            { "id": "billing", "type": "ApplicationService", "label": "Billing", "properties": {} }
+        ],
+        "relationships": [
+            { "id": "api-to-junction", "type": "Flow", "source": "api", "target": "flow-junction", "label": "", "properties": {} },
+            { "id": "junction-to-orders", "type": "Flow", "source": "flow-junction", "target": "orders", "label": "", "properties": {} },
+            { "id": "junction-to-billing", "type": "Flow", "source": "flow-junction", "target": "billing", "label": "", "properties": {} }
+        ],
+        "plugins": {
+            "generic-graph": {
+                "views": [
+                    {
+                        "id": "main",
+                        "label": "Main",
+                        "nodes": ["api", "flow-junction", "orders", "billing"],
+                        "relationships": ["api-to-junction", "junction-to-orders", "junction-to-billing"]
+                    }
+                ]
+            }
+        }
+    });
+
+    let mut cmd = common::plugin_command();
+    let output = cmd
+        .args(["project", "--target", "layout-request", "--view", "main"])
+        .write_stdin(serde_json::to_string(&input).unwrap())
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let data = common::ok_data(&output);
+    let junction = data["nodes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|node| node["id"] == "flow-junction")
+        .expect("projected layout request should contain the junction node");
+    assert_eq!(junction["width_hint"], serde_json::json!(28.0));
+    assert_eq!(junction["height_hint"], serde_json::json!(28.0));
+}
+
+#[test]
+fn generic_graph_projects_archimate_junction_render_metadata() {
+    let input = serde_json::json!({
+        "model_schema_version": "model.schema.v1",
+        "required_plugins": [
+            { "id": "generic-graph", "version": "0.7.0" },
+            { "id": "archimate-oef", "version": "0.7.0" }
+        ],
+        "nodes": [
+            { "id": "api", "type": "ApplicationComponent", "label": "API", "properties": {} },
+            { "id": "flow-junction", "type": "OrJunction", "label": "", "properties": {} },
+            { "id": "orders", "type": "ApplicationService", "label": "Orders", "properties": {} }
+        ],
+        "relationships": [
+            { "id": "api-to-junction", "type": "Flow", "source": "api", "target": "flow-junction", "label": "", "properties": {} },
+            { "id": "junction-to-orders", "type": "Flow", "source": "flow-junction", "target": "orders", "label": "", "properties": {} }
+        ],
+        "plugins": {
+            "generic-graph": {
+                "views": [
+                    {
+                        "id": "main",
+                        "label": "Main",
+                        "nodes": ["api", "flow-junction", "orders"],
+                        "relationships": ["api-to-junction", "junction-to-orders"]
+                    }
+                ]
+            }
+        }
+    });
+
+    let mut cmd = common::plugin_command();
+    let output = cmd
+        .args(["project", "--target", "render-metadata", "--view", "main"])
+        .write_stdin(serde_json::to_string(&input).unwrap())
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let data = common::ok_data(&output);
+    assert_eq!(
+        data["nodes"]["flow-junction"],
+        serde_json::json!({ "type": "OrJunction", "source_id": "flow-junction" })
+    );
+}
+
+#[test]
+fn generic_graph_rejects_archimate_junction_with_mixed_relationship_types() {
+    let input = serde_json::json!({
+        "model_schema_version": "model.schema.v1",
+        "required_plugins": [
+            { "id": "generic-graph", "version": "0.7.0" },
+            { "id": "archimate-oef", "version": "0.7.0" }
+        ],
+        "nodes": [
+            { "id": "api", "type": "ApplicationComponent", "label": "API", "properties": {} },
+            { "id": "junction", "type": "AndJunction", "label": "", "properties": {} },
+            { "id": "orders", "type": "ApplicationService", "label": "Orders", "properties": {} }
+        ],
+        "relationships": [
+            { "id": "api-to-junction", "type": "Flow", "source": "api", "target": "junction", "label": "", "properties": {} },
+            { "id": "junction-to-orders", "type": "Serving", "source": "junction", "target": "orders", "label": "", "properties": {} }
+        ],
+        "plugins": {
+            "generic-graph": {
+                "views": [
+                    {
+                        "id": "main",
+                        "label": "Main",
+                        "nodes": ["api", "junction", "orders"],
+                        "relationships": ["api-to-junction", "junction-to-orders"]
+                    }
+                ]
+            }
+        }
+    });
+
+    let mut cmd = common::plugin_command();
+    let output = cmd
+        .args(["validate", "--profile", "archimate"])
+        .write_stdin(serde_json::to_string(&input).unwrap())
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+
+    let envelope =
+        common::assert_error_code(&output, "DEDIREN_ARCHIMATE_JUNCTION_RELATIONSHIP_MIXED");
+    let message = envelope["diagnostics"][0]["message"].as_str().unwrap();
+    assert!(message.contains("junction"));
+    assert!(message.contains("Flow"));
+    assert!(message.contains("Serving"));
+}
+
+#[test]
+fn generic_graph_rejects_archimate_junction_with_invalid_effective_endpoint() {
+    let input = serde_json::json!({
+        "model_schema_version": "model.schema.v1",
+        "required_plugins": [
+            { "id": "generic-graph", "version": "0.7.0" },
+            { "id": "archimate-oef", "version": "0.7.0" }
+        ],
+        "nodes": [
+            { "id": "service", "type": "ApplicationService", "label": "Service", "properties": {} },
+            { "id": "junction", "type": "AndJunction", "label": "", "properties": {} },
+            { "id": "component", "type": "ApplicationComponent", "label": "Component", "properties": {} }
+        ],
+        "relationships": [
+            { "id": "service-to-junction", "type": "Realization", "source": "service", "target": "junction", "label": "", "properties": {} },
+            { "id": "junction-to-component", "type": "Realization", "source": "junction", "target": "component", "label": "", "properties": {} }
+        ],
+        "plugins": {
+            "generic-graph": {
+                "views": [
+                    {
+                        "id": "main",
+                        "label": "Main",
+                        "nodes": ["service", "junction", "component"],
+                        "relationships": ["service-to-junction", "junction-to-component"]
+                    }
+                ]
+            }
+        }
+    });
+
+    let mut cmd = common::plugin_command();
+    let output = cmd
+        .args(["validate", "--profile", "archimate"])
+        .write_stdin(serde_json::to_string(&input).unwrap())
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+
+    let envelope = common::assert_error_code(
+        &output,
+        "DEDIREN_ARCHIMATE_RELATIONSHIP_ENDPOINT_UNSUPPORTED",
+    );
+    let message = envelope["diagnostics"][0]["message"].as_str().unwrap();
+    assert!(message.contains("ApplicationService"));
+    assert!(message.contains("Realization"));
+    assert!(message.contains("ApplicationComponent"));
+}
+
+#[test]
+fn generic_graph_rejects_archimate_junction_without_incoming_and_outgoing_relationships() {
+    let input = serde_json::json!({
+        "model_schema_version": "model.schema.v1",
+        "required_plugins": [
+            { "id": "generic-graph", "version": "0.7.0" },
+            { "id": "archimate-oef", "version": "0.7.0" }
+        ],
+        "nodes": [
+            { "id": "api", "type": "ApplicationComponent", "label": "API", "properties": {} },
+            { "id": "junction", "type": "AndJunction", "label": "", "properties": {} }
+        ],
+        "relationships": [
+            { "id": "api-to-junction", "type": "Flow", "source": "api", "target": "junction", "label": "", "properties": {} }
+        ],
+        "plugins": {
+            "generic-graph": {
+                "views": [
+                    {
+                        "id": "main",
+                        "label": "Main",
+                        "nodes": ["api", "junction"],
+                        "relationships": ["api-to-junction"]
+                    }
+                ]
+            }
+        }
+    });
+
+    let mut cmd = common::plugin_command();
+    let output = cmd
+        .args(["validate", "--profile", "archimate"])
+        .write_stdin(serde_json::to_string(&input).unwrap())
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+
+    let envelope =
+        common::assert_error_code(&output, "DEDIREN_ARCHIMATE_JUNCTION_DIRECTION_INCOMPLETE");
+    let message = envelope["diagnostics"][0]["message"].as_str().unwrap();
+    assert!(message.contains("at least one incoming"));
+    assert!(message.contains("at least one outgoing"));
+}
+
+#[test]
+fn generic_graph_rejects_archimate_junction_chain_with_invalid_effective_endpoint() {
+    let input = serde_json::json!({
+        "model_schema_version": "model.schema.v1",
+        "required_plugins": [
+            { "id": "generic-graph", "version": "0.7.0" },
+            { "id": "archimate-oef", "version": "0.7.0" }
+        ],
+        "nodes": [
+            { "id": "service", "type": "ApplicationService", "label": "Service", "properties": {} },
+            { "id": "join", "type": "AndJunction", "label": "", "properties": {} },
+            { "id": "split", "type": "AndJunction", "label": "", "properties": {} },
+            { "id": "component", "type": "ApplicationComponent", "label": "Component", "properties": {} }
+        ],
+        "relationships": [
+            { "id": "service-to-join", "type": "Realization", "source": "service", "target": "join", "label": "", "properties": {} },
+            { "id": "join-to-split", "type": "Realization", "source": "join", "target": "split", "label": "", "properties": {} },
+            { "id": "split-to-component", "type": "Realization", "source": "split", "target": "component", "label": "", "properties": {} }
+        ],
+        "plugins": {
+            "generic-graph": {
+                "views": [
+                    {
+                        "id": "main",
+                        "label": "Main",
+                        "nodes": ["service", "join", "split", "component"],
+                        "relationships": ["service-to-join", "join-to-split", "split-to-component"]
+                    }
+                ]
+            }
+        }
+    });
+
+    let mut cmd = common::plugin_command();
+    let output = cmd
+        .args(["validate", "--profile", "archimate"])
+        .write_stdin(serde_json::to_string(&input).unwrap())
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+
+    let envelope = common::assert_error_code(
+        &output,
+        "DEDIREN_ARCHIMATE_RELATIONSHIP_ENDPOINT_UNSUPPORTED",
+    );
+    let message = envelope["diagnostics"][0]["message"].as_str().unwrap();
+    assert!(message.contains("ApplicationService"));
+    assert!(message.contains("Realization"));
+    assert!(message.contains("ApplicationComponent"));
+}
+
+#[test]
+fn generic_graph_allows_archimate_junction_containment_relationship() {
+    let input = serde_json::json!({
+        "model_schema_version": "model.schema.v1",
+        "required_plugins": [
+            { "id": "generic-graph", "version": "0.7.0" },
+            { "id": "archimate-oef", "version": "0.7.0" }
+        ],
+        "nodes": [
+            { "id": "group", "type": "Grouping", "label": "Group", "properties": {} },
+            { "id": "api", "type": "ApplicationComponent", "label": "API", "properties": {} },
+            { "id": "junction", "type": "AndJunction", "label": "", "properties": {} },
+            { "id": "orders", "type": "ApplicationService", "label": "Orders", "properties": {} }
+        ],
+        "relationships": [
+            { "id": "group-contains-junction", "type": "Composition", "source": "group", "target": "junction", "label": "", "properties": {} },
+            { "id": "api-to-junction", "type": "Flow", "source": "api", "target": "junction", "label": "", "properties": {} },
+            { "id": "junction-to-orders", "type": "Flow", "source": "junction", "target": "orders", "label": "", "properties": {} }
+        ],
+        "plugins": {
+            "generic-graph": {
+                "views": [
+                    {
+                        "id": "main",
+                        "label": "Main",
+                        "nodes": ["group", "api", "junction", "orders"],
+                        "relationships": ["group-contains-junction", "api-to-junction", "junction-to-orders"]
+                    }
+                ]
+            }
+        }
+    });
+
+    let mut cmd = common::plugin_command();
+    let output = cmd
+        .args(["project", "--target", "layout-request", "--view", "main"])
+        .write_stdin(serde_json::to_string(&input).unwrap())
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let data = common::ok_data(&output);
+    assert_eq!(
+        data["nodes"]
+            .as_array()
+            .expect("nodes should be an array")
+            .len(),
+        4
+    );
+}
+
+#[test]
 fn generic_graph_projects_render_metadata() {
     let input = std::fs::read_to_string(common::workspace_file(
         "fixtures/source/valid-archimate-oef.json",
@@ -426,11 +780,11 @@ fn archimate_source() -> serde_json::Value {
         "required_plugins": [
             {
                 "id": "generic-graph",
-                "version": "0.6.0"
+                "version": "0.7.0"
             },
             {
                 "id": "archimate-oef",
-                "version": "0.6.0"
+                "version": "0.7.0"
             }
         ],
         "nodes": [

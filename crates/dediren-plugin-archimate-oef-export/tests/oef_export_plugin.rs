@@ -217,6 +217,94 @@ fn oef_export_emits_semantic_grouping_view_node_and_ignores_layout_only_group() 
 }
 
 #[test]
+fn oef_export_emits_archimate_relationship_connector_junctions() {
+    let source = serde_json::json!({
+        "model_schema_version": "model.schema.v1",
+        "required_plugins": [
+            { "id": "generic-graph", "version": "0.7.0" },
+            { "id": "archimate-oef", "version": "0.7.0" }
+        ],
+        "nodes": [
+            { "id": "api", "type": "ApplicationComponent", "label": "API", "properties": {} },
+            { "id": "flow-junction", "type": "AndJunction", "label": "All Targets", "properties": {} },
+            { "id": "orders", "type": "ApplicationService", "label": "Orders", "properties": {} },
+            { "id": "billing", "type": "ApplicationService", "label": "Billing", "properties": {} }
+        ],
+        "relationships": [
+            { "id": "api-to-junction", "type": "Flow", "source": "api", "target": "flow-junction", "label": "", "properties": {} },
+            { "id": "junction-to-orders", "type": "Flow", "source": "flow-junction", "target": "orders", "label": "", "properties": {} },
+            { "id": "junction-to-billing", "type": "Flow", "source": "flow-junction", "target": "billing", "label": "", "properties": {} }
+        ],
+        "plugins": {}
+    });
+    let layout = serde_json::json!({
+        "layout_result_schema_version": "layout-result.schema.v1",
+        "view_id": "main",
+        "nodes": [
+            { "id": "api", "source_id": "api", "projection_id": "api", "x": 20.0, "y": 80.0, "width": 160.0, "height": 80.0, "label": "API" },
+            { "id": "flow-junction", "source_id": "flow-junction", "projection_id": "flow-junction", "x": 240.0, "y": 106.0, "width": 28.0, "height": 28.0, "label": "" },
+            { "id": "orders", "source_id": "orders", "projection_id": "orders", "x": 340.0, "y": 40.0, "width": 160.0, "height": 80.0, "label": "Orders" },
+            { "id": "billing", "source_id": "billing", "projection_id": "billing", "x": 340.0, "y": 150.0, "width": 160.0, "height": 80.0, "label": "Billing" }
+        ],
+        "edges": [
+            { "id": "api-to-junction", "source": "api", "target": "flow-junction", "source_id": "api-to-junction", "projection_id": "api-to-junction", "points": [{ "x": 180.0, "y": 120.0 }, { "x": 240.0, "y": 120.0 }], "label": "" },
+            { "id": "junction-to-orders", "source": "flow-junction", "target": "orders", "source_id": "junction-to-orders", "projection_id": "junction-to-orders", "points": [{ "x": 268.0, "y": 120.0 }, { "x": 340.0, "y": 80.0 }], "label": "" },
+            { "id": "junction-to-billing", "source": "flow-junction", "target": "billing", "source_id": "junction-to-billing", "projection_id": "junction-to-billing", "points": [{ "x": 268.0, "y": 120.0 }, { "x": 340.0, "y": 190.0 }], "label": "" }
+        ],
+        "groups": [],
+        "warnings": []
+    });
+
+    let data = export_with_source_and_layout(source, layout);
+    let xml = data["content"].as_str().unwrap();
+    let doc = roxmltree::Document::parse(xml).unwrap();
+
+    let junction_element = doc
+        .descendants()
+        .find(|node| {
+            node.has_tag_name("element")
+                && node.attribute("identifier") == Some("id-el-flow-junction")
+        })
+        .expect("expected an OEF element for the junction");
+    assert_eq!(
+        junction_element.attribute(("http://www.w3.org/2001/XMLSchema-instance", "type")),
+        Some("AndJunction")
+    );
+
+    let junction_view_node = doc
+        .descendants()
+        .find(|node| {
+            node.has_tag_name("node") && node.attribute("elementRef") == Some("id-el-flow-junction")
+        })
+        .expect("expected a view node for the junction");
+    assert_eq!(junction_view_node.attribute("w"), Some("28"));
+
+    let incoming = doc
+        .descendants()
+        .find(|node| {
+            node.has_tag_name("connection")
+                && node.attribute("relationshipRef") == Some("id-rel-api-to-junction")
+        })
+        .expect("expected incoming junction relationship view connection");
+    assert_eq!(
+        incoming.attribute("target"),
+        Some("id-vn-main-flow-junction")
+    );
+
+    let outgoing = doc
+        .descendants()
+        .find(|node| {
+            node.has_tag_name("connection")
+                && node.attribute("relationshipRef") == Some("id-rel-junction-to-orders")
+        })
+        .expect("expected outgoing junction relationship view connection");
+    assert_eq!(
+        outgoing.attribute("source"),
+        Some("id-vn-main-flow-junction")
+    );
+}
+
+#[test]
 fn oef_export_plugin_rejects_unknown_archimate_node_type_with_error_envelope() {
     let mut input = export_input();
     input["source"]["nodes"][0]["type"] = serde_json::json!("TechnologyNode");
@@ -279,6 +367,112 @@ fn oef_export_plugin_rejects_invalid_archimate_relationship_endpoint_with_error_
     assert_diagnostic_message_contains(&envelope, "ApplicationService");
     assert_diagnostic_message_contains(&envelope, "Realization");
     assert_diagnostic_message_contains(&envelope, "ApplicationComponent");
+}
+
+#[test]
+fn oef_export_plugin_rejects_junction_chain_with_invalid_effective_endpoint() {
+    let mut input = export_input();
+    input["source"] = serde_json::json!({
+        "model_schema_version": "model.schema.v1",
+        "required_plugins": [
+            { "id": "generic-graph", "version": "0.7.0" },
+            { "id": "archimate-oef", "version": "0.7.0" }
+        ],
+        "nodes": [
+            { "id": "service", "type": "ApplicationService", "label": "Service", "properties": {} },
+            { "id": "join", "type": "AndJunction", "label": "", "properties": {} },
+            { "id": "split", "type": "AndJunction", "label": "", "properties": {} },
+            { "id": "component", "type": "ApplicationComponent", "label": "Component", "properties": {} }
+        ],
+        "relationships": [
+            { "id": "service-to-join", "type": "Realization", "source": "service", "target": "join", "label": "", "properties": {} },
+            { "id": "join-to-split", "type": "Realization", "source": "join", "target": "split", "label": "", "properties": {} },
+            { "id": "split-to-component", "type": "Realization", "source": "split", "target": "component", "label": "", "properties": {} }
+        ],
+        "plugins": {}
+    });
+    input["layout_result"] = serde_json::json!({
+        "layout_result_schema_version": "layout-result.schema.v1",
+        "view_id": "main",
+        "nodes": [
+            { "id": "service", "source_id": "service", "projection_id": "service", "x": 20.0, "y": 60.0, "width": 160.0, "height": 80.0, "label": "Service" },
+            { "id": "join", "source_id": "join", "projection_id": "join", "x": 220.0, "y": 86.0, "width": 28.0, "height": 28.0, "label": "" },
+            { "id": "split", "source_id": "split", "projection_id": "split", "x": 280.0, "y": 86.0, "width": 28.0, "height": 28.0, "label": "" },
+            { "id": "component", "source_id": "component", "projection_id": "component", "x": 360.0, "y": 60.0, "width": 160.0, "height": 80.0, "label": "Component" }
+        ],
+        "edges": [
+            { "id": "service-to-join", "source": "service", "target": "join", "source_id": "service-to-join", "projection_id": "service-to-join", "points": [{ "x": 180.0, "y": 100.0 }, { "x": 220.0, "y": 100.0 }], "label": "" },
+            { "id": "join-to-split", "source": "join", "target": "split", "source_id": "join-to-split", "projection_id": "join-to-split", "points": [{ "x": 248.0, "y": 100.0 }, { "x": 280.0, "y": 100.0 }], "label": "" },
+            { "id": "split-to-component", "source": "split", "target": "component", "source_id": "split-to-component", "projection_id": "split-to-component", "points": [{ "x": 308.0, "y": 100.0 }, { "x": 360.0, "y": 100.0 }], "label": "" }
+        ],
+        "groups": [],
+        "warnings": []
+    });
+
+    let mut cmd = common::plugin_command();
+    let output = cmd
+        .arg("export")
+        .write_stdin(serde_json::to_string(&input).unwrap())
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+
+    let envelope = common::assert_error_code(
+        &output,
+        "DEDIREN_ARCHIMATE_RELATIONSHIP_ENDPOINT_UNSUPPORTED",
+    );
+    assert_diagnostic_message_contains(&envelope, "ApplicationService");
+    assert_diagnostic_message_contains(&envelope, "Realization");
+    assert_diagnostic_message_contains(&envelope, "ApplicationComponent");
+}
+
+#[test]
+fn oef_export_allows_junction_containment_relationship() {
+    let source = serde_json::json!({
+        "model_schema_version": "model.schema.v1",
+        "required_plugins": [
+            { "id": "generic-graph", "version": "0.7.0" },
+            { "id": "archimate-oef", "version": "0.7.0" }
+        ],
+        "nodes": [
+            { "id": "group", "type": "Grouping", "label": "Group", "properties": {} },
+            { "id": "api", "type": "ApplicationComponent", "label": "API", "properties": {} },
+            { "id": "junction", "type": "AndJunction", "label": "", "properties": {} },
+            { "id": "orders", "type": "ApplicationService", "label": "Orders", "properties": {} }
+        ],
+        "relationships": [
+            { "id": "group-contains-junction", "type": "Composition", "source": "group", "target": "junction", "label": "", "properties": {} },
+            { "id": "api-to-junction", "type": "Flow", "source": "api", "target": "junction", "label": "", "properties": {} },
+            { "id": "junction-to-orders", "type": "Flow", "source": "junction", "target": "orders", "label": "", "properties": {} }
+        ],
+        "plugins": {}
+    });
+    let layout = serde_json::json!({
+        "layout_result_schema_version": "layout-result.schema.v1",
+        "view_id": "main",
+        "nodes": [
+            { "id": "group", "source_id": "group", "projection_id": "group", "x": 0.0, "y": 0.0, "width": 440.0, "height": 180.0, "label": "Group" },
+            { "id": "api", "source_id": "api", "projection_id": "api", "x": 20.0, "y": 60.0, "width": 160.0, "height": 80.0, "label": "API" },
+            { "id": "junction", "source_id": "junction", "projection_id": "junction", "x": 220.0, "y": 86.0, "width": 28.0, "height": 28.0, "label": "" },
+            { "id": "orders", "source_id": "orders", "projection_id": "orders", "x": 300.0, "y": 60.0, "width": 120.0, "height": 80.0, "label": "Orders" }
+        ],
+        "edges": [
+            { "id": "group-contains-junction", "source": "group", "target": "junction", "source_id": "group-contains-junction", "projection_id": "group-contains-junction", "points": [{ "x": 220.0, "y": 86.0 }, { "x": 220.0, "y": 86.0 }], "label": "" },
+            { "id": "api-to-junction", "source": "api", "target": "junction", "source_id": "api-to-junction", "projection_id": "api-to-junction", "points": [{ "x": 180.0, "y": 100.0 }, { "x": 220.0, "y": 100.0 }], "label": "" },
+            { "id": "junction-to-orders", "source": "junction", "target": "orders", "source_id": "junction-to-orders", "projection_id": "junction-to-orders", "points": [{ "x": 248.0, "y": 100.0 }, { "x": 300.0, "y": 100.0 }], "label": "" }
+        ],
+        "groups": [],
+        "warnings": []
+    });
+
+    let data = export_with_source_and_layout(source, layout);
+    let xml = data["content"].as_str().unwrap();
+    assert!(
+        xml.contains("id-rel-group-contains-junction"),
+        "expected containment relationship in OEF XML: {xml}"
+    );
 }
 
 fn export_input() -> serde_json::Value {
