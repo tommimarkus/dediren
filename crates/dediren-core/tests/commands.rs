@@ -1,6 +1,6 @@
 mod common;
 
-use dediren_core::commands::{layout_command, LayoutCommandInput};
+use dediren_core::commands::{layout_command, semantic_validate_command, LayoutCommandInput};
 use dediren_core::plugins::PluginRegistry;
 use tempfile::TempDir;
 
@@ -63,6 +63,25 @@ fn layout_command_allows_path_for_layout_runtime_environment() {
 
     assert_eq!(0, output.exit_code);
     assert!(output.stdout.contains("\"layout_result_schema_version\""));
+}
+
+#[test]
+fn semantic_validate_command_rejects_invalid_source_before_plugin_lookup() {
+    let mut source: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(common::workspace_file(
+            "fixtures/source/valid-archimate-oef.json",
+        ))
+        .unwrap(),
+    )
+    .unwrap();
+    source["relationships"][0]["source"] = serde_json::json!("missing-source");
+    let input = serde_json::to_string(&source).unwrap();
+
+    let output = semantic_validate_command("missing-plugin", "archimate", &input)
+        .expect("invalid source should be returned as a validation envelope");
+
+    assert_eq!(2, output.exit_code);
+    assert!(output.stdout.contains("DEDIREN_DANGLING_ENDPOINT"));
 }
 
 fn write_manifest(dir: &std::path::Path, id: &str, executable: &str, capabilities: &[&str]) {

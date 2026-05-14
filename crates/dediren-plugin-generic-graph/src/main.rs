@@ -6,8 +6,9 @@ use dediren_archimate::ArchimateTypeValidationError;
 use dediren_contracts::{
     CommandEnvelope, Diagnostic, DiagnosticSeverity, GenericGraphPluginData, GroupProvenance,
     LayoutEdge, LayoutGroup, LayoutLabel, LayoutNode, LayoutRequest, RenderMetadata,
-    RenderMetadataSelector, SourceDocument, LAYOUT_REQUEST_SCHEMA_VERSION,
-    RENDER_METADATA_SCHEMA_VERSION,
+    RenderMetadataSelector, SemanticValidationResult, SourceDocument,
+    LAYOUT_REQUEST_SCHEMA_VERSION, RENDER_METADATA_SCHEMA_VERSION,
+    SEMANTIC_VALIDATION_RESULT_SCHEMA_VERSION,
 };
 
 fn main() -> anyhow::Result<()> {
@@ -24,8 +25,10 @@ fn main() -> anyhow::Result<()> {
         return Ok(());
     }
 
-    if args.get(1).map(String::as_str) != Some("project") {
-        bail!("expected command: project");
+    match args.get(1).map(String::as_str) {
+        Some("validate") => return validate_from_stdin(&args),
+        Some("project") => {}
+        _ => bail!("expected command: validate or project"),
     }
 
     let target = value_after(&args, "--target").context("missing --target")?;
@@ -140,6 +143,40 @@ fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
+fn validate_from_stdin(args: &[String]) -> anyhow::Result<()> {
+    let Some(profile) = value_after(args, "--profile") else {
+        exit_with_diagnostic(
+            "DEDIREN_SEMANTIC_PROFILE_REQUIRED",
+            "semantic validation requires --profile",
+            None,
+        );
+    };
+    if profile != "archimate" {
+        exit_with_diagnostic(
+            "DEDIREN_SEMANTIC_PROFILE_UNSUPPORTED",
+            &format!("unsupported semantic profile: {profile}"),
+            Some("profile".to_string()),
+        );
+    }
+
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input)?;
+    let source: SourceDocument = serde_json::from_str(&input)?;
+    if let Err(error) = validate_archimate_source_types(&source) {
+        exit_with_archimate_type_error(error);
+    }
+
+    let result = SemanticValidationResult {
+        semantic_validation_result_schema_version: SEMANTIC_VALIDATION_RESULT_SCHEMA_VERSION
+            .to_string(),
+        semantic_profile: profile,
+        node_count: source.nodes.len(),
+        relationship_count: source.relationships.len(),
+    };
+    println!("{}", serde_json::to_string(&CommandEnvelope::ok(result))?);
+    Ok(())
+}
+
 fn project_render_metadata(
     source: &SourceDocument,
     selected_view: &dediren_contracts::GenericGraphView,
@@ -235,11 +272,15 @@ fn validate_archimate_source_types(
 }
 
 fn exit_with_archimate_type_error(error: ArchimateTypeValidationError) -> ! {
+    exit_with_diagnostic(error.code(), &error.message(), Some(error.path));
+}
+
+fn exit_with_diagnostic(code: &str, message: &str, path: Option<String>) -> ! {
     let diagnostic = Diagnostic {
-        code: error.code().to_string(),
+        code: code.to_string(),
         severity: DiagnosticSeverity::Error,
-        message: error.message(),
-        path: Some(error.path),
+        message: message.to_string(),
+        path,
     };
     println!(
         "{}",

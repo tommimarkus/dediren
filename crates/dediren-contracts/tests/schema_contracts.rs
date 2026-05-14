@@ -8,6 +8,7 @@ const PUBLIC_SCHEMA_PATHS: &[&str] = &[
     "schemas/envelope.schema.json",
     "schemas/layout-request.schema.json",
     "schemas/layout-result.schema.json",
+    "schemas/semantic-validation-result.schema.json",
     "schemas/svg-render-policy.schema.json",
     "schemas/render-metadata.schema.json",
     "schemas/render-result.schema.json",
@@ -371,6 +372,19 @@ fn render_result_matches_schema() {
 }
 
 #[test]
+fn semantic_validation_result_matches_schema() {
+    assert_json_valid(
+        "schemas/semantic-validation-result.schema.json",
+        json!({
+            "semantic_validation_result_schema_version": "semantic-validation-result.schema.v1",
+            "semantic_profile": "archimate",
+            "node_count": 2,
+            "relationship_count": 1
+        }),
+    );
+}
+
+#[test]
 fn plugin_manifest_matches_schema() {
     assert_json_valid(
         "schemas/plugin-manifest.schema.json",
@@ -381,6 +395,17 @@ fn plugin_manifest_matches_schema() {
             "executable": "dediren-plugin-svg-render",
             "capabilities": ["render"]
         }),
+    );
+}
+
+#[test]
+fn readme_documents_archimate_connector_junction_boundary() {
+    let readme = std::fs::read_to_string(workspace_file("README.md")).unwrap();
+    assert!(
+        readme.contains("Relationship connectors and junctions are not supported")
+            && readme.contains("first-class source")
+            && readme.contains("shared_source_junction"),
+        "README.md should document the ArchiMate connector/junction source boundary"
     );
 }
 

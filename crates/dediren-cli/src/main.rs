@@ -12,6 +12,10 @@ struct Cli {
 enum Commands {
     Validate {
         #[arg(long)]
+        plugin: Option<String>,
+        #[arg(long)]
+        profile: Option<String>,
+        #[arg(long)]
         input: Option<String>,
     },
     Project {
@@ -59,11 +63,30 @@ enum Commands {
 fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
     match cli.command {
-        Some(Commands::Validate { input }) => {
+        Some(Commands::Validate {
+            plugin,
+            profile,
+            input,
+        }) => {
             let text = dediren_core::io::read_json_input(input.as_deref())?;
-            let (code, envelope) = dediren_core::validate::validate_source_json(&text);
-            println!("{}", serde_json::to_string(&envelope)?);
-            std::process::exit(code);
+            match (plugin, profile) {
+                (Some(plugin), Some(profile)) => print_plugin_result(
+                    dediren_core::commands::semantic_validate_command(&plugin, &profile, &text),
+                ),
+                (Some(_), None) => print_usage_error(
+                    "DEDIREN_VALIDATE_PROFILE_REQUIRED",
+                    "validate --plugin requires --profile",
+                ),
+                (None, Some(_)) => print_usage_error(
+                    "DEDIREN_VALIDATE_PLUGIN_REQUIRED",
+                    "validate --profile requires --plugin",
+                ),
+                (None, None) => {
+                    let (code, envelope) = dediren_core::validate::validate_source_json(&text);
+                    println!("{}", serde_json::to_string(&envelope)?);
+                    std::process::exit(code);
+                }
+            }
         }
         Some(Commands::Project {
             target,
@@ -132,6 +155,19 @@ fn main() -> anyhow::Result<()> {
             Ok(())
         }
     }
+}
+
+fn print_usage_error(code: &str, message: &str) -> anyhow::Result<()> {
+    let envelope = dediren_contracts::CommandEnvelope::<serde_json::Value>::error(vec![
+        dediren_contracts::Diagnostic {
+            code: code.to_string(),
+            severity: dediren_contracts::DiagnosticSeverity::Error,
+            message: message.to_string(),
+            path: None,
+        },
+    ]);
+    println!("{}", serde_json::to_string(&envelope)?);
+    std::process::exit(2);
 }
 
 fn print_plugin_result(

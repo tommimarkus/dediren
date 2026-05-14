@@ -7,6 +7,7 @@ pub const ENVELOPE_SCHEMA_VERSION: &str = "envelope.schema.v1";
 pub const PLUGIN_PROTOCOL_VERSION: &str = "plugin.protocol.v1";
 pub const LAYOUT_REQUEST_SCHEMA_VERSION: &str = "layout-request.schema.v1";
 pub const LAYOUT_RESULT_SCHEMA_VERSION: &str = "layout-result.schema.v1";
+pub const SEMANTIC_VALIDATION_RESULT_SCHEMA_VERSION: &str = "semantic-validation-result.schema.v1";
 pub const RENDER_RESULT_SCHEMA_VERSION: &str = "render-result.schema.v1";
 pub const SVG_RENDER_POLICY_SCHEMA_VERSION: &str = "svg-render-policy.schema.v1";
 pub const RENDER_METADATA_SCHEMA_VERSION: &str = "render-metadata.schema.v1";
@@ -201,6 +202,15 @@ pub struct LayoutConstraint {
     pub id: String,
     pub kind: String,
     pub subjects: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SemanticValidationResult {
+    pub semantic_validation_result_schema_version: String,
+    pub semantic_profile: String,
+    pub node_count: usize,
+    pub relationship_count: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

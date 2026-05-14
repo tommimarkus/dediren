@@ -1,8 +1,9 @@
 use dediren_contracts::{
     CommandEnvelope, Diagnostic, DiagnosticSeverity, GroupProvenance, LayoutRequest, Margin, Page,
-    RenderMetadata, RenderMetadataSelector, RenderPolicy, RenderResult, SourceDocument,
-    SvgEdgeLineStyle, SvgEdgeMarkerEnd, SvgEdgeStyle, SvgNodeDecorator, SvgNodeStyle,
-    SvgStylePolicy, SVG_RENDER_POLICY_SCHEMA_VERSION,
+    RenderMetadata, RenderMetadataSelector, RenderPolicy, RenderResult, SemanticValidationResult,
+    SourceDocument, SvgEdgeLineStyle, SvgEdgeMarkerEnd, SvgEdgeStyle, SvgNodeDecorator,
+    SvgNodeStyle, SvgStylePolicy, SEMANTIC_VALIDATION_RESULT_SCHEMA_VERSION,
+    SVG_RENDER_POLICY_SCHEMA_VERSION,
 };
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -220,6 +221,22 @@ fn render_result_roundtrips() {
     let encoded = serde_json::to_string(&result).unwrap();
     let decoded: RenderResult = serde_json::from_str(&encoded).unwrap();
     assert_eq!(decoded.artifact_kind, "svg");
+}
+
+#[test]
+fn semantic_validation_result_roundtrips() {
+    let result = SemanticValidationResult {
+        semantic_validation_result_schema_version: SEMANTIC_VALIDATION_RESULT_SCHEMA_VERSION
+            .to_string(),
+        semantic_profile: "archimate".to_string(),
+        node_count: 2,
+        relationship_count: 1,
+    };
+
+    let encoded = serde_json::to_string(&result).unwrap();
+    let decoded: SemanticValidationResult = serde_json::from_str(&encoded).unwrap();
+    assert_eq!(decoded.semantic_profile, "archimate");
+    assert_eq!(decoded.relationship_count, 1);
 }
 
 fn workspace_file(path: &str) -> PathBuf {

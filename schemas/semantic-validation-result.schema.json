@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dediren.dev/schemas/semantic-validation-result.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "semantic_validation_result_schema_version",
+    "semantic_profile",
+    "node_count",
+    "relationship_count"
+  ],
+  "properties": {
+    "semantic_validation_result_schema_version": {
+      "const": "semantic-validation-result.schema.v1"
+    },
+    "semantic_profile": { "type": "string", "minLength": 1 },
+    "node_count": { "type": "integer", "minimum": 0 },
+    "relationship_count": { "type": "integer", "minimum": 0 }
+  }
+}

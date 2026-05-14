@@ -73,6 +73,29 @@ pub fn project_command(
     )
 }
 
+pub fn semantic_validate_command(
+    plugin: &str,
+    profile: &str,
+    input_text: &str,
+) -> Result<PluginRunOutcome, PluginExecutionError> {
+    let (validation_exit_code, validation_envelope) =
+        crate::validate::validate_source_json(input_text);
+    if validation_exit_code != 0 {
+        return Ok(PluginRunOutcome {
+            stdout: serde_json::to_string(&validation_envelope)
+                .map_err(command_input_error("validate"))?,
+            exit_code: validation_exit_code,
+        });
+    }
+
+    crate::plugins::run_plugin_for_capability(
+        plugin,
+        "semantic-validation",
+        &["validate", "--profile", profile],
+        input_text,
+    )
+}
+
 pub fn render_command(
     plugin: &str,
     policy_text: &str,

@@ -38,18 +38,18 @@ Runtime prerequisite:
 
 - Java 21 or newer available as `java` on `PATH`.
 
-For the current `0.4.0` version, the xtask creates:
+For the current `0.5.0` version, the xtask creates:
 
 ```text
-dist/dediren-agent-bundle-0.4.0-x86_64-unknown-linux-gnu/
-dist/dediren-agent-bundle-0.4.0-x86_64-unknown-linux-gnu.tar.gz
+dist/dediren-agent-bundle-0.5.0-x86_64-unknown-linux-gnu/
+dist/dediren-agent-bundle-0.5.0-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Run the smoke test from a shell where `java -version` resolves to Java 21 or
 newer:
 
 ```bash
-cargo xtask dist smoke dist/dediren-agent-bundle-0.4.0-x86_64-unknown-linux-gnu.tar.gz
+cargo xtask dist smoke dist/dediren-agent-bundle-0.5.0-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Concurrent `cargo xtask dist build` invocations serialize on a repo-local lock
@@ -60,8 +60,8 @@ Unpack and run it anywhere:
 
 ```bash
 mkdir -p /tmp/dediren-dist
-tar -xzf dist/dediren-agent-bundle-0.4.0-x86_64-unknown-linux-gnu.tar.gz -C /tmp/dediren-dist
-/tmp/dediren-dist/dediren-agent-bundle-0.4.0-x86_64-unknown-linux-gnu/bin/dediren --help
+tar -xzf dist/dediren-agent-bundle-0.5.0-x86_64-unknown-linux-gnu.tar.gz -C /tmp/dediren-dist
+/tmp/dediren-dist/dediren-agent-bundle-0.5.0-x86_64-unknown-linux-gnu/bin/dediren --help
 ```
 
 The archive includes first-party plugin manifests under `plugins/`, first-party
@@ -131,7 +131,21 @@ validate -> project --target layout-request -> layout -> validate-layout -> expo
 Commands:
 
 - `validate` checks source graph shape, id uniqueness, endpoint integrity, and
-  authored-geometry rules.
+  authored-geometry rules. It stays profile-agnostic by default. To run
+  plugin-owned semantic validation before projection, pass an explicit plugin
+  and profile, for example:
+
+  ```bash
+  dediren validate \
+    --plugin generic-graph \
+    --profile archimate \
+    --input fixtures/source/valid-archimate-oef.json
+  ```
+
+  The bundled `generic-graph` semantic validator currently supports the
+  `archimate` profile. Plugin semantic validation first runs the same source
+  graph validation as default `validate`, so malformed source graphs fail before
+  profile-specific checks run.
 - `project` asks a semantic/view plugin to produce a target artifact. The
   bundled `generic-graph` plugin supports `layout-request` and
   `render-metadata`. When projecting ArchiMate render metadata, it validates
@@ -190,6 +204,15 @@ rules. Use the ArchiMate/OEF element name `Node` for technology nodes; aliases
 such as `TechnologyNode` are not accepted in ArchiMate metadata or export
 source.
 
+Relationship connectors and junctions are not supported as first-class source
+concepts in `model.schema.v1`; source relationship endpoints must reference
+source node IDs. Generated ELK layout results may carry
+`routing_hints` such as `shared_source_junction` and `shared_target_junction`,
+but those are renderer advice for generated route trunks, not source-authored
+ArchiMate connector or junction elements. Use direct relationships today; model
+connector/junction fan-in or fan-out only after a future source-schema slice adds
+explicit validation, projection, layout, render, and OEF export support.
+
 Create render metadata, then render with the ArchiMate policy:
 
 ```bash
@@ -232,7 +255,7 @@ command envelopes. The bundled first-party plugins are:
 
 | Plugin | Capability | Purpose |
 | --- | --- | --- |
-| `generic-graph` | `projection` | Projects source graph views into layout requests or render metadata. |
+| `generic-graph` | `semantic-validation`, `projection` | Validates supported semantic profiles and projects source graph views into layout requests or render metadata. |
 | `elk-layout` | `layout` | Runs the Java ELK helper and returns generated layout results. |
 | `svg-render` | `render` | Renders SVG from layout result JSON and render policy JSON. |
 | `archimate-oef` | `export` | Exports ArchiMate 3.2 OEF XML from source and layout data. |
@@ -332,6 +355,7 @@ Use the public schemas as the source of truth for JSON shape:
 - `schemas/model.schema.json`
 - `schemas/layout-request.schema.json`
 - `schemas/layout-result.schema.json`
+- `schemas/semantic-validation-result.schema.json`
 - `schemas/render-metadata.schema.json`
 - `schemas/svg-render-policy.schema.json`
 - `schemas/render-result.schema.json`
@@ -358,6 +382,10 @@ normalizes the failure into diagnostics such as:
 - `DEDIREN_PLUGIN_TIMEOUT`
 - `DEDIREN_PLUGIN_UNSUPPORTED_CAPABILITY`
 - `DEDIREN_PLUGIN_OUTPUT_INVALID_JSON`
+- `DEDIREN_SEMANTIC_PROFILE_REQUIRED`
+- `DEDIREN_SEMANTIC_PROFILE_UNSUPPORTED`
+- `DEDIREN_VALIDATE_PROFILE_REQUIRED`
+- `DEDIREN_VALIDATE_PLUGIN_REQUIRED`
 - `DEDIREN_ELK_RUNTIME_UNAVAILABLE`
 - `DEDIREN_ELK_JAVA_UNAVAILABLE`
 - `DEDIREN_ELK_JAVA_UNSUPPORTED`
@@ -383,7 +411,7 @@ newer:
 
 ```bash
 cargo xtask dist build
-cargo xtask dist smoke dist/dediren-agent-bundle-0.4.0-x86_64-unknown-linux-gnu.tar.gz
+cargo xtask dist smoke dist/dediren-agent-bundle-0.5.0-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Focused checks:

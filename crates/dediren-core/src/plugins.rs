@@ -719,6 +719,9 @@ fn validate_success_data(
 
 fn capability_result_schema(required_capability: &str, args: &[&str]) -> Option<&'static str> {
     match required_capability {
+        "semantic-validation" => Some(include_str!(
+            "../../../schemas/semantic-validation-result.schema.json"
+        )),
         "projection" if arg_value(args, "--target") == Some("render-metadata") => {
             Some(include_str!("../../../schemas/render-metadata.schema.json"))
         }
