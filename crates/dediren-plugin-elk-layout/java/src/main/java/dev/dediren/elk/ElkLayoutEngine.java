@@ -7,6 +7,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.eclipse.elk.alg.libavoid.options.LibavoidOptions;
 import org.eclipse.elk.alg.layered.options.LayeredOptions;
 import org.eclipse.elk.alg.layered.options.WrappingStrategy;
 import org.eclipse.elk.core.RecursiveGraphLayoutEngine;
@@ -27,6 +28,8 @@ import org.eclipse.elk.graph.ElkPort;
 import org.eclipse.elk.graph.util.ElkGraphUtil;
 
 final class ElkLayoutEngine {
+    private static final String LAYERED_ALGORITHM = "org.eclipse.elk.layered";
+    private static final String LIBAVOID_ALGORITHM = "org.eclipse.elk.alg.libavoid";
     private static final double DEFAULT_WIDTH = 160.0;
     private static final double DEFAULT_HEIGHT = 80.0;
     private static final double GROUP_PADDING = 24.0;
@@ -44,6 +47,9 @@ final class ElkLayoutEngine {
     private static final double ROUTE_CLOSE_PARALLEL_DISTANCE = 20.0;
     private static final double ROUTE_CLOSE_PARALLEL_MIN_OVERLAP = 40.0;
     private static final double ROUTE_ENDPOINT_CLEARANCE = 32.0;
+    private static final double LIBAVOID_SEGMENT_PENALTY = 50.0;
+    private static final double LIBAVOID_IDEAL_NUDGING_DISTANCE = 16.0;
+    private static final double LIBAVOID_SHAPE_BUFFER_DISTANCE = 16.0;
     private static final double GEOMETRY_EPSILON = 0.001;
     private static final int MERGEABLE_ENDPOINT_EDGE_COUNT = 3;
     private static final String SHARED_SOURCE_JUNCTION_HINT = "shared_source_junction";
@@ -62,7 +68,7 @@ final class ElkLayoutEngine {
 
     private static JsonContracts.LayoutResult layoutFlat(JsonContracts.LayoutRequest request) {
         ElkNode root = ElkGraphUtil.createGraph();
-        configureRoot(root, Direction.RIGHT);
+        configureLayeredRoot(root, Direction.RIGHT);
 
         Map<String, JsonContracts.LayoutNode> requestNodes = requestNodesById(request);
         List<JsonContracts.LayoutEdge> requestEdges = list(request.edges());
@@ -131,9 +137,18 @@ final class ElkLayoutEngine {
         }
 
         List<JsonContracts.LaidOutEdge> edges = new ArrayList<>();
+        Map<String, List<JsonContracts.Point>> libavoidRoutes =
+            routeWithLibavoid(
+                requestEdges,
+                nodes,
+                flatEdgeDirections(requestEdges),
+                endpointMerges,
+                Map.of());
         for (JsonContracts.LayoutEdge edge : list(request.edges())) {
             ElkEdge elkEdge = elkEdges.get(edge.id());
             if (elkEdge != null) {
+                List<JsonContracts.Point> route =
+                    routeOrFallback(libavoidRoutes.get(edge.id()), points(elkEdge));
                 edges.add(new JsonContracts.LaidOutEdge(
                     edge.id(),
                     edge.source(),
@@ -141,7 +156,7 @@ final class ElkLayoutEngine {
                     edge.source_id(),
                     edge.id(),
                     routingHints(edge.id(), endpointMerges),
-                    points(elkEdge),
+                    route,
                     edge.label()));
             }
         }
@@ -163,7 +178,7 @@ final class ElkLayoutEngine {
         Map<String, JsonContracts.LayoutNode> requestNodes = requestNodesById(request);
         Map<String, String> ownerByNode = ownerByNode(request);
         ElkNode root = ElkGraphUtil.createGraph();
-        configureRoot(root, Direction.RIGHT);
+        configureLayeredRoot(root, Direction.RIGHT);
         root.setProperty(CoreOptions.HIERARCHY_HANDLING, HierarchyHandling.INCLUDE_CHILDREN);
         root.setProperty(CoreOptions.ASPECT_RATIO, 2.2);
         root.setProperty(LayeredOptions.WRAPPING_STRATEGY, WrappingStrategy.MULTI_EDGE);
@@ -192,7 +207,7 @@ final class ElkLayoutEngine {
             elkGroup.setIdentifier(group.id());
             ElkGraphUtil.createLabel(elkGroup).setText(group.label());
             Direction groupDirection = internalDirection(members, internalEdges);
-            configureRoot(elkGroup, groupDirection);
+            configureLayeredRoot(elkGroup, groupDirection);
             elkGroup.setProperty(CoreOptions.HIERARCHY_HANDLING, HierarchyHandling.INCLUDE_CHILDREN);
             elkGroup.setProperty(CoreOptions.PADDING, new ElkPadding(GROUP_PADDING));
             elkGroups.put(group.id(), elkGroup);
@@ -290,9 +305,23 @@ final class ElkLayoutEngine {
         }
 
         List<JsonContracts.LaidOutEdge> edges = new ArrayList<>();
+        Map<String, Direction> libavoidDirections = groupedEdgeDirections(
+            requestEdges,
+            ownerByNode,
+            groupDirectionById,
+            groupOrderById);
+        Map<String, List<JsonContracts.Point>> libavoidRoutes =
+            routeWithLibavoid(
+                requestEdges,
+                nodes,
+                libavoidDirections,
+                endpointMerges,
+                edgePortIndexes);
         for (JsonContracts.LayoutEdge edge : list(request.edges())) {
             ElkEdge elkEdge = elkEdges.get(edge.id());
             if (elkEdge != null) {
+                List<JsonContracts.Point> route =
+                    routeOrFallback(libavoidRoutes.get(edge.id()), points(elkEdge));
                 edges.add(new JsonContracts.LaidOutEdge(
                     edge.id(),
                     edge.source(),
@@ -300,7 +329,7 @@ final class ElkLayoutEngine {
                     edge.source_id(),
                     edge.id(),
                     routingHints(edge.id(), endpointMerges),
-                    points(elkEdge),
+                    route,
                     edge.label()));
             }
         }
@@ -318,8 +347,8 @@ final class ElkLayoutEngine {
             warnings);
     }
 
-    private static void configureRoot(ElkNode root, Direction direction) {
-        root.setProperty(CoreOptions.ALGORITHM, "org.eclipse.elk.layered");
+    private static void configureLayeredRoot(ElkNode root, Direction direction) {
+        root.setProperty(CoreOptions.ALGORITHM, LAYERED_ALGORITHM);
         root.setProperty(CoreOptions.DIRECTION, direction);
         root.setProperty(CoreOptions.EDGE_ROUTING, EdgeRouting.ORTHOGONAL);
         root.setProperty(CoreOptions.SPACING_NODE_NODE, NODE_SPACING);
@@ -336,6 +365,133 @@ final class ElkLayoutEngine {
         root.setProperty(LayeredOptions.SPACING_EDGE_EDGE_BETWEEN_LAYERS, EDGE_EDGE_SPACING);
         root.setProperty(LayeredOptions.MERGE_EDGES, true);
         root.setProperty(LayeredOptions.MERGE_HIERARCHY_EDGES, true);
+    }
+
+    static ElkNode configuredLibavoidRoot() {
+        ElkNode root = ElkGraphUtil.createGraph();
+        configureLibavoidRoot(root);
+        return root;
+    }
+
+    private static void configureLibavoidRoot(ElkNode root) {
+        root.setProperty(CoreOptions.ALGORITHM, LIBAVOID_ALGORITHM);
+        root.setProperty(CoreOptions.DIRECTION, Direction.RIGHT);
+        root.setProperty(CoreOptions.EDGE_ROUTING, EdgeRouting.ORTHOGONAL);
+        root.setProperty(LibavoidOptions.SEGMENT_PENALTY, LIBAVOID_SEGMENT_PENALTY);
+        root.setProperty(LibavoidOptions.IDEAL_NUDGING_DISTANCE, LIBAVOID_IDEAL_NUDGING_DISTANCE);
+        root.setProperty(LibavoidOptions.SHAPE_BUFFER_DISTANCE, LIBAVOID_SHAPE_BUFFER_DISTANCE);
+        root.setProperty(LibavoidOptions.NUDGE_ORTHOGONAL_SEGMENTS_CONNECTED_TO_SHAPES, true);
+        root.setProperty(LibavoidOptions.PENALISE_ORTHOGONAL_SHARED_PATHS_AT_CONN_ENDS, false);
+    }
+
+    static Map<String, List<JsonContracts.Point>> routeWithLibavoid(
+        List<JsonContracts.LayoutEdge> edges,
+        List<JsonContracts.LaidOutNode> nodes) {
+        return routeWithLibavoid(
+            edges,
+            nodes,
+            flatEdgeDirections(edges),
+            emptyEndpointMerges(edges),
+            Map.of());
+    }
+
+    private static Map<String, List<JsonContracts.Point>> routeWithLibavoid(
+        List<JsonContracts.LayoutEdge> edges,
+        List<JsonContracts.LaidOutNode> nodes,
+        Map<String, Direction> edgeDirections,
+        Map<String, EdgeEndpointMerge> endpointMerges,
+        Map<String, EdgePortIndexes> edgePortIndexes) {
+        ElkNode root = configuredLibavoidRoot();
+
+        Map<String, ElkNode> elkNodes = new HashMap<>();
+        for (JsonContracts.LaidOutNode node : nodes) {
+            ElkNode elkNode = ElkGraphUtil.createNode(root);
+            elkNode.setIdentifier(node.id());
+            elkNode.setDimensions(node.width(), node.height());
+            elkNode.setLocation(node.x(), node.y());
+            ElkGraphUtil.createLabel(elkNode).setText(node.label());
+            elkNodes.put(node.id(), elkNode);
+        }
+
+        Map<String, ElkEdge> elkEdges = new HashMap<>();
+        Map<String, EnumMap<PortSide, Integer>> portIndexes = new HashMap<>();
+        for (JsonContracts.LayoutEdge edge : edges) {
+            ElkNode source = elkNodes.get(edge.source());
+            ElkNode target = elkNodes.get(edge.target());
+            if (source == null || target == null) {
+                continue;
+            }
+            Direction direction = edgeDirections.getOrDefault(edge.id(), Direction.RIGHT);
+            EdgeEndpointMerge endpointMerge =
+                endpointMerges.getOrDefault(edge.id(), NO_ENDPOINT_MERGE);
+            EdgePortIndexes portIndexesForEdge = edgePortIndexes.get(edge.id());
+            ElkEdge elkEdge = createRoutedEdge(
+                source,
+                target,
+                edge,
+                direction,
+                endpointMerge.sourceEndpoint()
+                    ? 0
+                    : portIndexesForEdge == null
+                        ? nextPortIndex(portIndexes, edge.source(), sourcePortSide(direction))
+                        : portIndexesForEdge.sourceIndex(),
+                endpointMerge.targetEndpoint()
+                    ? 0
+                    : portIndexesForEdge == null
+                        ? nextPortIndex(portIndexes, edge.target(), targetPortSide(direction))
+                        : portIndexesForEdge.targetIndex(),
+                endpointMerge.sourceEndpoint(),
+                endpointMerge.targetEndpoint());
+            elkEdges.put(edge.id(), elkEdge);
+        }
+
+        new RecursiveGraphLayoutEngine().layout(root, new BasicProgressMonitor());
+
+        Map<String, List<JsonContracts.Point>> routes = new HashMap<>();
+        for (Map.Entry<String, ElkEdge> entry : elkEdges.entrySet()) {
+            routes.put(entry.getKey(), points(entry.getValue()));
+        }
+        return routes;
+    }
+
+    private static Map<String, Direction> flatEdgeDirections(
+        List<JsonContracts.LayoutEdge> edges) {
+        Map<String, Direction> directions = new HashMap<>();
+        for (JsonContracts.LayoutEdge edge : edges) {
+            directions.put(edge.id(), Direction.RIGHT);
+        }
+        return directions;
+    }
+
+    private static Map<String, Direction> groupedEdgeDirections(
+        List<JsonContracts.LayoutEdge> edges,
+        Map<String, String> ownerByNode,
+        Map<String, Direction> groupDirectionById,
+        Map<String, Integer> groupOrderById) {
+        Map<String, Direction> directions = new HashMap<>();
+        for (JsonContracts.LayoutEdge edge : edges) {
+            directions.put(
+                edge.id(),
+                edgeDirection(edge, ownerByNode, groupDirectionById, groupOrderById));
+        }
+        return directions;
+    }
+
+    private static Map<String, EdgeEndpointMerge> emptyEndpointMerges(
+        List<JsonContracts.LayoutEdge> edges) {
+        Map<String, EdgeEndpointMerge> endpointMerges = new HashMap<>();
+        for (JsonContracts.LayoutEdge edge : edges) {
+            endpointMerges.put(edge.id(), NO_ENDPOINT_MERGE);
+        }
+        return endpointMerges;
+    }
+
+    private static List<JsonContracts.Point> routeOrFallback(
+        List<JsonContracts.Point> libavoidRoute,
+        List<JsonContracts.Point> layeredRoute) {
+        return libavoidRoute == null || libavoidRoute.isEmpty()
+            ? layeredRoute
+            : libavoidRoute;
     }
 
     private static Direction internalDirection(
@@ -902,12 +1058,31 @@ final class ElkLayoutEngine {
     private static List<JsonContracts.LaidOutEdge> normalizeExcessiveRoutes(
         List<JsonContracts.LaidOutEdge> edges,
         List<JsonContracts.LaidOutNode> nodes) {
+        List<JsonContracts.LaidOutEdge> current = edges;
+        for (int pass = 0; pass < 3; pass++) {
+            List<JsonContracts.LaidOutEdge> normalized =
+                normalizeExcessiveRoutesOnce(current, nodes);
+            if (normalized.equals(current)) {
+                return normalized;
+            }
+            current = normalized;
+        }
+        return current;
+    }
+
+    private static List<JsonContracts.LaidOutEdge> normalizeExcessiveRoutesOnce(
+        List<JsonContracts.LaidOutEdge> edges,
+        List<JsonContracts.LaidOutNode> nodes) {
         List<JsonContracts.LaidOutEdge> normalized = new ArrayList<>();
         for (int edgeIndex = 0; edgeIndex < edges.size(); edgeIndex++) {
             JsonContracts.LaidOutEdge edge = edges.get(edgeIndex);
             List<JsonContracts.LaidOutEdge> comparisonEdges = new ArrayList<>(normalized);
             comparisonEdges.addAll(edges.subList(edgeIndex + 1, edges.size()));
-            if (!hasExcessiveDetour(edge.points()) && cornerCount(edge.points()) <= 2) {
+            int originalCloseParallelCount =
+                closeParallelRouteCount(edge, edge.points(), comparisonEdges);
+            if (!hasExcessiveDetour(edge.points())
+                && cornerCount(edge.points()) <= 2
+                && originalCloseParallelCount == 0) {
                 normalized.add(edge);
                 continue;
             }
@@ -916,8 +1091,6 @@ final class ElkLayoutEngine {
             if (replacement.isEmpty()) {
                 normalized.add(edge);
             } else {
-                int originalCloseParallelCount =
-                    closeParallelRouteCount(edge, edge.points(), comparisonEdges);
                 int replacementCloseParallelCount =
                     closeParallelRouteCount(edge, replacement, comparisonEdges);
                 int originalCornerCount = cornerCount(edge.points());
@@ -981,6 +1154,13 @@ final class ElkLayoutEngine {
             clearStart,
             clearEnd,
             end);
+        addExistingRouteLaneCandidates(
+            candidates,
+            existingEdges,
+            start,
+            clearStart,
+            clearEnd,
+            end);
         double minNodeX = minNodeX(nodes);
         double maxNodeX = maxNodeX(nodes);
         double minNodeY = minNodeY(nodes);
@@ -1033,6 +1213,48 @@ final class ElkLayoutEngine {
                 candidates.add(routeViaX(start, clearStart, clearEnd, end, segmentStart.x()));
             } else if (horizontal(segmentStart, segmentEnd)) {
                 candidates.add(routeViaY(start, clearStart, clearEnd, end, segmentStart.y()));
+            }
+        }
+    }
+
+    private static void addExistingRouteLaneCandidates(
+        List<List<JsonContracts.Point>> candidates,
+        List<JsonContracts.LaidOutEdge> existingEdges,
+        JsonContracts.Point start,
+        JsonContracts.Point clearStart,
+        JsonContracts.Point clearEnd,
+        JsonContracts.Point end) {
+        for (JsonContracts.LaidOutEdge existingEdge : existingEdges) {
+            for (int index = 0; index < existingEdge.points().size() - 1; index++) {
+                JsonContracts.Point segmentStart = existingEdge.points().get(index);
+                JsonContracts.Point segmentEnd = existingEdge.points().get(index + 1);
+                if (vertical(segmentStart, segmentEnd)) {
+                    candidates.add(routeViaX(
+                        start,
+                        clearStart,
+                        clearEnd,
+                        end,
+                        segmentStart.x() - ROUTE_FALLBACK_LANE_SPACING));
+                    candidates.add(routeViaX(
+                        start,
+                        clearStart,
+                        clearEnd,
+                        end,
+                        segmentStart.x() + ROUTE_FALLBACK_LANE_SPACING));
+                } else if (horizontal(segmentStart, segmentEnd)) {
+                    candidates.add(routeViaY(
+                        start,
+                        clearStart,
+                        clearEnd,
+                        end,
+                        segmentStart.y() - ROUTE_FALLBACK_LANE_SPACING));
+                    candidates.add(routeViaY(
+                        start,
+                        clearStart,
+                        clearEnd,
+                        end,
+                        segmentStart.y() + ROUTE_FALLBACK_LANE_SPACING));
+                }
             }
         }
     }

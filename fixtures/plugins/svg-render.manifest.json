@@ -1,7 +1,7 @@
 {
   "plugin_manifest_schema_version": "plugin-manifest.schema.v1",
   "id": "svg-render",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "executable": "dediren-plugin-svg-render",
   "capabilities": ["render"]
 }

@@ -38,18 +38,18 @@ Runtime prerequisite:
 
 - Java 21 or newer available as `java` on `PATH`.
 
-For the current `0.5.0` version, the xtask creates:
+For the current `0.5.1` version, the xtask creates:
 
 ```text
-dist/dediren-agent-bundle-0.5.0-x86_64-unknown-linux-gnu/
-dist/dediren-agent-bundle-0.5.0-x86_64-unknown-linux-gnu.tar.gz
+dist/dediren-agent-bundle-0.5.1-x86_64-unknown-linux-gnu/
+dist/dediren-agent-bundle-0.5.1-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Run the smoke test from a shell where `java -version` resolves to Java 21 or
 newer:
 
 ```bash
-cargo xtask dist smoke dist/dediren-agent-bundle-0.5.0-x86_64-unknown-linux-gnu.tar.gz
+cargo xtask dist smoke dist/dediren-agent-bundle-0.5.1-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Concurrent `cargo xtask dist build` invocations serialize on a repo-local lock
@@ -60,8 +60,8 @@ Unpack and run it anywhere:
 
 ```bash
 mkdir -p /tmp/dediren-dist
-tar -xzf dist/dediren-agent-bundle-0.5.0-x86_64-unknown-linux-gnu.tar.gz -C /tmp/dediren-dist
-/tmp/dediren-dist/dediren-agent-bundle-0.5.0-x86_64-unknown-linux-gnu/bin/dediren --help
+tar -xzf dist/dediren-agent-bundle-0.5.1-x86_64-unknown-linux-gnu.tar.gz -C /tmp/dediren-dist
+/tmp/dediren-dist/dediren-agent-bundle-0.5.1-x86_64-unknown-linux-gnu/bin/dediren --help
 ```
 
 The archive includes first-party plugin manifests under `plugins/`, first-party
@@ -303,11 +303,14 @@ DEDIREN_ELK_COMMAND=crates/dediren-plugin-elk-layout/java/scripts/elk-layout.sh 
 
 The Java helper reads a `layout-request.schema.v1` document from stdin and
 returns a command envelope whose `.data` is a `layout-result.schema.v1`
-document. The helper uses Eclipse ELK Layered (`org.eclipse.elk.layered`). The
-Gradle build keeps the SDKMAN Java 25 toolchain for ELK layout work, emits Java
-21-compatible bytecode for the distributed helper, and pins Maven dependencies
-through dependency locking. Concurrent helper builds serialize on
-`.cache/locks/elk-layout-java-build.lock`.
+document. The helper uses Eclipse ELK Layered (`org.eclipse.elk.layered`) for
+generated node and group placement, then reroutes connectors over that fixed
+geometry with ELK Libavoid (`org.eclipse.elk.alg.libavoid`). Libavoid is an
+edge-routing backend only; source graph JSON still must not carry authored
+coordinates. The Gradle build keeps the SDKMAN Java 25 toolchain for ELK layout
+work, emits Java 21-compatible bytecode for the distributed helper, and pins
+Maven dependencies through dependency locking. Concurrent helper builds
+serialize on `.cache/locks/elk-layout-java-build.lock`.
 
 For large same-side fan-in and fan-out groups, the helper lets ELK merge routes
 through shared junction trunks instead of assigning every relationship its own
@@ -411,7 +414,7 @@ newer:
 
 ```bash
 cargo xtask dist build
-cargo xtask dist smoke dist/dediren-agent-bundle-0.5.0-x86_64-unknown-linux-gnu.tar.gz
+cargo xtask dist smoke dist/dediren-agent-bundle-0.5.1-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Focused checks:
