@@ -11,6 +11,8 @@ use std::path::{Path, PathBuf};
 use std::sync::{Mutex, MutexGuard};
 
 static REAL_ELK_LOCK: Mutex<()> = Mutex::new(());
+const ROUTE_CLOSE_PARALLEL_DISTANCE: f64 = 20.0;
+const ROUTE_CLOSE_PARALLEL_MIN_OVERLAP: f64 = 40.0;
 
 #[test]
 #[ignore = "run with --ignored after building the ELK Java helper; serialize real ELK runs"]
@@ -46,6 +48,99 @@ fn real_elk_renders_basic_projected_graph() {
     assert_svg_texts_include(&doc, &["Client", "API", "calls"]);
     assert_reasonable_svg_aspect(&svg, 4.5);
     write_render_artifact("real-elk", "real_elk_renders_basic_projected_graph", &svg);
+}
+
+#[test]
+fn close_parallel_route_details_mark_edge_pairs() {
+    let layout_data = serde_json::json!({
+        "edges": [
+            {
+                "id": "left-edge",
+                "source": "left-source",
+                "target": "left-target",
+                "points": [
+                    { "x": 0.0, "y": 10.0 },
+                    { "x": 100.0, "y": 10.0 }
+                ]
+            },
+            {
+                "id": "right-edge",
+                "source": "right-source",
+                "target": "right-target",
+                "points": [
+                    { "x": 40.0, "y": 20.0 },
+                    { "x": 140.0, "y": 20.0 }
+                ]
+            }
+        ]
+    });
+
+    let details = close_parallel_route_details(&layout_data);
+
+    assert!(details.contains("left-edge <-> right-edge"));
+    assert!(details.contains("horizontal"));
+    assert!(details.contains("distance=10.0"));
+    assert!(details.contains("overlap=60.0"));
+}
+
+#[test]
+fn close_parallel_route_overlay_marks_graph_segments() {
+    let svg = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 80"><g><rect x="0" y="0" width="20" height="20"/></g></svg>"#;
+    let layout_data = serde_json::json!({
+        "edges": [
+            {
+                "id": "left-edge",
+                "source": "left-source",
+                "target": "left-target",
+                "points": [
+                    { "x": 0.0, "y": 10.0 },
+                    { "x": 100.0, "y": 10.0 }
+                ]
+            },
+            {
+                "id": "right-edge",
+                "source": "right-source",
+                "target": "right-target",
+                "points": [
+                    { "x": 40.0, "y": 20.0 },
+                    { "x": 140.0, "y": 20.0 }
+                ]
+            }
+        ]
+    });
+
+    let annotated = annotate_close_parallel_routes(svg, &layout_data);
+
+    assert!(annotated.contains("data-dediren-route-quality-overlay"));
+    assert!(annotated.contains("data-dediren-route-quality-pair=\"left-edge--right-edge\""));
+    assert!(annotated.contains("left-edge &lt;-&gt; right-edge"));
+    assert!(annotated.contains("x1=\"0.0\" y1=\"10.0\" x2=\"100.0\" y2=\"10.0\""));
+    assert!(annotated.contains("x1=\"40.0\" y1=\"20.0\" x2=\"140.0\" y2=\"20.0\""));
+}
+
+#[test]
+fn close_parallel_route_details_ignore_same_edge_segments() {
+    let layout_data = serde_json::json!({
+        "edges": [
+            {
+                "id": "looping-edge",
+                "source": "source",
+                "target": "target",
+                "points": [
+                    { "x": 0.0, "y": 10.0 },
+                    { "x": 100.0, "y": 10.0 },
+                    { "x": 100.0, "y": 20.0 },
+                    { "x": 0.0, "y": 20.0 }
+                ]
+            }
+        ]
+    });
+
+    assert_eq!(close_parallel_route_details(&layout_data), "");
+    assert_eq!(
+        annotate_close_parallel_routes("<svg></svg>", &layout_data),
+        "<svg></svg>"
+    );
 }
 
 #[test]
@@ -410,9 +505,18 @@ fn real_elk_renders_complex_multi_layer_system() {
         "complex-multi-layer-layout-result.json",
         &layout_output,
     );
-    assert_complex_layout_quality_bounded(&validate_layout(&layout));
-
     let layout_data = ok_data(&layout_output);
+    let default_svg = render_svg(&layout, "fixtures/render-policy/default-svg.json", None);
+    let route_quality_artifact = write_close_parallel_route_artifact(
+        &default_svg,
+        &layout_data,
+        "real_elk_renders_complex_multi_layer_system_route_quality",
+    );
+    assert_complex_layout_quality_bounded(
+        &validate_layout(&layout),
+        &layout_data,
+        route_quality_artifact.as_deref(),
+    );
     assert_eq!(
         layout_data["nodes"]
             .as_array()
@@ -465,7 +569,6 @@ fn real_elk_renders_complex_multi_layer_system() {
         "identity-federates",
     );
 
-    let default_svg = render_svg(&layout, "fixtures/render-policy/default-svg.json", None);
     let default_doc = svg_doc(&default_svg);
     assert_complex_profile_svg(&default_doc, &default_svg);
     write_render_artifact(
@@ -689,7 +792,11 @@ fn assert_layout_quality_ok(quality: &Value) {
     assert_eq!(quality["warning_count"], 0, "layout quality: {quality}");
 }
 
-fn assert_complex_layout_quality_bounded(quality: &Value) {
+fn assert_complex_layout_quality_bounded(
+    quality: &Value,
+    layout_data: &Value,
+    route_quality_artifact: Option<&Path>,
+) {
     assert_eq!(quality["overlap_count"], 0, "layout quality: {quality}");
     assert_eq!(
         quality["connector_through_node_count"], 0,
@@ -709,9 +816,277 @@ fn assert_complex_layout_quality_bounded(quality: &Value) {
         "complex layout should keep route detours bounded: {quality}"
     );
     assert_eq!(
-        quality["route_close_parallel_count"], 0,
-        "complex layout should keep parallel route channels readable: {quality}"
+        quality["route_close_parallel_count"],
+        0,
+        "complex layout should keep parallel route channels readable: {quality}{}{}",
+        close_parallel_route_details(layout_data),
+        route_quality_artifact
+            .map(|path| format!("\nannotated route-quality SVG: {}", artifact_path(path)))
+            .unwrap_or_default()
     );
+}
+
+fn artifact_path(path: &Path) -> String {
+    path.canonicalize()
+        .unwrap_or_else(|_| path.to_path_buf())
+        .display()
+        .to_string()
+}
+
+fn close_parallel_route_details(layout_data: &Value) -> String {
+    let pairs = close_parallel_route_pairs(layout_data);
+    let mut details = Vec::new();
+    for pair in pairs {
+        details.push(format!(
+            "  - {} <-> {}: {}, distance={:.1}, overlap={:.1}; {} fixed={:.1} span={:.1}..{:.1}; {} fixed={:.1} span={:.1}..{:.1}",
+            pair.left.edge_id,
+            pair.right.edge_id,
+            orientation_name(pair.left.orientation),
+            pair.distance,
+            pair.overlap,
+            pair.left.edge_id,
+            pair.left.fixed,
+            pair.left.min,
+            pair.left.max,
+            pair.right.edge_id,
+            pair.right.fixed,
+            pair.right.min,
+            pair.right.max,
+        ));
+    }
+    if details.is_empty() {
+        String::new()
+    } else {
+        format!("\nclose-parallel route pairs:\n{}", details.join("\n"))
+    }
+}
+
+fn write_close_parallel_route_artifact(
+    svg: &str,
+    layout_data: &Value,
+    test_name: &str,
+) -> Option<PathBuf> {
+    let annotated = annotate_close_parallel_routes(svg, layout_data);
+    if annotated != svg {
+        return Some(write_render_artifact("real-elk", test_name, &annotated));
+    }
+    None
+}
+
+fn annotate_close_parallel_routes(svg: &str, layout_data: &Value) -> String {
+    let pairs = close_parallel_route_pairs(layout_data);
+    if pairs.is_empty() {
+        return svg.to_string();
+    }
+
+    let mut overlay = String::from(
+        r##"<g data-dediren-route-quality-overlay="close-parallel" font-family="Inter, Arial, sans-serif">"##,
+    );
+    for (index, pair) in pairs.iter().enumerate() {
+        let color = if index % 2 == 0 { "#ef4444" } else { "#f97316" };
+        overlay.push_str(&format!(
+            r##"<g data-dediren-route-quality-pair="{}--{}">"##,
+            escape_xml_attr(&pair.left.edge_id),
+            escape_xml_attr(&pair.right.edge_id)
+        ));
+        overlay.push_str(&overlay_line(&pair.left, color));
+        overlay.push_str(&overlay_line(&pair.right, color));
+        overlay.push_str(&format!(
+            r##"<text x="{:.1}" y="{:.1}" fill="{}" font-size="28" font-weight="700" stroke="#ffffff" stroke-width="6" stroke-linejoin="round" paint-order="stroke">{} &lt;-&gt; {} ({:.1}px apart, {:.1}px overlap)</text>"##,
+            pair.label_x(),
+            pair.label_y(),
+            color,
+            escape_xml_text(&pair.left.edge_id),
+            escape_xml_text(&pair.right.edge_id),
+            pair.distance,
+            pair.overlap
+        ));
+        overlay.push_str("</g>");
+    }
+    overlay.push_str("</g>");
+
+    if let Some(index) = svg.rfind("</svg>") {
+        let mut annotated = String::with_capacity(svg.len() + overlay.len());
+        annotated.push_str(&svg[..index]);
+        annotated.push_str(&overlay);
+        annotated.push_str(&svg[index..]);
+        annotated
+    } else {
+        format!("{svg}{overlay}")
+    }
+}
+
+fn overlay_line(segment: &RouteSegment, color: &str) -> String {
+    let (x1, y1, x2, y2) = segment_endpoints(segment);
+    format!(
+        r##"<line data-dediren-route-quality-edge="{}" x1="{:.1}" y1="{:.1}" x2="{:.1}" y2="{:.1}" stroke="{}" stroke-width="10" stroke-opacity="0.72" stroke-linecap="round" fill="none"/>"##,
+        escape_xml_attr(&segment.edge_id),
+        x1,
+        y1,
+        x2,
+        y2,
+        color
+    )
+}
+
+fn close_parallel_route_pairs(layout_data: &Value) -> Vec<RoutePair> {
+    let segments = route_segments(layout_data);
+    let mut pairs = Vec::new();
+    for (index, left) in segments.iter().enumerate() {
+        for right in segments.iter().skip(index + 1) {
+            if close_parallel_route_segments(left, right) {
+                pairs.push(RoutePair {
+                    left: left.clone(),
+                    right: right.clone(),
+                    distance: (left.fixed - right.fixed).abs(),
+                    overlap: overlap_length(left.min, left.max, right.min, right.max),
+                });
+            }
+        }
+    }
+    pairs
+}
+
+fn route_segments(layout_data: &Value) -> Vec<RouteSegment> {
+    let edges = layout_data["edges"]
+        .as_array()
+        .expect("laid out edges should be an array");
+    let mut segments = Vec::new();
+    for (edge_index, edge) in edges.iter().enumerate() {
+        let edge_id = edge["id"]
+            .as_str()
+            .unwrap_or_else(|| panic!("laid out edge id should be a string: {edge}"));
+        let source = edge["source"]
+            .as_str()
+            .unwrap_or_else(|| panic!("{edge_id} source should be a string"));
+        let target = edge["target"]
+            .as_str()
+            .unwrap_or_else(|| panic!("{edge_id} target should be a string"));
+        let points = edge["points"]
+            .as_array()
+            .unwrap_or_else(|| panic!("{edge_id} points should be an array"));
+        for segment in points.windows(2) {
+            if let Some(route_segment) = route_segment(
+                edge_index,
+                edge_id,
+                source,
+                target,
+                &segment[0],
+                &segment[1],
+            ) {
+                segments.push(route_segment);
+            }
+        }
+    }
+    segments
+}
+
+fn route_segment(
+    edge_index: usize,
+    edge_id: &str,
+    source: &str,
+    target: &str,
+    start: &Value,
+    end: &Value,
+) -> Option<RouteSegment> {
+    let orientation = route_orientation(start, end)?;
+    let start_x = point_coordinate(start, "x");
+    let start_y = point_coordinate(start, "y");
+    let end_x = point_coordinate(end, "x");
+    let end_y = point_coordinate(end, "y");
+    let (fixed, min, max) = match orientation {
+        RouteOrientation::Horizontal => (start_y, start_x.min(end_x), start_x.max(end_x)),
+        RouteOrientation::Vertical => (start_x, start_y.min(end_y), start_y.max(end_y)),
+    };
+    Some(RouteSegment {
+        edge_index,
+        edge_id: edge_id.to_string(),
+        source: source.to_string(),
+        target: target.to_string(),
+        orientation,
+        fixed,
+        min,
+        max,
+    })
+}
+
+#[derive(Clone)]
+struct RouteSegment {
+    edge_index: usize,
+    edge_id: String,
+    source: String,
+    target: String,
+    orientation: RouteOrientation,
+    fixed: f64,
+    min: f64,
+    max: f64,
+}
+
+struct RoutePair {
+    left: RouteSegment,
+    right: RouteSegment,
+    distance: f64,
+    overlap: f64,
+}
+
+impl RoutePair {
+    fn label_x(&self) -> f64 {
+        let (left_x1, _, left_x2, _) = segment_endpoints(&self.left);
+        let (right_x1, _, right_x2, _) = segment_endpoints(&self.right);
+        (left_x1 + left_x2 + right_x1 + right_x2) / 4.0
+    }
+
+    fn label_y(&self) -> f64 {
+        let (_, left_y1, _, left_y2) = segment_endpoints(&self.left);
+        let (_, right_y1, _, right_y2) = segment_endpoints(&self.right);
+        ((left_y1 + left_y2 + right_y1 + right_y2) / 4.0) - 16.0
+    }
+}
+
+fn close_parallel_route_segments(left: &RouteSegment, right: &RouteSegment) -> bool {
+    left.edge_index != right.edge_index
+        && !share_endpoint(left, right)
+        && left.orientation == right.orientation
+        && (left.fixed - right.fixed).abs() < ROUTE_CLOSE_PARALLEL_DISTANCE
+        && overlap_length(left.min, left.max, right.min, right.max)
+            >= ROUTE_CLOSE_PARALLEL_MIN_OVERLAP
+}
+
+fn share_endpoint(left: &RouteSegment, right: &RouteSegment) -> bool {
+    left.source == right.source
+        || left.source == right.target
+        || left.target == right.source
+        || left.target == right.target
+}
+
+fn overlap_length(left_min: f64, left_max: f64, right_min: f64, right_max: f64) -> f64 {
+    (left_max.min(right_max) - left_min.max(right_min)).max(0.0)
+}
+
+fn orientation_name(orientation: RouteOrientation) -> &'static str {
+    match orientation {
+        RouteOrientation::Horizontal => "horizontal",
+        RouteOrientation::Vertical => "vertical",
+    }
+}
+
+fn segment_endpoints(segment: &RouteSegment) -> (f64, f64, f64, f64) {
+    match segment.orientation {
+        RouteOrientation::Horizontal => (segment.min, segment.fixed, segment.max, segment.fixed),
+        RouteOrientation::Vertical => (segment.fixed, segment.min, segment.fixed, segment.max),
+    }
+}
+
+fn escape_xml_text(text: &str) -> String {
+    text.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+}
+
+fn escape_xml_attr(text: &str) -> String {
+    escape_xml_text(text)
+        .replace('"', "&quot;")
+        .replace('\'', "&apos;")
 }
 
 fn assert_edges_have_at_most_corner_count(
