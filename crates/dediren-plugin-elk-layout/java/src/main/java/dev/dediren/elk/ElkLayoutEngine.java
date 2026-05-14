@@ -326,6 +326,8 @@ final class ElkLayoutEngine {
             libavoidSourcePortSides,
             endpointMerges,
             edgePortIndexes);
+        List<JsonContracts.LaidOutGroup> groups =
+            groupedBounds(request, elkGroups, elkNodes, warnings);
         Map<String, List<JsonContracts.Point>> libavoidRoutes =
             routeWithLibavoid(
                 requestEdges,
@@ -350,10 +352,7 @@ final class ElkLayoutEngine {
                     edge.label()));
             }
         }
-        edges = normalizeExcessiveRoutes(edges, nodes);
-
-        List<JsonContracts.LaidOutGroup> groups =
-            groupedBounds(request, elkGroups, elkNodes, warnings);
+        edges = normalizeExcessiveRoutes(edges, nodes, groups);
 
         return new JsonContracts.LayoutResult(
             "layout-result.schema.v1",
@@ -1348,11 +1347,12 @@ final class ElkLayoutEngine {
 
     private static List<JsonContracts.LaidOutEdge> normalizeExcessiveRoutes(
         List<JsonContracts.LaidOutEdge> edges,
-        List<JsonContracts.LaidOutNode> nodes) {
+        List<JsonContracts.LaidOutNode> nodes,
+        List<JsonContracts.LaidOutGroup> groups) {
         List<JsonContracts.LaidOutEdge> current = edges;
         for (int pass = 0; pass < 3; pass++) {
             List<JsonContracts.LaidOutEdge> normalized =
-                normalizeExcessiveRoutesOnce(current, nodes);
+                normalizeExcessiveRoutesOnce(current, nodes, groups);
             if (normalized.equals(current)) {
                 return normalized;
             }
@@ -1363,7 +1363,8 @@ final class ElkLayoutEngine {
 
     private static List<JsonContracts.LaidOutEdge> normalizeExcessiveRoutesOnce(
         List<JsonContracts.LaidOutEdge> edges,
-        List<JsonContracts.LaidOutNode> nodes) {
+        List<JsonContracts.LaidOutNode> nodes,
+        List<JsonContracts.LaidOutGroup> groups) {
         List<JsonContracts.LaidOutEdge> normalized = new ArrayList<>();
         for (int edgeIndex = 0; edgeIndex < edges.size(); edgeIndex++) {
             JsonContracts.LaidOutEdge edge = edges.get(edgeIndex);
@@ -1371,14 +1372,17 @@ final class ElkLayoutEngine {
             comparisonEdges.addAll(edges.subList(edgeIndex + 1, edges.size()));
             int originalCloseParallelCount =
                 closeParallelRouteCount(edge, edge.points(), comparisonEdges);
+            boolean originalIntersectsUnrelatedGroup =
+                routeIntersectsUnrelatedGroup(edge, edge.points(), groups);
             if (!hasExcessiveDetour(edge.points())
                 && cornerCount(edge.points()) <= 2
-                && originalCloseParallelCount == 0) {
+                && originalCloseParallelCount == 0
+                && !originalIntersectsUnrelatedGroup) {
                 normalized.add(edge);
                 continue;
             }
             List<JsonContracts.Point> replacement =
-                shortestCleanOrthogonalRoute(edge, nodes, comparisonEdges);
+                shortestCleanOrthogonalRoute(edge, nodes, groups, comparisonEdges);
             if (replacement.isEmpty()) {
                 normalized.add(edge);
             } else {
@@ -1393,6 +1397,18 @@ final class ElkLayoutEngine {
                         || replacementCornerCount < originalCornerCount;
                 boolean replacementIsShorter =
                     routeLength(replacement) < routeLength(edge.points());
+                if (originalIntersectsUnrelatedGroup && replacementDoesNotAddParallelRoutes) {
+                    normalized.add(new JsonContracts.LaidOutEdge(
+                        edge.id(),
+                        edge.source(),
+                        edge.target(),
+                        edge.source_id(),
+                        edge.projection_id(),
+                        edge.routing_hints(),
+                        replacement,
+                        edge.label()));
+                    continue;
+                }
                 if (!replacementDoesNotAddParallelRoutes
                     || (!replacementImprovesReadability && !replacementIsShorter)) {
                     normalized.add(edge);
@@ -1426,6 +1442,7 @@ final class ElkLayoutEngine {
     private static List<JsonContracts.Point> shortestCleanOrthogonalRoute(
         JsonContracts.LaidOutEdge edge,
         List<JsonContracts.LaidOutNode> nodes,
+        List<JsonContracts.LaidOutGroup> groups,
         List<JsonContracts.LaidOutEdge> existingEdges) {
         JsonContracts.Point start = edge.points().get(0);
         JsonContracts.Point end = edge.points().get(edge.points().size() - 1);
@@ -1452,10 +1469,10 @@ final class ElkLayoutEngine {
             clearStart,
             clearEnd,
             end);
-        double minNodeX = minNodeX(nodes);
-        double maxNodeX = maxNodeX(nodes);
-        double minNodeY = minNodeY(nodes);
-        double maxNodeY = maxNodeY(nodes);
+        double minNodeX = minObstacleX(nodes, groups);
+        double maxNodeX = maxObstacleX(nodes, groups);
+        double minNodeY = minObstacleY(nodes, groups);
+        double maxNodeY = maxObstacleY(nodes, groups);
         for (int lane = 0; lane < ROUTE_FALLBACK_LANE_COUNT; lane++) {
             double offset = ROUTE_CHANNEL_PADDING + (lane * ROUTE_FALLBACK_LANE_SPACING);
             candidates.add(routeViaX(start, clearStart, clearEnd, end, minNodeX - offset));
@@ -1469,7 +1486,8 @@ final class ElkLayoutEngine {
         int bestCornerCount = Integer.MAX_VALUE;
         double bestLength = Double.POSITIVE_INFINITY;
         for (List<JsonContracts.Point> candidate : candidates) {
-            if (routeIntersectsUnrelatedNode(edge, candidate, nodes)) {
+            if (routeIntersectsUnrelatedNode(edge, candidate, nodes)
+                || routeIntersectsUnrelatedGroup(edge, candidate, groups)) {
                 continue;
             }
             int closeParallelCount = closeParallelRouteCount(edge, candidate, existingEdges);
@@ -1659,6 +1677,32 @@ final class ElkLayoutEngine {
         return false;
     }
 
+    private static boolean routeIntersectsUnrelatedGroup(
+        JsonContracts.LaidOutEdge edge,
+        List<JsonContracts.Point> points,
+        List<JsonContracts.LaidOutGroup> groups) {
+        for (int index = 0; index < points.size() - 1; index++) {
+            JsonContracts.Point start = points.get(index);
+            JsonContracts.Point end = points.get(index + 1);
+            for (JsonContracts.LaidOutGroup group : groups) {
+                if (groupContainsEndpoint(edge, group)) {
+                    continue;
+                }
+                if (segmentIntersectsRect(start, end, group)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static boolean groupContainsEndpoint(
+        JsonContracts.LaidOutEdge edge,
+        JsonContracts.LaidOutGroup group) {
+        return group.members().contains(edge.source())
+            || group.members().contains(edge.target());
+    }
+
     private static boolean segmentIntersectsRect(
         JsonContracts.Point start,
         JsonContracts.Point end,
@@ -1676,6 +1720,25 @@ final class ElkLayoutEngine {
             node.y(),
             node.width(),
             node.height());
+    }
+
+    private static boolean segmentIntersectsRect(
+        JsonContracts.Point start,
+        JsonContracts.Point end,
+        JsonContracts.LaidOutGroup group) {
+        double minX = Math.min(start.x(), end.x());
+        double maxX = Math.max(start.x(), end.x());
+        double minY = Math.min(start.y(), end.y());
+        double maxY = Math.max(start.y(), end.y());
+        return rectanglesOverlap(
+            minX,
+            minY,
+            Math.max(maxX - minX, 1.0),
+            Math.max(maxY - minY, 1.0),
+            group.x(),
+            group.y(),
+            group.width(),
+            group.height());
     }
 
     private static boolean rectanglesOverlap(
@@ -1841,6 +1904,50 @@ final class ElkLayoutEngine {
             .mapToDouble(node -> node.y() + node.height())
             .max()
             .orElse(0.0);
+    }
+
+    private static double minObstacleX(
+        List<JsonContracts.LaidOutNode> nodes,
+        List<JsonContracts.LaidOutGroup> groups) {
+        return Math.min(
+            minNodeX(nodes),
+            groups.stream()
+                .mapToDouble(JsonContracts.LaidOutGroup::x)
+                .min()
+                .orElse(minNodeX(nodes)));
+    }
+
+    private static double maxObstacleX(
+        List<JsonContracts.LaidOutNode> nodes,
+        List<JsonContracts.LaidOutGroup> groups) {
+        return Math.max(
+            maxNodeX(nodes),
+            groups.stream()
+                .mapToDouble(group -> group.x() + group.width())
+                .max()
+                .orElse(maxNodeX(nodes)));
+    }
+
+    private static double minObstacleY(
+        List<JsonContracts.LaidOutNode> nodes,
+        List<JsonContracts.LaidOutGroup> groups) {
+        return Math.min(
+            minNodeY(nodes),
+            groups.stream()
+                .mapToDouble(JsonContracts.LaidOutGroup::y)
+                .min()
+                .orElse(minNodeY(nodes)));
+    }
+
+    private static double maxObstacleY(
+        List<JsonContracts.LaidOutNode> nodes,
+        List<JsonContracts.LaidOutGroup> groups) {
+        return Math.max(
+            maxNodeY(nodes),
+            groups.stream()
+                .mapToDouble(group -> group.y() + group.height())
+                .max()
+                .orElse(maxNodeY(nodes)));
     }
 
     private static JsonContracts.LaidOutNode nodeById(

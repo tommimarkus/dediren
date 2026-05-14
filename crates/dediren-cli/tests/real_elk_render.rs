@@ -580,6 +580,7 @@ fn real_elk_renders_complex_multi_layer_system() {
         "fulfillment-ships",
         "fulfillment-writes-warehouse",
     );
+    assert_edge_does_not_intersect_unrelated_groups(&layout_data, "payment-authorizes");
     assert_no_route_crossing_near_source(
         &layout_data,
         "identity-service",
@@ -1289,6 +1290,73 @@ fn assert_edges_have_distinct_source_ports(
         !same_source_port,
         "{left_edge_id} and {right_edge_id} should not share a source port: left={left_source:?}, right={right_source:?}"
     );
+}
+
+fn assert_edge_does_not_intersect_unrelated_groups(layout_data: &Value, edge_id: &str) {
+    let edge = laid_out_edge(layout_data, edge_id);
+    let points = edge["points"]
+        .as_array()
+        .unwrap_or_else(|| panic!("{edge_id} points should be an array"));
+    for segment in points.windows(2) {
+        for group in layout_data["groups"]
+            .as_array()
+            .expect("laid out groups should be an array")
+        {
+            if group_contains_endpoint(group, edge["source"].as_str())
+                || group_contains_endpoint(group, edge["target"].as_str())
+            {
+                continue;
+            }
+            assert!(
+                !segment_intersects_group(&segment[0], &segment[1], group),
+                "{edge_id} should not route through unrelated group {}: segment={segment:?}, group={group:?}",
+                group["id"]
+            );
+        }
+    }
+}
+
+fn group_contains_endpoint(group: &Value, endpoint: Option<&str>) -> bool {
+    endpoint.is_some_and(|endpoint| {
+        group["members"]
+            .as_array()
+            .expect("group members should be an array")
+            .iter()
+            .any(|member| member == endpoint)
+    })
+}
+
+fn segment_intersects_group(start: &Value, end: &Value, group: &Value) -> bool {
+    rectangles_overlap(
+        point_coordinate(start, "x").min(point_coordinate(end, "x")),
+        point_coordinate(start, "y").min(point_coordinate(end, "y")),
+        (point_coordinate(start, "x") - point_coordinate(end, "x"))
+            .abs()
+            .max(1.0),
+        (point_coordinate(start, "y") - point_coordinate(end, "y"))
+            .abs()
+            .max(1.0),
+        point_coordinate(group, "x"),
+        point_coordinate(group, "y"),
+        point_coordinate(group, "width"),
+        point_coordinate(group, "height"),
+    )
+}
+
+fn rectangles_overlap(
+    left_x: f64,
+    left_y: f64,
+    left_width: f64,
+    left_height: f64,
+    right_x: f64,
+    right_y: f64,
+    right_width: f64,
+    right_height: f64,
+) -> bool {
+    left_x < right_x + right_width
+        && left_x + left_width > right_x
+        && left_y < right_y + right_height
+        && left_y + left_height > right_y
 }
 
 fn assert_junction_between_x(

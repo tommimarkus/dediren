@@ -153,6 +153,32 @@ fn count_group_boundary_issues(result: &LayoutResult) -> usize {
             }
         }
     }
+    for edge in &result.edges {
+        for segment in edge.points.windows(2) {
+            for group in &result.groups {
+                if group
+                    .members
+                    .iter()
+                    .any(|member| member == &edge.source || member == &edge.target)
+                {
+                    continue;
+                }
+                if segment_intersects_rect(
+                    segment[0].x,
+                    segment[0].y,
+                    segment[1].x,
+                    segment[1].y,
+                    group.x,
+                    group.y,
+                    group.width,
+                    group.height,
+                ) {
+                    count += 1;
+                    break;
+                }
+            }
+        }
+    }
     count
 }
 

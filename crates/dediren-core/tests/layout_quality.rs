@@ -180,6 +180,64 @@ fn group_boundary_issues_are_counted() {
     assert_eq!(report.group_boundary_issue_count, 1);
 }
 
+#[test]
+fn connector_through_unrelated_group_is_counted() {
+    let mut result = empty_result();
+    result.nodes.push(node("source", 0.0, 0.0));
+    result.nodes.push(node("target", 500.0, 0.0));
+    result.groups.push(LaidOutGroup {
+        id: "source-group".to_string(),
+        source_id: "source-group".to_string(),
+        projection_id: "source-group".to_string(),
+        provenance: None,
+        x: -20.0,
+        y: -20.0,
+        width: 160.0,
+        height: 120.0,
+        members: vec!["source".to_string()],
+        label: "Source".to_string(),
+    });
+    result.groups.push(LaidOutGroup {
+        id: "unrelated-group".to_string(),
+        source_id: "unrelated-group".to_string(),
+        projection_id: "unrelated-group".to_string(),
+        provenance: None,
+        x: 220.0,
+        y: -20.0,
+        width: 160.0,
+        height: 120.0,
+        members: vec!["unrelated".to_string()],
+        label: "Unrelated".to_string(),
+    });
+    result.groups.push(LaidOutGroup {
+        id: "target-group".to_string(),
+        source_id: "target-group".to_string(),
+        projection_id: "target-group".to_string(),
+        provenance: None,
+        x: 480.0,
+        y: -20.0,
+        width: 160.0,
+        height: 120.0,
+        members: vec!["target".to_string()],
+        label: "Target".to_string(),
+    });
+    result.edges.push(LaidOutEdge {
+        id: "edge".to_string(),
+        source: "source".to_string(),
+        target: "target".to_string(),
+        source_id: "edge".to_string(),
+        projection_id: "edge".to_string(),
+        routing_hints: vec![],
+        points: vec![Point { x: 100.0, y: 40.0 }, Point { x: 500.0, y: 40.0 }],
+        label: "crosses group".to_string(),
+    });
+
+    let report = dediren_core::quality::validate_layout(&result);
+
+    assert_eq!(report.group_boundary_issue_count, 1);
+    assert_eq!(report.status, "warning");
+}
+
 fn empty_result() -> LayoutResult {
     LayoutResult {
         layout_result_schema_version: "layout-result.schema.v1".to_string(),
