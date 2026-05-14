@@ -593,7 +593,19 @@ fn real_elk_renders_complex_multi_layer_system() {
         "pricing-reads-products",
         "pricing-caches-quotes",
     );
-    assert_source_port_below_node_center(
+    assert_no_route_crossing_near_source_area(
+        &layout_data,
+        "event-bus",
+        "event-bus-to-or-junction",
+        "event-bus-drives-order-worker",
+    );
+    assert_no_route_crossing_near_source_area(
+        &layout_data,
+        "event-dispatch-or-junction",
+        "or-junction-drives-email-worker",
+        "or-junction-drives-reporting",
+    );
+    assert_source_port_right_of_node_center(
         &layout_data,
         "or-junction-drives-email-worker",
         "event-dispatch-or-junction",
@@ -1172,6 +1184,57 @@ fn assert_no_route_crossing_near_source(
     );
 }
 
+fn assert_no_route_crossing_near_source_area(
+    layout_data: &Value,
+    source_id: &str,
+    left_edge_id: &str,
+    right_edge_id: &str,
+) {
+    let source = laid_out_node(layout_data, source_id);
+    let source_left = point_coordinate(source, "x");
+    let source_right = source_left + point_coordinate(source, "width");
+    let source_top = point_coordinate(source, "y");
+    let source_bottom = source_top + point_coordinate(source, "height");
+    let near_left = source_left - 80.0;
+    let near_right = source_right + 220.0;
+    let near_top = source_top - 120.0;
+    let near_bottom = source_bottom + 220.0;
+    let segments = route_segments(layout_data);
+    let mut crossings = Vec::new();
+    for left in segments
+        .iter()
+        .filter(|segment| segment.edge_id == left_edge_id)
+    {
+        for right in segments
+            .iter()
+            .filter(|segment| segment.edge_id == right_edge_id)
+        {
+            if let Some((crossing_x, crossing_y)) = segment_crossing(left, right) {
+                if crossing_x >= near_left
+                    && crossing_x <= near_right
+                    && crossing_y >= near_top
+                    && crossing_y <= near_bottom
+                {
+                    crossings.push(format!(
+                        "{} {} {:?} crosses {} {} {:?} at ({crossing_x:.1}, {crossing_y:.1})",
+                        left.edge_id,
+                        orientation_name(left.orientation),
+                        segment_endpoints(left),
+                        right.edge_id,
+                        orientation_name(right.orientation),
+                        segment_endpoints(right)
+                    ));
+                }
+            }
+        }
+    }
+    assert!(
+        crossings.is_empty(),
+        "routes from {source_id} should not cross near the source area:\n{}",
+        crossings.join("\n")
+    );
+}
+
 fn segment_crossing(left: &RouteSegment, right: &RouteSegment) -> Option<(f64, f64)> {
     if left.orientation == right.orientation {
         return None;
@@ -1390,20 +1453,6 @@ fn assert_source_port_right_of_node_center(layout_data: &Value, edge_id: &str, n
     assert!(
         source_port_x > node_center,
         "{edge_id} should leave {node_id} from the right side, got source x={source_port_x}, node center x={node_center}"
-    );
-}
-
-fn assert_source_port_below_node_center(layout_data: &Value, edge_id: &str, node_id: &str) {
-    let edge = laid_out_edge(layout_data, edge_id);
-    let points = edge["points"]
-        .as_array()
-        .unwrap_or_else(|| panic!("{edge_id} points should be an array"));
-    let source_port_y = point_coordinate(&points[0], "y");
-    let node = laid_out_node(layout_data, node_id);
-    let node_center = point_coordinate(node, "y") + (point_coordinate(node, "height") / 2.0);
-    assert!(
-        source_port_y > node_center,
-        "{edge_id} should be able to leave {node_id} from the bottom side, got source y={source_port_y}, node center y={node_center}"
     );
 }
 

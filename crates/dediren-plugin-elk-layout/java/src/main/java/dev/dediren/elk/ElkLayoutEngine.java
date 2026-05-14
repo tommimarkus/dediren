@@ -49,6 +49,7 @@ final class ElkLayoutEngine {
     private static final double ROUTE_CLOSE_PARALLEL_DISTANCE = 20.0;
     private static final double ROUTE_CLOSE_PARALLEL_MIN_OVERLAP = 40.0;
     private static final double ROUTE_ENDPOINT_CLEARANCE = 32.0;
+    private static final double CONNECTOR_ENDPOINT_DOGLEG_SNAP = 24.0;
     private static final double LIBAVOID_SEGMENT_PENALTY = 50.0;
     private static final double LIBAVOID_IDEAL_NUDGING_DISTANCE = 16.0;
     private static final double LIBAVOID_SHAPE_BUFFER_DISTANCE = 16.0;
@@ -352,6 +353,7 @@ final class ElkLayoutEngine {
                     edge.label()));
             }
         }
+        edges = straightenConnectorEndpointDoglegs(edges, nodes);
         edges = normalizeExcessiveRoutes(edges, nodes, groups);
 
         return new JsonContracts.LayoutResult(
@@ -1042,7 +1044,9 @@ final class ElkLayoutEngine {
         double targetX = centerX(target);
         double targetY = centerY(target);
         double verticalDelta = targetY - sourceY;
-        if (Math.abs(verticalDelta) <= GEOMETRY_EPSILON) {
+        double horizontalDelta = targetX - sourceX;
+        if (Math.abs(verticalDelta) <= GEOMETRY_EPSILON
+            || Math.abs(horizontalDelta) > Math.abs(verticalDelta)) {
             return defaultSide;
         }
 
@@ -1065,6 +1069,12 @@ final class ElkLayoutEngine {
         PortSide sourceSide) {
         double sourceY = centerY(source);
         double targetY = centerY(target);
+        if (sourceSide == PortSide.NORTH) {
+            return new SourcePortOrder(0, centerX(target));
+        }
+        if (sourceSide == PortSide.SOUTH) {
+            return new SourcePortOrder(0, -centerX(target));
+        }
         if (sourceSide != PortSide.EAST && sourceSide != PortSide.WEST) {
             return new SourcePortOrder(0, centerX(target));
         }
@@ -1359,6 +1369,81 @@ final class ElkLayoutEngine {
             current = normalized;
         }
         return current;
+    }
+
+    private static List<JsonContracts.LaidOutEdge> straightenConnectorEndpointDoglegs(
+        List<JsonContracts.LaidOutEdge> edges,
+        List<JsonContracts.LaidOutNode> nodes) {
+        List<JsonContracts.LaidOutEdge> straightened = new ArrayList<>();
+        for (JsonContracts.LaidOutEdge edge : edges) {
+            List<JsonContracts.Point> points = straightenConnectorEndpointDogleg(edge, nodes);
+            if (points.equals(edge.points())) {
+                straightened.add(edge);
+            } else {
+                straightened.add(new JsonContracts.LaidOutEdge(
+                    edge.id(),
+                    edge.source(),
+                    edge.target(),
+                    edge.source_id(),
+                    edge.projection_id(),
+                    edge.routing_hints(),
+                    points,
+                    edge.label()));
+            }
+        }
+        return straightened;
+    }
+
+    private static List<JsonContracts.Point> straightenConnectorEndpointDogleg(
+        JsonContracts.LaidOutEdge edge,
+        List<JsonContracts.LaidOutNode> nodes) {
+        JsonContracts.LaidOutNode source = nodeById(nodes, edge.source());
+        JsonContracts.LaidOutNode target = nodeById(nodes, edge.target());
+        if (source == null
+            || target == null
+            || !isConnectorSizedNode(source)
+            || edge.points().size() < 4) {
+            return edge.points();
+        }
+        return snapSmallTerminalDogleg(edge.points(), target);
+    }
+
+    private static List<JsonContracts.Point> snapSmallTerminalDogleg(
+        List<JsonContracts.Point> points,
+        JsonContracts.LaidOutNode target) {
+        int endIndex = points.size() - 1;
+        JsonContracts.Point beforeEntry = points.get(endIndex - 3);
+        JsonContracts.Point doglegStart = points.get(endIndex - 2);
+        JsonContracts.Point doglegEnd = points.get(endIndex - 1);
+        JsonContracts.Point end = points.get(endIndex);
+
+        if (horizontal(beforeEntry, doglegStart)
+            && vertical(doglegStart, doglegEnd)
+            && horizontal(doglegEnd, end)
+            && Math.abs(doglegStart.y() - doglegEnd.y()) <= CONNECTOR_ENDPOINT_DOGLEG_SNAP
+            && pointOnVerticalBoundary(end, target)
+            && withinNodeY(target, doglegStart.y())) {
+            return replaceTerminalPoint(points, new JsonContracts.Point(end.x(), doglegStart.y()));
+        }
+
+        if (vertical(beforeEntry, doglegStart)
+            && horizontal(doglegStart, doglegEnd)
+            && vertical(doglegEnd, end)
+            && Math.abs(doglegStart.x() - doglegEnd.x()) <= CONNECTOR_ENDPOINT_DOGLEG_SNAP
+            && pointOnHorizontalBoundary(end, target)
+            && withinNodeX(target, doglegStart.x())) {
+            return replaceTerminalPoint(points, new JsonContracts.Point(doglegStart.x(), end.y()));
+        }
+
+        return points;
+    }
+
+    private static List<JsonContracts.Point> replaceTerminalPoint(
+        List<JsonContracts.Point> points,
+        JsonContracts.Point end) {
+        List<JsonContracts.Point> adjusted = new ArrayList<>(points.subList(0, points.size() - 2));
+        adjusted.add(end);
+        return compactPoints(adjusted);
     }
 
     private static List<JsonContracts.LaidOutEdge> normalizeExcessiveRoutesOnce(
@@ -1720,6 +1805,32 @@ final class ElkLayoutEngine {
             node.y(),
             node.width(),
             node.height());
+    }
+
+    private static boolean pointOnVerticalBoundary(
+        JsonContracts.Point point,
+        JsonContracts.LaidOutNode node) {
+        double right = node.x() + node.width();
+        return sameCoordinate(point.x(), node.x())
+            || sameCoordinate(point.x(), right);
+    }
+
+    private static boolean pointOnHorizontalBoundary(
+        JsonContracts.Point point,
+        JsonContracts.LaidOutNode node) {
+        double bottom = node.y() + node.height();
+        return sameCoordinate(point.y(), node.y())
+            || sameCoordinate(point.y(), bottom);
+    }
+
+    private static boolean withinNodeX(JsonContracts.LaidOutNode node, double x) {
+        return x >= node.x() - GEOMETRY_EPSILON
+            && x <= node.x() + node.width() + GEOMETRY_EPSILON;
+    }
+
+    private static boolean withinNodeY(JsonContracts.LaidOutNode node, double y) {
+        return y >= node.y() - GEOMETRY_EPSILON
+            && y <= node.y() + node.height() + GEOMETRY_EPSILON;
     }
 
     private static boolean segmentIntersectsRect(
