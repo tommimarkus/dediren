@@ -382,7 +382,7 @@ fn real_elk_renders_cross_group_route_without_quality_warnings() {
 fn real_elk_renders_complex_multi_layer_system() {
     let _guard = real_elk_guard();
     let temp = assert_fs::TempDir::new().unwrap();
-    let request = serde_json::json!({
+    let mut request = serde_json::json!({
         "layout_request_schema_version": "layout-request.schema.v1",
         "view_id": "main",
         "nodes": [
@@ -501,6 +501,9 @@ fn real_elk_renders_complex_multi_layer_system() {
         "labels": [],
         "constraints": []
     });
+    let metadata = complex_archimate_render_metadata();
+    apply_layout_request_relationship_types_from_render_metadata(&mut request, &metadata);
+    assert_layout_request_relationship_types_match_render_metadata(&request, &metadata);
     let request = write_temp_json(&temp, "complex-multi-layer-layout-request.json", &request);
 
     let layout_output = real_elk_layout(&request);
@@ -572,6 +575,11 @@ fn real_elk_renders_complex_multi_layer_system() {
         &["fulfillment-writes-warehouse", "payment-records-ledger"],
         4,
     );
+    assert_edges_have_distinct_source_ports(
+        &layout_data,
+        "fulfillment-ships",
+        "fulfillment-writes-warehouse",
+    );
     assert_no_route_crossing_near_source(
         &layout_data,
         "identity-service",
@@ -625,7 +633,6 @@ fn real_elk_renders_complex_multi_layer_system() {
         &rich_svg,
     );
 
-    let metadata = complex_archimate_render_metadata();
     let archimate_edge_types = metadata["edges"]
         .as_object()
         .expect("complex ArchiMate metadata should contain edges")
@@ -1256,6 +1263,34 @@ fn assert_edges_include_routing_hint(layout_data: &Value, edge_ids: &[&str], hin
     }
 }
 
+fn assert_edges_have_distinct_source_ports(
+    layout_data: &Value,
+    left_edge_id: &str,
+    right_edge_id: &str,
+) {
+    let left = laid_out_edge(layout_data, left_edge_id);
+    let right = laid_out_edge(layout_data, right_edge_id);
+    let left_points = left["points"]
+        .as_array()
+        .unwrap_or_else(|| panic!("{left_edge_id} points should be an array"));
+    let right_points = right["points"]
+        .as_array()
+        .unwrap_or_else(|| panic!("{right_edge_id} points should be an array"));
+    let left_source = &left_points[0];
+    let right_source = &right_points[0];
+    let same_source_port = same_coordinate(
+        point_coordinate(left_source, "x"),
+        point_coordinate(right_source, "x"),
+    ) && same_coordinate(
+        point_coordinate(left_source, "y"),
+        point_coordinate(right_source, "y"),
+    );
+    assert!(
+        !same_source_port,
+        "{left_edge_id} and {right_edge_id} should not share a source port: left={left_source:?}, right={right_source:?}"
+    );
+}
+
 fn assert_junction_between_x(
     layout_data: &Value,
     junction_id: &str,
@@ -1435,6 +1470,54 @@ fn assert_archimate_edge_notation(
             );
         }
         None => assert_eq!(path.attribute("marker-end"), None, "{edge_id} marker"),
+    }
+}
+
+fn assert_layout_request_relationship_types_match_render_metadata(
+    request: &Value,
+    metadata: &Value,
+) {
+    let request_edges = request["edges"]
+        .as_array()
+        .expect("layout request edges should be an array");
+    let metadata_edges = metadata["edges"]
+        .as_object()
+        .expect("render metadata edges should be an object");
+    for edge in request_edges {
+        let edge_id = edge["id"]
+            .as_str()
+            .expect("layout request edge id should be a string");
+        let expected_type = metadata_edges
+            .get(edge_id)
+            .and_then(|edge| edge["type"].as_str())
+            .unwrap_or_else(|| panic!("{edge_id} should have render metadata type"));
+        assert_eq!(
+            edge["relationship_type"].as_str(),
+            Some(expected_type),
+            "{edge_id} layout relationship_type should match ArchiMate render metadata"
+        );
+    }
+}
+
+fn apply_layout_request_relationship_types_from_render_metadata(
+    request: &mut Value,
+    metadata: &Value,
+) {
+    let metadata_edges = metadata["edges"]
+        .as_object()
+        .expect("render metadata edges should be an object");
+    let request_edges = request["edges"]
+        .as_array_mut()
+        .expect("layout request edges should be an array");
+    for edge in request_edges {
+        let edge_id = edge["id"]
+            .as_str()
+            .expect("layout request edge id should be a string");
+        let relationship_type = metadata_edges
+            .get(edge_id)
+            .and_then(|edge| edge["type"].as_str())
+            .unwrap_or_else(|| panic!("{edge_id} should have render metadata type"));
+        edge["relationship_type"] = Value::String(relationship_type.to_string());
     }
 }
 
