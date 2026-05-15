@@ -83,6 +83,88 @@ class MainTest {
     }
 
     @Test
+    void requestWithUnknownLayoutPreferenceReturnsErrorEnvelope() throws Exception {
+        String request = """
+            {
+              "layout_request_schema_version": "layout-request.schema.v1",
+              "view_id": "main",
+              "nodes": [],
+              "edges": [],
+              "groups": [],
+              "labels": [],
+              "constraints": [],
+              "layout_preferences": {
+                "direction": "diagonal"
+              }
+            }
+            """;
+        ByteArrayInputStream stdin =
+            new ByteArrayInputStream(request.getBytes(StandardCharsets.UTF_8));
+        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+
+        int exitCode = Main.run(stdin, new PrintStream(stdout, true, StandardCharsets.UTF_8));
+
+        String text = stdout.toString(StandardCharsets.UTF_8);
+        assertEquals(3, exitCode);
+        EnvelopeAssertions.errorEnvelope(text, "DEDIREN_ELK_LAYOUT_FAILED");
+        assertTrue(text.contains("$.layout_preferences.direction"));
+    }
+
+    @Test
+    void requestWithNullLayoutPreferencesReturnsInputErrorEnvelope() throws Exception {
+        String request = """
+            {
+              "layout_request_schema_version": "layout-request.schema.v1",
+              "view_id": "main",
+              "nodes": [],
+              "edges": [],
+              "groups": [],
+              "labels": [],
+              "constraints": [],
+              "layout_preferences": null
+            }
+            """;
+        ByteArrayInputStream stdin =
+            new ByteArrayInputStream(request.getBytes(StandardCharsets.UTF_8));
+        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+
+        int exitCode = Main.run(stdin, new PrintStream(stdout, true, StandardCharsets.UTF_8));
+
+        String text = stdout.toString(StandardCharsets.UTF_8);
+        assertEquals(3, exitCode);
+        EnvelopeAssertions.errorEnvelope(text, "DEDIREN_ELK_INPUT_INVALID_JSON");
+    }
+
+    @Test
+    void requestWithNullRoutingStyleReturnsInputErrorEnvelope() throws Exception {
+        String request = """
+            {
+              "layout_request_schema_version": "layout-request.schema.v1",
+              "view_id": "main",
+              "nodes": [],
+              "edges": [],
+              "groups": [],
+              "labels": [],
+              "constraints": [],
+              "layout_preferences": {
+                "routing": {
+                  "style": null
+                }
+              }
+            }
+            """;
+        ByteArrayInputStream stdin =
+            new ByteArrayInputStream(request.getBytes(StandardCharsets.UTF_8));
+        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+
+        int exitCode = Main.run(stdin, new PrintStream(stdout, true, StandardCharsets.UTF_8));
+
+        String text = stdout.toString(StandardCharsets.UTF_8);
+        assertEquals(3, exitCode);
+        EnvelopeAssertions.errorEnvelope(text, "DEDIREN_ELK_INPUT_INVALID_JSON");
+    }
+
+    @Test
     void requestWithScalarGroupProvenanceReturnsErrorEnvelope() throws Exception {
         String request = """
             {

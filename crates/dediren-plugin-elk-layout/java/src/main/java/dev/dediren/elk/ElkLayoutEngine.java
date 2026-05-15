@@ -2202,6 +2202,7 @@ final class ElkLayoutEngine {
         requireNonNull(request.groups(), "$.groups");
         requireNonNull(request.labels(), "$.labels");
         requireNonNull(request.constraints(), "$.constraints");
+        validateLayoutPreferences(request.layout_preferences(), "$.layout_preferences");
 
         for (int index = 0; index < request.nodes().size(); index++) {
             JsonContracts.LayoutNode node = request.nodes().get(index);
@@ -2262,6 +2263,67 @@ final class ElkLayoutEngine {
                     path + ".subjects[" + subjectIndex + "]");
             }
         }
+    }
+
+    private static void validateLayoutPreferences(
+        JsonContracts.LayoutPreferences preferences,
+        String path) {
+        if (preferences == null) {
+            return;
+        }
+        requireOneOf(
+            preferences.direction(),
+            path + ".direction",
+            "right",
+            "left",
+            "down",
+            "up");
+        requireOneOf(
+            preferences.density(),
+            path + ".density",
+            "compact",
+            "readable",
+            "spacious");
+        requireOneOf(
+            preferences.wrapping(),
+            path + ".wrapping",
+            "auto",
+            "off",
+            "multi-edge");
+        validateRoutingPreferences(preferences.routing(), path + ".routing");
+    }
+
+    private static void validateRoutingPreferences(
+        JsonContracts.LayoutRoutingPreferences routing,
+        String path) {
+        if (routing == null) {
+            return;
+        }
+        requireOneOf(routing.style(), path + ".style", "orthogonal");
+        requireOneOf(
+            routing.profile(),
+            path + ".profile",
+            "compact",
+            "readable",
+            "spacious");
+        requireOneOf(
+            routing.endpoint_merging(),
+            path + ".endpoint_merging",
+            "off",
+            "local",
+            "auto");
+    }
+
+    private static void requireOneOf(String value, String path, String... accepted) {
+        if (value == null) {
+            return;
+        }
+        for (String candidate : accepted) {
+            if (candidate.equals(value)) {
+                return;
+            }
+        }
+        throw new IllegalArgumentException(path + " has unsupported value: " + value);
     }
 
     private static void validateProvenance(JsonContracts.GroupProvenance provenance, String path) {

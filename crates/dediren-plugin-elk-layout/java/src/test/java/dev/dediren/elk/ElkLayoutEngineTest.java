@@ -38,7 +38,8 @@ class ElkLayoutEngineTest {
                 "client-calls-api", "client", "api", "calls", "client-calls-api")),
             List.of(),
             List.of(),
-            List.of());
+            List.of(),
+            null);
 
         JsonContracts.LayoutResult result = new ElkLayoutEngine().layout(request);
 
@@ -112,7 +113,8 @@ class ElkLayoutEngineTest {
                 List.of("client", "missing"),
                 new JsonContracts.GroupProvenance(null, new JsonContracts.SemanticBacked("system-group")))),
             List.of(),
-            List.of());
+            List.of(),
+            null);
 
         JsonContracts.LayoutResult result = new ElkLayoutEngine().layout(request);
 
@@ -139,7 +141,8 @@ class ElkLayoutEngineTest {
                 List.of("client"),
                 new JsonContracts.GroupProvenance(true, null))),
             List.of(),
-            List.of());
+            List.of(),
+            null);
 
         JsonContracts.LayoutResult result = new ElkLayoutEngine().layout(request);
 
@@ -184,7 +187,8 @@ class ElkLayoutEngineTest {
                     List.of("payments", "database"),
                     new JsonContracts.GroupProvenance(null, new JsonContracts.SemanticBacked("external-dependencies")))),
             List.of(),
-            List.of());
+            List.of(),
+            null);
 
         JsonContracts.LayoutResult result = new ElkLayoutEngine().layout(request);
 
@@ -246,7 +250,8 @@ class ElkLayoutEngineTest {
                     List.of("payments", "database"),
                     new JsonContracts.GroupProvenance(null, new JsonContracts.SemanticBacked("external-dependencies")))),
             List.of(),
-            List.of());
+            List.of(),
+            null);
 
         JsonContracts.LayoutResult result = new ElkLayoutEngine().layout(request);
         JsonContracts.LaidOutNode client = nodeById(result, "client");
@@ -299,7 +304,8 @@ class ElkLayoutEngineTest {
                     List.of("payments", "database"),
                     new JsonContracts.GroupProvenance(null, new JsonContracts.SemanticBacked("external-dependencies")))),
             List.of(),
-            List.of());
+            List.of(),
+            null);
 
         JsonContracts.LayoutResult result = new ElkLayoutEngine().layout(request);
         JsonContracts.LaidOutEdge paymentEdge = result.edges().stream()
@@ -338,7 +344,8 @@ class ElkLayoutEngineTest {
                     "gateway-orders", "gateway", "orders", "orders", "gateway-orders")),
             List.of(),
             List.of(),
-            List.of());
+            List.of(),
+            null);
 
         JsonContracts.LayoutResult result = new ElkLayoutEngine().layout(request);
         JsonContracts.LaidOutNode gateway = nodeById(result, "gateway");
@@ -379,7 +386,8 @@ class ElkLayoutEngineTest {
                     List.of("identity-service", "pricing-service", "order-service", "catalog-service"),
                     new JsonContracts.GroupProvenance(null, new JsonContracts.SemanticBacked("core-services")))),
             List.of(),
-            List.of());
+            List.of(),
+            null);
 
         JsonContracts.LayoutResult result = new ElkLayoutEngine().layout(request);
 
@@ -429,7 +437,8 @@ class ElkLayoutEngineTest {
                     List.of("identity-service", "pricing-service", "order-service", "catalog-service"),
                     new JsonContracts.GroupProvenance(null, new JsonContracts.SemanticBacked("core-services")))),
             List.of(),
-            List.of());
+            List.of(),
+            null);
 
         JsonContracts.LayoutResult result = new ElkLayoutEngine().layout(request);
         List<JsonContracts.LaidOutEdge> fanOutEdges = List.of(
@@ -475,7 +484,8 @@ class ElkLayoutEngineTest {
                     List.of("identity-service", "pricing-service", "order-service"),
                     new JsonContracts.GroupProvenance(null, new JsonContracts.SemanticBacked("core-services")))),
             List.of(),
-            List.of());
+            List.of(),
+            null);
 
         JsonContracts.LayoutResult result = new ElkLayoutEngine().layout(request);
 
@@ -520,7 +530,8 @@ class ElkLayoutEngineTest {
                     List.of("identity-provider"),
                     new JsonContracts.GroupProvenance(null, new JsonContracts.SemanticBacked("external-systems")))),
             List.of(),
-            List.of());
+            List.of(),
+            null);
 
         JsonContracts.LayoutResult result = new ElkLayoutEngine().layout(request);
         JsonContracts.LaidOutNode source = nodeById(result, "identity-service");
@@ -566,7 +577,8 @@ class ElkLayoutEngineTest {
                     List.of("session-cache", "product-db"),
                     new JsonContracts.GroupProvenance(null, new JsonContracts.SemanticBacked("data-platform")))),
             List.of(),
-            List.of());
+            List.of(),
+            null);
 
         JsonContracts.LayoutResult result = new ElkLayoutEngine().layout(request);
         JsonContracts.LaidOutNode source = nodeById(result, "pricing-service");
@@ -609,7 +621,8 @@ class ElkLayoutEngineTest {
                 List.of("event-bus", "dispatch", "order-worker", "email-worker", "reporting-ingestor"),
                 new JsonContracts.GroupProvenance(null, new JsonContracts.SemanticBacked("async-processing")))),
             List.of(),
-            List.of());
+            List.of(),
+            null);
 
         JsonContracts.LayoutResult result = new ElkLayoutEngine().layout(request);
         JsonContracts.LaidOutNode dispatch = nodeById(result, "dispatch");
@@ -650,7 +663,8 @@ class ElkLayoutEngineTest {
                     List.of("orders-api"),
                     new JsonContracts.GroupProvenance(null, new JsonContracts.SemanticBacked("application-services")))),
             List.of(),
-            List.of());
+            List.of(),
+            null);
 
         JsonContracts.LayoutResult result = new ElkLayoutEngine().layout(request);
         JsonContracts.LaidOutEdge webEdge = result.edges().stream()
@@ -696,7 +710,8 @@ class ElkLayoutEngineTest {
                     List.of("orders-api"),
                     new JsonContracts.GroupProvenance(null, new JsonContracts.SemanticBacked("application-services")))),
             List.of(),
-            List.of());
+            List.of(),
+            null);
 
         JsonContracts.LayoutResult result = new ElkLayoutEngine().layout(request);
         List<JsonContracts.LaidOutEdge> fanInEdges = List.of(
@@ -746,7 +761,8 @@ class ElkLayoutEngineTest {
                     List.of("payments", "database"),
                     new JsonContracts.GroupProvenance(null, new JsonContracts.SemanticBacked("external-dependencies")))),
             List.of(),
-            List.of());
+            List.of(),
+            null);
 
         JsonContracts.LayoutResult result = new ElkLayoutEngine().layout(request);
 
@@ -783,7 +799,8 @@ class ElkLayoutEngineTest {
                     List.of("payments", "database"),
                     new JsonContracts.GroupProvenance(null, new JsonContracts.SemanticBacked("external-dependencies")))),
             List.of(),
-            List.of());
+            List.of(),
+            null);
 
         JsonContracts.LayoutResult result = new ElkLayoutEngine().layout(request);
         JsonContracts.LaidOutEdge paymentEdge = edgeById(result, "payments-serves-api");
@@ -883,7 +900,8 @@ class ElkLayoutEngineTest {
                 List.of("a", "b"),
                 new JsonContracts.GroupProvenance(null, new JsonContracts.SemanticBacked("group")))),
             List.of(),
-            List.of());
+            List.of(),
+            null);
 
         JsonContracts.LayoutResult result = new ElkLayoutEngine().layout(request);
 

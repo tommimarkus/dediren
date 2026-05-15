@@ -44,4 +44,39 @@ class JsonContractsTest {
         JsonNode data = EnvelopeAssertions.okData(envelope);
         assertEquals("layout-result.schema.v1", data.path("layout_result_schema_version").asText());
     }
+
+    @Test
+    void readsLayoutPreferences() throws Exception {
+        String json = """
+            {
+              "layout_request_schema_version": "layout-request.schema.v1",
+              "view_id": "main",
+              "nodes": [],
+              "edges": [],
+              "groups": [],
+              "labels": [],
+              "constraints": [],
+              "layout_preferences": {
+                "direction": "down",
+                "density": "readable",
+                "wrapping": "off",
+                "routing": {
+                  "style": "orthogonal",
+                  "profile": "spacious",
+                  "endpoint_merging": "off"
+                }
+              }
+            }
+            """;
+
+        JsonContracts.LayoutRequest request =
+            mapper.readValue(json, JsonContracts.LayoutRequest.class);
+
+        assertEquals("down", request.layout_preferences().direction());
+        assertEquals("readable", request.layout_preferences().density());
+        assertEquals("off", request.layout_preferences().wrapping());
+        assertEquals("orthogonal", request.layout_preferences().routing().style());
+        assertEquals("spacious", request.layout_preferences().routing().profile());
+        assertEquals("off", request.layout_preferences().routing().endpoint_merging());
+    }
 }
