@@ -56,6 +56,120 @@ fn svg_renderer_adds_line_jump_for_later_crossing_edge() {
 }
 
 #[test]
+fn svg_renderer_deduplicates_vertical_line_jumps_at_same_crossing() {
+    let input = styled_inline_input(
+        serde_json::json!([]),
+        serde_json::json!([]),
+        serde_json::json!([
+            {
+                "id": "first-horizontal",
+                "source": "left-a",
+                "target": "right-a",
+                "source_id": "first-horizontal",
+                "projection_id": "first-horizontal",
+                "points": [
+                    { "x": 0, "y": 100 },
+                    { "x": 200, "y": 100 }
+                ],
+                "label": "first"
+            },
+            {
+                "id": "second-horizontal",
+                "source": "left-b",
+                "target": "right-b",
+                "source_id": "second-horizontal",
+                "projection_id": "second-horizontal",
+                "points": [
+                    { "x": 0, "y": 100.04 },
+                    { "x": 200, "y": 100.04 }
+                ],
+                "label": "second"
+            },
+            {
+                "id": "front-vertical",
+                "source": "top",
+                "target": "bottom",
+                "source_id": "front-vertical",
+                "projection_id": "front-vertical",
+                "points": [
+                    { "x": 100, "y": 0 },
+                    { "x": 100, "y": 200 }
+                ],
+                "label": "front"
+            }
+        ]),
+        serde_json::json!({}),
+    );
+    let content = render_content(input);
+    let doc = svg_doc(&content);
+    let front_edge = semantic_group(&doc, "data-dediren-edge-id", "front-vertical");
+    let data = child_element(front_edge, "path").attribute("d").unwrap();
+
+    assert_eq!(
+        occurrence_count(data, "Q 106.0 100.0 100.0 106.0"),
+        1,
+        "one visible crossing point should produce one vertical line jump, got {data}"
+    );
+}
+
+#[test]
+fn svg_renderer_deduplicates_horizontal_line_jumps_at_same_crossing() {
+    let input = styled_inline_input(
+        serde_json::json!([]),
+        serde_json::json!([]),
+        serde_json::json!([
+            {
+                "id": "first-vertical",
+                "source": "top-a",
+                "target": "bottom-a",
+                "source_id": "first-vertical",
+                "projection_id": "first-vertical",
+                "points": [
+                    { "x": 100, "y": 0 },
+                    { "x": 100, "y": 200 }
+                ],
+                "label": "first"
+            },
+            {
+                "id": "second-vertical",
+                "source": "top-b",
+                "target": "bottom-b",
+                "source_id": "second-vertical",
+                "projection_id": "second-vertical",
+                "points": [
+                    { "x": 100.04, "y": 0 },
+                    { "x": 100.04, "y": 200 }
+                ],
+                "label": "second"
+            },
+            {
+                "id": "front-horizontal",
+                "source": "left",
+                "target": "right",
+                "source_id": "front-horizontal",
+                "projection_id": "front-horizontal",
+                "points": [
+                    { "x": 0, "y": 100 },
+                    { "x": 200, "y": 100 }
+                ],
+                "label": "front"
+            }
+        ]),
+        serde_json::json!({}),
+    );
+    let content = render_content(input);
+    let doc = svg_doc(&content);
+    let front_edge = semantic_group(&doc, "data-dediren-edge-id", "front-horizontal");
+    let data = child_element(front_edge, "path").attribute("d").unwrap();
+
+    assert_eq!(
+        occurrence_count(data, "Q 100.0 94.0 106.0 100.0"),
+        1,
+        "one visible crossing point should produce one horizontal line jump, got {data}"
+    );
+}
+
+#[test]
 fn svg_renderer_preserves_shared_endpoint_merge_trunk() {
     let input = styled_inline_input(
         serde_json::json!([]),
@@ -418,4 +532,8 @@ fn svg_renderer_background_covers_positive_origin_viewbox() {
             .unwrap(),
         view_box[3]
     );
+}
+
+fn occurrence_count(haystack: &str, needle: &str) -> usize {
+    haystack.match_indices(needle).count()
 }

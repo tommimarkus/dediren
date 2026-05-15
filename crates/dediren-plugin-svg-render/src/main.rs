@@ -3166,7 +3166,13 @@ fn line_jump_points(
             }
         }
     }
-    jumps.sort_by(|left, right| left.distance.total_cmp(&right.distance));
+    jumps.sort_by(|left, right| {
+        left.distance
+            .total_cmp(&right.distance)
+            .then_with(|| left.point.x.total_cmp(&right.point.x))
+            .then_with(|| left.point.y.total_cmp(&right.point.y))
+    });
+    jumps.dedup_by(|left, right| same_rendered_point(&left.point, &right.point));
     jumps
 }
 
@@ -3400,6 +3406,15 @@ fn append_line_to(data: &mut String, current: &Point, target: &Point) {
 
 fn same_point(left: &Point, right: &Point) -> bool {
     left.x == right.x && left.y == right.y
+}
+
+fn same_rendered_point(left: &Point, right: &Point) -> bool {
+    rendered_coordinate_key(left.x) == rendered_coordinate_key(right.x)
+        && rendered_coordinate_key(left.y) == rendered_coordinate_key(right.y)
+}
+
+fn rendered_coordinate_key(value: f64) -> i64 {
+    (value * 10.0).round() as i64
 }
 
 fn shifted_toward(from: &Point, to: &Point, distance: f64) -> Point {
