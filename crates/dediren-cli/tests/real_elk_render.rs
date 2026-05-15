@@ -593,13 +593,25 @@ fn real_elk_renders_complex_multi_layer_system() {
         "pricing-reads-products",
         "pricing-caches-quotes",
     );
-    assert_no_route_crossing_near_source_area(
+    assert_no_route_crossing_near_node_area(
+        &layout_data,
+        "api-gateway",
+        "web-calls-gateway",
+        "admin-calls-gateway",
+    );
+    assert_no_route_crossing_near_node_area(
+        &layout_data,
+        "notification-service",
+        "notification-sends-email",
+        "email-worker-notifies",
+    );
+    assert_no_route_crossing_near_node_area(
         &layout_data,
         "event-bus",
         "event-bus-to-or-junction",
         "event-bus-drives-order-worker",
     );
-    assert_no_route_crossing_near_source_area(
+    assert_no_route_crossing_near_node_area(
         &layout_data,
         "event-dispatch-or-junction",
         "or-junction-drives-email-worker",
@@ -614,6 +626,13 @@ fn real_elk_renders_complex_multi_layer_system() {
         &layout_data,
         "or-junction-drives-reporting",
         "event-dispatch-or-junction",
+    );
+    assert_source_port_left_of_node_center(&layout_data, "email-worker-notifies", "email-worker");
+    assert_source_port_below_target_port_on_node(
+        &layout_data,
+        "email-worker-notifies",
+        "or-junction-drives-email-worker",
+        "email-worker",
     );
     assert_edges_have_at_most_corner_count(&layout_data, &["or-junction-drives-email-worker"], 1);
     assert_junction_between_x(
@@ -1184,21 +1203,21 @@ fn assert_no_route_crossing_near_source(
     );
 }
 
-fn assert_no_route_crossing_near_source_area(
+fn assert_no_route_crossing_near_node_area(
     layout_data: &Value,
-    source_id: &str,
+    node_id: &str,
     left_edge_id: &str,
     right_edge_id: &str,
 ) {
-    let source = laid_out_node(layout_data, source_id);
-    let source_left = point_coordinate(source, "x");
-    let source_right = source_left + point_coordinate(source, "width");
-    let source_top = point_coordinate(source, "y");
-    let source_bottom = source_top + point_coordinate(source, "height");
-    let near_left = source_left - 80.0;
-    let near_right = source_right + 220.0;
-    let near_top = source_top - 120.0;
-    let near_bottom = source_bottom + 220.0;
+    let node = laid_out_node(layout_data, node_id);
+    let node_left = point_coordinate(node, "x");
+    let node_right = node_left + point_coordinate(node, "width");
+    let node_top = point_coordinate(node, "y");
+    let node_bottom = node_top + point_coordinate(node, "height");
+    let near_left = node_left - 220.0;
+    let near_right = node_right + 220.0;
+    let near_top = node_top - 220.0;
+    let near_bottom = node_bottom + 220.0;
     let segments = route_segments(layout_data);
     let mut crossings = Vec::new();
     for left in segments
@@ -1209,7 +1228,7 @@ fn assert_no_route_crossing_near_source_area(
             .iter()
             .filter(|segment| segment.edge_id == right_edge_id)
         {
-            if let Some((crossing_x, crossing_y)) = segment_crossing(left, right) {
+            if let Some((crossing_x, crossing_y)) = segment_touching_crossing(left, right) {
                 if crossing_x >= near_left
                     && crossing_x <= near_right
                     && crossing_y >= near_top
@@ -1230,9 +1249,28 @@ fn assert_no_route_crossing_near_source_area(
     }
     assert!(
         crossings.is_empty(),
-        "routes from {source_id} should not cross near the source area:\n{}",
+        "routes connected to {node_id} should not cross near the node area:\n{}",
         crossings.join("\n")
     );
+}
+
+fn segment_touching_crossing(left: &RouteSegment, right: &RouteSegment) -> Option<(f64, f64)> {
+    if left.orientation == right.orientation {
+        return None;
+    }
+    let (horizontal, vertical) = if left.orientation == RouteOrientation::Horizontal {
+        (left, right)
+    } else {
+        (right, left)
+    };
+    if vertical.fixed >= horizontal.min
+        && vertical.fixed <= horizontal.max
+        && horizontal.fixed >= vertical.min
+        && horizontal.fixed <= vertical.max
+    {
+        return Some((vertical.fixed, horizontal.fixed));
+    }
+    None
 }
 
 fn segment_crossing(left: &RouteSegment, right: &RouteSegment) -> Option<(f64, f64)> {
@@ -1453,6 +1491,46 @@ fn assert_source_port_right_of_node_center(layout_data: &Value, edge_id: &str, n
     assert!(
         source_port_x > node_center,
         "{edge_id} should leave {node_id} from the right side, got source x={source_port_x}, node center x={node_center}"
+    );
+}
+
+fn assert_source_port_left_of_node_center(layout_data: &Value, edge_id: &str, node_id: &str) {
+    let edge = laid_out_edge(layout_data, edge_id);
+    let points = edge["points"]
+        .as_array()
+        .unwrap_or_else(|| panic!("{edge_id} points should be an array"));
+    let source_port_x = point_coordinate(&points[0], "x");
+    let node_center = node_center_x(layout_data, node_id);
+    assert!(
+        source_port_x < node_center,
+        "{edge_id} should leave {node_id} from the left side, got source x={source_port_x}, node center x={node_center}"
+    );
+}
+
+fn assert_source_port_below_target_port_on_node(
+    layout_data: &Value,
+    source_edge_id: &str,
+    target_edge_id: &str,
+    node_id: &str,
+) {
+    let source_edge = laid_out_edge(layout_data, source_edge_id);
+    let source_points = source_edge["points"]
+        .as_array()
+        .unwrap_or_else(|| panic!("{source_edge_id} points should be an array"));
+    let target_edge = laid_out_edge(layout_data, target_edge_id);
+    let target_points = target_edge["points"]
+        .as_array()
+        .unwrap_or_else(|| panic!("{target_edge_id} points should be an array"));
+    let source_port_y = point_coordinate(&source_points[0], "y");
+    let target_port_y = point_coordinate(
+        target_points
+            .last()
+            .unwrap_or_else(|| panic!("{target_edge_id} should have a target point")),
+        "y",
+    );
+    assert!(
+        source_port_y > target_port_y,
+        "{source_edge_id} source port should be below {target_edge_id} target port on {node_id}, got source y={source_port_y}, target y={target_port_y}"
     );
 }
 

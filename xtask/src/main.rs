@@ -184,6 +184,7 @@ fn build_dist(root: &Path) -> Result<()> {
             .arg(&archive)
             .arg(&bundle_name),
     )?;
+    prune_stale_dist_artifacts(&dist_dir, &bundle_name)?;
 
     println!("{}", archive.display());
     Ok(())
@@ -524,6 +525,31 @@ fn remove_file_if_exists(path: &Path) -> Result<()> {
         Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
         Err(error) => Err(error).with_context(|| format!("remove file {}", path.display())),
     }
+}
+
+fn prune_stale_dist_artifacts(dist_dir: &Path, current_bundle_name: &str) -> Result<()> {
+    let current_archive_name = format!("{current_bundle_name}.tar.gz");
+    for entry in fs::read_dir(dist_dir)
+        .with_context(|| format!("read dist directory {}", dist_dir.display()))?
+    {
+        let entry = entry?;
+        let name = entry.file_name();
+        let name = name.to_string_lossy();
+        if !name.starts_with("dediren-agent-bundle-") {
+            continue;
+        }
+
+        let file_type = entry.file_type()?;
+        let path = entry.path();
+        if file_type.is_dir() && name != current_bundle_name {
+            fs::remove_dir_all(&path)
+                .with_context(|| format!("remove stale bundle directory {}", path.display()))?;
+        } else if file_type.is_file() && name.ends_with(".tar.gz") && name != current_archive_name {
+            fs::remove_file(&path)
+                .with_context(|| format!("remove stale bundle archive {}", path.display()))?;
+        }
+    }
+    Ok(())
 }
 
 struct FileLock {

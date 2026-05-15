@@ -35,6 +35,47 @@ fn dist_build_serializes_parallel_invocations() {
 
 #[cfg(unix)]
 #[test]
+fn dist_build_prunes_stale_bundle_artifacts() {
+    let repo = FakeDistRepo::new();
+    let stale_dir = repo
+        .root
+        .path()
+        .join("dist/dediren-agent-bundle-0.0.1-x86_64-unknown-linux-gnu");
+    let stale_archive = repo
+        .root
+        .path()
+        .join("dist/dediren-agent-bundle-0.0.1-x86_64-unknown-linux-gnu.tar.gz");
+    let unrelated = repo.root.path().join("dist/keep-me.txt");
+    fs::create_dir_all(&stale_dir).unwrap();
+    fs::write(&stale_archive, "stale archive").unwrap();
+    fs::write(&unrelated, "unrelated").unwrap();
+
+    repo.release_helper_build();
+    let output = repo.xtask_command(["dist", "build"]).output().unwrap();
+
+    assert!(
+        output.status.success(),
+        "dist build should pass\nstatus: {:?}\nstdout:\n{}\nstderr:\n{}",
+        output.status.code(),
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr),
+    );
+    assert!(
+        !stale_dir.exists(),
+        "dist build should remove stale bundle directories"
+    );
+    assert!(
+        !stale_archive.exists(),
+        "dist build should remove stale bundle archives"
+    );
+    assert!(
+        unrelated.exists(),
+        "dist build should leave unrelated dist files alone"
+    );
+}
+
+#[cfg(unix)]
+#[test]
 fn dist_smoke_runs_bundle_pipeline_with_clean_environment() {
     let repo = FakeDistRepo::new();
     let archive = repo.write_smoke_archive();
@@ -118,6 +159,7 @@ impl FakeDistRepo {
     }
 
     fn release_helper_build(&self) {
+        fs::create_dir_all(self.root.path().join(".cache")).unwrap();
         fs::write(self.root.path().join(".cache/release-elk-helper"), "").unwrap();
     }
 

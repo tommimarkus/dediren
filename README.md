@@ -38,30 +38,32 @@ Runtime prerequisite:
 
 - Java 21 or newer available as `java` on `PATH`.
 
-For the current `0.8.2` version, the xtask creates:
+For the current `0.8.3` version, the xtask creates:
 
 ```text
-dist/dediren-agent-bundle-0.8.2-x86_64-unknown-linux-gnu/
-dist/dediren-agent-bundle-0.8.2-x86_64-unknown-linux-gnu.tar.gz
+dist/dediren-agent-bundle-0.8.3-x86_64-unknown-linux-gnu/
+dist/dediren-agent-bundle-0.8.3-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Run the smoke test from a shell where `java -version` resolves to Java 21 or
 newer:
 
 ```bash
-cargo xtask dist smoke dist/dediren-agent-bundle-0.8.2-x86_64-unknown-linux-gnu.tar.gz
+cargo xtask dist smoke dist/dediren-agent-bundle-0.8.3-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Concurrent `cargo xtask dist build` invocations serialize on a repo-local lock
 under `.cache/locks/` because release binaries, the ELK helper build, and
 `dist/` artifacts are shared generated outputs.
+A successful build leaves only the current `dediren-agent-bundle-*` directory
+and `.tar.gz` archive in `dist/`; stale bundle versions are pruned.
 
 Unpack and run it anywhere:
 
 ```bash
 mkdir -p /tmp/dediren-dist
-tar -xzf dist/dediren-agent-bundle-0.8.2-x86_64-unknown-linux-gnu.tar.gz -C /tmp/dediren-dist
-/tmp/dediren-dist/dediren-agent-bundle-0.8.2-x86_64-unknown-linux-gnu/bin/dediren --help
+tar -xzf dist/dediren-agent-bundle-0.8.3-x86_64-unknown-linux-gnu.tar.gz -C /tmp/dediren-dist
+/tmp/dediren-dist/dediren-agent-bundle-0.8.3-x86_64-unknown-linux-gnu/bin/dediren --help
 ```
 
 The archive includes first-party plugin manifests under `plugins/`, first-party
@@ -452,7 +454,7 @@ newer:
 
 ```bash
 cargo xtask dist build
-cargo xtask dist smoke dist/dediren-agent-bundle-0.8.2-x86_64-unknown-linux-gnu.tar.gz
+cargo xtask dist smoke dist/dediren-agent-bundle-0.8.3-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Focused checks:
