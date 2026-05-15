@@ -72,6 +72,7 @@
         "label": { "type": "string" },
         "nodes": { "type": "array", "items": { "type": "string" } },
         "relationships": { "type": "array", "items": { "type": "string" } },
+        "layout_preferences": { "$ref": "#/$defs/layoutPreferences" },
         "groups": {
           "type": "array",
           "items": { "$ref": "#/$defs/genericGraphViewGroup" }
@@ -88,6 +89,25 @@
         "members": { "type": "array", "items": { "type": "string" } },
         "role": { "enum": ["semantic-boundary", "layout-only"] },
         "semantic_source_id": { "type": "string" }
+      }
+    },
+    "layoutPreferences": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "direction": { "enum": ["right", "left", "down", "up"] },
+        "density": { "enum": ["compact", "readable", "spacious"] },
+        "wrapping": { "enum": ["auto", "off", "multi-edge"] },
+        "routing": { "$ref": "#/$defs/layoutRoutingPreferences" }
+      }
+    },
+    "layoutRoutingPreferences": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "style": { "enum": ["orthogonal"] },
+        "profile": { "enum": ["compact", "readable", "spacious"] },
+        "endpoint_merging": { "enum": ["off", "local", "auto"] }
       }
     }
   }

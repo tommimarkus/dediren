@@ -1,10 +1,11 @@
 use dediren_contracts::{
     CommandEnvelope, Diagnostic, DiagnosticSeverity, GenericGraphPluginData,
-    GenericGraphSemanticProfile, GenericGraphViewGroupRole, GroupProvenance, LayoutRequest, Margin,
-    Page, RenderMetadata, RenderMetadataSelector, RenderPolicy, RenderResult,
-    SemanticValidationResult, SourceDocument, SvgEdgeLineStyle, SvgEdgeMarkerEnd, SvgEdgeStyle,
-    SvgNodeDecorator, SvgNodeStyle, SvgStylePolicy, SEMANTIC_VALIDATION_RESULT_SCHEMA_VERSION,
-    SVG_RENDER_POLICY_SCHEMA_VERSION,
+    GenericGraphSemanticProfile, GenericGraphViewGroupRole, GroupProvenance, LayoutDensity,
+    LayoutDirection, LayoutEndpointMerging, LayoutRequest, LayoutRoutingProfile,
+    LayoutRoutingStyle, LayoutWrapping, Margin, Page, RenderMetadata, RenderMetadataSelector,
+    RenderPolicy, RenderResult, SemanticValidationResult, SourceDocument, SvgEdgeLineStyle,
+    SvgEdgeMarkerEnd, SvgEdgeStyle, SvgNodeDecorator, SvgNodeStyle, SvgStylePolicy,
+    SEMANTIC_VALIDATION_RESULT_SCHEMA_VERSION, SVG_RENDER_POLICY_SCHEMA_VERSION,
 };
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -47,10 +48,82 @@ fn layout_request_roundtrips() {
         groups: vec![],
         labels: vec![],
         constraints: vec![],
+        layout_preferences: None,
     };
     let encoded = serde_json::to_string(&request).unwrap();
     let decoded: LayoutRequest = serde_json::from_str(&encoded).unwrap();
     assert_eq!(decoded.view_id, "main");
+}
+
+#[test]
+fn layout_request_preferences_roundtrip() {
+    let request: LayoutRequest = serde_json::from_str(
+        r#"{
+          "layout_request_schema_version": "layout-request.schema.v1",
+          "view_id": "main",
+          "nodes": [],
+          "edges": [],
+          "groups": [],
+          "labels": [],
+          "constraints": [],
+          "layout_preferences": {
+            "direction": "down",
+            "density": "readable",
+            "wrapping": "off",
+            "routing": {
+              "style": "orthogonal",
+              "profile": "spacious",
+              "endpoint_merging": "off"
+            }
+          }
+        }"#,
+    )
+    .unwrap();
+
+    let preferences = request.layout_preferences.unwrap();
+    assert_eq!(Some(LayoutDirection::Down), preferences.direction);
+    assert_eq!(Some(LayoutDensity::Readable), preferences.density);
+    assert_eq!(Some(LayoutWrapping::Off), preferences.wrapping);
+    let routing = preferences.routing.unwrap();
+    assert_eq!(Some(LayoutRoutingStyle::Orthogonal), routing.style);
+    assert_eq!(Some(LayoutRoutingProfile::Spacious), routing.profile);
+    assert_eq!(Some(LayoutEndpointMerging::Off), routing.endpoint_merging);
+}
+
+#[test]
+fn generic_graph_view_layout_preferences_roundtrip() {
+    let data: GenericGraphPluginData = serde_json::from_str(
+        r#"{
+          "views": [
+            {
+              "id": "main",
+              "label": "Main",
+              "nodes": ["api"],
+              "relationships": [],
+              "layout_preferences": {
+                "direction": "right",
+                "density": "compact",
+                "wrapping": "auto",
+                "routing": {
+                  "style": "orthogonal",
+                  "profile": "readable",
+                  "endpoint_merging": "local"
+                }
+              }
+            }
+          ]
+        }"#,
+    )
+    .unwrap();
+
+    let preferences = data.views[0].layout_preferences.as_ref().unwrap();
+    assert_eq!(Some(LayoutDirection::Right), preferences.direction);
+    assert_eq!(Some(LayoutDensity::Compact), preferences.density);
+    assert_eq!(Some(LayoutWrapping::Auto), preferences.wrapping);
+    let routing = preferences.routing.as_ref().unwrap();
+    assert_eq!(Some(LayoutRoutingStyle::Orthogonal), routing.style);
+    assert_eq!(Some(LayoutRoutingProfile::Readable), routing.profile);
+    assert_eq!(Some(LayoutEndpointMerging::Local), routing.endpoint_merging);
 }
 
 #[test]

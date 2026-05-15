@@ -685,6 +685,82 @@ fn layout_contracts_match_schemas() {
 }
 
 #[test]
+fn layout_preferences_match_schemas() {
+    assert_json_valid(
+        "schemas/layout-request.schema.json",
+        json!({
+            "layout_request_schema_version": "layout-request.schema.v1",
+            "view_id": "main",
+            "nodes": [],
+            "edges": [],
+            "groups": [],
+            "labels": [],
+            "constraints": [],
+            "layout_preferences": {
+                "direction": "down",
+                "density": "readable",
+                "wrapping": "off",
+                "routing": {
+                    "style": "orthogonal",
+                    "profile": "spacious",
+                    "endpoint_merging": "off"
+                }
+            }
+        }),
+    );
+
+    assert_json_valid(
+        "schemas/model.schema.json",
+        json!({
+            "model_schema_version": "model.schema.v1",
+            "nodes": [
+                { "id": "api", "type": "ApplicationComponent", "label": "API", "properties": {} }
+            ],
+            "relationships": [],
+            "plugins": {
+                "generic-graph": {
+                    "views": [
+                        {
+                            "id": "main",
+                            "label": "Main",
+                            "nodes": ["api"],
+                            "relationships": [],
+                            "layout_preferences": {
+                                "direction": "right",
+                                "density": "compact",
+                                "wrapping": "auto",
+                                "routing": {
+                                    "style": "orthogonal",
+                                    "profile": "readable",
+                                    "endpoint_merging": "local"
+                                }
+                            }
+                        }
+                    ]
+                }
+            }
+        }),
+    );
+
+    assert_json_invalid(
+        "schemas/layout-request.schema.json",
+        json!({
+            "layout_request_schema_version": "layout-request.schema.v1",
+            "view_id": "main",
+            "nodes": [],
+            "edges": [],
+            "groups": [],
+            "labels": [],
+            "constraints": [],
+            "layout_preferences": {
+                "org.eclipse.elk.layered.mergeEdges": true
+            }
+        }),
+        "raw ELK option passthrough",
+    );
+}
+
+#[test]
 fn layout_fixtures_match_schemas() {
     assert_valid(
         "schemas/layout-request.schema.json",

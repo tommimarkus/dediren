@@ -167,6 +167,7 @@ fn main() -> anyhow::Result<()> {
         groups,
         labels,
         constraints: Vec::new(),
+        layout_preferences: None,
     };
 
     println!("{}", serde_json::to_string(&CommandEnvelope::ok(request))?);

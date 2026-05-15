@@ -140,6 +140,8 @@ pub struct GenericGraphView {
     pub label: String,
     pub nodes: Vec<String>,
     pub relationships: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub layout_preferences: Option<LayoutPreferences>,
     #[serde(default)]
     pub groups: Vec<GenericGraphViewGroup>,
 }
@@ -169,6 +171,77 @@ impl Default for GenericGraphViewGroupRole {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LayoutPreferences {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub direction: Option<LayoutDirection>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub density: Option<LayoutDensity>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub wrapping: Option<LayoutWrapping>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub routing: Option<LayoutRoutingPreferences>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum LayoutDirection {
+    Right,
+    Left,
+    Down,
+    Up,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum LayoutDensity {
+    Compact,
+    Readable,
+    Spacious,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum LayoutWrapping {
+    Auto,
+    Off,
+    MultiEdge,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LayoutRoutingPreferences {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub style: Option<LayoutRoutingStyle>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub profile: Option<LayoutRoutingProfile>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub endpoint_merging: Option<LayoutEndpointMerging>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum LayoutRoutingStyle {
+    Orthogonal,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum LayoutRoutingProfile {
+    Compact,
+    Readable,
+    Spacious,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum LayoutEndpointMerging {
+    Off,
+    Local,
+    Auto,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct LayoutRequest {
@@ -184,6 +257,8 @@ pub struct LayoutRequest {
     pub labels: Vec<LayoutLabel>,
     #[serde(default)]
     pub constraints: Vec<LayoutConstraint>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub layout_preferences: Option<LayoutPreferences>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

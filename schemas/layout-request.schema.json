@@ -11,7 +11,8 @@
     "edges": { "type": "array", "items": { "$ref": "#/$defs/edge" } },
     "groups": { "type": "array", "items": { "$ref": "#/$defs/group" } },
     "labels": { "type": "array", "items": { "$ref": "#/$defs/label" } },
-    "constraints": { "type": "array", "items": { "$ref": "#/$defs/constraint" } }
+    "constraints": { "type": "array", "items": { "$ref": "#/$defs/constraint" } },
+    "layout_preferences": { "$ref": "#/$defs/layoutPreferences" }
   },
   "$defs": {
     "node": {
@@ -93,6 +94,25 @@
         "id": { "type": "string" },
         "kind": { "type": "string" },
         "subjects": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "layoutPreferences": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "direction": { "enum": ["right", "left", "down", "up"] },
+        "density": { "enum": ["compact", "readable", "spacious"] },
+        "wrapping": { "enum": ["auto", "off", "multi-edge"] },
+        "routing": { "$ref": "#/$defs/layoutRoutingPreferences" }
+      }
+    },
+    "layoutRoutingPreferences": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "style": { "enum": ["orthogonal"] },
+        "profile": { "enum": ["compact", "readable", "spacious"] },
+        "endpoint_merging": { "enum": ["off", "local", "auto"] }
       }
     }
   }
