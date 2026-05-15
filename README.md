@@ -38,18 +38,18 @@ Runtime prerequisite:
 
 - Java 21 or newer available as `java` on `PATH`.
 
-For the current `0.8.3` version, the xtask creates:
+For the current `0.8.4` version, the xtask creates:
 
 ```text
-dist/dediren-agent-bundle-0.8.3-x86_64-unknown-linux-gnu/
-dist/dediren-agent-bundle-0.8.3-x86_64-unknown-linux-gnu.tar.gz
+dist/dediren-agent-bundle-0.8.4-x86_64-unknown-linux-gnu/
+dist/dediren-agent-bundle-0.8.4-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Run the smoke test from a shell where `java -version` resolves to Java 21 or
 newer:
 
 ```bash
-cargo xtask dist smoke dist/dediren-agent-bundle-0.8.3-x86_64-unknown-linux-gnu.tar.gz
+cargo xtask dist smoke dist/dediren-agent-bundle-0.8.4-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Concurrent `cargo xtask dist build` invocations serialize on a repo-local lock
@@ -62,8 +62,8 @@ Unpack and run it anywhere:
 
 ```bash
 mkdir -p /tmp/dediren-dist
-tar -xzf dist/dediren-agent-bundle-0.8.3-x86_64-unknown-linux-gnu.tar.gz -C /tmp/dediren-dist
-/tmp/dediren-dist/dediren-agent-bundle-0.8.3-x86_64-unknown-linux-gnu/bin/dediren --help
+tar -xzf dist/dediren-agent-bundle-0.8.4-x86_64-unknown-linux-gnu.tar.gz -C /tmp/dediren-dist
+/tmp/dediren-dist/dediren-agent-bundle-0.8.4-x86_64-unknown-linux-gnu/bin/dediren --help
 ```
 
 The archive includes first-party plugin manifests under `plugins/`, first-party
@@ -343,6 +343,11 @@ work, emits Java 21-compatible bytecode for the distributed helper, and pins
 Maven dependencies through dependency locking. Concurrent helper builds
 serialize on `.cache/locks/elk-layout-java-build.lock`.
 
+The packaged helper disables HotSpot perfdata collection so parallel layout
+runs do not emit JVM perfdata startup warnings on stdout. The Rust adapter also
+tolerates that narrow warning if an older or externally configured helper emits
+it before the JSON envelope.
+
 For large same-side fan-in and fan-out groups, the helper lets ELK merge routes
 through shared junction trunks instead of assigning every relationship its own
 source or target port. Layout results expose that renderer advice through
@@ -454,7 +459,7 @@ newer:
 
 ```bash
 cargo xtask dist build
-cargo xtask dist smoke dist/dediren-agent-bundle-0.8.3-x86_64-unknown-linux-gnu.tar.gz
+cargo xtask dist smoke dist/dediren-agent-bundle-0.8.4-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Focused checks:

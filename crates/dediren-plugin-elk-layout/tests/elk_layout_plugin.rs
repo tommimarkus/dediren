@@ -113,6 +113,29 @@ fn fake_elk_plugin_reports_external_invalid_json_output() {
 }
 
 #[test]
+fn fake_elk_plugin_accepts_hotspot_perfdata_warning_before_json() {
+    let input =
+        std::fs::read_to_string(workspace_file("fixtures/layout-request/basic.json")).unwrap();
+    let helper = helper_command(&format!(
+        "printf '%s\\n' '[0.001s][warning][perf,memops] Cannot use file /tmp/hsperfdata_user/1 because it is locked by another process (errno = 11)'; cat {}",
+        shell_quote(
+            &workspace_file("fixtures/layout-result/basic.json")
+                .display()
+                .to_string()
+        )
+    ));
+    let mut cmd = Command::cargo_bin("dediren-plugin-elk-layout").unwrap();
+    cmd.env("DEDIREN_ELK_COMMAND", helper)
+        .arg("layout")
+        .write_stdin(input);
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains("\"status\":\"ok\""))
+        .stdout(predicate::str::contains("\"layout_result_schema_version\""))
+        .stdout(predicate::str::contains("warning][perf,memops").not());
+}
+
+#[test]
 fn fixture_elk_plugin_reports_missing_runtime() {
     let input =
         std::fs::read_to_string(workspace_file("fixtures/layout-request/basic.json")).unwrap();

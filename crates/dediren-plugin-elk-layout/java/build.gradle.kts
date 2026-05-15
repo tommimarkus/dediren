@@ -15,6 +15,7 @@ tasks.withType<JavaCompile>().configureEach {
 
 application {
     mainClass.set("dev.dediren.elk.Main")
+    applicationDefaultJvmArgs = listOf("-XX:-UsePerfData")
 }
 
 dependencyLocking {

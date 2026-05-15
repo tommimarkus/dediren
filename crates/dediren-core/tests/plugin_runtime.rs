@@ -115,7 +115,7 @@ fn installed_bundle_registry_finds_manifest_and_binary_next_to_cli() {
     } else {
         "dediren-plugin-runtime-testbed"
     });
-    std::fs::copy(testbed_binary(), &plugin_binary).unwrap();
+    install_testbed_binary(&plugin_binary);
     #[cfg(unix)]
     {
         let mut permissions = std::fs::metadata(&plugin_binary).unwrap().permissions();
@@ -493,4 +493,15 @@ fn testbed_binary() -> PathBuf {
         "dediren-plugin-runtime-testbed",
         "dediren-plugin-runtime-testbed",
     )
+}
+
+fn install_testbed_binary(target: &Path) {
+    let source = testbed_binary();
+    if std::fs::hard_link(&source, target).is_ok() {
+        return;
+    }
+
+    let copying = target.with_extension("copying");
+    std::fs::copy(&source, &copying).unwrap();
+    std::fs::rename(copying, target).unwrap();
 }

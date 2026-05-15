@@ -269,7 +269,7 @@ fn shell_command(command_line: &str) -> Command {
 fn emit_external_output(output: Output) -> anyhow::Result<()> {
     let exit_code = output.status.code().unwrap_or(3);
     let stdout = String::from_utf8_lossy(&output.stdout);
-    let value: serde_json::Value = match serde_json::from_str(&stdout) {
+    let value: serde_json::Value = match external_json_from_stdout(&stdout) {
         Ok(value) => value,
         Err(error) => {
             if output.status.success() {
@@ -315,6 +315,38 @@ fn emit_external_output(output: Output) -> anyhow::Result<()> {
     });
     println!("{}", serde_json::to_string(&CommandEnvelope::ok(result))?);
     Ok(())
+}
+
+fn external_json_from_stdout(stdout: &str) -> Result<serde_json::Value, serde_json::Error> {
+    match serde_json::from_str(stdout) {
+        Ok(value) => Ok(value),
+        Err(error) => {
+            let trimmed = strip_hotspot_perfdata_warnings(stdout);
+            if trimmed.len() != stdout.len() {
+                if let Ok(value) = serde_json::from_str(trimmed) {
+                    return Ok(value);
+                }
+            }
+            Err(error)
+        }
+    }
+}
+
+fn strip_hotspot_perfdata_warnings(mut stdout: &str) -> &str {
+    loop {
+        let Some(line_end) = stdout.find('\n') else {
+            return stdout;
+        };
+        let line = stdout[..line_end].trim_end_matches('\r');
+        if !is_hotspot_perfdata_warning(line) {
+            return stdout;
+        }
+        stdout = &stdout[line_end + 1..];
+    }
+}
+
+fn is_hotspot_perfdata_warning(line: &str) -> bool {
+    line.starts_with('[') && line.contains("][warning][perf") && line.contains("hsperfdata")
 }
 
 fn emit_external_envelope(
@@ -466,6 +498,21 @@ mod tests {
     #[test]
     fn java_major_version_rejects_unrecognized_output() {
         assert_eq!(None, java_major_version_from_output("not a java version"));
+    }
+
+    #[test]
+    fn external_json_from_stdout_ignores_leading_hotspot_perfdata_warning() {
+        let value = external_json_from_stdout(
+            "[0.001s][warning][perf,memops] Cannot use file /tmp/hsperfdata_user/1 because it is locked by another process (errno = 11)\n{\"status\":\"ok\"}",
+        )
+        .unwrap();
+
+        assert_eq!(value["status"], "ok");
+    }
+
+    #[test]
+    fn external_json_from_stdout_keeps_unrecognized_leading_output_invalid() {
+        assert!(external_json_from_stdout("not-json\n{\"status\":\"ok\"}").is_err());
     }
 
     #[test]
