@@ -228,6 +228,79 @@ fn real_elk_layout_validates_grouped_cross_group_route() {
 }
 
 #[test]
+#[ignore = "run with --ignored after building the ELK Java helper"]
+fn real_elk_layout_applies_layout_preferences() {
+    let request = serde_json::json!({
+        "layout_request_schema_version": "layout-request.schema.v1",
+        "view_id": "main",
+        "nodes": [
+            { "id": "source", "label": "Source", "source_id": "source", "width_hint": 160.0, "height_hint": 80.0 },
+            { "id": "target-a", "label": "Target A", "source_id": "target-a", "width_hint": 160.0, "height_hint": 80.0 },
+            { "id": "target-b", "label": "Target B", "source_id": "target-b", "width_hint": 160.0, "height_hint": 80.0 },
+            { "id": "target-c", "label": "Target C", "source_id": "target-c", "width_hint": 160.0, "height_hint": 80.0 }
+        ],
+        "edges": [
+            { "id": "edge-a", "source": "source", "target": "target-a", "label": "realizes", "source_id": "edge-a", "relationship_type": "Realization" },
+            { "id": "edge-b", "source": "source", "target": "target-b", "label": "realizes", "source_id": "edge-b", "relationship_type": "Realization" },
+            { "id": "edge-c", "source": "source", "target": "target-c", "label": "realizes", "source_id": "edge-c", "relationship_type": "Realization" }
+        ],
+        "groups": [],
+        "labels": [],
+        "constraints": [],
+        "layout_preferences": {
+            "direction": "down",
+            "routing": {
+                "style": "orthogonal",
+                "endpoint_merging": "off"
+            }
+        }
+    });
+    let request_file = write_temp_file(
+        "layout-preferences-real-elk-request.json",
+        &request.to_string(),
+    );
+
+    let layout_output = common::dediren_command()
+        .env(
+            "DEDIREN_PLUGIN_ELK_LAYOUT",
+            plugin_binary("dediren-plugin-elk-layout"),
+        )
+        .env(
+            "DEDIREN_ELK_COMMAND",
+            workspace_file("crates/dediren-plugin-elk-layout/java/scripts/elk-layout.sh"),
+        )
+        .args(["layout", "--plugin", "elk-layout", "--input"])
+        .arg(request_file)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let layout_data = ok_data(&layout_output);
+    let source = layout_node_by_id(&layout_data, "source");
+    let source_center_y = node_center_y(source);
+    for target_id in ["target-a", "target-b", "target-c"] {
+        let target = layout_node_by_id(&layout_data, target_id);
+        assert!(
+            node_center_y(target) > source_center_y,
+            "direction=down should place {target_id} below source, source={source:?}, target={target:?}"
+        );
+    }
+    for edge_id in ["edge-a", "edge-b", "edge-c"] {
+        let edge = layout_edge_by_id(&layout_data, edge_id);
+        let routing_hints = &edge["routing_hints"];
+        assert!(
+            routing_hints.is_null()
+                || routing_hints
+                    .as_array()
+                    .is_some_and(|hints| hints.is_empty()),
+            "endpoint_merging=off should suppress shared endpoint hints for {edge_id}"
+        );
+    }
+}
+
+#[test]
 fn fixture_layout_result_reports_quality() {
     let output = common::dediren_command()
         .arg("validate-layout")
@@ -244,6 +317,32 @@ fn fixture_layout_result_reports_quality() {
     assert_eq!(data["connector_through_node_count"], 0);
     assert_eq!(data["route_close_parallel_count"], 0);
     assert_eq!(data["status"], "ok");
+}
+
+fn layout_node_by_id<'a>(data: &'a serde_json::Value, id: &str) -> &'a serde_json::Value {
+    data["nodes"]
+        .as_array()
+        .expect("layout result nodes should be an array")
+        .iter()
+        .find(|node| node["id"] == id)
+        .unwrap_or_else(|| panic!("layout result should contain node {id}"))
+}
+
+fn layout_edge_by_id<'a>(data: &'a serde_json::Value, id: &str) -> &'a serde_json::Value {
+    data["edges"]
+        .as_array()
+        .expect("layout result edges should be an array")
+        .iter()
+        .find(|edge| edge["id"] == id)
+        .unwrap_or_else(|| panic!("layout result should contain edge {id}"))
+}
+
+fn node_center_y(node: &serde_json::Value) -> f64 {
+    let y = node["y"].as_f64().expect("node y should be numeric");
+    let height = node["height"]
+        .as_f64()
+        .expect("node height should be numeric");
+    y + (height / 2.0)
 }
 
 fn assert_basic_layout_result(data: &serde_json::Value) {

@@ -758,6 +758,128 @@ fn layout_preferences_match_schemas() {
         }),
         "raw ELK option passthrough",
     );
+
+    assert_json_invalid(
+        "schemas/layout-request.schema.json",
+        json!({
+            "layout_request_schema_version": "layout-request.schema.v1",
+            "view_id": "main",
+            "nodes": [],
+            "edges": [],
+            "groups": [],
+            "labels": [],
+            "constraints": [],
+            "layout_preferences": null
+        }),
+        "null layout request preferences",
+    );
+
+    assert_json_invalid(
+        "schemas/layout-request.schema.json",
+        json!({
+            "layout_request_schema_version": "layout-request.schema.v1",
+            "view_id": "main",
+            "nodes": [],
+            "edges": [],
+            "groups": [],
+            "labels": [],
+            "constraints": [],
+            "layout_preferences": {
+                "density": "dense"
+            }
+        }),
+        "invalid layout request density",
+    );
+
+    assert_json_invalid(
+        "schemas/layout-request.schema.json",
+        json!({
+            "layout_request_schema_version": "layout-request.schema.v1",
+            "view_id": "main",
+            "nodes": [],
+            "edges": [],
+            "groups": [],
+            "labels": [],
+            "constraints": [],
+            "layout_preferences": {
+                "wrapping": "always"
+            }
+        }),
+        "invalid layout request wrapping",
+    );
+
+    assert_json_invalid(
+        "schemas/layout-request.schema.json",
+        json!({
+            "layout_request_schema_version": "layout-request.schema.v1",
+            "view_id": "main",
+            "nodes": [],
+            "edges": [],
+            "groups": [],
+            "labels": [],
+            "constraints": [],
+            "layout_preferences": {
+                "routing": {
+                    "profile": "wide"
+                }
+            }
+        }),
+        "invalid layout request routing profile",
+    );
+
+    assert_json_invalid(
+        "schemas/model.schema.json",
+        json!({
+            "model_schema_version": "model.schema.v1",
+            "nodes": [
+                { "id": "api", "type": "ApplicationComponent", "label": "API", "properties": {} }
+            ],
+            "relationships": [],
+            "plugins": {
+                "generic-graph": {
+                    "views": [
+                        {
+                            "id": "main",
+                            "label": "Main",
+                            "nodes": ["api"],
+                            "relationships": [],
+                            "layout_preferences": null
+                        }
+                    ]
+                }
+            }
+        }),
+        "null model view preferences",
+    );
+
+    assert_json_invalid(
+        "schemas/model.schema.json",
+        json!({
+            "model_schema_version": "model.schema.v1",
+            "nodes": [
+                { "id": "api", "type": "ApplicationComponent", "label": "API", "properties": {} }
+            ],
+            "relationships": [],
+            "plugins": {
+                "generic-graph": {
+                    "views": [
+                        {
+                            "id": "main",
+                            "label": "Main",
+                            "nodes": ["api"],
+                            "relationships": [],
+                            "layout_preferences": {
+                                "routing": {
+                                    "endpoint_merging": "global"
+                                }
+                            }
+                        }
+                    ]
+                }
+            }
+        }),
+        "invalid model view endpoint merging",
+    );
 }
 
 #[test]
