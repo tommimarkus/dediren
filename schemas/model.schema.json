@@ -9,7 +9,13 @@
     "required_plugins": { "type": "array", "items": { "$ref": "#/$defs/pluginRequirement" } },
     "nodes": { "type": "array", "items": { "$ref": "#/$defs/sourceNode" } },
     "relationships": { "type": "array", "items": { "$ref": "#/$defs/sourceRelationship" } },
-    "plugins": { "type": "object", "additionalProperties": true }
+    "plugins": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "generic-graph": { "$ref": "#/$defs/genericGraphPluginData" }
+      }
+    }
   },
   "$defs": {
     "pluginRequirement": {
@@ -43,6 +49,45 @@
         "target": { "type": "string" },
         "label": { "type": "string" },
         "properties": { "type": "object", "additionalProperties": true }
+      }
+    },
+    "genericGraphPluginData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["views"],
+      "properties": {
+        "semantic_profile": { "enum": ["generic-graph", "archimate"] },
+        "views": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/genericGraphView" }
+        }
+      }
+    },
+    "genericGraphView": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label", "nodes", "relationships"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" },
+        "label": { "type": "string" },
+        "nodes": { "type": "array", "items": { "type": "string" } },
+        "relationships": { "type": "array", "items": { "type": "string" } },
+        "groups": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/genericGraphViewGroup" }
+        }
+      }
+    },
+    "genericGraphViewGroup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label", "members"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" },
+        "label": { "type": "string" },
+        "members": { "type": "array", "items": { "type": "string" } },
+        "role": { "enum": ["semantic-boundary", "layout-only"] },
+        "semantic_source_id": { "type": "string" }
       }
     }
   }

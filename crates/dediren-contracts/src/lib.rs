@@ -112,7 +112,25 @@ pub struct SourceRelationship {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct GenericGraphPluginData {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub semantic_profile: Option<GenericGraphSemanticProfile>,
     pub views: Vec<GenericGraphView>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum GenericGraphSemanticProfile {
+    GenericGraph,
+    Archimate,
+}
+
+impl GenericGraphSemanticProfile {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::GenericGraph => "generic-graph",
+            Self::Archimate => "archimate",
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

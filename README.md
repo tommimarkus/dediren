@@ -38,18 +38,18 @@ Runtime prerequisite:
 
 - Java 21 or newer available as `java` on `PATH`.
 
-For the current `0.8.4` version, the xtask creates:
+For the current `0.9.0` version, the xtask creates:
 
 ```text
-dist/dediren-agent-bundle-0.8.4-x86_64-unknown-linux-gnu/
-dist/dediren-agent-bundle-0.8.4-x86_64-unknown-linux-gnu.tar.gz
+dist/dediren-agent-bundle-0.9.0-x86_64-unknown-linux-gnu/
+dist/dediren-agent-bundle-0.9.0-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Run the smoke test from a shell where `java -version` resolves to Java 21 or
 newer:
 
 ```bash
-cargo xtask dist smoke dist/dediren-agent-bundle-0.8.4-x86_64-unknown-linux-gnu.tar.gz
+cargo xtask dist smoke dist/dediren-agent-bundle-0.9.0-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Concurrent `cargo xtask dist build` invocations serialize on a repo-local lock
@@ -62,8 +62,8 @@ Unpack and run it anywhere:
 
 ```bash
 mkdir -p /tmp/dediren-dist
-tar -xzf dist/dediren-agent-bundle-0.8.4-x86_64-unknown-linux-gnu.tar.gz -C /tmp/dediren-dist
-/tmp/dediren-dist/dediren-agent-bundle-0.8.4-x86_64-unknown-linux-gnu/bin/dediren --help
+tar -xzf dist/dediren-agent-bundle-0.9.0-x86_64-unknown-linux-gnu.tar.gz -C /tmp/dediren-dist
+/tmp/dediren-dist/dediren-agent-bundle-0.9.0-x86_64-unknown-linux-gnu/bin/dediren --help
 ```
 
 The archive includes first-party plugin manifests under `plugins/`, first-party
@@ -153,7 +153,10 @@ Commands:
   `render-metadata`. When projecting ArchiMate render metadata, it validates
   source node and relationship type strings and ArchiMate 3.2 relationship
   endpoint legality against the supported ArchiMate vocabulary. Render metadata
-  can contain node, relationship, and group selectors.
+  can contain node, relationship, and group selectors. Set
+  `plugins.generic-graph.semantic_profile` to `archimate` when a source should
+  produce ArchiMate-profiled render metadata without also requiring the
+  `archimate-oef` export plugin.
 - `layout` asks a layout plugin to generate a layout result. The bundled
   `elk-layout` plugin is a Rust adapter over the Java ELK helper.
 - `validate-layout` reports backend-neutral layout quality metrics, including
@@ -200,6 +203,24 @@ ArchiMate SVG notation uses two artifacts:
 
 The render metadata artifact does not carry colors, fonts, shapes, or layout
 data. Visual notation still comes from SVG render policy.
+
+For ArchiMate SVG without OEF export, configure the source graph's
+`generic-graph` plugin data with:
+
+```json
+{
+  "plugins": {
+    "generic-graph": {
+      "semantic_profile": "archimate",
+      "views": []
+    }
+  }
+}
+```
+
+The `archimate-oef` plugin is required only for OEF export. Older source graphs
+that list or configure `archimate-oef` still infer ArchiMate render metadata
+for compatibility.
 
 ArchiMate render and export paths reject unsupported ArchiMate element or
 relationship type strings and reject ArchiMate 3.2 relationships whose source
@@ -459,7 +480,7 @@ newer:
 
 ```bash
 cargo xtask dist build
-cargo xtask dist smoke dist/dediren-agent-bundle-0.8.4-x86_64-unknown-linux-gnu.tar.gz
+cargo xtask dist smoke dist/dediren-agent-bundle-0.9.0-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Focused checks:

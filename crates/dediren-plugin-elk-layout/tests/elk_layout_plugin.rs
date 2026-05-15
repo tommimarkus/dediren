@@ -1,6 +1,9 @@
 use assert_cmd::Command;
 use predicates::prelude::*;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicU64, Ordering};
+
+static TEMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 #[test]
 fn fake_elk_plugin_wraps_raw_layout_result() {
@@ -191,9 +194,10 @@ fn helper_command(script_body: &str) -> String {
 
 fn write_temp_file(name: &str, content: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!(
-        "dediren-elk-plugin-test-{}-{}",
+        "dediren-elk-plugin-test-{}-{}-{}",
         std::process::id(),
-        unique_suffix()
+        unique_suffix(),
+        TEMP_COUNTER.fetch_add(1, Ordering::Relaxed)
     ));
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join(name);

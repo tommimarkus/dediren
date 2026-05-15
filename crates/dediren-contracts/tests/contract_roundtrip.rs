@@ -1,9 +1,10 @@
 use dediren_contracts::{
     CommandEnvelope, Diagnostic, DiagnosticSeverity, GenericGraphPluginData,
-    GenericGraphViewGroupRole, GroupProvenance, LayoutRequest, Margin, Page, RenderMetadata,
-    RenderMetadataSelector, RenderPolicy, RenderResult, SemanticValidationResult, SourceDocument,
-    SvgEdgeLineStyle, SvgEdgeMarkerEnd, SvgEdgeStyle, SvgNodeDecorator, SvgNodeStyle,
-    SvgStylePolicy, SEMANTIC_VALIDATION_RESULT_SCHEMA_VERSION, SVG_RENDER_POLICY_SCHEMA_VERSION,
+    GenericGraphSemanticProfile, GenericGraphViewGroupRole, GroupProvenance, LayoutRequest, Margin,
+    Page, RenderMetadata, RenderMetadataSelector, RenderPolicy, RenderResult,
+    SemanticValidationResult, SourceDocument, SvgEdgeLineStyle, SvgEdgeMarkerEnd, SvgEdgeStyle,
+    SvgNodeDecorator, SvgNodeStyle, SvgStylePolicy, SEMANTIC_VALIDATION_RESULT_SCHEMA_VERSION,
+    SVG_RENDER_POLICY_SCHEMA_VERSION,
 };
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -138,6 +139,31 @@ fn generic_graph_group_role_round_trips_layout_only() {
         GenericGraphViewGroupRole::LayoutOnly,
         data.views[0].groups[0].role
     );
+}
+
+#[test]
+fn generic_graph_semantic_profile_round_trips() {
+    let data: GenericGraphPluginData = serde_json::from_str(
+        r#"{
+          "semantic_profile": "archimate",
+          "views": [
+            {
+              "id": "main",
+              "label": "Main",
+              "nodes": ["api"],
+              "relationships": []
+            }
+          ]
+        }"#,
+    )
+    .unwrap();
+
+    assert_eq!(
+        Some(GenericGraphSemanticProfile::Archimate),
+        data.semantic_profile
+    );
+    let encoded = serde_json::to_value(&data).unwrap();
+    assert_eq!(encoded["semantic_profile"], "archimate");
 }
 
 #[test]

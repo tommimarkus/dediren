@@ -8,10 +8,10 @@ use dediren_archimate::{
 };
 use dediren_contracts::{
     CommandEnvelope, Diagnostic, DiagnosticSeverity, GenericGraphPluginData,
-    GenericGraphViewGroupRole, GroupProvenance, LayoutEdge, LayoutGroup, LayoutLabel, LayoutNode,
-    LayoutRequest, RenderMetadata, RenderMetadataSelector, SemanticValidationResult,
-    SourceDocument, LAYOUT_REQUEST_SCHEMA_VERSION, RENDER_METADATA_SCHEMA_VERSION,
-    SEMANTIC_VALIDATION_RESULT_SCHEMA_VERSION,
+    GenericGraphSemanticProfile, GenericGraphViewGroupRole, GroupProvenance, LayoutEdge,
+    LayoutGroup, LayoutLabel, LayoutNode, LayoutRequest, RenderMetadata, RenderMetadataSelector,
+    SemanticValidationResult, SourceDocument, LAYOUT_REQUEST_SCHEMA_VERSION,
+    RENDER_METADATA_SCHEMA_VERSION, SEMANTIC_VALIDATION_RESULT_SCHEMA_VERSION,
 };
 
 fn main() -> anyhow::Result<()> {
@@ -54,8 +54,9 @@ fn main() -> anyhow::Result<()> {
         .iter()
         .find(|candidate| candidate.id == view)
         .with_context(|| format!("missing generic-graph view {view}"))?;
+    let semantic_profile = source_semantic_profile(&source, &plugin_data);
 
-    if source_semantic_profile(&source) == "archimate" {
+    if semantic_profile == "archimate" {
         if let Err(error) = validate_archimate_source_types(&source) {
             exit_with_archimate_type_error(error);
         }
@@ -65,7 +66,7 @@ fn main() -> anyhow::Result<()> {
     }
 
     if target == "render-metadata" {
-        let metadata = project_render_metadata(&source, selected_view)?;
+        let metadata = project_render_metadata(&source, selected_view, semantic_profile)?;
         println!("{}", serde_json::to_string(&CommandEnvelope::ok(metadata))?);
         return Ok(());
     }
@@ -83,8 +84,8 @@ fn main() -> anyhow::Result<()> {
                 id: source_node.id.clone(),
                 label: source_node.label.clone(),
                 source_id: source_node.id.clone(),
-                width_hint: Some(layout_width_hint(&source, source_node)),
-                height_hint: Some(layout_height_hint(&source, source_node)),
+                width_hint: Some(layout_width_hint(semantic_profile, source_node)),
+                height_hint: Some(layout_height_hint(semantic_profile, source_node)),
             })
         })
         .collect::<anyhow::Result<Vec<_>>>()?;
@@ -212,9 +213,8 @@ fn validate_from_stdin(args: &[String]) -> anyhow::Result<()> {
 fn project_render_metadata(
     source: &SourceDocument,
     selected_view: &dediren_contracts::GenericGraphView,
+    semantic_profile: &str,
 ) -> anyhow::Result<RenderMetadata> {
-    let semantic_profile = source_semantic_profile(source).to_string();
-
     let mut nodes = BTreeMap::new();
     for id in &selected_view.nodes {
         let source_node = source
@@ -276,15 +276,20 @@ fn project_render_metadata(
 
     Ok(RenderMetadata {
         render_metadata_schema_version: RENDER_METADATA_SCHEMA_VERSION.to_string(),
-        semantic_profile,
+        semantic_profile: semantic_profile.to_string(),
         nodes,
         edges,
         groups,
     })
 }
 
-fn source_semantic_profile(source: &SourceDocument) -> &'static str {
-    if source
+fn source_semantic_profile(
+    source: &SourceDocument,
+    plugin_data: &GenericGraphPluginData,
+) -> &'static str {
+    if let Some(profile) = plugin_data.semantic_profile {
+        profile.as_str()
+    } else if source
         .required_plugins
         .iter()
         .any(|plugin| plugin.id == "archimate-oef")
@@ -296,8 +301,8 @@ fn source_semantic_profile(source: &SourceDocument) -> &'static str {
     }
 }
 
-fn layout_width_hint(source: &SourceDocument, source_node: &dediren_contracts::SourceNode) -> f64 {
-    if source_semantic_profile(source) == "archimate"
+fn layout_width_hint(semantic_profile: &str, source_node: &dediren_contracts::SourceNode) -> f64 {
+    if semantic_profile == GenericGraphSemanticProfile::Archimate.as_str()
         && dediren_archimate::is_relationship_connector_type(&source_node.node_type)
     {
         28.0
@@ -306,8 +311,8 @@ fn layout_width_hint(source: &SourceDocument, source_node: &dediren_contracts::S
     }
 }
 
-fn layout_height_hint(source: &SourceDocument, source_node: &dediren_contracts::SourceNode) -> f64 {
-    if source_semantic_profile(source) == "archimate"
+fn layout_height_hint(semantic_profile: &str, source_node: &dediren_contracts::SourceNode) -> f64 {
+    if semantic_profile == GenericGraphSemanticProfile::Archimate.as_str()
         && dediren_archimate::is_relationship_connector_type(&source_node.node_type)
     {
         28.0
