@@ -1,5 +1,6 @@
 mod common;
 
+use assert_fs::prelude::*;
 use common::{ok_data, plugin_binary, workspace_file};
 use std::path::PathBuf;
 
@@ -16,6 +17,60 @@ fn fixture_elk_layout_uses_result_fixture() {
         )
         .args(["layout", "--plugin", "elk-layout", "--input"])
         .arg(workspace_file("fixtures/layout-request/basic.json"))
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let data = ok_data(&output);
+    assert_basic_layout_result(&data);
+}
+
+#[test]
+fn layout_accepts_layout_preferences_with_fixture_runtime() {
+    let temp = assert_fs::TempDir::new().unwrap();
+    let request = temp.child("request.json");
+    request
+        .write_str(
+            &serde_json::to_string_pretty(&serde_json::json!({
+                "layout_request_schema_version": "layout-request.schema.v1",
+                "view_id": "main",
+                "nodes": [],
+                "edges": [],
+                "groups": [],
+                "labels": [],
+                "constraints": [],
+                "layout_preferences": {
+                    "direction": "down",
+                    "density": "readable",
+                    "wrapping": "off",
+                    "routing": {
+                        "style": "orthogonal",
+                        "profile": "readable",
+                        "endpoint_merging": "off"
+                    }
+                }
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+
+    let mut cmd = common::dediren_command();
+    let output = cmd
+        .env(
+            "DEDIREN_PLUGIN_ELK_LAYOUT",
+            plugin_binary("dediren-plugin-elk-layout"),
+        )
+        .env(
+            "DEDIREN_ELK_RESULT_FIXTURE",
+            workspace_file("fixtures/layout-result/basic.json"),
+        )
+        .arg("layout")
+        .arg("--plugin")
+        .arg("elk-layout")
+        .arg("--input")
+        .arg(request.path())
         .assert()
         .success()
         .get_output()
