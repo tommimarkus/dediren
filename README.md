@@ -38,18 +38,18 @@ Runtime prerequisite:
 
 - Java 21 or newer available as `java` on `PATH`.
 
-For the current `0.9.1` version, the xtask creates:
+For the current `0.10.0` version, the xtask creates:
 
 ```text
-dist/dediren-agent-bundle-0.9.1-x86_64-unknown-linux-gnu/
-dist/dediren-agent-bundle-0.9.1-x86_64-unknown-linux-gnu.tar.gz
+dist/dediren-agent-bundle-0.10.0-x86_64-unknown-linux-gnu/
+dist/dediren-agent-bundle-0.10.0-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Run the smoke test from a shell where `java -version` resolves to Java 21 or
 newer:
 
 ```bash
-cargo xtask dist smoke dist/dediren-agent-bundle-0.9.1-x86_64-unknown-linux-gnu.tar.gz
+cargo xtask dist smoke dist/dediren-agent-bundle-0.10.0-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Concurrent `cargo xtask dist build` invocations serialize on a repo-local lock
@@ -62,8 +62,8 @@ Unpack and run it anywhere:
 
 ```bash
 mkdir -p /tmp/dediren-dist
-tar -xzf dist/dediren-agent-bundle-0.9.1-x86_64-unknown-linux-gnu.tar.gz -C /tmp/dediren-dist
-/tmp/dediren-dist/dediren-agent-bundle-0.9.1-x86_64-unknown-linux-gnu/bin/dediren --help
+tar -xzf dist/dediren-agent-bundle-0.10.0-x86_64-unknown-linux-gnu.tar.gz -C /tmp/dediren-dist
+/tmp/dediren-dist/dediren-agent-bundle-0.10.0-x86_64-unknown-linux-gnu/bin/dediren --help
 ```
 
 The archive includes first-party plugin manifests under `plugins/`, first-party
@@ -385,6 +385,32 @@ generated junction trunks. Layout requests that omit `relationship_type` keep
 those endpoints separate. If the field is present, it must be a non-empty
 string.
 
+Layout requests may also carry optional `layout_preferences`. Source documents
+can place the same object on `plugins.generic-graph.views[]`; the
+`generic-graph` projection copies it into the layout request. The values are
+Dediren layout intent, not raw ELK options:
+
+```json
+{
+  "layout_preferences": {
+    "direction": "right",
+    "density": "readable",
+    "wrapping": "auto",
+    "routing": {
+      "style": "orthogonal",
+      "profile": "readable",
+      "endpoint_merging": "local"
+    }
+  }
+}
+```
+
+Supported directions are `right`, `left`, `down`, and `up`. Supported density
+and routing profiles are `compact`, `readable`, and `spacious`. Supported
+wrapping values are `auto`, `off`, and `multi-edge`. Supported endpoint merging
+values are `auto`, `local`, and `off`. Missing preferences keep the helper's
+default behavior.
+
 ### ELK Test Lanes
 
 Test names use explicit lane prefixes so failures and artifacts are easy to
@@ -480,7 +506,7 @@ newer:
 
 ```bash
 cargo xtask dist build
-cargo xtask dist smoke dist/dediren-agent-bundle-0.9.1-x86_64-unknown-linux-gnu.tar.gz
+cargo xtask dist smoke dist/dediren-agent-bundle-0.10.0-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Focused checks:

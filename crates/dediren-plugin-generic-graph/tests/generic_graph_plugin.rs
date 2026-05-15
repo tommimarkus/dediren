@@ -1,5 +1,7 @@
 mod common;
 
+const WORKSPACE_VERSION: &str = env!("CARGO_PKG_VERSION");
+
 #[test]
 fn generic_graph_projects_basic_view() {
     let input = std::fs::read_to_string(common::workspace_file("fixtures/source/valid-basic.json"))
@@ -307,8 +309,8 @@ fn generic_graph_projects_archimate_junctions_as_small_layout_nodes() {
     let input = serde_json::json!({
         "model_schema_version": "model.schema.v1",
         "required_plugins": [
-            { "id": "generic-graph", "version": "0.9.1" },
-            { "id": "archimate-oef", "version": "0.9.1" }
+            { "id": "generic-graph", "version": WORKSPACE_VERSION },
+            { "id": "archimate-oef", "version": WORKSPACE_VERSION }
         ],
         "nodes": [
             { "id": "api", "type": "ApplicationComponent", "label": "API", "properties": {} },
@@ -361,8 +363,8 @@ fn generic_graph_projects_archimate_junction_render_metadata() {
     let input = serde_json::json!({
         "model_schema_version": "model.schema.v1",
         "required_plugins": [
-            { "id": "generic-graph", "version": "0.9.1" },
-            { "id": "archimate-oef", "version": "0.9.1" }
+            { "id": "generic-graph", "version": WORKSPACE_VERSION },
+            { "id": "archimate-oef", "version": WORKSPACE_VERSION }
         ],
         "nodes": [
             { "id": "api", "type": "ApplicationComponent", "label": "API", "properties": {} },
@@ -409,8 +411,8 @@ fn generic_graph_rejects_archimate_junction_with_mixed_relationship_types() {
     let input = serde_json::json!({
         "model_schema_version": "model.schema.v1",
         "required_plugins": [
-            { "id": "generic-graph", "version": "0.9.1" },
-            { "id": "archimate-oef", "version": "0.9.1" }
+            { "id": "generic-graph", "version": WORKSPACE_VERSION },
+            { "id": "archimate-oef", "version": WORKSPACE_VERSION }
         ],
         "nodes": [
             { "id": "api", "type": "ApplicationComponent", "label": "API", "properties": {} },
@@ -458,8 +460,8 @@ fn generic_graph_rejects_archimate_junction_with_invalid_effective_endpoint() {
     let input = serde_json::json!({
         "model_schema_version": "model.schema.v1",
         "required_plugins": [
-            { "id": "generic-graph", "version": "0.9.1" },
-            { "id": "archimate-oef", "version": "0.9.1" }
+            { "id": "generic-graph", "version": WORKSPACE_VERSION },
+            { "id": "archimate-oef", "version": WORKSPACE_VERSION }
         ],
         "nodes": [
             { "id": "service", "type": "ApplicationService", "label": "Service", "properties": {} },
@@ -509,8 +511,8 @@ fn generic_graph_rejects_archimate_junction_without_incoming_and_outgoing_relati
     let input = serde_json::json!({
         "model_schema_version": "model.schema.v1",
         "required_plugins": [
-            { "id": "generic-graph", "version": "0.9.1" },
-            { "id": "archimate-oef", "version": "0.9.1" }
+            { "id": "generic-graph", "version": WORKSPACE_VERSION },
+            { "id": "archimate-oef", "version": WORKSPACE_VERSION }
         ],
         "nodes": [
             { "id": "api", "type": "ApplicationComponent", "label": "API", "properties": {} },
@@ -555,8 +557,8 @@ fn generic_graph_rejects_archimate_junction_chain_with_invalid_effective_endpoin
     let input = serde_json::json!({
         "model_schema_version": "model.schema.v1",
         "required_plugins": [
-            { "id": "generic-graph", "version": "0.9.1" },
-            { "id": "archimate-oef", "version": "0.9.1" }
+            { "id": "generic-graph", "version": WORKSPACE_VERSION },
+            { "id": "archimate-oef", "version": WORKSPACE_VERSION }
         ],
         "nodes": [
             { "id": "service", "type": "ApplicationService", "label": "Service", "properties": {} },
@@ -608,8 +610,8 @@ fn generic_graph_allows_archimate_junction_containment_relationship() {
     let input = serde_json::json!({
         "model_schema_version": "model.schema.v1",
         "required_plugins": [
-            { "id": "generic-graph", "version": "0.9.1" },
-            { "id": "archimate-oef", "version": "0.9.1" }
+            { "id": "generic-graph", "version": WORKSPACE_VERSION },
+            { "id": "archimate-oef", "version": WORKSPACE_VERSION }
         ],
         "nodes": [
             { "id": "group", "type": "Grouping", "label": "Group", "properties": {} },
@@ -698,7 +700,7 @@ fn generic_graph_projects_archimate_render_metadata_without_oef_export_plugin() 
     source["required_plugins"] = serde_json::json!([
         {
             "id": "generic-graph",
-            "version": "0.9.1"
+            "version": WORKSPACE_VERSION
         }
     ]);
     source["plugins"]["generic-graph"]["semantic_profile"] = serde_json::json!("archimate");
@@ -882,11 +884,11 @@ fn archimate_source() -> serde_json::Value {
         "required_plugins": [
             {
                 "id": "generic-graph",
-                "version": "0.9.1"
+                "version": WORKSPACE_VERSION
             },
             {
                 "id": "archimate-oef",
-                "version": "0.9.1"
+                "version": WORKSPACE_VERSION
             }
         ],
         "nodes": [

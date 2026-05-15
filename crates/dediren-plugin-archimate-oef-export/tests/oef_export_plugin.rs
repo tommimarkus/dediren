@@ -1,5 +1,7 @@
 mod common;
 
+const WORKSPACE_VERSION: &str = env!("CARGO_PKG_VERSION");
+
 fn workspace_file(path: &str) -> String {
     format!("{}/{}", env!("CARGO_MANIFEST_DIR"), path)
         .replace("/crates/dediren-plugin-archimate-oef-export/", "/")
@@ -221,8 +223,8 @@ fn oef_export_emits_archimate_relationship_connector_junctions() {
     let source = serde_json::json!({
         "model_schema_version": "model.schema.v1",
         "required_plugins": [
-            { "id": "generic-graph", "version": "0.9.1" },
-            { "id": "archimate-oef", "version": "0.9.1" }
+            { "id": "generic-graph", "version": WORKSPACE_VERSION },
+            { "id": "archimate-oef", "version": WORKSPACE_VERSION }
         ],
         "nodes": [
             { "id": "api", "type": "ApplicationComponent", "label": "API", "properties": {} },
@@ -375,8 +377,8 @@ fn oef_export_plugin_rejects_junction_chain_with_invalid_effective_endpoint() {
     input["source"] = serde_json::json!({
         "model_schema_version": "model.schema.v1",
         "required_plugins": [
-            { "id": "generic-graph", "version": "0.9.1" },
-            { "id": "archimate-oef", "version": "0.9.1" }
+            { "id": "generic-graph", "version": WORKSPACE_VERSION },
+            { "id": "archimate-oef", "version": WORKSPACE_VERSION }
         ],
         "nodes": [
             { "id": "service", "type": "ApplicationService", "label": "Service", "properties": {} },
@@ -433,8 +435,8 @@ fn oef_export_allows_junction_containment_relationship() {
     let source = serde_json::json!({
         "model_schema_version": "model.schema.v1",
         "required_plugins": [
-            { "id": "generic-graph", "version": "0.9.1" },
-            { "id": "archimate-oef", "version": "0.9.1" }
+            { "id": "generic-graph", "version": WORKSPACE_VERSION },
+            { "id": "archimate-oef", "version": WORKSPACE_VERSION }
         ],
         "nodes": [
             { "id": "group", "type": "Grouping", "label": "Group", "properties": {} },
