@@ -39,6 +39,16 @@ final class ElkLayoutEngine {
     private static final double EDGE_NODE_SPACING = 32.0;
     private static final double EDGE_EDGE_SPACING = 40.0;
     private static final double PORT_PORT_SPACING = 32.0;
+    private static final double READABLE_NODE_SPACING = 72.0;
+    private static final double READABLE_EDGE_NODE_SPACING = 48.0;
+    private static final double READABLE_EDGE_EDGE_SPACING = 48.0;
+    private static final double READABLE_PORT_PORT_SPACING = 40.0;
+    private static final double READABLE_GROUP_PADDING = 32.0;
+    private static final double SPACIOUS_NODE_SPACING = 96.0;
+    private static final double SPACIOUS_EDGE_NODE_SPACING = 64.0;
+    private static final double SPACIOUS_EDGE_EDGE_SPACING = 64.0;
+    private static final double SPACIOUS_PORT_PORT_SPACING = 48.0;
+    private static final double SPACIOUS_GROUP_PADDING = 40.0;
     private static final int DEFAULT_SHORT_SIDE_PORT_CAPACITY = 3;
     private static final double PORT_SURROUNDING_SPACING = 16.0;
     private static final double ROUTE_DETOUR_RATIO = 1.5;
@@ -53,6 +63,12 @@ final class ElkLayoutEngine {
     private static final double LIBAVOID_SEGMENT_PENALTY = 50.0;
     private static final double LIBAVOID_IDEAL_NUDGING_DISTANCE = 16.0;
     private static final double LIBAVOID_SHAPE_BUFFER_DISTANCE = 16.0;
+    private static final double READABLE_LIBAVOID_SEGMENT_PENALTY = 60.0;
+    private static final double READABLE_LIBAVOID_IDEAL_NUDGING_DISTANCE = 24.0;
+    private static final double READABLE_LIBAVOID_SHAPE_BUFFER_DISTANCE = 24.0;
+    private static final double SPACIOUS_LIBAVOID_SEGMENT_PENALTY = 80.0;
+    private static final double SPACIOUS_LIBAVOID_IDEAL_NUDGING_DISTANCE = 32.0;
+    private static final double SPACIOUS_LIBAVOID_SHAPE_BUFFER_DISTANCE = 32.0;
     private static final double GEOMETRY_EPSILON = 0.001;
     private static final int MERGEABLE_ENDPOINT_EDGE_COUNT = 3;
     private static final String SHARED_SOURCE_JUNCTION_HINT = "shared_source_junction";
@@ -70,20 +86,22 @@ final class ElkLayoutEngine {
     }
 
     private static JsonContracts.LayoutResult layoutFlat(JsonContracts.LayoutRequest request) {
+        JsonContracts.LayoutPreferences preferences = request.layout_preferences();
+        Direction layoutDirection = preferredDirection(preferences);
         ElkNode root = ElkGraphUtil.createGraph();
-        configureLayeredRoot(root, Direction.RIGHT);
+        configureLayeredRoot(root, layoutDirection, preferences);
 
         Map<String, JsonContracts.LayoutNode> requestNodes = requestNodesById(request);
         List<JsonContracts.LayoutEdge> requestEdges = list(request.edges());
         Map<String, EdgeEndpointMerge> endpointMerges =
-            flatEdgeEndpointMerges(requestEdges, requestNodes);
+            flatEdgeEndpointMerges(requestEdges, requestNodes, preferences);
         Map<String, EnumMap<PortSide, Integer>> portCounts =
-            flatPortCounts(requestEdges, requestNodes, endpointMerges);
+            flatPortCounts(requestEdges, requestNodes, endpointMerges, layoutDirection);
         Map<String, ElkNode> elkNodes = new HashMap<>();
         for (JsonContracts.LayoutNode node : list(request.nodes())) {
             ElkNode elkNode = ElkGraphUtil.createNode(root);
             elkNode.setIdentifier(node.id());
-            setGeneratedDimensions(elkNode, node, portCounts.get(node.id()));
+            setGeneratedDimensions(elkNode, node, portCounts.get(node.id()), preferences);
             ElkGraphUtil.createLabel(elkNode).setText(node.label());
             elkNodes.put(node.id(), elkNode);
         }
@@ -109,13 +127,13 @@ final class ElkLayoutEngine {
                 source,
                 target,
                 edge,
-                Direction.RIGHT,
+                layoutDirection,
                 endpointMerge.sourceEndpoint()
                     ? 0
-                    : nextPortIndex(portIndexes, edge.source(), sourcePortSide(Direction.RIGHT)),
+                    : nextPortIndex(portIndexes, edge.source(), sourcePortSide(layoutDirection)),
                 endpointMerge.targetEndpoint()
                     ? 0
-                    : nextPortIndex(portIndexes, edge.target(), targetPortSide(Direction.RIGHT)),
+                    : nextPortIndex(portIndexes, edge.target(), targetPortSide(layoutDirection)),
                 endpointMerge.sourceEndpoint(),
                 endpointMerge.targetEndpoint());
             elkEdges.put(edge.id(), elkEdge);
@@ -144,10 +162,11 @@ final class ElkLayoutEngine {
             routeWithLibavoid(
                 requestEdges,
                 nodes,
-                flatEdgeDirections(requestEdges),
+                flatEdgeDirections(requestEdges, layoutDirection),
                 Map.of(),
                 endpointMerges,
-                Map.of());
+                Map.of(),
+                preferences);
         for (JsonContracts.LayoutEdge edge : list(request.edges())) {
             ElkEdge elkEdge = elkEdges.get(edge.id());
             if (elkEdge != null) {
@@ -178,14 +197,18 @@ final class ElkLayoutEngine {
     }
 
     private static JsonContracts.LayoutResult layoutGrouped(JsonContracts.LayoutRequest request) {
+        JsonContracts.LayoutPreferences preferences = request.layout_preferences();
+        Direction rootDirection = preferredDirection(preferences);
         List<JsonContracts.Diagnostic> warnings = new ArrayList<>();
         Map<String, JsonContracts.LayoutNode> requestNodes = requestNodesById(request);
         Map<String, String> ownerByNode = ownerByNode(request);
         ElkNode root = ElkGraphUtil.createGraph();
-        configureLayeredRoot(root, Direction.RIGHT);
+        configureLayeredRoot(root, rootDirection, preferences);
         root.setProperty(CoreOptions.HIERARCHY_HANDLING, HierarchyHandling.INCLUDE_CHILDREN);
         root.setProperty(CoreOptions.ASPECT_RATIO, 2.2);
-        root.setProperty(LayeredOptions.WRAPPING_STRATEGY, WrappingStrategy.MULTI_EDGE);
+        if (groupedWrappingEnabled(preferences)) {
+            root.setProperty(LayeredOptions.WRAPPING_STRATEGY, WrappingStrategy.MULTI_EDGE);
+        }
         root.setProperty(LayeredOptions.FEEDBACK_EDGES, true);
 
         Map<String, ElkNode> elkGroups = new HashMap<>();
@@ -211,9 +234,9 @@ final class ElkLayoutEngine {
             elkGroup.setIdentifier(group.id());
             ElkGraphUtil.createLabel(elkGroup).setText(group.label());
             Direction groupDirection = internalDirection(members, internalEdges);
-            configureLayeredRoot(elkGroup, groupDirection);
+            configureLayeredRoot(elkGroup, groupDirection, preferences);
             elkGroup.setProperty(CoreOptions.HIERARCHY_HANDLING, HierarchyHandling.INCLUDE_CHILDREN);
-            elkGroup.setProperty(CoreOptions.PADDING, new ElkPadding(GROUP_PADDING));
+            elkGroup.setProperty(CoreOptions.PADDING, new ElkPadding(groupPadding(preferences)));
             elkGroups.put(group.id(), elkGroup);
             groupDirectionById.put(group.id(), groupDirection);
         }
@@ -224,13 +247,16 @@ final class ElkLayoutEngine {
             requestNodes,
             ownerByNode,
             groupDirectionById,
-            groupOrderById);
+            groupOrderById,
+            rootDirection,
+            preferences);
         Map<String, EnumMap<PortSide, Integer>> portCounts = groupedPortCounts(
             requestEdges,
             requestNodes,
             ownerByNode,
             groupDirectionById,
             groupOrderById,
+            rootDirection,
             endpointMerges);
         Map<String, ElkNode> elkNodes = new HashMap<>();
         for (JsonContracts.LayoutNode node : list(request.nodes())) {
@@ -242,7 +268,7 @@ final class ElkLayoutEngine {
             }
             ElkNode elkNode = ElkGraphUtil.createNode(parent);
             elkNode.setIdentifier(node.id());
-            setGeneratedDimensions(elkNode, node, portCounts.get(node.id()));
+            setGeneratedDimensions(elkNode, node, portCounts.get(node.id()), preferences);
             ElkGraphUtil.createLabel(elkNode).setText(node.label());
             elkNodes.put(node.id(), elkNode);
         }
@@ -255,6 +281,7 @@ final class ElkLayoutEngine {
             ownerByNode,
             groupDirectionById,
             groupOrderById,
+            rootDirection,
             endpointMerges);
         for (int index = 0; index < requestEdges.size(); index++) {
             JsonContracts.LayoutEdge edge = requestEdges.get(index);
@@ -269,7 +296,7 @@ final class ElkLayoutEngine {
                 continue;
             }
             Direction edgeDirection =
-                edgeDirection(edge, requestNodes, ownerByNode, groupDirectionById, groupOrderById);
+                edgeDirection(edge, requestNodes, ownerByNode, groupDirectionById, groupOrderById, rootDirection);
             EdgeEndpointMerge endpointMerge =
                 endpointMerges.getOrDefault(edge.id(), NO_ENDPOINT_MERGE);
             EdgePortIndexes portIndexes = edgePortIndexes.get(edge.id());
@@ -314,7 +341,8 @@ final class ElkLayoutEngine {
             requestNodes,
             ownerByNode,
             groupDirectionById,
-            groupOrderById);
+            groupOrderById,
+            rootDirection);
         Map<String, PortSide> libavoidSourcePortSides = geometryAwareSourcePortSides(
             requestEdges,
             nodes,
@@ -336,7 +364,8 @@ final class ElkLayoutEngine {
                 libavoidDirections,
                 libavoidSourcePortSides,
                 endpointMerges,
-                libavoidEdgePortIndexes);
+                libavoidEdgePortIndexes,
+                preferences);
         for (JsonContracts.LayoutEdge edge : list(request.edges())) {
             ElkEdge elkEdge = elkEdges.get(edge.id());
             if (elkEdge != null) {
@@ -365,41 +394,151 @@ final class ElkLayoutEngine {
             warnings);
     }
 
-    private static void configureLayeredRoot(ElkNode root, Direction direction) {
+    private static void configureLayeredRoot(
+        ElkNode root,
+        Direction direction,
+        JsonContracts.LayoutPreferences preferences) {
+        double nodeSpacing = switch (density(preferences)) {
+            case "readable" -> READABLE_NODE_SPACING;
+            case "spacious" -> SPACIOUS_NODE_SPACING;
+            default -> NODE_SPACING;
+        };
+        double edgeNodeSpacing = switch (density(preferences)) {
+            case "readable" -> READABLE_EDGE_NODE_SPACING;
+            case "spacious" -> SPACIOUS_EDGE_NODE_SPACING;
+            default -> EDGE_NODE_SPACING;
+        };
+        double edgeEdgeSpacing = switch (density(preferences)) {
+            case "readable" -> READABLE_EDGE_EDGE_SPACING;
+            case "spacious" -> SPACIOUS_EDGE_EDGE_SPACING;
+            default -> EDGE_EDGE_SPACING;
+        };
+        double portPortSpacing = portPortSpacing(preferences);
+
         root.setProperty(CoreOptions.ALGORITHM, LAYERED_ALGORITHM);
         root.setProperty(CoreOptions.DIRECTION, direction);
         root.setProperty(CoreOptions.EDGE_ROUTING, EdgeRouting.ORTHOGONAL);
-        root.setProperty(CoreOptions.SPACING_NODE_NODE, NODE_SPACING);
-        root.setProperty(CoreOptions.SPACING_EDGE_NODE, EDGE_NODE_SPACING);
-        root.setProperty(CoreOptions.SPACING_EDGE_EDGE, EDGE_EDGE_SPACING);
-        root.setProperty(CoreOptions.SPACING_PORT_PORT, PORT_PORT_SPACING);
+        root.setProperty(CoreOptions.SPACING_NODE_NODE, nodeSpacing);
+        root.setProperty(CoreOptions.SPACING_EDGE_NODE, edgeNodeSpacing);
+        root.setProperty(CoreOptions.SPACING_EDGE_EDGE, edgeEdgeSpacing);
+        root.setProperty(CoreOptions.SPACING_PORT_PORT, portPortSpacing);
         root.setProperty(CoreOptions.SPACING_PORTS_SURROUNDING, new ElkMargin(PORT_SURROUNDING_SPACING));
-        root.setProperty(LayeredOptions.SPACING_EDGE_EDGE, EDGE_EDGE_SPACING);
-        root.setProperty(LayeredOptions.SPACING_EDGE_NODE, EDGE_NODE_SPACING);
-        root.setProperty(LayeredOptions.SPACING_PORT_PORT, PORT_PORT_SPACING);
+        root.setProperty(LayeredOptions.SPACING_EDGE_EDGE, edgeEdgeSpacing);
+        root.setProperty(LayeredOptions.SPACING_EDGE_NODE, edgeNodeSpacing);
+        root.setProperty(LayeredOptions.SPACING_PORT_PORT, portPortSpacing);
         root.setProperty(LayeredOptions.SPACING_PORTS_SURROUNDING, new ElkMargin(PORT_SURROUNDING_SPACING));
-        root.setProperty(LayeredOptions.SPACING_NODE_NODE_BETWEEN_LAYERS, NODE_SPACING);
-        root.setProperty(LayeredOptions.SPACING_EDGE_NODE_BETWEEN_LAYERS, EDGE_NODE_SPACING);
-        root.setProperty(LayeredOptions.SPACING_EDGE_EDGE_BETWEEN_LAYERS, EDGE_EDGE_SPACING);
-        root.setProperty(LayeredOptions.MERGE_EDGES, true);
-        root.setProperty(LayeredOptions.MERGE_HIERARCHY_EDGES, true);
+        root.setProperty(LayeredOptions.SPACING_NODE_NODE_BETWEEN_LAYERS, nodeSpacing);
+        root.setProperty(LayeredOptions.SPACING_EDGE_NODE_BETWEEN_LAYERS, edgeNodeSpacing);
+        root.setProperty(LayeredOptions.SPACING_EDGE_EDGE_BETWEEN_LAYERS, edgeEdgeSpacing);
+        boolean mergeEdges = endpointMergingEnabled(preferences);
+        root.setProperty(LayeredOptions.MERGE_EDGES, mergeEdges);
+        root.setProperty(LayeredOptions.MERGE_HIERARCHY_EDGES, mergeEdges);
     }
 
-    static ElkNode configuredLibavoidRoot() {
+    static ElkNode configuredLayeredRoot(
+        Direction direction,
+        JsonContracts.LayoutPreferences preferences) {
         ElkNode root = ElkGraphUtil.createGraph();
-        configureLibavoidRoot(root);
+        configureLayeredRoot(root, direction, preferences);
         return root;
     }
 
-    private static void configureLibavoidRoot(ElkNode root) {
+    static ElkNode configuredLibavoidRoot() {
+        return configuredLibavoidRoot(null);
+    }
+
+    static ElkNode configuredLibavoidRoot(JsonContracts.LayoutPreferences preferences) {
+        ElkNode root = ElkGraphUtil.createGraph();
+        configureLibavoidRoot(root, preferences);
+        return root;
+    }
+
+    private static void configureLibavoidRoot(
+        ElkNode root,
+        JsonContracts.LayoutPreferences preferences) {
         root.setProperty(CoreOptions.ALGORITHM, LIBAVOID_ALGORITHM);
-        root.setProperty(CoreOptions.DIRECTION, Direction.RIGHT);
+        root.setProperty(CoreOptions.DIRECTION, preferredDirection(preferences));
         root.setProperty(CoreOptions.EDGE_ROUTING, EdgeRouting.ORTHOGONAL);
-        root.setProperty(LibavoidOptions.SEGMENT_PENALTY, LIBAVOID_SEGMENT_PENALTY);
-        root.setProperty(LibavoidOptions.IDEAL_NUDGING_DISTANCE, LIBAVOID_IDEAL_NUDGING_DISTANCE);
-        root.setProperty(LibavoidOptions.SHAPE_BUFFER_DISTANCE, LIBAVOID_SHAPE_BUFFER_DISTANCE);
+        root.setProperty(LibavoidOptions.SEGMENT_PENALTY, switch (routingProfile(preferences)) {
+            case "readable" -> READABLE_LIBAVOID_SEGMENT_PENALTY;
+            case "spacious" -> SPACIOUS_LIBAVOID_SEGMENT_PENALTY;
+            default -> LIBAVOID_SEGMENT_PENALTY;
+        });
+        root.setProperty(LibavoidOptions.IDEAL_NUDGING_DISTANCE, switch (routingProfile(preferences)) {
+            case "readable" -> READABLE_LIBAVOID_IDEAL_NUDGING_DISTANCE;
+            case "spacious" -> SPACIOUS_LIBAVOID_IDEAL_NUDGING_DISTANCE;
+            default -> LIBAVOID_IDEAL_NUDGING_DISTANCE;
+        });
+        root.setProperty(LibavoidOptions.SHAPE_BUFFER_DISTANCE, switch (routingProfile(preferences)) {
+            case "readable" -> READABLE_LIBAVOID_SHAPE_BUFFER_DISTANCE;
+            case "spacious" -> SPACIOUS_LIBAVOID_SHAPE_BUFFER_DISTANCE;
+            default -> LIBAVOID_SHAPE_BUFFER_DISTANCE;
+        });
         root.setProperty(LibavoidOptions.NUDGE_ORTHOGONAL_SEGMENTS_CONNECTED_TO_SHAPES, true);
         root.setProperty(LibavoidOptions.PENALISE_ORTHOGONAL_SHARED_PATHS_AT_CONN_ENDS, false);
+    }
+
+    private static String density(JsonContracts.LayoutPreferences preferences) {
+        return preferences == null || preferences.density() == null
+            ? "compact"
+            : preferences.density();
+    }
+
+    private static double portPortSpacing(JsonContracts.LayoutPreferences preferences) {
+        return switch (density(preferences)) {
+            case "readable" -> READABLE_PORT_PORT_SPACING;
+            case "spacious" -> SPACIOUS_PORT_PORT_SPACING;
+            default -> PORT_PORT_SPACING;
+        };
+    }
+
+    private static double groupPadding(JsonContracts.LayoutPreferences preferences) {
+        return switch (density(preferences)) {
+            case "readable" -> READABLE_GROUP_PADDING;
+            case "spacious" -> SPACIOUS_GROUP_PADDING;
+            default -> GROUP_PADDING;
+        };
+    }
+
+    private static boolean groupedWrappingEnabled(JsonContracts.LayoutPreferences preferences) {
+        return preferences == null
+            || preferences.wrapping() == null
+            || "auto".equals(preferences.wrapping())
+            || "multi-edge".equals(preferences.wrapping());
+    }
+
+    private static String routingProfile(JsonContracts.LayoutPreferences preferences) {
+        if (preferences == null
+            || preferences.routing() == null
+            || preferences.routing().profile() == null) {
+            return "compact";
+        }
+        return preferences.routing().profile();
+    }
+
+    private static String endpointMerging(JsonContracts.LayoutPreferences preferences) {
+        if (preferences == null
+            || preferences.routing() == null
+            || preferences.routing().endpoint_merging() == null) {
+            return "auto";
+        }
+        return preferences.routing().endpoint_merging();
+    }
+
+    private static boolean endpointMergingEnabled(JsonContracts.LayoutPreferences preferences) {
+        return !"off".equals(endpointMerging(preferences));
+    }
+
+    private static Direction preferredDirection(JsonContracts.LayoutPreferences preferences) {
+        if (preferences == null || preferences.direction() == null) {
+            return Direction.RIGHT;
+        }
+        return switch (preferences.direction()) {
+            case "left" -> Direction.LEFT;
+            case "down" -> Direction.DOWN;
+            case "up" -> Direction.UP;
+            default -> Direction.RIGHT;
+        };
     }
 
     static Map<String, List<JsonContracts.Point>> routeWithLibavoid(
@@ -408,10 +547,11 @@ final class ElkLayoutEngine {
         return routeWithLibavoid(
             edges,
             nodes,
-            flatEdgeDirections(edges),
+            flatEdgeDirections(edges, Direction.RIGHT),
             Map.of(),
             emptyEndpointMerges(edges),
-            Map.of());
+            Map.of(),
+            null);
     }
 
     private static Map<String, List<JsonContracts.Point>> routeWithLibavoid(
@@ -420,8 +560,9 @@ final class ElkLayoutEngine {
         Map<String, Direction> edgeDirections,
         Map<String, PortSide> sourcePortSides,
         Map<String, EdgeEndpointMerge> endpointMerges,
-        Map<String, EdgePortIndexes> edgePortIndexes) {
-        ElkNode root = configuredLibavoidRoot();
+        Map<String, EdgePortIndexes> edgePortIndexes,
+        JsonContracts.LayoutPreferences preferences) {
+        ElkNode root = configuredLibavoidRoot(preferences);
 
         Map<String, ElkNode> elkNodes = new HashMap<>();
         for (JsonContracts.LaidOutNode node : nodes) {
@@ -480,10 +621,11 @@ final class ElkLayoutEngine {
     }
 
     private static Map<String, Direction> flatEdgeDirections(
-        List<JsonContracts.LayoutEdge> edges) {
+        List<JsonContracts.LayoutEdge> edges,
+        Direction direction) {
         Map<String, Direction> directions = new HashMap<>();
         for (JsonContracts.LayoutEdge edge : edges) {
-            directions.put(edge.id(), Direction.RIGHT);
+            directions.put(edge.id(), direction);
         }
         return directions;
     }
@@ -493,12 +635,13 @@ final class ElkLayoutEngine {
         Map<String, JsonContracts.LayoutNode> nodes,
         Map<String, String> ownerByNode,
         Map<String, Direction> groupDirectionById,
-        Map<String, Integer> groupOrderById) {
+        Map<String, Integer> groupOrderById,
+        Direction rootDirection) {
         Map<String, Direction> directions = new HashMap<>();
         for (JsonContracts.LayoutEdge edge : edges) {
             directions.put(
                 edge.id(),
-                edgeDirection(edge, nodes, ownerByNode, groupDirectionById, groupOrderById));
+                edgeDirection(edge, nodes, ownerByNode, groupDirectionById, groupOrderById, rootDirection));
         }
         return directions;
     }
@@ -534,7 +677,8 @@ final class ElkLayoutEngine {
         Map<String, JsonContracts.LayoutNode> nodes,
         Map<String, String> ownerByNode,
         Map<String, Direction> groupDirectionById,
-        Map<String, Integer> groupOrderById) {
+        Map<String, Integer> groupOrderById,
+        Direction rootDirection) {
         String sourceOwner = ownerByNode.get(edge.source());
         String targetOwner = ownerByNode.get(edge.target());
         if (sourceOwner != null && sourceOwner.equals(targetOwner)) {
@@ -547,10 +691,19 @@ final class ElkLayoutEngine {
             int sourceOrder = groupOrderById.getOrDefault(sourceOwner, 0);
             int targetOrder = groupOrderById.getOrDefault(targetOwner, 0);
             if (sourceOrder > targetOrder) {
-                return Direction.LEFT;
+                return oppositeDirection(rootDirection);
             }
         }
-        return Direction.RIGHT;
+        return rootDirection;
+    }
+
+    private static Direction oppositeDirection(Direction direction) {
+        return switch (direction) {
+            case LEFT -> Direction.RIGHT;
+            case UP -> Direction.DOWN;
+            case DOWN -> Direction.UP;
+            default -> Direction.LEFT;
+        };
     }
 
     private static boolean isConnectorSizedSource(JsonContracts.LayoutNode node) {
@@ -662,7 +815,13 @@ final class ElkLayoutEngine {
 
     private static Map<String, EdgeEndpointMerge> flatEdgeEndpointMerges(
         List<JsonContracts.LayoutEdge> edges,
-        Map<String, JsonContracts.LayoutNode> nodes) {
+        Map<String, JsonContracts.LayoutNode> nodes,
+        JsonContracts.LayoutPreferences preferences) {
+        if (!endpointMergingEnabled(preferences)) {
+            return emptyEndpointMerges(edges);
+        }
+
+        Direction direction = preferredDirection(preferences);
         Map<EdgeEndpointKey, Integer> endpointCounts = new HashMap<>();
         for (JsonContracts.LayoutEdge edge : edges) {
             String relationshipType = relationshipType(edge);
@@ -673,11 +832,11 @@ final class ElkLayoutEngine {
                 continue;
             }
             endpointCounts.merge(
-                new EdgeEndpointKey(edge.source(), sourcePortSide(Direction.RIGHT), true, relationshipType),
+                new EdgeEndpointKey(edge.source(), sourcePortSide(direction), true, relationshipType),
                 1,
                 Integer::sum);
             endpointCounts.merge(
-                new EdgeEndpointKey(edge.target(), targetPortSide(Direction.RIGHT), false, relationshipType),
+                new EdgeEndpointKey(edge.target(), targetPortSide(direction), false, relationshipType),
                 1,
                 Integer::sum);
         }
@@ -691,11 +850,11 @@ final class ElkLayoutEngine {
             endpointMerges.put(edge.id(), new EdgeEndpointMerge(
                 relationshipType != null
                     && endpointCounts.getOrDefault(
-                        new EdgeEndpointKey(edge.source(), sourcePortSide(Direction.RIGHT), true, relationshipType),
+                        new EdgeEndpointKey(edge.source(), sourcePortSide(direction), true, relationshipType),
                         0) >= MERGEABLE_ENDPOINT_EDGE_COUNT,
                 relationshipType != null
                     && endpointCounts.getOrDefault(
-                        new EdgeEndpointKey(edge.target(), targetPortSide(Direction.RIGHT), false, relationshipType),
+                        new EdgeEndpointKey(edge.target(), targetPortSide(direction), false, relationshipType),
                         0) >= MERGEABLE_ENDPOINT_EDGE_COUNT));
         }
         return endpointMerges;
@@ -706,7 +865,13 @@ final class ElkLayoutEngine {
         Map<String, JsonContracts.LayoutNode> nodes,
         Map<String, String> ownerByNode,
         Map<String, Direction> groupDirectionById,
-        Map<String, Integer> groupOrderById) {
+        Map<String, Integer> groupOrderById,
+        Direction rootDirection,
+        JsonContracts.LayoutPreferences preferences) {
+        if (!endpointMergingEnabled(preferences)) {
+            return emptyEndpointMerges(edges);
+        }
+
         Map<EdgeEndpointKey, Integer> endpointCounts = new HashMap<>();
         for (JsonContracts.LayoutEdge edge : edges) {
             String relationshipType = relationshipType(edge);
@@ -717,7 +882,7 @@ final class ElkLayoutEngine {
                 continue;
             }
             Direction direction =
-                edgeDirection(edge, nodes, ownerByNode, groupDirectionById, groupOrderById);
+                edgeDirection(edge, nodes, ownerByNode, groupDirectionById, groupOrderById, rootDirection);
             endpointCounts.merge(
                 new EdgeEndpointKey(edge.source(), sourcePortSide(direction), true, relationshipType),
                 1,
@@ -735,7 +900,7 @@ final class ElkLayoutEngine {
                 continue;
             }
             Direction direction =
-                edgeDirection(edge, nodes, ownerByNode, groupDirectionById, groupOrderById);
+                edgeDirection(edge, nodes, ownerByNode, groupDirectionById, groupOrderById, rootDirection);
             endpointMerges.put(edge.id(), new EdgeEndpointMerge(
                 relationshipType != null
                     && endpointCounts.getOrDefault(
@@ -767,7 +932,8 @@ final class ElkLayoutEngine {
     private static Map<String, EnumMap<PortSide, Integer>> flatPortCounts(
         List<JsonContracts.LayoutEdge> edges,
         Map<String, JsonContracts.LayoutNode> nodes,
-        Map<String, EdgeEndpointMerge> endpointMerges) {
+        Map<String, EdgeEndpointMerge> endpointMerges,
+        Direction direction) {
         Map<String, EnumMap<PortSide, Integer>> portCounts = new HashMap<>();
         Set<EdgeEndpointKey> countedMergePorts = new HashSet<>();
         for (JsonContracts.LayoutEdge edge : edges) {
@@ -780,7 +946,7 @@ final class ElkLayoutEngine {
                 portCounts,
                 countedMergePorts,
                 edge.source(),
-                sourcePortSide(Direction.RIGHT),
+                sourcePortSide(direction),
                 true,
                 relationshipType(edge),
                 endpointMerge.sourceEndpoint());
@@ -788,7 +954,7 @@ final class ElkLayoutEngine {
                 portCounts,
                 countedMergePorts,
                 edge.target(),
-                targetPortSide(Direction.RIGHT),
+                targetPortSide(direction),
                 false,
                 relationshipType(edge),
                 endpointMerge.targetEndpoint());
@@ -802,6 +968,7 @@ final class ElkLayoutEngine {
         Map<String, String> ownerByNode,
         Map<String, Direction> groupDirectionById,
         Map<String, Integer> groupOrderById,
+        Direction rootDirection,
         Map<String, EdgeEndpointMerge> endpointMerges) {
         Map<String, EnumMap<PortSide, Integer>> portCounts = new HashMap<>();
         Set<EdgeEndpointKey> countedMergePorts = new HashSet<>();
@@ -810,7 +977,7 @@ final class ElkLayoutEngine {
                 continue;
             }
             Direction direction =
-                edgeDirection(edge, nodes, ownerByNode, groupDirectionById, groupOrderById);
+                edgeDirection(edge, nodes, ownerByNode, groupDirectionById, groupOrderById, rootDirection);
             EdgeEndpointMerge endpointMerge =
                 endpointMerges.getOrDefault(edge.id(), NO_ENDPOINT_MERGE);
             countPort(
@@ -840,6 +1007,7 @@ final class ElkLayoutEngine {
         Map<String, String> ownerByNode,
         Map<String, Direction> groupDirectionById,
         Map<String, Integer> groupOrderById,
+        Direction rootDirection,
         Map<String, EdgeEndpointMerge> endpointMerges) {
         Map<String, Integer> nodeOrderById = groupedNodeOrderById(request, groupOrderById);
         Map<PortGroupKey, List<PortCandidate>> candidatesByPortGroup = new HashMap<>();
@@ -849,7 +1017,7 @@ final class ElkLayoutEngine {
                 continue;
             }
             Direction direction =
-                edgeDirection(edge, nodes, ownerByNode, groupDirectionById, groupOrderById);
+                edgeDirection(edge, nodes, ownerByNode, groupDirectionById, groupOrderById, rootDirection);
             PortSide sourceSide = sourcePortSide(direction);
             PortSide targetSide = targetPortSide(direction);
             EdgeEndpointMerge endpointMerge =
@@ -1186,28 +1354,35 @@ final class ElkLayoutEngine {
     private static void setGeneratedDimensions(
         ElkNode elkNode,
         JsonContracts.LayoutNode node,
-        Map<PortSide, Integer> portCounts) {
+        Map<PortSide, Integer> portCounts,
+        JsonContracts.LayoutPreferences preferences) {
         double width = positiveOrDefault(node.width_hint(), DEFAULT_WIDTH);
         double height = positiveOrDefault(node.height_hint(), DEFAULT_HEIGHT);
         if (portCounts != null) {
+            double portSpacing = portPortSpacing(preferences);
             width = Math.max(width, requiredPortSideLength(width, maxPortCount(
                 portCounts,
                 PortSide.NORTH,
-                PortSide.SOUTH)));
+                PortSide.SOUTH),
+                portSpacing));
             height = Math.max(height, requiredPortSideLength(height, maxPortCount(
                 portCounts,
                 PortSide.WEST,
-                PortSide.EAST)));
+                PortSide.EAST),
+                portSpacing));
         }
         elkNode.setDimensions(width, height);
     }
 
-    private static double requiredPortSideLength(double currentLength, int portCount) {
+    private static double requiredPortSideLength(
+        double currentLength,
+        int portCount,
+        double portSpacing) {
         if (portCount <= DEFAULT_SHORT_SIDE_PORT_CAPACITY) {
             return currentLength;
         }
         return currentLength
-            + ((portCount - DEFAULT_SHORT_SIDE_PORT_CAPACITY) * PORT_PORT_SPACING);
+            + ((portCount - DEFAULT_SHORT_SIDE_PORT_CAPACITY) * portSpacing);
     }
 
     private static int maxPortCount(
@@ -1260,6 +1435,7 @@ final class ElkLayoutEngine {
         return switch (direction) {
             case DOWN -> PortSide.SOUTH;
             case LEFT -> PortSide.WEST;
+            case UP -> PortSide.NORTH;
             default -> PortSide.EAST;
         };
     }
@@ -1268,6 +1444,7 @@ final class ElkLayoutEngine {
         return switch (direction) {
             case DOWN -> PortSide.NORTH;
             case LEFT -> PortSide.EAST;
+            case UP -> PortSide.SOUTH;
             default -> PortSide.WEST;
         };
     }
