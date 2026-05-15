@@ -38,6 +38,74 @@ fn generic_graph_projects_basic_view() {
 }
 
 #[test]
+fn generic_graph_projects_layout_preferences() {
+    let input = serde_json::json!({
+        "model_schema_version": "model.schema.v1",
+        "nodes": [
+            { "id": "client", "type": "BusinessActor", "label": "Client", "properties": {} },
+            { "id": "api", "type": "ApplicationComponent", "label": "API", "properties": {} }
+        ],
+        "relationships": [
+            {
+                "id": "client-calls-api",
+                "type": "generic.calls",
+                "source": "client",
+                "target": "api",
+                "label": "calls",
+                "properties": {}
+            }
+        ],
+        "plugins": {
+            "generic-graph": {
+                "views": [
+                    {
+                        "id": "main",
+                        "label": "Main",
+                        "nodes": ["client", "api"],
+                        "relationships": ["client-calls-api"],
+                        "layout_preferences": {
+                            "direction": "down",
+                            "density": "readable",
+                            "wrapping": "off",
+                            "routing": {
+                                "style": "orthogonal",
+                                "profile": "spacious",
+                                "endpoint_merging": "off"
+                            }
+                        }
+                    }
+                ]
+            }
+        }
+    });
+
+    let mut cmd = common::plugin_command();
+    let output = cmd
+        .args(["project", "--target", "layout-request", "--view", "main"])
+        .write_stdin(serde_json::to_string(&input).unwrap())
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let data = common::ok_data(&output);
+    assert_eq!(
+        data["layout_preferences"],
+        serde_json::json!({
+            "direction": "down",
+            "density": "readable",
+            "wrapping": "off",
+            "routing": {
+                "style": "orthogonal",
+                "profile": "spacious",
+                "endpoint_merging": "off"
+            }
+        })
+    );
+}
+
+#[test]
 fn generic_graph_projects_rich_view_groups() {
     let input = std::fs::read_to_string(common::workspace_file(
         "fixtures/source/valid-pipeline-rich.json",

@@ -167,7 +167,7 @@ fn main() -> anyhow::Result<()> {
         groups,
         labels,
         constraints: Vec::new(),
-        layout_preferences: None,
+        layout_preferences: selected_view.layout_preferences.clone(),
     };
 
     println!("{}", serde_json::to_string(&CommandEnvelope::ok(request))?);
