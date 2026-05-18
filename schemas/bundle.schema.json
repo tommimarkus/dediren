@@ -12,6 +12,7 @@
     "plugins",
     "schemas_dir",
     "fixtures_dir",
+    "docs_dir",
     "elk_helper"
   ],
   "properties": {
@@ -29,6 +30,7 @@
     },
     "schemas_dir": { "type": "string", "minLength": 1 },
     "fixtures_dir": { "type": "string", "minLength": 1 },
+    "docs_dir": { "type": "string", "minLength": 1 },
     "elk_helper": { "type": "string", "minLength": 1 }
   },
   "$defs": {

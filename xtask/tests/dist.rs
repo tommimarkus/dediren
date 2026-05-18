@@ -76,6 +76,37 @@ fn dist_build_prunes_stale_bundle_artifacts() {
 
 #[cfg(unix)]
 #[test]
+fn dist_build_includes_agent_usage_docs() {
+    let repo = FakeDistRepo::new();
+    repo.release_helper_build();
+    let output = repo.xtask_command(["dist", "build"]).output().unwrap();
+
+    assert!(
+        output.status.success(),
+        "dist build should pass\nstatus: {:?}\nstdout:\n{}\nstderr:\n{}",
+        output.status.code(),
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr),
+    );
+
+    let bundle = repo.root.path().join(format!(
+        "dist/dediren-agent-bundle-{}-x86_64-unknown-linux-gnu",
+        env!("CARGO_PKG_VERSION")
+    ));
+    let guide = bundle.join("docs/agent-usage.md");
+    assert!(
+        guide.exists(),
+        "dist build should include docs/agent-usage.md"
+    );
+    let metadata = fs::read_to_string(bundle.join("bundle.json")).unwrap();
+    assert!(
+        metadata.contains("\"docs_dir\": \"docs\""),
+        "bundle metadata should advertise docs_dir: {metadata}"
+    );
+}
+
+#[cfg(unix)]
+#[test]
 fn dist_smoke_runs_bundle_pipeline_with_clean_environment() {
     let repo = FakeDistRepo::new();
     let archive = repo.write_smoke_archive();
@@ -218,6 +249,7 @@ esac
     fn write_tree(&self) {
         fs::create_dir_all(self.root.path().join("fixtures/plugins")).unwrap();
         fs::create_dir_all(self.root.path().join("fixtures/source")).unwrap();
+        fs::create_dir_all(self.root.path().join("docs")).unwrap();
         fs::create_dir_all(self.root.path().join("schemas")).unwrap();
         fs::create_dir_all(
             self.root
@@ -240,6 +272,11 @@ esac
         )
         .unwrap();
         fs::write(self.root.path().join("fixtures/source/basic.json"), "{}").unwrap();
+        fs::write(
+            self.root.path().join("docs/agent-usage.md"),
+            "# Dediren Agent Usage\n\nBundle-visible agent guide.\n",
+        )
+        .unwrap();
         fs::write(self.root.path().join("schemas/schema.json"), "{}").unwrap();
 
         for binary in [

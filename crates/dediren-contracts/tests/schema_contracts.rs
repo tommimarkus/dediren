@@ -622,6 +622,7 @@ fn bundle_metadata_matches_schema() {
             ],
             "schemas_dir": "schemas",
             "fixtures_dir": "fixtures",
+            "docs_dir": "docs",
             "elk_helper": "runtimes/elk-layout-java/bin/dediren-elk-layout-java"
         }),
     );

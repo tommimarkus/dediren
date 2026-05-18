@@ -154,6 +154,7 @@ fn build_dist(root: &Path) -> Result<()> {
     fs::create_dir_all(bundle_dir.join("bin")).context("create bundle bin directory")?;
     fs::create_dir_all(bundle_dir.join("plugins")).context("create bundle plugins directory")?;
     fs::create_dir_all(bundle_dir.join("runtimes")).context("create bundle runtimes directory")?;
+    fs::create_dir_all(bundle_dir.join("docs")).context("create bundle docs directory")?;
 
     for binary in PLUGIN_BINARIES {
         install_executable(
@@ -166,6 +167,7 @@ fn build_dist(root: &Path) -> Result<()> {
     copy_manifest_files(&root.join("fixtures/plugins"), &bundle_dir.join("plugins"))?;
     copy_dir_recursive(&root.join("schemas"), &bundle_dir.join("schemas"))?;
     copy_fixture_dirs(root, &bundle_dir.join("fixtures"))?;
+    copy_agent_docs(root, &bundle_dir.join("docs"))?;
     copy_dir_recursive(
         &root.join("crates/dediren-plugin-elk-layout/java/build/install/dediren-elk-layout-java"),
         &bundle_dir.join("runtimes/elk-layout-java"),
@@ -448,6 +450,15 @@ fn copy_fixture_dirs(root: &Path, destination: &Path) -> Result<()> {
     Ok(())
 }
 
+fn copy_agent_docs(root: &Path, destination: &Path) -> Result<()> {
+    fs::copy(
+        root.join("docs/agent-usage.md"),
+        destination.join("agent-usage.md"),
+    )
+    .context("copy agent usage guide")?;
+    Ok(())
+}
+
 fn copy_dir_recursive(source: &Path, destination: &Path) -> Result<()> {
     fs::create_dir_all(destination)
         .with_context(|| format!("create directory {}", destination.display()))?;
@@ -487,6 +498,7 @@ fn write_bundle_metadata(bundle_dir: &Path, target: &str) -> Result<()> {
         "plugins": plugins,
         "schemas_dir": "schemas",
         "fixtures_dir": "fixtures",
+        "docs_dir": "docs",
         "elk_helper": "runtimes/elk-layout-java/bin/dediren-elk-layout-java"
     });
     fs::write(
