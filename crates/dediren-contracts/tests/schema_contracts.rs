@@ -71,7 +71,7 @@ fn source_with_fragments_matches_model_schema() {
             "model_schema_version": "model.schema.v1",
             "fragments": ["model/application.json", "model/technology.json"],
             "required_plugins": [
-                { "id": "generic-graph", "version": "0.11.1" }
+                { "id": "generic-graph", "version": "0.11.2" }
             ],
             "nodes": [],
             "relationships": [],
@@ -563,6 +563,10 @@ fn live_release_surfaces_match_workspace_version() {
     assert!(
         readme.contains("cargo xtask dist smoke"),
         "README.md should document the xtask distribution smoke command"
+    );
+    assert!(
+        readme.contains("MIT `LICENSE`"),
+        "README.md should document that distribution archives include the license notice"
     );
     assert!(
         !readme.contains("scripts/build-dist.sh"),

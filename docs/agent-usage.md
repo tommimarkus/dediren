@@ -8,7 +8,8 @@ which JSON is generated, and how to repair failures.
 If this guide is consumed through a skill package, the package should either
 ship this file alongside the Dediren bundle or copy the same JSON authoring
 contract into the skill instructions. The source repository README is not
-assumed to be available to runtime users.
+assumed to be available to runtime users. Preserve the bundle root `LICENSE`
+file when redistributing the archive contents.
 
 ## Fast Path
 
@@ -46,7 +47,7 @@ them.
 {
   "model_schema_version": "model.schema.v1",
   "required_plugins": [
-    { "id": "generic-graph", "version": "0.11.1" }
+    { "id": "generic-graph", "version": "0.11.2" }
   ],
   "nodes": [
     {
@@ -101,8 +102,8 @@ and use ArchiMate type names:
 {
   "model_schema_version": "model.schema.v1",
   "required_plugins": [
-    { "id": "generic-graph", "version": "0.11.1" },
-    { "id": "archimate-oef", "version": "0.11.1" }
+    { "id": "generic-graph", "version": "0.11.2" },
+    { "id": "archimate-oef", "version": "0.11.2" }
   ],
   "nodes": [
     {
@@ -269,7 +270,7 @@ target/debug/dediren-plugin-archimate-oef-export capabilities
 From an unpacked distribution bundle:
 
 ```bash
-BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-0.11.1-x86_64-unknown-linux-gnu
+BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-0.11.2-x86_64-unknown-linux-gnu
 "$BUNDLE/bin/dediren" --version
 "$BUNDLE/bin/dediren-plugin-generic-graph" capabilities
 "$BUNDLE/bin/dediren-plugin-elk-layout" capabilities
@@ -283,7 +284,7 @@ CLI workflow commands return command envelopes using `schemas/envelope.schema.js
 ## Bundle Smoke Workflow
 
 ```bash
-BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-0.11.1-x86_64-unknown-linux-gnu
+BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-0.11.2-x86_64-unknown-linux-gnu
 
 "$BUNDLE/bin/dediren" validate \
   --input "$BUNDLE/fixtures/source/valid-basic.json"
