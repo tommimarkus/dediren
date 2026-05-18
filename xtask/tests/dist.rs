@@ -98,10 +98,12 @@ fn dist_build_includes_agent_usage_docs() {
         guide.exists(),
         "dist build should include docs/agent-usage.md"
     );
-    let metadata = fs::read_to_string(bundle.join("bundle.json")).unwrap();
-    assert!(
-        metadata.contains("\"docs_dir\": \"docs\""),
-        "bundle metadata should advertise docs_dir: {metadata}"
+    let metadata: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(bundle.join("bundle.json")).unwrap()).unwrap();
+    assert_eq!(
+        metadata["docs_dir"].as_str(),
+        Some("docs"),
+        "bundle metadata should advertise docs_dir"
     );
 }
 
