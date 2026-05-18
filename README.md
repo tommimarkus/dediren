@@ -12,6 +12,13 @@ The product surface is intentionally machine-readable:
 - plugin manifests and runtime capability probes;
 - deterministic diagnostics that agents can inspect without scraping stderr.
 
+For a token-efficient agent JSON authoring guide, see `docs/agent-usage.md`.
+It maps which JSON agents author, which JSON Dediren generates, the
+Minimal Source JSON skeleton, render/export policy skeletons, fixture/schema
+references, validation commands, repair diagnostics, runtime probes, and
+bundle smoke workflow. Design plans under `docs/superpowers/` are
+implementation history, not the current user-facing contract.
+
 Authored source graph JSON is semantic and plugin-typed. It must not contain
 absolute position or size data. Generated layout result JSON may contain
 geometry, routes, metrics, warnings, and provenance.
@@ -66,6 +73,10 @@ tar -xzf dist/dediren-agent-bundle-0.11.0-x86_64-unknown-linux-gnu.tar.gz -C /tm
 /tmp/dediren-dist/dediren-agent-bundle-0.11.0-x86_64-unknown-linux-gnu/bin/dediren --help
 ```
 
+For a full unpacked-bundle JSON authoring and project/layout/render smoke
+workflow, use the `JSON Authoring Loop` and `Bundle Smoke Workflow` sections in
+`docs/agent-usage.md`.
+
 The archive includes first-party plugin manifests under `plugins/`, first-party
 plugin binaries under `bin/`, schemas, fixtures, and the built ELK Java helper
 under `runtimes/elk-layout-java/`. It does not bundle a JRE.
@@ -118,8 +129,15 @@ dediren render \
   > render-result.json
 ```
 
-`render-result.json` is a command envelope. The SVG text is in
-`.data.content`; there is no raw-output mode yet.
+`project`, `layout`, `render`, and `export` write JSON command envelopes.
+Downstream commands that consume generated artifacts accept either the full
+envelope or raw `.data` artifact JSON. In short, full envelope or raw .data
+handoff works, so redirecting one command into the next is valid. Extract
+rendered SVG with:
+
+```bash
+jq -r '.data.content' render-result.json > diagram.svg
+```
 
 ## Pipeline
 
@@ -346,6 +364,17 @@ command envelopes. The bundled first-party plugins are:
 | `elk-layout` | `layout` | Runs the Java ELK helper and returns generated layout results. |
 | `svg-render` | `render` | Renders SVG from layout result JSON and render policy JSON. |
 | `archimate-oef` | `export` | Exports ArchiMate 3.2 OEF XML from source and layout data. |
+
+After authoring JSON, agents can inspect runtime plugin support directly:
+
+```bash
+dediren-plugin-generic-graph capabilities
+dediren-plugin-elk-layout capabilities
+dediren-plugin-svg-render capabilities
+dediren-plugin-archimate-oef-export capabilities
+```
+
+The capability JSON uses `schemas/runtime-capability.schema.json`.
 
 The CLI discovers plugins explicitly:
 
