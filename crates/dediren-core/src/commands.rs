@@ -1,4 +1,8 @@
-use dediren_contracts::{LayoutRequest, OefExportInput, OefExportPolicy, SourceDocument};
+use std::path::Path;
+
+use dediren_contracts::{
+    CommandEnvelope, LayoutRequest, OefExportInput, OefExportPolicy, SourceDocument,
+};
 
 use crate::plugins::{
     run_plugin_for_capability_with_registry, PluginExecutionError, PluginRegistry,
@@ -65,11 +69,26 @@ pub fn project_command(
     view: &str,
     input_text: &str,
 ) -> Result<PluginRunOutcome, PluginExecutionError> {
+    project_command_with_base(plugin, target, view, input_text, None)
+}
+
+pub fn project_command_with_base(
+    plugin: &str,
+    target: &str,
+    view: &str,
+    input_text: &str,
+    base_dir: Option<&Path>,
+) -> Result<PluginRunOutcome, PluginExecutionError> {
+    let source = match crate::validate::load_and_validate_source_document(input_text, base_dir) {
+        Ok(source) => source,
+        Err(diagnostics) => return Ok(error_outcome(diagnostics)),
+    };
+    let input_text = serde_json::to_string(&source).map_err(command_input_error("project"))?;
     crate::plugins::run_plugin_for_capability(
         plugin,
         "projection",
         &["project", "--target", target, "--view", view],
-        input_text,
+        &input_text,
     )
 }
 
@@ -78,21 +97,26 @@ pub fn semantic_validate_command(
     profile: &str,
     input_text: &str,
 ) -> Result<PluginRunOutcome, PluginExecutionError> {
-    let (validation_exit_code, validation_envelope) =
-        crate::validate::validate_source_json(input_text);
-    if validation_exit_code != 0 {
-        return Ok(PluginRunOutcome {
-            stdout: serde_json::to_string(&validation_envelope)
-                .map_err(command_input_error("validate"))?,
-            exit_code: validation_exit_code,
-        });
-    }
+    semantic_validate_command_with_base(plugin, profile, input_text, None)
+}
+
+pub fn semantic_validate_command_with_base(
+    plugin: &str,
+    profile: &str,
+    input_text: &str,
+    base_dir: Option<&Path>,
+) -> Result<PluginRunOutcome, PluginExecutionError> {
+    let source = match crate::validate::load_and_validate_source_document(input_text, base_dir) {
+        Ok(source) => source,
+        Err(diagnostics) => return Ok(error_outcome(diagnostics)),
+    };
+    let input_text = serde_json::to_string(&source).map_err(command_input_error("validate"))?;
 
     crate::plugins::run_plugin_for_capability(
         plugin,
         "semantic-validation",
         &["validate", "--profile", profile],
-        input_text,
+        &input_text,
     )
 }
 
@@ -139,8 +163,21 @@ pub fn export_command(
     source_text: &str,
     layout_text: &str,
 ) -> Result<PluginRunOutcome, PluginExecutionError> {
+    export_command_with_base(plugin, policy_text, source_text, None, layout_text)
+}
+
+pub fn export_command_with_base(
+    plugin: &str,
+    policy_text: &str,
+    source_text: &str,
+    source_base_dir: Option<&Path>,
+    layout_text: &str,
+) -> Result<PluginRunOutcome, PluginExecutionError> {
     let source: SourceDocument =
-        serde_json::from_str(source_text).map_err(command_input_error("export"))?;
+        match crate::validate::load_and_validate_source_document(source_text, source_base_dir) {
+            Ok(source) => source,
+            Err(diagnostics) => return Ok(error_outcome(diagnostics)),
+        };
     let layout_result: dediren_contracts::LayoutResult = crate::io::parse_command_data(layout_text)
         .map_err(|error| PluginExecutionError::CommandInputInvalid {
             command: "export".to_string(),
@@ -160,6 +197,14 @@ pub fn export_command(
         &["export"],
         &serde_json::to_string(&export_input).map_err(command_input_error("export"))?,
     )
+}
+
+fn error_outcome(diagnostics: Vec<dediren_contracts::Diagnostic>) -> PluginRunOutcome {
+    let envelope = CommandEnvelope::<serde_json::Value>::error(diagnostics);
+    PluginRunOutcome {
+        stdout: serde_json::to_string(&envelope).expect("error envelope should serialize"),
+        exit_code: 2,
+    }
 }
 
 fn command_input_error(

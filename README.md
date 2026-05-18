@@ -38,18 +38,18 @@ Runtime prerequisite:
 
 - Java 21 or newer available as `java` on `PATH`.
 
-For the current `0.10.0` version, the xtask creates:
+For the current `0.11.0` version, the xtask creates:
 
 ```text
-dist/dediren-agent-bundle-0.10.0-x86_64-unknown-linux-gnu/
-dist/dediren-agent-bundle-0.10.0-x86_64-unknown-linux-gnu.tar.gz
+dist/dediren-agent-bundle-0.11.0-x86_64-unknown-linux-gnu/
+dist/dediren-agent-bundle-0.11.0-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Run the smoke test from a shell where `java -version` resolves to Java 21 or
 newer:
 
 ```bash
-cargo xtask dist smoke dist/dediren-agent-bundle-0.10.0-x86_64-unknown-linux-gnu.tar.gz
+cargo xtask dist smoke dist/dediren-agent-bundle-0.11.0-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Concurrent `cargo xtask dist build` invocations serialize on a repo-local lock
@@ -62,8 +62,8 @@ Unpack and run it anywhere:
 
 ```bash
 mkdir -p /tmp/dediren-dist
-tar -xzf dist/dediren-agent-bundle-0.10.0-x86_64-unknown-linux-gnu.tar.gz -C /tmp/dediren-dist
-/tmp/dediren-dist/dediren-agent-bundle-0.10.0-x86_64-unknown-linux-gnu/bin/dediren --help
+tar -xzf dist/dediren-agent-bundle-0.11.0-x86_64-unknown-linux-gnu.tar.gz -C /tmp/dediren-dist
+/tmp/dediren-dist/dediren-agent-bundle-0.11.0-x86_64-unknown-linux-gnu/bin/dediren --help
 ```
 
 The archive includes first-party plugin manifests under `plugins/`, first-party
@@ -169,6 +169,41 @@ Commands:
 
 Most pipeline commands accept `--input <file>`. If `--input` is omitted, they
 read JSON from stdin.
+
+## Source Fragments
+
+Large source models can use a single source-authoring composition primitive:
+relative file fragments. `model.json` remains the entrypoint and declares the
+files to assemble before validation, projection, semantic validation, or export:
+
+```json
+{
+  "model_schema_version": "model.schema.v1",
+  "fragments": [
+    "model/application.json",
+    "model/technology.json"
+  ],
+  "nodes": [],
+  "relationships": [],
+  "plugins": {
+    "generic-graph": {
+      "views": []
+    }
+  }
+}
+```
+
+Each fragment uses the same source model shape for nodes, relationships, and
+plugin-owned sections. Dediren resolves fragment paths relative to the entry
+model file, concatenates nodes and relationships, and merges plugin data into
+one effective `model.schema.v1` graph. Plugins receive only the assembled graph;
+they do not need fragment-specific contracts.
+
+Fragments are deliberately simple: nested fragments and absolute fragment paths
+are rejected, duplicate ids are still errors after assembly, and conflicting
+plugin scalar values are rejected instead of overridden. Fragmented models
+therefore require `--input <file>`; stdin has no base directory for resolving
+relative fragment paths.
 
 ## Styling SVG
 
@@ -481,6 +516,12 @@ normalizes the failure into diagnostics such as:
 - `DEDIREN_SEMANTIC_PROFILE_UNSUPPORTED`
 - `DEDIREN_VALIDATE_PROFILE_REQUIRED`
 - `DEDIREN_VALIDATE_PLUGIN_REQUIRED`
+- `DEDIREN_FRAGMENT_BASE_DIR_REQUIRED`
+- `DEDIREN_FRAGMENT_READ_FAILED`
+- `DEDIREN_FRAGMENT_PATH_UNSUPPORTED`
+- `DEDIREN_FRAGMENT_NESTED_UNSUPPORTED`
+- `DEDIREN_FRAGMENT_SCHEMA_VERSION_UNSUPPORTED`
+- `DEDIREN_FRAGMENT_CONFLICT`
 - `DEDIREN_ELK_RUNTIME_UNAVAILABLE`
 - `DEDIREN_ELK_JAVA_UNAVAILABLE`
 - `DEDIREN_ELK_JAVA_UNSUPPORTED`
@@ -506,7 +547,7 @@ newer:
 
 ```bash
 cargo xtask dist build
-cargo xtask dist smoke dist/dediren-agent-bundle-0.10.0-x86_64-unknown-linux-gnu.tar.gz
+cargo xtask dist smoke dist/dediren-agent-bundle-0.11.0-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Focused checks:

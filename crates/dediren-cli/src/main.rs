@@ -69,9 +69,15 @@ fn main() -> anyhow::Result<()> {
             input,
         }) => {
             let text = dediren_core::io::read_json_input(input.as_deref())?;
+            let base_dir = input_base_dir(input.as_deref());
             match (plugin, profile) {
                 (Some(plugin), Some(profile)) => print_plugin_result(
-                    dediren_core::commands::semantic_validate_command(&plugin, &profile, &text),
+                    dediren_core::commands::semantic_validate_command_with_base(
+                        &plugin,
+                        &profile,
+                        &text,
+                        base_dir.as_deref(),
+                    ),
                 ),
                 (Some(_), None) => print_usage_error(
                     "DEDIREN_VALIDATE_PROFILE_REQUIRED",
@@ -82,7 +88,10 @@ fn main() -> anyhow::Result<()> {
                     "validate --profile requires --plugin",
                 ),
                 (None, None) => {
-                    let (code, envelope) = dediren_core::validate::validate_source_json(&text);
+                    let (code, envelope) = dediren_core::validate::validate_source_json_with_base(
+                        &text,
+                        base_dir.as_deref(),
+                    );
                     println!("{}", serde_json::to_string(&envelope)?);
                     std::process::exit(code);
                 }
@@ -95,8 +104,13 @@ fn main() -> anyhow::Result<()> {
             input,
         }) => {
             let text = dediren_core::io::read_json_input(input.as_deref())?;
-            print_plugin_result(dediren_core::commands::project_command(
-                &plugin, &target, &view, &text,
+            let base_dir = input_base_dir(input.as_deref());
+            print_plugin_result(dediren_core::commands::project_command_with_base(
+                &plugin,
+                &target,
+                &view,
+                &text,
+                base_dir.as_deref(),
             ))
         }
         Some(Commands::Layout { plugin, input }) => {
@@ -139,14 +153,16 @@ fn main() -> anyhow::Result<()> {
             source,
             layout,
         }) => {
-            let source_text = std::fs::read_to_string(source)?;
+            let source_text = std::fs::read_to_string(&source)?;
+            let source_base_dir = input_base_dir(Some(&source));
             let policy_text = std::fs::read_to_string(policy)?;
             let layout_text = std::fs::read_to_string(layout)?;
 
-            print_plugin_result(dediren_core::commands::export_command(
+            print_plugin_result(dediren_core::commands::export_command_with_base(
                 &plugin,
                 &policy_text,
                 &source_text,
+                source_base_dir.as_deref(),
                 &layout_text,
             ))
         }
@@ -155,6 +171,15 @@ fn main() -> anyhow::Result<()> {
             Ok(())
         }
     }
+}
+
+fn input_base_dir(path: Option<&str>) -> Option<std::path::PathBuf> {
+    path.map(|path| {
+        std::path::Path::new(path)
+            .parent()
+            .unwrap_or_else(|| std::path::Path::new("."))
+            .to_path_buf()
+    })
 }
 
 fn print_usage_error(code: &str, message: &str) -> anyhow::Result<()> {

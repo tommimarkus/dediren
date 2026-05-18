@@ -64,6 +64,27 @@ fn valid_source_matches_model_schema() {
 }
 
 #[test]
+fn source_with_fragments_matches_model_schema() {
+    assert_json_valid(
+        "schemas/model.schema.json",
+        json!({
+            "model_schema_version": "model.schema.v1",
+            "fragments": ["model/application.json", "model/technology.json"],
+            "required_plugins": [
+                { "id": "generic-graph", "version": "0.11.0" }
+            ],
+            "nodes": [],
+            "relationships": [],
+            "plugins": {
+                "generic-graph": {
+                    "views": []
+                }
+            }
+        }),
+    );
+}
+
+#[test]
 fn source_with_absolute_geometry_fails_model_schema() {
     assert_invalid(
         "schemas/model.schema.json",

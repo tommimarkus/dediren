@@ -68,6 +68,8 @@ impl<T> CommandEnvelope<T> {
 #[serde(deny_unknown_fields)]
 pub struct SourceDocument {
     pub model_schema_version: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub fragments: Vec<String>,
     #[serde(default)]
     pub required_plugins: Vec<PluginRequirement>,
     #[serde(default)]

@@ -1,39 +1,20 @@
 use std::collections::HashSet;
+use std::path::Path;
 
 use dediren_contracts::{CommandEnvelope, Diagnostic, DiagnosticSeverity, SourceDocument};
 
 pub fn validate_source_json(text: &str) -> (i32, CommandEnvelope<serde_json::Value>) {
-    let value: serde_json::Value = match serde_json::from_str(text) {
-        Ok(value) => value,
-        Err(error) => {
-            return (
-                2,
-                CommandEnvelope::error(vec![schema_error(error.to_string())]),
-            );
-        }
-    };
+    validate_source_json_with_base(text, None)
+}
 
-    let schema: serde_json::Value =
-        serde_json::from_str(include_str!("../../../schemas/model.schema.json"))
-            .expect("model schema must be valid JSON");
-    let validator = jsonschema::validator_for(&schema).expect("model schema must compile");
-    if let Err(error) = validator.validate(&value) {
-        return (
-            2,
-            CommandEnvelope::error(vec![schema_error(error.to_string())]),
-        );
-    }
-
-    let doc: SourceDocument = match serde_json::from_value(value) {
+pub fn validate_source_json_with_base(
+    text: &str,
+    base_dir: Option<&Path>,
+) -> (i32, CommandEnvelope<serde_json::Value>) {
+    let doc = match crate::source::load_source_document(text, base_dir) {
         Ok(doc) => doc,
-        Err(error) => {
-            return (
-                2,
-                CommandEnvelope::error(vec![schema_error(error.to_string())]),
-            );
-        }
+        Err(diagnostics) => return (2, CommandEnvelope::error(diagnostics)),
     };
-
     match validate_source_document(&doc) {
         Ok(()) => {
             let data = serde_json::json!({
@@ -47,13 +28,13 @@ pub fn validate_source_json(text: &str) -> (i32, CommandEnvelope<serde_json::Val
     }
 }
 
-fn schema_error(message: String) -> Diagnostic {
-    Diagnostic {
-        code: "DEDIREN_SCHEMA_INVALID".to_string(),
-        severity: DiagnosticSeverity::Error,
-        message,
-        path: None,
-    }
+pub fn load_and_validate_source_document(
+    text: &str,
+    base_dir: Option<&Path>,
+) -> Result<SourceDocument, Vec<Diagnostic>> {
+    let doc = crate::source::load_source_document(text, base_dir)?;
+    validate_source_document(&doc)?;
+    Ok(doc)
 }
 
 fn validate_source_document(doc: &SourceDocument) -> Result<(), Vec<Diagnostic>> {

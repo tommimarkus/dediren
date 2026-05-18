@@ -2,6 +2,7 @@ pub mod commands;
 pub mod io;
 pub mod plugins;
 pub mod quality;
+pub mod source;
 pub mod validate;
 
 pub fn version() -> &'static str {

@@ -115,3 +115,104 @@ fn project_layout_request_preserves_layout_preferences() {
     let data = ok_data(&output);
     assert_eq!(data["layout_preferences"], layout_preferences);
 }
+
+#[test]
+fn project_uses_assembled_source_fragments() {
+    let temp = assert_fs::TempDir::new().unwrap();
+    let fragments = temp.child("fragments");
+    fragments.create_dir_all().unwrap();
+    temp.child("model.json")
+        .write_str(
+            &serde_json::to_string_pretty(&serde_json::json!({
+                "model_schema_version": "model.schema.v1",
+                "fragments": ["fragments/application.json", "fragments/views.json"],
+                "nodes": [],
+                "relationships": [],
+                "plugins": {
+                    "generic-graph": {
+                        "views": []
+                    }
+                }
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+    fragments
+        .child("application.json")
+        .write_str(
+            &serde_json::to_string_pretty(&serde_json::json!({
+                "model_schema_version": "model.schema.v1",
+                "nodes": [
+                    { "id": "client", "type": "BusinessActor", "label": "Client", "properties": {} },
+                    { "id": "api", "type": "ApplicationComponent", "label": "API", "properties": {} }
+                ],
+                "relationships": [
+                    {
+                        "id": "client-calls-api",
+                        "type": "Association",
+                        "source": "client",
+                        "target": "api",
+                        "label": "calls",
+                        "properties": {}
+                    }
+                ],
+                "plugins": {
+                    "generic-graph": {
+                        "views": []
+                    }
+                }
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+    fragments
+        .child("views.json")
+        .write_str(
+            &serde_json::to_string_pretty(&serde_json::json!({
+                "model_schema_version": "model.schema.v1",
+                "nodes": [],
+                "relationships": [],
+                "plugins": {
+                    "generic-graph": {
+                        "views": [
+                            {
+                                "id": "main",
+                                "label": "Main",
+                                "nodes": ["client", "api"],
+                                "relationships": ["client-calls-api"]
+                            }
+                        ]
+                    }
+                }
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+
+    let output = common::dediren_command()
+        .env(
+            "DEDIREN_PLUGIN_GENERIC_GRAPH",
+            plugin_binary("dediren-plugin-generic-graph"),
+        )
+        .args([
+            "project",
+            "--target",
+            "layout-request",
+            "--plugin",
+            "generic-graph",
+            "--view",
+            "main",
+            "--input",
+        ])
+        .arg(temp.child("model.json").path())
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let data = ok_data(&output);
+    assert_eq!(data["view_id"], "main");
+    assert_eq!(data["nodes"].as_array().unwrap().len(), 2);
+    assert_eq!(data["edges"].as_array().unwrap().len(), 1);
+}
