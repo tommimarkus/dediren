@@ -5,6 +5,11 @@ correctly. Read it before loading full schemas. Use schemas for exact validation
 and fixtures for examples, but use this file to decide which JSON to write,
 which JSON is generated, and how to repair failures.
 
+If this guide is consumed through a skill package, the package should either
+ship this file alongside the Dediren bundle or copy the same JSON authoring
+contract into the skill instructions. The source repository README is not
+assumed to be available to runtime users.
+
 ## Fast Path
 
 1. Author `model.json` using the `Minimal Source JSON` shape below.

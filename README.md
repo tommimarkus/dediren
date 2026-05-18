@@ -80,6 +80,10 @@ workflow, use the `JSON Authoring Loop` and `Bundle Smoke Workflow` sections in
 The archive includes first-party plugin manifests under `plugins/`, first-party
 plugin binaries under `bin/`, schemas, fixtures, and the built ELK Java helper
 under `runtimes/elk-layout-java/`. It does not bundle a JRE.
+Skill packages that bundle Dediren should preserve the archive's
+`docs/agent-usage.md` file or embed the same JSON authoring contract in the
+skill guidance. Do not rely on this source repository README being present at
+runtime.
 
 ### Development Install
 
