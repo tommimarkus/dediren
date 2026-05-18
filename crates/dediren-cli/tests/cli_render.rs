@@ -1,8 +1,8 @@
 mod common;
 
 use common::{
-    child_element, child_group_with_attr, ok_data, plugin_binary, semantic_group, svg_doc,
-    workspace_file, write_render_artifact,
+    assert_error_code, child_element, child_group_with_attr, ok_data, plugin_binary,
+    semantic_group, svg_doc, workspace_file, write_render_artifact,
 };
 
 #[test]
@@ -157,4 +157,52 @@ fn render_invokes_svg_plugin_with_archimate_policy_and_metadata() {
         content,
     );
     assert!(artifact.exists());
+}
+
+#[test]
+fn render_missing_policy_file_returns_json_envelope() {
+    let output = common::dediren_command()
+        .arg("render")
+        .arg("--plugin")
+        .arg("svg-render")
+        .arg("--policy")
+        .arg(workspace_file("fixtures/render-policy/missing-policy.json"))
+        .arg("--input")
+        .arg(workspace_file("fixtures/layout-result/basic.json"))
+        .assert()
+        .failure()
+        .get_output()
+        .clone();
+
+    assert!(
+        output.stderr.is_empty(),
+        "preflight failures should be JSON on stdout, stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_error_code(&output.stdout, "DEDIREN_COMMAND_INPUT_INVALID");
+}
+
+#[test]
+fn render_missing_metadata_file_returns_json_envelope() {
+    let output = common::dediren_command()
+        .arg("render")
+        .arg("--plugin")
+        .arg("svg-render")
+        .arg("--policy")
+        .arg(workspace_file("fixtures/render-policy/default-svg.json"))
+        .arg("--metadata")
+        .arg(workspace_file("fixtures/render-metadata/missing-metadata.json"))
+        .arg("--input")
+        .arg(workspace_file("fixtures/layout-result/basic.json"))
+        .assert()
+        .failure()
+        .get_output()
+        .clone();
+
+    assert!(
+        output.stderr.is_empty(),
+        "preflight failures should be JSON on stdout, stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_error_code(&output.stdout, "DEDIREN_COMMAND_INPUT_INVALID");
 }

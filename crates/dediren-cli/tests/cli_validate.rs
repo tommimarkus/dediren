@@ -387,3 +387,22 @@ fn relationship_as_endpoint_source() -> serde_json::Value {
 fn source_fixture_json(path: &str) -> serde_json::Value {
     serde_json::from_str(&std::fs::read_to_string(workspace_file(path)).unwrap()).unwrap()
 }
+
+#[test]
+fn validate_missing_input_file_returns_json_envelope() {
+    let output = common::dediren_command()
+        .arg("validate")
+        .arg("--input")
+        .arg(workspace_file("fixtures/source/missing-source.json"))
+        .assert()
+        .failure()
+        .get_output()
+        .clone();
+
+    assert!(
+        output.stderr.is_empty(),
+        "preflight failures should be JSON on stdout, stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_error_code(&output.stdout, "DEDIREN_COMMAND_INPUT_INVALID");
+}

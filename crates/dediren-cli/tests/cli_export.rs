@@ -174,3 +174,57 @@ fn export_rejects_invalid_archimate_relationship_endpoint() {
         "DEDIREN_ARCHIMATE_RELATIONSHIP_ENDPOINT_UNSUPPORTED",
     );
 }
+
+#[test]
+fn export_missing_source_file_returns_json_envelope() {
+    let output = common::dediren_command()
+        .arg("export")
+        .arg("--plugin")
+        .arg("archimate-oef")
+        .arg("--policy")
+        .arg(workspace_file("fixtures/export-policy/default-oef.json"))
+        .arg("--source")
+        .arg(workspace_file("fixtures/source/missing-archimate.json"))
+        .arg("--layout")
+        .arg(workspace_file(
+            "fixtures/layout-result/archimate-oef-basic.json",
+        ))
+        .assert()
+        .failure()
+        .get_output()
+        .clone();
+
+    assert!(
+        output.stderr.is_empty(),
+        "preflight failures should be JSON on stdout, stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_error_code(&output.stdout, "DEDIREN_COMMAND_INPUT_INVALID");
+}
+
+#[test]
+fn export_missing_policy_file_returns_json_envelope() {
+    let output = common::dediren_command()
+        .arg("export")
+        .arg("--plugin")
+        .arg("archimate-oef")
+        .arg("--policy")
+        .arg(workspace_file("fixtures/export-policy/missing-oef-policy.json"))
+        .arg("--source")
+        .arg(workspace_file("fixtures/source/valid-archimate-oef.json"))
+        .arg("--layout")
+        .arg(workspace_file(
+            "fixtures/layout-result/archimate-oef-basic.json",
+        ))
+        .assert()
+        .failure()
+        .get_output()
+        .clone();
+
+    assert!(
+        output.stderr.is_empty(),
+        "preflight failures should be JSON on stdout, stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_error_code(&output.stdout, "DEDIREN_COMMAND_INPUT_INVALID");
+}
