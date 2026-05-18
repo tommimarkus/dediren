@@ -209,7 +209,9 @@ fn export_missing_policy_file_returns_json_envelope() {
         .arg("--plugin")
         .arg("archimate-oef")
         .arg("--policy")
-        .arg(workspace_file("fixtures/export-policy/missing-oef-policy.json"))
+        .arg(workspace_file(
+            "fixtures/export-policy/missing-oef-policy.json",
+        ))
         .arg("--source")
         .arg(workspace_file("fixtures/source/valid-archimate-oef.json"))
         .arg("--layout")

@@ -191,7 +191,9 @@ fn render_missing_metadata_file_returns_json_envelope() {
         .arg("--policy")
         .arg(workspace_file("fixtures/render-policy/default-svg.json"))
         .arg("--metadata")
-        .arg(workspace_file("fixtures/render-metadata/missing-metadata.json"))
+        .arg(workspace_file(
+            "fixtures/render-metadata/missing-metadata.json",
+        ))
         .arg("--input")
         .arg(workspace_file("fixtures/layout-result/basic.json"))
         .assert()
