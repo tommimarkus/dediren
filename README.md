@@ -45,18 +45,18 @@ Runtime prerequisite:
 
 - Java 21 or newer available as `java` on `PATH`.
 
-For the current `0.11.1` version, the xtask creates:
+For the current `0.11.2` version, the xtask creates:
 
 ```text
-dist/dediren-agent-bundle-0.11.1-x86_64-unknown-linux-gnu/
-dist/dediren-agent-bundle-0.11.1-x86_64-unknown-linux-gnu.tar.gz
+dist/dediren-agent-bundle-0.11.2-x86_64-unknown-linux-gnu/
+dist/dediren-agent-bundle-0.11.2-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Run the smoke test from a shell where `java -version` resolves to Java 21 or
 newer:
 
 ```bash
-cargo xtask dist smoke dist/dediren-agent-bundle-0.11.1-x86_64-unknown-linux-gnu.tar.gz
+cargo xtask dist smoke dist/dediren-agent-bundle-0.11.2-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Concurrent `cargo xtask dist build` invocations serialize on a repo-local lock
@@ -69,17 +69,18 @@ Unpack and run it anywhere:
 
 ```bash
 mkdir -p /tmp/dediren-dist
-tar -xzf dist/dediren-agent-bundle-0.11.1-x86_64-unknown-linux-gnu.tar.gz -C /tmp/dediren-dist
-/tmp/dediren-dist/dediren-agent-bundle-0.11.1-x86_64-unknown-linux-gnu/bin/dediren --help
+tar -xzf dist/dediren-agent-bundle-0.11.2-x86_64-unknown-linux-gnu.tar.gz -C /tmp/dediren-dist
+/tmp/dediren-dist/dediren-agent-bundle-0.11.2-x86_64-unknown-linux-gnu/bin/dediren --help
 ```
 
 For a full unpacked-bundle JSON authoring and project/layout/render smoke
 workflow, use the `JSON Authoring Loop` and `Bundle Smoke Workflow` sections in
 `docs/agent-usage.md`.
 
-The archive includes first-party plugin manifests under `plugins/`, first-party
-plugin binaries under `bin/`, schemas, fixtures, and the built ELK Java helper
-under `runtimes/elk-layout-java/`. It does not bundle a JRE.
+The archive includes the root MIT `LICENSE` notice, first-party plugin
+manifests under `plugins/`, first-party plugin binaries under `bin/`, schemas,
+fixtures, and the built ELK Java helper under `runtimes/elk-layout-java/`. It
+does not bundle a JRE.
 Skill packages that bundle Dediren should preserve the archive's
 `docs/agent-usage.md` file or embed the same JSON authoring contract in the
 skill guidance. Do not rely on this source repository README being present at
@@ -580,7 +581,7 @@ newer:
 
 ```bash
 cargo xtask dist build
-cargo xtask dist smoke dist/dediren-agent-bundle-0.11.1-x86_64-unknown-linux-gnu.tar.gz
+cargo xtask dist smoke dist/dediren-agent-bundle-0.11.2-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Focused checks:

@@ -168,6 +168,7 @@ fn build_dist(root: &Path) -> Result<()> {
     copy_dir_recursive(&root.join("schemas"), &bundle_dir.join("schemas"))?;
     copy_fixture_dirs(root, &bundle_dir.join("fixtures"))?;
     copy_agent_docs(root, &bundle_dir.join("docs"))?;
+    copy_license_notice(root, &bundle_dir)?;
     copy_dir_recursive(
         &root.join("crates/dediren-plugin-elk-layout/java/build/install/dediren-elk-layout-java"),
         &bundle_dir.join("runtimes/elk-layout-java"),
@@ -456,6 +457,11 @@ fn copy_agent_docs(root: &Path, destination: &Path) -> Result<()> {
         destination.join("agent-usage.md"),
     )
     .context("copy agent usage guide")?;
+    Ok(())
+}
+
+fn copy_license_notice(root: &Path, bundle_dir: &Path) -> Result<()> {
+    fs::copy(root.join("LICENSE"), bundle_dir.join("LICENSE")).context("copy LICENSE")?;
     Ok(())
 }
 

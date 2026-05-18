@@ -109,6 +109,63 @@ fn dist_build_includes_agent_usage_docs() {
 
 #[cfg(unix)]
 #[test]
+fn dist_build_includes_license_notice() {
+    let repo = FakeDistRepo::new();
+    repo.release_helper_build();
+    let output = repo.xtask_command(["dist", "build"]).output().unwrap();
+
+    assert!(
+        output.status.success(),
+        "dist build should pass\nstatus: {:?}\nstdout:\n{}\nstderr:\n{}",
+        output.status.code(),
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr),
+    );
+
+    let bundle_name = format!(
+        "dediren-agent-bundle-{}-x86_64-unknown-linux-gnu",
+        env!("CARGO_PKG_VERSION")
+    );
+    let bundle = repo.root.path().join("dist").join(&bundle_name);
+    let source_license = fs::read_to_string(repo.root.path().join("LICENSE")).unwrap();
+    let bundled_license_path = bundle.join("LICENSE");
+    assert!(
+        bundled_license_path.exists(),
+        "dist build should include LICENSE at the bundle root"
+    );
+    let bundled_license = fs::read_to_string(bundled_license_path).unwrap();
+    assert_eq!(
+        bundled_license, source_license,
+        "dist build should copy the root LICENSE into the bundle root"
+    );
+
+    let archive = repo
+        .root
+        .path()
+        .join("dist")
+        .join(format!("{bundle_name}.tar.gz"));
+    let archive_listing = Command::new("tar")
+        .arg("-tzf")
+        .arg(&archive)
+        .output()
+        .unwrap();
+    assert!(
+        archive_listing.status.success(),
+        "test tar listing should pass\nstatus: {:?}\nstderr:\n{}",
+        archive_listing.status.code(),
+        String::from_utf8_lossy(&archive_listing.stderr),
+    );
+    assert!(
+        String::from_utf8_lossy(&archive_listing.stdout)
+            .lines()
+            .any(|path| path == format!("{bundle_name}/LICENSE")),
+        "dist archive should include the bundle root LICENSE\nstdout:\n{}",
+        String::from_utf8_lossy(&archive_listing.stdout),
+    );
+}
+
+#[cfg(unix)]
+#[test]
 fn dist_smoke_runs_bundle_pipeline_with_clean_environment() {
     let repo = FakeDistRepo::new();
     let archive = repo.write_smoke_archive();
@@ -271,6 +328,11 @@ esac
                 .path()
                 .join("fixtures/plugins/generic-graph.manifest.json"),
             "{}",
+        )
+        .unwrap();
+        fs::write(
+            self.root.path().join("LICENSE"),
+            "MIT License\n\nFake Dediren license fixture.\n",
         )
         .unwrap();
         fs::write(self.root.path().join("fixtures/source/basic.json"), "{}").unwrap();
