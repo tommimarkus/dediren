@@ -68,7 +68,7 @@ fn main() -> anyhow::Result<()> {
             profile,
             input,
         }) => {
-            let text = dediren_core::io::read_json_input(input.as_deref())?;
+            let text = read_json_input_or_exit(input.as_deref(), "input")?;
             let base_dir = input_base_dir(input.as_deref());
             match (plugin, profile) {
                 (Some(plugin), Some(profile)) => print_plugin_result(
@@ -103,7 +103,7 @@ fn main() -> anyhow::Result<()> {
             view,
             input,
         }) => {
-            let text = dediren_core::io::read_json_input(input.as_deref())?;
+            let text = read_json_input_or_exit(input.as_deref(), "input")?;
             let base_dir = input_base_dir(input.as_deref());
             print_plugin_result(dediren_core::commands::project_command_with_base(
                 &plugin,
@@ -114,13 +114,13 @@ fn main() -> anyhow::Result<()> {
             ))
         }
         Some(Commands::Layout { plugin, input }) => {
-            let text = dediren_core::io::read_json_input(input.as_deref())?;
+            let text = read_json_input_or_exit(input.as_deref(), "input")?;
             print_plugin_result(dediren_core::commands::layout_command_from_env(
                 &plugin, &text,
             ))
         }
         Some(Commands::ValidateLayout { input }) => {
-            let text = dediren_core::io::read_json_input(input.as_deref())?;
+            let text = read_json_input_or_exit(input.as_deref(), "input")?;
             let result: dediren_contracts::LayoutResult =
                 dediren_core::io::parse_command_data(&text)?;
             let report = dediren_core::quality::validate_layout(&result);
@@ -134,11 +134,11 @@ fn main() -> anyhow::Result<()> {
             metadata,
             input,
         }) => {
-            let layout_text = dediren_core::io::read_json_input(input.as_deref())?;
-            let policy_text = std::fs::read_to_string(policy)?;
+            let layout_text = read_json_input_or_exit(input.as_deref(), "input")?;
+            let policy_text = read_file_or_exit(&policy, "policy")?;
             let metadata_text = metadata
                 .as_deref()
-                .map(std::fs::read_to_string)
+                .map(|path| read_file_or_exit(path, "metadata"))
                 .transpose()?;
             print_plugin_result(dediren_core::commands::render_command(
                 &plugin,
@@ -153,10 +153,10 @@ fn main() -> anyhow::Result<()> {
             source,
             layout,
         }) => {
-            let source_text = std::fs::read_to_string(&source)?;
+            let source_text = read_file_or_exit(&source, "source")?;
             let source_base_dir = input_base_dir(Some(&source));
-            let policy_text = std::fs::read_to_string(policy)?;
-            let layout_text = std::fs::read_to_string(layout)?;
+            let policy_text = read_file_or_exit(&policy, "policy")?;
+            let layout_text = read_file_or_exit(&layout, "layout")?;
 
             print_plugin_result(dediren_core::commands::export_command_with_base(
                 &plugin,
@@ -180,6 +180,40 @@ fn input_base_dir(path: Option<&str>) -> Option<std::path::PathBuf> {
             .unwrap_or_else(|| std::path::Path::new("."))
             .to_path_buf()
     })
+}
+
+fn read_json_input_or_exit(path: Option<&str>, label: &str) -> anyhow::Result<String> {
+    match dediren_core::io::read_json_input(path) {
+        Ok(text) => Ok(text),
+        Err(error) => print_command_input_error(label, path, &error),
+    }
+}
+
+fn read_file_or_exit(path: &str, label: &str) -> anyhow::Result<String> {
+    match std::fs::read_to_string(path) {
+        Ok(text) => Ok(text),
+        Err(error) => print_command_input_error(label, Some(path), &error),
+    }
+}
+
+fn print_command_input_error(
+    label: &str,
+    path: Option<&str>,
+    error: &dyn std::fmt::Display,
+) -> anyhow::Result<String> {
+    let diagnostic_path = path
+        .map(|path| format!("{label}:{path}"))
+        .unwrap_or_else(|| label.to_string());
+    let envelope = dediren_contracts::CommandEnvelope::<serde_json::Value>::error(vec![
+        dediren_contracts::Diagnostic {
+            code: "DEDIREN_COMMAND_INPUT_INVALID".to_string(),
+            severity: dediren_contracts::DiagnosticSeverity::Error,
+            message: format!("failed to read {label}: {error}"),
+            path: Some(diagnostic_path),
+        },
+    ]);
+    println!("{}", serde_json::to_string(&envelope)?);
+    std::process::exit(2);
 }
 
 fn print_usage_error(code: &str, message: &str) -> anyhow::Result<()> {
