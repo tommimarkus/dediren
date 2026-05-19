@@ -1,11 +1,12 @@
 use dediren_contracts::{
-    CommandEnvelope, Diagnostic, DiagnosticSeverity, GenericGraphPluginData,
-    GenericGraphSemanticProfile, GenericGraphViewGroupRole, GroupProvenance, LayoutDensity,
-    LayoutDirection, LayoutEndpointMerging, LayoutRequest, LayoutRoutingProfile,
+    CommandEnvelope, Diagnostic, DiagnosticSeverity, ExportRequest, GenericGraphPluginData,
+    GenericGraphSemanticProfile, GenericGraphViewGroupRole, GenericGraphViewKind, GroupProvenance,
+    LayoutDensity, LayoutDirection, LayoutEndpointMerging, LayoutRequest, LayoutRoutingProfile,
     LayoutRoutingStyle, LayoutWrapping, Margin, Page, RenderMetadata, RenderMetadataSelector,
     RenderPolicy, RenderResult, SemanticValidationResult, SourceDocument, SvgEdgeLineStyle,
     SvgEdgeMarkerEnd, SvgEdgeStyle, SvgNodeDecorator, SvgNodeStyle, SvgStylePolicy,
-    SEMANTIC_VALIDATION_RESULT_SCHEMA_VERSION, SVG_RENDER_POLICY_SCHEMA_VERSION,
+    UmlXmiExportPolicy, SEMANTIC_VALIDATION_RESULT_SCHEMA_VERSION,
+    SVG_RENDER_POLICY_SCHEMA_VERSION,
 };
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -240,6 +241,34 @@ fn generic_graph_semantic_profile_round_trips() {
 }
 
 #[test]
+fn generic_graph_uml_profile_and_view_kind_round_trip() {
+    let data: GenericGraphPluginData = serde_json::from_str(
+        r#"{
+          "semantic_profile": "uml",
+          "views": [
+            {
+              "id": "class-view",
+              "label": "Class View",
+              "kind": "uml-class",
+              "nodes": ["class-order"],
+              "relationships": []
+            }
+          ]
+        }"#,
+    )
+    .unwrap();
+
+    assert_eq!(
+        Some(GenericGraphSemanticProfile::Uml),
+        data.semantic_profile
+    );
+    assert_eq!(Some(GenericGraphViewKind::UmlClass), data.views[0].kind);
+    let encoded = serde_json::to_value(&data).unwrap();
+    assert_eq!(encoded["semantic_profile"], "uml");
+    assert_eq!(encoded["views"][0]["kind"], "uml-class");
+}
+
+#[test]
 fn layout_group_provenance_round_trips_visual_only_object_shape() {
     let request: LayoutRequest = serde_json::from_str(
         r#"{
@@ -390,6 +419,105 @@ fn svg_policy_decorator_fields_round_trip() {
         "hollow_triangle"
     );
 
+    let round_tripped: RenderPolicy = serde_json::from_value(json).expect("deserialize policy");
+    assert_eq!(round_tripped, policy);
+}
+
+#[test]
+fn uml_xmi_export_policy_round_trips() {
+    let policy: UmlXmiExportPolicy = serde_json::from_str(
+        r#"{
+          "uml_xmi_export_policy_schema_version": "uml-xmi-export-policy.schema.v1",
+          "model_identifier": "id-dediren-uml-basic-model",
+          "model_name": "Dediren UML Basic",
+          "xmi_version": "2.5.1",
+          "uml_version": "2.5.1"
+        }"#,
+    )
+    .unwrap();
+
+    assert_eq!(policy.model_name, "Dediren UML Basic");
+    let encoded = serde_json::to_value(&policy).unwrap();
+    assert_eq!(encoded["uml_version"], "2.5.1");
+}
+
+#[test]
+fn export_request_accepts_generic_policy_value() {
+    let request: ExportRequest = serde_json::from_str(
+        r#"{
+          "export_request_schema_version": "export-request.schema.v1",
+          "source": {
+            "model_schema_version": "model.schema.v1",
+            "nodes": [],
+            "relationships": [],
+            "plugins": {}
+          },
+          "layout_result": {
+            "layout_result_schema_version": "layout-result.schema.v1",
+            "view_id": "class-view",
+            "nodes": [],
+            "edges": [],
+            "groups": [],
+            "warnings": []
+          },
+          "policy": {
+            "uml_xmi_export_policy_schema_version": "uml-xmi-export-policy.schema.v1",
+            "model_identifier": "id-dediren-uml-basic-model",
+            "model_name": "Dediren UML Basic"
+          }
+        }"#,
+    )
+    .unwrap();
+
+    assert_eq!(
+        request.export_request_schema_version,
+        "export-request.schema.v1"
+    );
+    assert_eq!(
+        request.policy["uml_xmi_export_policy_schema_version"],
+        "uml-xmi-export-policy.schema.v1"
+    );
+}
+
+#[test]
+fn uml_svg_decorator_fields_round_trip() {
+    let policy = RenderPolicy {
+        svg_render_policy_schema_version: SVG_RENDER_POLICY_SCHEMA_VERSION.to_string(),
+        semantic_profile: Some("uml".to_string()),
+        page: Page {
+            width: 640.0,
+            height: 360.0,
+        },
+        margin: Margin {
+            top: 24.0,
+            right: 24.0,
+            bottom: 24.0,
+            left: 24.0,
+        },
+        style: Some(SvgStylePolicy {
+            node_type_overrides: BTreeMap::from([(
+                "Class".to_string(),
+                SvgNodeStyle {
+                    decorator: Some(SvgNodeDecorator::UmlClass),
+                    ..SvgNodeStyle::default()
+                },
+            )]),
+            edge_type_overrides: BTreeMap::from([(
+                "Composition".to_string(),
+                SvgEdgeStyle {
+                    marker_start: Some(SvgEdgeMarkerEnd::FilledDiamond),
+                    ..SvgEdgeStyle::default()
+                },
+            )]),
+            ..SvgStylePolicy::default()
+        }),
+    };
+
+    let json = serde_json::to_value(&policy).expect("serialize policy");
+    assert_eq!(
+        json["style"]["node_type_overrides"]["Class"]["decorator"],
+        "uml_class"
+    );
     let round_tripped: RenderPolicy = serde_json::from_value(json).expect("deserialize policy");
     assert_eq!(round_tripped, policy);
 }

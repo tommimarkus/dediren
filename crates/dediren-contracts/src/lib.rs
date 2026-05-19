@@ -14,6 +14,7 @@ pub const RENDER_METADATA_SCHEMA_VERSION: &str = "render-metadata.schema.v1";
 pub const EXPORT_REQUEST_SCHEMA_VERSION: &str = "export-request.schema.v1";
 pub const EXPORT_RESULT_SCHEMA_VERSION: &str = "export-result.schema.v1";
 pub const OEF_EXPORT_POLICY_SCHEMA_VERSION: &str = "oef-export-policy.schema.v1";
+pub const UML_XMI_EXPORT_POLICY_SCHEMA_VERSION: &str = "uml-xmi-export-policy.schema.v1";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -124,6 +125,7 @@ pub struct GenericGraphPluginData {
 pub enum GenericGraphSemanticProfile {
     GenericGraph,
     Archimate,
+    Uml,
 }
 
 impl GenericGraphSemanticProfile {
@@ -131,6 +133,7 @@ impl GenericGraphSemanticProfile {
         match self {
             Self::GenericGraph => "generic-graph",
             Self::Archimate => "archimate",
+            Self::Uml => "uml",
         }
     }
 }
@@ -140,12 +143,24 @@ impl GenericGraphSemanticProfile {
 pub struct GenericGraphView {
     pub id: String,
     pub label: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kind: Option<GenericGraphViewKind>,
     pub nodes: Vec<String>,
     pub relationships: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub layout_preferences: Option<LayoutPreferences>,
     #[serde(default)]
     pub groups: Vec<GenericGraphViewGroup>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum GenericGraphViewKind {
+    Generic,
+    Archimate,
+    UmlClass,
+    UmlData,
+    UmlActivity,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -627,6 +642,20 @@ pub enum SvgNodeDecorator {
     ArchimateMaterial,
     ArchimateCommunicationNetwork,
     ArchimateDistributionNetwork,
+    UmlPackage,
+    UmlClass,
+    UmlInterface,
+    UmlDataType,
+    UmlEnumeration,
+    UmlActivity,
+    UmlAction,
+    UmlInitialNode,
+    UmlActivityFinalNode,
+    UmlDecisionNode,
+    UmlMergeNode,
+    UmlForkNode,
+    UmlJoinNode,
+    UmlObjectNode,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -725,6 +754,27 @@ pub struct OefExportInput {
     pub source: SourceDocument,
     pub layout_result: LayoutResult,
     pub policy: OefExportPolicy,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct UmlXmiExportPolicy {
+    pub uml_xmi_export_policy_schema_version: String,
+    pub model_identifier: String,
+    pub model_name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub xmi_version: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub uml_version: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ExportRequest {
+    pub export_request_schema_version: String,
+    pub source: SourceDocument,
+    pub layout_result: LayoutResult,
+    pub policy: Value,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
