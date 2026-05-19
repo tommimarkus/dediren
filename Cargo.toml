@@ -2,6 +2,7 @@
 members = [
   "crates/dediren-archimate",
   "crates/dediren-contracts",
+  "crates/dediren-uml",
   "crates/dediren-core",
   "crates/dediren-cli",
   "crates/dediren-plugin-generic-graph",
@@ -27,6 +28,8 @@ assert_cmd = "2"
 assert_fs = "1"
 clap = { version = "4", features = ["derive"] }
 dediren-archimate = { path = "crates/dediren-archimate" }
+dediren-contracts = { path = "crates/dediren-contracts" }
+dediren-uml = { path = "crates/dediren-uml" }
 jsonschema = "0.33"
 libc = "0.2"
 predicates = "3"
