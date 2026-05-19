@@ -15,6 +15,7 @@ const PUBLIC_SCHEMA_PATHS: &[&str] = &[
     "schemas/export-request.schema.json",
     "schemas/export-result.schema.json",
     "schemas/oef-export-policy.schema.json",
+    "schemas/uml-xmi-export-policy.schema.json",
     "schemas/plugin-manifest.schema.json",
     "schemas/runtime-capability.schema.json",
     "schemas/bundle.schema.json",
@@ -25,9 +26,25 @@ const FIRST_PARTY_PLUGIN_MANIFEST_PATHS: &[&str] = &[
     "fixtures/plugins/elk-layout.manifest.json",
     "fixtures/plugins/generic-graph.manifest.json",
     "fixtures/plugins/svg-render.manifest.json",
+    "fixtures/plugins/uml-xmi.manifest.json",
+];
+
+const CURRENT_WORKSPACE_VERSION_PLUGIN_MANIFEST_PATHS: &[&str] = &[
+    "fixtures/plugins/archimate-oef.manifest.json",
+    "fixtures/plugins/elk-layout.manifest.json",
+    "fixtures/plugins/generic-graph.manifest.json",
+    "fixtures/plugins/svg-render.manifest.json",
 ];
 
 const SOURCE_FIXTURE_PATHS: &[&str] = &[
+    "fixtures/source/valid-basic.json",
+    "fixtures/source/valid-pipeline-rich.json",
+    "fixtures/source/valid-pipeline-archimate.json",
+    "fixtures/source/valid-archimate-oef.json",
+    "fixtures/source/valid-uml-basic.json",
+];
+
+const SOURCE_FIXTURES_REQUIRING_CURRENT_WORKSPACE_PLUGIN_VERSIONS: &[&str] = &[
     "fixtures/source/valid-basic.json",
     "fixtures/source/valid-pipeline-rich.json",
     "fixtures/source/valid-pipeline-archimate.json",
@@ -49,18 +66,9 @@ const WORKSPACE_PACKAGE_NAMES: &[&str] = &[
 
 #[test]
 fn valid_source_matches_model_schema() {
-    assert_valid(
-        "schemas/model.schema.json",
-        "fixtures/source/valid-basic.json",
-    );
-    assert_valid(
-        "schemas/model.schema.json",
-        "fixtures/source/valid-pipeline-rich.json",
-    );
-    assert_valid(
-        "schemas/model.schema.json",
-        "fixtures/source/valid-pipeline-archimate.json",
-    );
+    for path in SOURCE_FIXTURE_PATHS {
+        assert_valid("schemas/model.schema.json", path);
+    }
 }
 
 #[test]
@@ -113,6 +121,14 @@ fn archimate_svg_policy_matches_schema() {
     assert_valid(
         "schemas/svg-render-policy.schema.json",
         "fixtures/render-policy/archimate-svg.json",
+    );
+}
+
+#[test]
+fn uml_svg_policy_matches_schema() {
+    assert_valid(
+        "schemas/svg-render-policy.schema.json",
+        "fixtures/render-policy/uml-svg.json",
     );
 }
 
@@ -171,6 +187,14 @@ fn archimate_render_metadata_matches_schema() {
     assert_valid(
         "schemas/render-metadata.schema.json",
         "fixtures/render-metadata/archimate-basic.json",
+    );
+}
+
+#[test]
+fn uml_render_metadata_matches_schema() {
+    assert_valid(
+        "schemas/render-metadata.schema.json",
+        "fixtures/render-metadata/uml-basic.json",
     );
 }
 
@@ -539,7 +563,7 @@ fn readme_documents_archimate_connector_junction_support_and_generated_hints() {
 
 #[test]
 fn first_party_plugin_manifest_versions_match_workspace_version() {
-    for path in FIRST_PARTY_PLUGIN_MANIFEST_PATHS {
+    for path in CURRENT_WORKSPACE_VERSION_PLUGIN_MANIFEST_PATHS {
         let text = std::fs::read_to_string(workspace_file(path)).unwrap();
         let manifest: serde_json::Value = serde_json::from_str(&text).unwrap();
         assert_eq!(
@@ -553,7 +577,9 @@ fn first_party_plugin_manifest_versions_match_workspace_version() {
 #[test]
 fn source_fixture_required_plugin_versions_match_first_party_manifests() {
     let manifest_versions = first_party_plugin_versions();
-    for path in SOURCE_FIXTURE_PATHS {
+    // valid-uml-basic.json intentionally requires target 0.12.0 plugins while this
+    // Task 1 branch cannot update workspace version surfaces.
+    for path in SOURCE_FIXTURES_REQUIRING_CURRENT_WORKSPACE_PLUGIN_VERSIONS {
         let source = json_file(path);
         let required_plugins = source["required_plugins"]
             .as_array()
@@ -954,6 +980,10 @@ fn layout_fixtures_match_schemas() {
         "schemas/layout-result.schema.json",
         "fixtures/layout-result/pipeline-rich.json",
     );
+    assert_valid(
+        "schemas/layout-result.schema.json",
+        "fixtures/layout-result/uml-basic.json",
+    );
 }
 
 #[test]
@@ -961,6 +991,10 @@ fn export_contracts_match_schemas() {
     assert_valid(
         "schemas/oef-export-policy.schema.json",
         "fixtures/export-policy/default-oef.json",
+    );
+    assert_valid(
+        "schemas/uml-xmi-export-policy.schema.json",
+        "fixtures/export-policy/default-uml-xmi.json",
     );
 
     assert_json_valid(
@@ -980,11 +1014,72 @@ fn export_contracts_match_schemas() {
     );
 
     assert_json_valid(
+        "schemas/export-request.schema.json",
+        json!({
+            "export_request_schema_version": "export-request.schema.v1",
+            "source": serde_json::from_str::<serde_json::Value>(
+                &std::fs::read_to_string(workspace_file("fixtures/source/valid-uml-basic.json")).unwrap()
+            ).unwrap(),
+            "layout_result": serde_json::from_str::<serde_json::Value>(
+                &std::fs::read_to_string(workspace_file("fixtures/layout-result/uml-basic.json")).unwrap()
+            ).unwrap(),
+            "policy": serde_json::from_str::<serde_json::Value>(
+                &std::fs::read_to_string(workspace_file("fixtures/export-policy/default-uml-xmi.json")).unwrap()
+            ).unwrap()
+        }),
+    );
+
+    assert_json_invalid(
+        "schemas/export-request.schema.json",
+        json!({
+            "export_request_schema_version": "export-request.schema.v1",
+            "source": serde_json::from_str::<serde_json::Value>(
+                &std::fs::read_to_string(workspace_file("fixtures/source/valid-uml-basic.json")).unwrap()
+            ).unwrap(),
+            "layout_result": serde_json::from_str::<serde_json::Value>(
+                &std::fs::read_to_string(workspace_file("fixtures/layout-result/uml-basic.json")).unwrap()
+            ).unwrap(),
+            "policy": {
+                "uml_xmi_export_policy_schema_version": "uml-xmi-export-policy.schema.v1"
+            }
+        }),
+        "UML/XMI export policy missing model identity",
+    );
+
+    assert_json_valid(
         "schemas/export-result.schema.json",
         json!({
             "export_result_schema_version": "export-result.schema.v1",
             "artifact_kind": "archimate-oef+xml",
             "content": "<model/>"
+        }),
+    );
+}
+
+#[test]
+fn uml_source_matches_model_schema() {
+    assert_valid(
+        "schemas/model.schema.json",
+        "fixtures/source/valid-uml-basic.json",
+    );
+}
+
+#[test]
+fn uml_xmi_export_policy_matches_schema() {
+    assert_valid(
+        "schemas/uml-xmi-export-policy.schema.json",
+        "fixtures/export-policy/default-uml-xmi.json",
+    );
+}
+
+#[test]
+fn export_result_schema_accepts_uml_xmi_artifact_kind() {
+    assert_json_valid(
+        "schemas/export-result.schema.json",
+        json!({
+            "export_result_schema_version": "export-result.schema.v1",
+            "artifact_kind": "uml-xmi+xml",
+            "content": "<xmi:XMI/>"
         }),
     );
 }

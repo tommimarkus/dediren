@@ -1,0 +1,38 @@
+{
+  "render_metadata_schema_version": "render-metadata.schema.v1",
+  "semantic_profile": "uml",
+  "nodes": {
+    "class-order": {
+      "type": "Class",
+      "source_id": "class-order"
+    },
+    "class-order-line": {
+      "type": "Class",
+      "source_id": "class-order-line"
+    },
+    "enum-order-status": {
+      "type": "Enumeration",
+      "source_id": "enum-order-status"
+    },
+    "pkg-orders": {
+      "type": "Package",
+      "source_id": "pkg-orders"
+    }
+  },
+  "edges": {
+    "order-has-lines": {
+      "type": "Composition",
+      "source_id": "order-has-lines"
+    },
+    "order-status-dependency": {
+      "type": "Dependency",
+      "source_id": "order-status-dependency"
+    }
+  },
+  "groups": {
+    "orders-package-boundary": {
+      "type": "Package",
+      "source_id": "pkg-orders"
+    }
+  }
+}

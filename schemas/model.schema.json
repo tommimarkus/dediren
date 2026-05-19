@@ -61,7 +61,7 @@
       "additionalProperties": false,
       "required": ["views"],
       "properties": {
-        "semantic_profile": { "enum": ["generic-graph", "archimate"] },
+        "semantic_profile": { "enum": ["generic-graph", "archimate", "uml"] },
         "views": {
           "type": "array",
           "items": { "$ref": "#/$defs/genericGraphView" }
@@ -75,6 +75,7 @@
       "properties": {
         "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" },
         "label": { "type": "string" },
+        "kind": { "enum": ["generic", "archimate", "uml-class", "uml-data", "uml-activity"] },
         "nodes": { "type": "array", "items": { "type": "string" } },
         "relationships": { "type": "array", "items": { "type": "string" } },
         "layout_preferences": { "$ref": "#/$defs/layoutPreferences" },

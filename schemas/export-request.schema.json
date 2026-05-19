@@ -18,8 +18,48 @@
     },
     "policy": {
       "type": "object",
-      "required": ["oef_export_policy_schema_version"],
-      "additionalProperties": true
+      "oneOf": [
+        { "$ref": "#/$defs/oefExportPolicy" },
+        { "$ref": "#/$defs/umlXmiExportPolicy" }
+      ]
+    }
+  },
+  "$defs": {
+    "oefExportPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "oef_export_policy_schema_version",
+        "model_identifier",
+        "model_name",
+        "view_identifier",
+        "view_name",
+        "viewpoint"
+      ],
+      "properties": {
+        "oef_export_policy_schema_version": { "const": "oef-export-policy.schema.v1" },
+        "model_identifier": { "type": "string", "minLength": 1 },
+        "model_name": { "type": "string", "minLength": 1 },
+        "view_identifier": { "type": "string", "minLength": 1 },
+        "view_name": { "type": "string", "minLength": 1 },
+        "viewpoint": { "type": "string", "minLength": 1 }
+      }
+    },
+    "umlXmiExportPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "uml_xmi_export_policy_schema_version",
+        "model_identifier",
+        "model_name"
+      ],
+      "properties": {
+        "uml_xmi_export_policy_schema_version": { "const": "uml-xmi-export-policy.schema.v1" },
+        "model_identifier": { "type": "string", "minLength": 1 },
+        "model_name": { "type": "string", "minLength": 1 },
+        "xmi_version": { "enum": ["2.5.1"] },
+        "uml_version": { "enum": ["2.5.1"] }
+      }
     }
   }
 }

@@ -1,0 +1,292 @@
+{
+  "model_schema_version": "model.schema.v1",
+  "required_plugins": [
+    {
+      "id": "generic-graph",
+      "version": "0.12.0"
+    },
+    {
+      "id": "uml-xmi",
+      "version": "0.12.0"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "pkg-orders",
+      "type": "Package",
+      "label": "Orders",
+      "properties": {
+        "uml": {
+          "kind": "package"
+        }
+      }
+    },
+    {
+      "id": "class-order",
+      "type": "Class",
+      "label": "Order",
+      "properties": {
+        "uml": {
+          "package": "pkg-orders",
+          "attributes": [
+            {
+              "name": "id",
+              "type": "OrderId",
+              "visibility": "public",
+              "multiplicity": "1"
+            },
+            {
+              "name": "status",
+              "type": "OrderStatus",
+              "visibility": "private",
+              "multiplicity": "1"
+            }
+          ],
+          "operations": [
+            {
+              "name": "submit",
+              "visibility": "public",
+              "parameters": [],
+              "return_type": "void"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "enum-order-status",
+      "type": "Enumeration",
+      "label": "OrderStatus",
+      "properties": {
+        "uml": {
+          "literals": ["Draft", "Submitted", "Cancelled"]
+        }
+      }
+    },
+    {
+      "id": "class-order-line",
+      "type": "Class",
+      "label": "OrderLine",
+      "properties": {
+        "uml": {
+          "attributes": [
+            {
+              "name": "sku",
+              "type": "String",
+              "visibility": "public",
+              "multiplicity": "1"
+            },
+            {
+              "name": "quantity",
+              "type": "Integer",
+              "visibility": "public",
+              "multiplicity": "1"
+            }
+          ],
+          "operations": []
+        }
+      }
+    },
+    {
+      "id": "activity-submit-order",
+      "type": "Activity",
+      "label": "Submit Order",
+      "properties": {
+        "uml": {
+          "partitions": ["Customer", "Order Service"]
+        }
+      }
+    },
+    {
+      "id": "initial-submit",
+      "type": "InitialNode",
+      "label": "",
+      "properties": {
+        "uml": {
+          "activity": "activity-submit-order",
+          "partition": "Customer"
+        }
+      }
+    },
+    {
+      "id": "action-enter-order",
+      "type": "Action",
+      "label": "Enter order",
+      "properties": {
+        "uml": {
+          "activity": "activity-submit-order",
+          "partition": "Customer"
+        }
+      }
+    },
+    {
+      "id": "decision-valid",
+      "type": "DecisionNode",
+      "label": "Valid?",
+      "properties": {
+        "uml": {
+          "activity": "activity-submit-order",
+          "partition": "Order Service"
+        }
+      }
+    },
+    {
+      "id": "action-submit",
+      "type": "Action",
+      "label": "Submit",
+      "properties": {
+        "uml": {
+          "activity": "activity-submit-order",
+          "partition": "Order Service"
+        }
+      }
+    },
+    {
+      "id": "final-submit",
+      "type": "ActivityFinalNode",
+      "label": "",
+      "properties": {
+        "uml": {
+          "activity": "activity-submit-order",
+          "partition": "Order Service"
+        }
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "id": "order-has-lines",
+      "type": "Composition",
+      "source": "class-order",
+      "target": "class-order-line",
+      "label": "lines",
+      "properties": {
+        "uml": {
+          "source_role": "order",
+          "target_role": "lines",
+          "source_multiplicity": "1",
+          "target_multiplicity": "1..*"
+        }
+      }
+    },
+    {
+      "id": "order-status-dependency",
+      "type": "Dependency",
+      "source": "class-order",
+      "target": "enum-order-status",
+      "label": "uses",
+      "properties": {}
+    },
+    {
+      "id": "flow-start-enter",
+      "type": "ControlFlow",
+      "source": "initial-submit",
+      "target": "action-enter-order",
+      "label": "",
+      "properties": {}
+    },
+    {
+      "id": "flow-enter-valid",
+      "type": "ControlFlow",
+      "source": "action-enter-order",
+      "target": "decision-valid",
+      "label": "",
+      "properties": {}
+    },
+    {
+      "id": "flow-valid-submit",
+      "type": "ControlFlow",
+      "source": "decision-valid",
+      "target": "action-submit",
+      "label": "yes",
+      "properties": {
+        "uml": {
+          "guard": "valid"
+        }
+      }
+    },
+    {
+      "id": "flow-submit-final",
+      "type": "ControlFlow",
+      "source": "action-submit",
+      "target": "final-submit",
+      "label": "",
+      "properties": {}
+    }
+  ],
+  "plugins": {
+    "generic-graph": {
+      "semantic_profile": "uml",
+      "views": [
+        {
+          "id": "class-view",
+          "label": "Orders Class Model",
+          "kind": "uml-class",
+          "nodes": ["pkg-orders", "class-order", "class-order-line", "enum-order-status"],
+          "relationships": ["order-has-lines", "order-status-dependency"],
+          "groups": [
+            {
+              "id": "orders-package-boundary",
+              "label": "Orders",
+              "role": "semantic-boundary",
+              "semantic_source_id": "pkg-orders",
+              "members": ["class-order", "class-order-line", "enum-order-status"]
+            }
+          ],
+          "layout_preferences": {
+            "direction": "right",
+            "density": "readable",
+            "routing": {
+              "style": "orthogonal",
+              "profile": "readable",
+              "endpoint_merging": "off"
+            }
+          }
+        },
+        {
+          "id": "data-view",
+          "label": "Orders Data Model",
+          "kind": "uml-data",
+          "nodes": ["class-order", "class-order-line", "enum-order-status"],
+          "relationships": ["order-has-lines", "order-status-dependency"],
+          "layout_preferences": {
+            "direction": "right",
+            "density": "readable",
+            "routing": {
+              "style": "orthogonal",
+              "profile": "readable",
+              "endpoint_merging": "off"
+            }
+          }
+        },
+        {
+          "id": "activity-view",
+          "label": "Submit Order Activity",
+          "kind": "uml-activity",
+          "nodes": [
+            "initial-submit",
+            "action-enter-order",
+            "decision-valid",
+            "action-submit",
+            "final-submit"
+          ],
+          "relationships": [
+            "flow-start-enter",
+            "flow-enter-valid",
+            "flow-valid-submit",
+            "flow-submit-final"
+          ],
+          "layout_preferences": {
+            "direction": "right",
+            "density": "spacious",
+            "routing": {
+              "style": "orthogonal",
+              "profile": "spacious",
+              "endpoint_merging": "off"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

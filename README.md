@@ -524,6 +524,7 @@ Use the public schemas as the source of truth for JSON shape:
 - `schemas/svg-render-policy.schema.json`
 - `schemas/render-result.schema.json`
 - `schemas/oef-export-policy.schema.json`
+- `schemas/uml-xmi-export-policy.schema.json`
 - `schemas/export-request.schema.json`
 - `schemas/export-result.schema.json`
 - `schemas/plugin-manifest.schema.json`

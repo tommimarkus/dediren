@@ -6,7 +6,7 @@
   "required": ["export_result_schema_version", "artifact_kind", "content"],
   "properties": {
     "export_result_schema_version": { "const": "export-result.schema.v1" },
-    "artifact_kind": { "const": "archimate-oef+xml" },
+    "artifact_kind": { "enum": ["archimate-oef+xml", "uml-xmi+xml"] },
     "content": { "type": "string" }
   }
 }

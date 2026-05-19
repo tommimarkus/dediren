@@ -1,0 +1,101 @@
+{
+  "layout_result_schema_version": "layout-result.schema.v1",
+  "view_id": "class-view",
+  "nodes": [
+    {
+      "id": "class-order",
+      "source_id": "class-order",
+      "projection_id": "class-order",
+      "x": 80,
+      "y": 96,
+      "width": 180,
+      "height": 120,
+      "label": "Order"
+    },
+    {
+      "id": "class-order-line",
+      "source_id": "class-order-line",
+      "projection_id": "class-order-line",
+      "x": 360,
+      "y": 72,
+      "width": 180,
+      "height": 104,
+      "label": "OrderLine"
+    },
+    {
+      "id": "enum-order-status",
+      "source_id": "enum-order-status",
+      "projection_id": "enum-order-status",
+      "x": 360,
+      "y": 232,
+      "width": 180,
+      "height": 96,
+      "label": "OrderStatus"
+    }
+  ],
+  "edges": [
+    {
+      "id": "order-has-lines",
+      "source": "class-order",
+      "target": "class-order-line",
+      "source_id": "order-has-lines",
+      "projection_id": "order-has-lines",
+      "points": [
+        {
+          "x": 260,
+          "y": 132
+        },
+        {
+          "x": 360,
+          "y": 132
+        }
+      ],
+      "label": "lines"
+    },
+    {
+      "id": "order-status-dependency",
+      "source": "class-order",
+      "target": "enum-order-status",
+      "source_id": "order-status-dependency",
+      "projection_id": "order-status-dependency",
+      "points": [
+        {
+          "x": 260,
+          "y": 176
+        },
+        {
+          "x": 310,
+          "y": 176
+        },
+        {
+          "x": 310,
+          "y": 280
+        },
+        {
+          "x": 360,
+          "y": 280
+        }
+      ],
+      "label": "uses"
+    }
+  ],
+  "groups": [
+    {
+      "id": "orders-package-boundary",
+      "source_id": "pkg-orders",
+      "projection_id": "orders-package-boundary",
+      "provenance": {
+        "semantic_backed": {
+          "source_id": "pkg-orders"
+        }
+      },
+      "x": 40,
+      "y": 40,
+      "width": 540,
+      "height": 328,
+      "members": ["class-order", "class-order-line", "enum-order-status"],
+      "label": "Orders"
+    }
+  ],
+  "warnings": []
+}

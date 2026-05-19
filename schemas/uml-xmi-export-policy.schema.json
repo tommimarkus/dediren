@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dediren.dev/schemas/uml-xmi-export-policy.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "uml_xmi_export_policy_schema_version",
+    "model_identifier",
+    "model_name"
+  ],
+  "properties": {
+    "uml_xmi_export_policy_schema_version": { "const": "uml-xmi-export-policy.schema.v1" },
+    "model_identifier": { "type": "string", "minLength": 1 },
+    "model_name": { "type": "string", "minLength": 1 },
+    "xmi_version": { "enum": ["2.5.1"] },
+    "uml_version": { "enum": ["2.5.1"] }
+  }
+}

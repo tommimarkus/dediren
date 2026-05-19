@@ -143,7 +143,21 @@
             "archimate_artifact",
             "archimate_material",
             "archimate_communication_network",
-            "archimate_distribution_network"
+            "archimate_distribution_network",
+            "uml_package",
+            "uml_class",
+            "uml_interface",
+            "uml_data_type",
+            "uml_enumeration",
+            "uml_activity",
+            "uml_action",
+            "uml_initial_node",
+            "uml_activity_final_node",
+            "uml_decision_node",
+            "uml_merge_node",
+            "uml_fork_node",
+            "uml_join_node",
+            "uml_object_node"
           ]
         }
       }
