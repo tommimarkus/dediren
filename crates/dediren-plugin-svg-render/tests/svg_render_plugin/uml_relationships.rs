@@ -33,132 +33,100 @@ fn svg_renderer_applies_uml_relationship_markers() {
 
 #[test]
 fn svg_renderer_covers_each_uml_relationship_marker() {
+    let policy = serde_json::from_str::<serde_json::Value>(
+        &std::fs::read_to_string(workspace_file("fixtures/render-policy/uml-svg.json")).unwrap(),
+    )
+    .unwrap();
+    let edge_styles = policy["style"]["edge_type_overrides"]
+        .as_object()
+        .expect("edge type overrides should be an object");
+    let edge_styles = edge_styles.clone();
+    let mut nodes = Vec::new();
+    let mut edges = Vec::new();
+    let mut metadata_nodes = serde_json::Map::new();
+    let mut metadata_edges = serde_json::Map::new();
+
+    for (index, relationship_type) in UML_RELATIONSHIP_TYPES.iter().enumerate() {
+        let y = 60 + index as i64 * 54;
+        let source = format!("relationship-source-{index}");
+        let target = format!("relationship-target-{index}");
+        let edge_id = format!("relationship-edge-{index}");
+        let node_type = if is_uml_activity_flow_type(relationship_type) {
+            "Action"
+        } else {
+            "Class"
+        };
+        nodes.push(serde_json::json!({
+            "id": source,
+            "source_id": source,
+            "projection_id": source,
+            "x": 40,
+            "y": y,
+            "width": 120,
+            "height": 36,
+            "label": "Source"
+        }));
+        nodes.push(serde_json::json!({
+            "id": target,
+            "source_id": target,
+            "projection_id": target,
+            "x": 360,
+            "y": y,
+            "width": 120,
+            "height": 36,
+            "label": "Target"
+        }));
+        edges.push(serde_json::json!({
+            "id": edge_id,
+            "source": source,
+            "target": target,
+            "source_id": edge_id,
+            "projection_id": edge_id,
+            "points": [
+                { "x": 160, "y": y + 18 },
+                { "x": 360, "y": y + 18 }
+            ],
+            "label": relationship_type
+        }));
+        metadata_nodes.insert(
+            source.clone(),
+            serde_json::json!({
+                "type": node_type,
+                "source_id": source
+            }),
+        );
+        metadata_nodes.insert(
+            target.clone(),
+            serde_json::json!({
+                "type": node_type,
+                "source_id": target
+            }),
+        );
+        metadata_edges.insert(
+            edge_id.clone(),
+            serde_json::json!({
+                "type": relationship_type,
+                "source_id": edge_id
+            }),
+        );
+    }
+
     let input = serde_json::json!({
         "layout_result": {
             "layout_result_schema_version": "layout-result.schema.v1",
             "view_id": "uml-relationship-marker-test",
-            "nodes": [
-                {
-                    "id": "source",
-                    "source_id": "source",
-                    "projection_id": "source",
-                    "x": 40,
-                    "y": 40,
-                    "width": 120,
-                    "height": 72,
-                    "label": "Source"
-                },
-                {
-                    "id": "target",
-                    "source_id": "target",
-                    "projection_id": "target",
-                    "x": 360,
-                    "y": 40,
-                    "width": 120,
-                    "height": 72,
-                    "label": "Target"
-                },
-                {
-                    "id": "activity-source",
-                    "source_id": "activity-source",
-                    "projection_id": "activity-source",
-                    "x": 40,
-                    "y": 176,
-                    "width": 120,
-                    "height": 72,
-                    "label": "Action"
-                },
-                {
-                    "id": "activity-target",
-                    "source_id": "activity-target",
-                    "projection_id": "activity-target",
-                    "x": 360,
-                    "y": 176,
-                    "width": 120,
-                    "height": 72,
-                    "label": "Next"
-                }
-            ],
-            "edges": [
-                {
-                    "id": "aggregation",
-                    "source": "source",
-                    "target": "target",
-                    "source_id": "aggregation",
-                    "projection_id": "aggregation",
-                    "points": [{ "x": 160, "y": 76 }, { "x": 360, "y": 76 }],
-                    "label": ""
-                },
-                {
-                    "id": "generalization",
-                    "source": "source",
-                    "target": "target",
-                    "source_id": "generalization",
-                    "projection_id": "generalization",
-                    "points": [{ "x": 160, "y": 108 }, { "x": 360, "y": 108 }],
-                    "label": ""
-                },
-                {
-                    "id": "realization",
-                    "source": "source",
-                    "target": "target",
-                    "source_id": "realization",
-                    "projection_id": "realization",
-                    "points": [{ "x": 160, "y": 140 }, { "x": 360, "y": 140 }],
-                    "label": ""
-                },
-                {
-                    "id": "dependency",
-                    "source": "source",
-                    "target": "target",
-                    "source_id": "dependency",
-                    "projection_id": "dependency",
-                    "points": [{ "x": 160, "y": 172 }, { "x": 360, "y": 172 }],
-                    "label": ""
-                },
-                {
-                    "id": "control-flow",
-                    "source": "activity-source",
-                    "target": "activity-target",
-                    "source_id": "control-flow",
-                    "projection_id": "control-flow",
-                    "points": [{ "x": 160, "y": 204 }, { "x": 360, "y": 204 }],
-                    "label": ""
-                },
-                {
-                    "id": "object-flow",
-                    "source": "activity-source",
-                    "target": "activity-target",
-                    "source_id": "object-flow",
-                    "projection_id": "object-flow",
-                    "points": [{ "x": 160, "y": 236 }, { "x": 360, "y": 236 }],
-                    "label": ""
-                }
-            ],
+            "nodes": nodes,
+            "edges": edges,
             "groups": [],
             "warnings": []
         },
         "render_metadata": {
             "render_metadata_schema_version": "render-metadata.schema.v1",
             "semantic_profile": "uml",
-            "nodes": {
-                "source": { "type": "Class", "source_id": "source" },
-                "target": { "type": "Class", "source_id": "target" },
-                "activity-source": { "type": "Action", "source_id": "activity-source" },
-                "activity-target": { "type": "Action", "source_id": "activity-target" }
-            },
-            "edges": {
-                "aggregation": { "type": "Aggregation", "source_id": "aggregation" },
-                "generalization": { "type": "Generalization", "source_id": "generalization" },
-                "realization": { "type": "Realization", "source_id": "realization" },
-                "dependency": { "type": "Dependency", "source_id": "dependency" },
-                "control-flow": { "type": "ControlFlow", "source_id": "control-flow" },
-                "object-flow": { "type": "ObjectFlow", "source_id": "object-flow" }
-            }
+            "nodes": serde_json::Value::Object(metadata_nodes),
+            "edges": serde_json::Value::Object(metadata_edges)
         },
-        "policy": serde_json::from_str::<serde_json::Value>(
-            &std::fs::read_to_string(workspace_file("fixtures/render-policy/uml-svg.json")).unwrap()
-        ).unwrap()
+        "policy": policy
     });
 
     let content = render_content(input);
@@ -166,66 +134,59 @@ fn svg_renderer_covers_each_uml_relationship_marker() {
     assert!(artifact.exists());
     let doc = svg_doc(&content);
 
-    let aggregation = child_element(
-        semantic_group(&doc, "data-dediren-edge-id", "aggregation"),
-        "path",
-    );
     assert_eq!(
-        aggregation.attribute("marker-start"),
-        Some("url(#marker-start-aggregation)")
+        edge_styles.len(),
+        UML_RELATIONSHIP_TYPES.len(),
+        "UML policy should style every covered relationship type"
     );
-    assert!(content.contains(r#"data-dediren-edge-marker-start="hollow_diamond""#));
+    for (index, relationship_type) in UML_RELATIONSHIP_TYPES.iter().enumerate() {
+        let edge_id = format!("relationship-edge-{index}");
+        let expected_style = edge_styles
+            .get(*relationship_type)
+            .unwrap_or_else(|| panic!("missing policy style for {relationship_type}"));
+        let edge = semantic_group(&doc, "data-dediren-edge-id", &edge_id);
+        let path = child_element(edge, "path");
+        assert_marker(
+            &doc,
+            path,
+            &edge_id,
+            "start",
+            expected_style
+                .get("marker_start")
+                .and_then(|value| value.as_str()),
+            relationship_type,
+        );
+        assert_marker(
+            &doc,
+            path,
+            &edge_id,
+            "end",
+            expected_style
+                .get("marker_end")
+                .and_then(|value| value.as_str())
+                .or(Some("filled_arrow")),
+            relationship_type,
+        );
+        match expected_style
+            .get("line_style")
+            .and_then(|value| value.as_str())
+        {
+            Some("dashed") => assert_eq!(
+                path.attribute("stroke-dasharray"),
+                Some("8 5"),
+                "{relationship_type} should render dashed"
+            ),
+            _ => assert_eq!(
+                path.attribute("stroke-dasharray"),
+                None,
+                "{relationship_type} should render solid"
+            ),
+        }
+    }
+}
 
-    let generalization = child_element(
-        semantic_group(&doc, "data-dediren-edge-id", "generalization"),
-        "path",
-    );
-    assert_eq!(
-        generalization.attribute("marker-end"),
-        Some("url(#marker-end-generalization)")
-    );
-    assert!(content.contains(r#"data-dediren-edge-marker-end="hollow_triangle""#));
-
-    let realization = child_element(
-        semantic_group(&doc, "data-dediren-edge-id", "realization"),
-        "path",
-    );
-    assert_eq!(
-        realization.attribute("marker-end"),
-        Some("url(#marker-end-realization)")
-    );
-    assert_eq!(realization.attribute("stroke-dasharray"), Some("8 5"));
-
-    let dependency = child_element(
-        semantic_group(&doc, "data-dediren-edge-id", "dependency"),
-        "path",
-    );
-    assert_eq!(
-        dependency.attribute("marker-end"),
-        Some("url(#marker-end-dependency)")
-    );
-    assert!(content.contains(r#"data-dediren-edge-marker-end="open_arrow""#));
-    assert_eq!(dependency.attribute("stroke-dasharray"), Some("8 5"));
-
-    let control_flow = child_element(
-        semantic_group(&doc, "data-dediren-edge-id", "control-flow"),
-        "path",
-    );
-    assert_eq!(
-        control_flow.attribute("marker-end"),
-        Some("url(#marker-end-control-flow)")
-    );
-    assert!(content.contains(r#"data-dediren-edge-marker-end="filled_arrow""#));
-
-    let object_flow = child_element(
-        semantic_group(&doc, "data-dediren-edge-id", "object-flow"),
-        "path",
-    );
-    assert_eq!(
-        object_flow.attribute("marker-end"),
-        Some("url(#marker-end-object-flow)")
-    );
-    assert_eq!(object_flow.attribute("stroke-dasharray"), Some("8 5"));
+fn is_uml_activity_flow_type(relationship_type: &str) -> bool {
+    matches!(relationship_type, "ControlFlow" | "ObjectFlow")
 }
 
 #[test]

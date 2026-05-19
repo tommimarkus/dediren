@@ -1932,6 +1932,34 @@ pub const ARCHIMATE_RELATIONSHIP_TYPES: &[&str] = &[
     "Flow",
 ];
 
+pub const UML_NODE_TYPES: &[&str] = &[
+    "Package",
+    "Class",
+    "Interface",
+    "DataType",
+    "Enumeration",
+    "Activity",
+    "Action",
+    "InitialNode",
+    "ActivityFinalNode",
+    "DecisionNode",
+    "MergeNode",
+    "ForkNode",
+    "JoinNode",
+    "ObjectNode",
+];
+
+pub const UML_RELATIONSHIP_TYPES: &[&str] = &[
+    "Association",
+    "Composition",
+    "Aggregation",
+    "Generalization",
+    "Realization",
+    "Dependency",
+    "ControlFlow",
+    "ObjectFlow",
+];
+
 pub fn workspace_file(path: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../..")
