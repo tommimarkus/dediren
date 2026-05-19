@@ -3,6 +3,9 @@ use clap::{Parser, Subcommand};
 #[derive(Debug, Parser)]
 #[command(name = "dediren")]
 #[command(version)]
+#[command(
+    after_help = "Agent authoring guide: docs/agent-usage.md\nUse it for source JSON shape, generated artifact handoff, fragments, and repair diagnostics."
+)]
 struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,

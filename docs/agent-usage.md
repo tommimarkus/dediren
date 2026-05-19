@@ -28,7 +28,7 @@ file when redistributing the archive contents.
 | Artifact | Agent authors it? | Schema | Best example | Notes |
 | --- | --- | --- | --- | --- |
 | Source model | Yes | `schemas/model.schema.json` | `fixtures/source/valid-basic.json` | Semantic graph and plugin-owned views. No geometry or styling. |
-| Fragment source model | Yes, for large models | `schemas/model.schema.json` | create fragments like the Source Fragments README section | Fragments use the same source shape and need file input, not stdin. |
+| Fragment source model | Yes, for large models | `schemas/model.schema.json` | see Source Fragments below | Fragments use the same source shape and need file input, not stdin. |
 | SVG render policy | Usually reuse, sometimes author | `schemas/svg-render-policy.schema.json` | `fixtures/render-policy/default-svg.json`, `fixtures/render-policy/rich-svg.json` | Owns colors, typography, strokes, labels, and per-layout-id style. |
 | OEF export policy | Usually reuse, sometimes author | `schemas/oef-export-policy.schema.json` | `fixtures/export-policy/default-oef.json` | Owns export metadata such as model identifier. |
 | Layout preferences | Sometimes author inside a view | `schemas/model.schema.json`, projected into `schemas/layout-request.schema.json` | see `layout_preferences` below | Expresses intent, not raw ELK options. |
@@ -47,7 +47,7 @@ them.
 {
   "model_schema_version": "model.schema.v1",
   "required_plugins": [
-    { "id": "generic-graph", "version": "0.11.2" }
+    { "id": "generic-graph", "version": "0.11.3" }
   ],
   "nodes": [
     {
@@ -78,7 +78,7 @@ them.
       "views": [
         {
           "id": "main",
-          "title": "Main",
+          "label": "Main",
           "nodes": ["client", "api"],
           "relationships": ["client-calls-api"],
           "groups": []
@@ -102,8 +102,8 @@ and use ArchiMate type names:
 {
   "model_schema_version": "model.schema.v1",
   "required_plugins": [
-    { "id": "generic-graph", "version": "0.11.2" },
-    { "id": "archimate-oef", "version": "0.11.2" }
+    { "id": "generic-graph", "version": "0.11.3" },
+    { "id": "archimate-oef", "version": "0.11.3" }
   ],
   "nodes": [
     {
@@ -135,7 +135,7 @@ and use ArchiMate type names:
       "views": [
         {
           "id": "main",
-          "title": "Main",
+          "label": "Main",
           "nodes": ["orders-component", "orders-service"],
           "relationships": ["orders-realizes-service"],
           "groups": []
@@ -148,6 +148,58 @@ and use ArchiMate type names:
 
 Use the ArchiMate/OEF element name `Node` for technology nodes. Do not use
 aliases such as `TechnologyNode`.
+
+## Source Fragments
+
+Use fragments when a model is too large for one source file. The root model
+declares relative fragment files and remains the entrypoint:
+
+```json
+{
+  "model_schema_version": "model.schema.v1",
+  "fragments": ["fragments/application.json"],
+  "nodes": [],
+  "relationships": [],
+  "plugins": {
+    "generic-graph": {
+      "views": []
+    }
+  }
+}
+```
+
+Each fragment uses the same source model shape:
+
+```json
+{
+  "model_schema_version": "model.schema.v1",
+  "nodes": [
+    {
+      "id": "api",
+      "type": "ApplicationComponent",
+      "label": "API",
+      "properties": {}
+    }
+  ],
+  "relationships": [],
+  "plugins": {
+    "generic-graph": {
+      "views": [
+        {
+          "id": "main",
+          "label": "Main",
+          "nodes": ["api"],
+          "relationships": []
+        }
+      ]
+    }
+  }
+}
+```
+
+Fragment paths resolve relative to the root model file, so fragmented models
+require `--input <file>`. Stdin has no base directory for relative fragment
+paths. Nested fragments and absolute fragment paths are rejected.
 
 ## Layout Preferences
 
@@ -270,7 +322,7 @@ target/debug/dediren-plugin-archimate-oef-export capabilities
 From an unpacked distribution bundle:
 
 ```bash
-BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-0.11.2-x86_64-unknown-linux-gnu
+BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-0.11.3-x86_64-unknown-linux-gnu
 "$BUNDLE/bin/dediren" --version
 "$BUNDLE/bin/dediren-plugin-generic-graph" capabilities
 "$BUNDLE/bin/dediren-plugin-elk-layout" capabilities
@@ -284,7 +336,7 @@ CLI workflow commands return command envelopes using `schemas/envelope.schema.js
 ## Bundle Smoke Workflow
 
 ```bash
-BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-0.11.2-x86_64-unknown-linux-gnu
+BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-0.11.3-x86_64-unknown-linux-gnu
 
 "$BUNDLE/bin/dediren" validate \
   --input "$BUNDLE/fixtures/source/valid-basic.json"
