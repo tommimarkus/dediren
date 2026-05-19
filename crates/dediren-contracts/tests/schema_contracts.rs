@@ -71,7 +71,7 @@ fn source_with_fragments_matches_model_schema() {
             "model_schema_version": "model.schema.v1",
             "fragments": ["model/application.json", "model/technology.json"],
             "required_plugins": [
-                { "id": "generic-graph", "version": "0.11.2" }
+                { "id": "generic-graph", "version": "0.11.3" }
             ],
             "nodes": [],
             "relationships": [],
@@ -447,6 +447,38 @@ fn readme_lists_all_public_schemas() {
     for path in PUBLIC_SCHEMA_PATHS {
         assert!(readme.contains(path), "README.md should list {path}");
     }
+}
+
+#[test]
+fn agent_usage_source_examples_use_schema_view_labels() {
+    let guide = std::fs::read_to_string(workspace_file("docs/agent-usage.md")).unwrap();
+
+    assert!(
+        guide.contains(r#""label": "Main""#),
+        "agent usage source examples should show schema-valid view labels"
+    );
+    assert!(
+        !guide.contains(r#""title": "Main""#),
+        "agent usage source examples should not show stale view title fields"
+    );
+}
+
+#[test]
+fn agent_usage_documents_source_fragments() {
+    let guide = std::fs::read_to_string(workspace_file("docs/agent-usage.md")).unwrap();
+
+    assert!(
+        guide.contains("## Source Fragments"),
+        "agent usage guide should include fragment authoring guidance in the bundled docs"
+    );
+    assert!(
+        guide.contains(r#""fragments": ["fragments/application.json"]"#),
+        "agent usage guide should show a root model declaring relative fragments"
+    );
+    assert!(
+        guide.contains("--input <file>"),
+        "agent usage guide should document that fragments require file input"
+    );
 }
 
 #[test]
