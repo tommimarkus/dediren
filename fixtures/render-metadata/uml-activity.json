@@ -1,0 +1,64 @@
+{
+  "render_metadata_schema_version": "render-metadata.schema.v1",
+  "semantic_profile": "uml",
+  "nodes": {
+    "action-enter-order": {
+      "type": "Action",
+      "source_id": "action-enter-order",
+      "properties": {
+        "activity": "activity-submit-order",
+        "partition": "Customer"
+      }
+    },
+    "action-submit": {
+      "type": "Action",
+      "source_id": "action-submit",
+      "properties": {
+        "activity": "activity-submit-order",
+        "partition": "Order Service"
+      }
+    },
+    "decision-valid": {
+      "type": "DecisionNode",
+      "source_id": "decision-valid",
+      "properties": {
+        "activity": "activity-submit-order",
+        "partition": "Order Service"
+      }
+    },
+    "final-submit": {
+      "type": "ActivityFinalNode",
+      "source_id": "final-submit",
+      "properties": {
+        "activity": "activity-submit-order",
+        "partition": "Order Service"
+      }
+    },
+    "initial-submit": {
+      "type": "InitialNode",
+      "source_id": "initial-submit",
+      "properties": {
+        "activity": "activity-submit-order",
+        "partition": "Customer"
+      }
+    }
+  },
+  "edges": {
+    "flow-enter-valid": {
+      "type": "ControlFlow",
+      "source_id": "flow-enter-valid"
+    },
+    "flow-start-enter": {
+      "type": "ControlFlow",
+      "source_id": "flow-start-enter"
+    },
+    "flow-submit-final": {
+      "type": "ControlFlow",
+      "source_id": "flow-submit-final"
+    },
+    "flow-valid-submit": {
+      "type": "ControlFlow",
+      "source_id": "flow-valid-submit"
+    }
+  }
+}

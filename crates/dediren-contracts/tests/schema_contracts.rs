@@ -83,7 +83,7 @@ fn source_with_fragments_matches_model_schema() {
             "model_schema_version": "model.schema.v1",
             "fragments": ["model/application.json", "model/technology.json"],
             "required_plugins": [
-                { "id": "generic-graph", "version": "0.12.0" }
+                { "id": "generic-graph", "version": "0.13.0" }
             ],
             "nodes": [],
             "relationships": [],
@@ -199,6 +199,14 @@ fn uml_render_metadata_matches_schema() {
     assert_valid(
         "schemas/render-metadata.schema.json",
         "fixtures/render-metadata/uml-basic.json",
+    );
+    assert_valid(
+        "schemas/render-metadata.schema.json",
+        "fixtures/render-metadata/uml-data.json",
+    );
+    assert_valid(
+        "schemas/render-metadata.schema.json",
+        "fixtures/render-metadata/uml-activity.json",
     );
 }
 
@@ -986,6 +994,14 @@ fn layout_fixtures_match_schemas() {
     assert_valid(
         "schemas/layout-result.schema.json",
         "fixtures/layout-result/uml-basic.json",
+    );
+    assert_valid(
+        "schemas/layout-result.schema.json",
+        "fixtures/layout-result/uml-data.json",
+    );
+    assert_valid(
+        "schemas/layout-result.schema.json",
+        "fixtures/layout-result/uml-activity.json",
     );
 }
 

@@ -1,0 +1,73 @@
+{
+  "render_metadata_schema_version": "render-metadata.schema.v1",
+  "semantic_profile": "uml",
+  "nodes": {
+    "class-order": {
+      "type": "Class",
+      "source_id": "class-order",
+      "properties": {
+        "package": "pkg-orders",
+        "attributes": [
+          {
+            "name": "id",
+            "type": "OrderId",
+            "visibility": "public",
+            "multiplicity": "1"
+          },
+          {
+            "name": "status",
+            "type": "OrderStatus",
+            "visibility": "private",
+            "multiplicity": "1"
+          }
+        ],
+        "operations": [
+          {
+            "name": "submit",
+            "visibility": "public",
+            "parameters": [],
+            "return_type": "void"
+          }
+        ]
+      }
+    },
+    "class-order-line": {
+      "type": "Class",
+      "source_id": "class-order-line",
+      "properties": {
+        "attributes": [
+          {
+            "name": "sku",
+            "type": "String",
+            "visibility": "public",
+            "multiplicity": "1"
+          },
+          {
+            "name": "quantity",
+            "type": "Integer",
+            "visibility": "public",
+            "multiplicity": "1"
+          }
+        ],
+        "operations": []
+      }
+    },
+    "enum-order-status": {
+      "type": "Enumeration",
+      "source_id": "enum-order-status",
+      "properties": {
+        "literals": ["Draft", "Submitted", "Cancelled"]
+      }
+    }
+  },
+  "edges": {
+    "order-has-lines": {
+      "type": "Composition",
+      "source_id": "order-has-lines"
+    },
+    "order-status-dependency": {
+      "type": "Dependency",
+      "source_id": "order-status-dependency"
+    }
+  }
+}

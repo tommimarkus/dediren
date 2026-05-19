@@ -261,6 +261,86 @@ fn fixture_mode_uml_pipeline_renders_and_exports() {
 }
 
 #[test]
+fn fixture_mode_uml_data_view_renders() {
+    let (svg, metadata_data) = render_uml_fixture_view(
+        "data-view",
+        "fixtures/layout-result/uml-data.json",
+        "fixtures/render-metadata/uml-data.json",
+    );
+    let doc = svg_doc(&svg);
+
+    assert_eq!(metadata_data["semantic_profile"], "uml");
+    assert_eq!(metadata_data["nodes"]["class-order"]["type"], "Class");
+    assert_eq!(
+        metadata_data["nodes"]["enum-order-status"]["type"],
+        "Enumeration"
+    );
+    assert_eq!(
+        metadata_data["edges"]["order-has-lines"]["type"],
+        "Composition"
+    );
+    assert_svg_texts_include(
+        &doc,
+        &[
+            "Order",
+            "OrderLine",
+            "OrderStatus",
+            "+ id : OrderId",
+            "Draft",
+            "lines",
+            "uses",
+        ],
+    );
+    assert_uml_node_decorator(&doc, "class-order", "uml_class");
+    assert_uml_node_decorator(&doc, "enum-order-status", "uml_enumeration");
+    assert_edge_marker_start(&doc, "order-has-lines", "filled_diamond");
+    assert_edge_marker_end(&doc, "order-status-dependency", "open_arrow");
+    assert_reasonable_svg_aspect(&svg, 4.5);
+    write_render_artifact(
+        "fixture-pipeline",
+        "fixture_mode_uml_data_view_renders",
+        &svg,
+    );
+}
+
+#[test]
+fn fixture_mode_uml_activity_view_renders() {
+    let (svg, metadata_data) = render_uml_fixture_view(
+        "activity-view",
+        "fixtures/layout-result/uml-activity.json",
+        "fixtures/render-metadata/uml-activity.json",
+    );
+    let doc = svg_doc(&svg);
+
+    assert_eq!(metadata_data["semantic_profile"], "uml");
+    assert_eq!(
+        metadata_data["nodes"]["initial-submit"]["type"],
+        "InitialNode"
+    );
+    assert_eq!(
+        metadata_data["nodes"]["decision-valid"]["type"],
+        "DecisionNode"
+    );
+    assert_eq!(
+        metadata_data["edges"]["flow-valid-submit"]["type"],
+        "ControlFlow"
+    );
+    assert_svg_texts_include(&doc, &["Enter order", "Valid?", "Submit", "yes"]);
+    assert_uml_node_decorator(&doc, "initial-submit", "uml_initial_node");
+    assert_uml_node_decorator(&doc, "action-enter-order", "uml_action");
+    assert_uml_node_decorator(&doc, "decision-valid", "uml_decision_node");
+    assert_uml_node_decorator(&doc, "final-submit", "uml_activity_final_node");
+    assert_edge_marker_end(&doc, "flow-start-enter", "filled_arrow");
+    assert_edge_marker_end(&doc, "flow-valid-submit", "filled_arrow");
+    assert_reasonable_svg_aspect(&svg, 6.0);
+    write_render_artifact(
+        "fixture-pipeline",
+        "fixture_mode_uml_activity_view_renders",
+        &svg,
+    );
+}
+
+#[test]
 fn fixture_archimate_pipeline_renders_node_notation() {
     let (svg, metadata_data) = render_fixture_archimate_pipeline();
     let doc = svg_doc(&svg);
@@ -494,6 +574,81 @@ fn render_fixture_archimate_pipeline() -> (String, serde_json::Value) {
     )
 }
 
+fn render_uml_fixture_view(
+    view_id: &str,
+    layout_fixture: &str,
+    metadata_fixture: &str,
+) -> (String, serde_json::Value) {
+    let generic_plugin = plugin_binary("dediren-plugin-generic-graph");
+    let svg_plugin = plugin_binary("dediren-plugin-svg-render");
+    let source = workspace_file("fixtures/source/valid-uml-basic.json");
+
+    let request_output = common::dediren_command()
+        .env("DEDIREN_PLUGIN_GENERIC_GRAPH", &generic_plugin)
+        .args([
+            "project",
+            "--target",
+            "layout-request",
+            "--plugin",
+            "generic-graph",
+            "--view",
+            view_id,
+            "--input",
+        ])
+        .arg(&source)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let request_data = ok_data(&request_output);
+    assert_eq!(request_data["view_id"], view_id);
+
+    let metadata_output = common::dediren_command()
+        .env("DEDIREN_PLUGIN_GENERIC_GRAPH", &generic_plugin)
+        .args([
+            "project",
+            "--target",
+            "render-metadata",
+            "--plugin",
+            "generic-graph",
+            "--view",
+            view_id,
+            "--input",
+        ])
+        .arg(&source)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let metadata_data = ok_data(&metadata_output);
+    let fixture_metadata: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(workspace_file(metadata_fixture)).unwrap())
+            .unwrap();
+    assert_eq!(metadata_data, fixture_metadata);
+
+    let render_output = common::dediren_command()
+        .env("DEDIREN_PLUGIN_SVG_RENDER", &svg_plugin)
+        .args(["render", "--plugin", "svg-render", "--policy"])
+        .arg(workspace_file("fixtures/render-policy/uml-svg.json"))
+        .arg("--metadata")
+        .arg(workspace_file(metadata_fixture))
+        .arg("--input")
+        .arg(workspace_file(layout_fixture))
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let render_data = ok_data(&render_output);
+    assert_eq!(render_data["artifact_kind"], "svg");
+    (
+        render_data["content"].as_str().unwrap().to_string(),
+        metadata_data,
+    )
+}
+
 fn assert_node_notation(
     doc: &roxmltree::Document<'_>,
     node_id: &str,
@@ -506,6 +661,32 @@ fn assert_node_notation(
     assert_eq!(rect.attribute("fill"), Some(fill));
     assert_eq!(rect.attribute("stroke"), Some(stroke));
     assert!(child_group_with_attr(node, "data-dediren-node-decorator", decorator).is_some());
+}
+
+fn assert_uml_node_decorator(doc: &roxmltree::Document<'_>, node_id: &str, decorator: &str) {
+    let node = semantic_group(doc, "data-dediren-node-id", node_id);
+    assert!(
+        child_group_with_attr(node, "data-dediren-node-decorator", decorator).is_some(),
+        "expected {node_id} to render UML decorator {decorator}"
+    );
+}
+
+fn assert_edge_marker_start(doc: &roxmltree::Document<'_>, edge_id: &str, marker_kind: &str) {
+    let edge = semantic_group(doc, "data-dediren-edge-id", edge_id);
+    let path = child_element(edge, "path");
+    let marker_id = format!("marker-start-{edge_id}");
+    let marker_ref = format!("url(#{marker_id})");
+    assert_eq!(path.attribute("marker-start"), Some(marker_ref.as_str()));
+    let marker = doc
+        .descendants()
+        .find(|node| {
+            node.has_tag_name("marker") && node.attribute("id") == Some(marker_id.as_str())
+        })
+        .unwrap_or_else(|| panic!("expected marker {marker_id}"));
+    assert_eq!(
+        marker.attribute("data-dediren-edge-marker-start"),
+        Some(marker_kind)
+    );
 }
 
 fn assert_edge_marker_end(doc: &roxmltree::Document<'_>, edge_id: &str, marker_kind: &str) {

@@ -324,6 +324,114 @@ fn real_elk_renders_archimate_metadata_notation() {
 
 #[test]
 #[ignore = "run with --ignored after building the ELK Java helper; serialize real ELK runs"]
+fn real_elk_renders_uml_class_profile() {
+    let _guard = real_elk_guard();
+    let (svg, metadata_data, layout_data) = render_real_elk_uml_view("class-view");
+    let doc = svg_doc(&svg);
+
+    assert_eq!(layout_data["view_id"], "class-view");
+    assert_eq!(metadata_data["semantic_profile"], "uml");
+    assert_eq!(metadata_data["nodes"]["class-order"]["type"], "Class");
+    assert_eq!(
+        metadata_data["nodes"]["enum-order-status"]["type"],
+        "Enumeration"
+    );
+    assert_eq!(
+        metadata_data["edges"]["order-has-lines"]["type"],
+        "Composition"
+    );
+    assert_svg_texts_include(
+        &doc,
+        &[
+            "Orders",
+            "Order",
+            "OrderLine",
+            "OrderStatus",
+            "+ id : OrderId",
+            "+ submit() : void",
+            "lines",
+            "uses",
+        ],
+    );
+    assert_uml_node_decorator(&doc, "pkg-orders", "uml_package");
+    assert_uml_node_decorator(&doc, "class-order", "uml_class");
+    assert_uml_node_decorator(&doc, "enum-order-status", "uml_enumeration");
+    assert_edge_marker_start(&doc, "order-has-lines", "filled_diamond");
+    assert_edge_marker_end(&doc, "order-status-dependency", "open_arrow");
+    assert_reasonable_svg_aspect(&svg, 5.0);
+    write_render_artifact("real-elk", "real_elk_renders_uml_class_profile", &svg);
+}
+
+#[test]
+#[ignore = "run with --ignored after building the ELK Java helper; serialize real ELK runs"]
+fn real_elk_renders_uml_data_profile() {
+    let _guard = real_elk_guard();
+    let (svg, metadata_data, layout_data) = render_real_elk_uml_view("data-view");
+    let doc = svg_doc(&svg);
+
+    assert_eq!(layout_data["view_id"], "data-view");
+    assert_eq!(metadata_data["semantic_profile"], "uml");
+    assert_eq!(metadata_data["nodes"]["class-order"]["type"], "Class");
+    assert_eq!(
+        metadata_data["nodes"]["enum-order-status"]["type"],
+        "Enumeration"
+    );
+    assert_svg_texts_include(
+        &doc,
+        &[
+            "Order",
+            "OrderLine",
+            "OrderStatus",
+            "- status : OrderStatus",
+            "Draft",
+            "Submitted",
+            "lines",
+            "uses",
+        ],
+    );
+    assert_uml_node_decorator(&doc, "class-order", "uml_class");
+    assert_uml_node_decorator(&doc, "class-order-line", "uml_class");
+    assert_uml_node_decorator(&doc, "enum-order-status", "uml_enumeration");
+    assert_edge_marker_start(&doc, "order-has-lines", "filled_diamond");
+    assert_edge_marker_end(&doc, "order-status-dependency", "open_arrow");
+    assert_reasonable_svg_aspect(&svg, 5.0);
+    write_render_artifact("real-elk", "real_elk_renders_uml_data_profile", &svg);
+}
+
+#[test]
+#[ignore = "run with --ignored after building the ELK Java helper; serialize real ELK runs"]
+fn real_elk_renders_uml_activity_profile() {
+    let _guard = real_elk_guard();
+    let (svg, metadata_data, layout_data) = render_real_elk_uml_view("activity-view");
+    let doc = svg_doc(&svg);
+
+    assert_eq!(layout_data["view_id"], "activity-view");
+    assert_eq!(metadata_data["semantic_profile"], "uml");
+    assert_eq!(
+        metadata_data["nodes"]["initial-submit"]["type"],
+        "InitialNode"
+    );
+    assert_eq!(
+        metadata_data["nodes"]["decision-valid"]["type"],
+        "DecisionNode"
+    );
+    assert_eq!(
+        metadata_data["edges"]["flow-valid-submit"]["type"],
+        "ControlFlow"
+    );
+    assert_svg_texts_include(&doc, &["Enter order", "Valid?", "Submit", "yes"]);
+    assert_uml_node_decorator(&doc, "initial-submit", "uml_initial_node");
+    assert_uml_node_decorator(&doc, "action-enter-order", "uml_action");
+    assert_uml_node_decorator(&doc, "decision-valid", "uml_decision_node");
+    assert_uml_node_decorator(&doc, "final-submit", "uml_activity_final_node");
+    assert_edge_marker_end(&doc, "flow-start-enter", "filled_arrow");
+    assert_edge_marker_end(&doc, "flow-valid-submit", "filled_arrow");
+    assert_reasonable_svg_aspect(&svg, 8.0);
+    write_render_artifact("real-elk", "real_elk_renders_uml_activity_profile", &svg);
+}
+
+#[test]
+#[ignore = "run with --ignored after building the ELK Java helper; serialize real ELK runs"]
 fn real_elk_renders_cross_group_route_without_quality_warnings() {
     let _guard = real_elk_guard();
     let temp = assert_fs::TempDir::new().unwrap();
@@ -791,6 +899,10 @@ fn real_elk_guard() -> MutexGuard<'static, ()> {
 }
 
 fn project_layout_request(source_fixture: &str) -> Vec<u8> {
+    project_layout_request_for_view(source_fixture, "main")
+}
+
+fn project_layout_request_for_view(source_fixture: &str, view_id: &str) -> Vec<u8> {
     common::dediren_command()
         .env(
             "DEDIREN_PLUGIN_GENERIC_GRAPH",
@@ -803,7 +915,7 @@ fn project_layout_request(source_fixture: &str) -> Vec<u8> {
             "--plugin",
             "generic-graph",
             "--view",
-            "main",
+            view_id,
             "--input",
         ])
         .arg(workspace_file(source_fixture))
@@ -815,6 +927,10 @@ fn project_layout_request(source_fixture: &str) -> Vec<u8> {
 }
 
 fn project_render_metadata(source_fixture: &str) -> Vec<u8> {
+    project_render_metadata_for_view(source_fixture, "main")
+}
+
+fn project_render_metadata_for_view(source_fixture: &str, view_id: &str) -> Vec<u8> {
     common::dediren_command()
         .env(
             "DEDIREN_PLUGIN_GENERIC_GRAPH",
@@ -827,7 +943,7 @@ fn project_render_metadata(source_fixture: &str) -> Vec<u8> {
             "--plugin",
             "generic-graph",
             "--view",
-            "main",
+            view_id,
             "--input",
         ])
         .arg(workspace_file(source_fixture))
@@ -836,6 +952,46 @@ fn project_render_metadata(source_fixture: &str) -> Vec<u8> {
         .get_output()
         .stdout
         .clone()
+}
+
+fn render_real_elk_uml_view(view_id: &str) -> (String, Value, Value) {
+    let temp = assert_fs::TempDir::new().unwrap();
+    let source = "fixtures/source/valid-uml-basic.json";
+
+    let request_output = project_layout_request_for_view(source, view_id);
+    let request_data = ok_data(&request_output);
+    assert_eq!(request_data["view_id"], view_id);
+    let request = write_temp_bytes(
+        &temp,
+        &format!("{view_id}-layout-request.json"),
+        &request_output,
+    );
+
+    let metadata_output = project_render_metadata_for_view(source, view_id);
+    let metadata_data = ok_data(&metadata_output);
+    assert_eq!(metadata_data["semantic_profile"], "uml");
+    let metadata = write_temp_bytes(
+        &temp,
+        &format!("{view_id}-render-metadata.json"),
+        &metadata_output,
+    );
+
+    let layout_output = real_elk_layout(&request);
+    let layout_data = ok_data(&layout_output);
+    assert_eq!(layout_data["view_id"], view_id);
+    let layout = write_temp_bytes(
+        &temp,
+        &format!("{view_id}-layout-result.json"),
+        &layout_output,
+    );
+    assert_layout_quality_ok(&validate_layout(&layout));
+
+    let svg = render_svg(
+        &layout,
+        "fixtures/render-policy/uml-svg.json",
+        Some(&metadata),
+    );
+    (svg, metadata_data, layout_data)
 }
 
 fn real_elk_layout(input: &Path) -> Vec<u8> {
@@ -1627,6 +1783,60 @@ fn assert_archimate_node_shape(doc: &roxmltree::Document<'_>, node_id: &str, exp
         node.descendants()
             .any(|child| child.attribute("data-dediren-node-shape") == Some(expected_shape)),
         "{node_id} should render node shape {expected_shape}"
+    );
+}
+
+fn assert_uml_node_decorator(doc: &roxmltree::Document<'_>, node_id: &str, decorator: &str) {
+    let node = semantic_group(doc, "data-dediren-node-id", node_id);
+    assert!(
+        child_group_with_attr(node, "data-dediren-node-decorator", decorator).is_some(),
+        "expected {node_id} to render UML decorator {decorator}"
+    );
+}
+
+fn assert_edge_marker_start(doc: &roxmltree::Document<'_>, edge_id: &str, marker_kind: &str) {
+    let edge = semantic_group(doc, "data-dediren-edge-id", edge_id);
+    let path = child_element(edge, "path");
+    let marker_id = format!("marker-start-{edge_id}");
+    let marker_ref = format!("url(#{marker_id})");
+    assert_eq!(
+        path.attribute("marker-start"),
+        Some(marker_ref.as_str()),
+        "{edge_id} marker reference"
+    );
+    let marker = doc
+        .descendants()
+        .find(|node| {
+            node.has_tag_name("marker") && node.attribute("id") == Some(marker_id.as_str())
+        })
+        .unwrap_or_else(|| panic!("expected marker {marker_id}"));
+    assert_eq!(
+        marker.attribute("data-dediren-edge-marker-start"),
+        Some(marker_kind),
+        "{edge_id} marker kind"
+    );
+}
+
+fn assert_edge_marker_end(doc: &roxmltree::Document<'_>, edge_id: &str, marker_kind: &str) {
+    let edge = semantic_group(doc, "data-dediren-edge-id", edge_id);
+    let path = child_element(edge, "path");
+    let marker_id = format!("marker-end-{edge_id}");
+    let marker_ref = format!("url(#{marker_id})");
+    assert_eq!(
+        path.attribute("marker-end"),
+        Some(marker_ref.as_str()),
+        "{edge_id} marker reference"
+    );
+    let marker = doc
+        .descendants()
+        .find(|node| {
+            node.has_tag_name("marker") && node.attribute("id") == Some(marker_id.as_str())
+        })
+        .unwrap_or_else(|| panic!("expected marker {marker_id}"));
+    assert_eq!(
+        marker.attribute("data-dediren-edge-marker-end"),
+        Some(marker_kind),
+        "{edge_id} marker kind"
     );
 }
 

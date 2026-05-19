@@ -1,0 +1,132 @@
+{
+  "layout_result_schema_version": "layout-result.schema.v1",
+  "view_id": "activity-view",
+  "nodes": [
+    {
+      "id": "initial-submit",
+      "source_id": "initial-submit",
+      "projection_id": "initial-submit",
+      "x": 80,
+      "y": 104,
+      "width": 32,
+      "height": 32,
+      "label": ""
+    },
+    {
+      "id": "action-enter-order",
+      "source_id": "action-enter-order",
+      "projection_id": "action-enter-order",
+      "x": 172,
+      "y": 80,
+      "width": 160,
+      "height": 80,
+      "label": "Enter order"
+    },
+    {
+      "id": "decision-valid",
+      "source_id": "decision-valid",
+      "projection_id": "decision-valid",
+      "x": 384,
+      "y": 84,
+      "width": 72,
+      "height": 72,
+      "label": "Valid?"
+    },
+    {
+      "id": "action-submit",
+      "source_id": "action-submit",
+      "projection_id": "action-submit",
+      "x": 508,
+      "y": 80,
+      "width": 160,
+      "height": 80,
+      "label": "Submit"
+    },
+    {
+      "id": "final-submit",
+      "source_id": "final-submit",
+      "projection_id": "final-submit",
+      "x": 728,
+      "y": 104,
+      "width": 32,
+      "height": 32,
+      "label": ""
+    }
+  ],
+  "edges": [
+    {
+      "id": "flow-start-enter",
+      "source": "initial-submit",
+      "target": "action-enter-order",
+      "source_id": "flow-start-enter",
+      "projection_id": "flow-start-enter",
+      "points": [
+        {
+          "x": 112,
+          "y": 120
+        },
+        {
+          "x": 172,
+          "y": 120
+        }
+      ],
+      "label": ""
+    },
+    {
+      "id": "flow-enter-valid",
+      "source": "action-enter-order",
+      "target": "decision-valid",
+      "source_id": "flow-enter-valid",
+      "projection_id": "flow-enter-valid",
+      "points": [
+        {
+          "x": 332,
+          "y": 120
+        },
+        {
+          "x": 384,
+          "y": 120
+        }
+      ],
+      "label": ""
+    },
+    {
+      "id": "flow-valid-submit",
+      "source": "decision-valid",
+      "target": "action-submit",
+      "source_id": "flow-valid-submit",
+      "projection_id": "flow-valid-submit",
+      "points": [
+        {
+          "x": 456,
+          "y": 120
+        },
+        {
+          "x": 508,
+          "y": 120
+        }
+      ],
+      "label": "yes"
+    },
+    {
+      "id": "flow-submit-final",
+      "source": "action-submit",
+      "target": "final-submit",
+      "source_id": "flow-submit-final",
+      "projection_id": "flow-submit-final",
+      "points": [
+        {
+          "x": 668,
+          "y": 120
+        },
+        {
+          "x": 728,
+          "y": 120
+        }
+      ],
+      "label": ""
+    }
+  ],
+  "groups": [],
+  "warnings": []
+}

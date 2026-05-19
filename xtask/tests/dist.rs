@@ -199,6 +199,28 @@ fn dist_build_includes_uml_profile_bundle_artifacts() {
         bundle.join("fixtures/render-policy/uml-svg.json").exists(),
         "dist build should include the UML SVG render policy fixture"
     );
+    assert!(
+        bundle.join("fixtures/layout-result/uml-data.json").exists(),
+        "dist build should include the UML data layout fixture"
+    );
+    assert!(
+        bundle
+            .join("fixtures/layout-result/uml-activity.json")
+            .exists(),
+        "dist build should include the UML activity layout fixture"
+    );
+    assert!(
+        bundle
+            .join("fixtures/render-metadata/uml-data.json")
+            .exists(),
+        "dist build should include the UML data render metadata fixture"
+    );
+    assert!(
+        bundle
+            .join("fixtures/render-metadata/uml-activity.json")
+            .exists(),
+        "dist build should include the UML activity render metadata fixture"
+    );
 
     let metadata: serde_json::Value =
         serde_json::from_str(&fs::read_to_string(bundle.join("bundle.json")).unwrap()).unwrap();
@@ -360,6 +382,8 @@ esac
     fn write_tree(&self) {
         fs::create_dir_all(self.root.path().join("fixtures/plugins")).unwrap();
         fs::create_dir_all(self.root.path().join("fixtures/source")).unwrap();
+        fs::create_dir_all(self.root.path().join("fixtures/layout-result")).unwrap();
+        fs::create_dir_all(self.root.path().join("fixtures/render-metadata")).unwrap();
         fs::create_dir_all(self.root.path().join("fixtures/render-policy")).unwrap();
         fs::create_dir_all(self.root.path().join("docs")).unwrap();
         fs::create_dir_all(self.root.path().join("schemas")).unwrap();
@@ -407,6 +431,14 @@ esac
             "{}",
         )
         .unwrap();
+        for path in [
+            "fixtures/layout-result/uml-data.json",
+            "fixtures/layout-result/uml-activity.json",
+            "fixtures/render-metadata/uml-data.json",
+            "fixtures/render-metadata/uml-activity.json",
+        ] {
+            fs::write(self.root.path().join(path), "{}").unwrap();
+        }
         fs::write(
             self.root.path().join("docs/agent-usage.md"),
             "# Dediren Agent Usage\n\nBundle-visible agent guide.\n",
