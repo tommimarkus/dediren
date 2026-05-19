@@ -192,6 +192,12 @@ fn render_invokes_svg_plugin_with_uml_policy_and_metadata() {
         child_group_with_attr(order, "data-dediren-node-decorator", "uml_class").is_some(),
         "expected UML class decorator in SVG"
     );
+    let artifact = write_render_artifact(
+        "cli-render",
+        "render_invokes_svg_plugin_with_uml_policy_and_metadata",
+        content,
+    );
+    assert!(artifact.exists());
 }
 
 #[test]

@@ -126,6 +126,8 @@ fn svg_renderer_renders_uml_activity_node_shapes() {
     });
 
     let content = render_content(input);
+    let artifact = write_render_artifact(&current_test_name(), &content);
+    assert!(artifact.exists());
     let doc = svg_doc(&content);
     for (node_id, decorator) in [
         ("activity-submit", "uml_activity"),

@@ -18,6 +18,8 @@ fn uml_style_input() -> serde_json::Value {
 fn svg_renderer_renders_uml_class_compartments() {
     let input = uml_style_input();
     let content = render_content(input);
+    let artifact = write_render_artifact(&current_test_name(), &content);
+    assert!(artifact.exists());
     let doc = svg_doc(&content);
 
     let order = semantic_group(&doc, "data-dediren-node-id", "class-order");
@@ -41,6 +43,8 @@ fn svg_renderer_renders_uml_class_compartments() {
 fn svg_renderer_renders_uml_enumeration_literals() {
     let input = uml_style_input();
     let content = render_content(input);
+    let artifact = write_render_artifact(&current_test_name(), &content);
+    assert!(artifact.exists());
     let doc = svg_doc(&content);
 
     let enumeration = semantic_group(&doc, "data-dediren-node-id", "enum-order-status");
@@ -123,6 +127,8 @@ fn svg_renderer_covers_uml_structural_node_shapes() {
     });
 
     let content = render_content(input);
+    let artifact = write_render_artifact(&current_test_name(), &content);
+    assert!(artifact.exists());
     let doc = svg_doc(&content);
 
     let package = semantic_group(&doc, "data-dediren-node-id", "package-orders");

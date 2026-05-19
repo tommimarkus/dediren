@@ -15,6 +15,8 @@ fn svg_renderer_applies_uml_relationship_markers() {
     });
 
     let content = render_content(input);
+    let artifact = write_render_artifact(&current_test_name(), &content);
+    assert!(artifact.exists());
     let doc = svg_doc(&content);
 
     let edge = semantic_group(&doc, "data-dediren-edge-id", "order-has-lines");
@@ -160,6 +162,8 @@ fn svg_renderer_covers_each_uml_relationship_marker() {
     });
 
     let content = render_content(input);
+    let artifact = write_render_artifact(&current_test_name(), &content);
+    assert!(artifact.exists());
     let doc = svg_doc(&content);
 
     let aggregation = child_element(

@@ -569,10 +569,10 @@ Generated render artifacts are written under `.test-output/renders/`:
 - `.test-output/renders/real-elk/` for real Java helper render tests.
 - `.test-output/renders/fixture-pipeline/` for fixture-backed CLI pipeline
   tests, including deterministic ArchiMate node, relationship, and group render
-  notation.
+  notation plus the UML fixture pipeline render.
 - `.test-output/renders/svg-render-plugin/` for renderer policy and semantic
-  fixture tests that do not prove ELK geometry, including the all-Archimate-node
-  and all-Archimate-relationship visual sheets.
+  fixture tests that do not prove ELK geometry, including the all-Archimate and
+  UML node/relationship/activity visual sheets.
 
 Generated SVGs are ignored by git. Inspect them locally instead of committing
 them unless a tracked example fixture was deliberately requested.

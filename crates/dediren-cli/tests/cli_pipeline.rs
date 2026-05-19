@@ -226,10 +226,16 @@ fn fixture_mode_uml_pipeline_renders_and_exports() {
         .clone();
     let render_data = ok_data(&render);
     assert_eq!(render_data["artifact_kind"], "svg");
-    assert!(render_data["content"]
+    let svg = render_data["content"]
         .as_str()
-        .expect("render content should be a string")
-        .contains("data-dediren-node-decorator=\"uml_class\""));
+        .expect("render content should be a string");
+    assert!(svg.contains("data-dediren-node-decorator=\"uml_class\""));
+    let artifact = write_render_artifact(
+        "fixture-pipeline",
+        "fixture_mode_uml_pipeline_renders_and_exports",
+        svg,
+    );
+    assert!(artifact.exists());
 
     let export = common::dediren_command()
         .env("DEDIREN_PLUGIN_UML_XMI", &xmi_plugin)
