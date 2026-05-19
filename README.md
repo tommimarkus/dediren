@@ -45,18 +45,18 @@ Runtime prerequisite:
 
 - Java 21 or newer available as `java` on `PATH`.
 
-For the current `0.14.0` version, the xtask creates:
+For the current `0.14.1` version, the xtask creates:
 
 ```text
-dist/dediren-agent-bundle-0.14.0-x86_64-unknown-linux-gnu/
-dist/dediren-agent-bundle-0.14.0-x86_64-unknown-linux-gnu.tar.gz
+dist/dediren-agent-bundle-0.14.1-x86_64-unknown-linux-gnu/
+dist/dediren-agent-bundle-0.14.1-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Run the smoke test from a shell where `java -version` resolves to Java 21 or
 newer:
 
 ```bash
-cargo xtask dist smoke dist/dediren-agent-bundle-0.14.0-x86_64-unknown-linux-gnu.tar.gz
+cargo xtask dist smoke dist/dediren-agent-bundle-0.14.1-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Concurrent `cargo xtask dist build` invocations serialize on a repo-local lock
@@ -69,8 +69,8 @@ Unpack and run it anywhere:
 
 ```bash
 mkdir -p /tmp/dediren-dist
-tar -xzf dist/dediren-agent-bundle-0.14.0-x86_64-unknown-linux-gnu.tar.gz -C /tmp/dediren-dist
-/tmp/dediren-dist/dediren-agent-bundle-0.14.0-x86_64-unknown-linux-gnu/bin/dediren --help
+tar -xzf dist/dediren-agent-bundle-0.14.1-x86_64-unknown-linux-gnu.tar.gz -C /tmp/dediren-dist
+/tmp/dediren-dist/dediren-agent-bundle-0.14.1-x86_64-unknown-linux-gnu/bin/dediren --help
 ```
 
 For a full unpacked-bundle JSON authoring and project/layout/render smoke
@@ -381,7 +381,15 @@ The bundled UML profile supports the first class/data/activity slice:
 authored source. UML/XMI is compatibility export output. Use
 `fixtures/source/valid-uml-complex.json` as the broader UML pressure fixture;
 it carries package-bounded class, data, and activity views over one source
-model.
+model. In the complex class view, relationship edges are backed by typed class
+members where the relationship represents a member reference, and the static
+`fixtures/layout-result/uml-complex-class.json` endpoints align to those
+rendered member rows. UML structural layout requests size class, interface,
+data type, and enumeration nodes from their rendered compartments so attributes
+and operations stay inside real ELK-generated boxes. Real ELK-generated UML
+layouts currently use generated classifier-boundary ports from the layout
+contract; member-row ports require a future semantic endpoint hint in the layout
+request.
 
 Validate UML source semantics:
 
@@ -663,7 +671,7 @@ newer:
 
 ```bash
 cargo xtask dist build
-cargo xtask dist smoke dist/dediren-agent-bundle-0.14.0-x86_64-unknown-linux-gnu.tar.gz
+cargo xtask dist smoke dist/dediren-agent-bundle-0.14.1-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Focused checks:

@@ -540,6 +540,42 @@ fn generic_graph_projects_compact_uml_activity_node_size_hints() {
 }
 
 #[test]
+fn generic_graph_projects_uml_structural_size_hints_from_compartments() {
+    let input = std::fs::read_to_string(common::workspace_file(
+        "fixtures/source/valid-uml-complex.json",
+    ))
+    .unwrap();
+
+    let mut cmd = common::plugin_command();
+    let output = cmd
+        .args([
+            "project",
+            "--target",
+            "layout-request",
+            "--view",
+            "complex-class-view",
+        ])
+        .write_stdin(input)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let data = common::ok_data(&output);
+    let order = layout_request_node(&data, "class-order");
+    assert_eq!(order["width_hint"], serde_json::json!(300.0));
+    assert_eq!(order["height_hint"], serde_json::json!(190.0));
+
+    let shipment = layout_request_node(&data, "class-shipment");
+    assert_eq!(shipment["height_hint"], serde_json::json!(130.0));
+
+    let gateway = layout_request_node(&data, "interface-payment-gateway");
+    assert_eq!(gateway["width_hint"], serde_json::json!(380.0));
+    assert_eq!(gateway["height_hint"], serde_json::json!(120.0));
+}
+
+#[test]
 fn generic_graph_rejects_archimate_junction_with_mixed_relationship_types() {
     let input = serde_json::json!({
         "model_schema_version": "model.schema.v1",
@@ -1067,4 +1103,13 @@ fn archimate_source() -> serde_json::Value {
             }
         }
     })
+}
+
+fn layout_request_node<'a>(data: &'a serde_json::Value, node_id: &str) -> &'a serde_json::Value {
+    data["nodes"]
+        .as_array()
+        .expect("layout request nodes should be an array")
+        .iter()
+        .find(|node| node["id"] == node_id)
+        .unwrap_or_else(|| panic!("expected layout request node {node_id}"))
 }

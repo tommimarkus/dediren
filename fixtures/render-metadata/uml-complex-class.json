@@ -13,6 +13,18 @@
             "type": "String",
             "visibility": "private",
             "multiplicity": "0..1"
+          },
+          {
+            "name": "state",
+            "type": "PaymentState",
+            "visibility": "private",
+            "multiplicity": "1"
+          },
+          {
+            "name": "order",
+            "type": "Order",
+            "visibility": "public",
+            "multiplicity": "1"
           }
         ],
         "operations": [
@@ -42,6 +54,12 @@
             "type": "String",
             "visibility": "public",
             "multiplicity": "1"
+          },
+          {
+            "name": "orders",
+            "type": "Order",
+            "visibility": "public",
+            "multiplicity": "0..*"
           }
         ],
         "operations": [
@@ -82,6 +100,30 @@
             "type": "Money",
             "visibility": "public",
             "multiplicity": "1"
+          },
+          {
+            "name": "customer",
+            "type": "Customer",
+            "visibility": "public",
+            "multiplicity": "1"
+          },
+          {
+            "name": "lines",
+            "type": "OrderLine",
+            "visibility": "public",
+            "multiplicity": "1..*"
+          },
+          {
+            "name": "payment",
+            "type": "CardPayment",
+            "visibility": "public",
+            "multiplicity": "0..1"
+          },
+          {
+            "name": "shipments",
+            "type": "Shipment",
+            "visibility": "public",
+            "multiplicity": "0..*"
           }
         ],
         "operations": [
@@ -128,6 +170,12 @@
             "type": "Money",
             "visibility": "public",
             "multiplicity": "1"
+          },
+          {
+            "name": "order",
+            "type": "Order",
+            "visibility": "public",
+            "multiplicity": "1"
           }
         ],
         "operations": []
@@ -146,9 +194,21 @@
             "multiplicity": "0..1"
           },
           {
+            "name": "order",
+            "type": "Order",
+            "visibility": "public",
+            "multiplicity": "1"
+          },
+          {
             "name": "destination",
             "type": "Address",
             "visibility": "public",
+            "multiplicity": "1"
+          },
+          {
+            "name": "state",
+            "type": "ShipmentState",
+            "visibility": "private",
             "multiplicity": "1"
           }
         ],
@@ -288,6 +348,10 @@
     "order-id-type": {
       "type": "Dependency",
       "source_id": "order-id-type"
+    },
+    "order-line-unit-price-money": {
+      "type": "Association",
+      "source_id": "order-line-unit-price-money"
     },
     "order-status-dependency": {
       "type": "Dependency",

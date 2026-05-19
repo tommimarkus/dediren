@@ -456,6 +456,8 @@ fn real_elk_renders_complex_uml_class_profile() {
         metadata_data["edges"]["card-payment-realizes-gateway"]["type"],
         "Realization"
     );
+    assert_laid_out_node_min_size(&layout_data, "class-order", 300.0, 190.0);
+    assert_laid_out_node_min_size(&layout_data, "interface-payment-gateway", 380.0, 120.0);
     assert_svg_texts_include(
         &doc,
         &[
@@ -1886,6 +1888,25 @@ fn laid_out_node<'a>(layout_data: &'a Value, node_id: &str) -> &'a Value {
         .iter()
         .find(|node| node["id"] == node_id)
         .unwrap_or_else(|| panic!("expected laid out node {node_id}"))
+}
+
+fn assert_laid_out_node_min_size(
+    layout_data: &Value,
+    node_id: &str,
+    min_width: f64,
+    min_height: f64,
+) {
+    let node = laid_out_node(layout_data, node_id);
+    let width = point_coordinate(node, "width");
+    let height = point_coordinate(node, "height");
+    assert!(
+        width >= min_width,
+        "{node_id} width should be >= {min_width}, got {width}"
+    );
+    assert!(
+        height >= min_height,
+        "{node_id} height should be >= {min_height}, got {height}"
+    );
 }
 
 fn corner_count(points: &[Value]) -> usize {

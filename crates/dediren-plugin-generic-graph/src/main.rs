@@ -13,6 +13,17 @@ use dediren_contracts::{
     SemanticValidationResult, SourceDocument, LAYOUT_REQUEST_SCHEMA_VERSION,
     RENDER_METADATA_SCHEMA_VERSION, SEMANTIC_VALIDATION_RESULT_SCHEMA_VERSION,
 };
+use serde_json::Value;
+
+const UML_STRUCTURAL_MIN_WIDTH: f64 = 220.0;
+const UML_STRUCTURAL_MIN_HEIGHT: f64 = 120.0;
+const UML_TEXT_CHAR_WIDTH: f64 = 8.0;
+const UML_TEXT_HORIZONTAL_PADDING: f64 = 32.0;
+const UML_TITLE_ROW_HEIGHT: f64 = 15.0;
+const UML_TITLE_PADDING: f64 = 8.0;
+const UML_MEMBER_ROW_HEIGHT: f64 = 14.0;
+const UML_COMPARTMENT_PADDING: f64 = 8.0;
+const UML_OPERATION_COMPARTMENT_EXTRA: f64 = 14.0;
 
 fn main() -> anyhow::Result<()> {
     let args: Vec<String> = std::env::args().collect();
@@ -340,7 +351,7 @@ fn layout_width_hint(semantic_profile: &str, source_node: &dediren_contracts::So
     } else if semantic_profile == GenericGraphSemanticProfile::Uml.as_str()
         && is_large_uml_structural_node_type(&source_node.node_type)
     {
-        220.0
+        uml_structural_width_hint(source_node)
     } else {
         160.0
     }
@@ -358,7 +369,7 @@ fn layout_height_hint(semantic_profile: &str, source_node: &dediren_contracts::S
     } else if semantic_profile == GenericGraphSemanticProfile::Uml.as_str()
         && is_large_uml_structural_node_type(&source_node.node_type)
     {
-        120.0
+        uml_structural_height_hint(source_node)
     } else {
         80.0
     }
@@ -369,6 +380,204 @@ fn is_large_uml_structural_node_type(node_type: &str) -> bool {
         node_type,
         "Class" | "Interface" | "DataType" | "Enumeration"
     )
+}
+
+fn uml_structural_width_hint(source_node: &dediren_contracts::SourceNode) -> f64 {
+    let properties = source_node.properties.get("uml");
+    let max_chars =
+        uml_classifier_line_lengths(&source_node.node_type, &source_node.label, properties)
+            .into_iter()
+            .max()
+            .unwrap_or_else(|| source_node.label.chars().count());
+    round_up(
+        (max_chars as f64 * UML_TEXT_CHAR_WIDTH + UML_TEXT_HORIZONTAL_PADDING)
+            .max(UML_STRUCTURAL_MIN_WIDTH),
+        20.0,
+    )
+}
+
+fn uml_structural_height_hint(source_node: &dediren_contracts::SourceNode) -> f64 {
+    let properties = source_node.properties.get("uml");
+    let title_height = uml_title_height(&source_node.node_type);
+    let attribute_count = if source_node.node_type == "Enumeration" {
+        uml_array_len(properties, "literals")
+    } else {
+        uml_array_len(properties, "attributes")
+    };
+    let operation_count = if source_node.node_type == "Enumeration" {
+        0
+    } else {
+        uml_array_len(properties, "operations")
+    };
+    let operation_extra = if operation_count > 0 {
+        UML_OPERATION_COMPARTMENT_EXTRA
+    } else {
+        0.0
+    };
+
+    round_up(
+        (title_height
+            + uml_compartment_height(attribute_count)
+            + uml_compartment_height(operation_count)
+            + operation_extra)
+            .max(UML_STRUCTURAL_MIN_HEIGHT),
+        10.0,
+    )
+}
+
+fn uml_classifier_line_lengths(
+    node_type: &str,
+    label: &str,
+    properties: Option<&Value>,
+) -> Vec<usize> {
+    let mut lengths = Vec::new();
+    if let Some(stereotype_len) = uml_stereotype_char_count(node_type) {
+        lengths.push(stereotype_len);
+    }
+    lengths.push(label.chars().count());
+
+    if node_type == "Enumeration" {
+        lengths.extend(
+            uml_string_values(properties, "literals")
+                .map(str::chars)
+                .map(Iterator::count),
+        );
+    } else {
+        lengths.extend(
+            uml_array_values(properties, "attributes")
+                .map(|attribute| uml_attribute_line(attribute).chars().count()),
+        );
+        lengths.extend(
+            uml_array_values(properties, "operations")
+                .map(|operation| uml_operation_line(operation).chars().count()),
+        );
+    }
+
+    lengths
+}
+
+fn uml_title_height(node_type: &str) -> f64 {
+    let title_lines = if uml_stereotype_char_count(node_type).is_some() {
+        2.0
+    } else {
+        1.0
+    };
+    (title_lines * UML_TITLE_ROW_HEIGHT + UML_TITLE_PADDING).max(28.0)
+}
+
+fn uml_stereotype_char_count(node_type: &str) -> Option<usize> {
+    match node_type {
+        "Enumeration" => Some(13),
+        "Interface" => Some(11),
+        "DataType" => Some(10),
+        _ => None,
+    }
+}
+
+fn uml_compartment_height(row_count: usize) -> f64 {
+    if row_count == 0 {
+        0.0
+    } else {
+        row_count as f64 * UML_MEMBER_ROW_HEIGHT + UML_COMPARTMENT_PADDING
+    }
+}
+
+fn uml_array_len(properties: Option<&Value>, key: &str) -> usize {
+    uml_array_values(properties, key).count()
+}
+
+fn uml_array_values<'a>(
+    properties: Option<&'a Value>,
+    key: &str,
+) -> impl Iterator<Item = &'a Value> {
+    properties
+        .and_then(|properties| properties.get(key))
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+}
+
+fn uml_string_values<'a>(
+    properties: Option<&'a Value>,
+    key: &str,
+) -> impl Iterator<Item = &'a str> {
+    uml_array_values(properties, key).filter_map(Value::as_str)
+}
+
+fn uml_attribute_line(attribute: &Value) -> String {
+    let visibility = uml_visibility_symbol(attribute.get("visibility").and_then(Value::as_str));
+    let name = attribute
+        .get("name")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    let attribute_type = attribute
+        .get("type")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    if attribute_type.is_empty() {
+        format!("{visibility} {name}")
+    } else {
+        format!("{visibility} {name} : {attribute_type}")
+    }
+}
+
+fn uml_operation_line(operation: &Value) -> String {
+    let visibility = uml_visibility_symbol(operation.get("visibility").and_then(Value::as_str));
+    let name = operation
+        .get("name")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    let parameters = operation
+        .get("parameters")
+        .and_then(Value::as_array)
+        .map(|parameters| {
+            parameters
+                .iter()
+                .map(uml_parameter_text)
+                .collect::<Vec<_>>()
+                .join(", ")
+        })
+        .unwrap_or_default();
+    let return_type = operation
+        .get("return_type")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    if return_type.is_empty() {
+        format!("{visibility} {name}({parameters})")
+    } else {
+        format!("{visibility} {name}({parameters}) : {return_type}")
+    }
+}
+
+fn uml_parameter_text(parameter: &Value) -> String {
+    let name = parameter
+        .get("name")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    let parameter_type = parameter
+        .get("type")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    if parameter_type.is_empty() {
+        name.to_string()
+    } else if name.is_empty() {
+        parameter_type.to_string()
+    } else {
+        format!("{name} : {parameter_type}")
+    }
+}
+
+fn uml_visibility_symbol(visibility: Option<&str>) -> &'static str {
+    match visibility {
+        Some("private") => "-",
+        Some("protected") => "#",
+        Some("package") => "~",
+        _ => "+",
+    }
+}
+
+fn round_up(value: f64, step: f64) -> f64 {
+    (value / step).ceil() * step
 }
 
 fn validate_archimate_source_types(

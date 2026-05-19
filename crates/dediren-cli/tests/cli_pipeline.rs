@@ -5,6 +5,7 @@ use common::{
     assert_reasonable_svg_aspect, assert_svg_texts_include, child_element, child_group_with_attr,
     ok_data, plugin_binary, semantic_group, svg_doc, workspace_file, write_render_artifact,
 };
+use serde_json::Value;
 
 #[test]
 fn fixture_pipeline_produces_svg_and_oef() {
@@ -379,14 +380,21 @@ fn fixture_mode_uml_complex_class_view_renders() {
             "Shipment",
             "Money",
             "OrderStatus",
+            "+ orders : Order",
+            "+ lines : OrderLine",
+            "+ payment : CardPayment",
+            "+ order : Order",
             "+ total : Money",
+            "- state : ShipmentState",
             "+ authorize(amount : Money) : PaymentState",
             "implements",
+            "unit price",
             "ships to",
         ],
     );
     assert_uml_node_decorator(&doc, "class-order", "uml_class");
     assert_uml_node_decorator(&doc, "interface-payment-gateway", "uml_interface");
+    assert_svg_node_min_size(&doc, "interface-payment-gateway", 380.0, 120.0);
     assert_uml_node_decorator(&doc, "datatype-money", "uml_data_type");
     assert_uml_node_decorator(&doc, "enum-order-status", "uml_enumeration");
     assert_edge_marker_start(&doc, "order-has-lines", "filled_diamond");
@@ -399,6 +407,72 @@ fn fixture_mode_uml_complex_class_view_renders() {
         "fixture_mode_uml_complex_class_view_renders",
         &svg,
     );
+}
+
+#[test]
+fn uml_complex_class_relationships_are_backed_by_members() {
+    let source = json_fixture("fixtures/source/valid-uml-complex.json");
+
+    for relationship_id in uml_view_relationship_ids(&source, "complex-class-view") {
+        let relationship = source_relationship(&source, &relationship_id);
+        if relationship["type"].as_str() == Some("Realization") {
+            continue;
+        }
+
+        let source_endpoint = source_node(&source, relationship["source"].as_str().unwrap());
+        let target_endpoint = source_node(&source, relationship["target"].as_str().unwrap());
+        let source_label = source_endpoint["label"].as_str().unwrap();
+        let target_label = target_endpoint["label"].as_str().unwrap();
+
+        assert!(
+            has_uml_attribute_of_type(source_endpoint, target_label)
+                || has_uml_attribute_of_type(target_endpoint, source_label),
+            "{relationship_id} should be backed by a typed UML member on at least one endpoint"
+        );
+    }
+}
+
+#[test]
+fn uml_complex_class_edge_ports_align_to_member_rows() {
+    let layout = json_fixture("fixtures/layout-result/uml-complex-class.json");
+    let metadata = json_fixture("fixtures/render-metadata/uml-complex-class.json");
+
+    for (edge_id, member_name) in [
+        ("customer-places-order", "orders"),
+        ("order-has-lines", "lines"),
+        ("order-has-payment", "payment"),
+        ("order-status-dependency", "status"),
+        ("order-total-money", "total"),
+        ("order-id-type", "id"),
+        ("card-payment-state", "state"),
+        ("shipment-for-order", "order"),
+        ("shipment-destination", "destination"),
+        ("shipment-state", "state"),
+        ("order-line-unit-price-money", "unitPrice"),
+    ] {
+        assert_edge_endpoint_aligns_to_member_row(
+            &layout,
+            &metadata,
+            edge_id,
+            "source",
+            member_name,
+        );
+    }
+
+    for (edge_id, member_name) in [
+        ("customer-places-order", "customer"),
+        ("order-has-lines", "order"),
+        ("order-has-payment", "order"),
+        ("shipment-for-order", "shipments"),
+    ] {
+        assert_edge_endpoint_aligns_to_member_row(
+            &layout,
+            &metadata,
+            edge_id,
+            "target",
+            member_name,
+        );
+    }
 }
 
 #[test]
@@ -724,6 +798,118 @@ fn render_uml_fixture_view_from_source(
     )
 }
 
+fn json_fixture(path: &str) -> Value {
+    serde_json::from_str(&std::fs::read_to_string(workspace_file(path)).unwrap()).unwrap()
+}
+
+fn uml_view_relationship_ids(source: &Value, view_id: &str) -> Vec<String> {
+    source["plugins"]["generic-graph"]["views"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|view| view["id"].as_str() == Some(view_id))
+        .unwrap_or_else(|| panic!("expected UML fixture view {view_id}"))
+        .get("relationships")
+        .and_then(Value::as_array)
+        .unwrap()
+        .iter()
+        .map(|relationship_id| relationship_id.as_str().unwrap().to_string())
+        .collect()
+}
+
+fn source_node<'a>(source: &'a Value, node_id: &str) -> &'a Value {
+    source["nodes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|node| node["id"].as_str() == Some(node_id))
+        .unwrap_or_else(|| panic!("expected source node {node_id}"))
+}
+
+fn source_relationship<'a>(source: &'a Value, relationship_id: &str) -> &'a Value {
+    source["relationships"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|relationship| relationship["id"].as_str() == Some(relationship_id))
+        .unwrap_or_else(|| panic!("expected source relationship {relationship_id}"))
+}
+
+fn has_uml_attribute_of_type(node: &Value, type_name: &str) -> bool {
+    node["properties"]["uml"]["attributes"]
+        .as_array()
+        .is_some_and(|attributes| {
+            attributes
+                .iter()
+                .any(|attribute| attribute["type"].as_str() == Some(type_name))
+        })
+}
+
+fn assert_edge_endpoint_aligns_to_member_row(
+    layout: &Value,
+    metadata: &Value,
+    edge_id: &str,
+    endpoint: &str,
+    member_name: &str,
+) {
+    let edge = layout_edge(layout, edge_id);
+    let points = edge["points"].as_array().unwrap();
+    let (node_id, point) = match endpoint {
+        "source" => (edge["source"].as_str().unwrap(), points.first().unwrap()),
+        "target" => (edge["target"].as_str().unwrap(), points.last().unwrap()),
+        _ => panic!("unsupported endpoint {endpoint}"),
+    };
+    let actual_y = point["y"].as_f64().unwrap();
+    let expected_y = uml_member_row_center_y(layout, metadata, node_id, member_name);
+    assert!(
+        (actual_y - expected_y).abs() <= 2.0,
+        "{edge_id} {endpoint} endpoint should align with {node_id}.{member_name} row: got y={actual_y}, expected y={expected_y}"
+    );
+}
+
+fn layout_edge<'a>(layout: &'a Value, edge_id: &str) -> &'a Value {
+    layout["edges"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|edge| edge["id"].as_str() == Some(edge_id))
+        .unwrap_or_else(|| panic!("expected layout edge {edge_id}"))
+}
+
+fn layout_node<'a>(layout: &'a Value, node_id: &str) -> &'a Value {
+    layout["nodes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|node| node["id"].as_str() == Some(node_id))
+        .unwrap_or_else(|| panic!("expected layout node {node_id}"))
+}
+
+fn uml_member_row_center_y(
+    layout: &Value,
+    metadata: &Value,
+    node_id: &str,
+    member_name: &str,
+) -> f64 {
+    let node = layout_node(layout, node_id);
+    let metadata_node = &metadata["nodes"][node_id];
+    let type_name = metadata_node["type"].as_str().unwrap();
+    let title_line_count = match type_name {
+        "DataType" | "Enumeration" | "Interface" => 2.0,
+        _ => 1.0,
+    };
+    let title_height = (title_line_count * 15.0_f64 + 8.0_f64).max(28.0_f64);
+    let attributes = metadata_node["properties"]["attributes"]
+        .as_array()
+        .unwrap_or_else(|| panic!("{node_id} should have attributes for member row assertions"));
+    let index = attributes
+        .iter()
+        .position(|attribute| attribute["name"].as_str() == Some(member_name))
+        .unwrap_or_else(|| panic!("{node_id} should have UML member {member_name}"));
+
+    node["y"].as_f64().unwrap() + title_height + 8.0 + index as f64 * 14.0
+}
+
 fn assert_node_notation(
     doc: &roxmltree::Document<'_>,
     node_id: &str,
@@ -743,6 +929,35 @@ fn assert_uml_node_decorator(doc: &roxmltree::Document<'_>, node_id: &str, decor
     assert!(
         child_group_with_attr(node, "data-dediren-node-decorator", decorator).is_some(),
         "expected {node_id} to render UML decorator {decorator}"
+    );
+}
+
+fn assert_svg_node_min_size(
+    doc: &roxmltree::Document<'_>,
+    node_id: &str,
+    min_width: f64,
+    min_height: f64,
+) {
+    let node = semantic_group(doc, "data-dediren-node-id", node_id);
+    let rect = child_element(node, "rect");
+    let width = rect
+        .attribute("width")
+        .unwrap_or_else(|| panic!("expected {node_id} rect to have width"))
+        .parse::<f64>()
+        .unwrap_or_else(|error| panic!("expected {node_id} width to be numeric: {error}"));
+    let height = rect
+        .attribute("height")
+        .unwrap_or_else(|| panic!("expected {node_id} rect to have height"))
+        .parse::<f64>()
+        .unwrap_or_else(|error| panic!("expected {node_id} height to be numeric: {error}"));
+
+    assert!(
+        width >= min_width,
+        "{node_id} width should be >= {min_width}, got {width}"
+    );
+    assert!(
+        height >= min_height,
+        "{node_id} height should be >= {min_height}, got {height}"
     );
 }
 

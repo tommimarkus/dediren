@@ -9,7 +9,7 @@
       "x": 80,
       "y": 170,
       "width": 220,
-      "height": 110,
+      "height": 120,
       "label": "Customer"
     },
     {
@@ -19,7 +19,7 @@
       "x": 380,
       "y": 140,
       "width": 260,
-      "height": 160,
+      "height": 190,
       "label": "Order"
     },
     {
@@ -29,7 +29,7 @@
       "x": 720,
       "y": 90,
       "width": 240,
-      "height": 130,
+      "height": 140,
       "label": "OrderLine"
     },
     {
@@ -68,7 +68,7 @@
       "projection_id": "interface-payment-gateway",
       "x": 80,
       "y": 560,
-      "width": 280,
+      "width": 380,
       "height": 120,
       "label": "PaymentGateway"
     },
@@ -76,17 +76,17 @@
       "id": "class-card-payment",
       "source_id": "class-card-payment",
       "projection_id": "class-card-payment",
-      "x": 410,
+      "x": 480,
       "y": 560,
       "width": 240,
-      "height": 120,
+      "height": 130,
       "label": "CardPayment"
     },
     {
       "id": "enum-payment-state",
       "source_id": "enum-payment-state",
       "projection_id": "enum-payment-state",
-      "x": 720,
+      "x": 750,
       "y": 630,
       "width": 240,
       "height": 105,
@@ -99,7 +99,7 @@
       "x": 1080,
       "y": 170,
       "width": 240,
-      "height": 120,
+      "height": 140,
       "label": "Shipment"
     },
     {
@@ -133,11 +133,19 @@
       "points": [
         {
           "x": 300,
-          "y": 225
+          "y": 234
+        },
+        {
+          "x": 340,
+          "y": 234
+        },
+        {
+          "x": 340,
+          "y": 218
         },
         {
           "x": 380,
-          "y": 225
+          "y": 218
         }
       ],
       "label": "places"
@@ -151,19 +159,19 @@
       "points": [
         {
           "x": 640,
-          "y": 185
+          "y": 232
         },
         {
           "x": 680,
-          "y": 185
+          "y": 232
         },
         {
           "x": 680,
-          "y": 155
+          "y": 168
         },
         {
           "x": 720,
-          "y": 155
+          "y": 168
         }
       ],
       "label": "lines"
@@ -176,12 +184,28 @@
       "projection_id": "order-has-payment",
       "points": [
         {
-          "x": 510,
-          "y": 300
+          "x": 640,
+          "y": 246
         },
         {
-          "x": 510,
-          "y": 560
+          "x": 690,
+          "y": 246
+        },
+        {
+          "x": 690,
+          "y": 520
+        },
+        {
+          "x": 460,
+          "y": 520
+        },
+        {
+          "x": 460,
+          "y": 624
+        },
+        {
+          "x": 480,
+          "y": 624
         }
       ],
       "label": "payment"
@@ -195,11 +219,11 @@
       "points": [
         {
           "x": 640,
-          "y": 250
+          "y": 190
         },
         {
           "x": 680,
-          "y": 250
+          "y": 190
         },
         {
           "x": 680,
@@ -221,11 +245,11 @@
       "points": [
         {
           "x": 640,
-          "y": 280
+          "y": 204
         },
         {
           "x": 700,
-          "y": 280
+          "y": 204
         },
         {
           "x": 700,
@@ -246,15 +270,49 @@
       "projection_id": "order-id-type",
       "points": [
         {
-          "x": 480,
-          "y": 300
+          "x": 380,
+          "y": 176
         },
         {
-          "x": 480,
-          "y": 360
+          "x": 330,
+          "y": 176
+        },
+        {
+          "x": 330,
+          "y": 408
+        },
+        {
+          "x": 380,
+          "y": 408
         }
       ],
       "label": "id type"
+    },
+    {
+      "id": "order-line-unit-price-money",
+      "source": "class-order-line",
+      "target": "datatype-money",
+      "source_id": "order-line-unit-price-money",
+      "projection_id": "order-line-unit-price-money",
+      "points": [
+        {
+          "x": 960,
+          "y": 154
+        },
+        {
+          "x": 990,
+          "y": 154
+        },
+        {
+          "x": 990,
+          "y": 512
+        },
+        {
+          "x": 960,
+          "y": 512
+        }
+      ],
+      "label": "unit price"
     },
     {
       "id": "card-payment-realizes-gateway",
@@ -264,11 +322,11 @@
       "projection_id": "card-payment-realizes-gateway",
       "points": [
         {
-          "x": 410,
+          "x": 480,
           "y": 620
         },
         {
-          "x": 360,
+          "x": 460,
           "y": 620
         }
       ],
@@ -282,11 +340,19 @@
       "projection_id": "card-payment-state",
       "points": [
         {
-          "x": 650,
-          "y": 640
+          "x": 720,
+          "y": 610
         },
         {
-          "x": 720,
+          "x": 735,
+          "y": 610
+        },
+        {
+          "x": 735,
+          "y": 682
+        },
+        {
+          "x": 750,
           "y": 682
         }
       ],
@@ -301,11 +367,11 @@
       "points": [
         {
           "x": 1080,
-          "y": 215
+          "y": 220
         },
         {
           "x": 1020,
-          "y": 215
+          "y": 220
         },
         {
           "x": 1020,
@@ -317,11 +383,11 @@
         },
         {
           "x": 660,
-          "y": 210
+          "y": 260
         },
         {
           "x": 640,
-          "y": 210
+          "y": 260
         }
       ],
       "label": "ships"
@@ -334,12 +400,20 @@
       "projection_id": "shipment-destination",
       "points": [
         {
-          "x": 1200,
-          "y": 290
+          "x": 1320,
+          "y": 234
         },
         {
-          "x": 1200,
-          "y": 360
+          "x": 1360,
+          "y": 234
+        },
+        {
+          "x": 1360,
+          "y": 417
+        },
+        {
+          "x": 1320,
+          "y": 417
         }
       ],
       "label": "ships to"
@@ -352,12 +426,20 @@
       "projection_id": "shipment-state",
       "points": [
         {
-          "x": 1260,
-          "y": 290
+          "x": 1320,
+          "y": 248
         },
         {
-          "x": 1260,
-          "y": 540
+          "x": 1370,
+          "y": 248
+        },
+        {
+          "x": 1370,
+          "y": 592
+        },
+        {
+          "x": 1320,
+          "y": 592
         }
       ],
       "label": "state"

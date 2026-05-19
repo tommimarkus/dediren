@@ -3,11 +3,11 @@
   "required_plugins": [
     {
       "id": "generic-graph",
-      "version": "0.14.0"
+      "version": "0.14.1"
     },
     {
       "id": "uml-xmi",
-      "version": "0.14.0"
+      "version": "0.14.1"
     }
   ],
   "nodes": [
@@ -42,6 +42,12 @@
               "type": "String",
               "visibility": "public",
               "multiplicity": "1"
+            },
+            {
+              "name": "orders",
+              "type": "Order",
+              "visibility": "public",
+              "multiplicity": "0..*"
             }
           ],
           "operations": [
@@ -85,6 +91,30 @@
               "type": "Money",
               "visibility": "public",
               "multiplicity": "1"
+            },
+            {
+              "name": "customer",
+              "type": "Customer",
+              "visibility": "public",
+              "multiplicity": "1"
+            },
+            {
+              "name": "lines",
+              "type": "OrderLine",
+              "visibility": "public",
+              "multiplicity": "1..*"
+            },
+            {
+              "name": "payment",
+              "type": "CardPayment",
+              "visibility": "public",
+              "multiplicity": "0..1"
+            },
+            {
+              "name": "shipments",
+              "type": "Shipment",
+              "visibility": "public",
+              "multiplicity": "0..*"
             }
           ],
           "operations": [
@@ -134,6 +164,12 @@
               "type": "Money",
               "visibility": "public",
               "multiplicity": "1"
+            },
+            {
+              "name": "order",
+              "type": "Order",
+              "visibility": "public",
+              "multiplicity": "1"
             }
           ],
           "operations": []
@@ -176,6 +212,18 @@
               "type": "String",
               "visibility": "private",
               "multiplicity": "0..1"
+            },
+            {
+              "name": "state",
+              "type": "PaymentState",
+              "visibility": "private",
+              "multiplicity": "1"
+            },
+            {
+              "name": "order",
+              "type": "Order",
+              "visibility": "public",
+              "multiplicity": "1"
             }
           ],
           "operations": [
@@ -204,9 +252,21 @@
               "multiplicity": "0..1"
             },
             {
+              "name": "order",
+              "type": "Order",
+              "visibility": "public",
+              "multiplicity": "1"
+            },
+            {
               "name": "destination",
               "type": "Address",
               "visibility": "public",
+              "multiplicity": "1"
+            },
+            {
+              "name": "state",
+              "type": "ShipmentState",
+              "visibility": "private",
               "multiplicity": "1"
             }
           ],
@@ -504,6 +564,14 @@
       "properties": {}
     },
     {
+      "id": "order-line-unit-price-money",
+      "type": "Association",
+      "source": "class-order-line",
+      "target": "datatype-money",
+      "label": "unit price",
+      "properties": {}
+    },
+    {
       "id": "order-id-type",
       "type": "Dependency",
       "source": "class-order",
@@ -664,6 +732,7 @@
             "order-has-payment",
             "order-status-dependency",
             "order-total-money",
+            "order-line-unit-price-money",
             "order-id-type",
             "card-payment-realizes-gateway",
             "card-payment-state",
@@ -732,6 +801,7 @@
             "order-has-lines",
             "order-status-dependency",
             "order-total-money",
+            "order-line-unit-price-money",
             "order-id-type",
             "shipment-destination",
             "shipment-state"
