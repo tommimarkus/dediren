@@ -350,6 +350,7 @@ fn render_metadata_round_trips() {
             RenderMetadataSelector {
                 selector_type: "ApplicationComponent".to_string(),
                 source_id: "orders-component".to_string(),
+                properties: None,
             },
         )]
         .into(),
@@ -358,6 +359,7 @@ fn render_metadata_round_trips() {
             RenderMetadataSelector {
                 selector_type: "Realization".to_string(),
                 source_id: "orders-realizes-service".to_string(),
+                properties: None,
             },
         )]
         .into(),
@@ -368,6 +370,52 @@ fn render_metadata_round_trips() {
     assert!(json.contains("\"type\":\"ApplicationComponent\""));
     let decoded: RenderMetadata = serde_json::from_str(&json).unwrap();
     assert_eq!(decoded, metadata);
+}
+
+#[test]
+fn render_metadata_selector_properties_round_trip() {
+    let metadata: RenderMetadata = serde_json::from_str(
+        r#"{
+          "render_metadata_schema_version": "render-metadata.schema.v1",
+          "semantic_profile": "uml",
+          "nodes": {
+            "class-order": {
+              "type": "Class",
+              "source_id": "class-order",
+              "properties": {
+                "attributes": [
+                  {
+                    "name": "id",
+                    "type": "OrderId",
+                    "visibility": "public"
+                  }
+                ],
+                "operations": [
+                  {
+                    "name": "submit",
+                    "visibility": "public",
+                    "parameters": [],
+                    "return_type": "void"
+                  }
+                ]
+              }
+            }
+          },
+          "edges": {}
+        }"#,
+    )
+    .unwrap();
+
+    let selector = metadata.nodes.get("class-order").unwrap();
+    assert_eq!(
+        selector.properties.as_ref().unwrap()["attributes"][0]["name"],
+        "id"
+    );
+    let encoded = serde_json::to_value(&metadata).unwrap();
+    assert_eq!(
+        encoded["nodes"]["class-order"]["properties"]["operations"][0]["name"],
+        "submit"
+    );
 }
 
 #[test]

@@ -247,6 +247,11 @@ fn project_render_metadata(
             RenderMetadataSelector {
                 selector_type: source_node.node_type.clone(),
                 source_id: source_node.id.clone(),
+                properties: if semantic_profile == GenericGraphSemanticProfile::Uml.as_str() {
+                    source_node.properties.get("uml").cloned()
+                } else {
+                    None
+                },
             },
         );
     }
@@ -263,6 +268,7 @@ fn project_render_metadata(
             RenderMetadataSelector {
                 selector_type: relationship.relationship_type.clone(),
                 source_id: relationship.id.clone(),
+                properties: None,
             },
         );
     }
@@ -290,6 +296,7 @@ fn project_render_metadata(
             RenderMetadataSelector {
                 selector_type: source_node.node_type.clone(),
                 source_id: source_node.id.clone(),
+                properties: None,
             },
         );
     }

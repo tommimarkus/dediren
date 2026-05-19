@@ -10,5 +10,11 @@ mod common;
 mod edge_labels;
 #[path = "svg_render_plugin/render_contracts.rs"]
 mod render_contracts;
+#[path = "svg_render_plugin/uml_activity.rs"]
+mod uml_activity;
+#[path = "svg_render_plugin/uml_nodes.rs"]
+mod uml_nodes;
+#[path = "svg_render_plugin/uml_relationships.rs"]
+mod uml_relationships;
 #[path = "svg_render_plugin/viewbox_routes.rs"]
 mod viewbox_routes;

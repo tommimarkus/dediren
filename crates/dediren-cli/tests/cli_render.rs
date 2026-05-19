@@ -160,6 +160,41 @@ fn render_invokes_svg_plugin_with_archimate_policy_and_metadata() {
 }
 
 #[test]
+fn render_invokes_svg_plugin_with_uml_policy_and_metadata() {
+    let output = common::dediren_command()
+        .env(
+            "DEDIREN_PLUGIN_SVG_RENDER",
+            plugin_binary("dediren-plugin-svg-render"),
+        )
+        .args(["render", "--plugin", "svg-render", "--policy"])
+        .arg(workspace_file("fixtures/render-policy/uml-svg.json"))
+        .arg("--metadata")
+        .arg(workspace_file("fixtures/render-metadata/uml-basic.json"))
+        .arg("--input")
+        .arg(workspace_file("fixtures/layout-result/uml-basic.json"))
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let data = ok_data(&output);
+    assert_eq!(
+        data["render_result_schema_version"],
+        "render-result.schema.v1"
+    );
+    let content = data["content"]
+        .as_str()
+        .expect("render result content should be a string");
+    let doc = svg_doc(content);
+    let order = semantic_group(&doc, "data-dediren-node-id", "class-order");
+    assert!(
+        child_group_with_attr(order, "data-dediren-node-decorator", "uml_class").is_some(),
+        "expected UML class decorator in SVG"
+    );
+}
+
+#[test]
 fn render_missing_policy_file_returns_json_envelope() {
     let output = common::dediren_command()
         .arg("render")

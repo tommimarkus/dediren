@@ -483,8 +483,26 @@ fn generic_graph_projects_uml_render_metadata() {
     let data = common::ok_data(&output);
     assert_eq!(data["semantic_profile"], "uml");
     assert_eq!(data["nodes"]["class-order"]["type"], "Class");
+    assert_eq!(
+        data["nodes"]["class-order"]["properties"]["attributes"][0]["name"],
+        "id"
+    );
+    assert_eq!(
+        data["nodes"]["enum-order-status"]["properties"]["literals"][1],
+        "Submitted"
+    );
     assert_eq!(data["edges"]["order-has-lines"]["type"], "Composition");
+    assert!(
+        data["edges"]["order-has-lines"].get("properties").is_none(),
+        "UML render metadata should not copy relationship properties"
+    );
     assert_eq!(data["groups"]["orders-package-boundary"]["type"], "Package");
+    assert!(
+        data["groups"]["orders-package-boundary"]
+            .get("properties")
+            .is_none(),
+        "UML render metadata should not copy group properties"
+    );
 }
 
 #[test]
@@ -806,6 +824,12 @@ fn generic_graph_projects_render_metadata() {
     assert_eq!(
         data["edges"]["orders-realizes-service"]["type"],
         "Realization"
+    );
+    assert!(
+        data["nodes"]["orders-component"]
+            .get("properties")
+            .is_none(),
+        "ArchiMate render metadata should not copy source properties"
     );
 }
 

@@ -468,12 +468,14 @@ pub struct RenderMetadata {
     pub groups: BTreeMap<String, RenderMetadataSelector>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RenderMetadataSelector {
     #[serde(rename = "type")]
     pub selector_type: String,
     pub source_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub properties: Option<Value>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

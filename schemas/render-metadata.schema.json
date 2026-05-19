@@ -32,7 +32,8 @@
       "required": ["type", "source_id"],
       "properties": {
         "type": { "type": "string", "minLength": 1, "maxLength": 160 },
-        "source_id": { "type": "string", "minLength": 1, "maxLength": 200 }
+        "source_id": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "properties": true
       }
     }
   }

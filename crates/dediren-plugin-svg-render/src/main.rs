@@ -3,12 +3,13 @@ use std::io::Read;
 use dediren_archimate::ArchimateTypeValidationError;
 use dediren_contracts::{
     CommandEnvelope, Diagnostic, DiagnosticSeverity, LaidOutEdge, LaidOutGroup, LaidOutNode,
-    LayoutResult, Point, RenderMetadata, RenderPolicy, RenderResult,
+    LayoutResult, Point, RenderMetadata, RenderMetadataSelector, RenderPolicy, RenderResult,
     SvgEdgeLabelHorizontalPosition, SvgEdgeLabelHorizontalSide, SvgEdgeLabelVerticalPosition,
     SvgEdgeLabelVerticalSide, SvgEdgeLineStyle, SvgEdgeMarkerEnd, SvgEdgeStyle, SvgGroupStyle,
     SvgNodeDecorator, SvgNodeStyle, RENDER_RESULT_SCHEMA_VERSION,
 };
 use serde::Deserialize;
+use serde_json::Value;
 
 #[derive(Debug, Deserialize)]
 struct RenderInput {
@@ -105,6 +106,15 @@ fn main() -> anyhow::Result<()> {
         render_input.render_metadata.as_ref(),
     ) {
         exit_with_archimate_type_error(error);
+    }
+    if let Err(error) = validate_uml_policy_types(&render_input.policy) {
+        exit_with_uml_type_error(error);
+    }
+    if let Err(error) = validate_uml_render_metadata(
+        &render_input.layout_result,
+        render_input.render_metadata.as_ref(),
+    ) {
+        exit_with_uml_type_error(error);
     }
     let result = RenderResult {
         render_result_schema_version: RENDER_RESULT_SCHEMA_VERSION.to_string(),
@@ -251,6 +261,86 @@ fn validate_archimate_render_metadata(
         };
 
         dediren_archimate::validate_relationship_endpoint_types(
+            &edge_selector.selector_type,
+            &source_selector.selector_type,
+            &target_selector.selector_type,
+            format!("render_metadata.edges.{}", edge.id),
+        )?;
+    }
+    Ok(())
+}
+
+fn validate_uml_policy_types(policy: &RenderPolicy) -> Result<(), dediren_uml::UmlValidationError> {
+    if policy.semantic_profile.as_deref() != Some("uml") {
+        return Ok(());
+    }
+
+    let Some(style) = policy.style.as_ref() else {
+        return Ok(());
+    };
+
+    for selector_type in style.node_type_overrides.keys() {
+        dediren_uml::validate_element_type(
+            selector_type,
+            format!("policy.style.node_type_overrides.{selector_type}"),
+        )?;
+    }
+    for selector_type in style.edge_type_overrides.keys() {
+        dediren_uml::validate_relationship_type(
+            selector_type,
+            format!("policy.style.edge_type_overrides.{selector_type}"),
+        )?;
+    }
+    for selector_type in style.group_type_overrides.keys() {
+        dediren_uml::validate_element_type(
+            selector_type,
+            format!("policy.style.group_type_overrides.{selector_type}"),
+        )?;
+    }
+    Ok(())
+}
+
+fn validate_uml_render_metadata(
+    layout_result: &LayoutResult,
+    metadata: Option<&RenderMetadata>,
+) -> Result<(), dediren_uml::UmlValidationError> {
+    let Some(metadata) = metadata else {
+        return Ok(());
+    };
+    if metadata.semantic_profile != "uml" {
+        return Ok(());
+    }
+
+    for (node_id, selector) in &metadata.nodes {
+        dediren_uml::validate_element_type(
+            &selector.selector_type,
+            format!("render_metadata.nodes.{node_id}.type"),
+        )?;
+    }
+    for (edge_id, selector) in &metadata.edges {
+        dediren_uml::validate_relationship_type(
+            &selector.selector_type,
+            format!("render_metadata.edges.{edge_id}.type"),
+        )?;
+    }
+    for (group_id, selector) in &metadata.groups {
+        dediren_uml::validate_element_type(
+            &selector.selector_type,
+            format!("render_metadata.groups.{group_id}.type"),
+        )?;
+    }
+    for edge in &layout_result.edges {
+        let Some(edge_selector) = metadata.edges.get(&edge.id) else {
+            continue;
+        };
+        let Some(source_selector) = metadata.nodes.get(&edge.source) else {
+            continue;
+        };
+        let Some(target_selector) = metadata.nodes.get(&edge.target) else {
+            continue;
+        };
+
+        dediren_uml::validate_relationship_endpoint_types(
             &edge_selector.selector_type,
             &source_selector.selector_type,
             &target_selector.selector_type,
@@ -676,13 +766,16 @@ fn render_svg(
 
     for node in &result.nodes {
         let node_style = node_style(policy, metadata, &node.id, &style);
+        let selector = metadata.and_then(|metadata| metadata.nodes.get(&node.id));
         svg.push_str(&format!(
             r#"<g data-dediren-node-id="{}">"#,
             escape_attr(&node.id)
         ));
         svg.push_str(&node_shape(node, &node_style));
-        svg.push_str(&node_decorator(node, &node_style));
-        svg.push_str(&node_label(node, &node_style, style.font_size));
+        svg.push_str(&node_decorator(node, &node_style, selector));
+        if !uml_decorator_supplies_node_label(node_style.decorator) {
+            svg.push_str(&node_label(node, &node_style, style.font_size));
+        }
         svg.push_str("</g>");
     }
 
@@ -947,6 +1040,9 @@ fn group_decorator(group: &LaidOutGroup, style: &ResolvedGroupStyle) -> String {
 
 fn node_shape(node: &LaidOutNode, style: &ResolvedNodeStyle) -> String {
     if let Some(decorator) = style.decorator {
+        if is_uml_decorator(decorator) {
+            return uml_node_shape(node, style, decorator);
+        }
         if matches!(
             decorator,
             SvgNodeDecorator::ArchimateAndJunction | SvgNodeDecorator::ArchimateOrJunction
@@ -966,6 +1062,135 @@ fn node_shape(node: &LaidOutNode, style: &ResolvedNodeStyle) -> String {
         escape_attr(&style.stroke),
         svg_style_number(style.stroke_width)
     )
+}
+
+fn uml_node_shape(
+    node: &LaidOutNode,
+    style: &ResolvedNodeStyle,
+    decorator: SvgNodeDecorator,
+) -> String {
+    let shape_name = uml_decorator_name(decorator);
+    match decorator {
+        SvgNodeDecorator::UmlInitialNode => {
+            let radius = (node.width.min(node.height) / 2.0 - style.stroke_width).max(4.0);
+            format!(
+                r##"<circle data-dediren-node-shape="{}" cx="{:.1}" cy="{:.1}" r="{:.1}" fill="{}" stroke="{}" stroke-width="{}"/>"##,
+                shape_name,
+                node.x + node.width / 2.0,
+                node.y + node.height / 2.0,
+                radius,
+                escape_attr(&style.fill),
+                escape_attr(&style.stroke),
+                svg_style_number(style.stroke_width)
+            )
+        }
+        SvgNodeDecorator::UmlActivityFinalNode => {
+            let radius = (node.width.min(node.height) / 2.0 - style.stroke_width).max(5.0);
+            let inner_radius = (radius * 0.48).max(3.0);
+            format!(
+                r##"<g data-dediren-node-shape="{}"><circle cx="{:.1}" cy="{:.1}" r="{:.1}" fill="#ffffff" stroke="{}" stroke-width="{}"/><circle cx="{:.1}" cy="{:.1}" r="{:.1}" fill="{}"/></g>"##,
+                shape_name,
+                node.x + node.width / 2.0,
+                node.y + node.height / 2.0,
+                radius,
+                escape_attr(&style.stroke),
+                svg_style_number(style.stroke_width),
+                node.x + node.width / 2.0,
+                node.y + node.height / 2.0,
+                inner_radius,
+                escape_attr(&style.stroke)
+            )
+        }
+        SvgNodeDecorator::UmlDecisionNode | SvgNodeDecorator::UmlMergeNode => {
+            let center_x = node.x + node.width / 2.0;
+            let center_y = node.y + node.height / 2.0;
+            format!(
+                r##"<path data-dediren-node-shape="{}" d="M {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1} Z" fill="{}" stroke="{}" stroke-width="{}"/>"##,
+                shape_name,
+                center_x,
+                node.y,
+                node.x + node.width,
+                center_y,
+                center_x,
+                node.y + node.height,
+                node.x,
+                center_y,
+                escape_attr(&style.fill),
+                escape_attr(&style.stroke),
+                svg_style_number(style.stroke_width)
+            )
+        }
+        SvgNodeDecorator::UmlForkNode | SvgNodeDecorator::UmlJoinNode => {
+            let horizontal = node.width >= node.height;
+            let bar_width = if horizontal {
+                node.width
+            } else {
+                node.width.min(14.0)
+            };
+            let bar_height = if horizontal {
+                node.height.min(14.0)
+            } else {
+                node.height
+            };
+            let x = node.x + (node.width - bar_width) / 2.0;
+            let y = node.y + (node.height - bar_height) / 2.0;
+            format!(
+                r##"<rect data-dediren-node-shape="{}" x="{:.1}" y="{:.1}" width="{:.1}" height="{:.1}" rx="0" fill="{}" stroke="{}" stroke-width="{}"/>"##,
+                shape_name,
+                x,
+                y,
+                bar_width,
+                bar_height,
+                escape_attr(&style.fill),
+                escape_attr(&style.stroke),
+                svg_style_number(style.stroke_width)
+            )
+        }
+        SvgNodeDecorator::UmlAction => format!(
+            r##"<rect data-dediren-node-shape="{}" x="{:.1}" y="{:.1}" width="{:.1}" height="{:.1}" rx="{}" fill="{}" stroke="{}" stroke-width="{}"/>"##,
+            shape_name,
+            node.x,
+            node.y,
+            node.width,
+            node.height,
+            svg_style_number(style.rx.max(10.0)),
+            escape_attr(&style.fill),
+            escape_attr(&style.stroke),
+            svg_style_number(style.stroke_width)
+        ),
+        SvgNodeDecorator::UmlPackage => {
+            let tab_width = (node.width * 0.34).clamp(40.0, 96.0);
+            let tab_height = (node.height * 0.18).clamp(14.0, 24.0);
+            format!(
+                r##"<path data-dediren-node-shape="{}" d="M {:.1} {:.1} H {:.1} V {:.1} H {:.1} V {:.1} H {:.1} V {:.1} H {:.1} Z" fill="{}" stroke="{}" stroke-width="{}"/>"##,
+                shape_name,
+                node.x,
+                node.y,
+                node.x + tab_width,
+                node.y + tab_height,
+                node.x + node.width,
+                node.y + node.height,
+                node.x,
+                node.y + tab_height,
+                node.x,
+                escape_attr(&style.fill),
+                escape_attr(&style.stroke),
+                svg_style_number(style.stroke_width)
+            )
+        }
+        _ => format!(
+            r##"<rect data-dediren-node-shape="{}" x="{:.1}" y="{:.1}" width="{:.1}" height="{:.1}" rx="{}" fill="{}" stroke="{}" stroke-width="{}"/>"##,
+            shape_name,
+            node.x,
+            node.y,
+            node.width,
+            node.height,
+            svg_style_number(style.rx),
+            escape_attr(&style.fill),
+            escape_attr(&style.stroke),
+            svg_style_number(style.stroke_width)
+        ),
+    }
 }
 
 fn archimate_junction_node_shape(
@@ -1082,8 +1307,15 @@ fn is_archimate_rounded_rectangle(decorator: SvgNodeDecorator) -> bool {
             | SvgNodeDecorator::ArchimateTechnologyEvent
     )
 }
-fn node_decorator(node: &LaidOutNode, style: &ResolvedNodeStyle) -> String {
+fn node_decorator(
+    node: &LaidOutNode,
+    style: &ResolvedNodeStyle,
+    selector: Option<&RenderMetadataSelector>,
+) -> String {
     match style.decorator {
+        Some(decorator) if is_uml_decorator(decorator) => {
+            uml_node_decorator(node, style, decorator, selector)
+        }
         Some(SvgNodeDecorator::ArchimateAndJunction | SvgNodeDecorator::ArchimateOrJunction) => {
             String::new()
         }
@@ -1108,6 +1340,287 @@ fn node_decorator(node: &LaidOutNode, style: &ResolvedNodeStyle) -> String {
         ),
         Some(_) => String::new(),
         None => String::new(),
+    }
+}
+
+fn is_uml_decorator(decorator: SvgNodeDecorator) -> bool {
+    matches!(
+        decorator,
+        SvgNodeDecorator::UmlPackage
+            | SvgNodeDecorator::UmlClass
+            | SvgNodeDecorator::UmlInterface
+            | SvgNodeDecorator::UmlDataType
+            | SvgNodeDecorator::UmlEnumeration
+            | SvgNodeDecorator::UmlActivity
+            | SvgNodeDecorator::UmlAction
+            | SvgNodeDecorator::UmlInitialNode
+            | SvgNodeDecorator::UmlActivityFinalNode
+            | SvgNodeDecorator::UmlDecisionNode
+            | SvgNodeDecorator::UmlMergeNode
+            | SvgNodeDecorator::UmlForkNode
+            | SvgNodeDecorator::UmlJoinNode
+            | SvgNodeDecorator::UmlObjectNode
+    )
+}
+
+fn uml_decorator_name(decorator: SvgNodeDecorator) -> &'static str {
+    match decorator {
+        SvgNodeDecorator::UmlPackage => "uml_package",
+        SvgNodeDecorator::UmlClass => "uml_class",
+        SvgNodeDecorator::UmlInterface => "uml_interface",
+        SvgNodeDecorator::UmlDataType => "uml_data_type",
+        SvgNodeDecorator::UmlEnumeration => "uml_enumeration",
+        SvgNodeDecorator::UmlActivity => "uml_activity",
+        SvgNodeDecorator::UmlAction => "uml_action",
+        SvgNodeDecorator::UmlInitialNode => "uml_initial_node",
+        SvgNodeDecorator::UmlActivityFinalNode => "uml_activity_final_node",
+        SvgNodeDecorator::UmlDecisionNode => "uml_decision_node",
+        SvgNodeDecorator::UmlMergeNode => "uml_merge_node",
+        SvgNodeDecorator::UmlForkNode => "uml_fork_node",
+        SvgNodeDecorator::UmlJoinNode => "uml_join_node",
+        SvgNodeDecorator::UmlObjectNode => "uml_object_node",
+        _ => unreachable!("uml_decorator_name only accepts UML decorators"),
+    }
+}
+
+fn uml_decorator_supplies_node_label(decorator: Option<SvgNodeDecorator>) -> bool {
+    matches!(
+        decorator,
+        Some(
+            SvgNodeDecorator::UmlClass
+                | SvgNodeDecorator::UmlInterface
+                | SvgNodeDecorator::UmlDataType
+                | SvgNodeDecorator::UmlEnumeration
+        )
+    )
+}
+
+fn uml_node_decorator(
+    node: &LaidOutNode,
+    style: &ResolvedNodeStyle,
+    decorator: SvgNodeDecorator,
+    selector: Option<&RenderMetadataSelector>,
+) -> String {
+    let decorator_name = uml_decorator_name(decorator);
+    let mut body = String::new();
+    match decorator {
+        SvgNodeDecorator::UmlClass
+        | SvgNodeDecorator::UmlInterface
+        | SvgNodeDecorator::UmlDataType
+        | SvgNodeDecorator::UmlEnumeration => {
+            body.push_str(&uml_classifier_notation(node, style, decorator, selector));
+        }
+        SvgNodeDecorator::UmlPackage => {
+            body.push_str(&format!(
+                r##"<text x="{:.1}" y="{:.1}" fill="{}" font-size="12">{}</text>"##,
+                node.x + 8.0,
+                node.y + 16.0,
+                escape_attr(&style.label_fill),
+                escape_text(&node.label)
+            ));
+        }
+        _ => {}
+    }
+    format!(
+        r#"<g data-dediren-node-decorator="{}">{}</g>"#,
+        decorator_name, body
+    )
+}
+
+fn uml_classifier_notation(
+    node: &LaidOutNode,
+    style: &ResolvedNodeStyle,
+    decorator: SvgNodeDecorator,
+    selector: Option<&RenderMetadataSelector>,
+) -> String {
+    let properties = selector.and_then(|selector| selector.properties.as_ref());
+    let mut title_lines = Vec::new();
+    if decorator == SvgNodeDecorator::UmlEnumeration {
+        title_lines.push("«enumeration»".to_string());
+    } else if decorator == SvgNodeDecorator::UmlInterface {
+        title_lines.push("«interface»".to_string());
+    } else if decorator == SvgNodeDecorator::UmlDataType {
+        title_lines.push("«dataType»".to_string());
+    }
+    title_lines.push(node.label.clone());
+
+    let mut attribute_lines = uml_attribute_lines(properties);
+    let mut operation_lines = uml_operation_lines(properties);
+    if decorator == SvgNodeDecorator::UmlEnumeration {
+        attribute_lines = uml_literal_lines(properties);
+        operation_lines.clear();
+    }
+
+    let title_height = (title_lines.len() as f64 * 15.0 + 8.0).max(28.0);
+    let attr_height = if attribute_lines.is_empty() {
+        0.0
+    } else {
+        attribute_lines.len() as f64 * 14.0 + 8.0
+    };
+    let first_separator_y = node.y + title_height;
+    let second_separator_y = first_separator_y + attr_height;
+
+    let mut svg = String::new();
+    if !attribute_lines.is_empty() || !operation_lines.is_empty() {
+        svg.push_str(&format!(
+            r##"<line x1="{:.1}" y1="{:.1}" x2="{:.1}" y2="{:.1}" stroke="{}" stroke-width="{}"/>"##,
+            node.x,
+            first_separator_y,
+            node.x + node.width,
+            first_separator_y,
+            escape_attr(&style.stroke),
+            svg_style_number(style.stroke_width)
+        ));
+    }
+    if !operation_lines.is_empty() {
+        svg.push_str(&format!(
+            r##"<line x1="{:.1}" y1="{:.1}" x2="{:.1}" y2="{:.1}" stroke="{}" stroke-width="{}"/>"##,
+            node.x,
+            second_separator_y,
+            node.x + node.width,
+            second_separator_y,
+            escape_attr(&style.stroke),
+            svg_style_number(style.stroke_width)
+        ));
+    }
+
+    let mut y = node.y + 15.0;
+    for line in title_lines {
+        svg.push_str(&format!(
+            r##"<text x="{:.1}" y="{:.1}" text-anchor="middle" fill="{}" font-size="12">{}</text>"##,
+            node.x + node.width / 2.0,
+            y,
+            escape_attr(&style.label_fill),
+            escape_text(&line)
+        ));
+        y += 15.0;
+    }
+
+    y = first_separator_y + 15.0;
+    for line in attribute_lines {
+        svg.push_str(&format!(
+            r##"<text x="{:.1}" y="{:.1}" fill="{}" font-size="12">{}</text>"##,
+            node.x + 8.0,
+            y,
+            escape_attr(&style.label_fill),
+            escape_text(&line)
+        ));
+        y += 14.0;
+    }
+
+    y = second_separator_y + 15.0;
+    for line in operation_lines {
+        svg.push_str(&format!(
+            r##"<text x="{:.1}" y="{:.1}" fill="{}" font-size="12">{}</text>"##,
+            node.x + 8.0,
+            y,
+            escape_attr(&style.label_fill),
+            escape_text(&line)
+        ));
+        y += 14.0;
+    }
+    svg
+}
+
+fn uml_attribute_lines(properties: Option<&Value>) -> Vec<String> {
+    properties
+        .and_then(|properties| properties.get("attributes"))
+        .and_then(Value::as_array)
+        .map(|attributes| attributes.iter().map(uml_attribute_line).collect())
+        .unwrap_or_default()
+}
+
+fn uml_attribute_line(attribute: &Value) -> String {
+    let visibility = uml_visibility_symbol(attribute.get("visibility").and_then(Value::as_str));
+    let name = attribute
+        .get("name")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    let attribute_type = attribute
+        .get("type")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    if attribute_type.is_empty() {
+        format!("{visibility} {name}")
+    } else {
+        format!("{visibility} {name} : {attribute_type}")
+    }
+}
+
+fn uml_operation_lines(properties: Option<&Value>) -> Vec<String> {
+    properties
+        .and_then(|properties| properties.get("operations"))
+        .and_then(Value::as_array)
+        .map(|operations| operations.iter().map(uml_operation_line).collect())
+        .unwrap_or_default()
+}
+
+fn uml_operation_line(operation: &Value) -> String {
+    let visibility = uml_visibility_symbol(operation.get("visibility").and_then(Value::as_str));
+    let name = operation
+        .get("name")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    let parameters = operation
+        .get("parameters")
+        .and_then(Value::as_array)
+        .map(|parameters| {
+            parameters
+                .iter()
+                .map(uml_parameter_text)
+                .collect::<Vec<_>>()
+                .join(", ")
+        })
+        .unwrap_or_default();
+    let return_type = operation
+        .get("return_type")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    if return_type.is_empty() {
+        format!("{visibility} {name}({parameters})")
+    } else {
+        format!("{visibility} {name}({parameters}) : {return_type}")
+    }
+}
+
+fn uml_parameter_text(parameter: &Value) -> String {
+    let name = parameter
+        .get("name")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    let parameter_type = parameter
+        .get("type")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    if parameter_type.is_empty() {
+        name.to_string()
+    } else if name.is_empty() {
+        parameter_type.to_string()
+    } else {
+        format!("{name} : {parameter_type}")
+    }
+}
+
+fn uml_literal_lines(properties: Option<&Value>) -> Vec<String> {
+    properties
+        .and_then(|properties| properties.get("literals"))
+        .and_then(Value::as_array)
+        .map(|literals| {
+            literals
+                .iter()
+                .filter_map(Value::as_str)
+                .map(str::to_string)
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn uml_visibility_symbol(visibility: Option<&str>) -> &'static str {
+    match visibility {
+        Some("private") => "-",
+        Some("protected") => "#",
+        Some("package") => "~",
+        _ => "+",
     }
 }
 
@@ -4075,5 +4588,9 @@ fn exit_with_diagnostic(code: &str, message: &str, path: Option<String>) -> ! {
 }
 
 fn exit_with_archimate_type_error(error: ArchimateTypeValidationError) -> ! {
+    exit_with_diagnostic(error.code(), &error.message(), Some(error.path));
+}
+
+fn exit_with_uml_type_error(error: dediren_uml::UmlValidationError) -> ! {
     exit_with_diagnostic(error.code(), &error.message(), Some(error.path));
 }

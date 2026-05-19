@@ -360,6 +360,7 @@ dependencies = [
  "assert_cmd",
  "dediren-archimate",
  "dediren-contracts",
+ "dediren-uml",
  "predicates",
  "roxmltree",
  "serde",
