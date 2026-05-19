@@ -18,13 +18,22 @@ const PLUGIN_BINARIES: &[&str] = &[
     "dediren-plugin-elk-layout",
     "dediren-plugin-svg-render",
     "dediren-plugin-archimate-oef-export",
+    "dediren-plugin-uml-xmi-export",
 ];
-const BUNDLE_PLUGINS: &[&str] = &["generic-graph", "elk-layout", "svg-render", "archimate-oef"];
+const BUNDLE_PLUGINS: &[&str] = &[
+    "generic-graph",
+    "elk-layout",
+    "svg-render",
+    "archimate-oef",
+    "uml-xmi",
+];
 const CLEAN_ENV: &[&str] = &[
     "DEDIREN_PLUGIN_DIRS",
     "DEDIREN_PLUGIN_GENERIC_GRAPH",
     "DEDIREN_PLUGIN_ELK_LAYOUT",
     "DEDIREN_PLUGIN_SVG_RENDER",
+    "DEDIREN_PLUGIN_ARCHIMATE_OEF",
+    "DEDIREN_PLUGIN_UML_XMI",
     "DEDIREN_ELK_COMMAND",
     "DEDIREN_ELK_RESULT_FIXTURE",
 ];

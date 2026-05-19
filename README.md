@@ -45,18 +45,18 @@ Runtime prerequisite:
 
 - Java 21 or newer available as `java` on `PATH`.
 
-For the current `0.11.3` version, the xtask creates:
+For the current `0.12.0` version, the xtask creates:
 
 ```text
-dist/dediren-agent-bundle-0.11.3-x86_64-unknown-linux-gnu/
-dist/dediren-agent-bundle-0.11.3-x86_64-unknown-linux-gnu.tar.gz
+dist/dediren-agent-bundle-0.12.0-x86_64-unknown-linux-gnu/
+dist/dediren-agent-bundle-0.12.0-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Run the smoke test from a shell where `java -version` resolves to Java 21 or
 newer:
 
 ```bash
-cargo xtask dist smoke dist/dediren-agent-bundle-0.11.3-x86_64-unknown-linux-gnu.tar.gz
+cargo xtask dist smoke dist/dediren-agent-bundle-0.12.0-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Concurrent `cargo xtask dist build` invocations serialize on a repo-local lock
@@ -69,8 +69,8 @@ Unpack and run it anywhere:
 
 ```bash
 mkdir -p /tmp/dediren-dist
-tar -xzf dist/dediren-agent-bundle-0.11.3-x86_64-unknown-linux-gnu.tar.gz -C /tmp/dediren-dist
-/tmp/dediren-dist/dediren-agent-bundle-0.11.3-x86_64-unknown-linux-gnu/bin/dediren --help
+tar -xzf dist/dediren-agent-bundle-0.12.0-x86_64-unknown-linux-gnu.tar.gz -C /tmp/dediren-dist
+/tmp/dediren-dist/dediren-agent-bundle-0.12.0-x86_64-unknown-linux-gnu/bin/dediren --help
 ```
 
 For a full unpacked-bundle JSON authoring and project/layout/render smoke
@@ -96,6 +96,7 @@ cargo install --path crates/dediren-plugin-generic-graph
 cargo install --path crates/dediren-plugin-elk-layout
 cargo install --path crates/dediren-plugin-svg-render
 cargo install --path crates/dediren-plugin-archimate-oef-export
+cargo install --path crates/dediren-plugin-uml-xmi-export
 ```
 
 This installs Rust binaries only. It does not create the distribution archive
@@ -168,9 +169,9 @@ Commands:
   ```
 
   The bundled `generic-graph` semantic validator currently supports the
-  `archimate` profile. Plugin semantic validation first runs the same source
-  graph validation as default `validate`, so malformed source graphs fail before
-  profile-specific checks run.
+  `archimate` and `uml` profiles. Plugin semantic validation first runs the same
+  source graph validation as default `validate`, so malformed source graphs
+  fail before profile-specific checks run.
 - `project` asks a semantic/view plugin to produce a target artifact. The
   bundled `generic-graph` plugin supports `layout-request` and
   `render-metadata`. When projecting ArchiMate render metadata, it validates
@@ -188,7 +189,8 @@ Commands:
 - `render` asks a render plugin to create a visual artifact. The bundled
   `svg-render` plugin returns SVG in a JSON command envelope.
 - `export` asks an export plugin to create a non-visual artifact. The bundled
-  `archimate-oef` plugin emits ArchiMate 3.2 OEF XML.
+  `archimate-oef` plugin emits ArchiMate 3.2 OEF XML, and the bundled
+  `uml-xmi` plugin emits UML 2.5.1 XMI XML.
 
 Most pipeline commands accept `--input <file>`. If `--input` is omitted, they
 read JSON from stdin.
@@ -358,6 +360,67 @@ dediren export \
 the XML into Archi or run an explicit schema validator when tool-conformance
 evidence is required.
 
+## UML SVG And XMI
+
+UML notation uses the same profile pipeline as ArchiMate. Configure the source
+graph's generic-graph plugin data with:
+
+```json
+{
+  "plugins": {
+    "generic-graph": {
+      "semantic_profile": "uml",
+      "views": []
+    }
+  }
+}
+```
+
+The bundled UML profile supports the first class/data/activity slice:
+`uml-class`, `uml-data`, and `uml-activity` views. Dediren JSON remains the
+authored source. UML/XMI is compatibility export output.
+
+Validate UML source semantics:
+
+```bash
+dediren validate \
+  --plugin generic-graph \
+  --profile uml \
+  --input fixtures/source/valid-uml-basic.json
+```
+
+Create UML render metadata and render SVG:
+
+```bash
+dediren project \
+  --target render-metadata \
+  --plugin generic-graph \
+  --view class-view \
+  --input fixtures/source/valid-uml-basic.json \
+  > uml-render-metadata.json
+
+dediren render \
+  --plugin svg-render \
+  --policy fixtures/render-policy/uml-svg.json \
+  --metadata uml-render-metadata.json \
+  --input fixtures/layout-result/uml-basic.json \
+  > uml-render-result.json
+```
+
+Export UML/XMI:
+
+```bash
+dediren export \
+  --plugin uml-xmi \
+  --policy fixtures/export-policy/default-uml-xmi.json \
+  --source fixtures/source/valid-uml-basic.json \
+  --layout fixtures/layout-result/uml-basic.json \
+  > uml-xmi-export-result.json
+```
+
+`uml-xmi-export-result.json` is a command envelope. The UML/XMI XML text is in
+`.data.content`.
+
 ## Plugins
 
 Plugins are external executables that communicate through JSON stdin/stdout and
@@ -369,6 +432,7 @@ command envelopes. The bundled first-party plugins are:
 | `elk-layout` | `layout` | Runs the Java ELK helper and returns generated layout results. |
 | `svg-render` | `render` | Renders SVG from layout result JSON and render policy JSON. |
 | `archimate-oef` | `export` | Exports ArchiMate 3.2 OEF XML from source and layout data. |
+| `uml-xmi` | `export` | Exports UML 2.5.1 XMI XML from UML-profile source data. |
 
 After authoring JSON, agents can inspect runtime plugin support directly:
 
@@ -377,6 +441,7 @@ dediren-plugin-generic-graph capabilities
 dediren-plugin-elk-layout capabilities
 dediren-plugin-svg-render capabilities
 dediren-plugin-archimate-oef-export capabilities
+dediren-plugin-uml-xmi-export capabilities
 ```
 
 The capability JSON uses `schemas/runtime-capability.schema.json`.
@@ -582,7 +647,7 @@ newer:
 
 ```bash
 cargo xtask dist build
-cargo xtask dist smoke dist/dediren-agent-bundle-0.11.3-x86_64-unknown-linux-gnu.tar.gz
+cargo xtask dist smoke dist/dediren-agent-bundle-0.12.0-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Focused checks:
@@ -593,6 +658,7 @@ cargo test -p dediren-core --test plugin_runtime
 cargo test -p dediren --test plugin_compat
 cargo test -p dediren-plugin-svg-render --test svg_render_plugin
 cargo test -p dediren-plugin-archimate-oef-export --test oef_export_plugin
+cargo test -p dediren-plugin-uml-xmi-export --test uml_xmi_export_plugin
 ```
 
 Real ELK checks from a source checkout, after building the helper:

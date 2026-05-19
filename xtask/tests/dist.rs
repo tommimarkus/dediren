@@ -166,6 +166,56 @@ fn dist_build_includes_license_notice() {
 
 #[cfg(unix)]
 #[test]
+fn dist_build_includes_uml_profile_bundle_artifacts() {
+    let repo = FakeDistRepo::new();
+    repo.release_helper_build();
+    let output = repo.xtask_command(["dist", "build"]).output().unwrap();
+
+    assert!(
+        output.status.success(),
+        "dist build should pass\nstatus: {:?}\nstdout:\n{}\nstderr:\n{}",
+        output.status.code(),
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr),
+    );
+
+    let bundle = repo.root.path().join(format!(
+        "dist/dediren-agent-bundle-{}-x86_64-unknown-linux-gnu",
+        env!("CARGO_PKG_VERSION")
+    ));
+    assert!(
+        bundle.join("bin/dediren-plugin-uml-xmi-export").exists(),
+        "dist build should include the UML/XMI export binary"
+    );
+    assert!(
+        bundle.join("plugins/uml-xmi.manifest.json").exists(),
+        "dist build should include the UML/XMI plugin manifest"
+    );
+    assert!(
+        bundle.join("fixtures/source/valid-uml-basic.json").exists(),
+        "dist build should include the UML source fixture"
+    );
+    assert!(
+        bundle.join("fixtures/render-policy/uml-svg.json").exists(),
+        "dist build should include the UML SVG render policy fixture"
+    );
+
+    let metadata: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(bundle.join("bundle.json")).unwrap()).unwrap();
+    assert!(
+        metadata["plugins"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|plugin| {
+                plugin["id"] == "uml-xmi" && plugin["version"] == env!("CARGO_PKG_VERSION")
+            }),
+        "bundle metadata should advertise the UML/XMI plugin"
+    );
+}
+
+#[cfg(unix)]
+#[test]
 fn dist_smoke_runs_bundle_pipeline_with_clean_environment() {
     let repo = FakeDistRepo::new();
     let archive = repo.write_smoke_archive();
@@ -176,6 +226,8 @@ fn dist_smoke_runs_bundle_pipeline_with_clean_environment() {
         .env("DEDIREN_PLUGIN_GENERIC_GRAPH", "ambient-generic")
         .env("DEDIREN_PLUGIN_ELK_LAYOUT", "ambient-elk")
         .env("DEDIREN_PLUGIN_SVG_RENDER", "ambient-svg")
+        .env("DEDIREN_PLUGIN_ARCHIMATE_OEF", "ambient-oef")
+        .env("DEDIREN_PLUGIN_UML_XMI", "ambient-xmi")
         .env("DEDIREN_ELK_COMMAND", "ambient-elk-command")
         .env("DEDIREN_ELK_RESULT_FIXTURE", "ambient-elk-fixture")
         .output()
@@ -269,7 +321,7 @@ impl FakeDistRepo {
             &bundle.join("bin/dediren"),
             r#"#!/usr/bin/env bash
 set -euo pipefail
-for name in DEDIREN_PLUGIN_DIRS DEDIREN_PLUGIN_GENERIC_GRAPH DEDIREN_PLUGIN_ELK_LAYOUT DEDIREN_PLUGIN_SVG_RENDER DEDIREN_ELK_COMMAND DEDIREN_ELK_RESULT_FIXTURE; do
+for name in DEDIREN_PLUGIN_DIRS DEDIREN_PLUGIN_GENERIC_GRAPH DEDIREN_PLUGIN_ELK_LAYOUT DEDIREN_PLUGIN_SVG_RENDER DEDIREN_PLUGIN_ARCHIMATE_OEF DEDIREN_PLUGIN_UML_XMI DEDIREN_ELK_COMMAND DEDIREN_ELK_RESULT_FIXTURE; do
   if [[ -n "${!name:-}" ]]; then
     echo "ambient environment leaked: $name" >&2
     exit 77
@@ -308,6 +360,7 @@ esac
     fn write_tree(&self) {
         fs::create_dir_all(self.root.path().join("fixtures/plugins")).unwrap();
         fs::create_dir_all(self.root.path().join("fixtures/source")).unwrap();
+        fs::create_dir_all(self.root.path().join("fixtures/render-policy")).unwrap();
         fs::create_dir_all(self.root.path().join("docs")).unwrap();
         fs::create_dir_all(self.root.path().join("schemas")).unwrap();
         fs::create_dir_all(
@@ -323,19 +376,37 @@ esac
         )
         .unwrap();
 
-        fs::write(
-            self.root
-                .path()
-                .join("fixtures/plugins/generic-graph.manifest.json"),
-            "{}",
-        )
-        .unwrap();
+        for manifest in [
+            "generic-graph.manifest.json",
+            "elk-layout.manifest.json",
+            "svg-render.manifest.json",
+            "archimate-oef.manifest.json",
+            "uml-xmi.manifest.json",
+        ] {
+            fs::write(
+                self.root.path().join("fixtures/plugins").join(manifest),
+                "{}",
+            )
+            .unwrap();
+        }
         fs::write(
             self.root.path().join("LICENSE"),
             "MIT License\n\nFake Dediren license fixture.\n",
         )
         .unwrap();
         fs::write(self.root.path().join("fixtures/source/basic.json"), "{}").unwrap();
+        fs::write(
+            self.root
+                .path()
+                .join("fixtures/source/valid-uml-basic.json"),
+            "{}",
+        )
+        .unwrap();
+        fs::write(
+            self.root.path().join("fixtures/render-policy/uml-svg.json"),
+            "{}",
+        )
+        .unwrap();
         fs::write(
             self.root.path().join("docs/agent-usage.md"),
             "# Dediren Agent Usage\n\nBundle-visible agent guide.\n",
@@ -349,6 +420,7 @@ esac
             "dediren-plugin-elk-layout",
             "dediren-plugin-svg-render",
             "dediren-plugin-archimate-oef-export",
+            "dediren-plugin-uml-xmi-export",
         ] {
             self.write_executable_at(
                 &self

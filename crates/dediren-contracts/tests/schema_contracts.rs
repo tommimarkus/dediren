@@ -34,6 +34,7 @@ const CURRENT_WORKSPACE_VERSION_PLUGIN_MANIFEST_PATHS: &[&str] = &[
     "fixtures/plugins/elk-layout.manifest.json",
     "fixtures/plugins/generic-graph.manifest.json",
     "fixtures/plugins/svg-render.manifest.json",
+    "fixtures/plugins/uml-xmi.manifest.json",
 ];
 
 const SOURCE_FIXTURE_PATHS: &[&str] = &[
@@ -49,6 +50,7 @@ const SOURCE_FIXTURES_REQUIRING_CURRENT_WORKSPACE_PLUGIN_VERSIONS: &[&str] = &[
     "fixtures/source/valid-pipeline-rich.json",
     "fixtures/source/valid-pipeline-archimate.json",
     "fixtures/source/valid-archimate-oef.json",
+    "fixtures/source/valid-uml-basic.json",
 ];
 
 const WORKSPACE_PACKAGE_NAMES: &[&str] = &[
@@ -61,6 +63,8 @@ const WORKSPACE_PACKAGE_NAMES: &[&str] = &[
     "dediren-plugin-generic-graph",
     "dediren-plugin-runtime-testbed",
     "dediren-plugin-svg-render",
+    "dediren-plugin-uml-xmi-export",
+    "dediren-uml",
     "xtask",
 ];
 
@@ -79,7 +83,7 @@ fn source_with_fragments_matches_model_schema() {
             "model_schema_version": "model.schema.v1",
             "fragments": ["model/application.json", "model/technology.json"],
             "required_plugins": [
-                { "id": "generic-graph", "version": "0.11.3" }
+                { "id": "generic-graph", "version": "0.12.0" }
             ],
             "nodes": [],
             "relationships": [],
@@ -577,8 +581,6 @@ fn first_party_plugin_manifest_versions_match_workspace_version() {
 #[test]
 fn source_fixture_required_plugin_versions_match_first_party_manifests() {
     let manifest_versions = first_party_plugin_versions();
-    // valid-uml-basic.json intentionally requires target 0.12.0 plugins while this
-    // Task 1 branch cannot update workspace version surfaces.
     for path in SOURCE_FIXTURES_REQUIRING_CURRENT_WORKSPACE_PLUGIN_VERSIONS {
         let source = json_file(path);
         let required_plugins = source["required_plugins"]
@@ -680,7 +682,8 @@ fn bundle_metadata_matches_schema() {
                 { "id": "generic-graph", "version": env!("CARGO_PKG_VERSION") },
                 { "id": "elk-layout", "version": env!("CARGO_PKG_VERSION") },
                 { "id": "svg-render", "version": env!("CARGO_PKG_VERSION") },
-                { "id": "archimate-oef", "version": env!("CARGO_PKG_VERSION") }
+                { "id": "archimate-oef", "version": env!("CARGO_PKG_VERSION") },
+                { "id": "uml-xmi", "version": env!("CARGO_PKG_VERSION") }
             ],
             "schemas_dir": "schemas",
             "fixtures_dir": "fixtures",
