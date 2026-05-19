@@ -45,18 +45,18 @@ Runtime prerequisite:
 
 - Java 21 or newer available as `java` on `PATH`.
 
-For the current `0.13.0` version, the xtask creates:
+For the current `0.14.0` version, the xtask creates:
 
 ```text
-dist/dediren-agent-bundle-0.13.0-x86_64-unknown-linux-gnu/
-dist/dediren-agent-bundle-0.13.0-x86_64-unknown-linux-gnu.tar.gz
+dist/dediren-agent-bundle-0.14.0-x86_64-unknown-linux-gnu/
+dist/dediren-agent-bundle-0.14.0-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Run the smoke test from a shell where `java -version` resolves to Java 21 or
 newer:
 
 ```bash
-cargo xtask dist smoke dist/dediren-agent-bundle-0.13.0-x86_64-unknown-linux-gnu.tar.gz
+cargo xtask dist smoke dist/dediren-agent-bundle-0.14.0-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Concurrent `cargo xtask dist build` invocations serialize on a repo-local lock
@@ -69,8 +69,8 @@ Unpack and run it anywhere:
 
 ```bash
 mkdir -p /tmp/dediren-dist
-tar -xzf dist/dediren-agent-bundle-0.13.0-x86_64-unknown-linux-gnu.tar.gz -C /tmp/dediren-dist
-/tmp/dediren-dist/dediren-agent-bundle-0.13.0-x86_64-unknown-linux-gnu/bin/dediren --help
+tar -xzf dist/dediren-agent-bundle-0.14.0-x86_64-unknown-linux-gnu.tar.gz -C /tmp/dediren-dist
+/tmp/dediren-dist/dediren-agent-bundle-0.14.0-x86_64-unknown-linux-gnu/bin/dediren --help
 ```
 
 For a full unpacked-bundle JSON authoring and project/layout/render smoke
@@ -378,7 +378,10 @@ graph's generic-graph plugin data with:
 
 The bundled UML profile supports the first class/data/activity slice:
 `uml-class`, `uml-data`, and `uml-activity` views. Dediren JSON remains the
-authored source. UML/XMI is compatibility export output.
+authored source. UML/XMI is compatibility export output. Use
+`fixtures/source/valid-uml-complex.json` as the broader UML pressure fixture;
+it carries package-bounded class, data, and activity views over one source
+model.
 
 Validate UML source semantics:
 
@@ -407,10 +410,13 @@ dediren render \
   > uml-render-result.json
 ```
 
-Fixture-backed UML render inputs cover the class, data, and activity lanes:
+Fixture-backed UML render inputs cover the class, data, activity, and complex
+class lanes:
 `fixtures/layout-result/uml-basic.json`,
 `fixtures/layout-result/uml-data.json`, and
-`fixtures/layout-result/uml-activity.json`.
+`fixtures/layout-result/uml-activity.json`, plus
+`fixtures/layout-result/uml-complex-class.json` with
+`fixtures/render-metadata/uml-complex-class.json`.
 
 Export UML/XMI:
 
@@ -574,14 +580,15 @@ Generated render artifacts are written under `.test-output/renders/`:
 - `.test-output/renders/real-elk/` for real Java helper render tests.
 - `.test-output/renders/fixture-pipeline/` for fixture-backed CLI pipeline
   tests, including deterministic ArchiMate node, relationship, and group render
-  notation plus UML class/data/activity fixture pipeline renders.
+  notation plus UML class/data/activity and complex class fixture pipeline
+  renders.
 - `.test-output/renders/svg-render-plugin/` for renderer policy and semantic
   fixture tests that do not prove ELK geometry, including the all-Archimate and
   UML node/relationship/activity visual sheets.
 
-Ignored real ELK render tests also write UML class, data, and activity SVGs to
-`.test-output/renders/real-elk/` when the Java helper is built and the
-`real_elk_render` ignored suite is run.
+Ignored real ELK render tests also write UML class, data, activity, and complex
+UML source-view SVGs to `.test-output/renders/real-elk/` when the Java helper is
+built and the `real_elk_render` ignored suite is run.
 
 Generated SVGs are ignored by git. Inspect them locally instead of committing
 them unless a tracked example fixture was deliberately requested.
@@ -656,7 +663,7 @@ newer:
 
 ```bash
 cargo xtask dist build
-cargo xtask dist smoke dist/dediren-agent-bundle-0.13.0-x86_64-unknown-linux-gnu.tar.gz
+cargo xtask dist smoke dist/dediren-agent-bundle-0.14.0-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Focused checks:

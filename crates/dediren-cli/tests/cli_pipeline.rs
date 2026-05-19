@@ -341,6 +341,67 @@ fn fixture_mode_uml_activity_view_renders() {
 }
 
 #[test]
+fn fixture_mode_uml_complex_class_view_renders() {
+    let (svg, metadata_data) = render_uml_fixture_view_from_source(
+        "complex-class-view",
+        "fixtures/source/valid-uml-complex.json",
+        "fixtures/layout-result/uml-complex-class.json",
+        "fixtures/render-metadata/uml-complex-class.json",
+    );
+    let doc = svg_doc(&svg);
+
+    assert_eq!(metadata_data["semantic_profile"], "uml");
+    assert_eq!(metadata_data["nodes"]["class-order"]["type"], "Class");
+    assert_eq!(
+        metadata_data["nodes"]["interface-payment-gateway"]["type"],
+        "Interface"
+    );
+    assert_eq!(metadata_data["nodes"]["datatype-money"]["type"], "DataType");
+    assert_eq!(
+        metadata_data["edges"]["order-has-lines"]["type"],
+        "Composition"
+    );
+    assert_eq!(
+        metadata_data["edges"]["card-payment-realizes-gateway"]["type"],
+        "Realization"
+    );
+
+    assert_svg_texts_include(
+        &doc,
+        &[
+            "Commerce",
+            "Fulfillment",
+            "Order",
+            "OrderLine",
+            "Customer",
+            "PaymentGateway",
+            "CardPayment",
+            "Shipment",
+            "Money",
+            "OrderStatus",
+            "+ total : Money",
+            "+ authorize(amount : Money) : PaymentState",
+            "implements",
+            "ships to",
+        ],
+    );
+    assert_uml_node_decorator(&doc, "class-order", "uml_class");
+    assert_uml_node_decorator(&doc, "interface-payment-gateway", "uml_interface");
+    assert_uml_node_decorator(&doc, "datatype-money", "uml_data_type");
+    assert_uml_node_decorator(&doc, "enum-order-status", "uml_enumeration");
+    assert_edge_marker_start(&doc, "order-has-lines", "filled_diamond");
+    assert_edge_marker_start(&doc, "order-has-payment", "hollow_diamond");
+    assert_edge_marker_end(&doc, "card-payment-realizes-gateway", "hollow_triangle");
+    assert_edge_marker_end(&doc, "order-status-dependency", "open_arrow");
+    assert_reasonable_svg_aspect(&svg, 4.8);
+    write_render_artifact(
+        "fixture-pipeline",
+        "fixture_mode_uml_complex_class_view_renders",
+        &svg,
+    );
+}
+
+#[test]
 fn fixture_archimate_pipeline_renders_node_notation() {
     let (svg, metadata_data) = render_fixture_archimate_pipeline();
     let doc = svg_doc(&svg);
@@ -579,9 +640,23 @@ fn render_uml_fixture_view(
     layout_fixture: &str,
     metadata_fixture: &str,
 ) -> (String, serde_json::Value) {
+    render_uml_fixture_view_from_source(
+        view_id,
+        "fixtures/source/valid-uml-basic.json",
+        layout_fixture,
+        metadata_fixture,
+    )
+}
+
+fn render_uml_fixture_view_from_source(
+    view_id: &str,
+    source_fixture: &str,
+    layout_fixture: &str,
+    metadata_fixture: &str,
+) -> (String, serde_json::Value) {
     let generic_plugin = plugin_binary("dediren-plugin-generic-graph");
     let svg_plugin = plugin_binary("dediren-plugin-svg-render");
-    let source = workspace_file("fixtures/source/valid-uml-basic.json");
+    let source = workspace_file(source_fixture);
 
     let request_output = common::dediren_command()
         .env("DEDIREN_PLUGIN_GENERIC_GRAPH", &generic_plugin)

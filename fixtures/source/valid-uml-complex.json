@@ -1,0 +1,791 @@
+{
+  "model_schema_version": "model.schema.v1",
+  "required_plugins": [
+    {
+      "id": "generic-graph",
+      "version": "0.14.0"
+    },
+    {
+      "id": "uml-xmi",
+      "version": "0.14.0"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "pkg-commerce",
+      "type": "Package",
+      "label": "Commerce",
+      "properties": {}
+    },
+    {
+      "id": "pkg-fulfillment",
+      "type": "Package",
+      "label": "Fulfillment",
+      "properties": {}
+    },
+    {
+      "id": "class-customer",
+      "type": "Class",
+      "label": "Customer",
+      "properties": {
+        "uml": {
+          "package": "pkg-commerce",
+          "attributes": [
+            {
+              "name": "id",
+              "type": "CustomerId",
+              "visibility": "public",
+              "multiplicity": "1"
+            },
+            {
+              "name": "email",
+              "type": "String",
+              "visibility": "public",
+              "multiplicity": "1"
+            }
+          ],
+          "operations": [
+            {
+              "name": "placeOrder",
+              "visibility": "public",
+              "parameters": [
+                {
+                  "name": "cart",
+                  "type": "Cart"
+                }
+              ],
+              "return_type": "Order"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "class-order",
+      "type": "Class",
+      "label": "Order",
+      "properties": {
+        "uml": {
+          "package": "pkg-commerce",
+          "attributes": [
+            {
+              "name": "id",
+              "type": "OrderId",
+              "visibility": "public",
+              "multiplicity": "1"
+            },
+            {
+              "name": "status",
+              "type": "OrderStatus",
+              "visibility": "private",
+              "multiplicity": "1"
+            },
+            {
+              "name": "total",
+              "type": "Money",
+              "visibility": "public",
+              "multiplicity": "1"
+            }
+          ],
+          "operations": [
+            {
+              "name": "submit",
+              "visibility": "public",
+              "parameters": [],
+              "return_type": "void"
+            },
+            {
+              "name": "cancel",
+              "visibility": "public",
+              "parameters": [
+                {
+                  "name": "reason",
+                  "type": "String"
+                }
+              ],
+              "return_type": "void"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "class-order-line",
+      "type": "Class",
+      "label": "OrderLine",
+      "properties": {
+        "uml": {
+          "package": "pkg-commerce",
+          "attributes": [
+            {
+              "name": "sku",
+              "type": "String",
+              "visibility": "public",
+              "multiplicity": "1"
+            },
+            {
+              "name": "quantity",
+              "type": "Integer",
+              "visibility": "public",
+              "multiplicity": "1"
+            },
+            {
+              "name": "unitPrice",
+              "type": "Money",
+              "visibility": "public",
+              "multiplicity": "1"
+            }
+          ],
+          "operations": []
+        }
+      }
+    },
+    {
+      "id": "interface-payment-gateway",
+      "type": "Interface",
+      "label": "PaymentGateway",
+      "properties": {
+        "uml": {
+          "package": "pkg-commerce",
+          "operations": [
+            {
+              "name": "authorize",
+              "visibility": "public",
+              "parameters": [
+                {
+                  "name": "amount",
+                  "type": "Money"
+                }
+              ],
+              "return_type": "PaymentState"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "class-card-payment",
+      "type": "Class",
+      "label": "CardPayment",
+      "properties": {
+        "uml": {
+          "package": "pkg-commerce",
+          "attributes": [
+            {
+              "name": "transactionId",
+              "type": "String",
+              "visibility": "private",
+              "multiplicity": "0..1"
+            }
+          ],
+          "operations": [
+            {
+              "name": "capture",
+              "visibility": "public",
+              "parameters": [],
+              "return_type": "PaymentState"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "class-shipment",
+      "type": "Class",
+      "label": "Shipment",
+      "properties": {
+        "uml": {
+          "package": "pkg-fulfillment",
+          "attributes": [
+            {
+              "name": "trackingNumber",
+              "type": "String",
+              "visibility": "public",
+              "multiplicity": "0..1"
+            },
+            {
+              "name": "destination",
+              "type": "Address",
+              "visibility": "public",
+              "multiplicity": "1"
+            }
+          ],
+          "operations": [
+            {
+              "name": "dispatch",
+              "visibility": "public",
+              "parameters": [],
+              "return_type": "void"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "datatype-order-id",
+      "type": "DataType",
+      "label": "OrderId",
+      "properties": {
+        "uml": {
+          "attributes": [
+            {
+              "name": "value",
+              "type": "String",
+              "visibility": "public",
+              "multiplicity": "1"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "datatype-money",
+      "type": "DataType",
+      "label": "Money",
+      "properties": {
+        "uml": {
+          "attributes": [
+            {
+              "name": "amount",
+              "type": "Decimal",
+              "visibility": "public",
+              "multiplicity": "1"
+            },
+            {
+              "name": "currency",
+              "type": "String",
+              "visibility": "public",
+              "multiplicity": "1"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "datatype-address",
+      "type": "DataType",
+      "label": "Address",
+      "properties": {
+        "uml": {
+          "attributes": [
+            {
+              "name": "line1",
+              "type": "String",
+              "visibility": "public",
+              "multiplicity": "1"
+            },
+            {
+              "name": "city",
+              "type": "String",
+              "visibility": "public",
+              "multiplicity": "1"
+            },
+            {
+              "name": "country",
+              "type": "String",
+              "visibility": "public",
+              "multiplicity": "1"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "enum-order-status",
+      "type": "Enumeration",
+      "label": "OrderStatus",
+      "properties": {
+        "uml": {
+          "literals": ["Draft", "Submitted", "Paid", "Shipped", "Cancelled"]
+        }
+      }
+    },
+    {
+      "id": "enum-payment-state",
+      "type": "Enumeration",
+      "label": "PaymentState",
+      "properties": {
+        "uml": {
+          "literals": ["Authorized", "Captured", "Declined"]
+        }
+      }
+    },
+    {
+      "id": "enum-shipment-state",
+      "type": "Enumeration",
+      "label": "ShipmentState",
+      "properties": {
+        "uml": {
+          "literals": ["Pending", "Packed", "Dispatched"]
+        }
+      }
+    },
+    {
+      "id": "activity-fulfill-order",
+      "type": "Activity",
+      "label": "Fulfill Order",
+      "properties": {
+        "uml": {
+          "partitions": ["Commerce", "Warehouse", "Carrier"]
+        }
+      }
+    },
+    {
+      "id": "initial-fulfill",
+      "type": "InitialNode",
+      "label": "",
+      "properties": {
+        "uml": {
+          "activity": "activity-fulfill-order",
+          "partition": "Commerce"
+        }
+      }
+    },
+    {
+      "id": "action-load-order",
+      "type": "Action",
+      "label": "Load order",
+      "properties": {
+        "uml": {
+          "activity": "activity-fulfill-order",
+          "partition": "Commerce"
+        }
+      }
+    },
+    {
+      "id": "decision-payment-ok",
+      "type": "DecisionNode",
+      "label": "Paid?",
+      "properties": {
+        "uml": {
+          "activity": "activity-fulfill-order",
+          "partition": "Commerce"
+        }
+      }
+    },
+    {
+      "id": "action-reserve-stock",
+      "type": "Action",
+      "label": "Reserve stock",
+      "properties": {
+        "uml": {
+          "activity": "activity-fulfill-order",
+          "partition": "Warehouse"
+        }
+      }
+    },
+    {
+      "id": "fork-fulfillment",
+      "type": "ForkNode",
+      "label": "",
+      "properties": {
+        "uml": {
+          "activity": "activity-fulfill-order",
+          "partition": "Warehouse"
+        }
+      }
+    },
+    {
+      "id": "action-pack-order",
+      "type": "Action",
+      "label": "Pack order",
+      "properties": {
+        "uml": {
+          "activity": "activity-fulfill-order",
+          "partition": "Warehouse"
+        }
+      }
+    },
+    {
+      "id": "action-create-label",
+      "type": "Action",
+      "label": "Create label",
+      "properties": {
+        "uml": {
+          "activity": "activity-fulfill-order",
+          "partition": "Carrier"
+        }
+      }
+    },
+    {
+      "id": "join-fulfillment",
+      "type": "JoinNode",
+      "label": "",
+      "properties": {
+        "uml": {
+          "activity": "activity-fulfill-order",
+          "partition": "Warehouse"
+        }
+      }
+    },
+    {
+      "id": "object-shipment",
+      "type": "ObjectNode",
+      "label": "Shipment",
+      "properties": {
+        "uml": {
+          "activity": "activity-fulfill-order",
+          "type": "Shipment"
+        }
+      }
+    },
+    {
+      "id": "final-fulfill",
+      "type": "ActivityFinalNode",
+      "label": "",
+      "properties": {
+        "uml": {
+          "activity": "activity-fulfill-order",
+          "partition": "Warehouse"
+        }
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "id": "customer-places-order",
+      "type": "Association",
+      "source": "class-customer",
+      "target": "class-order",
+      "label": "places",
+      "properties": {
+        "uml": {
+          "source_role": "customer",
+          "target_role": "orders",
+          "source_multiplicity": "1",
+          "target_multiplicity": "0..*"
+        }
+      }
+    },
+    {
+      "id": "order-has-lines",
+      "type": "Composition",
+      "source": "class-order",
+      "target": "class-order-line",
+      "label": "lines",
+      "properties": {
+        "uml": {
+          "source_role": "order",
+          "target_role": "lines",
+          "source_multiplicity": "1",
+          "target_multiplicity": "1..*"
+        }
+      }
+    },
+    {
+      "id": "order-has-payment",
+      "type": "Aggregation",
+      "source": "class-order",
+      "target": "class-card-payment",
+      "label": "payment",
+      "properties": {
+        "uml": {
+          "source_role": "order",
+          "target_role": "payment",
+          "source_multiplicity": "1",
+          "target_multiplicity": "0..1"
+        }
+      }
+    },
+    {
+      "id": "order-status-dependency",
+      "type": "Dependency",
+      "source": "class-order",
+      "target": "enum-order-status",
+      "label": "status",
+      "properties": {}
+    },
+    {
+      "id": "order-total-money",
+      "type": "Association",
+      "source": "class-order",
+      "target": "datatype-money",
+      "label": "total",
+      "properties": {}
+    },
+    {
+      "id": "order-id-type",
+      "type": "Dependency",
+      "source": "class-order",
+      "target": "datatype-order-id",
+      "label": "id type",
+      "properties": {}
+    },
+    {
+      "id": "card-payment-realizes-gateway",
+      "type": "Realization",
+      "source": "class-card-payment",
+      "target": "interface-payment-gateway",
+      "label": "implements",
+      "properties": {}
+    },
+    {
+      "id": "card-payment-state",
+      "type": "Dependency",
+      "source": "class-card-payment",
+      "target": "enum-payment-state",
+      "label": "state",
+      "properties": {}
+    },
+    {
+      "id": "shipment-for-order",
+      "type": "Association",
+      "source": "class-shipment",
+      "target": "class-order",
+      "label": "ships",
+      "properties": {}
+    },
+    {
+      "id": "shipment-destination",
+      "type": "Association",
+      "source": "class-shipment",
+      "target": "datatype-address",
+      "label": "ships to",
+      "properties": {}
+    },
+    {
+      "id": "shipment-state",
+      "type": "Dependency",
+      "source": "class-shipment",
+      "target": "enum-shipment-state",
+      "label": "state",
+      "properties": {}
+    },
+    {
+      "id": "flow-start-load",
+      "type": "ControlFlow",
+      "source": "initial-fulfill",
+      "target": "action-load-order",
+      "label": "",
+      "properties": {}
+    },
+    {
+      "id": "flow-load-payment",
+      "type": "ControlFlow",
+      "source": "action-load-order",
+      "target": "decision-payment-ok",
+      "label": "",
+      "properties": {}
+    },
+    {
+      "id": "flow-paid-reserve",
+      "type": "ControlFlow",
+      "source": "decision-payment-ok",
+      "target": "action-reserve-stock",
+      "label": "paid",
+      "properties": {
+        "uml": {
+          "guard": "paid"
+        }
+      }
+    },
+    {
+      "id": "flow-reserve-fork",
+      "type": "ControlFlow",
+      "source": "action-reserve-stock",
+      "target": "fork-fulfillment",
+      "label": "",
+      "properties": {}
+    },
+    {
+      "id": "flow-fork-pack",
+      "type": "ControlFlow",
+      "source": "fork-fulfillment",
+      "target": "action-pack-order",
+      "label": "",
+      "properties": {}
+    },
+    {
+      "id": "flow-fork-label",
+      "type": "ControlFlow",
+      "source": "fork-fulfillment",
+      "target": "action-create-label",
+      "label": "",
+      "properties": {}
+    },
+    {
+      "id": "flow-pack-join",
+      "type": "ControlFlow",
+      "source": "action-pack-order",
+      "target": "join-fulfillment",
+      "label": "",
+      "properties": {}
+    },
+    {
+      "id": "flow-label-shipment",
+      "type": "ObjectFlow",
+      "source": "action-create-label",
+      "target": "object-shipment",
+      "label": "label",
+      "properties": {}
+    },
+    {
+      "id": "flow-shipment-join",
+      "type": "ObjectFlow",
+      "source": "object-shipment",
+      "target": "join-fulfillment",
+      "label": "",
+      "properties": {}
+    },
+    {
+      "id": "flow-join-final",
+      "type": "ControlFlow",
+      "source": "join-fulfillment",
+      "target": "final-fulfill",
+      "label": "",
+      "properties": {}
+    }
+  ],
+  "plugins": {
+    "generic-graph": {
+      "semantic_profile": "uml",
+      "views": [
+        {
+          "id": "complex-class-view",
+          "label": "Commerce Fulfillment Class Model",
+          "kind": "uml-class",
+          "nodes": [
+            "class-customer",
+            "class-order",
+            "class-order-line",
+            "enum-order-status",
+            "datatype-order-id",
+            "datatype-money",
+            "interface-payment-gateway",
+            "class-card-payment",
+            "enum-payment-state",
+            "class-shipment",
+            "datatype-address",
+            "enum-shipment-state"
+          ],
+          "relationships": [
+            "customer-places-order",
+            "order-has-lines",
+            "order-has-payment",
+            "order-status-dependency",
+            "order-total-money",
+            "order-id-type",
+            "card-payment-realizes-gateway",
+            "card-payment-state",
+            "shipment-for-order",
+            "shipment-destination",
+            "shipment-state"
+          ],
+          "groups": [
+            {
+              "id": "commerce-package-boundary",
+              "label": "Commerce",
+              "role": "semantic-boundary",
+              "semantic_source_id": "pkg-commerce",
+              "members": [
+                "class-customer",
+                "class-order",
+                "class-order-line",
+                "enum-order-status",
+                "datatype-order-id",
+                "datatype-money",
+                "interface-payment-gateway",
+                "class-card-payment",
+                "enum-payment-state"
+              ]
+            },
+            {
+              "id": "fulfillment-package-boundary",
+              "label": "Fulfillment",
+              "role": "semantic-boundary",
+              "semantic_source_id": "pkg-fulfillment",
+              "members": [
+                "class-shipment",
+                "datatype-address",
+                "enum-shipment-state"
+              ]
+            }
+          ],
+          "layout_preferences": {
+            "direction": "right",
+            "density": "readable",
+            "routing": {
+              "style": "orthogonal",
+              "profile": "readable",
+              "endpoint_merging": "off"
+            }
+          }
+        },
+        {
+          "id": "complex-data-view",
+          "label": "Commerce Fulfillment Data Model",
+          "kind": "uml-data",
+          "nodes": [
+            "class-customer",
+            "class-order",
+            "class-order-line",
+            "class-shipment",
+            "datatype-order-id",
+            "datatype-money",
+            "datatype-address",
+            "enum-order-status",
+            "enum-payment-state",
+            "enum-shipment-state"
+          ],
+          "relationships": [
+            "customer-places-order",
+            "order-has-lines",
+            "order-status-dependency",
+            "order-total-money",
+            "order-id-type",
+            "shipment-destination",
+            "shipment-state"
+          ],
+          "layout_preferences": {
+            "direction": "right",
+            "density": "readable",
+            "routing": {
+              "style": "orthogonal",
+              "profile": "readable",
+              "endpoint_merging": "off"
+            }
+          }
+        },
+        {
+          "id": "complex-activity-view",
+          "label": "Fulfill Order Activity",
+          "kind": "uml-activity",
+          "nodes": [
+            "activity-fulfill-order",
+            "initial-fulfill",
+            "action-load-order",
+            "decision-payment-ok",
+            "action-reserve-stock",
+            "fork-fulfillment",
+            "action-pack-order",
+            "action-create-label",
+            "object-shipment",
+            "join-fulfillment",
+            "final-fulfill"
+          ],
+          "relationships": [
+            "flow-start-load",
+            "flow-load-payment",
+            "flow-paid-reserve",
+            "flow-reserve-fork",
+            "flow-fork-pack",
+            "flow-fork-label",
+            "flow-pack-join",
+            "flow-label-shipment",
+            "flow-shipment-join",
+            "flow-join-final"
+          ],
+          "layout_preferences": {
+            "direction": "right",
+            "density": "spacious",
+            "routing": {
+              "style": "orthogonal",
+              "profile": "spacious",
+              "endpoint_merging": "off"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,415 @@
+{
+  "layout_result_schema_version": "layout-result.schema.v1",
+  "view_id": "complex-class-view",
+  "nodes": [
+    {
+      "id": "class-customer",
+      "source_id": "class-customer",
+      "projection_id": "class-customer",
+      "x": 80,
+      "y": 170,
+      "width": 220,
+      "height": 110,
+      "label": "Customer"
+    },
+    {
+      "id": "class-order",
+      "source_id": "class-order",
+      "projection_id": "class-order",
+      "x": 380,
+      "y": 140,
+      "width": 260,
+      "height": 160,
+      "label": "Order"
+    },
+    {
+      "id": "class-order-line",
+      "source_id": "class-order-line",
+      "projection_id": "class-order-line",
+      "x": 720,
+      "y": 90,
+      "width": 240,
+      "height": 130,
+      "label": "OrderLine"
+    },
+    {
+      "id": "enum-order-status",
+      "source_id": "enum-order-status",
+      "projection_id": "enum-order-status",
+      "x": 720,
+      "y": 280,
+      "width": 240,
+      "height": 115,
+      "label": "OrderStatus"
+    },
+    {
+      "id": "datatype-order-id",
+      "source_id": "datatype-order-id",
+      "projection_id": "datatype-order-id",
+      "x": 380,
+      "y": 360,
+      "width": 220,
+      "height": 95,
+      "label": "OrderId"
+    },
+    {
+      "id": "datatype-money",
+      "source_id": "datatype-money",
+      "projection_id": "datatype-money",
+      "x": 720,
+      "y": 455,
+      "width": 240,
+      "height": 115,
+      "label": "Money"
+    },
+    {
+      "id": "interface-payment-gateway",
+      "source_id": "interface-payment-gateway",
+      "projection_id": "interface-payment-gateway",
+      "x": 80,
+      "y": 560,
+      "width": 280,
+      "height": 120,
+      "label": "PaymentGateway"
+    },
+    {
+      "id": "class-card-payment",
+      "source_id": "class-card-payment",
+      "projection_id": "class-card-payment",
+      "x": 410,
+      "y": 560,
+      "width": 240,
+      "height": 120,
+      "label": "CardPayment"
+    },
+    {
+      "id": "enum-payment-state",
+      "source_id": "enum-payment-state",
+      "projection_id": "enum-payment-state",
+      "x": 720,
+      "y": 630,
+      "width": 240,
+      "height": 105,
+      "label": "PaymentState"
+    },
+    {
+      "id": "class-shipment",
+      "source_id": "class-shipment",
+      "projection_id": "class-shipment",
+      "x": 1080,
+      "y": 170,
+      "width": 240,
+      "height": 120,
+      "label": "Shipment"
+    },
+    {
+      "id": "datatype-address",
+      "source_id": "datatype-address",
+      "projection_id": "datatype-address",
+      "x": 1080,
+      "y": 360,
+      "width": 240,
+      "height": 115,
+      "label": "Address"
+    },
+    {
+      "id": "enum-shipment-state",
+      "source_id": "enum-shipment-state",
+      "projection_id": "enum-shipment-state",
+      "x": 1080,
+      "y": 540,
+      "width": 240,
+      "height": 105,
+      "label": "ShipmentState"
+    }
+  ],
+  "edges": [
+    {
+      "id": "customer-places-order",
+      "source": "class-customer",
+      "target": "class-order",
+      "source_id": "customer-places-order",
+      "projection_id": "customer-places-order",
+      "points": [
+        {
+          "x": 300,
+          "y": 225
+        },
+        {
+          "x": 380,
+          "y": 225
+        }
+      ],
+      "label": "places"
+    },
+    {
+      "id": "order-has-lines",
+      "source": "class-order",
+      "target": "class-order-line",
+      "source_id": "order-has-lines",
+      "projection_id": "order-has-lines",
+      "points": [
+        {
+          "x": 640,
+          "y": 185
+        },
+        {
+          "x": 680,
+          "y": 185
+        },
+        {
+          "x": 680,
+          "y": 155
+        },
+        {
+          "x": 720,
+          "y": 155
+        }
+      ],
+      "label": "lines"
+    },
+    {
+      "id": "order-has-payment",
+      "source": "class-order",
+      "target": "class-card-payment",
+      "source_id": "order-has-payment",
+      "projection_id": "order-has-payment",
+      "points": [
+        {
+          "x": 510,
+          "y": 300
+        },
+        {
+          "x": 510,
+          "y": 560
+        }
+      ],
+      "label": "payment"
+    },
+    {
+      "id": "order-status-dependency",
+      "source": "class-order",
+      "target": "enum-order-status",
+      "source_id": "order-status-dependency",
+      "projection_id": "order-status-dependency",
+      "points": [
+        {
+          "x": 640,
+          "y": 250
+        },
+        {
+          "x": 680,
+          "y": 250
+        },
+        {
+          "x": 680,
+          "y": 335
+        },
+        {
+          "x": 720,
+          "y": 335
+        }
+      ],
+      "label": "status"
+    },
+    {
+      "id": "order-total-money",
+      "source": "class-order",
+      "target": "datatype-money",
+      "source_id": "order-total-money",
+      "projection_id": "order-total-money",
+      "points": [
+        {
+          "x": 640,
+          "y": 280
+        },
+        {
+          "x": 700,
+          "y": 280
+        },
+        {
+          "x": 700,
+          "y": 512
+        },
+        {
+          "x": 720,
+          "y": 512
+        }
+      ],
+      "label": "total"
+    },
+    {
+      "id": "order-id-type",
+      "source": "class-order",
+      "target": "datatype-order-id",
+      "source_id": "order-id-type",
+      "projection_id": "order-id-type",
+      "points": [
+        {
+          "x": 480,
+          "y": 300
+        },
+        {
+          "x": 480,
+          "y": 360
+        }
+      ],
+      "label": "id type"
+    },
+    {
+      "id": "card-payment-realizes-gateway",
+      "source": "class-card-payment",
+      "target": "interface-payment-gateway",
+      "source_id": "card-payment-realizes-gateway",
+      "projection_id": "card-payment-realizes-gateway",
+      "points": [
+        {
+          "x": 410,
+          "y": 620
+        },
+        {
+          "x": 360,
+          "y": 620
+        }
+      ],
+      "label": "implements"
+    },
+    {
+      "id": "card-payment-state",
+      "source": "class-card-payment",
+      "target": "enum-payment-state",
+      "source_id": "card-payment-state",
+      "projection_id": "card-payment-state",
+      "points": [
+        {
+          "x": 650,
+          "y": 640
+        },
+        {
+          "x": 720,
+          "y": 682
+        }
+      ],
+      "label": "state"
+    },
+    {
+      "id": "shipment-for-order",
+      "source": "class-shipment",
+      "target": "class-order",
+      "source_id": "shipment-for-order",
+      "projection_id": "shipment-for-order",
+      "points": [
+        {
+          "x": 1080,
+          "y": 215
+        },
+        {
+          "x": 1020,
+          "y": 215
+        },
+        {
+          "x": 1020,
+          "y": 105
+        },
+        {
+          "x": 660,
+          "y": 105
+        },
+        {
+          "x": 660,
+          "y": 210
+        },
+        {
+          "x": 640,
+          "y": 210
+        }
+      ],
+      "label": "ships"
+    },
+    {
+      "id": "shipment-destination",
+      "source": "class-shipment",
+      "target": "datatype-address",
+      "source_id": "shipment-destination",
+      "projection_id": "shipment-destination",
+      "points": [
+        {
+          "x": 1200,
+          "y": 290
+        },
+        {
+          "x": 1200,
+          "y": 360
+        }
+      ],
+      "label": "ships to"
+    },
+    {
+      "id": "shipment-state",
+      "source": "class-shipment",
+      "target": "enum-shipment-state",
+      "source_id": "shipment-state",
+      "projection_id": "shipment-state",
+      "points": [
+        {
+          "x": 1260,
+          "y": 290
+        },
+        {
+          "x": 1260,
+          "y": 540
+        }
+      ],
+      "label": "state"
+    }
+  ],
+  "groups": [
+    {
+      "id": "commerce-package-boundary",
+      "source_id": "pkg-commerce",
+      "projection_id": "commerce-package-boundary",
+      "provenance": {
+        "semantic_backed": {
+          "source_id": "pkg-commerce"
+        }
+      },
+      "x": 40,
+      "y": 40,
+      "width": 960,
+      "height": 740,
+      "members": [
+        "class-customer",
+        "class-order",
+        "class-order-line",
+        "enum-order-status",
+        "datatype-order-id",
+        "datatype-money",
+        "interface-payment-gateway",
+        "class-card-payment",
+        "enum-payment-state"
+      ],
+      "label": "Commerce"
+    },
+    {
+      "id": "fulfillment-package-boundary",
+      "source_id": "pkg-fulfillment",
+      "projection_id": "fulfillment-package-boundary",
+      "provenance": {
+        "semantic_backed": {
+          "source_id": "pkg-fulfillment"
+        }
+      },
+      "x": 1040,
+      "y": 90,
+      "width": 340,
+      "height": 600,
+      "members": [
+        "class-shipment",
+        "datatype-address",
+        "enum-shipment-state"
+      ],
+      "label": "Fulfillment"
+    }
+  ],
+  "warnings": []
+}

@@ -48,7 +48,7 @@ them.
 {
   "model_schema_version": "model.schema.v1",
   "required_plugins": [
-    { "id": "generic-graph", "version": "0.13.0" }
+    { "id": "generic-graph", "version": "0.14.0" }
   ],
   "nodes": [
     {
@@ -103,8 +103,8 @@ and use ArchiMate type names:
 {
   "model_schema_version": "model.schema.v1",
   "required_plugins": [
-    { "id": "generic-graph", "version": "0.13.0" },
-    { "id": "archimate-oef", "version": "0.13.0" }
+    { "id": "generic-graph", "version": "0.14.0" },
+    { "id": "archimate-oef", "version": "0.14.0" }
   ],
   "nodes": [
     {
@@ -168,6 +168,12 @@ For detailed class, data, or activity models, set:
 Use `kind: "uml-class"`, `kind: "uml-data"`, or `kind: "uml-activity"` on
 views. Author UML-specific attributes, operations, multiplicities, guards, and
 partitions under `properties.uml`.
+
+Use `fixtures/source/valid-uml-complex.json` when you need a non-trivial UML
+reference source. It contains package-bounded class, data, and activity views,
+with the checked class-view render pair at
+`fixtures/layout-result/uml-complex-class.json` and
+`fixtures/render-metadata/uml-complex-class.json`.
 
 Validation loop:
 
@@ -367,7 +373,7 @@ target/debug/dediren-plugin-uml-xmi-export capabilities
 From an unpacked distribution bundle:
 
 ```bash
-BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-0.13.0-x86_64-unknown-linux-gnu
+BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-0.14.0-x86_64-unknown-linux-gnu
 "$BUNDLE/bin/dediren" --version
 "$BUNDLE/bin/dediren-plugin-generic-graph" capabilities
 "$BUNDLE/bin/dediren-plugin-elk-layout" capabilities
@@ -382,7 +388,7 @@ CLI workflow commands return command envelopes using `schemas/envelope.schema.js
 ## Bundle Smoke Workflow
 
 ```bash
-BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-0.13.0-x86_64-unknown-linux-gnu
+BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-0.14.0-x86_64-unknown-linux-gnu
 
 "$BUNDLE/bin/dediren" validate \
   --input "$BUNDLE/fixtures/source/valid-basic.json"

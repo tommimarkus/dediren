@@ -432,6 +432,178 @@ fn real_elk_renders_uml_activity_profile() {
 
 #[test]
 #[ignore = "run with --ignored after building the ELK Java helper; serialize real ELK runs"]
+fn real_elk_renders_complex_uml_class_profile() {
+    let _guard = real_elk_guard();
+    let (svg, metadata_data, layout_data) = render_real_elk_uml_view_from_source(
+        "fixtures/source/valid-uml-complex.json",
+        "complex-class-view",
+    );
+    let doc = svg_doc(&svg);
+
+    assert_eq!(layout_data["view_id"], "complex-class-view");
+    assert_eq!(metadata_data["semantic_profile"], "uml");
+    assert_eq!(metadata_data["nodes"]["class-order"]["type"], "Class");
+    assert_eq!(
+        metadata_data["nodes"]["interface-payment-gateway"]["type"],
+        "Interface"
+    );
+    assert_eq!(metadata_data["nodes"]["datatype-money"]["type"], "DataType");
+    assert_eq!(
+        metadata_data["edges"]["order-has-lines"]["type"],
+        "Composition"
+    );
+    assert_eq!(
+        metadata_data["edges"]["card-payment-realizes-gateway"]["type"],
+        "Realization"
+    );
+    assert_svg_texts_include(
+        &doc,
+        &[
+            "Commerce",
+            "Fulfillment",
+            "Order",
+            "OrderLine",
+            "Customer",
+            "PaymentGateway",
+            "CardPayment",
+            "Shipment",
+            "Money",
+            "OrderStatus",
+            "implements",
+            "ships to",
+        ],
+    );
+    assert_uml_node_decorator(&doc, "class-order", "uml_class");
+    assert_uml_node_decorator(&doc, "interface-payment-gateway", "uml_interface");
+    assert_uml_node_decorator(&doc, "datatype-money", "uml_data_type");
+    assert_uml_node_decorator(&doc, "enum-order-status", "uml_enumeration");
+    assert_edge_marker_start(&doc, "order-has-lines", "filled_diamond");
+    assert_edge_marker_start(&doc, "order-has-payment", "hollow_diamond");
+    assert_edge_marker_end(&doc, "card-payment-realizes-gateway", "hollow_triangle");
+    assert_edge_marker_end(&doc, "order-status-dependency", "open_arrow");
+    assert_reasonable_svg_aspect(&svg, 5.5);
+    write_render_artifact(
+        "real-elk",
+        "real_elk_renders_complex_uml_class_profile",
+        &svg,
+    );
+}
+
+#[test]
+#[ignore = "run with --ignored after building the ELK Java helper; serialize real ELK runs"]
+fn real_elk_renders_complex_uml_data_profile() {
+    let _guard = real_elk_guard();
+    let (svg, metadata_data, layout_data) = render_real_elk_uml_view_from_source(
+        "fixtures/source/valid-uml-complex.json",
+        "complex-data-view",
+    );
+    let doc = svg_doc(&svg);
+
+    assert_eq!(layout_data["view_id"], "complex-data-view");
+    assert_eq!(metadata_data["semantic_profile"], "uml");
+    assert_eq!(metadata_data["nodes"]["class-order"]["type"], "Class");
+    assert_eq!(metadata_data["nodes"]["class-shipment"]["type"], "Class");
+    assert_eq!(
+        metadata_data["nodes"]["datatype-address"]["type"],
+        "DataType"
+    );
+    assert_eq!(
+        metadata_data["nodes"]["enum-shipment-state"]["type"],
+        "Enumeration"
+    );
+    assert_svg_texts_include(
+        &doc,
+        &[
+            "Customer",
+            "Order",
+            "OrderLine",
+            "Shipment",
+            "OrderId",
+            "Money",
+            "Address",
+            "OrderStatus",
+            "PaymentState",
+            "ShipmentState",
+            "places",
+            "lines",
+            "ships to",
+        ],
+    );
+    assert_uml_node_decorator(&doc, "class-order", "uml_class");
+    assert_uml_node_decorator(&doc, "datatype-address", "uml_data_type");
+    assert_uml_node_decorator(&doc, "enum-shipment-state", "uml_enumeration");
+    assert_edge_marker_start(&doc, "order-has-lines", "filled_diamond");
+    assert_edge_marker_end(&doc, "order-status-dependency", "open_arrow");
+    assert_edge_marker_end(&doc, "shipment-state", "open_arrow");
+    assert_reasonable_svg_aspect(&svg, 6.0);
+    write_render_artifact(
+        "real-elk",
+        "real_elk_renders_complex_uml_data_profile",
+        &svg,
+    );
+}
+
+#[test]
+#[ignore = "run with --ignored after building the ELK Java helper; serialize real ELK runs"]
+fn real_elk_renders_complex_uml_activity_profile() {
+    let _guard = real_elk_guard();
+    let (svg, metadata_data, layout_data) = render_real_elk_uml_view_from_source(
+        "fixtures/source/valid-uml-complex.json",
+        "complex-activity-view",
+    );
+    let doc = svg_doc(&svg);
+
+    assert_eq!(layout_data["view_id"], "complex-activity-view");
+    assert_eq!(metadata_data["semantic_profile"], "uml");
+    assert_eq!(
+        metadata_data["nodes"]["activity-fulfill-order"]["type"],
+        "Activity"
+    );
+    assert_eq!(
+        metadata_data["nodes"]["fork-fulfillment"]["type"],
+        "ForkNode"
+    );
+    assert_eq!(
+        metadata_data["nodes"]["object-shipment"]["type"],
+        "ObjectNode"
+    );
+    assert_eq!(
+        metadata_data["edges"]["flow-label-shipment"]["type"],
+        "ObjectFlow"
+    );
+    assert_svg_texts_include(
+        &doc,
+        &[
+            "Fulfill Order",
+            "Load order",
+            "Paid?",
+            "Reserve stock",
+            "Pack order",
+            "Create label",
+            "Shipment",
+            "paid",
+            "label",
+        ],
+    );
+    assert_uml_node_decorator(&doc, "activity-fulfill-order", "uml_activity");
+    assert_uml_node_decorator(&doc, "initial-fulfill", "uml_initial_node");
+    assert_uml_node_decorator(&doc, "fork-fulfillment", "uml_fork_node");
+    assert_uml_node_decorator(&doc, "join-fulfillment", "uml_join_node");
+    assert_uml_node_decorator(&doc, "object-shipment", "uml_object_node");
+    assert_uml_node_decorator(&doc, "final-fulfill", "uml_activity_final_node");
+    assert_edge_marker_end(&doc, "flow-start-load", "filled_arrow");
+    assert_edge_marker_end(&doc, "flow-label-shipment", "filled_arrow");
+    assert_edge_marker_end(&doc, "flow-join-final", "filled_arrow");
+    assert_reasonable_svg_aspect(&svg, 7.0);
+    write_render_artifact(
+        "real-elk",
+        "real_elk_renders_complex_uml_activity_profile",
+        &svg,
+    );
+}
+
+#[test]
+#[ignore = "run with --ignored after building the ELK Java helper; serialize real ELK runs"]
 fn real_elk_renders_cross_group_route_without_quality_warnings() {
     let _guard = real_elk_guard();
     let temp = assert_fs::TempDir::new().unwrap();
@@ -955,8 +1127,11 @@ fn project_render_metadata_for_view(source_fixture: &str, view_id: &str) -> Vec<
 }
 
 fn render_real_elk_uml_view(view_id: &str) -> (String, Value, Value) {
+    render_real_elk_uml_view_from_source("fixtures/source/valid-uml-basic.json", view_id)
+}
+
+fn render_real_elk_uml_view_from_source(source: &str, view_id: &str) -> (String, Value, Value) {
     let temp = assert_fs::TempDir::new().unwrap();
-    let source = "fixtures/source/valid-uml-basic.json";
 
     let request_output = project_layout_request_for_view(source, view_id);
     let request_data = ok_data(&request_output);

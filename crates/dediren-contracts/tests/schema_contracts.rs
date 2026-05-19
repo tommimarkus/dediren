@@ -43,6 +43,7 @@ const SOURCE_FIXTURE_PATHS: &[&str] = &[
     "fixtures/source/valid-pipeline-archimate.json",
     "fixtures/source/valid-archimate-oef.json",
     "fixtures/source/valid-uml-basic.json",
+    "fixtures/source/valid-uml-complex.json",
 ];
 
 const SOURCE_FIXTURES_REQUIRING_CURRENT_WORKSPACE_PLUGIN_VERSIONS: &[&str] = &[
@@ -51,6 +52,7 @@ const SOURCE_FIXTURES_REQUIRING_CURRENT_WORKSPACE_PLUGIN_VERSIONS: &[&str] = &[
     "fixtures/source/valid-pipeline-archimate.json",
     "fixtures/source/valid-archimate-oef.json",
     "fixtures/source/valid-uml-basic.json",
+    "fixtures/source/valid-uml-complex.json",
 ];
 
 const WORKSPACE_PACKAGE_NAMES: &[&str] = &[
@@ -83,7 +85,7 @@ fn source_with_fragments_matches_model_schema() {
             "model_schema_version": "model.schema.v1",
             "fragments": ["model/application.json", "model/technology.json"],
             "required_plugins": [
-                { "id": "generic-graph", "version": "0.13.0" }
+                { "id": "generic-graph", "version": "0.14.0" }
             ],
             "nodes": [],
             "relationships": [],
@@ -207,6 +209,10 @@ fn uml_render_metadata_matches_schema() {
     assert_valid(
         "schemas/render-metadata.schema.json",
         "fixtures/render-metadata/uml-activity.json",
+    );
+    assert_valid(
+        "schemas/render-metadata.schema.json",
+        "fixtures/render-metadata/uml-complex-class.json",
     );
 }
 
@@ -1002,6 +1008,10 @@ fn layout_fixtures_match_schemas() {
     assert_valid(
         "schemas/layout-result.schema.json",
         "fixtures/layout-result/uml-activity.json",
+    );
+    assert_valid(
+        "schemas/layout-result.schema.json",
+        "fixtures/layout-result/uml-complex-class.json",
     );
 }
 

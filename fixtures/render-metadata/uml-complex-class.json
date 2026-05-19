@@ -1,0 +1,323 @@
+{
+  "render_metadata_schema_version": "render-metadata.schema.v1",
+  "semantic_profile": "uml",
+  "nodes": {
+    "class-card-payment": {
+      "type": "Class",
+      "source_id": "class-card-payment",
+      "properties": {
+        "package": "pkg-commerce",
+        "attributes": [
+          {
+            "name": "transactionId",
+            "type": "String",
+            "visibility": "private",
+            "multiplicity": "0..1"
+          }
+        ],
+        "operations": [
+          {
+            "name": "capture",
+            "visibility": "public",
+            "parameters": [],
+            "return_type": "PaymentState"
+          }
+        ]
+      }
+    },
+    "class-customer": {
+      "type": "Class",
+      "source_id": "class-customer",
+      "properties": {
+        "package": "pkg-commerce",
+        "attributes": [
+          {
+            "name": "id",
+            "type": "CustomerId",
+            "visibility": "public",
+            "multiplicity": "1"
+          },
+          {
+            "name": "email",
+            "type": "String",
+            "visibility": "public",
+            "multiplicity": "1"
+          }
+        ],
+        "operations": [
+          {
+            "name": "placeOrder",
+            "visibility": "public",
+            "parameters": [
+              {
+                "name": "cart",
+                "type": "Cart"
+              }
+            ],
+            "return_type": "Order"
+          }
+        ]
+      }
+    },
+    "class-order": {
+      "type": "Class",
+      "source_id": "class-order",
+      "properties": {
+        "package": "pkg-commerce",
+        "attributes": [
+          {
+            "name": "id",
+            "type": "OrderId",
+            "visibility": "public",
+            "multiplicity": "1"
+          },
+          {
+            "name": "status",
+            "type": "OrderStatus",
+            "visibility": "private",
+            "multiplicity": "1"
+          },
+          {
+            "name": "total",
+            "type": "Money",
+            "visibility": "public",
+            "multiplicity": "1"
+          }
+        ],
+        "operations": [
+          {
+            "name": "submit",
+            "visibility": "public",
+            "parameters": [],
+            "return_type": "void"
+          },
+          {
+            "name": "cancel",
+            "visibility": "public",
+            "parameters": [
+              {
+                "name": "reason",
+                "type": "String"
+              }
+            ],
+            "return_type": "void"
+          }
+        ]
+      }
+    },
+    "class-order-line": {
+      "type": "Class",
+      "source_id": "class-order-line",
+      "properties": {
+        "package": "pkg-commerce",
+        "attributes": [
+          {
+            "name": "sku",
+            "type": "String",
+            "visibility": "public",
+            "multiplicity": "1"
+          },
+          {
+            "name": "quantity",
+            "type": "Integer",
+            "visibility": "public",
+            "multiplicity": "1"
+          },
+          {
+            "name": "unitPrice",
+            "type": "Money",
+            "visibility": "public",
+            "multiplicity": "1"
+          }
+        ],
+        "operations": []
+      }
+    },
+    "class-shipment": {
+      "type": "Class",
+      "source_id": "class-shipment",
+      "properties": {
+        "package": "pkg-fulfillment",
+        "attributes": [
+          {
+            "name": "trackingNumber",
+            "type": "String",
+            "visibility": "public",
+            "multiplicity": "0..1"
+          },
+          {
+            "name": "destination",
+            "type": "Address",
+            "visibility": "public",
+            "multiplicity": "1"
+          }
+        ],
+        "operations": [
+          {
+            "name": "dispatch",
+            "visibility": "public",
+            "parameters": [],
+            "return_type": "void"
+          }
+        ]
+      }
+    },
+    "datatype-address": {
+      "type": "DataType",
+      "source_id": "datatype-address",
+      "properties": {
+        "attributes": [
+          {
+            "name": "line1",
+            "type": "String",
+            "visibility": "public",
+            "multiplicity": "1"
+          },
+          {
+            "name": "city",
+            "type": "String",
+            "visibility": "public",
+            "multiplicity": "1"
+          },
+          {
+            "name": "country",
+            "type": "String",
+            "visibility": "public",
+            "multiplicity": "1"
+          }
+        ]
+      }
+    },
+    "datatype-money": {
+      "type": "DataType",
+      "source_id": "datatype-money",
+      "properties": {
+        "attributes": [
+          {
+            "name": "amount",
+            "type": "Decimal",
+            "visibility": "public",
+            "multiplicity": "1"
+          },
+          {
+            "name": "currency",
+            "type": "String",
+            "visibility": "public",
+            "multiplicity": "1"
+          }
+        ]
+      }
+    },
+    "datatype-order-id": {
+      "type": "DataType",
+      "source_id": "datatype-order-id",
+      "properties": {
+        "attributes": [
+          {
+            "name": "value",
+            "type": "String",
+            "visibility": "public",
+            "multiplicity": "1"
+          }
+        ]
+      }
+    },
+    "enum-order-status": {
+      "type": "Enumeration",
+      "source_id": "enum-order-status",
+      "properties": {
+        "literals": ["Draft", "Submitted", "Paid", "Shipped", "Cancelled"]
+      }
+    },
+    "enum-payment-state": {
+      "type": "Enumeration",
+      "source_id": "enum-payment-state",
+      "properties": {
+        "literals": ["Authorized", "Captured", "Declined"]
+      }
+    },
+    "enum-shipment-state": {
+      "type": "Enumeration",
+      "source_id": "enum-shipment-state",
+      "properties": {
+        "literals": ["Pending", "Packed", "Dispatched"]
+      }
+    },
+    "interface-payment-gateway": {
+      "type": "Interface",
+      "source_id": "interface-payment-gateway",
+      "properties": {
+        "package": "pkg-commerce",
+        "operations": [
+          {
+            "name": "authorize",
+            "visibility": "public",
+            "parameters": [
+              {
+                "name": "amount",
+                "type": "Money"
+              }
+            ],
+            "return_type": "PaymentState"
+          }
+        ]
+      }
+    }
+  },
+  "edges": {
+    "card-payment-realizes-gateway": {
+      "type": "Realization",
+      "source_id": "card-payment-realizes-gateway"
+    },
+    "card-payment-state": {
+      "type": "Dependency",
+      "source_id": "card-payment-state"
+    },
+    "customer-places-order": {
+      "type": "Association",
+      "source_id": "customer-places-order"
+    },
+    "order-has-lines": {
+      "type": "Composition",
+      "source_id": "order-has-lines"
+    },
+    "order-has-payment": {
+      "type": "Aggregation",
+      "source_id": "order-has-payment"
+    },
+    "order-id-type": {
+      "type": "Dependency",
+      "source_id": "order-id-type"
+    },
+    "order-status-dependency": {
+      "type": "Dependency",
+      "source_id": "order-status-dependency"
+    },
+    "order-total-money": {
+      "type": "Association",
+      "source_id": "order-total-money"
+    },
+    "shipment-destination": {
+      "type": "Association",
+      "source_id": "shipment-destination"
+    },
+    "shipment-for-order": {
+      "type": "Association",
+      "source_id": "shipment-for-order"
+    },
+    "shipment-state": {
+      "type": "Dependency",
+      "source_id": "shipment-state"
+    }
+  },
+  "groups": {
+    "commerce-package-boundary": {
+      "type": "Package",
+      "source_id": "pkg-commerce"
+    },
+    "fulfillment-package-boundary": {
+      "type": "Package",
+      "source_id": "pkg-fulfillment"
+    }
+  }
+}

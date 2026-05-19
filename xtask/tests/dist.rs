@@ -221,6 +221,24 @@ fn dist_build_includes_uml_profile_bundle_artifacts() {
             .exists(),
         "dist build should include the UML activity render metadata fixture"
     );
+    assert!(
+        bundle
+            .join("fixtures/source/valid-uml-complex.json")
+            .exists(),
+        "dist build should include the complex UML source fixture"
+    );
+    assert!(
+        bundle
+            .join("fixtures/layout-result/uml-complex-class.json")
+            .exists(),
+        "dist build should include the complex UML class layout fixture"
+    );
+    assert!(
+        bundle
+            .join("fixtures/render-metadata/uml-complex-class.json")
+            .exists(),
+        "dist build should include the complex UML class render metadata fixture"
+    );
 
     let metadata: serde_json::Value =
         serde_json::from_str(&fs::read_to_string(bundle.join("bundle.json")).unwrap()).unwrap();
@@ -427,6 +445,13 @@ esac
         )
         .unwrap();
         fs::write(
+            self.root
+                .path()
+                .join("fixtures/source/valid-uml-complex.json"),
+            "{}",
+        )
+        .unwrap();
+        fs::write(
             self.root.path().join("fixtures/render-policy/uml-svg.json"),
             "{}",
         )
@@ -434,8 +459,10 @@ esac
         for path in [
             "fixtures/layout-result/uml-data.json",
             "fixtures/layout-result/uml-activity.json",
+            "fixtures/layout-result/uml-complex-class.json",
             "fixtures/render-metadata/uml-data.json",
             "fixtures/render-metadata/uml-activity.json",
+            "fixtures/render-metadata/uml-complex-class.json",
         ] {
             fs::write(self.root.path().join(path), "{}").unwrap();
         }
