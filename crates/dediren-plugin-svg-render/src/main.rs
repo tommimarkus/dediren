@@ -1100,14 +1100,35 @@ fn node_decorator(node: &LaidOutNode, style: &ResolvedNodeStyle) -> String {
         Some(SvgNodeDecorator::ArchimateTechnologyNode) => {
             archimate_technology_node_decorator(node, style)
         }
-        Some(decorator) => archimate_symbol_decorator(
+        Some(decorator) if is_archimate_decorator(decorator) => archimate_symbol_decorator(
             node,
             style,
             &archimate_decorator_name(decorator),
             archimate_icon_kind(decorator),
         ),
+        Some(_) => String::new(),
         None => String::new(),
     }
+}
+
+fn is_archimate_decorator(decorator: SvgNodeDecorator) -> bool {
+    !matches!(
+        decorator,
+        SvgNodeDecorator::UmlPackage
+            | SvgNodeDecorator::UmlClass
+            | SvgNodeDecorator::UmlInterface
+            | SvgNodeDecorator::UmlDataType
+            | SvgNodeDecorator::UmlEnumeration
+            | SvgNodeDecorator::UmlActivity
+            | SvgNodeDecorator::UmlAction
+            | SvgNodeDecorator::UmlInitialNode
+            | SvgNodeDecorator::UmlActivityFinalNode
+            | SvgNodeDecorator::UmlDecisionNode
+            | SvgNodeDecorator::UmlMergeNode
+            | SvgNodeDecorator::UmlForkNode
+            | SvgNodeDecorator::UmlJoinNode
+            | SvgNodeDecorator::UmlObjectNode
+    )
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -1285,6 +1306,7 @@ fn archimate_icon_kind(decorator: SvgNodeDecorator) -> ArchimateIconKind {
         SvgNodeDecorator::ArchimateBusinessActor => ArchimateIconKind::Actor,
         SvgNodeDecorator::ArchimateApplicationComponent => ArchimateIconKind::Component,
         SvgNodeDecorator::ArchimateApplicationService => ArchimateIconKind::Service,
+        _ => unreachable!("archimate_icon_kind only accepts ArchiMate decorators"),
     }
 }
 

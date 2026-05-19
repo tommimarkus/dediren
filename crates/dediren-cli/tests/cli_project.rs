@@ -43,6 +43,35 @@ fn project_invokes_generic_graph_plugin() {
 }
 
 #[test]
+fn project_uml_render_metadata() {
+    let output = common::dediren_command()
+        .env(
+            "DEDIREN_PLUGIN_GENERIC_GRAPH",
+            plugin_binary("dediren-plugin-generic-graph"),
+        )
+        .args([
+            "project",
+            "--target",
+            "render-metadata",
+            "--plugin",
+            "generic-graph",
+            "--view",
+            "class-view",
+            "--input",
+        ])
+        .arg(workspace_file("fixtures/source/valid-uml-basic.json"))
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let data = ok_data(&output);
+    assert_eq!(data["semantic_profile"], "uml");
+    assert_eq!(data["nodes"]["class-order"]["type"], "Class");
+}
+
+#[test]
 fn project_layout_request_preserves_layout_preferences() {
     let temp = assert_fs::TempDir::new().unwrap();
     let source = temp.child("source.json");

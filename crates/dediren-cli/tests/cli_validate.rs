@@ -259,6 +259,36 @@ fn validate_with_archimate_profile_accepts_semantically_valid_source() {
 }
 
 #[test]
+fn validate_invokes_generic_graph_uml_profile() {
+    let output = common::dediren_command()
+        .env(
+            "DEDIREN_PLUGIN_GENERIC_GRAPH",
+            common::plugin_binary("dediren-plugin-generic-graph"),
+        )
+        .args([
+            "validate",
+            "--plugin",
+            "generic-graph",
+            "--profile",
+            "uml",
+            "--input",
+        ])
+        .arg(workspace_file("fixtures/source/valid-uml-basic.json"))
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let data = ok_data(&output);
+    assert_eq!(
+        data["semantic_validation_result_schema_version"],
+        "semantic-validation-result.schema.v1"
+    );
+    assert_eq!(data["semantic_profile"], "uml");
+}
+
+#[test]
 fn validate_with_archimate_profile_rejects_invalid_relationship_endpoint() {
     let temp = assert_fs::TempDir::new().unwrap();
     let source_file = temp.child("invalid-archimate-endpoint.json");

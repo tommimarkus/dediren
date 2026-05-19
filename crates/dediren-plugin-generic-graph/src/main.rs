@@ -43,12 +43,7 @@ fn main() -> anyhow::Result<()> {
     let mut input = String::new();
     std::io::stdin().read_to_string(&mut input)?;
     let source: SourceDocument = serde_json::from_str(&input)?;
-    let plugin_value = source
-        .plugins
-        .get("generic-graph")
-        .context("missing plugins.generic-graph")?
-        .clone();
-    let plugin_data: GenericGraphPluginData = serde_json::from_value(plugin_value)?;
+    let plugin_data = generic_graph_plugin_data(&source)?;
     let selected_view = plugin_data
         .views
         .iter()
@@ -62,6 +57,10 @@ fn main() -> anyhow::Result<()> {
         }
         if let Err(error) = validate_archimate_junction_semantics(&source) {
             exit_with_diagnostic(&error.code, &error.message, Some(error.path));
+        }
+    } else if semantic_profile == GenericGraphSemanticProfile::Uml.as_str() {
+        if let Err(error) = dediren_uml::validate_source(&source, &plugin_data) {
+            exit_with_uml_validation_error(error);
         }
     }
 
@@ -182,22 +181,33 @@ fn validate_from_stdin(args: &[String]) -> anyhow::Result<()> {
             None,
         );
     };
-    if profile != "archimate" {
-        exit_with_diagnostic(
-            "DEDIREN_SEMANTIC_PROFILE_UNSUPPORTED",
-            &format!("unsupported semantic profile: {profile}"),
-            Some("profile".to_string()),
-        );
-    }
 
     let mut input = String::new();
     std::io::stdin().read_to_string(&mut input)?;
     let source: SourceDocument = serde_json::from_str(&input)?;
-    if let Err(error) = validate_archimate_source_types(&source) {
-        exit_with_archimate_type_error(error);
-    }
-    if let Err(error) = validate_archimate_junction_semantics(&source) {
-        exit_with_diagnostic(&error.code, &error.message, Some(error.path));
+    let plugin_data = generic_graph_plugin_data(&source)?;
+
+    match profile.as_str() {
+        "archimate" => {
+            if let Err(error) = validate_archimate_source_types(&source) {
+                exit_with_archimate_type_error(error);
+            }
+            if let Err(error) = validate_archimate_junction_semantics(&source) {
+                exit_with_diagnostic(&error.code, &error.message, Some(error.path));
+            }
+        }
+        "uml" => {
+            if let Err(error) = dediren_uml::validate_source(&source, &plugin_data) {
+                exit_with_uml_validation_error(error);
+            }
+        }
+        _ => {
+            exit_with_diagnostic(
+                "DEDIREN_SEMANTIC_PROFILE_UNSUPPORTED",
+                &format!("unsupported semantic profile: {profile}"),
+                Some("profile".to_string()),
+            );
+        }
     }
 
     let result = SemanticValidationResult {
@@ -209,6 +219,15 @@ fn validate_from_stdin(args: &[String]) -> anyhow::Result<()> {
     };
     println!("{}", serde_json::to_string(&CommandEnvelope::ok(result))?);
     Ok(())
+}
+
+fn generic_graph_plugin_data(source: &SourceDocument) -> anyhow::Result<GenericGraphPluginData> {
+    let plugin_value = source
+        .plugins
+        .get("generic-graph")
+        .context("missing plugins.generic-graph")?
+        .clone();
+    Ok(serde_json::from_value(plugin_value)?)
 }
 
 fn project_render_metadata(
@@ -307,6 +326,14 @@ fn layout_width_hint(semantic_profile: &str, source_node: &dediren_contracts::So
         && dediren_archimate::is_relationship_connector_type(&source_node.node_type)
     {
         28.0
+    } else if semantic_profile == GenericGraphSemanticProfile::Uml.as_str()
+        && dediren_uml::is_compact_activity_node_type(&source_node.node_type)
+    {
+        32.0
+    } else if semantic_profile == GenericGraphSemanticProfile::Uml.as_str()
+        && is_large_uml_structural_node_type(&source_node.node_type)
+    {
+        220.0
     } else {
         160.0
     }
@@ -317,9 +344,24 @@ fn layout_height_hint(semantic_profile: &str, source_node: &dediren_contracts::S
         && dediren_archimate::is_relationship_connector_type(&source_node.node_type)
     {
         28.0
+    } else if semantic_profile == GenericGraphSemanticProfile::Uml.as_str()
+        && dediren_uml::is_compact_activity_node_type(&source_node.node_type)
+    {
+        32.0
+    } else if semantic_profile == GenericGraphSemanticProfile::Uml.as_str()
+        && is_large_uml_structural_node_type(&source_node.node_type)
+    {
+        120.0
     } else {
         80.0
     }
+}
+
+fn is_large_uml_structural_node_type(node_type: &str) -> bool {
+    matches!(
+        node_type,
+        "Class" | "Interface" | "DataType" | "Enumeration"
+    )
 }
 
 fn validate_archimate_source_types(
@@ -384,6 +426,10 @@ fn validate_archimate_junction_semantics(
 }
 
 fn exit_with_archimate_type_error(error: ArchimateTypeValidationError) -> ! {
+    exit_with_diagnostic(error.code(), &error.message(), Some(error.path));
+}
+
+fn exit_with_uml_validation_error(error: dediren_uml::UmlValidationError) -> ! {
     exit_with_diagnostic(error.code(), &error.message(), Some(error.path));
 }
 

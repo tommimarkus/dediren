@@ -407,6 +407,121 @@ fn generic_graph_projects_archimate_junction_render_metadata() {
 }
 
 #[test]
+fn generic_graph_validates_uml_profile() {
+    let input = std::fs::read_to_string(common::workspace_file(
+        "fixtures/source/valid-uml-basic.json",
+    ))
+    .unwrap();
+
+    let mut cmd = common::plugin_command();
+    let output = cmd
+        .args(["validate", "--profile", "uml"])
+        .write_stdin(input)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let data = common::ok_data(&output);
+    assert_eq!(
+        data["semantic_validation_result_schema_version"],
+        "semantic-validation-result.schema.v1"
+    );
+    assert_eq!(data["semantic_profile"], "uml");
+    assert_eq!(data["node_count"], 10);
+    assert_eq!(data["relationship_count"], 6);
+}
+
+#[test]
+fn generic_graph_rejects_invalid_uml_relationship_endpoint() {
+    let mut source: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(common::workspace_file(
+            "fixtures/source/valid-uml-basic.json",
+        ))
+        .unwrap(),
+    )
+    .unwrap();
+    source["relationships"][0]["source"] = serde_json::json!("initial-submit");
+
+    let mut cmd = common::plugin_command();
+    let output = cmd
+        .args(["validate", "--profile", "uml"])
+        .write_stdin(serde_json::to_string(&source).unwrap())
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+
+    common::assert_error_code(&output, "DEDIREN_UML_RELATIONSHIP_ENDPOINT_UNSUPPORTED");
+}
+
+#[test]
+fn generic_graph_projects_uml_render_metadata() {
+    let input = std::fs::read_to_string(common::workspace_file(
+        "fixtures/source/valid-uml-basic.json",
+    ))
+    .unwrap();
+
+    let mut cmd = common::plugin_command();
+    let output = cmd
+        .args([
+            "project",
+            "--target",
+            "render-metadata",
+            "--view",
+            "class-view",
+        ])
+        .write_stdin(input)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let data = common::ok_data(&output);
+    assert_eq!(data["semantic_profile"], "uml");
+    assert_eq!(data["nodes"]["class-order"]["type"], "Class");
+    assert_eq!(data["edges"]["order-has-lines"]["type"], "Composition");
+    assert_eq!(data["groups"]["orders-package-boundary"]["type"], "Package");
+}
+
+#[test]
+fn generic_graph_projects_compact_uml_activity_node_size_hints() {
+    let input = std::fs::read_to_string(common::workspace_file(
+        "fixtures/source/valid-uml-basic.json",
+    ))
+    .unwrap();
+
+    let mut cmd = common::plugin_command();
+    let output = cmd
+        .args([
+            "project",
+            "--target",
+            "layout-request",
+            "--view",
+            "activity-view",
+        ])
+        .write_stdin(input)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let data = common::ok_data(&output);
+    let initial = data["nodes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|node| node["id"] == "initial-submit")
+        .expect("projected layout request should contain the initial node");
+    assert_eq!(initial["width_hint"], serde_json::json!(32.0));
+    assert_eq!(initial["height_hint"], serde_json::json!(32.0));
+}
+
+#[test]
 fn generic_graph_rejects_archimate_junction_with_mixed_relationship_types() {
     let input = serde_json::json!({
         "model_schema_version": "model.schema.v1",
