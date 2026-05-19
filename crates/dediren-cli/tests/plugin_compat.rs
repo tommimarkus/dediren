@@ -19,6 +19,7 @@ fn first_party_plugins_report_capabilities() {
             "archimate-oef",
             &["export"][..],
         ),
+        ("dediren-plugin-uml-xmi-export", "uml-xmi", &["export"][..]),
     ] {
         let output = Command::new(plugin_binary(binary))
             .arg("capabilities")

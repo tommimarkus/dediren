@@ -141,6 +141,120 @@ fn fixture_pipeline_produces_svg_and_oef() {
 }
 
 #[test]
+fn fixture_mode_uml_pipeline_renders_and_exports() {
+    let generic_plugin = plugin_binary("dediren-plugin-generic-graph");
+    let svg_plugin = plugin_binary("dediren-plugin-svg-render");
+    let xmi_plugin = plugin_binary("dediren-plugin-uml-xmi-export");
+    let source = workspace_file("fixtures/source/valid-uml-basic.json");
+
+    let validate = common::dediren_command()
+        .env("DEDIREN_PLUGIN_GENERIC_GRAPH", &generic_plugin)
+        .args([
+            "validate",
+            "--plugin",
+            "generic-graph",
+            "--profile",
+            "uml",
+            "--input",
+        ])
+        .arg(&source)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    assert_eq!(ok_data(&validate)["semantic_profile"], "uml");
+
+    let layout_request = common::dediren_command()
+        .env("DEDIREN_PLUGIN_GENERIC_GRAPH", &generic_plugin)
+        .args([
+            "project",
+            "--target",
+            "layout-request",
+            "--plugin",
+            "generic-graph",
+            "--view",
+            "class-view",
+            "--input",
+        ])
+        .arg(&source)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    assert_eq!(ok_data(&layout_request)["view_id"], "class-view");
+
+    let metadata = common::dediren_command()
+        .env("DEDIREN_PLUGIN_GENERIC_GRAPH", &generic_plugin)
+        .args([
+            "project",
+            "--target",
+            "render-metadata",
+            "--plugin",
+            "generic-graph",
+            "--view",
+            "class-view",
+            "--input",
+        ])
+        .arg(&source)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let metadata_data = ok_data(&metadata);
+    assert_eq!(metadata_data["semantic_profile"], "uml");
+    assert_eq!(metadata_data["nodes"]["class-order"]["type"], "Class");
+    assert_eq!(
+        metadata_data["nodes"]["class-order"]["properties"]["attributes"][0]["name"],
+        "id"
+    );
+
+    let render = common::dediren_command()
+        .env("DEDIREN_PLUGIN_SVG_RENDER", &svg_plugin)
+        .args(["render", "--plugin", "svg-render", "--policy"])
+        .arg(workspace_file("fixtures/render-policy/uml-svg.json"))
+        .arg("--metadata")
+        .arg(workspace_file("fixtures/render-metadata/uml-basic.json"))
+        .arg("--input")
+        .arg(workspace_file("fixtures/layout-result/uml-basic.json"))
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let render_data = ok_data(&render);
+    assert_eq!(render_data["artifact_kind"], "svg");
+    assert!(render_data["content"]
+        .as_str()
+        .expect("render content should be a string")
+        .contains("data-dediren-node-decorator=\"uml_class\""));
+
+    let export = common::dediren_command()
+        .env("DEDIREN_PLUGIN_UML_XMI", &xmi_plugin)
+        .args(["export", "--plugin", "uml-xmi", "--policy"])
+        .arg(workspace_file(
+            "fixtures/export-policy/default-uml-xmi.json",
+        ))
+        .arg("--source")
+        .arg(&source)
+        .arg("--layout")
+        .arg(workspace_file("fixtures/layout-result/uml-basic.json"))
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let export_data = ok_data(&export);
+    assert_eq!(export_data["artifact_kind"], "uml-xmi+xml");
+    assert!(export_data["content"]
+        .as_str()
+        .expect("export content should be a string")
+        .contains("<uml:Model"));
+}
+
+#[test]
 fn fixture_archimate_pipeline_renders_node_notation() {
     let (svg, metadata_data) = render_fixture_archimate_pipeline();
     let doc = svg_doc(&svg);
