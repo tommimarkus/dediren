@@ -163,8 +163,7 @@ fn svg_renderer_covers_each_uml_relationship_marker() {
             "end",
             expected_style
                 .get("marker_end")
-                .and_then(|value| value.as_str())
-                .or(Some("filled_arrow")),
+                .and_then(|value| value.as_str()),
             relationship_type,
         );
         match expected_style

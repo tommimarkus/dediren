@@ -424,8 +424,8 @@ fn real_elk_renders_uml_activity_profile() {
     assert_uml_node_decorator(&doc, "action-enter-order", "uml_action");
     assert_uml_node_decorator(&doc, "decision-valid", "uml_decision_node");
     assert_uml_node_decorator(&doc, "final-submit", "uml_activity_final_node");
-    assert_edge_marker_end(&doc, "flow-start-enter", "filled_arrow");
-    assert_edge_marker_end(&doc, "flow-valid-submit", "filled_arrow");
+    assert_edge_marker_end(&doc, "flow-start-enter", "open_arrow");
+    assert_edge_marker_end(&doc, "flow-valid-submit", "open_arrow");
     assert_reasonable_svg_aspect(&svg, 8.0);
     write_render_artifact("real-elk", "real_elk_renders_uml_activity_profile", &svg);
 }
@@ -593,9 +593,9 @@ fn real_elk_renders_complex_uml_activity_profile() {
     assert_uml_node_decorator(&doc, "join-fulfillment", "uml_join_node");
     assert_uml_node_decorator(&doc, "object-shipment", "uml_object_node");
     assert_uml_node_decorator(&doc, "final-fulfill", "uml_activity_final_node");
-    assert_edge_marker_end(&doc, "flow-start-load", "filled_arrow");
-    assert_edge_marker_end(&doc, "flow-label-shipment", "filled_arrow");
-    assert_edge_marker_end(&doc, "flow-join-final", "filled_arrow");
+    assert_edge_marker_end(&doc, "flow-start-load", "open_arrow");
+    assert_edge_marker_end(&doc, "flow-label-shipment", "open_arrow");
+    assert_edge_marker_end(&doc, "flow-join-final", "open_arrow");
     assert_reasonable_svg_aspect(&svg, 7.0);
     write_render_artifact(
         "real-elk",

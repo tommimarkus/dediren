@@ -45,18 +45,18 @@ Runtime prerequisite:
 
 - Java 21 or newer available as `java` on `PATH`.
 
-For the current `0.14.1` version, the xtask creates:
+For the current `0.14.2` version, the xtask creates:
 
 ```text
-dist/dediren-agent-bundle-0.14.1-x86_64-unknown-linux-gnu/
-dist/dediren-agent-bundle-0.14.1-x86_64-unknown-linux-gnu.tar.gz
+dist/dediren-agent-bundle-0.14.2-x86_64-unknown-linux-gnu/
+dist/dediren-agent-bundle-0.14.2-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Run the smoke test from a shell where `java -version` resolves to Java 21 or
 newer:
 
 ```bash
-cargo xtask dist smoke dist/dediren-agent-bundle-0.14.1-x86_64-unknown-linux-gnu.tar.gz
+cargo xtask dist smoke dist/dediren-agent-bundle-0.14.2-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Concurrent `cargo xtask dist build` invocations serialize on a repo-local lock
@@ -69,8 +69,8 @@ Unpack and run it anywhere:
 
 ```bash
 mkdir -p /tmp/dediren-dist
-tar -xzf dist/dediren-agent-bundle-0.14.1-x86_64-unknown-linux-gnu.tar.gz -C /tmp/dediren-dist
-/tmp/dediren-dist/dediren-agent-bundle-0.14.1-x86_64-unknown-linux-gnu/bin/dediren --help
+tar -xzf dist/dediren-agent-bundle-0.14.2-x86_64-unknown-linux-gnu.tar.gz -C /tmp/dediren-dist
+/tmp/dediren-dist/dediren-agent-bundle-0.14.2-x86_64-unknown-linux-gnu/bin/dediren --help
 ```
 
 For a full unpacked-bundle JSON authoring and project/layout/render smoke
@@ -243,6 +243,8 @@ Useful policies:
   group, edge-label, and per-layout-id overrides.
 - `fixtures/render-policy/archimate-svg.json` applies ArchiMate-oriented
   notation from semantic render metadata.
+- `fixtures/render-policy/uml-svg.json` applies UML 2.5.1-oriented
+  black-on-white classifier, package, activity, and relationship notation.
 
 For the full public policy surface, use
 `schemas/svg-render-policy.schema.json`.
@@ -252,6 +254,10 @@ Rendered SVG includes stable semantic attributes such as
 `data-dediren-edge-marker-start`, `data-dediren-edge-marker-end`, and
 `data-dediren-group-decorator` so tests can assert notation without depending
 on raw geometry.
+
+The renderer keeps layout result route points unchanged as generated geometry,
+but rounds orthogonal SVG route elbows and stroke joins when serializing edge
+paths so small generated jogs do not appear as harsh stair steps.
 
 ## ArchiMate SVG And OEF
 
@@ -671,7 +677,7 @@ newer:
 
 ```bash
 cargo xtask dist build
-cargo xtask dist smoke dist/dediren-agent-bundle-0.14.1-x86_64-unknown-linux-gnu.tar.gz
+cargo xtask dist smoke dist/dediren-agent-bundle-0.14.2-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Focused checks:

@@ -331,8 +331,8 @@ fn fixture_mode_uml_activity_view_renders() {
     assert_uml_node_decorator(&doc, "action-enter-order", "uml_action");
     assert_uml_node_decorator(&doc, "decision-valid", "uml_decision_node");
     assert_uml_node_decorator(&doc, "final-submit", "uml_activity_final_node");
-    assert_edge_marker_end(&doc, "flow-start-enter", "filled_arrow");
-    assert_edge_marker_end(&doc, "flow-valid-submit", "filled_arrow");
+    assert_edge_marker_end(&doc, "flow-start-enter", "open_arrow");
+    assert_edge_marker_end(&doc, "flow-valid-submit", "open_arrow");
     assert_reasonable_svg_aspect(&svg, 6.0);
     write_render_artifact(
         "fixture-pipeline",

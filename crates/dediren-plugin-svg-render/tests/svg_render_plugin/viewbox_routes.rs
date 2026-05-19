@@ -215,12 +215,14 @@ fn svg_renderer_preserves_shared_endpoint_merge_trunk() {
     let data = merged_path.attribute("d").unwrap();
 
     assert!(
-        data.contains("M 0.0 100.0 L 140.0 100.0"),
-        "shared endpoint trunk should remain merged in the SVG path, got {data}"
+        data.starts_with("M 0.0 100.0 L 132.0 100.0 Q 140.0 100.0"),
+        "shared endpoint trunk should remain merged until the rounded bend, got {data}"
     );
     assert!(
-        !data.contains(" Q "),
-        "shared endpoint trunk should not be separated by overlap detours or line jumps, got {data}"
+        merged_edge.children().all(|node| {
+            !(node.has_tag_name("g") && node.attribute("data-dediren-line-jump-masks").is_some())
+        }),
+        "shared endpoint trunk should not be separated by line jump masks"
     );
 }
 
@@ -269,6 +271,56 @@ fn svg_renderer_suppresses_line_jump_between_shared_junction_edges() {
     assert!(
         !data.contains(" Q "),
         "shared junction renderer advice should suppress line jumps between merged edges, got {data}"
+    );
+}
+
+#[test]
+fn svg_renderer_rounds_orthogonal_route_corners() {
+    let input = styled_inline_input(
+        serde_json::json!([]),
+        serde_json::json!([]),
+        serde_json::json!([
+            {
+                "id": "stepped-edge",
+                "source": "left",
+                "target": "right",
+                "source_id": "stepped-edge",
+                "projection_id": "stepped-edge",
+                "points": [
+                    { "x": 0, "y": 100 },
+                    { "x": 80, "y": 100 },
+                    { "x": 80, "y": 105 },
+                    { "x": 160, "y": 105 }
+                ],
+                "label": "step"
+            }
+        ]),
+        serde_json::json!({}),
+    );
+    let content = render_content(input);
+    let doc = svg_doc(&content);
+
+    let edge = semantic_group(&doc, "data-dediren-edge-id", "stepped-edge");
+    let path = child_element(edge, "path");
+    let data = path.attribute("d").unwrap();
+
+    assert_eq!(path.attribute("stroke-linecap"), Some("round"));
+    assert_eq!(path.attribute("stroke-linejoin"), Some("round"));
+    assert!(
+        data.contains(" Q "),
+        "orthogonal route bends should be rounded in the SVG path, got {data}"
+    );
+    assert!(
+        !data.contains("L 80.0 100.0 L 80.0 105.0 L 160.0 105.0"),
+        "tiny route stairs should not be emitted as hard step segments, got {data}"
+    );
+    assert!(
+        data.starts_with("M 0.0 100.0"),
+        "rounded rendering should preserve the source endpoint, got {data}"
+    );
+    assert!(
+        data.ends_with("L 160.0 105.0"),
+        "rounded rendering should preserve the target endpoint, got {data}"
     );
 }
 

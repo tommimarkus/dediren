@@ -3471,7 +3471,7 @@ fn edge_path(
     };
     let jump_masks = line_jump_mask_group(edge, style, earlier_edges);
     format!(
-        r##"{}<path d="{}" fill="none" stroke="{}" stroke-width="{}"{}{}{}/>"##,
+        r##"{}<path d="{}" fill="none" stroke="{}" stroke-width="{}" stroke-linecap="round" stroke-linejoin="round"{}{}{}/>"##,
         jump_masks,
         escape_attr(&data),
         escape_attr(&style.stroke),
@@ -3587,14 +3587,30 @@ fn edge_path_data(edge: &LaidOutEdge, earlier_edges: &[&LaidOutEdge]) -> String 
         }
 
         let mut segment_end = end.clone();
+        let mut can_round_corner = true;
         if let Some(Some(next_detour)) = detours.get(index + 1) {
             if same_point(&next_detour.entry, end) {
                 segment_end = shifted_toward(&next_detour.entry, &current_point, LINE_JUMP_SIZE);
+                can_round_corner = false;
             }
         }
 
         let jumps = line_jump_points(edge, &current_point, &segment_end, earlier_edges);
         if jumps.is_empty() {
+            if can_round_corner {
+                if let Some(next) = points.get(index + 2) {
+                    if detours.get(index + 1).is_none_or(Option::is_none) {
+                        if let Some(corner) =
+                            rounded_route_corner(&current_point, &segment_end, next)
+                        {
+                            append_line_to(&mut data, &current_point, &corner.approach);
+                            append_quadratic_to(&mut data, &segment_end, &corner.departure);
+                            current_point = corner.departure;
+                            continue;
+                        }
+                    }
+                }
+            }
             append_line_to(&mut data, &current_point, &segment_end);
             current_point = segment_end;
             continue;
@@ -3712,8 +3728,50 @@ fn line_jump_points(
 }
 
 const LINE_JUMP_SIZE: f64 = 6.0;
+const ROUTE_CORNER_RADIUS: f64 = 8.0;
+const MIN_ROUTE_CORNER_RADIUS: f64 = 1.0;
 const SHARED_SOURCE_JUNCTION_HINT: &str = "shared_source_junction";
 const SHARED_TARGET_JUNCTION_HINT: &str = "shared_target_junction";
+
+#[derive(Debug)]
+struct RoundedRouteCorner {
+    approach: Point,
+    departure: Point,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RouteAxis {
+    Horizontal,
+    Vertical,
+}
+
+fn rounded_route_corner(start: &Point, corner: &Point, next: &Point) -> Option<RoundedRouteCorner> {
+    let incoming_axis = route_axis(start, corner)?;
+    let outgoing_axis = route_axis(corner, next)?;
+    if incoming_axis == outgoing_axis {
+        return None;
+    }
+    let radius = ROUTE_CORNER_RADIUS
+        .min(segment_length(start, corner) / 2.0)
+        .min(segment_length(corner, next) / 2.0);
+    if radius < MIN_ROUTE_CORNER_RADIUS {
+        return None;
+    }
+    Some(RoundedRouteCorner {
+        approach: shifted_toward(corner, start, radius),
+        departure: shifted_toward(corner, next, radius),
+    })
+}
+
+fn route_axis(start: &Point, end: &Point) -> Option<RouteAxis> {
+    if start.y == end.y && start.x != end.x {
+        return Some(RouteAxis::Horizontal);
+    }
+    if start.x == end.x && start.y != end.y {
+        return Some(RouteAxis::Vertical);
+    }
+    None
+}
 
 fn route_jump_point(
     start: &Point,
@@ -3937,6 +3995,13 @@ fn append_line_to(data: &mut String, current: &Point, target: &Point) {
     if !same_point(current, target) {
         data.push_str(&format!(" L {:.1} {:.1}", target.x, target.y));
     }
+}
+
+fn append_quadratic_to(data: &mut String, control: &Point, target: &Point) {
+    data.push_str(&format!(
+        " Q {:.1} {:.1} {:.1} {:.1}",
+        control.x, control.y, target.x, target.y
+    ));
 }
 
 fn same_point(left: &Point, right: &Point) -> bool {

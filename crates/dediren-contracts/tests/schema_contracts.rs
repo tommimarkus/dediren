@@ -85,7 +85,7 @@ fn source_with_fragments_matches_model_schema() {
             "model_schema_version": "model.schema.v1",
             "fragments": ["model/application.json", "model/technology.json"],
             "required_plugins": [
-                { "id": "generic-graph", "version": "0.14.1" }
+                { "id": "generic-graph", "version": "0.14.2" }
             ],
             "nodes": [],
             "relationships": [],
@@ -185,6 +185,157 @@ fn archimate_svg_policy_covers_square_nodes_and_relationships() {
         edge_types.get(*relationship_type).unwrap_or_else(|| {
             panic!("missing ArchiMate relationship style for {relationship_type}")
         });
+    }
+}
+
+#[test]
+fn uml_svg_policy_covers_node_types_groups_and_relationships() {
+    let policy: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(workspace_file("fixtures/render-policy/uml-svg.json")).unwrap(),
+    )
+    .unwrap();
+
+    let node_types = policy["style"]["node_type_overrides"]
+        .as_object()
+        .expect("node type overrides should be an object");
+    assert_eq!(
+        node_types.len(),
+        UML_NODE_DECORATORS.len(),
+        "UML policy should cover exactly the supported node types"
+    );
+    for node_type in node_types.keys() {
+        assert!(
+            UML_NODE_DECORATORS
+                .iter()
+                .any(|(supported_type, _)| *supported_type == node_type),
+            "unexpected UML node style for {node_type}"
+        );
+    }
+    for (node_type, decorator) in UML_NODE_DECORATORS {
+        let node_style = node_types
+            .get(*node_type)
+            .unwrap_or_else(|| panic!("missing UML node style for {node_type}"));
+        assert!(
+            node_style.get("fill").is_some(),
+            "expected fill color for {node_type}"
+        );
+        assert!(
+            node_style.get("stroke").is_some(),
+            "expected stroke color for {node_type}"
+        );
+        assert_eq!(
+            node_style
+                .get("decorator")
+                .and_then(serde_json::Value::as_str),
+            Some(*decorator),
+            "expected UML decorator for {node_type}"
+        );
+    }
+
+    let group_types = policy["style"]["group_type_overrides"]
+        .as_object()
+        .expect("group type overrides should be an object");
+    for group_type in group_types.keys() {
+        assert!(
+            UML_NODE_DECORATORS
+                .iter()
+                .any(|(supported_type, _)| *supported_type == group_type),
+            "unexpected UML group style for {group_type}"
+        );
+    }
+    let package_group_style = group_types
+        .get("Package")
+        .expect("UML policy should style package groups");
+    assert_eq!(
+        package_group_style
+            .get("decorator")
+            .and_then(serde_json::Value::as_str),
+        Some("uml_package"),
+        "expected UML package group decorator"
+    );
+
+    let edge_types = policy["style"]["edge_type_overrides"]
+        .as_object()
+        .expect("edge type overrides should be an object");
+    assert_eq!(
+        edge_types.len(),
+        UML_RELATIONSHIP_NOTATION.len(),
+        "UML policy should cover exactly the supported relationship types"
+    );
+    for relationship_type in edge_types.keys() {
+        assert!(
+            UML_RELATIONSHIP_NOTATION
+                .iter()
+                .any(|(supported_type, _, _, _)| *supported_type == relationship_type),
+            "unexpected UML relationship style for {relationship_type}"
+        );
+    }
+    for (relationship_type, marker_start, marker_end, line_style) in UML_RELATIONSHIP_NOTATION {
+        let edge_style = edge_types
+            .get(*relationship_type)
+            .unwrap_or_else(|| panic!("missing UML relationship style for {relationship_type}"));
+        assert_optional_style(edge_style, "marker_start", *marker_start, relationship_type);
+        assert_optional_style(edge_style, "marker_end", *marker_end, relationship_type);
+        assert_optional_style(edge_style, "line_style", *line_style, relationship_type);
+    }
+}
+
+#[test]
+fn uml_svg_policy_uses_default_black_white_notation() {
+    let policy: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(workspace_file("fixtures/render-policy/uml-svg.json")).unwrap(),
+    )
+    .unwrap();
+
+    assert_eq!(
+        policy["style"]["background"]["fill"].as_str(),
+        Some("#ffffff"),
+        "UML diagrams should use the spec's default white background"
+    );
+    assert_eq!(
+        policy["style"]["node"]["fill"].as_str(),
+        Some("#ffffff"),
+        "UML classifier-style nodes should default to white fill"
+    );
+    assert_eq!(
+        policy["style"]["node"]["stroke"].as_str(),
+        Some("#000000"),
+        "UML classifier-style nodes should default to black stroke"
+    );
+    assert_eq!(
+        policy["style"]["edge"]["stroke"].as_str(),
+        Some("#000000"),
+        "UML relationships should default to black stroke"
+    );
+
+    let node_types = policy["style"]["node_type_overrides"]
+        .as_object()
+        .expect("node type overrides should be an object");
+    for node_type in [
+        "Package",
+        "Class",
+        "Interface",
+        "DataType",
+        "Enumeration",
+        "Activity",
+        "Action",
+        "DecisionNode",
+        "MergeNode",
+        "ObjectNode",
+    ] {
+        let style = node_types
+            .get(node_type)
+            .unwrap_or_else(|| panic!("missing UML node style for {node_type}"));
+        assert_eq!(
+            style.get("fill").and_then(serde_json::Value::as_str),
+            Some("#ffffff"),
+            "expected UML {node_type} to use white fill"
+        );
+        assert_eq!(
+            style.get("stroke").and_then(serde_json::Value::as_str),
+            Some("#000000"),
+            "expected UML {node_type} to use black stroke"
+        );
     }
 }
 
@@ -1304,3 +1455,44 @@ const ARCHIMATE_RELATIONSHIP_TYPES: &[&str] = &[
     "Triggering",
     "Flow",
 ];
+
+const UML_NODE_DECORATORS: &[(&str, &str)] = &[
+    ("Package", "uml_package"),
+    ("Class", "uml_class"),
+    ("Interface", "uml_interface"),
+    ("DataType", "uml_data_type"),
+    ("Enumeration", "uml_enumeration"),
+    ("Activity", "uml_activity"),
+    ("Action", "uml_action"),
+    ("InitialNode", "uml_initial_node"),
+    ("ActivityFinalNode", "uml_activity_final_node"),
+    ("DecisionNode", "uml_decision_node"),
+    ("MergeNode", "uml_merge_node"),
+    ("ForkNode", "uml_fork_node"),
+    ("JoinNode", "uml_join_node"),
+    ("ObjectNode", "uml_object_node"),
+];
+
+const UML_RELATIONSHIP_NOTATION: &[(&str, Option<&str>, Option<&str>, Option<&str>)] = &[
+    ("Association", Some("none"), Some("none"), None),
+    ("Composition", Some("filled_diamond"), Some("none"), None),
+    ("Aggregation", Some("hollow_diamond"), Some("none"), None),
+    ("Generalization", None, Some("hollow_triangle"), None),
+    ("Realization", None, Some("hollow_triangle"), Some("dashed")),
+    ("Dependency", None, Some("open_arrow"), Some("dashed")),
+    ("ControlFlow", None, Some("open_arrow"), None),
+    ("ObjectFlow", None, Some("open_arrow"), None),
+];
+
+fn assert_optional_style(
+    style: &serde_json::Value,
+    field: &str,
+    expected: Option<&str>,
+    relationship_type: &str,
+) {
+    assert_eq!(
+        style.get(field).and_then(serde_json::Value::as_str),
+        expected,
+        "expected UML {field} notation for {relationship_type}"
+    );
+}
