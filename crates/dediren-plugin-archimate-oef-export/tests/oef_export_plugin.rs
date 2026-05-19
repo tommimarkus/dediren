@@ -372,6 +372,28 @@ fn oef_export_plugin_rejects_invalid_archimate_relationship_endpoint_with_error_
 }
 
 #[test]
+fn oef_export_plugin_rejects_invalid_policy_with_error_envelope() {
+    let mut input = export_input();
+    input["policy"]
+        .as_object_mut()
+        .expect("policy should be an object")
+        .remove("model_identifier");
+
+    let mut cmd = common::plugin_command();
+    let output = cmd
+        .arg("export")
+        .write_stdin(serde_json::to_string(&input).unwrap())
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+
+    let envelope = common::assert_error_code(&output, "DEDIREN_OEF_POLICY_INVALID");
+    assert_diagnostic_message_contains(&envelope, "model_identifier");
+}
+
+#[test]
 fn oef_export_plugin_rejects_junction_chain_with_invalid_effective_endpoint() {
     let mut input = export_input();
     input["source"] = serde_json::json!({

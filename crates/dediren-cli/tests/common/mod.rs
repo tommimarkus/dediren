@@ -39,6 +39,8 @@ pub fn ensure_plugin_binaries() {
                 "dediren-plugin-svg-render",
                 "-p",
                 "dediren-plugin-archimate-oef-export",
+                "-p",
+                "dediren-plugin-uml-xmi-export",
             ])
             .status()
             .expect("cargo build should start for first-party plugin binaries");

@@ -7,8 +7,8 @@ use dediren_archimate::{
     JunctionValidationRelationship,
 };
 use dediren_contracts::{
-    CommandEnvelope, Diagnostic, DiagnosticSeverity, ExportResult, LaidOutGroup, OefExportInput,
-    EXPORT_RESULT_SCHEMA_VERSION, PLUGIN_PROTOCOL_VERSION,
+    CommandEnvelope, Diagnostic, DiagnosticSeverity, ExportRequest, ExportResult, LaidOutGroup,
+    OefExportInput, OefExportPolicy, EXPORT_RESULT_SCHEMA_VERSION, PLUGIN_PROTOCOL_VERSION,
 };
 use quick_xml::events::{BytesEnd, BytesStart, BytesText, Event};
 use quick_xml::Writer;
@@ -44,7 +44,21 @@ fn main() -> anyhow::Result<()> {
 fn export_from_stdin() -> anyhow::Result<()> {
     let mut input = String::new();
     std::io::stdin().read_to_string(&mut input)?;
-    let request: OefExportInput = serde_json::from_str(&input)?;
+    let request: ExportRequest = serde_json::from_str(&input)?;
+    if let Err(message) = validate_oef_policy_schema(&request.policy) {
+        exit_with_diagnostic(
+            "DEDIREN_OEF_POLICY_INVALID",
+            &message,
+            Some("policy".to_string()),
+        );
+    }
+    let policy: OefExportPolicy = serde_json::from_value(request.policy)?;
+    let request = OefExportInput {
+        export_request_schema_version: request.export_request_schema_version,
+        source: request.source,
+        layout_result: request.layout_result,
+        policy,
+    };
     if let Err(error) = validate_archimate_types(&request) {
         exit_with_archimate_type_error(error);
     }
@@ -280,6 +294,15 @@ fn write_text_element(
     writer.write_event(Event::Text(BytesText::new(text)))?;
     writer.write_event(Event::End(BytesEnd::new(name)))?;
     Ok(())
+}
+
+fn validate_oef_policy_schema(value: &serde_json::Value) -> Result<(), String> {
+    let schema: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../schemas/oef-export-policy.schema.json"
+    ))
+    .map_err(|error| error.to_string())?;
+    let validator = jsonschema::validator_for(&schema).map_err(|error| error.to_string())?;
+    validator.validate(value).map_err(|error| error.to_string())
 }
 
 fn validate_archimate_types(request: &OefExportInput) -> Result<(), ArchimateTypeValidationError> {

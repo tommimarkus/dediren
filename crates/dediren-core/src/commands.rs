@@ -1,8 +1,6 @@
 use std::path::Path;
 
-use dediren_contracts::{
-    CommandEnvelope, LayoutRequest, OefExportInput, OefExportPolicy, SourceDocument,
-};
+use dediren_contracts::{CommandEnvelope, ExportRequest, LayoutRequest, SourceDocument};
 
 use crate::plugins::{
     run_plugin_for_capability_with_registry, PluginExecutionError, PluginRegistry,
@@ -183,9 +181,9 @@ pub fn export_command_with_base(
             command: "export".to_string(),
             message: error.to_string(),
         })?;
-    let policy: OefExportPolicy =
+    let policy: serde_json::Value =
         serde_json::from_str(policy_text).map_err(command_input_error("export"))?;
-    let export_input = OefExportInput {
+    let export_input = ExportRequest {
         export_request_schema_version: dediren_contracts::EXPORT_REQUEST_SCHEMA_VERSION.to_string(),
         source,
         layout_result,

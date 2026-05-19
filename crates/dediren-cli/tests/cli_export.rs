@@ -43,6 +43,45 @@ fn export_invokes_archimate_oef_plugin() {
 }
 
 #[test]
+fn export_invokes_uml_xmi_plugin() {
+    let output = common::dediren_command()
+        .env(
+            "DEDIREN_PLUGIN_UML_XMI",
+            plugin_binary("dediren-plugin-uml-xmi-export"),
+        )
+        .arg("export")
+        .arg("--plugin")
+        .arg("uml-xmi")
+        .arg("--policy")
+        .arg(workspace_file(
+            "fixtures/export-policy/default-uml-xmi.json",
+        ))
+        .arg("--source")
+        .arg(workspace_file("fixtures/source/valid-uml-basic.json"))
+        .arg("--layout")
+        .arg(workspace_file("fixtures/layout-result/uml-basic.json"))
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let data = ok_data(&output);
+    assert_eq!(
+        data["export_result_schema_version"],
+        "export-result.schema.v1"
+    );
+    assert_eq!(data["artifact_kind"], "uml-xmi+xml");
+    assert!(
+        data["content"]
+            .as_str()
+            .expect("export result content should be a string")
+            .contains("<uml:Model"),
+        "export content should contain UML model XML"
+    );
+}
+
+#[test]
 fn export_emits_semantic_grouping_and_ignores_layout_only_group() {
     let mut source: serde_json::Value = serde_json::from_str(
         &std::fs::read_to_string(workspace_file("fixtures/source/valid-archimate-oef.json"))
