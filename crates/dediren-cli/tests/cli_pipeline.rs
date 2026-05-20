@@ -105,12 +105,14 @@ fn fixture_pipeline_produces_svg_and_oef() {
             "Web App",
             "Orders API",
             "PostgreSQL",
-            "Payments Provider",
             "Application Services",
             "submits order",
-            "authorizes payment",
+            "requests payment authorization",
         ],
     );
+    assert!(svg_text.contains(">Payment</tspan>"));
+    assert!(svg_text.contains(">Authorization</tspan>"));
+    assert!(svg_text.contains(">Service</tspan>"));
     assert!(svg_text.contains("data-dediren-group-id=\"application-services\""));
     assert_reasonable_svg_aspect(&svg_text, 2.8);
 
@@ -592,6 +594,10 @@ fn fixture_archimate_pipeline_renders_relationship_notation() {
         metadata_data["edges"]["api-publishes-job"]["type"],
         "Triggering"
     );
+    assert_eq!(
+        metadata_data["edges"]["api-authorizes-payment"]["type"],
+        "Flow"
+    );
 
     assert_edge_marker_end(&doc, "web-app-calls-api", "hollow_triangle");
     let realization = semantic_group(&doc, "data-dediren-edge-id", "web-app-calls-api");
@@ -609,6 +615,7 @@ fn fixture_archimate_pipeline_renders_relationship_notation() {
         &[
             "calls API",
             "writes orders",
+            "requests payment authorization",
             "publishes fulfillment",
             "loads order",
         ],

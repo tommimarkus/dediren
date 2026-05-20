@@ -601,7 +601,7 @@ fn svg_renderer_keeps_horizontal_edge_label_close_to_route() {
                     { "x": 100, "y": 160 },
                     { "x": 320, "y": 160 }
                 ],
-                "label": "authorizes payment"
+                "label": "requests payment authorization"
             }
         ]),
         serde_json::json!({}),
@@ -647,7 +647,7 @@ fn svg_renderer_separates_labels_for_parallel_horizontal_edges() {
                     { "x": 100, "y": 172 },
                     { "x": 320, "y": 172 }
                 ],
-                "label": "authorizes payment"
+                "label": "requests payment authorization"
             }
         ]),
         serde_json::json!({}),
@@ -705,7 +705,7 @@ fn svg_renderer_separates_labels_for_adjacent_multisegment_routes() {
                     { "x": 740, "y": 346 },
                     { "x": 884, "y": 346 }
                 ],
-                "label": "authorizes payment"
+                "label": "requests payment authorization"
             }
         ]),
         serde_json::json!({}),

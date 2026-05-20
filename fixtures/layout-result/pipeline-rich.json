@@ -60,7 +60,7 @@
       "y": 160,
       "width": 180,
       "height": 80,
-      "label": "Payments Provider"
+      "label": "Payment Authorization Service"
     }
   ],
   "edges": [
@@ -142,7 +142,7 @@
           "y": 200
         }
       ],
-      "label": "authorizes payment"
+      "label": "requests payment authorization"
     },
     {
       "id": "api-publishes-job",

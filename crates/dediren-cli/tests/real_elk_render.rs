@@ -205,7 +205,7 @@ fn real_elk_renders_grouped_rich_graph() {
             "PostgreSQL",
             "Application Services",
             "submits order",
-            "authorizes payment",
+            "requests payment authorization",
         ],
     );
     assert!(svg.contains("data-dediren-group-id=\"application-services\""));
@@ -214,8 +214,9 @@ fn real_elk_renders_grouped_rich_graph() {
     assert!(svg.contains("data-dediren-node-id=\"payments\""));
     assert!(svg.contains(">Fulfillment</tspan>"));
     assert!(svg.contains(">Worker</tspan>"));
-    assert!(svg.contains(">Payments</tspan>"));
-    assert!(svg.contains(">Provider</tspan>"));
+    assert!(svg.contains(">Payment</tspan>"));
+    assert!(svg.contains(">Authorization</tspan>"));
+    assert!(svg.contains(">Service</tspan>"));
     assert_reasonable_svg_aspect(&svg, 4.2);
     write_render_artifact("real-elk", "real_elk_renders_grouped_rich_graph", &svg);
 }
@@ -303,17 +304,12 @@ fn real_elk_renders_archimate_metadata_notation() {
         path.attribute("marker-end"),
         Some("url(#marker-end-web-app-calls-api)")
     );
-    assert_svg_texts_include(
-        &doc,
-        &[
-            "Customer",
-            "Orders API",
-            "Payments Service",
-            "publishes fulfillment",
-        ],
-    );
+    assert_svg_texts_include(&doc, &["Customer", "Orders API", "publishes fulfillment"]);
     assert!(svg.contains(">Fulfillment</tspan>"));
     assert!(svg.contains(">Worker</tspan>"));
+    assert!(svg.contains(">Payment</tspan>"));
+    assert!(svg.contains(">Authorization</tspan>"));
+    assert!(svg.contains(">Service</tspan>"));
     assert_reasonable_svg_aspect(&svg, 5.0);
     write_render_artifact(
         "real-elk",
@@ -865,6 +861,12 @@ fn real_elk_renders_complex_multi_layer_system() {
         "fulfillment-writes-warehouse",
     );
     assert_edge_does_not_intersect_unrelated_groups(&layout_data, "payment-authorizes");
+    assert_target_ports_follow_source_vertical_order(
+        &layout_data,
+        "web-enters-cdn",
+        "mobile-enters-cdn",
+        "cdn",
+    );
     assert_source_port_right_of_node_center(&layout_data, "event-bus-to-or-junction", "event-bus");
     assert_target_port_left_of_node_center(
         &layout_data,
@@ -1715,12 +1717,7 @@ fn assert_target_port_left_of_node_center(layout_data: &Value, edge_id: &str, no
     let points = edge["points"]
         .as_array()
         .unwrap_or_else(|| panic!("{edge_id} points should be an array"));
-    let target_port_x = point_coordinate(
-        points
-            .last()
-            .unwrap_or_else(|| panic!("{edge_id} should have a target point")),
-        "x",
-    );
+    let target_port_x = point_coordinate(target_point(points, edge_id), "x");
     let node_center = node_center_x(layout_data, node_id);
     assert!(
         target_port_x < node_center,
@@ -1778,16 +1775,71 @@ fn assert_source_port_below_target_port_on_node(
         .as_array()
         .unwrap_or_else(|| panic!("{target_edge_id} points should be an array"));
     let source_port_y = point_coordinate(&source_points[0], "y");
-    let target_port_y = point_coordinate(
-        target_points
-            .last()
-            .unwrap_or_else(|| panic!("{target_edge_id} should have a target point")),
-        "y",
-    );
+    let target_port_y = point_coordinate(target_point(target_points, target_edge_id), "y");
     assert!(
         source_port_y > target_port_y,
         "{source_edge_id} source port should be below {target_edge_id} target port on {node_id}, got source y={source_port_y}, target y={target_port_y}"
     );
+}
+
+fn assert_target_ports_follow_source_vertical_order(
+    layout_data: &Value,
+    first_edge_id: &str,
+    second_edge_id: &str,
+    target_node_id: &str,
+) {
+    let first_edge = laid_out_edge(layout_data, first_edge_id);
+    let second_edge = laid_out_edge(layout_data, second_edge_id);
+    assert_eq!(
+        first_edge["target"], target_node_id,
+        "{first_edge_id} should target {target_node_id}"
+    );
+    assert_eq!(
+        second_edge["target"], target_node_id,
+        "{second_edge_id} should target {target_node_id}"
+    );
+    let first_source_id = first_edge["source"]
+        .as_str()
+        .unwrap_or_else(|| panic!("{first_edge_id} should have source"));
+    let second_source_id = second_edge["source"]
+        .as_str()
+        .unwrap_or_else(|| panic!("{second_edge_id} should have source"));
+    let first_source_y = node_center_y(layout_data, first_source_id);
+    let second_source_y = node_center_y(layout_data, second_source_id);
+    let first_points = first_edge["points"]
+        .as_array()
+        .unwrap_or_else(|| panic!("{first_edge_id} points should be an array"));
+    let second_points = second_edge["points"]
+        .as_array()
+        .unwrap_or_else(|| panic!("{second_edge_id} points should be an array"));
+    let first_target_y = point_coordinate(target_point(first_points, first_edge_id), "y");
+    let second_target_y = point_coordinate(target_point(second_points, second_edge_id), "y");
+
+    assert!(
+        same_vertical_order(first_source_y, second_source_y, first_target_y, second_target_y),
+        "{first_edge_id} and {second_edge_id} target ports on {target_node_id} should match source vertical order, got source y=({first_source_y}, {second_source_y}), target y=({first_target_y}, {second_target_y})"
+    );
+}
+
+fn same_vertical_order(
+    first_source_y: f64,
+    second_source_y: f64,
+    first_target_y: f64,
+    second_target_y: f64,
+) -> bool {
+    if same_coordinate(first_source_y, second_source_y)
+        || same_coordinate(first_target_y, second_target_y)
+    {
+        return true;
+    }
+    (first_source_y < second_source_y && first_target_y < second_target_y)
+        || (first_source_y > second_source_y && first_target_y > second_target_y)
+}
+
+fn target_point<'a>(points: &'a [Value], edge_id: &str) -> &'a Value {
+    points
+        .last()
+        .unwrap_or_else(|| panic!("{edge_id} should have a target point"))
 }
 
 fn node_center_x(layout_data: &Value, node_id: &str) -> f64 {

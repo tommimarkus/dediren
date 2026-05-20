@@ -200,13 +200,13 @@ class ElkLayoutEngineTest {
                 new JsonContracts.LayoutNode("web-app", "Web App", "web-app", 160.0, 80.0),
                 new JsonContracts.LayoutNode("orders-api", "Orders API", "orders-api", 160.0, 80.0),
                 new JsonContracts.LayoutNode("worker", "Fulfillment Worker", "worker", 160.0, 80.0),
-                new JsonContracts.LayoutNode("payments", "Payments Provider", "payments", 160.0, 80.0),
+                new JsonContracts.LayoutNode("payments", "Payment Authorization Service", "payments", 160.0, 80.0),
                 new JsonContracts.LayoutNode("database", "PostgreSQL", "database", 160.0, 80.0)),
             List.of(
                 new JsonContracts.LayoutEdge(
                     "web-app-calls-api", "web-app", "orders-api", "calls API", "web-app-calls-api"),
                 new JsonContracts.LayoutEdge(
-                    "api-authorizes-payment", "orders-api", "payments", "authorizes payment", "api-authorizes-payment"),
+                    "api-authorizes-payment", "orders-api", "payments", "requests payment authorization", "api-authorizes-payment"),
                 new JsonContracts.LayoutEdge(
                     "api-writes-database", "orders-api", "database", "writes orders", "api-writes-database"),
                 new JsonContracts.LayoutEdge(
@@ -267,12 +267,12 @@ class ElkLayoutEngineTest {
                 new JsonContracts.LayoutNode("web-app", "Web App", "web-app", 160.0, 80.0),
                 new JsonContracts.LayoutNode("orders-api", "Orders API", "orders-api", 160.0, 80.0),
                 new JsonContracts.LayoutNode("worker", "Fulfillment Worker", "worker", 160.0, 80.0),
-                new JsonContracts.LayoutNode("payments", "Payments Provider", "payments", 160.0, 80.0),
+                new JsonContracts.LayoutNode("payments", "Payment Authorization Service", "payments", 160.0, 80.0),
                 new JsonContracts.LayoutNode("database", "PostgreSQL", "database", 160.0, 80.0)),
             List.of(
                 new JsonContracts.LayoutEdge("client-submits-order", "client", "web-app", "submits order", "client-submits-order"),
                 new JsonContracts.LayoutEdge("web-app-calls-api", "web-app", "orders-api", "calls API", "web-app-calls-api"),
-                new JsonContracts.LayoutEdge("api-authorizes-payment", "orders-api", "payments", "authorizes payment", "api-authorizes-payment"),
+                new JsonContracts.LayoutEdge("api-authorizes-payment", "orders-api", "payments", "requests payment authorization", "api-authorizes-payment"),
                 new JsonContracts.LayoutEdge("api-writes-database", "orders-api", "database", "writes orders", "api-writes-database"),
                 new JsonContracts.LayoutEdge("api-publishes-job", "orders-api", "worker", "publishes fulfillment", "api-publishes-job"),
                 new JsonContracts.LayoutEdge("worker-reads-database", "worker", "database", "loads order", "worker-reads-database")),
@@ -325,11 +325,11 @@ class ElkLayoutEngineTest {
             "main",
             List.of(
                 new JsonContracts.LayoutNode("orders-api", "Orders API", "orders-api", 160.0, 80.0),
-                new JsonContracts.LayoutNode("payments", "Payments Provider", "payments", 160.0, 80.0),
+                new JsonContracts.LayoutNode("payments", "Payment Authorization Service", "payments", 160.0, 80.0),
                 new JsonContracts.LayoutNode("database", "PostgreSQL", "database", 160.0, 80.0)),
             List.of(
                 new JsonContracts.LayoutEdge("api-writes-database", "orders-api", "database", "writes orders", "api-writes-database"),
-                new JsonContracts.LayoutEdge("api-authorizes-payment", "orders-api", "payments", "authorizes payment", "api-authorizes-payment")),
+                new JsonContracts.LayoutEdge("api-authorizes-payment", "orders-api", "payments", "requests payment authorization", "api-authorizes-payment")),
             List.of(
                 new JsonContracts.LayoutGroup(
                     "application-services",
@@ -757,6 +757,65 @@ class ElkLayoutEngineTest {
     }
 
     @Test
+    void groupedTargetPortsFollowIncomingSourceOrder() {
+        JsonContracts.LayoutRequest request = new JsonContracts.LayoutRequest(
+            "layout-request.schema.v1",
+            "main",
+            List.of(
+                new JsonContracts.LayoutNode("customer-mobile", "Mobile App", "customer-mobile", 160.0, 80.0),
+                new JsonContracts.LayoutNode("customer-web", "Web Customer", "customer-web", 160.0, 80.0),
+                new JsonContracts.LayoutNode("support-agent", "Support Agent", "support-agent", 160.0, 80.0),
+                new JsonContracts.LayoutNode("cdn", "CDN", "cdn", 160.0, 80.0),
+                new JsonContracts.LayoutNode("web-frontend", "Web Frontend", "web-frontend", 160.0, 80.0),
+                new JsonContracts.LayoutNode("admin-portal", "Admin Portal", "admin-portal", 160.0, 80.0),
+                new JsonContracts.LayoutNode("api-gateway", "API Gateway", "api-gateway", 160.0, 80.0),
+                new JsonContracts.LayoutNode("gateway-and-junction", "", "gateway-and-junction", 28.0, 28.0)),
+            List.of(
+                new JsonContracts.LayoutEdge("mobile-enters-cdn", "customer-mobile", "cdn", "uses", "mobile-enters-cdn", "Association"),
+                new JsonContracts.LayoutEdge("web-enters-cdn", "customer-web", "cdn", "uses", "web-enters-cdn", "Association"),
+                new JsonContracts.LayoutEdge("support-opens-admin", "support-agent", "admin-portal", "manages", "support-opens-admin"),
+                new JsonContracts.LayoutEdge("cdn-serves-web", "cdn", "web-frontend", "serves", "cdn-serves-web"),
+                new JsonContracts.LayoutEdge("web-calls-gateway", "web-frontend", "api-gateway", "calls", "web-calls-gateway"),
+                new JsonContracts.LayoutEdge("admin-calls-gateway", "admin-portal", "api-gateway", "calls", "admin-calls-gateway"),
+                new JsonContracts.LayoutEdge("gateway-to-and-junction", "api-gateway", "gateway-and-junction", "routes", "gateway-to-and-junction")),
+            List.of(
+                new JsonContracts.LayoutGroup(
+                    "users",
+                    "Users",
+                    List.of("customer-mobile", "customer-web", "support-agent"),
+                    new JsonContracts.GroupProvenance(null, new JsonContracts.SemanticBacked("users"))),
+                new JsonContracts.LayoutGroup(
+                    "edge-platform",
+                    "Edge Platform",
+                    List.of("cdn", "web-frontend", "admin-portal", "api-gateway", "gateway-and-junction"),
+                    new JsonContracts.GroupProvenance(null, new JsonContracts.SemanticBacked("edge-platform")))),
+            List.of(),
+            List.of(),
+            null);
+
+        JsonContracts.LayoutResult result = new ElkLayoutEngine().layout(request);
+        JsonContracts.LaidOutNode mobile = nodeById(result, "customer-mobile");
+        JsonContracts.LaidOutNode web = nodeById(result, "customer-web");
+        JsonContracts.LaidOutEdge mobileEdge = edgeById(result, "mobile-enters-cdn");
+        JsonContracts.LaidOutEdge webEdge = edgeById(result, "web-enters-cdn");
+
+        assertRouteEndpointOnSide(result, "mobile-enters-cdn", "cdn", false, PortSide.WEST);
+        assertRouteEndpointOnSide(result, "web-enters-cdn", "cdn", false, PortSide.WEST);
+        assertEquals(List.of("shared_target_junction"), mobileEdge.routing_hints());
+        assertEquals(List.of("shared_target_junction"), webEdge.routing_hints());
+        assertTrue(
+            sameVerticalOrder(centerY(web), centerY(mobile), targetPortY(webEdge), targetPortY(mobileEdge)),
+            "same-target west ports should follow incoming source order to avoid CDN-side crossings, web="
+                + webEdge.points()
+                + ", mobile="
+                + mobileEdge.points()
+                + ", webNode="
+                + web
+                + ", mobileNode="
+                + mobile);
+    }
+
+    @Test
     void groupedPipelineProducesValidRoutesForMultipleIncomingEdges() {
         JsonContracts.LayoutRequest request = new JsonContracts.LayoutRequest(
             "layout-request.schema.v1",
@@ -857,12 +916,12 @@ class ElkLayoutEngineTest {
                 new JsonContracts.LayoutNode("web-app", "Web App", "web-app", 160.0, 80.0),
                 new JsonContracts.LayoutNode("orders-api", "Orders API", "orders-api", 160.0, 80.0),
                 new JsonContracts.LayoutNode("worker", "Fulfillment Worker", "worker", 160.0, 80.0),
-                new JsonContracts.LayoutNode("payments", "Payments Provider", "payments", 160.0, 80.0),
+                new JsonContracts.LayoutNode("payments", "Payment Authorization Service", "payments", 160.0, 80.0),
                 new JsonContracts.LayoutNode("database", "PostgreSQL", "database", 160.0, 80.0)),
             List.of(
                 new JsonContracts.LayoutEdge("client-submits-order", "client", "web-app", "submits order", "client-submits-order"),
                 new JsonContracts.LayoutEdge("web-app-calls-api", "web-app", "orders-api", "calls API", "web-app-calls-api"),
-                new JsonContracts.LayoutEdge("api-authorizes-payment", "orders-api", "payments", "authorizes payment", "api-authorizes-payment"),
+                new JsonContracts.LayoutEdge("api-authorizes-payment", "orders-api", "payments", "requests payment authorization", "api-authorizes-payment"),
                 new JsonContracts.LayoutEdge("api-writes-database", "orders-api", "database", "writes orders", "api-writes-database"),
                 new JsonContracts.LayoutEdge("api-publishes-job", "orders-api", "worker", "publishes fulfillment", "api-publishes-job"),
                 new JsonContracts.LayoutEdge("worker-reads-database", "worker", "database", "loads order", "worker-reads-database")),
@@ -897,11 +956,11 @@ class ElkLayoutEngineTest {
             List.of(
                 new JsonContracts.LayoutNode("orders-api", "Orders API", "orders-api", 160.0, 80.0),
                 new JsonContracts.LayoutNode("worker", "Fulfillment Worker", "worker", 160.0, 80.0),
-                new JsonContracts.LayoutNode("payments", "Payments Provider", "payments", 160.0, 80.0),
+                new JsonContracts.LayoutNode("payments", "Payment Authorization Service", "payments", 160.0, 80.0),
                 new JsonContracts.LayoutNode("database", "PostgreSQL", "database", 160.0, 80.0)),
             List.of(
                 new JsonContracts.LayoutEdge("api-writes-database", "orders-api", "database", "writes orders", "api-writes-database"),
-                new JsonContracts.LayoutEdge("payments-serves-api", "payments", "orders-api", "authorizes payment", "payments-serves-api"),
+                new JsonContracts.LayoutEdge("payments-serves-api", "payments", "orders-api", "serves payment authorization", "payments-serves-api"),
                 new JsonContracts.LayoutEdge("api-publishes-job", "orders-api", "worker", "publishes fulfillment", "api-publishes-job"),
                 new JsonContracts.LayoutEdge("worker-reads-database", "worker", "database", "loads order", "worker-reads-database")),
             List.of(
@@ -1128,6 +1187,27 @@ class ElkLayoutEngineTest {
 
     private static double sourcePortY(JsonContracts.LaidOutEdge edge) {
         return edge.points().get(0).y();
+    }
+
+    private static double targetPortY(JsonContracts.LaidOutEdge edge) {
+        return edge.points().get(edge.points().size() - 1).y();
+    }
+
+    private static boolean sameVerticalOrder(
+        double firstSourceY,
+        double secondSourceY,
+        double firstTargetY,
+        double secondTargetY) {
+        if (sameCoordinate(firstSourceY, secondSourceY)
+            || sameCoordinate(firstTargetY, secondTargetY)) {
+            return true;
+        }
+        return Double.compare(firstSourceY, secondSourceY)
+            == Double.compare(firstTargetY, secondTargetY);
+    }
+
+    private static boolean sameCoordinate(double left, double right) {
+        return Math.abs(left - right) <= GEOMETRY_EPSILON;
     }
 
     private static double centerY(JsonContracts.LaidOutNode node) {

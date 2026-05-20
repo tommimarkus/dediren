@@ -684,6 +684,7 @@ final class ElkLayoutEngine {
             return emptyEndpointMerges(edges);
         }
 
+        Set<String> sourceOnlyGroups = sourceOnlyGroups(edges, ownerByNode);
         Map<EdgeEndpointKey, Integer> endpointCounts = new HashMap<>();
         for (JsonContracts.LayoutEdge edge : edges) {
             String relationshipType = relationshipType(edge);
@@ -720,6 +721,11 @@ final class ElkLayoutEngine {
             }
             boolean mergeableEndpoint =
                 relationshipType != null && !sameOwnerInternalEdge(edge, ownerByNode);
+            // Actor/source-only groups often have only two equivalent entry
+            // edges into a platform node. Merge that target pair so ELK owns a
+            // single shared endpoint instead of forcing an arbitrary port order.
+            boolean sourceOnlyGroupTargetEndpoint =
+                sourceOnlyGroups.contains(ownerByNode.get(edge.source()));
             Direction direction =
                 edgeDirection(
                     edge,
@@ -736,9 +742,34 @@ final class ElkLayoutEngine {
                 mergeableEndpoint
                     && endpointCounts.getOrDefault(
                         new EdgeEndpointKey(edge.target(), targetPortSide(direction), false, relationshipType),
-                        0) >= MERGEABLE_ENDPOINT_EDGE_COUNT));
+                        0) >= (sourceOnlyGroupTargetEndpoint ? 2 : MERGEABLE_ENDPOINT_EDGE_COUNT)));
         }
         return endpointMerges;
+    }
+
+    private static Set<String> sourceOnlyGroups(
+        List<JsonContracts.LayoutEdge> edges,
+        Map<String, String> ownerByNode) {
+        Set<String> groups = new HashSet<>(ownerByNode.values());
+        Set<String> nonSourceOnlyGroups = new HashSet<>();
+        Set<String> groupsWithOutgoingEdges = new HashSet<>();
+        for (JsonContracts.LayoutEdge edge : edges) {
+            String sourceOwner = ownerByNode.get(edge.source());
+            String targetOwner = ownerByNode.get(edge.target());
+            if (sourceOwner != null && sourceOwner.equals(targetOwner)) {
+                nonSourceOnlyGroups.add(sourceOwner);
+                continue;
+            }
+            if (sourceOwner != null) {
+                groupsWithOutgoingEdges.add(sourceOwner);
+            }
+            if (targetOwner != null) {
+                nonSourceOnlyGroups.add(targetOwner);
+            }
+        }
+        groups.retainAll(groupsWithOutgoingEdges);
+        groups.removeAll(nonSourceOnlyGroups);
+        return groups;
     }
 
     private static boolean sameOwnerInternalEdge(
@@ -875,15 +906,15 @@ final class ElkLayoutEngine {
         String nodeId,
         PortSide side) {
         int index = nextIndexByNodeSide.merge(new NodeSideKey(nodeId, side), 1, Integer::sum) - 1;
-        // ELK's fixed-order west-side ports render in the opposite vertical
+        // ELK's west-side port indexes render in the opposite vertical
         // direction, so use descending indices there to preserve request order
         // as top-to-bottom visual graph intent.
         return side == PortSide.WEST ? -index : index;
     }
 
     // ELK accounts for the generated ports, but Dediren still increases the
-    // minimum node side length when many fixed-order ports would otherwise be
-    // packed onto the same side. This is size intent, not route geometry.
+    // minimum node side length when many ports would otherwise be packed onto
+    // the same side. This is size intent, not route geometry.
     private static void setGeneratedDimensions(
         ElkNode elkNode,
         JsonContracts.LayoutNode node,

@@ -3,7 +3,7 @@
   "required_plugins": [
     {
       "id": "generic-graph",
-      "version": "0.14.4"
+      "version": "0.14.5"
     }
   ],
   "nodes": [
@@ -40,7 +40,7 @@
     {
       "id": "payments",
       "type": "generic.external-service",
-      "label": "Payments Provider",
+      "label": "Payment Authorization Service",
       "properties": {}
     }
   ],
@@ -74,7 +74,7 @@
       "type": "generic.calls",
       "source": "orders-api",
       "target": "payments",
-      "label": "authorizes payment",
+      "label": "requests payment authorization",
       "properties": {}
     },
     {
