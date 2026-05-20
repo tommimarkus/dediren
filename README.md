@@ -45,18 +45,18 @@ Runtime prerequisite:
 
 - Java 21 or newer available as `java` on `PATH`.
 
-For the current `0.14.2` version, the xtask creates:
+For the current `0.14.4` version, the xtask creates:
 
 ```text
-dist/dediren-agent-bundle-0.14.2-x86_64-unknown-linux-gnu/
-dist/dediren-agent-bundle-0.14.2-x86_64-unknown-linux-gnu.tar.gz
+dist/dediren-agent-bundle-0.14.4-x86_64-unknown-linux-gnu/
+dist/dediren-agent-bundle-0.14.4-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Run the smoke test from a shell where `java -version` resolves to Java 21 or
 newer:
 
 ```bash
-cargo xtask dist smoke dist/dediren-agent-bundle-0.14.2-x86_64-unknown-linux-gnu.tar.gz
+cargo xtask dist smoke dist/dediren-agent-bundle-0.14.4-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Concurrent `cargo xtask dist build` invocations serialize on a repo-local lock
@@ -69,8 +69,8 @@ Unpack and run it anywhere:
 
 ```bash
 mkdir -p /tmp/dediren-dist
-tar -xzf dist/dediren-agent-bundle-0.14.2-x86_64-unknown-linux-gnu.tar.gz -C /tmp/dediren-dist
-/tmp/dediren-dist/dediren-agent-bundle-0.14.2-x86_64-unknown-linux-gnu/bin/dediren --help
+tar -xzf dist/dediren-agent-bundle-0.14.4-x86_64-unknown-linux-gnu.tar.gz -C /tmp/dediren-dist
+/tmp/dediren-dist/dediren-agent-bundle-0.14.4-x86_64-unknown-linux-gnu/bin/dediren --help
 ```
 
 For a full unpacked-bundle JSON authoring and project/layout/render smoke
@@ -515,13 +515,12 @@ DEDIREN_ELK_COMMAND=crates/dediren-plugin-elk-layout/java/scripts/elk-layout.sh 
 The Java helper reads a `layout-request.schema.v1` document from stdin and
 returns a command envelope whose `.data` is a `layout-result.schema.v1`
 document. The helper uses Eclipse ELK Layered (`org.eclipse.elk.layered`) for
-generated node and group placement, then reroutes connectors over that fixed
-geometry with ELK Libavoid (`org.eclipse.elk.alg.libavoid`). Libavoid is an
-edge-routing backend only; source graph JSON still must not carry authored
-coordinates. The Gradle build keeps the SDKMAN Java 25 toolchain for ELK layout
-work, emits Java 21-compatible bytecode for the distributed helper, and pins
-Maven dependencies through dependency locking. Concurrent helper builds
-serialize on `.cache/locks/elk-layout-java-build.lock`.
+generated node and group placement plus orthogonal connector routing; source
+graph JSON still must not carry authored coordinates. The Gradle build keeps
+the SDKMAN Java 25 toolchain for ELK layout work, emits Java 21-compatible
+bytecode for the distributed helper, and pins Maven dependencies through
+dependency locking. Concurrent helper builds serialize on
+`.cache/locks/elk-layout-java-build.lock`.
 
 The packaged helper disables HotSpot perfdata collection so parallel layout
 runs do not emit JVM perfdata startup warnings on stdout. The Rust adapter also
@@ -557,7 +556,6 @@ Dediren layout intent, not raw ELK options:
     "wrapping": "auto",
     "routing": {
       "style": "orthogonal",
-      "profile": "readable",
       "endpoint_merging": "local"
     }
   }
@@ -565,10 +563,12 @@ Dediren layout intent, not raw ELK options:
 ```
 
 Supported directions are `right`, `left`, `down`, and `up`. Supported density
-and routing profiles are `compact`, `readable`, and `spacious`. Supported
-wrapping values are `auto`, `off`, and `multi-edge`. Supported endpoint merging
-values are `auto`, `local`, and `off`. Missing preferences keep the helper's
-default behavior.
+profiles are `compact`, `readable`, and `spacious`. Supported wrapping values
+are `auto`, `off`, and `multi-edge`. Supported routing style is `orthogonal`.
+`routing.profile` still accepts `compact`, `readable`, and `spacious` for
+schema compatibility, but the current Layered-only helper derives route spacing
+from `density`. Supported endpoint merging values are `auto`, `local`, and
+`off`. Missing preferences keep the helper's default behavior.
 
 ### ELK Test Lanes
 
@@ -677,7 +677,7 @@ newer:
 
 ```bash
 cargo xtask dist build
-cargo xtask dist smoke dist/dediren-agent-bundle-0.14.2-x86_64-unknown-linux-gnu.tar.gz
+cargo xtask dist smoke dist/dediren-agent-bundle-0.14.4-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Focused checks:

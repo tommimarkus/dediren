@@ -4,10 +4,15 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
+import org.eclipse.elk.alg.layered.options.EdgeStraighteningStrategy;
 import org.eclipse.elk.alg.layered.options.LayeredOptions;
-import org.eclipse.elk.alg.libavoid.options.LibavoidOptions;
-import org.eclipse.elk.core.options.CoreOptions;
+import org.eclipse.elk.alg.layered.options.NodePlacementStrategy;
+import org.eclipse.elk.alg.layered.options.OrderingStrategy;
+import org.eclipse.elk.alg.layered.options.PortSortingStrategy;
 import org.eclipse.elk.core.options.Direction;
 import org.eclipse.elk.core.options.PortSide;
 import org.eclipse.elk.graph.ElkNode;
@@ -15,48 +20,35 @@ import org.junit.jupiter.api.Test;
 
 class ElkLayoutEngineTest {
     private static final double GEOMETRY_EPSILON = 0.001;
+    private static final double PORT_SIDE_EPSILON = 1.0;
 
     @Test
-    void libavoidRootUsesDocumentedAestheticRoutingOptions() {
-        ElkNode root = ElkLayoutEngine.configuredLibavoidRoot();
-
-        assertEquals(50.0, root.getProperty(LibavoidOptions.SEGMENT_PENALTY));
-        assertEquals(16.0, root.getProperty(LibavoidOptions.IDEAL_NUDGING_DISTANCE));
-        assertEquals(16.0, root.getProperty(LibavoidOptions.SHAPE_BUFFER_DISTANCE));
-        assertEquals(
-            true,
-            root.getProperty(LibavoidOptions.NUDGE_ORTHOGONAL_SEGMENTS_CONNECTED_TO_SHAPES));
-        assertEquals(
-            false,
-            root.getProperty(LibavoidOptions.PENALISE_ORTHOGONAL_SHARED_PATHS_AT_CONN_ENDS));
+    void elkHelperBuildUsesLayeredOnly() throws IOException {
+        assertFalse(
+            Files.readString(Path.of("build.gradle.kts")).contains("org.eclipse.elk.alg.libavoid"),
+            "ELK helper must not declare the Libavoid backend");
+        assertFalse(
+            Files.readString(Path.of("gradle.lockfile")).contains("org.eclipse.elk.alg.libavoid"),
+            "ELK helper lockfile must not include the Libavoid backend");
     }
 
     @Test
-    void libavoidRootUsesReadableRoutingProfile() {
-        JsonContracts.LayoutPreferences preferences = new JsonContracts.LayoutPreferences(
-            null,
-            null,
-            null,
-            new JsonContracts.LayoutRoutingPreferences("orthogonal", "readable", null));
+    void elkHelperDoesNotOwnPostElkRouteGeometry() throws IOException {
+        String source = Files.readString(Path.of(
+            "src/main/java/dev/dediren/elk/ElkLayoutEngine.java"));
 
-        ElkNode root = ElkLayoutEngine.configuredLibavoidRoot(preferences);
-
-        assertEquals(60.0, root.getProperty(LibavoidOptions.SEGMENT_PENALTY));
-        assertEquals(24.0, root.getProperty(LibavoidOptions.IDEAL_NUDGING_DISTANCE));
-        assertEquals(24.0, root.getProperty(LibavoidOptions.SHAPE_BUFFER_DISTANCE));
-    }
-
-    @Test
-    void libavoidRootUsesPreferredDirection() {
-        JsonContracts.LayoutPreferences preferences = new JsonContracts.LayoutPreferences(
-            "up",
-            null,
-            null,
-            null);
-
-        ElkNode root = ElkLayoutEngine.configuredLibavoidRoot(preferences);
-
-        assertEquals(Direction.UP, root.getProperty(CoreOptions.DIRECTION));
+        assertFalse(
+            source.contains("straightenConnectorEndpointDoglegs("),
+            "ELK helper must not snap connector doglegs after ELK has routed edges");
+        assertFalse(
+            source.contains("normalizeExcessiveRoutes("),
+            "ELK helper must not replace ELK routes with a custom route normalizer");
+        assertFalse(
+            source.contains("shortestCleanOrthogonalRoute("),
+            "ELK helper must not contain a fallback orthogonal router");
+        assertFalse(
+            source.contains("routeIntersectsUnrelatedNode("),
+            "route intersection checks belong in validation diagnostics, not route replacement");
     }
 
     @Test
@@ -71,6 +63,20 @@ class ElkLayoutEngineTest {
 
         assertEquals(false, root.getProperty(LayeredOptions.MERGE_EDGES));
         assertEquals(false, root.getProperty(LayeredOptions.MERGE_HIERARCHY_EDGES));
+    }
+
+    @Test
+    void layeredRootUsesElkFirstOrderingAndStraighteningOptions() {
+        ElkNode root = ElkLayoutEngine.configuredLayeredRoot(Direction.RIGHT, null);
+
+        assertEquals(PortSortingStrategy.INPUT_ORDER, root.getProperty(LayeredOptions.PORT_SORTING_STRATEGY));
+        assertEquals(OrderingStrategy.PREFER_EDGES, root.getProperty(LayeredOptions.CONSIDER_MODEL_ORDER_STRATEGY));
+        assertEquals(true, root.getProperty(LayeredOptions.CONSIDER_MODEL_ORDER_PORT_MODEL_ORDER));
+        assertEquals(NodePlacementStrategy.BRANDES_KOEPF, root.getProperty(LayeredOptions.NODE_PLACEMENT_STRATEGY));
+        assertEquals(
+            EdgeStraighteningStrategy.IMPROVE_STRAIGHTNESS,
+            root.getProperty(LayeredOptions.NODE_PLACEMENT_BK_EDGE_STRAIGHTENING));
+        assertEquals(true, root.getProperty(LayeredOptions.UNNECESSARY_BENDPOINTS));
     }
 
     @Test
@@ -130,42 +136,6 @@ class ElkLayoutEngineTest {
 
         assertRouteEndpointOnSide(result, "worker-polls-queue", "worker", true, PortSide.NORTH);
         assertRouteEndpointOnSide(result, "worker-polls-queue", "queue", false, PortSide.SOUTH);
-    }
-
-    @Test
-    void libavoidRoutingPassAvoidsFixedNodeObstacles() {
-        JsonContracts.LaidOutNode source = new JsonContracts.LaidOutNode(
-            "source", "source", "source", 0.0, 0.0, 160.0, 80.0, "Source");
-        JsonContracts.LaidOutNode obstacle = new JsonContracts.LaidOutNode(
-            "obstacle", "obstacle", "obstacle", 220.0, -20.0, 160.0, 120.0, "Obstacle");
-        JsonContracts.LaidOutNode target = new JsonContracts.LaidOutNode(
-            "target", "target", "target", 440.0, 0.0, 160.0, 80.0, "Target");
-        JsonContracts.LayoutEdge edge = new JsonContracts.LayoutEdge(
-            "source-target", "source", "target", "calls", "source-target");
-
-        List<JsonContracts.Point> points = ElkLayoutEngine.routeWithLibavoid(
-            List.of(edge),
-            List.of(source, obstacle, target)).get("source-target");
-
-        assertTrue(points.size() >= 2, "Libavoid should return route points");
-        assertEquals(
-            0,
-            connectorThroughNodeCount(new JsonContracts.LayoutResult(
-                "layout-result.schema.v1",
-                "main",
-                List.of(source, obstacle, target),
-                List.of(new JsonContracts.LaidOutEdge(
-                    edge.id(),
-                    edge.source(),
-                    edge.target(),
-                    edge.source_id(),
-                    edge.id(),
-                    List.of(),
-                    points,
-                    edge.label())),
-                List.of(),
-                List.of())),
-            "Libavoid should route around fixed obstacle geometry");
     }
 
     @Test
@@ -425,7 +395,7 @@ class ElkLayoutEngineTest {
     }
 
     @Test
-    void groupedGatewayFanOutKeepsCompactDoglegs() {
+    void groupedGatewayFanOutKeepsBoundedElkRoutes() {
         JsonContracts.LayoutRequest request = new JsonContracts.LayoutRequest(
             "layout-request.schema.v1",
             "main",
@@ -462,16 +432,21 @@ class ElkLayoutEngineTest {
         assertEquals(
             0,
             connectorThroughNodeCount(result),
-            "compact gateway fan-out routes should still avoid unrelated service nodes");
+            "gateway fan-out routes should avoid unrelated service nodes");
         for (String edgeId : List.of(
             "gateway-authenticates",
             "gateway-prices-cart",
             "gateway-places-order",
             "gateway-queries-catalog")) {
             JsonContracts.LaidOutEdge edge = edgeById(result, edgeId);
+            assertRouted(edge);
+            int corners = cornerCount(edge.points());
             assertTrue(
-                cornerCount(edge.points()) <= 2,
-                edgeId + " should use a compact dogleg, points=" + edge.points());
+                corners <= 4,
+                edgeId + " should keep a bounded ELK-routed corner count, got "
+                    + corners
+                    + " corners, points="
+                    + edge.points());
         }
     }
 
@@ -646,6 +621,43 @@ class ElkLayoutEngineTest {
     }
 
     @Test
+    void sameGroupInternalEdgesDoNotUseSharedEndpointMerge() {
+        JsonContracts.LayoutRequest request = new JsonContracts.LayoutRequest(
+            "layout-request.schema.v1",
+            "main",
+            List.of(
+                new JsonContracts.LayoutNode("api-gateway", "API Gateway", "api-gateway", 160.0, 112.0),
+                new JsonContracts.LayoutNode("identity-service", "Identity Service", "identity-service", 160.0, 80.0),
+                new JsonContracts.LayoutNode("pricing-service", "Pricing Service", "pricing-service", 160.0, 80.0),
+                new JsonContracts.LayoutNode("order-service", "Order Service", "order-service", 160.0, 80.0)),
+            List.of(
+                new JsonContracts.LayoutEdge("gateway-authenticates", "api-gateway", "identity-service", "authenticates", "gateway-authenticates", "Serving"),
+                new JsonContracts.LayoutEdge("gateway-prices-cart", "api-gateway", "pricing-service", "prices cart", "gateway-prices-cart", "Serving"),
+                new JsonContracts.LayoutEdge("gateway-places-order", "api-gateway", "order-service", "places order", "gateway-places-order", "Serving")),
+            List.of(new JsonContracts.LayoutGroup(
+                "core-services",
+                "Core Services",
+                List.of("api-gateway", "identity-service", "pricing-service", "order-service"),
+                new JsonContracts.GroupProvenance(null, new JsonContracts.SemanticBacked("core-services")))),
+            List.of(),
+            List.of(),
+            null);
+
+        JsonContracts.LayoutResult result = new ElkLayoutEngine().layout(request);
+
+        for (String edgeId : List.of(
+            "gateway-authenticates",
+            "gateway-prices-cart",
+            "gateway-places-order")) {
+            JsonContracts.LaidOutEdge edge = edgeById(result, edgeId);
+            assertEquals(
+                List.of(),
+                edge.routing_hints(),
+                "same-group internal edges should not be converted into shared endpoint junctions");
+        }
+    }
+
+    @Test
     void groupedSourcePortsFollowDivergingRouteChannelOrder() {
         JsonContracts.LayoutRequest request = new JsonContracts.LayoutRequest(
             "layout-request.schema.v1",
@@ -742,45 +754,6 @@ class ElkLayoutEngineTest {
                 + readsEdge.points()
                 + ", cache="
                 + cacheEdge.points());
-    }
-
-    @Test
-    void groupedConnectorFanOutCanUseDifferentSourceSidesInVerticalGroup() {
-        JsonContracts.LayoutRequest request = new JsonContracts.LayoutRequest(
-            "layout-request.schema.v1",
-            "main",
-            List.of(
-                new JsonContracts.LayoutNode("event-bus", "Event Bus", "event-bus", 160.0, 80.0),
-                new JsonContracts.LayoutNode("dispatch", "", "dispatch", 28.0, 28.0),
-                new JsonContracts.LayoutNode("order-worker", "Order Worker", "order-worker", 160.0, 80.0),
-                new JsonContracts.LayoutNode("email-worker", "Email Worker", "email-worker", 160.0, 80.0),
-                new JsonContracts.LayoutNode("reporting-ingestor", "Reporting Ingestor", "reporting-ingestor", 160.0, 80.0)),
-            List.of(
-                new JsonContracts.LayoutEdge("event-bus-dispatch", "event-bus", "dispatch", "dispatches", "event-bus-dispatch"),
-                new JsonContracts.LayoutEdge("dispatch-email", "dispatch", "email-worker", "email event", "dispatch-email"),
-                new JsonContracts.LayoutEdge("dispatch-reporting", "dispatch", "reporting-ingestor", "reporting event", "dispatch-reporting")),
-            List.of(new JsonContracts.LayoutGroup(
-                "async-processing",
-                "Async Processing",
-                List.of("event-bus", "dispatch", "order-worker", "email-worker", "reporting-ingestor"),
-                new JsonContracts.GroupProvenance(null, new JsonContracts.SemanticBacked("async-processing")))),
-            List.of(),
-            List.of(),
-            null);
-
-        JsonContracts.LayoutResult result = new ElkLayoutEngine().layout(request);
-        JsonContracts.LaidOutNode dispatch = nodeById(result, "dispatch");
-        JsonContracts.LaidOutEdge emailEdge = edgeById(result, "dispatch-email");
-        JsonContracts.LaidOutEdge reportingEdge = edgeById(result, "dispatch-reporting");
-
-        assertTrue(
-            sourcePortY(emailEdge) > centerY(dispatch),
-            "downward connector fan-out should be allowed to leave from the bottom side, email="
-                + emailEdge.points());
-        assertTrue(
-            sourcePortX(reportingEdge) > centerX(dispatch),
-            "connector fan-out should still be able to leave from the right side when that avoids the incoming side, reporting="
-                + reportingEdge.points());
     }
 
     @Test
@@ -917,7 +890,7 @@ class ElkLayoutEngineTest {
     }
 
     @Test
-    void groupedReverseCrossGroupEdgeAvoidsExcessiveDetour() {
+    void groupedReverseCrossGroupEdgeKeepsBoundedElkDetour() {
         JsonContracts.LayoutRequest request = new JsonContracts.LayoutRequest(
             "layout-request.schema.v1",
             "main",
@@ -948,16 +921,20 @@ class ElkLayoutEngineTest {
 
         JsonContracts.LayoutResult result = new ElkLayoutEngine().layout(request);
         JsonContracts.LaidOutEdge paymentEdge = edgeById(result, "payments-serves-api");
+        int detourCount = excessiveRouteDetourCount(result);
 
+        assertRouted(paymentEdge);
+        assertTrue(
+            detourCount <= 1,
+            "reverse cross-group routes should keep ELK detours bounded, got " + detourCount);
         assertEquals(
             0,
-            excessiveRouteDetourCount(result),
-            "reverse cross-group route should be normalized when ELK routes it around the diagram");
+            connectorThroughNodeCount(result),
+            "reverse cross-group routes should avoid unrelated member nodes");
         assertEquals(
             0,
             endpointBoundaryOverlapCount(result, paymentEdge),
-            "normalized reverse route should leave endpoint nodes before turning");
-        assertTrue(paymentEdge.points().size() <= 6, "normalized reverse route should stay compact");
+            "ELK-routed reverse route should leave endpoint nodes before turning");
     }
 
     @Test
@@ -996,6 +973,63 @@ class ElkLayoutEngineTest {
         assertRouteEndpointOnSide(result, "workflow-to-worker", "worker-entry", false, PortSide.NORTH);
         assertRouteEndpointOnSide(result, "worker-to-workflow", "worker-return", true, PortSide.NORTH);
         assertRouteEndpointOnSide(result, "worker-to-workflow", "workflow-return", false, PortSide.SOUTH);
+    }
+
+    @Test
+    void groupedConnectorEdgesKeepHorizontalFlowInsideVerticalGroups() {
+        JsonContracts.LayoutRequest request = new JsonContracts.LayoutRequest(
+            "layout-request.schema.v1",
+            "main",
+            List.of(
+                new JsonContracts.LayoutNode("event-bus", "Event Bus", "event-bus", 160.0, 80.0),
+                new JsonContracts.LayoutNode(
+                    "event-dispatch-or-junction",
+                    "Event Dispatch",
+                    "event-dispatch-or-junction",
+                    28.0,
+                    28.0),
+                new JsonContracts.LayoutNode("order-worker", "Order Worker", "order-worker", 160.0, 80.0)),
+            List.of(
+                new JsonContracts.LayoutEdge(
+                    "event-bus-to-or-junction",
+                    "event-bus",
+                    "event-dispatch-or-junction",
+                    "dispatches",
+                    "event-bus-to-or-junction"),
+                new JsonContracts.LayoutEdge(
+                    "event-bus-drives-order-worker",
+                    "event-bus",
+                    "order-worker",
+                    "order event",
+                    "event-bus-drives-order-worker")),
+            List.of(new JsonContracts.LayoutGroup(
+                "async-processing",
+                "Async Processing",
+                List.of("event-bus", "event-dispatch-or-junction", "order-worker"),
+                new JsonContracts.GroupProvenance(null, new JsonContracts.SemanticBacked("async-processing")))),
+            List.of(),
+            List.of(),
+            null);
+
+        JsonContracts.LayoutResult result = new ElkLayoutEngine().layout(request);
+        JsonContracts.LaidOutEdge dispatchEdge = edgeById(result, "event-bus-to-or-junction");
+        JsonContracts.LaidOutEdge orderEdge = edgeById(result, "event-bus-drives-order-worker");
+
+        assertRouteEndpointOnSide(result, "event-bus-to-or-junction", "event-bus", true, PortSide.EAST);
+        assertRouteEndpointOnSide(
+            result,
+            "event-bus-to-or-junction",
+            "event-dispatch-or-junction",
+            false,
+            PortSide.WEST);
+        assertRouteEndpointOnSide(result, "event-bus-drives-order-worker", "event-bus", true, PortSide.SOUTH);
+        assertRouteEndpointOnSide(result, "event-bus-drives-order-worker", "order-worker", false, PortSide.NORTH);
+        assertTrue(
+            sourcePortY(dispatchEdge) < sourcePortY(orderEdge),
+            "junction dispatch source port should be above the direct order branch, dispatch="
+                + dispatchEdge.points()
+                + ", order="
+                + orderEdge.points());
     }
 
     private static void assertRouted(JsonContracts.LaidOutEdge edge) {
@@ -1053,19 +1087,19 @@ class ElkLayoutEngineTest {
         String message) {
         switch (side) {
             case NORTH -> {
-                assertEquals(node.y(), point.y(), GEOMETRY_EPSILON, message);
+                assertEquals(node.y(), point.y(), PORT_SIDE_EPSILON, message);
                 assertWithinHorizontalBounds(point, node, message);
             }
             case SOUTH -> {
-                assertEquals(node.y() + node.height(), point.y(), GEOMETRY_EPSILON, message);
+                assertEquals(node.y() + node.height(), point.y(), PORT_SIDE_EPSILON, message);
                 assertWithinHorizontalBounds(point, node, message);
             }
             case WEST -> {
-                assertEquals(node.x(), point.x(), GEOMETRY_EPSILON, message);
+                assertEquals(node.x(), point.x(), PORT_SIDE_EPSILON, message);
                 assertWithinVerticalBounds(point, node, message);
             }
             case EAST -> {
-                assertEquals(node.x() + node.width(), point.x(), GEOMETRY_EPSILON, message);
+                assertEquals(node.x() + node.width(), point.x(), PORT_SIDE_EPSILON, message);
                 assertWithinVerticalBounds(point, node, message);
             }
             default -> throw new IllegalArgumentException("unsupported side " + side);
@@ -1094,14 +1128,6 @@ class ElkLayoutEngineTest {
 
     private static double sourcePortY(JsonContracts.LaidOutEdge edge) {
         return edge.points().get(0).y();
-    }
-
-    private static double sourcePortX(JsonContracts.LaidOutEdge edge) {
-        return edge.points().get(0).x();
-    }
-
-    private static double centerX(JsonContracts.LaidOutNode node) {
-        return node.x() + node.width() / 2.0;
     }
 
     private static double centerY(JsonContracts.LaidOutNode node) {

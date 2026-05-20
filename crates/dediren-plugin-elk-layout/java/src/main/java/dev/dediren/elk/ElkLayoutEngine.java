@@ -7,8 +7,11 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.eclipse.elk.alg.libavoid.options.LibavoidOptions;
+import org.eclipse.elk.alg.layered.options.EdgeStraighteningStrategy;
 import org.eclipse.elk.alg.layered.options.LayeredOptions;
+import org.eclipse.elk.alg.layered.options.NodePlacementStrategy;
+import org.eclipse.elk.alg.layered.options.OrderingStrategy;
+import org.eclipse.elk.alg.layered.options.PortSortingStrategy;
 import org.eclipse.elk.alg.layered.options.WrappingStrategy;
 import org.eclipse.elk.core.RecursiveGraphLayoutEngine;
 import org.eclipse.elk.core.math.ElkMargin;
@@ -29,7 +32,6 @@ import org.eclipse.elk.graph.util.ElkGraphUtil;
 
 final class ElkLayoutEngine {
     private static final String LAYERED_ALGORITHM = "org.eclipse.elk.layered";
-    private static final String LIBAVOID_ALGORITHM = "org.eclipse.elk.alg.libavoid";
     private static final double DEFAULT_WIDTH = 160.0;
     private static final double DEFAULT_HEIGHT = 80.0;
     private static final double CONNECTOR_SOURCE_MAX_WIDTH = 48.0;
@@ -51,25 +53,6 @@ final class ElkLayoutEngine {
     private static final double SPACIOUS_GROUP_PADDING = 40.0;
     private static final int DEFAULT_SHORT_SIDE_PORT_CAPACITY = 3;
     private static final double PORT_SURROUNDING_SPACING = 16.0;
-    private static final double ROUTE_DETOUR_RATIO = 1.5;
-    private static final double ROUTE_DETOUR_EXCESS = 240.0;
-    private static final double ROUTE_CHANNEL_PADDING = 32.0;
-    private static final double ROUTE_FALLBACK_LANE_SPACING = 48.0;
-    private static final int ROUTE_FALLBACK_LANE_COUNT = 4;
-    private static final double ROUTE_CLOSE_PARALLEL_DISTANCE = 20.0;
-    private static final double ROUTE_CLOSE_PARALLEL_MIN_OVERLAP = 40.0;
-    private static final double ROUTE_ENDPOINT_CLEARANCE = 32.0;
-    private static final double CONNECTOR_ENDPOINT_DOGLEG_SNAP = 24.0;
-    private static final double LIBAVOID_SEGMENT_PENALTY = 50.0;
-    private static final double LIBAVOID_IDEAL_NUDGING_DISTANCE = 16.0;
-    private static final double LIBAVOID_SHAPE_BUFFER_DISTANCE = 16.0;
-    private static final double READABLE_LIBAVOID_SEGMENT_PENALTY = 60.0;
-    private static final double READABLE_LIBAVOID_IDEAL_NUDGING_DISTANCE = 24.0;
-    private static final double READABLE_LIBAVOID_SHAPE_BUFFER_DISTANCE = 24.0;
-    private static final double SPACIOUS_LIBAVOID_SEGMENT_PENALTY = 80.0;
-    private static final double SPACIOUS_LIBAVOID_IDEAL_NUDGING_DISTANCE = 32.0;
-    private static final double SPACIOUS_LIBAVOID_SHAPE_BUFFER_DISTANCE = 32.0;
-    private static final double GEOMETRY_EPSILON = 0.001;
     private static final int MERGEABLE_ENDPOINT_EDGE_COUNT = 3;
     private static final String SHARED_SOURCE_JUNCTION_HINT = "shared_source_junction";
     private static final String SHARED_TARGET_JUNCTION_HINT = "shared_target_junction";
@@ -158,20 +141,9 @@ final class ElkLayoutEngine {
         }
 
         List<JsonContracts.LaidOutEdge> edges = new ArrayList<>();
-        Map<String, List<JsonContracts.Point>> libavoidRoutes =
-            routeWithLibavoid(
-                requestEdges,
-                nodes,
-                flatEdgeDirections(requestEdges, layoutDirection),
-                Map.of(),
-                endpointMerges,
-                Map.of(),
-                preferences);
         for (JsonContracts.LayoutEdge edge : list(request.edges())) {
             ElkEdge elkEdge = elkEdges.get(edge.id());
             if (elkEdge != null) {
-                List<JsonContracts.Point> route =
-                    routeOrFallback(libavoidRoutes.get(edge.id()), points(elkEdge));
                 edges.add(new JsonContracts.LaidOutEdge(
                     edge.id(),
                     edge.source(),
@@ -179,7 +151,7 @@ final class ElkLayoutEngine {
                     edge.source_id(),
                     edge.id(),
                     routingHints(edge.id(), endpointMerges),
-                    route,
+                    points(elkEdge),
                     edge.label()));
             }
         }
@@ -203,7 +175,7 @@ final class ElkLayoutEngine {
         Map<String, JsonContracts.LayoutNode> requestNodes = requestNodesById(request);
         Map<String, String> ownerByNode = ownerByNode(request);
         ElkNode root = ElkGraphUtil.createGraph();
-        configureLayeredRoot(root, rootDirection, preferences);
+        configureLayeredRoot(root, rootDirection, preferences, false);
         root.setProperty(CoreOptions.HIERARCHY_HANDLING, HierarchyHandling.INCLUDE_CHILDREN);
         root.setProperty(CoreOptions.ASPECT_RATIO, 2.2);
         if (groupedWrappingEnabled(preferences)) {
@@ -234,7 +206,7 @@ final class ElkLayoutEngine {
             elkGroup.setIdentifier(group.id());
             ElkGraphUtil.createLabel(elkGroup).setText(group.label());
             Direction groupDirection = internalDirection(members, internalEdges);
-            configureLayeredRoot(elkGroup, groupDirection, preferences);
+            configureLayeredRoot(elkGroup, groupDirection, preferences, false);
             elkGroup.setProperty(CoreOptions.HIERARCHY_HANDLING, HierarchyHandling.INCLUDE_CHILDREN);
             elkGroup.setProperty(CoreOptions.PADDING, new ElkPadding(groupPadding(preferences)));
             elkGroups.put(group.id(), elkGroup);
@@ -276,13 +248,11 @@ final class ElkLayoutEngine {
         Map<String, ElkEdge> elkEdges = new HashMap<>();
         Map<String, EdgePortIndexes> edgePortIndexes = groupedEdgePortIndexes(
             request,
-            requestEdges,
             requestNodes,
             ownerByNode,
             groupDirectionById,
             groupOrderById,
-            rootDirection,
-            endpointMerges);
+            rootDirection);
         for (int index = 0; index < requestEdges.size(); index++) {
             JsonContracts.LayoutEdge edge = requestEdges.get(index);
             ElkNode source = elkNodes.get(edge.source());
@@ -296,7 +266,13 @@ final class ElkLayoutEngine {
                 continue;
             }
             Direction edgeDirection =
-                edgeDirection(edge, requestNodes, ownerByNode, groupDirectionById, groupOrderById, rootDirection);
+                edgeDirection(
+                    edge,
+                    requestNodes,
+                    ownerByNode,
+                    groupDirectionById,
+                    groupOrderById,
+                    rootDirection);
             EdgeEndpointMerge endpointMerge =
                 endpointMerges.getOrDefault(edge.id(), NO_ENDPOINT_MERGE);
             EdgePortIndexes portIndexes = edgePortIndexes.get(edge.id());
@@ -336,41 +312,11 @@ final class ElkLayoutEngine {
         }
 
         List<JsonContracts.LaidOutEdge> edges = new ArrayList<>();
-        Map<String, Direction> libavoidDirections = groupedEdgeDirections(
-            requestEdges,
-            requestNodes,
-            ownerByNode,
-            groupDirectionById,
-            groupOrderById,
-            rootDirection);
-        Map<String, PortSide> libavoidSourcePortSides = geometryAwareSourcePortSides(
-            requestEdges,
-            nodes,
-            libavoidDirections,
-            endpointMerges);
-        Map<String, EdgePortIndexes> libavoidEdgePortIndexes = geometryAwareEdgePortIndexes(
-            requestEdges,
-            nodes,
-            libavoidDirections,
-            libavoidSourcePortSides,
-            endpointMerges,
-            edgePortIndexes);
         List<JsonContracts.LaidOutGroup> groups =
             groupedBounds(request, elkGroups, elkNodes, warnings);
-        Map<String, List<JsonContracts.Point>> libavoidRoutes =
-            routeWithLibavoid(
-                requestEdges,
-                nodes,
-                libavoidDirections,
-                libavoidSourcePortSides,
-                endpointMerges,
-                libavoidEdgePortIndexes,
-                preferences);
         for (JsonContracts.LayoutEdge edge : list(request.edges())) {
             ElkEdge elkEdge = elkEdges.get(edge.id());
             if (elkEdge != null) {
-                List<JsonContracts.Point> route =
-                    routeOrFallback(libavoidRoutes.get(edge.id()), points(elkEdge));
                 edges.add(new JsonContracts.LaidOutEdge(
                     edge.id(),
                     edge.source(),
@@ -378,12 +324,12 @@ final class ElkLayoutEngine {
                     edge.source_id(),
                     edge.id(),
                     routingHints(edge.id(), endpointMerges),
-                    route,
+                    points(elkEdge),
                     edge.label()));
             }
         }
-        edges = straightenConnectorEndpointDoglegs(edges, nodes);
-        edges = normalizeExcessiveRoutes(edges, nodes, groups);
+        // Route geometry belongs to ELK Layered. Keep route-quality concerns in
+        // ELK graph construction, ELK options, and validation diagnostics.
 
         return new JsonContracts.LayoutResult(
             "layout-result.schema.v1",
@@ -398,6 +344,14 @@ final class ElkLayoutEngine {
         ElkNode root,
         Direction direction,
         JsonContracts.LayoutPreferences preferences) {
+        configureLayeredRoot(root, direction, preferences, true);
+    }
+
+    private static void configureLayeredRoot(
+        ElkNode root,
+        Direction direction,
+        JsonContracts.LayoutPreferences preferences,
+        boolean preserveModelOrder) {
         double nodeSpacing = switch (density(preferences)) {
             case "readable" -> READABLE_NODE_SPACING;
             case "spacious" -> SPACIOUS_NODE_SPACING;
@@ -430,6 +384,16 @@ final class ElkLayoutEngine {
         root.setProperty(LayeredOptions.SPACING_NODE_NODE_BETWEEN_LAYERS, nodeSpacing);
         root.setProperty(LayeredOptions.SPACING_EDGE_NODE_BETWEEN_LAYERS, edgeNodeSpacing);
         root.setProperty(LayeredOptions.SPACING_EDGE_EDGE_BETWEEN_LAYERS, edgeEdgeSpacing);
+        root.setProperty(LayeredOptions.PORT_SORTING_STRATEGY, PortSortingStrategy.INPUT_ORDER);
+        if (preserveModelOrder) {
+            root.setProperty(LayeredOptions.CONSIDER_MODEL_ORDER_STRATEGY, OrderingStrategy.PREFER_EDGES);
+            root.setProperty(LayeredOptions.CONSIDER_MODEL_ORDER_PORT_MODEL_ORDER, true);
+        }
+        root.setProperty(LayeredOptions.NODE_PLACEMENT_STRATEGY, NodePlacementStrategy.BRANDES_KOEPF);
+        root.setProperty(
+            LayeredOptions.NODE_PLACEMENT_BK_EDGE_STRAIGHTENING,
+            EdgeStraighteningStrategy.IMPROVE_STRAIGHTNESS);
+        root.setProperty(LayeredOptions.UNNECESSARY_BENDPOINTS, true);
         boolean mergeEdges = endpointMergingEnabled(preferences);
         root.setProperty(LayeredOptions.MERGE_EDGES, mergeEdges);
         root.setProperty(LayeredOptions.MERGE_HIERARCHY_EDGES, mergeEdges);
@@ -441,41 +405,6 @@ final class ElkLayoutEngine {
         ElkNode root = ElkGraphUtil.createGraph();
         configureLayeredRoot(root, direction, preferences);
         return root;
-    }
-
-    static ElkNode configuredLibavoidRoot() {
-        return configuredLibavoidRoot(null);
-    }
-
-    static ElkNode configuredLibavoidRoot(JsonContracts.LayoutPreferences preferences) {
-        ElkNode root = ElkGraphUtil.createGraph();
-        configureLibavoidRoot(root, preferences);
-        return root;
-    }
-
-    private static void configureLibavoidRoot(
-        ElkNode root,
-        JsonContracts.LayoutPreferences preferences) {
-        root.setProperty(CoreOptions.ALGORITHM, LIBAVOID_ALGORITHM);
-        root.setProperty(CoreOptions.DIRECTION, preferredDirection(preferences));
-        root.setProperty(CoreOptions.EDGE_ROUTING, EdgeRouting.ORTHOGONAL);
-        root.setProperty(LibavoidOptions.SEGMENT_PENALTY, switch (routingProfile(preferences)) {
-            case "readable" -> READABLE_LIBAVOID_SEGMENT_PENALTY;
-            case "spacious" -> SPACIOUS_LIBAVOID_SEGMENT_PENALTY;
-            default -> LIBAVOID_SEGMENT_PENALTY;
-        });
-        root.setProperty(LibavoidOptions.IDEAL_NUDGING_DISTANCE, switch (routingProfile(preferences)) {
-            case "readable" -> READABLE_LIBAVOID_IDEAL_NUDGING_DISTANCE;
-            case "spacious" -> SPACIOUS_LIBAVOID_IDEAL_NUDGING_DISTANCE;
-            default -> LIBAVOID_IDEAL_NUDGING_DISTANCE;
-        });
-        root.setProperty(LibavoidOptions.SHAPE_BUFFER_DISTANCE, switch (routingProfile(preferences)) {
-            case "readable" -> READABLE_LIBAVOID_SHAPE_BUFFER_DISTANCE;
-            case "spacious" -> SPACIOUS_LIBAVOID_SHAPE_BUFFER_DISTANCE;
-            default -> LIBAVOID_SHAPE_BUFFER_DISTANCE;
-        });
-        root.setProperty(LibavoidOptions.NUDGE_ORTHOGONAL_SEGMENTS_CONNECTED_TO_SHAPES, true);
-        root.setProperty(LibavoidOptions.PENALISE_ORTHOGONAL_SHARED_PATHS_AT_CONN_ENDS, false);
     }
 
     private static String density(JsonContracts.LayoutPreferences preferences) {
@@ -507,15 +436,6 @@ final class ElkLayoutEngine {
             || "multi-edge".equals(preferences.wrapping());
     }
 
-    private static String routingProfile(JsonContracts.LayoutPreferences preferences) {
-        if (preferences == null
-            || preferences.routing() == null
-            || preferences.routing().profile() == null) {
-            return "compact";
-        }
-        return preferences.routing().profile();
-    }
-
     private static String endpointMerging(JsonContracts.LayoutPreferences preferences) {
         if (preferences == null
             || preferences.routing() == null
@@ -541,111 +461,6 @@ final class ElkLayoutEngine {
         };
     }
 
-    static Map<String, List<JsonContracts.Point>> routeWithLibavoid(
-        List<JsonContracts.LayoutEdge> edges,
-        List<JsonContracts.LaidOutNode> nodes) {
-        return routeWithLibavoid(
-            edges,
-            nodes,
-            flatEdgeDirections(edges, Direction.RIGHT),
-            Map.of(),
-            emptyEndpointMerges(edges),
-            Map.of(),
-            null);
-    }
-
-    private static Map<String, List<JsonContracts.Point>> routeWithLibavoid(
-        List<JsonContracts.LayoutEdge> edges,
-        List<JsonContracts.LaidOutNode> nodes,
-        Map<String, Direction> edgeDirections,
-        Map<String, PortSide> sourcePortSides,
-        Map<String, EdgeEndpointMerge> endpointMerges,
-        Map<String, EdgePortIndexes> edgePortIndexes,
-        JsonContracts.LayoutPreferences preferences) {
-        ElkNode root = configuredLibavoidRoot(preferences);
-
-        Map<String, ElkNode> elkNodes = new HashMap<>();
-        for (JsonContracts.LaidOutNode node : nodes) {
-            ElkNode elkNode = ElkGraphUtil.createNode(root);
-            elkNode.setIdentifier(node.id());
-            elkNode.setDimensions(node.width(), node.height());
-            elkNode.setLocation(node.x(), node.y());
-            ElkGraphUtil.createLabel(elkNode).setText(node.label());
-            elkNodes.put(node.id(), elkNode);
-        }
-
-        Map<String, ElkEdge> elkEdges = new HashMap<>();
-        Map<String, EnumMap<PortSide, Integer>> portIndexes = new HashMap<>();
-        for (JsonContracts.LayoutEdge edge : edges) {
-            ElkNode source = elkNodes.get(edge.source());
-            ElkNode target = elkNodes.get(edge.target());
-            if (source == null || target == null) {
-                continue;
-            }
-            Direction direction = edgeDirections.getOrDefault(edge.id(), Direction.RIGHT);
-            PortSide sourceSide = sourcePortSides.getOrDefault(
-                edge.id(),
-                sourcePortSide(direction));
-            PortSide targetSide = targetPortSide(direction);
-            EdgeEndpointMerge endpointMerge =
-                endpointMerges.getOrDefault(edge.id(), NO_ENDPOINT_MERGE);
-            EdgePortIndexes portIndexesForEdge = edgePortIndexes.get(edge.id());
-            ElkEdge elkEdge = createRoutedEdge(
-                source,
-                target,
-                edge,
-                sourceSide,
-                targetSide,
-                endpointMerge.sourceEndpoint()
-                    ? 0
-                    : portIndexesForEdge == null
-                        ? nextPortIndex(portIndexes, edge.source(), sourceSide)
-                        : portIndexesForEdge.sourceIndex(),
-                endpointMerge.targetEndpoint()
-                    ? 0
-                    : portIndexesForEdge == null
-                        ? nextPortIndex(portIndexes, edge.target(), targetSide)
-                        : portIndexesForEdge.targetIndex(),
-                endpointMerge.sourceEndpoint(),
-                endpointMerge.targetEndpoint());
-            elkEdges.put(edge.id(), elkEdge);
-        }
-
-        new RecursiveGraphLayoutEngine().layout(root, new BasicProgressMonitor());
-
-        Map<String, List<JsonContracts.Point>> routes = new HashMap<>();
-        for (Map.Entry<String, ElkEdge> entry : elkEdges.entrySet()) {
-            routes.put(entry.getKey(), points(entry.getValue()));
-        }
-        return routes;
-    }
-
-    private static Map<String, Direction> flatEdgeDirections(
-        List<JsonContracts.LayoutEdge> edges,
-        Direction direction) {
-        Map<String, Direction> directions = new HashMap<>();
-        for (JsonContracts.LayoutEdge edge : edges) {
-            directions.put(edge.id(), direction);
-        }
-        return directions;
-    }
-
-    private static Map<String, Direction> groupedEdgeDirections(
-        List<JsonContracts.LayoutEdge> edges,
-        Map<String, JsonContracts.LayoutNode> nodes,
-        Map<String, String> ownerByNode,
-        Map<String, Direction> groupDirectionById,
-        Map<String, Integer> groupOrderById,
-        Direction rootDirection) {
-        Map<String, Direction> directions = new HashMap<>();
-        for (JsonContracts.LayoutEdge edge : edges) {
-            directions.put(
-                edge.id(),
-                edgeDirection(edge, nodes, ownerByNode, groupDirectionById, groupOrderById, rootDirection));
-        }
-        return directions;
-    }
-
     private static Map<String, EdgeEndpointMerge> emptyEndpointMerges(
         List<JsonContracts.LayoutEdge> edges) {
         Map<String, EdgeEndpointMerge> endpointMerges = new HashMap<>();
@@ -653,14 +468,6 @@ final class ElkLayoutEngine {
             endpointMerges.put(edge.id(), NO_ENDPOINT_MERGE);
         }
         return endpointMerges;
-    }
-
-    private static List<JsonContracts.Point> routeOrFallback(
-        List<JsonContracts.Point> libavoidRoute,
-        List<JsonContracts.Point> layeredRoute) {
-        return libavoidRoute == null || libavoidRoute.isEmpty()
-            ? layeredRoute
-            : libavoidRoute;
     }
 
     private static Direction internalDirection(
@@ -682,7 +489,8 @@ final class ElkLayoutEngine {
         String sourceOwner = ownerByNode.get(edge.source());
         String targetOwner = ownerByNode.get(edge.target());
         if (sourceOwner != null && sourceOwner.equals(targetOwner)) {
-            if (isConnectorSizedSource(nodes.get(edge.source()))) {
+            if (isConnectorSizedRequestNode(nodes.get(edge.source()))
+                || isConnectorSizedRequestNode(nodes.get(edge.target()))) {
                 return Direction.RIGHT;
             }
             return groupDirectionById.getOrDefault(sourceOwner, Direction.RIGHT);
@@ -706,7 +514,7 @@ final class ElkLayoutEngine {
         };
     }
 
-    private static boolean isConnectorSizedSource(JsonContracts.LayoutNode node) {
+    private static boolean isConnectorSizedRequestNode(JsonContracts.LayoutNode node) {
         if (node == null) {
             return false;
         }
@@ -767,7 +575,7 @@ final class ElkLayoutEngine {
         node.setProperty(CoreOptions.PORT_CONSTRAINTS, PortConstraints.FIXED_ORDER);
         ElkPort port = ElkGraphUtil.createPort(node);
         port.setIdentifier(id);
-        port.setDimensions(0.0, 0.0);
+        port.setDimensions(1.0, 1.0);
         port.setProperty(CoreOptions.PORT_SIDE, side);
         port.setProperty(CoreOptions.PORT_INDEX, index);
         return port;
@@ -813,6 +621,10 @@ final class ElkLayoutEngine {
         return maxIndex + 1;
     }
 
+    // Endpoint merging is Dediren graph shaping, not route geometry. ELK's
+    // MERGE_EDGES and MERGE_HIERARCHY_EDGES are broad booleans; Dediren keeps
+    // relationship-type scoped shared ports so intentional fan-in/fan-out
+    // junctions remain readable without globally merging unrelated edges.
     private static Map<String, EdgeEndpointMerge> flatEdgeEndpointMerges(
         List<JsonContracts.LayoutEdge> edges,
         Map<String, JsonContracts.LayoutNode> nodes,
@@ -878,11 +690,18 @@ final class ElkLayoutEngine {
             if (!nodes.containsKey(edge.source())
                 || !nodes.containsKey(edge.target())
                 || edge.source().equals(edge.target())
+                || sameOwnerInternalEdge(edge, ownerByNode)
                 || relationshipType == null) {
                 continue;
             }
             Direction direction =
-                edgeDirection(edge, nodes, ownerByNode, groupDirectionById, groupOrderById, rootDirection);
+                edgeDirection(
+                    edge,
+                    nodes,
+                    ownerByNode,
+                    groupDirectionById,
+                    groupOrderById,
+                    rootDirection);
             endpointCounts.merge(
                 new EdgeEndpointKey(edge.source(), sourcePortSide(direction), true, relationshipType),
                 1,
@@ -899,19 +718,34 @@ final class ElkLayoutEngine {
             if (!nodes.containsKey(edge.source()) || !nodes.containsKey(edge.target())) {
                 continue;
             }
+            boolean mergeableEndpoint =
+                relationshipType != null && !sameOwnerInternalEdge(edge, ownerByNode);
             Direction direction =
-                edgeDirection(edge, nodes, ownerByNode, groupDirectionById, groupOrderById, rootDirection);
+                edgeDirection(
+                    edge,
+                    nodes,
+                    ownerByNode,
+                    groupDirectionById,
+                    groupOrderById,
+                    rootDirection);
             endpointMerges.put(edge.id(), new EdgeEndpointMerge(
-                relationshipType != null
+                mergeableEndpoint
                     && endpointCounts.getOrDefault(
                         new EdgeEndpointKey(edge.source(), sourcePortSide(direction), true, relationshipType),
                         0) >= MERGEABLE_ENDPOINT_EDGE_COUNT,
-                relationshipType != null
+                mergeableEndpoint
                     && endpointCounts.getOrDefault(
                         new EdgeEndpointKey(edge.target(), targetPortSide(direction), false, relationshipType),
                         0) >= MERGEABLE_ENDPOINT_EDGE_COUNT));
         }
         return endpointMerges;
+    }
+
+    private static boolean sameOwnerInternalEdge(
+        JsonContracts.LayoutEdge edge,
+        Map<String, String> ownerByNode) {
+        String sourceOwner = ownerByNode.get(edge.source());
+        return sourceOwner != null && sourceOwner.equals(ownerByNode.get(edge.target()));
     }
 
     private static List<String> routingHints(
@@ -977,7 +811,13 @@ final class ElkLayoutEngine {
                 continue;
             }
             Direction direction =
-                edgeDirection(edge, nodes, ownerByNode, groupDirectionById, groupOrderById, rootDirection);
+                edgeDirection(
+                    edge,
+                    nodes,
+                    ownerByNode,
+                    groupDirectionById,
+                    groupOrderById,
+                    rootDirection);
             EdgeEndpointMerge endpointMerge =
                 endpointMerges.getOrDefault(edge.id(), NO_ENDPOINT_MERGE);
             countPort(
@@ -1002,355 +842,48 @@ final class ElkLayoutEngine {
 
     private static Map<String, EdgePortIndexes> groupedEdgePortIndexes(
         JsonContracts.LayoutRequest request,
-        List<JsonContracts.LayoutEdge> edges,
         Map<String, JsonContracts.LayoutNode> nodes,
         Map<String, String> ownerByNode,
         Map<String, Direction> groupDirectionById,
         Map<String, Integer> groupOrderById,
-        Direction rootDirection,
-        Map<String, EdgeEndpointMerge> endpointMerges) {
-        Map<String, Integer> nodeOrderById = groupedNodeOrderById(request, groupOrderById);
-        Map<PortGroupKey, List<PortCandidate>> candidatesByPortGroup = new HashMap<>();
-        for (int edgeIndex = 0; edgeIndex < edges.size(); edgeIndex++) {
-            JsonContracts.LayoutEdge edge = edges.get(edgeIndex);
+        Direction rootDirection) {
+        Map<NodeSideKey, Integer> nextIndexByNodeSide = new HashMap<>();
+        Map<String, EdgePortIndexes> portIndexesByEdge = new HashMap<>();
+        for (JsonContracts.LayoutEdge edge : list(request.edges())) {
             if (!nodes.containsKey(edge.source()) || !nodes.containsKey(edge.target())) {
                 continue;
             }
             Direction direction =
-                edgeDirection(edge, nodes, ownerByNode, groupDirectionById, groupOrderById, rootDirection);
+                edgeDirection(
+                    edge,
+                    nodes,
+                    ownerByNode,
+                    groupDirectionById,
+                    groupOrderById,
+                    rootDirection);
             PortSide sourceSide = sourcePortSide(direction);
             PortSide targetSide = targetPortSide(direction);
-            EdgeEndpointMerge endpointMerge =
-                endpointMerges.getOrDefault(edge.id(), NO_ENDPOINT_MERGE);
-            if (!endpointMerge.sourceEndpoint()) {
-                candidatesByPortGroup
-                    .computeIfAbsent(new PortGroupKey(edge.source(), sourceSide), ignored -> new ArrayList<>())
-                    .add(new PortCandidate(
-                        edge.id(),
-                        true,
-                        nodeOrderById.getOrDefault(edge.target(), Integer.MAX_VALUE),
-                        edgeIndex));
-            }
-            if (!endpointMerge.targetEndpoint()) {
-                candidatesByPortGroup
-                    .computeIfAbsent(new PortGroupKey(edge.target(), targetSide), ignored -> new ArrayList<>())
-                    .add(new PortCandidate(
-                        edge.id(),
-                        false,
-                        nodeOrderById.getOrDefault(edge.source(), Integer.MAX_VALUE),
-                        edgeIndex));
-            }
-        }
-
-        Map<String, Integer> sourcePortIndexByEdge = new HashMap<>();
-        Map<String, Integer> targetPortIndexByEdge = new HashMap<>();
-        for (List<PortCandidate> candidates : candidatesByPortGroup.values()) {
-            candidates.sort((left, right) -> {
-                // Source-side order follows the diverging route channel order; target-side order
-                // still follows the remote endpoint order to keep arrivals stable.
-                int remoteOrder = left.sourceEndpoint() && right.sourceEndpoint()
-                    ? Integer.compare(right.remoteNodeOrder(), left.remoteNodeOrder())
-                    : Integer.compare(left.remoteNodeOrder(), right.remoteNodeOrder());
-                if (remoteOrder != 0) {
-                    return remoteOrder;
-                }
-                int requestOrder = Integer.compare(left.requestEdgeIndex(), right.requestEdgeIndex());
-                if (requestOrder != 0) {
-                    return requestOrder;
-                }
-                return left.edgeId().compareTo(right.edgeId());
-            });
-            for (int portIndex = 0; portIndex < candidates.size(); portIndex++) {
-                PortCandidate candidate = candidates.get(portIndex);
-                if (candidate.sourceEndpoint()) {
-                    sourcePortIndexByEdge.put(candidate.edgeId(), portIndex);
-                } else {
-                    targetPortIndexByEdge.put(candidate.edgeId(), portIndex);
-                }
-            }
-        }
-
-        Map<String, EdgePortIndexes> portIndexesByEdge = new HashMap<>();
-        for (JsonContracts.LayoutEdge edge : edges) {
-            if (!nodes.containsKey(edge.source()) || !nodes.containsKey(edge.target())) {
-                continue;
-            }
-            portIndexesByEdge.put(edge.id(), new EdgePortIndexes(
-                sourcePortIndexByEdge.getOrDefault(edge.id(), 0),
-                targetPortIndexByEdge.getOrDefault(edge.id(), 0)));
+            int sourceIndex = nextGroupedPortIndex(nextIndexByNodeSide, edge.source(), sourceSide);
+            int targetIndex = nextGroupedPortIndex(nextIndexByNodeSide, edge.target(), targetSide);
+            portIndexesByEdge.put(edge.id(), new EdgePortIndexes(sourceIndex, targetIndex));
         }
         return portIndexesByEdge;
     }
 
-    private static Map<String, PortSide> geometryAwareSourcePortSides(
-        List<JsonContracts.LayoutEdge> edges,
-        List<JsonContracts.LaidOutNode> laidOutNodes,
-        Map<String, Direction> edgeDirections,
-        Map<String, EdgeEndpointMerge> endpointMerges) {
-        Map<String, JsonContracts.LaidOutNode> nodes = laidOutNodesById(laidOutNodes);
-        Map<String, Set<PortSide>> incomingTargetSides = incomingTargetPortSidesByNode(
-            edges,
-            nodes,
-            edgeDirections);
-        Map<String, PortSide> sourcePortSides = new HashMap<>();
-        for (JsonContracts.LayoutEdge edge : edges) {
-            Direction direction = edgeDirections.getOrDefault(edge.id(), Direction.RIGHT);
-            PortSide defaultSide = sourcePortSide(direction);
-            PortSide sourceSide = defaultSide;
-            EdgeEndpointMerge endpointMerge =
-                endpointMerges.getOrDefault(edge.id(), NO_ENDPOINT_MERGE);
-            JsonContracts.LaidOutNode source = nodes.get(edge.source());
-            JsonContracts.LaidOutNode target = nodes.get(edge.target());
-            if (source != null
-                && target != null
-                && !endpointMerge.sourceEndpoint()) {
-                sourceSide = geometryAwareSourcePortSide(
-                    source,
-                    target,
-                    defaultSide,
-                    incomingTargetSides.getOrDefault(edge.source(), Set.of()),
-                    isConnectorSizedNode(source));
-            }
-            sourcePortSides.put(edge.id(), sourceSide);
-        }
-        return sourcePortSides;
-    }
-
-    private static Map<String, Set<PortSide>> incomingTargetPortSidesByNode(
-        List<JsonContracts.LayoutEdge> edges,
-        Map<String, JsonContracts.LaidOutNode> nodes,
-        Map<String, Direction> edgeDirections) {
-        Map<String, Set<PortSide>> incomingTargetSides = new HashMap<>();
-        for (JsonContracts.LayoutEdge edge : edges) {
-            if (!nodes.containsKey(edge.source()) || !nodes.containsKey(edge.target())) {
-                continue;
-            }
-            Direction direction = edgeDirections.getOrDefault(edge.id(), Direction.RIGHT);
-            incomingTargetSides
-                .computeIfAbsent(edge.target(), ignored -> new HashSet<>())
-                .add(targetPortSide(direction));
-        }
-        return incomingTargetSides;
-    }
-
-    private static Map<String, EdgePortIndexes> geometryAwareEdgePortIndexes(
-        List<JsonContracts.LayoutEdge> edges,
-        List<JsonContracts.LaidOutNode> laidOutNodes,
-        Map<String, Direction> edgeDirections,
-        Map<String, PortSide> sourcePortSides,
-        Map<String, EdgeEndpointMerge> endpointMerges,
-        Map<String, EdgePortIndexes> fallbackPortIndexes) {
-        Map<String, JsonContracts.LaidOutNode> nodes = laidOutNodesById(laidOutNodes);
-        Map<PortGroupKey, List<GeometryPortCandidate>> candidatesByPortGroup = new HashMap<>();
-        for (int edgeIndex = 0; edgeIndex < edges.size(); edgeIndex++) {
-            JsonContracts.LayoutEdge edge = edges.get(edgeIndex);
-            EdgeEndpointMerge endpointMerge =
-                endpointMerges.getOrDefault(edge.id(), NO_ENDPOINT_MERGE);
-            JsonContracts.LaidOutNode source = nodes.get(edge.source());
-            JsonContracts.LaidOutNode target = nodes.get(edge.target());
-            if (source == null || target == null) {
-                continue;
-            }
-            Direction direction = edgeDirections.getOrDefault(edge.id(), Direction.RIGHT);
-            if (!endpointMerge.sourceEndpoint()) {
-                PortSide sourceSide = sourcePortSides.getOrDefault(
-                    edge.id(),
-                    sourcePortSide(direction));
-                PortOrder order = portOrder(source, target, sourceSide);
-                candidatesByPortGroup
-                    .computeIfAbsent(
-                        new PortGroupKey(edge.source(), sourceSide),
-                        ignored -> new ArrayList<>())
-                    .add(new GeometryPortCandidate(
-                        edge.id(),
-                        true,
-                        order.band(),
-                        order.order(),
-                        order.secondary(),
-                        edgeIndex));
-            }
-            if (!endpointMerge.targetEndpoint()) {
-                PortSide targetSide = targetPortSide(direction);
-                PortOrder order = portOrder(target, source, targetSide);
-                candidatesByPortGroup
-                    .computeIfAbsent(
-                        new PortGroupKey(edge.target(), targetSide),
-                        ignored -> new ArrayList<>())
-                    .add(new GeometryPortCandidate(
-                        edge.id(),
-                        false,
-                        order.band(),
-                        order.order(),
-                        order.secondary(),
-                        edgeIndex));
-            }
-        }
-
-        Map<String, Integer> sourcePortIndexByEdge = new HashMap<>();
-        Map<String, Integer> targetPortIndexByEdge = new HashMap<>();
-        for (List<GeometryPortCandidate> candidates : candidatesByPortGroup.values()) {
-            candidates.sort((left, right) -> {
-                int bandOrder = Integer.compare(left.band(), right.band());
-                if (bandOrder != 0) {
-                    return bandOrder;
-                }
-                int geometryOrder = Double.compare(left.order(), right.order());
-                if (geometryOrder != 0) {
-                    return geometryOrder;
-                }
-                int secondaryOrder = Double.compare(left.secondary(), right.secondary());
-                if (secondaryOrder != 0) {
-                    return secondaryOrder;
-                }
-                int requestOrder = Integer.compare(left.requestEdgeIndex(), right.requestEdgeIndex());
-                if (requestOrder != 0) {
-                    return requestOrder;
-                }
-                return left.edgeId().compareTo(right.edgeId());
-            });
-            for (int portIndex = 0; portIndex < candidates.size(); portIndex++) {
-                GeometryPortCandidate candidate = candidates.get(portIndex);
-                if (candidate.sourceEndpoint()) {
-                    sourcePortIndexByEdge.put(candidate.edgeId(), portIndex);
-                } else {
-                    targetPortIndexByEdge.put(candidate.edgeId(), portIndex);
-                }
-            }
-        }
-
-        Map<String, EdgePortIndexes> portIndexesByEdge = new HashMap<>();
-        for (JsonContracts.LayoutEdge edge : edges) {
-            EdgePortIndexes fallback = fallbackPortIndexes.getOrDefault(
-                edge.id(),
-                new EdgePortIndexes(0, 0));
-            portIndexesByEdge.put(edge.id(), new EdgePortIndexes(
-                sourcePortIndexByEdge.getOrDefault(edge.id(), fallback.sourceIndex()),
-                targetPortIndexByEdge.getOrDefault(edge.id(), fallback.targetIndex())));
-        }
-        return portIndexesByEdge;
-    }
-
-    private record PortOrder(int band, double order, double secondary) {}
-
-    private static PortSide geometryAwareSourcePortSide(
-        JsonContracts.LaidOutNode source,
-        JsonContracts.LaidOutNode target,
-        PortSide defaultSide,
-        Set<PortSide> incomingTargetSides,
-        boolean connectorSized) {
-        double sourceX = centerX(source);
-        double sourceY = centerY(source);
-        double targetX = centerX(target);
-        double targetY = centerY(target);
-        double verticalDelta = targetY - sourceY;
-        double horizontalDelta = targetX - sourceX;
-        if (incomingTargetSides.contains(defaultSide)
-            && verticalDelta < -ROUTE_ENDPOINT_CLEARANCE
-            && !incomingTargetSides.contains(PortSide.NORTH)) {
-            return PortSide.NORTH;
-        }
-        if (!connectorSized) {
-            return defaultSide;
-        }
-        if (Math.abs(verticalDelta) <= GEOMETRY_EPSILON
-            || Math.abs(horizontalDelta) > Math.abs(verticalDelta)) {
-            return defaultSide;
-        }
-
-        PortSide verticalSide = verticalDelta > 0.0 ? PortSide.SOUTH : PortSide.NORTH;
-        if (!incomingTargetSides.contains(verticalSide)) {
-            return verticalSide;
-        }
-        if (targetX < sourceX - GEOMETRY_EPSILON) {
-            return PortSide.WEST;
-        }
-        if (targetX > sourceX + GEOMETRY_EPSILON) {
-            return PortSide.EAST;
-        }
-        return defaultSide;
-    }
-
-    private static PortOrder portOrder(
-        JsonContracts.LaidOutNode node,
-        JsonContracts.LaidOutNode remote,
+    private static int nextGroupedPortIndex(
+        Map<NodeSideKey, Integer> nextIndexByNodeSide,
+        String nodeId,
         PortSide side) {
-        double nodeY = centerY(node);
-        double remoteY = centerY(remote);
-        if (side == PortSide.NORTH) {
-            return new PortOrder(0, centerX(remote), -remoteY);
-        }
-        if (side == PortSide.SOUTH) {
-            return new PortOrder(0, -centerX(remote), remoteY);
-        }
-        if (side == PortSide.WEST) {
-            if (remoteY > nodeY + GEOMETRY_EPSILON) {
-                return new PortOrder(0, -remoteY, centerX(remote));
-            }
-            if (remoteY < nodeY - GEOMETRY_EPSILON) {
-                return new PortOrder(1, -remoteY, centerX(remote));
-            }
-            return new PortOrder(0, -remoteY, centerX(remote));
-        }
-        if (side != PortSide.EAST) {
-            return new PortOrder(0, centerX(remote), remoteY);
-        }
-        if (remoteY < nodeY - GEOMETRY_EPSILON) {
-            return new PortOrder(0, remoteY, centerX(remote));
-        }
-        if (remoteY > nodeY + GEOMETRY_EPSILON) {
-            return new PortOrder(1, -remoteY, centerX(remote));
-        }
-        return new PortOrder(0, remoteY, centerX(remote));
+        int index = nextIndexByNodeSide.merge(new NodeSideKey(nodeId, side), 1, Integer::sum) - 1;
+        // ELK's fixed-order west-side ports render in the opposite vertical
+        // direction, so use descending indices there to preserve request order
+        // as top-to-bottom visual graph intent.
+        return side == PortSide.WEST ? -index : index;
     }
 
-    private static Map<String, JsonContracts.LaidOutNode> laidOutNodesById(
-        List<JsonContracts.LaidOutNode> nodes) {
-        Map<String, JsonContracts.LaidOutNode> byId = new HashMap<>();
-        for (JsonContracts.LaidOutNode node : nodes) {
-            byId.put(node.id(), node);
-        }
-        return byId;
-    }
-
-    private static boolean isConnectorSizedNode(JsonContracts.LaidOutNode node) {
-        return node.width() <= CONNECTOR_SOURCE_MAX_WIDTH
-            && node.height() <= CONNECTOR_SOURCE_MAX_HEIGHT;
-    }
-
-    private static double centerX(JsonContracts.LaidOutNode node) {
-        return node.x() + node.width() / 2.0;
-    }
-
-    private static double centerY(JsonContracts.LaidOutNode node) {
-        return node.y() + node.height() / 2.0;
-    }
-
-    private static Map<String, Integer> groupedNodeOrderById(
-        JsonContracts.LayoutRequest request,
-        Map<String, Integer> groupOrderById) {
-        Map<String, Integer> nodeOrderById = new HashMap<>();
-        int stride = Math.max(list(request.nodes()).size() + 1, 1);
-        List<JsonContracts.LayoutGroup> groups = list(request.groups());
-        for (int groupIndex = 0; groupIndex < groups.size(); groupIndex++) {
-            JsonContracts.LayoutGroup group = groups.get(groupIndex);
-            int groupOrder = groupOrderById.getOrDefault(group.id(), groupIndex);
-            List<String> members = list(group.members());
-            for (int memberIndex = 0; memberIndex < members.size(); memberIndex++) {
-                nodeOrderById.putIfAbsent(
-                    members.get(memberIndex),
-                    groupOrder * stride + memberIndex);
-            }
-        }
-
-        int ungroupedBase = groups.size() * stride;
-        List<JsonContracts.LayoutNode> nodes = list(request.nodes());
-        for (int nodeIndex = 0; nodeIndex < nodes.size(); nodeIndex++) {
-            JsonContracts.LayoutNode node = nodes.get(nodeIndex);
-            nodeOrderById.putIfAbsent(node.id(), ungroupedBase + nodeIndex);
-        }
-        return nodeOrderById;
-    }
-
+    // ELK accounts for the generated ports, but Dediren still increases the
+    // minimum node side length when many fixed-order ports would otherwise be
+    // packed onto the same side. This is size intent, not route geometry.
     private static void setGeneratedDimensions(
         ElkNode elkNode,
         JsonContracts.LayoutNode node,
@@ -1451,6 +984,8 @@ final class ElkLayoutEngine {
 
     private record EdgePortIndexes(int sourceIndex, int targetIndex) {}
 
+    private record NodeSideKey(String nodeId, PortSide side) {}
+
     private record EdgeEndpointMerge(boolean sourceEndpoint, boolean targetEndpoint) {}
 
     private record EdgeEndpointKey(
@@ -1458,22 +993,6 @@ final class ElkLayoutEngine {
         PortSide side,
         boolean sourceEndpoint,
         String relationshipType) {}
-
-    private record PortGroupKey(String nodeId, PortSide side) {}
-
-    private record PortCandidate(
-        String edgeId,
-        boolean sourceEndpoint,
-        int remoteNodeOrder,
-        int requestEdgeIndex) {}
-
-    private record GeometryPortCandidate(
-        String edgeId,
-        boolean sourceEndpoint,
-        int band,
-        double order,
-        double secondary,
-        int requestEdgeIndex) {}
 
     private static Map<String, JsonContracts.LayoutNode> requestNodesById(
         JsonContracts.LayoutRequest request) {
@@ -1580,721 +1099,6 @@ final class ElkLayoutEngine {
                 section.getEndY() + offsetY));
         }
         return points;
-    }
-
-    private static List<JsonContracts.LaidOutEdge> normalizeExcessiveRoutes(
-        List<JsonContracts.LaidOutEdge> edges,
-        List<JsonContracts.LaidOutNode> nodes,
-        List<JsonContracts.LaidOutGroup> groups) {
-        List<JsonContracts.LaidOutEdge> current = edges;
-        for (int pass = 0; pass < 3; pass++) {
-            List<JsonContracts.LaidOutEdge> normalized =
-                normalizeExcessiveRoutesOnce(current, nodes, groups);
-            if (normalized.equals(current)) {
-                return normalized;
-            }
-            current = normalized;
-        }
-        return current;
-    }
-
-    private static List<JsonContracts.LaidOutEdge> straightenConnectorEndpointDoglegs(
-        List<JsonContracts.LaidOutEdge> edges,
-        List<JsonContracts.LaidOutNode> nodes) {
-        List<JsonContracts.LaidOutEdge> straightened = new ArrayList<>();
-        for (JsonContracts.LaidOutEdge edge : edges) {
-            List<JsonContracts.Point> points = straightenConnectorEndpointDogleg(edge, nodes);
-            if (points.equals(edge.points())) {
-                straightened.add(edge);
-            } else {
-                straightened.add(new JsonContracts.LaidOutEdge(
-                    edge.id(),
-                    edge.source(),
-                    edge.target(),
-                    edge.source_id(),
-                    edge.projection_id(),
-                    edge.routing_hints(),
-                    points,
-                    edge.label()));
-            }
-        }
-        return straightened;
-    }
-
-    private static List<JsonContracts.Point> straightenConnectorEndpointDogleg(
-        JsonContracts.LaidOutEdge edge,
-        List<JsonContracts.LaidOutNode> nodes) {
-        JsonContracts.LaidOutNode source = nodeById(nodes, edge.source());
-        JsonContracts.LaidOutNode target = nodeById(nodes, edge.target());
-        if (source == null
-            || target == null
-            || !isConnectorSizedNode(source)
-            || edge.points().size() < 4) {
-            return edge.points();
-        }
-        return snapSmallTerminalDogleg(edge.points(), target);
-    }
-
-    private static List<JsonContracts.Point> snapSmallTerminalDogleg(
-        List<JsonContracts.Point> points,
-        JsonContracts.LaidOutNode target) {
-        int endIndex = points.size() - 1;
-        JsonContracts.Point beforeEntry = points.get(endIndex - 3);
-        JsonContracts.Point doglegStart = points.get(endIndex - 2);
-        JsonContracts.Point doglegEnd = points.get(endIndex - 1);
-        JsonContracts.Point end = points.get(endIndex);
-
-        if (horizontal(beforeEntry, doglegStart)
-            && vertical(doglegStart, doglegEnd)
-            && horizontal(doglegEnd, end)
-            && Math.abs(doglegStart.y() - doglegEnd.y()) <= CONNECTOR_ENDPOINT_DOGLEG_SNAP
-            && pointOnVerticalBoundary(end, target)
-            && withinNodeY(target, doglegStart.y())) {
-            return replaceTerminalPoint(points, new JsonContracts.Point(end.x(), doglegStart.y()));
-        }
-
-        if (vertical(beforeEntry, doglegStart)
-            && horizontal(doglegStart, doglegEnd)
-            && vertical(doglegEnd, end)
-            && Math.abs(doglegStart.x() - doglegEnd.x()) <= CONNECTOR_ENDPOINT_DOGLEG_SNAP
-            && pointOnHorizontalBoundary(end, target)
-            && withinNodeX(target, doglegStart.x())) {
-            return replaceTerminalPoint(points, new JsonContracts.Point(doglegStart.x(), end.y()));
-        }
-
-        return points;
-    }
-
-    private static List<JsonContracts.Point> replaceTerminalPoint(
-        List<JsonContracts.Point> points,
-        JsonContracts.Point end) {
-        List<JsonContracts.Point> adjusted = new ArrayList<>(points.subList(0, points.size() - 2));
-        adjusted.add(end);
-        return compactPoints(adjusted);
-    }
-
-    private static List<JsonContracts.LaidOutEdge> normalizeExcessiveRoutesOnce(
-        List<JsonContracts.LaidOutEdge> edges,
-        List<JsonContracts.LaidOutNode> nodes,
-        List<JsonContracts.LaidOutGroup> groups) {
-        List<JsonContracts.LaidOutEdge> normalized = new ArrayList<>();
-        for (int edgeIndex = 0; edgeIndex < edges.size(); edgeIndex++) {
-            JsonContracts.LaidOutEdge edge = edges.get(edgeIndex);
-            List<JsonContracts.LaidOutEdge> comparisonEdges = new ArrayList<>(normalized);
-            comparisonEdges.addAll(edges.subList(edgeIndex + 1, edges.size()));
-            int originalCloseParallelCount =
-                closeParallelRouteCount(edge, edge.points(), comparisonEdges);
-            boolean originalIntersectsUnrelatedGroup =
-                routeIntersectsUnrelatedGroup(edge, edge.points(), groups);
-            if (!hasExcessiveDetour(edge.points())
-                && cornerCount(edge.points()) <= 2
-                && originalCloseParallelCount == 0
-                && !originalIntersectsUnrelatedGroup) {
-                normalized.add(edge);
-                continue;
-            }
-            List<JsonContracts.Point> replacement =
-                shortestCleanOrthogonalRoute(edge, nodes, groups, comparisonEdges);
-            if (replacement.isEmpty()) {
-                normalized.add(edge);
-            } else {
-                int replacementCloseParallelCount =
-                    closeParallelRouteCount(edge, replacement, comparisonEdges);
-                int originalCornerCount = cornerCount(edge.points());
-                int replacementCornerCount = cornerCount(replacement);
-                boolean replacementDoesNotAddParallelRoutes =
-                    replacementCloseParallelCount <= originalCloseParallelCount;
-                boolean replacementImprovesReadability =
-                    replacementCloseParallelCount < originalCloseParallelCount
-                        || replacementCornerCount < originalCornerCount;
-                boolean replacementIsShorter =
-                    routeLength(replacement) < routeLength(edge.points());
-                if (originalIntersectsUnrelatedGroup && replacementDoesNotAddParallelRoutes) {
-                    normalized.add(new JsonContracts.LaidOutEdge(
-                        edge.id(),
-                        edge.source(),
-                        edge.target(),
-                        edge.source_id(),
-                        edge.projection_id(),
-                        edge.routing_hints(),
-                        replacement,
-                        edge.label()));
-                    continue;
-                }
-                if (!replacementDoesNotAddParallelRoutes
-                    || (!replacementImprovesReadability && !replacementIsShorter)) {
-                    normalized.add(edge);
-                    continue;
-                }
-                normalized.add(new JsonContracts.LaidOutEdge(
-                    edge.id(),
-                    edge.source(),
-                    edge.target(),
-                    edge.source_id(),
-                    edge.projection_id(),
-                    edge.routing_hints(),
-                    replacement,
-                    edge.label()));
-            }
-        }
-        return normalized;
-    }
-
-    private static boolean hasExcessiveDetour(List<JsonContracts.Point> points) {
-        if (points.size() < 2) {
-            return false;
-        }
-        double directLength = directLength(points);
-        double routeLength = routeLength(points);
-        return directLength > 0.0
-            && routeLength > directLength * ROUTE_DETOUR_RATIO
-            && routeLength - directLength > ROUTE_DETOUR_EXCESS;
-    }
-
-    private static List<JsonContracts.Point> shortestCleanOrthogonalRoute(
-        JsonContracts.LaidOutEdge edge,
-        List<JsonContracts.LaidOutNode> nodes,
-        List<JsonContracts.LaidOutGroup> groups,
-        List<JsonContracts.LaidOutEdge> existingEdges) {
-        JsonContracts.Point start = edge.points().get(0);
-        JsonContracts.Point end = edge.points().get(edge.points().size() - 1);
-        JsonContracts.Point clearStart = clearancePoint(start, nodeById(nodes, edge.source()));
-        JsonContracts.Point clearEnd = clearancePoint(end, nodeById(nodes, edge.target()));
-        List<List<JsonContracts.Point>> candidates = new ArrayList<>();
-        candidates.add(routeViaX(start, clearStart, clearEnd, end, (start.x() + end.x()) / 2.0));
-        candidates.add(routeViaY(start, clearStart, clearEnd, end, (start.y() + end.y()) / 2.0));
-        candidates.add(routeViaX(start, clearStart, clearEnd, end, clearStart.x()));
-        candidates.add(routeViaX(start, clearStart, clearEnd, end, clearEnd.x()));
-        candidates.add(routeViaY(start, clearStart, clearEnd, end, clearStart.y()));
-        candidates.add(routeViaY(start, clearStart, clearEnd, end, clearEnd.y()));
-        addOriginalRouteLaneCandidates(
-            candidates,
-            edge.points(),
-            start,
-            clearStart,
-            clearEnd,
-            end);
-        addExistingRouteLaneCandidates(
-            candidates,
-            existingEdges,
-            start,
-            clearStart,
-            clearEnd,
-            end);
-        double minNodeX = minObstacleX(nodes, groups);
-        double maxNodeX = maxObstacleX(nodes, groups);
-        double minNodeY = minObstacleY(nodes, groups);
-        double maxNodeY = maxObstacleY(nodes, groups);
-        for (int lane = 0; lane < ROUTE_FALLBACK_LANE_COUNT; lane++) {
-            double offset = ROUTE_CHANNEL_PADDING + (lane * ROUTE_FALLBACK_LANE_SPACING);
-            candidates.add(routeViaX(start, clearStart, clearEnd, end, minNodeX - offset));
-            candidates.add(routeViaX(start, clearStart, clearEnd, end, maxNodeX + offset));
-            candidates.add(routeViaY(start, clearStart, clearEnd, end, minNodeY - offset));
-            candidates.add(routeViaY(start, clearStart, clearEnd, end, maxNodeY + offset));
-        }
-
-        List<JsonContracts.Point> best = List.of();
-        int bestCloseParallelCount = Integer.MAX_VALUE;
-        int bestCornerCount = Integer.MAX_VALUE;
-        double bestLength = Double.POSITIVE_INFINITY;
-        for (List<JsonContracts.Point> candidate : candidates) {
-            if (routeIntersectsUnrelatedNode(edge, candidate, nodes)
-                || routeIntersectsUnrelatedGroup(edge, candidate, groups)) {
-                continue;
-            }
-            int closeParallelCount = closeParallelRouteCount(edge, candidate, existingEdges);
-            int candidateCornerCount = cornerCount(candidate);
-            double candidateLength = routeLength(candidate);
-            if (closeParallelCount < bestCloseParallelCount
-                || (closeParallelCount == bestCloseParallelCount
-                    && candidateCornerCount < bestCornerCount)
-                || (closeParallelCount == bestCloseParallelCount
-                    && candidateCornerCount == bestCornerCount
-                    && candidateLength < bestLength)) {
-                best = candidate;
-                bestCloseParallelCount = closeParallelCount;
-                bestCornerCount = candidateCornerCount;
-                bestLength = candidateLength;
-            }
-        }
-        return best;
-    }
-
-    private static void addOriginalRouteLaneCandidates(
-        List<List<JsonContracts.Point>> candidates,
-        List<JsonContracts.Point> originalPoints,
-        JsonContracts.Point start,
-        JsonContracts.Point clearStart,
-        JsonContracts.Point clearEnd,
-        JsonContracts.Point end) {
-        for (int index = 0; index < originalPoints.size() - 1; index++) {
-            JsonContracts.Point segmentStart = originalPoints.get(index);
-            JsonContracts.Point segmentEnd = originalPoints.get(index + 1);
-            if (vertical(segmentStart, segmentEnd)) {
-                candidates.add(routeViaX(start, clearStart, clearEnd, end, segmentStart.x()));
-            } else if (horizontal(segmentStart, segmentEnd)) {
-                candidates.add(routeViaY(start, clearStart, clearEnd, end, segmentStart.y()));
-            }
-        }
-    }
-
-    private static void addExistingRouteLaneCandidates(
-        List<List<JsonContracts.Point>> candidates,
-        List<JsonContracts.LaidOutEdge> existingEdges,
-        JsonContracts.Point start,
-        JsonContracts.Point clearStart,
-        JsonContracts.Point clearEnd,
-        JsonContracts.Point end) {
-        for (JsonContracts.LaidOutEdge existingEdge : existingEdges) {
-            for (int index = 0; index < existingEdge.points().size() - 1; index++) {
-                JsonContracts.Point segmentStart = existingEdge.points().get(index);
-                JsonContracts.Point segmentEnd = existingEdge.points().get(index + 1);
-                if (vertical(segmentStart, segmentEnd)) {
-                    candidates.add(routeViaX(
-                        start,
-                        clearStart,
-                        clearEnd,
-                        end,
-                        segmentStart.x() - ROUTE_FALLBACK_LANE_SPACING));
-                    candidates.add(routeViaX(
-                        start,
-                        clearStart,
-                        clearEnd,
-                        end,
-                        segmentStart.x() + ROUTE_FALLBACK_LANE_SPACING));
-                } else if (horizontal(segmentStart, segmentEnd)) {
-                    candidates.add(routeViaY(
-                        start,
-                        clearStart,
-                        clearEnd,
-                        end,
-                        segmentStart.y() - ROUTE_FALLBACK_LANE_SPACING));
-                    candidates.add(routeViaY(
-                        start,
-                        clearStart,
-                        clearEnd,
-                        end,
-                        segmentStart.y() + ROUTE_FALLBACK_LANE_SPACING));
-                }
-            }
-        }
-    }
-
-    private static JsonContracts.Point clearancePoint(
-        JsonContracts.Point point,
-        JsonContracts.LaidOutNode node) {
-        if (node == null) {
-            return point;
-        }
-        double right = node.x() + node.width();
-        double bottom = node.y() + node.height();
-        if (sameCoordinate(point.x(), node.x())) {
-            return new JsonContracts.Point(node.x() - ROUTE_ENDPOINT_CLEARANCE, point.y());
-        }
-        if (sameCoordinate(point.x(), right)) {
-            return new JsonContracts.Point(right + ROUTE_ENDPOINT_CLEARANCE, point.y());
-        }
-        if (sameCoordinate(point.y(), node.y())) {
-            return new JsonContracts.Point(point.x(), node.y() - ROUTE_ENDPOINT_CLEARANCE);
-        }
-        if (sameCoordinate(point.y(), bottom)) {
-            return new JsonContracts.Point(point.x(), bottom + ROUTE_ENDPOINT_CLEARANCE);
-        }
-        return point;
-    }
-
-    private static List<JsonContracts.Point> routeViaX(
-        JsonContracts.Point start,
-        JsonContracts.Point clearStart,
-        JsonContracts.Point clearEnd,
-        JsonContracts.Point end,
-        double viaX) {
-        return compactPoints(List.of(
-            start,
-            clearStart,
-            new JsonContracts.Point(viaX, clearStart.y()),
-            new JsonContracts.Point(viaX, clearEnd.y()),
-            clearEnd,
-            end));
-    }
-
-    private static List<JsonContracts.Point> routeViaY(
-        JsonContracts.Point start,
-        JsonContracts.Point clearStart,
-        JsonContracts.Point clearEnd,
-        JsonContracts.Point end,
-        double viaY) {
-        return compactPoints(List.of(
-            start,
-            clearStart,
-            new JsonContracts.Point(clearStart.x(), viaY),
-            new JsonContracts.Point(clearEnd.x(), viaY),
-            clearEnd,
-            end));
-    }
-
-    private static List<JsonContracts.Point> compactPoints(List<JsonContracts.Point> points) {
-        List<JsonContracts.Point> compacted = new ArrayList<>();
-        for (JsonContracts.Point point : points) {
-            if (!compacted.isEmpty() && samePoint(compacted.get(compacted.size() - 1), point)) {
-                continue;
-            }
-            if (compacted.size() >= 2
-                && collinear(
-                    compacted.get(compacted.size() - 2),
-                    compacted.get(compacted.size() - 1),
-                    point)) {
-                compacted.set(compacted.size() - 1, point);
-            } else {
-                compacted.add(point);
-            }
-        }
-        return compacted;
-    }
-
-    private static boolean collinear(
-        JsonContracts.Point first,
-        JsonContracts.Point second,
-        JsonContracts.Point third) {
-        return sameCoordinate(first.x(), second.x())
-            && sameCoordinate(second.x(), third.x())
-            || sameCoordinate(first.y(), second.y())
-                && sameCoordinate(second.y(), third.y());
-    }
-
-    private static boolean samePoint(JsonContracts.Point left, JsonContracts.Point right) {
-        return sameCoordinate(left.x(), right.x())
-            && sameCoordinate(left.y(), right.y());
-    }
-
-    private static boolean sameCoordinate(double left, double right) {
-        return Math.abs(left - right) <= GEOMETRY_EPSILON;
-    }
-
-    private static boolean routeIntersectsUnrelatedNode(
-        JsonContracts.LaidOutEdge edge,
-        List<JsonContracts.Point> points,
-        List<JsonContracts.LaidOutNode> nodes) {
-        for (int index = 0; index < points.size() - 1; index++) {
-            JsonContracts.Point start = points.get(index);
-            JsonContracts.Point end = points.get(index + 1);
-            for (JsonContracts.LaidOutNode node : nodes) {
-                if (!node.id().equals(edge.source())
-                    && !node.id().equals(edge.target())
-                    && segmentIntersectsRect(start, end, node)) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    private static boolean routeIntersectsUnrelatedGroup(
-        JsonContracts.LaidOutEdge edge,
-        List<JsonContracts.Point> points,
-        List<JsonContracts.LaidOutGroup> groups) {
-        for (int index = 0; index < points.size() - 1; index++) {
-            JsonContracts.Point start = points.get(index);
-            JsonContracts.Point end = points.get(index + 1);
-            for (JsonContracts.LaidOutGroup group : groups) {
-                if (groupContainsEndpoint(edge, group)) {
-                    continue;
-                }
-                if (segmentIntersectsRect(start, end, group)) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    private static boolean groupContainsEndpoint(
-        JsonContracts.LaidOutEdge edge,
-        JsonContracts.LaidOutGroup group) {
-        return group.members().contains(edge.source())
-            || group.members().contains(edge.target());
-    }
-
-    private static boolean segmentIntersectsRect(
-        JsonContracts.Point start,
-        JsonContracts.Point end,
-        JsonContracts.LaidOutNode node) {
-        double minX = Math.min(start.x(), end.x());
-        double maxX = Math.max(start.x(), end.x());
-        double minY = Math.min(start.y(), end.y());
-        double maxY = Math.max(start.y(), end.y());
-        return rectanglesOverlap(
-            minX,
-            minY,
-            Math.max(maxX - minX, 1.0),
-            Math.max(maxY - minY, 1.0),
-            node.x(),
-            node.y(),
-            node.width(),
-            node.height());
-    }
-
-    private static boolean pointOnVerticalBoundary(
-        JsonContracts.Point point,
-        JsonContracts.LaidOutNode node) {
-        double right = node.x() + node.width();
-        return sameCoordinate(point.x(), node.x())
-            || sameCoordinate(point.x(), right);
-    }
-
-    private static boolean pointOnHorizontalBoundary(
-        JsonContracts.Point point,
-        JsonContracts.LaidOutNode node) {
-        double bottom = node.y() + node.height();
-        return sameCoordinate(point.y(), node.y())
-            || sameCoordinate(point.y(), bottom);
-    }
-
-    private static boolean withinNodeX(JsonContracts.LaidOutNode node, double x) {
-        return x >= node.x() - GEOMETRY_EPSILON
-            && x <= node.x() + node.width() + GEOMETRY_EPSILON;
-    }
-
-    private static boolean withinNodeY(JsonContracts.LaidOutNode node, double y) {
-        return y >= node.y() - GEOMETRY_EPSILON
-            && y <= node.y() + node.height() + GEOMETRY_EPSILON;
-    }
-
-    private static boolean segmentIntersectsRect(
-        JsonContracts.Point start,
-        JsonContracts.Point end,
-        JsonContracts.LaidOutGroup group) {
-        double minX = Math.min(start.x(), end.x());
-        double maxX = Math.max(start.x(), end.x());
-        double minY = Math.min(start.y(), end.y());
-        double maxY = Math.max(start.y(), end.y());
-        return rectanglesOverlap(
-            minX,
-            minY,
-            Math.max(maxX - minX, 1.0),
-            Math.max(maxY - minY, 1.0),
-            group.x(),
-            group.y(),
-            group.width(),
-            group.height());
-    }
-
-    private static boolean rectanglesOverlap(
-        double leftX,
-        double leftY,
-        double leftWidth,
-        double leftHeight,
-        double rightX,
-        double rightY,
-        double rightWidth,
-        double rightHeight) {
-        return leftX < rightX + rightWidth
-            && leftX + leftWidth > rightX
-            && leftY < rightY + rightHeight
-            && leftY + leftHeight > rightY;
-    }
-
-    private static double routeLength(List<JsonContracts.Point> points) {
-        double length = 0.0;
-        for (int index = 0; index < points.size() - 1; index++) {
-            JsonContracts.Point start = points.get(index);
-            JsonContracts.Point end = points.get(index + 1);
-            length += Math.abs(start.x() - end.x()) + Math.abs(start.y() - end.y());
-        }
-        return length;
-    }
-
-    private static int cornerCount(List<JsonContracts.Point> points) {
-        int corners = 0;
-        RouteOrientation previous = null;
-        for (int index = 0; index < points.size() - 1; index++) {
-            RouteOrientation current = routeOrientation(points.get(index), points.get(index + 1));
-            if (current == null) {
-                continue;
-            }
-            if (previous != null && previous != current) {
-                corners++;
-            }
-            previous = current;
-        }
-        return corners;
-    }
-
-    private enum RouteOrientation {
-        HORIZONTAL,
-        VERTICAL
-    }
-
-    private static RouteOrientation routeOrientation(
-        JsonContracts.Point start,
-        JsonContracts.Point end) {
-        if (horizontal(start, end)) {
-            return RouteOrientation.HORIZONTAL;
-        }
-        if (vertical(start, end)) {
-            return RouteOrientation.VERTICAL;
-        }
-        return null;
-    }
-
-    private static double directLength(List<JsonContracts.Point> points) {
-        JsonContracts.Point start = points.get(0);
-        JsonContracts.Point end = points.get(points.size() - 1);
-        return Math.abs(start.x() - end.x()) + Math.abs(start.y() - end.y());
-    }
-
-    private static int closeParallelRouteCount(
-        JsonContracts.LaidOutEdge candidateEdge,
-        List<JsonContracts.Point> candidate,
-        List<JsonContracts.LaidOutEdge> existingEdges) {
-        int count = 0;
-        for (int candidateIndex = 0; candidateIndex < candidate.size() - 1; candidateIndex++) {
-            JsonContracts.Point candidateStart = candidate.get(candidateIndex);
-            JsonContracts.Point candidateEnd = candidate.get(candidateIndex + 1);
-            for (JsonContracts.LaidOutEdge edge : existingEdges) {
-                if (shareEndpoint(candidateEdge, edge)) {
-                    continue;
-                }
-                for (int edgeIndex = 0; edgeIndex < edge.points().size() - 1; edgeIndex++) {
-                    if (closeParallelSegments(
-                        candidateStart,
-                        candidateEnd,
-                        edge.points().get(edgeIndex),
-                        edge.points().get(edgeIndex + 1))) {
-                        count++;
-                    }
-                }
-            }
-        }
-        return count;
-    }
-
-    private static boolean shareEndpoint(
-        JsonContracts.LaidOutEdge left,
-        JsonContracts.LaidOutEdge right) {
-        return left.source().equals(right.source())
-            || left.source().equals(right.target())
-            || left.target().equals(right.source())
-            || left.target().equals(right.target());
-    }
-
-    private static boolean closeParallelSegments(
-        JsonContracts.Point leftStart,
-        JsonContracts.Point leftEnd,
-        JsonContracts.Point rightStart,
-        JsonContracts.Point rightEnd) {
-        if (horizontal(leftStart, leftEnd) && horizontal(rightStart, rightEnd)) {
-            return Math.abs(leftStart.y() - rightStart.y()) < ROUTE_CLOSE_PARALLEL_DISTANCE
-                && overlapLength(leftStart.x(), leftEnd.x(), rightStart.x(), rightEnd.x())
-                    >= ROUTE_CLOSE_PARALLEL_MIN_OVERLAP;
-        }
-        if (vertical(leftStart, leftEnd) && vertical(rightStart, rightEnd)) {
-            return Math.abs(leftStart.x() - rightStart.x()) < ROUTE_CLOSE_PARALLEL_DISTANCE
-                && overlapLength(leftStart.y(), leftEnd.y(), rightStart.y(), rightEnd.y())
-                    >= ROUTE_CLOSE_PARALLEL_MIN_OVERLAP;
-        }
-        return false;
-    }
-
-    private static boolean horizontal(JsonContracts.Point start, JsonContracts.Point end) {
-        return sameCoordinate(start.y(), end.y()) && !sameCoordinate(start.x(), end.x());
-    }
-
-    private static boolean vertical(JsonContracts.Point start, JsonContracts.Point end) {
-        return sameCoordinate(start.x(), end.x()) && !sameCoordinate(start.y(), end.y());
-    }
-
-    private static double overlapLength(
-        double firstStart,
-        double firstEnd,
-        double secondStart,
-        double secondEnd) {
-        double firstMin = Math.min(firstStart, firstEnd);
-        double firstMax = Math.max(firstStart, firstEnd);
-        double secondMin = Math.min(secondStart, secondEnd);
-        double secondMax = Math.max(secondStart, secondEnd);
-        return Math.max(0.0, Math.min(firstMax, secondMax) - Math.max(firstMin, secondMin));
-    }
-
-    private static double minNodeX(List<JsonContracts.LaidOutNode> nodes) {
-        return nodes.stream()
-            .mapToDouble(JsonContracts.LaidOutNode::x)
-            .min()
-            .orElse(0.0);
-    }
-
-    private static double maxNodeX(List<JsonContracts.LaidOutNode> nodes) {
-        return nodes.stream()
-            .mapToDouble(node -> node.x() + node.width())
-            .max()
-            .orElse(0.0);
-    }
-
-    private static double minNodeY(List<JsonContracts.LaidOutNode> nodes) {
-        return nodes.stream()
-            .mapToDouble(JsonContracts.LaidOutNode::y)
-            .min()
-            .orElse(0.0);
-    }
-
-    private static double maxNodeY(List<JsonContracts.LaidOutNode> nodes) {
-        return nodes.stream()
-            .mapToDouble(node -> node.y() + node.height())
-            .max()
-            .orElse(0.0);
-    }
-
-    private static double minObstacleX(
-        List<JsonContracts.LaidOutNode> nodes,
-        List<JsonContracts.LaidOutGroup> groups) {
-        return Math.min(
-            minNodeX(nodes),
-            groups.stream()
-                .mapToDouble(JsonContracts.LaidOutGroup::x)
-                .min()
-                .orElse(minNodeX(nodes)));
-    }
-
-    private static double maxObstacleX(
-        List<JsonContracts.LaidOutNode> nodes,
-        List<JsonContracts.LaidOutGroup> groups) {
-        return Math.max(
-            maxNodeX(nodes),
-            groups.stream()
-                .mapToDouble(group -> group.x() + group.width())
-                .max()
-                .orElse(maxNodeX(nodes)));
-    }
-
-    private static double minObstacleY(
-        List<JsonContracts.LaidOutNode> nodes,
-        List<JsonContracts.LaidOutGroup> groups) {
-        return Math.min(
-            minNodeY(nodes),
-            groups.stream()
-                .mapToDouble(JsonContracts.LaidOutGroup::y)
-                .min()
-                .orElse(minNodeY(nodes)));
-    }
-
-    private static double maxObstacleY(
-        List<JsonContracts.LaidOutNode> nodes,
-        List<JsonContracts.LaidOutGroup> groups) {
-        return Math.max(
-            maxNodeY(nodes),
-            groups.stream()
-                .mapToDouble(group -> group.y() + group.height())
-                .max()
-                .orElse(maxNodeY(nodes)));
-    }
-
-    private static JsonContracts.LaidOutNode nodeById(
-        List<JsonContracts.LaidOutNode> nodes,
-        String id) {
-        return nodes.stream()
-            .filter(node -> node.id().equals(id))
-            .findFirst()
-            .orElse(null);
     }
 
     private static List<JsonContracts.LaidOutGroup> groups(

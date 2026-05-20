@@ -1,11 +1,15 @@
 # Dediren ELK + Libavoid Layout Routing Strategy
 
 Date: 2026-05-15
-Status: Draft specification
+Status: Superseded on 2026-05-20
 Scope: `elk-layout` Java helper graph construction, ELK Layered options, and
 ELK Libavoid options. This spec does not change public contracts by itself.
 Perspective: identify the options currently hardcoded in the helper and decide
 which should reasonably become JSON-configurable layout intent.
+
+Supersession note: the Libavoid second routing pass caused enough route-quality
+instability that `elk-layout` moved back to an ELK Layered-only helper. Keep
+this document as implementation history, not current product guidance.
 
 ## Purpose
 

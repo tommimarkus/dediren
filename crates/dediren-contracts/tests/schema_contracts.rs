@@ -85,7 +85,7 @@ fn source_with_fragments_matches_model_schema() {
             "model_schema_version": "model.schema.v1",
             "fragments": ["model/application.json", "model/technology.json"],
             "required_plugins": [
-                { "id": "generic-graph", "version": "0.14.2" }
+                { "id": "generic-graph", "version": "0.14.4" }
             ],
             "nodes": [],
             "relationships": [],
