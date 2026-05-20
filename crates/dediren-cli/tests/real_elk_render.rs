@@ -699,26 +699,29 @@ fn real_elk_renders_complex_multi_layer_system() {
             { "id": "email-provider", "label": "Email Provider", "source_id": "email-provider", "width_hint": 160.0, "height_hint": 80.0 },
             { "id": "erp", "label": "ERP", "source_id": "erp", "width_hint": 160.0, "height_hint": 80.0 }
         ],
+        // The edge array is also ELK model-order input. Keep same-side ports
+        // ordered by the visual route channel they should occupy in this
+        // hand-authored real-world fixture.
         "edges": [
             { "id": "mobile-enters-cdn", "source": "customer-mobile", "target": "cdn", "label": "uses", "source_id": "mobile-enters-cdn" },
             { "id": "web-enters-cdn", "source": "customer-web", "target": "cdn", "label": "uses", "source_id": "web-enters-cdn" },
             { "id": "support-opens-admin", "source": "support-agent", "target": "admin-portal", "label": "manages", "source_id": "support-opens-admin" },
             { "id": "cdn-serves-web", "source": "cdn", "target": "web-frontend", "label": "serves", "source_id": "cdn-serves-web" },
-            { "id": "web-calls-gateway", "source": "web-frontend", "target": "api-gateway", "label": "calls", "source_id": "web-calls-gateway" },
             { "id": "admin-calls-gateway", "source": "admin-portal", "target": "api-gateway", "label": "calls", "source_id": "admin-calls-gateway" },
+            { "id": "web-calls-gateway", "source": "web-frontend", "target": "api-gateway", "label": "calls", "source_id": "web-calls-gateway" },
             { "id": "gateway-to-and-junction", "source": "api-gateway", "target": "gateway-and-junction", "label": "routes", "source_id": "gateway-to-and-junction" },
             { "id": "and-junction-authenticates", "source": "gateway-and-junction", "target": "identity-service", "label": "authenticates", "source_id": "and-junction-authenticates", "relationship_type": "Association" },
             { "id": "and-junction-queries-catalog", "source": "gateway-and-junction", "target": "catalog-service", "label": "queries catalog", "source_id": "and-junction-queries-catalog", "relationship_type": "Association" },
             { "id": "and-junction-prices-cart", "source": "gateway-and-junction", "target": "pricing-service", "label": "prices cart", "source_id": "and-junction-prices-cart", "relationship_type": "Association" },
             { "id": "and-junction-places-order", "source": "gateway-and-junction", "target": "order-service", "label": "places order", "source_id": "and-junction-places-order", "relationship_type": "Association" },
             { "id": "identity-federates", "source": "identity-service", "target": "identity-provider", "label": "federates", "source_id": "identity-federates" },
-            { "id": "identity-caches-session", "source": "identity-service", "target": "session-cache", "label": "caches session", "source_id": "identity-caches-session" },
             { "id": "catalog-reads-products", "source": "catalog-service", "target": "product-db", "label": "reads products", "source_id": "catalog-reads-products" },
             { "id": "pricing-reads-products", "source": "pricing-service", "target": "product-db", "label": "reads products", "source_id": "pricing-reads-products" },
             { "id": "pricing-caches-quotes", "source": "pricing-service", "target": "session-cache", "label": "caches quotes", "source_id": "pricing-caches-quotes" },
-            { "id": "order-checks-catalog", "source": "order-service", "target": "catalog-service", "label": "checks catalog", "source_id": "order-checks-catalog" },
+            { "id": "identity-caches-session", "source": "identity-service", "target": "session-cache", "label": "caches session", "source_id": "identity-caches-session" },
             { "id": "order-requests-payment", "source": "order-service", "target": "payment-service", "label": "requests payment", "source_id": "order-requests-payment" },
             { "id": "order-reserves-stock", "source": "order-service", "target": "fulfillment-service", "label": "reserves stock", "source_id": "order-reserves-stock" },
+            { "id": "order-checks-catalog", "source": "order-service", "target": "catalog-service", "label": "checks catalog", "source_id": "order-checks-catalog" },
             { "id": "order-writes-orders", "source": "order-service", "target": "order-db", "label": "writes orders", "source_id": "order-writes-orders" },
             { "id": "order-publishes-events", "source": "order-service", "target": "event-bus", "label": "publishes events", "source_id": "order-publishes-events" },
             { "id": "payment-authorizes", "source": "payment-service", "target": "payment-provider", "label": "authorizes", "source_id": "payment-authorizes" },
@@ -729,13 +732,13 @@ fn real_elk_renders_complex_multi_layer_system() {
             { "id": "fulfillment-publishes-events", "source": "fulfillment-service", "target": "event-bus", "label": "publishes events", "source_id": "fulfillment-publishes-events" },
             { "id": "event-bus-to-or-junction", "source": "event-bus", "target": "event-dispatch-or-junction", "label": "dispatches", "source_id": "event-bus-to-or-junction" },
             { "id": "event-bus-drives-order-worker", "source": "event-bus", "target": "order-worker", "label": "order event", "source_id": "event-bus-drives-order-worker" },
+            { "id": "email-worker-notifies", "source": "email-worker", "target": "notification-service", "label": "notifies", "source_id": "email-worker-notifies" },
             { "id": "or-junction-drives-email-worker", "source": "event-dispatch-or-junction", "target": "email-worker", "label": "email event", "source_id": "or-junction-drives-email-worker" },
             { "id": "or-junction-drives-reporting", "source": "event-dispatch-or-junction", "target": "reporting-ingestor", "label": "reporting event", "source_id": "or-junction-drives-reporting" },
             { "id": "order-worker-reads-orders", "source": "order-worker", "target": "order-db", "label": "reads orders", "source_id": "order-worker-reads-orders" },
-            { "id": "order-worker-syncs-erp", "source": "order-worker", "target": "erp", "label": "syncs orders", "source_id": "order-worker-syncs-erp" },
             { "id": "warehouse-adapter-syncs-erp", "source": "warehouse-adapter", "target": "erp", "label": "syncs stock", "source_id": "warehouse-adapter-syncs-erp" },
+            { "id": "order-worker-syncs-erp", "source": "order-worker", "target": "erp", "label": "syncs orders", "source_id": "order-worker-syncs-erp" },
             { "id": "warehouse-adapter-writes-db", "source": "warehouse-adapter", "target": "warehouse-db", "label": "writes state", "source_id": "warehouse-adapter-writes-db" },
-            { "id": "email-worker-notifies", "source": "email-worker", "target": "notification-service", "label": "notifies", "source_id": "email-worker-notifies" },
             { "id": "notification-sends-email", "source": "notification-service", "target": "email-provider", "label": "sends email", "source_id": "notification-sends-email" },
             { "id": "reporting-reads-orders", "source": "reporting-ingestor", "target": "order-db", "label": "reads changes", "source_id": "reporting-reads-orders" },
             { "id": "reporting-writes-analytics", "source": "reporting-ingestor", "target": "analytics-warehouse", "label": "loads facts", "source_id": "reporting-writes-analytics" }
@@ -860,6 +863,42 @@ fn real_elk_renders_complex_multi_layer_system() {
         "fulfillment-ships",
         "fulfillment-writes-warehouse",
     );
+    assert_same_source_routes_do_not_cross_near_source(
+        &layout_data,
+        "order-service",
+        &[
+            "order-checks-catalog",
+            "order-requests-payment",
+            "order-reserves-stock",
+        ],
+    );
+    assert_same_target_routes_do_not_cross_near_target(
+        &layout_data,
+        "api-gateway",
+        &["web-calls-gateway", "admin-calls-gateway"],
+    );
+    assert_same_target_routes_do_not_cross_near_target(
+        &layout_data,
+        "session-cache",
+        &["pricing-caches-quotes", "identity-caches-session"],
+    );
+    assert_target_ports_follow_source_vertical_order(
+        &layout_data,
+        "pricing-caches-quotes",
+        "identity-caches-session",
+        "session-cache",
+    );
+    assert_same_target_routes_do_not_cross_near_target(
+        &layout_data,
+        "erp",
+        &["warehouse-adapter-syncs-erp", "order-worker-syncs-erp"],
+    );
+    assert_target_ports_follow_source_vertical_order(
+        &layout_data,
+        "warehouse-adapter-syncs-erp",
+        "order-worker-syncs-erp",
+        "erp",
+    );
     assert_edge_does_not_intersect_unrelated_groups(&layout_data, "payment-authorizes");
     assert_target_ports_follow_source_vertical_order(
         &layout_data,
@@ -895,11 +934,17 @@ fn real_elk_renders_complex_multi_layer_system() {
         "event-dispatch-or-junction",
     );
     assert_source_port_left_of_node_center(&layout_data, "email-worker-notifies", "email-worker");
-    assert_source_port_below_target_port_on_node(
+    assert_source_port_above_target_port_on_node(
         &layout_data,
         "email-worker-notifies",
         "or-junction-drives-email-worker",
         "email-worker",
+    );
+    assert_routes_do_not_cross_near_node(
+        &layout_data,
+        "email-worker",
+        "or-junction-drives-email-worker",
+        "email-worker-notifies",
     );
     assert_edges_have_at_most_corner_count(&layout_data, &["or-junction-drives-email-worker"], 2);
     assert_junction_between_x(
@@ -1515,6 +1560,165 @@ fn segment_endpoints(segment: &RouteSegment) -> (f64, f64, f64, f64) {
     }
 }
 
+fn route_crossing_count_near_source(
+    left_edge: &Value,
+    right_edge: &Value,
+    source: &Value,
+) -> usize {
+    let source_right = point_coordinate(source, "x") + point_coordinate(source, "width");
+    let near_source_right = source_right + 240.0;
+    let left_points = left_edge["points"]
+        .as_array()
+        .expect("left edge points should be an array");
+    let right_points = right_edge["points"]
+        .as_array()
+        .expect("right edge points should be an array");
+    let mut count = 0;
+    for left_segment in left_points.windows(2) {
+        if point_coordinate(&left_segment[0], "x").min(point_coordinate(&left_segment[1], "x"))
+            > near_source_right
+        {
+            continue;
+        }
+        for right_segment in right_points.windows(2) {
+            if point_coordinate(&right_segment[0], "x")
+                .min(point_coordinate(&right_segment[1], "x"))
+                > near_source_right
+            {
+                continue;
+            }
+            if segments_cross(
+                &left_segment[0],
+                &left_segment[1],
+                &right_segment[0],
+                &right_segment[1],
+            ) {
+                count += 1;
+            }
+        }
+    }
+    count
+}
+
+fn route_crossing_count_near_target(
+    left_edge: &Value,
+    right_edge: &Value,
+    target: &Value,
+) -> usize {
+    route_crossing_count_near_box(left_edge, right_edge, target, 240.0)
+}
+
+fn route_crossing_count_near_node(left_edge: &Value, right_edge: &Value, node: &Value) -> usize {
+    route_crossing_count_near_box(left_edge, right_edge, node, 160.0)
+}
+
+fn route_crossing_count_near_box(
+    left_edge: &Value,
+    right_edge: &Value,
+    node: &Value,
+    margin: f64,
+) -> usize {
+    let min_x = point_coordinate(node, "x") - margin;
+    let max_x = point_coordinate(node, "x") + point_coordinate(node, "width") + margin;
+    let min_y = point_coordinate(node, "y") - margin;
+    let max_y = point_coordinate(node, "y") + point_coordinate(node, "height") + margin;
+    let left_points = left_edge["points"]
+        .as_array()
+        .expect("left edge points should be an array");
+    let right_points = right_edge["points"]
+        .as_array()
+        .expect("right edge points should be an array");
+    let mut count = 0;
+    for left_segment in left_points.windows(2) {
+        if !segment_touches_box(
+            &left_segment[0],
+            &left_segment[1],
+            min_x,
+            max_x,
+            min_y,
+            max_y,
+        ) {
+            continue;
+        }
+        for right_segment in right_points.windows(2) {
+            if !segment_touches_box(
+                &right_segment[0],
+                &right_segment[1],
+                min_x,
+                max_x,
+                min_y,
+                max_y,
+            ) {
+                continue;
+            }
+            if segments_cross(
+                &left_segment[0],
+                &left_segment[1],
+                &right_segment[0],
+                &right_segment[1],
+            ) {
+                count += 1;
+            }
+        }
+    }
+    count
+}
+
+fn segment_touches_box(
+    start: &Value,
+    end: &Value,
+    min_x: f64,
+    max_x: f64,
+    min_y: f64,
+    max_y: f64,
+) -> bool {
+    let segment_min_x = point_coordinate(start, "x").min(point_coordinate(end, "x"));
+    let segment_max_x = point_coordinate(start, "x").max(point_coordinate(end, "x"));
+    let segment_min_y = point_coordinate(start, "y").min(point_coordinate(end, "y"));
+    let segment_max_y = point_coordinate(start, "y").max(point_coordinate(end, "y"));
+    segment_min_x <= max_x
+        && segment_max_x >= min_x
+        && segment_min_y <= max_y
+        && segment_max_y >= min_y
+}
+
+fn segments_cross(
+    left_start: &Value,
+    left_end: &Value,
+    right_start: &Value,
+    right_end: &Value,
+) -> bool {
+    let Some(left_orientation) = route_orientation(left_start, left_end) else {
+        return false;
+    };
+    let Some(right_orientation) = route_orientation(right_start, right_end) else {
+        return false;
+    };
+    if left_orientation == right_orientation {
+        return false;
+    }
+    let (horizontal_start, horizontal_end, vertical_start, vertical_end) =
+        if left_orientation == RouteOrientation::Horizontal {
+            (left_start, left_end, right_start, right_end)
+        } else {
+            (right_start, right_end, left_start, left_end)
+        };
+    let min_horizontal_x =
+        point_coordinate(horizontal_start, "x").min(point_coordinate(horizontal_end, "x"));
+    let max_horizontal_x =
+        point_coordinate(horizontal_start, "x").max(point_coordinate(horizontal_end, "x"));
+    let min_vertical_y =
+        point_coordinate(vertical_start, "y").min(point_coordinate(vertical_end, "y"));
+    let max_vertical_y =
+        point_coordinate(vertical_start, "y").max(point_coordinate(vertical_end, "y"));
+    let crossing_x = point_coordinate(vertical_start, "x");
+    let crossing_y = point_coordinate(horizontal_start, "y");
+    crossing_x > min_horizontal_x + 0.001
+        && crossing_x < max_horizontal_x - 0.001
+        && crossing_y > min_vertical_y + 0.001
+        && crossing_y < max_vertical_y - 0.001
+}
+
 fn escape_xml_text(text: &str) -> String {
     text.replace('&', "&amp;")
         .replace('<', "&lt;")
@@ -1595,6 +1799,69 @@ fn assert_edges_have_distinct_source_ports(
     assert!(
         !same_source_port,
         "{left_edge_id} and {right_edge_id} should not share a source port: left={left_source:?}, right={right_source:?}"
+    );
+}
+
+fn assert_same_source_routes_do_not_cross_near_source(
+    layout_data: &Value,
+    source_node_id: &str,
+    edge_ids: &[&str],
+) {
+    let source = laid_out_node(layout_data, source_node_id);
+    for (left_index, left_edge_id) in edge_ids.iter().enumerate() {
+        let left_edge = laid_out_edge(layout_data, left_edge_id);
+        assert_eq!(left_edge["source"], source_node_id);
+        for right_edge_id in edge_ids.iter().skip(left_index + 1) {
+            let right_edge = laid_out_edge(layout_data, right_edge_id);
+            assert_eq!(right_edge["source"], source_node_id);
+            let crossing_count = route_crossing_count_near_source(left_edge, right_edge, source);
+            assert_eq!(
+                crossing_count, 0,
+                "{left_edge_id} and {right_edge_id} should not cross near {source_node_id}: left={}, right={}",
+                left_edge["points"],
+                right_edge["points"]
+            );
+        }
+    }
+}
+
+fn assert_same_target_routes_do_not_cross_near_target(
+    layout_data: &Value,
+    target_node_id: &str,
+    edge_ids: &[&str],
+) {
+    let target = laid_out_node(layout_data, target_node_id);
+    for (left_index, left_edge_id) in edge_ids.iter().enumerate() {
+        let left_edge = laid_out_edge(layout_data, left_edge_id);
+        assert_eq!(left_edge["target"], target_node_id);
+        for right_edge_id in edge_ids.iter().skip(left_index + 1) {
+            let right_edge = laid_out_edge(layout_data, right_edge_id);
+            assert_eq!(right_edge["target"], target_node_id);
+            let crossing_count = route_crossing_count_near_target(left_edge, right_edge, target);
+            assert_eq!(
+                crossing_count, 0,
+                "{left_edge_id} and {right_edge_id} should not cross near {target_node_id}: left={}, right={}",
+                left_edge["points"],
+                right_edge["points"]
+            );
+        }
+    }
+}
+
+fn assert_routes_do_not_cross_near_node(
+    layout_data: &Value,
+    node_id: &str,
+    first_edge_id: &str,
+    second_edge_id: &str,
+) {
+    let node = laid_out_node(layout_data, node_id);
+    let first_edge = laid_out_edge(layout_data, first_edge_id);
+    let second_edge = laid_out_edge(layout_data, second_edge_id);
+    let crossing_count = route_crossing_count_near_node(first_edge, second_edge, node);
+    assert_eq!(
+        crossing_count, 0,
+        "{first_edge_id} and {second_edge_id} should not cross near {node_id}: first={}, second={}",
+        first_edge["points"], second_edge["points"]
     );
 }
 
@@ -1760,7 +2027,7 @@ fn assert_source_port_above_source_port_on_node(
     );
 }
 
-fn assert_source_port_below_target_port_on_node(
+fn assert_source_port_above_target_port_on_node(
     layout_data: &Value,
     source_edge_id: &str,
     target_edge_id: &str,
@@ -1777,8 +2044,8 @@ fn assert_source_port_below_target_port_on_node(
     let source_port_y = point_coordinate(&source_points[0], "y");
     let target_port_y = point_coordinate(target_point(target_points, target_edge_id), "y");
     assert!(
-        source_port_y > target_port_y,
-        "{source_edge_id} source port should be below {target_edge_id} target port on {node_id}, got source y={source_port_y}, target y={target_port_y}"
+        source_port_y < target_port_y,
+        "{source_edge_id} source port should be above {target_edge_id} target port on {node_id}, got source y={source_port_y}, target y={target_port_y}"
     );
 }
 

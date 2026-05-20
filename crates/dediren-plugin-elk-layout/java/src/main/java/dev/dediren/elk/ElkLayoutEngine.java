@@ -476,7 +476,27 @@ final class ElkLayoutEngine {
         if (nodes.size() < 3) {
             return Direction.RIGHT;
         }
+        if (nodes.stream().anyMatch(ElkLayoutEngine::isConnectorSizedRequestNode)) {
+            return Direction.DOWN;
+        }
+        // A same-source service fan-out reads as a left-to-right call flow.
+        // Express that as ELK direction intent instead of correcting routes
+        // after ELK has produced them.
+        if (hasInternalFanOut(edges)) {
+            return Direction.RIGHT;
+        }
         return Direction.DOWN;
+    }
+
+    private static boolean hasInternalFanOut(List<JsonContracts.LayoutEdge> edges) {
+        Map<String, Integer> outgoingCounts = new HashMap<>();
+        for (JsonContracts.LayoutEdge edge : edges) {
+            int count = outgoingCounts.merge(edge.source(), 1, Integer::sum);
+            if (count >= MERGEABLE_ENDPOINT_EDGE_COUNT) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static Direction edgeDirection(
@@ -894,22 +914,35 @@ final class ElkLayoutEngine {
                     rootDirection);
             PortSide sourceSide = sourcePortSide(direction);
             PortSide targetSide = targetPortSide(direction);
-            int sourceIndex = nextGroupedPortIndex(nextIndexByNodeSide, edge.source(), sourceSide);
-            int targetIndex = nextGroupedPortIndex(nextIndexByNodeSide, edge.target(), targetSide);
+            int sourceIndex = nextGroupedPortIndex(
+                nextIndexByNodeSide,
+                edge.source(),
+                sourceSide,
+                reverseGroupedPortIndex(sourceSide));
+            int targetIndex = nextGroupedPortIndex(
+                nextIndexByNodeSide,
+                edge.target(),
+                targetSide,
+                reverseGroupedPortIndex(targetSide));
             portIndexesByEdge.put(edge.id(), new EdgePortIndexes(sourceIndex, targetIndex));
         }
         return portIndexesByEdge;
     }
 
+    private static boolean reverseGroupedPortIndex(PortSide side) {
+        return side == PortSide.WEST;
+    }
+
     private static int nextGroupedPortIndex(
         Map<NodeSideKey, Integer> nextIndexByNodeSide,
         String nodeId,
-        PortSide side) {
+        PortSide side,
+        boolean reverseIndex) {
         int index = nextIndexByNodeSide.merge(new NodeSideKey(nodeId, side), 1, Integer::sum) - 1;
         // ELK's west-side port indexes render in the opposite vertical
         // direction, so use descending indices there to preserve request order
         // as top-to-bottom visual graph intent.
-        return side == PortSide.WEST ? -index : index;
+        return reverseIndex ? -index : index;
     }
 
     // ELK accounts for the generated ports, but Dediren still increases the

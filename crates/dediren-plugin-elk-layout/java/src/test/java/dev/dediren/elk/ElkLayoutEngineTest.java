@@ -319,6 +319,46 @@ class ElkLayoutEngineTest {
     }
 
     @Test
+    void groupedInternalFanOutUsesRightwardServiceFlow() {
+        JsonContracts.LayoutRequest request = new JsonContracts.LayoutRequest(
+            "layout-request.schema.v1",
+            "main",
+            List.of(
+                new JsonContracts.LayoutNode("order-service", "Order Service", "order-service", 160.0, 80.0),
+                new JsonContracts.LayoutNode("catalog-service", "Catalog Service", "catalog-service", 160.0, 80.0),
+                new JsonContracts.LayoutNode("payment-service", "Payment Service", "payment-service", 160.0, 80.0),
+                new JsonContracts.LayoutNode("fulfillment-service", "Fulfillment Service", "fulfillment-service", 160.0, 80.0)),
+            List.of(
+                new JsonContracts.LayoutEdge("order-checks-catalog", "order-service", "catalog-service", "checks catalog", "order-checks-catalog"),
+                new JsonContracts.LayoutEdge("order-requests-payment", "order-service", "payment-service", "requests payment", "order-requests-payment"),
+                new JsonContracts.LayoutEdge("order-reserves-stock", "order-service", "fulfillment-service", "reserves stock", "order-reserves-stock")),
+            List.of(new JsonContracts.LayoutGroup(
+                "core-services",
+                "Core Services",
+                List.of("order-service", "catalog-service", "payment-service", "fulfillment-service"),
+                new JsonContracts.GroupProvenance(null, new JsonContracts.SemanticBacked("core-services")))),
+            List.of(),
+            List.of(),
+            null);
+
+        JsonContracts.LayoutResult result = new ElkLayoutEngine().layout(request);
+        JsonContracts.LaidOutNode orderService = nodeById(result, "order-service");
+        JsonContracts.LaidOutEdge catalog = edgeById(result, "order-checks-catalog");
+        JsonContracts.LaidOutEdge payment = edgeById(result, "order-requests-payment");
+        JsonContracts.LaidOutEdge fulfillment = edgeById(result, "order-reserves-stock");
+
+        for (String edgeId : List.of(
+            "order-checks-catalog",
+            "order-requests-payment",
+            "order-reserves-stock")) {
+            assertRouteEndpointOnSide(result, edgeId, "order-service", true, PortSide.EAST);
+        }
+        assertEquals(0, routeCrossingCountNearSource(catalog, payment, orderService));
+        assertEquals(0, routeCrossingCountNearSource(catalog, fulfillment, orderService));
+        assertEquals(0, routeCrossingCountNearSource(payment, fulfillment, orderService));
+    }
+
+    @Test
     void groupedPipelineProducesValidRoutesForMultipleOutgoingEdges() {
         JsonContracts.LayoutRequest request = new JsonContracts.LayoutRequest(
             "layout-request.schema.v1",
