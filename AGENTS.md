@@ -14,6 +14,11 @@
   say why in the handoff.
 - Treat plans as task guidance and implementation history. Live code and tests
   are the current truth when they disagree with a plan.
+- For ELK layout/routing changes, start from the ELK-first rule before editing
+  Java: try official ELK Layered options, generated graph structure, ports,
+  hierarchy, and real-render evidence before adding custom placement or route
+  geometry code. Custom post-processing of ELK edge points is a last resort and
+  must document which ELK options or graph-shaping attempts failed.
 
 ## Skill Routing
 
@@ -46,6 +51,10 @@
   let ELK compute geometry and routes. Keep `dediren` code focused on contract
   mapping, diagnostics, normalization, and regression coverage around ELK
   behavior.
+- Before adding or extending custom Java layout/routing heuristics, add a
+  failing helper or real-render test for the exact visual problem, list the ELK
+  options or graph-shaping alternatives tried, and keep any remaining custom
+  logic isolated as Dediren graph intent rather than route-point rewriting.
 
 ## Contract Boundaries
 
