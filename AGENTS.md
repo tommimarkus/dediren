@@ -77,9 +77,10 @@
 - Plugin protocol or runtime changes: update manifests, runtime capability
   handling, plugin envelope validation, CLI behavior, README notes, and
   compatibility tests together.
-- User-facing command, workflow, install, or artifact-location changes: update
-  `README.md` in the same change so the public instructions match the live
-  behavior.
+- User-facing command, workflow, install, artifact-location, or agent-authoring
+  changes: update `README.md` and, when bundle/runtime agents are affected,
+  `docs/agent-usage.md` in the same change so public and shipped instructions
+  match the live behavior.
 - ELK layout changes: keep the Rust `elk-layout` adapter and Java helper
   contract aligned. The helper lives under
   `crates/dediren-plugin-elk-layout/java` and is invoked through
@@ -101,8 +102,10 @@
   derive from it, and `bundle.json` reports it.
 - When bumping the product/plugin version, move all encoded release surfaces
   together: `Cargo.toml`, `Cargo.lock`, `fixtures/plugins/*.manifest.json`,
-  README bundle examples, distribution xtask usage text, and tests or fixtures
-  that assert version strings.
+  `fixtures/source/*.json` `required_plugins[].version`, README bundle
+  examples, `docs/agent-usage.md` required-plugin and bundle examples,
+  distribution xtask usage text, and tests or fixtures that assert version
+  strings.
 - Use semver intent even while the project is pre-1.0:
   - Major: backwards-incompatible public product or plugin contract changes,
     such as removing or renaming a CLI command, plugin id, capability,
@@ -130,6 +133,11 @@
 - Do not make bare version-increment commits. Amend the content commit before
   pushing when practical; otherwise carry the catch-up in the next real content
   commit.
+- After every product/plugin version bump, run a stale-version search over
+  `Cargo.toml`, `Cargo.lock`, `README.md`, `docs/agent-usage.md`,
+  `fixtures/plugins`, and `fixtures/source`. The search must include both the
+  previous version and any recently skipped patch versions, because imported
+  bundles often expose stale examples before source tests do.
 - If this repo later contains Codex/Claude plugin packages with
   `.claude-plugin/plugin.json`, `.codex-plugin/plugin.json`, or
   `marketplace.json`, keep those sibling version and description fields in sync
@@ -185,6 +193,17 @@ Contract/schema changes:
 cargo test -p dediren-contracts --test schema_contracts
 cargo test -p dediren-contracts --test contract_roundtrip
 ```
+
+Versioned release-surface changes:
+
+```bash
+cargo test -p dediren-contracts --test schema_contracts
+rg -n '<old-version>|<new-version>' Cargo.toml Cargo.lock README.md docs/agent-usage.md fixtures/plugins fixtures/source
+```
+
+Confirm the `rg` output shows only intentional current-version surfaces and no
+stale old-version matches. For generated bundle docs, also inspect or smoke the
+built archive before closing release-surface issues.
 
 Plugin runtime changes:
 
