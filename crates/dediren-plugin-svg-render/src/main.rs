@@ -652,13 +652,14 @@ fn svg_bounds(
 
     for node in &result.nodes {
         bounds.include_rect(node.x, node.y, node.width, node.height);
+        let node_style = node_style(policy, metadata, &node.id, style);
         let (label_lines, label_font_size) = node_label_lines_and_size(node, style.font_size);
         let line_height = node_label_line_height(label_font_size);
-        let first_y = node_label_first_line_y(node, label_font_size, label_lines.len());
+        let position = node_label_position(node, &node_style, label_font_size, label_lines.len());
         for (index, line) in label_lines.iter().enumerate() {
             bounds.include_label(
-                node.x + node.width / 2.0,
-                first_y + index as f64 * line_height,
+                position.x,
+                position.y + index as f64 * line_height,
                 line,
                 label_font_size,
             );
@@ -3234,22 +3235,28 @@ fn archimate_technology_node_decorator(node: &LaidOutNode, style: &ResolvedNodeS
 
 fn node_label(node: &LaidOutNode, style: &ResolvedNodeStyle, font_size: f64) -> String {
     let (lines, label_font_size) = node_label_lines_and_size(node, font_size);
-    let x = node.x + node.width / 2.0;
-    let y = node_label_first_line_y(node, label_font_size, lines.len());
+    let position = node_label_position(node, style, label_font_size, lines.len());
+    let baseline_attr = if position.center_baseline {
+        r#" dominant-baseline="middle""#
+    } else {
+        ""
+    };
     if lines.len() == 1 {
         return format!(
-            r##"<text x="{:.1}" y="{:.1}" text-anchor="middle" dominant-baseline="middle" fill="{}" font-size="{}">{}</text>"##,
-            x,
-            y,
+            r##"<text x="{:.1}" y="{:.1}" text-anchor="middle"{} fill="{}" font-size="{}">{}</text>"##,
+            position.x,
+            position.y,
+            baseline_attr,
             escape_attr(&style.label_fill),
             svg_label_number(label_font_size),
             escape_text(&lines[0])
         );
     }
     let mut text = format!(
-        r##"<text x="{:.1}" y="{:.1}" text-anchor="middle" dominant-baseline="middle" fill="{}" font-size="{}">"##,
-        x,
-        y,
+        r##"<text x="{:.1}" y="{:.1}" text-anchor="middle"{} fill="{}" font-size="{}">"##,
+        position.x,
+        position.y,
+        baseline_attr,
         escape_attr(&style.label_fill),
         svg_label_number(label_font_size)
     );
@@ -3261,13 +3268,59 @@ fn node_label(node: &LaidOutNode, style: &ResolvedNodeStyle, font_size: f64) -> 
         };
         text.push_str(&format!(
             r##"<tspan x="{:.1}" dy="{}">{}</tspan>"##,
-            x,
+            position.x,
             dy,
             escape_text(line)
         ));
     }
     text.push_str("</text>");
     text
+}
+
+#[derive(Clone, Copy)]
+struct NodeLabelPosition {
+    x: f64,
+    y: f64,
+    center_baseline: bool,
+}
+
+fn node_label_position(
+    node: &LaidOutNode,
+    style: &ResolvedNodeStyle,
+    font_size: f64,
+    line_count: usize,
+) -> NodeLabelPosition {
+    if uml_compact_control_node_label_outside(style.decorator) {
+        let line_height = node_label_line_height(font_size);
+        let line_span = line_count.saturating_sub(1) as f64 * line_height;
+        let diagonal_gap = 8.0;
+        let diagonal_delta = node.width.max(node.height) / 2.0 + diagonal_gap;
+        let label_center_y = node.y + node.height / 2.0 - diagonal_delta;
+        let label_center_x = node.x + node.width / 2.0 - diagonal_delta;
+        let first_line_y = label_center_y - (line_span - font_size * 0.6) / 2.0;
+        return NodeLabelPosition {
+            x: label_center_x,
+            y: first_line_y,
+            center_baseline: false,
+        };
+    }
+    NodeLabelPosition {
+        x: node.x + node.width / 2.0,
+        y: node_label_first_line_y(node, font_size, line_count),
+        center_baseline: true,
+    }
+}
+
+fn uml_compact_control_node_label_outside(decorator: Option<SvgNodeDecorator>) -> bool {
+    matches!(
+        decorator,
+        Some(
+            SvgNodeDecorator::UmlInitialNode
+                | SvgNodeDecorator::UmlActivityFinalNode
+                | SvgNodeDecorator::UmlDecisionNode
+                | SvgNodeDecorator::UmlMergeNode
+        )
+    )
 }
 
 fn node_label_lines_and_size(node: &LaidOutNode, font_size: f64) -> (Vec<String>, f64) {

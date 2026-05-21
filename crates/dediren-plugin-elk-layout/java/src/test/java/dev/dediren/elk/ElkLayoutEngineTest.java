@@ -139,6 +139,43 @@ class ElkLayoutEngineTest {
     }
 
     @Test
+    void compactDecisionFanOutUsesSeparateSourceCorners() {
+        JsonContracts.LayoutRequest request = new JsonContracts.LayoutRequest(
+            "layout-request.schema.v1",
+            "activity",
+            List.of(
+                new JsonContracts.LayoutNode("check-cache", "Cached?", "check-cache", 32.0, 32.0),
+                new JsonContracts.LayoutNode("cached", "Use Cache", "cached", 160.0, 80.0),
+                new JsonContracts.LayoutNode("stale", "Refresh", "stale", 160.0, 80.0)),
+            List.of(
+                new JsonContracts.LayoutEdge(
+                    "check-cache-cached", "check-cache", "cached", "cached", "check-cache-cached", "ControlFlow"),
+                new JsonContracts.LayoutEdge(
+                    "check-cache-stale", "check-cache", "stale", "stale", "check-cache-stale", "ControlFlow")),
+            List.of(),
+            List.of(),
+            List.of(),
+            null);
+
+        JsonContracts.LayoutResult result = new ElkLayoutEngine().layout(request);
+        JsonContracts.LaidOutEdge cachedEdge = edgeById(result, "check-cache-cached");
+        JsonContracts.LaidOutEdge staleEdge = edgeById(result, "check-cache-stale");
+
+        assertFalse(
+            samePoint(cachedEdge.points().get(0), staleEdge.points().get(0)),
+            "decision fan-out branches should not leave the same visual corner, cached="
+                + cachedEdge.points()
+                + ", stale="
+                + staleEdge.points());
+        assertTrue(
+            usesDifferentSourceSides(result, "check-cache-cached", "check-cache-stale", "check-cache"),
+            "decision fan-out branches should use separate source corners, cached="
+                + cachedEdge.points()
+                + ", stale="
+                + staleEdge.points());
+    }
+
+    @Test
     void partialGroupUsesLaidOutMembersAndSemanticSourceId() {
         JsonContracts.LayoutRequest request = new JsonContracts.LayoutRequest(
             "layout-request.schema.v1",
@@ -1203,6 +1240,43 @@ class ElkLayoutEngineTest {
             }
             default -> throw new IllegalArgumentException("unsupported side " + side);
         }
+    }
+
+    private static boolean usesDifferentSourceSides(
+        JsonContracts.LayoutResult result,
+        String firstEdgeId,
+        String secondEdgeId,
+        String nodeId) {
+        JsonContracts.LaidOutNode node = nodeById(result, nodeId);
+        PortSide firstSide = routeEndpointSide(edgeById(result, firstEdgeId).points().get(0), node);
+        PortSide secondSide = routeEndpointSide(edgeById(result, secondEdgeId).points().get(0), node);
+        return firstSide != null && secondSide != null && firstSide != secondSide;
+    }
+
+    private static PortSide routeEndpointSide(
+        JsonContracts.Point point,
+        JsonContracts.LaidOutNode node) {
+        if (Math.abs(node.y() - point.y()) <= PORT_SIDE_EPSILON
+            && point.x() >= node.x() - GEOMETRY_EPSILON
+            && point.x() <= node.x() + node.width() + GEOMETRY_EPSILON) {
+            return PortSide.NORTH;
+        }
+        if (Math.abs(node.y() + node.height() - point.y()) <= PORT_SIDE_EPSILON
+            && point.x() >= node.x() - GEOMETRY_EPSILON
+            && point.x() <= node.x() + node.width() + GEOMETRY_EPSILON) {
+            return PortSide.SOUTH;
+        }
+        if (Math.abs(node.x() - point.x()) <= PORT_SIDE_EPSILON
+            && point.y() >= node.y() - GEOMETRY_EPSILON
+            && point.y() <= node.y() + node.height() + GEOMETRY_EPSILON) {
+            return PortSide.WEST;
+        }
+        if (Math.abs(node.x() + node.width() - point.x()) <= PORT_SIDE_EPSILON
+            && point.y() >= node.y() - GEOMETRY_EPSILON
+            && point.y() <= node.y() + node.height() + GEOMETRY_EPSILON) {
+            return PortSide.EAST;
+        }
+        return null;
     }
 
     private static void assertWithinHorizontalBounds(

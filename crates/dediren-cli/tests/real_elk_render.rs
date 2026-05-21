@@ -428,6 +428,91 @@ fn real_elk_renders_uml_activity_profile() {
 
 #[test]
 #[ignore = "run with --ignored after building the ELK Java helper; serialize real ELK runs"]
+fn real_elk_renders_uml_decision_fanout_branches() {
+    let _guard = real_elk_guard();
+    let temp = assert_fs::TempDir::new().unwrap();
+    let request = serde_json::json!({
+        "layout_request_schema_version": "layout-request.schema.v1",
+        "view_id": "decision-fanout",
+        "nodes": [
+            { "id": "start", "label": "", "source_id": "start", "width_hint": 28.0, "height_hint": 28.0 },
+            { "id": "check-cache", "label": "Cached?", "source_id": "check-cache", "width_hint": 32.0, "height_hint": 32.0 },
+            { "id": "use-cached", "label": "Use cached", "source_id": "use-cached", "width_hint": 140.0, "height_hint": 64.0 },
+            { "id": "refresh", "label": "Refresh", "source_id": "refresh", "width_hint": 140.0, "height_hint": 64.0 }
+        ],
+        "edges": [
+            { "id": "flow-start-check", "source": "start", "target": "check-cache", "label": "", "source_id": "flow-start-check", "relationship_type": "ControlFlow" },
+            { "id": "flow-cached", "source": "check-cache", "target": "use-cached", "label": "cached", "source_id": "flow-cached", "relationship_type": "ControlFlow" },
+            { "id": "flow-stale", "source": "check-cache", "target": "refresh", "label": "stale", "source_id": "flow-stale", "relationship_type": "ControlFlow" }
+        ],
+        "groups": [],
+        "labels": [],
+        "constraints": [],
+        "layout_preferences": {
+            "direction": "right",
+            "density": "spacious",
+            "routing": {
+                "style": "orthogonal",
+                "profile": "spacious",
+                "endpoint_merging": "off"
+            }
+        }
+    });
+    let metadata = serde_json::json!({
+        "render_metadata_schema_version": "render-metadata.schema.v1",
+        "semantic_profile": "uml",
+        "nodes": {
+            "start": { "type": "InitialNode", "source_id": "start" },
+            "check-cache": { "type": "DecisionNode", "source_id": "check-cache" },
+            "use-cached": { "type": "Action", "source_id": "use-cached" },
+            "refresh": { "type": "Action", "source_id": "refresh" }
+        },
+        "edges": {
+            "flow-start-check": { "type": "ControlFlow", "source_id": "flow-start-check" },
+            "flow-cached": { "type": "ControlFlow", "source_id": "flow-cached" },
+            "flow-stale": { "type": "ControlFlow", "source_id": "flow-stale" }
+        }
+    });
+    let request = write_temp_json(&temp, "decision-fanout-layout-request.json", &request);
+    let metadata = write_temp_json(&temp, "decision-fanout-render-metadata.json", &metadata);
+
+    let layout_output = real_elk_layout(&request);
+    let layout = write_temp_bytes(&temp, "decision-fanout-layout-result.json", &layout_output);
+    assert_layout_quality_ok(&validate_layout(&layout));
+    let layout_data = ok_data(&layout_output);
+
+    assert_eq!(layout_data["view_id"], "decision-fanout");
+    assert_edges_have_distinct_source_ports(&layout_data, "flow-cached", "flow-stale");
+    assert_source_ports_on_different_sides(
+        &layout_data,
+        "check-cache",
+        "flow-cached",
+        "flow-stale",
+    );
+
+    let svg = render_svg(
+        &layout,
+        "fixtures/render-policy/uml-svg.json",
+        Some(&metadata),
+    );
+    let doc = svg_doc(&svg);
+    assert_svg_texts_include(
+        &doc,
+        &["Cached?", "Use cached", "Refresh", "cached", "stale"],
+    );
+    assert_uml_node_decorator(&doc, "check-cache", "uml_decision_node");
+    assert_edge_marker_end(&doc, "flow-cached", "open_arrow");
+    assert_edge_marker_end(&doc, "flow-stale", "open_arrow");
+    assert_reasonable_svg_aspect(&svg, 5.0);
+    write_render_artifact(
+        "real-elk",
+        "real_elk_renders_uml_decision_fanout_branches",
+        &svg,
+    );
+}
+
+#[test]
+#[ignore = "run with --ignored after building the ELK Java helper; serialize real ELK runs"]
 fn real_elk_renders_complex_uml_class_profile() {
     let _guard = real_elk_guard();
     let (svg, metadata_data, layout_data) = render_real_elk_uml_view_from_source_with_detour_budget(
@@ -2047,6 +2132,47 @@ fn assert_source_port_above_target_port_on_node(
         source_port_y < target_port_y,
         "{source_edge_id} source port should be above {target_edge_id} target port on {node_id}, got source y={source_port_y}, target y={target_port_y}"
     );
+}
+
+fn assert_source_ports_on_different_sides(
+    layout_data: &Value,
+    node_id: &str,
+    first_edge_id: &str,
+    second_edge_id: &str,
+) {
+    let first_side = source_port_side(layout_data, first_edge_id, node_id);
+    let second_side = source_port_side(layout_data, second_edge_id, node_id);
+    assert_ne!(
+        first_side, second_side,
+        "{first_edge_id} and {second_edge_id} should leave {node_id} from different sides"
+    );
+}
+
+fn source_port_side(layout_data: &Value, edge_id: &str, node_id: &str) -> &'static str {
+    let edge = laid_out_edge(layout_data, edge_id);
+    assert_eq!(edge["source"], node_id, "{edge_id} source");
+    let points = edge["points"]
+        .as_array()
+        .unwrap_or_else(|| panic!("{edge_id} points should be an array"));
+    let source = &points[0];
+    let source_x = point_coordinate(source, "x");
+    let source_y = point_coordinate(source, "y");
+    let node = laid_out_node(layout_data, node_id);
+    let left = point_coordinate(node, "x");
+    let top = point_coordinate(node, "y");
+    let right = left + point_coordinate(node, "width");
+    let bottom = top + point_coordinate(node, "height");
+    let distances = [
+        ("left", (source_x - left).abs()),
+        ("right", (source_x - right).abs()),
+        ("top", (source_y - top).abs()),
+        ("bottom", (source_y - bottom).abs()),
+    ];
+    distances
+        .into_iter()
+        .min_by(|left, right| left.1.total_cmp(&right.1))
+        .map(|(side, _)| side)
+        .unwrap()
 }
 
 fn assert_target_ports_follow_source_vertical_order(

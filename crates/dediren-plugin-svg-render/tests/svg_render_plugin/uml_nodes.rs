@@ -150,6 +150,36 @@ fn svg_renderer_covers_each_uml_node_type() {
         );
         assert_uml_node_uses_policy_style(node_type, shape, expected_style);
         child_group_with_attr(node, "data-dediren-node-decorator", expected_decorator);
+        if uml_compact_control_node_type(node_type) {
+            let row = index / 4;
+            let column = index % 4;
+            let node_x = 40.0 + column as f64 * 220.0;
+            let node_y = 40.0 + row as f64 * 140.0;
+            let label = child_element(node, "text");
+            let label_bounds = text_label_bounds(label);
+            let node_center_x = node_x + 32.0;
+            let node_center_y = node_y + 32.0;
+            assert!(
+                label_bounds.2 < node_center_x && label_bounds.3 < node_center_y,
+                "{node_type} label should stay in the up-left quadrant outside the compact control symbol center"
+            );
+            let label_center_x = (label_bounds.0 + label_bounds.2) / 2.0;
+            let label_center_y = (label_bounds.1 + label_bounds.3) / 2.0;
+            let left_delta = node_center_x - label_center_x;
+            let up_delta = node_center_y - label_center_y;
+            assert!(
+                left_delta > 0.0 && up_delta > 0.0,
+                "{node_type} label center should sit up-left of the compact control symbol center"
+            );
+            assert!(
+                (left_delta - up_delta).abs() <= 1.0,
+                "{node_type} label center should sit on the 45-degree up-left diagonal from the symbol center, got left_delta={left_delta} and up_delta={up_delta}"
+            );
+            assert!(
+                left_delta <= 40.5,
+                "{node_type} label center should stay close to the compact control symbol, got diagonal delta={left_delta}"
+            );
+        }
     }
     assert!(
         content.contains("«interface»"),
@@ -173,6 +203,64 @@ fn uml_node_coverage_size(node_type: &str) -> (i64, i64) {
         "Class" | "Interface" | "DataType" | "Enumeration" => (180, 108),
         _ => (180, 72),
     }
+}
+
+fn uml_compact_control_node_type(node_type: &str) -> bool {
+    matches!(
+        node_type,
+        "InitialNode" | "ActivityFinalNode" | "DecisionNode" | "MergeNode"
+    )
+}
+
+fn text_label_bounds(label: roxmltree::Node<'_, '_>) -> (f64, f64, f64, f64) {
+    let font_size = label
+        .attribute("font-size")
+        .unwrap()
+        .parse::<f64>()
+        .unwrap();
+    let x = label.attribute("x").unwrap().parse::<f64>().unwrap();
+    let mut baseline_y = label.attribute("y").unwrap().parse::<f64>().unwrap();
+    let mut min_x = f64::INFINITY;
+    let mut max_x = f64::NEG_INFINITY;
+    let mut min_y = f64::INFINITY;
+    let mut max_y = f64::NEG_INFINITY;
+    let anchor = label.attribute("text-anchor").unwrap_or("middle");
+    let tspans = child_elements(label, "tspan").collect::<Vec<_>>();
+    if tspans.is_empty() {
+        return text_line_bounds(x, baseline_y, label.text().unwrap_or(""), font_size, anchor);
+    }
+    for tspan in tspans {
+        let dy = tspan.attribute("dy").unwrap_or("0").parse::<f64>().unwrap();
+        baseline_y += dy;
+        let line_bounds =
+            text_line_bounds(x, baseline_y, tspan.text().unwrap_or(""), font_size, anchor);
+        min_x = min_x.min(line_bounds.0);
+        min_y = min_y.min(line_bounds.1);
+        max_x = max_x.max(line_bounds.2);
+        max_y = max_y.max(line_bounds.3);
+    }
+    (min_x, min_y, max_x, max_y)
+}
+
+fn text_line_bounds(
+    x: f64,
+    baseline_y: f64,
+    text: &str,
+    font_size: f64,
+    anchor: &str,
+) -> (f64, f64, f64, f64) {
+    let width = estimated_svg_text_width(text, font_size);
+    let (min_x, max_x) = match anchor {
+        "start" => (x, x + width),
+        "end" => (x - width, x),
+        _ => (x - width / 2.0, x + width / 2.0),
+    };
+    (
+        min_x,
+        baseline_y - font_size,
+        max_x,
+        baseline_y + font_size * 0.4,
+    )
 }
 
 fn assert_uml_node_uses_policy_style(
