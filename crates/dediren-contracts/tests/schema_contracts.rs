@@ -85,7 +85,7 @@ fn source_with_fragments_matches_model_schema() {
             "model_schema_version": "model.schema.v1",
             "fragments": ["model/application.json", "model/technology.json"],
             "required_plugins": [
-                { "id": "generic-graph", "version": "0.14.4" }
+                { "id": "generic-graph", "version": "0.14.8" }
             ],
             "nodes": [],
             "relationships": [],
@@ -672,6 +672,24 @@ fn agent_usage_documents_source_fragments() {
         guide.contains("--input <file>"),
         "agent usage guide should document that fragments require file input"
     );
+}
+
+#[test]
+fn agent_usage_versioned_examples_match_workspace_version() {
+    let guide = std::fs::read_to_string(workspace_file("docs/agent-usage.md")).unwrap();
+    let version = env!("CARGO_PKG_VERSION");
+
+    let versions = agent_usage_example_versions(&guide);
+    assert!(
+        !versions.is_empty(),
+        "agent usage guide should include versioned examples to keep in sync"
+    );
+    for found in versions {
+        assert_eq!(
+            found, version,
+            "agent usage guide versioned examples should match workspace version"
+        );
+    }
 }
 
 #[test]
@@ -1330,6 +1348,27 @@ fn cargo_lock_package_version<'a>(lock: &'a str, package_name: &str) -> Option<&
         }
     }
     None
+}
+
+fn agent_usage_example_versions(guide: &str) -> Vec<&str> {
+    let mut versions = Vec::new();
+    for line in guide.lines() {
+        if let Some(version) = line
+            .split(r#""version": ""#)
+            .nth(1)
+            .and_then(|value| value.split('"').next())
+        {
+            versions.push(version);
+        }
+        if let Some(version) = line
+            .split("dediren-agent-bundle-")
+            .nth(1)
+            .and_then(|value| value.split("-x86_64-unknown-linux-gnu").next())
+        {
+            versions.push(version);
+        }
+    }
+    versions
 }
 
 fn assert_valid(schema_path: &str, instance_path: &str) {
