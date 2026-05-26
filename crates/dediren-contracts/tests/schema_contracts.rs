@@ -989,9 +989,41 @@ fn release_workflow_matches_supported_targets_and_permissions() {
         ),
         "artifact attestation should cover the target archive"
     );
+    let upload_archive_step = yaml_named_step(&build_steps, "Upload archive artifact")
+        .expect("build job should upload release archives as workflow artifacts");
+    assert!(
+        yaml_step_uses_pinned_action(&upload_archive_step, "actions/upload-artifact", "v7"),
+        "build job should use the expected artifact upload action"
+    );
+    assert!(
+        yaml_block_contains(&upload_archive_step, 10, "compression-level: 0"),
+        "release archive artifacts should avoid recompressing already-compressed tarballs"
+    );
+    assert!(
+        !yaml_block_contains(&upload_archive_step, 10, "archive: false"),
+        "release archive artifacts should keep the downloader-compatible artifact archive wrapper"
+    );
     assert_no_clobber_release_commands(&publish_job);
     let publish_steps =
         yaml_block(&publish_job, 4, "steps:").expect("publish job should define steps");
+    let download_artifacts_step = yaml_named_step(&publish_steps, "Download artifacts")
+        .expect("publish job should download release artifacts");
+    assert!(
+        yaml_step_uses_pinned_action(&download_artifacts_step, "actions/download-artifact", "v7"),
+        "publish job should use the expected artifact download action"
+    );
+    assert!(
+        yaml_block_contains(
+            &download_artifacts_step,
+            10,
+            "pattern: dediren-agent-bundle-*"
+        ),
+        "publish job should only download release bundle artifacts"
+    );
+    assert!(
+        yaml_block_contains(&download_artifacts_step, 10, "merge-multiple: true"),
+        "publish job should merge archive files into one release-artifacts directory"
+    );
     let verify_release_assets_step = yaml_named_step(&publish_steps, "Verify release assets")
         .expect("publish job should verify release assets");
     assert!(

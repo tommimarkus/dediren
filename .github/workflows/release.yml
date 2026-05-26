@@ -143,7 +143,7 @@ jobs:
           path: dist/dediren-agent-bundle-*-${{ matrix.target }}.tar.gz
           if-no-files-found: error
           retention-days: 14
-          archive: false
+          compression-level: 0
 
   publish:
     needs: build
@@ -170,6 +170,7 @@ jobs:
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
           path: release-artifacts
+          pattern: dediren-agent-bundle-*
           merge-multiple: true
 
       - name: Verify release assets
