@@ -2,10 +2,52 @@
 
 use assert_cmd::Command;
 use serde_json::Value;
+use std::path::PathBuf;
+use std::sync::OnceLock;
+use tempfile::TempDir;
+
+static TEST_SCHEMA_DIR: OnceLock<TempDir> = OnceLock::new();
+
+const TEST_OEF_SCHEMA: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           targetNamespace="http://www.opengroup.org/xsd/archimate/3.0/"
+           xmlns="http://www.opengroup.org/xsd/archimate/3.0/"
+           elementFormDefault="qualified">
+  <xs:element name="model">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:any minOccurs="0" maxOccurs="unbounded" processContents="skip"/>
+      </xs:sequence>
+      <xs:attribute name="identifier" type="xs:ID" use="required"/>
+      <xs:anyAttribute processContents="skip"/>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>
+"#;
 
 pub fn plugin_command() -> Command {
-    Command::cargo_bin("dediren-plugin-archimate-oef-export")
-        .expect("archimate-oef plugin binary should be built by Cargo")
+    let mut command = Command::cargo_bin("dediren-plugin-archimate-oef-export")
+        .expect("archimate-oef plugin binary should be built by Cargo");
+    command.env("DEDIREN_OEF_SCHEMA_DIR", test_schema_dir());
+    command
+}
+
+fn test_schema_dir() -> PathBuf {
+    TEST_SCHEMA_DIR
+        .get_or_init(|| {
+            let temp = tempfile::tempdir().expect("test schema tempdir should be created");
+            for file_name in [
+                "archimate3_Model.xsd",
+                "archimate3_View.xsd",
+                "archimate3_Diagram.xsd",
+            ] {
+                std::fs::write(temp.path().join(file_name), TEST_OEF_SCHEMA)
+                    .expect("test OEF schema should be written");
+            }
+            temp
+        })
+        .path()
+        .to_path_buf()
 }
 
 pub fn stdout_json(output: &[u8]) -> Value {

@@ -3,8 +3,8 @@ use std::path::Path;
 use dediren_contracts::{CommandEnvelope, ExportRequest, LayoutRequest, SourceDocument};
 
 use crate::plugins::{
-    run_plugin_for_capability_with_registry, PluginExecutionError, PluginRegistry,
-    PluginRunOptions, PluginRunOutcome,
+    run_plugin_for_capability_with_options, run_plugin_for_capability_with_registry,
+    PluginExecutionError, PluginRegistry, PluginRunOptions, PluginRunOutcome,
 };
 
 pub struct LayoutCommandInput<'a> {
@@ -16,6 +16,12 @@ pub struct LayoutCommandInput<'a> {
 
 const LAYOUT_RUNTIME_ENV_ALLOWLIST: &[&str] =
     &["DEDIREN_ELK_COMMAND", "DEDIREN_ELK_RESULT_FIXTURE", "PATH"];
+const EXPORT_RUNTIME_ENV_ALLOWLIST: &[&str] = &[
+    "DEDIREN_OEF_SCHEMA_DIR",
+    "DEDIREN_XMI_SCHEMA_PATH",
+    "DEDIREN_SCHEMA_CACHE_DIR",
+    "PATH",
+];
 
 pub fn layout_command(
     input: LayoutCommandInput<'_>,
@@ -27,12 +33,7 @@ pub fn layout_command(
                 message: error.to_string(),
             }
         })?;
-    let mut options = PluginRunOptions::default();
-    for (name, value) in input.env {
-        if LAYOUT_RUNTIME_ENV_ALLOWLIST.contains(&name.as_str()) {
-            options.allowed_env.push((name, value));
-        }
-    }
+    let options = plugin_options_from_env(input.env, LAYOUT_RUNTIME_ENV_ALLOWLIST);
     run_plugin_for_capability_with_registry(
         &input.registry,
         input.plugin,
@@ -47,12 +48,7 @@ pub fn layout_command_from_env(
     plugin: &str,
     input_text: &str,
 ) -> Result<PluginRunOutcome, PluginExecutionError> {
-    let mut env = Vec::new();
-    for name in LAYOUT_RUNTIME_ENV_ALLOWLIST {
-        if let Ok(value) = std::env::var(name) {
-            env.push(((*name).to_string(), value));
-        }
-    }
+    let env = current_allowed_env(LAYOUT_RUNTIME_ENV_ALLOWLIST);
     layout_command(LayoutCommandInput {
         plugin,
         input_text,
@@ -189,12 +185,37 @@ pub fn export_command_with_base(
         layout_result,
         policy,
     };
-    crate::plugins::run_plugin_for_capability(
+    let options = plugin_options_from_env(
+        current_allowed_env(EXPORT_RUNTIME_ENV_ALLOWLIST),
+        EXPORT_RUNTIME_ENV_ALLOWLIST,
+    );
+    run_plugin_for_capability_with_options(
         plugin,
         "export",
         &["export"],
         &serde_json::to_string(&export_input).map_err(command_input_error("export"))?,
+        options,
     )
+}
+
+fn current_allowed_env(allowlist: &[&str]) -> Vec<(String, String)> {
+    let mut env = Vec::new();
+    for name in allowlist {
+        if let Ok(value) = std::env::var(name) {
+            env.push(((*name).to_string(), value));
+        }
+    }
+    env
+}
+
+fn plugin_options_from_env(env: Vec<(String, String)>, allowlist: &[&str]) -> PluginRunOptions {
+    let mut options = PluginRunOptions::default();
+    for (name, value) in env {
+        if allowlist.contains(&name.as_str()) {
+            options.allowed_env.push((name, value));
+        }
+    }
+    options
 }
 
 fn error_outcome(diagnostics: Vec<dediren_contracts::Diagnostic>) -> PluginRunOutcome {

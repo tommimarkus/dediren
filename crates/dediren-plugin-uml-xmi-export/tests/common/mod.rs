@@ -2,10 +2,45 @@
 
 use assert_cmd::Command;
 use serde_json::Value;
+use std::path::PathBuf;
+use std::sync::OnceLock;
+use tempfile::TempDir;
+
+static TEST_SCHEMA_DIR: OnceLock<TempDir> = OnceLock::new();
+
+const TEST_XMI_SCHEMA: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
+<xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+            targetNamespace="http://www.omg.org/spec/XMI/20131001"
+            xmlns="http://www.omg.org/spec/XMI/20131001"
+            elementFormDefault="qualified">
+  <xsd:element name="XMI">
+    <xsd:complexType>
+      <xsd:choice minOccurs="0" maxOccurs="unbounded">
+        <xsd:any processContents="lax"/>
+      </xsd:choice>
+      <xsd:anyAttribute processContents="lax"/>
+    </xsd:complexType>
+  </xsd:element>
+</xsd:schema>
+"#;
 
 pub fn plugin_command() -> Command {
-    Command::cargo_bin("dediren-plugin-uml-xmi-export")
-        .expect("uml-xmi plugin binary should be built by Cargo")
+    let mut command = Command::cargo_bin("dediren-plugin-uml-xmi-export")
+        .expect("uml-xmi plugin binary should be built by Cargo");
+    command.env("DEDIREN_XMI_SCHEMA_PATH", test_schema_path());
+    command
+}
+
+fn test_schema_path() -> PathBuf {
+    TEST_SCHEMA_DIR
+        .get_or_init(|| {
+            let temp = tempfile::tempdir().expect("test schema tempdir should be created");
+            std::fs::write(temp.path().join("XMI.xsd"), TEST_XMI_SCHEMA)
+                .expect("test XMI schema should be written");
+            temp
+        })
+        .path()
+        .join("XMI.xsd")
 }
 
 pub fn workspace_file(path: &str) -> String {

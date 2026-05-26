@@ -1,10 +1,13 @@
-use std::collections::HashSet;
-use std::io::{Cursor, Read};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::io::{Cursor, Read, Write};
+use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
 
 use anyhow::{bail, Context};
 use dediren_contracts::{
     CommandEnvelope, Diagnostic, DiagnosticSeverity, ExportRequest, ExportResult,
-    GenericGraphPluginData, SourceNode, EXPORT_RESULT_SCHEMA_VERSION, PLUGIN_PROTOCOL_VERSION,
+    GenericGraphPluginData, LaidOutGroup, SourceNode, SourceRelationship,
+    EXPORT_RESULT_SCHEMA_VERSION, PLUGIN_PROTOCOL_VERSION,
 };
 use quick_xml::events::{BytesEnd, BytesStart, Event};
 use quick_xml::Writer;
@@ -14,11 +17,21 @@ const XMI_NS: &str = "http://www.omg.org/spec/XMI/20131001";
 const UML_NS: &str = "http://www.omg.org/spec/UML/20161101";
 const XMI_VERSION: &str = "2.5.1";
 const UML_VERSION: &str = "2.5.1";
+const XMI_SCHEMA_VALIDATOR: &str = "xmllint";
+const OMG_XMI_SCHEMA_URL: &str = "https://www.omg.org/spec/XMI/20131001/XMI.xsd";
+const XMI_SCHEMA_PATH_ENV: &str = "DEDIREN_XMI_SCHEMA_PATH";
+const SCHEMA_CACHE_DIR_ENV: &str = "DEDIREN_SCHEMA_CACHE_DIR";
+const SCHEMA_FETCHER: &str = "curl";
 
 fn main() -> anyhow::Result<()> {
     let args: Vec<String> = std::env::args().collect();
     match args.get(1).map(String::as_str) {
         Some("capabilities") => {
+            let schema_validation_available = Command::new(XMI_SCHEMA_VALIDATOR)
+                .arg("--version")
+                .output()
+                .map(|output| output.status.success())
+                .unwrap_or(false);
             println!(
                 "{}",
                 serde_json::json!({
@@ -28,7 +41,18 @@ fn main() -> anyhow::Result<()> {
                     "runtime": {
                         "artifact_kind": "uml-xmi+xml",
                         "uml_version": UML_VERSION,
-                        "xmi_version": XMI_VERSION
+                        "xmi_version": XMI_VERSION,
+                        "schema_validation": {
+                            "kind": "omg-xmi-xsd-partial",
+                            "schema_version": XMI_VERSION,
+                            "validator": XMI_SCHEMA_VALIDATOR,
+                            "available": schema_validation_available,
+                            "schema_source": "DEDIREN_XMI_SCHEMA_PATH or runtime cache download",
+                            "schema_path_env": XMI_SCHEMA_PATH_ENV,
+                            "cache_dir_env": SCHEMA_CACHE_DIR_ENV,
+                            "fetcher": SCHEMA_FETCHER,
+                            "limitation": "UML 2.5.1 is published as an XMI metamodel, not an importable XML Schema"
+                        }
                     }
                 })
             );
@@ -55,6 +79,21 @@ fn export_from_stdin() -> anyhow::Result<()> {
     }
 
     let content = build_xmi(&request, &policy)?;
+    if let Err(error) = validate_xmi_to_available_standards(&content) {
+        match error {
+            XmiValidationError::Invalid { code, message } => {
+                exit_with_diagnostic(code, message, Some("content"))
+            }
+            XmiValidationError::ValidatorUnavailable(message) => exit_with_diagnostic(
+                "DEDIREN_XMI_SCHEMA_VALIDATOR_UNAVAILABLE",
+                message,
+                Some("content"),
+            ),
+            XmiValidationError::SchemaUnavailable(message) => {
+                exit_with_diagnostic("DEDIREN_XMI_SCHEMA_UNAVAILABLE", message, Some("content"))
+            }
+        }
+    }
     let result = ExportResult {
         export_result_schema_version: EXPORT_RESULT_SCHEMA_VERSION.to_string(),
         artifact_kind: "uml-xmi+xml".to_string(),
@@ -79,14 +118,33 @@ fn build_xmi(
     request: &ExportRequest,
     policy: &dediren_contracts::UmlXmiExportPolicy,
 ) -> anyhow::Result<String> {
-    let xmi_version = policy.xmi_version.as_deref().unwrap_or(XMI_VERSION);
     let mut ids = IdentifierMap::with_reserved(&policy.model_identifier);
+    let scope = ExportScope::from_request(request);
+    let selected_nodes = request
+        .source
+        .nodes
+        .iter()
+        .filter(|node| scope.node_ids.contains(&node.id))
+        .collect::<Vec<_>>();
+    let selected_relationships = request
+        .source
+        .relationships
+        .iter()
+        .filter(|relationship| scope.relationship_ids.contains(&relationship.id))
+        .collect::<Vec<_>>();
+    let mut node_ids = BTreeMap::new();
+    for node in &selected_nodes {
+        node_ids.insert(node.id.clone(), ids.xmi_id(&node.id));
+    }
+    let mut relationship_ids = BTreeMap::new();
+    for relationship in &selected_relationships {
+        relationship_ids.insert(relationship.id.clone(), ids.xmi_id(&relationship.id));
+    }
     let mut writer = Writer::new(Cursor::new(Vec::new()));
 
     let mut xmi = BytesStart::new("xmi:XMI");
     xmi.push_attribute(("xmlns:xmi", XMI_NS));
     xmi.push_attribute(("xmlns:uml", UML_NS));
-    xmi.push_attribute(("xmi:version", xmi_version));
     writer.write_event(Event::Start(xmi))?;
 
     let mut model = BytesStart::new("uml:Model");
@@ -94,14 +152,33 @@ fn build_xmi(
     model.push_attribute(("name", policy.model_name.as_str()));
     writer.write_event(Event::Start(model))?;
 
-    for node in &request.source.nodes {
+    for node in selected_nodes {
+        let element_id = node_ids
+            .get(&node.id)
+            .with_context(|| format!("missing generated XMI id for node {}", node.id))?;
         match node.node_type.as_str() {
-            "Package" => write_empty_packaged_element(&mut writer, &mut ids, "uml:Package", node)?,
-            "Class" => write_class(&mut writer, &mut ids, node)?,
-            "Enumeration" => write_enumeration(&mut writer, &mut ids, node)?,
-            "Activity" => {
-                write_empty_packaged_element(&mut writer, &mut ids, "uml:Activity", node)?;
+            "Package" => {
+                write_empty_packaged_element(&mut writer, "uml:Package", node, element_id)?
             }
+            "Class" => write_classifier(&mut writer, &mut ids, "uml:Class", node, element_id)?,
+            "Interface" => {
+                write_classifier(&mut writer, &mut ids, "uml:Interface", node, element_id)?;
+            }
+            "DataType" => {
+                write_classifier(&mut writer, &mut ids, "uml:DataType", node, element_id)?;
+            }
+            "Enumeration" => write_enumeration(&mut writer, &mut ids, node, element_id)?,
+            "Activity" => write_activity(
+                &mut writer,
+                node,
+                element_id,
+                &request.source.nodes,
+                &selected_relationships,
+                &node_ids,
+                &relationship_ids,
+            )?,
+            "Action" | "InitialNode" | "ActivityFinalNode" | "DecisionNode" | "MergeNode"
+            | "ForkNode" | "JoinNode" | "ObjectNode" => {}
             _ => {}
         }
     }
@@ -114,25 +191,318 @@ fn build_xmi(
     Ok(content)
 }
 
+enum XmiValidationError {
+    Invalid { code: &'static str, message: String },
+    ValidatorUnavailable(String),
+    SchemaUnavailable(String),
+}
+
+fn validate_xmi_to_available_standards(content: &str) -> Result<(), XmiValidationError> {
+    validate_xmi_document_and_ids(content)?;
+    validate_omg_xmi_schema(content)
+}
+
+fn validate_xmi_document_and_ids(content: &str) -> Result<(), XmiValidationError> {
+    let doc = roxmltree::Document::parse(content).map_err(|error| XmiValidationError::Invalid {
+        code: "DEDIREN_XMI_XML_INVALID",
+        message: format!("generated UML/XMI XML is not well-formed: {error}"),
+    })?;
+    let root = doc.root_element();
+    if root.tag_name().namespace() != Some(XMI_NS) || root.tag_name().name() != "XMI" {
+        return Err(XmiValidationError::Invalid {
+            code: "DEDIREN_XMI_SCHEMA_INVALID",
+            message: "generated UML/XMI XML root must be xmi:XMI in the OMG XMI namespace"
+                .to_string(),
+        });
+    }
+    if root.attribute((XMI_NS, "version")).is_some() {
+        return Err(XmiValidationError::Invalid {
+            code: "DEDIREN_XMI_SCHEMA_INVALID",
+            message: "generated UML/XMI XML uses xmi:version, which OMG XMI.xsd does not allow"
+                .to_string(),
+        });
+    }
+
+    let mut ids = HashSet::new();
+    for element in doc.descendants().filter(roxmltree::Node::is_element) {
+        let Some(id) = element.attribute((XMI_NS, "id")) else {
+            continue;
+        };
+        if !is_xml_id(id) {
+            return Err(XmiValidationError::Invalid {
+                code: "DEDIREN_XMI_ID_INVALID",
+                message: format!("generated UML/XMI XML contains invalid xmi:id {id:?}"),
+            });
+        }
+        if !ids.insert(id.to_string()) {
+            return Err(XmiValidationError::Invalid {
+                code: "DEDIREN_XMI_ID_INVALID",
+                message: format!("generated UML/XMI XML contains duplicate xmi:id {id:?}"),
+            });
+        }
+    }
+
+    Ok(())
+}
+
+fn validate_omg_xmi_schema(content: &str) -> Result<(), XmiValidationError> {
+    let schema_path = resolve_omg_xmi_schema_path()?;
+
+    let mut child = Command::new(XMI_SCHEMA_VALIDATOR)
+        .args(["--nonet", "--noout", "--schema"])
+        .arg(&schema_path)
+        .arg("-")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|error| {
+            XmiValidationError::ValidatorUnavailable(format!(
+                "failed to run OMG XMI schema validator {XMI_SCHEMA_VALIDATOR}: {error}"
+            ))
+        })?;
+
+    let mut stdin = child.stdin.take().ok_or_else(|| {
+        XmiValidationError::ValidatorUnavailable(format!(
+            "failed to open stdin for OMG XMI schema validator {XMI_SCHEMA_VALIDATOR}"
+        ))
+    })?;
+    stdin.write_all(content.as_bytes()).map_err(|error| {
+        XmiValidationError::ValidatorUnavailable(format!(
+            "failed to write UML/XMI XML to OMG XMI schema validator {XMI_SCHEMA_VALIDATOR}: {error}"
+        ))
+    })?;
+    drop(stdin);
+
+    let output = child.wait_with_output().map_err(|error| {
+        XmiValidationError::ValidatorUnavailable(format!(
+            "failed to read OMG XMI schema validator output: {error}"
+        ))
+    })?;
+    if output.status.success() {
+        return Ok(());
+    }
+
+    let details = validation_output_details(&output.stdout, &output.stderr, output.status);
+    if xmi_schema_errors_are_only_unavailable_uml_schema(&details) {
+        return Ok(());
+    }
+    Err(XmiValidationError::Invalid {
+        code: "DEDIREN_XMI_SCHEMA_INVALID",
+        message: format!("generated UML/XMI XML does not validate against OMG XMI.xsd: {details}"),
+    })
+}
+
+fn resolve_omg_xmi_schema_path() -> Result<PathBuf, XmiValidationError> {
+    if let Some(configured) = non_empty_env_path(XMI_SCHEMA_PATH_ENV) {
+        if is_non_empty_file(&configured) {
+            return Ok(configured);
+        }
+        return Err(XmiValidationError::SchemaUnavailable(format!(
+            "OMG XMI schema file {} is missing or empty; provide the official XMI.xsd or unset {XMI_SCHEMA_PATH_ENV} to allow cache download",
+            configured.display()
+        )));
+    }
+
+    let schema_path = schema_cache_base_dir()
+        .map_err(XmiValidationError::SchemaUnavailable)?
+        .join("omg")
+        .join("xmi")
+        .join("2.5.1")
+        .join("XMI.xsd");
+    ensure_cached_schema_file(&schema_path, OMG_XMI_SCHEMA_URL, "OMG XMI schema")?;
+    Ok(schema_path)
+}
+
+fn ensure_cached_schema_file(
+    schema_path: &Path,
+    url: &str,
+    description: &str,
+) -> Result<(), XmiValidationError> {
+    if is_non_empty_file(schema_path) {
+        return Ok(());
+    }
+
+    let parent = schema_path.parent().ok_or_else(|| {
+        XmiValidationError::SchemaUnavailable(format!(
+            "schema cache path {} has no parent directory",
+            schema_path.display()
+        ))
+    })?;
+    std::fs::create_dir_all(parent).map_err(|error| {
+        XmiValidationError::SchemaUnavailable(format!(
+            "failed to create schema cache directory {}: {error}",
+            parent.display()
+        ))
+    })?;
+    let temp = tempfile::NamedTempFile::new_in(parent).map_err(|error| {
+        XmiValidationError::SchemaUnavailable(format!(
+            "failed to prepare temporary {description} download in {}: {error}",
+            parent.display()
+        ))
+    })?;
+
+    let output = Command::new(SCHEMA_FETCHER)
+        .args([
+            "--location",
+            "--fail",
+            "--silent",
+            "--show-error",
+            url,
+            "--output",
+        ])
+        .arg(temp.path())
+        .output()
+        .map_err(|error| {
+            XmiValidationError::SchemaUnavailable(format!(
+                "failed to start {SCHEMA_FETCHER} to download {description} from {url}: {error}"
+            ))
+        })?;
+    if !output.status.success() {
+        return Err(XmiValidationError::SchemaUnavailable(format!(
+            "failed to download {description} from {url}: {}",
+            fetch_output_details(&output.stdout, &output.stderr, output.status)
+        )));
+    }
+    if !is_non_empty_file(temp.path()) {
+        return Err(XmiValidationError::SchemaUnavailable(format!(
+            "downloaded {description} from {url} was empty"
+        )));
+    }
+
+    match temp.persist(schema_path) {
+        Ok(_) => Ok(()),
+        Err(_) if is_non_empty_file(schema_path) => Ok(()),
+        Err(error) => Err(XmiValidationError::SchemaUnavailable(format!(
+            "failed to store {description} in {}: {}",
+            schema_path.display(),
+            error.error
+        ))),
+    }
+}
+
+fn schema_cache_base_dir() -> Result<PathBuf, String> {
+    if let Some(configured) = non_empty_env_path(SCHEMA_CACHE_DIR_ENV) {
+        return Ok(configured);
+    }
+    if let Some(configured) = non_empty_env_path("XDG_CACHE_HOME") {
+        return Ok(configured.join("dediren").join("schemas"));
+    }
+    if let Some(configured) = non_empty_env_path("LOCALAPPDATA") {
+        return Ok(configured.join("dediren").join("schemas"));
+    }
+    if let Some(home) = non_empty_env_path("HOME") {
+        return Ok(home.join(".cache").join("dediren").join("schemas"));
+    }
+    Err(format!(
+        "cannot determine schema cache directory; set {SCHEMA_CACHE_DIR_ENV} or {XMI_SCHEMA_PATH_ENV}"
+    ))
+}
+
+fn non_empty_env_path(name: &str) -> Option<PathBuf> {
+    std::env::var_os(name)
+        .filter(|value| !value.is_empty())
+        .map(PathBuf::from)
+}
+
+fn is_non_empty_file(path: &Path) -> bool {
+    path.metadata()
+        .map(|metadata| metadata.is_file() && metadata.len() > 0)
+        .unwrap_or(false)
+}
+
+fn fetch_output_details(stdout: &[u8], stderr: &[u8], status: std::process::ExitStatus) -> String {
+    let mut details = String::from_utf8_lossy(stderr).trim().to_string();
+    let stdout = String::from_utf8_lossy(stdout);
+    let stdout = stdout.trim();
+    if !stdout.is_empty() {
+        if !details.is_empty() {
+            details.push('\n');
+        }
+        details.push_str(stdout);
+    }
+    if details.is_empty() {
+        details = format!("{SCHEMA_FETCHER} exited with status {status}");
+    }
+    details
+}
+
+fn validation_output_details(
+    stdout: &[u8],
+    stderr: &[u8],
+    status: std::process::ExitStatus,
+) -> String {
+    let mut details = String::from_utf8_lossy(stderr).trim().to_string();
+    let stdout = String::from_utf8_lossy(stdout);
+    let stdout = stdout.trim();
+    if !stdout.is_empty() {
+        if !details.is_empty() {
+            details.push('\n');
+        }
+        details.push_str(stdout);
+    }
+    if details.is_empty() {
+        details = format!("{XMI_SCHEMA_VALIDATOR} exited with status {status}");
+    }
+    details
+}
+
+fn xmi_schema_errors_are_only_unavailable_uml_schema(details: &str) -> bool {
+    let mut saw_uml_schema_gap = false;
+    for line in details
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+    {
+        if line.ends_with("fails to validate") {
+            continue;
+        }
+        if line.contains(UML_NS)
+            && line.contains("No matching global element declaration available")
+        {
+            saw_uml_schema_gap = true;
+            continue;
+        }
+        return false;
+    }
+    saw_uml_schema_gap
+}
+
+fn is_xml_id(value: &str) -> bool {
+    let mut chars = value.chars();
+    let Some(first) = chars.next() else {
+        return false;
+    };
+    if !(first == '_' || first.is_ascii_alphabetic()) {
+        return false;
+    }
+    chars.all(|character| {
+        character == '_'
+            || character == '-'
+            || character == '.'
+            || character.is_ascii_alphanumeric()
+    })
+}
+
 fn write_empty_packaged_element(
     writer: &mut Writer<Cursor<Vec<u8>>>,
-    ids: &mut IdentifierMap,
     uml_type: &str,
     node: &SourceNode,
+    element_id: &str,
 ) -> anyhow::Result<()> {
-    let element_id = ids.xmi_id(&node.id);
-    let element = packaged_element(uml_type, node, &element_id);
+    let element = packaged_element(uml_type, node, element_id);
     writer.write_event(Event::Empty(element))?;
     Ok(())
 }
 
-fn write_class(
+fn write_classifier(
     writer: &mut Writer<Cursor<Vec<u8>>>,
     ids: &mut IdentifierMap,
+    uml_type: &str,
     node: &SourceNode,
+    element_id: &str,
 ) -> anyhow::Result<()> {
-    let element_id = ids.xmi_id(&node.id);
-    let element = packaged_element("uml:Class", node, &element_id);
+    let element = packaged_element(uml_type, node, element_id);
     writer.write_event(Event::Start(element))?;
 
     for attribute in uml_array(node, "attributes") {
@@ -192,9 +562,9 @@ fn write_enumeration(
     writer: &mut Writer<Cursor<Vec<u8>>>,
     ids: &mut IdentifierMap,
     node: &SourceNode,
+    element_id: &str,
 ) -> anyhow::Result<()> {
-    let element_id = ids.xmi_id(&node.id);
-    let element = packaged_element("uml:Enumeration", node, &element_id);
+    let element = packaged_element("uml:Enumeration", node, element_id);
     writer.write_event(Event::Start(element))?;
 
     for literal in uml_array(node, "literals") {
@@ -210,6 +580,109 @@ fn write_enumeration(
 
     writer.write_event(Event::End(BytesEnd::new("packagedElement")))?;
     Ok(())
+}
+
+fn write_activity(
+    writer: &mut Writer<Cursor<Vec<u8>>>,
+    activity: &SourceNode,
+    activity_id: &str,
+    source_nodes: &[SourceNode],
+    selected_relationships: &[&SourceRelationship],
+    node_ids: &BTreeMap<String, String>,
+    relationship_ids: &BTreeMap<String, String>,
+) -> anyhow::Result<()> {
+    let element = packaged_element("uml:Activity", activity, activity_id);
+    writer.write_event(Event::Start(element))?;
+
+    for node in source_nodes.iter().filter(|node| {
+        node_ids.contains_key(&node.id)
+            && uml_string(node, "activity") == Some(activity.id.as_str())
+    }) {
+        let node_id = node_ids
+            .get(&node.id)
+            .with_context(|| format!("missing generated XMI id for activity node {}", node.id))?;
+        write_activity_node(writer, node, node_id)?;
+    }
+
+    for relationship in selected_relationships {
+        let Some(source_id) = node_ids.get(&relationship.source) else {
+            continue;
+        };
+        let Some(target_id) = node_ids.get(&relationship.target) else {
+            continue;
+        };
+        let relationship_id = relationship_ids.get(&relationship.id).with_context(|| {
+            format!(
+                "missing generated XMI id for activity relationship {}",
+                relationship.id
+            )
+        })?;
+        write_activity_edge(writer, relationship, relationship_id, source_id, target_id)?;
+    }
+
+    writer.write_event(Event::End(BytesEnd::new("packagedElement")))?;
+    Ok(())
+}
+
+fn write_activity_node(
+    writer: &mut Writer<Cursor<Vec<u8>>>,
+    node: &SourceNode,
+    node_id: &str,
+) -> anyhow::Result<()> {
+    let mut activity_node = BytesStart::new("node");
+    activity_node.push_attribute(("xmi:type", activity_node_xmi_type(&node.node_type)));
+    activity_node.push_attribute(("xmi:id", node_id));
+    if !node.label.is_empty() {
+        activity_node.push_attribute(("name", node.label.as_str()));
+    }
+    if let Some(object_type) = uml_string(node, "type") {
+        activity_node.push_attribute(("type", object_type));
+    }
+    writer.write_event(Event::Empty(activity_node))?;
+    Ok(())
+}
+
+fn write_activity_edge(
+    writer: &mut Writer<Cursor<Vec<u8>>>,
+    relationship: &SourceRelationship,
+    relationship_id: &str,
+    source_id: &str,
+    target_id: &str,
+) -> anyhow::Result<()> {
+    let mut edge = BytesStart::new("edge");
+    edge.push_attribute((
+        "xmi:type",
+        activity_edge_xmi_type(&relationship.relationship_type),
+    ));
+    edge.push_attribute(("xmi:id", relationship_id));
+    if !relationship.label.is_empty() {
+        edge.push_attribute(("name", relationship.label.as_str()));
+    }
+    edge.push_attribute(("source", source_id));
+    edge.push_attribute(("target", target_id));
+    writer.write_event(Event::Empty(edge))?;
+    Ok(())
+}
+
+fn activity_node_xmi_type(node_type: &str) -> &'static str {
+    match node_type {
+        "Action" => "uml:OpaqueAction",
+        "InitialNode" => "uml:InitialNode",
+        "ActivityFinalNode" => "uml:ActivityFinalNode",
+        "DecisionNode" => "uml:DecisionNode",
+        "MergeNode" => "uml:MergeNode",
+        "ForkNode" => "uml:ForkNode",
+        "JoinNode" => "uml:JoinNode",
+        "ObjectNode" => "uml:CentralBufferNode",
+        _ => "uml:OpaqueAction",
+    }
+}
+
+fn activity_edge_xmi_type(relationship_type: &str) -> &'static str {
+    match relationship_type {
+        "ObjectFlow" => "uml:ObjectFlow",
+        _ => "uml:ControlFlow",
+    }
 }
 
 fn packaged_element<'a>(
@@ -234,6 +707,14 @@ fn uml_array<'a>(node: &'a SourceNode, field: &str) -> &'a [Value] {
         .unwrap_or(&[])
 }
 
+fn uml_string<'a>(node: &'a SourceNode, field: &str) -> Option<&'a str> {
+    node.properties
+        .get("uml")
+        .and_then(Value::as_object)
+        .and_then(|uml| uml.get(field))
+        .and_then(Value::as_str)
+}
+
 fn string_field<'a>(value: &'a Value, field: &str) -> Option<&'a str> {
     value.as_object()?.get(field)?.as_str()
 }
@@ -255,6 +736,62 @@ fn validate_policy_schema(value: &Value) -> Result<(), String> {
     .map_err(|error| error.to_string())?;
     let validator = jsonschema::validator_for(&schema).map_err(|error| error.to_string())?;
     validator.validate(value).map_err(|error| error.to_string())
+}
+
+struct ExportScope {
+    node_ids: BTreeSet<String>,
+    relationship_ids: BTreeSet<String>,
+}
+
+impl ExportScope {
+    fn from_request(request: &ExportRequest) -> Self {
+        let source_nodes_by_id = request
+            .source
+            .nodes
+            .iter()
+            .map(|node| (node.id.as_str(), node))
+            .collect::<BTreeMap<_, _>>();
+        let mut node_ids = request
+            .layout_result
+            .nodes
+            .iter()
+            .map(|node| node.source_id.clone())
+            .collect::<BTreeSet<_>>();
+
+        for group in &request.layout_result.groups {
+            if let Some(source_id) = semantic_group_source_id(group) {
+                node_ids.insert(source_id.to_string());
+            }
+        }
+
+        let activity_ids = node_ids
+            .iter()
+            .filter_map(|node_id| source_nodes_by_id.get(node_id.as_str()))
+            .filter_map(|node| uml_string(node, "activity"))
+            .map(ToString::to_string)
+            .collect::<Vec<_>>();
+        node_ids.extend(activity_ids);
+
+        let relationship_ids = request
+            .layout_result
+            .edges
+            .iter()
+            .map(|edge| edge.source_id.clone())
+            .collect();
+
+        Self {
+            node_ids,
+            relationship_ids,
+        }
+    }
+}
+
+fn semantic_group_source_id(group: &LaidOutGroup) -> Option<&str> {
+    match group.provenance.as_ref() {
+        Some(provenance) if provenance.visual_only => None,
+        Some(provenance) => provenance.semantic_source_id(),
+        None => Some(group.source_id.as_str()),
+    }
 }
 
 #[derive(Default)]

@@ -20,6 +20,18 @@ fn oef_export_plugin_reports_capabilities() {
 
     let capabilities = common::stdout_json(&stdout);
     assert_eq!(capabilities["id"], "archimate-oef");
+    assert_eq!(
+        capabilities["runtime"]["schema_validation"]["kind"],
+        "official-oef-xsd"
+    );
+    assert_eq!(
+        capabilities["runtime"]["schema_validation"]["validator"],
+        "xmllint"
+    );
+    assert_eq!(
+        capabilities["runtime"]["schema_validation"]["available"], true,
+        "xmllint should be available for OEF export schema validation"
+    );
     let capability_ids: Vec<&str> = capabilities["capabilities"]
         .as_array()
         .expect("capabilities should be an array")
@@ -219,6 +231,104 @@ fn oef_export_emits_semantic_grouping_view_node_and_ignores_layout_only_group() 
 }
 
 #[test]
+fn oef_export_rounds_decimal_geometry_to_integer_oef_coordinates() {
+    let mut source: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(workspace_file("fixtures/source/valid-archimate-oef.json"))
+            .unwrap(),
+    )
+    .unwrap();
+    source["nodes"]
+        .as_array_mut()
+        .unwrap()
+        .push(serde_json::json!({
+            "id": "customer-domain",
+            "type": "Grouping",
+            "label": "Customer Domain",
+            "properties": {}
+        }));
+
+    let mut layout: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(workspace_file(
+            "fixtures/layout-result/archimate-oef-basic.json",
+        ))
+        .unwrap(),
+    )
+    .unwrap();
+    layout["nodes"][0]["x"] = serde_json::json!(40.25);
+    layout["nodes"][0]["y"] = serde_json::json!(40.75);
+    layout["nodes"][0]["width"] = serde_json::json!(180.6);
+    layout["nodes"][0]["height"] = serde_json::json!(80.4);
+    layout["edges"][0]["points"][0]["x"] = serde_json::json!(220.2);
+    layout["edges"][0]["points"][0]["y"] = serde_json::json!(80.8);
+    layout["groups"] = serde_json::json!([
+        {
+            "id": "customer-domain-group",
+            "source_id": "customer-domain",
+            "projection_id": "customer-domain-group",
+            "provenance": { "semantic_backed": { "source_id": "customer-domain" } },
+            "x": 10.6,
+            "y": 11.5,
+            "width": 520.4,
+            "height": 180.6,
+            "members": ["orders-component", "orders-service"],
+            "label": "Customer Domain"
+        }
+    ]);
+
+    let data = export_with_source_and_layout(source, layout);
+    let xml = data["content"].as_str().unwrap();
+    let doc = roxmltree::Document::parse(xml).unwrap();
+
+    let grouping_view_node = doc
+        .descendants()
+        .find(|node| {
+            node.has_tag_name("node")
+                && node.attribute("elementRef") == Some("id-el-customer-domain")
+        })
+        .expect("expected a semantic grouping view node");
+    assert_eq!(grouping_view_node.attribute("x"), Some("11"));
+    assert_eq!(grouping_view_node.attribute("y"), Some("12"));
+    assert_eq!(grouping_view_node.attribute("w"), Some("520"));
+    assert_eq!(grouping_view_node.attribute("h"), Some("181"));
+
+    let orders_component = doc
+        .descendants()
+        .find(|node| {
+            node.has_tag_name("node")
+                && node.attribute("elementRef") == Some("id-el-orders-component")
+        })
+        .expect("expected orders component view node");
+    assert_eq!(orders_component.attribute("x"), Some("40"));
+    assert_eq!(orders_component.attribute("y"), Some("41"));
+    assert_eq!(orders_component.attribute("w"), Some("181"));
+    assert_eq!(orders_component.attribute("h"), Some("80"));
+
+    let connection = doc
+        .descendants()
+        .find(|node| node.has_tag_name("connection"))
+        .expect("expected relationship view connection");
+    let bendpoint = connection
+        .children()
+        .find(|node| node.has_tag_name("bendpoint"))
+        .expect("expected at least one bendpoint");
+    assert_eq!(bendpoint.attribute("x"), Some("220"));
+    assert_eq!(bendpoint.attribute("y"), Some("81"));
+
+    for node in doc.descendants().filter(|node| node.has_tag_name("node")) {
+        for attribute in ["x", "y", "w", "h"] {
+            assert_oef_integer_attribute(node, attribute);
+        }
+    }
+    for bendpoint in doc
+        .descendants()
+        .filter(|node| node.has_tag_name("bendpoint"))
+    {
+        assert_oef_integer_attribute(bendpoint, "x");
+        assert_oef_integer_attribute(bendpoint, "y");
+    }
+}
+
+#[test]
 fn oef_export_emits_archimate_relationship_connector_junctions() {
     let source = serde_json::json!({
         "model_schema_version": "model.schema.v1",
@@ -394,6 +504,26 @@ fn oef_export_plugin_rejects_invalid_policy_with_error_envelope() {
 }
 
 #[test]
+fn oef_export_plugin_rejects_generated_xml_that_fails_official_oef_schema() {
+    let mut input = export_input();
+    input["policy"]["model_identifier"] = serde_json::json!("not a valid xml id");
+
+    let mut cmd = common::plugin_command();
+    let output = cmd
+        .arg("export")
+        .write_stdin(serde_json::to_string(&input).unwrap())
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+
+    let envelope = common::assert_error_code(&output, "DEDIREN_OEF_SCHEMA_INVALID");
+    assert_diagnostic_message_contains(&envelope, "official OEF schema");
+    assert_diagnostic_message_contains(&envelope, "model");
+}
+
+#[test]
 fn oef_export_plugin_rejects_junction_chain_with_invalid_effective_endpoint() {
     let mut input = export_input();
     input["source"] = serde_json::json!({
@@ -555,5 +685,16 @@ fn assert_diagnostic_message_contains(envelope: &serde_json::Value, expected: &s
     assert!(
         messages.iter().any(|message| message.contains(expected)),
         "expected diagnostic message to contain {expected:?}, got {messages:?}"
+    );
+}
+
+fn assert_oef_integer_attribute(node: roxmltree::Node<'_, '_>, attribute: &str) {
+    let value = node
+        .attribute(attribute)
+        .unwrap_or_else(|| panic!("expected OEF attribute {attribute}"));
+    let digits = value.strip_prefix('-').unwrap_or(value);
+    assert!(
+        !digits.is_empty() && digits.bytes().all(|byte| byte.is_ascii_digit()),
+        "expected OEF attribute {attribute} to be an integer, got {value:?}"
     );
 }

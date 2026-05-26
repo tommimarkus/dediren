@@ -1,5 +1,7 @@
 use std::collections::{BTreeMap, HashSet};
-use std::io::{Cursor, Read};
+use std::io::{Cursor, Read, Write};
+use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
 
 use anyhow::{bail, Context};
 use dediren_archimate::{
@@ -16,11 +18,26 @@ use quick_xml::Writer;
 const OEF_NS: &str = "http://www.opengroup.org/xsd/archimate/3.0/";
 const XSI_NS: &str = "http://www.w3.org/2001/XMLSchema-instance";
 const OEF_SCHEMA: &str = "http://www.opengroup.org/xsd/archimate/3.1/archimate3_Model.xsd";
+const OEF_SCHEMA_VALIDATOR: &str = "xmllint";
+const OEF_SCHEMA_BASE_URL: &str = "https://www.opengroup.org/xsd/archimate/3.1";
+const OEF_SCHEMA_DIR_ENV: &str = "DEDIREN_OEF_SCHEMA_DIR";
+const SCHEMA_CACHE_DIR_ENV: &str = "DEDIREN_SCHEMA_CACHE_DIR";
+const SCHEMA_FETCHER: &str = "curl";
+const OFFICIAL_OEF_SCHEMA_FILES: &[&str] = &[
+    "archimate3_Model.xsd",
+    "archimate3_View.xsd",
+    "archimate3_Diagram.xsd",
+];
 
 fn main() -> anyhow::Result<()> {
     let args: Vec<String> = std::env::args().collect();
     match args.get(1).map(String::as_str) {
         Some("capabilities") => {
+            let schema_validation_available = Command::new(OEF_SCHEMA_VALIDATOR)
+                .arg("--version")
+                .output()
+                .map(|output| output.status.success())
+                .unwrap_or(false);
             println!(
                 "{}",
                 serde_json::json!({
@@ -30,7 +47,17 @@ fn main() -> anyhow::Result<()> {
                     "runtime": {
                         "artifact_kind": "archimate-oef+xml",
                         "archimate_version": "3.2",
-                        "oef_namespace": OEF_NS
+                        "oef_namespace": OEF_NS,
+                        "schema_validation": {
+                            "kind": "official-oef-xsd",
+                            "schema_version": "3.1",
+                            "validator": OEF_SCHEMA_VALIDATOR,
+                            "available": schema_validation_available,
+                            "schema_source": "DEDIREN_OEF_SCHEMA_DIR or runtime cache download",
+                            "schema_dir_env": OEF_SCHEMA_DIR_ENV,
+                            "cache_dir_env": SCHEMA_CACHE_DIR_ENV,
+                            "fetcher": SCHEMA_FETCHER
+                        }
                     }
                 })
             );
@@ -69,6 +96,25 @@ fn export_from_stdin() -> anyhow::Result<()> {
         exit_with_diagnostic(&error.code, &error.message, Some(error.path));
     }
     let content = build_oef(&request)?;
+    if let Err(error) = validate_official_oef_schema(&content) {
+        match error {
+            OefSchemaValidationError::Invalid(message) => exit_with_diagnostic(
+                "DEDIREN_OEF_SCHEMA_INVALID",
+                &message,
+                Some("content".into()),
+            ),
+            OefSchemaValidationError::ValidatorUnavailable(message) => exit_with_diagnostic(
+                "DEDIREN_OEF_SCHEMA_VALIDATOR_UNAVAILABLE",
+                &message,
+                Some("content".into()),
+            ),
+            OefSchemaValidationError::SchemaUnavailable(message) => exit_with_diagnostic(
+                "DEDIREN_OEF_SCHEMA_UNAVAILABLE",
+                &message,
+                Some("content".into()),
+            ),
+        }
+    }
     let result = ExportResult {
         export_result_schema_version: EXPORT_RESULT_SCHEMA_VERSION.to_string(),
         artifact_kind: "archimate-oef+xml".to_string(),
@@ -283,6 +329,215 @@ fn build_oef(request: &OefExportInput) -> anyhow::Result<String> {
     Ok(content)
 }
 
+enum OefSchemaValidationError {
+    Invalid(String),
+    ValidatorUnavailable(String),
+    SchemaUnavailable(String),
+}
+
+fn validate_official_oef_schema(content: &str) -> Result<(), OefSchemaValidationError> {
+    let schema_dir = resolve_official_oef_schema_dir()?;
+    let schema_path = schema_dir.join("archimate3_Diagram.xsd");
+    let mut child = Command::new(OEF_SCHEMA_VALIDATOR)
+        .args(["--nonet", "--noout", "--schema"])
+        .arg(&schema_path)
+        .arg("-")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|error| {
+            OefSchemaValidationError::ValidatorUnavailable(format!(
+                "failed to run official OEF schema validator {OEF_SCHEMA_VALIDATOR}: {error}"
+            ))
+        })?;
+
+    let mut stdin = child.stdin.take().ok_or_else(|| {
+        OefSchemaValidationError::ValidatorUnavailable(format!(
+            "failed to open stdin for official OEF schema validator {OEF_SCHEMA_VALIDATOR}"
+        ))
+    })?;
+    stdin.write_all(content.as_bytes()).map_err(|error| {
+        OefSchemaValidationError::ValidatorUnavailable(format!(
+            "failed to write OEF XML to official OEF schema validator {OEF_SCHEMA_VALIDATOR}: {error}"
+        ))
+    })?;
+    drop(stdin);
+
+    let output = child.wait_with_output().map_err(|error| {
+        OefSchemaValidationError::ValidatorUnavailable(format!(
+            "failed to read official OEF schema validator output: {error}"
+        ))
+    })?;
+    if output.status.success() {
+        return Ok(());
+    }
+
+    let mut details = String::from_utf8_lossy(&output.stderr).trim().to_string();
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    if details.is_empty() {
+        details = stdout.trim().to_string();
+    }
+    if details.is_empty() {
+        details = format!(
+            "{OEF_SCHEMA_VALIDATOR} exited with status {}",
+            output.status
+        );
+    }
+    Err(OefSchemaValidationError::Invalid(format!(
+        "generated OEF XML does not validate against the official OEF schema: {details}"
+    )))
+}
+
+fn resolve_official_oef_schema_dir() -> Result<PathBuf, OefSchemaValidationError> {
+    if let Some(configured) = non_empty_env_path(OEF_SCHEMA_DIR_ENV) {
+        ensure_oef_schema_files_exist(&configured)?;
+        return Ok(configured);
+    }
+
+    let schema_dir = schema_cache_base_dir()
+        .map_err(OefSchemaValidationError::SchemaUnavailable)?
+        .join("opengroup")
+        .join("archimate")
+        .join("3.1");
+    std::fs::create_dir_all(&schema_dir).map_err(|error| {
+        OefSchemaValidationError::SchemaUnavailable(format!(
+            "failed to create OEF schema cache directory {}: {error}",
+            schema_dir.display()
+        ))
+    })?;
+
+    for file_name in OFFICIAL_OEF_SCHEMA_FILES {
+        let url = format!("{OEF_SCHEMA_BASE_URL}/{file_name}");
+        ensure_cached_schema_file(&schema_dir.join(file_name), &url, "official OEF schema")?;
+    }
+    Ok(schema_dir)
+}
+
+fn ensure_oef_schema_files_exist(schema_dir: &Path) -> Result<(), OefSchemaValidationError> {
+    for file_name in OFFICIAL_OEF_SCHEMA_FILES {
+        let schema_path = schema_dir.join(file_name);
+        if !is_non_empty_file(&schema_path) {
+            return Err(OefSchemaValidationError::SchemaUnavailable(format!(
+                "official OEF schema file {} is missing or empty; provide all ArchiMate 3.1 OEF XSD files or unset {OEF_SCHEMA_DIR_ENV} to allow cache download",
+                schema_path.display()
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn ensure_cached_schema_file(
+    schema_path: &Path,
+    url: &str,
+    description: &str,
+) -> Result<(), OefSchemaValidationError> {
+    if is_non_empty_file(schema_path) {
+        return Ok(());
+    }
+
+    let parent = schema_path.parent().ok_or_else(|| {
+        OefSchemaValidationError::SchemaUnavailable(format!(
+            "schema cache path {} has no parent directory",
+            schema_path.display()
+        ))
+    })?;
+    let temp = tempfile::NamedTempFile::new_in(parent).map_err(|error| {
+        OefSchemaValidationError::SchemaUnavailable(format!(
+            "failed to prepare temporary {description} download in {}: {error}",
+            parent.display()
+        ))
+    })?;
+
+    let output = Command::new(SCHEMA_FETCHER)
+        .args([
+            "--location",
+            "--fail",
+            "--silent",
+            "--show-error",
+            url,
+            "--output",
+        ])
+        .arg(temp.path())
+        .output()
+        .map_err(|error| {
+            OefSchemaValidationError::SchemaUnavailable(format!(
+                "failed to start {SCHEMA_FETCHER} to download {description} from {url}: {error}"
+            ))
+        })?;
+    if !output.status.success() {
+        return Err(OefSchemaValidationError::SchemaUnavailable(format!(
+            "failed to download {description} from {url}: {}",
+            validation_output_details(&output.stdout, &output.stderr, output.status)
+        )));
+    }
+    if !is_non_empty_file(temp.path()) {
+        return Err(OefSchemaValidationError::SchemaUnavailable(format!(
+            "downloaded {description} from {url} was empty"
+        )));
+    }
+
+    match temp.persist(schema_path) {
+        Ok(_) => Ok(()),
+        Err(error) if is_non_empty_file(schema_path) => Ok(()),
+        Err(error) => Err(OefSchemaValidationError::SchemaUnavailable(format!(
+            "failed to store {description} in {}: {}",
+            schema_path.display(),
+            error.error
+        ))),
+    }
+}
+
+fn schema_cache_base_dir() -> Result<PathBuf, String> {
+    if let Some(configured) = non_empty_env_path(SCHEMA_CACHE_DIR_ENV) {
+        return Ok(configured);
+    }
+    if let Some(configured) = non_empty_env_path("XDG_CACHE_HOME") {
+        return Ok(configured.join("dediren").join("schemas"));
+    }
+    if let Some(configured) = non_empty_env_path("LOCALAPPDATA") {
+        return Ok(configured.join("dediren").join("schemas"));
+    }
+    if let Some(home) = non_empty_env_path("HOME") {
+        return Ok(home.join(".cache").join("dediren").join("schemas"));
+    }
+    Err(format!(
+        "cannot determine schema cache directory; set {SCHEMA_CACHE_DIR_ENV} or {OEF_SCHEMA_DIR_ENV}"
+    ))
+}
+
+fn non_empty_env_path(name: &str) -> Option<PathBuf> {
+    std::env::var_os(name)
+        .filter(|value| !value.is_empty())
+        .map(PathBuf::from)
+}
+
+fn is_non_empty_file(path: &Path) -> bool {
+    path.metadata()
+        .map(|metadata| metadata.is_file() && metadata.len() > 0)
+        .unwrap_or(false)
+}
+
+fn validation_output_details(
+    stdout: &[u8],
+    stderr: &[u8],
+    status: std::process::ExitStatus,
+) -> String {
+    let mut details = String::from_utf8_lossy(stderr).trim().to_string();
+    let stdout = String::from_utf8_lossy(stdout);
+    let stdout = stdout.trim();
+    if !stdout.is_empty() {
+        if !details.is_empty() {
+            details.push('\n');
+        }
+        details.push_str(stdout);
+    }
+    if details.is_empty() {
+        details = format!("{SCHEMA_FETCHER} exited with status {status}");
+    }
+    details
+}
+
 fn write_text_element(
     writer: &mut Writer<Cursor<Vec<u8>>>,
     name: &str,
@@ -433,11 +688,7 @@ fn exit_with_diagnostic(code: &str, message: &str, path: Option<String>) -> ! {
 }
 
 fn format_number(value: f64) -> String {
-    if value.fract() == 0.0 {
-        format!("{}", value as i64)
-    } else {
-        format!("{value}")
-    }
+    format!("{:.0}", value.round())
 }
 
 #[derive(Default)]

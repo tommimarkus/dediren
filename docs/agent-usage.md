@@ -48,7 +48,7 @@ them.
 {
   "model_schema_version": "model.schema.v1",
   "required_plugins": [
-    { "id": "generic-graph", "version": "0.14.8" }
+    { "id": "generic-graph", "version": "0.14.9" }
   ],
   "nodes": [
     {
@@ -103,8 +103,8 @@ and use ArchiMate type names:
 {
   "model_schema_version": "model.schema.v1",
   "required_plugins": [
-    { "id": "generic-graph", "version": "0.14.8" },
-    { "id": "archimate-oef", "version": "0.14.8" }
+    { "id": "generic-graph", "version": "0.14.9" },
+    { "id": "archimate-oef", "version": "0.14.9" }
   ],
   "nodes": [
     {
@@ -191,6 +191,19 @@ dediren export --plugin uml-xmi \
   --source model.json \
   --layout layout-result.json > uml-xmi-export-result.json
 ```
+
+UML/XMI export is scoped by the layout result. Use the layout generated for the
+view you want to export. Structural views emit selected package, class,
+interface, data type, and enumeration content. Activity views emit the owning
+UML Activity plus selected activity nodes and control/object flows.
+The exporter validates generated XMI against OMG `XMI.xsd` to the extent the
+published schemas support it, validates `xmi:id` values, and relies on
+Dediren's UML profile validator for UML metamodel semantics because OMG
+publishes UML 2.5.1 as an XMI metamodel rather than an importable XML Schema.
+Dediren does not ship OMG schema files. Use `DEDIREN_XMI_SCHEMA_PATH` for an
+offline local copy, or let the exporter download
+`https://www.omg.org/spec/XMI/20131001/XMI.xsd` into the runtime schema cache
+under `DEDIREN_SCHEMA_CACHE_DIR` or the OS cache directory.
 
 Update runtime probes to include:
 
@@ -313,6 +326,17 @@ dediren export --plugin archimate-oef \
   --layout layout-result.json > oef-export-result.json
 ```
 
+OEF XML stores generated node, group, and bendpoint geometry as integer
+attributes. The exporter rounds layout result coordinates while writing XML.
+It validates the generated XML against the official Open Group ArchiMate 3.1
+OEF diagram XSD before returning an OK envelope. `xmllint` must be available on
+`PATH`; otherwise the plugin returns a structured error envelope. Dediren does
+not ship the Open Group XSD files. Use `DEDIREN_OEF_SCHEMA_DIR` for an offline
+local copy of all three ArchiMate 3.1 OEF XSD files, or let the exporter
+download them from `https://www.opengroup.org/xsd/archimate/3.1/` into the
+runtime schema cache under `DEDIREN_SCHEMA_CACHE_DIR` or the OS cache
+directory.
+
 ## Contract Map
 
 | Need | Source |
@@ -373,7 +397,7 @@ target/debug/dediren-plugin-uml-xmi-export capabilities
 From an unpacked distribution bundle:
 
 ```bash
-BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-0.14.8-x86_64-unknown-linux-gnu
+BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-0.14.9-x86_64-unknown-linux-gnu
 "$BUNDLE/bin/dediren" --version
 "$BUNDLE/bin/dediren-plugin-generic-graph" capabilities
 "$BUNDLE/bin/dediren-plugin-elk-layout" capabilities
@@ -388,7 +412,7 @@ CLI workflow commands return command envelopes using `schemas/envelope.schema.js
 ## Bundle Smoke Workflow
 
 ```bash
-BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-0.14.8-x86_64-unknown-linux-gnu
+BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-0.14.9-x86_64-unknown-linux-gnu
 
 "$BUNDLE/bin/dediren" validate \
   --input "$BUNDLE/fixtures/source/valid-basic.json"
@@ -417,8 +441,12 @@ BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-0.14.8-x86_64-unknown-linux-gnu
 jq -r '.data.content' render-result.json > diagram.svg
 ```
 
-The real `elk-layout` path needs Java 21 or newer as `java` on `PATH`. For a
-deterministic no-Java repair loop in a source checkout, set
+The real `elk-layout` path needs Java 21 or newer as `java` on `PATH`. OEF and
+UML/XMI export need `xmllint` on `PATH` for available standards validation and
+`curl` on `PATH` when the standards schema cache must be populated from the
+network. Offline runs can set `DEDIREN_OEF_SCHEMA_DIR` and
+`DEDIREN_XMI_SCHEMA_PATH`. For a deterministic no-Java repair loop in a source
+checkout, set
 `DEDIREN_ELK_RESULT_FIXTURE=fixtures/layout-result/basic.json`.
 
 ## Repair Map
@@ -447,6 +475,13 @@ Common recovery signals:
 | `DEDIREN_PLUGIN_UNSUPPORTED_CAPABILITY` | Probe plugin capabilities and choose a plugin that supports the command. |
 | `DEDIREN_ELK_RUNTIME_UNAVAILABLE` | Build/provide the helper or use the distribution bundle. |
 | `DEDIREN_ELK_JAVA_UNAVAILABLE` | Put Java 21 or newer on `PATH`. |
+| `DEDIREN_OEF_SCHEMA_VALIDATOR_UNAVAILABLE` | Install/provide `xmllint` before running `archimate-oef` export. |
+| `DEDIREN_OEF_SCHEMA_UNAVAILABLE` | Provide `DEDIREN_OEF_SCHEMA_DIR`, set `DEDIREN_SCHEMA_CACHE_DIR`, or allow `curl` to download the official OEF XSDs into the runtime cache. |
+| `DEDIREN_OEF_SCHEMA_INVALID` | Fix source, layout, or OEF export policy values so the generated XML conforms to the official OEF XSD. |
+| `DEDIREN_XMI_SCHEMA_VALIDATOR_UNAVAILABLE` | Install/provide `xmllint` before running `uml-xmi` export. |
+| `DEDIREN_XMI_SCHEMA_UNAVAILABLE` | Provide `DEDIREN_XMI_SCHEMA_PATH`, set `DEDIREN_SCHEMA_CACHE_DIR`, or allow `curl` to download OMG `XMI.xsd` into the runtime cache. |
+| `DEDIREN_XMI_SCHEMA_INVALID` | Fix generated XMI envelope shape or unsupported XMI attributes against OMG `XMI.xsd`. |
+| `DEDIREN_XMI_ID_INVALID` | Fix XMI identifier source/policy values so generated `xmi:id` values are XML IDs and unique. |
 | `DEDIREN_ARCHIMATE_ELEMENT_TYPE_UNSUPPORTED` | Replace node `type` with a supported ArchiMate element type. |
 | `DEDIREN_ARCHIMATE_RELATIONSHIP_TYPE_UNSUPPORTED` | Replace relationship `type` with a supported ArchiMate relationship type. |
 | `DEDIREN_ARCHIMATE_RELATIONSHIP_ENDPOINT_UNSUPPORTED` | Fix ArchiMate source/target type legality. |

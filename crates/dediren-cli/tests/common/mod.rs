@@ -8,6 +8,40 @@ use std::process::Command as StdCommand;
 use std::sync::OnceLock;
 
 static PLUGIN_BINARIES: OnceLock<()> = OnceLock::new();
+static TEST_SCHEMA_DIR: OnceLock<PathBuf> = OnceLock::new();
+
+const TEST_OEF_SCHEMA: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           targetNamespace="http://www.opengroup.org/xsd/archimate/3.0/"
+           xmlns="http://www.opengroup.org/xsd/archimate/3.0/"
+           elementFormDefault="qualified">
+  <xs:element name="model">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:any minOccurs="0" maxOccurs="unbounded" processContents="skip"/>
+      </xs:sequence>
+      <xs:attribute name="identifier" type="xs:ID" use="required"/>
+      <xs:anyAttribute processContents="skip"/>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>
+"#;
+
+const TEST_XMI_SCHEMA: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
+<xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+            targetNamespace="http://www.omg.org/spec/XMI/20131001"
+            xmlns="http://www.omg.org/spec/XMI/20131001"
+            elementFormDefault="qualified">
+  <xsd:element name="XMI">
+    <xsd:complexType>
+      <xsd:choice minOccurs="0" maxOccurs="unbounded">
+        <xsd:any processContents="lax"/>
+      </xsd:choice>
+      <xsd:anyAttribute processContents="lax"/>
+    </xsd:complexType>
+  </xsd:element>
+</xsd:schema>
+"#;
 
 pub fn workspace_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..")
@@ -20,8 +54,49 @@ pub fn workspace_file(path: &str) -> PathBuf {
 pub fn dediren_command() -> Command {
     let mut cmd = Command::cargo_bin("dediren").expect("dediren binary should be built by Cargo");
     cmd.current_dir(workspace_root())
-        .env("DEDIREN_PLUGIN_DIRS", workspace_file("fixtures/plugins"));
+        .env("DEDIREN_PLUGIN_DIRS", workspace_file("fixtures/plugins"))
+        .env("DEDIREN_OEF_SCHEMA_DIR", test_oef_schema_dir())
+        .env("DEDIREN_XMI_SCHEMA_PATH", test_xmi_schema_path());
     cmd
+}
+
+fn test_schema_root() -> PathBuf {
+    TEST_SCHEMA_DIR
+        .get_or_init(|| {
+            let root = std::env::temp_dir()
+                .join(format!("dediren-cli-test-schemas-{}", std::process::id()));
+            let oef_dir = root.join("opengroup").join("archimate").join("3.1");
+            std::fs::create_dir_all(&oef_dir).expect("test OEF schema dir should be created");
+            for file_name in [
+                "archimate3_Model.xsd",
+                "archimate3_View.xsd",
+                "archimate3_Diagram.xsd",
+            ] {
+                std::fs::write(oef_dir.join(file_name), TEST_OEF_SCHEMA)
+                    .expect("test OEF schema should be written");
+            }
+            let xmi_dir = root.join("omg").join("xmi").join("2.5.1");
+            std::fs::create_dir_all(&xmi_dir).expect("test XMI schema dir should be created");
+            std::fs::write(xmi_dir.join("XMI.xsd"), TEST_XMI_SCHEMA)
+                .expect("test XMI schema should be written");
+            root
+        })
+        .clone()
+}
+
+fn test_oef_schema_dir() -> PathBuf {
+    test_schema_root()
+        .join("opengroup")
+        .join("archimate")
+        .join("3.1")
+}
+
+fn test_xmi_schema_path() -> PathBuf {
+    test_schema_root()
+        .join("omg")
+        .join("xmi")
+        .join("2.5.1")
+        .join("XMI.xsd")
 }
 
 pub fn ensure_plugin_binaries() {

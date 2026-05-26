@@ -44,19 +44,26 @@ Build prerequisites:
 Runtime prerequisite:
 
 - Java 21 or newer available as `java` on `PATH`.
+- `xmllint` on `PATH` for ArchiMate OEF and UML/XMI export standards
+  validation.
+- `curl` on `PATH` if export validation needs to populate the standards schema
+  cache automatically. Offline runs can provide schema files through
+  `DEDIREN_OEF_SCHEMA_DIR` and `DEDIREN_XMI_SCHEMA_PATH`.
 
-For the current `0.14.8` version, the xtask creates:
+For the current `0.14.9` version, the xtask creates:
 
 ```text
-dist/dediren-agent-bundle-0.14.8-x86_64-unknown-linux-gnu/
-dist/dediren-agent-bundle-0.14.8-x86_64-unknown-linux-gnu.tar.gz
+dist/dediren-agent-bundle-0.14.9-x86_64-unknown-linux-gnu/
+dist/dediren-agent-bundle-0.14.9-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Run the smoke test from a shell where `java -version` resolves to Java 21 or
-newer:
+newer and `xmllint --version` succeeds. Export validation also needs either
+cached standards schemas, configured local schema paths, or `curl` network
+access to populate the cache:
 
 ```bash
-cargo xtask dist smoke dist/dediren-agent-bundle-0.14.8-x86_64-unknown-linux-gnu.tar.gz
+cargo xtask dist smoke dist/dediren-agent-bundle-0.14.9-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Concurrent `cargo xtask dist build` invocations serialize on a repo-local lock
@@ -69,8 +76,8 @@ Unpack and run it anywhere:
 
 ```bash
 mkdir -p /tmp/dediren-dist
-tar -xzf dist/dediren-agent-bundle-0.14.8-x86_64-unknown-linux-gnu.tar.gz -C /tmp/dediren-dist
-/tmp/dediren-dist/dediren-agent-bundle-0.14.8-x86_64-unknown-linux-gnu/bin/dediren --help
+tar -xzf dist/dediren-agent-bundle-0.14.9-x86_64-unknown-linux-gnu.tar.gz -C /tmp/dediren-dist
+/tmp/dediren-dist/dediren-agent-bundle-0.14.9-x86_64-unknown-linux-gnu/bin/dediren --help
 ```
 
 For a full unpacked-bundle JSON authoring and project/layout/render smoke
@@ -350,7 +357,9 @@ dediren render \
 ```
 
 Export ArchiMate 3.2 OEF XML from source semantics plus generated layout
-geometry:
+geometry. OEF view geometry attributes are integer fields, so the exporter
+rounds generated node, group, and bendpoint coordinates to integer values when
+writing XML:
 
 ```bash
 dediren export \
@@ -362,9 +371,15 @@ dediren export \
 ```
 
 `oef-export-result.json` is a command envelope. The OEF XML text is in
-`.data.content`. The exporter does not run external OEF XSD validation; import
-the XML into Archi or run an explicit schema validator when tool-conformance
-evidence is required.
+`.data.content`. Before returning an OK envelope, the exporter validates the
+generated XML against the official Open Group ArchiMate 3.1 OEF diagram XSD
+used for ArchiMate 3.1/3.2 exchange files. Dediren does not ship those XSD
+files. It first uses `DEDIREN_OEF_SCHEMA_DIR` when set; otherwise it downloads
+the official XSDs from `https://www.opengroup.org/xsd/archimate/3.1/` into the
+runtime schema cache under `DEDIREN_SCHEMA_CACHE_DIR` or the OS cache directory,
+then runs `xmllint --nonet` against the cached files. If `xmllint`, the schema
+files, or the generated XML are invalid/unavailable, the export returns an
+error envelope.
 
 ## UML SVG And XMI
 
@@ -434,7 +449,10 @@ class lanes:
 `fixtures/layout-result/uml-complex-class.json` with
 `fixtures/render-metadata/uml-complex-class.json`.
 
-Export UML/XMI:
+Export UML/XMI. The exporter scopes output to the selected layout result: class
+and data views emit their selected package/class/interface/data type/enumeration
+content, while activity views emit the owning UML Activity plus the selected
+activity nodes and flows.
 
 ```bash
 dediren export \
@@ -446,7 +464,16 @@ dediren export \
 ```
 
 `uml-xmi-export-result.json` is a command envelope. The UML/XMI XML text is in
-`.data.content`.
+`.data.content`. Before returning an OK envelope, the exporter validates the
+generated XMI layer against OMG `XMI.xsd` to the extent that the published
+schemas support it, and validates UML content through Dediren's UML profile
+rules. OMG publishes the UML 2.5.1 metamodel as XMI rather than as an
+importable XML Schema, so this check validates the generic XMI envelope and
+`xmi:id` values but does not claim full UML metamodel validation. Dediren does
+not ship OMG schema files. It first uses `DEDIREN_XMI_SCHEMA_PATH` when set;
+otherwise it downloads `https://www.omg.org/spec/XMI/20131001/XMI.xsd` into the
+runtime schema cache under `DEDIREN_SCHEMA_CACHE_DIR` or the OS cache directory,
+then runs `xmllint --nonet` against the cached file.
 
 ## Plugins
 
@@ -458,8 +485,8 @@ command envelopes. The bundled first-party plugins are:
 | `generic-graph` | `semantic-validation`, `projection` | Validates supported semantic profiles and projects source graph views into layout requests or render metadata. |
 | `elk-layout` | `layout` | Runs the Java ELK helper and returns generated layout results. |
 | `svg-render` | `render` | Renders SVG from layout result JSON and render policy JSON. |
-| `archimate-oef` | `export` | Exports ArchiMate 3.2 OEF XML from source and layout data. |
-| `uml-xmi` | `export` | Exports UML 2.5.1 XMI XML from UML-profile source data. |
+| `archimate-oef` | `export` | Exports ArchiMate 3.2 OEF XML from source and layout data, rounding generated OEF geometry to integer XML attributes and validating the generated XML against the official OEF XSD. |
+| `uml-xmi` | `export` | Exports view-scoped UML 2.5.1 XMI XML from UML-profile source and layout data, validating the generic XMI layer against OMG `XMI.xsd` where applicable. |
 
 After authoring JSON, agents can inspect runtime plugin support directly:
 
@@ -660,6 +687,13 @@ normalizes the failure into diagnostics such as:
 - `DEDIREN_ARCHIMATE_ELEMENT_TYPE_UNSUPPORTED`
 - `DEDIREN_ARCHIMATE_RELATIONSHIP_TYPE_UNSUPPORTED`
 - `DEDIREN_ARCHIMATE_RELATIONSHIP_ENDPOINT_UNSUPPORTED`
+- `DEDIREN_OEF_SCHEMA_VALIDATOR_UNAVAILABLE`
+- `DEDIREN_OEF_SCHEMA_UNAVAILABLE`
+- `DEDIREN_OEF_SCHEMA_INVALID`
+- `DEDIREN_XMI_SCHEMA_VALIDATOR_UNAVAILABLE`
+- `DEDIREN_XMI_SCHEMA_UNAVAILABLE`
+- `DEDIREN_XMI_SCHEMA_INVALID`
+- `DEDIREN_XMI_ID_INVALID`
 
 Agents should read stdout JSON for success and failure decisions. `stderr` is
 reserved for human debugging.
@@ -675,11 +709,11 @@ git diff --check
 ```
 
 Distribution checks from a shell where `java -version` resolves to Java 21 or
-newer:
+newer and `xmllint --version` succeeds:
 
 ```bash
 cargo xtask dist build
-cargo xtask dist smoke dist/dediren-agent-bundle-0.14.8-x86_64-unknown-linux-gnu.tar.gz
+cargo xtask dist smoke dist/dediren-agent-bundle-0.14.9-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Focused checks:
