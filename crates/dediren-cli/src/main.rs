@@ -126,6 +126,13 @@ fn main() -> anyhow::Result<()> {
             let text = read_json_input_or_exit(input.as_deref(), "input")?;
             let result: dediren_contracts::LayoutResult =
                 dediren_core::io::parse_command_data(&text)?;
+            let diagnostics = dediren_core::quality::validate_layout_diagnostics(&result);
+            if !diagnostics.is_empty() {
+                let envelope =
+                    dediren_contracts::CommandEnvelope::<serde_json::Value>::error(diagnostics);
+                println!("{}", serde_json::to_string(&envelope)?);
+                std::process::exit(2);
+            }
             let report = dediren_core::quality::validate_layout(&result);
             let envelope = dediren_contracts::CommandEnvelope::ok(report);
             println!("{}", serde_json::to_string(&envelope)?);

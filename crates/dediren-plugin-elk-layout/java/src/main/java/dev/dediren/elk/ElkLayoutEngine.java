@@ -179,6 +179,7 @@ final class ElkLayoutEngine {
         List<JsonContracts.Diagnostic> warnings = new ArrayList<>();
         Map<String, JsonContracts.LayoutNode> requestNodes = requestNodesById(request);
         Map<String, String> ownerByNode = ownerByNode(request);
+        List<JsonContracts.LayoutEdge> requestEdges = list(request.edges());
         ElkNode root = ElkGraphUtil.createGraph();
         configureLayeredRoot(root, rootDirection, preferences, false);
         root.setProperty(CoreOptions.HIERARCHY_HANDLING, HierarchyHandling.INCLUDE_CHILDREN);
@@ -218,7 +219,6 @@ final class ElkLayoutEngine {
             groupDirectionById.put(group.id(), groupDirection);
         }
 
-        List<JsonContracts.LayoutEdge> requestEdges = list(request.edges());
         Map<String, EdgeEndpointMerge> endpointMerges = groupedEdgeEndpointMerges(
             requestEdges,
             requestNodes,
@@ -435,10 +435,7 @@ final class ElkLayoutEngine {
     }
 
     private static boolean groupedWrappingEnabled(JsonContracts.LayoutPreferences preferences) {
-        return preferences == null
-            || preferences.wrapping() == null
-            || "auto".equals(preferences.wrapping())
-            || "multi-edge".equals(preferences.wrapping());
+        return preferences != null && "multi-edge".equals(preferences.wrapping());
     }
 
     private static String endpointMerging(JsonContracts.LayoutPreferences preferences) {

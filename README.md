@@ -27,13 +27,13 @@ geometry, routes, metrics, warnings, and provenance.
 
 ### Distribution Archives
 
-GitHub Release archives are published by `v*` tags. The initial release
-targets for `0.14.10` are:
+GitHub Release archives are published by `v*` tags. The release targets for the
+current version are:
 
 ```text
-dediren-agent-bundle-0.14.10-x86_64-unknown-linux-gnu.tar.gz
-dediren-agent-bundle-0.14.10-aarch64-unknown-linux-gnu.tar.gz
-dediren-agent-bundle-0.14.10-aarch64-apple-darwin.tar.gz
+dediren-agent-bundle-0.14.11-x86_64-unknown-linux-gnu.tar.gz
+dediren-agent-bundle-0.14.11-aarch64-unknown-linux-gnu.tar.gz
+dediren-agent-bundle-0.14.11-aarch64-apple-darwin.tar.gz
 ```
 
 To build an agent-ready local distribution archive from this source checkout,
@@ -66,11 +66,11 @@ Runtime prerequisite:
   `DEDIREN_OEF_SCHEMA_DIR` and `DEDIREN_XMI_SCHEMA_PATH`.
 
 Omitting `--target` builds for the current supported host target. For the
-current `0.14.10` version and the target above, the xtask creates:
+current `0.14.11` version and the target above, the xtask creates:
 
 ```text
-dist/dediren-agent-bundle-0.14.10-x86_64-unknown-linux-gnu/
-dist/dediren-agent-bundle-0.14.10-x86_64-unknown-linux-gnu.tar.gz
+dist/dediren-agent-bundle-0.14.11-x86_64-unknown-linux-gnu/
+dist/dediren-agent-bundle-0.14.11-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Run the smoke test from a shell where `java -version` resolves to Java 21 or
@@ -79,7 +79,7 @@ cached standards schemas, configured local schema paths, or `curl` network
 access to populate the cache:
 
 ```bash
-VERSION=0.14.10
+VERSION=0.14.11
 TARGET=x86_64-unknown-linux-gnu
 cargo xtask dist smoke "dist/dediren-agent-bundle-${VERSION}-${TARGET}.tar.gz"
 ```
@@ -93,7 +93,7 @@ and `.tar.gz` archive in `dist/`; stale bundle versions are pruned.
 Unpack and run it anywhere:
 
 ```bash
-VERSION=0.14.10
+VERSION=0.14.11
 TARGET=x86_64-unknown-linux-gnu
 mkdir -p /tmp/dediren-dist
 tar -xzf "dist/dediren-agent-bundle-${VERSION}-${TARGET}.tar.gz" -C /tmp/dediren-dist
@@ -213,6 +213,9 @@ Commands:
 - `validate-layout` reports backend-neutral layout quality metrics, including
   overlaps, connectors through unrelated nodes, invalid routes, route detours,
   close parallel route channels, group boundary issues, and backend warnings.
+  It returns an error envelope when route geometry is structurally invalid,
+  such as empty edge route points or endpoints that do not touch their declared
+  source and target node perimeters.
 - `render` asks a render plugin to create a visual artifact. The bundled
   `svg-render` plugin returns SVG in a JSON command envelope.
 - `export` asks an export plugin to create a non-visual artifact. The bundled
@@ -613,7 +616,10 @@ Dediren layout intent, not raw ELK options:
 
 Supported directions are `right`, `left`, `down`, and `up`. Supported density
 profiles are `compact`, `readable`, and `spacious`. Supported wrapping values
-are `auto`, `off`, and `multi-edge`. Supported routing style is `orthogonal`.
+are `auto`, `off`, and `multi-edge`; `auto` currently favors unwrapped grouped
+layouts, while `multi-edge` opts into ELK multi-edge wrapping when width
+reduction is worth the route-quality tradeoff. Supported routing style is
+`orthogonal`.
 `routing.profile` still accepts `compact`, `readable`, and `spacious` for
 schema compatibility, but the current Layered-only helper derives route spacing
 from `density`. Supported endpoint merging values are `auto`, `local`, and
@@ -732,7 +738,7 @@ Distribution checks from a shell where `java -version` resolves to Java 21 or
 newer and `xmllint --version` succeeds:
 
 ```bash
-VERSION=0.14.10
+VERSION=0.14.11
 TARGET=x86_64-unknown-linux-gnu
 cargo xtask dist build --target "$TARGET"
 cargo xtask dist smoke "dist/dediren-agent-bundle-${VERSION}-${TARGET}.tar.gz"

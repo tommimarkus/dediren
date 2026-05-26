@@ -1112,6 +1112,145 @@ class ElkLayoutEngineTest {
     }
 
     @Test
+    void businessProcessCooperationRoutesCrossHierarchyFeedbackEdgesToDeclaredTargets() {
+        JsonContracts.LayoutRequest request = new JsonContracts.LayoutRequest(
+            "layout-request.schema.v1",
+            "business-process-cooperation",
+            List.of(
+                new JsonContracts.LayoutNode(
+                    "actor-electronic-applicant",
+                    "Electronic Applicant",
+                    "actor-electronic-applicant",
+                    160.0,
+                    80.0),
+                new JsonContracts.LayoutNode(
+                    "actor-ulosottolaitos",
+                    "Ulosottolaitos / ORK",
+                    "actor-ulosottolaitos",
+                    160.0,
+                    80.0),
+                new JsonContracts.LayoutNode(
+                    "proc-uljas-submit-batch",
+                    "Submit Batch",
+                    "proc-uljas-submit-batch",
+                    160.0,
+                    80.0),
+                new JsonContracts.LayoutNode(
+                    "proc-uljas-process-batch",
+                    "Process Batch",
+                    "proc-uljas-process-batch",
+                    160.0,
+                    80.0),
+                new JsonContracts.LayoutNode(
+                    "proc-uljas-feedback-cycle",
+                    "Deliver Feedback",
+                    "proc-uljas-feedback-cycle",
+                    160.0,
+                    80.0),
+                new JsonContracts.LayoutNode(
+                    "evt-batch-landed",
+                    "Batch Landed",
+                    "evt-batch-landed",
+                    160.0,
+                    80.0),
+                new JsonContracts.LayoutNode(
+                    "svc-send-uljas-message",
+                    "Send Uljas Message",
+                    "svc-send-uljas-message",
+                    160.0,
+                    80.0),
+                new JsonContracts.LayoutNode(
+                    "svc-receive-uljas-message",
+                    "Receive Uljas Message",
+                    "svc-receive-uljas-message",
+                    160.0,
+                    80.0)),
+            List.of(
+                new JsonContracts.LayoutEdge(
+                    "actor-applicant-assigns-submit",
+                    "actor-electronic-applicant",
+                    "proc-uljas-submit-batch",
+                    "performs",
+                    "actor-applicant-assigns-submit",
+                    "Assignment"),
+                new JsonContracts.LayoutEdge(
+                    "actor-ulosottolaitos-assigns-process",
+                    "actor-ulosottolaitos",
+                    "proc-uljas-process-batch",
+                    "performs",
+                    "actor-ulosottolaitos-assigns-process",
+                    "Assignment"),
+                new JsonContracts.LayoutEdge(
+                    "actor-ulosottolaitos-assigns-feedback",
+                    "actor-ulosottolaitos",
+                    "proc-uljas-feedback-cycle",
+                    "performs",
+                    "actor-ulosottolaitos-assigns-feedback",
+                    "Assignment"),
+                new JsonContracts.LayoutEdge(
+                    "proc-submit-triggers-evt-landed",
+                    "proc-uljas-submit-batch",
+                    "evt-batch-landed",
+                    "lands",
+                    "proc-submit-triggers-evt-landed",
+                    "Triggering"),
+                new JsonContracts.LayoutEdge(
+                    "evt-landed-triggers-process",
+                    "evt-batch-landed",
+                    "proc-uljas-process-batch",
+                    "forwards",
+                    "evt-landed-triggers-process",
+                    "Triggering"),
+                new JsonContracts.LayoutEdge(
+                    "proc-process-triggers-feedback",
+                    "proc-uljas-process-batch",
+                    "proc-uljas-feedback-cycle",
+                    "outputs",
+                    "proc-process-triggers-feedback",
+                    "Triggering"),
+                new JsonContracts.LayoutEdge(
+                    "proc-feedback-flow-applicant",
+                    "proc-uljas-feedback-cycle",
+                    "actor-electronic-applicant",
+                    "delivers",
+                    "proc-feedback-flow-applicant",
+                    "Flow"),
+                new JsonContracts.LayoutEdge(
+                    "svc-send-serves-proc-submit",
+                    "svc-send-uljas-message",
+                    "proc-uljas-submit-batch",
+                    "serves",
+                    "svc-send-serves-proc-submit",
+                    "Serving"),
+                new JsonContracts.LayoutEdge(
+                    "svc-receive-serves-proc-feedback",
+                    "svc-receive-uljas-message",
+                    "proc-uljas-feedback-cycle",
+                    "serves",
+                    "svc-receive-serves-proc-feedback",
+                    "Serving")),
+            List.of(new JsonContracts.LayoutGroup(
+                "grp-stakeholders-view-bpc",
+                "Uljas Business Stakeholders",
+                List.of("actor-electronic-applicant", "actor-ulosottolaitos"),
+                new JsonContracts.GroupProvenance(
+                    null,
+                    new JsonContracts.SemanticBacked("grp-uljas-business-stakeholders")))),
+            List.of(),
+            List.of(),
+            new JsonContracts.LayoutPreferences(
+                "right",
+                "spacious",
+                null,
+                new JsonContracts.LayoutRoutingPreferences("orthogonal", "spacious", "off")));
+
+        JsonContracts.LayoutResult result = new ElkLayoutEngine().layout(request);
+
+        assertRouteEndpointsOnNodePerimeters(result, "actor-ulosottolaitos-assigns-feedback");
+        assertRouteEndpointsOnNodePerimeters(result, "proc-feedback-flow-applicant");
+    }
+
+    @Test
     void groupedConnectorEdgesKeepHorizontalFlowInsideVerticalGroups() {
         JsonContracts.LayoutRequest request = new JsonContracts.LayoutRequest(
             "layout-request.schema.v1",
@@ -1214,6 +1353,33 @@ class ElkLayoutEngineTest {
             ? edge.points().get(0)
             : edge.points().get(edge.points().size() - 1);
         assertPointOnSide(point, node, side, edgeId + " endpoint for " + nodeId);
+    }
+
+    private static void assertRouteEndpointsOnNodePerimeters(
+        JsonContracts.LayoutResult result,
+        String edgeId) {
+        JsonContracts.LaidOutEdge edge = edgeById(result, edgeId);
+        assertRouted(edge);
+        JsonContracts.Point sourcePoint = edge.points().get(0);
+        JsonContracts.Point targetPoint = edge.points().get(edge.points().size() - 1);
+        JsonContracts.LaidOutNode source = nodeById(result, edge.source());
+        JsonContracts.LaidOutNode target = nodeById(result, edge.target());
+        assertTrue(
+            routeEndpointSide(sourcePoint, source) != null,
+            "edge " + edgeId + " should start on source node perimeter, point="
+                + sourcePoint
+                + ", node="
+                + source
+                + ", points="
+                + edge.points());
+        assertTrue(
+            routeEndpointSide(targetPoint, target) != null,
+            "edge " + edgeId + " should end on target node perimeter, point="
+                + targetPoint
+                + ", node="
+                + target
+                + ", points="
+                + edge.points());
     }
 
     private static void assertPointOnSide(

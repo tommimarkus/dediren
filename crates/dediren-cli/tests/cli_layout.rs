@@ -1,7 +1,7 @@
 mod common;
 
 use assert_fs::prelude::*;
-use common::{ok_data, plugin_binary, workspace_file};
+use common::{error_codes, ok_data, plugin_binary, workspace_file};
 use std::path::PathBuf;
 
 #[test]
@@ -317,6 +317,50 @@ fn fixture_layout_result_reports_quality() {
     assert_eq!(data["connector_through_node_count"], 0);
     assert_eq!(data["route_close_parallel_count"], 0);
     assert_eq!(data["status"], "ok");
+}
+
+#[test]
+fn validate_layout_rejects_empty_routes_and_endpoint_misses() {
+    let temp = assert_fs::TempDir::new().unwrap();
+    let layout = temp.child("invalid-route-layout.json");
+    layout
+        .write_str(
+            &serde_json::to_string_pretty(&serde_json::json!({
+                "layout_result_schema_version": "layout-result.schema.v1",
+                "view_id": "main",
+                "nodes": [
+                    { "id": "source", "source_id": "source", "projection_id": "source", "x": 0.0, "y": 0.0, "width": 100.0, "height": 80.0, "label": "Source" },
+                    { "id": "target", "source_id": "target", "projection_id": "target", "x": 300.0, "y": 0.0, "width": 100.0, "height": 80.0, "label": "Target" }
+                ],
+                "edges": [
+                    { "id": "empty", "source": "source", "target": "target", "source_id": "empty", "projection_id": "empty", "routing_hints": [], "points": [], "label": "empty" },
+                    { "id": "misses-target", "source": "source", "target": "target", "source_id": "misses-target", "projection_id": "misses-target", "routing_hints": [], "points": [{"x": 100.0, "y": 40.0}, {"x": 250.0, "y": 40.0}], "label": "misses target" }
+                ],
+                "groups": [],
+                "warnings": []
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+
+    let output = common::dediren_command()
+        .arg("validate-layout")
+        .arg("--input")
+        .arg(layout.path())
+        .assert()
+        .failure()
+        .code(2)
+        .get_output()
+        .stdout
+        .clone();
+
+    assert_eq!(
+        error_codes(&output),
+        vec![
+            "DEDIREN_LAYOUT_ROUTE_POINTS_EMPTY",
+            "DEDIREN_LAYOUT_ROUTE_ENDPOINT_OFF_NODE_PERIMETER"
+        ]
+    );
 }
 
 fn layout_node_by_id<'a>(data: &'a serde_json::Value, id: &str) -> &'a serde_json::Value {
