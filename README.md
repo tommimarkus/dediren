@@ -25,21 +25,36 @@ geometry, routes, metrics, warnings, and provenance.
 
 ## Install
 
-### Linux Distribution Archive
+### Distribution Archives
 
-For an agent-ready local installation on Linux x86_64, build the repo-local
-distribution archive:
+GitHub Release archives are published by `v*` tags. The initial release
+targets for `0.14.10` are:
+
+```text
+dediren-agent-bundle-0.14.10-x86_64-unknown-linux-gnu.tar.gz
+dediren-agent-bundle-0.14.10-aarch64-unknown-linux-gnu.tar.gz
+dediren-agent-bundle-0.14.10-aarch64-apple-darwin.tar.gz
+```
+
+To build an agent-ready local distribution archive from this source checkout,
+choose a supported host target:
 
 ```bash
-cargo xtask dist build
+TARGET=x86_64-unknown-linux-gnu
+cargo xtask dist build --target "$TARGET"
 ```
 
 Build prerequisites:
 
-- Linux x86_64 host.
+- Host platform matching the selected target. Cross-compilation is not
+  supported by the distribution builder.
 - Rust and Cargo matching the workspace toolchain.
-- SDKMAN with the Java and Gradle versions declared by
+- By default, SDKMAN with the Java and Gradle versions declared by
   `crates/dediren-plugin-elk-layout/java/.sdkmanrc`.
+- CI or other prepared environments can set `DEDIREN_ELK_BUILD_USE_SDKMAN=0`
+  when Java 25 and Gradle 9.5.0 are already on `PATH`.
+- Local builds keep Gradle state under `.cache/gradle`; GitHub Actions builds
+  use the standard Gradle user home so `setup-gradle` can cache dependencies.
 
 Runtime prerequisite:
 
@@ -50,11 +65,12 @@ Runtime prerequisite:
   cache automatically. Offline runs can provide schema files through
   `DEDIREN_OEF_SCHEMA_DIR` and `DEDIREN_XMI_SCHEMA_PATH`.
 
-For the current `0.14.9` version, the xtask creates:
+Omitting `--target` builds for the current supported host target. For the
+current `0.14.10` version and the target above, the xtask creates:
 
 ```text
-dist/dediren-agent-bundle-0.14.9-x86_64-unknown-linux-gnu/
-dist/dediren-agent-bundle-0.14.9-x86_64-unknown-linux-gnu.tar.gz
+dist/dediren-agent-bundle-0.14.10-x86_64-unknown-linux-gnu/
+dist/dediren-agent-bundle-0.14.10-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Run the smoke test from a shell where `java -version` resolves to Java 21 or
@@ -63,7 +79,9 @@ cached standards schemas, configured local schema paths, or `curl` network
 access to populate the cache:
 
 ```bash
-cargo xtask dist smoke dist/dediren-agent-bundle-0.14.9-x86_64-unknown-linux-gnu.tar.gz
+VERSION=0.14.10
+TARGET=x86_64-unknown-linux-gnu
+cargo xtask dist smoke "dist/dediren-agent-bundle-${VERSION}-${TARGET}.tar.gz"
 ```
 
 Concurrent `cargo xtask dist build` invocations serialize on a repo-local lock
@@ -75,9 +93,11 @@ and `.tar.gz` archive in `dist/`; stale bundle versions are pruned.
 Unpack and run it anywhere:
 
 ```bash
+VERSION=0.14.10
+TARGET=x86_64-unknown-linux-gnu
 mkdir -p /tmp/dediren-dist
-tar -xzf dist/dediren-agent-bundle-0.14.9-x86_64-unknown-linux-gnu.tar.gz -C /tmp/dediren-dist
-/tmp/dediren-dist/dediren-agent-bundle-0.14.9-x86_64-unknown-linux-gnu/bin/dediren --help
+tar -xzf "dist/dediren-agent-bundle-${VERSION}-${TARGET}.tar.gz" -C /tmp/dediren-dist
+"/tmp/dediren-dist/dediren-agent-bundle-${VERSION}-${TARGET}/bin/dediren" --help
 ```
 
 For a full unpacked-bundle JSON authoring and project/layout/render smoke
@@ -712,8 +732,10 @@ Distribution checks from a shell where `java -version` resolves to Java 21 or
 newer and `xmllint --version` succeeds:
 
 ```bash
-cargo xtask dist build
-cargo xtask dist smoke dist/dediren-agent-bundle-0.14.9-x86_64-unknown-linux-gnu.tar.gz
+VERSION=0.14.10
+TARGET=x86_64-unknown-linux-gnu
+cargo xtask dist build --target "$TARGET"
+cargo xtask dist smoke "dist/dediren-agent-bundle-${VERSION}-${TARGET}.tar.gz"
 ```
 
 Focused checks:

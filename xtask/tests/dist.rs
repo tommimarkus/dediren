@@ -10,8 +10,52 @@ use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
 #[cfg(unix)]
+const SUPPORTED_TEST_TARGETS: &[&str] = &[
+    "x86_64-unknown-linux-gnu",
+    "aarch64-unknown-linux-gnu",
+    "aarch64-apple-darwin",
+];
+
+#[cfg(unix)]
+fn host_dist_target() -> &'static str {
+    match (std::env::consts::OS, std::env::consts::ARCH) {
+        ("linux", "x86_64") => "x86_64-unknown-linux-gnu",
+        ("linux", "aarch64") => "aarch64-unknown-linux-gnu",
+        ("macos", "aarch64") => "aarch64-apple-darwin",
+        _ => "unsupported-host",
+    }
+}
+
+#[cfg(unix)]
+fn is_supported_host() -> bool {
+    host_dist_target() != "unsupported-host"
+}
+
+#[cfg(unix)]
+fn other_supported_target_for_host() -> Option<&'static str> {
+    let host = host_dist_target();
+    SUPPORTED_TEST_TARGETS
+        .iter()
+        .copied()
+        .find(|target| *target != host)
+}
+
+#[cfg(unix)]
+fn current_bundle_name() -> String {
+    format!(
+        "dediren-agent-bundle-{}-{}",
+        env!("CARGO_PKG_VERSION"),
+        host_dist_target()
+    )
+}
+
+#[cfg(unix)]
 #[test]
 fn dist_build_serializes_parallel_invocations() {
+    if !is_supported_host() {
+        return;
+    }
+
     let repo = FakeDistRepo::new();
     let first = repo.run_xtask(["dist", "build"]);
     repo.wait_for_helper_build();
@@ -35,7 +79,128 @@ fn dist_build_serializes_parallel_invocations() {
 
 #[cfg(unix)]
 #[test]
+fn dist_build_accepts_explicit_host_target() {
+    if !is_supported_host() {
+        return;
+    }
+
+    let repo = FakeDistRepo::new();
+    repo.release_helper_build();
+    let output = repo
+        .xtask_command(["dist", "build", "--target", host_dist_target()])
+        .output()
+        .unwrap();
+
+    assert!(
+        output.status.success(),
+        "dist build should accept the explicit host target\nstatus: {:?}\nstdout:\n{}\nstderr:\n{}",
+        output.status.code(),
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr),
+    );
+    assert!(
+        repo.root
+            .path()
+            .join("dist")
+            .join(format!("{}.tar.gz", current_bundle_name()))
+            .exists(),
+        "dist build should create the host-targeted archive"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn dist_build_explicit_target_wins_over_env_fallback() {
+    let host_target = host_dist_target();
+    if !is_supported_host() {
+        return;
+    }
+    let Some(env_target) = other_supported_target_for_host() else {
+        return;
+    };
+
+    let repo = FakeDistRepo::new();
+    repo.release_helper_build();
+    let output = repo
+        .xtask_command(["dist", "build", "--target", host_target])
+        .env("DEDIREN_DIST_TARGET", env_target)
+        .output()
+        .unwrap();
+
+    assert!(
+        output.status.success(),
+        "explicit dist target should win over DEDIREN_DIST_TARGET\nstatus: {:?}\nstdout:\n{}\nstderr:\n{}",
+        output.status.code(),
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr),
+    );
+    assert!(
+        repo.root
+            .path()
+            .join("dist")
+            .join(format!("{}.tar.gz", current_bundle_name()))
+            .exists(),
+        "dist build should create the explicit host-targeted archive"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn dist_build_rejects_unsupported_target() {
+    let repo = FakeDistRepo::new();
+    repo.release_helper_build();
+    let output = repo
+        .xtask_command(["dist", "build", "--target", "riscv64gc-unknown-linux-gnu"])
+        .output()
+        .unwrap();
+
+    assert!(
+        !output.status.success(),
+        "dist build should reject unsupported targets\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr),
+    );
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains("unsupported distribution target"),
+        "dist build should explain unsupported targets\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stderr),
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn dist_build_rejects_supported_target_for_wrong_host() {
+    let Some(other_target) = other_supported_target_for_host() else {
+        return;
+    };
+
+    let repo = FakeDistRepo::new();
+    repo.release_helper_build();
+    let output = repo
+        .xtask_command(["dist", "build", "--target", other_target])
+        .output()
+        .unwrap();
+
+    assert!(
+        !output.status.success(),
+        "dist build should reject a supported target on the wrong host\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr),
+    );
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains("must be built on"),
+        "dist build should explain host-target mismatches\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stderr),
+    );
+}
+
+#[cfg(unix)]
+#[test]
 fn dist_build_prunes_stale_bundle_artifacts() {
+    if !is_supported_host() {
+        return;
+    }
+
     let repo = FakeDistRepo::new();
     let stale_dir = repo
         .root
@@ -77,6 +242,10 @@ fn dist_build_prunes_stale_bundle_artifacts() {
 #[cfg(unix)]
 #[test]
 fn dist_build_includes_agent_usage_docs() {
+    if !is_supported_host() {
+        return;
+    }
+
     let repo = FakeDistRepo::new();
     repo.release_helper_build();
     let output = repo.xtask_command(["dist", "build"]).output().unwrap();
@@ -89,10 +258,7 @@ fn dist_build_includes_agent_usage_docs() {
         String::from_utf8_lossy(&output.stderr),
     );
 
-    let bundle = repo.root.path().join(format!(
-        "dist/dediren-agent-bundle-{}-x86_64-unknown-linux-gnu",
-        env!("CARGO_PKG_VERSION")
-    ));
+    let bundle = repo.root.path().join("dist").join(current_bundle_name());
     let guide = bundle.join("docs/agent-usage.md");
     assert!(
         guide.exists(),
@@ -110,6 +276,10 @@ fn dist_build_includes_agent_usage_docs() {
 #[cfg(unix)]
 #[test]
 fn dist_build_includes_license_notice() {
+    if !is_supported_host() {
+        return;
+    }
+
     let repo = FakeDistRepo::new();
     repo.release_helper_build();
     let output = repo.xtask_command(["dist", "build"]).output().unwrap();
@@ -122,10 +292,7 @@ fn dist_build_includes_license_notice() {
         String::from_utf8_lossy(&output.stderr),
     );
 
-    let bundle_name = format!(
-        "dediren-agent-bundle-{}-x86_64-unknown-linux-gnu",
-        env!("CARGO_PKG_VERSION")
-    );
+    let bundle_name = current_bundle_name();
     let bundle = repo.root.path().join("dist").join(&bundle_name);
     let source_license = fs::read_to_string(repo.root.path().join("LICENSE")).unwrap();
     let bundled_license_path = bundle.join("LICENSE");
@@ -167,6 +334,10 @@ fn dist_build_includes_license_notice() {
 #[cfg(unix)]
 #[test]
 fn dist_build_includes_uml_profile_bundle_artifacts() {
+    if !is_supported_host() {
+        return;
+    }
+
     let repo = FakeDistRepo::new();
     repo.release_helper_build();
     let output = repo.xtask_command(["dist", "build"]).output().unwrap();
@@ -179,10 +350,7 @@ fn dist_build_includes_uml_profile_bundle_artifacts() {
         String::from_utf8_lossy(&output.stderr),
     );
 
-    let bundle = repo.root.path().join(format!(
-        "dist/dediren-agent-bundle-{}-x86_64-unknown-linux-gnu",
-        env!("CARGO_PKG_VERSION")
-    ));
+    let bundle = repo.root.path().join("dist").join(current_bundle_name());
     assert!(
         bundle.join("bin/dediren-plugin-uml-xmi-export").exists(),
         "dist build should include the UML/XMI export binary"
@@ -411,12 +579,10 @@ esac
                 .join("crates/dediren-plugin-elk-layout/java/scripts"),
         )
         .unwrap();
-        fs::create_dir_all(
-            self.root
-                .path()
-                .join("target/x86_64-unknown-linux-gnu/release"),
-        )
-        .unwrap();
+        for target in SUPPORTED_TEST_TARGETS {
+            fs::create_dir_all(self.root.path().join("target").join(target).join("release"))
+                .unwrap();
+        }
 
         for manifest in [
             "generic-graph.manifest.json",
@@ -481,14 +647,18 @@ esac
             "dediren-plugin-archimate-oef-export",
             "dediren-plugin-uml-xmi-export",
         ] {
-            self.write_executable_at(
-                &self
-                    .root
-                    .path()
-                    .join("target/x86_64-unknown-linux-gnu/release")
-                    .join(binary),
-                "#!/usr/bin/env bash\n",
-            );
+            for target in SUPPORTED_TEST_TARGETS {
+                self.write_executable_at(
+                    &self
+                        .root
+                        .path()
+                        .join("target")
+                        .join(target)
+                        .join("release")
+                        .join(binary),
+                    "#!/usr/bin/env bash\n",
+                );
+            }
         }
 
         self.write_executable(

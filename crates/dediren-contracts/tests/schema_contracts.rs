@@ -70,6 +70,12 @@ const WORKSPACE_PACKAGE_NAMES: &[&str] = &[
     "xtask",
 ];
 
+const RELEASE_TARGETS: &[&str] = &[
+    "x86_64-unknown-linux-gnu",
+    "aarch64-unknown-linux-gnu",
+    "aarch64-apple-darwin",
+];
+
 #[test]
 fn valid_source_matches_model_schema() {
     for path in SOURCE_FIXTURE_PATHS {
@@ -85,7 +91,7 @@ fn source_with_fragments_matches_model_schema() {
             "model_schema_version": "model.schema.v1",
             "fragments": ["model/application.json", "model/technology.json"],
             "required_plugins": [
-                { "id": "generic-graph", "version": "0.14.9" }
+                { "id": "generic-graph", "version": env!("CARGO_PKG_VERSION") }
             ],
             "nodes": [],
             "relationships": [],
@@ -686,7 +692,8 @@ fn agent_usage_versioned_examples_match_workspace_version() {
     );
     for found in versions {
         assert_eq!(
-            found, version,
+            found.as_str(),
+            version,
             "agent usage guide versioned examples should match workspace version"
         );
     }
@@ -786,19 +793,19 @@ fn source_fixture_required_plugin_versions_match_first_party_manifests() {
 #[test]
 fn live_release_surfaces_match_workspace_version() {
     let version = env!("CARGO_PKG_VERSION");
-    let target = "x86_64-unknown-linux-gnu";
-    let bundle_name = format!("dediren-agent-bundle-{version}-{target}");
-    let archive_name = format!("{bundle_name}.tar.gz");
-
     let readme = std::fs::read_to_string(workspace_file("README.md")).unwrap();
-    assert!(
-        readme.contains(&bundle_name),
-        "README.md should mention {bundle_name}"
-    );
-    assert!(
-        readme.contains(&archive_name),
-        "README.md should mention {archive_name}"
-    );
+    for target in RELEASE_TARGETS {
+        let bundle_name = format!("dediren-agent-bundle-{version}-{target}");
+        let archive_name = format!("{bundle_name}.tar.gz");
+        assert!(
+            readme.contains(&bundle_name),
+            "README.md should mention {bundle_name}"
+        );
+        assert!(
+            readme.contains(&archive_name),
+            "README.md should mention {archive_name}"
+        );
+    }
     assert!(
         readme.contains("cargo xtask dist build"),
         "README.md should document the xtask distribution build command"
@@ -839,6 +846,192 @@ fn live_release_surfaces_match_workspace_version() {
 }
 
 #[test]
+fn release_workflow_matches_supported_targets_and_permissions() {
+    let workflow =
+        std::fs::read_to_string(workspace_file(".github/workflows/release.yml")).unwrap();
+    let lines = yaml_lines(&workflow);
+    let expected_targets = release_targets();
+    assert_workflow_actions_are_sha_pinned(&lines);
+    assert_checkouts_do_not_persist_credentials(&lines);
+
+    assert_eq!(
+        xtask_dist_targets(),
+        expected_targets,
+        "release target contract should match xtask supported targets"
+    );
+
+    let on_block = yaml_block(&lines, 0, "on:").expect("release workflow should define triggers");
+    let push_block =
+        yaml_block(&on_block, 2, "push:").expect("release workflow should run on push");
+    let tags_block =
+        yaml_block(&push_block, 4, "tags:").expect("release workflow should run on tags");
+    assert!(
+        yaml_block_contains_any(&tags_block, 6, &["- \"v*\"", "- 'v*'", "- v*"]),
+        "release workflow should run on v-prefixed tags"
+    );
+    assert!(
+        yaml_block_contains(&on_block, 2, "workflow_dispatch:"),
+        "release workflow should support manual dispatch"
+    );
+
+    let permissions_block =
+        yaml_block(&lines, 0, "permissions:").expect("release workflow should set permissions");
+    assert!(
+        yaml_block_contains(&permissions_block, 2, "contents: read"),
+        "release workflow should default to read-only contents permissions"
+    );
+
+    let jobs_block = yaml_block(&lines, 0, "jobs:").expect("release workflow should define jobs");
+    let validate_job = yaml_block(&jobs_block, 2, "validate:")
+        .expect("release workflow should define validate job");
+    let build_job =
+        yaml_block(&jobs_block, 2, "build:").expect("release workflow should define build job");
+    let publish_job =
+        yaml_block(&jobs_block, 2, "publish:").expect("release workflow should define publish job");
+    assert!(
+        yaml_block_contains(&validate_job, 4, "timeout-minutes: 30"),
+        "validate job should have a bounded timeout"
+    );
+    assert!(
+        yaml_block_contains(&build_job, 4, "timeout-minutes: 60"),
+        "build job should have a bounded native build timeout"
+    );
+    assert!(
+        yaml_block_contains(&publish_job, 4, "timeout-minutes: 15"),
+        "publish job should have a bounded timeout"
+    );
+    let publish_permissions = yaml_block(&publish_job, 4, "permissions:")
+        .expect("publish job should declare permissions");
+    let build_permissions =
+        yaml_block(&build_job, 4, "permissions:").expect("build job should declare permissions");
+    assert!(
+        yaml_block_contains(&build_permissions, 6, "contents: read"),
+        "build job should keep read-only contents permission"
+    );
+    assert!(
+        yaml_block_contains(&build_permissions, 6, "id-token: write"),
+        "build job should be able to issue artifact provenance attestations"
+    );
+    assert!(
+        yaml_block_contains(&build_permissions, 6, "attestations: write"),
+        "build job should be able to write artifact attestations"
+    );
+    assert!(
+        yaml_block_contains(&publish_permissions, 6, "contents: write"),
+        "release workflow should grant write contents permission for publishing"
+    );
+
+    let validate_steps =
+        yaml_block(&validate_job, 4, "steps:").expect("validate job should define steps");
+    let workspace_tests_step = yaml_named_step(&validate_steps, "Check workspace tests")
+        .expect("validate job should run the full workspace test suite");
+    assert!(
+        yaml_block_contains(
+            &workspace_tests_step,
+            8,
+            "run: cargo test --workspace --locked"
+        ),
+        "release validation should run the full workspace test suite before publishing"
+    );
+
+    let build_steps = yaml_block(&build_job, 4, "steps:").expect("build job should define steps");
+    let setup_gradle_step =
+        yaml_named_step(&build_steps, "Set up Gradle").expect("build job should set up Gradle");
+    assert!(
+        yaml_step_uses_pinned_action(&setup_gradle_step, "gradle/actions/setup-gradle", "v6"),
+        "build job should use the expected Gradle setup action"
+    );
+    assert!(
+        yaml_block_contains(&setup_gradle_step, 10, "cache-provider: basic"),
+        "release workflow should use basic cache provider"
+    );
+    let cargo_cache_step = yaml_named_step(&build_steps, "Restore Cargo cache")
+        .expect("build job should restore Cargo cache");
+    assert!(
+        yaml_step_uses_pinned_action(&cargo_cache_step, "actions/cache", "v5"),
+        "release workflow should use actions/cache v5"
+    );
+    let gradle_project_cache_step = yaml_named_step(&build_steps, "Restore Gradle project cache")
+        .expect("build job should restore the Gradle project cache used by the helper script");
+    assert!(
+        yaml_step_uses_pinned_action(&gradle_project_cache_step, "actions/cache", "v5"),
+        "release workflow should cache the Gradle project cache with actions/cache v5"
+    );
+    assert!(
+        yaml_block_contains(
+            &gradle_project_cache_step,
+            10,
+            "path: .cache/gradle/project-cache/elk-layout-java"
+        ),
+        "release workflow should cache the helper script's Gradle project cache directory"
+    );
+    let attest_step = yaml_named_step(&build_steps, "Attest archive provenance")
+        .expect("build job should attest release archives");
+    assert!(
+        yaml_step_uses_pinned_action(&attest_step, "actions/attest-build-provenance", "v3"),
+        "build job should use the expected artifact attestation action"
+    );
+    assert!(
+        yaml_block_contains(
+            &attest_step,
+            10,
+            r#"subject-path: dist/dediren-agent-bundle-*-${{ matrix.target }}.tar.gz"#
+        ),
+        "artifact attestation should cover the target archive"
+    );
+    assert_no_clobber_release_commands(&publish_job);
+    let publish_steps =
+        yaml_block(&publish_job, 4, "steps:").expect("publish job should define steps");
+    let verify_release_assets_step = yaml_named_step(&publish_steps, "Verify release assets")
+        .expect("publish job should verify release assets");
+    assert!(
+        yaml_block_contains(
+            &verify_release_assets_step,
+            12,
+            r#"bundle="dediren-agent-bundle-${VERSION}-${target}""#
+        ),
+        "release asset verification should derive the top-level bundle directory"
+    );
+    assert!(
+        yaml_block_contains(
+            &verify_release_assets_step,
+            12,
+            r#"tar -tzf "$archive" "$bundle/LICENSE" >/dev/null"#
+        ),
+        "release asset verification should check the prefixed LICENSE member"
+    );
+    assert!(
+        yaml_block_contains(
+            &verify_release_assets_step,
+            12,
+            r#"tar -tzf "$archive" "$bundle/docs/agent-usage.md" >/dev/null"#
+        ),
+        "release asset verification should check the prefixed agent guide member"
+    );
+    assert!(
+        yaml_block_contains(
+            &verify_release_assets_step,
+            12,
+            r#"tar -xOf "$archive" "$bundle/bundle.json" \"#
+        ),
+        "release asset verification should extract the prefixed bundle metadata"
+    );
+    let matrix_targets = workflow_matrix_targets(&build_job);
+    assert_eq!(
+        matrix_targets, expected_targets,
+        "release workflow build matrix should match supported release targets"
+    );
+    for target in RELEASE_TARGETS {
+        assert!(
+            matrix_targets
+                .iter()
+                .any(|matrix_target| matrix_target == target),
+            "release workflow should include target {target}"
+        );
+    }
+}
+
+#[test]
 fn runtime_capabilities_match_schema() {
     assert_json_valid(
         "schemas/runtime-capability.schema.json",
@@ -853,27 +1046,29 @@ fn runtime_capabilities_match_schema() {
 
 #[test]
 fn bundle_metadata_matches_schema() {
-    assert_json_valid(
-        "schemas/bundle.schema.json",
-        json!({
-            "bundle_schema_version": "dediren-bundle.schema.v1",
-            "product": "dediren",
-            "version": env!("CARGO_PKG_VERSION"),
-            "target": "x86_64-unknown-linux-gnu",
-            "built_at_utc": "2026-05-13T00:00:00Z",
-            "plugins": [
-                { "id": "generic-graph", "version": env!("CARGO_PKG_VERSION") },
-                { "id": "elk-layout", "version": env!("CARGO_PKG_VERSION") },
-                { "id": "svg-render", "version": env!("CARGO_PKG_VERSION") },
-                { "id": "archimate-oef", "version": env!("CARGO_PKG_VERSION") },
-                { "id": "uml-xmi", "version": env!("CARGO_PKG_VERSION") }
-            ],
-            "schemas_dir": "schemas",
-            "fixtures_dir": "fixtures",
-            "docs_dir": "docs",
-            "elk_helper": "runtimes/elk-layout-java/bin/dediren-elk-layout-java"
-        }),
-    );
+    for target in RELEASE_TARGETS {
+        assert_json_valid(
+            "schemas/bundle.schema.json",
+            json!({
+                "bundle_schema_version": "dediren-bundle.schema.v1",
+                "product": "dediren",
+                "version": env!("CARGO_PKG_VERSION"),
+                "target": target,
+                "built_at_utc": "2026-05-13T00:00:00Z",
+                "plugins": [
+                    { "id": "generic-graph", "version": env!("CARGO_PKG_VERSION") },
+                    { "id": "elk-layout", "version": env!("CARGO_PKG_VERSION") },
+                    { "id": "svg-render", "version": env!("CARGO_PKG_VERSION") },
+                    { "id": "archimate-oef", "version": env!("CARGO_PKG_VERSION") },
+                    { "id": "uml-xmi", "version": env!("CARGO_PKG_VERSION") }
+                ],
+                "schemas_dir": "schemas",
+                "fixtures_dir": "fixtures",
+                "docs_dir": "docs",
+                "elk_helper": "runtimes/elk-layout-java/bin/dediren-elk-layout-java"
+            }),
+        );
+    }
 }
 
 #[test]
@@ -1318,6 +1513,209 @@ fn string_property<'a>(value: &'a serde_json::Value, property: &str) -> &'a str 
         .unwrap_or_else(|| panic!("{property} should be a string"))
 }
 
+#[derive(Clone, Copy)]
+struct YamlLine<'a> {
+    indent: usize,
+    text: &'a str,
+}
+
+fn yaml_lines(source: &str) -> Vec<YamlLine<'_>> {
+    source
+        .lines()
+        .filter_map(|line| {
+            let text = line.trim();
+            if text.is_empty() || text.starts_with('#') {
+                return None;
+            }
+            Some(YamlLine {
+                indent: line.len() - line.trim_start().len(),
+                text,
+            })
+        })
+        .collect()
+}
+
+fn yaml_block<'a>(lines: &[YamlLine<'a>], indent: usize, key: &str) -> Option<Vec<YamlLine<'a>>> {
+    let start = lines
+        .iter()
+        .position(|line| line.indent == indent && line.text == key)?;
+    Some(
+        lines[start + 1..]
+            .iter()
+            .take_while(|line| line.indent > indent)
+            .copied()
+            .collect(),
+    )
+}
+
+fn yaml_block_contains(lines: &[YamlLine<'_>], indent: usize, text: &str) -> bool {
+    lines
+        .iter()
+        .any(|line| line.indent == indent && line.text == text)
+}
+
+fn yaml_block_contains_any(lines: &[YamlLine<'_>], indent: usize, texts: &[&str]) -> bool {
+    texts
+        .iter()
+        .any(|text| yaml_block_contains(lines, indent, text))
+}
+
+fn yaml_step_uses_pinned_action(lines: &[YamlLine<'_>], action: &str, tag: &str) -> bool {
+    lines.iter().any(|line| {
+        line.indent == 8
+            && line
+                .text
+                .strip_prefix("uses: ")
+                .and_then(parse_action_ref)
+                .is_some_and(|(found_action, reference, comment)| {
+                    found_action == action && is_commit_sha(reference) && comment == Some(tag)
+                })
+    })
+}
+
+fn assert_workflow_actions_are_sha_pinned(lines: &[YamlLine<'_>]) {
+    for line in lines {
+        let Some(value) = line.text.strip_prefix("uses: ") else {
+            continue;
+        };
+        let Some((action, reference, comment)) = parse_action_ref(value) else {
+            panic!("workflow action reference should include @ref: {value}");
+        };
+        assert!(
+            is_commit_sha(reference),
+            "workflow action {action} should be pinned to a commit SHA"
+        );
+        assert!(
+            comment.is_some(),
+            "workflow action {action} should keep a human-readable version comment"
+        );
+    }
+}
+
+fn assert_checkouts_do_not_persist_credentials(lines: &[YamlLine<'_>]) {
+    for (index, line) in lines.iter().enumerate() {
+        let is_checkout = line
+            .text
+            .strip_prefix("uses: ")
+            .and_then(parse_action_ref)
+            .is_some_and(|(action, _, _)| action == "actions/checkout");
+        if !is_checkout {
+            continue;
+        }
+        let has_persist_disabled = lines[index..]
+            .iter()
+            .take_while(|next| next.indent > 6 || std::ptr::eq(*next, line))
+            .any(|next| next.indent == 10 && next.text == "persist-credentials: false");
+        assert!(
+            has_persist_disabled,
+            "checkout steps should not persist credentials"
+        );
+    }
+}
+
+fn parse_action_ref(value: &str) -> Option<(&str, &str, Option<&str>)> {
+    let (action, rest) = value.split_once('@')?;
+    let mut parts = rest.splitn(2, '#');
+    let reference = parts.next()?.trim();
+    let comment = parts.next().map(str::trim);
+    Some((action.trim(), reference, comment))
+}
+
+fn is_commit_sha(value: &str) -> bool {
+    value.len() == 40 && value.chars().all(|character| character.is_ascii_hexdigit())
+}
+
+fn yaml_named_step<'a>(lines: &[YamlLine<'a>], name: &str) -> Option<Vec<YamlLine<'a>>> {
+    let step_header = format!("- name: {name}");
+    let start = lines
+        .iter()
+        .position(|line| line.indent == 6 && line.text == step_header)?;
+    Some(
+        lines[start..]
+            .iter()
+            .take_while(|line| line.indent > 6 || line.text == step_header)
+            .copied()
+            .collect(),
+    )
+}
+
+fn assert_no_clobber_release_commands(publish_job: &[YamlLine<'_>]) {
+    for line in publish_job {
+        if line.indent >= 6 && line.text.starts_with("run:") {
+            assert!(
+                !line.text.contains("--clobber"),
+                "release workflow should not clobber existing release artifacts"
+            );
+        }
+        if line.indent >= 8 && !line.text.starts_with('#') {
+            assert!(
+                !line.text.contains("--clobber"),
+                "release workflow should not clobber existing release artifacts"
+            );
+        }
+    }
+}
+
+fn workflow_matrix_targets(build_job: &[YamlLine<'_>]) -> Vec<String> {
+    let strategy = yaml_block(build_job, 4, "strategy:").expect("build job should define strategy");
+    let matrix = yaml_block(&strategy, 6, "matrix:").expect("build job should define matrix");
+    let include = yaml_block(&matrix, 8, "include:").expect("matrix should include targets");
+    include
+        .iter()
+        .filter_map(|line| {
+            if line.indent != 10 {
+                return None;
+            }
+            line.text
+                .strip_prefix("- target: ")
+                .map(trim_yaml_scalar)
+                .map(str::to_string)
+        })
+        .collect()
+}
+
+fn trim_yaml_scalar(value: &str) -> &str {
+    value.trim().trim_matches('"').trim_matches('\'')
+}
+
+fn release_targets() -> Vec<String> {
+    RELEASE_TARGETS
+        .iter()
+        .map(|target| (*target).to_string())
+        .collect()
+}
+
+fn xtask_dist_targets() -> Vec<String> {
+    let source = std::fs::read_to_string(workspace_file("xtask/src/main.rs")).unwrap();
+    let mut in_targets = false;
+    let mut targets = Vec::new();
+    for line in source.lines() {
+        let line = line.trim();
+        if line.starts_with("const DIST_TARGETS:") {
+            in_targets = true;
+            continue;
+        }
+        if in_targets && line == "];" {
+            break;
+        }
+        if !in_targets {
+            continue;
+        }
+        if let Some(target) = line
+            .split("triple:")
+            .nth(1)
+            .and_then(|value| value.split('"').nth(1))
+        {
+            targets.push(target.to_string());
+        }
+    }
+    assert!(
+        !targets.is_empty(),
+        "xtask/src/main.rs should declare distribution target triples"
+    );
+    targets
+}
+
 fn cargo_lock_package_version<'a>(lock: &'a str, package_name: &str) -> Option<&'a str> {
     let mut in_package = false;
     let mut matched_package = false;
@@ -1350,25 +1748,49 @@ fn cargo_lock_package_version<'a>(lock: &'a str, package_name: &str) -> Option<&
     None
 }
 
-fn agent_usage_example_versions(guide: &str) -> Vec<&str> {
+fn agent_usage_example_versions(guide: &str) -> Vec<String> {
     let mut versions = Vec::new();
+    let mut shell_version = None;
     for line in guide.lines() {
+        if let Some(version) = line.strip_prefix("VERSION=") {
+            let version = version.trim().to_owned();
+            shell_version = Some(version.clone());
+            versions.push(version);
+        }
         if let Some(version) = line
             .split(r#""version": ""#)
             .nth(1)
             .and_then(|value| value.split('"').next())
         {
-            versions.push(version);
+            versions.push(version.to_owned());
         }
-        if let Some(version) = line
-            .split("dediren-agent-bundle-")
-            .nth(1)
-            .and_then(|value| value.split("-x86_64-unknown-linux-gnu").next())
-        {
-            versions.push(version);
+        if let Some(suffix) = line.split("dediren-agent-bundle-").nth(1) {
+            if suffix.starts_with("${VERSION}-") {
+                if let Some(version) = &shell_version {
+                    versions.push(version.clone());
+                }
+            } else if let Some(version) = bundle_version_from_suffix(suffix) {
+                versions.push(version.to_owned());
+            }
         }
     }
     versions
+}
+
+fn bundle_version_from_suffix(suffix: &str) -> Option<&str> {
+    if let Some(version) = suffix.split("-${TARGET}").next() {
+        if version != suffix {
+            return Some(version);
+        }
+    }
+    for target in RELEASE_TARGETS {
+        if let Some(version) = suffix.split(&format!("-{target}")).next() {
+            if version != suffix {
+                return Some(version);
+            }
+        }
+    }
+    None
 }
 
 fn assert_valid(schema_path: &str, instance_path: &str) {

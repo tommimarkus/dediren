@@ -10,7 +10,29 @@ use anyhow::{anyhow, bail, Context, Result};
 use clap::{Parser, Subcommand};
 use serde_json::json;
 
-const DIST_TARGET: &str = "x86_64-unknown-linux-gnu";
+const DEFAULT_DIST_TARGET: &str = "x86_64-unknown-linux-gnu";
+struct DistTarget {
+    triple: &'static str,
+    host_os: &'static str,
+    host_arch: &'static str,
+}
+const DIST_TARGETS: &[DistTarget] = &[
+    DistTarget {
+        triple: "x86_64-unknown-linux-gnu",
+        host_os: "linux",
+        host_arch: "x86_64",
+    },
+    DistTarget {
+        triple: "aarch64-unknown-linux-gnu",
+        host_os: "linux",
+        host_arch: "aarch64",
+    },
+    DistTarget {
+        triple: "aarch64-apple-darwin",
+        host_os: "macos",
+        host_arch: "aarch64",
+    },
+];
 const MIN_JAVA_MAJOR: u32 = 21;
 const PLUGIN_BINARIES: &[&str] = &[
     "dediren",
@@ -58,8 +80,13 @@ enum Commands {
 
 #[derive(Debug, Subcommand)]
 enum DistCommand {
-    Build,
-    Smoke { archive: Option<PathBuf> },
+    Build {
+        #[arg(long, value_name = "TRIPLE")]
+        target: Option<String>,
+    },
+    Smoke {
+        archive: Option<PathBuf>,
+    },
 }
 
 fn main() {
@@ -81,12 +108,12 @@ fn run() -> Result<()> {
             Ok(())
         }
         Commands::Dist { command } => match command {
-            DistCommand::Build => build_dist(&root),
+            DistCommand::Build { target } => build_dist(&root, target.as_deref()),
             DistCommand::Smoke { archive } => {
                 let Some(archive) = archive else {
                     eprintln!(
                         "usage: cargo xtask dist smoke dist/{}.tar.gz",
-                        bundle_name(workspace_version(), DIST_TARGET)
+                        bundle_name(workspace_version(), DEFAULT_DIST_TARGET)
                     );
                     std::process::exit(2);
                 };
@@ -96,8 +123,10 @@ fn run() -> Result<()> {
     }
 }
 
-fn build_dist(root: &Path) -> Result<()> {
-    let target = std::env::var("DEDIREN_DIST_TARGET").unwrap_or_else(|_| DIST_TARGET.to_string());
+fn build_dist(root: &Path, requested_target: Option<&str>) -> Result<()> {
+    let target = resolve_dist_target(requested_target)?;
+    ensure_host_can_build(target)?;
+
     let lock_path = root.join(".cache/locks/build-dist.lock");
     let _lock = FileLock::acquire(
         &lock_path,
@@ -107,19 +136,10 @@ fn build_dist(root: &Path) -> Result<()> {
         ),
     )?;
 
-    if target != DIST_TARGET {
-        bail!(
-            "cargo xtask dist build supports only DEDIREN_DIST_TARGET={DIST_TARGET}; got: {target}"
-        );
-    }
-    if std::env::consts::OS != "linux" || std::env::consts::ARCH != "x86_64" {
-        bail!("cargo xtask dist build currently supports Linux x86_64 only");
-    }
-
     let cargo_target_dir = root.join("target");
-    let bin_dir = cargo_target_dir.join(&target).join("release");
+    let bin_dir = cargo_target_dir.join(target.triple).join("release");
     let dist_dir = root.join("dist");
-    let bundle_name = bundle_name(workspace_version(), &target);
+    let bundle_name = bundle_name(workspace_version(), target.triple);
     let bundle_dir = dist_dir.join(&bundle_name);
     let archive = dist_dir.join(format!("{bundle_name}.tar.gz"));
 
@@ -146,7 +166,7 @@ fn build_dist(root: &Path) -> Result<()> {
         .arg("--release")
         .arg("--locked")
         .arg("--target")
-        .arg(&target);
+        .arg(target.triple);
     for binary in PLUGIN_BINARIES {
         cargo_build.arg("-p").arg(binary);
     }
@@ -167,7 +187,7 @@ fn build_dist(root: &Path) -> Result<()> {
 
     for binary in PLUGIN_BINARIES {
         install_executable(
-            &bin_dir.join(binary),
+            &release_binary_path(&bin_dir, binary, target),
             &bundle_dir.join("bin").join(binary),
             binary,
         )?;
@@ -182,14 +202,11 @@ fn build_dist(root: &Path) -> Result<()> {
         &root.join("crates/dediren-plugin-elk-layout/java/build/install/dediren-elk-layout-java"),
         &bundle_dir.join("runtimes/elk-layout-java"),
     )?;
-    write_bundle_metadata(&bundle_dir, &target)?;
+    write_bundle_metadata(&bundle_dir, target)?;
 
     println!("creating {}", archive.display());
     run_status(
         Command::new("tar")
-            .arg("--owner=0")
-            .arg("--group=0")
-            .arg("--numeric-owner")
             .arg("-C")
             .arg(&dist_dir)
             .arg("-czf")
@@ -300,6 +317,71 @@ fn workspace_version() -> &'static str {
 
 fn bundle_name(version: &str, target: &str) -> String {
     format!("dediren-agent-bundle-{version}-{target}")
+}
+
+fn resolve_dist_target(requested: Option<&str>) -> Result<&'static DistTarget> {
+    if let Some(requested) = requested {
+        return find_dist_target(requested);
+    }
+    if let Ok(requested) = std::env::var("DEDIREN_DIST_TARGET") {
+        return find_dist_target(&requested);
+    }
+
+    Ok(current_host_dist_target().unwrap_or_else(|| {
+        DIST_TARGETS
+            .iter()
+            .find(|target| target.triple == DEFAULT_DIST_TARGET)
+            .expect("DEFAULT_DIST_TARGET must be listed in DIST_TARGETS")
+    }))
+}
+
+fn ensure_host_can_build(target: &DistTarget) -> Result<()> {
+    let host_os = std::env::consts::OS;
+    let host_arch = std::env::consts::ARCH;
+    if host_os == target.host_os && host_arch == target.host_arch {
+        return Ok(());
+    }
+
+    bail!(
+        "distribution target {} must be built on {} {}; current host is {} {}",
+        target.triple,
+        target.host_os,
+        target.host_arch,
+        host_os,
+        host_arch
+    )
+}
+
+fn release_binary_path(bin_dir: &Path, binary: &str, _target: &DistTarget) -> PathBuf {
+    bin_dir.join(binary)
+}
+
+fn current_host_dist_target() -> Option<&'static DistTarget> {
+    let host_os = std::env::consts::OS;
+    let host_arch = std::env::consts::ARCH;
+    DIST_TARGETS
+        .iter()
+        .find(|target| target.host_os == host_os && target.host_arch == host_arch)
+}
+
+fn find_dist_target(requested: &str) -> Result<&'static DistTarget> {
+    DIST_TARGETS
+        .iter()
+        .find(|target| target.triple == requested)
+        .ok_or_else(|| {
+            anyhow!(
+                "unsupported distribution target: {requested}; supported targets: {}",
+                supported_dist_targets()
+            )
+        })
+}
+
+fn supported_dist_targets() -> String {
+    DIST_TARGETS
+        .iter()
+        .map(|target| target.triple)
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 fn run_status(command: &mut Command) -> Result<()> {
@@ -499,7 +581,7 @@ fn copy_dir_recursive(source: &Path, destination: &Path) -> Result<()> {
     Ok(())
 }
 
-fn write_bundle_metadata(bundle_dir: &Path, target: &str) -> Result<()> {
+fn write_bundle_metadata(bundle_dir: &Path, target: &DistTarget) -> Result<()> {
     let plugins = BUNDLE_PLUGINS
         .iter()
         .map(|id| json!({ "id": id, "version": workspace_version() }))
@@ -508,7 +590,7 @@ fn write_bundle_metadata(bundle_dir: &Path, target: &str) -> Result<()> {
         "bundle_schema_version": "dediren-bundle.schema.v1",
         "product": "dediren",
         "version": workspace_version(),
-        "target": target,
+        "target": target.triple,
         "built_at_utc": build_time_utc()?,
         "plugins": plugins,
         "schemas_dir": "schemas",
