@@ -1,4 +1,6 @@
-use dediren_contracts::{LaidOutEdge, LaidOutGroup, LaidOutNode, LayoutResult, Point};
+use dediren_contracts::{
+    DiagnosticSeverity, LaidOutEdge, LaidOutGroup, LaidOutNode, LayoutResult, Point,
+};
 use std::path::PathBuf;
 
 #[test]
@@ -43,6 +45,54 @@ fn invalid_routes_are_counted() {
     let report = dediren_core::quality::validate_layout(&result);
     assert_eq!(report.invalid_route_count, 1);
     assert_eq!(report.status, "warning");
+}
+
+#[test]
+fn route_diagnostics_report_empty_routes_and_endpoint_misses() {
+    let mut result = empty_result();
+    result.nodes.push(node("source", 0.0, 0.0));
+    result.nodes.push(node("target", 300.0, 0.0));
+    result.edges.push(LaidOutEdge {
+        id: "empty".to_string(),
+        source: "source".to_string(),
+        target: "target".to_string(),
+        source_id: "empty".to_string(),
+        projection_id: "empty".to_string(),
+        routing_hints: vec![],
+        points: vec![],
+        label: "empty".to_string(),
+    });
+    result.edges.push(LaidOutEdge {
+        id: "misses-target".to_string(),
+        source: "source".to_string(),
+        target: "target".to_string(),
+        source_id: "misses-target".to_string(),
+        projection_id: "misses-target".to_string(),
+        routing_hints: vec![],
+        points: vec![Point { x: 100.0, y: 40.0 }, Point { x: 250.0, y: 40.0 }],
+        label: "misses target".to_string(),
+    });
+
+    let diagnostics = dediren_core::quality::validate_layout_diagnostics(&result);
+
+    assert_eq!(
+        diagnostics
+            .iter()
+            .map(|diagnostic| diagnostic.code.as_str())
+            .collect::<Vec<_>>(),
+        vec![
+            "DEDIREN_LAYOUT_ROUTE_POINTS_EMPTY",
+            "DEDIREN_LAYOUT_ROUTE_ENDPOINT_OFF_NODE_PERIMETER"
+        ]
+    );
+    assert!(diagnostics
+        .iter()
+        .all(|diagnostic| diagnostic.severity == DiagnosticSeverity::Error));
+    assert_eq!(diagnostics[0].path.as_deref(), Some("$.edges[0].points"));
+    assert_eq!(
+        diagnostics[1].path.as_deref(),
+        Some("$.edges[1].points[-1]")
+    );
 }
 
 #[test]

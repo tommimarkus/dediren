@@ -48,7 +48,7 @@ them.
 {
   "model_schema_version": "model.schema.v1",
   "required_plugins": [
-    { "id": "generic-graph", "version": "0.14.9" }
+    { "id": "generic-graph", "version": "0.14.11" }
   ],
   "nodes": [
     {
@@ -103,8 +103,8 @@ and use ArchiMate type names:
 {
   "model_schema_version": "model.schema.v1",
   "required_plugins": [
-    { "id": "generic-graph", "version": "0.14.9" },
-    { "id": "archimate-oef", "version": "0.14.9" }
+    { "id": "generic-graph", "version": "0.14.11" },
+    { "id": "archimate-oef", "version": "0.14.11" }
   ],
   "nodes": [
     {
@@ -285,8 +285,10 @@ Put optional layout intent on `plugins.generic-graph.views[]`:
 
 Supported directions are `right`, `left`, `down`, and `up`. Supported density
 and routing profiles are `compact`, `readable`, and `spacious`. Supported
-wrapping values are `auto`, `off`, and `multi-edge`. Supported endpoint merging
-values are `auto`, `local`, and `off`.
+wrapping values are `auto`, `off`, and `multi-edge`; `auto` currently favors
+unwrapped grouped layouts, while `multi-edge` opts into ELK multi-edge wrapping
+when width reduction is worth the route-quality tradeoff. Supported endpoint
+merging values are `auto`, `local`, and `off`.
 
 ## JSON Authoring Loop
 
@@ -397,7 +399,7 @@ target/debug/dediren-plugin-uml-xmi-export capabilities
 From an unpacked distribution bundle:
 
 ```bash
-BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-0.14.9-x86_64-unknown-linux-gnu
+BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-0.14.11-x86_64-unknown-linux-gnu
 "$BUNDLE/bin/dediren" --version
 "$BUNDLE/bin/dediren-plugin-generic-graph" capabilities
 "$BUNDLE/bin/dediren-plugin-elk-layout" capabilities
@@ -412,7 +414,7 @@ CLI workflow commands return command envelopes using `schemas/envelope.schema.js
 ## Bundle Smoke Workflow
 
 ```bash
-BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-0.14.9-x86_64-unknown-linux-gnu
+BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-0.14.11-x86_64-unknown-linux-gnu
 
 "$BUNDLE/bin/dediren" validate \
   --input "$BUNDLE/fixtures/source/valid-basic.json"

@@ -50,11 +50,11 @@ Runtime prerequisite:
   cache automatically. Offline runs can provide schema files through
   `DEDIREN_OEF_SCHEMA_DIR` and `DEDIREN_XMI_SCHEMA_PATH`.
 
-For the current `0.14.9` version, the xtask creates:
+For the current `0.14.11` version, the xtask creates:
 
 ```text
-dist/dediren-agent-bundle-0.14.9-x86_64-unknown-linux-gnu/
-dist/dediren-agent-bundle-0.14.9-x86_64-unknown-linux-gnu.tar.gz
+dist/dediren-agent-bundle-0.14.11-x86_64-unknown-linux-gnu/
+dist/dediren-agent-bundle-0.14.11-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Run the smoke test from a shell where `java -version` resolves to Java 21 or
@@ -63,7 +63,7 @@ cached standards schemas, configured local schema paths, or `curl` network
 access to populate the cache:
 
 ```bash
-cargo xtask dist smoke dist/dediren-agent-bundle-0.14.9-x86_64-unknown-linux-gnu.tar.gz
+cargo xtask dist smoke dist/dediren-agent-bundle-0.14.11-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Concurrent `cargo xtask dist build` invocations serialize on a repo-local lock
@@ -76,8 +76,8 @@ Unpack and run it anywhere:
 
 ```bash
 mkdir -p /tmp/dediren-dist
-tar -xzf dist/dediren-agent-bundle-0.14.9-x86_64-unknown-linux-gnu.tar.gz -C /tmp/dediren-dist
-/tmp/dediren-dist/dediren-agent-bundle-0.14.9-x86_64-unknown-linux-gnu/bin/dediren --help
+tar -xzf dist/dediren-agent-bundle-0.14.11-x86_64-unknown-linux-gnu.tar.gz -C /tmp/dediren-dist
+/tmp/dediren-dist/dediren-agent-bundle-0.14.11-x86_64-unknown-linux-gnu/bin/dediren --help
 ```
 
 For a full unpacked-bundle JSON authoring and project/layout/render smoke
@@ -193,6 +193,9 @@ Commands:
 - `validate-layout` reports backend-neutral layout quality metrics, including
   overlaps, connectors through unrelated nodes, invalid routes, route detours,
   close parallel route channels, group boundary issues, and backend warnings.
+  It returns an error envelope when route geometry is structurally invalid,
+  such as empty edge route points or endpoints that do not touch their declared
+  source and target node perimeters.
 - `render` asks a render plugin to create a visual artifact. The bundled
   `svg-render` plugin returns SVG in a JSON command envelope.
 - `export` asks an export plugin to create a non-visual artifact. The bundled
@@ -593,7 +596,10 @@ Dediren layout intent, not raw ELK options:
 
 Supported directions are `right`, `left`, `down`, and `up`. Supported density
 profiles are `compact`, `readable`, and `spacious`. Supported wrapping values
-are `auto`, `off`, and `multi-edge`. Supported routing style is `orthogonal`.
+are `auto`, `off`, and `multi-edge`; `auto` currently favors unwrapped grouped
+layouts, while `multi-edge` opts into ELK multi-edge wrapping when width
+reduction is worth the route-quality tradeoff. Supported routing style is
+`orthogonal`.
 `routing.profile` still accepts `compact`, `readable`, and `spacious` for
 schema compatibility, but the current Layered-only helper derives route spacing
 from `density`. Supported endpoint merging values are `auto`, `local`, and
@@ -713,7 +719,7 @@ newer and `xmllint --version` succeeds:
 
 ```bash
 cargo xtask dist build
-cargo xtask dist smoke dist/dediren-agent-bundle-0.14.9-x86_64-unknown-linux-gnu.tar.gz
+cargo xtask dist smoke dist/dediren-agent-bundle-0.14.11-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Focused checks:

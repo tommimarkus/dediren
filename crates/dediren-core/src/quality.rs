@@ -1,4 +1,6 @@
-use dediren_contracts::LayoutResult;
+use dediren_contracts::{
+    Diagnostic, DiagnosticSeverity, LaidOutEdge, LaidOutNode, LayoutResult, Point,
+};
 use serde::{Deserialize, Serialize};
 
 const ROUTE_DETOUR_RATIO: f64 = 1.5;
@@ -6,6 +8,7 @@ const ROUTE_DETOUR_EXCESS: f64 = 240.0;
 const ROUTE_CLOSE_PARALLEL_DISTANCE: f64 = 20.0;
 const ROUTE_CLOSE_PARALLEL_MIN_OVERLAP: f64 = 40.0;
 const GEOMETRY_EPSILON: f64 = 0.001;
+const ROUTE_ENDPOINT_TOLERANCE: f64 = 1.5;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LayoutQualityReport {
@@ -58,7 +61,7 @@ pub fn validate_layout_with_policy(
     let invalid_route_count = result
         .edges
         .iter()
-        .filter(|edge| edge.points.len() < 2)
+        .filter(|edge| route_has_integrity_issue(edge, result))
         .count();
     let route_detour_count = count_route_detours(result);
     let route_close_parallel_count = count_close_parallel_routes(result);
@@ -88,6 +91,108 @@ pub fn validate_layout_with_policy(
         group_boundary_issue_count,
         warning_count,
     }
+}
+
+pub fn validate_layout_diagnostics(result: &LayoutResult) -> Vec<Diagnostic> {
+    let mut diagnostics = Vec::new();
+    for (edge_index, edge) in result.edges.iter().enumerate() {
+        if edge.points.is_empty() {
+            diagnostics.push(route_error(
+                "DEDIREN_LAYOUT_ROUTE_POINTS_EMPTY",
+                format!("edge '{}' has no route points", edge.id),
+                format!("$.edges[{edge_index}].points"),
+            ));
+            continue;
+        }
+        if edge.points.len() < 2 {
+            diagnostics.push(route_error(
+                "DEDIREN_LAYOUT_ROUTE_POINTS_INSUFFICIENT",
+                format!(
+                    "edge '{}' must have at least start and end route points",
+                    edge.id
+                ),
+                format!("$.edges[{edge_index}].points"),
+            ));
+            continue;
+        }
+        let Some(source) = result.nodes.iter().find(|node| node.id == edge.source) else {
+            continue;
+        };
+        let Some(target) = result.nodes.iter().find(|node| node.id == edge.target) else {
+            continue;
+        };
+        if !point_on_node_perimeter(&edge.points[0], source, ROUTE_ENDPOINT_TOLERANCE) {
+            diagnostics.push(route_error(
+                "DEDIREN_LAYOUT_ROUTE_ENDPOINT_OFF_NODE_PERIMETER",
+                format!(
+                    "edge '{}' first route point is not on source node '{}' perimeter",
+                    edge.id, edge.source
+                ),
+                format!("$.edges[{edge_index}].points[0]"),
+            ));
+        }
+        if !point_on_node_perimeter(
+            &edge.points[edge.points.len() - 1],
+            target,
+            ROUTE_ENDPOINT_TOLERANCE,
+        ) {
+            diagnostics.push(route_error(
+                "DEDIREN_LAYOUT_ROUTE_ENDPOINT_OFF_NODE_PERIMETER",
+                format!(
+                    "edge '{}' last route point is not on target node '{}' perimeter",
+                    edge.id, edge.target
+                ),
+                format!("$.edges[{edge_index}].points[-1]"),
+            ));
+        }
+    }
+    diagnostics
+}
+
+fn route_has_integrity_issue(edge: &LaidOutEdge, result: &LayoutResult) -> bool {
+    if edge.points.len() < 2 {
+        return true;
+    }
+    let Some(source) = result.nodes.iter().find(|node| node.id == edge.source) else {
+        return false;
+    };
+    let Some(target) = result.nodes.iter().find(|node| node.id == edge.target) else {
+        return false;
+    };
+    !point_on_node_perimeter(&edge.points[0], source, ROUTE_ENDPOINT_TOLERANCE)
+        || !point_on_node_perimeter(
+            &edge.points[edge.points.len() - 1],
+            target,
+            ROUTE_ENDPOINT_TOLERANCE,
+        )
+}
+
+fn route_error(code: &str, message: String, path: String) -> Diagnostic {
+    Diagnostic {
+        code: code.to_string(),
+        severity: DiagnosticSeverity::Error,
+        message,
+        path: Some(path),
+    }
+}
+
+fn point_on_node_perimeter(point: &Point, node: &LaidOutNode, tolerance: f64) -> bool {
+    let left = node.x;
+    let right = node.x + node.width;
+    let top = node.y;
+    let bottom = node.y + node.height;
+    point.x >= left - tolerance
+        && point.x <= right + tolerance
+        && point.y >= top - tolerance
+        && point.y <= bottom + tolerance
+        && (same_within(point.x, left, tolerance)
+            || same_within(point.x, right, tolerance)
+            || same_within(point.y, top, tolerance)
+            || same_within(point.y, bottom, tolerance))
+}
+
+fn same_within(left: f64, right: f64, tolerance: f64) -> bool {
+    (left - right).abs() <= tolerance
 }
 
 fn count_overlaps(result: &LayoutResult) -> usize {
