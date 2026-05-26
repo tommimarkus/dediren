@@ -31,9 +31,9 @@ GitHub Release archives are published by `v*` tags. The release targets for the
 current version are:
 
 ```text
-dediren-agent-bundle-0.14.11-x86_64-unknown-linux-gnu.tar.gz
-dediren-agent-bundle-0.14.11-aarch64-unknown-linux-gnu.tar.gz
-dediren-agent-bundle-0.14.11-aarch64-apple-darwin.tar.gz
+dediren-agent-bundle-0.14.12-x86_64-unknown-linux-gnu.tar.gz
+dediren-agent-bundle-0.14.12-aarch64-unknown-linux-gnu.tar.gz
+dediren-agent-bundle-0.14.12-aarch64-apple-darwin.tar.gz
 ```
 
 To build an agent-ready local distribution archive from this source checkout,
@@ -66,11 +66,11 @@ Runtime prerequisite:
   `DEDIREN_OEF_SCHEMA_DIR` and `DEDIREN_XMI_SCHEMA_PATH`.
 
 Omitting `--target` builds for the current supported host target. For the
-current `0.14.11` version and the target above, the xtask creates:
+current `0.14.12` version and the target above, the xtask creates:
 
 ```text
-dist/dediren-agent-bundle-0.14.11-x86_64-unknown-linux-gnu/
-dist/dediren-agent-bundle-0.14.11-x86_64-unknown-linux-gnu.tar.gz
+dist/dediren-agent-bundle-0.14.12-x86_64-unknown-linux-gnu/
+dist/dediren-agent-bundle-0.14.12-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Run the smoke test from a shell where `java -version` resolves to Java 21 or
@@ -79,7 +79,7 @@ cached standards schemas, configured local schema paths, or `curl` network
 access to populate the cache:
 
 ```bash
-VERSION=0.14.11
+VERSION=0.14.12
 TARGET=x86_64-unknown-linux-gnu
 cargo xtask dist smoke "dist/dediren-agent-bundle-${VERSION}-${TARGET}.tar.gz"
 ```
@@ -93,7 +93,7 @@ and `.tar.gz` archive in `dist/`; stale bundle versions are pruned.
 Unpack and run it anywhere:
 
 ```bash
-VERSION=0.14.11
+VERSION=0.14.12
 TARGET=x86_64-unknown-linux-gnu
 mkdir -p /tmp/dediren-dist
 tar -xzf "dist/dediren-agent-bundle-${VERSION}-${TARGET}.tar.gz" -C /tmp/dediren-dist
@@ -738,7 +738,7 @@ Distribution checks from a shell where `java -version` resolves to Java 21 or
 newer and `xmllint --version` succeeds:
 
 ```bash
-VERSION=0.14.11
+VERSION=0.14.12
 TARGET=x86_64-unknown-linux-gnu
 cargo xtask dist build --target "$TARGET"
 cargo xtask dist smoke "dist/dediren-agent-bundle-${VERSION}-${TARGET}.tar.gz"

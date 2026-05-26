@@ -48,7 +48,7 @@ them.
 {
   "model_schema_version": "model.schema.v1",
   "required_plugins": [
-    { "id": "generic-graph", "version": "0.14.11" }
+    { "id": "generic-graph", "version": "0.14.12" }
   ],
   "nodes": [
     {
@@ -103,8 +103,8 @@ and use ArchiMate type names:
 {
   "model_schema_version": "model.schema.v1",
   "required_plugins": [
-    { "id": "generic-graph", "version": "0.14.11" },
-    { "id": "archimate-oef", "version": "0.14.11" }
+    { "id": "generic-graph", "version": "0.14.12" },
+    { "id": "archimate-oef", "version": "0.14.12" }
   ],
   "nodes": [
     {
@@ -399,7 +399,7 @@ target/debug/dediren-plugin-uml-xmi-export capabilities
 From an unpacked distribution bundle:
 
 ```bash
-VERSION=0.14.11
+VERSION=0.14.12
 TARGET=x86_64-unknown-linux-gnu
 BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-${VERSION}-${TARGET}
 "$BUNDLE/bin/dediren" --version
@@ -416,7 +416,7 @@ CLI workflow commands return command envelopes using `schemas/envelope.schema.js
 ## Bundle Smoke Workflow
 
 ```bash
-VERSION=0.14.11
+VERSION=0.14.12
 TARGET=x86_64-unknown-linux-gnu
 BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-${VERSION}-${TARGET}
 
