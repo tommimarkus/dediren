@@ -96,6 +96,9 @@
 
 - Version bumps live in the same commit as the content change that requires
   them. Do not defer the bump to a follow-up commit.
+- Every product/plugin version bump must also create the matching annotated git
+  tag `v<version>` on the commit containing that bump before pushing. Do not
+  leave a version bump without its release tag.
 - The product version is `Cargo.toml` `[workspace.package] version`.
   First-party Rust crates inherit it, first-party plugin manifests under
   `fixtures/plugins/*.manifest.json` must match it, distribution archive names
