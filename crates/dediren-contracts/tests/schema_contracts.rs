@@ -923,6 +923,16 @@ fn release_workflow_matches_supported_targets_and_permissions() {
 
     let validate_steps =
         yaml_block(&validate_job, 4, "steps:").expect("validate job should define steps");
+    let validate_xml_tools_step = yaml_named_step(&validate_steps, "Install XML tools")
+        .expect("validate job should install XML schema validation tools");
+    assert!(
+        yaml_block_contains(
+            &validate_xml_tools_step,
+            8,
+            "run: sudo apt-get update && sudo apt-get install -y libxml2-utils"
+        ),
+        "release validation should install xmllint for OEF and XMI export tests"
+    );
     let workspace_tests_step = yaml_named_step(&validate_steps, "Check workspace tests")
         .expect("validate job should run the full workspace test suite");
     assert!(
