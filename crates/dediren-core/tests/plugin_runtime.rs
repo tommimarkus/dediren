@@ -80,7 +80,7 @@ fn runtime_id_mismatch_is_structured() {
     );
 
     let mut options = PluginRunOptions::default();
-    options.allowed_env.push((
+    options.candidate_env.push((
         "DEDIREN_TEST_PLUGIN_ID".to_string(),
         "different-plugin".to_string(),
     ));
@@ -133,7 +133,7 @@ fn installed_bundle_registry_finds_manifest_and_binary_next_to_cli() {
     let fake_cli = bin_dir.join("dediren");
     let registry = PluginRegistry::for_executable(&fake_cli);
     let mut options = PluginRunOptions::default();
-    options.allowed_env.push((
+    options.candidate_env.push((
         "DEDIREN_TEST_PLUGIN_CAPABILITIES".to_string(),
         "layout".to_string(),
     ));
@@ -164,7 +164,7 @@ fn plugin_timeout_is_structured() {
     let mut options = PluginRunOptions::default();
     options.timeout = Duration::from_millis(20);
     options
-        .allowed_env
+        .candidate_env
         .push(("DEDIREN_TEST_PLUGIN_MODE".to_string(), "sleep".to_string()));
 
     let registry = PluginRegistry::from_dirs(vec![temp.path().to_path_buf()]);
@@ -193,7 +193,7 @@ fn plugin_timeout_covers_pipe_drain_after_parent_exits() {
 
     let mut options = PluginRunOptions::default();
     options.timeout = Duration::from_millis(50);
-    options.allowed_env.push((
+    options.candidate_env.push((
         "DEDIREN_TEST_PLUGIN_MODE".to_string(),
         "leak-stdout-child".to_string(),
     ));
@@ -230,7 +230,7 @@ fn plugin_that_never_reads_large_stdin_times_out() {
 
     let mut options = PluginRunOptions::default();
     options.timeout = Duration::from_millis(50);
-    options.allowed_env.push((
+    options.candidate_env.push((
         "DEDIREN_TEST_PLUGIN_MODE".to_string(),
         "no-read-stdin".to_string(),
     ));
@@ -262,7 +262,7 @@ fn plugin_large_stderr_is_drained_while_running() {
 
     let mut options = PluginRunOptions::default();
     options.timeout = Duration::from_secs(1);
-    options.allowed_env.push((
+    options.candidate_env.push((
         "DEDIREN_TEST_PLUGIN_MODE".to_string(),
         "large-output".to_string(),
     ));
@@ -294,7 +294,7 @@ fn plugin_large_stdout_is_drained_while_running() {
 
     let mut options = PluginRunOptions::default();
     options.timeout = Duration::from_secs(1);
-    options.allowed_env.push((
+    options.candidate_env.push((
         "DEDIREN_TEST_PLUGIN_MODE".to_string(),
         "large-stdout".to_string(),
     ));
@@ -431,6 +431,74 @@ fn legacy_capabilities_command_bypasses_command_capability_requirement() {
 }
 
 #[test]
+fn manifest_allowed_env_is_passed_to_capability_probe_and_command() {
+    let temp = TempDir::new().unwrap();
+    let manifest = serde_json::json!({
+        "plugin_manifest_schema_version": "plugin-manifest.schema.v1",
+        "id": "runtime-testbed",
+        "version": "0.1.0",
+        "executable": testbed_binary(),
+        "capabilities": ["layout"],
+        "allowed_env": ["DEDIREN_TEST_PLUGIN_CAPABILITIES"]
+    });
+    std::fs::write(
+        temp.path().join("runtime-testbed.manifest.json"),
+        serde_json::to_string_pretty(&manifest).unwrap(),
+    )
+    .unwrap();
+    let registry = PluginRegistry::from_dirs(vec![temp.path().to_path_buf()]);
+
+    let mut options = PluginRunOptions::default();
+    options.candidate_env.push((
+        "DEDIREN_TEST_PLUGIN_CAPABILITIES".to_string(),
+        "layout".to_string(),
+    ));
+    let outcome = run_plugin_for_capability_with_registry(
+        &registry,
+        "runtime-testbed",
+        "layout",
+        &["layout"],
+        "{}",
+        options,
+    );
+
+    let outcome = outcome.expect("manifest-declared env should reach the plugin runtime");
+    assert_eq!(outcome.exit_code, 0);
+    assert!(outcome.stdout.contains("\"layout_result_schema_version\""));
+}
+
+#[test]
+fn explicit_env_without_manifest_allowlist_is_not_passed_to_plugin() {
+    let temp = TempDir::new().unwrap();
+    write_manifest_without_allowed_env(
+        temp.path(),
+        "runtime-testbed",
+        testbed_binary().to_str().unwrap(),
+        &["render"],
+    );
+
+    let mut options = PluginRunOptions::default();
+    options.candidate_env.push((
+        "DEDIREN_TEST_PLUGIN_MODE".to_string(),
+        "invalid-json".to_string(),
+    ));
+
+    let registry = PluginRegistry::from_dirs(vec![temp.path().to_path_buf()]);
+    let outcome = run_plugin_for_capability_with_registry(
+        &registry,
+        "runtime-testbed",
+        "render",
+        &["render"],
+        "{}",
+        options,
+    )
+    .expect("undeclared env should not reach the plugin runtime");
+
+    assert_eq!(outcome.exit_code, 0);
+    assert!(outcome.stdout.contains("\"render_result_schema_version\""));
+}
+
+#[test]
 fn manifest_schema_validation_rejects_wrong_schema_version() {
     let temp = TempDir::new().unwrap();
     let manifest = serde_json::json!({
@@ -460,7 +528,7 @@ fn run_with_mode(
 ) -> Result<dediren_core::plugins::PluginRunOutcome, PluginExecutionError> {
     let mut options = PluginRunOptions::default();
     options
-        .allowed_env
+        .candidate_env
         .push(("DEDIREN_TEST_PLUGIN_MODE".to_string(), mode.to_string()));
     let registry = PluginRegistry::from_dirs(vec![manifest_dir.to_path_buf()]);
     run_plugin_for_capability_with_registry(
@@ -474,13 +542,43 @@ fn run_with_mode(
 }
 
 fn write_manifest(dir: &Path, id: &str, executable: &str, capabilities: &[&str]) {
-    let manifest = serde_json::json!({
+    let mut manifest = serde_json::json!({
         "plugin_manifest_schema_version": "plugin-manifest.schema.v1",
         "id": id,
         "version": "0.1.0",
         "executable": executable,
         "capabilities": capabilities
     });
+    if id == "runtime-testbed" {
+        manifest["allowed_env"] = serde_json::json!([
+            "DEDIREN_TEST_PLUGIN_CAPABILITIES",
+            "DEDIREN_TEST_PLUGIN_ID",
+            "DEDIREN_TEST_PLUGIN_MODE"
+        ]);
+    }
+    write_manifest_value(dir, id, manifest);
+}
+
+fn write_manifest_without_allowed_env(
+    dir: &Path,
+    id: &str,
+    executable: &str,
+    capabilities: &[&str],
+) {
+    write_manifest_value(
+        dir,
+        id,
+        serde_json::json!({
+            "plugin_manifest_schema_version": "plugin-manifest.schema.v1",
+            "id": id,
+            "version": "0.1.0",
+            "executable": executable,
+            "capabilities": capabilities
+        }),
+    );
+}
+
+fn write_manifest_value(dir: &Path, id: &str, manifest: serde_json::Value) {
     std::fs::write(
         dir.join(format!("{id}.manifest.json")),
         serde_json::to_string_pretty(&manifest).unwrap(),

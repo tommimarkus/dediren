@@ -64,6 +64,7 @@ const WORKSPACE_PACKAGE_NAMES: &[&str] = &[
     "dediren-plugin-elk-layout",
     "dediren-plugin-generic-graph",
     "dediren-plugin-runtime-testbed",
+    "dediren-plugin-schema-cache",
     "dediren-plugin-svg-render",
     "dediren-plugin-uml-xmi-export",
     "dediren-uml",
@@ -733,9 +734,51 @@ fn plugin_manifest_matches_schema() {
             "id": "svg-render",
             "version": "0.1.0",
             "executable": "dediren-plugin-svg-render",
-            "capabilities": ["render"]
+            "capabilities": ["render"],
+            "allowed_env": ["PATH"]
         }),
     );
+}
+
+#[test]
+fn first_party_plugin_manifests_declare_runtime_environment_surface() {
+    let expected = BTreeMap::from([
+        (
+            "elk-layout",
+            vec!["DEDIREN_ELK_COMMAND", "DEDIREN_ELK_RESULT_FIXTURE", "PATH"],
+        ),
+        (
+            "archimate-oef",
+            vec!["DEDIREN_OEF_SCHEMA_DIR", "DEDIREN_SCHEMA_CACHE_DIR", "PATH"],
+        ),
+        (
+            "uml-xmi",
+            vec![
+                "DEDIREN_XMI_SCHEMA_PATH",
+                "DEDIREN_SCHEMA_CACHE_DIR",
+                "PATH",
+            ],
+        ),
+    ]);
+
+    for path in FIRST_PARTY_PLUGIN_MANIFEST_PATHS {
+        let manifest = json_file(path);
+        let id = string_property(&manifest, "id");
+        let actual = manifest["allowed_env"]
+            .as_array()
+            .map(|items| {
+                items
+                    .iter()
+                    .map(|item| item.as_str().expect("allowed_env item should be a string"))
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        assert_eq!(
+            actual,
+            expected.get(id).cloned().unwrap_or_default(),
+            "{path} should declare the plugin runtime env surface"
+        );
+    }
 }
 
 #[test]

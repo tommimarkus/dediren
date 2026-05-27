@@ -49,7 +49,7 @@ them.
 {
   "model_schema_version": "model.schema.v1",
   "required_plugins": [
-    { "id": "generic-graph", "version": "0.15.1" }
+    { "id": "generic-graph", "version": "0.16.0" }
   ],
   "nodes": [
     {
@@ -104,8 +104,8 @@ and use ArchiMate type names:
 {
   "model_schema_version": "model.schema.v1",
   "required_plugins": [
-    { "id": "generic-graph", "version": "0.15.1" },
-    { "id": "archimate-oef", "version": "0.15.1" }
+    { "id": "generic-graph", "version": "0.16.0" },
+    { "id": "archimate-oef", "version": "0.16.0" }
   ],
   "nodes": [
     {
@@ -354,7 +354,7 @@ directory.
 | Exact JSON shape | `schemas/*.json` |
 | Small copyable examples | `fixtures/` |
 | Broader workflow overview | `README.md` |
-| Plugin ids, executables, static capabilities | `fixtures/plugins/*.manifest.json` or bundle `plugins/*.manifest.json` |
+| Plugin ids, executables, static capabilities, and forwarded runtime env names | `fixtures/plugins/*.manifest.json` or bundle `plugins/*.manifest.json` |
 | Runtime plugin support | `<plugin-binary> capabilities` |
 | Success/failure decisions | command stdout JSON envelope |
 
@@ -406,7 +406,7 @@ target/debug/dediren-plugin-uml-xmi-export capabilities
 From an unpacked distribution bundle:
 
 ```bash
-VERSION=0.15.1
+VERSION=0.16.0
 TARGET=x86_64-unknown-linux-gnu
 BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-${VERSION}-${TARGET}
 "$BUNDLE/bin/dediren" --version
@@ -418,12 +418,14 @@ BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-${VERSION}-${TARGET}
 ```
 
 Capability output is raw JSON using `schemas/runtime-capability.schema.json`.
-CLI workflow commands return command envelopes using `schemas/envelope.schema.json`.
+Plugin manifests declare `allowed_env`; the CLI clears plugin process
+environments and forwards only manifest-listed runtime values. CLI workflow
+commands return command envelopes using `schemas/envelope.schema.json`.
 
 ## Bundle Smoke Workflow
 
 ```bash
-VERSION=0.15.1
+VERSION=0.16.0
 TARGET=x86_64-unknown-linux-gnu
 BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-${VERSION}-${TARGET}
 
@@ -478,7 +480,9 @@ Common recovery signals:
 | --- | --- |
 | `DEDIREN_COMMAND_INPUT_INVALID` | Check file path, readable file, or stdin content. |
 | `DEDIREN_SCHEMA_INVALID` | Fix required fields and field types against the matching schema. |
-| `DEDIREN_DUPLICATE_ID` | Make source node, relationship, group, and fragment ids unique after assembly. |
+| `DEDIREN_DUPLICATE_ID` | Make source node and relationship ids unique after assembly. |
+| `DEDIREN_GENERIC_GRAPH_DUPLICATE_VIEW_ID` | Make `plugins.generic-graph.views[].id` values unique after assembly. |
+| `DEDIREN_GENERIC_GRAPH_DUPLICATE_GROUP_ID` | Make `plugins.generic-graph.views[].groups[].id` values unique within each view after assembly. |
 | `DEDIREN_DANGLING_ENDPOINT` | Fix `relationships[].source` or `relationships[].target` to reference existing node ids. |
 | `DEDIREN_FRAGMENT_BASE_DIR_REQUIRED` | Use `--input <file>` instead of stdin for fragmented models. |
 | `DEDIREN_SEMANTIC_PROFILE_REQUIRED` | Add `plugins.generic-graph.semantic_profile`, usually `archimate` for ArchiMate metadata. |

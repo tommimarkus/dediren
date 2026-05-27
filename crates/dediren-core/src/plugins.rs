@@ -14,7 +14,7 @@ pub struct PluginRegistry {
 #[derive(Debug, Clone)]
 pub struct PluginRunOptions {
     pub timeout: Duration,
-    pub allowed_env: Vec<(String, String)>,
+    pub candidate_env: Vec<(String, String)>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -84,6 +84,11 @@ struct ValidatedEnvelope {
     value: serde_json::Value,
 }
 
+struct ResolvedPluginRunOptions {
+    timeout: Duration,
+    allowed_env: Vec<(String, String)>,
+}
+
 impl PluginExecutionError {
     pub fn diagnostic(&self) -> Diagnostic {
         Diagnostic {
@@ -139,7 +144,7 @@ impl Default for PluginRunOptions {
     fn default() -> Self {
         Self {
             timeout: Duration::from_secs(10),
-            allowed_env: Vec::new(),
+            candidate_env: Vec::new(),
         }
     }
 }
@@ -343,6 +348,7 @@ pub fn run_plugin_for_capability_with_registry(
     options: PluginRunOptions,
 ) -> Result<PluginRunOutcome, PluginExecutionError> {
     let loaded = registry.load_manifest_with_path(plugin_id)?;
+    let options = resolve_plugin_run_options(options, &loaded.manifest);
     let is_capabilities_command = args.first().copied() == Some("capabilities");
     if !is_capabilities_command && !supports_capability(&loaded.manifest, required_capability) {
         return Err(PluginExecutionError::UnsupportedCapability {
@@ -385,6 +391,31 @@ pub fn run_plugin_for_capability_with_registry(
     normalize_plugin_output(plugin_id, required_capability, args, output)
 }
 
+fn resolve_plugin_run_options(
+    options: PluginRunOptions,
+    manifest: &PluginManifest,
+) -> ResolvedPluginRunOptions {
+    let mut allowed_env = Vec::new();
+    for name in &manifest.allowed_env {
+        if let Some(value) =
+            candidate_env_value(&options.candidate_env, name).or_else(|| std::env::var(name).ok())
+        {
+            allowed_env.push((name.clone(), value));
+        }
+    }
+    ResolvedPluginRunOptions {
+        timeout: options.timeout,
+        allowed_env,
+    }
+}
+
+fn candidate_env_value(candidate_env: &[(String, String)], name: &str) -> Option<String> {
+    candidate_env
+        .iter()
+        .find(|(candidate_name, _)| candidate_name == name)
+        .map(|(_, value)| value.clone())
+}
+
 fn supports_capability(manifest: &PluginManifest, required_capability: &str) -> bool {
     manifest
         .capabilities
@@ -397,7 +428,7 @@ fn run_executable_with_timeout(
     executable: &Path,
     args: &[&str],
     input: &str,
-    options: &PluginRunOptions,
+    options: &ResolvedPluginRunOptions,
 ) -> Result<Output, PluginExecutionError> {
     let deadline = Instant::now() + options.timeout;
     let mut child = Command::new(executable)
@@ -579,7 +610,7 @@ fn executable_path(loaded: &LoadedPluginManifest) -> Result<PathBuf, PluginExecu
 fn probe_capabilities(
     plugin_id: &str,
     executable: &Path,
-    options: &PluginRunOptions,
+    options: &ResolvedPluginRunOptions,
 ) -> Result<RuntimeCapabilities, PluginExecutionError> {
     let output =
         run_executable_with_timeout(plugin_id, executable, &["capabilities"], "", options)?;

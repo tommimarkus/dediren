@@ -40,6 +40,96 @@ fn generic_graph_projects_basic_view() {
 }
 
 #[test]
+fn generic_graph_rejects_duplicate_view_ids() {
+    let input = serde_json::json!({
+        "model_schema_version": "model.schema.v1",
+        "nodes": [
+            { "id": "client", "type": "BusinessActor", "label": "Client", "properties": {} },
+            { "id": "api", "type": "ApplicationComponent", "label": "API", "properties": {} }
+        ],
+        "relationships": [],
+        "plugins": {
+            "generic-graph": {
+                "views": [
+                    {
+                        "id": "main",
+                        "label": "First",
+                        "nodes": ["client"],
+                        "relationships": []
+                    },
+                    {
+                        "id": "main",
+                        "label": "Second",
+                        "nodes": ["api"],
+                        "relationships": []
+                    }
+                ]
+            }
+        }
+    });
+
+    let mut cmd = common::plugin_command();
+    let output = cmd
+        .args(["project", "--target", "layout-request", "--view", "main"])
+        .write_stdin(serde_json::to_string(&input).unwrap())
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+
+    common::assert_error_code(&output, "DEDIREN_GENERIC_GRAPH_DUPLICATE_VIEW_ID");
+}
+
+#[test]
+fn generic_graph_rejects_duplicate_group_ids_within_view() {
+    let input = serde_json::json!({
+        "model_schema_version": "model.schema.v1",
+        "nodes": [
+            { "id": "client", "type": "BusinessActor", "label": "Client", "properties": {} },
+            { "id": "api", "type": "ApplicationComponent", "label": "API", "properties": {} }
+        ],
+        "relationships": [],
+        "plugins": {
+            "generic-graph": {
+                "views": [
+                    {
+                        "id": "main",
+                        "label": "Main",
+                        "nodes": ["client", "api"],
+                        "relationships": [],
+                        "groups": [
+                            {
+                                "id": "boundary",
+                                "label": "First",
+                                "members": ["client"]
+                            },
+                            {
+                                "id": "boundary",
+                                "label": "Second",
+                                "members": ["api"]
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    });
+
+    let mut cmd = common::plugin_command();
+    let output = cmd
+        .args(["project", "--target", "layout-request", "--view", "main"])
+        .write_stdin(serde_json::to_string(&input).unwrap())
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+
+    common::assert_error_code(&output, "DEDIREN_GENERIC_GRAPH_DUPLICATE_GROUP_ID");
+}
+
+#[test]
 fn generic_graph_projects_layout_preferences() {
     let input = serde_json::json!({
         "model_schema_version": "model.schema.v1",

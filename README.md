@@ -31,9 +31,9 @@ GitHub Release archives are published by `v*` tags. The release targets for the
 current version are:
 
 ```text
-dediren-agent-bundle-0.15.1-x86_64-unknown-linux-gnu.tar.gz
-dediren-agent-bundle-0.15.1-aarch64-unknown-linux-gnu.tar.gz
-dediren-agent-bundle-0.15.1-aarch64-apple-darwin.tar.gz
+dediren-agent-bundle-0.16.0-x86_64-unknown-linux-gnu.tar.gz
+dediren-agent-bundle-0.16.0-aarch64-unknown-linux-gnu.tar.gz
+dediren-agent-bundle-0.16.0-aarch64-apple-darwin.tar.gz
 ```
 
 To build an agent-ready local distribution archive from this source checkout,
@@ -68,11 +68,11 @@ Runtime prerequisite:
   `DEDIREN_OEF_SCHEMA_DIR` and `DEDIREN_XMI_SCHEMA_PATH`.
 
 Omitting `--target` builds for the current supported host target. For the
-current `0.15.1` version and the target above, the xtask creates:
+current `0.16.0` version and the target above, the xtask creates:
 
 ```text
-dist/dediren-agent-bundle-0.15.1-x86_64-unknown-linux-gnu/
-dist/dediren-agent-bundle-0.15.1-x86_64-unknown-linux-gnu.tar.gz
+dist/dediren-agent-bundle-0.16.0-x86_64-unknown-linux-gnu/
+dist/dediren-agent-bundle-0.16.0-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Run the smoke test from a shell where `java -version` resolves to Java 21 or
@@ -81,7 +81,7 @@ cached standards schemas, configured local schema paths, or `curl` network
 access to populate the cache:
 
 ```bash
-VERSION=0.15.1
+VERSION=0.16.0
 TARGET=x86_64-unknown-linux-gnu
 cargo xtask dist smoke "dist/dediren-agent-bundle-${VERSION}-${TARGET}.tar.gz"
 ```
@@ -95,7 +95,7 @@ and `.tar.gz` archive in `dist/`; stale bundle versions are pruned.
 Unpack and run it anywhere:
 
 ```bash
-VERSION=0.15.1
+VERSION=0.16.0
 TARGET=x86_64-unknown-linux-gnu
 mkdir -p /tmp/dediren-dist
 tar -xzf "dist/dediren-agent-bundle-${VERSION}-${TARGET}.tar.gz" -C /tmp/dediren-dist
@@ -262,10 +262,10 @@ one effective `model.schema.v1` graph. Plugins receive only the assembled graph;
 they do not need fragment-specific contracts.
 
 Fragments are deliberately simple: nested fragments and absolute fragment paths
-are rejected, duplicate ids are still errors after assembly, and conflicting
-plugin scalar values are rejected instead of overridden. Fragmented models
-therefore require `--input <file>`; stdin has no base directory for resolving
-relative fragment paths.
+are rejected, source ids and plugin-owned view/group ids are still checked for
+duplicates after assembly, and conflicting plugin scalar values are rejected
+instead of overridden. Fragmented models therefore require `--input <file>`;
+stdin has no base directory for resolving relative fragment paths.
 
 ## Styling SVG
 
@@ -545,6 +545,12 @@ name resolved next to the `dediren` executable. Override a specific executable
 with `DEDIREN_PLUGIN_<PLUGIN_ID>`, uppercased with dashes converted to
 underscores, for example `DEDIREN_PLUGIN_SVG_RENDER`.
 
+Plugin manifests may declare `allowed_env`. The core clears the plugin process
+environment and forwards only values whose names are listed in the manifest, in
+addition to explicit executable override variables handled by the core itself.
+First-party manifests declare the ELK, OEF, UML/XMI, schema-cache, and `PATH`
+variables needed by their external helpers.
+
 ## ELK Runtime
 
 The first-party `elk-layout` plugin is a Rust external-process adapter. Runtime
@@ -745,7 +751,7 @@ Distribution checks from a shell where `java -version` resolves to Java 21 or
 newer and `xmllint --version` succeeds:
 
 ```bash
-VERSION=0.15.1
+VERSION=0.16.0
 TARGET=x86_64-unknown-linux-gnu
 cargo xtask dist build --target "$TARGET"
 cargo xtask dist smoke "dist/dediren-agent-bundle-${VERSION}-${TARGET}.tar.gz"

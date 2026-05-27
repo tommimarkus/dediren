@@ -12,6 +12,10 @@ use dediren_contracts::{
     CommandEnvelope, Diagnostic, DiagnosticSeverity, ExportRequest, ExportResult, LaidOutGroup,
     OefExportInput, OefExportPolicy, EXPORT_RESULT_SCHEMA_VERSION, PLUGIN_PROTOCOL_VERSION,
 };
+use dediren_plugin_schema_cache::{
+    command_output_details, ensure_cached_schema_file, is_non_empty_file, non_empty_env_path,
+    schema_cache_base_dir,
+};
 use quick_xml::events::{BytesEnd, BytesStart, BytesText, Event};
 use quick_xml::Writer;
 
@@ -373,17 +377,12 @@ fn validate_official_oef_schema(content: &str) -> Result<(), OefSchemaValidation
         return Ok(());
     }
 
-    let mut details = String::from_utf8_lossy(&output.stderr).trim().to_string();
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    if details.is_empty() {
-        details = stdout.trim().to_string();
-    }
-    if details.is_empty() {
-        details = format!(
-            "{OEF_SCHEMA_VALIDATOR} exited with status {}",
-            output.status
-        );
-    }
+    let details = command_output_details(
+        &output.stdout,
+        &output.stderr,
+        OEF_SCHEMA_VALIDATOR,
+        output.status,
+    );
     Err(OefSchemaValidationError::Invalid(format!(
         "generated OEF XML does not validate against the official OEF schema: {details}"
     )))
@@ -395,7 +394,7 @@ fn resolve_official_oef_schema_dir() -> Result<PathBuf, OefSchemaValidationError
         return Ok(configured);
     }
 
-    let schema_dir = schema_cache_base_dir()
+    let schema_dir = schema_cache_base_dir(SCHEMA_CACHE_DIR_ENV, OEF_SCHEMA_DIR_ENV)
         .map_err(OefSchemaValidationError::SchemaUnavailable)?
         .join("opengroup")
         .join("archimate")
@@ -409,7 +408,13 @@ fn resolve_official_oef_schema_dir() -> Result<PathBuf, OefSchemaValidationError
 
     for file_name in OFFICIAL_OEF_SCHEMA_FILES {
         let url = format!("{OEF_SCHEMA_BASE_URL}/{file_name}");
-        ensure_cached_schema_file(&schema_dir.join(file_name), &url, "official OEF schema")?;
+        ensure_cached_schema_file(
+            &schema_dir.join(file_name),
+            &url,
+            "official OEF schema",
+            SCHEMA_FETCHER,
+        )
+        .map_err(OefSchemaValidationError::SchemaUnavailable)?;
     }
     Ok(schema_dir)
 }
@@ -425,117 +430,6 @@ fn ensure_oef_schema_files_exist(schema_dir: &Path) -> Result<(), OefSchemaValid
         }
     }
     Ok(())
-}
-
-fn ensure_cached_schema_file(
-    schema_path: &Path,
-    url: &str,
-    description: &str,
-) -> Result<(), OefSchemaValidationError> {
-    if is_non_empty_file(schema_path) {
-        return Ok(());
-    }
-
-    let parent = schema_path.parent().ok_or_else(|| {
-        OefSchemaValidationError::SchemaUnavailable(format!(
-            "schema cache path {} has no parent directory",
-            schema_path.display()
-        ))
-    })?;
-    let temp = tempfile::NamedTempFile::new_in(parent).map_err(|error| {
-        OefSchemaValidationError::SchemaUnavailable(format!(
-            "failed to prepare temporary {description} download in {}: {error}",
-            parent.display()
-        ))
-    })?;
-
-    let output = Command::new(SCHEMA_FETCHER)
-        .args([
-            "--location",
-            "--fail",
-            "--silent",
-            "--show-error",
-            url,
-            "--output",
-        ])
-        .arg(temp.path())
-        .output()
-        .map_err(|error| {
-            OefSchemaValidationError::SchemaUnavailable(format!(
-                "failed to start {SCHEMA_FETCHER} to download {description} from {url}: {error}"
-            ))
-        })?;
-    if !output.status.success() {
-        return Err(OefSchemaValidationError::SchemaUnavailable(format!(
-            "failed to download {description} from {url}: {}",
-            validation_output_details(&output.stdout, &output.stderr, output.status)
-        )));
-    }
-    if !is_non_empty_file(temp.path()) {
-        return Err(OefSchemaValidationError::SchemaUnavailable(format!(
-            "downloaded {description} from {url} was empty"
-        )));
-    }
-
-    match temp.persist(schema_path) {
-        Ok(_) => Ok(()),
-        Err(error) if is_non_empty_file(schema_path) => Ok(()),
-        Err(error) => Err(OefSchemaValidationError::SchemaUnavailable(format!(
-            "failed to store {description} in {}: {}",
-            schema_path.display(),
-            error.error
-        ))),
-    }
-}
-
-fn schema_cache_base_dir() -> Result<PathBuf, String> {
-    if let Some(configured) = non_empty_env_path(SCHEMA_CACHE_DIR_ENV) {
-        return Ok(configured);
-    }
-    if let Some(configured) = non_empty_env_path("XDG_CACHE_HOME") {
-        return Ok(configured.join("dediren").join("schemas"));
-    }
-    if let Some(configured) = non_empty_env_path("LOCALAPPDATA") {
-        return Ok(configured.join("dediren").join("schemas"));
-    }
-    if let Some(home) = non_empty_env_path("HOME") {
-        return Ok(home.join(".cache").join("dediren").join("schemas"));
-    }
-    Err(format!(
-        "cannot determine schema cache directory; set {SCHEMA_CACHE_DIR_ENV} or {OEF_SCHEMA_DIR_ENV}"
-    ))
-}
-
-fn non_empty_env_path(name: &str) -> Option<PathBuf> {
-    std::env::var_os(name)
-        .filter(|value| !value.is_empty())
-        .map(PathBuf::from)
-}
-
-fn is_non_empty_file(path: &Path) -> bool {
-    path.metadata()
-        .map(|metadata| metadata.is_file() && metadata.len() > 0)
-        .unwrap_or(false)
-}
-
-fn validation_output_details(
-    stdout: &[u8],
-    stderr: &[u8],
-    status: std::process::ExitStatus,
-) -> String {
-    let mut details = String::from_utf8_lossy(stderr).trim().to_string();
-    let stdout = String::from_utf8_lossy(stdout);
-    let stdout = stdout.trim();
-    if !stdout.is_empty() {
-        if !details.is_empty() {
-            details.push('\n');
-        }
-        details.push_str(stdout);
-    }
-    if details.is_empty() {
-        details = format!("{SCHEMA_FETCHER} exited with status {status}");
-    }
-    details
 }
 
 fn write_text_element(

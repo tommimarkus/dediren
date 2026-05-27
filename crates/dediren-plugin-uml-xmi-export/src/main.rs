@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::io::{Cursor, Read, Write};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
 use anyhow::{bail, Context};
@@ -8,6 +8,10 @@ use dediren_contracts::{
     CommandEnvelope, Diagnostic, DiagnosticSeverity, ExportRequest, ExportResult,
     GenericGraphPluginData, LaidOutGroup, SourceNode, SourceRelationship,
     EXPORT_RESULT_SCHEMA_VERSION, PLUGIN_PROTOCOL_VERSION,
+};
+use dediren_plugin_schema_cache::{
+    command_output_details, ensure_cached_schema_file, is_non_empty_file, non_empty_env_path,
+    schema_cache_base_dir,
 };
 use quick_xml::events::{BytesEnd, BytesStart, Event};
 use quick_xml::Writer;
@@ -283,7 +287,12 @@ fn validate_omg_xmi_schema(content: &str) -> Result<(), XmiValidationError> {
         return Ok(());
     }
 
-    let details = validation_output_details(&output.stdout, &output.stderr, output.status);
+    let details = command_output_details(
+        &output.stdout,
+        &output.stderr,
+        XMI_SCHEMA_VALIDATOR,
+        output.status,
+    );
     if xmi_schema_errors_are_only_unavailable_uml_schema(&details) {
         return Ok(());
     }
@@ -304,147 +313,20 @@ fn resolve_omg_xmi_schema_path() -> Result<PathBuf, XmiValidationError> {
         )));
     }
 
-    let schema_path = schema_cache_base_dir()
+    let schema_path = schema_cache_base_dir(SCHEMA_CACHE_DIR_ENV, XMI_SCHEMA_PATH_ENV)
         .map_err(XmiValidationError::SchemaUnavailable)?
         .join("omg")
         .join("xmi")
         .join("2.5.1")
         .join("XMI.xsd");
-    ensure_cached_schema_file(&schema_path, OMG_XMI_SCHEMA_URL, "OMG XMI schema")?;
+    ensure_cached_schema_file(
+        &schema_path,
+        OMG_XMI_SCHEMA_URL,
+        "OMG XMI schema",
+        SCHEMA_FETCHER,
+    )
+    .map_err(XmiValidationError::SchemaUnavailable)?;
     Ok(schema_path)
-}
-
-fn ensure_cached_schema_file(
-    schema_path: &Path,
-    url: &str,
-    description: &str,
-) -> Result<(), XmiValidationError> {
-    if is_non_empty_file(schema_path) {
-        return Ok(());
-    }
-
-    let parent = schema_path.parent().ok_or_else(|| {
-        XmiValidationError::SchemaUnavailable(format!(
-            "schema cache path {} has no parent directory",
-            schema_path.display()
-        ))
-    })?;
-    std::fs::create_dir_all(parent).map_err(|error| {
-        XmiValidationError::SchemaUnavailable(format!(
-            "failed to create schema cache directory {}: {error}",
-            parent.display()
-        ))
-    })?;
-    let temp = tempfile::NamedTempFile::new_in(parent).map_err(|error| {
-        XmiValidationError::SchemaUnavailable(format!(
-            "failed to prepare temporary {description} download in {}: {error}",
-            parent.display()
-        ))
-    })?;
-
-    let output = Command::new(SCHEMA_FETCHER)
-        .args([
-            "--location",
-            "--fail",
-            "--silent",
-            "--show-error",
-            url,
-            "--output",
-        ])
-        .arg(temp.path())
-        .output()
-        .map_err(|error| {
-            XmiValidationError::SchemaUnavailable(format!(
-                "failed to start {SCHEMA_FETCHER} to download {description} from {url}: {error}"
-            ))
-        })?;
-    if !output.status.success() {
-        return Err(XmiValidationError::SchemaUnavailable(format!(
-            "failed to download {description} from {url}: {}",
-            fetch_output_details(&output.stdout, &output.stderr, output.status)
-        )));
-    }
-    if !is_non_empty_file(temp.path()) {
-        return Err(XmiValidationError::SchemaUnavailable(format!(
-            "downloaded {description} from {url} was empty"
-        )));
-    }
-
-    match temp.persist(schema_path) {
-        Ok(_) => Ok(()),
-        Err(_) if is_non_empty_file(schema_path) => Ok(()),
-        Err(error) => Err(XmiValidationError::SchemaUnavailable(format!(
-            "failed to store {description} in {}: {}",
-            schema_path.display(),
-            error.error
-        ))),
-    }
-}
-
-fn schema_cache_base_dir() -> Result<PathBuf, String> {
-    if let Some(configured) = non_empty_env_path(SCHEMA_CACHE_DIR_ENV) {
-        return Ok(configured);
-    }
-    if let Some(configured) = non_empty_env_path("XDG_CACHE_HOME") {
-        return Ok(configured.join("dediren").join("schemas"));
-    }
-    if let Some(configured) = non_empty_env_path("LOCALAPPDATA") {
-        return Ok(configured.join("dediren").join("schemas"));
-    }
-    if let Some(home) = non_empty_env_path("HOME") {
-        return Ok(home.join(".cache").join("dediren").join("schemas"));
-    }
-    Err(format!(
-        "cannot determine schema cache directory; set {SCHEMA_CACHE_DIR_ENV} or {XMI_SCHEMA_PATH_ENV}"
-    ))
-}
-
-fn non_empty_env_path(name: &str) -> Option<PathBuf> {
-    std::env::var_os(name)
-        .filter(|value| !value.is_empty())
-        .map(PathBuf::from)
-}
-
-fn is_non_empty_file(path: &Path) -> bool {
-    path.metadata()
-        .map(|metadata| metadata.is_file() && metadata.len() > 0)
-        .unwrap_or(false)
-}
-
-fn fetch_output_details(stdout: &[u8], stderr: &[u8], status: std::process::ExitStatus) -> String {
-    let mut details = String::from_utf8_lossy(stderr).trim().to_string();
-    let stdout = String::from_utf8_lossy(stdout);
-    let stdout = stdout.trim();
-    if !stdout.is_empty() {
-        if !details.is_empty() {
-            details.push('\n');
-        }
-        details.push_str(stdout);
-    }
-    if details.is_empty() {
-        details = format!("{SCHEMA_FETCHER} exited with status {status}");
-    }
-    details
-}
-
-fn validation_output_details(
-    stdout: &[u8],
-    stderr: &[u8],
-    status: std::process::ExitStatus,
-) -> String {
-    let mut details = String::from_utf8_lossy(stderr).trim().to_string();
-    let stdout = String::from_utf8_lossy(stdout);
-    let stdout = stdout.trim();
-    if !stdout.is_empty() {
-        if !details.is_empty() {
-            details.push('\n');
-        }
-        details.push_str(stdout);
-    }
-    if details.is_empty() {
-        details = format!("{XMI_SCHEMA_VALIDATOR} exited with status {status}");
-    }
-    details
 }
 
 fn xmi_schema_errors_are_only_unavailable_uml_schema(details: &str) -> bool {

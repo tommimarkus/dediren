@@ -85,13 +85,17 @@ fn semantic_validate_command_rejects_invalid_source_before_plugin_lookup() {
 }
 
 fn write_manifest(dir: &std::path::Path, id: &str, executable: &str, capabilities: &[&str]) {
-    let manifest = serde_json::json!({
+    let mut manifest = serde_json::json!({
         "plugin_manifest_schema_version": "plugin-manifest.schema.v1",
         "id": id,
         "version": "0.1.0",
         "executable": executable,
         "capabilities": capabilities
     });
+    if id == "elk-layout" {
+        manifest["allowed_env"] =
+            serde_json::json!(["DEDIREN_ELK_COMMAND", "DEDIREN_ELK_RESULT_FIXTURE", "PATH"]);
+    }
     std::fs::write(
         dir.join(format!("{id}.manifest.json")),
         serde_json::to_string_pretty(&manifest).unwrap(),

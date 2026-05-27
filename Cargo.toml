@@ -7,6 +7,7 @@ members = [
   "crates/dediren-cli",
   "crates/dediren-plugin-generic-graph",
   "crates/dediren-plugin-elk-layout",
+  "crates/dediren-plugin-schema-cache",
   "crates/dediren-plugin-svg-render",
   "crates/dediren-plugin-archimate-oef-export",
   "crates/dediren-plugin-uml-xmi-export",
@@ -16,7 +17,7 @@ members = [
 resolver = "2"
 
 [workspace.package]
-version = "0.15.1"
+version = "0.16.0"
 edition = "2021"
 license = "MIT"
 repository = "https://github.com/souroldgeezer/dediren"
@@ -30,6 +31,7 @@ assert_fs = "1"
 clap = { version = "4", features = ["derive"] }
 dediren-archimate = { path = "crates/dediren-archimate" }
 dediren-contracts = { path = "crates/dediren-contracts" }
+dediren-plugin-schema-cache = { path = "crates/dediren-plugin-schema-cache" }
 dediren-uml = { path = "crates/dediren-uml" }
 jsonschema = "0.33"
 libc = "0.2"

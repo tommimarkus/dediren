@@ -795,6 +795,8 @@ pub struct PluginManifest {
     pub version: String,
     pub executable: String,
     pub capabilities: Vec<String>,
+    #[serde(default)]
+    pub allowed_env: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

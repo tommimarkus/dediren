@@ -55,6 +55,9 @@ fn main() -> anyhow::Result<()> {
     std::io::stdin().read_to_string(&mut input)?;
     let source: SourceDocument = serde_json::from_str(&input)?;
     let plugin_data = generic_graph_plugin_data(&source)?;
+    if let Err(error) = validate_generic_graph_plugin_data(&plugin_data) {
+        exit_with_diagnostic(error.code, &error.message, Some(error.path));
+    }
     let selected_view = plugin_data
         .views
         .iter()
@@ -197,6 +200,9 @@ fn validate_from_stdin(args: &[String]) -> anyhow::Result<()> {
     std::io::stdin().read_to_string(&mut input)?;
     let source: SourceDocument = serde_json::from_str(&input)?;
     let plugin_data = generic_graph_plugin_data(&source)?;
+    if let Err(error) = validate_generic_graph_plugin_data(&plugin_data) {
+        exit_with_diagnostic(error.code, &error.message, Some(error.path));
+    }
 
     match profile.as_str() {
         "archimate" => {
@@ -239,6 +245,44 @@ fn generic_graph_plugin_data(source: &SourceDocument) -> anyhow::Result<GenericG
         .context("missing plugins.generic-graph")?
         .clone();
     Ok(serde_json::from_value(plugin_value)?)
+}
+
+struct GenericGraphValidationError {
+    code: &'static str,
+    message: String,
+    path: String,
+}
+
+fn validate_generic_graph_plugin_data(
+    plugin_data: &GenericGraphPluginData,
+) -> Result<(), GenericGraphValidationError> {
+    let mut view_ids = BTreeSet::new();
+    for (view_index, view) in plugin_data.views.iter().enumerate() {
+        if !view_ids.insert(view.id.as_str()) {
+            return Err(GenericGraphValidationError {
+                code: "DEDIREN_GENERIC_GRAPH_DUPLICATE_VIEW_ID",
+                message: format!("duplicate generic-graph view id '{}'", view.id),
+                path: format!("$.plugins.generic-graph.views[{view_index}].id"),
+            });
+        }
+
+        let mut group_ids = BTreeSet::new();
+        for (group_index, group) in view.groups.iter().enumerate() {
+            if !group_ids.insert(group.id.as_str()) {
+                return Err(GenericGraphValidationError {
+                    code: "DEDIREN_GENERIC_GRAPH_DUPLICATE_GROUP_ID",
+                    message: format!(
+                        "duplicate generic-graph group id '{}' in view '{}'",
+                        group.id, view.id
+                    ),
+                    path: format!(
+                        "$.plugins.generic-graph.views[{view_index}].groups[{group_index}].id"
+                    ),
+                });
+            }
+        }
+    }
+    Ok(())
 }
 
 fn project_render_metadata(
