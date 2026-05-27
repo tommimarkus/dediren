@@ -31,9 +31,9 @@ GitHub Release archives are published by `v*` tags. The release targets for the
 current version are:
 
 ```text
-dediren-agent-bundle-0.14.13-x86_64-unknown-linux-gnu.tar.gz
-dediren-agent-bundle-0.14.13-aarch64-unknown-linux-gnu.tar.gz
-dediren-agent-bundle-0.14.13-aarch64-apple-darwin.tar.gz
+dediren-agent-bundle-0.15.0-x86_64-unknown-linux-gnu.tar.gz
+dediren-agent-bundle-0.15.0-aarch64-unknown-linux-gnu.tar.gz
+dediren-agent-bundle-0.15.0-aarch64-apple-darwin.tar.gz
 ```
 
 To build an agent-ready local distribution archive from this source checkout,
@@ -66,11 +66,11 @@ Runtime prerequisite:
   `DEDIREN_OEF_SCHEMA_DIR` and `DEDIREN_XMI_SCHEMA_PATH`.
 
 Omitting `--target` builds for the current supported host target. For the
-current `0.14.13` version and the target above, the xtask creates:
+current `0.15.0` version and the target above, the xtask creates:
 
 ```text
-dist/dediren-agent-bundle-0.14.13-x86_64-unknown-linux-gnu/
-dist/dediren-agent-bundle-0.14.13-x86_64-unknown-linux-gnu.tar.gz
+dist/dediren-agent-bundle-0.15.0-x86_64-unknown-linux-gnu/
+dist/dediren-agent-bundle-0.15.0-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Run the smoke test from a shell where `java -version` resolves to Java 21 or
@@ -79,7 +79,7 @@ cached standards schemas, configured local schema paths, or `curl` network
 access to populate the cache:
 
 ```bash
-VERSION=0.14.13
+VERSION=0.15.0
 TARGET=x86_64-unknown-linux-gnu
 cargo xtask dist smoke "dist/dediren-agent-bundle-${VERSION}-${TARGET}.tar.gz"
 ```
@@ -93,7 +93,7 @@ and `.tar.gz` archive in `dist/`; stale bundle versions are pruned.
 Unpack and run it anywhere:
 
 ```bash
-VERSION=0.14.13
+VERSION=0.15.0
 TARGET=x86_64-unknown-linux-gnu
 mkdir -p /tmp/dediren-dist
 tar -xzf "dist/dediren-agent-bundle-${VERSION}-${TARGET}.tar.gz" -C /tmp/dediren-dist
@@ -104,10 +104,12 @@ For a full unpacked-bundle JSON authoring and project/layout/render smoke
 workflow, use the `JSON Authoring Loop` and `Bundle Smoke Workflow` sections in
 `docs/agent-usage.md`.
 
-The archive includes the root MIT `LICENSE` notice, first-party plugin
-manifests under `plugins/`, first-party plugin binaries under `bin/`, schemas,
-fixtures, and the built ELK Java helper under `runtimes/elk-layout-java/`. It
-does not bundle a JRE.
+The archive includes the root MIT `LICENSE` notice,
+`THIRD-PARTY-NOTICES.md`, first-party plugin manifests under `plugins/`,
+first-party plugin binaries under `bin/`, schemas, fixtures, and the built ELK
+Java helper under `runtimes/elk-layout-java/`. The helper runtime includes
+third-party Java libraries; keep `THIRD-PARTY-NOTICES.md` with redistributed
+archives. It does not bundle a JRE.
 Skill packages that bundle Dediren should preserve the archive's
 `docs/agent-usage.md` file or embed the same JSON authoring contract in the
 skill guidance. Do not rely on this source repository README being present at
@@ -202,9 +204,10 @@ Commands:
 - `project` asks a semantic/view plugin to produce a target artifact. The
   bundled `generic-graph` plugin supports `layout-request` and
   `render-metadata`. When projecting ArchiMate render metadata, it validates
-  source node and relationship type strings and ArchiMate 3.2 relationship
-  endpoint legality against the supported ArchiMate vocabulary. Render metadata
-  can contain node, relationship, and group selectors. Set
+  source node and relationship type strings plus Dediren's curated unsupported
+  endpoint guard cases. It does not redistribute a complete ArchiMate
+  relationship endpoint matrix. Render metadata can contain node, relationship,
+  and group selectors. Set
   `plugins.generic-graph.semantic_profile` to `archimate` when a source should
   produce ArchiMate-profiled render metadata without also requiring the
   `archimate-oef` export plugin.
@@ -319,11 +322,11 @@ that list or configure `archimate-oef` still infer ArchiMate render metadata
 for compatibility.
 
 ArchiMate render and export paths reject unsupported ArchiMate element or
-relationship type strings and reject ArchiMate 3.2 relationships whose source
-and target element types are not allowed by the ArchiMate 3.2 relationship
-rules. Use the ArchiMate/OEF element name `Node` for technology nodes; aliases
-such as `TechnologyNode` are not accepted in ArchiMate metadata or export
-source.
+relationship type strings and Dediren's curated unsupported relationship
+endpoint guard cases. They do not bundle a complete ArchiMate relationship
+endpoint matrix. Use the ArchiMate/OEF element name `Node` for technology
+nodes; aliases such as `TechnologyNode` are not accepted in ArchiMate metadata
+or export source.
 
 Relationship connector junctions are supported with the ArchiMate/OEF element
 types `AndJunction` and `OrJunction`. Author a junction as a source node,
@@ -738,7 +741,7 @@ Distribution checks from a shell where `java -version` resolves to Java 21 or
 newer and `xmllint --version` succeeds:
 
 ```bash
-VERSION=0.14.13
+VERSION=0.15.0
 TARGET=x86_64-unknown-linux-gnu
 cargo xtask dist build --target "$TARGET"
 cargo xtask dist smoke "dist/dediren-agent-bundle-${VERSION}-${TARGET}.tar.gz"

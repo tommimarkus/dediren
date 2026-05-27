@@ -333,6 +333,73 @@ fn dist_build_includes_license_notice() {
 
 #[cfg(unix)]
 #[test]
+fn dist_build_includes_third_party_notices() {
+    if !is_supported_host() {
+        return;
+    }
+
+    let repo = FakeDistRepo::new();
+    repo.release_helper_build();
+    let output = repo.xtask_command(["dist", "build"]).output().unwrap();
+
+    assert!(
+        output.status.success(),
+        "dist build should pass\nstatus: {:?}\nstdout:\n{}\nstderr:\n{}",
+        output.status.code(),
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr),
+    );
+
+    let bundle_name = current_bundle_name();
+    let bundle = repo.root.path().join("dist").join(&bundle_name);
+    let notice_path = bundle.join("THIRD-PARTY-NOTICES.md");
+    assert!(
+        notice_path.exists(),
+        "dist build should include third-party notices at the bundle root"
+    );
+    let notice = fs::read_to_string(&notice_path).unwrap();
+    for expected in [
+        "ELK Java helper runtime",
+        "org.eclipse.elk",
+        "Eclipse Public License",
+        "jackson-databind",
+        "Apache License 2.0",
+        "checker-qual",
+        "MIT License",
+    ] {
+        assert!(
+            notice.contains(expected),
+            "third-party notices should mention {expected:?}\n{notice}"
+        );
+    }
+
+    let archive = repo
+        .root
+        .path()
+        .join("dist")
+        .join(format!("{bundle_name}.tar.gz"));
+    let archive_listing = Command::new("tar")
+        .arg("-tzf")
+        .arg(&archive)
+        .output()
+        .unwrap();
+    assert!(
+        archive_listing.status.success(),
+        "test tar listing should pass\nstatus: {:?}\nstderr:\n{}",
+        archive_listing.status.code(),
+        String::from_utf8_lossy(&archive_listing.stderr),
+    );
+    assert!(
+        String::from_utf8_lossy(&archive_listing.stdout)
+            .lines()
+            .any(|path| path == format!("{bundle_name}/THIRD-PARTY-NOTICES.md")),
+        "dist archive should include the bundle root third-party notices\nstdout:\n{}",
+        String::from_utf8_lossy(&archive_listing.stdout),
+    );
+}
+
+#[cfg(unix)]
+#[test]
 fn dist_build_includes_uml_profile_bundle_artifacts() {
     if !is_supported_host() {
         return;
@@ -600,6 +667,11 @@ esac
         fs::write(
             self.root.path().join("LICENSE"),
             "MIT License\n\nFake Dediren license fixture.\n",
+        )
+        .unwrap();
+        fs::write(
+            self.root.path().join("THIRD-PARTY-NOTICES.md"),
+            "# Third-Party Notices\n\nELK Java helper runtime\n\n- org.eclipse.elk: Eclipse Public License\n- jackson-databind: Apache License 2.0\n- checker-qual: MIT License\n",
         )
         .unwrap();
         fs::write(self.root.path().join("fixtures/source/basic.json"), "{}").unwrap();

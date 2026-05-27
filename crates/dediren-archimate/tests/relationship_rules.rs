@@ -138,11 +138,27 @@ fn rejects_curated_archimate_32_relationship_oracle() {
 }
 
 #[test]
-fn derived_relationship_triples_only_reference_supported_names() {
+fn relationship_rules_do_not_embed_full_spec_table() {
+    let source = include_str!("../src/relationship_rules.rs");
+    for forbidden in [
+        concat!("SOURCE", "_RELATIONSHIP_CODES"),
+        concat!("relationship ", "tables"),
+        concat!("local ", "PDF"),
+        concat!("const ", "TARGET_TYPES"),
+    ] {
+        assert!(
+            !source.contains(forbidden),
+            "relationship validation should not redistribute a full spec-derived table marker: {forbidden}"
+        );
+    }
+}
+
+#[test]
+fn curated_relationship_triples_only_reference_supported_names() {
     let triples = relationship_endpoint_triples();
     assert!(
-        triples.len() > ELEMENT_TYPES.len(),
-        "derived rule table should contain many endpoint triples"
+        triples.len() <= 64,
+        "relationship endpoint policy should stay curated, not a redistributed full matrix"
     );
 
     for triple in triples {
@@ -165,7 +181,7 @@ fn derived_relationship_triples_only_reference_supported_names() {
 }
 
 #[test]
-fn derived_relationship_triples_are_accepted_by_validator() {
+fn curated_relationship_triples_are_accepted_by_validator() {
     for triple in relationship_endpoint_triples() {
         validate_relationship_endpoint_types(
             triple.relationship_type,
@@ -173,12 +189,12 @@ fn derived_relationship_triples_are_accepted_by_validator() {
             triple.target_type,
             "$.relationships[*]",
         )
-        .unwrap_or_else(|error| panic!("derived triple should validate: {triple:?}: {error:?}"));
+        .unwrap_or_else(|error| panic!("curated triple should validate: {triple:?}: {error:?}"));
     }
 }
 
 #[test]
-fn derived_relationship_triples_cover_every_relationship_type() {
+fn curated_relationship_triples_cover_every_relationship_type() {
     let covered: std::collections::BTreeSet<&str> = relationship_endpoint_triples()
         .iter()
         .map(|triple| triple.relationship_type)
@@ -192,7 +208,7 @@ fn derived_relationship_triples_cover_every_relationship_type() {
 }
 
 #[test]
-fn derived_relationship_triples_are_unique() {
+fn curated_relationship_triples_are_unique() {
     let mut seen = std::collections::BTreeSet::new();
     for triple in relationship_endpoint_triples() {
         assert!(

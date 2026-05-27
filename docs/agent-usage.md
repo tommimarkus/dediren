@@ -9,7 +9,7 @@ If this guide is consumed through a skill package, the package should either
 ship this file alongside the Dediren bundle or copy the same JSON authoring
 contract into the skill instructions. The source repository README is not
 assumed to be available to runtime users. Preserve the bundle root `LICENSE`
-file when redistributing the archive contents.
+and `THIRD-PARTY-NOTICES.md` files when redistributing the archive contents.
 
 ## Fast Path
 
@@ -48,7 +48,7 @@ them.
 {
   "model_schema_version": "model.schema.v1",
   "required_plugins": [
-    { "id": "generic-graph", "version": "0.14.13" }
+    { "id": "generic-graph", "version": "0.15.0" }
   ],
   "nodes": [
     {
@@ -103,8 +103,8 @@ and use ArchiMate type names:
 {
   "model_schema_version": "model.schema.v1",
   "required_plugins": [
-    { "id": "generic-graph", "version": "0.14.13" },
-    { "id": "archimate-oef", "version": "0.14.13" }
+    { "id": "generic-graph", "version": "0.15.0" },
+    { "id": "archimate-oef", "version": "0.15.0" }
   ],
   "nodes": [
     {
@@ -149,6 +149,12 @@ and use ArchiMate type names:
 
 Use the ArchiMate/OEF element name `Node` for technology nodes. Do not use
 aliases such as `TechnologyNode`.
+
+Dediren validates ArchiMate type names and a small Dediren-owned set of
+unsupported endpoint guard cases. It does not ship the full ArchiMate
+relationship endpoint matrix. If you need a full standard-conformance review
+for authored ArchiMate relationships, use the official standard and tooling as
+the external authority.
 
 ## UML Profile Authoring
 
@@ -399,7 +405,7 @@ target/debug/dediren-plugin-uml-xmi-export capabilities
 From an unpacked distribution bundle:
 
 ```bash
-VERSION=0.14.13
+VERSION=0.15.0
 TARGET=x86_64-unknown-linux-gnu
 BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-${VERSION}-${TARGET}
 "$BUNDLE/bin/dediren" --version
@@ -416,7 +422,7 @@ CLI workflow commands return command envelopes using `schemas/envelope.schema.js
 ## Bundle Smoke Workflow
 
 ```bash
-VERSION=0.14.13
+VERSION=0.15.0
 TARGET=x86_64-unknown-linux-gnu
 BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-${VERSION}-${TARGET}
 
@@ -490,6 +496,6 @@ Common recovery signals:
 | `DEDIREN_XMI_ID_INVALID` | Fix XMI identifier source/policy values so generated `xmi:id` values are XML IDs and unique. |
 | `DEDIREN_ARCHIMATE_ELEMENT_TYPE_UNSUPPORTED` | Replace node `type` with a supported ArchiMate element type. |
 | `DEDIREN_ARCHIMATE_RELATIONSHIP_TYPE_UNSUPPORTED` | Replace relationship `type` with a supported ArchiMate relationship type. |
-| `DEDIREN_ARCHIMATE_RELATIONSHIP_ENDPOINT_UNSUPPORTED` | Fix ArchiMate source/target type legality. |
+| `DEDIREN_ARCHIMATE_RELATIONSHIP_ENDPOINT_UNSUPPORTED` | Fix the source/target types for a Dediren-curated unsupported ArchiMate endpoint pair. |
 
 `stderr` is for human debugging. Do not parse it for workflow decisions.
