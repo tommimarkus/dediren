@@ -9,7 +9,8 @@ If this guide is consumed through a skill package, the package should either
 ship this file alongside the Dediren bundle or copy the same JSON authoring
 contract into the skill instructions. The source repository README is not
 assumed to be available to runtime users. Preserve the bundle root `LICENSE`
-and `THIRD-PARTY-NOTICES.md` files when redistributing the archive contents.
+and generated `THIRD-PARTY-NOTICES.md` files when redistributing the archive
+contents.
 
 ## Fast Path
 
@@ -48,7 +49,7 @@ them.
 {
   "model_schema_version": "model.schema.v1",
   "required_plugins": [
-    { "id": "generic-graph", "version": "0.15.0" }
+    { "id": "generic-graph", "version": "0.15.1" }
   ],
   "nodes": [
     {
@@ -103,8 +104,8 @@ and use ArchiMate type names:
 {
   "model_schema_version": "model.schema.v1",
   "required_plugins": [
-    { "id": "generic-graph", "version": "0.15.0" },
-    { "id": "archimate-oef", "version": "0.15.0" }
+    { "id": "generic-graph", "version": "0.15.1" },
+    { "id": "archimate-oef", "version": "0.15.1" }
   ],
   "nodes": [
     {
@@ -405,7 +406,7 @@ target/debug/dediren-plugin-uml-xmi-export capabilities
 From an unpacked distribution bundle:
 
 ```bash
-VERSION=0.15.0
+VERSION=0.15.1
 TARGET=x86_64-unknown-linux-gnu
 BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-${VERSION}-${TARGET}
 "$BUNDLE/bin/dediren" --version
@@ -422,7 +423,7 @@ CLI workflow commands return command envelopes using `schemas/envelope.schema.js
 ## Bundle Smoke Workflow
 
 ```bash
-VERSION=0.15.0
+VERSION=0.15.1
 TARGET=x86_64-unknown-linux-gnu
 BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-${VERSION}-${TARGET}
 

@@ -188,6 +188,8 @@ if [[ "$GRADLE_LAUNCHER_JVM" != "25" ]]; then
 fi
 
 gradle \
+  --no-parallel \
+  --no-configuration-cache \
   --project-cache-dir "$PROJECT_CACHE_DIR" \
   -p "$PROJECT_DIR" \
-  clean test installDist
+  clean test installDist generateLicenseReport

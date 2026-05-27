@@ -823,6 +823,14 @@ fn live_release_surfaces_match_workspace_version() {
         "README.md should document that distribution archives include third-party notices"
     );
     assert!(
+        readme.contains("Gradle License Report"),
+        "README.md should document that distribution archives use generated third-party notices"
+    );
+    assert!(
+        readme.contains("cargo-about"),
+        "README.md should document the Rust notice generator"
+    );
+    assert!(
         !readme.contains("scripts/build-dist.sh"),
         "README.md should not document legacy distribution build wrappers"
     );

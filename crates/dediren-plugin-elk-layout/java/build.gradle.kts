@@ -1,6 +1,12 @@
+import com.github.jk1.license.filter.DependencyFilter
+import com.github.jk1.license.filter.SpdxLicenseBundleNormalizer
+import com.github.jk1.license.render.ReportRenderer
+import com.github.jk1.license.render.TextReportRenderer
+
 plugins {
     application
     java
+    id("com.github.jk1.dependency-license-report") version "3.1.2"
 }
 
 java {
@@ -20,6 +26,16 @@ application {
 
 dependencyLocking {
     lockAllConfigurations()
+}
+
+licenseReport {
+    outputDir = layout.buildDirectory.dir("reports/dependency-license").get().asFile.path
+    configurations = arrayOf("runtimeClasspath")
+    excludeBoms = true
+    renderers = arrayOf<ReportRenderer>(
+        TextReportRenderer("THIRD-PARTY-NOTICES.md")
+    )
+    filters = arrayOf<DependencyFilter>(SpdxLicenseBundleNormalizer())
 }
 
 dependencies {

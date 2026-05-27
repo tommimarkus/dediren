@@ -172,6 +172,9 @@ fn build_dist(root: &Path, requested_target: Option<&str>) -> Result<()> {
     }
     run_status(&mut cargo_build)?;
 
+    println!("generating Rust third-party notices");
+    let rust_notice = generate_rust_third_party_notices(root, target.triple)?;
+
     println!("building ELK Java helper");
     run_status(&mut Command::new(root.join(
         "crates/dediren-plugin-elk-layout/java/scripts/build-elk-layout.sh",
@@ -198,7 +201,7 @@ fn build_dist(root: &Path, requested_target: Option<&str>) -> Result<()> {
     copy_fixture_dirs(root, &bundle_dir.join("fixtures"))?;
     copy_agent_docs(root, &bundle_dir.join("docs"))?;
     copy_license_notice(root, &bundle_dir)?;
-    copy_third_party_notices(root, &bundle_dir)?;
+    write_third_party_notices(root, &bundle_dir, &rust_notice)?;
     copy_dir_recursive(
         &root.join("crates/dediren-plugin-elk-layout/java/build/install/dediren-elk-layout-java"),
         &bundle_dir.join("runtimes/elk-layout-java"),
@@ -557,12 +560,50 @@ fn copy_license_notice(root: &Path, bundle_dir: &Path) -> Result<()> {
     Ok(())
 }
 
-fn copy_third_party_notices(root: &Path, bundle_dir: &Path) -> Result<()> {
-    fs::copy(
-        root.join("THIRD-PARTY-NOTICES.md"),
-        bundle_dir.join("THIRD-PARTY-NOTICES.md"),
+fn generate_rust_third_party_notices(root: &Path, target: &str) -> Result<PathBuf> {
+    let output_dir = root.join("target/dediren-third-party-notices");
+    fs::create_dir_all(&output_dir).with_context(|| format!("create {}", output_dir.display()))?;
+    let output = output_dir.join("rust-dependencies.md");
+    run_status(
+        Command::new("cargo")
+            .current_dir(root)
+            .arg("about")
+            .arg("generate")
+            .arg("--workspace")
+            .arg("--locked")
+            .arg("--offline")
+            .arg("--fail")
+            .arg("--config")
+            .arg(root.join(".cargo/about.toml"))
+            .arg("--target")
+            .arg(target)
+            .arg("--output-file")
+            .arg(&output)
+            .arg(root.join(".cargo/about.hbs")),
     )
-    .context("copy THIRD-PARTY-NOTICES.md")?;
+    .context("generate Rust third-party notices with cargo-about")?;
+    Ok(output)
+}
+
+fn write_third_party_notices(root: &Path, bundle_dir: &Path, rust_notice: &Path) -> Result<()> {
+    let java_notice =
+        root.join("crates/dediren-plugin-elk-layout/java/build/reports/dependency-license/THIRD-PARTY-NOTICES.md");
+    let rust_notice = fs::read_to_string(rust_notice)
+        .with_context(|| format!("read {}", rust_notice.display()))?;
+    let java_notice = fs::read_to_string(&java_notice)
+        .with_context(|| format!("read {}", java_notice.display()))?;
+
+    let combined = format!(
+        "# Third-Party Notices\n\n\
+         Dediren's own source and binaries are covered by the root LICENSE file. \
+         The sections below are generated reports for third-party dependencies \
+         redistributed in or compiled into the distribution bundle.\n\n\
+         {rust_notice}\n\n\
+         # ELK Java Helper Runtime Dependencies\n\n\
+         {java_notice}"
+    );
+    fs::write(bundle_dir.join("THIRD-PARTY-NOTICES.md"), combined)
+        .context("write THIRD-PARTY-NOTICES.md")?;
     Ok(())
 }
 
