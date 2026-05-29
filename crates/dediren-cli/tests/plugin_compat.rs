@@ -1,7 +1,7 @@
 mod common;
 
-use common::{assert_error_code, plugin_binary, stdout_json, workspace_file};
-use predicates::prelude::*;
+use assert_fs::prelude::*;
+use common::{assert_error_code, ok_data, plugin_binary, stdout_json, workspace_file};
 use std::process::Command;
 
 #[test]
@@ -66,13 +66,16 @@ fn unknown_plugin_failure_is_structured_by_cli() {
 }
 
 #[test]
-fn plugin_error_envelope_is_preserved_by_cli() {
+fn elk_layout_ignores_external_command_and_runs_in_process() {
     let output = common::dediren_command()
         .env(
             "DEDIREN_PLUGIN_ELK_LAYOUT",
             plugin_binary("dediren-plugin-elk-layout"),
         )
-        .env_remove("DEDIREN_ELK_COMMAND")
+        .env(
+            "DEDIREN_ELK_COMMAND",
+            "/definitely/not/a/dediren/elk/helper",
+        )
         .env_remove("DEDIREN_ELK_RESULT_FIXTURE")
         .arg("layout")
         .arg("--plugin")
@@ -80,11 +83,125 @@ fn plugin_error_envelope_is_preserved_by_cli() {
         .arg("--input")
         .arg(workspace_file("fixtures/layout-request/basic.json"))
         .assert()
-        .failure()
-        .stdout(predicate::str::contains("DEDIREN_PLUGIN_ERROR").not())
+        .success()
         .get_output()
         .stdout
         .clone();
 
-    assert_error_code(&output, "DEDIREN_ELK_RUNTIME_UNAVAILABLE");
+    let data = ok_data(&output);
+    assert_eq!(
+        data["layout_result_schema_version"],
+        "layout-result.schema.v1"
+    );
+    assert!(
+        data["edges"]
+            .as_array()
+            .expect("layout result edges should be an array")
+            .iter()
+            .any(|edge| edge["id"] == "client-calls-api"),
+        "in-process Rust backend output should contain client-calls-api edge"
+    );
+}
+
+#[test]
+fn elk_layout_result_fixture_takes_precedence_over_external_command() {
+    let temp = assert_fs::TempDir::new().unwrap();
+    let fixture = temp.child("sentinel-layout-result.json");
+    fixture
+        .write_str(
+            &serde_json::to_string_pretty(&serde_json::json!({
+                "layout_result_schema_version": "layout-result.schema.v1",
+                "view_id": "sentinel-fixture-view",
+                "nodes": [
+                    {
+                        "id": "sentinel-node",
+                        "source_id": "sentinel-source",
+                        "projection_id": "sentinel-projection",
+                        "x": 9876.5,
+                        "y": 5432.25,
+                        "width": 321.0,
+                        "height": 123.0,
+                        "label": "Sentinel fixture node"
+                    }
+                ],
+                "edges": [],
+                "groups": [],
+                "warnings": []
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+
+    let output = common::dediren_command()
+        .env(
+            "DEDIREN_PLUGIN_ELK_LAYOUT",
+            plugin_binary("dediren-plugin-elk-layout"),
+        )
+        .env(
+            "DEDIREN_ELK_COMMAND",
+            "/definitely/not/a/dediren/elk/helper",
+        )
+        .env("DEDIREN_ELK_RESULT_FIXTURE", fixture.path())
+        .arg("layout")
+        .arg("--plugin")
+        .arg("elk-layout")
+        .arg("--input")
+        .arg(workspace_file("fixtures/layout-request/basic.json"))
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let data = ok_data(&output);
+    assert_eq!(
+        data["layout_result_schema_version"],
+        "layout-result.schema.v1"
+    );
+    assert_eq!(data["view_id"], "sentinel-fixture-view");
+
+    let sentinel = data["nodes"]
+        .as_array()
+        .expect("sentinel fixture nodes should be an array")
+        .iter()
+        .find(|node| node["id"] == "sentinel-node")
+        .expect("fixture result should contain sentinel node");
+    assert_eq!(sentinel["label"], "Sentinel fixture node");
+    assert_eq!(sentinel["projection_id"], "sentinel-projection");
+    assert_eq!(sentinel["x"].as_f64(), Some(9876.5));
+    assert_eq!(sentinel["y"].as_f64(), Some(5432.25));
+}
+
+#[test]
+fn elk_layout_fixture_error_envelope_is_preserved_by_cli() {
+    let temp = assert_fs::TempDir::new().unwrap();
+    let missing_fixture = temp.path().join("missing-layout-result.json");
+
+    let output = common::dediren_command()
+        .env(
+            "DEDIREN_PLUGIN_ELK_LAYOUT",
+            plugin_binary("dediren-plugin-elk-layout"),
+        )
+        .env("DEDIREN_ELK_RESULT_FIXTURE", missing_fixture)
+        .arg("layout")
+        .arg("--plugin")
+        .arg("elk-layout")
+        .arg("--input")
+        .arg(workspace_file("fixtures/layout-request/basic.json"))
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+
+    assert_error_code(&output, "DEDIREN_ELK_FIXTURE_UNAVAILABLE");
+    let stdout = String::from_utf8_lossy(&output);
+    assert!(
+        stdout.contains("DEDIREN_ELK_FIXTURE_UNAVAILABLE"),
+        "CLI stdout should preserve plugin fixture error code: {stdout}"
+    );
+    assert!(
+        !stdout.contains("DEDIREN_PLUGIN_ERROR"),
+        "CLI stdout should not wrap plugin fixture errors: {stdout}"
+    );
 }

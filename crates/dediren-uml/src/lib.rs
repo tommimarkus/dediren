@@ -315,12 +315,12 @@ fn is_activity_type(value: &str) -> bool {
 }
 
 trait GenericGraphViewKindName {
-    fn as_str(self) -> &'static str;
+    fn as_str(&self) -> &'static str;
 }
 
 impl GenericGraphViewKindName for GenericGraphViewKind {
-    fn as_str(self) -> &'static str {
-        match self {
+    fn as_str(&self) -> &'static str {
+        match *self {
             Self::Generic => "generic",
             Self::Archimate => "archimate",
             Self::UmlClass => "uml-class",

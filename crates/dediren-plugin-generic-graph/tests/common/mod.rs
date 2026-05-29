@@ -65,7 +65,7 @@ pub fn assert_error_code(output: &[u8], expected_code: &str) -> Value {
         })
         .collect();
     assert!(
-        codes.iter().any(|code| *code == expected_code),
+        codes.contains(&expected_code),
         "expected diagnostic code {expected_code}, got {codes:?}"
     );
     envelope

@@ -1,5 +1,5 @@
 use dediren_contracts::{
-    Diagnostic, DiagnosticSeverity, LaidOutEdge, LaidOutNode, LayoutResult, Point,
+    Diagnostic, DiagnosticSeverity, LaidOutEdge, LaidOutGroup, LaidOutNode, LayoutResult, Point,
 };
 use serde::{Deserialize, Serialize};
 
@@ -9,6 +9,14 @@ const ROUTE_CLOSE_PARALLEL_DISTANCE: f64 = 20.0;
 const ROUTE_CLOSE_PARALLEL_MIN_OVERLAP: f64 = 40.0;
 const GEOMETRY_EPSILON: f64 = 0.001;
 const ROUTE_ENDPOINT_TOLERANCE: f64 = 1.5;
+
+#[derive(Debug, Clone, Copy)]
+struct Rect {
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LayoutQualityReport {
@@ -199,16 +207,7 @@ fn count_overlaps(result: &LayoutResult) -> usize {
     let mut count = 0;
     for (index, left) in result.nodes.iter().enumerate() {
         for right in result.nodes.iter().skip(index + 1) {
-            if rectangles_overlap(
-                left.x,
-                left.y,
-                left.width,
-                left.height,
-                right.x,
-                right.y,
-                right.width,
-                right.height,
-            ) {
+            if rectangles_overlap(node_rect(left), node_rect(right)) {
                 count += 1;
             }
         }
@@ -223,16 +222,7 @@ fn count_connector_through_nodes(result: &LayoutResult) -> usize {
             for node in &result.nodes {
                 if node.id != edge.source
                     && node.id != edge.target
-                    && segment_intersects_rect(
-                        segment[0].x,
-                        segment[0].y,
-                        segment[1].x,
-                        segment[1].y,
-                        node.x,
-                        node.y,
-                        node.width,
-                        node.height,
-                    )
+                    && segment_intersects_rect(&segment[0], &segment[1], node_rect(node))
                 {
                     count += 1;
                     break;
@@ -268,16 +258,7 @@ fn count_group_boundary_issues(result: &LayoutResult) -> usize {
                 {
                     continue;
                 }
-                if segment_intersects_rect(
-                    segment[0].x,
-                    segment[0].y,
-                    segment[1].x,
-                    segment[1].y,
-                    group.x,
-                    group.y,
-                    group.width,
-                    group.height,
-                ) {
+                if segment_intersects_rect(&segment[0], &segment[1], group_rect(group)) {
                     count += 1;
                     break;
                 }
@@ -415,44 +396,43 @@ fn same_coordinate(left: f64, right: f64) -> bool {
     (left - right).abs() <= GEOMETRY_EPSILON
 }
 
-fn rectangles_overlap(
-    left_x: f64,
-    left_y: f64,
-    left_width: f64,
-    left_height: f64,
-    right_x: f64,
-    right_y: f64,
-    right_width: f64,
-    right_height: f64,
-) -> bool {
-    left_x < right_x + right_width
-        && left_x + left_width > right_x
-        && left_y < right_y + right_height
-        && left_y + left_height > right_y
+fn rectangles_overlap(left: Rect, right: Rect) -> bool {
+    left.x < right.x + right.width
+        && left.x + left.width > right.x
+        && left.y < right.y + right.height
+        && left.y + left.height > right.y
 }
 
-fn segment_intersects_rect(
-    x1: f64,
-    y1: f64,
-    x2: f64,
-    y2: f64,
-    rect_x: f64,
-    rect_y: f64,
-    rect_width: f64,
-    rect_height: f64,
-) -> bool {
-    let min_x = x1.min(x2);
-    let max_x = x1.max(x2);
-    let min_y = y1.min(y2);
-    let max_y = y1.max(y2);
+fn segment_intersects_rect(start: &Point, end: &Point, rect: Rect) -> bool {
+    let min_x = start.x.min(end.x);
+    let max_x = start.x.max(end.x);
+    let min_y = start.y.min(end.y);
+    let max_y = start.y.max(end.y);
     rectangles_overlap(
-        min_x,
-        min_y,
-        (max_x - min_x).max(1.0),
-        (max_y - min_y).max(1.0),
-        rect_x,
-        rect_y,
-        rect_width,
-        rect_height,
+        Rect {
+            x: min_x,
+            y: min_y,
+            width: (max_x - min_x).max(1.0),
+            height: (max_y - min_y).max(1.0),
+        },
+        rect,
     )
+}
+
+fn node_rect(node: &LaidOutNode) -> Rect {
+    Rect {
+        x: node.x,
+        y: node.y,
+        width: node.width,
+        height: node.height,
+    }
+}
+
+fn group_rect(group: &LaidOutGroup) -> Rect {
+    Rect {
+        x: group.x,
+        y: group.y,
+        width: group.width,
+        height: group.height,
+    }
 }

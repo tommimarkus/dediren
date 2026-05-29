@@ -12,8 +12,7 @@
     "plugins",
     "schemas_dir",
     "fixtures_dir",
-    "docs_dir",
-    "elk_helper"
+    "docs_dir"
   ],
   "properties": {
     "bundle_schema_version": { "const": "dediren-bundle.schema.v1" },
@@ -31,7 +30,12 @@
     "schemas_dir": { "type": "string", "minLength": 1 },
     "fixtures_dir": { "type": "string", "minLength": 1 },
     "docs_dir": { "type": "string", "minLength": 1 },
-    "elk_helper": { "type": "string", "minLength": 1 }
+    "elk_helper": {
+      "type": "string",
+      "minLength": 1,
+      "deprecated": true,
+      "description": "Deprecated bundle metadata from releases before 0.17.0. Current bundles omit this field because layout runs through the Rust elkrs backend."
+    }
   },
   "$defs": {
     "bundledPlugin": {

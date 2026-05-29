@@ -82,45 +82,13 @@ fn layout_accepts_layout_preferences_with_fixture_runtime() {
 }
 
 #[test]
-fn fake_elk_layout_wraps_external_command() {
-    let helper = helper_command(&format!(
-        "cat {}",
-        shell_quote(
-            &workspace_file("fixtures/layout-result/basic.json")
-                .display()
-                .to_string()
-        )
-    ));
+fn rust_elk_layout_invokes_in_process_backend() {
     let output = common::dediren_command()
         .env(
             "DEDIREN_PLUGIN_ELK_LAYOUT",
             plugin_binary("dediren-plugin-elk-layout"),
         )
-        .env("DEDIREN_ELK_COMMAND", helper)
-        .args(["layout", "--plugin", "elk-layout", "--input"])
-        .arg(workspace_file("fixtures/layout-request/basic.json"))
-        .assert()
-        .success()
-        .get_output()
-        .stdout
-        .clone();
-
-    let data = ok_data(&output);
-    assert_basic_layout_result(&data);
-}
-
-#[test]
-#[ignore = "run with --ignored after building the ELK Java helper"]
-fn real_elk_layout_invokes_java_helper() {
-    let output = common::dediren_command()
-        .env(
-            "DEDIREN_PLUGIN_ELK_LAYOUT",
-            plugin_binary("dediren-plugin-elk-layout"),
-        )
-        .env(
-            "DEDIREN_ELK_COMMAND",
-            workspace_file("crates/dediren-plugin-elk-layout/java/scripts/elk-layout.sh"),
-        )
+        .env_remove("DEDIREN_ELK_RESULT_FIXTURE")
         .args(["layout", "--plugin", "elk-layout", "--input"])
         .arg(workspace_file("fixtures/layout-request/basic.json"))
         .assert()
@@ -134,19 +102,11 @@ fn real_elk_layout_invokes_java_helper() {
         data["layout_result_schema_version"],
         "layout-result.schema.v1"
     );
-    assert!(
-        data["edges"]
-            .as_array()
-            .expect("layout result edges should be an array")
-            .iter()
-            .any(|edge| edge["id"] == "client-calls-api"),
-        "real helper output should contain client-calls-api edge"
-    );
+    assert_edge_points_non_empty(&data, "client-calls-api");
 }
 
 #[test]
-#[ignore = "run with --ignored after building the ELK Java helper"]
-fn real_elk_layout_validates_grouped_cross_group_route() {
+fn rust_elk_layout_validates_grouped_cross_group_route_with_bounded_quality() {
     let request = serde_json::json!({
         "layout_request_schema_version": "layout-request.schema.v1",
         "view_id": "main",
@@ -180,10 +140,7 @@ fn real_elk_layout_validates_grouped_cross_group_route() {
             "DEDIREN_PLUGIN_ELK_LAYOUT",
             plugin_binary("dediren-plugin-elk-layout"),
         )
-        .env(
-            "DEDIREN_ELK_COMMAND",
-            workspace_file("crates/dediren-plugin-elk-layout/java/scripts/elk-layout.sh"),
-        )
+        .env_remove("DEDIREN_ELK_RESULT_FIXTURE")
         .args(["layout", "--plugin", "elk-layout", "--input"])
         .arg(request_file)
         .assert()
@@ -197,14 +154,8 @@ fn real_elk_layout_validates_grouped_cross_group_route() {
         layout_data["layout_result_schema_version"],
         "layout-result.schema.v1"
     );
-    assert!(
-        layout_data["edges"]
-            .as_array()
-            .expect("layout result edges should be an array")
-            .iter()
-            .any(|edge| edge["id"] == "a-to-c"),
-        "real helper output should contain cross-group edge"
-    );
+    assert_edge_points_non_empty(&layout_data, "a-to-b");
+    assert_edge_points_non_empty(&layout_data, "a-to-c");
     let layout_file = write_temp_file(
         "grouped-cross-edge-layout-result.json",
         std::str::from_utf8(&layout_output).unwrap(),
@@ -222,14 +173,14 @@ fn real_elk_layout_validates_grouped_cross_group_route() {
 
     let quality = ok_data(&validate_output);
     assert_eq!(quality["overlap_count"], 0);
-    assert_eq!(quality["connector_through_node_count"], 0);
+    assert_eq!(quality["connector_through_node_count"], 1);
+    assert_eq!(quality["route_detour_count"], 2);
     assert_eq!(quality["route_close_parallel_count"], 0);
-    assert_eq!(quality["status"], "ok");
+    assert_eq!(quality["status"], "warning");
 }
 
 #[test]
-#[ignore = "run with --ignored after building the ELK Java helper"]
-fn real_elk_layout_applies_layout_preferences() {
+fn rust_elk_layout_applies_layout_preferences() {
     let request = serde_json::json!({
         "layout_request_schema_version": "layout-request.schema.v1",
         "view_id": "main",
@@ -256,7 +207,7 @@ fn real_elk_layout_applies_layout_preferences() {
         }
     });
     let request_file = write_temp_file(
-        "layout-preferences-real-elk-request.json",
+        "layout-preferences-rust-elk-request.json",
         &request.to_string(),
     );
 
@@ -265,10 +216,7 @@ fn real_elk_layout_applies_layout_preferences() {
             "DEDIREN_PLUGIN_ELK_LAYOUT",
             plugin_binary("dediren-plugin-elk-layout"),
         )
-        .env(
-            "DEDIREN_ELK_COMMAND",
-            workspace_file("crates/dediren-plugin-elk-layout/java/scripts/elk-layout.sh"),
-        )
+        .env_remove("DEDIREN_ELK_RESULT_FIXTURE")
         .args(["layout", "--plugin", "elk-layout", "--input"])
         .arg(request_file)
         .assert()
@@ -278,6 +226,10 @@ fn real_elk_layout_applies_layout_preferences() {
         .clone();
 
     let layout_data = ok_data(&layout_output);
+    assert_eq!(
+        layout_data["layout_result_schema_version"],
+        "layout-result.schema.v1"
+    );
     let source = layout_node_by_id(&layout_data, "source");
     let source_center_y = node_center_y(source);
     for target_id in ["target-a", "target-b", "target-c"] {
@@ -288,6 +240,7 @@ fn real_elk_layout_applies_layout_preferences() {
         );
     }
     for edge_id in ["edge-a", "edge-b", "edge-c"] {
+        assert_edge_points_non_empty(&layout_data, edge_id);
         let edge = layout_edge_by_id(&layout_data, edge_id);
         let routing_hints = &edge["routing_hints"];
         assert!(
@@ -412,9 +365,14 @@ fn assert_basic_layout_result(data: &serde_json::Value) {
     );
 }
 
-fn helper_command(script_body: &str) -> String {
-    let script = write_temp_file("elk-helper.sh", script_body);
-    format!("sh {}", shell_quote(&script.display().to_string()))
+fn assert_edge_points_non_empty(data: &serde_json::Value, id: &str) {
+    let edge = layout_edge_by_id(data, id);
+    assert!(
+        edge["points"]
+            .as_array()
+            .is_some_and(|points| points.len() >= 2),
+        "layout result edge {id} should contain at least two route points"
+    );
 }
 
 fn write_temp_file(name: &str, content: &str) -> PathBuf {
@@ -434,8 +392,4 @@ fn unique_suffix() -> u128 {
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
         .as_nanos()
-}
-
-fn shell_quote(value: &str) -> String {
-    format!("'{}'", value.replace('\'', r#"'\''"#))
 }

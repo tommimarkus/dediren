@@ -24,8 +24,10 @@ pub fn layout_command(
                 message: error.to_string(),
             }
         })?;
-    let mut options = PluginRunOptions::default();
-    options.candidate_env = input.env;
+    let options = PluginRunOptions {
+        candidate_env: input.env,
+        ..PluginRunOptions::default()
+    };
     run_plugin_for_capability_with_registry(
         &input.registry,
         input.plugin,
@@ -176,8 +178,10 @@ pub fn export_command_with_base(
         layout_result,
         policy,
     };
-    let mut options = PluginRunOptions::default();
-    options.candidate_env = std::env::vars().collect();
+    let options = PluginRunOptions {
+        candidate_env: std::env::vars().collect(),
+        ..PluginRunOptions::default()
+    };
     run_plugin_for_capability_with_options(
         plugin,
         "export",

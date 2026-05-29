@@ -17,7 +17,7 @@ members = [
 resolver = "2"
 
 [workspace.package]
-version = "0.16.0"
+version = "0.17.0"
 edition = "2021"
 license = "MIT"
 repository = "https://github.com/souroldgeezer/dediren"
@@ -33,6 +33,8 @@ dediren-archimate = { path = "crates/dediren-archimate" }
 dediren-contracts = { path = "crates/dediren-contracts" }
 dediren-plugin-schema-cache = { path = "crates/dediren-plugin-schema-cache" }
 dediren-uml = { path = "crates/dediren-uml" }
+elkrs-core = { git = "https://github.com/tommimarkus/elkrs", rev = "aeba4e35a0648b57caa88b8588099a3bb48021ae" }
+elkrs-layered = { git = "https://github.com/tommimarkus/elkrs", rev = "aeba4e35a0648b57caa88b8588099a3bb48021ae" }
 jsonschema = "0.33"
 libc = "0.2"
 predicates = "3"

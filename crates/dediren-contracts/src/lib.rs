@@ -175,17 +175,12 @@ pub struct GenericGraphViewGroup {
     pub semantic_source_id: Option<String>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum GenericGraphViewGroupRole {
+    #[default]
     SemanticBoundary,
     LayoutOnly,
-}
-
-impl Default for GenericGraphViewGroupRole {
-    fn default() -> Self {
-        Self::SemanticBoundary
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

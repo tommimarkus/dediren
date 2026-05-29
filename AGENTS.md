@@ -14,17 +14,17 @@
   say why in the handoff.
 - Treat plans as task guidance and implementation history. Live code and tests
   are the current truth when they disagree with a plan.
-- For ELK layout/routing changes, start from the ELK-first rule before editing
-  Java: try official ELK Layered options, generated graph structure, ports,
-  hierarchy, and real-render evidence before adding custom placement or route
-  geometry code. Custom post-processing of ELK edge points is a last resort and
-  must document which ELK options or graph-shaping attempts failed.
+- For ELK layout/routing changes, start from the ELK-first rule: try official
+  ELK Layered options, generated graph structure, ports, hierarchy, and
+  real-render evidence before adding custom placement or route geometry code.
+  Custom post-processing of ELK edge points is a last resort and must document
+  which ELK options or graph-shaping attempts failed.
 
 ## Skill Routing
 
 - Use `souroldgeezer-design:software-design` for build/review/lookup questions
   about module boundaries, dependency direction, responsibility ownership,
-  coupling, refactors, plugin/core split, Rust code shape, Java helper shape,
+  coupling, refactors, plugin/core split, Rust code shape, layout backend shape,
   or plan-to-code design drift.
 - In `software-design` review mode for this repo, start from contract
   ownership and dependency direction before implementation details.
@@ -51,10 +51,10 @@
   let ELK compute geometry and routes. Keep `dediren` code focused on contract
   mapping, diagnostics, normalization, and regression coverage around ELK
   behavior.
-- Before adding or extending custom Java layout/routing heuristics, add a
-  failing helper or real-render test for the exact visual problem, list the ELK
-  options or graph-shaping alternatives tried, and keep any remaining custom
-  logic isolated as Dediren graph intent rather than route-point rewriting.
+- Before adding or extending custom layout/routing heuristics, add a failing
+  backend or real-render test for the exact visual problem, list the ELK options
+  or graph-shaping alternatives tried, and keep any remaining custom logic
+  isolated as Dediren graph intent rather than route-point rewriting.
 
 ## Contract Boundaries
 
@@ -73,7 +73,7 @@
 ## Files That Move Together
 
 - Public JSON shape changes: update `schemas/`, `dediren-contracts`, fixtures,
-  Rust/Java/plugin mapping code, and schema/round-trip tests together.
+  Rust/plugin mapping code, and schema/round-trip tests together.
 - Plugin protocol or runtime changes: update manifests, runtime capability
   handling, plugin envelope validation, CLI behavior, README notes, and
   compatibility tests together.
@@ -81,10 +81,10 @@
   changes: update `README.md` and, when bundle/runtime agents are affected,
   `docs/agent-usage.md` in the same change so public and shipped instructions
   match the live behavior.
-- ELK layout changes: keep the Rust `elk-layout` adapter and Java helper
-  contract aligned. The helper lives under
-  `crates/dediren-plugin-elk-layout/java` and is invoked through
-  `DEDIREN_ELK_COMMAND`.
+- ELK layout changes: keep the Rust `elk-layout` plugin contract, `elkrs`
+  backend mapping, fixtures, CLI tests, and render-evidence tests aligned.
+  `DEDIREN_ELK_RESULT_FIXTURE` remains the deterministic test override; there
+  is no Java helper or `DEDIREN_ELK_COMMAND` runtime path.
 - SVG render policy changes: update `schemas/svg-render-policy.schema.json`,
   `dediren-contracts`, render fixtures, `dediren-plugin-svg-render`, CLI render
   tests, and README examples together.
@@ -159,18 +159,14 @@
   `.dediren/plugins`, then user-configured directories.
 - Keep stderr for human debugging only.
 
-## ELK Helper
+## ELK Runtime
 
-- Fixture mode with `DEDIREN_ELK_RESULT_FIXTURE` takes precedence over
-  `DEDIREN_ELK_COMMAND` and is for deterministic Rust adapter tests.
-- Real ELK work requires the SDKMAN/Gradle Java helper:
-
-```bash
-source "$HOME/.sdkman/bin/sdkman-init.sh"
-crates/dediren-plugin-elk-layout/java/scripts/build-elk-layout.sh
-```
-
-- Run ignored real-helper tests only after the helper is built.
+- Fixture mode with `DEDIREN_ELK_RESULT_FIXTURE` takes precedence over the
+  in-process Rust `elkrs` backend and is for deterministic adapter tests.
+- Real ELK work runs through the Rust `elkrs` backend compiled into
+  `dediren-plugin-elk-layout`; no Java, Gradle, SDKMAN, or external ELK command
+  is required.
+- Rust ELK backend and render-evidence tests run as normal Rust tests.
 
 ## Verification
 
@@ -215,14 +211,13 @@ cargo test -p dediren-core --test plugin_runtime
 cargo test -p dediren --test plugin_compat
 ```
 
-ELK helper changes:
+ELK runtime changes:
 
 ```bash
-crates/dediren-plugin-elk-layout/java/scripts/build-elk-layout.sh
-cargo test -p dediren-plugin-elk-layout --test elk_layout_plugin real_elk_plugin_invokes_java_helper -- --ignored --exact --test-threads=1
-cargo test -p dediren --test cli_layout real_elk_layout_invokes_java_helper -- --ignored --exact --test-threads=1
-cargo test -p dediren --test cli_layout real_elk_layout_validates_grouped_cross_group_route -- --ignored --exact --test-threads=1
-cargo test -p dediren --test real_elk_render -- --ignored --test-threads=1
+cargo test -p dediren-plugin-elk-layout --test elk_layout_plugin
+cargo test -p dediren --test cli_layout
+cargo test -p dediren --test plugin_compat
+cargo test -p dediren --test real_elk_render -- --test-threads=1
 ```
 
 SVG render changes:
@@ -267,10 +262,7 @@ handoff, then rerun affected checks.
 - Do not use `git add -f` unless the user explicitly names the ignored path to
   track.
 - Do not commit ignored/generated outputs by default. In this repo that includes
-  `target/`, `.cache/gradle/`,
-  `crates/dediren-plugin-elk-layout/java/.gradle/`,
-  `crates/dediren-plugin-elk-layout/java/build/`, and generated `*.svg` files
-  outside `.github/`.
+  `target/`, `.cache/locks/`, and generated `*.svg` files outside `.github/`.
 - If a task creates render/test artifacts, report their paths instead of
   staging them unless the user asked for tracked examples.
 - Keep commits scoped to the requested change and mention any skipped

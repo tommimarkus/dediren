@@ -68,7 +68,7 @@ pub fn render_error(input: serde_json::Value, expected_code: &str) -> serde_json
         })
         .collect();
     assert!(
-        codes.iter().any(|code| *code == expected_code),
+        codes.contains(&expected_code),
         "expected diagnostic code {expected_code}, got {codes:?}"
     );
     envelope

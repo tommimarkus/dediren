@@ -743,10 +743,7 @@ fn plugin_manifest_matches_schema() {
 #[test]
 fn first_party_plugin_manifests_declare_runtime_environment_surface() {
     let expected = BTreeMap::from([
-        (
-            "elk-layout",
-            vec!["DEDIREN_ELK_COMMAND", "DEDIREN_ELK_RESULT_FIXTURE", "PATH"],
-        ),
+        ("elk-layout", vec!["DEDIREN_ELK_RESULT_FIXTURE"]),
         (
             "archimate-oef",
             vec!["DEDIREN_OEF_SCHEMA_DIR", "DEDIREN_SCHEMA_CACHE_DIR", "PATH"],
@@ -866,12 +863,29 @@ fn live_release_surfaces_match_workspace_version() {
         "README.md should document that distribution archives include third-party notices"
     );
     assert!(
-        readme.contains("Gradle License Report"),
-        "README.md should document that distribution archives use generated third-party notices"
+        !readme.contains("Gradle License Report"),
+        "README.md should not document the removed Java helper license report"
     );
     assert!(
         readme.contains("cargo-about"),
         "README.md should document the Rust notice generator"
+    );
+    assert!(
+        readme.contains("Rust `elkrs`") || readme.contains("Rust elkrs"),
+        "README.md should document that layout is backed by Rust elkrs"
+    );
+    assert!(
+        !readme.contains("runtimes/elk-layout-java"),
+        "README.md should not document removed Java helper runtime paths"
+    );
+    assert!(
+        readme.contains(".test-output/renders/rust-elk/")
+            && !readme.contains(".test-output/renders/real-elk/"),
+        "README.md should document current Rust ELK render artifact paths"
+    );
+    assert!(
+        readme.contains("rust_elk_*") && !readme.contains("real_elk_*"),
+        "README.md should document current Rust ELK test lane prefixes"
     );
     assert!(
         !readme.contains("scripts/build-dist.sh"),
@@ -1000,15 +1014,13 @@ fn release_workflow_matches_supported_targets_and_permissions() {
     );
 
     let build_steps = yaml_block(&build_job, 4, "steps:").expect("build job should define steps");
-    let setup_gradle_step =
-        yaml_named_step(&build_steps, "Set up Gradle").expect("build job should set up Gradle");
     assert!(
-        yaml_step_uses_pinned_action(&setup_gradle_step, "gradle/actions/setup-gradle", "v6"),
-        "build job should use the expected Gradle setup action"
+        yaml_named_step(&build_steps, "Set up Java").is_none(),
+        "build job should not set up Java for the Rust elkrs layout backend"
     );
     assert!(
-        yaml_block_contains(&setup_gradle_step, 10, "cache-provider: basic"),
-        "release workflow should use basic cache provider"
+        yaml_named_step(&build_steps, "Set up Gradle").is_none(),
+        "build job should not set up Gradle for the Rust elkrs layout backend"
     );
     let cargo_cache_step = yaml_named_step(&build_steps, "Restore Cargo cache")
         .expect("build job should restore Cargo cache");
@@ -1016,19 +1028,25 @@ fn release_workflow_matches_supported_targets_and_permissions() {
         yaml_step_uses_pinned_action(&cargo_cache_step, "actions/cache", "v5"),
         "release workflow should use actions/cache v5"
     );
-    let gradle_project_cache_step = yaml_named_step(&build_steps, "Restore Gradle project cache")
-        .expect("build job should restore the Gradle project cache used by the helper script");
     assert!(
-        yaml_step_uses_pinned_action(&gradle_project_cache_step, "actions/cache", "v5"),
-        "release workflow should cache the Gradle project cache with actions/cache v5"
+        yaml_named_step(&build_steps, "Restore Gradle project cache").is_none(),
+        "build job should not cache the removed Gradle helper project"
     );
+    let cargo_about_step = yaml_named_step(&build_steps, "Install cargo-about")
+        .expect("build job should install cargo-about");
     assert!(
         yaml_block_contains(
-            &gradle_project_cache_step,
-            10,
-            "path: .cache/gradle/project-cache/elk-layout-java"
+            &cargo_about_step,
+            8,
+            "run: cargo install --locked cargo-about --version 0.8.4"
         ),
-        "release workflow should cache the helper script's Gradle project cache directory"
+        "build job should install the pinned cargo-about CLI used by xtask dist notices"
+    );
+    assert!(
+        !workflow.contains("DEDIREN_ELK_BUILD_USE_SDKMAN")
+            && !workflow.contains("gradle/actions/setup-gradle")
+            && !workflow.contains("actions/setup-java"),
+        "release workflow should not contain Java or Gradle helper setup"
     );
     let attest_step = yaml_named_step(&build_steps, "Attest archive provenance")
         .expect("build job should attest release archives");
@@ -1161,11 +1179,35 @@ fn bundle_metadata_matches_schema() {
                 ],
                 "schemas_dir": "schemas",
                 "fixtures_dir": "fixtures",
-                "docs_dir": "docs",
-                "elk_helper": "runtimes/elk-layout-java/bin/dediren-elk-layout-java"
+                "docs_dir": "docs"
             }),
         );
     }
+}
+
+#[test]
+fn pre_0_17_bundle_metadata_still_matches_bundle_schema_v1() {
+    assert_json_valid(
+        "schemas/bundle.schema.json",
+        json!({
+            "bundle_schema_version": "dediren-bundle.schema.v1",
+            "product": "dediren",
+            "version": "0.16.0",
+            "target": "x86_64-unknown-linux-gnu",
+            "built_at_utc": "2026-05-13T00:00:00Z",
+            "plugins": [
+                { "id": "generic-graph", "version": "0.16.0" },
+                { "id": "elk-layout", "version": "0.16.0" },
+                { "id": "svg-render", "version": "0.16.0" },
+                { "id": "archimate-oef", "version": "0.16.0" },
+                { "id": "uml-xmi", "version": "0.16.0" }
+            ],
+            "schemas_dir": "schemas",
+            "fixtures_dir": "fixtures",
+            "docs_dir": "docs",
+            "elk_helper": "runtimes/elk-layout-java/bin/elk-layout"
+        }),
+    );
 }
 
 #[test]
@@ -2031,7 +2073,14 @@ const UML_NODE_DECORATORS: &[(&str, &str)] = &[
     ("ObjectNode", "uml_object_node"),
 ];
 
-const UML_RELATIONSHIP_NOTATION: &[(&str, Option<&str>, Option<&str>, Option<&str>)] = &[
+type RelationshipNotationExpectation = (
+    &'static str,
+    Option<&'static str>,
+    Option<&'static str>,
+    Option<&'static str>,
+);
+
+const UML_RELATIONSHIP_NOTATION: &[RelationshipNotationExpectation] = &[
     ("Association", Some("none"), Some("none"), None),
     ("Composition", Some("filled_diamond"), Some("none"), None),
     ("Aggregation", Some("hollow_diamond"), Some("none"), None),

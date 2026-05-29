@@ -94,10 +94,10 @@ fn export_from_stdin() -> anyhow::Result<()> {
         exit_with_archimate_type_error(error);
     }
     if let Err(error) = validate_archimate_junction_semantics(&request) {
-        exit_with_diagnostic(&error.code, &error.message, Some(error.path));
+        exit_with_diagnostic(error.code, &error.message, Some(error.path));
     }
     if let Err(error) = validate_archimate_group_semantics(&request) {
-        exit_with_diagnostic(&error.code, &error.message, Some(error.path));
+        exit_with_diagnostic(error.code, &error.message, Some(error.path));
     }
     let content = build_oef(&request)?;
     if let Err(error) = validate_official_oef_schema(&content) {

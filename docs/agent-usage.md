@@ -11,6 +11,8 @@ contract into the skill instructions. The source repository README is not
 assumed to be available to runtime users. Preserve the bundle root `LICENSE`
 and generated `THIRD-PARTY-NOTICES.md` files when redistributing the archive
 contents.
+The bundle uses the Rust `elkrs` backend in the `elk-layout` plugin and has no
+separate ELK helper runtime or Java prerequisite.
 
 ## Fast Path
 
@@ -49,7 +51,7 @@ them.
 {
   "model_schema_version": "model.schema.v1",
   "required_plugins": [
-    { "id": "generic-graph", "version": "0.16.0" }
+    { "id": "generic-graph", "version": "0.17.0" }
   ],
   "nodes": [
     {
@@ -104,8 +106,8 @@ and use ArchiMate type names:
 {
   "model_schema_version": "model.schema.v1",
   "required_plugins": [
-    { "id": "generic-graph", "version": "0.16.0" },
-    { "id": "archimate-oef", "version": "0.16.0" }
+    { "id": "generic-graph", "version": "0.17.0" },
+    { "id": "archimate-oef", "version": "0.17.0" }
   ],
   "nodes": [
     {
@@ -291,11 +293,15 @@ Put optional layout intent on `plugins.generic-graph.views[]`:
 ```
 
 Supported directions are `right`, `left`, `down`, and `up`. Supported density
-and routing profiles are `compact`, `readable`, and `spacious`. Supported
-wrapping values are `auto`, `off`, and `multi-edge`; `auto` currently favors
-unwrapped grouped layouts, while `multi-edge` opts into ELK multi-edge wrapping
-when width reduction is worth the route-quality tradeoff. Supported endpoint
-merging values are `auto`, `local`, and `off`.
+and routing profiles are `compact`, `readable`, and `spacious`; `elkrs` 1.0.0
+applies the edge-spacing options behind those routing profiles without backend
+warnings. Compound and hierarchy-crossing routes can still produce bounded
+Dediren route-quality warnings such as detours, close parallel route channels,
+or connector-through-node counts. Supported wrapping values are `auto`, `off`,
+and `multi-edge` for schema compatibility, but `auto` and `multi-edge`
+currently report `DEDIREN_ELK_OPTION_UNSUPPORTED`. Supported endpoint merging
+values are `auto`, `local`, and `off`; `auto` and `local` currently report
+`DEDIREN_ELK_OPTION_UNSUPPORTED` and do not emit shared junction routing hints.
 
 ## JSON Authoring Loop
 
@@ -406,7 +412,7 @@ target/debug/dediren-plugin-uml-xmi-export capabilities
 From an unpacked distribution bundle:
 
 ```bash
-VERSION=0.16.0
+VERSION=0.17.0
 TARGET=x86_64-unknown-linux-gnu
 BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-${VERSION}-${TARGET}
 "$BUNDLE/bin/dediren" --version
@@ -425,7 +431,7 @@ commands return command envelopes using `schemas/envelope.schema.json`.
 ## Bundle Smoke Workflow
 
 ```bash
-VERSION=0.16.0
+VERSION=0.17.0
 TARGET=x86_64-unknown-linux-gnu
 BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-${VERSION}-${TARGET}
 
@@ -456,12 +462,14 @@ BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-${VERSION}-${TARGET}
 jq -r '.data.content' render-result.json > diagram.svg
 ```
 
-The real `elk-layout` path needs Java 21 or newer as `java` on `PATH`. OEF and
-UML/XMI export need `xmllint` on `PATH` for available standards validation and
-`curl` on `PATH` when the standards schema cache must be populated from the
-network. Offline runs can set `DEDIREN_OEF_SCHEMA_DIR` and
-`DEDIREN_XMI_SCHEMA_PATH`. For a deterministic no-Java repair loop in a source
-checkout, set
+The `elk-layout` plugin runs ELK Layered in-process through Rust `elkrs`;
+`elkrs-core` and `elkrs-layered` are pinned to `elkrs` v1.0.0 as Git
+dependencies because they are not yet published on crates.io. OEF and UML/XMI
+export need `xmllint` on `PATH` for available standards validation and `curl`
+on `PATH` when the
+standards schema cache must be populated from the network. Offline runs can set
+`DEDIREN_OEF_SCHEMA_DIR` and `DEDIREN_XMI_SCHEMA_PATH`. For a deterministic
+repair loop in a source checkout, set
 `DEDIREN_ELK_RESULT_FIXTURE=fixtures/layout-result/basic.json`.
 
 ## Repair Map
@@ -490,8 +498,6 @@ Common recovery signals:
 | `DEDIREN_PLUGIN_UNKNOWN` | Check plugin id and explicit plugin discovery paths. |
 | `DEDIREN_PLUGIN_MISSING_EXECUTABLE` | Check the manifest executable and bundle/source binary location. |
 | `DEDIREN_PLUGIN_UNSUPPORTED_CAPABILITY` | Probe plugin capabilities and choose a plugin that supports the command. |
-| `DEDIREN_ELK_RUNTIME_UNAVAILABLE` | Build/provide the helper or use the distribution bundle. |
-| `DEDIREN_ELK_JAVA_UNAVAILABLE` | Put Java 21 or newer on `PATH`. |
 | `DEDIREN_OEF_SCHEMA_VALIDATOR_UNAVAILABLE` | Install/provide `xmllint` before running `archimate-oef` export. |
 | `DEDIREN_OEF_SCHEMA_UNAVAILABLE` | Provide `DEDIREN_OEF_SCHEMA_DIR`, set `DEDIREN_SCHEMA_CACHE_DIR`, or allow `curl` to download the official OEF XSDs into the runtime cache. |
 | `DEDIREN_OEF_SCHEMA_INVALID` | Fix source, layout, or OEF export policy values so the generated XML conforms to the official OEF XSD. |

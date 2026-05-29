@@ -70,7 +70,7 @@ fn main() -> anyhow::Result<()> {
             exit_with_archimate_type_error(error);
         }
         if let Err(error) = validate_archimate_junction_semantics(&source) {
-            exit_with_diagnostic(&error.code, &error.message, Some(error.path));
+            exit_with_diagnostic(error.code, &error.message, Some(error.path));
         }
     } else if semantic_profile == GenericGraphSemanticProfile::Uml.as_str() {
         if let Err(error) = dediren_uml::validate_source(&source, &plugin_data) {
@@ -210,7 +210,7 @@ fn validate_from_stdin(args: &[String]) -> anyhow::Result<()> {
                 exit_with_archimate_type_error(error);
             }
             if let Err(error) = validate_archimate_junction_semantics(&source) {
-                exit_with_diagnostic(&error.code, &error.message, Some(error.path));
+                exit_with_diagnostic(error.code, &error.message, Some(error.path));
             }
         }
         "uml" => {

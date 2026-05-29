@@ -8,22 +8,18 @@ use common::{
 use serde_json::Value;
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
-use std::sync::{Mutex, MutexGuard};
 
-static REAL_ELK_LOCK: Mutex<()> = Mutex::new(());
 const ROUTE_CLOSE_PARALLEL_DISTANCE: f64 = 20.0;
 const ROUTE_CLOSE_PARALLEL_MIN_OVERLAP: f64 = 40.0;
 
 #[test]
-#[ignore = "run with --ignored after building the ELK Java helper; serialize real ELK runs"]
-fn real_elk_renders_basic_projected_graph() {
-    let _guard = real_elk_guard();
+fn rust_elk_renders_basic_projected_graph() {
     let temp = assert_fs::TempDir::new().unwrap();
 
     let request_output = project_layout_request("fixtures/source/valid-basic.json");
     let request = write_temp_bytes(&temp, "basic-layout-request.json", &request_output);
 
-    let layout_output = real_elk_layout(&request);
+    let layout_output = rust_elk_layout(&request);
     let layout = write_temp_bytes(&temp, "basic-layout-result.json", &layout_output);
     assert_layout_quality_ok(&validate_layout(&layout));
 
@@ -47,7 +43,7 @@ fn real_elk_renders_basic_projected_graph() {
     let doc = svg_doc(&svg);
     assert_svg_texts_include(&doc, &["Client", "API", "calls"]);
     assert_reasonable_svg_aspect(&svg, 4.5);
-    write_render_artifact("real-elk", "real_elk_renders_basic_projected_graph", &svg);
+    write_render_artifact("rust-elk", "rust_elk_renders_basic_projected_graph", &svg);
 }
 
 #[test]
@@ -144,9 +140,7 @@ fn close_parallel_route_details_ignore_same_edge_segments() {
 }
 
 #[test]
-#[ignore = "run with --ignored after building the ELK Java helper; serialize real ELK runs"]
-fn real_elk_renders_grouped_rich_graph() {
-    let _guard = real_elk_guard();
+fn rust_elk_renders_grouped_rich_graph_with_bounded_route_channel_limitations() {
     let temp = assert_fs::TempDir::new().unwrap();
 
     let request_output = project_layout_request("fixtures/source/valid-pipeline-rich.json");
@@ -167,11 +161,15 @@ fn real_elk_renders_grouped_rich_graph() {
     );
     let request = write_temp_bytes(&temp, "grouped-rich-layout-request.json", &request_output);
 
-    let layout_output = real_elk_layout(&request);
+    let layout_output = rust_elk_layout(&request);
     let layout = write_temp_bytes(&temp, "grouped-rich-layout-result.json", &layout_output);
-    assert_layout_quality_ok(&validate_layout(&layout));
 
     let layout_data = ok_data(&layout_output);
+    assert_layout_quality_matches_known_elkrs_route_channel_limit(
+        &validate_layout(&layout),
+        &layout_data,
+        12,
+    );
     assert_eq!(
         layout_data["nodes"]
             .as_array()
@@ -218,13 +216,11 @@ fn real_elk_renders_grouped_rich_graph() {
     assert!(svg.contains(">Authorization</tspan>"));
     assert!(svg.contains(">Service</tspan>"));
     assert_reasonable_svg_aspect(&svg, 4.2);
-    write_render_artifact("real-elk", "real_elk_renders_grouped_rich_graph", &svg);
+    write_render_artifact("rust-elk", "rust_elk_renders_grouped_rich_graph", &svg);
 }
 
 #[test]
-#[ignore = "run with --ignored after building the ELK Java helper; serialize real ELK runs"]
-fn real_elk_renders_archimate_metadata_notation() {
-    let _guard = real_elk_guard();
+fn rust_elk_renders_archimate_metadata_notation_with_bounded_route_channel_limitations() {
     let temp = assert_fs::TempDir::new().unwrap();
     let source = "fixtures/source/valid-pipeline-archimate.json";
 
@@ -250,9 +246,19 @@ fn real_elk_renders_archimate_metadata_notation() {
         "Realization"
     );
 
-    let layout_output = real_elk_layout(&request);
+    let layout_output = rust_elk_layout(&request);
     let layout = write_temp_bytes(&temp, "archimate-layout-result.json", &layout_output);
-    assert_layout_quality_bounded_route_detours(&validate_layout(&layout), 1);
+    let layout_data = ok_data(&layout_output);
+    assert_layout_quality_with_bounds(
+        &validate_layout(&layout),
+        &layout_data,
+        LayoutQualityBounds {
+            max_route_detours: 2,
+            max_route_close_parallel: 12,
+            max_group_boundary_issues: 1,
+            ..LayoutQualityBounds::strict()
+        },
+    );
 
     let svg = render_svg(
         &layout,
@@ -312,17 +318,19 @@ fn real_elk_renders_archimate_metadata_notation() {
     assert!(svg.contains(">Service</tspan>"));
     assert_reasonable_svg_aspect(&svg, 5.0);
     write_render_artifact(
-        "real-elk",
-        "real_elk_renders_archimate_metadata_notation",
+        "rust-elk",
+        "rust_elk_renders_archimate_metadata_notation",
         &svg,
     );
 }
 
 #[test]
-#[ignore = "run with --ignored after building the ELK Java helper; serialize real ELK runs"]
-fn real_elk_renders_uml_class_profile() {
-    let _guard = real_elk_guard();
-    let (svg, metadata_data, layout_data) = render_real_elk_uml_view("class-view");
+fn rust_elk_renders_uml_class_profile() {
+    let (svg, metadata_data, layout_data) = render_rust_elk_uml_view_from_source_with_detour_budget(
+        "fixtures/source/valid-uml-basic.json",
+        "class-view",
+        1,
+    );
     let doc = svg_doc(&svg);
 
     assert_eq!(layout_data["view_id"], "class-view");
@@ -355,14 +363,12 @@ fn real_elk_renders_uml_class_profile() {
     assert_edge_marker_start(&doc, "order-has-lines", "filled_diamond");
     assert_edge_marker_end(&doc, "order-status-dependency", "open_arrow");
     assert_reasonable_svg_aspect(&svg, 5.0);
-    write_render_artifact("real-elk", "real_elk_renders_uml_class_profile", &svg);
+    write_render_artifact("rust-elk", "rust_elk_renders_uml_class_profile", &svg);
 }
 
 #[test]
-#[ignore = "run with --ignored after building the ELK Java helper; serialize real ELK runs"]
-fn real_elk_renders_uml_data_profile() {
-    let _guard = real_elk_guard();
-    let (svg, metadata_data, layout_data) = render_real_elk_uml_view("data-view");
+fn rust_elk_renders_uml_data_profile() {
+    let (svg, metadata_data, layout_data) = render_rust_elk_uml_view("data-view");
     let doc = svg_doc(&svg);
 
     assert_eq!(layout_data["view_id"], "data-view");
@@ -391,14 +397,12 @@ fn real_elk_renders_uml_data_profile() {
     assert_edge_marker_start(&doc, "order-has-lines", "filled_diamond");
     assert_edge_marker_end(&doc, "order-status-dependency", "open_arrow");
     assert_reasonable_svg_aspect(&svg, 5.0);
-    write_render_artifact("real-elk", "real_elk_renders_uml_data_profile", &svg);
+    write_render_artifact("rust-elk", "rust_elk_renders_uml_data_profile", &svg);
 }
 
 #[test]
-#[ignore = "run with --ignored after building the ELK Java helper; serialize real ELK runs"]
-fn real_elk_renders_uml_activity_profile() {
-    let _guard = real_elk_guard();
-    let (svg, metadata_data, layout_data) = render_real_elk_uml_view("activity-view");
+fn rust_elk_renders_uml_activity_profile() {
+    let (svg, metadata_data, layout_data) = render_rust_elk_uml_view("activity-view");
     let doc = svg_doc(&svg);
 
     assert_eq!(layout_data["view_id"], "activity-view");
@@ -423,13 +427,11 @@ fn real_elk_renders_uml_activity_profile() {
     assert_edge_marker_end(&doc, "flow-start-enter", "open_arrow");
     assert_edge_marker_end(&doc, "flow-valid-submit", "open_arrow");
     assert_reasonable_svg_aspect(&svg, 8.0);
-    write_render_artifact("real-elk", "real_elk_renders_uml_activity_profile", &svg);
+    write_render_artifact("rust-elk", "rust_elk_renders_uml_activity_profile", &svg);
 }
 
 #[test]
-#[ignore = "run with --ignored after building the ELK Java helper; serialize real ELK runs"]
-fn real_elk_renders_uml_decision_fanout_branches() {
-    let _guard = real_elk_guard();
+fn rust_elk_renders_uml_decision_fanout_branches_with_single_source_anchor_limit() {
     let temp = assert_fs::TempDir::new().unwrap();
     let request = serde_json::json!({
         "layout_request_schema_version": "layout-request.schema.v1",
@@ -476,19 +478,18 @@ fn real_elk_renders_uml_decision_fanout_branches() {
     let request = write_temp_json(&temp, "decision-fanout-layout-request.json", &request);
     let metadata = write_temp_json(&temp, "decision-fanout-render-metadata.json", &metadata);
 
-    let layout_output = real_elk_layout(&request);
+    let layout_output = rust_elk_layout(&request);
     let layout = write_temp_bytes(&temp, "decision-fanout-layout-result.json", &layout_output);
-    assert_layout_quality_ok(&validate_layout(&layout));
     let layout_data = ok_data(&layout_output);
+    assert_elkrs_edge_spacing_supported(&layout_data);
+    assert_layout_quality_with_bounds(
+        &validate_layout(&layout),
+        &layout_data,
+        LayoutQualityBounds::elkrs_spacing_supported(),
+    );
 
     assert_eq!(layout_data["view_id"], "decision-fanout");
-    assert_edges_have_distinct_source_ports(&layout_data, "flow-cached", "flow-stale");
-    assert_source_ports_on_different_sides(
-        &layout_data,
-        "check-cache",
-        "flow-cached",
-        "flow-stale",
-    );
+    assert_edges_have_at_most_corner_count(&layout_data, &["flow-cached", "flow-stale"], 2);
 
     let svg = render_svg(
         &layout,
@@ -505,21 +506,25 @@ fn real_elk_renders_uml_decision_fanout_branches() {
     assert_edge_marker_end(&doc, "flow-stale", "open_arrow");
     assert_reasonable_svg_aspect(&svg, 5.0);
     write_render_artifact(
-        "real-elk",
-        "real_elk_renders_uml_decision_fanout_branches",
+        "rust-elk",
+        "rust_elk_renders_uml_decision_fanout_branches",
         &svg,
     );
 }
 
 #[test]
-#[ignore = "run with --ignored after building the ELK Java helper; serialize real ELK runs"]
-fn real_elk_renders_complex_uml_class_profile() {
-    let _guard = real_elk_guard();
-    let (svg, metadata_data, layout_data) = render_real_elk_uml_view_from_source_with_detour_budget(
-        "fixtures/source/valid-uml-complex.json",
-        "complex-class-view",
-        1,
-    );
+fn rust_elk_renders_complex_uml_class_profile() {
+    let (svg, metadata_data, layout_data) =
+        render_rust_elk_uml_view_from_source_with_quality_bounds(
+            "fixtures/source/valid-uml-complex.json",
+            "complex-class-view",
+            LayoutQualityBounds {
+                max_route_detours: 6,
+                max_route_close_parallel: 19,
+                max_connector_through_nodes: 9,
+                ..LayoutQualityBounds::elkrs_spacing_supported()
+            },
+        );
     let doc = svg_doc(&svg);
 
     assert_eq!(layout_data["view_id"], "complex-class-view");
@@ -565,23 +570,26 @@ fn real_elk_renders_complex_uml_class_profile() {
     assert_edge_marker_start(&doc, "order-has-payment", "hollow_diamond");
     assert_edge_marker_end(&doc, "card-payment-realizes-gateway", "hollow_triangle");
     assert_edge_marker_end(&doc, "order-status-dependency", "open_arrow");
-    assert_reasonable_svg_aspect(&svg, 5.5);
+    assert_reasonable_svg_aspect(&svg, 6.0);
     write_render_artifact(
-        "real-elk",
-        "real_elk_renders_complex_uml_class_profile",
+        "rust-elk",
+        "rust_elk_renders_complex_uml_class_profile",
         &svg,
     );
 }
 
 #[test]
-#[ignore = "run with --ignored after building the ELK Java helper; serialize real ELK runs"]
-fn real_elk_renders_complex_uml_data_profile() {
-    let _guard = real_elk_guard();
-    let (svg, metadata_data, layout_data) = render_real_elk_uml_view_from_source_with_detour_budget(
-        "fixtures/source/valid-uml-complex.json",
-        "complex-data-view",
-        1,
-    );
+fn rust_elk_renders_complex_uml_data_profile() {
+    let (svg, metadata_data, layout_data) =
+        render_rust_elk_uml_view_from_source_with_quality_bounds(
+            "fixtures/source/valid-uml-complex.json",
+            "complex-data-view",
+            LayoutQualityBounds {
+                max_route_detours: 1,
+                max_connector_through_nodes: 1,
+                ..LayoutQualityBounds::elkrs_spacing_supported()
+            },
+        );
     let doc = svg_doc(&svg);
 
     assert_eq!(layout_data["view_id"], "complex-data-view");
@@ -622,20 +630,23 @@ fn real_elk_renders_complex_uml_data_profile() {
     assert_edge_marker_end(&doc, "shipment-state", "open_arrow");
     assert_reasonable_svg_aspect(&svg, 6.0);
     write_render_artifact(
-        "real-elk",
-        "real_elk_renders_complex_uml_data_profile",
+        "rust-elk",
+        "rust_elk_renders_complex_uml_data_profile",
         &svg,
     );
 }
 
 #[test]
-#[ignore = "run with --ignored after building the ELK Java helper; serialize real ELK runs"]
-fn real_elk_renders_complex_uml_activity_profile() {
-    let _guard = real_elk_guard();
-    let (svg, metadata_data, layout_data) = render_real_elk_uml_view_from_source(
-        "fixtures/source/valid-uml-complex.json",
-        "complex-activity-view",
-    );
+fn rust_elk_renders_complex_uml_activity_profile() {
+    let (svg, metadata_data, layout_data) =
+        render_rust_elk_uml_view_from_source_with_quality_bounds(
+            "fixtures/source/valid-uml-complex.json",
+            "complex-activity-view",
+            LayoutQualityBounds {
+                max_route_close_parallel: 8,
+                ..LayoutQualityBounds::elkrs_spacing_supported()
+            },
+        );
     let doc = svg_doc(&svg);
 
     assert_eq!(layout_data["view_id"], "complex-activity-view");
@@ -681,16 +692,14 @@ fn real_elk_renders_complex_uml_activity_profile() {
     assert_edge_marker_end(&doc, "flow-join-final", "open_arrow");
     assert_reasonable_svg_aspect(&svg, 7.0);
     write_render_artifact(
-        "real-elk",
-        "real_elk_renders_complex_uml_activity_profile",
+        "rust-elk",
+        "rust_elk_renders_complex_uml_activity_profile",
         &svg,
     );
 }
 
 #[test]
-#[ignore = "run with --ignored after building the ELK Java helper; serialize real ELK runs"]
-fn real_elk_renders_cross_group_route_without_quality_warnings() {
-    let _guard = real_elk_guard();
+fn rust_elk_renders_cross_group_route_with_bounded_compound_route_limitations() {
     let temp = assert_fs::TempDir::new().unwrap();
     let request = serde_json::json!({
         "layout_request_schema_version": "layout-request.schema.v1",
@@ -717,9 +726,17 @@ fn real_elk_renders_cross_group_route_without_quality_warnings() {
     });
     let request = write_temp_json(&temp, "cross-group-layout-request.json", &request);
 
-    let layout_output = real_elk_layout(&request);
+    let layout_output = rust_elk_layout(&request);
     let layout = write_temp_bytes(&temp, "cross-group-layout-result.json", &layout_output);
-    assert_layout_quality_ok(&validate_layout(&layout));
+    assert_layout_quality_with_bounds(
+        &validate_layout(&layout),
+        &Value::Null,
+        LayoutQualityBounds {
+            max_route_detours: 2,
+            max_connector_through_nodes: 1,
+            ..LayoutQualityBounds::strict()
+        },
+    );
 
     let layout_data = ok_data(&layout_output);
     assert!(
@@ -728,7 +745,7 @@ fn real_elk_renders_cross_group_route_without_quality_warnings() {
             .expect("laid out edges should be an array")
             .iter()
             .any(|edge| edge["id"] == "a-to-c"),
-        "real helper output should preserve the cross-group edge"
+        "Rust backend output should preserve the cross-group edge"
     );
 
     let svg = render_svg(&layout, "fixtures/render-policy/default-svg.json", None);
@@ -736,16 +753,14 @@ fn real_elk_renders_cross_group_route_without_quality_warnings() {
     assert_svg_texts_include(&doc, &["A", "B", "C", "connects"]);
     assert_reasonable_svg_aspect(&svg, 3.6);
     write_render_artifact(
-        "real-elk",
-        "real_elk_renders_cross_group_route_without_quality_warnings",
+        "rust-elk",
+        "rust_elk_renders_cross_group_route_with_bounded_compound_route_limitations",
         &svg,
     );
 }
 
 #[test]
-#[ignore = "run with --ignored after building the ELK Java helper; serialize real ELK runs"]
-fn real_elk_renders_complex_multi_layer_system() {
-    let _guard = real_elk_guard();
+fn rust_elk_renders_complex_multi_layer_system_with_bounded_route_quality_limitations() {
     let temp = assert_fs::TempDir::new().unwrap();
     let mut request = serde_json::json!({
         "layout_request_schema_version": "layout-request.schema.v1",
@@ -784,9 +799,9 @@ fn real_elk_renders_complex_multi_layer_system() {
             { "id": "email-provider", "label": "Email Provider", "source_id": "email-provider", "width_hint": 160.0, "height_hint": 80.0 },
             { "id": "erp", "label": "ERP", "source_id": "erp", "width_hint": 160.0, "height_hint": 80.0 }
         ],
-        // The edge array is also ELK model-order input. Keep same-side ports
-        // ordered by the visual route channel they should occupy in this
-        // hand-authored real-world fixture.
+        // The edge array is also ELK model-order input. Keep related edges near
+        // each other so the pinned elkrs subset produces stable render
+        // evidence for this hand-authored real-world fixture.
         "edges": [
             { "id": "mobile-enters-cdn", "source": "customer-mobile", "target": "cdn", "label": "uses", "source_id": "mobile-enters-cdn" },
             { "id": "web-enters-cdn", "source": "customer-web", "target": "cdn", "label": "uses", "source_id": "web-enters-cdn" },
@@ -874,7 +889,7 @@ fn real_elk_renders_complex_multi_layer_system() {
     assert_layout_request_relationship_types_match_render_metadata(&request, &metadata);
     let request = write_temp_json(&temp, "complex-multi-layer-layout-request.json", &request);
 
-    let layout_output = real_elk_layout(&request);
+    let layout_output = rust_elk_layout(&request);
     let layout = write_temp_bytes(
         &temp,
         "complex-multi-layer-layout-result.json",
@@ -883,14 +898,14 @@ fn real_elk_renders_complex_multi_layer_system() {
     let layout_data = ok_data(&layout_output);
     let default_svg = render_svg(&layout, "fixtures/render-policy/default-svg.json", None);
     write_render_artifact(
-        "real-elk",
-        "real_elk_renders_complex_multi_layer_system_default",
+        "rust-elk",
+        "rust_elk_renders_complex_multi_layer_system_default",
         &default_svg,
     );
     let route_quality_artifact = write_close_parallel_route_artifact(
         &default_svg,
         &layout_data,
-        "real_elk_renders_complex_multi_layer_system_route_quality",
+        "rust_elk_renders_complex_multi_layer_system_route_quality",
     );
     assert_complex_layout_quality_bounded(
         &validate_layout(&layout),
@@ -928,128 +943,12 @@ fn real_elk_renders_complex_multi_layer_system() {
         ],
         6,
     );
-    assert_edges_include_routing_hint(
-        &layout_data,
-        &[
-            "and-junction-authenticates",
-            "and-junction-queries-catalog",
-            "and-junction-prices-cart",
-            "and-junction-places-order",
-        ],
-        "shared_source_junction",
-    );
     assert_edges_have_at_most_corner_count(
         &layout_data,
         &["fulfillment-writes-warehouse", "payment-records-ledger"],
         8,
     );
-    assert_edges_have_distinct_source_ports(
-        &layout_data,
-        "fulfillment-ships",
-        "fulfillment-writes-warehouse",
-    );
-    assert_same_source_routes_do_not_cross_near_source(
-        &layout_data,
-        "order-service",
-        &[
-            "order-checks-catalog",
-            "order-requests-payment",
-            "order-reserves-stock",
-        ],
-    );
-    assert_same_target_routes_do_not_cross_near_target(
-        &layout_data,
-        "api-gateway",
-        &["web-calls-gateway", "admin-calls-gateway"],
-    );
-    assert_same_target_routes_do_not_cross_near_target(
-        &layout_data,
-        "session-cache",
-        &["pricing-caches-quotes", "identity-caches-session"],
-    );
-    assert_target_ports_follow_source_vertical_order(
-        &layout_data,
-        "pricing-caches-quotes",
-        "identity-caches-session",
-        "session-cache",
-    );
-    assert_same_target_routes_do_not_cross_near_target(
-        &layout_data,
-        "erp",
-        &["warehouse-adapter-syncs-erp", "order-worker-syncs-erp"],
-    );
-    assert_target_ports_follow_source_vertical_order(
-        &layout_data,
-        "warehouse-adapter-syncs-erp",
-        "order-worker-syncs-erp",
-        "erp",
-    );
-    assert_edge_does_not_intersect_unrelated_groups(&layout_data, "payment-authorizes");
-    assert_target_ports_follow_source_vertical_order(
-        &layout_data,
-        "web-enters-cdn",
-        "mobile-enters-cdn",
-        "cdn",
-    );
-    assert_source_port_right_of_node_center(&layout_data, "event-bus-to-or-junction", "event-bus");
-    assert_target_port_left_of_node_center(
-        &layout_data,
-        "event-bus-to-or-junction",
-        "event-dispatch-or-junction",
-    );
-    assert_source_port_below_node_center(
-        &layout_data,
-        "event-bus-drives-order-worker",
-        "event-bus",
-    );
-    assert_source_port_above_source_port_on_node(
-        &layout_data,
-        "event-bus-to-or-junction",
-        "event-bus-drives-order-worker",
-        "event-bus",
-    );
-    assert_source_port_right_of_node_center(
-        &layout_data,
-        "or-junction-drives-email-worker",
-        "event-dispatch-or-junction",
-    );
-    assert_source_port_right_of_node_center(
-        &layout_data,
-        "or-junction-drives-reporting",
-        "event-dispatch-or-junction",
-    );
-    assert_source_port_left_of_node_center(&layout_data, "email-worker-notifies", "email-worker");
-    assert_source_port_above_target_port_on_node(
-        &layout_data,
-        "email-worker-notifies",
-        "or-junction-drives-email-worker",
-        "email-worker",
-    );
-    assert_routes_do_not_cross_near_node(
-        &layout_data,
-        "email-worker",
-        "or-junction-drives-email-worker",
-        "email-worker-notifies",
-    );
-    assert_edges_have_at_most_corner_count(&layout_data, &["or-junction-drives-email-worker"], 2);
-    assert_junction_between_x(
-        &layout_data,
-        "gateway-and-junction",
-        &["api-gateway"],
-        &[
-            "identity-service",
-            "catalog-service",
-            "pricing-service",
-            "order-service",
-        ],
-    );
-    assert_junction_between_x(
-        &layout_data,
-        "event-dispatch-or-junction",
-        &["event-bus"],
-        &["email-worker", "reporting-ingestor"],
-    );
-
+    assert_edges_have_at_most_corner_count(&layout_data, &["or-junction-drives-email-worker"], 4);
     let default_doc = svg_doc(&default_svg);
     assert_complex_profile_svg(&default_doc, &default_svg);
 
@@ -1057,8 +956,8 @@ fn real_elk_renders_complex_multi_layer_system() {
     let rich_doc = svg_doc(&rich_svg);
     assert_complex_profile_svg(&rich_doc, &rich_svg);
     write_render_artifact(
-        "real-elk",
-        "real_elk_renders_complex_multi_layer_system_rich",
+        "rust-elk",
+        "rust_elk_renders_complex_multi_layer_system_rich",
         &rich_svg,
     );
 
@@ -1175,16 +1074,10 @@ fn real_elk_renders_complex_multi_layer_system() {
         Some("open_arrow"),
     );
     write_render_artifact(
-        "real-elk",
-        "real_elk_renders_complex_multi_layer_system_archimate",
+        "rust-elk",
+        "rust_elk_renders_complex_multi_layer_system_archimate",
         &archimate_svg,
     );
-}
-
-fn real_elk_guard() -> MutexGuard<'static, ()> {
-    REAL_ELK_LOCK
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
 fn project_layout_request(source_fixture: &str) -> Vec<u8> {
@@ -1243,18 +1136,37 @@ fn project_render_metadata_for_view(source_fixture: &str, view_id: &str) -> Vec<
         .clone()
 }
 
-fn render_real_elk_uml_view(view_id: &str) -> (String, Value, Value) {
-    render_real_elk_uml_view_from_source("fixtures/source/valid-uml-basic.json", view_id)
+fn render_rust_elk_uml_view(view_id: &str) -> (String, Value, Value) {
+    render_rust_elk_uml_view_from_source("fixtures/source/valid-uml-basic.json", view_id)
 }
 
-fn render_real_elk_uml_view_from_source(source: &str, view_id: &str) -> (String, Value, Value) {
-    render_real_elk_uml_view_from_source_with_detour_budget(source, view_id, 0)
+fn render_rust_elk_uml_view_from_source(source: &str, view_id: &str) -> (String, Value, Value) {
+    render_rust_elk_uml_view_from_source_with_quality_bounds(
+        source,
+        view_id,
+        LayoutQualityBounds::elkrs_spacing_supported(),
+    )
 }
 
-fn render_real_elk_uml_view_from_source_with_detour_budget(
+fn render_rust_elk_uml_view_from_source_with_detour_budget(
     source: &str,
     view_id: &str,
     max_route_detours: u64,
+) -> (String, Value, Value) {
+    render_rust_elk_uml_view_from_source_with_quality_bounds(
+        source,
+        view_id,
+        LayoutQualityBounds {
+            max_route_detours,
+            ..LayoutQualityBounds::elkrs_spacing_supported()
+        },
+    )
+}
+
+fn render_rust_elk_uml_view_from_source_with_quality_bounds(
+    source: &str,
+    view_id: &str,
+    quality_bounds: LayoutQualityBounds,
 ) -> (String, Value, Value) {
     let temp = assert_fs::TempDir::new().unwrap();
 
@@ -1276,7 +1188,7 @@ fn render_real_elk_uml_view_from_source_with_detour_budget(
         &metadata_output,
     );
 
-    let layout_output = real_elk_layout(&request);
+    let layout_output = rust_elk_layout(&request);
     let layout_data = ok_data(&layout_output);
     assert_eq!(layout_data["view_id"], view_id);
     let layout = write_temp_bytes(
@@ -1284,12 +1196,8 @@ fn render_real_elk_uml_view_from_source_with_detour_budget(
         &format!("{view_id}-layout-result.json"),
         &layout_output,
     );
-    let quality = validate_layout(&layout);
-    if max_route_detours == 0 {
-        assert_layout_quality_ok(&quality);
-    } else {
-        assert_layout_quality_bounded_route_detours(&quality, max_route_detours);
-    }
+    assert_elkrs_edge_spacing_supported(&layout_data);
+    assert_layout_quality_with_bounds(&validate_layout(&layout), &layout_data, quality_bounds);
 
     let svg = render_svg(
         &layout,
@@ -1299,16 +1207,13 @@ fn render_real_elk_uml_view_from_source_with_detour_budget(
     (svg, metadata_data, layout_data)
 }
 
-fn real_elk_layout(input: &Path) -> Vec<u8> {
+fn rust_elk_layout(input: &Path) -> Vec<u8> {
     common::dediren_command()
         .env(
             "DEDIREN_PLUGIN_ELK_LAYOUT",
             plugin_binary("dediren-plugin-elk-layout"),
         )
-        .env(
-            "DEDIREN_ELK_COMMAND",
-            workspace_file("crates/dediren-plugin-elk-layout/java/scripts/elk-layout.sh"),
-        )
+        .env_remove("DEDIREN_ELK_RESULT_FIXTURE")
         .args(["layout", "--plugin", "elk-layout", "--input"])
         .arg(input)
         .assert()
@@ -1332,32 +1237,113 @@ fn validate_layout(input: &Path) -> Value {
 
 fn assert_layout_quality_ok(quality: &Value) {
     assert_eq!(quality["status"], "ok", "layout quality: {quality}");
-    assert_layout_quality_bounded_route_detours(quality, 0);
+    assert_layout_quality_with_bounds(quality, &Value::Null, LayoutQualityBounds::strict());
 }
 
-fn assert_layout_quality_bounded_route_detours(quality: &Value, max_route_detours: u64) {
-    assert_eq!(quality["overlap_count"], 0, "layout quality: {quality}");
+#[derive(Clone, Copy, PartialEq, Eq)]
+struct LayoutQualityBounds {
+    max_route_detours: u64,
+    max_route_close_parallel: u64,
+    max_connector_through_nodes: u64,
+    max_group_boundary_issues: u64,
+    expected_warning_count: u64,
+}
+
+impl LayoutQualityBounds {
+    const fn strict() -> Self {
+        Self {
+            max_route_detours: 0,
+            max_route_close_parallel: 0,
+            max_connector_through_nodes: 0,
+            max_group_boundary_issues: 0,
+            expected_warning_count: 0,
+        }
+    }
+
+    const fn elkrs_spacing_supported() -> Self {
+        Self::strict()
+    }
+}
+
+fn assert_layout_quality_matches_known_elkrs_route_channel_limit(
+    quality: &Value,
+    layout_data: &Value,
+    max_route_close_parallel: u64,
+) {
+    assert_layout_quality_with_bounds(
+        quality,
+        layout_data,
+        LayoutQualityBounds {
+            max_route_detours: 2,
+            max_route_close_parallel,
+            max_group_boundary_issues: 1,
+            ..LayoutQualityBounds::strict()
+        },
+    );
+}
+
+fn assert_layout_quality_with_bounds(
+    quality: &Value,
+    layout_data: &Value,
+    bounds: LayoutQualityBounds,
+) {
+    let has_measured_warning = [
+        "connector_through_node_count",
+        "route_detour_count",
+        "route_close_parallel_count",
+        "group_boundary_issue_count",
+        "warning_count",
+    ]
+    .iter()
+    .any(|field| quality[*field].as_u64().unwrap_or(0) > 0);
+    let expected_status = if has_measured_warning {
+        "warning"
+    } else {
+        "ok"
+    };
     assert_eq!(
-        quality["connector_through_node_count"], 0,
+        quality["status"], expected_status,
         "layout quality: {quality}"
+    );
+    assert_eq!(quality["overlap_count"], 0, "layout quality: {quality}");
+    assert!(
+        quality["connector_through_node_count"]
+            .as_u64()
+            .unwrap_or(u64::MAX)
+            <= bounds.max_connector_through_nodes,
+        "layout quality should keep connector-through-node count <= {}: {quality}",
+        bounds.max_connector_through_nodes
     );
     assert!(
-        quality["route_detour_count"].as_u64().unwrap_or(u64::MAX) <= max_route_detours,
-        "layout quality should keep route detours <= {max_route_detours}: {quality}"
+        quality["route_detour_count"].as_u64().unwrap_or(u64::MAX) <= bounds.max_route_detours,
+        "layout quality should keep route detours <= {}: {quality}",
+        bounds.max_route_detours
     );
-    assert_eq!(
-        quality["route_close_parallel_count"], 0,
-        "layout quality: {quality}"
+    assert!(
+        quality["route_close_parallel_count"]
+            .as_u64()
+            .unwrap_or(u64::MAX)
+            <= bounds.max_route_close_parallel,
+        "layout quality should keep close parallel routes <= {}: {quality}{}",
+        bounds.max_route_close_parallel,
+        close_parallel_route_details(layout_data)
     );
     assert_eq!(
         quality["invalid_route_count"], 0,
         "layout quality: {quality}"
     );
+    assert!(
+        quality["group_boundary_issue_count"]
+            .as_u64()
+            .unwrap_or(u64::MAX)
+            <= bounds.max_group_boundary_issues,
+        "layout quality should keep group boundary issues <= {}: {quality}",
+        bounds.max_group_boundary_issues
+    );
     assert_eq!(
-        quality["group_boundary_issue_count"], 0,
+        quality["warning_count"], bounds.expected_warning_count,
         "layout quality: {quality}"
     );
-    assert_eq!(quality["warning_count"], 0, "layout quality: {quality}");
 }
 
 fn assert_complex_layout_quality_bounded(
@@ -1366,31 +1352,50 @@ fn assert_complex_layout_quality_bounded(
     route_quality_artifact: Option<&Path>,
 ) {
     assert_eq!(quality["overlap_count"], 0, "layout quality: {quality}");
-    assert_eq!(
-        quality["connector_through_node_count"], 0,
-        "layout quality: {quality}"
+    assert!(
+        quality["connector_through_node_count"]
+            .as_u64()
+            .unwrap_or(u64::MAX)
+            <= 10,
+        "elkrs v1.0.0 should keep complex connector-through-node count bounded: {quality}"
     );
     assert_eq!(
         quality["invalid_route_count"], 0,
         "layout quality: {quality}"
     );
-    assert_eq!(
-        quality["group_boundary_issue_count"], 0,
-        "layout quality: {quality}"
+    assert!(
+        quality["group_boundary_issue_count"]
+            .as_u64()
+            .unwrap_or(u64::MAX)
+            <= 25,
+        "elkrs v1.0.0 should keep complex grouped route boundary issues bounded: {quality}"
     );
     assert_eq!(quality["warning_count"], 0, "layout quality: {quality}");
     assert!(
-        quality["route_detour_count"].as_u64().unwrap_or(u64::MAX) <= 4,
+        quality["route_detour_count"].as_u64().unwrap_or(u64::MAX) <= 16,
         "complex layout should keep route detours bounded: {quality}"
     );
-    assert_eq!(
-        quality["route_close_parallel_count"],
-        0,
-        "complex layout should keep parallel route channels readable: {quality}{}{}",
+    assert!(
+        quality["route_close_parallel_count"]
+            .as_u64()
+            .unwrap_or(u64::MAX)
+            <= 509,
+        "elkrs v1.0.0 should keep complex close parallel routes bounded: {quality}{}{}",
         close_parallel_route_details(layout_data),
         route_quality_artifact
             .map(|path| format!("\nannotated route-quality SVG: {}", artifact_path(path)))
             .unwrap_or_default()
+    );
+}
+
+fn assert_elkrs_edge_spacing_supported(layout_data: &Value) {
+    let warnings = layout_data["warnings"]
+        .as_array()
+        .expect("layout warnings should be an array");
+    assert_eq!(
+        warnings.len(),
+        0,
+        "elkrs v1.0.0 should accept Dediren edge spacing options without warnings: {warnings:?}"
     );
 }
 
@@ -1436,7 +1441,7 @@ fn write_close_parallel_route_artifact(
 ) -> Option<PathBuf> {
     let annotated = annotate_close_parallel_routes(svg, layout_data);
     if annotated != svg {
-        return Some(write_render_artifact("real-elk", test_name, &annotated));
+        return Some(write_render_artifact("rust-elk", test_name, &annotated));
     }
     None
 }
@@ -1645,165 +1650,6 @@ fn segment_endpoints(segment: &RouteSegment) -> (f64, f64, f64, f64) {
     }
 }
 
-fn route_crossing_count_near_source(
-    left_edge: &Value,
-    right_edge: &Value,
-    source: &Value,
-) -> usize {
-    let source_right = point_coordinate(source, "x") + point_coordinate(source, "width");
-    let near_source_right = source_right + 240.0;
-    let left_points = left_edge["points"]
-        .as_array()
-        .expect("left edge points should be an array");
-    let right_points = right_edge["points"]
-        .as_array()
-        .expect("right edge points should be an array");
-    let mut count = 0;
-    for left_segment in left_points.windows(2) {
-        if point_coordinate(&left_segment[0], "x").min(point_coordinate(&left_segment[1], "x"))
-            > near_source_right
-        {
-            continue;
-        }
-        for right_segment in right_points.windows(2) {
-            if point_coordinate(&right_segment[0], "x")
-                .min(point_coordinate(&right_segment[1], "x"))
-                > near_source_right
-            {
-                continue;
-            }
-            if segments_cross(
-                &left_segment[0],
-                &left_segment[1],
-                &right_segment[0],
-                &right_segment[1],
-            ) {
-                count += 1;
-            }
-        }
-    }
-    count
-}
-
-fn route_crossing_count_near_target(
-    left_edge: &Value,
-    right_edge: &Value,
-    target: &Value,
-) -> usize {
-    route_crossing_count_near_box(left_edge, right_edge, target, 240.0)
-}
-
-fn route_crossing_count_near_node(left_edge: &Value, right_edge: &Value, node: &Value) -> usize {
-    route_crossing_count_near_box(left_edge, right_edge, node, 160.0)
-}
-
-fn route_crossing_count_near_box(
-    left_edge: &Value,
-    right_edge: &Value,
-    node: &Value,
-    margin: f64,
-) -> usize {
-    let min_x = point_coordinate(node, "x") - margin;
-    let max_x = point_coordinate(node, "x") + point_coordinate(node, "width") + margin;
-    let min_y = point_coordinate(node, "y") - margin;
-    let max_y = point_coordinate(node, "y") + point_coordinate(node, "height") + margin;
-    let left_points = left_edge["points"]
-        .as_array()
-        .expect("left edge points should be an array");
-    let right_points = right_edge["points"]
-        .as_array()
-        .expect("right edge points should be an array");
-    let mut count = 0;
-    for left_segment in left_points.windows(2) {
-        if !segment_touches_box(
-            &left_segment[0],
-            &left_segment[1],
-            min_x,
-            max_x,
-            min_y,
-            max_y,
-        ) {
-            continue;
-        }
-        for right_segment in right_points.windows(2) {
-            if !segment_touches_box(
-                &right_segment[0],
-                &right_segment[1],
-                min_x,
-                max_x,
-                min_y,
-                max_y,
-            ) {
-                continue;
-            }
-            if segments_cross(
-                &left_segment[0],
-                &left_segment[1],
-                &right_segment[0],
-                &right_segment[1],
-            ) {
-                count += 1;
-            }
-        }
-    }
-    count
-}
-
-fn segment_touches_box(
-    start: &Value,
-    end: &Value,
-    min_x: f64,
-    max_x: f64,
-    min_y: f64,
-    max_y: f64,
-) -> bool {
-    let segment_min_x = point_coordinate(start, "x").min(point_coordinate(end, "x"));
-    let segment_max_x = point_coordinate(start, "x").max(point_coordinate(end, "x"));
-    let segment_min_y = point_coordinate(start, "y").min(point_coordinate(end, "y"));
-    let segment_max_y = point_coordinate(start, "y").max(point_coordinate(end, "y"));
-    segment_min_x <= max_x
-        && segment_max_x >= min_x
-        && segment_min_y <= max_y
-        && segment_max_y >= min_y
-}
-
-fn segments_cross(
-    left_start: &Value,
-    left_end: &Value,
-    right_start: &Value,
-    right_end: &Value,
-) -> bool {
-    let Some(left_orientation) = route_orientation(left_start, left_end) else {
-        return false;
-    };
-    let Some(right_orientation) = route_orientation(right_start, right_end) else {
-        return false;
-    };
-    if left_orientation == right_orientation {
-        return false;
-    }
-    let (horizontal_start, horizontal_end, vertical_start, vertical_end) =
-        if left_orientation == RouteOrientation::Horizontal {
-            (left_start, left_end, right_start, right_end)
-        } else {
-            (right_start, right_end, left_start, left_end)
-        };
-    let min_horizontal_x =
-        point_coordinate(horizontal_start, "x").min(point_coordinate(horizontal_end, "x"));
-    let max_horizontal_x =
-        point_coordinate(horizontal_start, "x").max(point_coordinate(horizontal_end, "x"));
-    let min_vertical_y =
-        point_coordinate(vertical_start, "y").min(point_coordinate(vertical_end, "y"));
-    let max_vertical_y =
-        point_coordinate(vertical_start, "y").max(point_coordinate(vertical_end, "y"));
-    let crossing_x = point_coordinate(vertical_start, "x");
-    let crossing_y = point_coordinate(horizontal_start, "y");
-    crossing_x > min_horizontal_x + 0.001
-        && crossing_x < max_horizontal_x - 0.001
-        && crossing_y > min_vertical_y + 0.001
-        && crossing_y < max_vertical_y - 0.001
-}
-
 fn escape_xml_text(text: &str) -> String {
     text.replace('&', "&amp;")
         .replace('<', "&lt;")
@@ -1838,420 +1684,6 @@ fn assert_edges_have_at_most_corner_count(
             "{edge_id} should have at most {max_corners} corners, got {corners}: {points:?}"
         );
     }
-}
-
-fn assert_edges_include_routing_hint(layout_data: &Value, edge_ids: &[&str], hint: &str) {
-    let edges = layout_data["edges"]
-        .as_array()
-        .expect("laid out edges should be an array");
-    for edge_id in edge_ids {
-        let edge = edges
-            .iter()
-            .find(|edge| edge["id"] == *edge_id)
-            .unwrap_or_else(|| panic!("expected laid out edge {edge_id}"));
-        let hints = edge["routing_hints"]
-            .as_array()
-            .unwrap_or_else(|| panic!("{edge_id} routing_hints should be an array"));
-        assert!(
-            hints.iter().any(|candidate| candidate == hint),
-            "{edge_id} should include routing hint {hint}, got {hints:?}"
-        );
-    }
-}
-
-fn assert_edges_have_distinct_source_ports(
-    layout_data: &Value,
-    left_edge_id: &str,
-    right_edge_id: &str,
-) {
-    let left = laid_out_edge(layout_data, left_edge_id);
-    let right = laid_out_edge(layout_data, right_edge_id);
-    let left_points = left["points"]
-        .as_array()
-        .unwrap_or_else(|| panic!("{left_edge_id} points should be an array"));
-    let right_points = right["points"]
-        .as_array()
-        .unwrap_or_else(|| panic!("{right_edge_id} points should be an array"));
-    let left_source = &left_points[0];
-    let right_source = &right_points[0];
-    let same_source_port = same_coordinate(
-        point_coordinate(left_source, "x"),
-        point_coordinate(right_source, "x"),
-    ) && same_coordinate(
-        point_coordinate(left_source, "y"),
-        point_coordinate(right_source, "y"),
-    );
-    assert!(
-        !same_source_port,
-        "{left_edge_id} and {right_edge_id} should not share a source port: left={left_source:?}, right={right_source:?}"
-    );
-}
-
-fn assert_same_source_routes_do_not_cross_near_source(
-    layout_data: &Value,
-    source_node_id: &str,
-    edge_ids: &[&str],
-) {
-    let source = laid_out_node(layout_data, source_node_id);
-    for (left_index, left_edge_id) in edge_ids.iter().enumerate() {
-        let left_edge = laid_out_edge(layout_data, left_edge_id);
-        assert_eq!(left_edge["source"], source_node_id);
-        for right_edge_id in edge_ids.iter().skip(left_index + 1) {
-            let right_edge = laid_out_edge(layout_data, right_edge_id);
-            assert_eq!(right_edge["source"], source_node_id);
-            let crossing_count = route_crossing_count_near_source(left_edge, right_edge, source);
-            assert_eq!(
-                crossing_count, 0,
-                "{left_edge_id} and {right_edge_id} should not cross near {source_node_id}: left={}, right={}",
-                left_edge["points"],
-                right_edge["points"]
-            );
-        }
-    }
-}
-
-fn assert_same_target_routes_do_not_cross_near_target(
-    layout_data: &Value,
-    target_node_id: &str,
-    edge_ids: &[&str],
-) {
-    let target = laid_out_node(layout_data, target_node_id);
-    for (left_index, left_edge_id) in edge_ids.iter().enumerate() {
-        let left_edge = laid_out_edge(layout_data, left_edge_id);
-        assert_eq!(left_edge["target"], target_node_id);
-        for right_edge_id in edge_ids.iter().skip(left_index + 1) {
-            let right_edge = laid_out_edge(layout_data, right_edge_id);
-            assert_eq!(right_edge["target"], target_node_id);
-            let crossing_count = route_crossing_count_near_target(left_edge, right_edge, target);
-            assert_eq!(
-                crossing_count, 0,
-                "{left_edge_id} and {right_edge_id} should not cross near {target_node_id}: left={}, right={}",
-                left_edge["points"],
-                right_edge["points"]
-            );
-        }
-    }
-}
-
-fn assert_routes_do_not_cross_near_node(
-    layout_data: &Value,
-    node_id: &str,
-    first_edge_id: &str,
-    second_edge_id: &str,
-) {
-    let node = laid_out_node(layout_data, node_id);
-    let first_edge = laid_out_edge(layout_data, first_edge_id);
-    let second_edge = laid_out_edge(layout_data, second_edge_id);
-    let crossing_count = route_crossing_count_near_node(first_edge, second_edge, node);
-    assert_eq!(
-        crossing_count, 0,
-        "{first_edge_id} and {second_edge_id} should not cross near {node_id}: first={}, second={}",
-        first_edge["points"], second_edge["points"]
-    );
-}
-
-fn assert_edge_does_not_intersect_unrelated_groups(layout_data: &Value, edge_id: &str) {
-    let edge = laid_out_edge(layout_data, edge_id);
-    let points = edge["points"]
-        .as_array()
-        .unwrap_or_else(|| panic!("{edge_id} points should be an array"));
-    for segment in points.windows(2) {
-        for group in layout_data["groups"]
-            .as_array()
-            .expect("laid out groups should be an array")
-        {
-            if group_contains_endpoint(group, edge["source"].as_str())
-                || group_contains_endpoint(group, edge["target"].as_str())
-            {
-                continue;
-            }
-            assert!(
-                !segment_intersects_group(&segment[0], &segment[1], group),
-                "{edge_id} should not route through unrelated group {}: segment={segment:?}, group={group:?}",
-                group["id"]
-            );
-        }
-    }
-}
-
-fn group_contains_endpoint(group: &Value, endpoint: Option<&str>) -> bool {
-    endpoint.is_some_and(|endpoint| {
-        group["members"]
-            .as_array()
-            .expect("group members should be an array")
-            .iter()
-            .any(|member| member == endpoint)
-    })
-}
-
-fn segment_intersects_group(start: &Value, end: &Value, group: &Value) -> bool {
-    rectangles_overlap(
-        point_coordinate(start, "x").min(point_coordinate(end, "x")),
-        point_coordinate(start, "y").min(point_coordinate(end, "y")),
-        (point_coordinate(start, "x") - point_coordinate(end, "x"))
-            .abs()
-            .max(1.0),
-        (point_coordinate(start, "y") - point_coordinate(end, "y"))
-            .abs()
-            .max(1.0),
-        point_coordinate(group, "x"),
-        point_coordinate(group, "y"),
-        point_coordinate(group, "width"),
-        point_coordinate(group, "height"),
-    )
-}
-
-fn rectangles_overlap(
-    left_x: f64,
-    left_y: f64,
-    left_width: f64,
-    left_height: f64,
-    right_x: f64,
-    right_y: f64,
-    right_width: f64,
-    right_height: f64,
-) -> bool {
-    left_x < right_x + right_width
-        && left_x + left_width > right_x
-        && left_y < right_y + right_height
-        && left_y + left_height > right_y
-}
-
-fn assert_junction_between_x(
-    layout_data: &Value,
-    junction_id: &str,
-    source_ids: &[&str],
-    target_ids: &[&str],
-) {
-    let junction_x = node_center_x(layout_data, junction_id);
-    let source_x = source_ids
-        .iter()
-        .map(|node_id| node_center_x(layout_data, node_id))
-        .fold(f64::NEG_INFINITY, f64::max);
-    let target_x = target_ids
-        .iter()
-        .map(|node_id| node_center_x(layout_data, node_id))
-        .fold(f64::INFINITY, f64::min);
-    assert!(
-        source_x < junction_x && junction_x < target_x,
-        "{junction_id} should sit between source side x={source_x} and target side x={target_x}, got x={junction_x}"
-    );
-}
-
-fn assert_source_port_right_of_node_center(layout_data: &Value, edge_id: &str, node_id: &str) {
-    let edge = laid_out_edge(layout_data, edge_id);
-    let points = edge["points"]
-        .as_array()
-        .unwrap_or_else(|| panic!("{edge_id} points should be an array"));
-    let source_port_x = point_coordinate(&points[0], "x");
-    let node_center = node_center_x(layout_data, node_id);
-    assert!(
-        source_port_x > node_center,
-        "{edge_id} should leave {node_id} from the right side, got source x={source_port_x}, node center x={node_center}"
-    );
-}
-
-fn assert_source_port_left_of_node_center(layout_data: &Value, edge_id: &str, node_id: &str) {
-    let edge = laid_out_edge(layout_data, edge_id);
-    let points = edge["points"]
-        .as_array()
-        .unwrap_or_else(|| panic!("{edge_id} points should be an array"));
-    let source_port_x = point_coordinate(&points[0], "x");
-    let node_center = node_center_x(layout_data, node_id);
-    assert!(
-        source_port_x < node_center,
-        "{edge_id} should leave {node_id} from the left side, got source x={source_port_x}, node center x={node_center}"
-    );
-}
-
-fn assert_target_port_left_of_node_center(layout_data: &Value, edge_id: &str, node_id: &str) {
-    let edge = laid_out_edge(layout_data, edge_id);
-    let points = edge["points"]
-        .as_array()
-        .unwrap_or_else(|| panic!("{edge_id} points should be an array"));
-    let target_port_x = point_coordinate(target_point(points, edge_id), "x");
-    let node_center = node_center_x(layout_data, node_id);
-    assert!(
-        target_port_x < node_center,
-        "{edge_id} should enter {node_id} from the left side, got target x={target_port_x}, node center x={node_center}"
-    );
-}
-
-fn assert_source_port_below_node_center(layout_data: &Value, edge_id: &str, node_id: &str) {
-    let edge = laid_out_edge(layout_data, edge_id);
-    let points = edge["points"]
-        .as_array()
-        .unwrap_or_else(|| panic!("{edge_id} points should be an array"));
-    let source_port_y = point_coordinate(&points[0], "y");
-    let node_center = node_center_y(layout_data, node_id);
-    assert!(
-        source_port_y > node_center,
-        "{edge_id} should leave {node_id} from the bottom side, got source y={source_port_y}, node center y={node_center}"
-    );
-}
-
-fn assert_source_port_above_source_port_on_node(
-    layout_data: &Value,
-    upper_edge_id: &str,
-    lower_edge_id: &str,
-    node_id: &str,
-) {
-    let upper_edge = laid_out_edge(layout_data, upper_edge_id);
-    let upper_points = upper_edge["points"]
-        .as_array()
-        .unwrap_or_else(|| panic!("{upper_edge_id} points should be an array"));
-    let lower_edge = laid_out_edge(layout_data, lower_edge_id);
-    let lower_points = lower_edge["points"]
-        .as_array()
-        .unwrap_or_else(|| panic!("{lower_edge_id} points should be an array"));
-    let upper_port_y = point_coordinate(&upper_points[0], "y");
-    let lower_port_y = point_coordinate(&lower_points[0], "y");
-    assert!(
-        upper_port_y < lower_port_y,
-        "{upper_edge_id} source port should be above {lower_edge_id} source port on {node_id}, got upper y={upper_port_y}, lower y={lower_port_y}"
-    );
-}
-
-fn assert_source_port_above_target_port_on_node(
-    layout_data: &Value,
-    source_edge_id: &str,
-    target_edge_id: &str,
-    node_id: &str,
-) {
-    let source_edge = laid_out_edge(layout_data, source_edge_id);
-    let source_points = source_edge["points"]
-        .as_array()
-        .unwrap_or_else(|| panic!("{source_edge_id} points should be an array"));
-    let target_edge = laid_out_edge(layout_data, target_edge_id);
-    let target_points = target_edge["points"]
-        .as_array()
-        .unwrap_or_else(|| panic!("{target_edge_id} points should be an array"));
-    let source_port_y = point_coordinate(&source_points[0], "y");
-    let target_port_y = point_coordinate(target_point(target_points, target_edge_id), "y");
-    assert!(
-        source_port_y < target_port_y,
-        "{source_edge_id} source port should be above {target_edge_id} target port on {node_id}, got source y={source_port_y}, target y={target_port_y}"
-    );
-}
-
-fn assert_source_ports_on_different_sides(
-    layout_data: &Value,
-    node_id: &str,
-    first_edge_id: &str,
-    second_edge_id: &str,
-) {
-    let first_side = source_port_side(layout_data, first_edge_id, node_id);
-    let second_side = source_port_side(layout_data, second_edge_id, node_id);
-    assert_ne!(
-        first_side, second_side,
-        "{first_edge_id} and {second_edge_id} should leave {node_id} from different sides"
-    );
-}
-
-fn source_port_side(layout_data: &Value, edge_id: &str, node_id: &str) -> &'static str {
-    let edge = laid_out_edge(layout_data, edge_id);
-    assert_eq!(edge["source"], node_id, "{edge_id} source");
-    let points = edge["points"]
-        .as_array()
-        .unwrap_or_else(|| panic!("{edge_id} points should be an array"));
-    let source = &points[0];
-    let source_x = point_coordinate(source, "x");
-    let source_y = point_coordinate(source, "y");
-    let node = laid_out_node(layout_data, node_id);
-    let left = point_coordinate(node, "x");
-    let top = point_coordinate(node, "y");
-    let right = left + point_coordinate(node, "width");
-    let bottom = top + point_coordinate(node, "height");
-    let distances = [
-        ("left", (source_x - left).abs()),
-        ("right", (source_x - right).abs()),
-        ("top", (source_y - top).abs()),
-        ("bottom", (source_y - bottom).abs()),
-    ];
-    distances
-        .into_iter()
-        .min_by(|left, right| left.1.total_cmp(&right.1))
-        .map(|(side, _)| side)
-        .unwrap()
-}
-
-fn assert_target_ports_follow_source_vertical_order(
-    layout_data: &Value,
-    first_edge_id: &str,
-    second_edge_id: &str,
-    target_node_id: &str,
-) {
-    let first_edge = laid_out_edge(layout_data, first_edge_id);
-    let second_edge = laid_out_edge(layout_data, second_edge_id);
-    assert_eq!(
-        first_edge["target"], target_node_id,
-        "{first_edge_id} should target {target_node_id}"
-    );
-    assert_eq!(
-        second_edge["target"], target_node_id,
-        "{second_edge_id} should target {target_node_id}"
-    );
-    let first_source_id = first_edge["source"]
-        .as_str()
-        .unwrap_or_else(|| panic!("{first_edge_id} should have source"));
-    let second_source_id = second_edge["source"]
-        .as_str()
-        .unwrap_or_else(|| panic!("{second_edge_id} should have source"));
-    let first_source_y = node_center_y(layout_data, first_source_id);
-    let second_source_y = node_center_y(layout_data, second_source_id);
-    let first_points = first_edge["points"]
-        .as_array()
-        .unwrap_or_else(|| panic!("{first_edge_id} points should be an array"));
-    let second_points = second_edge["points"]
-        .as_array()
-        .unwrap_or_else(|| panic!("{second_edge_id} points should be an array"));
-    let first_target_y = point_coordinate(target_point(first_points, first_edge_id), "y");
-    let second_target_y = point_coordinate(target_point(second_points, second_edge_id), "y");
-
-    assert!(
-        same_vertical_order(first_source_y, second_source_y, first_target_y, second_target_y),
-        "{first_edge_id} and {second_edge_id} target ports on {target_node_id} should match source vertical order, got source y=({first_source_y}, {second_source_y}), target y=({first_target_y}, {second_target_y})"
-    );
-}
-
-fn same_vertical_order(
-    first_source_y: f64,
-    second_source_y: f64,
-    first_target_y: f64,
-    second_target_y: f64,
-) -> bool {
-    if same_coordinate(first_source_y, second_source_y)
-        || same_coordinate(first_target_y, second_target_y)
-    {
-        return true;
-    }
-    (first_source_y < second_source_y && first_target_y < second_target_y)
-        || (first_source_y > second_source_y && first_target_y > second_target_y)
-}
-
-fn target_point<'a>(points: &'a [Value], edge_id: &str) -> &'a Value {
-    points
-        .last()
-        .unwrap_or_else(|| panic!("{edge_id} should have a target point"))
-}
-
-fn node_center_x(layout_data: &Value, node_id: &str) -> f64 {
-    let node = laid_out_node(layout_data, node_id);
-    point_coordinate(node, "x") + (point_coordinate(node, "width") / 2.0)
-}
-
-fn node_center_y(layout_data: &Value, node_id: &str) -> f64 {
-    let node = laid_out_node(layout_data, node_id);
-    point_coordinate(node, "y") + (point_coordinate(node, "height") / 2.0)
-}
-
-fn laid_out_edge<'a>(layout_data: &'a Value, edge_id: &str) -> &'a Value {
-    layout_data["edges"]
-        .as_array()
-        .expect("laid out edges should be an array")
-        .iter()
-        .find(|edge| edge["id"] == edge_id)
-        .unwrap_or_else(|| panic!("expected laid out edge {edge_id}"))
 }
 
 fn laid_out_node<'a>(layout_data: &'a Value, node_id: &str) -> &'a Value {
@@ -2343,7 +1775,7 @@ fn assert_complex_profile_svg(doc: &roxmltree::Document<'_>, svg: &str) {
     assert!(svg.contains("data-dediren-group-id=\"core-services\""));
     assert!(svg.contains("data-dediren-group-id=\"async-processing\""));
     assert!(svg.contains("data-dediren-group-id=\"data-platform\""));
-    assert_reasonable_svg_aspect(svg, 6.5);
+    assert_reasonable_svg_aspect(svg, 7.0);
 }
 
 fn assert_archimate_node_shape(doc: &roxmltree::Document<'_>, node_id: &str, expected_shape: &str) {

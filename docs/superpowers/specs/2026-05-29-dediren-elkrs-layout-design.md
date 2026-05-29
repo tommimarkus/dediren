@@ -24,7 +24,7 @@ this design is:
 - Keep ELK interpretation inside `crates/dediren-plugin-elk-layout`.
 - Replace Java helper execution with in-process Rust calls to `elkrs-layered`.
 - Pin `elkrs` Cargo dependencies to the exact upstream commit currently tagged
-  `v0.1.0`: `cb246ec9d132298faeb6404de77308dcdc00eafb`.
+  `v1.0.0`: `aeba4e35a0648b57caa88b8588099a3bb48021ae`.
 - Keep `DEDIREN_ELK_RESULT_FIXTURE` for deterministic repair and test loops.
 - Remove `DEDIREN_ELK_COMMAND`; no active product path should invoke Java.
 - Remove Java/Gradle setup from release CI and distribution assembly.
@@ -54,8 +54,8 @@ implementation.
 The committed dependency shape should use exact-revision Git dependencies:
 
 ```toml
-elkrs-core = { git = "https://github.com/tommimarkus/elkrs", rev = "cb246ec9d132298faeb6404de77308dcdc00eafb" }
-elkrs-layered = { git = "https://github.com/tommimarkus/elkrs", rev = "cb246ec9d132298faeb6404de77308dcdc00eafb" }
+elkrs-core = { git = "https://github.com/tommimarkus/elkrs", rev = "aeba4e35a0648b57caa88b8588099a3bb48021ae" }
+elkrs-layered = { git = "https://github.com/tommimarkus/elkrs", rev = "aeba4e35a0648b57caa88b8588099a3bb48021ae" }
 ```
 
 `elkrs-json` may be used if it reduces mapping risk without forcing Dediren to
@@ -320,7 +320,7 @@ fixture-mode guidance, and current diagnostic codes.
 
 ## Open Risks
 
-- `elkrs` v0.1.0 is intentionally narrow and may not cover all Java helper
+- `elkrs` v1.0.0 is intentionally bounded and may not cover all Java helper
   behavior Dediren currently exercises.
 - Grouped layouts, relationship-type endpoint merging, and route-quality render
   expectations are the highest migration-risk areas.

@@ -161,11 +161,10 @@ fn plugin_timeout_is_structured() {
         &["render"],
     );
 
-    let mut options = PluginRunOptions::default();
-    options.timeout = Duration::from_millis(20);
-    options
-        .candidate_env
-        .push(("DEDIREN_TEST_PLUGIN_MODE".to_string(), "sleep".to_string()));
+    let options = PluginRunOptions {
+        timeout: Duration::from_millis(20),
+        candidate_env: vec![("DEDIREN_TEST_PLUGIN_MODE".to_string(), "sleep".to_string())],
+    };
 
     let registry = PluginRegistry::from_dirs(vec![temp.path().to_path_buf()]);
     let error = run_plugin_for_capability_with_registry(
@@ -191,12 +190,13 @@ fn plugin_timeout_covers_pipe_drain_after_parent_exits() {
         &["render"],
     );
 
-    let mut options = PluginRunOptions::default();
-    options.timeout = Duration::from_millis(50);
-    options.candidate_env.push((
-        "DEDIREN_TEST_PLUGIN_MODE".to_string(),
-        "leak-stdout-child".to_string(),
-    ));
+    let options = PluginRunOptions {
+        timeout: Duration::from_millis(50),
+        candidate_env: vec![(
+            "DEDIREN_TEST_PLUGIN_MODE".to_string(),
+            "leak-stdout-child".to_string(),
+        )],
+    };
 
     let registry = PluginRegistry::from_dirs(vec![temp.path().to_path_buf()]);
     let started = Instant::now();
@@ -228,12 +228,13 @@ fn plugin_that_never_reads_large_stdin_times_out() {
         &["render"],
     );
 
-    let mut options = PluginRunOptions::default();
-    options.timeout = Duration::from_millis(50);
-    options.candidate_env.push((
-        "DEDIREN_TEST_PLUGIN_MODE".to_string(),
-        "no-read-stdin".to_string(),
-    ));
+    let options = PluginRunOptions {
+        timeout: Duration::from_millis(50),
+        candidate_env: vec![(
+            "DEDIREN_TEST_PLUGIN_MODE".to_string(),
+            "no-read-stdin".to_string(),
+        )],
+    };
 
     let registry = PluginRegistry::from_dirs(vec![temp.path().to_path_buf()]);
     let input = "x".repeat(1024 * 1024);
@@ -260,12 +261,13 @@ fn plugin_large_stderr_is_drained_while_running() {
         &["render"],
     );
 
-    let mut options = PluginRunOptions::default();
-    options.timeout = Duration::from_secs(1);
-    options.candidate_env.push((
-        "DEDIREN_TEST_PLUGIN_MODE".to_string(),
-        "large-output".to_string(),
-    ));
+    let options = PluginRunOptions {
+        timeout: Duration::from_secs(1),
+        candidate_env: vec![(
+            "DEDIREN_TEST_PLUGIN_MODE".to_string(),
+            "large-output".to_string(),
+        )],
+    };
 
     let registry = PluginRegistry::from_dirs(vec![temp.path().to_path_buf()]);
     let outcome = run_plugin_for_capability_with_registry(
@@ -292,12 +294,13 @@ fn plugin_large_stdout_is_drained_while_running() {
         &["render"],
     );
 
-    let mut options = PluginRunOptions::default();
-    options.timeout = Duration::from_secs(1);
-    options.candidate_env.push((
-        "DEDIREN_TEST_PLUGIN_MODE".to_string(),
-        "large-stdout".to_string(),
-    ));
+    let options = PluginRunOptions {
+        timeout: Duration::from_secs(1),
+        candidate_env: vec![(
+            "DEDIREN_TEST_PLUGIN_MODE".to_string(),
+            "large-stdout".to_string(),
+        )],
+    };
 
     let registry = PluginRegistry::from_dirs(vec![temp.path().to_path_buf()]);
     let outcome = run_plugin_for_capability_with_registry(

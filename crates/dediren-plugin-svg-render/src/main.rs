@@ -96,7 +96,7 @@ fn main() -> anyhow::Result<()> {
     if let Err(error) =
         validate_render_metadata_usage(&render_input.policy, render_input.render_metadata.as_ref())
     {
-        exit_with_diagnostic(&error.code, &error.message, Some(error.path));
+        exit_with_diagnostic(error.code, &error.message, Some(error.path));
     }
     if let Err(error) = validate_archimate_policy_types(&render_input.policy) {
         exit_with_archimate_type_error(error);
@@ -4379,29 +4379,21 @@ fn label_candidate(
         LabelAnchorOrientation::Vertical => font_size * 0.15,
     };
     let side_offset = estimate_text_width(text, font_size) / 2.0 + route_gap;
+    let horizontal_candidate = HorizontalLabelCandidate {
+        x,
+        base_y,
+        step,
+        side_offset,
+        horizontal_direction: anchor.horizontal_direction,
+        center_x: anchor.horizontal_center_x,
+    };
     match (anchor.orientation, anchor.horizontal_side) {
         (LabelAnchorOrientation::Horizontal, Some(SvgEdgeLabelHorizontalSide::Below)) => {
-            horizontal_label_candidate_order(
-                attempt,
-                x,
-                base_y,
-                step,
-                side_offset,
-                -1.0,
-                anchor.horizontal_direction,
-                anchor.horizontal_center_x,
-            )
+            horizontal_label_candidate_order(attempt, horizontal_candidate, -1.0)
         }
-        (LabelAnchorOrientation::Horizontal, _) => horizontal_label_candidate_order(
-            attempt,
-            x,
-            base_y,
-            step,
-            side_offset,
-            1.0,
-            anchor.horizontal_direction,
-            anchor.horizontal_center_x,
-        ),
+        (LabelAnchorOrientation::Horizontal, _) => {
+            horizontal_label_candidate_order(attempt, horizontal_candidate, 1.0)
+        }
         (LabelAnchorOrientation::Vertical, _) => {
             let prefer_left = anchor.vertical_side != Some(SvgEdgeLabelVerticalSide::Right);
             label_candidate_order(attempt, x, base_y, step, side_offset, 1.0, prefer_left)
@@ -4409,16 +4401,29 @@ fn label_candidate(
     }
 }
 
-fn horizontal_label_candidate_order(
-    attempt: usize,
+#[derive(Debug, Clone, Copy)]
+struct HorizontalLabelCandidate {
     x: f64,
     base_y: f64,
     step: f64,
     side_offset: f64,
-    fallback_direction: f64,
     horizontal_direction: f64,
     center_x: Option<f64>,
+}
+
+fn horizontal_label_candidate_order(
+    attempt: usize,
+    candidate: HorizontalLabelCandidate,
+    fallback_direction: f64,
 ) -> (f64, f64) {
+    let HorizontalLabelCandidate {
+        x,
+        base_y,
+        step,
+        side_offset,
+        horizontal_direction,
+        center_x,
+    } = candidate;
     match attempt {
         0 => (x, base_y),
         1 => (center_x.unwrap_or(x), base_y),

@@ -11,7 +11,6 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
-  DEDIREN_ELK_BUILD_USE_SDKMAN: "0"
   SEGMENT_DOWNLOAD_TIMEOUT_MINS: "5"
 
 jobs:
@@ -84,26 +83,6 @@ jobs:
       - name: Add Rust target
         run: rustup target add ${{ matrix.target }}
 
-      - name: Set up Java
-        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5
-        with:
-          distribution: temurin
-          java-version: "25"
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@39fdf500b386709a9a4a769f717dad447ac345b9 # v6
-        with:
-          gradle-version: "9.5.0"
-          cache-provider: basic
-
-      - name: Restore Gradle project cache
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
-        with:
-          path: .cache/gradle/project-cache/elk-layout-java
-          key: gradle-project-${{ runner.os }}-${{ matrix.target }}-${{ hashFiles('crates/dediren-plugin-elk-layout/java/**/*.gradle*', 'crates/dediren-plugin-elk-layout/java/gradle.lockfile') }}
-          restore-keys: |
-            gradle-project-${{ runner.os }}-${{ matrix.target }}-
-
       - name: Install Linux tools
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libxml2-utils jq
@@ -124,6 +103,9 @@ jobs:
           key: cargo-build-${{ runner.os }}-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             cargo-build-${{ runner.os }}-${{ matrix.target }}-
+
+      - name: Install cargo-about
+        run: cargo install --locked cargo-about --version 0.8.4
 
       - name: Build distribution
         run: cargo xtask dist build --target ${{ matrix.target }}

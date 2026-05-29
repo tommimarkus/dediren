@@ -33,7 +33,6 @@ const DIST_TARGETS: &[DistTarget] = &[
         host_arch: "aarch64",
     },
 ];
-const MIN_JAVA_MAJOR: u32 = 21;
 const PLUGIN_BINARIES: &[&str] = &[
     "dediren",
     "dediren-plugin-generic-graph",
@@ -56,7 +55,6 @@ const CLEAN_ENV: &[&str] = &[
     "DEDIREN_PLUGIN_SVG_RENDER",
     "DEDIREN_PLUGIN_ARCHIMATE_OEF",
     "DEDIREN_PLUGIN_UML_XMI",
-    "DEDIREN_ELK_COMMAND",
     "DEDIREN_ELK_RESULT_FIXTURE",
 ];
 
@@ -175,17 +173,11 @@ fn build_dist(root: &Path, requested_target: Option<&str>) -> Result<()> {
     println!("generating Rust third-party notices");
     let rust_notice = generate_rust_third_party_notices(root, target.triple)?;
 
-    println!("building ELK Java helper");
-    run_status(&mut Command::new(root.join(
-        "crates/dediren-plugin-elk-layout/java/scripts/build-elk-layout.sh",
-    )))?;
-
     println!("assembling {}", bundle_dir.display());
     remove_dir_if_exists(&bundle_dir)?;
     remove_file_if_exists(&archive)?;
     fs::create_dir_all(bundle_dir.join("bin")).context("create bundle bin directory")?;
     fs::create_dir_all(bundle_dir.join("plugins")).context("create bundle plugins directory")?;
-    fs::create_dir_all(bundle_dir.join("runtimes")).context("create bundle runtimes directory")?;
     fs::create_dir_all(bundle_dir.join("docs")).context("create bundle docs directory")?;
 
     for binary in PLUGIN_BINARIES {
@@ -202,10 +194,6 @@ fn build_dist(root: &Path, requested_target: Option<&str>) -> Result<()> {
     copy_agent_docs(root, &bundle_dir.join("docs"))?;
     copy_license_notice(root, &bundle_dir)?;
     write_third_party_notices(root, &bundle_dir, &rust_notice)?;
-    copy_dir_recursive(
-        &root.join("crates/dediren-plugin-elk-layout/java/build/install/dediren-elk-layout-java"),
-        &bundle_dir.join("runtimes/elk-layout-java"),
-    )?;
     write_bundle_metadata(&bundle_dir, target)?;
 
     println!("creating {}", archive.display());
@@ -232,8 +220,6 @@ fn smoke_dist(root: &Path, archive: &Path) -> Result<()> {
     if !archive.is_file() {
         bail!("archive not found: {}", archive.display());
     }
-    ensure_java_runtime()?;
-
     let temp = TempDir::new("dediren-dist-smoke")?;
     run_status(
         Command::new("tar")
@@ -428,42 +414,6 @@ fn run_bundle_command<const N: usize>(
     Ok(output)
 }
 
-fn ensure_java_runtime() -> Result<()> {
-    let output = Command::new("java")
-        .arg("-version")
-        .output()
-        .context("java is required on PATH for the distribution smoke test")?;
-    if !output.status.success() {
-        bail!("java -version failed");
-    }
-    let text = format!(
-        "{}\n{}",
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
-    );
-    let Some(major) = parse_java_major(&text) else {
-        bail!("could not parse java -version output");
-    };
-    if major < MIN_JAVA_MAJOR {
-        bail!("Java {MIN_JAVA_MAJOR} or newer is required on PATH for the bundled ELK helper");
-    }
-    Ok(())
-}
-
-fn parse_java_major(text: &str) -> Option<u32> {
-    let version = text.split('"').nth(1).or_else(|| {
-        text.split_whitespace()
-            .find(|part| part.starts_with(|c: char| c.is_ascii_digit()))
-    })?;
-    let mut parts = version.split('.');
-    let first = parts.next()?.parse::<u32>().ok()?;
-    if first == 1 {
-        parts.next()?.parse::<u32>().ok()
-    } else {
-        Some(first)
-    }
-}
-
 fn find_bundle_dir(temp: &Path) -> Result<PathBuf> {
     let mut matches = fs::read_dir(temp)
         .context("read extracted archive directory")?
@@ -585,22 +535,16 @@ fn generate_rust_third_party_notices(root: &Path, target: &str) -> Result<PathBu
     Ok(output)
 }
 
-fn write_third_party_notices(root: &Path, bundle_dir: &Path, rust_notice: &Path) -> Result<()> {
-    let java_notice =
-        root.join("crates/dediren-plugin-elk-layout/java/build/reports/dependency-license/THIRD-PARTY-NOTICES.md");
+fn write_third_party_notices(_root: &Path, bundle_dir: &Path, rust_notice: &Path) -> Result<()> {
     let rust_notice = fs::read_to_string(rust_notice)
         .with_context(|| format!("read {}", rust_notice.display()))?;
-    let java_notice = fs::read_to_string(&java_notice)
-        .with_context(|| format!("read {}", java_notice.display()))?;
 
     let combined = format!(
         "# Third-Party Notices\n\n\
          Dediren's own source and binaries are covered by the root LICENSE file. \
          The sections below are generated reports for third-party dependencies \
          redistributed in or compiled into the distribution bundle.\n\n\
-         {rust_notice}\n\n\
-         # ELK Java Helper Runtime Dependencies\n\n\
-         {java_notice}"
+         {rust_notice}"
     );
     fs::write(bundle_dir.join("THIRD-PARTY-NOTICES.md"), combined)
         .context("write THIRD-PARTY-NOTICES.md")?;
@@ -646,8 +590,7 @@ fn write_bundle_metadata(bundle_dir: &Path, target: &DistTarget) -> Result<()> {
         "plugins": plugins,
         "schemas_dir": "schemas",
         "fixtures_dir": "fixtures",
-        "docs_dir": "docs",
-        "elk_helper": "runtimes/elk-layout-java/bin/dediren-elk-layout-java"
+        "docs_dir": "docs"
     });
     fs::write(
         bundle_dir.join("bundle.json"),
@@ -724,6 +667,7 @@ impl FileLock {
         }
         let file = OpenOptions::new()
             .create(true)
+            .truncate(false)
             .read(true)
             .write(true)
             .open(path)
