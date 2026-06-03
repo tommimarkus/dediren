@@ -65,6 +65,7 @@ class MainTest {
         String text = stdout.toString(StandardCharsets.UTF_8);
         assertEquals(0, exitCode);
         JsonNode data = EnvelopeAssertions.okData(text);
+        ElkLayoutRenderArtifacts.write(data);
         assertEquals("layout-result.schema.v1", data.path("layout_result_schema_version").asText());
         assertEquals("client-calls-api", data.path("edges").get(0).path("id").asText());
     }
