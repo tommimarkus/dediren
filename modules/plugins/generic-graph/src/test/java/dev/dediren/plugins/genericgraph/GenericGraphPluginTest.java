@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import dev.dediren.contracts.json.JsonSupport;
+import dev.dediren.contracts.schema.SchemaValidator;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
@@ -36,6 +37,7 @@ class GenericGraphPluginTest {
         assertThat(data.get("nodes")).hasSize(2);
         assertThat(data.get("edges")).hasSize(1);
         assertThat(data.at("/edges/0/relationship_type").asText()).isEqualTo("generic.calls");
+        assertSchemaValid("schemas/layout-request.schema.json", data);
     }
 
     @Test
@@ -69,6 +71,213 @@ class GenericGraphPluginTest {
     }
 
     @Test
+    void rejectsDuplicateGroupIdsWithinView() throws Exception {
+        PluginResult result = Main.executeForTesting(
+                new String[]{"project", "--target", "layout-request", "--view", "main"},
+                """
+                {
+                  "model_schema_version": "model.schema.v1",
+                  "nodes": [
+                    { "id": "client", "type": "BusinessActor", "label": "Client", "properties": {} },
+                    { "id": "api", "type": "ApplicationComponent", "label": "API", "properties": {} }
+                  ],
+                  "relationships": [],
+                  "plugins": {
+                    "generic-graph": {
+                      "views": [
+                        {
+                          "id": "main",
+                          "label": "Main",
+                          "nodes": ["client", "api"],
+                          "relationships": [],
+                          "groups": [
+                            { "id": "boundary", "label": "First", "members": ["client"] },
+                            { "id": "boundary", "label": "Second", "members": ["api"] }
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                }
+                """);
+
+        assertThat(result.exitCode()).isEqualTo(3);
+        assertErrorCode(result, "DEDIREN_GENERIC_GRAPH_DUPLICATE_GROUP_ID");
+    }
+
+    @Test
+    void projectsLayoutPreferences() throws Exception {
+        PluginResult result = Main.executeForTesting(
+                new String[]{"project", "--target", "layout-request", "--view", "main"},
+                """
+                {
+                  "model_schema_version": "model.schema.v1",
+                  "nodes": [
+                    { "id": "client", "type": "BusinessActor", "label": "Client", "properties": {} },
+                    { "id": "api", "type": "ApplicationComponent", "label": "API", "properties": {} }
+                  ],
+                  "relationships": [
+                    {
+                      "id": "client-calls-api",
+                      "type": "generic.calls",
+                      "source": "client",
+                      "target": "api",
+                      "label": "calls",
+                      "properties": {}
+                    }
+                  ],
+                  "plugins": {
+                    "generic-graph": {
+                      "views": [
+                        {
+                          "id": "main",
+                          "label": "Main",
+                          "nodes": ["client", "api"],
+                          "relationships": ["client-calls-api"],
+                          "layout_preferences": {
+                            "direction": "down",
+                            "density": "readable",
+                            "wrapping": "off",
+                            "routing": {
+                              "style": "orthogonal",
+                              "profile": "spacious",
+                              "endpoint_merging": "off"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+                """);
+
+        JsonNode data = okData(result);
+
+        assertThat(data.get("layout_preferences"))
+                .isEqualTo(JsonSupport.objectMapper().readTree("""
+                        {
+                          "direction": "down",
+                          "density": "readable",
+                          "wrapping": "off",
+                          "routing": {
+                            "style": "orthogonal",
+                            "profile": "spacious",
+                            "endpoint_merging": "off"
+                          }
+                        }
+                        """));
+        assertSchemaValid("schemas/layout-request.schema.json", data);
+    }
+
+    @Test
+    void projectsRichViewGroups() throws Exception {
+        PluginResult result = Main.executeForTesting(
+                new String[]{"project", "--target", "layout-request", "--view", "main"},
+                fixture("fixtures/source/valid-pipeline-rich.json"));
+
+        JsonNode data = okData(result);
+        JsonNode groups = data.get("groups");
+
+        assertThat(groups).hasSize(2);
+        assertThat(groups.at("/0/id").asText()).isEqualTo("application-services");
+        assertThat(groups.at("/0/label").asText()).isEqualTo("Application Services");
+        assertThat(groups.at("/0/members").toString()).isEqualTo("[\"web-app\",\"orders-api\",\"worker\"]");
+        assertThat(groups.at("/0/provenance/semantic_backed/source_id").asText())
+                .isEqualTo("application-services");
+        assertThat(groups.at("/1/id").asText()).isEqualTo("external-dependencies");
+        assertThat(groups.at("/1/members").toString()).isEqualTo("[\"payments\",\"database\"]");
+        assertSchemaValid("schemas/layout-request.schema.json", data);
+    }
+
+    @Test
+    void projectsGroupRolesIntoProvenance() throws Exception {
+        PluginResult result = Main.executeForTesting(
+                new String[]{"project", "--target", "layout-request", "--view", "main"},
+                """
+                {
+                  "model_schema_version": "model.schema.v1",
+                  "nodes": [
+                    { "id": "client", "type": "BusinessActor", "label": "Client", "properties": {} },
+                    { "id": "api", "type": "ApplicationComponent", "label": "API", "properties": {} },
+                    { "id": "domain-group", "type": "Grouping", "label": "Domain Group", "properties": {} }
+                  ],
+                  "relationships": [],
+                  "plugins": {
+                    "generic-graph": {
+                      "views": [
+                        {
+                          "id": "main",
+                          "label": "Main",
+                          "nodes": ["client", "api"],
+                          "relationships": [],
+                          "groups": [
+                            {
+                              "id": "domain-boundary",
+                              "label": "Domain Boundary",
+                              "members": ["client", "api"],
+                              "role": "semantic-boundary",
+                              "semantic_source_id": "domain-group"
+                            },
+                            {
+                              "id": "visual-column",
+                              "label": "Visual Column",
+                              "members": ["api"],
+                              "role": "layout-only"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                }
+                """);
+
+        JsonNode groups = okData(result).get("groups");
+
+        assertThat(groups.at("/0/provenance/semantic_backed/source_id").asText()).isEqualTo("domain-group");
+        assertThat(groups.at("/1/provenance/visual_only").asBoolean()).isTrue();
+    }
+
+    @Test
+    void rejectsGroupSemanticSourceIdThatIsNotASourceNode() throws Exception {
+        PluginResult result = Main.executeForTesting(
+                new String[]{"project", "--target", "layout-request", "--view", "main"},
+                """
+                {
+                  "model_schema_version": "model.schema.v1",
+                  "nodes": [
+                    { "id": "api", "type": "ApplicationComponent", "label": "API", "properties": {} }
+                  ],
+                  "relationships": [],
+                  "plugins": {
+                    "generic-graph": {
+                      "views": [
+                        {
+                          "id": "main",
+                          "label": "Main",
+                          "nodes": ["api"],
+                          "relationships": [],
+                          "groups": [
+                            {
+                              "id": "bad-group",
+                              "label": "Bad Group",
+                              "members": ["api"],
+                              "role": "semantic-boundary",
+                              "semantic_source_id": "missing-grouping-node"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                }
+                """);
+
+        assertThat(result.exitCode()).isEqualTo(2);
+        assertThat(result.stderr()).contains("group bad-group semantic_source_id references missing node");
+    }
+
+    @Test
     void validatesArchimateSourceSemantics() throws Exception {
         PluginResult result = Main.executeForTesting(
                 new String[]{"validate", "--profile", "archimate"},
@@ -99,6 +308,68 @@ class GenericGraphPluginTest {
     }
 
     @Test
+    void rejectsInvalidUmlRelationshipEndpoint() throws Exception {
+        JsonNode source = JsonSupport.objectMapper().readTree(fixture("fixtures/source/valid-uml-basic.json"));
+        ((com.fasterxml.jackson.databind.node.ObjectNode) source.at("/relationships/0"))
+                .put("source", "initial-submit");
+
+        PluginResult result = Main.executeForTesting(
+                new String[]{"validate", "--profile", "uml"},
+                JsonSupport.objectMapper().writeValueAsString(source));
+
+        assertThat(result.exitCode()).isEqualTo(3);
+        assertErrorCode(result, "DEDIREN_UML_RELATIONSHIP_ENDPOINT_UNSUPPORTED");
+    }
+
+    @Test
+    void projectsUmlRenderMetadata() throws Exception {
+        PluginResult result = Main.executeForTesting(
+                new String[]{"project", "--target", "render-metadata", "--view", "class-view"},
+                fixture("fixtures/source/valid-uml-basic.json"));
+
+        JsonNode data = okData(result);
+
+        assertThat(data.at("/semantic_profile").asText()).isEqualTo("uml");
+        assertThat(data.at("/nodes/class-order/type").asText()).isEqualTo("Class");
+        assertThat(data.at("/nodes/class-order/properties/attributes/0/name").asText()).isEqualTo("id");
+        assertThat(data.at("/nodes/enum-order-status/properties/literals/1").asText()).isEqualTo("Submitted");
+        assertThat(data.at("/edges/order-has-lines/type").asText()).isEqualTo("Composition");
+        assertThat(data.at("/edges/order-has-lines/properties").isMissingNode()).isTrue();
+        assertThat(data.at("/groups/orders-package-boundary/type").asText()).isEqualTo("Package");
+        assertThat(data.at("/groups/orders-package-boundary/properties").isMissingNode()).isTrue();
+        assertSchemaValid("schemas/render-metadata.schema.json", data);
+    }
+
+    @Test
+    void projectsCompactUmlActivityNodeSizeHints() throws Exception {
+        PluginResult result = Main.executeForTesting(
+                new String[]{"project", "--target", "layout-request", "--view", "activity-view"},
+                fixture("fixtures/source/valid-uml-basic.json"));
+
+        JsonNode data = okData(result);
+        JsonNode initial = layoutRequestNode(data, "initial-submit");
+
+        assertThat(initial.at("/width_hint").asDouble()).isEqualTo(32.0);
+        assertThat(initial.at("/height_hint").asDouble()).isEqualTo(32.0);
+        assertSchemaValid("schemas/layout-request.schema.json", data);
+    }
+
+    @Test
+    void projectsUmlStructuralSizeHintsFromCompartments() throws Exception {
+        PluginResult result = Main.executeForTesting(
+                new String[]{"project", "--target", "layout-request", "--view", "complex-class-view"},
+                fixture("fixtures/source/valid-uml-complex.json"));
+
+        JsonNode data = okData(result);
+
+        assertThat(layoutRequestNode(data, "class-order").at("/width_hint").asDouble()).isEqualTo(300.0);
+        assertThat(layoutRequestNode(data, "class-order").at("/height_hint").asDouble()).isEqualTo(190.0);
+        assertThat(layoutRequestNode(data, "class-shipment").at("/height_hint").asDouble()).isEqualTo(130.0);
+        assertThat(layoutRequestNode(data, "interface-payment-gateway").at("/width_hint").asDouble()).isEqualTo(380.0);
+        assertThat(layoutRequestNode(data, "interface-payment-gateway").at("/height_hint").asDouble()).isEqualTo(120.0);
+    }
+
+    @Test
     void projectsArchimateRenderMetadata() throws Exception {
         PluginResult result = Main.executeForTesting(
                 new String[]{"project", "--target", "render-metadata", "--view", "main"},
@@ -111,6 +382,387 @@ class GenericGraphPluginTest {
         assertThat(data.at("/semantic_profile").asText()).isEqualTo("archimate");
         assertThat(data.at("/nodes/orders-component/type").asText()).isEqualTo("ApplicationComponent");
         assertThat(data.at("/edges/orders-realizes-service/type").asText()).isEqualTo("Realization");
+        assertThat(data.at("/nodes/orders-component/properties").isMissingNode()).isTrue();
+        assertSchemaValid("schemas/render-metadata.schema.json", data);
+    }
+
+    @Test
+    void projectsArchimateRenderMetadataWithoutOefExportPlugin() throws Exception {
+        JsonNode source = archimateSource();
+        ((com.fasterxml.jackson.databind.node.ObjectNode) source).putArray("required_plugins")
+                .addObject()
+                .put("id", "generic-graph")
+                .put("version", "0.16.0");
+        ((com.fasterxml.jackson.databind.node.ObjectNode) source.at("/plugins/generic-graph"))
+                .put("semantic_profile", "archimate");
+
+        PluginResult result = Main.executeForTesting(
+                new String[]{"project", "--target", "render-metadata", "--view", "main"},
+                JsonSupport.objectMapper().writeValueAsString(source));
+
+        JsonNode data = okData(result);
+
+        assertThat(data.at("/semantic_profile").asText()).isEqualTo("archimate");
+        assertThat(data.at("/nodes/orders-component/type").asText()).isEqualTo("ApplicationComponent");
+        assertThat(data.at("/edges/orders-realizes-service/type").asText()).isEqualTo("Realization");
+    }
+
+    @Test
+    void projectsGroupRenderMetadataForSemanticSourceId() throws Exception {
+        PluginResult result = Main.executeForTesting(
+                new String[]{"project", "--target", "render-metadata", "--view", "main"},
+                """
+                {
+                  "model_schema_version": "model.schema.v1",
+                  "nodes": [
+                    { "id": "api", "type": "ApplicationComponent", "label": "API", "properties": {} },
+                    { "id": "domain-group", "type": "Grouping", "label": "Domain Group", "properties": {} }
+                  ],
+                  "relationships": [],
+                  "plugins": {
+                    "generic-graph": {
+                      "views": [
+                        {
+                          "id": "main",
+                          "label": "Main",
+                          "nodes": ["api"],
+                          "relationships": [],
+                          "groups": [
+                            {
+                              "id": "domain-boundary",
+                              "label": "Domain Boundary",
+                              "members": ["api"],
+                              "role": "semantic-boundary",
+                              "semantic_source_id": "domain-group"
+                            },
+                            {
+                              "id": "visual-column",
+                              "label": "Visual Column",
+                              "members": ["api"],
+                              "role": "layout-only"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                }
+                """);
+
+        JsonNode data = okData(result);
+
+        assertThat(data.at("/groups/domain-boundary/type").asText()).isEqualTo("Grouping");
+        assertThat(data.at("/groups/domain-boundary/source_id").asText()).isEqualTo("domain-group");
+        assertThat(data.at("/groups/visual-column").isMissingNode()).isTrue();
+    }
+
+    @Test
+    void projectsArchimateJunctionsAsSmallLayoutNodes() throws Exception {
+        PluginResult result = Main.executeForTesting(
+                new String[]{"project", "--target", "layout-request", "--view", "main"},
+                """
+                {
+                  "model_schema_version": "model.schema.v1",
+                  "required_plugins": [
+                    { "id": "generic-graph", "version": "0.16.0" },
+                    { "id": "archimate-oef", "version": "0.16.0" }
+                  ],
+                  "nodes": [
+                    { "id": "api", "type": "ApplicationComponent", "label": "API", "properties": {} },
+                    { "id": "flow-junction", "type": "AndJunction", "label": "", "properties": {} },
+                    { "id": "orders", "type": "ApplicationService", "label": "Orders", "properties": {} },
+                    { "id": "billing", "type": "ApplicationService", "label": "Billing", "properties": {} }
+                  ],
+                  "relationships": [
+                    { "id": "api-to-junction", "type": "Flow", "source": "api", "target": "flow-junction", "label": "", "properties": {} },
+                    { "id": "junction-to-orders", "type": "Flow", "source": "flow-junction", "target": "orders", "label": "", "properties": {} },
+                    { "id": "junction-to-billing", "type": "Flow", "source": "flow-junction", "target": "billing", "label": "", "properties": {} }
+                  ],
+                  "plugins": {
+                    "generic-graph": {
+                      "views": [
+                        {
+                          "id": "main",
+                          "label": "Main",
+                          "nodes": ["api", "flow-junction", "orders", "billing"],
+                          "relationships": ["api-to-junction", "junction-to-orders", "junction-to-billing"]
+                        }
+                      ]
+                    }
+                  }
+                }
+                """);
+
+        JsonNode junction = layoutRequestNode(okData(result), "flow-junction");
+
+        assertThat(junction.at("/width_hint").asDouble()).isEqualTo(28.0);
+        assertThat(junction.at("/height_hint").asDouble()).isEqualTo(28.0);
+    }
+
+    @Test
+    void projectsArchimateJunctionRenderMetadata() throws Exception {
+        PluginResult result = Main.executeForTesting(
+                new String[]{"project", "--target", "render-metadata", "--view", "main"},
+                """
+                {
+                  "model_schema_version": "model.schema.v1",
+                  "required_plugins": [
+                    { "id": "generic-graph", "version": "0.16.0" },
+                    { "id": "archimate-oef", "version": "0.16.0" }
+                  ],
+                  "nodes": [
+                    { "id": "api", "type": "ApplicationComponent", "label": "API", "properties": {} },
+                    { "id": "flow-junction", "type": "OrJunction", "label": "", "properties": {} },
+                    { "id": "orders", "type": "ApplicationService", "label": "Orders", "properties": {} }
+                  ],
+                  "relationships": [
+                    { "id": "api-to-junction", "type": "Flow", "source": "api", "target": "flow-junction", "label": "", "properties": {} },
+                    { "id": "junction-to-orders", "type": "Flow", "source": "flow-junction", "target": "orders", "label": "", "properties": {} }
+                  ],
+                  "plugins": {
+                    "generic-graph": {
+                      "views": [
+                        {
+                          "id": "main",
+                          "label": "Main",
+                          "nodes": ["api", "flow-junction", "orders"],
+                          "relationships": ["api-to-junction", "junction-to-orders"]
+                        }
+                      ]
+                    }
+                  }
+                }
+                """);
+
+        JsonNode data = okData(result);
+
+        assertThat(data.at("/nodes/flow-junction/type").asText()).isEqualTo("OrJunction");
+        assertThat(data.at("/nodes/flow-junction/source_id").asText()).isEqualTo("flow-junction");
+    }
+
+    @Test
+    void rejectsArchimateJunctionWithMixedRelationshipTypes() throws Exception {
+        PluginResult result = Main.executeForTesting(
+                new String[]{"validate", "--profile", "archimate"},
+                archimateJunctionSource("Flow", "Serving", "api", "junction", "orders"));
+
+        assertThat(result.exitCode()).isEqualTo(3);
+        assertErrorCode(result, "DEDIREN_ARCHIMATE_JUNCTION_RELATIONSHIP_MIXED");
+        assertThat(result.stdout()).contains("junction", "Flow", "Serving");
+    }
+
+    @Test
+    void rejectsArchimateJunctionWithInvalidEffectiveEndpoint() throws Exception {
+        PluginResult result = Main.executeForTesting(
+                new String[]{"validate", "--profile", "archimate"},
+                archimateJunctionSource("Realization", "Realization", "service", "junction", "component"));
+
+        assertThat(result.exitCode()).isEqualTo(3);
+        assertErrorCode(result, "DEDIREN_ARCHIMATE_RELATIONSHIP_ENDPOINT_UNSUPPORTED");
+        assertThat(result.stdout()).contains("ApplicationService", "Realization", "ApplicationComponent");
+    }
+
+    @Test
+    void rejectsArchimateJunctionWithoutIncomingAndOutgoingRelationships() throws Exception {
+        PluginResult result = Main.executeForTesting(
+                new String[]{"validate", "--profile", "archimate"},
+                """
+                {
+                  "model_schema_version": "model.schema.v1",
+                  "required_plugins": [
+                    { "id": "generic-graph", "version": "0.16.0" },
+                    { "id": "archimate-oef", "version": "0.16.0" }
+                  ],
+                  "nodes": [
+                    { "id": "api", "type": "ApplicationComponent", "label": "API", "properties": {} },
+                    { "id": "junction", "type": "AndJunction", "label": "", "properties": {} }
+                  ],
+                  "relationships": [
+                    { "id": "api-to-junction", "type": "Flow", "source": "api", "target": "junction", "label": "", "properties": {} }
+                  ],
+                  "plugins": {
+                    "generic-graph": {
+                      "views": [
+                        {
+                          "id": "main",
+                          "label": "Main",
+                          "nodes": ["api", "junction"],
+                          "relationships": ["api-to-junction"]
+                        }
+                      ]
+                    }
+                  }
+                }
+                """);
+
+        assertThat(result.exitCode()).isEqualTo(3);
+        assertErrorCode(result, "DEDIREN_ARCHIMATE_JUNCTION_DIRECTION_INCOMPLETE");
+        assertThat(result.stdout()).contains("at least one incoming", "at least one outgoing");
+    }
+
+    @Test
+    void rejectsArchimateJunctionChainWithInvalidEffectiveEndpoint() throws Exception {
+        PluginResult result = Main.executeForTesting(
+                new String[]{"validate", "--profile", "archimate"},
+                """
+                {
+                  "model_schema_version": "model.schema.v1",
+                  "required_plugins": [
+                    { "id": "generic-graph", "version": "0.16.0" },
+                    { "id": "archimate-oef", "version": "0.16.0" }
+                  ],
+                  "nodes": [
+                    { "id": "service", "type": "ApplicationService", "label": "Service", "properties": {} },
+                    { "id": "join", "type": "AndJunction", "label": "", "properties": {} },
+                    { "id": "split", "type": "AndJunction", "label": "", "properties": {} },
+                    { "id": "component", "type": "ApplicationComponent", "label": "Component", "properties": {} }
+                  ],
+                  "relationships": [
+                    { "id": "service-to-join", "type": "Realization", "source": "service", "target": "join", "label": "", "properties": {} },
+                    { "id": "join-to-split", "type": "Realization", "source": "join", "target": "split", "label": "", "properties": {} },
+                    { "id": "split-to-component", "type": "Realization", "source": "split", "target": "component", "label": "", "properties": {} }
+                  ],
+                  "plugins": {
+                    "generic-graph": {
+                      "views": [
+                        {
+                          "id": "main",
+                          "label": "Main",
+                          "nodes": ["service", "join", "split", "component"],
+                          "relationships": ["service-to-join", "join-to-split", "split-to-component"]
+                        }
+                      ]
+                    }
+                  }
+                }
+                """);
+
+        assertThat(result.exitCode()).isEqualTo(3);
+        assertErrorCode(result, "DEDIREN_ARCHIMATE_RELATIONSHIP_ENDPOINT_UNSUPPORTED");
+        assertThat(result.stdout()).contains("ApplicationService", "Realization", "ApplicationComponent");
+    }
+
+    @Test
+    void allowsArchimateJunctionContainmentRelationship() throws Exception {
+        PluginResult result = Main.executeForTesting(
+                new String[]{"project", "--target", "layout-request", "--view", "main"},
+                """
+                {
+                  "model_schema_version": "model.schema.v1",
+                  "required_plugins": [
+                    { "id": "generic-graph", "version": "0.16.0" },
+                    { "id": "archimate-oef", "version": "0.16.0" }
+                  ],
+                  "nodes": [
+                    { "id": "group", "type": "Grouping", "label": "Group", "properties": {} },
+                    { "id": "api", "type": "ApplicationComponent", "label": "API", "properties": {} },
+                    { "id": "junction", "type": "AndJunction", "label": "", "properties": {} },
+                    { "id": "orders", "type": "ApplicationService", "label": "Orders", "properties": {} }
+                  ],
+                  "relationships": [
+                    { "id": "group-contains-junction", "type": "Composition", "source": "group", "target": "junction", "label": "", "properties": {} },
+                    { "id": "api-to-junction", "type": "Flow", "source": "api", "target": "junction", "label": "", "properties": {} },
+                    { "id": "junction-to-orders", "type": "Flow", "source": "junction", "target": "orders", "label": "", "properties": {} }
+                  ],
+                  "plugins": {
+                    "generic-graph": {
+                      "views": [
+                        {
+                          "id": "main",
+                          "label": "Main",
+                          "nodes": ["group", "api", "junction", "orders"],
+                          "relationships": ["group-contains-junction", "api-to-junction", "junction-to-orders"]
+                        }
+                      ]
+                    }
+                  }
+                }
+                """);
+
+        assertThat(okData(result).get("nodes")).hasSize(4);
+    }
+
+    @Test
+    void rejectsUnknownArchimateNodeTypeForRenderMetadata() throws Exception {
+        JsonNode source = archimateSource();
+        ((com.fasterxml.jackson.databind.node.ObjectNode) source.at("/nodes/0"))
+                .put("type", "TechnologyNode");
+
+        PluginResult result = Main.executeForTesting(
+                new String[]{"project", "--target", "render-metadata", "--view", "main"},
+                JsonSupport.objectMapper().writeValueAsString(source));
+
+        assertThat(result.exitCode()).isEqualTo(3);
+        assertErrorCode(result, "DEDIREN_ARCHIMATE_ELEMENT_TYPE_UNSUPPORTED");
+        assertThat(result.stdout()).contains("TechnologyNode");
+    }
+
+    @Test
+    void rejectsUnknownArchimateRelationshipTypeForRenderMetadata() throws Exception {
+        JsonNode source = archimateSource();
+        ((com.fasterxml.jackson.databind.node.ObjectNode) source.at("/relationships/0"))
+                .put("type", "ConnectsTo");
+
+        PluginResult result = Main.executeForTesting(
+                new String[]{"project", "--target", "render-metadata", "--view", "main"},
+                JsonSupport.objectMapper().writeValueAsString(source));
+
+        assertThat(result.exitCode()).isEqualTo(3);
+        assertErrorCode(result, "DEDIREN_ARCHIMATE_RELATIONSHIP_TYPE_UNSUPPORTED");
+        assertThat(result.stdout()).contains("ConnectsTo");
+    }
+
+    @Test
+    void rejectsInvalidArchimateRelationshipEndpointForRenderMetadata() throws Exception {
+        JsonNode source = archimateSource();
+        ((com.fasterxml.jackson.databind.node.ObjectNode) source.at("/nodes/0"))
+                .put("type", "ApplicationService");
+        ((com.fasterxml.jackson.databind.node.ObjectNode) source.at("/nodes/1"))
+                .put("type", "ApplicationComponent");
+        ((com.fasterxml.jackson.databind.node.ObjectNode) source.at("/relationships/0"))
+                .put("type", "Realization");
+
+        PluginResult result = Main.executeForTesting(
+                new String[]{"project", "--target", "render-metadata", "--view", "main"},
+                JsonSupport.objectMapper().writeValueAsString(source));
+
+        assertThat(result.exitCode()).isEqualTo(3);
+        assertErrorCode(result, "DEDIREN_ARCHIMATE_RELATIONSHIP_ENDPOINT_UNSUPPORTED");
+        assertThat(result.stdout()).contains("ApplicationService", "Realization", "ApplicationComponent");
+    }
+
+    @Test
+    void rejectsInvalidArchimateRelationshipEndpointForSemanticValidation() throws Exception {
+        JsonNode source = archimateSource();
+        ((com.fasterxml.jackson.databind.node.ObjectNode) source.at("/nodes/0"))
+                .put("type", "ApplicationService");
+        ((com.fasterxml.jackson.databind.node.ObjectNode) source.at("/nodes/1"))
+                .put("type", "ApplicationComponent");
+        ((com.fasterxml.jackson.databind.node.ObjectNode) source.at("/relationships/0"))
+                .put("type", "Realization");
+
+        PluginResult result = Main.executeForTesting(
+                new String[]{"validate", "--profile", "archimate"},
+                JsonSupport.objectMapper().writeValueAsString(source));
+
+        assertThat(result.exitCode()).isEqualTo(3);
+        assertErrorCode(result, "DEDIREN_ARCHIMATE_RELATIONSHIP_ENDPOINT_UNSUPPORTED");
+        assertThat(result.stdout()).contains("ApplicationService", "Realization", "ApplicationComponent");
+    }
+
+    @Test
+    void rejectsArchimateJunctionAsSourceNodeForSemanticValidation() throws Exception {
+        JsonNode source = archimateSource();
+        ((com.fasterxml.jackson.databind.node.ObjectNode) source.at("/nodes/0"))
+                .put("type", "Junction");
+
+        PluginResult result = Main.executeForTesting(
+                new String[]{"validate", "--profile", "archimate"},
+                JsonSupport.objectMapper().writeValueAsString(source));
+
+        assertThat(result.exitCode()).isEqualTo(3);
+        assertErrorCode(result, "DEDIREN_ARCHIMATE_ELEMENT_TYPE_UNSUPPORTED");
+        assertThat(result.stdout()).contains("Junction");
     }
 
     private static JsonNode okData(PluginResult result) throws Exception {
@@ -119,8 +771,130 @@ class GenericGraphPluginTest {
         return envelope.get("data");
     }
 
+    private static void assertErrorCode(PluginResult result, String expectedCode) throws Exception {
+        JsonNode envelope = JsonSupport.objectMapper().readTree(result.stdout());
+        assertThat(envelope.at("/diagnostics/0/code").asText()).isEqualTo(expectedCode);
+    }
+
+    private static void assertSchemaValid(String schemaPath, JsonNode data) {
+        assertThat(SchemaValidator.fromRepositoryRoot(workspaceRoot()).validate(schemaPath, data))
+                .describedAs(schemaPath)
+                .isEmpty();
+    }
+
+    private static JsonNode layoutRequestNode(JsonNode data, String nodeId) {
+        for (JsonNode node : data.get("nodes")) {
+            if (nodeId.equals(node.at("/id").asText())) {
+                return node;
+            }
+        }
+        throw new AssertionError("expected layout request node " + nodeId);
+    }
+
     private static String fixture(String path) throws Exception {
         return Files.readString(workspaceRoot().resolve(path));
+    }
+
+    private static String archimateJunctionSource(
+            String incomingType,
+            String outgoingType,
+            String sourceId,
+            String junctionId,
+            String targetId) {
+        String sourceType = sourceId.equals("service") ? "ApplicationService" : "ApplicationComponent";
+        String targetType = targetId.equals("component") ? "ApplicationComponent" : "ApplicationService";
+        return """
+                {
+                  "model_schema_version": "model.schema.v1",
+                  "required_plugins": [
+                    { "id": "generic-graph", "version": "0.16.0" },
+                    { "id": "archimate-oef", "version": "0.16.0" }
+                  ],
+                  "nodes": [
+                    { "id": "%s", "type": "%s", "label": "Source", "properties": {} },
+                    { "id": "%s", "type": "AndJunction", "label": "", "properties": {} },
+                    { "id": "%s", "type": "%s", "label": "Target", "properties": {} }
+                  ],
+                  "relationships": [
+                    { "id": "source-to-junction", "type": "%s", "source": "%s", "target": "%s", "label": "", "properties": {} },
+                    { "id": "junction-to-target", "type": "%s", "source": "%s", "target": "%s", "label": "", "properties": {} }
+                  ],
+                  "plugins": {
+                    "generic-graph": {
+                      "views": [
+                        {
+                          "id": "main",
+                          "label": "Main",
+                          "nodes": ["%s", "%s", "%s"],
+                          "relationships": ["source-to-junction", "junction-to-target"]
+                        }
+                      ]
+                    }
+                  }
+                }
+                """.formatted(
+                sourceId,
+                sourceType,
+                junctionId,
+                targetId,
+                targetType,
+                incomingType,
+                sourceId,
+                junctionId,
+                outgoingType,
+                junctionId,
+                targetId,
+                sourceId,
+                junctionId,
+                targetId);
+    }
+
+    private static JsonNode archimateSource() throws Exception {
+        return JsonSupport.objectMapper().readTree("""
+                {
+                  "model_schema_version": "model.schema.v1",
+                  "required_plugins": [
+                    { "id": "generic-graph", "version": "0.16.0" },
+                    { "id": "archimate-oef", "version": "0.16.0" }
+                  ],
+                  "nodes": [
+                    {
+                      "id": "orders-component",
+                      "type": "ApplicationComponent",
+                      "label": "Orders Component",
+                      "properties": {}
+                    },
+                    {
+                      "id": "orders-service",
+                      "type": "ApplicationService",
+                      "label": "Orders Service",
+                      "properties": {}
+                    }
+                  ],
+                  "relationships": [
+                    {
+                      "id": "orders-realizes-service",
+                      "type": "Realization",
+                      "source": "orders-component",
+                      "target": "orders-service",
+                      "label": "realizes",
+                      "properties": {}
+                    }
+                  ],
+                  "plugins": {
+                    "generic-graph": {
+                      "views": [
+                        {
+                          "id": "main",
+                          "label": "Main",
+                          "nodes": ["orders-component", "orders-service"],
+                          "relationships": ["orders-realizes-service"]
+                        }
+                      ]
+                    }
+                  }
+                }
+                """);
     }
 
     private static Path workspaceRoot() {

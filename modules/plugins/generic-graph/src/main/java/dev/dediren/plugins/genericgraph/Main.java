@@ -100,7 +100,14 @@ public final class Main {
         }
         return switch (args[0]) {
             case "validate" -> validateFromStdin(args, stdin, stdout);
-            case "project" -> projectFromStdin(args, stdin, stdout, stderr);
+            case "project" -> {
+                try {
+                    yield projectFromStdin(args, stdin, stdout, stderr);
+                } catch (IOException error) {
+                    stderr.println(error.getMessage());
+                    yield 2;
+                }
+            }
             default -> {
                 stderr.println("expected command: validate or project");
                 yield 2;

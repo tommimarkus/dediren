@@ -61,7 +61,7 @@
   - Run: `./gradlew :modules:plugins:generic-graph:test`
   - Expected: pass.
 
-- [ ] **Task 5: Port projection to layout request and render metadata** _(partially complete: basic Java projection is implemented; full Rust fixture parity and schema assertions remain open)_
+- [x] **Task 5: Port projection to layout request and render metadata**
   - Model: `gpt-5-codex`
   - Implement `project` targets `layout-request` and `render-metadata`.
   - Preserve layout preferences, group roles/provenance, UML compact size hints, ArchiMate junction metadata, and source ids.
@@ -75,20 +75,20 @@
   - Add tests for configured cache, direct schema path, generated temp schema fixtures, download/cache behavior, download-disabled failures, and structured diagnostics.
   - Expected: Java helper behavior is available to export plugins; export-plugin command-envelope diagnostics are covered when OEF/XMI are wired in Slice 04.
 
-- [ ] **Task 7: Add semantic Rust coverage note**
+- [x] **Task 7: Add semantic Rust coverage note**
   - Model: `gpt-5-mini`
   - In the slice handoff, map `dediren-archimate`, `dediren-uml`, `dediren-plugin-generic-graph`, and `dediren-plugin-schema-cache` to the Java modules and test classes created in this slice.
   - Include the fixture families covered: `fixtures/source`, `fixtures/layout-request`, `fixtures/render-metadata`, and schema-cache temp schema fixtures.
   - Expected: no semantic Rust crate remains without a named Java successor.
 
-- [ ] **Task 8: Run architecture and test audits**
+- [x] **Task 8: Run architecture and test audits**
   - Model: `gpt-5`
   - Use `souroldgeezer-design:software-design` Review for vocabulary ownership and plugin/core direction.
   - Use `souroldgeezer-architecture:architecture-design` Lookup/Review for ArchiMate and UML semantic expectations touched by this slice.
   - Use `souroldgeezer-audit:test-quality-audit` Deep for semantic plugin tests.
   - Fix block findings before commit.
 
-- [ ] **Task 9: Verify and commit**
+- [x] **Task 9: Verify and commit**
   - Model: `gpt-5-mini`
   - Run: `./gradlew :modules:archimate:test :modules:uml:test :modules:schema-cache:test :modules:plugins:generic-graph:test`
   - Run: `cargo test -p dediren-archimate --locked`
@@ -155,8 +155,33 @@ Audit notes:
 - Architecture-design scope check: no ArchiMate or UML package source/evidence was edited in this helper checkpoint.
 - Test-quality check: helper behavior covers env fallback, non-empty files, cache hit, temp download/cache store, failed download diagnostics, empty downloads, output detail formatting, and fake-curl process arguments. Export-plugin command-envelope diagnostics remain in Slice 04 when OEF/XMI are wired to this helper.
 
-Open before closing Slice 03:
+## 2026-06-03 Checkpoint: Generic Graph Projection Parity
 
-- Expand `GenericGraphPluginTest` to cover the full Rust fixture matrix, including rich groups, layout preferences, junction chains, UML structural sizing, and negative projection paths.
-- Add schema validation assertions for generated layout-request and render-metadata payloads.
-- Run full architecture/test-quality audits after projection parity is expanded.
+Expanded Java coverage in `GenericGraphPluginTest` to cover the Rust projection and semantic-validation matrix:
+
+- Duplicate view and group diagnostics.
+- Layout preferences.
+- Rich groups and group provenance.
+- Missing group semantic source projection errors.
+- ArchiMate semantic validation, junction sizing, junction render metadata, junction-chain validation, containment handling, unknown type diagnostics, and invalid endpoint diagnostics.
+- UML semantic validation, invalid endpoint diagnostics, render metadata, compact activity node sizing, and structural compartment size hints.
+- Layout-request and render-metadata schema validation for generated payloads.
+
+Verification evidence:
+
+```bash
+GRADLE_USER_HOME=.cache/gradle/user-home ./gradlew :modules:plugins:generic-graph:test
+```
+
+Result: all passed.
+
+Audit notes:
+
+- Software-design boundary check: semantic vocabularies remain in `modules/archimate` and `modules/uml`; generic-graph owns projection and profile dispatch; core remains plugin-neutral.
+- Architecture-design scope check: ArchiMate and UML notation behavior was exercised through dediren source/projection contracts; no package source or rendered architecture evidence was edited in this checkpoint.
+- Test-quality check: Java tests now cover happy paths, negative diagnostics, schema assertions, and fixture-backed parity. Remaining mutation evidence is not available in this Gradle setup and is accepted for this migration slice.
+
+Slice 03 closeout:
+
+- Semantic plugin migration is complete for the Java side-by-side path.
+- Export-plugin command-envelope diagnostics that consume schema-cache move with OEF/XMI wiring in Slice 04.
