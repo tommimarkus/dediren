@@ -4,10 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.networknt.schema.JsonSchema;
-import com.networknt.schema.JsonSchemaFactory;
-import com.networknt.schema.SpecVersion;
-import com.networknt.schema.ValidationMessage;
+import com.networknt.schema.Error;
+import com.networknt.schema.InputFormat;
+import com.networknt.schema.Schema;
+import com.networknt.schema.SchemaRegistry;
+import com.networknt.schema.SpecificationVersion;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -16,8 +17,8 @@ import java.util.List;
 
 public final class SchemaAssertions {
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-    private static final JsonSchemaFactory SCHEMA_FACTORY =
-            JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V202012);
+    private static final SchemaRegistry SCHEMA_REGISTRY =
+            SchemaRegistry.withDefaultDialect(SpecificationVersion.DRAFT_2020_12);
 
     private SchemaAssertions() {
     }
@@ -42,10 +43,10 @@ public final class SchemaAssertions {
 
     public static List<String> validate(Path repositoryRoot, String schemaPath, JsonNode data) {
         try {
-            JsonSchema schema = loadSchema(repositoryRoot, schemaPath);
-            return schema.validate(data)
+            Schema schema = loadSchema(repositoryRoot, schemaPath);
+            return schema.validate(OBJECT_MAPPER.writeValueAsString(data), InputFormat.JSON)
                     .stream()
-                    .map(ValidationMessage::getMessage)
+                    .map(Error::getMessage)
                     .sorted()
                     .toList();
         } catch (IOException | RuntimeException error) {
@@ -59,9 +60,9 @@ public final class SchemaAssertions {
                 .isEmpty();
     }
 
-    private static JsonSchema loadSchema(Path repositoryRoot, String schemaPath) throws IOException {
+    private static Schema loadSchema(Path repositoryRoot, String schemaPath) throws IOException {
         try (InputStream stream = Files.newInputStream(repositoryRoot.resolve(schemaPath))) {
-            return SCHEMA_FACTORY.getSchema(stream);
+            return SCHEMA_REGISTRY.getSchema(stream);
         }
     }
 }
