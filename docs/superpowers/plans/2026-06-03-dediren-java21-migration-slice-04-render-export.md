@@ -73,13 +73,36 @@ git diff --check
 
 Result: all passed.
 
-- [ ] **Task 4: Port UML XMI export**
+- [x] **Task 4: Port UML XMI export**
   - Model: `gpt-5-codex`
   - Generate UML 2.5.1 XMI XML for the current class, data, and activity slice.
   - Preserve scoped model export, id collision deduplication, relationship endpoint validation, and XML id checks.
   - Add tests equivalent to `uml_xmi_export_plugin.rs`.
   - Run: `./gradlew :modules:plugins:uml-xmi-export:test`
   - Expected: pass.
+
+### 2026-06-03 UML XMI Checkpoint
+
+Implemented Java UML XMI export in `modules/plugins/uml-xmi-export`:
+
+- `capabilities` with UML 2.5.1, XMI 2.5.1, and OMG XMI schema-validation runtime metadata.
+- `export` command envelope output for UML/XMI XML.
+- UML policy validation, generic-graph plugin data loading, UML relationship endpoint validation, and structured diagnostic envelopes.
+- Scoped model export from generated layout results, including semantic groups and activity-owner inclusion for activity views.
+- Class/interface/data-type/enumeration/activity XML generation, attribute/operation/literal/activity-node/activity-flow output, generated ID collision handling, and XML ID validation.
+- Offline Java tests with injected minimal XMI XSDs plus xmllint validation and Rust parity coverage.
+- Schema-cache helper wiring for `DEDIREN_XMI_SCHEMA_PATH`, `DEDIREN_SCHEMA_CACHE_DIR`, and curl-backed runtime downloads.
+
+Verification:
+
+```bash
+GRADLE_USER_HOME=.cache/gradle/user-home ./gradlew :modules:plugins:uml-xmi-export:test
+cargo test -p dediren-plugin-uml-xmi-export --test uml_xmi_export_plugin --locked
+GRADLE_USER_HOME=.cache/gradle/user-home ./gradlew test
+git diff --check
+```
+
+Result: all passed.
 
 - [ ] **Task 5: Add CLI integration parity**
   - Model: `gpt-5-codex`
