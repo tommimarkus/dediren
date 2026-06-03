@@ -74,6 +74,13 @@
 ## Versioning
 
 - The product version source is root `pom.xml`.
+- Prefer Maven-calculated version bumps for POM changes so the next numeric
+  version is not hand-entered. For a patch bump, run:
+  `./mvnw build-helper:parse-version versions:set -DnewVersion='${parsedVersion.majorVersion}.${parsedVersion.minorVersion}.${parsedVersion.nextIncrementalVersion}' -DprocessAllModules=true -DgenerateBackupPoms=false`.
+  For minor use
+  `-DnewVersion='${parsedVersion.majorVersion}.${parsedVersion.nextMinorVersion}.0'`;
+  for major use
+  `-DnewVersion='${parsedVersion.nextMajorVersion}.0.0'`.
 - Version bumps live in the same commit as the content change that requires
   them.
 - Every product/plugin version bump must also create the matching annotated git
@@ -82,6 +89,14 @@
   source fixture `required_plugins[].version` entries, README bundle examples,
   `docs/agent-usage.md` examples, distribution metadata, and tests that assert
   version strings must match the product version.
+- Known version assertion surfaces include
+  `apps/cli/src/test/java/dev/dediren/cli/MainTest.java`,
+  `modules/contracts/src/test/java/dev/dediren/contracts/ContractRoundTripTest.java`,
+  `modules/plugins/archimate-oef-export/src/test/java/dev/dediren/plugins/archimateoef/MainTest.java`,
+  `modules/plugins/generic-graph/src/test/java/dev/dediren/plugins/genericgraph/GenericGraphPluginTest.java`,
+  and `tools/dist/src/test/java/dev/dediren/tools/dist/DistModuleTest.java`.
+- `.github/workflows/release.yml` validates tag `v<version>` against root
+  `pom.xml`; update it only if the product version source changes.
 - Use SemVer intent while pre-1.0:
   - Major: backwards-incompatible public product or plugin contract changes.
   - Minor: additive compatible public surface changes or runtime migration
