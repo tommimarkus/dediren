@@ -1,0 +1,21 @@
+[versions]
+assertj = "3.27.3"
+eclipse-elk = "0.11.0"
+jackson = "2.17.3"
+json-schema-validator = "1.5.8"
+junit = "5.10.3"
+junit-platform = "1.10.3"
+picocli = "4.7.7"
+xmlunit = "2.10.0"
+
+[libraries]
+assertj-core = { module = "org.assertj:assertj-core", version.ref = "assertj" }
+elk-core = { module = "org.eclipse.elk:org.eclipse.elk.core", version.ref = "eclipse-elk" }
+elk-graph = { module = "org.eclipse.elk:org.eclipse.elk.graph", version.ref = "eclipse-elk" }
+elk-layered = { module = "org.eclipse.elk:org.eclipse.elk.alg.layered", version.ref = "eclipse-elk" }
+jackson-databind = { module = "com.fasterxml.jackson.core:jackson-databind", version.ref = "jackson" }
+json-schema-validator = { module = "com.networknt:json-schema-validator", version.ref = "json-schema-validator" }
+junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit" }
+junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher", version.ref = "junit-platform" }
+picocli = { module = "info.picocli:picocli", version.ref = "picocli" }
+xmlunit-core = { module = "org.xmlunit:xmlunit-core", version.ref = "xmlunit" }

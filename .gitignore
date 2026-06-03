@@ -1,5 +1,8 @@
 /target/
 /dist/
+/.gradle/
+/build/
+**/build/
 /.worktrees/
 /.test-output/
 /.cache/gradle/
