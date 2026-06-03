@@ -1,9 +1,10 @@
 package dev.dediren.core.plugins;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import dev.dediren.core.DedirenPaths;
+import dev.dediren.core.schema.SchemaValidator;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.contracts.plugin.RuntimeCapabilities;
-import dev.dediren.contracts.schema.SchemaValidator;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -95,8 +96,8 @@ public final class PluginRunner {
         Path manifestDir = loaded.path().getParent();
         if (executable.getNameCount() == 1
                 && manifestDir.toAbsolutePath().normalize()
-                        .equals(CorePaths.repositoryRoot().resolve("plugins").toAbsolutePath().normalize())) {
-            return CorePaths.repositoryRoot().resolve("bin").resolve(executable).normalize();
+                        .equals(DedirenPaths.productRoot().resolve("plugins").toAbsolutePath().normalize())) {
+            return DedirenPaths.productRoot().resolve("bin").resolve(executable).normalize();
         }
         return manifestDir.resolve(executable).normalize();
     }
@@ -279,7 +280,7 @@ public final class PluginRunner {
     }
 
     private static SchemaValidator validator() {
-        return SchemaValidator.fromRepositoryRoot(CorePaths.repositoryRoot());
+        return SchemaValidator.fromRepositoryRoot(DedirenPaths.productRoot());
     }
 
     private record ProcessOutput(String stdout, String stderr, int exitCode) {

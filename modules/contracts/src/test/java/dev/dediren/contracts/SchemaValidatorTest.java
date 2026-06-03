@@ -2,7 +2,7 @@ package dev.dediren.contracts;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import dev.dediren.contracts.schema.SchemaValidator;
+import dev.dediren.testsupport.SchemaAssertions;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -35,10 +35,8 @@ class SchemaValidatorTest {
 
     @Test
     void allPublicSchemasCompile() {
-        var validator = SchemaValidator.fromRepositoryRoot(workspaceRoot());
-
         for (String schema : PUBLIC_SCHEMAS) {
-            assertThat(validator.compile(schema))
+            assertThat(SchemaAssertions.compile(workspaceRoot(), schema))
                     .describedAs(schema)
                     .isEmpty();
         }
@@ -46,13 +44,13 @@ class SchemaValidatorTest {
 
     @Test
     void validSourceMatchesModelSchemaAndAbsoluteGeometryIsRejected() {
-        var validator = SchemaValidator.fromRepositoryRoot(workspaceRoot());
-
-        assertThat(validator.validateFixture(
+        assertThat(SchemaAssertions.validateFixture(
+                workspaceRoot(),
                 "schemas/model.schema.json",
                 "fixtures/source/valid-basic.json"))
                 .isEmpty();
-        assertThat(validator.validateFixture(
+        assertThat(SchemaAssertions.validateFixture(
+                workspaceRoot(),
                 "schemas/model.schema.json",
                 "fixtures/source/invalid-absolute-geometry.json"))
                 .isNotEmpty();
@@ -60,10 +58,8 @@ class SchemaValidatorTest {
 
     @Test
     void firstPartyPluginManifestsMatchSchema() {
-        var validator = SchemaValidator.fromRepositoryRoot(workspaceRoot());
-
         for (String manifest : PLUGIN_MANIFESTS) {
-            assertThat(validator.validateFixture("schemas/plugin-manifest.schema.json", manifest))
+            assertThat(SchemaAssertions.validateFixture(workspaceRoot(), "schemas/plugin-manifest.schema.json", manifest))
                     .describedAs(manifest)
                     .isEmpty();
         }

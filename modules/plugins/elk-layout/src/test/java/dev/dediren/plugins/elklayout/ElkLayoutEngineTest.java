@@ -63,7 +63,7 @@ class ElkLayoutEngineTest {
             null,
             new LayoutRoutingPreferences(LayoutRoutingStyle.ORTHOGONAL, null, LayoutEndpointMerging.OFF));
 
-        ElkNode root = ElkLayoutEngine.configuredLayeredRoot(Direction.RIGHT, preferences);
+        ElkNode root = ElkLayeredOptions.configuredRoot(Direction.RIGHT, preferences);
 
         assertEquals(false, root.getProperty(LayeredOptions.MERGE_EDGES));
         assertEquals(false, root.getProperty(LayeredOptions.MERGE_HIERARCHY_EDGES));
@@ -71,7 +71,7 @@ class ElkLayoutEngineTest {
 
     @Test
     void layeredRootUsesElkFirstOrderingAndStraighteningOptions() {
-        ElkNode root = ElkLayoutEngine.configuredLayeredRoot(Direction.RIGHT, null);
+        ElkNode root = ElkLayeredOptions.configuredRoot(Direction.RIGHT, null);
 
         assertEquals(PortSortingStrategy.INPUT_ORDER, root.getProperty(LayeredOptions.PORT_SORTING_STRATEGY));
         assertEquals(OrderingStrategy.PREFER_EDGES, root.getProperty(LayeredOptions.CONSIDER_MODEL_ORDER_STRATEGY));

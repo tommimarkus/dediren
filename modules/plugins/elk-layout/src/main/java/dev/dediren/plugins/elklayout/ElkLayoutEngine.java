@@ -7,10 +7,7 @@ import dev.dediren.contracts.layout.LaidOutEdge;
 import dev.dediren.contracts.layout.LaidOutGroup;
 import dev.dediren.contracts.layout.LaidOutNode;
 import dev.dediren.contracts.layout.LayoutConstraint;
-import dev.dediren.contracts.layout.LayoutDensity;
-import dev.dediren.contracts.layout.LayoutDirection;
 import dev.dediren.contracts.layout.LayoutEdge;
-import dev.dediren.contracts.layout.LayoutEndpointMerging;
 import dev.dediren.contracts.layout.LayoutGroup;
 import dev.dediren.contracts.layout.LayoutLabel;
 import dev.dediren.contracts.layout.LayoutNode;
@@ -18,7 +15,6 @@ import dev.dediren.contracts.layout.LayoutPreferences;
 import dev.dediren.contracts.layout.LayoutRequest;
 import dev.dediren.contracts.layout.LayoutResult;
 import dev.dediren.contracts.layout.LayoutRoutingPreferences;
-import dev.dediren.contracts.layout.LayoutWrapping;
 import dev.dediren.contracts.layout.Point;
 import java.util.ArrayList;
 import java.util.EnumMap;
@@ -27,19 +23,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.eclipse.elk.alg.layered.options.EdgeStraighteningStrategy;
-import org.eclipse.elk.alg.layered.options.LayeredOptions;
-import org.eclipse.elk.alg.layered.options.NodePlacementStrategy;
-import org.eclipse.elk.alg.layered.options.OrderingStrategy;
-import org.eclipse.elk.alg.layered.options.PortSortingStrategy;
-import org.eclipse.elk.alg.layered.options.WrappingStrategy;
 import org.eclipse.elk.core.RecursiveGraphLayoutEngine;
-import org.eclipse.elk.core.math.ElkMargin;
-import org.eclipse.elk.core.math.ElkPadding;
 import org.eclipse.elk.core.options.CoreOptions;
 import org.eclipse.elk.core.options.Direction;
-import org.eclipse.elk.core.options.EdgeRouting;
-import org.eclipse.elk.core.options.HierarchyHandling;
 import org.eclipse.elk.core.options.PortConstraints;
 import org.eclipse.elk.core.options.PortSide;
 import org.eclipse.elk.core.util.BasicProgressMonitor;
@@ -51,28 +37,11 @@ import org.eclipse.elk.graph.ElkPort;
 import org.eclipse.elk.graph.util.ElkGraphUtil;
 
 final class ElkLayoutEngine {
-    private static final String LAYERED_ALGORITHM = "org.eclipse.elk.layered";
     private static final double DEFAULT_WIDTH = 160.0;
     private static final double DEFAULT_HEIGHT = 80.0;
     private static final double CONNECTOR_SOURCE_MAX_WIDTH = 48.0;
     private static final double CONNECTOR_SOURCE_MAX_HEIGHT = 48.0;
-    private static final double GROUP_PADDING = 24.0;
-    private static final double NODE_SPACING = 60.0;
-    private static final double EDGE_NODE_SPACING = 32.0;
-    private static final double EDGE_EDGE_SPACING = 40.0;
-    private static final double PORT_PORT_SPACING = 32.0;
-    private static final double READABLE_NODE_SPACING = 72.0;
-    private static final double READABLE_EDGE_NODE_SPACING = 48.0;
-    private static final double READABLE_EDGE_EDGE_SPACING = 48.0;
-    private static final double READABLE_PORT_PORT_SPACING = 40.0;
-    private static final double READABLE_GROUP_PADDING = 32.0;
-    private static final double SPACIOUS_NODE_SPACING = 96.0;
-    private static final double SPACIOUS_EDGE_NODE_SPACING = 64.0;
-    private static final double SPACIOUS_EDGE_EDGE_SPACING = 64.0;
-    private static final double SPACIOUS_PORT_PORT_SPACING = 48.0;
-    private static final double SPACIOUS_GROUP_PADDING = 40.0;
     private static final int DEFAULT_SHORT_SIDE_PORT_CAPACITY = 3;
-    private static final double PORT_SURROUNDING_SPACING = 16.0;
     private static final int MERGEABLE_ENDPOINT_EDGE_COUNT = 3;
     private static final String SHARED_SOURCE_JUNCTION_HINT = "shared_source_junction";
     private static final String SHARED_TARGET_JUNCTION_HINT = "shared_target_junction";
@@ -90,9 +59,9 @@ final class ElkLayoutEngine {
 
     private static LayoutResult layoutFlat(LayoutRequest request) {
         LayoutPreferences preferences = request.layoutPreferences();
-        Direction layoutDirection = preferredDirection(preferences);
+        Direction layoutDirection = ElkLayeredOptions.preferredDirection(preferences);
         ElkNode root = ElkGraphUtil.createGraph();
-        configureLayeredRoot(root, layoutDirection, preferences);
+        ElkLayeredOptions.configureRoot(root, layoutDirection, preferences);
 
         Map<String, LayoutNode> requestNodes = requestNodesById(request);
         List<LayoutEdge> requestEdges = list(request.edges());
@@ -195,19 +164,13 @@ final class ElkLayoutEngine {
 
     private static LayoutResult layoutGrouped(LayoutRequest request) {
         LayoutPreferences preferences = request.layoutPreferences();
-        Direction rootDirection = preferredDirection(preferences);
+        Direction rootDirection = ElkLayeredOptions.preferredDirection(preferences);
         List<Diagnostic> warnings = new ArrayList<>();
         Map<String, LayoutNode> requestNodes = requestNodesById(request);
         Map<String, String> ownerByNode = ownerByNode(request);
         List<LayoutEdge> requestEdges = list(request.edges());
         ElkNode root = ElkGraphUtil.createGraph();
-        configureLayeredRoot(root, rootDirection, preferences, false);
-        root.setProperty(CoreOptions.HIERARCHY_HANDLING, HierarchyHandling.INCLUDE_CHILDREN);
-        root.setProperty(CoreOptions.ASPECT_RATIO, 2.2);
-        if (groupedWrappingEnabled(preferences)) {
-            root.setProperty(LayeredOptions.WRAPPING_STRATEGY, WrappingStrategy.MULTI_EDGE);
-        }
-        root.setProperty(LayeredOptions.FEEDBACK_EDGES, true);
+        ElkLayeredOptions.configureGroupedRoot(root, rootDirection, preferences);
 
         Map<String, ElkNode> elkGroups = new HashMap<>();
         Map<String, Direction> groupDirectionById = new HashMap<>();
@@ -232,9 +195,7 @@ final class ElkLayoutEngine {
             elkGroup.setIdentifier(group.id());
             ElkGraphUtil.createLabel(elkGroup).setText(group.label());
             Direction groupDirection = internalDirection(members, internalEdges);
-            configureLayeredRoot(elkGroup, groupDirection, preferences, false);
-            elkGroup.setProperty(CoreOptions.HIERARCHY_HANDLING, HierarchyHandling.INCLUDE_CHILDREN);
-            elkGroup.setProperty(CoreOptions.PADDING, new ElkPadding(groupPadding(preferences)));
+            ElkLayeredOptions.configureGroup(elkGroup, groupDirection, preferences);
             elkGroups.put(group.id(), elkGroup);
             groupDirectionById.put(group.id(), groupDirection);
         }
@@ -363,124 +324,6 @@ final class ElkLayoutEngine {
             edges,
             groups,
             warnings);
-    }
-
-    private static void configureLayeredRoot(
-        ElkNode root,
-        Direction direction,
-        LayoutPreferences preferences) {
-        configureLayeredRoot(root, direction, preferences, true);
-    }
-
-    private static void configureLayeredRoot(
-        ElkNode root,
-        Direction direction,
-        LayoutPreferences preferences,
-        boolean preserveModelOrder) {
-        double nodeSpacing = switch (density(preferences)) {
-            case READABLE -> READABLE_NODE_SPACING;
-            case SPACIOUS -> SPACIOUS_NODE_SPACING;
-            default -> NODE_SPACING;
-        };
-        double edgeNodeSpacing = switch (density(preferences)) {
-            case READABLE -> READABLE_EDGE_NODE_SPACING;
-            case SPACIOUS -> SPACIOUS_EDGE_NODE_SPACING;
-            default -> EDGE_NODE_SPACING;
-        };
-        double edgeEdgeSpacing = switch (density(preferences)) {
-            case READABLE -> READABLE_EDGE_EDGE_SPACING;
-            case SPACIOUS -> SPACIOUS_EDGE_EDGE_SPACING;
-            default -> EDGE_EDGE_SPACING;
-        };
-        double portPortSpacing = portPortSpacing(preferences);
-
-        root.setProperty(CoreOptions.ALGORITHM, LAYERED_ALGORITHM);
-        root.setProperty(CoreOptions.DIRECTION, direction);
-        root.setProperty(CoreOptions.EDGE_ROUTING, EdgeRouting.ORTHOGONAL);
-        root.setProperty(CoreOptions.SPACING_NODE_NODE, nodeSpacing);
-        root.setProperty(CoreOptions.SPACING_EDGE_NODE, edgeNodeSpacing);
-        root.setProperty(CoreOptions.SPACING_EDGE_EDGE, edgeEdgeSpacing);
-        root.setProperty(CoreOptions.SPACING_PORT_PORT, portPortSpacing);
-        root.setProperty(CoreOptions.SPACING_PORTS_SURROUNDING, new ElkMargin(PORT_SURROUNDING_SPACING));
-        root.setProperty(LayeredOptions.SPACING_EDGE_EDGE, edgeEdgeSpacing);
-        root.setProperty(LayeredOptions.SPACING_EDGE_NODE, edgeNodeSpacing);
-        root.setProperty(LayeredOptions.SPACING_PORT_PORT, portPortSpacing);
-        root.setProperty(LayeredOptions.SPACING_PORTS_SURROUNDING, new ElkMargin(PORT_SURROUNDING_SPACING));
-        root.setProperty(LayeredOptions.SPACING_NODE_NODE_BETWEEN_LAYERS, nodeSpacing);
-        root.setProperty(LayeredOptions.SPACING_EDGE_NODE_BETWEEN_LAYERS, edgeNodeSpacing);
-        root.setProperty(LayeredOptions.SPACING_EDGE_EDGE_BETWEEN_LAYERS, edgeEdgeSpacing);
-        root.setProperty(LayeredOptions.PORT_SORTING_STRATEGY, PortSortingStrategy.INPUT_ORDER);
-        if (preserveModelOrder) {
-            root.setProperty(LayeredOptions.CONSIDER_MODEL_ORDER_STRATEGY, OrderingStrategy.PREFER_EDGES);
-            root.setProperty(LayeredOptions.CONSIDER_MODEL_ORDER_PORT_MODEL_ORDER, true);
-        }
-        root.setProperty(LayeredOptions.NODE_PLACEMENT_STRATEGY, NodePlacementStrategy.BRANDES_KOEPF);
-        root.setProperty(
-            LayeredOptions.NODE_PLACEMENT_BK_EDGE_STRAIGHTENING,
-            EdgeStraighteningStrategy.IMPROVE_STRAIGHTNESS);
-        root.setProperty(LayeredOptions.UNNECESSARY_BENDPOINTS, true);
-        boolean mergeEdges = endpointMergingEnabled(preferences);
-        root.setProperty(LayeredOptions.MERGE_EDGES, mergeEdges);
-        root.setProperty(LayeredOptions.MERGE_HIERARCHY_EDGES, mergeEdges);
-    }
-
-    static ElkNode configuredLayeredRoot(
-        Direction direction,
-        LayoutPreferences preferences) {
-        ElkNode root = ElkGraphUtil.createGraph();
-        configureLayeredRoot(root, direction, preferences);
-        return root;
-    }
-
-    private static LayoutDensity density(LayoutPreferences preferences) {
-        return preferences == null || preferences.density() == null
-            ? LayoutDensity.COMPACT
-            : preferences.density();
-    }
-
-    private static double portPortSpacing(LayoutPreferences preferences) {
-        return switch (density(preferences)) {
-            case READABLE -> READABLE_PORT_PORT_SPACING;
-            case SPACIOUS -> SPACIOUS_PORT_PORT_SPACING;
-            default -> PORT_PORT_SPACING;
-        };
-    }
-
-    private static double groupPadding(LayoutPreferences preferences) {
-        return switch (density(preferences)) {
-            case READABLE -> READABLE_GROUP_PADDING;
-            case SPACIOUS -> SPACIOUS_GROUP_PADDING;
-            default -> GROUP_PADDING;
-        };
-    }
-
-    private static boolean groupedWrappingEnabled(LayoutPreferences preferences) {
-        return preferences != null && preferences.wrapping() == LayoutWrapping.MULTI_EDGE;
-    }
-
-    private static LayoutEndpointMerging endpointMerging(LayoutPreferences preferences) {
-        if (preferences == null
-            || preferences.routing() == null
-            || preferences.routing().endpointMerging() == null) {
-            return LayoutEndpointMerging.AUTO;
-        }
-        return preferences.routing().endpointMerging();
-    }
-
-    private static boolean endpointMergingEnabled(LayoutPreferences preferences) {
-        return endpointMerging(preferences) != LayoutEndpointMerging.OFF;
-    }
-
-    private static Direction preferredDirection(LayoutPreferences preferences) {
-        if (preferences == null || preferences.direction() == null) {
-            return Direction.RIGHT;
-        }
-        return switch (preferences.direction()) {
-            case LEFT -> Direction.LEFT;
-            case DOWN -> Direction.DOWN;
-            case UP -> Direction.UP;
-            default -> Direction.RIGHT;
-        };
     }
 
     private static Map<String, EdgeEndpointMerge> emptyEndpointMerges(
@@ -740,11 +583,11 @@ final class ElkLayoutEngine {
         List<LayoutEdge> edges,
         Map<String, LayoutNode> nodes,
         LayoutPreferences preferences) {
-        if (!endpointMergingEnabled(preferences)) {
+        if (!ElkLayeredOptions.endpointMergingEnabled(preferences)) {
             return emptyEndpointMerges(edges);
         }
 
-        Direction direction = preferredDirection(preferences);
+        Direction direction = ElkLayeredOptions.preferredDirection(preferences);
         Map<EdgeEndpointKey, Integer> endpointCounts = new HashMap<>();
         for (LayoutEdge edge : edges) {
             String relationshipType = relationshipType(edge);
@@ -791,7 +634,7 @@ final class ElkLayoutEngine {
         Map<String, Integer> groupOrderById,
         Direction rootDirection,
         LayoutPreferences preferences) {
-        if (!endpointMergingEnabled(preferences)) {
+        if (!ElkLayeredOptions.endpointMergingEnabled(preferences)) {
             return emptyEndpointMerges(edges);
         }
 
@@ -1048,7 +891,7 @@ final class ElkLayoutEngine {
         double width = positiveOrDefault(node.widthHint(), DEFAULT_WIDTH);
         double height = positiveOrDefault(node.heightHint(), DEFAULT_HEIGHT);
         if (portCounts != null) {
-            double portSpacing = portPortSpacing(preferences);
+            double portSpacing = ElkLayeredOptions.portPortSpacing(preferences);
             width = Math.max(width, requiredPortSideLength(width, maxPortCount(
                 portCounts,
                 PortSide.NORTH,
@@ -1308,10 +1151,10 @@ final class ElkLayoutEngine {
                 semanticBackedSourceId(group.provenance(), group.id()),
                 group.id(),
                 group.provenance(),
-                minX - GROUP_PADDING,
-                minY - GROUP_PADDING,
-                (maxX - minX) + (GROUP_PADDING * 2.0),
-                (maxY - minY) + (GROUP_PADDING * 2.0),
+                minX - ElkLayeredOptions.DEFAULT_GROUP_PADDING,
+                minY - ElkLayeredOptions.DEFAULT_GROUP_PADDING,
+                (maxX - minX) + (ElkLayeredOptions.DEFAULT_GROUP_PADDING * 2.0),
+                (maxY - minY) + (ElkLayeredOptions.DEFAULT_GROUP_PADDING * 2.0),
                 memberIds,
                 group.label()));
         }

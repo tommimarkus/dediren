@@ -1,0 +1,302 @@
+package dev.dediren.plugins.svgrender;
+
+import dev.dediren.archimate.Archimate;
+import dev.dediren.archimate.ArchimateTypeValidationException;
+import dev.dediren.contracts.layout.LaidOutEdge;
+import dev.dediren.contracts.layout.LayoutResult;
+import dev.dediren.contracts.render.RenderMetadata;
+import dev.dediren.contracts.render.RenderMetadataSelector;
+import dev.dediren.contracts.render.RenderPolicy;
+import dev.dediren.contracts.render.SvgBackgroundStyle;
+import dev.dediren.contracts.render.SvgEdgeStyle;
+import dev.dediren.contracts.render.SvgFontStyle;
+import dev.dediren.contracts.render.SvgGroupStyle;
+import dev.dediren.contracts.render.SvgNodeStyle;
+import dev.dediren.contracts.render.SvgStylePolicy;
+import dev.dediren.uml.Uml;
+import dev.dediren.uml.UmlValidationException;
+import java.util.Map;
+
+final class RenderInputValidator {
+    private RenderInputValidator() {
+    }
+
+    static void validate(LayoutResult layout, RenderMetadata metadata, RenderPolicy policy)
+            throws PolicyValidationException, RenderMetadataUsageException,
+            ArchimateTypeValidationException, UmlValidationException {
+        validateRenderPolicy(policy);
+        validateRenderMetadataUsage(policy, metadata);
+        validateArchimatePolicyTypes(policy);
+        validateArchimateRenderMetadata(layout, metadata);
+        validateUmlPolicyTypes(policy);
+        validateUmlRenderMetadata(layout, metadata);
+    }
+
+    private static void validateRenderMetadataUsage(RenderPolicy policy, RenderMetadata metadata)
+            throws RenderMetadataUsageException {
+        SvgStylePolicy style = policy.style();
+        boolean usesTypeOverrides = style != null
+                && (!style.nodeTypeOverrides().isEmpty()
+                || !style.edgeTypeOverrides().isEmpty()
+                || !style.groupTypeOverrides().isEmpty());
+        if (!usesTypeOverrides) {
+            return;
+        }
+        if (policy.semanticProfile() == null) {
+            throw new RenderMetadataUsageException(
+                    "DEDIREN_RENDER_METADATA_PROFILE_REQUIRED",
+                    "semantic_profile",
+                    "type-aware SVG render policies must declare semantic_profile");
+        }
+        if (metadata == null) {
+            throw new RenderMetadataUsageException(
+                    "DEDIREN_RENDER_METADATA_REQUIRED",
+                    "render_metadata",
+                    "type-aware SVG render policy requires render metadata");
+        }
+        if (!policy.semanticProfile().equals(metadata.semanticProfile())) {
+            throw new RenderMetadataUsageException(
+                    "DEDIREN_RENDER_METADATA_PROFILE_MISMATCH",
+                    "render_metadata.semantic_profile",
+                    "render metadata profile " + metadata.semanticProfile()
+                            + " does not match policy profile " + policy.semanticProfile());
+        }
+    }
+
+    private static void validateArchimatePolicyTypes(RenderPolicy policy)
+            throws ArchimateTypeValidationException {
+        if (!"archimate".equals(policy.semanticProfile()) || policy.style() == null) {
+            return;
+        }
+        for (String type : policy.style().nodeTypeOverrides().keySet()) {
+            Archimate.validateElementType(type, "policy.style.node_type_overrides." + type);
+        }
+        for (String type : policy.style().edgeTypeOverrides().keySet()) {
+            Archimate.validateRelationshipType(type, "policy.style.edge_type_overrides." + type);
+        }
+        for (String type : policy.style().groupTypeOverrides().keySet()) {
+            Archimate.validateElementType(type, "policy.style.group_type_overrides." + type);
+        }
+    }
+
+    private static void validateArchimateRenderMetadata(LayoutResult layout, RenderMetadata metadata)
+            throws ArchimateTypeValidationException {
+        if (metadata == null || !"archimate".equals(metadata.semanticProfile())) {
+            return;
+        }
+        for (Map.Entry<String, RenderMetadataSelector> entry : metadata.nodes().entrySet()) {
+            Archimate.validateElementType(entry.getValue().type(), "render_metadata.nodes." + entry.getKey() + ".type");
+        }
+        for (Map.Entry<String, RenderMetadataSelector> entry : metadata.edges().entrySet()) {
+            Archimate.validateRelationshipType(entry.getValue().type(), "render_metadata.edges." + entry.getKey() + ".type");
+        }
+        for (Map.Entry<String, RenderMetadataSelector> entry : metadata.groups().entrySet()) {
+            Archimate.validateElementType(entry.getValue().type(), "render_metadata.groups." + entry.getKey() + ".type");
+        }
+        for (LaidOutEdge edge : layout.edges()) {
+            RenderMetadataSelector edgeSelector = metadata.edges().get(edge.id());
+            RenderMetadataSelector sourceSelector = metadata.nodes().get(edge.source());
+            RenderMetadataSelector targetSelector = metadata.nodes().get(edge.target());
+            if (edgeSelector != null && sourceSelector != null && targetSelector != null) {
+                Archimate.validateRelationshipEndpointTypes(
+                        edgeSelector.type(),
+                        sourceSelector.type(),
+                        targetSelector.type(),
+                        "render_metadata.edges." + edge.id());
+            }
+        }
+    }
+
+    private static void validateUmlPolicyTypes(RenderPolicy policy) throws UmlValidationException {
+        if (!"uml".equals(policy.semanticProfile()) || policy.style() == null) {
+            return;
+        }
+        for (String type : policy.style().nodeTypeOverrides().keySet()) {
+            Uml.validateElementType(type, "policy.style.node_type_overrides." + type);
+        }
+        for (String type : policy.style().edgeTypeOverrides().keySet()) {
+            Uml.validateRelationshipType(type, "policy.style.edge_type_overrides." + type);
+        }
+        for (String type : policy.style().groupTypeOverrides().keySet()) {
+            Uml.validateElementType(type, "policy.style.group_type_overrides." + type);
+        }
+    }
+
+    private static void validateUmlRenderMetadata(LayoutResult layout, RenderMetadata metadata)
+            throws UmlValidationException {
+        if (metadata == null || !"uml".equals(metadata.semanticProfile())) {
+            return;
+        }
+        for (Map.Entry<String, RenderMetadataSelector> entry : metadata.nodes().entrySet()) {
+            Uml.validateElementType(entry.getValue().type(), "render_metadata.nodes." + entry.getKey() + ".type");
+        }
+        for (Map.Entry<String, RenderMetadataSelector> entry : metadata.edges().entrySet()) {
+            Uml.validateRelationshipType(entry.getValue().type(), "render_metadata.edges." + entry.getKey() + ".type");
+        }
+        for (Map.Entry<String, RenderMetadataSelector> entry : metadata.groups().entrySet()) {
+            Uml.validateElementType(entry.getValue().type(), "render_metadata.groups." + entry.getKey() + ".type");
+        }
+        for (LaidOutEdge edge : layout.edges()) {
+            RenderMetadataSelector edgeSelector = metadata.edges().get(edge.id());
+            RenderMetadataSelector sourceSelector = metadata.nodes().get(edge.source());
+            RenderMetadataSelector targetSelector = metadata.nodes().get(edge.target());
+            if (edgeSelector != null && sourceSelector != null && targetSelector != null) {
+                Uml.validateRelationshipEndpointTypes(
+                        edgeSelector.type(),
+                        sourceSelector.type(),
+                        targetSelector.type(),
+                        "render_metadata.edges." + edge.id());
+            }
+        }
+    }
+
+    private static void validateRenderPolicy(RenderPolicy policy) throws PolicyValidationException {
+        SvgStylePolicy style = policy.style();
+        if (style == null) {
+            return;
+        }
+        validateBackgroundStyle(style.background(), "style.background");
+        validateFontStyle(style.font(), "style.font");
+        validateNodeStyle(style.node(), "style.node");
+        validateEdgeStyle(style.edge(), "style.edge");
+        validateGroupStyle(style.group(), "style.group");
+        for (Map.Entry<String, SvgNodeStyle> entry : style.nodeTypeOverrides().entrySet()) {
+            validateNodeStyle(entry.getValue(), "style.node_type_overrides." + entry.getKey());
+        }
+        for (Map.Entry<String, SvgEdgeStyle> entry : style.edgeTypeOverrides().entrySet()) {
+            validateEdgeStyle(entry.getValue(), "style.edge_type_overrides." + entry.getKey());
+        }
+        for (Map.Entry<String, SvgGroupStyle> entry : style.groupTypeOverrides().entrySet()) {
+            validateGroupStyle(entry.getValue(), "style.group_type_overrides." + entry.getKey());
+        }
+        for (Map.Entry<String, SvgNodeStyle> entry : style.nodeOverrides().entrySet()) {
+            validateNodeStyle(entry.getValue(), "style.node_overrides." + entry.getKey());
+        }
+        for (Map.Entry<String, SvgEdgeStyle> entry : style.edgeOverrides().entrySet()) {
+            validateEdgeStyle(entry.getValue(), "style.edge_overrides." + entry.getKey());
+        }
+        for (Map.Entry<String, SvgGroupStyle> entry : style.groupOverrides().entrySet()) {
+            validateGroupStyle(entry.getValue(), "style.group_overrides." + entry.getKey());
+        }
+    }
+
+    private static void validateBackgroundStyle(SvgBackgroundStyle style, String path)
+            throws PolicyValidationException {
+        if (style != null) {
+            validateColor(style.fill(), path + ".fill");
+        }
+    }
+
+    private static void validateFontStyle(SvgFontStyle style, String path) throws PolicyValidationException {
+        if (style == null) {
+            return;
+        }
+        if (style.family() != null) {
+            int length = style.family().codePointCount(0, style.family().length());
+            if (length < 1 || length > 120) {
+                throw new PolicyValidationException(path + ".family", "SVG render policy " + path
+                        + ".family length is outside the allowed range");
+            }
+        }
+        validateNumber(style.size(), path + ".size", Bound.EXCLUSIVE_MIN, 0.0, 96.0);
+    }
+
+    private static void validateNodeStyle(SvgNodeStyle style, String path) throws PolicyValidationException {
+        if (style == null) {
+            return;
+        }
+        validateColor(style.fill(), path + ".fill");
+        validateColor(style.stroke(), path + ".stroke");
+        validateNumber(style.strokeWidth(), path + ".stroke_width", Bound.MIN, 0.0, 24.0);
+        validateNumber(style.rx(), path + ".rx", Bound.MIN, 0.0, 80.0);
+        validateColor(style.labelFill(), path + ".label_fill");
+    }
+
+    private static void validateEdgeStyle(SvgEdgeStyle style, String path) throws PolicyValidationException {
+        if (style == null) {
+            return;
+        }
+        validateColor(style.stroke(), path + ".stroke");
+        validateNumber(style.strokeWidth(), path + ".stroke_width", Bound.MIN, 0.0, 24.0);
+        validateColor(style.labelFill(), path + ".label_fill");
+    }
+
+    private static void validateGroupStyle(SvgGroupStyle style, String path) throws PolicyValidationException {
+        if (style == null) {
+            return;
+        }
+        validateColor(style.fill(), path + ".fill");
+        validateColor(style.stroke(), path + ".stroke");
+        validateNumber(style.strokeWidth(), path + ".stroke_width", Bound.MIN, 0.0, 24.0);
+        validateNumber(style.rx(), path + ".rx", Bound.MIN, 0.0, 80.0);
+        validateColor(style.labelFill(), path + ".label_fill");
+        validateNumber(style.labelSize(), path + ".label_size", Bound.EXCLUSIVE_MIN, 0.0, 96.0);
+    }
+
+    private static void validateColor(String value, String path) throws PolicyValidationException {
+        if (value == null) {
+            return;
+        }
+        boolean valid = value.length() == 7 && value.charAt(0) == '#'
+                && value.substring(1).chars().allMatch(character ->
+                Character.digit(character, 16) >= 0);
+        if (!valid) {
+            throw new PolicyValidationException(
+                    path,
+                    "SVG render policy " + path + " must be a #RRGGBB hex color");
+        }
+    }
+
+    private static void validateNumber(
+            Double value,
+            String path,
+            Bound lowerBoundKind,
+            double minimum,
+            double maximum) throws PolicyValidationException {
+        if (value == null) {
+            return;
+        }
+        boolean lowerOk = lowerBoundKind == Bound.MIN ? value >= minimum : value > minimum;
+        if (!Double.isFinite(value) || !lowerOk || value > maximum) {
+            throw new PolicyValidationException(path, "SVG render policy " + path
+                    + " is outside the allowed range");
+        }
+    }
+
+    private enum Bound {
+        MIN,
+        EXCLUSIVE_MIN
+    }
+
+    static final class PolicyValidationException extends Exception {
+        private final String path;
+
+        private PolicyValidationException(String path, String message) {
+            super(message);
+            this.path = path;
+        }
+
+        String path() {
+            return path;
+        }
+    }
+
+    static final class RenderMetadataUsageException extends Exception {
+        private final String code;
+        private final String path;
+
+        private RenderMetadataUsageException(String code, String path, String message) {
+            super(message);
+            this.code = code;
+            this.path = path;
+        }
+
+        String code() {
+            return code;
+        }
+
+        String path() {
+            return path;
+        }
+    }
+}

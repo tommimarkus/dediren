@@ -18,6 +18,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 public final class DistTool {
@@ -38,12 +39,6 @@ public final class DistTool {
             "archimate-oef-export", "dediren-plugin-archimate-oef-export", "archimate-oef"),
         new Launcher("modules/plugins/uml-xmi-export/build/install/uml-xmi-export", "uml-xmi-export",
             "dediren-plugin-uml-xmi-export", "uml-xmi"));
-    private static final List<String> BUNDLE_PLUGINS = List.of(
-        "generic-graph",
-        "elk-layout",
-        "svg-render",
-        "archimate-oef",
-        "uml-xmi");
     private static final List<String> CLEAN_ENV = List.of(
         "DEDIREN_PLUGIN_DIRS",
         "DEDIREN_PLUGIN_GENERIC_GRAPH",
@@ -240,8 +235,28 @@ public final class DistTool {
         }
         Path targetBin = bundle.resolve("bin").resolve(launcher.bundleScript());
         Files.copy(sourceBin, targetBin, StandardCopyOption.REPLACE_EXISTING);
+        Files.writeString(
+            targetBin,
+            withBundleRootExport(Files.readString(targetBin, StandardCharsets.UTF_8)),
+            StandardCharsets.UTF_8);
         makeExecutable(targetBin);
         copyDirectoryContents(install.resolve("lib"), bundle.resolve("lib"));
+    }
+
+    static String withBundleRootExport(String script) {
+        if (script.contains("DEDIREN_BUNDLE_ROOT=")) {
+            return script;
+        }
+        int appHome = script.indexOf("APP_HOME=$( cd -P ");
+        if (appHome < 0) {
+            throw new IllegalArgumentException("launcher script does not contain the APP_HOME assignment");
+        }
+        int lineEnd = script.indexOf('\n', appHome);
+        int insertionPoint = lineEnd < 0 ? script.length() : lineEnd + 1;
+        String lineSeparator = script.contains("\r\n") ? "\r\n" : "\n";
+        String export = "DEDIREN_BUNDLE_ROOT=\"${DEDIREN_BUNDLE_ROOT:-$APP_HOME}\"" + lineSeparator
+            + "export DEDIREN_BUNDLE_ROOT" + lineSeparator;
+        return script.substring(0, insertionPoint) + export + script.substring(insertionPoint);
     }
 
     private static void copyManifestFiles(Path source, Path target) throws IOException {
@@ -272,7 +287,7 @@ public final class DistTool {
 
     private static void writeBundleMetadata(Path bundle, String version, String target) throws IOException {
         List<Map<String, String>> plugins = new ArrayList<>();
-        for (String plugin : BUNDLE_PLUGINS) {
+        for (String plugin : bundledPluginIds()) {
             plugins.add(Map.of("id", plugin, "version", version));
         }
         Map<String, Object> metadata = new LinkedHashMap<>();
@@ -290,6 +305,13 @@ public final class DistTool {
             bundle.resolve("bundle.json"),
             JsonSupport.objectMapper().writerWithDefaultPrettyPrinter().writeValueAsString(metadata),
             StandardCharsets.UTF_8);
+    }
+
+    static List<String> bundledPluginIds() {
+        return LAUNCHERS.stream()
+            .map(Launcher::pluginId)
+            .filter(Objects::nonNull)
+            .toList();
     }
 
     private static String runBundleCommand(Path executable, Path bundle, List<String> args, Path stdin)

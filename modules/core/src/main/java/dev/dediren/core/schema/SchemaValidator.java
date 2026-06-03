@@ -1,4 +1,4 @@
-package dev.dediren.contracts.schema;
+package dev.dediren.core.schema;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.networknt.schema.JsonSchema;

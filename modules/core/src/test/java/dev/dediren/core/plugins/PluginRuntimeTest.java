@@ -168,6 +168,47 @@ class PluginRuntimeTest {
     }
 
     @Test
+    void bundledRegistryUsesExplicitBundleRootOutsideCurrentWorkingDirectory() throws Exception {
+        Path bundleRoot = temp.resolve("runtime-bundle");
+        Path schemas = bundleRoot.resolve("schemas");
+        Path plugins = bundleRoot.resolve("plugins");
+        Path bin = bundleRoot.resolve("bin");
+        Path outsideBundle = temp.resolve("outside-bundle");
+        Files.createDirectories(schemas);
+        Files.createDirectories(plugins);
+        Files.createDirectories(bin);
+        Files.createDirectories(outsideBundle);
+        writePermissiveSchemas(
+                schemas,
+                "model.schema.json",
+                "plugin-manifest.schema.json",
+                "runtime-capability.schema.json",
+                "envelope.schema.json",
+                "render-result.schema.json");
+        writeTestbedExecutable(bin.resolve("runtime-testbed"));
+        writeManifest(plugins, "runtime-testbed", "runtime-testbed", List.of("render"), List.of());
+        String originalUserDir = System.getProperty("user.dir");
+        String originalBundleRoot = System.getProperty("dediren.bundle.root");
+        System.setProperty("user.dir", outsideBundle.toString());
+        System.setProperty("dediren.bundle.root", bundleRoot.toString());
+        try {
+            PluginRunOutcome outcome = PluginRunner.runForCapabilityWithRegistry(
+                    PluginRegistry.bundled(),
+                    "runtime-testbed",
+                    "render",
+                    List.of("render"),
+                    "{}",
+                    PluginRunOptions.defaults());
+
+            assertThat(outcome.exitCode()).isZero();
+            assertThat(outcome.stdout()).contains("\"render_result_schema_version\"");
+        } finally {
+            restoreProperty("user.dir", originalUserDir);
+            restoreProperty("dediren.bundle.root", originalBundleRoot);
+        }
+    }
+
+    @Test
     void bundledRegistryResolvesDistributionExecutablesFromBundleBin() throws Exception {
         Path bundleRoot = temp.resolve("runtime-bundle");
         Path schemas = bundleRoot.resolve("schemas");
@@ -200,6 +241,14 @@ class PluginRuntimeTest {
             assertThat(outcome.stdout()).contains("\"render_result_schema_version\"");
         } finally {
             System.setProperty("user.dir", originalUserDir);
+        }
+    }
+
+    private static void restoreProperty(String name, String value) {
+        if (value == null) {
+            System.clearProperty(name);
+        } else {
+            System.setProperty(name, value);
         }
     }
 

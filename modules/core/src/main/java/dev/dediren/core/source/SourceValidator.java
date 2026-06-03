@@ -7,8 +7,9 @@ import dev.dediren.contracts.CommandEnvelope;
 import dev.dediren.contracts.ContractVersions;
 import dev.dediren.contracts.Diagnostic;
 import dev.dediren.contracts.DiagnosticSeverity;
+import dev.dediren.core.DedirenPaths;
+import dev.dediren.core.schema.SchemaValidator;
 import dev.dediren.contracts.json.JsonSupport;
-import dev.dediren.contracts.schema.SchemaValidator;
 import dev.dediren.contracts.source.PluginRequirement;
 import dev.dediren.contracts.source.SourceDocument;
 import dev.dediren.contracts.source.SourceNode;
@@ -109,7 +110,7 @@ public final class SourceValidator {
         } catch (IOException error) {
             throw new SourceDiagnosticsException(List.of(schemaError(error.getMessage())));
         }
-        var errors = SchemaValidator.fromRepositoryRoot(repositoryRoot())
+        var errors = SchemaValidator.fromRepositoryRoot(DedirenPaths.productRoot())
                 .validate("schemas/model.schema.json", value);
         if (!errors.isEmpty()) {
             throw new SourceDiagnosticsException(List.of(schemaError(errors.getFirst())));
@@ -217,17 +218,6 @@ public final class SourceValidator {
 
     private static Diagnostic error(String code, String message, String path) {
         return new Diagnostic(code, DiagnosticSeverity.ERROR, message, path);
-    }
-
-    private static Path repositoryRoot() {
-        Path current = Path.of(System.getProperty("user.dir")).toAbsolutePath();
-        while (current != null) {
-            if (Files.exists(current.resolve("schemas/model.schema.json"))) {
-                return current;
-            }
-            current = current.getParent();
-        }
-        throw new IllegalStateException("Could not locate repository root from user.dir");
     }
 
     public static final class SourceDiagnosticsException extends Exception {

@@ -37,8 +37,8 @@ For a token-efficient authoring guide, see `docs/agent-usage.md`.
 `distBuild` creates an agent-ready archive under `dist/`:
 
 ```text
-dist/dediren-agent-bundle-0.18.0-x86_64-unknown-linux-gnu/
-dist/dediren-agent-bundle-0.18.0-x86_64-unknown-linux-gnu.tar.gz
+dist/dediren-agent-bundle-0.18.1-x86_64-unknown-linux-gnu/
+dist/dediren-agent-bundle-0.18.1-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Set a supported target with Gradle project property `target` when needed:
@@ -60,7 +60,7 @@ target must match the build host.
 ## Bundle Layout
 
 ```text
-dediren-agent-bundle-0.18.0-x86_64-unknown-linux-gnu/
+dediren-agent-bundle-0.18.1-x86_64-unknown-linux-gnu/
   bin/
     dediren
     dediren-plugin-generic-graph
@@ -83,12 +83,16 @@ resolve to bundled launchers under `bin/`. Project plugin directories and
 `DEDIREN_PLUGIN_DIRS` remain explicit later lookup sources; plugins are not
 discovered implicitly from `PATH`.
 
+Bundle launchers set `DEDIREN_BUNDLE_ROOT` from their installation root so
+commands can locate bundled `schemas/`, `plugins/`, and `bin/` regardless of
+the caller's current working directory.
+
 ## First Run
 
 From an unpacked bundle:
 
 ```bash
-VERSION=0.18.0
+VERSION=0.18.1
 TARGET=x86_64-unknown-linux-gnu
 BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-${VERSION}-${TARGET}
 
@@ -167,9 +171,13 @@ use the same schema and are resolved relative to the entry file.
 
 ## Runtime Environment
 
-Plugin processes receive only environment variables listed in their manifests.
-Important explicit variables:
+Bundle launchers use `DEDIREN_BUNDLE_ROOT` for product-root discovery. Plugin
+child processes launched by the core receive only environment variables listed
+in their manifests. Important explicit variables:
 
+- `DEDIREN_BUNDLE_ROOT`: explicit bundle or repository root for schemas,
+  bundled plugin manifests, and bundled launchers. Packaged launchers set this
+  automatically; override it only for custom launchers or tests.
 - `DEDIREN_PLUGIN_DIRS`: additional manifest directories, separated with the
   platform path separator.
 - `DEDIREN_PLUGIN_<PLUGIN_ID>`: per-plugin executable override, for example

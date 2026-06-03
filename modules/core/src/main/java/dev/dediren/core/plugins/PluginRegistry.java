@@ -1,8 +1,9 @@
 package dev.dediren.core.plugins;
 
+import dev.dediren.core.DedirenPaths;
+import dev.dediren.core.schema.SchemaValidator;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.contracts.plugin.PluginManifest;
-import dev.dediren.contracts.schema.SchemaValidator;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -21,7 +22,7 @@ public final class PluginRegistry {
     }
 
     public static PluginRegistry bundled() {
-        Path root = CorePaths.repositoryRoot();
+        Path root = DedirenPaths.productRoot();
         var dirs = new ArrayList<Path>();
         dirs.add(root.resolve("plugins"));
         dirs.add(root.resolve("fixtures/plugins"));
@@ -45,7 +46,7 @@ public final class PluginRegistry {
             }
             try {
                 var value = JsonSupport.objectMapper().readTree(path.toFile());
-                var errors = SchemaValidator.fromRepositoryRoot(CorePaths.repositoryRoot())
+                var errors = SchemaValidator.fromRepositoryRoot(DedirenPaths.productRoot())
                         .validate("schemas/plugin-manifest.schema.json", value);
                 if (!errors.isEmpty()) {
                     throw PluginExecutionException.plugin(

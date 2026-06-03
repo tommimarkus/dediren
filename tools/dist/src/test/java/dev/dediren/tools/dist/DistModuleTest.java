@@ -9,4 +9,32 @@ class DistModuleTest {
     void moduleLoads() {
         assertThat(DistModule.moduleName()).isEqualTo("dist");
     }
+
+    @Test
+    void launcherScriptExportsBundleRootFromAppHome() {
+        String script = """
+            #!/bin/sh
+            APP_HOME=$( cd -P "${APP_HOME:-./}.." > /dev/null && printf '%s\\n' "$PWD" ) || exit
+
+            DEFAULT_JVM_OPTS='"-Ddediren.version=0.18.1"'
+            """;
+
+        String rewritten = DistTool.withBundleRootExport(script);
+
+        assertThat(rewritten)
+            .contains("DEDIREN_BUNDLE_ROOT=\"${DEDIREN_BUNDLE_ROOT:-$APP_HOME}\"")
+            .contains("export DEDIREN_BUNDLE_ROOT")
+            .containsSubsequence("APP_HOME=$(", "DEDIREN_BUNDLE_ROOT=");
+    }
+
+    @Test
+    void bundledPluginIdsAreDerivedFromPluginLaunchers() {
+        assertThat(DistTool.bundledPluginIds())
+            .containsExactly(
+                "generic-graph",
+                "elk-layout",
+                "svg-render",
+                "archimate-oef",
+                "uml-xmi");
+    }
 }

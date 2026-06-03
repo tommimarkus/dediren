@@ -38,7 +38,7 @@ when redistributing a Dediren archive.
 {
   "model_schema_version": "model.schema.v1",
   "required_plugins": [
-    { "id": "generic-graph", "version": "0.18.0" }
+    { "id": "generic-graph", "version": "0.18.1" }
   ],
   "nodes": [
     { "id": "client", "type": "generic.actor", "label": "Client", "properties": {} },
@@ -82,8 +82,8 @@ profile and use ArchiMate type names:
 ```json
 {
   "required_plugins": [
-    { "id": "generic-graph", "version": "0.18.0" },
-    { "id": "archimate-oef", "version": "0.18.0" }
+    { "id": "generic-graph", "version": "0.18.1" },
+    { "id": "archimate-oef", "version": "0.18.1" }
   ],
   "plugins": {
     "generic-graph": {
@@ -122,7 +122,7 @@ jq -r '.data.content' render-result.json > diagram.svg
 ## Runtime Probes
 
 ```bash
-VERSION=0.18.0
+VERSION=0.18.1
 TARGET=x86_64-unknown-linux-gnu
 BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-${VERSION}-${TARGET}
 
@@ -136,6 +136,8 @@ BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-${VERSION}-${TARGET}
 
 Capability output is raw JSON using `schemas/runtime-capability.schema.json`.
 Workflow commands return command envelopes using `schemas/envelope.schema.json`.
+Packaged launchers set `DEDIREN_BUNDLE_ROOT` automatically so commands can run
+from any current working directory.
 
 ## Bundle Smoke Workflow
 
@@ -216,9 +218,13 @@ stable cache location is desired.
 
 ## Plugin Environment
 
-Plugin processes receive only manifest-listed environment variables. Important
-explicit variables:
+Bundle launchers use `DEDIREN_BUNDLE_ROOT` for product-root discovery. Plugin
+child processes launched by the core receive only manifest-listed environment
+variables. Important explicit variables:
 
+- `DEDIREN_BUNDLE_ROOT`: explicit bundle or repository root for bundled
+  schemas, plugin manifests, and launchers. Packaged launchers set this
+  automatically.
 - `DEDIREN_PLUGIN_DIRS`: additional manifest directories.
 - `DEDIREN_PLUGIN_<PLUGIN_ID>`: per-plugin executable override.
 - `DEDIREN_OEF_SCHEMA_DIR`: local OEF schema directory.
