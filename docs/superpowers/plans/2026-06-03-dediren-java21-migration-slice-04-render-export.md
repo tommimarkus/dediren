@@ -44,13 +44,34 @@
   - Add tests equivalent to every Rust SVG test module: `archimate_groups`, `archimate_nodes`, `archimate_relationships`, `edge_labels`, `render_contracts`, `uml_activity`, `uml_nodes`, `uml_relationships`, and `viewbox_routes`.
   - Expected: generated SVG is stable enough for current tests and remains valid XML.
 
-- [ ] **Task 3: Port ArchiMate OEF export**
+- [x] **Task 3: Port ArchiMate OEF export**
   - Model: `gpt-5-codex`
   - Generate ArchiMate 3.2 OEF XML from source, policy, and generated layout results.
   - Preserve geometry rounding, semantic grouping behavior, junction handling, endpoint validation, and official schema validation.
   - Add tests equivalent to `oef_export_plugin.rs`.
   - Run: `./gradlew :modules:plugins:archimate-oef-export:test`
   - Expected: pass.
+
+### 2026-06-03 OEF Checkpoint
+
+Implemented Java OEF export in `modules/plugins/archimate-oef-export`:
+
+- `capabilities` with official OEF schema validation runtime metadata.
+- `export` command envelope output for ArchiMate OEF XML.
+- ArchiMate type, relationship endpoint, junction, and group-source validation.
+- Generated identifiers, geometry rounding, semantic grouping view nodes, relationship connector/junction nodes, and containment-through-junction handling.
+- Offline Java tests with injected minimal OEF XSDs plus xmllint validation.
+- Schema-cache helper wiring for `DEDIREN_OEF_SCHEMA_DIR`, `DEDIREN_SCHEMA_CACHE_DIR`, and curl-backed runtime downloads.
+
+Verification:
+
+```bash
+GRADLE_USER_HOME=.cache/gradle/user-home ./gradlew :modules:plugins:archimate-oef-export:test
+cargo test -p dediren-plugin-archimate-oef-export --test oef_export_plugin --locked
+git diff --check
+```
+
+Result: all passed.
 
 - [ ] **Task 4: Port UML XMI export**
   - Model: `gpt-5-codex`
