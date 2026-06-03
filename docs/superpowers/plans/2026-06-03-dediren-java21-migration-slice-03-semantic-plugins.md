@@ -96,3 +96,50 @@
   - Run: `cargo test -p dediren-plugin-generic-graph --test generic_graph_plugin --locked`
   - Run: `git diff --check`
   - Commit message: `feat: port semantic plugins to java`
+
+## 2026-06-03 Checkpoint: ArchiMate, UML, Generic Graph
+
+Implemented in Java so far:
+
+- `modules/archimate`
+  - Supported ArchiMate element/relationship vocabulary.
+  - Curated relationship endpoint rejection policy.
+  - Relationship connector and junction validation rules.
+- `modules/uml`
+  - UML structural/activity vocabulary.
+  - Relationship endpoint validation.
+  - Multiplicity validation.
+  - UML view-kind restrictions.
+- `modules/plugins/generic-graph`
+  - `capabilities`.
+  - `validate --profile archimate|uml` semantic validation.
+  - `project --target layout-request`.
+  - `project --target render-metadata`.
+  - Duplicate view/group diagnostics.
+  - ArchiMate/UML layout size hints and render metadata mapping.
+
+Rust-to-Java successor mapping for this checkpoint:
+
+| Rust source/test | Java successor |
+| --- | --- |
+| `crates/dediren-archimate/src/lib.rs`, `src/relationship_rules.rs`, `tests/relationship_rules.rs` | `modules/archimate/src/main/java/dev/dediren/archimate/*`, `ArchimateRelationshipRulesTest` |
+| `crates/dediren-uml/src/lib.rs`, `tests/uml_validation.rs` | `modules/uml/src/main/java/dev/dediren/uml/*`, `UmlValidationTest` |
+| `crates/dediren-plugin-generic-graph/src/main.rs`, `tests/generic_graph_plugin.rs` | `modules/plugins/generic-graph/src/main/java/dev/dediren/plugins/genericgraph/Main.java`, `GenericGraphPluginTest` |
+
+Verification evidence:
+
+```bash
+GRADLE_USER_HOME=.cache/gradle/user-home ./gradlew :modules:archimate:test :modules:uml:test :modules:plugins:generic-graph:test
+cargo test -p dediren-archimate --locked
+cargo test -p dediren-uml --locked
+cargo test -p dediren-plugin-generic-graph --test generic_graph_plugin --locked
+```
+
+Result: all passed.
+
+Open before closing Slice 03:
+
+- Port the schema-cache plugin behavior and tests.
+- Expand `GenericGraphPluginTest` to cover the full Rust fixture matrix, including rich groups, layout preferences, junction chains, UML structural sizing, and negative projection paths.
+- Add schema validation assertions for generated layout-request and render-metadata payloads.
+- Run architecture/test-quality audits after schema-cache is ported.
