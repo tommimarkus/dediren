@@ -206,9 +206,8 @@ handoff, then rerun affected checks.
   stage only intentional changes.
 - Do not use `git add -A` when unrelated files exist. Prefer explicit paths.
 - Do not commit ignored/generated outputs by default. In this repo that
-  includes `dist/`, `target/`, `build/`, `.gradle/`, `.cache/gradle/`,
-  `.cache/maven/`, downloaded `.mvn/wrapper/maven-wrapper.jar`, and generated
-  `*.svg` files outside `.github/`.
+  includes `dist/`, `target/`, `.cache/`, downloaded `.mvn/wrapper/maven-wrapper.jar`,
+  and generated `*.svg` files.
 - If a task creates render/test artifacts, report their paths instead of
   staging them unless the user asked for tracked examples.
 - Keep commits scoped to the requested change and mention any skipped

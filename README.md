@@ -36,9 +36,12 @@ For a token-efficient authoring guide, see `docs/agent-usage.md`.
 ./mvnw -pl tools/dist -am verify -Pdist-smoke
 ```
 
-Set `NVD_API_KEY` before running the `security-sca` profile so OWASP
-Dependency-Check uses the authenticated NVD API path. CI and release workflows
-read the same value from the GitHub Actions `NVD_API_KEY` secret.
+Maven artifacts and wrapper state are repo-local under `.cache/maven` for
+sandbox-friendly builds. Set `NVD_API_KEY` before running the `security-sca`
+profile so OWASP Dependency-Check uses the authenticated NVD API path. CI and
+release workflows read the same value from the GitHub Actions `NVD_API_KEY`
+secret. Vulnerability data is stored under `.cache/dependency-check`; CI and
+release workflows cache that path separately from Maven artifacts.
 
 The `dist-build` profile creates an agent-ready archive under `dist/`:
 

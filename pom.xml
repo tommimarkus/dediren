@@ -186,6 +186,7 @@
             <artifactId>dependency-check-maven</artifactId>
             <version>${dependency-check-maven.version}</version>
             <configuration>
+              <dataDirectory>${maven.multiModuleProjectDirectory}/.cache/dependency-check</dataDirectory>
               <failBuildOnCVSS>7.0</failBuildOnCVSS>
               <formats>
                 <format>HTML</format>

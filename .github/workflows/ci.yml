@@ -13,6 +13,7 @@ permissions:
 
 env:
   SEGMENT_DOWNLOAD_TIMEOUT_MINS: "5"
+  MAVEN_USER_HOME: ${{ github.workspace }}/.cache/maven/user-home
 
 jobs:
   test:
@@ -29,7 +30,14 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
-          cache: maven
+
+      - name: Cache Maven artifacts
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: .cache/maven
+          key: maven-${{ runner.os }}-${{ hashFiles('**/pom.xml', '.mvn/wrapper/maven-wrapper.properties') }}
+          restore-keys: |
+            maven-${{ runner.os }}-
 
       - name: Install XML tools
         run: sudo apt-get update && sudo apt-get install -y libxml2-utils
@@ -54,7 +62,22 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
-          cache: maven
+
+      - name: Cache Maven artifacts
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: .cache/maven
+          key: maven-${{ runner.os }}-${{ hashFiles('**/pom.xml', '.mvn/wrapper/maven-wrapper.properties') }}
+          restore-keys: |
+            maven-${{ runner.os }}-
+
+      - name: Cache Dependency-Check data
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: .cache/dependency-check
+          key: dependency-check-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            dependency-check-${{ runner.os }}-
 
       - name: Check dependency vulnerabilities
         env:
