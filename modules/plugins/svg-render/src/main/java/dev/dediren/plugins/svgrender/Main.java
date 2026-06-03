@@ -415,6 +415,8 @@ public final class Main {
         for (LaidOutEdge edge : result.edges()) {
             ResolvedEdgeStyle style = edgeStyle(policy, metadata, edge.id(), base);
             svg.append("<g data-dediren-edge-id=\"").append(attr(edge.id())).append("\">");
+            svg.append(edgeMarker(edge, style, "start"));
+            svg.append(edgeMarker(edge, style, "end"));
             svg.append(edgePath(edge, style));
             if (edge.label() != null && !edge.label().isEmpty()) {
                 Point labelPoint = edgeLabelPoint(edge);
@@ -430,10 +432,201 @@ public final class Main {
         }
         for (LaidOutNode node : result.nodes()) {
             ResolvedNodeStyle style = nodeStyle(policy, metadata, node.id(), base);
+            RenderMetadataSelector selector = metadata == null ? null : metadata.nodes().get(node.id());
             svg.append("<g data-dediren-node-id=\"").append(attr(node.id())).append("\">");
-            svg.append(String.format(
+            svg.append(nodeShape(node, style));
+            svg.append(nodeDecorator(node, style, selector));
+            if (!umlDecoratorSuppliesNodeLabel(style.decorator())) {
+                svg.append(String.format(
+                        Locale.ROOT,
+                        "<text x=\"%.1f\" y=\"%.1f\" text-anchor=\"middle\" fill=\"%s\">%s</text>",
+                        node.x() + node.width() / 2.0,
+                        node.y() + node.height() / 2.0 + base.fontSize() / 3.0,
+                        attr(style.labelFill()),
+                        text(node.label())));
+            }
+            svg.append("</g>");
+        }
+        svg.append("</g></svg>\n");
+        return svg.toString();
+    }
+
+    private static String nodeShape(LaidOutNode node, ResolvedNodeStyle style) {
+        SvgNodeDecorator decorator = style.decorator();
+        if (decorator == SvgNodeDecorator.ARCHIMATE_AND_JUNCTION
+                || decorator == SvgNodeDecorator.ARCHIMATE_OR_JUNCTION) {
+            double radius = Math.max(4.0, Math.min(node.width(), node.height()) / 2.0 - style.strokeWidth());
+            String fill = decorator == SvgNodeDecorator.ARCHIMATE_AND_JUNCTION ? style.stroke() : style.fill();
+            return String.format(
                     Locale.ROOT,
-                    "<rect data-dediren-node-shape=\"archimate_rectangle\" x=\"%.1f\" y=\"%.1f\" width=\"%.1f\" height=\"%.1f\" rx=\"%s\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%s\"/>",
+                    "<circle data-dediren-node-shape=\"%s\" cx=\"%.1f\" cy=\"%.1f\" r=\"%.1f\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%s\"/>",
+                    decoratorName(decorator),
+                    node.x() + node.width() / 2.0,
+                    node.y() + node.height() / 2.0,
+                    radius,
+                    attr(fill),
+                    attr(style.stroke()),
+                    styleNumber(style.strokeWidth()));
+        }
+        if (decorator != null && isUmlDecorator(decorator)) {
+            return umlNodeShape(node, style, decorator);
+        }
+        String shapeName = "archimate_rectangle";
+        double rx = 0.0;
+        if (decorator == null) {
+            rx = style.rx();
+        } else if (isArchimateCutCornerRectangle(decorator)) {
+            return archimateCutCornerShape(node, style);
+        } else if (isArchimateRoundedRectangle(decorator)) {
+            rx = Math.max(1.0, style.rx());
+            shapeName = "archimate_rounded_rectangle";
+        }
+        return String.format(
+                Locale.ROOT,
+                "<rect data-dediren-node-shape=\"%s\" x=\"%.1f\" y=\"%.1f\" width=\"%.1f\" height=\"%.1f\" rx=\"%s\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%s\"/>",
+                shapeName,
+                node.x(),
+                node.y(),
+                node.width(),
+                node.height(),
+                styleNumber(rx),
+                attr(style.fill()),
+                attr(style.stroke()),
+                styleNumber(style.strokeWidth()));
+    }
+
+    private static String archimateCutCornerShape(LaidOutNode node, ResolvedNodeStyle style) {
+        double corner = Math.max(8.0, Math.min(14.0, Math.min(node.width(), node.height()) * 0.14));
+        return String.format(
+                Locale.ROOT,
+                "<path data-dediren-node-shape=\"archimate_cut_corner_rectangle\" d=\"M %.1f %.1f L %.1f %.1f L %.1f %.1f L %.1f %.1f L %.1f %.1f L %.1f %.1f L %.1f %.1f L %.1f %.1f Z\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%s\"/>",
+                node.x() + corner,
+                node.y(),
+                node.x() + node.width() - corner,
+                node.y(),
+                node.x() + node.width(),
+                node.y() + corner,
+                node.x() + node.width(),
+                node.y() + node.height() - corner,
+                node.x() + node.width() - corner,
+                node.y() + node.height(),
+                node.x() + corner,
+                node.y() + node.height(),
+                node.x(),
+                node.y() + node.height() - corner,
+                node.x(),
+                node.y() + corner,
+                attr(style.fill()),
+                attr(style.stroke()),
+                styleNumber(style.strokeWidth()));
+    }
+
+    private static String umlNodeShape(LaidOutNode node, ResolvedNodeStyle style, SvgNodeDecorator decorator) {
+        String shapeName = decoratorName(decorator);
+        return switch (decorator) {
+            case UML_INITIAL_NODE -> {
+                double radius = Math.max(4.0, Math.min(node.width(), node.height()) / 2.0 - style.strokeWidth());
+                yield String.format(
+                        Locale.ROOT,
+                        "<circle data-dediren-node-shape=\"%s\" cx=\"%.1f\" cy=\"%.1f\" r=\"%.1f\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%s\"/>",
+                        shapeName,
+                        node.x() + node.width() / 2.0,
+                        node.y() + node.height() / 2.0,
+                        radius,
+                        attr(style.fill()),
+                        attr(style.stroke()),
+                        styleNumber(style.strokeWidth()));
+            }
+            case UML_ACTIVITY_FINAL_NODE -> {
+                double radius = Math.max(5.0, Math.min(node.width(), node.height()) / 2.0 - style.strokeWidth());
+                double innerRadius = Math.max(3.0, radius * 0.48);
+                yield String.format(
+                        Locale.ROOT,
+                        "<g data-dediren-node-shape=\"%s\"><circle cx=\"%.1f\" cy=\"%.1f\" r=\"%.1f\" fill=\"#ffffff\" stroke=\"%s\" stroke-width=\"%s\"/><circle cx=\"%.1f\" cy=\"%.1f\" r=\"%.1f\" fill=\"%s\"/></g>",
+                        shapeName,
+                        node.x() + node.width() / 2.0,
+                        node.y() + node.height() / 2.0,
+                        radius,
+                        attr(style.stroke()),
+                        styleNumber(style.strokeWidth()),
+                        node.x() + node.width() / 2.0,
+                        node.y() + node.height() / 2.0,
+                        innerRadius,
+                        attr(style.stroke()));
+            }
+            case UML_DECISION_NODE, UML_MERGE_NODE -> {
+                double centerX = node.x() + node.width() / 2.0;
+                double centerY = node.y() + node.height() / 2.0;
+                yield String.format(
+                        Locale.ROOT,
+                        "<path data-dediren-node-shape=\"%s\" d=\"M %.1f %.1f L %.1f %.1f L %.1f %.1f L %.1f %.1f Z\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%s\"/>",
+                        shapeName,
+                        centerX,
+                        node.y(),
+                        node.x() + node.width(),
+                        centerY,
+                        centerX,
+                        node.y() + node.height(),
+                        node.x(),
+                        centerY,
+                        attr(style.fill()),
+                        attr(style.stroke()),
+                        styleNumber(style.strokeWidth()));
+            }
+            case UML_FORK_NODE, UML_JOIN_NODE -> {
+                boolean horizontal = node.width() >= node.height();
+                double width = horizontal ? node.width() : Math.min(node.width(), 14.0);
+                double height = horizontal ? Math.min(node.height(), 14.0) : node.height();
+                double x = node.x() + (node.width() - width) / 2.0;
+                double y = node.y() + (node.height() - height) / 2.0;
+                yield String.format(
+                        Locale.ROOT,
+                        "<rect data-dediren-node-shape=\"%s\" x=\"%.1f\" y=\"%.1f\" width=\"%.1f\" height=\"%.1f\" rx=\"0\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%s\"/>",
+                        shapeName,
+                        x,
+                        y,
+                        width,
+                        height,
+                        attr(style.fill()),
+                        attr(style.stroke()),
+                        styleNumber(style.strokeWidth()));
+            }
+            case UML_PACKAGE -> {
+                double tabWidth = Math.max(40.0, Math.min(96.0, node.width() * 0.34));
+                double tabHeight = Math.max(14.0, Math.min(24.0, node.height() * 0.18));
+                yield String.format(
+                        Locale.ROOT,
+                        "<path data-dediren-node-shape=\"%s\" d=\"M %.1f %.1f H %.1f V %.1f H %.1f V %.1f H %.1f V %.1f H %.1f Z\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%s\"/>",
+                        shapeName,
+                        node.x(),
+                        node.y(),
+                        node.x() + tabWidth,
+                        node.y() + tabHeight,
+                        node.x() + node.width(),
+                        node.y() + node.height(),
+                        node.x(),
+                        node.y() + tabHeight,
+                        node.x(),
+                        attr(style.fill()),
+                        attr(style.stroke()),
+                        styleNumber(style.strokeWidth()));
+            }
+            case UML_ACTION -> String.format(
+                    Locale.ROOT,
+                    "<rect data-dediren-node-shape=\"%s\" x=\"%.1f\" y=\"%.1f\" width=\"%.1f\" height=\"%.1f\" rx=\"%s\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%s\"/>",
+                    shapeName,
+                    node.x(),
+                    node.y(),
+                    node.width(),
+                    node.height(),
+                    styleNumber(Math.max(style.rx(), 10.0)),
+                    attr(style.fill()),
+                    attr(style.stroke()),
+                    styleNumber(style.strokeWidth()));
+            default -> String.format(
+                    Locale.ROOT,
+                    "<rect data-dediren-node-shape=\"%s\" x=\"%.1f\" y=\"%.1f\" width=\"%.1f\" height=\"%.1f\" rx=\"%s\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%s\"/>",
+                    shapeName,
                     node.x(),
                     node.y(),
                     node.width(),
@@ -441,18 +634,407 @@ public final class Main {
                     styleNumber(style.rx()),
                     attr(style.fill()),
                     attr(style.stroke()),
-                    styleNumber(style.strokeWidth())));
+                    styleNumber(style.strokeWidth()));
+        };
+    }
+
+    private static String nodeDecorator(LaidOutNode node, ResolvedNodeStyle style, RenderMetadataSelector selector) {
+        SvgNodeDecorator decorator = style.decorator();
+        if (decorator == null || decorator == SvgNodeDecorator.ARCHIMATE_AND_JUNCTION
+                || decorator == SvgNodeDecorator.ARCHIMATE_OR_JUNCTION) {
+            return "";
+        }
+        if (isUmlDecorator(decorator)) {
+            return umlNodeDecorator(node, style, decorator, selector);
+        }
+        return archimateNodeDecorator(node, style, decorator);
+    }
+
+    private static String archimateNodeDecorator(LaidOutNode node, ResolvedNodeStyle style, SvgNodeDecorator decorator) {
+        String name = decoratorName(decorator);
+        String kind = archimateIconKind(decorator);
+        double size = 22.0;
+        double x = node.x() + node.width() - size - 6.0;
+        double y = node.y() + 9.0;
+        String body = switch (decorator) {
+            case ARCHIMATE_APPLICATION_COMPONENT -> String.format(
+                    Locale.ROOT,
+                    "<rect x=\"%.1f\" y=\"%.1f\" width=\"%.1f\" height=\"%.1f\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%s\"/><rect x=\"%.1f\" y=\"%.1f\" width=\"%.1f\" height=\"%.1f\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%s\"/><rect x=\"%.1f\" y=\"%.1f\" width=\"%.1f\" height=\"%.1f\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%s\"/>",
+                    x + size * 0.22,
+                    y + size * 0.08,
+                    size * 0.72,
+                    size * 0.64,
+                    attr(style.fill()),
+                    attr(style.stroke()),
+                    styleNumber(style.strokeWidth()),
+                    x,
+                    y + size * 0.2,
+                    size * 0.28,
+                    size * 0.18,
+                    attr(style.fill()),
+                    attr(style.stroke()),
+                    styleNumber(style.strokeWidth()),
+                    x,
+                    y + size * 0.48,
+                    size * 0.28,
+                    size * 0.18,
+                    attr(style.fill()),
+                    attr(style.stroke()),
+                    styleNumber(style.strokeWidth()));
+            case ARCHIMATE_APPLICATION_SERVICE, ARCHIMATE_BUSINESS_SERVICE, ARCHIMATE_TECHNOLOGY_SERVICE ->
+                    String.format(
+                            Locale.ROOT,
+                            "<rect x=\"%.1f\" y=\"%.1f\" width=\"%.1f\" height=\"%.1f\" rx=\"%.1f\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%s\"/>",
+                            x,
+                            y + size * 0.12,
+                            size,
+                            size * 0.5,
+                            size * 0.18,
+                            attr(style.fill()),
+                            attr(style.stroke()),
+                            styleNumber(style.strokeWidth()));
+            case ARCHIMATE_BUSINESS_ACTOR -> String.format(
+                    Locale.ROOT,
+                    "<ellipse cx=\"%.1f\" cy=\"%.1f\" rx=\"%.1f\" ry=\"%.1f\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%s\"/><path d=\"M %.1f %.1f L %.1f %.1f M %.1f %.1f L %.1f %.1f L %.1f %.1f\" fill=\"none\" stroke=\"%s\" stroke-width=\"%s\" stroke-linecap=\"round\"/>",
+                    x + size * 0.5,
+                    y + size * 0.2,
+                    size * 0.16,
+                    size * 0.2,
+                    attr(style.fill()),
+                    attr(style.stroke()),
+                    styleNumber(style.strokeWidth()),
+                    x + size * 0.5,
+                    y + size * 0.42,
+                    x + size * 0.5,
+                    y + size * 0.72,
+                    x + size * 0.22,
+                    y + size * 0.54,
+                    x + size * 0.5,
+                    y + size * 0.5,
+                    x + size * 0.78,
+                    y + size * 0.54,
+                    attr(style.stroke()),
+                    styleNumber(style.strokeWidth()));
+            case ARCHIMATE_DATA_OBJECT, ARCHIMATE_BUSINESS_OBJECT -> String.format(
+                    Locale.ROOT,
+                    "<path data-dediren-icon-part=\"document-body\" d=\"M %.1f %.1f L %.1f %.1f L %.1f %.1f L %.1f %.1f Z\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%s\"/><path data-dediren-icon-part=\"document-header\" d=\"M %.1f %.1f L %.1f %.1f\" fill=\"none\" stroke=\"%s\" stroke-width=\"%s\"/>",
+                    x,
+                    y,
+                    x + size * 0.92,
+                    y,
+                    x + size * 0.92,
+                    y + size * 0.72,
+                    x,
+                    y + size * 0.72,
+                    attr(style.fill()),
+                    attr(style.stroke()),
+                    styleNumber(style.strokeWidth()),
+                    x,
+                    y + size * 0.22,
+                    x + size * 0.92,
+                    y + size * 0.22,
+                    attr(style.stroke()),
+                    styleNumber(style.strokeWidth()));
+            case ARCHIMATE_TECHNOLOGY_NODE -> String.format(
+                    Locale.ROOT,
+                    "<rect x=\"%.1f\" y=\"%.1f\" width=\"%.1f\" height=\"%.1f\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%s\"/><path data-dediren-icon-part=\"node-3d-edges\" d=\"M %.1f %.1f L %.1f %.1f L %.1f %.1f M %.1f %.1f L %.1f %.1f\" fill=\"none\" stroke=\"%s\" stroke-width=\"%s\"/>",
+                    x,
+                    y + size * 0.12,
+                    size * 0.82,
+                    size * 0.62,
+                    attr(style.fill()),
+                    attr(style.stroke()),
+                    styleNumber(style.strokeWidth()),
+                    x + size * 0.64,
+                    y,
+                    x + size,
+                    y,
+                    x + size,
+                    y + size * 0.58,
+                    x + size * 0.82,
+                    y + size * 0.12,
+                    x + size,
+                    y,
+                    attr(style.stroke()),
+                    styleNumber(style.strokeWidth()));
+            default -> "<path data-dediren-icon-part=\"" + attr(kind)
+                    + "\" d=\"M " + styleNumber(x) + " " + styleNumber(y)
+                    + " L " + styleNumber(x + size) + " " + styleNumber(y)
+                    + " L " + styleNumber(x + size * 0.5) + " " + styleNumber(y + size * 0.72)
+                    + " Z\" fill=\"" + attr(style.fill()) + "\" stroke=\"" + attr(style.stroke())
+                    + "\" stroke-width=\"" + styleNumber(style.strokeWidth()) + "\"/>";
+        };
+        return "<g data-dediren-node-decorator=\"" + attr(name)
+                + "\" data-dediren-icon-kind=\"" + attr(kind)
+                + "\" data-dediren-icon-size=\"22\">" + body + "</g>";
+    }
+
+    private static String umlNodeDecorator(
+            LaidOutNode node,
+            ResolvedNodeStyle style,
+            SvgNodeDecorator decorator,
+            RenderMetadataSelector selector) {
+        String name = decoratorName(decorator);
+        String body = "";
+        if (umlDecoratorSuppliesNodeLabel(decorator)) {
+            body = umlClassifierNotation(node, style, decorator, selector);
+        } else if (decorator == SvgNodeDecorator.UML_PACKAGE) {
+            body = String.format(
+                    Locale.ROOT,
+                    "<text x=\"%.1f\" y=\"%.1f\" fill=\"%s\" font-size=\"12\">%s</text>",
+                    node.x() + 8.0,
+                    node.y() + 16.0,
+                    attr(style.labelFill()),
+                    text(node.label()));
+        }
+        return "<g data-dediren-node-decorator=\"" + attr(name) + "\">" + body + "</g>";
+    }
+
+    private static String umlClassifierNotation(
+            LaidOutNode node,
+            ResolvedNodeStyle style,
+            SvgNodeDecorator decorator,
+            RenderMetadataSelector selector) {
+        JsonNode properties = selector == null ? null : selector.properties();
+        List<String> titleLines = new ArrayList<>();
+        if (decorator == SvgNodeDecorator.UML_ENUMERATION) {
+            titleLines.add("&#171;enumeration&#187;");
+        } else if (decorator == SvgNodeDecorator.UML_INTERFACE) {
+            titleLines.add("&#171;interface&#187;");
+        } else if (decorator == SvgNodeDecorator.UML_DATA_TYPE) {
+            titleLines.add("&#171;dataType&#187;");
+        }
+        titleLines.add(text(node.label()));
+
+        List<String> attributeLines = decorator == SvgNodeDecorator.UML_ENUMERATION
+                ? umlLiteralLines(properties)
+                : umlAttributeLines(properties);
+        List<String> operationLines = decorator == SvgNodeDecorator.UML_ENUMERATION
+                ? List.of()
+                : umlOperationLines(properties);
+        double titleHeight = Math.max(28.0, titleLines.size() * 15.0 + 8.0);
+        double attributeHeight = attributeLines.isEmpty() ? 0.0 : attributeLines.size() * 14.0 + 8.0;
+        double firstSeparatorY = node.y() + titleHeight;
+        double secondSeparatorY = firstSeparatorY + attributeHeight;
+
+        StringBuilder svg = new StringBuilder();
+        if (!attributeLines.isEmpty() || !operationLines.isEmpty()) {
             svg.append(String.format(
                     Locale.ROOT,
-                    "<text x=\"%.1f\" y=\"%.1f\" text-anchor=\"middle\" fill=\"%s\">%s</text>",
-                    node.x() + node.width() / 2.0,
-                    node.y() + node.height() / 2.0 + base.fontSize() / 3.0,
-                    attr(style.labelFill()),
-                    text(node.label())));
-            svg.append("</g>");
+                    "<line x1=\"%.1f\" y1=\"%.1f\" x2=\"%.1f\" y2=\"%.1f\" stroke=\"%s\" stroke-width=\"%s\"/>",
+                    node.x(),
+                    firstSeparatorY,
+                    node.x() + node.width(),
+                    firstSeparatorY,
+                    attr(style.stroke()),
+                    styleNumber(style.strokeWidth())));
         }
-        svg.append("</g></svg>\n");
+        if (!operationLines.isEmpty()) {
+            svg.append(String.format(
+                    Locale.ROOT,
+                    "<line x1=\"%.1f\" y1=\"%.1f\" x2=\"%.1f\" y2=\"%.1f\" stroke=\"%s\" stroke-width=\"%s\"/>",
+                    node.x(),
+                    secondSeparatorY,
+                    node.x() + node.width(),
+                    secondSeparatorY,
+                    attr(style.stroke()),
+                    styleNumber(style.strokeWidth())));
+        }
+        double y = node.y() + 15.0;
+        for (String line : titleLines) {
+            svg.append(String.format(
+                    Locale.ROOT,
+                    "<text x=\"%.1f\" y=\"%.1f\" text-anchor=\"middle\" fill=\"%s\" font-size=\"12\">%s</text>",
+                    node.x() + node.width() / 2.0,
+                    y,
+                    attr(style.labelFill()),
+                    line));
+            y += 15.0;
+        }
+        y = firstSeparatorY + 15.0;
+        for (String line : attributeLines) {
+            svg.append(String.format(
+                    Locale.ROOT,
+                    "<text x=\"%.1f\" y=\"%.1f\" fill=\"%s\" font-size=\"12\">%s</text>",
+                    node.x() + 8.0,
+                    y,
+                    attr(style.labelFill()),
+                    text(line)));
+            y += 14.0;
+        }
+        y = secondSeparatorY + 15.0;
+        for (String line : operationLines) {
+            svg.append(String.format(
+                    Locale.ROOT,
+                    "<text x=\"%.1f\" y=\"%.1f\" fill=\"%s\" font-size=\"12\">%s</text>",
+                    node.x() + 8.0,
+                    y,
+                    attr(style.labelFill()),
+                    text(line)));
+            y += 14.0;
+        }
         return svg.toString();
+    }
+
+    private static List<String> umlAttributeLines(JsonNode properties) {
+        JsonNode attributes = properties == null ? null : properties.get("attributes");
+        if (attributes == null || !attributes.isArray()) {
+            return List.of();
+        }
+        List<String> lines = new ArrayList<>();
+        for (JsonNode attribute : attributes) {
+            String visibility = umlVisibilitySymbol(textField(attribute, "visibility", "public"));
+            String name = textField(attribute, "name", "");
+            String type = textField(attribute, "type", "");
+            lines.add(type.isEmpty() ? visibility + " " + name : visibility + " " + name + " : " + type);
+        }
+        return lines;
+    }
+
+    private static List<String> umlOperationLines(JsonNode properties) {
+        JsonNode operations = properties == null ? null : properties.get("operations");
+        if (operations == null || !operations.isArray()) {
+            return List.of();
+        }
+        List<String> lines = new ArrayList<>();
+        for (JsonNode operation : operations) {
+            String visibility = umlVisibilitySymbol(textField(operation, "visibility", "public"));
+            String name = textField(operation, "name", "");
+            List<String> parameters = new ArrayList<>();
+            JsonNode parameterValues = operation.get("parameters");
+            if (parameterValues != null && parameterValues.isArray()) {
+                for (JsonNode parameter : parameterValues) {
+                    String parameterName = textField(parameter, "name", "");
+                    String parameterType = textField(parameter, "type", "");
+                    if (parameterType.isEmpty()) {
+                        parameters.add(parameterName);
+                    } else if (parameterName.isEmpty()) {
+                        parameters.add(parameterType);
+                    } else {
+                        parameters.add(parameterName + " : " + parameterType);
+                    }
+                }
+            }
+            String returnType = textField(operation, "return_type", "");
+            String signature = visibility + " " + name + "(" + String.join(", ", parameters) + ")";
+            lines.add(returnType.isEmpty() ? signature : signature + " : " + returnType);
+        }
+        return lines;
+    }
+
+    private static List<String> umlLiteralLines(JsonNode properties) {
+        JsonNode literals = properties == null ? null : properties.get("literals");
+        if (literals == null || !literals.isArray()) {
+            return List.of();
+        }
+        List<String> lines = new ArrayList<>();
+        for (JsonNode literal : literals) {
+            if (literal.isTextual()) {
+                lines.add(literal.asText());
+            }
+        }
+        return lines;
+    }
+
+    private static String umlVisibilitySymbol(String visibility) {
+        return switch (visibility) {
+            case "private" -> "-";
+            case "protected" -> "#";
+            case "package" -> "~";
+            default -> "+";
+        };
+    }
+
+    private static String textField(JsonNode value, String field, String fallback) {
+        JsonNode fieldValue = value == null ? null : value.get(field);
+        return fieldValue != null && fieldValue.isTextual() ? fieldValue.asText() : fallback;
+    }
+
+    private static boolean umlDecoratorSuppliesNodeLabel(SvgNodeDecorator decorator) {
+        return decorator == SvgNodeDecorator.UML_CLASS
+                || decorator == SvgNodeDecorator.UML_INTERFACE
+                || decorator == SvgNodeDecorator.UML_DATA_TYPE
+                || decorator == SvgNodeDecorator.UML_ENUMERATION;
+    }
+
+    private static boolean isUmlDecorator(SvgNodeDecorator decorator) {
+        return decorator != null && decorator.name().startsWith("UML_");
+    }
+
+    private static boolean isArchimateCutCornerRectangle(SvgNodeDecorator decorator) {
+        return decorator == SvgNodeDecorator.ARCHIMATE_STAKEHOLDER
+                || decorator == SvgNodeDecorator.ARCHIMATE_DRIVER
+                || decorator == SvgNodeDecorator.ARCHIMATE_ASSESSMENT
+                || decorator == SvgNodeDecorator.ARCHIMATE_GOAL
+                || decorator == SvgNodeDecorator.ARCHIMATE_OUTCOME
+                || decorator == SvgNodeDecorator.ARCHIMATE_VALUE
+                || decorator == SvgNodeDecorator.ARCHIMATE_MEANING
+                || decorator == SvgNodeDecorator.ARCHIMATE_CONSTRAINT
+                || decorator == SvgNodeDecorator.ARCHIMATE_REQUIREMENT
+                || decorator == SvgNodeDecorator.ARCHIMATE_PRINCIPLE;
+    }
+
+    private static boolean isArchimateRoundedRectangle(SvgNodeDecorator decorator) {
+        return decorator == SvgNodeDecorator.ARCHIMATE_WORK_PACKAGE
+                || decorator == SvgNodeDecorator.ARCHIMATE_IMPLEMENTATION_EVENT
+                || decorator == SvgNodeDecorator.ARCHIMATE_COURSE_OF_ACTION
+                || decorator == SvgNodeDecorator.ARCHIMATE_VALUE_STREAM
+                || decorator == SvgNodeDecorator.ARCHIMATE_CAPABILITY
+                || decorator == SvgNodeDecorator.ARCHIMATE_BUSINESS_SERVICE
+                || decorator == SvgNodeDecorator.ARCHIMATE_BUSINESS_FUNCTION
+                || decorator == SvgNodeDecorator.ARCHIMATE_BUSINESS_PROCESS
+                || decorator == SvgNodeDecorator.ARCHIMATE_BUSINESS_EVENT
+                || decorator == SvgNodeDecorator.ARCHIMATE_APPLICATION_SERVICE
+                || decorator == SvgNodeDecorator.ARCHIMATE_APPLICATION_FUNCTION
+                || decorator == SvgNodeDecorator.ARCHIMATE_APPLICATION_PROCESS
+                || decorator == SvgNodeDecorator.ARCHIMATE_APPLICATION_EVENT
+                || decorator == SvgNodeDecorator.ARCHIMATE_TECHNOLOGY_SERVICE
+                || decorator == SvgNodeDecorator.ARCHIMATE_TECHNOLOGY_FUNCTION
+                || decorator == SvgNodeDecorator.ARCHIMATE_TECHNOLOGY_PROCESS
+                || decorator == SvgNodeDecorator.ARCHIMATE_TECHNOLOGY_EVENT;
+    }
+
+    private static String archimateIconKind(SvgNodeDecorator decorator) {
+        String name = decoratorName(decorator).replace("archimate_", "");
+        return switch (name) {
+            case "application_component" -> "component";
+            case "business_actor" -> "actor";
+            case "technology_node" -> "node";
+            case "data_object", "business_object" -> "object";
+            case "application_service", "business_service", "technology_service" -> "service";
+            default -> name;
+        };
+    }
+
+    private static String decoratorName(SvgNodeDecorator decorator) {
+        return decorator.name().toLowerCase(Locale.ROOT);
+    }
+
+    private static String edgeMarker(LaidOutEdge edge, ResolvedEdgeStyle style, String side) {
+        SvgEdgeMarkerEnd marker = side.equals("start") ? style.markerStart() : style.markerEnd();
+        if (marker == SvgEdgeMarkerEnd.NONE) {
+            return "";
+        }
+        String markerName = markerName(marker);
+        String id = "marker-" + side + "-" + edge.id();
+        String attribute = "data-dediren-edge-marker-" + side;
+        String fill = markerFill(marker, style);
+        String stroke = markerStroke(marker, style);
+        String body = switch (marker) {
+            case FILLED_DIAMOND, HOLLOW_DIAMOND -> "<path d=\"M 1 5 L 5 1 L 9 5 L 5 9 Z\" fill=\""
+                    + fill + "\" stroke=\"" + stroke + "\" stroke-width=\"1\"/>";
+            case HOLLOW_TRIANGLE -> "<path d=\"M 1 1 L 9 5 L 1 9 Z\" fill=\"" + fill
+                    + "\" stroke=\"" + stroke + "\" stroke-width=\"1\"/>";
+            case OPEN_ARROW -> "<path d=\"M 1 1 L 9 5 L 1 9\" fill=\"none\" stroke=\""
+                    + stroke + "\" stroke-width=\"1.5\"/>";
+            case FILLED_CIRCLE, HOLLOW_CIRCLE -> "<circle cx=\"5\" cy=\"5\" r=\"3.5\" fill=\""
+                    + fill + "\" stroke=\"" + stroke + "\" stroke-width=\"1\"/>";
+            default -> "<path d=\"M 1 1 L 9 5 L 1 9 Z\" fill=\"" + fill + "\" stroke=\""
+                    + stroke + "\" stroke-width=\"1\"/>";
+        };
+        return "<marker id=\"" + attr(id) + "\" " + attribute + "=\"" + markerName
+                + "\" markerWidth=\"10\" markerHeight=\"10\" refX=\"5\" refY=\"5\" orient=\"auto\">"
+                + body + "</marker>";
     }
 
     private static String edgePath(LaidOutEdge edge, ResolvedEdgeStyle style) {
@@ -465,9 +1047,35 @@ public final class Main {
             commands.add((index == 0 ? "M " : "L ")
                     + String.format(Locale.ROOT, "%.1f %.1f", point.x(), point.y()));
         }
-        String dash = style.lineStyle() == SvgEdgeLineStyle.DASHED ? " stroke-dasharray=\"6 4\"" : "";
+        String dash = style.lineStyle() == SvgEdgeLineStyle.DASHED ? " stroke-dasharray=\"8 5\"" : "";
+        String markerStart = style.markerStart() == SvgEdgeMarkerEnd.NONE
+                ? ""
+                : " marker-start=\"url(#marker-start-" + attr(edge.id()) + ")\"";
+        String markerEnd = style.markerEnd() == SvgEdgeMarkerEnd.NONE
+                ? ""
+                : " marker-end=\"url(#marker-end-" + attr(edge.id()) + ")\"";
         return "<path d=\"" + String.join(" ", commands) + "\" fill=\"none\" stroke=\""
-                + attr(style.stroke()) + "\" stroke-width=\"" + styleNumber(style.strokeWidth()) + "\"" + dash + "/>";
+                + attr(style.stroke()) + "\" stroke-width=\"" + styleNumber(style.strokeWidth()) + "\""
+                + dash + markerStart + markerEnd + "/>";
+    }
+
+    private static String markerName(SvgEdgeMarkerEnd marker) {
+        return marker.name().toLowerCase(Locale.ROOT);
+    }
+
+    private static String markerFill(SvgEdgeMarkerEnd marker, ResolvedEdgeStyle style) {
+        return switch (marker) {
+            case HOLLOW_TRIANGLE, HOLLOW_DIAMOND, HOLLOW_CIRCLE -> "#ffffff";
+            case OPEN_ARROW -> "none";
+            default -> attr(style.stroke());
+        };
+    }
+
+    private static String markerStroke(SvgEdgeMarkerEnd marker, ResolvedEdgeStyle style) {
+        return switch (marker) {
+            case FILLED_ARROW, FILLED_DIAMOND, FILLED_CIRCLE -> attr(style.stroke());
+            default -> attr(style.stroke());
+        };
     }
 
     private static Point edgeLabelPoint(LaidOutEdge edge) {

@@ -64,6 +64,28 @@ Result: all passed.
   - Add tests equivalent to every Rust SVG test module: `archimate_groups`, `archimate_nodes`, `archimate_relationships`, `edge_labels`, `render_contracts`, `uml_activity`, `uml_nodes`, `uml_relationships`, and `viewbox_routes`.
   - Expected: generated SVG is stable enough for current tests and remains valid XML.
 
+### 2026-06-03 SVG Semantic Rendering Subcheckpoint
+
+Added Java SVG rendering coverage for the first Task 2 lane:
+
+- ArchiMate application component/service decorators from type overrides.
+- ArchiMate and/or junction circle symbols.
+- UML class compartments and enumeration literal output from render metadata properties.
+- ArchiMate realization edge dash and hollow-triangle marker notation.
+- UML composition relationship start marker notation.
+- Edge ID override precedence for disabling inherited markers.
+
+Verification:
+
+```bash
+GRADLE_USER_HOME=.cache/gradle/user-home ./gradlew :modules:plugins:svg-render:test
+cargo test -p dediren-plugin-svg-render --test svg_render_plugin --locked
+```
+
+Result: Java SVG module tests passed, and the Rust reference SVG suite passed 61/61.
+
+Remaining in Task 2: full ArchiMate/UML type coverage tests, group decorator parity, edge label placement/collision handling, route rounding, line jumps, shared-endpoint route behavior, and viewbox label/content bounds.
+
 - [x] **Task 3: Port ArchiMate OEF export**
   - Model: `gpt-5-codex`
   - Generate ArchiMate 3.2 OEF XML from source, policy, and generated layout results.

@@ -276,6 +276,166 @@ class MainTest {
         }
     }
 
+    @Nested
+    class SemanticRendering {
+        @Test
+        void appliesArchimateNodeDecoratorsFromTypeOverrides() throws Exception {
+            JsonNode input = archimateStyleInput();
+            ((ObjectNode) input.at("/policy/style/node_type_overrides/ApplicationComponent"))
+                    .put("decorator", "archimate_application_component");
+            ((ObjectNode) input.at("/policy/style/node_type_overrides/ApplicationService"))
+                    .put("decorator", "archimate_application_service");
+
+            Document document = svgDocument(okContent(render(input)));
+
+            Element component = groupWithAttribute(document, "data-dediren-node-id", "orders-component");
+            Element service = groupWithAttribute(document, "data-dediren-node-id", "orders-service");
+            Element componentDecorator = childGroupWithAttribute(
+                    component,
+                    "data-dediren-node-decorator",
+                    "archimate_application_component");
+            Element serviceDecorator = childGroupWithAttribute(
+                    service,
+                    "data-dediren-node-decorator",
+                    "archimate_application_service");
+
+            assertThat(childElements(componentDecorator, "rect")).hasSizeGreaterThanOrEqualTo(2);
+            assertThat(childElements(serviceDecorator, "rect")).hasSizeGreaterThanOrEqualTo(1);
+            assertThat(childElements(serviceDecorator, "path")).isEmpty();
+        }
+
+        @Test
+        void rendersArchimateJunctionNodesAsCircleSymbols() throws Exception {
+            JsonNode policy = fixtureJson("fixtures/render-policy/archimate-svg.json");
+            JsonNode input = archimateRenderInput(
+                    policy,
+                    """
+                    [
+                      {
+                        "id": "and-junction",
+                        "source_id": "and-junction",
+                        "projection_id": "and-junction",
+                        "x": 80,
+                        "y": 80,
+                        "width": 28,
+                        "height": 28,
+                        "label": ""
+                      },
+                      {
+                        "id": "or-junction",
+                        "source_id": "or-junction",
+                        "projection_id": "or-junction",
+                        "x": 160,
+                        "y": 80,
+                        "width": 28,
+                        "height": 28,
+                        "label": ""
+                      }
+                    ]
+                    """,
+                    "[]",
+                    """
+                    {
+                      "and-junction": { "type": "AndJunction", "source_id": "and-junction" },
+                      "or-junction": { "type": "OrJunction", "source_id": "or-junction" }
+                    }
+                    """,
+                    "{}");
+
+            Document document = svgDocument(okContent(render(input)));
+
+            Element andShape = firstElementWithAttribute(
+                    groupWithAttribute(document, "data-dediren-node-id", "and-junction"),
+                    "data-dediren-node-shape");
+            assertThat(andShape.getAttribute("data-dediren-node-shape")).isEqualTo("archimate_and_junction");
+            assertThat(andShape.getAttribute("fill")).isEqualTo("#111827");
+
+            Element orShape = firstElementWithAttribute(
+                    groupWithAttribute(document, "data-dediren-node-id", "or-junction"),
+                    "data-dediren-node-shape");
+            assertThat(orShape.getAttribute("data-dediren-node-shape")).isEqualTo("archimate_or_junction");
+            assertThat(orShape.getAttribute("fill")).isEqualTo("#ffffff");
+        }
+
+        @Test
+        void rendersUmlClassCompartments() throws Exception {
+            Document document = svgDocument(okContent(render(umlStyleInput())));
+            String content = okContent(render(umlStyleInput()));
+
+            Element order = groupWithAttribute(document, "data-dediren-node-id", "class-order");
+            Element shape = firstElementWithAttribute(order, "data-dediren-node-shape");
+
+            assertThat(shape.getAttribute("data-dediren-node-shape")).isEqualTo("uml_class");
+            childGroupWithAttribute(order, "data-dediren-node-decorator", "uml_class");
+            assertThat(content).contains("id : OrderId", "+ submit() : void");
+        }
+
+        @Test
+        void rendersUmlEnumerationLiterals() throws Exception {
+            String content = okContent(render(umlStyleInput()));
+            Document document = svgDocument(content);
+
+            Element enumeration = groupWithAttribute(document, "data-dediren-node-id", "enum-order-status");
+            Element shape = firstElementWithAttribute(enumeration, "data-dediren-node-shape");
+
+            assertThat(shape.getAttribute("data-dediren-node-shape")).isEqualTo("uml_enumeration");
+            childGroupWithAttribute(enumeration, "data-dediren-node-decorator", "uml_enumeration");
+            assertThat(content).contains("&#171;enumeration&#187;", "Submitted");
+        }
+
+        @Test
+        void appliesArchimateRealizationEdgeNotation() throws Exception {
+            JsonNode input = archimateStyleInput();
+            ((ObjectNode) input.at("/policy/style/edge_type_overrides/Realization"))
+                    .put("line_style", "dashed")
+                    .put("marker_end", "hollow_triangle");
+
+            Document document = svgDocument(okContent(render(input)));
+
+            Element edge = groupWithAttribute(document, "data-dediren-edge-id", "orders-realizes-service");
+            Element path = firstChildElement(edge, "path");
+            assertThat(path.getAttribute("stroke-dasharray")).isEqualTo("8 5");
+            assertThat(path.getAttribute("marker-end")).isEqualTo("url(#marker-end-orders-realizes-service)");
+
+            Element marker = marker(document, "marker-end-orders-realizes-service", "data-dediren-edge-marker-end");
+            Element markerPath = firstChildElement(marker, "path");
+            assertThat(marker.getAttribute("data-dediren-edge-marker-end")).isEqualTo("hollow_triangle");
+            assertThat(markerPath.getAttribute("fill")).isEqualTo("#ffffff");
+            assertThat(markerPath.getAttribute("stroke")).isEqualTo("#374151");
+        }
+
+        @Test
+        void appliesUmlRelationshipMarkers() throws Exception {
+            String content = okContent(render(umlStyleInput()));
+            Document document = svgDocument(content);
+
+            Element edge = groupWithAttribute(document, "data-dediren-edge-id", "order-has-lines");
+            Element path = firstChildElement(edge, "path");
+
+            assertThat(path.getAttribute("marker-start")).isEqualTo("url(#marker-start-order-has-lines)");
+            assertThat(content).contains("data-dediren-edge-marker-start=\"filled_diamond\"");
+        }
+
+        @Test
+        void edgeIdOverrideCanDisableMarker() throws Exception {
+            JsonNode input = archimateStyleInput();
+            ObjectNode edgeOverrides = (ObjectNode) input.at("/policy/style/edge_overrides");
+            edgeOverrides.set("orders-realizes-service", JsonSupport.objectMapper().readTree("""
+                    {
+                      "marker_end": "none",
+                      "line_style": "solid"
+                    }
+                    """));
+
+            Document document = svgDocument(okContent(render(input)));
+
+            Element edge = groupWithAttribute(document, "data-dediren-edge-id", "orders-realizes-service");
+            Element path = firstChildElement(edge, "path");
+            assertThat(path.hasAttribute("marker-end")).isFalse();
+            assertThat(path.hasAttribute("stroke-dasharray")).isFalse();
+        }
+    }
+
     private static PluginResult render(JsonNode input) throws Exception {
         return Main.executeForTesting(new String[]{"render"}, JsonSupport.objectMapper().writeValueAsString(input));
     }
@@ -312,6 +472,33 @@ class MainTest {
         input.set("layout_result", fixtureJson("fixtures/layout-result/uml-basic.json"));
         input.set("render_metadata", fixtureJson("fixtures/render-metadata/uml-basic.json"));
         input.set("policy", fixtureJson("fixtures/render-policy/uml-svg.json"));
+        return input;
+    }
+
+    private static JsonNode archimateRenderInput(
+            JsonNode policy,
+            String nodes,
+            String edges,
+            String metadataNodes,
+            String metadataEdges) throws Exception {
+        ObjectNode layout = JsonSupport.objectMapper().createObjectNode();
+        layout.put("layout_result_schema_version", "layout-result.schema.v1");
+        layout.put("view_id", "archimate-coverage");
+        layout.set("nodes", JsonSupport.objectMapper().readTree(nodes));
+        layout.set("edges", JsonSupport.objectMapper().readTree(edges));
+        layout.set("groups", JsonSupport.objectMapper().createArrayNode());
+        layout.set("warnings", JsonSupport.objectMapper().createArrayNode());
+
+        ObjectNode metadata = JsonSupport.objectMapper().createObjectNode();
+        metadata.put("render_metadata_schema_version", "render-metadata.schema.v1");
+        metadata.put("semantic_profile", "archimate");
+        metadata.set("nodes", JsonSupport.objectMapper().readTree(metadataNodes));
+        metadata.set("edges", JsonSupport.objectMapper().readTree(metadataEdges));
+
+        ObjectNode input = JsonSupport.objectMapper().createObjectNode();
+        input.set("layout_result", layout);
+        input.set("render_metadata", metadata);
+        input.set("policy", policy);
         return input;
     }
 
@@ -374,6 +561,47 @@ class MainTest {
             }
         }
         throw new AssertionError("expected <" + parent.getTagName() + "> to contain <" + tagName + ">");
+    }
+
+    private static Element childGroupWithAttribute(Element parent, String name, String value) {
+        for (Element element : childElements(parent, "g")) {
+            if (value.equals(element.getAttribute(name))) {
+                return element;
+            }
+        }
+        throw new AssertionError("expected child group with " + name + "=" + value);
+    }
+
+    private static Element firstElementWithAttribute(Element parent, String name) {
+        var children = parent.getChildNodes();
+        for (int index = 0; index < children.getLength(); index++) {
+            if (children.item(index) instanceof Element child && child.hasAttribute(name)) {
+                return child;
+            }
+        }
+        throw new AssertionError("expected child element with " + name);
+    }
+
+    private static Element marker(Document document, String id, String markerAttribute) {
+        var elements = document.getElementsByTagName("marker");
+        for (int index = 0; index < elements.getLength(); index++) {
+            Element element = (Element) elements.item(index);
+            if (id.equals(element.getAttribute("id")) && element.hasAttribute(markerAttribute)) {
+                return element;
+            }
+        }
+        throw new AssertionError("expected marker " + id);
+    }
+
+    private static java.util.List<Element> childElements(Element parent, String tagName) {
+        var elements = new java.util.ArrayList<Element>();
+        var children = parent.getChildNodes();
+        for (int index = 0; index < children.getLength(); index++) {
+            if (children.item(index) instanceof Element child && child.getTagName().equals(tagName)) {
+                elements.add(child);
+            }
+        }
+        return elements;
     }
 
     private static JsonNode fixtureJson(String path) throws Exception {
