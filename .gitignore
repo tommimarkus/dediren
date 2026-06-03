@@ -13,6 +13,7 @@
 .mvn/wrapper/MavenWrapperDownloader.class
 crates/dediren-plugin-elk-layout/java/.gradle/
 crates/dediren-plugin-elk-layout/java/build/
+crates/dediren-plugin-elk-layout/java/bin/
 **/*.svg
 !.github/**/*.svg
 .codex/rules/default.rules
