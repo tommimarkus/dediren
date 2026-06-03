@@ -8,6 +8,8 @@
 
 **Tech Stack:** Java 21, Picocli, Jackson, JUnit 5, AssertJ, Gradle application plugin.
 
+**Constraint:** The Java migration uses the Gradle wrapper only. Do not add SDKMAN project support, `.sdkmanrc`, SDKMAN bootstrap scripts, or SDKMAN-dependent documentation. Existing legacy SDKMAN helper references are cleanup targets for the ELK/runtime removal slices.
+
 ---
 
 ## Files
@@ -104,3 +106,54 @@
   - Add a handoff note mapping each Rust CLI/core/runtime-testbed test file to the Java successor test class.
   - Run: `git diff --check`
   - Commit message: `feat: port core cli and plugin runtime to java`
+
+## 2026-06-03 Checkpoint: Core/CLI/Runtime Foundation
+
+Implemented in Java so far:
+
+- `modules/core/src/main/java/dev/dediren/core/io/JsonInput.java`
+  - Success-envelope data extraction and raw JSON command parsing.
+- `modules/core/src/main/java/dev/dediren/core/source/SourceValidator.java`
+  - Model schema validation, fragment assembly, duplicate id checks, dangling endpoint checks, and fragment conflict diagnostics.
+- `modules/core/src/main/java/dev/dediren/core/plugins/*.java`
+  - Explicit manifest registry, manifest schema validation, process execution, capability probes, env allowlist forwarding, timeout handling, stdout/stderr draining, command envelope validation, and capability result schema validation.
+- `modules/core/src/main/java/dev/dediren/core/commands/*.java`
+  - Core-owned `validate-layout`, `layout`, `project`, semantic `validate`, `render`, and `export` orchestration.
+- `modules/core/src/main/java/dev/dediren/core/quality/*.java`
+  - Initial backend-neutral layout quality diagnostics and report counts.
+- `testbeds/plugin-runtime/src/main/java/dev/dediren/testbeds/pluginruntime/Main.java`
+  - Java plugin runtime testbed used by Java plugin runtime tests.
+- `apps/cli/src/main/java/dev/dediren/cli/Main.java`
+  - Picocli `validate`, `project`, `layout`, `validate-layout`, `render`, and `export` subcommands with structured JSON preflight errors.
+
+Rust-to-Java successor mapping for this checkpoint:
+
+| Rust source/test | Java successor |
+| --- | --- |
+| `crates/dediren-core/src/validate.rs`, `crates/dediren-core/src/source.rs` | `SourceValidator`, `CliValidateTest` |
+| `crates/dediren-core/src/io.rs` | `JsonInput`, `JsonInputTest` |
+| `crates/dediren-core/src/plugins.rs` | `PluginRegistry`, `PluginRunner`, `PluginRuntimeTest` |
+| `crates/dediren-core/src/commands.rs` | `CoreCommands`, `CoreCommandsTest` |
+| `crates/dediren-core/src/quality.rs` | `LayoutQuality`, `LayoutQualityTest` |
+| `crates/dediren-cli/src/main.rs` validate/help/preflight/validate-layout lanes | `Main`, `CliValidateTest`, `CliLayoutRenderCommandTest` |
+| `crates/dediren-plugin-runtime-testbed/src/main.rs` | `testbeds/plugin-runtime/Main.java`, `PluginRuntimeTest` |
+
+Verification evidence:
+
+```bash
+GRADLE_USER_HOME=.cache/gradle/user-home ./gradlew test
+cargo test -p dediren-core --test plugin_runtime --locked
+cargo test -p dediren --test plugin_compat --locked
+cargo test -p dediren --test cli_help --locked
+cargo test -p dediren --test cli_validate --locked
+```
+
+Result: all passed.
+
+Open before closing Slice 02:
+
+- Add Java successor coverage for the rest of the Rust CLI lanes: `cli_project.rs`, plugin-backed `cli_layout.rs`, plugin-backed `cli_render.rs`, `cli_export.rs`, `cli_pipeline.rs`, and fixture-mode `real_elk_render.rs`.
+- Expand plugin runtime tests to cover the remaining Rust runtime stress cases, including large stdout/stderr and timeout pipe-drain behavior.
+- Expand layout quality parity against every case in `crates/dediren-core/tests/layout_quality.rs`.
+- Extract duplicated Java test helpers into `test-support`.
+- Run `software-design`, `test-quality-audit`, and `devsecops-audit` review passes before the final Slice 02 commit.

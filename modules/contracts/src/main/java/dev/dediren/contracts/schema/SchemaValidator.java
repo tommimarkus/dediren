@@ -36,8 +36,16 @@ public final class SchemaValidator {
 
     public List<String> validateFixture(String schemaPath, String fixturePath) {
         try {
-            JsonSchema schema = loadSchema(schemaPath);
             JsonNode document = JsonSupport.objectMapper().readTree(repositoryRoot.resolve(fixturePath).toFile());
+            return validate(schemaPath, document);
+        } catch (IOException | RuntimeException error) {
+            return List.of(error.getMessage());
+        }
+    }
+
+    public List<String> validate(String schemaPath, JsonNode document) {
+        try {
+            JsonSchema schema = loadSchema(schemaPath);
             return schema.validate(document)
                     .stream()
                     .map(ValidationMessage::getMessage)

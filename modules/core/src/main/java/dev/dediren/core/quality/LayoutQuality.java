@@ -1,0 +1,328 @@
+package dev.dediren.core.quality;
+
+import dev.dediren.contracts.Diagnostic;
+import dev.dediren.contracts.DiagnosticSeverity;
+import dev.dediren.contracts.layout.LaidOutEdge;
+import dev.dediren.contracts.layout.LaidOutNode;
+import dev.dediren.contracts.layout.LayoutResult;
+import dev.dediren.contracts.layout.Point;
+import java.util.ArrayList;
+import java.util.List;
+
+public final class LayoutQuality {
+    private static final double ROUTE_DETOUR_RATIO = 1.5;
+    private static final double ROUTE_DETOUR_EXCESS = 240.0;
+    private static final double ROUTE_CLOSE_PARALLEL_DISTANCE = 20.0;
+    private static final double ROUTE_CLOSE_PARALLEL_MIN_OVERLAP = 40.0;
+    private static final double GEOMETRY_EPSILON = 0.001;
+    private static final double ROUTE_ENDPOINT_TOLERANCE = 1.5;
+
+    private LayoutQuality() {
+    }
+
+    public static LayoutQualityReport validateLayout(LayoutResult result) {
+        int overlapCount = countOverlaps(result);
+        int connectorThroughNodeCount = countConnectorThroughNodes(result);
+        int invalidRouteCount = (int) result.edges().stream()
+                .filter(edge -> routeHasIntegrityIssue(edge, result))
+                .count();
+        int routeDetourCount = (int) result.edges().stream()
+                .filter(edge -> hasExcessiveDetour(edge.points()))
+                .count();
+        int routeCloseParallelCount = countCloseParallelRoutes(result);
+        int groupBoundaryIssueCount = countGroupBoundaryIssues(result);
+        int warningCount = result.warnings().size();
+        String status = overlapCount == 0
+                && connectorThroughNodeCount == 0
+                && invalidRouteCount == 0
+                && routeDetourCount == 0
+                && routeCloseParallelCount == 0
+                && groupBoundaryIssueCount == 0
+                && warningCount == 0
+                ? "ok"
+                : "warning";
+        return new LayoutQualityReport(
+                status,
+                "draft",
+                overlapCount,
+                connectorThroughNodeCount,
+                invalidRouteCount,
+                routeDetourCount,
+                routeCloseParallelCount,
+                groupBoundaryIssueCount,
+                warningCount);
+    }
+
+    public static List<Diagnostic> validateLayoutDiagnostics(LayoutResult result) {
+        var diagnostics = new ArrayList<Diagnostic>();
+        for (int edgeIndex = 0; edgeIndex < result.edges().size(); edgeIndex++) {
+            LaidOutEdge edge = result.edges().get(edgeIndex);
+            if (edge.points().isEmpty()) {
+                diagnostics.add(routeError(
+                        "DEDIREN_LAYOUT_ROUTE_POINTS_EMPTY",
+                        "edge '" + edge.id() + "' has no route points",
+                        "$.edges[" + edgeIndex + "].points"));
+                continue;
+            }
+            if (edge.points().size() < 2) {
+                diagnostics.add(routeError(
+                        "DEDIREN_LAYOUT_ROUTE_POINTS_INSUFFICIENT",
+                        "edge '" + edge.id() + "' must have at least start and end route points",
+                        "$.edges[" + edgeIndex + "].points"));
+                continue;
+            }
+            LaidOutNode source = findNode(result, edge.source());
+            LaidOutNode target = findNode(result, edge.target());
+            if (source == null || target == null) {
+                continue;
+            }
+            if (!pointOnNodePerimeter(edge.points().getFirst(), source, ROUTE_ENDPOINT_TOLERANCE)) {
+                diagnostics.add(routeError(
+                        "DEDIREN_LAYOUT_ROUTE_ENDPOINT_OFF_NODE_PERIMETER",
+                        "edge '" + edge.id() + "' first route point is not on source node '" + edge.source() + "' perimeter",
+                        "$.edges[" + edgeIndex + "].points[0]"));
+            }
+            if (!pointOnNodePerimeter(edge.points().getLast(), target, ROUTE_ENDPOINT_TOLERANCE)) {
+                diagnostics.add(routeError(
+                        "DEDIREN_LAYOUT_ROUTE_ENDPOINT_OFF_NODE_PERIMETER",
+                        "edge '" + edge.id() + "' last route point is not on target node '" + edge.target() + "' perimeter",
+                        "$.edges[" + edgeIndex + "].points[-1]"));
+            }
+        }
+        return diagnostics;
+    }
+
+    private static Diagnostic routeError(String code, String message, String path) {
+        return new Diagnostic(code, DiagnosticSeverity.ERROR, message, path);
+    }
+
+    private static boolean routeHasIntegrityIssue(LaidOutEdge edge, LayoutResult result) {
+        if (edge.points().size() < 2) {
+            return true;
+        }
+        LaidOutNode source = findNode(result, edge.source());
+        LaidOutNode target = findNode(result, edge.target());
+        if (source == null || target == null) {
+            return false;
+        }
+        return !pointOnNodePerimeter(edge.points().getFirst(), source, ROUTE_ENDPOINT_TOLERANCE)
+                || !pointOnNodePerimeter(edge.points().getLast(), target, ROUTE_ENDPOINT_TOLERANCE);
+    }
+
+    private static LaidOutNode findNode(LayoutResult result, String id) {
+        return result.nodes().stream().filter(node -> id.equals(node.id())).findFirst().orElse(null);
+    }
+
+    private static boolean pointOnNodePerimeter(Point point, LaidOutNode node, double tolerance) {
+        double left = node.x();
+        double right = node.x() + node.width();
+        double top = node.y();
+        double bottom = node.y() + node.height();
+        return point.x() >= left - tolerance
+                && point.x() <= right + tolerance
+                && point.y() >= top - tolerance
+                && point.y() <= bottom + tolerance
+                && (sameWithin(point.x(), left, tolerance)
+                || sameWithin(point.x(), right, tolerance)
+                || sameWithin(point.y(), top, tolerance)
+                || sameWithin(point.y(), bottom, tolerance));
+    }
+
+    private static boolean sameWithin(double left, double right, double tolerance) {
+        return Math.abs(left - right) <= tolerance;
+    }
+
+    private static int countOverlaps(LayoutResult result) {
+        int count = 0;
+        for (int i = 0; i < result.nodes().size(); i++) {
+            LaidOutNode left = result.nodes().get(i);
+            for (int j = i + 1; j < result.nodes().size(); j++) {
+                LaidOutNode right = result.nodes().get(j);
+                if (rectanglesOverlap(left.x(), left.y(), left.width(), left.height(),
+                        right.x(), right.y(), right.width(), right.height())) {
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
+
+    private static int countConnectorThroughNodes(LayoutResult result) {
+        int count = 0;
+        for (LaidOutEdge edge : result.edges()) {
+            for (int i = 0; i + 1 < edge.points().size(); i++) {
+                Point start = edge.points().get(i);
+                Point end = edge.points().get(i + 1);
+                for (LaidOutNode node : result.nodes()) {
+                    if (!node.id().equals(edge.source())
+                            && !node.id().equals(edge.target())
+                            && segmentIntersectsRect(start, end, node.x(), node.y(), node.width(), node.height())) {
+                        count++;
+                        break;
+                    }
+                }
+            }
+        }
+        return count;
+    }
+
+    private static int countGroupBoundaryIssues(LayoutResult result) {
+        int count = 0;
+        for (var group : result.groups()) {
+            for (String memberId : group.members()) {
+                LaidOutNode node = findNode(result, memberId);
+                if (node == null) {
+                    continue;
+                }
+                boolean inside = node.x() >= group.x()
+                        && node.y() >= group.y()
+                        && node.x() + node.width() <= group.x() + group.width()
+                        && node.y() + node.height() <= group.y() + group.height();
+                if (!inside) {
+                    count++;
+                }
+            }
+        }
+        for (LaidOutEdge edge : result.edges()) {
+            for (int i = 0; i + 1 < edge.points().size(); i++) {
+                Point start = edge.points().get(i);
+                Point end = edge.points().get(i + 1);
+                for (var group : result.groups()) {
+                    if (group.members().contains(edge.source()) || group.members().contains(edge.target())) {
+                        continue;
+                    }
+                    if (segmentIntersectsRect(start, end, group.x(), group.y(), group.width(), group.height())) {
+                        count++;
+                        break;
+                    }
+                }
+            }
+        }
+        return count;
+    }
+
+    private static int countCloseParallelRoutes(LayoutResult result) {
+        var segments = new ArrayList<RouteSegment>();
+        for (int edgeIndex = 0; edgeIndex < result.edges().size(); edgeIndex++) {
+            LaidOutEdge edge = result.edges().get(edgeIndex);
+            for (int i = 0; i + 1 < edge.points().size(); i++) {
+                RouteSegment segment = routeSegment(edgeIndex, edge.source(), edge.target(), edge.points().get(i), edge.points().get(i + 1));
+                if (segment != null) {
+                    segments.add(segment);
+                }
+            }
+        }
+        int count = 0;
+        for (int i = 0; i < segments.size(); i++) {
+            for (int j = i + 1; j < segments.size(); j++) {
+                if (closeParallelRouteSegments(segments.get(i), segments.get(j))) {
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
+
+    private static RouteSegment routeSegment(int edgeIndex, String source, String target, Point start, Point end) {
+        if (sameCoordinate(start.y(), end.y()) && !sameCoordinate(start.x(), end.x())) {
+            return new RouteSegment(edgeIndex, source, target, Orientation.HORIZONTAL, start.y(),
+                    Math.min(start.x(), end.x()), Math.max(start.x(), end.x()));
+        }
+        if (sameCoordinate(start.x(), end.x()) && !sameCoordinate(start.y(), end.y())) {
+            return new RouteSegment(edgeIndex, source, target, Orientation.VERTICAL, start.x(),
+                    Math.min(start.y(), end.y()), Math.max(start.y(), end.y()));
+        }
+        return null;
+    }
+
+    private static boolean closeParallelRouteSegments(RouteSegment left, RouteSegment right) {
+        return left.edgeIndex != right.edgeIndex
+                && !shareEndpoint(left, right)
+                && left.orientation == right.orientation
+                && Math.abs(left.fixed - right.fixed) < ROUTE_CLOSE_PARALLEL_DISTANCE
+                && overlapLength(left.min, left.max, right.min, right.max) >= ROUTE_CLOSE_PARALLEL_MIN_OVERLAP;
+    }
+
+    private static boolean shareEndpoint(RouteSegment left, RouteSegment right) {
+        return left.source.equals(right.source)
+                || left.source.equals(right.target)
+                || left.target.equals(right.source)
+                || left.target.equals(right.target);
+    }
+
+    private static double overlapLength(double leftMin, double leftMax, double rightMin, double rightMax) {
+        return Math.max(0.0, Math.min(leftMax, rightMax) - Math.max(leftMin, rightMin));
+    }
+
+    private static boolean hasExcessiveDetour(List<Point> points) {
+        if (points.size() < 2) {
+            return false;
+        }
+        double routeLength = routeLength(points);
+        Point start = points.getFirst();
+        Point end = points.getLast();
+        double directLength = Math.abs(start.x() - end.x()) + Math.abs(start.y() - end.y());
+        return directLength > 0.0
+                && routeLength > directLength * ROUTE_DETOUR_RATIO
+                && routeLength - directLength > ROUTE_DETOUR_EXCESS;
+    }
+
+    private static double routeLength(List<Point> points) {
+        double length = 0.0;
+        for (int i = 0; i + 1 < points.size(); i++) {
+            length += Math.abs(points.get(i).x() - points.get(i + 1).x())
+                    + Math.abs(points.get(i).y() - points.get(i + 1).y());
+        }
+        return length;
+    }
+
+    private static boolean sameCoordinate(double left, double right) {
+        return Math.abs(left - right) <= GEOMETRY_EPSILON;
+    }
+
+    private static boolean rectanglesOverlap(
+            double leftX,
+            double leftY,
+            double leftWidth,
+            double leftHeight,
+            double rightX,
+            double rightY,
+            double rightWidth,
+            double rightHeight) {
+        return leftX < rightX + rightWidth
+                && leftX + leftWidth > rightX
+                && leftY < rightY + rightHeight
+                && leftY + leftHeight > rightY;
+    }
+
+    private static boolean segmentIntersectsRect(Point start, Point end, double rectX, double rectY, double rectWidth, double rectHeight) {
+        double minX = Math.min(start.x(), end.x());
+        double maxX = Math.max(start.x(), end.x());
+        double minY = Math.min(start.y(), end.y());
+        double maxY = Math.max(start.y(), end.y());
+        return rectanglesOverlap(
+                minX,
+                minY,
+                Math.max(maxX - minX, 1.0),
+                Math.max(maxY - minY, 1.0),
+                rectX,
+                rectY,
+                rectWidth,
+                rectHeight);
+    }
+
+    private enum Orientation {
+        HORIZONTAL,
+        VERTICAL
+    }
+
+    private record RouteSegment(
+            int edgeIndex,
+            String source,
+            String target,
+            Orientation orientation,
+            double fixed,
+            double min,
+            double max) {
+    }
+}
