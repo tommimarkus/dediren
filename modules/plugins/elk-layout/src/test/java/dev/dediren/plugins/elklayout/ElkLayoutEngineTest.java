@@ -99,6 +99,7 @@ class ElkLayoutEngineTest {
             null);
 
         LayoutResult result = new ElkLayoutEngine().layout(request);
+        ElkLayoutRenderArtifacts.write(result);
 
         LaidOutNode client = result.nodes().stream()
             .filter(node -> node.id().equals("client"))
@@ -137,6 +138,7 @@ class ElkLayoutEngineTest {
             new LayoutPreferences(LayoutDirection.UP, null, null, null));
 
         LayoutResult result = new ElkLayoutEngine().layout(request);
+        ElkLayoutRenderArtifacts.write(result);
 
         assertRouteEndpointOnSide(result, "worker-polls-queue", "worker", true, PortSide.NORTH);
         assertRouteEndpointOnSide(result, "worker-polls-queue", "queue", false, PortSide.SOUTH);
@@ -162,6 +164,7 @@ class ElkLayoutEngineTest {
             null);
 
         LayoutResult result = new ElkLayoutEngine().layout(request);
+        ElkLayoutRenderArtifacts.write(result);
         LaidOutEdge cachedEdge = edgeById(result, "check-cache-cached");
         LaidOutEdge staleEdge = edgeById(result, "check-cache-stale");
 
@@ -196,6 +199,7 @@ class ElkLayoutEngineTest {
             null);
 
         LayoutResult result = new ElkLayoutEngine().layout(request);
+        ElkLayoutRenderArtifacts.write(result);
 
         LaidOutGroup group = result.groups().get(0);
 
@@ -224,6 +228,7 @@ class ElkLayoutEngineTest {
             null);
 
         LayoutResult result = new ElkLayoutEngine().layout(request);
+        ElkLayoutRenderArtifacts.write(result);
 
         LaidOutGroup group = result.groups().get(0);
 
@@ -270,6 +275,7 @@ class ElkLayoutEngineTest {
             null);
 
         LayoutResult result = new ElkLayoutEngine().layout(request);
+        ElkLayoutRenderArtifacts.write(result);
 
         assertEquals(2, result.groups().size());
         LaidOutGroup application = result.groups().stream()
@@ -333,6 +339,7 @@ class ElkLayoutEngineTest {
             null);
 
         LayoutResult result = new ElkLayoutEngine().layout(request);
+        ElkLayoutRenderArtifacts.write(result);
         LaidOutNode client = nodeById(result, "client");
         LaidOutNode webApp = nodeById(result, "web-app");
         LaidOutGroup application = groupById(result, "application-services");
@@ -383,6 +390,7 @@ class ElkLayoutEngineTest {
             null);
 
         LayoutResult result = new ElkLayoutEngine().layout(request);
+        ElkLayoutRenderArtifacts.write(result);
         LaidOutNode orderService = nodeById(result, "order-service");
         LaidOutEdge catalog = edgeById(result, "order-checks-catalog");
         LaidOutEdge payment = edgeById(result, "order-requests-payment");
@@ -427,6 +435,7 @@ class ElkLayoutEngineTest {
             null);
 
         LayoutResult result = new ElkLayoutEngine().layout(request);
+        ElkLayoutRenderArtifacts.write(result);
         LaidOutEdge paymentEdge = result.edges().stream()
             .filter(edge -> edge.id().equals("api-authorizes-payment"))
             .findFirst()
@@ -467,6 +476,7 @@ class ElkLayoutEngineTest {
             null);
 
         LayoutResult result = new ElkLayoutEngine().layout(request);
+        ElkLayoutRenderArtifacts.write(result);
         LaidOutNode gateway = nodeById(result, "gateway");
 
         assertEquals(
@@ -509,6 +519,7 @@ class ElkLayoutEngineTest {
             null);
 
         LayoutResult result = new ElkLayoutEngine().layout(request);
+        ElkLayoutRenderArtifacts.write(result);
 
         assertEquals(
             0,
@@ -565,6 +576,7 @@ class ElkLayoutEngineTest {
             null);
 
         LayoutResult result = new ElkLayoutEngine().layout(request);
+        ElkLayoutRenderArtifacts.write(result);
         List<LaidOutEdge> fanOutEdges = List.of(
             edgeById(result, "gateway-authenticates"),
             edgeById(result, "gateway-prices-cart"),
@@ -606,6 +618,7 @@ class ElkLayoutEngineTest {
                 new LayoutRoutingPreferences(LayoutRoutingStyle.ORTHOGONAL, null, LayoutEndpointMerging.OFF)));
 
         LayoutResult result = new ElkLayoutEngine().layout(request);
+        ElkLayoutRenderArtifacts.write(result);
         List<LaidOutEdge> fanOutEdges = List.of(
             edgeById(result, "edge-a"),
             edgeById(result, "edge-b"),
@@ -650,6 +663,7 @@ class ElkLayoutEngineTest {
                 new LayoutRoutingPreferences(LayoutRoutingStyle.ORTHOGONAL, null, LayoutEndpointMerging.OFF)));
 
         LayoutResult result = new ElkLayoutEngine().layout(request);
+        ElkLayoutRenderArtifacts.write(result);
 
         LaidOutNode source = nodeById(result, "source");
         assertTrue(
@@ -688,6 +702,7 @@ class ElkLayoutEngineTest {
             null);
 
         LayoutResult result = new ElkLayoutEngine().layout(request);
+        ElkLayoutRenderArtifacts.write(result);
 
         for (String edgeId : List.of(
             "gateway-authenticates",
@@ -725,6 +740,7 @@ class ElkLayoutEngineTest {
             null);
 
         LayoutResult result = new ElkLayoutEngine().layout(request);
+        ElkLayoutRenderArtifacts.write(result);
 
         for (String edgeId : List.of(
             "gateway-authenticates",
@@ -771,6 +787,7 @@ class ElkLayoutEngineTest {
             null);
 
         LayoutResult result = new ElkLayoutEngine().layout(request);
+        ElkLayoutRenderArtifacts.write(result);
         LaidOutNode source = nodeById(result, "identity-service");
         LaidOutEdge cacheEdge = edgeById(result, "identity-caches-session");
         LaidOutEdge federatesEdge = edgeById(result, "identity-federates");
@@ -818,6 +835,7 @@ class ElkLayoutEngineTest {
             null);
 
         LayoutResult result = new ElkLayoutEngine().layout(request);
+        ElkLayoutRenderArtifacts.write(result);
         LaidOutNode source = nodeById(result, "pricing-service");
         LaidOutEdge readsEdge = edgeById(result, "pricing-reads-products");
         LaidOutEdge cacheEdge = edgeById(result, "pricing-caches-quotes");
@@ -875,6 +893,7 @@ class ElkLayoutEngineTest {
             null);
 
         LayoutResult result = new ElkLayoutEngine().layout(request);
+        ElkLayoutRenderArtifacts.write(result);
         LaidOutNode mobile = nodeById(result, "customer-mobile");
         LaidOutNode web = nodeById(result, "customer-web");
         LaidOutEdge mobileEdge = edgeById(result, "mobile-enters-cdn");
@@ -924,6 +943,7 @@ class ElkLayoutEngineTest {
             null);
 
         LayoutResult result = new ElkLayoutEngine().layout(request);
+        ElkLayoutRenderArtifacts.write(result);
         LaidOutEdge webEdge = result.edges().stream()
             .filter(edge -> edge.id().equals("web-calls-api"))
             .findFirst()
@@ -971,6 +991,7 @@ class ElkLayoutEngineTest {
             null);
 
         LayoutResult result = new ElkLayoutEngine().layout(request);
+        ElkLayoutRenderArtifacts.write(result);
         List<LaidOutEdge> fanInEdges = List.of(
             edgeById(result, "web-calls-api"),
             edgeById(result, "worker-updates-api"),
@@ -1022,6 +1043,7 @@ class ElkLayoutEngineTest {
             null);
 
         LayoutResult result = new ElkLayoutEngine().layout(request);
+        ElkLayoutRenderArtifacts.write(result);
 
         assertEquals(
             0,
@@ -1060,6 +1082,7 @@ class ElkLayoutEngineTest {
             null);
 
         LayoutResult result = new ElkLayoutEngine().layout(request);
+        ElkLayoutRenderArtifacts.write(result);
         LaidOutEdge paymentEdge = edgeById(result, "payments-serves-api");
         int detourCount = excessiveRouteDetourCount(result);
 
@@ -1108,6 +1131,7 @@ class ElkLayoutEngineTest {
             new LayoutPreferences(LayoutDirection.DOWN, null, null, null));
 
         LayoutResult result = new ElkLayoutEngine().layout(request);
+        ElkLayoutRenderArtifacts.write(result);
 
         assertRouteEndpointOnSide(result, "workflow-to-worker", "workflow-entry", true, PortSide.SOUTH);
         assertRouteEndpointOnSide(result, "workflow-to-worker", "worker-entry", false, PortSide.NORTH);
@@ -1247,6 +1271,7 @@ class ElkLayoutEngineTest {
                 new LayoutRoutingPreferences(LayoutRoutingStyle.ORTHOGONAL, LayoutRoutingProfile.SPACIOUS, LayoutEndpointMerging.OFF)));
 
         LayoutResult result = new ElkLayoutEngine().layout(request);
+        ElkLayoutRenderArtifacts.write(result);
 
         assertRouteEndpointsOnNodePerimeters(result, "actor-ulosottolaitos-assigns-feedback");
         assertRouteEndpointsOnNodePerimeters(result, "proc-feedback-flow-applicant");
@@ -1289,6 +1314,7 @@ class ElkLayoutEngineTest {
             null);
 
         LayoutResult result = new ElkLayoutEngine().layout(request);
+        ElkLayoutRenderArtifacts.write(result);
         LaidOutEdge dispatchEdge = edgeById(result, "event-bus-to-or-junction");
         LaidOutEdge orderEdge = edgeById(result, "event-bus-drives-order-worker");
 
@@ -1535,6 +1561,7 @@ class ElkLayoutEngineTest {
             null);
 
         LayoutResult result = new ElkLayoutEngine().layout(request);
+        ElkLayoutRenderArtifacts.write(result);
 
         assertEquals(
             0,

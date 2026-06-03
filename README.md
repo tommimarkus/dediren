@@ -46,8 +46,8 @@ release workflows cache that path separately from Maven artifacts.
 The `dist-build` profile creates an agent-ready archive under `dist/`:
 
 ```text
-dist/dediren-agent-bundle-0.18.1-x86_64-unknown-linux-gnu/
-dist/dediren-agent-bundle-0.18.1-x86_64-unknown-linux-gnu.tar.gz
+dist/dediren-agent-bundle-0.18.2-x86_64-unknown-linux-gnu/
+dist/dediren-agent-bundle-0.18.2-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Set a supported target with `DEDIREN_DIST_TARGET` when needed:
@@ -69,7 +69,7 @@ target must match the build host.
 ## Bundle Layout
 
 ```text
-dediren-agent-bundle-0.18.1-x86_64-unknown-linux-gnu/
+dediren-agent-bundle-0.18.2-x86_64-unknown-linux-gnu/
   bin/
     dediren
     dediren-plugin-generic-graph
@@ -101,7 +101,7 @@ the caller's current working directory.
 From an unpacked bundle:
 
 ```bash
-VERSION=0.18.1
+VERSION=0.18.2
 TARGET=x86_64-unknown-linux-gnu
 BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-${VERSION}-${TARGET}
 
@@ -223,6 +223,58 @@ Release tags use `v<version>`. The product version source is
 root `pom.xml`. First-party plugin manifests, source fixture
 `required_plugins[].version` entries, bundle examples, and release workflow
 checks must move with the product version.
+
+Use SemVer intent while the project is pre-1.0:
+
+- Patch: compatible fixes, documentation, tests, and internal refactors.
+- Minor: additive compatible public surface changes or runtime migration
+  cutovers.
+- Major: backwards-incompatible public product or plugin contract changes.
+
+Maven can calculate the next version for the POMs, which avoids manually
+typing the next numeric version. For a patch bump:
+
+```bash
+./mvnw build-helper:parse-version versions:set \
+  -DnewVersion='${parsedVersion.majorVersion}.${parsedVersion.minorVersion}.${parsedVersion.nextIncrementalVersion}' \
+  -DprocessAllModules=true \
+  -DgenerateBackupPoms=false
+```
+
+For a minor bump, use
+`-DnewVersion='${parsedVersion.majorVersion}.${parsedVersion.nextMinorVersion}.0'`.
+For a major bump, use
+`-DnewVersion='${parsedVersion.nextMajorVersion}.0.0'`.
+
+After Maven updates the POMs, update the remaining checked-in product version
+surfaces:
+
+| Surface | Files |
+| --- | --- |
+| Product version source | `pom.xml` |
+| Module parent versions | `apps/**/pom.xml`, `modules/**/pom.xml`, `test-support/pom.xml`, `testbeds/**/pom.xml`, `tools/**/pom.xml` |
+| First-party plugin manifests | `fixtures/plugins/*.manifest.json` |
+| Source fixture plugin requirements | `fixtures/source/*.json` `required_plugins[].version` entries |
+| Bundle and required-plugin examples | `README.md`, `docs/agent-usage.md` |
+| CLI version assertion | `apps/cli/src/test/java/dev/dediren/cli/MainTest.java` |
+| Manifest round-trip assertion | `modules/contracts/src/test/java/dev/dediren/contracts/ContractRoundTripTest.java` |
+| Export/plugin fixture assertions | `modules/plugins/archimate-oef-export/src/test/java/dev/dediren/plugins/archimateoef/MainTest.java`, `modules/plugins/generic-graph/src/test/java/dev/dediren/plugins/genericgraph/GenericGraphPluginTest.java` |
+| Distribution launcher assertion | `tools/dist/src/test/java/dev/dediren/tools/dist/DistModuleTest.java` |
+| Release tag check | `.github/workflows/release.yml` validates `v<version>` against root `pom.xml`; update only if the version source changes |
+
+Before committing a version bump, run a stale-version search over the active
+version surfaces:
+
+```bash
+rg "<old-version>" pom.xml README.md docs/agent-usage.md fixtures/plugins fixtures/source
+```
+
+Then commit the content change and version bump together, and create the
+matching annotated tag on that commit:
+
+```bash
+git tag -a v<version> -m "Release <version>"
+```
 
 GitHub Releases publish target-specific archives, `SHA256SUMS`, and CycloneDX
 SBOMs. The release workflow generates GitHub artifact attestations for archives
