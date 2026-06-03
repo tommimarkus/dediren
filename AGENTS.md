@@ -18,12 +18,6 @@
 
 ## Skill Routing
 
-- `git-workflow-policy: feature branches, clean worktree, no direct main`.
-  Project-local workflow rules and exceptions live in `## Git Hygiene`.
-- `release-policy: SemVer pre-1.0, root pom.xml version source, annotated
-  v<version> tags, GitHub Releases from the tag workflow, no package
-  publication unless explicitly authorized`. Project-local release rules and
-  exceptions live in `## Versioning` and `README.md`.
 - Use `souroldgeezer-design:software-design` for module boundaries,
   dependency direction, responsibility ownership, coupling, refactors,
   plugin/core split, Java code shape, or plan-to-code design drift.
