@@ -24,16 +24,16 @@ class ElkLayoutEngineTest {
     private static final double PORT_SIDE_EPSILON = 1.0;
 
     @Test
-    void elkHelperBuildUsesLayeredOnly() throws IOException {
-        String buildFile = Files.readString(Path.of("build.gradle.kts"));
-        String versionCatalog = Files.readString(Path.of("../../..", "gradle", "libs.versions.toml"));
+    void elkModuleUsesLayeredOnly() throws IOException {
+        String modulePom = Files.readString(Path.of("pom.xml"));
+        String rootPom = Files.readString(Path.of("../../..", "pom.xml"));
 
         assertFalse(
-            buildFile.contains("org.eclipse.elk.alg.libavoid"),
-            "ELK helper must not declare the Libavoid backend");
+            modulePom.contains("org.eclipse.elk.alg.libavoid"),
+            "ELK module must not declare the Libavoid backend");
         assertFalse(
-            versionCatalog.contains("org.eclipse.elk.alg.libavoid"),
-            "ELK root version catalog must not include the Libavoid backend");
+            rootPom.contains("org.eclipse.elk.alg.libavoid"),
+            "ELK root dependency management must not include the Libavoid backend");
     }
 
     @Test

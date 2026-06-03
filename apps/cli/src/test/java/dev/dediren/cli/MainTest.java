@@ -11,7 +11,7 @@ class MainTest {
     }
 
     @Test
-    void versionCommandReportsGradleProductVersion() {
+    void versionCommandReportsProductVersion() {
         CliResult result = Main.executeForTesting(new String[]{"--version"}, "");
 
         assertThat(result.exitCode()).isZero();

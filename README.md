@@ -18,7 +18,7 @@ For a token-efficient authoring guide, see `docs/agent-usage.md`.
 ## Requirements
 
 - Java 21 or newer available as `java` on `PATH`.
-- Build with the checked-in Gradle Wrapper: `./gradlew`.
+- Build with the checked-in Maven Wrapper: `./mvnw`.
 - `xmllint` on `PATH` for standards validation in ArchiMate OEF and UML/XMI
   export paths.
 - `curl` on `PATH` only when export validation needs to populate a standards
@@ -28,24 +28,24 @@ For a token-efficient authoring guide, see `docs/agent-usage.md`.
 ## Build And Test
 
 ```bash
-./gradlew test
-./gradlew :tools:dist:thirdPartyNotices
-./gradlew :tools:dist:distBuild
-./gradlew :tools:dist:distSmoke
+./mvnw test
+./mvnw -pl tools/dist -am verify -Pthird-party-notices
+./mvnw -pl tools/dist -am verify -Pdist-build
+./mvnw -pl tools/dist -am verify -Pdist-smoke
 ```
 
-`distBuild` creates an agent-ready archive under `dist/`:
+The `dist-build` profile creates an agent-ready archive under `dist/`:
 
 ```text
 dist/dediren-agent-bundle-0.18.1-x86_64-unknown-linux-gnu/
 dist/dediren-agent-bundle-0.18.1-x86_64-unknown-linux-gnu.tar.gz
 ```
 
-Set a supported target with Gradle project property `target` when needed:
+Set a supported target with `DEDIREN_DIST_TARGET` when needed:
 
 ```bash
-./gradlew :tools:dist:distBuild -Ptarget=x86_64-unknown-linux-gnu
-./gradlew :tools:dist:distSmoke -Ptarget=x86_64-unknown-linux-gnu
+DEDIREN_DIST_TARGET=x86_64-unknown-linux-gnu ./mvnw -pl tools/dist -am verify -Pdist-build
+DEDIREN_DIST_TARGET=x86_64-unknown-linux-gnu ./mvnw -pl tools/dist -am verify -Pdist-smoke
 ```
 
 Supported targets are:
@@ -195,22 +195,22 @@ decisions from stdout JSON.
 Use the narrowest useful lane first:
 
 ```bash
-./gradlew :modules:contracts:test
-./gradlew :modules:core:test
-./gradlew :apps:cli:test
-./gradlew :modules:plugins:generic-graph:test
-./gradlew :modules:plugins:elk-layout:test
-./gradlew :modules:plugins:svg-render:test
-./gradlew :modules:plugins:archimate-oef-export:test
-./gradlew :modules:plugins:uml-xmi-export:test
-./gradlew test
-./gradlew :tools:dist:distBuild :tools:dist:distSmoke
+./mvnw -pl modules/contracts -am test
+./mvnw -pl modules/core -am test
+./mvnw -pl apps/cli -am test
+./mvnw -pl modules/plugins/generic-graph -am test
+./mvnw -pl modules/plugins/elk-layout -am test
+./mvnw -pl modules/plugins/svg-render -am test
+./mvnw -pl modules/plugins/archimate-oef-export -am test
+./mvnw -pl modules/plugins/uml-xmi-export -am test
+./mvnw test
+./mvnw -pl tools/dist -am verify -Pdist-smoke
 git diff --check
 ```
 
 ## Release
 
 Release tags use `v<version>`. The product version source is
-`build.gradle.kts`. First-party plugin manifests, source fixture
+root `pom.xml`. First-party plugin manifests, source fixture
 `required_plugins[].version` entries, bundle examples, and release workflow
 checks must move with the product version.

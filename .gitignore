@@ -1,4 +1,5 @@
 /target/
+**/target/
 /dist/
 /.gradle/
 /build/
@@ -6,7 +7,10 @@
 /.worktrees/
 /.test-output/
 /.cache/gradle/
+/.cache/maven/
 /.cache/locks/
+.mvn/wrapper/maven-wrapper.jar
+.mvn/wrapper/MavenWrapperDownloader.class
 crates/dediren-plugin-elk-layout/java/.gradle/
 crates/dediren-plugin-elk-layout/java/build/
 **/*.svg

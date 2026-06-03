@@ -28,16 +28,16 @@ public final class DistTool {
         new DistTarget("aarch64-unknown-linux-gnu", "linux", "aarch64"),
         new DistTarget("aarch64-apple-darwin", "macos", "aarch64"));
     private static final List<Launcher> LAUNCHERS = List.of(
-        new Launcher("apps/cli/build/install/cli", "cli", "dediren", null),
-        new Launcher("modules/plugins/generic-graph/build/install/generic-graph", "generic-graph",
+        new Launcher("apps/cli/target/appassembler", "cli", "dediren", null),
+        new Launcher("modules/plugins/generic-graph/target/appassembler", "generic-graph",
             "dediren-plugin-generic-graph", "generic-graph"),
-        new Launcher("modules/plugins/elk-layout/build/install/elk-layout", "elk-layout",
+        new Launcher("modules/plugins/elk-layout/target/appassembler", "elk-layout",
             "dediren-plugin-elk-layout", "elk-layout"),
-        new Launcher("modules/plugins/svg-render/build/install/svg-render", "svg-render",
+        new Launcher("modules/plugins/svg-render/target/appassembler", "svg-render",
             "dediren-plugin-svg-render", "svg-render"),
-        new Launcher("modules/plugins/archimate-oef-export/build/install/archimate-oef-export",
+        new Launcher("modules/plugins/archimate-oef-export/target/appassembler",
             "archimate-oef-export", "dediren-plugin-archimate-oef-export", "archimate-oef"),
-        new Launcher("modules/plugins/uml-xmi-export/build/install/uml-xmi-export", "uml-xmi-export",
+        new Launcher("modules/plugins/uml-xmi-export/target/appassembler", "uml-xmi-export",
             "dediren-plugin-uml-xmi-export", "uml-xmi"));
     private static final List<String> CLEAN_ENV = List.of(
         "DEDIREN_PLUGIN_DIRS",
@@ -142,7 +142,7 @@ public final class DistTool {
         StringBuilder notice = new StringBuilder();
         notice.append("# Third-Party Notices\n\n");
         notice.append("Dediren's own source and launchers are covered by the root LICENSE file.\n");
-        notice.append("The Gradle runtime dependency graph below covers redistributed Java libraries.\n\n");
+        notice.append("The Maven runtime dependency graph below covers redistributed Java libraries.\n\n");
         notice.append("## Java Runtime Dependencies\n\n");
         for (String jar : jars) {
             notice.append("- ").append(jar).append('\n');
@@ -247,16 +247,30 @@ public final class DistTool {
         if (script.contains("DEDIREN_BUNDLE_ROOT=")) {
             return script;
         }
-        int appHome = script.indexOf("APP_HOME=$( cd -P ");
-        if (appHome < 0) {
-            throw new IllegalArgumentException("launcher script does not contain the APP_HOME assignment");
-        }
-        int lineEnd = script.indexOf('\n', appHome);
+        InsertionPoint marker = findBundleRootInsertionPoint(script);
+        int lineEnd = script.indexOf('\n', marker.index());
         int insertionPoint = lineEnd < 0 ? script.length() : lineEnd + 1;
         String lineSeparator = script.contains("\r\n") ? "\r\n" : "\n";
-        String export = "DEDIREN_BUNDLE_ROOT=\"${DEDIREN_BUNDLE_ROOT:-$APP_HOME}\"" + lineSeparator
+        String export = "DEDIREN_BUNDLE_ROOT=\"${DEDIREN_BUNDLE_ROOT:-$" + marker.variable() + "}\""
+            + lineSeparator
             + "export DEDIREN_BUNDLE_ROOT" + lineSeparator;
         return script.substring(0, insertionPoint) + export + script.substring(insertionPoint);
+    }
+
+    private static InsertionPoint findBundleRootInsertionPoint(String script) {
+        int appHome = script.indexOf("APP_HOME=$( cd -P ");
+        if (appHome >= 0) {
+            return new InsertionPoint(appHome, "APP_HOME");
+        }
+        int basedir = script.indexOf("BASEDIR=");
+        if (basedir >= 0) {
+            return new InsertionPoint(basedir, "BASEDIR");
+        }
+        int baseDir = script.indexOf("BASE_DIR=");
+        if (baseDir >= 0) {
+            return new InsertionPoint(baseDir, "BASE_DIR");
+        }
+        throw new IllegalArgumentException("launcher script does not contain a recognized application home assignment");
     }
 
     private static void copyManifestFiles(Path source, Path target) throws IOException {
@@ -703,6 +717,9 @@ public final class DistTool {
     }
 
     private record DistTarget(String triple, String hostOs, String hostArch) {
+    }
+
+    private record InsertionPoint(int index, String variable) {
     }
 
     private record Launcher(String installDir, String sourceScript, String bundleScript, String pluginId) {

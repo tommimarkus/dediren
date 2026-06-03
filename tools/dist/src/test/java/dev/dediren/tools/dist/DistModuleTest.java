@@ -28,6 +28,22 @@ class DistModuleTest {
     }
 
     @Test
+    void mavenLauncherScriptExportsBundleRootFromBasedir() {
+        String script = """
+            #!/bin/sh
+            BASEDIR=$(dirname "$0")/..
+            exec "$JAVACMD" "$@"
+            """;
+
+        String rewritten = DistTool.withBundleRootExport(script);
+
+        assertThat(rewritten)
+            .contains("DEDIREN_BUNDLE_ROOT=\"${DEDIREN_BUNDLE_ROOT:-$BASEDIR}\"")
+            .contains("export DEDIREN_BUNDLE_ROOT")
+            .containsSubsequence("BASEDIR=$(", "DEDIREN_BUNDLE_ROOT=");
+    }
+
+    @Test
     void bundledPluginIdsAreDerivedFromPluginLaunchers() {
         assertThat(DistTool.bundledPluginIds())
             .containsExactly(

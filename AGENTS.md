@@ -73,7 +73,7 @@
 
 ## Versioning
 
-- The product version source is root `build.gradle.kts`.
+- The product version source is root `pom.xml`.
 - Version bumps live in the same commit as the content change that requires
   them.
 - Every product/plugin version bump must also create the matching annotated git
@@ -90,8 +90,8 @@
 - Public schema ids such as `model.schema.v1` change only when the contract
   family intentionally changes.
 - After every product/plugin version bump, run a stale-version search over
-  `build.gradle.kts`, `README.md`, `docs/agent-usage.md`, `fixtures/plugins`,
-  and `fixtures/source`.
+  `pom.xml`, `README.md`, `docs/agent-usage.md`, `fixtures/plugins`, and
+  `fixtures/source`.
 
 ## Plugin Runtime Rules
 
@@ -109,7 +109,7 @@
 ## ELK Runtime
 
 - `modules/plugins/elk-layout` is the first-party official Java ELK plugin.
-- It uses Eclipse ELK Java libraries and the Gradle application launcher.
+- It uses Eclipse ELK Java libraries and the Maven appassembler launcher.
 - Java 21 or newer is required.
 
 ## Verification
@@ -126,49 +126,51 @@ git diff --check
 General Java changes:
 
 ```bash
-./gradlew test
+./mvnw test
 ```
 
 Contract/schema changes:
 
 ```bash
-./gradlew :modules:contracts:test
+./mvnw -pl modules/contracts -am test
 ```
 
 Plugin runtime changes:
 
 ```bash
-./gradlew :modules:core:test :apps:cli:test
+./mvnw -pl modules/core,apps/cli -am test
 ```
 
 ELK changes:
 
 ```bash
-./gradlew :modules:plugins:elk-layout:test :tools:dist:distSmoke
+./mvnw -pl modules/plugins/elk-layout -am test
+./mvnw -pl tools/dist -am verify -Pdist-smoke
 ```
 
 SVG render changes:
 
 ```bash
-./gradlew :modules:plugins:svg-render:test :apps:cli:test
+./mvnw -pl modules/plugins/svg-render,apps/cli -am test
 ```
 
 OEF export changes:
 
 ```bash
-./gradlew :modules:plugins:archimate-oef-export:test :apps:cli:test
+./mvnw -pl modules/plugins/archimate-oef-export,apps/cli -am test
 ```
 
 UML/XMI export changes:
 
 ```bash
-./gradlew :modules:plugins:uml-xmi-export:test :apps:cli:test
+./mvnw -pl modules/plugins/uml-xmi-export,apps/cli -am test
 ```
 
 Distribution/release changes:
 
 ```bash
-./gradlew test :tools:dist:distBuild :tools:dist:distSmoke
+./mvnw test
+./mvnw -pl tools/dist -am verify -Pdist-smoke
 git diff --check
 ```
 
@@ -198,7 +200,8 @@ handoff, then rerun affected checks.
   stage only intentional changes.
 - Do not use `git add -A` when unrelated files exist. Prefer explicit paths.
 - Do not commit ignored/generated outputs by default. In this repo that
-  includes `dist/`, `build/`, `.gradle/`, `.cache/gradle/`, and generated
+  includes `dist/`, `target/`, `build/`, `.gradle/`, `.cache/gradle/`,
+  `.cache/maven/`, downloaded `.mvn/wrapper/maven-wrapper.jar`, and generated
   `*.svg` files outside `.github/`.
 - If a task creates render/test artifacts, report their paths instead of
   staging them unless the user asked for tracked examples.

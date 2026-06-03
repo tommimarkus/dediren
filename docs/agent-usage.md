@@ -5,6 +5,9 @@ bundle. Use schemas for exact validation and fixtures for examples, but use
 this file to decide which JSON to write, which JSON is generated, and how to
 repair failures.
 
+Source builds use the checked-in Maven Wrapper. Packaged bundle usage below is
+unchanged.
+
 Preserve the bundle root `LICENSE`, `THIRD-PARTY-NOTICES.md`, and this guide
 when redistributing a Dediren archive.
 

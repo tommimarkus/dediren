@@ -27,17 +27,13 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@39fdf500b386709a9a4a769f717dad447ac345b9 # v6
-        with:
-          cache-provider: basic
+          cache: maven
 
       - name: Install XML tools
         run: sudo apt-get update && sudo apt-get install -y libxml2-utils
 
       - name: Check workspace tests
-        run: ./gradlew test
+        run: ./mvnw test
 
       - name: Check whitespace
         run: git diff --check
@@ -71,11 +67,7 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@39fdf500b386709a9a4a769f717dad447ac345b9 # v6
-        with:
-          cache-provider: basic
+          cache: maven
 
       - name: Install Linux tools
         if: runner.os == 'Linux'
@@ -87,11 +79,10 @@ jobs:
           brew install libxml2 jq
           echo "/opt/homebrew/opt/libxml2/bin" >> "$GITHUB_PATH"
 
-      - name: Build distribution
-        run: ./gradlew :tools:dist:distBuild -Ptarget=${{ matrix.target }}
-
-      - name: Smoke distribution
-        run: ./gradlew :tools:dist:distSmoke -Ptarget=${{ matrix.target }}
+      - name: Build and smoke distribution
+        env:
+          DEDIREN_DIST_TARGET: ${{ matrix.target }}
+        run: ./mvnw -pl tools/dist -am verify -Pdist-smoke
 
       - name: Attest archive provenance
         uses: actions/attest-build-provenance@43d14bc2b83dec42d39ecae14e916627a18bb661 # v3
@@ -135,9 +126,9 @@ jobs:
           set -euo pipefail
 
           VERSION="${GITHUB_REF_NAME#v}"
-          PROJECT_VERSION="$(sed -n 's/^version = "\(.*\)"/\1/p' build.gradle.kts)"
+          PROJECT_VERSION="$(awk '/<version>/{gsub(/.*<version>|<\/version>.*/, ""); print; exit}' pom.xml)"
           if [[ "$PROJECT_VERSION" != "$VERSION" ]]; then
-            echo "Tag version $VERSION does not match Gradle project version $PROJECT_VERSION" >&2
+            echo "Tag version $VERSION does not match Maven project version $PROJECT_VERSION" >&2
             exit 1
           fi
 
