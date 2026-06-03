@@ -11,6 +11,11 @@ unchanged.
 Preserve the bundle root `LICENSE`, `THIRD-PARTY-NOTICES.md`, and this guide
 when redistributing a Dediren archive.
 
+This file is the shipped agent-facing contract for bundle usage. If Dediren is
+embedded in another agent skill, plugin, or tool package, preserve this path or
+carry the same JSON authoring, command handoff, runtime probe, and repair
+guidance in that package.
+
 ## Fast Path
 
 1. Author `model.json` with the `Minimal Source JSON` shape below.

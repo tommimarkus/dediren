@@ -3,21 +3,37 @@
 ## Start Here
 
 - Check `git status --short --branch` before editing.
+- Use this file for repository work guidance. Use `docs/agent-usage.md` for
+  downstream agents that author Dediren JSON or run packaged bundles.
 - Before changing behavior, load only the relevant local context:
   - Product boundary question: `docs/superpowers/specs/2026-05-08-dediren-design.md`
   - Existing slice or planned task: matching file under `docs/superpowers/plans/`
   - User-facing command or workflow: `README.md`
+  - Bundle-local agent authoring or runtime guidance: `docs/agent-usage.md`
 - Treat `README.md` as the main user-facing document. Keep it current when
   commands, workflows, plugin/runtime behavior, public artifacts, or examples
   change.
+- Treat `docs/agent-usage.md` as the shipped, token-efficient guide for agents
+  using a Dediren archive. Keep it bundle-local and command-oriented.
 - Treat plans as task guidance and implementation history. Live code and tests
   are the current truth when they disagree with a plan.
+- Do not revive stale Rust, Cargo, SDKMAN, Gradle, or `elkrs` guidance from old
+  plans. The live product is Java 21+ built with the checked-in Maven Wrapper.
 - For ELK layout/routing changes, start from the ELK-first rule: try official
   ELK Layered options, graph structure, ports, hierarchy, and real-render
   evidence before adding custom placement or route geometry code.
 
 ## Skill Routing
 
+- Use Superpowers skills for the work process: brainstorming, planning,
+  TDD/debugging discipline, parallelization, review flow, and verification
+  before completion. Use Sour Old Geezer skills for implementation-domain
+  judgment: software design, test quality, DevSecOps, architecture notation,
+  API/app/infra design, and repo-specific operational posture. They are
+  complementary: let Superpowers shape how the work proceeds and Sour Old
+  Geezer shape what "good" means inside the changed domain.
+- Keep policy-skill initialization out of this file. Project-local workflow and
+  release rules live in `## Git Hygiene`, `## Versioning`, and `README.md`.
 - Use `souroldgeezer-design:software-design` for module boundaries,
   dependency direction, responsibility ownership, coupling, refactors,
   plugin/core split, Java code shape, or plan-to-code design drift.
@@ -59,6 +75,9 @@
 - User-facing command, workflow, install, artifact-location, or
   agent-authoring changes: update `README.md` and `docs/agent-usage.md` in the
   same change.
+- Bundle-local agent guide changes that affect examples, redistributed files,
+  command handoff, diagnostics, runtime probes, or plugin environment variables
+  must stay consistent with `README.md` and distribution tests.
 - ELK layout changes: update `modules/plugins/elk-layout`, CLI/distribution
   smoke coverage, and README/agent runtime notes together.
 - SVG render policy changes: update `schemas/svg-render-policy.schema.json`,
