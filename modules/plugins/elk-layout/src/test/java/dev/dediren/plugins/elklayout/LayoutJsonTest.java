@@ -36,6 +36,7 @@ class LayoutJsonTest {
             List.of(),
             List.of(),
             List.of());
+        ElkLayoutRenderArtifacts.write(result);
 
         String envelope = EnvelopeWriter.ok(result);
 
