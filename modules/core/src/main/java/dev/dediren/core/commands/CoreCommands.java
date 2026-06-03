@@ -29,7 +29,14 @@ public final class CoreCommands {
     }
 
     public static PluginRunOutcome layoutCommand(String plugin, String inputText) throws PluginExecutionException {
-        return layoutCommand(new LayoutCommandInput(plugin, inputText, PluginRegistry.bundled(), System.getenv()));
+        return layoutCommand(plugin, inputText, System.getenv());
+    }
+
+    public static PluginRunOutcome layoutCommand(
+            String plugin,
+            String inputText,
+            Map<String, String> env) throws PluginExecutionException {
+        return layoutCommand(new LayoutCommandInput(plugin, inputText, PluginRegistry.bundled(), env));
     }
 
     public static PluginRunOutcome layoutCommand(LayoutCommandInput input) throws PluginExecutionException {
@@ -49,6 +56,16 @@ public final class CoreCommands {
             String view,
             String inputText,
             Path baseDir) throws PluginExecutionException {
+        return projectCommand(plugin, target, view, inputText, baseDir, System.getenv());
+    }
+
+    public static PluginRunOutcome projectCommand(
+            String plugin,
+            String target,
+            String view,
+            String inputText,
+            Path baseDir,
+            Map<String, String> env) throws PluginExecutionException {
         SourceDocument source;
         try {
             source = SourceValidator.loadAndValidateSourceDocument(inputText, baseDir);
@@ -61,7 +78,7 @@ public final class CoreCommands {
                 "projection",
                 List.of("project", "--target", target, "--view", view),
                 toJson("project", source),
-                PluginRunOptions.defaults());
+                PluginRunOptions.defaults().withCandidateEnv(env));
     }
 
     public static PluginRunOutcome semanticValidateCommand(
@@ -76,6 +93,15 @@ public final class CoreCommands {
             String profile,
             String inputText,
             Path baseDir) throws PluginExecutionException {
+        return semanticValidateCommand(plugin, profile, inputText, baseDir, System.getenv());
+    }
+
+    public static PluginRunOutcome semanticValidateCommand(
+            String plugin,
+            String profile,
+            String inputText,
+            Path baseDir,
+            Map<String, String> env) throws PluginExecutionException {
         SourceDocument source;
         try {
             source = SourceValidator.loadAndValidateSourceDocument(inputText, baseDir);
@@ -88,7 +114,7 @@ public final class CoreCommands {
                 "semantic-validation",
                 List.of("validate", "--profile", profile),
                 toJson("validate", source),
-                PluginRunOptions.defaults());
+                PluginRunOptions.defaults().withCandidateEnv(env));
     }
 
     public static ValidationResult validateLayoutCommand(String inputText) {
@@ -110,6 +136,15 @@ public final class CoreCommands {
             String policyText,
             String metadataText,
             String layoutText) throws PluginExecutionException {
+        return renderCommand(plugin, policyText, metadataText, layoutText, System.getenv());
+    }
+
+    public static PluginRunOutcome renderCommand(
+            String plugin,
+            String policyText,
+            String metadataText,
+            String layoutText,
+            Map<String, String> env) throws PluginExecutionException {
         LayoutResult layoutResult = parseCommandData("render", layoutText, LayoutResult.class);
         JsonNode policy = parseJson("render", policyText);
         RenderMetadata metadata = metadataText == null
@@ -128,7 +163,7 @@ public final class CoreCommands {
                 "render",
                 List.of("render"),
                 toJson("render", input),
-                PluginRunOptions.defaults());
+                PluginRunOptions.defaults().withCandidateEnv(env));
     }
 
     public static PluginRunOutcome exportCommand(
@@ -137,6 +172,16 @@ public final class CoreCommands {
             String sourceText,
             Path sourceBaseDir,
             String layoutText) throws PluginExecutionException {
+        return exportCommand(plugin, policyText, sourceText, sourceBaseDir, layoutText, System.getenv());
+    }
+
+    public static PluginRunOutcome exportCommand(
+            String plugin,
+            String policyText,
+            String sourceText,
+            Path sourceBaseDir,
+            String layoutText,
+            Map<String, String> env) throws PluginExecutionException {
         SourceDocument source;
         try {
             source = SourceValidator.loadAndValidateSourceDocument(sourceText, sourceBaseDir);
@@ -156,7 +201,7 @@ public final class CoreCommands {
                 "export",
                 List.of("export"),
                 toJson("export", input),
-                PluginRunOptions.defaults().withCandidateEnv(System.getenv()));
+                PluginRunOptions.defaults().withCandidateEnv(env));
     }
 
     static PluginRunOutcome errorOutcome(List<Diagnostic> diagnostics) {

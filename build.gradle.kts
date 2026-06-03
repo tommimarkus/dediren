@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "dev.dediren"
-version = "0.16.0"
+version = "0.18.0"
 
 subprojects {
     group = rootProject.group

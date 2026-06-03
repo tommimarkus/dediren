@@ -10,8 +10,6 @@ permissions:
   contents: read
 
 env:
-  CARGO_TERM_COLOR: always
-  DEDIREN_ELK_BUILD_USE_SDKMAN: "0"
   SEGMENT_DOWNLOAD_TIMEOUT_MINS: "5"
 
 jobs:
@@ -24,30 +22,22 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Install stable Rust
-        run: |
-          rustup toolchain install stable --profile minimal
-          rustup default stable
-
-      - name: Restore Cargo cache
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+      - name: Set up Java
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: cargo-validate-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            cargo-validate-${{ runner.os }}-
+          distribution: temurin
+          java-version: "21"
 
-      - name: Check formatting
-        run: cargo fmt --all -- --check
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@39fdf500b386709a9a4a769f717dad447ac345b9 # v6
+        with:
+          cache-provider: basic
 
       - name: Install XML tools
         run: sudo apt-get update && sudo apt-get install -y libxml2-utils
 
       - name: Check workspace tests
-        run: cargo test --workspace --locked
+        run: ./gradlew test
 
       - name: Check whitespace
         run: git diff --check
@@ -76,33 +66,16 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Install stable Rust
-        run: |
-          rustup toolchain install stable --profile minimal
-          rustup default stable
-
-      - name: Add Rust target
-        run: rustup target add ${{ matrix.target }}
-
       - name: Set up Java
         uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5
         with:
           distribution: temurin
-          java-version: "25"
+          java-version: "21"
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@39fdf500b386709a9a4a769f717dad447ac345b9 # v6
         with:
-          gradle-version: "9.5.0"
           cache-provider: basic
-
-      - name: Restore Gradle project cache
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
-        with:
-          path: .cache/gradle/project-cache/elk-layout-java
-          key: gradle-project-${{ runner.os }}-${{ matrix.target }}-${{ hashFiles('crates/dediren-plugin-elk-layout/java/**/*.gradle*', 'crates/dediren-plugin-elk-layout/java/gradle.lockfile') }}
-          restore-keys: |
-            gradle-project-${{ runner.os }}-${{ matrix.target }}-
 
       - name: Install Linux tools
         if: runner.os == 'Linux'
@@ -114,22 +87,11 @@ jobs:
           brew install libxml2 jq
           echo "/opt/homebrew/opt/libxml2/bin" >> "$GITHUB_PATH"
 
-      - name: Restore Cargo cache
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: cargo-build-${{ runner.os }}-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            cargo-build-${{ runner.os }}-${{ matrix.target }}-
-
       - name: Build distribution
-        run: cargo xtask dist build --target ${{ matrix.target }}
+        run: ./gradlew :tools:dist:distBuild -Ptarget=${{ matrix.target }}
 
       - name: Smoke distribution
-        run: cargo xtask dist smoke "dist/dediren-agent-bundle-$(cargo xtask version)-${{ matrix.target }}.tar.gz"
+        run: ./gradlew :tools:dist:distSmoke -Ptarget=${{ matrix.target }}
 
       - name: Attest archive provenance
         uses: actions/attest-build-provenance@43d14bc2b83dec42d39ecae14e916627a18bb661 # v3
@@ -158,11 +120,6 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Install stable Rust
-        run: |
-          rustup toolchain install stable --profile minimal
-          rustup default stable
-
       - name: Install jq
         run: sudo apt-get update && sudo apt-get install -y jq
 
@@ -178,8 +135,9 @@ jobs:
           set -euo pipefail
 
           VERSION="${GITHUB_REF_NAME#v}"
-          if [[ "$(cargo xtask version)" != "$VERSION" ]]; then
-            echo "Tag version $VERSION does not match cargo xtask version $(cargo xtask version)" >&2
+          PROJECT_VERSION="$(sed -n 's/^version = "\(.*\)"/\1/p' build.gradle.kts)"
+          if [[ "$PROJECT_VERSION" != "$VERSION" ]]; then
+            echo "Tag version $VERSION does not match Gradle project version $PROJECT_VERSION" >&2
             exit 1
           fi
 

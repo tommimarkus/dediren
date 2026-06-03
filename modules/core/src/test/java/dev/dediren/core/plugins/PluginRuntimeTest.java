@@ -146,6 +146,63 @@ class PluginRuntimeTest {
         assertThat(outcome.stdout()).contains("\"render_result_schema_version\"");
     }
 
+    @Test
+    void bundledRegistryLoadsDistributionPluginManifests() throws Exception {
+        Path bundleRoot = temp.resolve("bundle-root");
+        Path schemas = bundleRoot.resolve("schemas");
+        Path plugins = bundleRoot.resolve("plugins");
+        Files.createDirectories(schemas);
+        Files.createDirectories(plugins);
+        writePermissiveSchemas(schemas, "model.schema.json", "plugin-manifest.schema.json");
+        writeManifest(plugins, "runtime-testbed", testbedExecutable().toString(), List.of("render"), List.of());
+        String originalUserDir = System.getProperty("user.dir");
+        System.setProperty("user.dir", bundleRoot.toString());
+        try {
+            LoadedPluginManifest manifest = PluginRegistry.bundled().loadManifest("runtime-testbed");
+
+            assertThat(manifest.manifest().id()).isEqualTo("runtime-testbed");
+            assertThat(manifest.path()).isEqualTo(plugins.resolve("runtime-testbed.manifest.json"));
+        } finally {
+            System.setProperty("user.dir", originalUserDir);
+        }
+    }
+
+    @Test
+    void bundledRegistryResolvesDistributionExecutablesFromBundleBin() throws Exception {
+        Path bundleRoot = temp.resolve("runtime-bundle");
+        Path schemas = bundleRoot.resolve("schemas");
+        Path plugins = bundleRoot.resolve("plugins");
+        Path bin = bundleRoot.resolve("bin");
+        Files.createDirectories(schemas);
+        Files.createDirectories(plugins);
+        Files.createDirectories(bin);
+        writePermissiveSchemas(
+                schemas,
+                "model.schema.json",
+                "plugin-manifest.schema.json",
+                "runtime-capability.schema.json",
+                "envelope.schema.json",
+                "render-result.schema.json");
+        writeTestbedExecutable(bin.resolve("runtime-testbed"));
+        writeManifest(plugins, "runtime-testbed", "runtime-testbed", List.of("render"), List.of());
+        String originalUserDir = System.getProperty("user.dir");
+        System.setProperty("user.dir", bundleRoot.toString());
+        try {
+            PluginRunOutcome outcome = PluginRunner.runForCapabilityWithRegistry(
+                    PluginRegistry.bundled(),
+                    "runtime-testbed",
+                    "render",
+                    List.of("render"),
+                    "{}",
+                    PluginRunOptions.defaults());
+
+            assertThat(outcome.exitCode()).isZero();
+            assertThat(outcome.stdout()).contains("\"render_result_schema_version\"");
+        } finally {
+            System.setProperty("user.dir", originalUserDir);
+        }
+    }
+
     private PluginRunOutcome runWithMode(String mode, String capability, List<String> args) throws Exception {
         var options = PluginRunOptions.defaults()
                 .withCandidateEnv(Map.of("DEDIREN_TEST_PLUGIN_MODE", mode));
@@ -160,6 +217,11 @@ class PluginRuntimeTest {
 
     private Path testbedExecutable() throws IOException {
         Path script = temp.resolve("runtime-testbed.sh");
+        writeTestbedExecutable(script);
+        return script;
+    }
+
+    private static void writeTestbedExecutable(Path script) throws IOException {
         String java = Path.of(System.getProperty("java.home"), "bin", "java").toString();
         String classpath = System.getProperty("java.class.path");
         Files.writeString(script, """
@@ -167,7 +229,12 @@ class PluginRuntimeTest {
                 exec "%s" -cp "%s" dev.dediren.testbeds.pluginruntime.Main "$@"
                 """.formatted(java, classpath));
         script.toFile().setExecutable(true);
-        return script;
+    }
+
+    private static void writePermissiveSchemas(Path dir, String... names) throws IOException {
+        for (String name : names) {
+            Files.writeString(dir.resolve(name), "{}");
+        }
     }
 
     private static void writeManifest(Path dir, String id, String executable, List<String> capabilities)

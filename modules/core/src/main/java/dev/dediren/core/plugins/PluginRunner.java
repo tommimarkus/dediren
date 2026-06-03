@@ -34,7 +34,7 @@ public final class PluginRunner {
                     "plugin " + pluginId + " does not support capability " + requiredCapability);
         }
 
-        Path executable = executablePath(loaded);
+        Path executable = executablePath(loaded, options);
         if (!Files.exists(executable)) {
             throw PluginExecutionException.plugin(
                     "DEDIREN_PLUGIN_MISSING_EXECUTABLE",
@@ -79,9 +79,12 @@ public final class PluginRunner {
         return allowed;
     }
 
-    private static Path executablePath(LoadedPluginManifest loaded) {
+    private static Path executablePath(LoadedPluginManifest loaded, PluginRunOptions options) {
         String envName = "DEDIREN_PLUGIN_" + loaded.manifest().id().toUpperCase().replace('-', '_');
-        String override = System.getenv(envName);
+        String override = options.candidateEnv().get(envName);
+        if (override == null) {
+            override = System.getenv(envName);
+        }
         if (override != null && !override.isBlank()) {
             return Path.of(override);
         }
@@ -89,7 +92,13 @@ public final class PluginRunner {
         if (executable.isAbsolute()) {
             return executable;
         }
-        return loaded.path().getParent().resolve(executable).normalize();
+        Path manifestDir = loaded.path().getParent();
+        if (executable.getNameCount() == 1
+                && manifestDir.toAbsolutePath().normalize()
+                        .equals(CorePaths.repositoryRoot().resolve("plugins").toAbsolutePath().normalize())) {
+            return CorePaths.repositoryRoot().resolve("bin").resolve(executable).normalize();
+        }
+        return manifestDir.resolve(executable).normalize();
     }
 
     private static RuntimeCapabilities normalizeRuntimeCapabilities(String pluginId, ProcessOutput output)

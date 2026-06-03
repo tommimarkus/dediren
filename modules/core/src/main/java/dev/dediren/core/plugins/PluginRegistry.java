@@ -23,6 +23,7 @@ public final class PluginRegistry {
     public static PluginRegistry bundled() {
         Path root = CorePaths.repositoryRoot();
         var dirs = new ArrayList<Path>();
+        dirs.add(root.resolve("plugins"));
         dirs.add(root.resolve("fixtures/plugins"));
         dirs.add(root.resolve(".dediren/plugins"));
         String configured = System.getenv("DEDIREN_PLUGIN_DIRS");

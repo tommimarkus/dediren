@@ -19,6 +19,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Callable;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
@@ -29,19 +30,21 @@ import picocli.CommandLine.Model.CommandSpec;
 @Command(
         name = "dediren",
         mixinStandardHelpOptions = true,
-        version = "dediren-java-migration",
+        versionProvider = Main.ProductVersionProvider.class,
         footer = {
                 "Agent authoring guide: docs/agent-usage.md",
                 "Use it for source JSON shape, generated artifact handoff, fragments, and repair diagnostics."
         })
 public final class Main {
     private final InputStream stdin;
+    private final Map<String, String> env;
 
     @Spec
     private CommandSpec spec;
 
-    private Main(InputStream stdin) {
+    private Main(InputStream stdin, Map<String, String> env) {
         this.stdin = stdin;
+        this.env = env;
     }
 
     public static String moduleName() {
@@ -49,7 +52,11 @@ public final class Main {
     }
 
     public static void main(String[] args) {
-        int exitCode = commandLine(System.in, new PrintWriter(System.out, true), new PrintWriter(System.err, true))
+        int exitCode = commandLine(
+                System.in,
+                new PrintWriter(System.out, true),
+                new PrintWriter(System.err, true),
+                System.getenv())
                 .execute(args);
         if (exitCode != 0) {
             System.exit(exitCode);
@@ -57,12 +64,17 @@ public final class Main {
     }
 
     public static CliResult executeForTesting(String[] args, String stdin) {
+        return executeForTesting(args, stdin, System.getenv());
+    }
+
+    static CliResult executeForTesting(String[] args, String stdin, Map<String, String> env) {
         ByteArrayOutputStream stdout = new ByteArrayOutputStream();
         ByteArrayOutputStream stderr = new ByteArrayOutputStream();
         int exitCode = commandLine(
                 new ByteArrayInputStream(stdin.getBytes(StandardCharsets.UTF_8)),
                 new PrintWriter(stdout, true),
-                new PrintWriter(stderr, true))
+                new PrintWriter(stderr, true),
+                env)
                 .execute(args);
         return new CliResult(
                 exitCode,
@@ -70,14 +82,18 @@ public final class Main {
                 stderr.toString(StandardCharsets.UTF_8));
     }
 
-    private static CommandLine commandLine(InputStream stdin, PrintWriter stdout, PrintWriter stderr) {
-        CommandLine commandLine = new CommandLine(new Main(stdin));
-        commandLine.addSubcommand("validate", new ValidateCommand(stdin));
-        commandLine.addSubcommand("project", new ProjectCommand(stdin));
-        commandLine.addSubcommand("layout", new LayoutCommand(stdin));
+    private static CommandLine commandLine(
+            InputStream stdin,
+            PrintWriter stdout,
+            PrintWriter stderr,
+            Map<String, String> env) {
+        CommandLine commandLine = new CommandLine(new Main(stdin, env));
+        commandLine.addSubcommand("validate", new ValidateCommand(stdin, env));
+        commandLine.addSubcommand("project", new ProjectCommand(stdin, env));
+        commandLine.addSubcommand("layout", new LayoutCommand(stdin, env));
         commandLine.addSubcommand("validate-layout", new ValidateLayoutCommand(stdin));
-        commandLine.addSubcommand("render", new RenderCommand(stdin));
-        commandLine.addSubcommand("export", new ExportCommand());
+        commandLine.addSubcommand("render", new RenderCommand(stdin, env));
+        commandLine.addSubcommand("export", new ExportCommand(env));
         commandLine.setOut(stdout);
         commandLine.setErr(stderr);
         return commandLine;
@@ -86,6 +102,7 @@ public final class Main {
     @Command(name = "validate", description = "Validate source JSON")
     static final class ValidateCommand implements Callable<Integer> {
         private final InputStream stdin;
+        private final Map<String, String> env;
 
         @Option(names = "--plugin")
         private String plugin;
@@ -99,8 +116,9 @@ public final class Main {
         @Spec
         private CommandSpec spec;
 
-        ValidateCommand(InputStream stdin) {
+        ValidateCommand(InputStream stdin, Map<String, String> env) {
             this.stdin = stdin;
+            this.env = env;
         }
 
         @Override
@@ -125,7 +143,8 @@ public final class Main {
                             plugin,
                             profile,
                             inputText.text(),
-                            inputText.baseDir()));
+                            inputText.baseDir(),
+                            env));
                 } catch (PluginExecutionException error) {
                     return printPluginError(error);
                 }
@@ -154,6 +173,7 @@ public final class Main {
     @Command(name = "project", description = "Project source JSON into a backend request")
     static final class ProjectCommand implements Callable<Integer> {
         private final InputStream stdin;
+        private final Map<String, String> env;
 
         @Option(names = "--target", required = true)
         private String target;
@@ -170,8 +190,9 @@ public final class Main {
         @Spec
         private CommandSpec spec;
 
-        ProjectCommand(InputStream stdin) {
+        ProjectCommand(InputStream stdin, Map<String, String> env) {
             this.stdin = stdin;
+            this.env = env;
         }
 
         @Override
@@ -186,7 +207,8 @@ public final class Main {
                         target,
                         view,
                         inputText.text(),
-                        inputText.baseDir()));
+                        inputText.baseDir(),
+                        env));
             } catch (PluginExecutionException error) {
                 return writePluginError(spec, error);
             }
@@ -196,6 +218,7 @@ public final class Main {
     @Command(name = "layout", description = "Run a layout plugin")
     static final class LayoutCommand implements Callable<Integer> {
         private final InputStream stdin;
+        private final Map<String, String> env;
 
         @Option(names = "--plugin", required = true)
         private String plugin;
@@ -206,8 +229,9 @@ public final class Main {
         @Spec
         private CommandSpec spec;
 
-        LayoutCommand(InputStream stdin) {
+        LayoutCommand(InputStream stdin, Map<String, String> env) {
             this.stdin = stdin;
+            this.env = env;
         }
 
         @Override
@@ -217,7 +241,7 @@ public final class Main {
                 return writeEnvelope(spec, inputText.error(), 2);
             }
             try {
-                return writePluginOutcome(spec, CoreCommands.layoutCommand(plugin, inputText.text()));
+                return writePluginOutcome(spec, CoreCommands.layoutCommand(plugin, inputText.text(), env));
             } catch (PluginExecutionException error) {
                 return writePluginError(spec, error);
             }
@@ -251,6 +275,7 @@ public final class Main {
     @Command(name = "render", description = "Run a render plugin")
     static final class RenderCommand implements Callable<Integer> {
         private final InputStream stdin;
+        private final Map<String, String> env;
 
         @Option(names = "--plugin", required = true)
         private String plugin;
@@ -267,8 +292,9 @@ public final class Main {
         @Spec
         private CommandSpec spec;
 
-        RenderCommand(InputStream stdin) {
+        RenderCommand(InputStream stdin, Map<String, String> env) {
             this.stdin = stdin;
+            this.env = env;
         }
 
         @Override
@@ -290,7 +316,8 @@ public final class Main {
                         plugin,
                         policyText.text(),
                         metadataText == null ? null : metadataText.text(),
-                        layoutText.text()));
+                        layoutText.text(),
+                        env));
             } catch (PluginExecutionException error) {
                 return writePluginError(spec, error);
             }
@@ -299,6 +326,8 @@ public final class Main {
 
     @Command(name = "export", description = "Run an export plugin")
     static final class ExportCommand implements Callable<Integer> {
+        private final Map<String, String> env;
+
         @Option(names = "--plugin", required = true)
         private String plugin;
 
@@ -313,6 +342,10 @@ public final class Main {
 
         @Spec
         private CommandSpec spec;
+
+        ExportCommand(Map<String, String> env) {
+            this.env = env;
+        }
 
         @Override
         public Integer call() throws Exception {
@@ -334,7 +367,8 @@ public final class Main {
                         policyText.text(),
                         sourceText.text(),
                         sourceText.baseDir(),
-                        layoutText.text()));
+                        layoutText.text(),
+                        env));
             } catch (PluginExecutionException error) {
                 return writePluginError(spec, error);
             }
@@ -373,7 +407,9 @@ public final class Main {
     }
 
     private static Integer writePluginOutcome(CommandSpec spec, PluginRunOutcome outcome) {
-        spec.commandLine().getOut().print(outcome.stdout());
+        PrintWriter out = spec.commandLine().getOut();
+        out.print(outcome.stdout());
+        out.flush();
         return outcome.exitCode();
     }
 
@@ -392,6 +428,13 @@ public final class Main {
                 DiagnosticSeverity.ERROR,
                 "failed to read " + label + ": " + error.getMessage(),
                 diagnosticPath)));
+    }
+
+    public static final class ProductVersionProvider implements CommandLine.IVersionProvider {
+        @Override
+        public String[] getVersion() {
+            return new String[]{"dediren " + System.getProperty("dediren.version", "unknown")};
+        }
     }
 
     private record JsonInputText(String text, Path baseDir, CommandEnvelope<JsonNode> error) {

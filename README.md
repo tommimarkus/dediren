@@ -1,186 +1,139 @@
 # dediren
 
 `dediren` is a contract-first diagram pipeline for agentic tools. It turns
-semantic JSON into generated layout JSON, rendered SVG, or ArchiMate 3.2 OEF
-XML through explicit CLI commands and process-boundary plugins.
+semantic JSON into generated layout JSON, rendered SVG, ArchiMate 3.2 OEF XML,
+or UML 2.5.1 XMI XML through explicit CLI commands and process-boundary
+plugins.
 
-The product surface is intentionally machine-readable:
+The stable product surface is machine-readable:
 
 - public JSON schemas in `schemas/`;
-- example inputs, policies, and expected artifacts in `fixtures/`;
+- source, policy, layout, render, and export fixtures in `fixtures/`;
 - JSON command envelopes on stdout for success and failure;
-- plugin manifests and runtime capability probes;
+- first-party plugin manifests and runtime capability probes;
 - deterministic diagnostics that agents can inspect without scraping stderr.
 
-For a token-efficient agent JSON authoring guide, see `docs/agent-usage.md`.
-It maps which JSON agents author, which JSON Dediren generates, the
-Minimal Source JSON skeleton, render/export policy skeletons, fixture/schema
-references, validation commands, repair diagnostics, runtime probes, and
-bundle smoke workflow. Design plans under `docs/superpowers/` are
-implementation history, not the current user-facing contract.
+For a token-efficient authoring guide, see `docs/agent-usage.md`.
 
-Authored source graph JSON is semantic and plugin-typed. It must not contain
-absolute position or size data. Generated layout result JSON may contain
-geometry, routes, metrics, warnings, and provenance.
-
-## Install
-
-### Distribution Archives
-
-GitHub Release archives are published by `v*` tags. The release targets for the
-current version are:
-
-```text
-dediren-agent-bundle-0.16.0-x86_64-unknown-linux-gnu.tar.gz
-dediren-agent-bundle-0.16.0-aarch64-unknown-linux-gnu.tar.gz
-dediren-agent-bundle-0.16.0-aarch64-apple-darwin.tar.gz
-```
-
-To build an agent-ready local distribution archive from this source checkout,
-choose a supported host target:
-
-```bash
-TARGET=x86_64-unknown-linux-gnu
-cargo xtask dist build --target "$TARGET"
-```
-
-Build prerequisites:
-
-- Host platform matching the selected target. Cross-compilation is not
-  supported by the distribution builder.
-- Rust and Cargo matching the workspace toolchain.
-- `cargo-about` available as a Cargo subcommand. Install it with
-  `cargo install --locked cargo-about --features cli`.
-- By default, SDKMAN with the Java and Gradle versions declared by
-  `crates/dediren-plugin-elk-layout/java/.sdkmanrc`.
-- CI or other prepared environments can set `DEDIREN_ELK_BUILD_USE_SDKMAN=0`
-  when Java 25 and Gradle 9.5.0 are already on `PATH`.
-- Local builds keep Gradle state under `.cache/gradle`; GitHub Actions builds
-  use the standard Gradle user home so `setup-gradle` can cache dependencies.
-
-Runtime prerequisite:
+## Requirements
 
 - Java 21 or newer available as `java` on `PATH`.
-- `xmllint` on `PATH` for ArchiMate OEF and UML/XMI export standards
-  validation.
-- `curl` on `PATH` if export validation needs to populate the standards schema
-  cache automatically. Offline runs can provide schema files through
+- Build with the checked-in Gradle Wrapper: `./gradlew`.
+- `xmllint` on `PATH` for standards validation in ArchiMate OEF and UML/XMI
+  export paths.
+- `curl` on `PATH` only when export validation needs to populate a standards
+  schema cache. Offline runs can provide schema files with
   `DEDIREN_OEF_SCHEMA_DIR` and `DEDIREN_XMI_SCHEMA_PATH`.
 
-Omitting `--target` builds for the current supported host target. For the
-current `0.16.0` version and the target above, the xtask creates:
+## Build And Test
+
+```bash
+./gradlew test
+./gradlew :tools:dist:thirdPartyNotices
+./gradlew :tools:dist:distBuild
+./gradlew :tools:dist:distSmoke
+```
+
+`distBuild` creates an agent-ready archive under `dist/`:
 
 ```text
-dist/dediren-agent-bundle-0.16.0-x86_64-unknown-linux-gnu/
-dist/dediren-agent-bundle-0.16.0-x86_64-unknown-linux-gnu.tar.gz
+dist/dediren-agent-bundle-0.18.0-x86_64-unknown-linux-gnu/
+dist/dediren-agent-bundle-0.18.0-x86_64-unknown-linux-gnu.tar.gz
 ```
 
-Run the smoke test from a shell where `java -version` resolves to Java 21 or
-newer and `xmllint --version` succeeds. Export validation also needs either
-cached standards schemas, configured local schema paths, or `curl` network
-access to populate the cache:
+Set a supported target with Gradle project property `target` when needed:
 
 ```bash
-VERSION=0.16.0
-TARGET=x86_64-unknown-linux-gnu
-cargo xtask dist smoke "dist/dediren-agent-bundle-${VERSION}-${TARGET}.tar.gz"
+./gradlew :tools:dist:distBuild -Ptarget=x86_64-unknown-linux-gnu
+./gradlew :tools:dist:distSmoke -Ptarget=x86_64-unknown-linux-gnu
 ```
 
-Concurrent `cargo xtask dist build` invocations serialize on a repo-local lock
-under `.cache/locks/` because release binaries, the ELK helper build, and
-`dist/` artifacts are shared generated outputs.
-A successful build leaves only the current `dediren-agent-bundle-*` directory
-and `.tar.gz` archive in `dist/`; stale bundle versions are pruned.
+Supported targets are:
 
-Unpack and run it anywhere:
+- `x86_64-unknown-linux-gnu`
+- `aarch64-unknown-linux-gnu`
+- `aarch64-apple-darwin`
 
-```bash
-VERSION=0.16.0
-TARGET=x86_64-unknown-linux-gnu
-mkdir -p /tmp/dediren-dist
-tar -xzf "dist/dediren-agent-bundle-${VERSION}-${TARGET}.tar.gz" -C /tmp/dediren-dist
-"/tmp/dediren-dist/dediren-agent-bundle-${VERSION}-${TARGET}/bin/dediren" --help
+The Java archive contains launch scripts and jars, not a bundled JRE. The host
+target must match the build host.
+
+## Bundle Layout
+
+```text
+dediren-agent-bundle-0.18.0-x86_64-unknown-linux-gnu/
+  bin/
+    dediren
+    dediren-plugin-generic-graph
+    dediren-plugin-elk-layout
+    dediren-plugin-svg-render
+    dediren-plugin-archimate-oef-export
+    dediren-plugin-uml-xmi-export
+  lib/
+  plugins/
+  schemas/
+  fixtures/
+  docs/agent-usage.md
+  LICENSE
+  THIRD-PARTY-NOTICES.md
+  bundle.json
 ```
 
-For a full unpacked-bundle JSON authoring and project/layout/render smoke
-workflow, use the `JSON Authoring Loop` and `Bundle Smoke Workflow` sections in
-`docs/agent-usage.md`.
-
-The archive includes the root MIT `LICENSE` notice, a generated
-`THIRD-PARTY-NOTICES.md` report, first-party plugin manifests under
-`plugins/`, first-party plugin binaries under `bin/`, schemas, fixtures, and
-the built ELK Java helper under `runtimes/elk-layout-java/`. The
-`THIRD-PARTY-NOTICES.md` file combines `cargo-about` output for the Rust
-workspace dependency graph with Gradle License Report output for the ELK Java
-helper `runtimeClasspath`; keep it with redistributed archives. It does not
-bundle a JRE.
-Skill packages that bundle Dediren should preserve the archive's
-`docs/agent-usage.md` file or embed the same JSON authoring contract in the
-skill guidance. Do not rely on this source repository README being present at
-runtime.
-
-### Development Install
-
-For development from a source checkout:
-
-```bash
-cargo install --path crates/dediren-cli
-cargo install --path crates/dediren-plugin-generic-graph
-cargo install --path crates/dediren-plugin-elk-layout
-cargo install --path crates/dediren-plugin-svg-render
-cargo install --path crates/dediren-plugin-archimate-oef-export
-cargo install --path crates/dediren-plugin-uml-xmi-export
-```
-
-This installs Rust binaries only. It does not create the distribution archive
-or bundle the ELK Java helper distribution.
+First-party plugin manifests live under `plugins/`. Manifest executable names
+resolve to bundled launchers under `bin/`. Project plugin directories and
+`DEDIREN_PLUGIN_DIRS` remain explicit later lookup sources; plugins are not
+discovered implicitly from `PATH`.
 
 ## First Run
 
-From a source checkout, this deterministic fixture-mode pipeline validates a
-source graph, projects it to a layout request, uses a checked-in layout result,
-and renders SVG:
+From an unpacked bundle:
 
 ```bash
-dediren validate \
-  --input fixtures/source/valid-basic.json
+VERSION=0.18.0
+TARGET=x86_64-unknown-linux-gnu
+BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-${VERSION}-${TARGET}
 
-dediren project \
+"$BUNDLE/bin/dediren" --version
+"$BUNDLE/bin/dediren-plugin-generic-graph" capabilities
+"$BUNDLE/bin/dediren-plugin-elk-layout" capabilities
+"$BUNDLE/bin/dediren-plugin-svg-render" capabilities
+"$BUNDLE/bin/dediren-plugin-archimate-oef-export" capabilities
+"$BUNDLE/bin/dediren-plugin-uml-xmi-export" capabilities
+```
+
+Project, layout, validate, and render:
+
+```bash
+"$BUNDLE/bin/dediren" validate \
+  --input "$BUNDLE/fixtures/source/valid-basic.json"
+
+"$BUNDLE/bin/dediren" project \
   --target layout-request \
   --plugin generic-graph \
   --view main \
-  --input fixtures/source/valid-basic.json \
+  --input "$BUNDLE/fixtures/source/valid-basic.json" \
   > layout-request.json
 
-DEDIREN_ELK_RESULT_FIXTURE=fixtures/layout-result/basic.json \
-  dediren layout \
-    --plugin elk-layout \
-    --input layout-request.json \
-    > layout-result.json
+"$BUNDLE/bin/dediren" layout \
+  --plugin elk-layout \
+  --input layout-request.json \
+  > layout-result.json
 
-dediren validate-layout \
+"$BUNDLE/bin/dediren" validate-layout \
   --input layout-result.json
 
-dediren render \
+"$BUNDLE/bin/dediren" render \
   --plugin svg-render \
-  --policy fixtures/render-policy/default-svg.json \
+  --policy "$BUNDLE/fixtures/render-policy/default-svg.json" \
   --input layout-result.json \
   > render-result.json
-```
 
-`project`, `layout`, `render`, and `export` write JSON command envelopes.
-Downstream commands that consume generated artifacts accept either the full
-envelope or raw `.data` artifact JSON. In short, full envelope or raw .data
-handoff works, so redirecting one command into the next is valid. Extract
-rendered SVG with:
-
-```bash
 jq -r '.data.content' render-result.json > diagram.svg
 ```
 
-## Pipeline
+Downstream commands accept either a full Dediren command envelope or the raw
+`.data` artifact JSON.
 
-The primary pipeline is JSON-first:
+## Pipeline
 
 ```text
 validate -> project --target layout-request -> layout -> validate-layout -> render
@@ -190,594 +143,66 @@ validate -> project --target layout-request -> layout -> validate-layout -> expo
 Commands:
 
 - `validate` checks source graph shape, id uniqueness, endpoint integrity, and
-  authored-geometry rules. It stays profile-agnostic by default. To run
-  plugin-owned semantic validation before projection, pass an explicit plugin
-  and profile, for example:
+  authored-geometry rules. With `--plugin generic-graph --profile archimate`
+  or `--profile uml`, it also runs plugin-owned semantic validation.
+- `project` asks `generic-graph` to generate a layout request or render
+  metadata for a named view.
+- `layout` asks the official Java ELK plugin to generate node geometry and
+  edge routes.
+- `validate-layout` reports backend-neutral route and layout quality metrics.
+- `render` asks `svg-render` to generate SVG in `.data.content`.
+- `export` asks `archimate-oef` or `uml-xmi` to generate XML in
+  `.data.content`.
 
-  ```bash
-  dediren validate \
-    --plugin generic-graph \
-    --profile archimate \
-    --input fixtures/source/valid-archimate-oef.json
-  ```
+## Source JSON Rules
 
-  The bundled `generic-graph` semantic validator currently supports the
-  `archimate` and `uml` profiles. Plugin semantic validation first runs the same
-  source graph validation as default `validate`, so malformed source graphs
-  fail before profile-specific checks run.
-- `project` asks a semantic/view plugin to produce a target artifact. The
-  bundled `generic-graph` plugin supports `layout-request` and
-  `render-metadata`. When projecting ArchiMate render metadata, it validates
-  source node and relationship type strings plus Dediren's curated unsupported
-  endpoint guard cases. It does not redistribute a complete ArchiMate
-  relationship endpoint matrix. Render metadata can contain node, relationship,
-  and group selectors. Set
-  `plugins.generic-graph.semantic_profile` to `archimate` when a source should
-  produce ArchiMate-profiled render metadata without also requiring the
-  `archimate-oef` export plugin.
-- `layout` asks a layout plugin to generate a layout result. The bundled
-  `elk-layout` plugin is a Rust adapter over the Java ELK helper.
-- `validate-layout` reports backend-neutral layout quality metrics, including
-  overlaps, connectors through unrelated nodes, invalid routes, route detours,
-  close parallel route channels, group boundary issues, and backend warnings.
-  It returns an error envelope when route geometry is structurally invalid,
-  such as empty edge route points or endpoints that do not touch their declared
-  source and target node perimeters.
-- `render` asks a render plugin to create a visual artifact. The bundled
-  `svg-render` plugin returns SVG in a JSON command envelope.
-- `export` asks an export plugin to create a non-visual artifact. The bundled
-  `archimate-oef` plugin emits ArchiMate 3.2 OEF XML, and the bundled
-  `uml-xmi` plugin emits UML 2.5.1 XMI XML.
+Authored source graph JSON is semantic and plugin-typed. Do not put absolute
+positions, sizes, colors, fonts, or SVG shape choices in source JSON. Layout
+requests express layout intent. Layout results contain generated geometry.
+Render policies own SVG styling.
 
-Most pipeline commands accept `--input <file>`. If `--input` is omitted, they
-read JSON from stdin.
+The smallest useful source model is `fixtures/source/valid-basic.json`. Larger
+models can use relative file fragments declared in the source model; fragments
+use the same schema and are resolved relative to the entry file.
 
-## Source Fragments
+## Runtime Environment
 
-Large source models can use a single source-authoring composition primitive:
-relative file fragments. `model.json` remains the entrypoint and declares the
-files to assemble before validation, projection, semantic validation, or export:
+Plugin processes receive only environment variables listed in their manifests.
+Important explicit variables:
 
-```json
-{
-  "model_schema_version": "model.schema.v1",
-  "fragments": [
-    "model/application.json",
-    "model/technology.json"
-  ],
-  "nodes": [],
-  "relationships": [],
-  "plugins": {
-    "generic-graph": {
-      "views": []
-    }
-  }
-}
-```
+- `DEDIREN_PLUGIN_DIRS`: additional manifest directories, separated with the
+  platform path separator.
+- `DEDIREN_PLUGIN_<PLUGIN_ID>`: per-plugin executable override, for example
+  `DEDIREN_PLUGIN_SVG_RENDER`.
+- `DEDIREN_OEF_SCHEMA_DIR`: local directory containing official OEF schema
+  files.
+- `DEDIREN_XMI_SCHEMA_PATH`: local XMI schema file.
+- `DEDIREN_SCHEMA_CACHE_DIR`: cache directory for schema downloads.
 
-Each fragment uses the same source model shape for nodes, relationships, and
-plugin-owned sections. Dediren resolves fragment paths relative to the entry
-model file, concatenates nodes and relationships, and merges plugin data into
-one effective `model.schema.v1` graph. Plugins receive only the assembled graph;
-they do not need fragment-specific contracts.
+Stderr is for human debugging only. Agents should make success or failure
+decisions from stdout JSON.
 
-Fragments are deliberately simple: nested fragments and absolute fragment paths
-are rejected, source ids and plugin-owned view/group ids are still checked for
-duplicates after assembly, and conflicting plugin scalar values are rejected
-instead of overridden. Fragmented models therefore require `--input <file>`;
-stdin has no base directory for resolving relative fragment paths.
+## Verification Lanes
 
-## Styling SVG
-
-SVG styling is owned by render policy JSON. Source graph JSON and layout result
-JSON stay presentation-free; they do not carry colors, fonts, shapes, or style
-hints.
-
-Useful policies:
-
-- `fixtures/render-policy/default-svg.json` uses renderer defaults.
-- `fixtures/render-policy/rich-svg.json` shows background, font, node, edge,
-  group, edge-label, and per-layout-id overrides.
-- `fixtures/render-policy/archimate-svg.json` applies ArchiMate-oriented
-  notation from semantic render metadata.
-- `fixtures/render-policy/uml-svg.json` applies UML 2.5.1-oriented
-  black-on-white classifier, package, activity, and relationship notation.
-
-For the full public policy surface, use
-`schemas/svg-render-policy.schema.json`.
-
-Rendered SVG includes stable semantic attributes such as
-`data-dediren-node-decorator`, `data-dediren-icon-kind`,
-`data-dediren-edge-marker-start`, `data-dediren-edge-marker-end`, and
-`data-dediren-group-decorator` so tests can assert notation without depending
-on raw geometry.
-
-The renderer keeps layout result route points unchanged as generated geometry,
-but rounds orthogonal SVG route elbows and stroke joins when serializing edge
-paths so small generated jogs do not appear as harsh stair steps.
-
-## ArchiMate SVG And OEF
-
-ArchiMate SVG notation uses two artifacts:
-
-1. layout result JSON for generated geometry;
-2. render metadata JSON for semantic selectors such as node, relationship, and
-   group types.
-
-The render metadata artifact does not carry colors, fonts, shapes, or layout
-data. Visual notation still comes from SVG render policy.
-
-For ArchiMate SVG without OEF export, configure the source graph's
-`generic-graph` plugin data with:
-
-```json
-{
-  "plugins": {
-    "generic-graph": {
-      "semantic_profile": "archimate",
-      "views": []
-    }
-  }
-}
-```
-
-The `archimate-oef` plugin is required only for OEF export. Older source graphs
-that list or configure `archimate-oef` still infer ArchiMate render metadata
-for compatibility.
-
-ArchiMate render and export paths reject unsupported ArchiMate element or
-relationship type strings and Dediren's curated unsupported relationship
-endpoint guard cases. They do not bundle a complete ArchiMate relationship
-endpoint matrix. Use the ArchiMate/OEF element name `Node` for technology
-nodes; aliases such as `TechnologyNode` are not accepted in ArchiMate metadata
-or export source.
-
-Relationship connector junctions are supported with the ArchiMate/OEF element
-types `AndJunction` and `OrJunction`. Author a junction as a source node,
-include it in the generic-graph view `nodes`, and connect relationships through
-that node. Validation allows relationship endpoints to touch junction nodes, but
-each junction must connect at least one incoming and one outgoing relationship,
-and non-containment relationships incident to one junction must use the same
-ArchiMate relationship type. Validation follows contiguous junction chains and
-rejects them when the equivalent direct relationship between the non-junction
-endpoint concepts is not allowed. `Composition` or `Aggregation` relationships
-between a junction and a `Plateau`, `Grouping`, or `Location` are treated as
-containment and do not count as the junction relationship type. Projection gives
-junction nodes compact layout size hints, SVG renders them as filled
-`AndJunction` and open `OrJunction` circles, and OEF export emits them as normal
-relationship connector elements and view nodes.
-
-### Groups
-
-`plugins.generic-graph.views[].groups` are layout containers. Give each group
-an explicit `role`:
-
-- `semantic-boundary` means the group carries architectural meaning. This is
-  the default for older source files.
-- `layout-only` means the group is only a layout aid and must not be exported as
-  an ArchiMate element.
-
-For ArchiMate `Grouping`, create a normal source node with `"type": "Grouping"`
-and point the view group at it with `semantic_source_id`. The layout group then
-uses generated geometry, SVG can render ArchiMate grouping notation, and OEF
-export can emit an ArchiMate Grouping view node. Do not use layout-only groups
-for ArchiMate semantic Grouping.
-
-Generated ELK layout results may also carry `routing_hints` such as
-`shared_source_junction` and `shared_target_junction`. Those hints are renderer
-advice for generated route trunks and remain separate from source-authored
-ArchiMate `AndJunction` or `OrJunction` elements.
-
-Create render metadata, then render with the ArchiMate policy:
+Use the narrowest useful lane first:
 
 ```bash
-dediren project \
-  --target render-metadata \
-  --plugin generic-graph \
-  --view main \
-  --input fixtures/source/valid-archimate-oef.json \
-  > render-metadata.json
-
-dediren render \
-  --plugin svg-render \
-  --policy fixtures/render-policy/archimate-svg.json \
-  --metadata render-metadata.json \
-  --input fixtures/layout-result/archimate-oef-basic.json \
-  > archimate-render-result.json
-```
-
-Export ArchiMate 3.2 OEF XML from source semantics plus generated layout
-geometry. OEF view geometry attributes are integer fields, so the exporter
-rounds generated node, group, and bendpoint coordinates to integer values when
-writing XML:
-
-```bash
-dediren export \
-  --plugin archimate-oef \
-  --policy fixtures/export-policy/default-oef.json \
-  --source fixtures/source/valid-archimate-oef.json \
-  --layout fixtures/layout-result/archimate-oef-basic.json \
-  > oef-export-result.json
-```
-
-`oef-export-result.json` is a command envelope. The OEF XML text is in
-`.data.content`. Before returning an OK envelope, the exporter validates the
-generated XML against the official Open Group ArchiMate 3.1 OEF diagram XSD
-used for ArchiMate 3.1/3.2 exchange files. Dediren does not ship those XSD
-files. It first uses `DEDIREN_OEF_SCHEMA_DIR` when set; otherwise it downloads
-the official XSDs from `https://www.opengroup.org/xsd/archimate/3.1/` into the
-runtime schema cache under `DEDIREN_SCHEMA_CACHE_DIR` or the OS cache directory,
-then runs `xmllint --nonet` against the cached files. If `xmllint`, the schema
-files, or the generated XML are invalid/unavailable, the export returns an
-error envelope.
-
-## UML SVG And XMI
-
-UML notation uses the same profile pipeline as ArchiMate. Configure the source
-graph's generic-graph plugin data with:
-
-```json
-{
-  "plugins": {
-    "generic-graph": {
-      "semantic_profile": "uml",
-      "views": []
-    }
-  }
-}
-```
-
-The bundled UML profile supports the first class/data/activity slice:
-`uml-class`, `uml-data`, and `uml-activity` views. Dediren JSON remains the
-authored source. UML/XMI is compatibility export output. Use
-`fixtures/source/valid-uml-complex.json` as the broader UML pressure fixture;
-it carries package-bounded class, data, and activity views over one source
-model. In the complex class view, relationship edges are backed by typed class
-members where the relationship represents a member reference, and the static
-`fixtures/layout-result/uml-complex-class.json` endpoints align to those
-rendered member rows. UML structural layout requests size class, interface,
-data type, and enumeration nodes from their rendered compartments so attributes
-and operations stay inside real ELK-generated boxes. Real ELK-generated UML
-layouts currently use generated classifier-boundary ports from the layout
-contract; member-row ports require a future semantic endpoint hint in the layout
-request. UML activity labels for initial, activity-final, decision, and merge
-control nodes render outside the compact symbol so the notation stays readable;
-branch text still renders from activity edge labels.
-
-Validate UML source semantics:
-
-```bash
-dediren validate \
-  --plugin generic-graph \
-  --profile uml \
-  --input fixtures/source/valid-uml-basic.json
-```
-
-Create UML render metadata and render SVG:
-
-```bash
-dediren project \
-  --target render-metadata \
-  --plugin generic-graph \
-  --view class-view \
-  --input fixtures/source/valid-uml-basic.json \
-  > uml-render-metadata.json
-
-dediren render \
-  --plugin svg-render \
-  --policy fixtures/render-policy/uml-svg.json \
-  --metadata uml-render-metadata.json \
-  --input fixtures/layout-result/uml-basic.json \
-  > uml-render-result.json
-```
-
-Fixture-backed UML render inputs cover the class, data, activity, and complex
-class lanes:
-`fixtures/layout-result/uml-basic.json`,
-`fixtures/layout-result/uml-data.json`, and
-`fixtures/layout-result/uml-activity.json`, plus
-`fixtures/layout-result/uml-complex-class.json` with
-`fixtures/render-metadata/uml-complex-class.json`.
-
-Export UML/XMI. The exporter scopes output to the selected layout result: class
-and data views emit their selected package/class/interface/data type/enumeration
-content, while activity views emit the owning UML Activity plus the selected
-activity nodes and flows.
-
-```bash
-dediren export \
-  --plugin uml-xmi \
-  --policy fixtures/export-policy/default-uml-xmi.json \
-  --source fixtures/source/valid-uml-basic.json \
-  --layout fixtures/layout-result/uml-basic.json \
-  > uml-xmi-export-result.json
-```
-
-`uml-xmi-export-result.json` is a command envelope. The UML/XMI XML text is in
-`.data.content`. Before returning an OK envelope, the exporter validates the
-generated XMI layer against OMG `XMI.xsd` to the extent that the published
-schemas support it, and validates UML content through Dediren's UML profile
-rules. OMG publishes the UML 2.5.1 metamodel as XMI rather than as an
-importable XML Schema, so this check validates the generic XMI envelope and
-`xmi:id` values but does not claim full UML metamodel validation. Dediren does
-not ship OMG schema files. It first uses `DEDIREN_XMI_SCHEMA_PATH` when set;
-otherwise it downloads `https://www.omg.org/spec/XMI/20131001/XMI.xsd` into the
-runtime schema cache under `DEDIREN_SCHEMA_CACHE_DIR` or the OS cache directory,
-then runs `xmllint --nonet` against the cached file.
-
-## Plugins
-
-Plugins are external executables that communicate through JSON stdin/stdout and
-command envelopes. The bundled first-party plugins are:
-
-| Plugin | Capability | Purpose |
-| --- | --- | --- |
-| `generic-graph` | `semantic-validation`, `projection` | Validates supported semantic profiles and projects source graph views into layout requests or render metadata. |
-| `elk-layout` | `layout` | Runs the Java ELK helper and returns generated layout results. |
-| `svg-render` | `render` | Renders SVG from layout result JSON and render policy JSON. |
-| `archimate-oef` | `export` | Exports ArchiMate 3.2 OEF XML from source and layout data, rounding generated OEF geometry to integer XML attributes and validating the generated XML against the official OEF XSD. |
-| `uml-xmi` | `export` | Exports view-scoped UML 2.5.1 XMI XML from UML-profile source and layout data, validating the generic XMI layer against OMG `XMI.xsd` where applicable. |
-
-After authoring JSON, agents can inspect runtime plugin support directly:
-
-```bash
-dediren-plugin-generic-graph capabilities
-dediren-plugin-elk-layout capabilities
-dediren-plugin-svg-render capabilities
-dediren-plugin-archimate-oef-export capabilities
-dediren-plugin-uml-xmi-export capabilities
-```
-
-The capability JSON uses `schemas/runtime-capability.schema.json`.
-
-The CLI discovers plugins explicitly:
-
-1. bundled manifests under the installation root `plugins/` directory when
-   running from a distribution archive;
-2. repo fixture manifests in `fixtures/plugins` when running from the source
-   checkout;
-3. project plugin directories such as `.dediren/plugins`;
-4. user-configured plugin directories from `DEDIREN_PLUGIN_DIRS`.
-
-The CLI does not discover plugins implicitly from `PATH`. A manifest executable
-can be an absolute path, a path relative to the manifest directory, or a binary
-name resolved next to the `dediren` executable. Override a specific executable
-with `DEDIREN_PLUGIN_<PLUGIN_ID>`, uppercased with dashes converted to
-underscores, for example `DEDIREN_PLUGIN_SVG_RENDER`.
-
-Plugin manifests may declare `allowed_env`. The core clears the plugin process
-environment and forwards only values whose names are listed in the manifest, in
-addition to explicit executable override variables handled by the core itself.
-First-party manifests declare the ELK, OEF, UML/XMI, schema-cache, and `PATH`
-variables needed by their external helpers.
-
-## ELK Runtime
-
-The first-party `elk-layout` plugin is a Rust external-process adapter. Runtime
-selection order is:
-
-1. `DEDIREN_ELK_RESULT_FIXTURE`, for deterministic tests and repair loops;
-2. `DEDIREN_ELK_COMMAND`, for an explicit external helper command;
-3. bundled helper at
-   `runtimes/elk-layout-java/bin/dediren-elk-layout-java` when running from a
-   distribution archive.
-
-Fixture mode takes precedence over `DEDIREN_ELK_COMMAND`.
-
-To build and run the Java helper from a source checkout:
-
-```bash
-source "$HOME/.sdkman/bin/sdkman-init.sh"
-cd crates/dediren-plugin-elk-layout/java
-sdk env install
-sdk env
-cd ../../..
-crates/dediren-plugin-elk-layout/java/scripts/build-elk-layout.sh
-DEDIREN_ELK_COMMAND=crates/dediren-plugin-elk-layout/java/scripts/elk-layout.sh \
-  dediren layout --plugin elk-layout --input fixtures/layout-request/basic.json
-```
-
-The Java helper reads a `layout-request.schema.v1` document from stdin and
-returns a command envelope whose `.data` is a `layout-result.schema.v1`
-document. The helper uses Eclipse ELK Layered (`org.eclipse.elk.layered`) for
-generated node and group placement plus orthogonal connector routing; source
-graph JSON still must not carry authored coordinates. The Gradle build keeps
-the SDKMAN Java 25 toolchain for ELK layout work, emits Java 21-compatible
-bytecode for the distributed helper, and pins Maven dependencies through
-dependency locking. Concurrent helper builds serialize on
-`.cache/locks/elk-layout-java-build.lock`.
-
-The packaged helper disables HotSpot perfdata collection so parallel layout
-runs do not emit JVM perfdata startup warnings on stdout. The Rust adapter also
-tolerates that narrow warning if an older or externally configured helper emits
-it before the JSON envelope.
-
-For large same-side fan-in and fan-out groups, the helper lets ELK merge routes
-through shared junction trunks instead of assigning every relationship its own
-source or target port. Layout results expose that renderer advice through
-`routing_hints` values such as `shared_source_junction` and
-`shared_target_junction`, so SVG rendering preserves intentional shared endpoint
-trunks while still detouring unrelated route overlaps.
-
-Endpoint merging is keyed by relationship semantics. `layout-request.schema.v1`
-edges may carry an optional `relationship_type`; the ELK helper only merges
-same-side endpoints when at least three edges have the same non-empty
-relationship type. The `generic-graph` plugin projects `relationship_type` from
-each source relationship type, so different relationship types do not share
-generated junction trunks. Layout requests that omit `relationship_type` keep
-those endpoints separate. If the field is present, it must be a non-empty
-string.
-
-Layout requests may also carry optional `layout_preferences`. Source documents
-can place the same object on `plugins.generic-graph.views[]`; the
-`generic-graph` projection copies it into the layout request. The values are
-Dediren layout intent, not raw ELK options:
-
-```json
-{
-  "layout_preferences": {
-    "direction": "right",
-    "density": "readable",
-    "wrapping": "auto",
-    "routing": {
-      "style": "orthogonal",
-      "endpoint_merging": "local"
-    }
-  }
-}
-```
-
-Supported directions are `right`, `left`, `down`, and `up`. Supported density
-profiles are `compact`, `readable`, and `spacious`. Supported wrapping values
-are `auto`, `off`, and `multi-edge`; `auto` currently favors unwrapped grouped
-layouts, while `multi-edge` opts into ELK multi-edge wrapping when width
-reduction is worth the route-quality tradeoff. Supported routing style is
-`orthogonal`.
-`routing.profile` still accepts `compact`, `readable`, and `spacious` for
-schema compatibility, but the current Layered-only helper derives route spacing
-from `density`. Supported endpoint merging values are `auto`, `local`, and
-`off`. Missing preferences keep the helper's default behavior.
-
-### ELK Test Lanes
-
-Test names use explicit lane prefixes so failures and artifacts are easy to
-classify:
-
-- `fixture_*` tests use checked-in JSON fixtures. They are deterministic and
-  are the right place for contract shape, ArchiMate node and relationship
-  vocabulary, and relationship-rule coverage.
-- `fake_*` tests exercise runtime boundary behavior with a test command instead
-  of the Java helper.
-- `real_elk_*` tests invoke the Java helper and are ignored by default. They are
-  the preferred coverage for generated geometry, route quality, and SVG render
-  evidence that depends on actual ELK output.
-
-The default `cargo test --workspace --locked` lane runs fixture and fake tests
-only. If Cargo prints `test ... ignored, run with --ignored after building the
-ELK Java helper`, the test did not run; rerun it with `-- --ignored` after
-building the helper.
-
-Generated render artifacts are written under `.test-output/renders/`:
-
-- `.test-output/renders/real-elk/` for real Java helper render tests.
-- `.test-output/renders/fixture-pipeline/` for fixture-backed CLI pipeline
-  tests, including deterministic ArchiMate node, relationship, and group render
-  notation plus UML class/data/activity and complex class fixture pipeline
-  renders.
-- `.test-output/renders/svg-render-plugin/` for renderer policy and semantic
-  fixture tests that do not prove ELK geometry, including the all-Archimate and
-  UML node/relationship/activity visual sheets.
-
-Ignored real ELK render tests also write UML class, data, activity, and complex
-UML source-view SVGs to `.test-output/renders/real-elk/` when the Java helper is
-built and the `real_elk_render` ignored suite is run.
-
-Generated SVGs are ignored by git. Inspect them locally instead of committing
-them unless a tracked example fixture was deliberately requested.
-
-## Contracts And Fixtures
-
-Use the public schemas as the source of truth for JSON shape:
-
-- `schemas/model.schema.json`
-- `schemas/layout-request.schema.json`
-- `schemas/layout-result.schema.json`
-- `schemas/semantic-validation-result.schema.json`
-- `schemas/render-metadata.schema.json`
-- `schemas/svg-render-policy.schema.json`
-- `schemas/render-result.schema.json`
-- `schemas/oef-export-policy.schema.json`
-- `schemas/uml-xmi-export-policy.schema.json`
-- `schemas/export-request.schema.json`
-- `schemas/export-result.schema.json`
-- `schemas/plugin-manifest.schema.json`
-- `schemas/runtime-capability.schema.json`
-- `schemas/envelope.schema.json`
-- `schemas/bundle.schema.json`
-
-The `fixtures/` tree provides small examples for source documents, layout
-requests/results, render policies, export policies, plugin manifests, and
-expected artifacts.
-
-## Error Handling
-
-All command results are JSON command envelopes on stdout. If a plugin returns a
-valid error envelope, the CLI preserves that envelope and exits non-zero. If the
-runtime boundary fails before a plugin can return a valid envelope, the CLI
-normalizes the failure into diagnostics such as:
-
-- `DEDIREN_PLUGIN_MISSING_EXECUTABLE`
-- `DEDIREN_PLUGIN_TIMEOUT`
-- `DEDIREN_PLUGIN_UNSUPPORTED_CAPABILITY`
-- `DEDIREN_PLUGIN_OUTPUT_INVALID_JSON`
-- `DEDIREN_SEMANTIC_PROFILE_REQUIRED`
-- `DEDIREN_SEMANTIC_PROFILE_UNSUPPORTED`
-- `DEDIREN_VALIDATE_PROFILE_REQUIRED`
-- `DEDIREN_VALIDATE_PLUGIN_REQUIRED`
-- `DEDIREN_FRAGMENT_BASE_DIR_REQUIRED`
-- `DEDIREN_FRAGMENT_READ_FAILED`
-- `DEDIREN_FRAGMENT_PATH_UNSUPPORTED`
-- `DEDIREN_FRAGMENT_NESTED_UNSUPPORTED`
-- `DEDIREN_FRAGMENT_SCHEMA_VERSION_UNSUPPORTED`
-- `DEDIREN_FRAGMENT_CONFLICT`
-- `DEDIREN_ELK_RUNTIME_UNAVAILABLE`
-- `DEDIREN_ELK_JAVA_UNAVAILABLE`
-- `DEDIREN_ELK_JAVA_UNSUPPORTED`
-- `DEDIREN_ARCHIMATE_ELEMENT_TYPE_UNSUPPORTED`
-- `DEDIREN_ARCHIMATE_RELATIONSHIP_TYPE_UNSUPPORTED`
-- `DEDIREN_ARCHIMATE_RELATIONSHIP_ENDPOINT_UNSUPPORTED`
-- `DEDIREN_OEF_SCHEMA_VALIDATOR_UNAVAILABLE`
-- `DEDIREN_OEF_SCHEMA_UNAVAILABLE`
-- `DEDIREN_OEF_SCHEMA_INVALID`
-- `DEDIREN_XMI_SCHEMA_VALIDATOR_UNAVAILABLE`
-- `DEDIREN_XMI_SCHEMA_UNAVAILABLE`
-- `DEDIREN_XMI_SCHEMA_INVALID`
-- `DEDIREN_XMI_ID_INVALID`
-
-Agents should read stdout JSON for success and failure decisions. `stderr` is
-reserved for human debugging.
-
-## Development Checks
-
-Common verification commands:
-
-```bash
-cargo fmt --all -- --check
-cargo test --workspace --locked
+./gradlew :modules:contracts:test
+./gradlew :modules:core:test
+./gradlew :apps:cli:test
+./gradlew :modules:plugins:generic-graph:test
+./gradlew :modules:plugins:elk-layout:test
+./gradlew :modules:plugins:svg-render:test
+./gradlew :modules:plugins:archimate-oef-export:test
+./gradlew :modules:plugins:uml-xmi-export:test
+./gradlew test
+./gradlew :tools:dist:distBuild :tools:dist:distSmoke
 git diff --check
 ```
 
-Distribution checks from a shell where `java -version` resolves to Java 21 or
-newer and `xmllint --version` succeeds:
+## Release
 
-```bash
-VERSION=0.16.0
-TARGET=x86_64-unknown-linux-gnu
-cargo xtask dist build --target "$TARGET"
-cargo xtask dist smoke "dist/dediren-agent-bundle-${VERSION}-${TARGET}.tar.gz"
-```
-
-Focused checks:
-
-```bash
-cargo test -p dediren-contracts --test schema_contracts
-cargo test -p dediren-core --test plugin_runtime
-cargo test -p dediren --test plugin_compat
-cargo test -p dediren-plugin-svg-render --test svg_render_plugin
-cargo test -p dediren-plugin-archimate-oef-export --test oef_export_plugin
-cargo test -p dediren-plugin-uml-xmi-export --test uml_xmi_export_plugin
-```
-
-Real ELK checks from a source checkout, after building the helper:
-
-```bash
-crates/dediren-plugin-elk-layout/java/scripts/build-elk-layout.sh
-cargo test --locked -p dediren-plugin-elk-layout --test elk_layout_plugin real_elk_plugin_invokes_java_helper -- --ignored --exact --test-threads=1
-cargo test --locked -p dediren --test cli_layout real_elk_layout_invokes_java_helper -- --ignored --exact --test-threads=1
-cargo test --locked -p dediren --test cli_layout real_elk_layout_validates_grouped_cross_group_route -- --ignored --exact --test-threads=1
-cargo test --locked -p dediren --test real_elk_render -- --ignored --test-threads=1
-```
-
-## Security
-
-See `SECURITY.md` for supported versions and vulnerability reporting.
+Release tags use `v<version>`. The product version source is
+`build.gradle.kts`. First-party plugin manifests, source fixture
+`required_plugins[].version` entries, bundle examples, and release workflow
+checks must move with the product version.

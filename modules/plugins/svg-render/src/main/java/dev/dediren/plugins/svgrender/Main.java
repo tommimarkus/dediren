@@ -361,7 +361,7 @@ public final class Main {
 
     private static String renderSvg(LayoutResult result, RenderMetadata metadata, RenderPolicy policy) {
         ResolvedStyle base = baseStyle(policy);
-        SvgBounds bounds = svgBounds(result, policy);
+        SvgBounds bounds = svgBounds(result, metadata, policy, base);
         StringBuilder svg = new StringBuilder();
         svg.append(String.format(
                 Locale.ROOT,
@@ -414,6 +414,7 @@ public final class Main {
             svg.append("</g>");
         }
         List<LaidOutEdge> renderedEdges = new ArrayList<>();
+        List<LabelBox> occupiedLabelBoxes = nodeObstacleBoxes(result);
         for (LaidOutEdge edge : result.edges()) {
             ResolvedEdgeStyle style = edgeStyle(policy, metadata, edge.id(), base);
             List<LineJump> lineJumps = lineJumps(edge, renderedEdges);
@@ -423,7 +424,7 @@ public final class Main {
             svg.append(lineJumpMasks(edge, lineJumps, base.backgroundFill()));
             svg.append(edgePath(edge, style, lineJumps));
             if (edge.label() != null && !edge.label().isEmpty()) {
-                EdgeLabel label = edgeLabel(edge, style);
+                EdgeLabel label = edgeLabel(edge, style, occupiedLabelBoxes, base.fontSize());
                 svg.append(String.format(
                         Locale.ROOT,
                         "<text x=\"%.1f\" y=\"%.1f\" text-anchor=\"%s\" fill=\"%s\" paint-order=\"stroke\" stroke=\"%s\" stroke-width=\"4\">%s</text>",
@@ -433,6 +434,7 @@ public final class Main {
                         attr(style.labelFill()),
                         attr(base.backgroundFill()),
                         text(edge.label())));
+                occupiedLabelBoxes.add(label.bounds());
             }
             svg.append("</g>");
             renderedEdges.add(edge);
@@ -1098,6 +1100,7 @@ public final class Main {
                 : " marker-end=\"url(#marker-end-" + attr(edge.id()) + ")\"";
         return "<path d=\"" + data + "\" fill=\"none\" stroke=\""
                 + attr(style.stroke()) + "\" stroke-width=\"" + styleNumber(style.strokeWidth()) + "\""
+                + " stroke-linecap=\"round\" stroke-linejoin=\"round\""
                 + dash + markerStart + markerEnd + "/>";
     }
 
@@ -1122,13 +1125,7 @@ public final class Main {
 
     private static String pathData(LaidOutEdge edge, List<LineJump> lineJumps) {
         if (lineJumps.isEmpty()) {
-            List<String> commands = new ArrayList<>();
-            for (int index = 0; index < edge.points().size(); index++) {
-                Point point = edge.points().get(index);
-                commands.add((index == 0 ? "M " : "L ")
-                        + String.format(Locale.ROOT, "%.1f %.1f", point.x(), point.y()));
-            }
-            return String.join(" ", commands);
+            return roundedPathData(edge.points());
         }
         StringBuilder data = new StringBuilder();
         Point first = edge.points().get(0);
@@ -1149,6 +1146,75 @@ public final class Main {
             data.append(String.format(Locale.ROOT, " L %.1f %.1f", end.x(), end.y()));
         }
         return data.toString();
+    }
+
+    private static String roundedPathData(List<Point> points) {
+        if (points.isEmpty()) {
+            return "";
+        }
+        if (points.size() == 1) {
+            Point only = points.getFirst();
+            return String.format(Locale.ROOT, "M %.1f %.1f", only.x(), only.y());
+        }
+        StringBuilder data = new StringBuilder();
+        Point first = points.getFirst();
+        data.append(String.format(Locale.ROOT, "M %.1f %.1f", first.x(), first.y()));
+        for (int index = 1; index < points.size() - 1; index++) {
+            Point previous = points.get(index - 1);
+            Point corner = points.get(index);
+            Point next = points.get(index + 1);
+            RoundedCorner rounded = roundedCorner(previous, corner, next);
+            if (rounded == null) {
+                data.append(String.format(Locale.ROOT, " L %.1f %.1f", corner.x(), corner.y()));
+            } else {
+                data.append(String.format(
+                        Locale.ROOT,
+                        " L %.1f %.1f Q %.1f %.1f %.1f %.1f",
+                        rounded.before().x(),
+                        rounded.before().y(),
+                        corner.x(),
+                        corner.y(),
+                        rounded.after().x(),
+                        rounded.after().y()));
+            }
+        }
+        Point last = points.getLast();
+        data.append(String.format(Locale.ROOT, " L %.1f %.1f", last.x(), last.y()));
+        return data.toString();
+    }
+
+    private static RoundedCorner roundedCorner(Point previous, Point corner, Point next) {
+        boolean firstHorizontal = nearlyEqual(previous.y(), corner.y());
+        boolean firstVertical = nearlyEqual(previous.x(), corner.x());
+        boolean secondHorizontal = nearlyEqual(corner.y(), next.y());
+        boolean secondVertical = nearlyEqual(corner.x(), next.x());
+        if (!((firstHorizontal && secondVertical) || (firstVertical && secondHorizontal))) {
+            return null;
+        }
+        double firstLength = distance(previous, corner);
+        double secondLength = distance(corner, next);
+        double radius = Math.min(8.0, Math.min(firstLength / 2.0, secondLength / 2.0));
+        if (radius < 2.0) {
+            return null;
+        }
+        return new RoundedCorner(
+                shiftedToward(corner, previous, radius),
+                shiftedToward(corner, next, radius));
+    }
+
+    private static Point shiftedToward(Point from, Point toward, double distance) {
+        double length = distance(from, toward);
+        if (length == 0.0) {
+            return from;
+        }
+        double ratio = distance / length;
+        return new Point(
+                from.x() + (toward.x() - from.x()) * ratio,
+                from.y() + (toward.y() - from.y()) * ratio);
+    }
+
+    private static double distance(Point left, Point right) {
+        return Math.hypot(left.x() - right.x(), left.y() - right.y());
     }
 
     private static double segmentProgress(Point start, Point end, double x, double y) {
@@ -1173,6 +1239,9 @@ public final class Main {
                 continue;
             }
             for (LaidOutEdge previousEdge : renderedEdges) {
+                if (isSharedJunctionPair(edge, previousEdge)) {
+                    continue;
+                }
                 for (int previousIndex = 0; previousIndex < previousEdge.points().size() - 1; previousIndex++) {
                     Point previousStart = previousEdge.points().get(previousIndex);
                     Point previousEnd = previousEdge.points().get(previousIndex + 1);
@@ -1197,6 +1266,11 @@ public final class Main {
             }
         }
         return dedupeJumps(jumps);
+    }
+
+    private static boolean isSharedJunctionPair(LaidOutEdge edge, LaidOutEdge previousEdge) {
+        return (edge.routingHints().contains("shared_source_junction") && edge.source().equals(previousEdge.source()))
+                || (edge.routingHints().contains("shared_target_junction") && edge.target().equals(previousEdge.target()));
     }
 
     private static List<LineJump> dedupeJumps(List<LineJump> jumps) {
@@ -1224,7 +1298,11 @@ public final class Main {
         return value > min && value < max;
     }
 
-    private static EdgeLabel edgeLabel(LaidOutEdge edge, ResolvedEdgeStyle style) {
+    private static EdgeLabel edgeLabel(
+            LaidOutEdge edge,
+            ResolvedEdgeStyle style,
+            List<LabelBox> occupiedBoxes,
+            double fontSize) {
         Optional<Segment> horizontal = firstHorizontalSegment(edge);
         if (horizontal.isPresent()) {
             Segment segment = horizontal.get();
@@ -1232,30 +1310,67 @@ public final class Main {
             if (direction == 0.0) {
                 direction = 1.0;
             }
-            double x = switch (style.labelHorizontalPosition()) {
+            double preferredX = switch (style.labelHorizontalPosition()) {
                 case CENTER -> (segment.start().x() + segment.end().x()) / 2.0;
                 case NEAR_END -> segment.end().x() - direction * 18.0;
                 case NEAR_START -> segment.start().x() + direction * 18.0;
             };
-            double offset = switch (style.labelHorizontalSide()) {
+            double centerX = (segment.start().x() + segment.end().x()) / 2.0;
+            double nearStartX = segment.start().x() + direction * 18.0;
+            double nearEndX = segment.end().x() - direction * 18.0;
+            double baseOffset = switch (style.labelHorizontalSide()) {
                 case ABOVE -> -10.0;
                 case BELOW -> 18.0;
                 case AUTO -> autoHorizontalLabelOffset(edge, segment.index());
             };
-            return new EdgeLabel(x, segment.start().y() + offset, "middle");
+            List<Double> xCandidates = orderedValues(preferredX, centerX, nearStartX, nearEndX);
+            double oppositeOffset = baseOffset < 0.0 ? 18.0 : -10.0;
+            List<Double> offsets = orderedValues(
+                    baseOffset,
+                    oppositeOffset,
+                    baseOffset + 28.0,
+                    baseOffset - 28.0,
+                    baseOffset + 56.0,
+                    baseOffset - 56.0);
+            for (double offset : offsets) {
+                for (double x : xCandidates) {
+                    EdgeLabel candidate = edgeLabelCandidate(x, segment.start().y() + offset, "middle", edge.label(), fontSize);
+                    if (occupiedBoxes.stream().noneMatch(candidate.bounds()::overlaps)) {
+                        return candidate;
+                    }
+                }
+            }
+            return edgeLabelCandidate(preferredX, segment.start().y() + baseOffset, "middle", edge.label(), fontSize);
         }
         Optional<Segment> vertical = firstVerticalSegment(edge);
         if (vertical.isPresent()) {
             Segment segment = vertical.get();
             double minY = edge.points().stream().mapToDouble(Point::y).min().orElse(segment.start().y());
             double maxY = edge.points().stream().mapToDouble(Point::y).max().orElse(segment.end().y());
-            return new EdgeLabel(
+            return edgeLabelCandidate(
                     segment.start().x() - 6.0,
                     (minY + maxY) / 2.0,
-                    "end");
+                    "end",
+                    edge.label(),
+                    fontSize);
         }
         Point point = edge.points().isEmpty() ? new Point(0.0, 0.0) : edge.points().get(edge.points().size() / 2);
-        return new EdgeLabel(point.x(), point.y() - 6.0, "middle");
+        return edgeLabelCandidate(point.x(), point.y() - 6.0, "middle", edge.label(), fontSize);
+    }
+
+    private static EdgeLabel edgeLabelCandidate(double x, double y, String anchor, String text, double fontSize) {
+        return new EdgeLabel(x, y, anchor, labelBox(x, y, anchor, text, fontSize));
+    }
+
+    private static List<Double> orderedValues(double... values) {
+        List<Double> ordered = new ArrayList<>();
+        for (double value : values) {
+            boolean exists = ordered.stream().anyMatch(existing -> Math.abs(existing - value) < 0.1);
+            if (!exists) {
+                ordered.add(value);
+            }
+        }
+        return ordered;
     }
 
     private static double autoHorizontalLabelOffset(LaidOutEdge edge, int segmentIndex) {
@@ -1270,6 +1385,15 @@ public final class Main {
     }
 
     private static Optional<Segment> firstHorizontalSegment(LaidOutEdge edge) {
+        if (edge.routingHints().contains("shared_source_junction")) {
+            for (int index = edge.points().size() - 2; index >= 0; index--) {
+                Point start = edge.points().get(index);
+                Point end = edge.points().get(index + 1);
+                if (nearlyEqual(start.y(), end.y()) && Math.abs(start.x() - end.x()) > 0.001) {
+                    return Optional.of(new Segment(index, start, end));
+                }
+            }
+        }
         for (int index = 0; index < edge.points().size() - 1; index++) {
             Point start = edge.points().get(index);
             Point end = edge.points().get(index + 1);
@@ -1291,7 +1415,11 @@ public final class Main {
         return Optional.empty();
     }
 
-    private static SvgBounds svgBounds(LayoutResult result, RenderPolicy policy) {
+    private static SvgBounds svgBounds(
+            LayoutResult result,
+            RenderMetadata metadata,
+            RenderPolicy policy,
+            ResolvedStyle base) {
         var bounds = SvgBounds.empty();
         for (LaidOutGroup group : result.groups()) {
             bounds.includeRect(group.x(), group.y(), group.width(), group.height());
@@ -1304,10 +1432,42 @@ public final class Main {
         for (LaidOutNode node : result.nodes()) {
             bounds.includeRect(node.x(), node.y(), node.width(), node.height());
         }
+        List<LabelBox> occupiedBoxes = nodeObstacleBoxes(result);
+        for (LaidOutEdge edge : result.edges()) {
+            if (edge.label() == null || edge.label().isEmpty()) {
+                continue;
+            }
+            EdgeLabel label = edgeLabel(edge, edgeStyle(policy, metadata, edge.id(), base), occupiedBoxes, base.fontSize());
+            bounds.includeRect(
+                    label.bounds().minX(),
+                    label.bounds().minY(),
+                    label.bounds().width(),
+                    label.bounds().height());
+            occupiedBoxes.add(label.bounds());
+        }
         if (bounds.isEmpty()) {
             bounds.includeRect(0.0, 0.0, policy.page().width(), policy.page().height());
         }
         return bounds.padded(policy);
+    }
+
+    private static List<LabelBox> nodeObstacleBoxes(LayoutResult result) {
+        List<LabelBox> boxes = new ArrayList<>();
+        for (LaidOutNode node : result.nodes()) {
+            boxes.add(new LabelBox(node.x(), node.y(), node.x() + node.width(), node.y() + node.height()));
+        }
+        return boxes;
+    }
+
+    private static LabelBox labelBox(double x, double y, String anchor, String text, double fontSize) {
+        double width = (text == null ? 0 : text.length()) * fontSize * 0.56;
+        double minX = switch (anchor) {
+            case "end" -> x - width;
+            case "middle" -> x - width / 2.0;
+            default -> x;
+        };
+        double minY = y - fontSize;
+        return new LabelBox(minX, minY, minX + width, y + fontSize * 0.25);
     }
 
     private static ResolvedStyle baseStyle(RenderPolicy policy) {
@@ -1466,7 +1626,27 @@ public final class Main {
     private record Segment(int index, Point start, Point end) {
     }
 
-    private record EdgeLabel(double x, double y, String anchor) {
+    private record RoundedCorner(Point before, Point after) {
+    }
+
+    private record EdgeLabel(double x, double y, String anchor, LabelBox bounds) {
+    }
+
+    private record LabelBox(double minX, double minY, double maxX, double maxY) {
+        boolean overlaps(LabelBox other) {
+            return minX < other.maxX
+                    && maxX > other.minX
+                    && minY < other.maxY
+                    && maxY > other.minY;
+        }
+
+        double width() {
+            return maxX - minX;
+        }
+
+        double height() {
+            return maxY - minY;
+        }
     }
 
     private record LineJump(int segmentIndex, double x, double y, boolean vertical) {

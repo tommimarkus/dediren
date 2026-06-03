@@ -4,8 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import dev.dediren.contracts.json.JsonSupport;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -95,6 +98,181 @@ class CliLayoutRenderCommandTest {
 
         assertThat(result.exitCode()).isEqualTo(2);
         assertThat(envelope.at("/diagnostics/0/code").asText()).isEqualTo("DEDIREN_COMMAND_INPUT_INVALID");
+    }
+
+    @Test
+    void renderCommandRunsJavaSvgPlugin() throws Exception {
+        CliResult result = Main.executeForTesting(new String[]{
+                "render",
+                "--plugin",
+                "svg-render",
+                "--policy",
+                workspaceRoot().resolve("fixtures/render-policy/default-svg.json").toString(),
+                "--input",
+                workspaceRoot().resolve("fixtures/layout-result/basic.json").toString()
+        }, "", pluginEnv("svg-render", "dev.dediren.plugins.svgrender.Main"));
+
+        JsonNode envelope = JsonSupport.objectMapper().readTree(result.stdout());
+
+        assertThat(result.exitCode()).isZero();
+        assertThat(envelope.at("/status").asText()).isEqualTo("ok");
+        assertThat(envelope.at("/data/artifact_kind").asText()).isEqualTo("svg");
+        assertThat(envelope.at("/data/content").asText()).contains("<svg");
+    }
+
+    @Test
+    void exportCommandRunsJavaArchimateOefPlugin() throws Exception {
+        Map<String, String> env = pluginEnv("archimate-oef", "dev.dediren.plugins.archimateoef.Main");
+        env.putAll(envWithOefSchemas());
+
+        CliResult result = Main.executeForTesting(new String[]{
+                "export",
+                "--plugin",
+                "archimate-oef",
+                "--policy",
+                workspaceRoot().resolve("fixtures/export-policy/default-oef.json").toString(),
+                "--source",
+                workspaceRoot().resolve("fixtures/source/valid-archimate-oef.json").toString(),
+                "--layout",
+                workspaceRoot().resolve("fixtures/layout-result/archimate-oef-basic.json").toString()
+        }, "", env);
+
+        JsonNode envelope = JsonSupport.objectMapper().readTree(result.stdout());
+
+        assertThat(result.exitCode()).isZero();
+        assertThat(envelope.at("/status").asText()).isEqualTo("ok");
+        assertThat(envelope.at("/data/artifact_kind").asText()).isEqualTo("archimate-oef+xml");
+        assertThat(envelope.at("/data/content").asText()).contains("<model");
+    }
+
+    @Test
+    void exportCommandRunsJavaUmlXmiPlugin() throws Exception {
+        Map<String, String> env = pluginEnv("uml-xmi", "dev.dediren.plugins.umlxmi.Main");
+        env.putAll(envWithXmiSchema());
+
+        CliResult result = Main.executeForTesting(new String[]{
+                "export",
+                "--plugin",
+                "uml-xmi",
+                "--policy",
+                workspaceRoot().resolve("fixtures/export-policy/default-uml-xmi.json").toString(),
+                "--source",
+                workspaceRoot().resolve("fixtures/source/valid-uml-basic.json").toString(),
+                "--layout",
+                workspaceRoot().resolve("fixtures/layout-result/uml-basic.json").toString()
+        }, "", env);
+
+        JsonNode envelope = JsonSupport.objectMapper().readTree(result.stdout());
+
+        assertThat(result.exitCode()).isZero();
+        assertThat(envelope.at("/status").asText()).isEqualTo("ok");
+        assertThat(envelope.at("/data/artifact_kind").asText()).isEqualTo("uml-xmi+xml");
+        assertThat(envelope.at("/data/content").asText()).contains("xmi:XMI");
+    }
+
+    private Map<String, String> pluginEnv(String pluginId, String mainClass) throws Exception {
+        Path script = temp.resolve(pluginId + ".sh");
+        String java = Path.of(System.getProperty("java.home"), "bin", "java").toString();
+        String classpath = System.getProperty("java.class.path");
+        Files.writeString(script, """
+                #!/bin/sh
+                exec "%s" -cp "%s" %s "$@"
+                """.formatted(java, classpath, mainClass), StandardCharsets.UTF_8);
+        script.toFile().setExecutable(true);
+        return new LinkedHashMap<>(Map.of(
+                "DEDIREN_PLUGIN_" + pluginId.toUpperCase().replace('-', '_'),
+                script.toString()));
+    }
+
+    private Map<String, String> envWithOefSchemas() throws Exception {
+        Path schemaDir = temp.resolve("oef-schemas");
+        Files.createDirectories(schemaDir);
+        String schema = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+                  targetNamespace="http://www.opengroup.org/xsd/archimate/3.0/"
+                  xmlns="http://www.opengroup.org/xsd/archimate/3.0/"
+                  elementFormDefault="qualified"
+                  attributeFormDefault="unqualified">
+                  <xs:element name="model">
+                    <xs:complexType>
+                      <xs:sequence>
+                        <xs:any minOccurs="0" maxOccurs="unbounded" processContents="lax"/>
+                      </xs:sequence>
+                      <xs:attribute name="identifier" type="xs:ID" use="required"/>
+                      <xs:anyAttribute namespace="##any" processContents="lax"/>
+                    </xs:complexType>
+                  </xs:element>
+                  <xs:complexType name="ApplicationComponent" mixed="true">
+                    <xs:sequence><xs:any minOccurs="0" maxOccurs="unbounded" processContents="lax"/></xs:sequence>
+                    <xs:anyAttribute namespace="##any" processContents="lax"/>
+                  </xs:complexType>
+                  <xs:complexType name="ApplicationService" mixed="true">
+                    <xs:sequence><xs:any minOccurs="0" maxOccurs="unbounded" processContents="lax"/></xs:sequence>
+                    <xs:anyAttribute namespace="##any" processContents="lax"/>
+                  </xs:complexType>
+                  <xs:complexType name="Grouping" mixed="true">
+                    <xs:sequence><xs:any minOccurs="0" maxOccurs="unbounded" processContents="lax"/></xs:sequence>
+                    <xs:anyAttribute namespace="##any" processContents="lax"/>
+                  </xs:complexType>
+                  <xs:complexType name="AndJunction" mixed="true">
+                    <xs:sequence><xs:any minOccurs="0" maxOccurs="unbounded" processContents="lax"/></xs:sequence>
+                    <xs:anyAttribute namespace="##any" processContents="lax"/>
+                  </xs:complexType>
+                  <xs:complexType name="Realization" mixed="true">
+                    <xs:sequence><xs:any minOccurs="0" maxOccurs="unbounded" processContents="lax"/></xs:sequence>
+                    <xs:anyAttribute namespace="##any" processContents="lax"/>
+                  </xs:complexType>
+                  <xs:complexType name="Flow" mixed="true">
+                    <xs:sequence><xs:any minOccurs="0" maxOccurs="unbounded" processContents="lax"/></xs:sequence>
+                    <xs:anyAttribute namespace="##any" processContents="lax"/>
+                  </xs:complexType>
+                  <xs:complexType name="Composition" mixed="true">
+                    <xs:sequence><xs:any minOccurs="0" maxOccurs="unbounded" processContents="lax"/></xs:sequence>
+                    <xs:anyAttribute namespace="##any" processContents="lax"/>
+                  </xs:complexType>
+                  <xs:complexType name="Element" mixed="true">
+                    <xs:sequence><xs:any minOccurs="0" maxOccurs="unbounded" processContents="lax"/></xs:sequence>
+                    <xs:anyAttribute namespace="##any" processContents="lax"/>
+                  </xs:complexType>
+                  <xs:complexType name="Relationship" mixed="true">
+                    <xs:sequence><xs:any minOccurs="0" maxOccurs="unbounded" processContents="lax"/></xs:sequence>
+                    <xs:anyAttribute namespace="##any" processContents="lax"/>
+                  </xs:complexType>
+                  <xs:complexType name="Diagram" mixed="true">
+                    <xs:sequence><xs:any minOccurs="0" maxOccurs="unbounded" processContents="lax"/></xs:sequence>
+                    <xs:anyAttribute namespace="##any" processContents="lax"/>
+                  </xs:complexType>
+                </xs:schema>
+                """;
+        for (String fileName : java.util.List.of(
+                "archimate3_Model.xsd",
+                "archimate3_View.xsd",
+                "archimate3_Diagram.xsd")) {
+            Files.writeString(schemaDir.resolve(fileName), schema, StandardCharsets.UTF_8);
+        }
+        return Map.of("DEDIREN_OEF_SCHEMA_DIR", schemaDir.toString());
+    }
+
+    private Map<String, String> envWithXmiSchema() throws Exception {
+        Path schemaPath = temp.resolve("XMI.xsd");
+        Files.writeString(schemaPath, """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+                            targetNamespace="http://www.omg.org/spec/XMI/20131001"
+                            xmlns="http://www.omg.org/spec/XMI/20131001"
+                            elementFormDefault="qualified">
+                  <xsd:element name="XMI">
+                    <xsd:complexType>
+                      <xsd:choice minOccurs="0" maxOccurs="unbounded">
+                        <xsd:any processContents="lax"/>
+                      </xsd:choice>
+                      <xsd:anyAttribute processContents="lax"/>
+                    </xsd:complexType>
+                  </xsd:element>
+                </xsd:schema>
+                """, StandardCharsets.UTF_8);
+        return Map.of("DEDIREN_XMI_SCHEMA_PATH", schemaPath.toString());
     }
 
     private static Path workspaceRoot() {

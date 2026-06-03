@@ -567,6 +567,58 @@ class MainTest {
         }
 
         @Test
+        void rendersDetailedArchimateIconMorphology() throws Exception {
+            JsonNode input = archimateRenderInput(
+                    fixtureJson("fixtures/render-policy/archimate-svg.json"),
+                    """
+                    [
+                      { "id": "component", "source_id": "component", "projection_id": "component", "x": 40, "y": 40, "width": 160, "height": 80, "label": "Component" },
+                      { "id": "actor", "source_id": "actor", "projection_id": "actor", "x": 240, "y": 40, "width": 160, "height": 80, "label": "Actor" },
+                      { "id": "data", "source_id": "data", "projection_id": "data", "x": 440, "y": 40, "width": 160, "height": 80, "label": "Data" },
+                      { "id": "node", "source_id": "node", "projection_id": "node", "x": 640, "y": 40, "width": 160, "height": 80, "label": "Node" }
+                    ]
+                    """,
+                    "[]",
+                    """
+                    {
+                      "component": { "type": "ApplicationComponent", "source_id": "component" },
+                      "actor": { "type": "BusinessActor", "source_id": "actor" },
+                      "data": { "type": "DataObject", "source_id": "data" },
+                      "node": { "type": "Node", "source_id": "node" }
+                    }
+                    """,
+                    "{}");
+            Document document = svgDocument(okContent(render(input)));
+
+            Element component = childGroupWithAttribute(
+                    groupWithAttribute(document, "data-dediren-node-id", "component"),
+                    "data-dediren-node-decorator",
+                    "archimate_application_component");
+            assertThat(childElements(component, "rect")).hasSize(3);
+
+            Element actor = childGroupWithAttribute(
+                    groupWithAttribute(document, "data-dediren-node-id", "actor"),
+                    "data-dediren-node-decorator",
+                    "archimate_business_actor");
+            assertThat(childElements(actor, "ellipse")).hasSize(1);
+            assertThat(firstChildElement(actor, "path").getAttribute("stroke-linecap")).isEqualTo("round");
+
+            Element data = childGroupWithAttribute(
+                    groupWithAttribute(document, "data-dediren-node-id", "data"),
+                    "data-dediren-node-decorator",
+                    "archimate_data_object");
+            assertThat(childElements(data, "path").stream().map(path -> path.getAttribute("data-dediren-icon-part")))
+                    .contains("document-body", "document-header");
+
+            Element node = childGroupWithAttribute(
+                    groupWithAttribute(document, "data-dediren-node-id", "node"),
+                    "data-dediren-node-decorator",
+                    "archimate_technology_node");
+            assertThat(firstElementWithAttribute(node, "data-dediren-icon-part").getAttribute("data-dediren-icon-part"))
+                    .isEqualTo("node-3d-edges");
+        }
+
+        @Test
         void coversEachUmlNodeTypeFromPolicy() throws Exception {
             JsonNode policy = fixtureJson("fixtures/render-policy/uml-svg.json");
             ObjectNode nodeStyles = (ObjectNode) policy.at("/style/node_type_overrides");
@@ -823,6 +875,206 @@ class MainTest {
             Document document = svgDocument(okContent(render(input)));
 
             assertThat(document.getDocumentElement().getAttribute("viewBox")).isEqualTo("304.0 224.0 152.0 96.0");
+        }
+
+        @Test
+        void placesSharedSourceJunctionLabelOnUniqueBranch() throws Exception {
+            JsonNode input = styledInlineInput(
+                    "[]",
+                    "[]",
+                    """
+                    [
+                      {
+                        "id": "gateway-prices-cart",
+                        "source": "api-gateway",
+                        "target": "pricing-service",
+                        "source_id": "gateway-prices-cart",
+                        "projection_id": "gateway-prices-cart",
+                        "routing_hints": ["shared_source_junction"],
+                        "points": [
+                          { "x": 0, "y": 120 },
+                          { "x": 100, "y": 120 },
+                          { "x": 100, "y": 40 },
+                          { "x": 300, "y": 40 }
+                        ],
+                        "label": "prices cart"
+                      }
+                    ]
+                    """,
+                    "{ \"edge\": { \"label_horizontal_position\": \"center\" } }");
+            Document document = svgDocument(okContent(render(input)));
+
+            Element label = firstChildElement(
+                    groupWithAttribute(document, "data-dediren-edge-id", "gateway-prices-cart"),
+                    "text");
+
+            assertThat(Double.parseDouble(label.getAttribute("x"))).isCloseTo(200.0, org.assertj.core.data.Offset.offset(1.0));
+            assertThat(Double.parseDouble(label.getAttribute("y"))).isCloseTo(40.0, org.assertj.core.data.Offset.offset(18.0));
+        }
+
+        @Test
+        void roundsOrthogonalRouteCorners() throws Exception {
+            JsonNode input = styledInlineInput(
+                    "[]",
+                    "[]",
+                    """
+                    [
+                      {
+                        "id": "stepped-edge",
+                        "source": "left",
+                        "target": "right",
+                        "source_id": "stepped-edge",
+                        "projection_id": "stepped-edge",
+                        "points": [
+                          { "x": 0, "y": 100 },
+                          { "x": 80, "y": 100 },
+                          { "x": 80, "y": 105 },
+                          { "x": 160, "y": 105 }
+                        ],
+                        "label": "step"
+                      }
+                    ]
+                    """,
+                    "{}");
+            Document document = svgDocument(okContent(render(input)));
+
+            Element path = firstChildElement(groupWithAttribute(document, "data-dediren-edge-id", "stepped-edge"), "path");
+
+            assertThat(path.getAttribute("stroke-linecap")).isEqualTo("round");
+            assertThat(path.getAttribute("stroke-linejoin")).isEqualTo("round");
+            assertThat(path.getAttribute("d")).contains(" Q ");
+            assertThat(path.getAttribute("d")).startsWith("M 0.0 100.0");
+            assertThat(path.getAttribute("d")).endsWith("L 160.0 105.0");
+        }
+
+        @Test
+        void suppressesLineJumpBetweenSharedJunctionEdges() throws Exception {
+            JsonNode input = styledInlineInput(
+                    "[]",
+                    "[]",
+                    """
+                    [
+                      {
+                        "id": "first-edge",
+                        "source": "shared-source",
+                        "target": "top-target",
+                        "source_id": "first-edge",
+                        "projection_id": "first-edge",
+                        "points": [
+                          { "x": 0, "y": 100 },
+                          { "x": 80, "y": 100 },
+                          { "x": 80, "y": 40 }
+                        ],
+                        "label": "first"
+                      },
+                      {
+                        "id": "merged-edge",
+                        "source": "shared-source",
+                        "target": "bottom-target",
+                        "source_id": "merged-edge",
+                        "projection_id": "merged-edge",
+                        "routing_hints": ["shared_source_junction"],
+                        "points": [
+                          { "x": 0, "y": 90 },
+                          { "x": 120, "y": 90 }
+                        ],
+                        "label": "merged"
+                      }
+                    ]
+                    """,
+                    "{}");
+            Document document = svgDocument(okContent(render(input)));
+
+            Element path = firstChildElement(groupWithAttribute(document, "data-dediren-edge-id", "merged-edge"), "path");
+
+            assertThat(path.getAttribute("d")).doesNotContain(" Q ");
+        }
+
+        @Test
+        void expandsViewboxToIncludeEdgeLabels() throws Exception {
+            JsonNode input = styledInlineInput(
+                    "[]",
+                    """
+                    [
+                      { "id": "left-node", "source_id": "left-node", "projection_id": "left-node", "x": 12, "y": 32, "width": 160, "height": 80, "label": "Left" },
+                      { "id": "right-node", "source_id": "right-node", "projection_id": "right-node", "x": 212, "y": 32, "width": 160, "height": 80, "label": "Right" }
+                    ]
+                    """,
+                    """
+                    [
+                      {
+                        "id": "left-to-right",
+                        "source": "left-node",
+                        "target": "right-node",
+                        "source_id": "left-to-right",
+                        "projection_id": "left-to-right",
+                        "points": [
+                          { "x": 172, "y": 72 },
+                          { "x": 212, "y": 72 }
+                        ],
+                        "label": "very long clipped edge label"
+                      }
+                    ]
+                    """,
+                    "{}");
+            Document document = svgDocument(okContent(render(input)));
+
+            String viewBox = document.getDocumentElement().getAttribute("viewBox");
+            String[] parts = viewBox.split("\\s+");
+            double minX = Double.parseDouble(parts[0]);
+            double minY = Double.parseDouble(parts[1]);
+            double width = Double.parseDouble(parts[2]);
+            double height = Double.parseDouble(parts[3]);
+            Element label = firstChildElement(groupWithAttribute(document, "data-dediren-edge-id", "left-to-right"), "text");
+            double labelY = Double.parseDouble(label.getAttribute("y"));
+
+            assertThat(minX).isLessThan(0.0);
+            assertThat(minY).isLessThanOrEqualTo(16.0);
+            assertThat(width).isGreaterThanOrEqualTo(380.0);
+            assertThat(height).isGreaterThanOrEqualTo(100.0);
+            assertThat(minY + height).isGreaterThanOrEqualTo(labelY + 8.0);
+        }
+
+        @Test
+        void separatesLabelsForParallelHorizontalEdges() throws Exception {
+            JsonNode input = styledInlineInput(
+                    "[]",
+                    "[]",
+                    """
+                    [
+                      {
+                        "id": "upper-edge",
+                        "source": "orders-api",
+                        "target": "payments",
+                        "source_id": "upper-edge",
+                        "projection_id": "upper-edge",
+                        "points": [
+                          { "x": 100, "y": 160 },
+                          { "x": 320, "y": 160 }
+                        ],
+                        "label": "writes orders"
+                      },
+                      {
+                        "id": "lower-edge",
+                        "source": "orders-api",
+                        "target": "database",
+                        "source_id": "lower-edge",
+                        "projection_id": "lower-edge",
+                        "points": [
+                          { "x": 100, "y": 172 },
+                          { "x": 320, "y": 172 }
+                        ],
+                        "label": "requests payment authorization"
+                      }
+                    ]
+                    """,
+                    "{}");
+            Document document = svgDocument(okContent(render(input)));
+
+            Element upper = firstChildElement(groupWithAttribute(document, "data-dediren-edge-id", "upper-edge"), "text");
+            Element lower = firstChildElement(groupWithAttribute(document, "data-dediren-edge-id", "lower-edge"), "text");
+
+            assertThat(textBoxesOverlap(upper, lower)).isFalse();
         }
     }
 
@@ -1094,6 +1346,32 @@ class MainTest {
             }
         }
         return elements;
+    }
+
+    private static boolean textBoxesOverlap(Element left, Element right) {
+        double[] leftBox = textBox(left);
+        double[] rightBox = textBox(right);
+        return leftBox[0] < rightBox[2]
+                && leftBox[2] > rightBox[0]
+                && leftBox[1] < rightBox[3]
+                && leftBox[3] > rightBox[1];
+    }
+
+    private static double[] textBox(Element label) {
+        double fontSize = label.hasAttribute("font-size")
+                ? Double.parseDouble(label.getAttribute("font-size"))
+                : 14.0;
+        double x = Double.parseDouble(label.getAttribute("x"));
+        double y = Double.parseDouble(label.getAttribute("y"));
+        String text = label.getTextContent() == null ? "" : label.getTextContent();
+        double width = text.length() * fontSize * 0.56;
+        double minX = switch (label.getAttribute("text-anchor")) {
+            case "end" -> x - width;
+            case "middle" -> x - width / 2.0;
+            default -> x;
+        };
+        double minY = y - fontSize;
+        return new double[]{minX, minY, minX + width, y + fontSize * 0.25};
     }
 
     private static JsonNode fixtureJson(String path) throws Exception {

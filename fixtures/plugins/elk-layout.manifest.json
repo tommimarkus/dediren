@@ -1,8 +1,8 @@
 {
   "plugin_manifest_schema_version": "plugin-manifest.schema.v1",
   "id": "elk-layout",
-  "version": "0.16.0",
+  "version": "0.18.0",
   "executable": "dediren-plugin-elk-layout",
   "capabilities": ["layout"],
-  "allowed_env": ["DEDIREN_ELK_COMMAND", "DEDIREN_ELK_RESULT_FIXTURE", "PATH"]
+  "allowed_env": ["JAVA_HOME", "PATH"]
 }

@@ -6,7 +6,7 @@ import org.junit.jupiter.api.Test;
 
 class ContractVersionsTest {
     @Test
-    void schemaVersionConstantsMatchRustContracts() {
+    void schemaVersionConstantsMatchPublicSchemas() {
         assertThat(ContractVersions.MODEL_SCHEMA_VERSION).isEqualTo("model.schema.v1");
         assertThat(ContractVersions.ENVELOPE_SCHEMA_VERSION).isEqualTo("envelope.schema.v1");
         assertThat(ContractVersions.PLUGIN_PROTOCOL_VERSION).isEqualTo("plugin.protocol.v1");

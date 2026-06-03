@@ -58,7 +58,7 @@ cargo test -p dediren-plugin-svg-render --test svg_render_plugin render_contract
 
 Result: all passed.
 
-- [ ] **Task 2: Port SVG node, edge, label, and viewbox rendering**
+- [x] **Task 2: Port SVG node, edge, label, and viewbox rendering**
   - Model: `gpt-5-codex`
   - Preserve ArchiMate decorators, UML symbols, edge markers, edge labels, shared endpoint route behavior, line jumps, and viewbox cropping/expansion.
   - Add tests equivalent to every Rust SVG test module: `archimate_groups`, `archimate_nodes`, `archimate_relationships`, `edge_labels`, `render_contracts`, `uml_activity`, `uml_nodes`, `uml_relationships`, and `viewbox_routes`.
@@ -123,7 +123,29 @@ GRADLE_USER_HOME=.cache/gradle/user-home ./gradlew :modules:plugins:svg-render:t
 
 Result: all Java SVG module tests passed.
 
-Remaining in Task 2: detailed ArchiMate icon morphology assertions, adjacent/parallel label collision handling, route rounding, shared-endpoint route behavior, and expanded viewbox bounds for displaced labels.
+### 2026-06-03 SVG Geometry Completion Checkpoint
+
+Completed the remaining Task 2 Java SVG geometry parity checks:
+
+- Detailed ArchiMate icon morphology assertions for application component,
+  business actor, data object, and technology node decorators.
+- Shared-source junction labels now use the unique downstream branch instead of
+  the shared trunk.
+- Orthogonal route corners render with rounded joins and preserve source/target
+  endpoints.
+- Shared-junction route hints suppress line jumps between merged edges.
+- Edge label placement tracks node and prior-label occupancy to separate
+  parallel horizontal labels.
+- Label-aware bounds are included in the SVG viewBox calculation for displaced
+  and long edge labels.
+
+Verification:
+
+```bash
+GRADLE_USER_HOME=.cache/gradle/user-home ./gradlew :modules:plugins:svg-render:test
+```
+
+Result: all Java SVG render plugin tests passed.
 
 - [x] **Task 3: Port ArchiMate OEF export**
   - Model: `gpt-5-codex`
@@ -185,26 +207,72 @@ git diff --check
 
 Result: all passed.
 
-- [ ] **Task 5: Add CLI integration parity**
+- [x] **Task 5: Add CLI integration parity**
   - Model: `gpt-5-codex`
   - Run Java CLI against Java plugins for render and export workflows.
   - Preserve stdout envelope shapes and non-zero structured error handling.
   - Add tests equivalent to `cli_render.rs` and `cli_export.rs`.
   - Expected: pass.
 
-- [ ] **Task 6: Add render/export Rust coverage note**
+- [x] **Task 6: Add render/export Rust coverage note**
   - Model: `gpt-5-mini`
   - In the slice handoff, map Rust SVG/OEF/XMI source files, test files, render policies, export policies, layout-result fixtures, and render-metadata fixtures to their Java successor tests.
   - Expected: no render/export Rust test module remains without a named Java successor.
 
-- [ ] **Task 7: Run architecture and test audits**
+### 2026-06-03 CLI Render/Export Integration Checkpoint
+
+Added direct Java CLI success coverage for process-boundary render/export
+workflows:
+
+- `render --plugin svg-render` now runs the Java SVG plugin through the CLI and
+  asserts an `ok` SVG artifact envelope.
+- `export --plugin archimate-oef` now runs the Java OEF plugin through the CLI
+  with local test OEF schemas and asserts an `ok` ArchiMate OEF XML artifact
+  envelope.
+- `export --plugin uml-xmi` now runs the Java UML XMI plugin through the CLI
+  with a local test XMI schema and asserts an `ok` UML XMI XML artifact
+  envelope.
+- The CLI test hook now passes an explicit candidate environment into
+  production core command paths, allowing tests to point plugin ids at Java
+  process launchers while production still uses the process environment.
+- Plugin executable override resolution now accepts the same candidate
+  environment used for allowed plugin runtime variables.
+
+Verification:
+
+```bash
+GRADLE_USER_HOME=.cache/gradle/user-home ./gradlew :apps:cli:test --tests dev.dediren.cli.CliLayoutRenderCommandTest
+```
+
+Result: all CLI layout/render/export tests passed.
+
+Rust-to-Java render/export coverage mapping:
+
+| Rust surface | Java successor |
+| --- | --- |
+| `crates/dediren-plugin-svg-render/src/main.rs` | `modules/plugins/svg-render/src/main/java/dev/dediren/plugins/svgrender/Main.java` |
+| `crates/dediren-plugin-svg-render/tests/svg_render_plugin/render_contracts.rs` | `MainTest` render policy validation and command envelope tests |
+| `crates/dediren-plugin-svg-render/tests/svg_render_plugin/archimate_nodes.rs` and `archimate_groups.rs` | `MainTest` ArchiMate node/group/decorator coverage |
+| `crates/dediren-plugin-svg-render/tests/svg_render_plugin/archimate_relationships.rs` | `MainTest` ArchiMate relationship marker/dash coverage |
+| `crates/dediren-plugin-svg-render/tests/svg_render_plugin/uml_nodes.rs` and `uml_activity.rs` | `MainTest` UML class/enumeration/activity symbol coverage |
+| `crates/dediren-plugin-svg-render/tests/svg_render_plugin/uml_relationships.rs` | `MainTest` UML relationship marker coverage |
+| `crates/dediren-plugin-svg-render/tests/svg_render_plugin/edge_labels.rs` and `viewbox_routes.rs` | `MainTest` label collision, line jump, rounded route, and label-aware viewBox coverage |
+| `crates/dediren-plugin-archimate-oef-export/src/main.rs` | `modules/plugins/archimate-oef-export/src/main/java/dev/dediren/plugins/archimateoef/Main.java` |
+| `crates/dediren-plugin-archimate-oef-export/tests/oef_export_plugin.rs` | `modules/plugins/archimate-oef-export/src/test/java/dev/dediren/plugins/archimateoef/MainTest.java` |
+| `crates/dediren-plugin-uml-xmi-export/src/main.rs` | `modules/plugins/uml-xmi-export/src/main/java/dev/dediren/plugins/umlxmi/Main.java` |
+| `crates/dediren-plugin-uml-xmi-export/tests/uml_xmi_export_plugin.rs` | `modules/plugins/uml-xmi-export/src/test/java/dev/dediren/plugins/umlxmi/MainTest.java` |
+| `crates/dediren-cli/tests/cli_render.rs` | `apps/cli/src/test/java/dev/dediren/cli/CliLayoutRenderCommandTest.java` plus `tools/dist:distSmoke` |
+| `crates/dediren-cli/tests/cli_export.rs` | `apps/cli/src/test/java/dev/dediren/cli/CliLayoutRenderCommandTest.java` plus `tools/dist:distSmoke` |
+| render/export fixtures and policies | retained under `fixtures/` and exercised by Java plugin, CLI, and distribution tests |
+
+- [x] **Task 7: Run architecture and test audits**
   - Model: `gpt-5`
   - Use `souroldgeezer-architecture:architecture-design` Review for ArchiMate/OEF/UML evidence and render/export readiness.
   - Use `souroldgeezer-audit:test-quality-audit` Deep for SVG/OEF/XMI plugin tests.
   - Use `souroldgeezer-design:software-design` Review for plugin ownership and duplication risks.
   - Fix block findings before commit.
 
-- [ ] **Task 8: Verify and commit**
+- [x] **Task 8: Verify and commit**
   - Model: `gpt-5-mini`
   - Run: `./gradlew :modules:plugins:svg-render:test :modules:plugins:archimate-oef-export:test :modules:plugins:uml-xmi-export:test :apps:cli:test`
   - Run: `cargo test -p dediren-plugin-svg-render --test svg_render_plugin --locked`
@@ -212,3 +280,31 @@ Result: all passed.
   - Run: `cargo test -p dediren-plugin-uml-xmi-export --test uml_xmi_export_plugin --locked`
   - Run: `git diff --check`
   - Commit message: `feat: port render and export plugins to java`
+
+### 2026-06-03 Render/Export Final Audit And Verification
+
+Audit notes:
+
+- `souroldgeezer-design:software-design` Review: no block findings. Render
+  policy remains owned by `svg-render`; OEF/XMI semantics remain in their
+  export plugins; core stays plugin-neutral and owns only orchestration and
+  envelope validation. The CLI test-only plugin dependencies do not affect the
+  production dependency graph.
+- `souroldgeezer-audit:test-quality-audit` Deep: no block findings. Java tests
+  cover plugin unit behavior, process-boundary CLI render/export workflows,
+  schema-backed XML validation, SVG geometry/label/viewBox behavior, and bundle
+  smoke. Accepted limit: no mutation-testing evidence is available in this
+  Gradle setup.
+- `souroldgeezer-architecture:architecture-design` Review: no block findings.
+  ArchiMate/OEF and UML/XMI outputs remain generated from source/layout
+  contracts, not authored geometry.
+
+Verification:
+
+```bash
+GRADLE_USER_HOME=.cache/gradle/user-home ./gradlew test :tools:dist:distBuild :tools:dist:distSmoke
+git diff --check
+```
+
+Result: all passed. Rust parity commands in the original task list are no
+longer applicable after the Slice 06 Rust retirement.

@@ -111,7 +111,7 @@ rg -n "elkrs|rust-elkrs" Cargo.toml Cargo.lock README.md docs/agent-usage.md mod
 
 Result: ELK module tests passed, wrapper-based install distribution built successfully, the script-launched executable reported official Java ELK capabilities, no SDKMAN references remain in runtime scripts/modules, and no target-state `elkrs` references were found.
 
-- [ ] **Task 6: Add real official Java ELK tests**
+- [x] **Task 6: Add real official Java ELK tests**
   - Model: `gpt-5-codex`
   - Port or recreate tests for basic layout, layout preferences, grouped cross-group routes, UML class/data/activity render cases, ArchiMate render cases, and route quality.
   - Cover every Rust ELK lane: `elk_layout_plugin.rs`, the real/ignored lanes in `cli_layout.rs`, and all real render cases in `real_elk_render.rs`.
@@ -130,29 +130,61 @@ Result: ELK module tests passed, wrapper-based install distribution built succes
 
 Rust and legacy helper surfaces now have explicit Java target-state decisions:
 
-- `crates/dediren-plugin-elk-layout/java/src/main/java/dev/dediren/elk/*` moved to `modules/plugins/elk-layout/src/main/java/dev/dediren/plugins/elklayout/*`.
-- `crates/dediren-plugin-elk-layout/java/src/test/java/dev/dediren/elk/*` moved to `modules/plugins/elk-layout/src/test/java/dev/dediren/plugins/elklayout/*`.
-- The moved Java tests now use shared `modules/contracts` layout records rather than local plugin protocol records.
-- `crates/dediren-plugin-elk-layout/java/.sdkmanrc` was removed.
-- `crates/dediren-plugin-elk-layout/java/scripts/build-elk-layout.sh` now runs the root Gradle Wrapper target `:modules:plugins:elk-layout:installDist`.
-- `crates/dediren-plugin-elk-layout/java/scripts/elk-layout.sh` now executes the root Java plugin install distribution and does not source SDKMAN.
-- `crates/dediren-plugin-elk-layout/src/main.rs` remains a legacy Rust adapter until the distribution cutover removes Rust crates or rewires first-party bundled manifests to Java launchers.
-- `fixtures/plugins/elk-layout.manifest.json` still declares the legacy Rust executable and `DEDIREN_ELK_COMMAND` environment while Rust compatibility remains. Target-state cutover must replace this with the Java launcher path and remove `DEDIREN_ELK_COMMAND` from allowed env.
-- Rust ignored CLI/render lanes in `crates/dediren-cli/tests/cli_layout.rs` and `crates/dediren-cli/tests/real_elk_render.rs` remain source-parity references for Task 6 and slice 06. The Java ELK module already carries the official ELK route-quality matrix; Java CLI/bundle render evidence is still a cutover task.
-- README and `docs/agent-usage.md` still describe Rust adapter and SDKMAN-era helper behavior. They remain open for the distribution/docs cutover task, not for the Java ELK module implementation.
-- No `elkrs`/`rust-elkrs` source, dependency, diagnostic, fixture limitation, or doc statement was found in the active target-state search paths for this branch.
+- Legacy helper Java source and tests moved into
+  `modules/plugins/elk-layout/src/main/java/dev/dediren/plugins/elklayout`
+  and `modules/plugins/elk-layout/src/test/java/dev/dediren/plugins/elklayout`.
+- The target plugin uses official Eclipse ELK Java dependencies from the root
+  Gradle build and the root Gradle Wrapper.
+- `fixtures/plugins/elk-layout.manifest.json` now points at
+  `dediren-plugin-elk-layout` and allows only Java launcher/runtime env names.
+- The Rust adapter, helper scripts, helper Gradle project, and tracked Rust
+  ELK tests were deleted in Slice 06 after the Java migration ledger review.
+- The old external ELK command and ELK result fixture environment are retired;
+  deterministic coverage now comes from Java ELK unit tests plus packaged
+  bundle smoke against the Java launcher.
+- CLI and distribution evidence now cover official Java ELK through
+  `layout --plugin elk-layout`, `validate-layout`, and SVG render from the
+  unpacked bundle.
+- No `elkrs`/`rust-elkrs` source, dependency, diagnostic, fixture limitation,
+  or target-state doc statement remains in active search paths.
 
-- [ ] **Task 8: Run audits**
+- [x] **Task 8: Run audits**
   - Model: `gpt-5`
   - Use `souroldgeezer-audit:test-quality-audit` Deep on ELK Java tests.
   - Use `souroldgeezer-audit:devsecops-audit` Quick on Java dependency posture and plugin process boundary.
   - Use `souroldgeezer-architecture:architecture-design` Review if ArchiMate or UML render evidence changes.
   - Fix block findings before commit.
 
-- [ ] **Task 9: Verify and commit**
+- [x] **Task 9: Verify and commit**
   - Model: `gpt-5-mini`
   - Run: `./gradlew :modules:plugins:elk-layout:test :apps:cli:test`
   - Run: `rg -n "elkrs|rust-elkrs" Cargo.toml Cargo.lock README.md docs/agent-usage.md modules fixtures/plugins`
   - Expected: no target-state `elkrs` references remain.
   - Run: `git diff --check`
   - Commit message: `feat: use official java elk layout`
+
+### 2026-06-03 Official Java ELK Final Verification
+
+Audit notes:
+
+- `souroldgeezer-audit:test-quality-audit` Deep: no block findings. Java ELK
+  tests cover official ELK layout output, grouped route behavior, route quality,
+  capabilities, and structured diagnostics; distribution smoke covers CLI use
+  of the packaged Java launcher.
+- `souroldgeezer-audit:devsecops-audit` Quick: no block findings. ELK
+  dependencies are declared in Gradle version catalog and redistributed through
+  the Java bundle notices; plugin execution remains a process boundary.
+- `souroldgeezer-architecture:architecture-design` Review: no block findings.
+  ArchiMate/UML render evidence remains generated from source/layout contracts.
+
+Verification:
+
+```bash
+GRADLE_USER_HOME=.cache/gradle/user-home ./gradlew test :tools:dist:distBuild :tools:dist:distSmoke
+git diff --check
+rg -n "cargo|Cargo|Rust|crates/|xtask|cargo-about|SDKMAN|sdkman|\\.sdkmanrc|DEDIREN_ELK_BUILD_USE_SDKMAN|DEDIREN_ELK_COMMAND|DEDIREN_ELK_RESULT_FIXTURE|elkrs|rust-elkrs|target/debug" README.md docs/agent-usage.md AGENTS.md .github/workflows build.gradle.kts settings.gradle.kts gradle.properties fixtures modules apps tools
+```
+
+Result: Gradle, distribution smoke, whitespace, and active target-state stale
+searches passed. The commit will be part of the final migration commit instead
+of the earlier slice-specific commit name.
