@@ -436,6 +436,204 @@ class MainTest {
         }
     }
 
+    @Nested
+    class RouteAndLabelRendering {
+        @Test
+        void placesEdgeLabelNearRouteMidpointForVerticalRoute() throws Exception {
+            JsonNode input = styledInlineInput(
+                    "[]",
+                    "[]",
+                    """
+                    [
+                      {
+                        "id": "routed-edge",
+                        "source": "source-node",
+                        "target": "target-node",
+                        "source_id": "routed-edge",
+                        "projection_id": "routed-edge",
+                        "points": [
+                          { "x": 100, "y": 0 },
+                          { "x": 100, "y": 100 },
+                          { "x": 100, "y": 200 }
+                        ],
+                        "label": "routed label"
+                      }
+                    ]
+                    """,
+                    "{}");
+            Document document = svgDocument(okContent(render(input)));
+
+            Element label = firstChildElement(groupWithAttribute(document, "data-dediren-edge-id", "routed-edge"), "text");
+
+            assertThat(label.getAttribute("text-anchor")).isEqualTo("end");
+            assertThat(Double.parseDouble(label.getAttribute("x"))).isCloseTo(94.0, org.assertj.core.data.Offset.offset(3.0));
+            assertThat(Double.parseDouble(label.getAttribute("y"))).isCloseTo(100.0, org.assertj.core.data.Offset.offset(6.0));
+        }
+
+        @Test
+        void defaultsHorizontalEdgeLabelNearStart() throws Exception {
+            JsonNode input = styledInlineInput(
+                    "[]",
+                    "[]",
+                    """
+                    [
+                      {
+                        "id": "horizontal-edge",
+                        "source": "source-node",
+                        "target": "target-node",
+                        "source_id": "horizontal-edge",
+                        "projection_id": "horizontal-edge",
+                        "points": [
+                          { "x": 0, "y": 120 },
+                          { "x": 100, "y": 120 }
+                        ],
+                        "label": "start"
+                      }
+                    ]
+                    """,
+                    "{}");
+            Document document = svgDocument(okContent(render(input)));
+
+            Element label = firstChildElement(groupWithAttribute(document, "data-dediren-edge-id", "horizontal-edge"), "text");
+
+            assertThat(Double.parseDouble(label.getAttribute("x"))).isCloseTo(18.0, org.assertj.core.data.Offset.offset(1.0));
+        }
+
+        @Test
+        void allowsCenteredHorizontalEdgeLabelsByPolicy() throws Exception {
+            JsonNode input = styledInlineInput(
+                    "[]",
+                    "[]",
+                    """
+                    [
+                      {
+                        "id": "horizontal-edge",
+                        "source": "source-node",
+                        "target": "target-node",
+                        "source_id": "horizontal-edge",
+                        "projection_id": "horizontal-edge",
+                        "points": [
+                          { "x": 0, "y": 120 },
+                          { "x": 100, "y": 120 }
+                        ],
+                        "label": "center label"
+                      }
+                    ]
+                    """,
+                    "{ \"edge\": { \"label_horizontal_position\": \"center\" } }");
+            Document document = svgDocument(okContent(render(input)));
+
+            Element label = firstChildElement(groupWithAttribute(document, "data-dediren-edge-id", "horizontal-edge"), "text");
+
+            assertThat(Double.parseDouble(label.getAttribute("x"))).isCloseTo(50.0, org.assertj.core.data.Offset.offset(1.0));
+        }
+
+        @Test
+        void paintsEdgeLabelWithBackgroundHalo() throws Exception {
+            JsonNode input = styledInlineInput(
+                    "[]",
+                    "[]",
+                    """
+                    [
+                      {
+                        "id": "labeled-edge",
+                        "source": "source-node",
+                        "target": "target-node",
+                        "source_id": "labeled-edge",
+                        "projection_id": "labeled-edge",
+                        "points": [
+                          { "x": 0, "y": 100 },
+                          { "x": 200, "y": 100 }
+                        ],
+                        "label": "clear label"
+                      }
+                    ]
+                    """,
+                    "{ \"background\": { \"fill\": \"#f8fafc\" } }");
+            Document document = svgDocument(okContent(render(input)));
+
+            Element label = firstChildElement(groupWithAttribute(document, "data-dediren-edge-id", "labeled-edge"), "text");
+
+            assertThat(label.getAttribute("paint-order")).isEqualTo("stroke");
+            assertThat(label.getAttribute("stroke")).isEqualTo("#f8fafc");
+            assertThat(label.getAttribute("stroke-width")).isEqualTo("4");
+        }
+
+        @Test
+        void addsLineJumpForLaterCrossingEdge() throws Exception {
+            JsonNode input = styledInlineInput(
+                    "[]",
+                    "[]",
+                    """
+                    [
+                      {
+                        "id": "first-edge",
+                        "source": "left",
+                        "target": "right",
+                        "source_id": "first-edge",
+                        "projection_id": "first-edge",
+                        "points": [
+                          { "x": 0, "y": 100 },
+                          { "x": 200, "y": 100 }
+                        ],
+                        "label": "first"
+                      },
+                      {
+                        "id": "front-edge",
+                        "source": "top",
+                        "target": "bottom",
+                        "source_id": "front-edge",
+                        "projection_id": "front-edge",
+                        "points": [
+                          { "x": 100, "y": 0 },
+                          { "x": 100, "y": 200 }
+                        ],
+                        "label": "front"
+                      }
+                    ]
+                    """,
+                    "{}");
+            Document document = svgDocument(okContent(render(input)));
+
+            Element firstPath = firstChildElement(groupWithAttribute(document, "data-dediren-edge-id", "first-edge"), "path");
+            Element frontEdge = groupWithAttribute(document, "data-dediren-edge-id", "front-edge");
+            Element frontPath = firstChildElement(frontEdge, "path");
+
+            assertThat(firstPath.getAttribute("d")).doesNotContain(" Q ");
+            assertThat(frontPath.getAttribute("d"))
+                    .contains("L 100.0 94.0")
+                    .contains("Q 106.0 100.0 100.0 106.0");
+            Element masks = childGroupWithAttribute(frontEdge, "data-dediren-line-jump-masks", "front-edge");
+            assertThat(firstChildElement(masks, "path").getAttribute("stroke")).isEqualTo("#ffffff");
+        }
+
+        @Test
+        void cropsSmallDiagramToContentBounds() throws Exception {
+            JsonNode input = styledInlineInput(
+                    "[]",
+                    """
+                    [
+                      {
+                        "id": "node-a",
+                        "source_id": "node-a",
+                        "projection_id": "node-a",
+                        "x": 320,
+                        "y": 240,
+                        "width": 120,
+                        "height": 64,
+                        "label": "Node A"
+                      }
+                    ]
+                    """,
+                    "[]",
+                    "{}");
+
+            Document document = svgDocument(okContent(render(input)));
+
+            assertThat(document.getDocumentElement().getAttribute("viewBox")).isEqualTo("304.0 224.0 152.0 96.0");
+        }
+    }
+
     private static PluginResult render(JsonNode input) throws Exception {
         return Main.executeForTesting(new String[]{"render"}, JsonSupport.objectMapper().writeValueAsString(input));
     }

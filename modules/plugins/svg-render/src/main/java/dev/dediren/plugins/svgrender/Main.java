@@ -412,23 +412,29 @@ public final class Main {
                     text(group.label())));
             svg.append("</g>");
         }
+        List<LaidOutEdge> renderedEdges = new ArrayList<>();
         for (LaidOutEdge edge : result.edges()) {
             ResolvedEdgeStyle style = edgeStyle(policy, metadata, edge.id(), base);
+            List<LineJump> lineJumps = lineJumps(edge, renderedEdges);
             svg.append("<g data-dediren-edge-id=\"").append(attr(edge.id())).append("\">");
             svg.append(edgeMarker(edge, style, "start"));
             svg.append(edgeMarker(edge, style, "end"));
-            svg.append(edgePath(edge, style));
+            svg.append(lineJumpMasks(edge, lineJumps, base.backgroundFill()));
+            svg.append(edgePath(edge, style, lineJumps));
             if (edge.label() != null && !edge.label().isEmpty()) {
-                Point labelPoint = edgeLabelPoint(edge);
+                EdgeLabel label = edgeLabel(edge, style);
                 svg.append(String.format(
                         Locale.ROOT,
-                        "<text x=\"%.1f\" y=\"%.1f\" text-anchor=\"middle\" fill=\"%s\">%s</text>",
-                        labelPoint.x(),
-                        labelPoint.y() - 6.0,
+                        "<text x=\"%.1f\" y=\"%.1f\" text-anchor=\"%s\" fill=\"%s\" paint-order=\"stroke\" stroke=\"%s\" stroke-width=\"4\">%s</text>",
+                        label.x(),
+                        label.y(),
+                        attr(label.anchor()),
                         attr(style.labelFill()),
+                        attr(base.backgroundFill()),
                         text(edge.label())));
             }
             svg.append("</g>");
+            renderedEdges.add(edge);
         }
         for (LaidOutNode node : result.nodes()) {
             ResolvedNodeStyle style = nodeStyle(policy, metadata, node.id(), base);
@@ -1037,16 +1043,26 @@ public final class Main {
                 + body + "</marker>";
     }
 
-    private static String edgePath(LaidOutEdge edge, ResolvedEdgeStyle style) {
+    private static String lineJumpMasks(LaidOutEdge edge, List<LineJump> lineJumps, String backgroundFill) {
+        if (lineJumps.isEmpty()) {
+            return "";
+        }
+        StringBuilder masks = new StringBuilder();
+        masks.append("<g data-dediren-line-jump-masks=\"").append(attr(edge.id())).append("\">");
+        for (LineJump jump : lineJumps) {
+            masks.append("<path d=\"").append(attr(jump.maskPath()))
+                    .append("\" fill=\"none\" stroke=\"").append(attr(backgroundFill))
+                    .append("\" stroke-width=\"6\"/>");
+        }
+        masks.append("</g>");
+        return masks.toString();
+    }
+
+    private static String edgePath(LaidOutEdge edge, ResolvedEdgeStyle style, List<LineJump> lineJumps) {
         if (edge.points().isEmpty()) {
             return "";
         }
-        List<String> commands = new ArrayList<>();
-        for (int index = 0; index < edge.points().size(); index++) {
-            Point point = edge.points().get(index);
-            commands.add((index == 0 ? "M " : "L ")
-                    + String.format(Locale.ROOT, "%.1f %.1f", point.x(), point.y()));
-        }
+        String data = pathData(edge, lineJumps);
         String dash = style.lineStyle() == SvgEdgeLineStyle.DASHED ? " stroke-dasharray=\"8 5\"" : "";
         String markerStart = style.markerStart() == SvgEdgeMarkerEnd.NONE
                 ? ""
@@ -1054,7 +1070,7 @@ public final class Main {
         String markerEnd = style.markerEnd() == SvgEdgeMarkerEnd.NONE
                 ? ""
                 : " marker-end=\"url(#marker-end-" + attr(edge.id()) + ")\"";
-        return "<path d=\"" + String.join(" ", commands) + "\" fill=\"none\" stroke=\""
+        return "<path d=\"" + data + "\" fill=\"none\" stroke=\""
                 + attr(style.stroke()) + "\" stroke-width=\"" + styleNumber(style.strokeWidth()) + "\""
                 + dash + markerStart + markerEnd + "/>";
     }
@@ -1078,11 +1094,175 @@ public final class Main {
         };
     }
 
-    private static Point edgeLabelPoint(LaidOutEdge edge) {
-        if (edge.points().isEmpty()) {
-            return new Point(0.0, 0.0);
+    private static String pathData(LaidOutEdge edge, List<LineJump> lineJumps) {
+        if (lineJumps.isEmpty()) {
+            List<String> commands = new ArrayList<>();
+            for (int index = 0; index < edge.points().size(); index++) {
+                Point point = edge.points().get(index);
+                commands.add((index == 0 ? "M " : "L ")
+                        + String.format(Locale.ROOT, "%.1f %.1f", point.x(), point.y()));
+            }
+            return String.join(" ", commands);
         }
-        return edge.points().get(edge.points().size() / 2);
+        StringBuilder data = new StringBuilder();
+        Point first = edge.points().get(0);
+        data.append(String.format(Locale.ROOT, "M %.1f %.1f", first.x(), first.y()));
+        for (int index = 0; index < edge.points().size() - 1; index++) {
+            int segmentIndex = index;
+            Point start = edge.points().get(index);
+            Point end = edge.points().get(index + 1);
+            List<LineJump> segmentJumps = lineJumps.stream()
+                    .filter(jump -> jump.segmentIndex() == segmentIndex)
+                    .sorted((left, right) -> Double.compare(
+                            segmentProgress(start, end, left.x(), left.y()),
+                            segmentProgress(start, end, right.x(), right.y())))
+                    .toList();
+            for (LineJump jump : segmentJumps) {
+                data.append(" ").append(jump.pathPrefix(start, end));
+            }
+            data.append(String.format(Locale.ROOT, " L %.1f %.1f", end.x(), end.y()));
+        }
+        return data.toString();
+    }
+
+    private static double segmentProgress(Point start, Point end, double x, double y) {
+        double dx = Math.abs(end.x() - start.x());
+        double dy = Math.abs(end.y() - start.y());
+        if (dx >= dy) {
+            double length = end.x() - start.x();
+            return length == 0.0 ? 0.0 : (x - start.x()) / length;
+        }
+        double length = end.y() - start.y();
+        return length == 0.0 ? 0.0 : (y - start.y()) / length;
+    }
+
+    private static List<LineJump> lineJumps(LaidOutEdge edge, List<LaidOutEdge> renderedEdges) {
+        List<LineJump> jumps = new ArrayList<>();
+        for (int segmentIndex = 0; segmentIndex < edge.points().size() - 1; segmentIndex++) {
+            Point currentStart = edge.points().get(segmentIndex);
+            Point currentEnd = edge.points().get(segmentIndex + 1);
+            boolean currentVertical = nearlyEqual(currentStart.x(), currentEnd.x());
+            boolean currentHorizontal = nearlyEqual(currentStart.y(), currentEnd.y());
+            if (!currentVertical && !currentHorizontal) {
+                continue;
+            }
+            for (LaidOutEdge previousEdge : renderedEdges) {
+                for (int previousIndex = 0; previousIndex < previousEdge.points().size() - 1; previousIndex++) {
+                    Point previousStart = previousEdge.points().get(previousIndex);
+                    Point previousEnd = previousEdge.points().get(previousIndex + 1);
+                    boolean previousVertical = nearlyEqual(previousStart.x(), previousEnd.x());
+                    boolean previousHorizontal = nearlyEqual(previousStart.y(), previousEnd.y());
+                    if (currentVertical && previousHorizontal) {
+                        double x = currentStart.x();
+                        double y = previousStart.y();
+                        if (insideSegment(y, currentStart.y(), currentEnd.y())
+                                && insideSegment(x, previousStart.x(), previousEnd.x())) {
+                            jumps.add(new LineJump(segmentIndex, x, y, true));
+                        }
+                    } else if (currentHorizontal && previousVertical) {
+                        double x = previousStart.x();
+                        double y = currentStart.y();
+                        if (insideSegment(x, currentStart.x(), currentEnd.x())
+                                && insideSegment(y, previousStart.y(), previousEnd.y())) {
+                            jumps.add(new LineJump(segmentIndex, x, y, false));
+                        }
+                    }
+                }
+            }
+        }
+        return dedupeJumps(jumps);
+    }
+
+    private static List<LineJump> dedupeJumps(List<LineJump> jumps) {
+        List<LineJump> deduped = new ArrayList<>();
+        for (LineJump jump : jumps) {
+            boolean exists = deduped.stream().anyMatch(existing ->
+                    existing.segmentIndex() == jump.segmentIndex()
+                            && Math.abs(existing.x() - jump.x()) < 0.1
+                            && Math.abs(existing.y() - jump.y()) < 0.1
+                            && existing.vertical() == jump.vertical());
+            if (!exists) {
+                deduped.add(jump);
+            }
+        }
+        return deduped;
+    }
+
+    private static boolean nearlyEqual(double left, double right) {
+        return Math.abs(left - right) < 0.001;
+    }
+
+    private static boolean insideSegment(double value, double start, double end) {
+        double min = Math.min(start, end);
+        double max = Math.max(start, end);
+        return value > min && value < max;
+    }
+
+    private static EdgeLabel edgeLabel(LaidOutEdge edge, ResolvedEdgeStyle style) {
+        Optional<Segment> horizontal = firstHorizontalSegment(edge);
+        if (horizontal.isPresent()) {
+            Segment segment = horizontal.get();
+            double direction = Math.signum(segment.end().x() - segment.start().x());
+            if (direction == 0.0) {
+                direction = 1.0;
+            }
+            double x = switch (style.labelHorizontalPosition()) {
+                case CENTER -> (segment.start().x() + segment.end().x()) / 2.0;
+                case NEAR_END -> segment.end().x() - direction * 18.0;
+                case NEAR_START -> segment.start().x() + direction * 18.0;
+            };
+            double offset = switch (style.labelHorizontalSide()) {
+                case ABOVE -> -10.0;
+                case BELOW -> 18.0;
+                case AUTO -> autoHorizontalLabelOffset(edge, segment.index());
+            };
+            return new EdgeLabel(x, segment.start().y() + offset, "middle");
+        }
+        Optional<Segment> vertical = firstVerticalSegment(edge);
+        if (vertical.isPresent()) {
+            Segment segment = vertical.get();
+            double minY = edge.points().stream().mapToDouble(Point::y).min().orElse(segment.start().y());
+            double maxY = edge.points().stream().mapToDouble(Point::y).max().orElse(segment.end().y());
+            return new EdgeLabel(
+                    segment.start().x() - 6.0,
+                    (minY + maxY) / 2.0,
+                    "end");
+        }
+        Point point = edge.points().isEmpty() ? new Point(0.0, 0.0) : edge.points().get(edge.points().size() / 2);
+        return new EdgeLabel(point.x(), point.y() - 6.0, "middle");
+    }
+
+    private static double autoHorizontalLabelOffset(LaidOutEdge edge, int segmentIndex) {
+        if (segmentIndex + 2 < edge.points().size()) {
+            Point segmentStart = edge.points().get(segmentIndex);
+            Point next = edge.points().get(segmentIndex + 2);
+            if (next.y() < segmentStart.y()) {
+                return -10.0;
+            }
+        }
+        return 18.0;
+    }
+
+    private static Optional<Segment> firstHorizontalSegment(LaidOutEdge edge) {
+        for (int index = 0; index < edge.points().size() - 1; index++) {
+            Point start = edge.points().get(index);
+            Point end = edge.points().get(index + 1);
+            if (nearlyEqual(start.y(), end.y()) && Math.abs(start.x() - end.x()) > 0.001) {
+                return Optional.of(new Segment(index, start, end));
+            }
+        }
+        return Optional.empty();
+    }
+
+    private static Optional<Segment> firstVerticalSegment(LaidOutEdge edge) {
+        for (int index = 0; index < edge.points().size() - 1; index++) {
+            Point start = edge.points().get(index);
+            Point end = edge.points().get(index + 1);
+            if (nearlyEqual(start.x(), end.x()) && Math.abs(start.y() - end.y()) > 0.001) {
+                return Optional.of(new Segment(index, start, end));
+            }
+        }
+        return Optional.empty();
     }
 
     private static SvgBounds svgBounds(LayoutResult result, RenderPolicy policy) {
@@ -1255,6 +1435,66 @@ public final class Main {
     }
 
     private record RenderInput(LayoutResult layoutResult, RenderMetadata renderMetadata, RenderPolicy policy) {
+    }
+
+    private record Segment(int index, Point start, Point end) {
+    }
+
+    private record EdgeLabel(double x, double y, String anchor) {
+    }
+
+    private record LineJump(int segmentIndex, double x, double y, boolean vertical) {
+        String pathPrefix(Point start, Point end) {
+            if (vertical) {
+                double before = y + (start.y() < end.y() ? -6.0 : 6.0);
+                double after = y + (start.y() < end.y() ? 6.0 : -6.0);
+                double controlX = x + 6.0;
+                return String.format(
+                        Locale.ROOT,
+                        "L %.1f %.1f Q %.1f %.1f %.1f %.1f",
+                        x,
+                        before,
+                        controlX,
+                        y,
+                        x,
+                        after);
+            }
+            double before = x + (start.x() < end.x() ? -6.0 : 6.0);
+            double after = x + (start.x() < end.x() ? 6.0 : -6.0);
+            double controlY = y - 6.0;
+            return String.format(
+                    Locale.ROOT,
+                    "L %.1f %.1f Q %.1f %.1f %.1f %.1f",
+                    before,
+                    y,
+                    x,
+                    controlY,
+                    after,
+                    y);
+        }
+
+        String maskPath() {
+            if (vertical) {
+                return String.format(
+                        Locale.ROOT,
+                        "M %.1f %.1f Q %.1f %.1f %.1f %.1f",
+                        x,
+                        y - 6.0,
+                        x + 6.0,
+                        y,
+                        x,
+                        y + 6.0);
+            }
+            return String.format(
+                    Locale.ROOT,
+                    "M %.1f %.1f Q %.1f %.1f %.1f %.1f",
+                    x - 6.0,
+                    y,
+                    x,
+                    y - 6.0,
+                    x + 6.0,
+                    y);
+        }
     }
 
     private static final class SvgBounds {

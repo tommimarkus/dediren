@@ -86,6 +86,26 @@ Result: Java SVG module tests passed, and the Rust reference SVG suite passed 61
 
 Remaining in Task 2: full ArchiMate/UML type coverage tests, group decorator parity, edge label placement/collision handling, route rounding, line jumps, shared-endpoint route behavior, and viewbox label/content bounds.
 
+### 2026-06-03 SVG Route And Label Subcheckpoint
+
+Added Java SVG rendering coverage for the route geometry lane:
+
+- Vertical edge labels placed near the route midpoint with right-aligned text.
+- Horizontal edge labels placed near start by default and centered when policy requests it.
+- Edge label halo rendering against configured background fill.
+- Line-jump rendering and background mask generation for later crossing edges.
+- Content-bounds viewbox cropping for small diagrams.
+
+Verification:
+
+```bash
+GRADLE_USER_HOME=.cache/gradle/user-home ./gradlew :modules:plugins:svg-render:test
+```
+
+Result: all Java SVG module tests passed.
+
+Remaining in Task 2: full exhaustive Java coverage for every ArchiMate/UML node and relationship type, group decorator parity, adjacent/parallel label collision handling, route rounding, shared-endpoint route behavior, and expanded viewbox bounds for displaced labels.
+
 - [x] **Task 3: Port ArchiMate OEF export**
   - Model: `gpt-5-codex`
   - Generate ArchiMate 3.2 OEF XML from source, policy, and generated layout results.
