@@ -7,6 +7,7 @@ junit = "5.10.3"
 junit-platform = "1.10.3"
 picocli = "4.7.7"
 xmlunit = "2.10.0"
+xtext-xbase = "2.32.0"
 
 [libraries]
 assertj-core = { module = "org.assertj:assertj-core", version.ref = "assertj" }
@@ -19,3 +20,4 @@ junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "jun
 junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher", version.ref = "junit-platform" }
 picocli = { module = "info.picocli:picocli", version.ref = "picocli" }
 xmlunit-core = { module = "org.xmlunit:xmlunit-core", version.ref = "xmlunit" }
+xtext-xbase-lib = { module = "org.eclipse.xtext:org.eclipse.xtext.xbase.lib", version.ref = "xtext-xbase" }

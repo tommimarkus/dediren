@@ -7,6 +7,7 @@ dependencies {
     implementation(libs.elk.core)
     implementation(libs.elk.graph)
     implementation(libs.elk.layered)
+    implementation(libs.xtext.xbase.lib)
     testImplementation(project(":test-support"))
     testImplementation(libs.assertj.core)
     testImplementation(libs.junit.jupiter)
