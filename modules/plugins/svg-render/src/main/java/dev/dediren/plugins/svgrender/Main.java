@@ -402,6 +402,7 @@ public final class Main {
                     attr(style.fill()),
                     attr(style.stroke()),
                     styleNumber(style.strokeWidth())));
+            svg.append(groupDecorator(group, style));
             svg.append(String.format(
                     Locale.ROOT,
                     "<text x=\"%.1f\" y=\"%.1f\" fill=\"%s\" font-size=\"%s\">%s</text>",
@@ -455,6 +456,31 @@ public final class Main {
         }
         svg.append("</g></svg>\n");
         return svg.toString();
+    }
+
+    private static String groupDecorator(LaidOutGroup group, ResolvedGroupStyle style) {
+        if (style.decorator() != SvgNodeDecorator.ARCHIMATE_GROUPING) {
+            return "";
+        }
+        double size = 22.0;
+        double x = group.x() + group.width() - size - 6.0;
+        double y = group.y() + 9.0;
+        String body = String.format(
+                Locale.ROOT,
+                "<path data-dediren-icon-part=\"grouping\" d=\"M %.1f %.1f L %.1f %.1f L %.1f %.1f L %.1f %.1f Z\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%s\"/>",
+                x,
+                y,
+                x + size,
+                y,
+                x + size,
+                y + size * 0.72,
+                x,
+                y + size * 0.72,
+                attr(style.fill()),
+                attr(style.stroke()),
+                styleNumber(style.strokeWidth()));
+        return "<g data-dediren-group-decorator=\"archimate_grouping\" data-dediren-icon-kind=\"grouping\""
+                + " data-dediren-icon-size=\"22\">" + body + "</g>";
     }
 
     private static String nodeShape(LaidOutNode node, ResolvedNodeStyle style) {

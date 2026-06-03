@@ -3,6 +3,7 @@ package dev.dediren.plugins.svgrender;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import dev.dediren.contracts.json.JsonSupport;
 import java.io.StringReader;
@@ -434,6 +435,197 @@ class MainTest {
             assertThat(path.hasAttribute("marker-end")).isFalse();
             assertThat(path.hasAttribute("stroke-dasharray")).isFalse();
         }
+
+        @Test
+        void archimateGroupingMetadataRendersGroupDecorator() throws Exception {
+            ObjectNode layout = JsonSupport.objectMapper().createObjectNode();
+            layout.put("layout_result_schema_version", "layout-result.schema.v1");
+            layout.put("view_id", "main");
+            layout.set("nodes", JsonSupport.objectMapper().createArrayNode());
+            layout.set("edges", JsonSupport.objectMapper().createArrayNode());
+            layout.set("groups", JsonSupport.objectMapper().readTree("""
+                    [
+                      {
+                        "id": "customer-domain",
+                        "source_id": "customer-domain",
+                        "projection_id": "customer-domain",
+                        "provenance": { "semantic_backed": { "source_id": "customer-domain" } },
+                        "x": 20,
+                        "y": 20,
+                        "width": 240,
+                        "height": 140,
+                        "members": [],
+                        "label": "Customer Domain"
+                      }
+                    ]
+                    """));
+            layout.set("warnings", JsonSupport.objectMapper().createArrayNode());
+
+            ObjectNode metadata = JsonSupport.objectMapper().createObjectNode();
+            metadata.put("render_metadata_schema_version", "render-metadata.schema.v1");
+            metadata.put("semantic_profile", "archimate");
+            metadata.set("nodes", JsonSupport.objectMapper().createObjectNode());
+            metadata.set("edges", JsonSupport.objectMapper().createObjectNode());
+            metadata.set("groups", JsonSupport.objectMapper().readTree("""
+                    {
+                      "customer-domain": {
+                        "type": "Grouping",
+                        "source_id": "customer-domain"
+                      }
+                    }
+                    """));
+
+            JsonNode policy = JsonSupport.objectMapper().readTree("""
+                    {
+                      "svg_render_policy_schema_version": "svg-render-policy.schema.v1",
+                      "semantic_profile": "archimate",
+                      "page": { "width": 400, "height": 240 },
+                      "margin": { "top": 24, "right": 24, "bottom": 24, "left": 24 },
+                      "style": {
+                        "group_type_overrides": {
+                          "Grouping": {
+                            "decorator": "archimate_grouping",
+                            "fill": "#fef9c3",
+                            "stroke": "#a16207"
+                          }
+                        }
+                      }
+                    }
+                    """);
+
+            ObjectNode input = JsonSupport.objectMapper().createObjectNode();
+            input.set("layout_result", layout);
+            input.set("render_metadata", metadata);
+            input.set("policy", policy);
+
+            Document document = svgDocument(okContent(render(input)));
+
+            Element group = groupWithAttribute(document, "data-dediren-group-id", "customer-domain");
+            assertThat(group.getAttribute("data-dediren-group-type")).isEqualTo("Grouping");
+            assertThat(group.getAttribute("data-dediren-group-source-id")).isEqualTo("customer-domain");
+            childGroupWithAttribute(group, "data-dediren-group-decorator", "archimate_grouping");
+        }
+
+        @Test
+        void coversEachArchimateNodeTypeFromPolicy() throws Exception {
+            JsonNode policy = fixtureJson("fixtures/render-policy/archimate-svg.json");
+            ObjectNode nodeStyles = (ObjectNode) policy.at("/style/node_type_overrides");
+            ArrayNode nodes = JsonSupport.objectMapper().createArrayNode();
+            ObjectNode metadataNodes = JsonSupport.objectMapper().createObjectNode();
+            int index = 0;
+            for (var fields = nodeStyles.fields(); fields.hasNext(); ) {
+                var field = fields.next();
+                String nodeType = field.getKey();
+                String id = "archimate-node-" + index;
+                nodes.add(JsonSupport.objectMapper().readTree("""
+                        {
+                          "id": "%s",
+                          "source_id": "%s",
+                          "projection_id": "%s",
+                          "x": %d,
+                          "y": %d,
+                          "width": 128,
+                          "height": 68,
+                          "label": "%s"
+                        }
+                        """.formatted(id, id, id, 32 + (index % 6) * 150, 40 + (index / 6) * 95, nodeType)));
+                metadataNodes.set(id, JsonSupport.objectMapper().readTree("""
+                        {
+                          "type": "%s",
+                          "source_id": "%s"
+                        }
+                        """.formatted(nodeType, id)));
+                index++;
+            }
+
+            Document document = svgDocument(okContent(render(semanticRenderInput(
+                    "archimate",
+                    nodes,
+                    JsonSupport.objectMapper().createArrayNode(),
+                    metadataNodes,
+                    JsonSupport.objectMapper().createObjectNode(),
+                    policy))));
+
+            index = 0;
+            for (var fields = nodeStyles.fields(); fields.hasNext(); ) {
+                var field = fields.next();
+                String id = "archimate-node-" + index;
+                String expectedDecorator = field.getValue().at("/decorator").asText();
+                Element node = groupWithAttribute(document, "data-dediren-node-id", id);
+                Element shape = firstElementWithAttribute(node, "data-dediren-node-shape");
+                String expectedFill = "archimate_and_junction".equals(expectedDecorator)
+                        ? field.getValue().at("/stroke").asText()
+                        : field.getValue().at("/fill").asText();
+                assertThat(shape.getAttribute("fill")).isEqualTo(expectedFill);
+                assertThat(shape.getAttribute("stroke")).isEqualTo(field.getValue().at("/stroke").asText());
+                if (!"archimate_and_junction".equals(expectedDecorator)
+                        && !"archimate_or_junction".equals(expectedDecorator)) {
+                    childGroupWithAttribute(node, "data-dediren-node-decorator", expectedDecorator);
+                }
+                index++;
+            }
+        }
+
+        @Test
+        void coversEachUmlNodeTypeFromPolicy() throws Exception {
+            JsonNode policy = fixtureJson("fixtures/render-policy/uml-svg.json");
+            ObjectNode nodeStyles = (ObjectNode) policy.at("/style/node_type_overrides");
+            ArrayNode nodes = JsonSupport.objectMapper().createArrayNode();
+            ObjectNode metadataNodes = JsonSupport.objectMapper().createObjectNode();
+            int index = 0;
+            for (var fields = nodeStyles.fields(); fields.hasNext(); ) {
+                var field = fields.next();
+                String nodeType = field.getKey();
+                String id = "uml-node-" + index;
+                nodes.add(JsonSupport.objectMapper().readTree("""
+                        {
+                          "id": "%s",
+                          "source_id": "%s",
+                          "projection_id": "%s",
+                          "x": %d,
+                          "y": %d,
+                          "width": 180,
+                          "height": 96,
+                          "label": "%s"
+                        }
+                        """.formatted(id, id, id, 40 + (index % 4) * 220, 40 + (index / 4) * 140, nodeType)));
+                metadataNodes.set(id, JsonSupport.objectMapper().readTree("""
+                        {
+                          "type": "%s",
+                          "source_id": "%s"
+                        }
+                        """.formatted(nodeType, id)));
+                index++;
+            }
+
+            String content = okContent(render(semanticRenderInput(
+                    "uml",
+                    nodes,
+                    JsonSupport.objectMapper().createArrayNode(),
+                    metadataNodes,
+                    JsonSupport.objectMapper().createObjectNode(),
+                    policy)));
+            Document document = svgDocument(content);
+
+            index = 0;
+            for (var fields = nodeStyles.fields(); fields.hasNext(); ) {
+                var field = fields.next();
+                String id = "uml-node-" + index;
+                String expectedDecorator = field.getValue().at("/decorator").asText();
+                Element node = groupWithAttribute(document, "data-dediren-node-id", id);
+                Element shape = firstElementWithAttribute(node, "data-dediren-node-shape");
+                assertThat(shape.getAttribute("data-dediren-node-shape")).isEqualTo(expectedDecorator);
+                childGroupWithAttribute(node, "data-dediren-node-decorator", expectedDecorator);
+                index++;
+            }
+            assertThat(content).contains("&#171;interface&#187;", "&#171;dataType&#187;", "&#171;enumeration&#187;");
+        }
+
+        @Test
+        void coversEachRelationshipTypeFromPolicies() throws Exception {
+            assertRelationshipPolicyCoverage("archimate", "fixtures/render-policy/archimate-svg.json");
+            assertRelationshipPolicyCoverage("uml", "fixtures/render-policy/uml-svg.json");
+        }
     }
 
     @Nested
@@ -698,6 +890,108 @@ class MainTest {
         input.set("render_metadata", metadata);
         input.set("policy", policy);
         return input;
+    }
+
+    private static JsonNode semanticRenderInput(
+            String semanticProfile,
+            ArrayNode nodes,
+            ArrayNode edges,
+            ObjectNode metadataNodes,
+            ObjectNode metadataEdges,
+            JsonNode policy) {
+        ObjectNode layout = JsonSupport.objectMapper().createObjectNode();
+        layout.put("layout_result_schema_version", "layout-result.schema.v1");
+        layout.put("view_id", semanticProfile + "-coverage");
+        layout.set("nodes", nodes);
+        layout.set("edges", edges);
+        layout.set("groups", JsonSupport.objectMapper().createArrayNode());
+        layout.set("warnings", JsonSupport.objectMapper().createArrayNode());
+
+        ObjectNode metadata = JsonSupport.objectMapper().createObjectNode();
+        metadata.put("render_metadata_schema_version", "render-metadata.schema.v1");
+        metadata.put("semantic_profile", semanticProfile);
+        metadata.set("nodes", metadataNodes);
+        metadata.set("edges", metadataEdges);
+
+        ObjectNode input = JsonSupport.objectMapper().createObjectNode();
+        input.set("layout_result", layout);
+        input.set("render_metadata", metadata);
+        input.set("policy", policy);
+        return input;
+    }
+
+    private static void assertRelationshipPolicyCoverage(String semanticProfile, String policyPath) throws Exception {
+        JsonNode policy = fixtureJson(policyPath);
+        ObjectNode edgeStyles = (ObjectNode) policy.at("/style/edge_type_overrides");
+        ArrayNode edges = JsonSupport.objectMapper().createArrayNode();
+        ObjectNode metadataEdges = JsonSupport.objectMapper().createObjectNode();
+        int index = 0;
+        for (var fields = edgeStyles.fields(); fields.hasNext(); ) {
+            String relationshipType = fields.next().getKey();
+            String id = semanticProfile + "-relationship-" + index;
+            int y = 60 + index * 48;
+            edges.add(JsonSupport.objectMapper().readTree("""
+                    {
+                      "id": "%s",
+                      "source": "source-%d",
+                      "target": "target-%d",
+                      "source_id": "%s",
+                      "projection_id": "%s",
+                      "points": [
+                        { "x": 120, "y": %d },
+                        { "x": 260, "y": %d }
+                      ],
+                      "label": "%s"
+                    }
+                    """.formatted(id, index, index, id, id, y, y, relationshipType)));
+            metadataEdges.set(id, JsonSupport.objectMapper().readTree("""
+                    {
+                      "type": "%s",
+                      "source_id": "%s"
+                    }
+                    """.formatted(relationshipType, id)));
+            index++;
+        }
+
+        Document document = svgDocument(okContent(render(semanticRenderInput(
+                semanticProfile,
+                JsonSupport.objectMapper().createArrayNode(),
+                edges,
+                JsonSupport.objectMapper().createObjectNode(),
+                metadataEdges,
+                policy))));
+
+        index = 0;
+        for (var fields = edgeStyles.fields(); fields.hasNext(); ) {
+            var field = fields.next();
+            String id = semanticProfile + "-relationship-" + index;
+            JsonNode style = field.getValue();
+            Element edge = groupWithAttribute(document, "data-dediren-edge-id", id);
+            Element path = firstChildElement(edge, "path");
+            assertMarkerForStyle(document, path, id, "start", style.at("/marker_start").asText("none"));
+            assertMarkerForStyle(document, path, id, "end", style.at("/marker_end").asText("filled_arrow"));
+            if ("dashed".equals(style.at("/line_style").asText())) {
+                assertThat(path.getAttribute("stroke-dasharray")).isEqualTo("8 5");
+            }
+            index++;
+        }
+    }
+
+    private static void assertMarkerForStyle(
+            Document document,
+            Element path,
+            String edgeId,
+            String side,
+            String markerName) {
+        String attributeName = "marker-" + side;
+        if ("none".equals(markerName)) {
+            assertThat(path.hasAttribute(attributeName)).isFalse();
+            return;
+        }
+        String markerId = "marker-" + side + "-" + edgeId;
+        assertThat(path.getAttribute(attributeName)).isEqualTo("url(#" + markerId + ")");
+        Element marker = marker(document, markerId, "data-dediren-edge-marker-" + side);
+        assertThat(marker.getAttribute("data-dediren-edge-marker-" + side)).isEqualTo(markerName);
     }
 
     private static JsonNode renderInput(String layoutPath, String policyPath) throws Exception {

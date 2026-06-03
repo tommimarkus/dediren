@@ -70,6 +70,7 @@ Added Java SVG rendering coverage for the first Task 2 lane:
 
 - ArchiMate application component/service decorators from type overrides.
 - ArchiMate and/or junction circle symbols.
+- ArchiMate grouping metadata group decorator output.
 - UML class compartments and enumeration literal output from render metadata properties.
 - ArchiMate realization edge dash and hollow-triangle marker notation.
 - UML composition relationship start marker notation.
@@ -84,7 +85,7 @@ cargo test -p dediren-plugin-svg-render --test svg_render_plugin --locked
 
 Result: Java SVG module tests passed, and the Rust reference SVG suite passed 61/61.
 
-Remaining in Task 2: full ArchiMate/UML type coverage tests, group decorator parity, edge label placement/collision handling, route rounding, line jumps, shared-endpoint route behavior, and viewbox label/content bounds.
+Remaining in Task 2: full ArchiMate/UML type coverage tests, edge label collision handling, route rounding, shared-endpoint route behavior, and viewbox label/content bounds.
 
 ### 2026-06-03 SVG Route And Label Subcheckpoint
 
@@ -104,7 +105,25 @@ GRADLE_USER_HOME=.cache/gradle/user-home ./gradlew :modules:plugins:svg-render:t
 
 Result: all Java SVG module tests passed.
 
-Remaining in Task 2: full exhaustive Java coverage for every ArchiMate/UML node and relationship type, group decorator parity, adjacent/parallel label collision handling, route rounding, shared-endpoint route behavior, and expanded viewbox bounds for displaced labels.
+Remaining in Task 2: full exhaustive Java coverage for every ArchiMate/UML node and relationship type, adjacent/parallel label collision handling, route rounding, shared-endpoint route behavior, and expanded viewbox bounds for displaced labels.
+
+### 2026-06-03 SVG Type Coverage Subcheckpoint
+
+Added generated Java SVG coverage from the live render-policy maps:
+
+- Every ArchiMate node type in `fixtures/render-policy/archimate-svg.json` now renders with its configured fill, stroke, and decorator or junction shape.
+- Every UML node type in `fixtures/render-policy/uml-svg.json` now renders with its configured shape and decorator.
+- Every ArchiMate and UML relationship type in the render policies now renders with configured marker and dash behavior.
+
+Verification:
+
+```bash
+GRADLE_USER_HOME=.cache/gradle/user-home ./gradlew :modules:plugins:svg-render:test
+```
+
+Result: all Java SVG module tests passed.
+
+Remaining in Task 2: detailed ArchiMate icon morphology assertions, adjacent/parallel label collision handling, route rounding, shared-endpoint route behavior, and expanded viewbox bounds for displaced labels.
 
 - [x] **Task 3: Port ArchiMate OEF export**
   - Model: `gpt-5-codex`
