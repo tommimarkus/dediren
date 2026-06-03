@@ -15,7 +15,7 @@ env:
 jobs:
   validate:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -33,10 +33,15 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y libxml2-utils
 
       - name: Check workspace tests
-        run: ./mvnw test
+        run: ./mvnw -B -ntp test
 
       - name: Check whitespace
         run: git diff --check
+
+      - name: Check dependency vulnerabilities
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        run: ./mvnw -B -ntp -Psecurity-sca -DskipTests package org.owasp:dependency-check-maven:aggregate
 
   build:
     needs: validate
@@ -102,14 +107,22 @@ jobs:
     needs: build
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 25
     permissions:
+      attestations: read
       contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           persist-credentials: false
+
+      - name: Set up Java
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
 
       - name: Install jq
         run: sudo apt-get update && sudo apt-get install -y jq
@@ -120,6 +133,9 @@ jobs:
           path: release-artifacts
           pattern: dediren-agent-bundle-*
           merge-multiple: true
+
+      - name: Generate SBOM
+        run: ./mvnw -B -ntp -Psbom org.cyclonedx:cyclonedx-maven-plugin:makeAggregateBom
 
       - name: Verify release assets
         run: |
@@ -134,6 +150,8 @@ jobs:
 
           mkdir -p release-assets
           cp release-artifacts/*.tar.gz release-assets/
+          cp target/bom.json "release-assets/dediren-${VERSION}.cdx.json"
+          cp target/bom.xml "release-assets/dediren-${VERSION}.cdx.xml"
 
           expected_targets=(
             x86_64-unknown-linux-gnu
@@ -156,10 +174,25 @@ jobs:
                   '.version == $version and .target == $target' >/dev/null
           done
 
+          test -s "release-assets/dediren-${VERSION}.cdx.json"
+          jq -e '.bomFormat == "CycloneDX" and .metadata.component.name == "dediren"' \
+            "release-assets/dediren-${VERSION}.cdx.json" >/dev/null
+          test -s "release-assets/dediren-${VERSION}.cdx.xml"
+
           (
             cd release-assets
             sha256sum *.tar.gz > SHA256SUMS
           )
+
+      - name: Verify artifact attestations
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          for archive in release-assets/*.tar.gz; do
+            gh attestation verify "$archive" --repo "$GITHUB_REPOSITORY"
+          done
 
       - name: Publish release
         env:
@@ -167,6 +200,8 @@ jobs:
         run: |
           gh release create "$GITHUB_REF_NAME" \
             release-assets/*.tar.gz \
+            release-assets/*.cdx.json \
+            release-assets/*.cdx.xml \
             release-assets/SHA256SUMS \
             --verify-tag \
             --title "Dediren $GITHUB_REF_NAME" \

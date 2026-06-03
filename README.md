@@ -29,10 +29,16 @@ For a token-efficient authoring guide, see `docs/agent-usage.md`.
 
 ```bash
 ./mvnw test
+./mvnw -Psecurity-sca -DskipTests package org.owasp:dependency-check-maven:aggregate
+./mvnw -Psbom org.cyclonedx:cyclonedx-maven-plugin:makeAggregateBom
 ./mvnw -pl tools/dist -am verify -Pthird-party-notices
 ./mvnw -pl tools/dist -am verify -Pdist-build
 ./mvnw -pl tools/dist -am verify -Pdist-smoke
 ```
+
+Set `NVD_API_KEY` before running the `security-sca` profile so OWASP
+Dependency-Check uses the authenticated NVD API path. CI and release workflows
+read the same value from the GitHub Actions `NVD_API_KEY` secret.
 
 The `dist-build` profile creates an agent-ready archive under `dist/`:
 
@@ -214,3 +220,13 @@ Release tags use `v<version>`. The product version source is
 root `pom.xml`. First-party plugin manifests, source fixture
 `required_plugins[].version` entries, bundle examples, and release workflow
 checks must move with the product version.
+
+GitHub Releases publish target-specific archives, `SHA256SUMS`, and CycloneDX
+SBOMs. The release workflow generates GitHub artifact attestations for archives
+and verifies those attestations before publishing. Verify a downloaded archive
+with:
+
+```bash
+gh attestation verify dediren-agent-bundle-<version>-<target>.tar.gz \
+  --repo tommimarkus/dediren
+```

@@ -30,7 +30,7 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <maven.compiler.release>21</maven.compiler.release>
     <argLine>-Dfile.encoding=UTF-8</argLine>
-    <assertj.version>3.27.3</assertj.version>
+    <assertj.version>3.27.7</assertj.version>
     <eclipse-elk.version>0.11.0</eclipse-elk.version>
     <guava.version>32.1.2-jre</guava.version>
     <jackson.version>2.17.3</jackson.version>
@@ -40,6 +40,8 @@
     <xmlunit.version>2.10.0</xmlunit.version>
     <xtext-xbase.version>2.32.0</xtext-xbase.version>
     <appassembler-maven-plugin.version>2.1.0</appassembler-maven-plugin.version>
+    <cyclonedx-maven-plugin.version>2.9.1</cyclonedx-maven-plugin.version>
+    <dependency-check-maven.version>12.2.2</dependency-check-maven.version>
     <exec-maven-plugin.version>3.6.2</exec-maven-plugin.version>
     <maven-compiler-plugin.version>3.14.1</maven-compiler-plugin.version>
     <maven-surefire-plugin.version>3.5.4</maven-surefire-plugin.version>
@@ -155,4 +157,47 @@
       </plugin>
     </plugins>
   </build>
+
+  <profiles>
+    <profile>
+      <id>sbom</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.cyclonedx</groupId>
+            <artifactId>cyclonedx-maven-plugin</artifactId>
+            <version>${cyclonedx-maven-plugin.version}</version>
+            <configuration>
+              <includeTestScope>false</includeTestScope>
+              <outputFormat>all</outputFormat>
+              <outputName>bom</outputName>
+              <schemaVersion>1.6</schemaVersion>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
+      <id>security-sca</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.owasp</groupId>
+            <artifactId>dependency-check-maven</artifactId>
+            <version>${dependency-check-maven.version}</version>
+            <configuration>
+              <failBuildOnCVSS>7.0</failBuildOnCVSS>
+              <formats>
+                <format>HTML</format>
+                <format>JSON</format>
+              </formats>
+              <nvdApiKeyEnvironmentVariable>NVD_API_KEY</nvdApiKeyEnvironmentVariable>
+              <outputDirectory>${project.build.directory}/dependency-check</outputDirectory>
+              <skipTestScope>true</skipTestScope>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
 </project>

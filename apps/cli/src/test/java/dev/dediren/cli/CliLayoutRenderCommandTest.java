@@ -101,6 +101,31 @@ class CliLayoutRenderCommandTest {
     }
 
     @Test
+    void projectCommandRunsJavaGenericGraphPlugin() throws Exception {
+        CliResult result = Main.executeForTesting(new String[]{
+                "project",
+                "--plugin",
+                "generic-graph",
+                "--target",
+                "layout-request",
+                "--view",
+                "main",
+                "--input",
+                workspaceRoot().resolve("fixtures/source/valid-basic.json").toString()
+        }, "", pluginEnv("generic-graph", "dev.dediren.plugins.genericgraph.Main"));
+
+        JsonNode envelope = JsonSupport.objectMapper().readTree(result.stdout());
+
+        assertThat(result.exitCode()).isZero();
+        assertThat(envelope.at("/status").asText()).isEqualTo("ok");
+        assertThat(envelope.at("/data/layout_request_schema_version").asText()).isEqualTo("layout-request.schema.v1");
+        assertThat(envelope.at("/data/view_id").asText()).isEqualTo("main");
+        assertThat(envelope.at("/data/nodes")).hasSize(2);
+        assertThat(envelope.at("/data/edges")).hasSize(1);
+        assertThat(envelope.at("/data/edges/0/relationship_type").asText()).isEqualTo("generic.calls");
+    }
+
+    @Test
     void renderCommandRunsJavaSvgPlugin() throws Exception {
         CliResult result = Main.executeForTesting(new String[]{
                 "render",
@@ -117,7 +142,8 @@ class CliLayoutRenderCommandTest {
         assertThat(result.exitCode()).isZero();
         assertThat(envelope.at("/status").asText()).isEqualTo("ok");
         assertThat(envelope.at("/data/artifact_kind").asText()).isEqualTo("svg");
-        assertThat(envelope.at("/data/content").asText()).contains("<svg");
+        assertThat(envelope.at("/data/content").asText())
+                .contains("<svg", "data-dediren-node-id=\"client\"", "data-dediren-edge-id=\"client-calls-api\"");
     }
 
     @Test
@@ -142,7 +168,8 @@ class CliLayoutRenderCommandTest {
         assertThat(result.exitCode()).isZero();
         assertThat(envelope.at("/status").asText()).isEqualTo("ok");
         assertThat(envelope.at("/data/artifact_kind").asText()).isEqualTo("archimate-oef+xml");
-        assertThat(envelope.at("/data/content").asText()).contains("<model");
+        assertThat(envelope.at("/data/content").asText())
+                .contains("<model", "identifier=\"id-dediren-oef-basic-model\"", "xsi:type=\"ApplicationComponent\"");
     }
 
     @Test
@@ -167,7 +194,8 @@ class CliLayoutRenderCommandTest {
         assertThat(result.exitCode()).isZero();
         assertThat(envelope.at("/status").asText()).isEqualTo("ok");
         assertThat(envelope.at("/data/artifact_kind").asText()).isEqualTo("uml-xmi+xml");
-        assertThat(envelope.at("/data/content").asText()).contains("xmi:XMI");
+        assertThat(envelope.at("/data/content").asText())
+                .contains("xmi:XMI", "<uml:Model", "xmi:type=\"uml:Class\"");
     }
 
     private Map<String, String> pluginEnv(String pluginId, String mainClass) throws Exception {
