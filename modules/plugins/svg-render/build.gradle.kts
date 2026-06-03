@@ -3,7 +3,9 @@ plugins {
 }
 
 dependencies {
+    implementation(project(":modules:archimate"))
     implementation(project(":modules:contracts"))
+    implementation(project(":modules:uml"))
     testImplementation(project(":test-support"))
     testImplementation(libs.assertj.core)
     testImplementation(libs.junit.jupiter)

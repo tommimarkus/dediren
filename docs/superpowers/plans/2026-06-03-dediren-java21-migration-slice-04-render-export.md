@@ -30,13 +30,33 @@
 
 ## Tasks
 
-- [ ] **Task 1: Port SVG render policy parsing**
+- [x] **Task 1: Port SVG render policy parsing**
   - Model: `gpt-5-codex`
   - Add Java records/helpers for render policy inputs where contracts do not already cover behavior.
   - Preserve policy validation for unsafe colors, unknown decorators, profile mismatch, type overrides, group styles, and rich styles.
   - Add tests equivalent to `render_contracts` sections in Rust SVG tests.
   - Run: `./gradlew :modules:plugins:svg-render:test --tests '*RenderContract*'`
   - Expected: pass.
+
+### 2026-06-03 SVG Render Policy Checkpoint
+
+Implemented the Java SVG plugin command foundation in `modules/plugins/svg-render`:
+
+- `capabilities` with SVG artifact runtime metadata.
+- `render` command envelope output for SVG artifacts.
+- Render policy validation for safe hex colors, numeric style bounds, font-family length, rich style overrides, group overrides, and type-aware policy metadata requirements.
+- ArchiMate and UML policy/render-metadata selector type validation with structured diagnostic envelopes.
+- Initial Java SVG output for background, viewport font style, groups, nodes, edges, labels, and style override precedence.
+- Java tests equivalent to Rust `render_contracts`, including non-ASCII font-family handling, plus semantic type validation checks for ArchiMate and UML selectors.
+
+Verification:
+
+```bash
+GRADLE_USER_HOME=.cache/gradle/user-home ./gradlew :modules:plugins:svg-render:test --tests '*RenderContracts*'
+cargo test -p dediren-plugin-svg-render --test svg_render_plugin render_contracts --locked
+```
+
+Result: all passed.
 
 - [ ] **Task 2: Port SVG node, edge, label, and viewbox rendering**
   - Model: `gpt-5-codex`
