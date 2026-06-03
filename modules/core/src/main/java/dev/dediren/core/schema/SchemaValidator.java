@@ -1,10 +1,11 @@
 package dev.dediren.core.schema;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.networknt.schema.JsonSchema;
-import com.networknt.schema.JsonSchemaFactory;
-import com.networknt.schema.SpecVersion;
-import com.networknt.schema.ValidationMessage;
+import com.networknt.schema.Error;
+import com.networknt.schema.InputFormat;
+import com.networknt.schema.Schema;
+import com.networknt.schema.SchemaRegistry;
+import com.networknt.schema.SpecificationVersion;
 import dev.dediren.contracts.json.JsonSupport;
 import java.io.IOException;
 import java.io.InputStream;
@@ -14,11 +15,11 @@ import java.util.List;
 
 public final class SchemaValidator {
     private final Path repositoryRoot;
-    private final JsonSchemaFactory schemaFactory;
+    private final SchemaRegistry schemaRegistry;
 
     private SchemaValidator(Path repositoryRoot) {
         this.repositoryRoot = repositoryRoot;
-        this.schemaFactory = JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V202012);
+        this.schemaRegistry = SchemaRegistry.withDefaultDialect(SpecificationVersion.DRAFT_2020_12);
     }
 
     public static SchemaValidator fromRepositoryRoot(Path repositoryRoot) {
@@ -45,10 +46,10 @@ public final class SchemaValidator {
 
     public List<String> validate(String schemaPath, JsonNode document) {
         try {
-            JsonSchema schema = loadSchema(schemaPath);
-            return schema.validate(document)
+            Schema schema = loadSchema(schemaPath);
+            return schema.validate(JsonSupport.objectMapper().writeValueAsString(document), InputFormat.JSON)
                     .stream()
-                    .map(ValidationMessage::getMessage)
+                    .map(Error::getMessage)
                     .sorted()
                     .toList();
         } catch (IOException | RuntimeException error) {
@@ -56,9 +57,9 @@ public final class SchemaValidator {
         }
     }
 
-    private JsonSchema loadSchema(String schemaPath) throws IOException {
+    private Schema loadSchema(String schemaPath) throws IOException {
         try (InputStream stream = Files.newInputStream(repositoryRoot.resolve(schemaPath))) {
-            return schemaFactory.getSchema(stream);
+            return schemaRegistry.getSchema(stream);
         }
     }
 }
