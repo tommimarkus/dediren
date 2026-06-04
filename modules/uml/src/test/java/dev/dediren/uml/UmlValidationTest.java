@@ -2,6 +2,8 @@ package dev.dediren.uml;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.NullNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.contracts.source.GenericGraphPluginData;
@@ -47,13 +49,30 @@ class UmlValidationTest {
     void acceptsUmlSequenceVocabulary() throws Exception {
         Fixture fixture = loadUmlSequenceFixture();
 
-        Uml.validateElementType("Lifeline", "$.type");
+        for (String type : new String[]{
+                "Interaction",
+                "Lifeline",
+                "ExecutionSpecification",
+                "DestructionOccurrenceSpecification",
+                "Gate"}) {
+            Uml.validateElementType(type, "$.type");
+        }
         Uml.validateRelationshipType("Message", "$.type");
         Uml.validateRelationshipEndpointTypes(
                 "Message",
                 "Lifeline",
                 "DestructionOccurrenceSpecification",
                 "$.relationship");
+        Uml.validateSource(fixture.source(), fixture.pluginData());
+    }
+
+    @Test
+    void acceptsAdditionalSequenceNodeTypesInSequenceViews() throws Exception {
+        Fixture fixture = loadMutatedUmlSequenceFixture(source -> {
+            addSequenceNode(source, "execution-service", "ExecutionSpecification", "Service execution");
+            addSequenceNode(source, "gate-inbound", "Gate", "Inbound gate");
+        });
+
         Uml.validateSource(fixture.source(), fixture.pluginData());
     }
 
@@ -183,6 +202,21 @@ class UmlValidationTest {
                 UmlValidationException.class,
                 () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
 
+        assertThat(error.code()).isEqualTo("DEDIREN_UML_RELATIONSHIP_PROPERTY_INVALID");
+        assertThat(error.value()).isEqualTo("Message.sequence");
+        assertThat(error.path()).isEqualTo("$.relationships[0].properties.uml.sequence");
+    }
+
+    @Test
+    void rejectsMessageWithNonObjectUmlProperties() throws Exception {
+        Fixture fixture = loadMutatedUmlSequenceFixture(
+                source -> firstMessageProperties(source).put("uml", "not-an-object"));
+
+        UmlValidationException error = org.junit.jupiter.api.Assertions.assertThrows(
+                UmlValidationException.class,
+                () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+
+        assertThat(error.code()).isEqualTo("DEDIREN_UML_RELATIONSHIP_PROPERTY_INVALID");
         assertThat(error.value()).isEqualTo("Message.sequence");
         assertThat(error.path()).isEqualTo("$.relationships[0].properties.uml.sequence");
     }
@@ -196,6 +230,7 @@ class UmlValidationTest {
                 UmlValidationException.class,
                 () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
 
+        assertThat(error.code()).isEqualTo("DEDIREN_UML_RELATIONSHIP_PROPERTY_INVALID");
         assertThat(error.value()).isEqualTo("0");
         assertThat(error.path()).isEqualTo("$.relationships[0].properties.uml.sequence");
     }
@@ -209,7 +244,22 @@ class UmlValidationTest {
                 UmlValidationException.class,
                 () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
 
+        assertThat(error.code()).isEqualTo("DEDIREN_UML_RELATIONSHIP_PROPERTY_INVALID");
         assertThat(error.value()).isEqualTo("1.5");
+        assertThat(error.path()).isEqualTo("$.relationships[0].properties.uml.sequence");
+    }
+
+    @Test
+    void rejectsMessageWithNullSequenceOrder() throws Exception {
+        Fixture fixture = loadMutatedUmlSequenceFixture(
+                source -> firstMessageUmlProperties(source).set("sequence", NullNode.getInstance()));
+
+        UmlValidationException error = org.junit.jupiter.api.Assertions.assertThrows(
+                UmlValidationException.class,
+                () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+
+        assertThat(error.code()).isEqualTo("DEDIREN_UML_RELATIONSHIP_PROPERTY_INVALID");
+        assertThat(error.value()).isEqualTo("null");
         assertThat(error.path()).isEqualTo("$.relationships[0].properties.uml.sequence");
     }
 
@@ -222,7 +272,22 @@ class UmlValidationTest {
                 UmlValidationException.class,
                 () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
 
+        assertThat(error.code()).isEqualTo("DEDIREN_UML_RELATIONSHIP_PROPERTY_INVALID");
         assertThat(error.value()).isEqualTo("lostMessage");
+        assertThat(error.path()).isEqualTo("$.relationships[0].properties.uml.message_sort");
+    }
+
+    @Test
+    void rejectsMessageWithNonTextualMessageSort() throws Exception {
+        Fixture fixture = loadMutatedUmlSequenceFixture(
+                source -> firstMessageUmlProperties(source).put("message_sort", 1));
+
+        UmlValidationException error = org.junit.jupiter.api.Assertions.assertThrows(
+                UmlValidationException.class,
+                () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+
+        assertThat(error.code()).isEqualTo("DEDIREN_UML_RELATIONSHIP_PROPERTY_INVALID");
+        assertThat(error.value()).isEqualTo("1");
         assertThat(error.path()).isEqualTo("$.relationships[0].properties.uml.message_sort");
     }
 
@@ -232,6 +297,22 @@ class UmlValidationTest {
                 source -> firstMessageUmlProperties(source).remove("message_sort"));
 
         Uml.validateSource(fixture.source(), fixture.pluginData());
+    }
+
+    @Test
+    void acceptsSupportedMessageSorts() throws Exception {
+        for (String sort : new String[]{
+                "synchCall",
+                "asynchCall",
+                "asynchSignal",
+                "reply",
+                "createMessage",
+                "deleteMessage"}) {
+            Fixture fixture = loadMutatedUmlSequenceFixture(
+                    source -> firstMessageUmlProperties(source).put("message_sort", sort));
+
+            Uml.validateSource(fixture.source(), fixture.pluginData());
+        }
     }
 
     private static Fixture loadUmlFixture() throws Exception {
@@ -268,6 +349,21 @@ class UmlValidationTest {
 
     private static ObjectNode firstMessageUmlProperties(ObjectNode source) {
         return (ObjectNode) source.get("relationships").get(0).get("properties").get("uml");
+    }
+
+    private static ObjectNode firstMessageProperties(ObjectNode source) {
+        return (ObjectNode) source.get("relationships").get(0).get("properties");
+    }
+
+    private static void addSequenceNode(ObjectNode source, String id, String type, String label) {
+        var node = JsonSupport.objectMapper().createObjectNode();
+        node.put("id", id);
+        node.put("type", type);
+        node.put("label", label);
+        node.set("properties", JsonSupport.objectMapper().createObjectNode()
+                .set("uml", JsonSupport.objectMapper().createObjectNode()));
+        ((ArrayNode) source.get("nodes")).add(node);
+        ((ArrayNode) source.get("plugins").get("generic-graph").get("views").get(0).get("nodes")).add(id);
     }
 
     private static Path workspaceRoot() {

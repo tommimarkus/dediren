@@ -37,6 +37,8 @@ public final class Uml {
     private static final Set<String> SEQUENCE_TYPES = Set.of(
             "Interaction",
             "Lifeline",
+            "ExecutionSpecification",
+            "Gate",
             "DestructionOccurrenceSpecification");
     private static final List<String> RELATIONSHIP_TYPES = List.of(
             "Association",
@@ -229,7 +231,7 @@ public final class Uml {
         String umlPath = path + ".properties.uml";
         if (umlProperties == null || !umlProperties.isObject()) {
             throw new UmlValidationException(
-                    UmlTypeKind.RELATIONSHIP,
+                    UmlTypeKind.RELATIONSHIP_PROPERTY,
                     "Message.sequence",
                     umlPath + ".sequence");
         }
@@ -237,13 +239,13 @@ public final class Uml {
         JsonNode sequence = umlProperties.get("sequence");
         if (sequence == null) {
             throw new UmlValidationException(
-                    UmlTypeKind.RELATIONSHIP,
+                    UmlTypeKind.RELATIONSHIP_PROPERTY,
                     "Message.sequence",
                     umlPath + ".sequence");
         }
         if (!sequence.isIntegralNumber() || sequence.bigIntegerValue().signum() < 1) {
             throw new UmlValidationException(
-                    UmlTypeKind.RELATIONSHIP,
+                    UmlTypeKind.RELATIONSHIP_PROPERTY,
                     sequence.toString(),
                     umlPath + ".sequence");
         }
@@ -252,7 +254,7 @@ public final class Uml {
         if (messageSort != null
                 && (!messageSort.isTextual() || !MESSAGE_SORTS.contains(messageSort.asText()))) {
             throw new UmlValidationException(
-                    UmlTypeKind.RELATIONSHIP,
+                    UmlTypeKind.RELATIONSHIP_PROPERTY,
                     messageSort.isTextual() ? messageSort.asText() : messageSort.toString(),
                     umlPath + ".message_sort");
         }

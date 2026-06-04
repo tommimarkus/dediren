@@ -16,6 +16,7 @@ public final class UmlValidationException extends Exception {
         return switch (kind) {
             case ELEMENT -> "DEDIREN_UML_ELEMENT_TYPE_UNSUPPORTED";
             case RELATIONSHIP -> "DEDIREN_UML_RELATIONSHIP_TYPE_UNSUPPORTED";
+            case RELATIONSHIP_PROPERTY -> "DEDIREN_UML_RELATIONSHIP_PROPERTY_INVALID";
             case RELATIONSHIP_ENDPOINT -> "DEDIREN_UML_RELATIONSHIP_ENDPOINT_UNSUPPORTED";
             case MULTIPLICITY -> "DEDIREN_UML_MULTIPLICITY_INVALID";
             case VIEW_KIND -> "DEDIREN_UML_VIEW_KIND_UNSUPPORTED_ELEMENT";
@@ -38,6 +39,7 @@ public final class UmlValidationException extends Exception {
         return switch (kind) {
             case ELEMENT -> "unsupported UML element type: " + value;
             case RELATIONSHIP -> "unsupported UML relationship type: " + value;
+            case RELATIONSHIP_PROPERTY -> "invalid UML relationship property: " + value;
             case RELATIONSHIP_ENDPOINT -> "unsupported UML relationship endpoint: " + value;
             case MULTIPLICITY -> "invalid UML multiplicity: " + value;
             case VIEW_KIND -> "view contains unsupported UML element: " + value;
