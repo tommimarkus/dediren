@@ -50,6 +50,9 @@ public final class Main {
     private static final String XMI_SCHEMA_PATH_ENV = "DEDIREN_XMI_SCHEMA_PATH";
     private static final String SCHEMA_CACHE_DIR_ENV = "DEDIREN_SCHEMA_CACHE_DIR";
     private static final String SCHEMA_FETCHER = "curl";
+    private static final String UNSUPPORTED_SEQUENCE_MESSAGE_ENDPOINT =
+            "DEDIREN_UML_XMI_SEQUENCE_MESSAGE_ENDPOINT_UNSUPPORTED";
+    private static final String UNSUPPORTED_SEQUENCE_NODE = "DEDIREN_UML_XMI_SEQUENCE_NODE_UNSUPPORTED";
 
     private Main() {
     }
@@ -148,6 +151,11 @@ public final class Main {
             Uml.validateSource(request.source(), pluginData);
         } catch (UmlValidationException error) {
             return exitWithDiagnostic(stdout, error.code(), error.message(), error.path());
+        }
+        try {
+            validateExportableSequenceScope(request);
+        } catch (XmiExportException error) {
+            return exitWithDiagnostic(stdout, error.code(), error.getMessage(), error.path());
         }
 
         String content = buildXmi(request, policy);
@@ -597,6 +605,47 @@ public final class Main {
         return 3;
     }
 
+    private static void validateExportableSequenceScope(ExportRequest request) throws XmiExportException {
+        ExportScope scope = ExportScope.fromRequest(request);
+        var sourceNodesById = request.source().nodes().stream()
+                .collect(Collectors.toMap(SourceNode::id, node -> node));
+
+        for (int index = 0; index < request.source().relationships().size(); index++) {
+            SourceRelationship relationship = request.source().relationships().get(index);
+            if (!scope.relationshipIds().contains(relationship.id()) || !relationship.type().equals("Message")) {
+                continue;
+            }
+            SourceNode source = sourceNodesById.get(relationship.source());
+            SourceNode target = sourceNodesById.get(relationship.target());
+            if (source != null
+                    && target != null
+                    && (!source.type().equals("Lifeline") || !target.type().equals("Lifeline"))) {
+                throw new XmiExportException(
+                        UNSUPPORTED_SEQUENCE_MESSAGE_ENDPOINT,
+                        "UML/XMI sequence export supports selected Message endpoints only between Lifeline nodes in this MVP: "
+                                + source.type() + " -> " + target.type(),
+                        "$.relationships[" + index + "]");
+            }
+        }
+
+        for (int index = 0; index < request.source().nodes().size(); index++) {
+            SourceNode node = request.source().nodes().get(index);
+            if (scope.nodeIds().contains(node.id()) && unsupportedSequenceNode(node.type())) {
+                throw new XmiExportException(
+                        UNSUPPORTED_SEQUENCE_NODE,
+                        "UML/XMI sequence export does not support selected " + node.type()
+                                + " nodes in this MVP",
+                        "$.nodes[" + index + "]");
+            }
+        }
+    }
+
+    private static boolean unsupportedSequenceNode(String type) {
+        return type.equals("ExecutionSpecification")
+                || type.equals("Gate")
+                || type.equals("DestructionOccurrenceSpecification");
+    }
+
     private static List<JsonNode> umlArray(SourceNode node, String field) {
         JsonNode value = node.properties().get("uml");
         value = value == null ? null : value.get(field);
@@ -813,6 +862,25 @@ public final class Main {
 
         String code() {
             return code;
+        }
+    }
+
+    private static final class XmiExportException extends Exception {
+        private final String code;
+        private final String path;
+
+        private XmiExportException(String code, String message, String path) {
+            super(message);
+            this.code = code;
+            this.path = path;
+        }
+
+        String code() {
+            return code;
+        }
+
+        String path() {
+            return path;
         }
     }
 }

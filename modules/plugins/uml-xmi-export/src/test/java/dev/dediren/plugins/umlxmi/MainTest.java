@@ -105,9 +105,85 @@ class MainTest {
         String xml = exportXml(input);
 
         assertThat(xml).containsSubsequence(
+                "xmi:id=\"id-m2-send-event\"",
+                "xmi:id=\"id-m2-receive-event\"",
+                "xmi:id=\"id-m1-send-event\"",
+                "xmi:id=\"id-m1-receive-event\"",
+                "xmi:id=\"id-m3-send-event\"",
+                "xmi:id=\"id-m3-receive-event\"");
+        assertThat(xml).containsSubsequence(
                 "<message xmi:id=\"id-m2\"",
                 "<message xmi:id=\"id-m1\"",
                 "<message xmi:id=\"id-m3\"");
+    }
+
+    @Test
+    void rejectsSelectedSequenceDeleteMessageToDestructionOccurrence() throws Exception {
+        JsonNode input = exportSequenceInput();
+        ((com.fasterxml.jackson.databind.node.ArrayNode) input.at("/source/nodes")).add(
+                JsonSupport.objectMapper().readTree("""
+                {
+                  "id": "service-destroyed",
+                  "type": "DestructionOccurrenceSpecification",
+                  "label": "",
+                  "properties": {
+                    "uml": {
+                      "interaction": "interaction-place-order"
+                    }
+                  }
+                }
+                """));
+        ((com.fasterxml.jackson.databind.node.ArrayNode) input.at("/source/relationships")).add(
+                JsonSupport.objectMapper().readTree("""
+                {
+                  "id": "m5",
+                  "type": "Message",
+                  "source": "customer",
+                  "target": "service-destroyed",
+                  "label": "cancelOrder",
+                  "properties": {
+                    "uml": {
+                      "interaction": "interaction-place-order",
+                      "sequence": 4,
+                      "message_sort": "deleteMessage"
+                    }
+                  }
+                }
+                """));
+
+        PluginResult result = Main.executeForTesting(
+                new String[]{"export"},
+                JsonSupport.objectMapper().writeValueAsString(input),
+                envWithXmiSchema());
+
+        assertThat(result.exitCode()).isEqualTo(3);
+        assertError(result, "DEDIREN_UML_XMI_SEQUENCE_MESSAGE_ENDPOINT_UNSUPPORTED", "$.relationships[3]");
+    }
+
+    @Test
+    void rejectsSelectedUnsupportedSequenceNode() throws Exception {
+        JsonNode input = exportSequenceInput();
+        ((com.fasterxml.jackson.databind.node.ArrayNode) input.at("/source/nodes")).add(
+                JsonSupport.objectMapper().readTree("""
+                {
+                  "id": "service-execution",
+                  "type": "ExecutionSpecification",
+                  "label": "",
+                  "properties": {
+                    "uml": {
+                      "interaction": "interaction-place-order"
+                    }
+                  }
+                }
+                """));
+
+        PluginResult result = Main.executeForTesting(
+                new String[]{"export"},
+                JsonSupport.objectMapper().writeValueAsString(input),
+                envWithXmiSchema());
+
+        assertThat(result.exitCode()).isEqualTo(3);
+        assertError(result, "DEDIREN_UML_XMI_SEQUENCE_NODE_UNSUPPORTED", "$.nodes[3]");
     }
 
     @Test
@@ -275,6 +351,12 @@ class MainTest {
     private static void assertErrorCode(PluginResult result, String expectedCode) throws Exception {
         JsonNode envelope = JsonSupport.objectMapper().readTree(result.stdout());
         assertThat(envelope.at("/diagnostics/0/code").asText()).isEqualTo(expectedCode);
+    }
+
+    private static void assertError(PluginResult result, String expectedCode, String expectedPath) throws Exception {
+        JsonNode envelope = JsonSupport.objectMapper().readTree(result.stdout());
+        assertThat(envelope.at("/diagnostics/0/code").asText()).isEqualTo(expectedCode);
+        assertThat(envelope.at("/diagnostics/0/path").asText()).isEqualTo(expectedPath);
     }
 
     private static JsonNode fixtureJson(String path) throws Exception {
