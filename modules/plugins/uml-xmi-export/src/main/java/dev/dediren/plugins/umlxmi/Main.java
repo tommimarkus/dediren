@@ -314,20 +314,27 @@ public final class Main {
             Map<String, String> relationshipIds) {
         xml.append("<packagedElement xmi:type=\"uml:Interaction\" xmi:id=\"").append(attr(interactionId))
                 .append("\" name=\"").append(attr(interaction.label())).append("\">");
-        for (SourceNode node : sourceNodes) {
-            if (nodeIds.containsKey(node.id())
-                    && node.type().equals("Lifeline")
-                    && interaction.id().equals(umlString(node, "interaction"))) {
-                xml.append("<lifeline xmi:id=\"").append(attr(nodeIds.get(node.id())))
-                        .append("\" name=\"").append(attr(node.label())).append("\"/>");
-            }
-        }
         List<MessageExport> messages = sequenceMessages(
                 ids,
                 interaction,
                 selectedRelationships,
                 nodeIds,
                 relationshipIds);
+        var messageEndpointIds = new HashSet<String>();
+        for (MessageExport message : messages) {
+            messageEndpointIds.add(message.sourceNodeId());
+            messageEndpointIds.add(message.targetNodeId());
+        }
+        for (SourceNode node : sourceNodes) {
+            String nodeId = nodeIds.get(node.id());
+            if (nodeId != null
+                    && node.type().equals("Lifeline")
+                    && (interaction.id().equals(umlString(node, "interaction"))
+                            || messageEndpointIds.contains(nodeId))) {
+                xml.append("<lifeline xmi:id=\"").append(attr(nodeId))
+                        .append("\" name=\"").append(attr(node.label())).append("\"/>");
+            }
+        }
         for (MessageExport message : messages) {
             writeMessageOccurrence(xml, message, "send", message.sourceEventId(), message.sourceNodeId());
             writeMessageOccurrence(xml, message, "receive", message.receiveEventId(), message.targetNodeId());

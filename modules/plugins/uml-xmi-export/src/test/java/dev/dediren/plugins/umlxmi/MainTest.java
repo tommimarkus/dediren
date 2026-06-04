@@ -97,6 +97,19 @@ class MainTest {
     }
 
     @Test
+    void exportsEndpointLifelineWhenOnlySelectedMessageOwnsInteraction() throws Exception {
+        JsonNode input = exportSequenceInput();
+        ((ObjectNode) input.at("/source/nodes/1/properties/uml")).remove("interaction");
+
+        String xml = exportXml(input);
+
+        assertThat(xml).contains(
+                "<lifeline xmi:id=\"id-customer\" name=\"Customer\"/>",
+                "<message xmi:id=\"id-m1\" name=\"placeOrder\" messageSort=\"synchCall\""
+                        + " sendEvent=\"id-m1-send-event\" receiveEvent=\"id-m1-receive-event\"/>");
+    }
+
+    @Test
     void exportsSequenceMessagesInSequenceOrder() throws Exception {
         JsonNode input = exportSequenceInput();
         ((ObjectNode) input.at("/source/relationships/0/properties/uml")).put("sequence", 2);
