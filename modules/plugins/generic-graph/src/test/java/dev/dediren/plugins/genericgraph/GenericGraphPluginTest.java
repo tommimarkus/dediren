@@ -376,10 +376,88 @@ class GenericGraphPluginTest {
         assertThat(data.at("/nodes/class-order/properties/attributes/0/name").asText()).isEqualTo("id");
         assertThat(data.at("/nodes/enum-order-status/properties/literals/1").asText()).isEqualTo("Submitted");
         assertThat(data.at("/edges/order-has-lines/type").asText()).isEqualTo("Composition");
-        assertThat(data.at("/edges/order-has-lines/properties").isMissingNode()).isTrue();
+        assertThat(data.at("/edges/order-has-lines/properties/source_multiplicity").asText()).isEqualTo("1");
+        assertThat(data.at("/edges/order-has-lines/properties/target_multiplicity").asText()).isEqualTo("1..*");
         assertThat(data.at("/groups/orders-package-boundary/type").asText()).isEqualTo("Package");
         assertThat(data.at("/groups/orders-package-boundary/properties").isMissingNode()).isTrue();
         assertSchemaValid("schemas/render-metadata.schema.json", data);
+    }
+
+    @Test
+    void projectsUmlSequenceViewKind() throws Exception {
+        PluginResult result = Main.executeForTesting(
+                new String[]{"project", "--target", "layout-request", "--view", "sequence-view"},
+                fixture("fixtures/source/valid-uml-sequence-basic.json"));
+
+        JsonNode data = okData(result);
+
+        assertThat(data.at("/view_id").asText()).isEqualTo("sequence-view");
+        assertThat(data.get("constraints"))
+                .extracting(constraint -> constraint.at("/kind").asText())
+                .containsExactly("uml.sequence.lifeline-order", "uml.sequence.message-order");
+        assertSchemaValid("schemas/layout-request.schema.json", data);
+    }
+
+    @Test
+    void projectsUmlSequenceEdgeRenderMetadata() throws Exception {
+        PluginResult result = Main.executeForTesting(
+                new String[]{"project", "--target", "render-metadata", "--view", "sequence-view"},
+                fixture("fixtures/source/valid-uml-sequence-basic.json"));
+
+        JsonNode data = okData(result);
+
+        assertThat(data.at("/semantic_profile").asText()).isEqualTo("uml");
+        assertThat(data.at("/edges/m1/type").asText()).isEqualTo("Message");
+        assertThat(data.at("/edges/m1/properties/interaction").asText()).isEqualTo("interaction-place-order");
+        assertThat(data.at("/edges/m1/properties/sequence").asInt()).isEqualTo(1);
+        assertThat(data.at("/edges/m1/properties/message_sort").asText()).isEqualTo("synchCall");
+        assertThat(data.at("/edges/m2/properties/sequence").asInt()).isEqualTo(2);
+        assertThat(data.at("/edges/m2/properties/message_sort").asText()).isEqualTo("reply");
+        assertThat(data.at("/edges/m3/properties/sequence").asInt()).isEqualTo(3);
+        assertThat(data.at("/edges/m3/properties/message_sort").asText()).isEqualTo("asynchSignal");
+        assertSchemaValid("schemas/render-metadata.schema.json", data);
+    }
+
+    @Test
+    void projectsUmlSequenceLayoutConstraints() throws Exception {
+        PluginResult result = Main.executeForTesting(
+                new String[]{"project", "--target", "layout-request", "--view", "sequence-view"},
+                sequenceFixtureWithReorderedMessagesForConstraints());
+
+        JsonNode data = okData(result);
+        JsonNode lifelineOrder = layoutRequestConstraint(data, "uml.sequence.lifeline-order");
+        JsonNode messageOrder = layoutRequestConstraint(data, "uml.sequence.message-order");
+
+        assertThat(lifelineOrder.at("/id").asText())
+                .isEqualTo("sequence-view.uml.sequence.lifeline-order");
+        assertThat(jsonTexts(lifelineOrder.get("subjects")))
+                .containsExactly("customer", "service");
+        assertThat(messageOrder.at("/id").asText())
+                .isEqualTo("sequence-view.uml.sequence.message-order");
+        assertThat(jsonTexts(messageOrder.get("subjects")))
+                .containsExactly("m2", "m1", "m3");
+        assertSchemaValid("schemas/layout-request.schema.json", data);
+    }
+
+    @Test
+    void projectsUmlSequenceLifelineSizeHints() throws Exception {
+        PluginResult result = Main.executeForTesting(
+                new String[]{"project", "--target", "layout-request", "--view", "sequence-view"},
+                sequenceFixtureWithAdditionalSequenceNodes());
+
+        JsonNode data = okData(result);
+
+        assertThat(layoutRequestNode(data, "interaction-place-order").at("/width_hint").asDouble()).isEqualTo(360.0);
+        assertThat(layoutRequestNode(data, "interaction-place-order").at("/height_hint").asDouble()).isEqualTo(260.0);
+        assertThat(layoutRequestNode(data, "customer").at("/width_hint").asDouble()).isEqualTo(140.0);
+        assertThat(layoutRequestNode(data, "customer").at("/height_hint").asDouble()).isEqualTo(48.0);
+        assertThat(layoutRequestNode(data, "service-execution").at("/width_hint").asDouble()).isEqualTo(16.0);
+        assertThat(layoutRequestNode(data, "service-execution").at("/height_hint").asDouble()).isEqualTo(72.0);
+        assertThat(layoutRequestNode(data, "entry-gate").at("/width_hint").asDouble()).isEqualTo(24.0);
+        assertThat(layoutRequestNode(data, "entry-gate").at("/height_hint").asDouble()).isEqualTo(24.0);
+        assertThat(layoutRequestNode(data, "service-destroyed").at("/width_hint").asDouble()).isEqualTo(24.0);
+        assertThat(layoutRequestNode(data, "service-destroyed").at("/height_hint").asDouble()).isEqualTo(24.0);
+        assertSchemaValid("schemas/layout-request.schema.json", data);
     }
 
     @Test
@@ -834,8 +912,67 @@ class GenericGraphPluginTest {
         throw new AssertionError("expected layout request node " + nodeId);
     }
 
+    private static JsonNode layoutRequestConstraint(JsonNode data, String kind) {
+        for (JsonNode constraint : data.get("constraints")) {
+            if (kind.equals(constraint.at("/kind").asText())) {
+                return constraint;
+            }
+        }
+        throw new AssertionError("expected layout request constraint " + kind);
+    }
+
+    private static java.util.List<String> jsonTexts(JsonNode values) {
+        var texts = new java.util.ArrayList<String>();
+        values.forEach(value -> texts.add(value.asText()));
+        return texts;
+    }
+
     private static String fixture(String path) throws Exception {
         return Files.readString(workspaceRoot().resolve(path));
+    }
+
+    private static String sequenceFixtureWithAdditionalSequenceNodes() throws Exception {
+        JsonNode source = JsonSupport.objectMapper().readTree(fixture("fixtures/source/valid-uml-sequence-basic.json"));
+        var nodes = (com.fasterxml.jackson.databind.node.ArrayNode) source.get("nodes");
+        var viewNodes = (com.fasterxml.jackson.databind.node.ArrayNode) source.at("/plugins/generic-graph/views/0/nodes");
+
+        addSequenceNode(nodes, viewNodes, "service-execution", "ExecutionSpecification", "");
+        addSequenceNode(nodes, viewNodes, "entry-gate", "Gate", "Entry");
+        addSequenceNode(nodes, viewNodes, "service-destroyed", "DestructionOccurrenceSpecification", "");
+
+        return JsonSupport.objectMapper().writeValueAsString(source);
+    }
+
+    private static String sequenceFixtureWithReorderedMessagesForConstraints() throws Exception {
+        JsonNode source = JsonSupport.objectMapper().readTree(fixture("fixtures/source/valid-uml-sequence-basic.json"));
+        var relationships = (com.fasterxml.jackson.databind.node.ArrayNode) source.get("relationships");
+        JsonNode m1 = relationships.get(0).deepCopy();
+        JsonNode m2 = relationships.get(1).deepCopy();
+        JsonNode m3 = relationships.get(2).deepCopy();
+
+        ((com.fasterxml.jackson.databind.node.ObjectNode) m2.at("/properties/uml")).put("sequence", 1);
+        relationships.removeAll();
+        relationships.add(m3);
+        relationships.add(m2);
+        relationships.add(m1);
+
+        return JsonSupport.objectMapper().writeValueAsString(source);
+    }
+
+    private static void addSequenceNode(
+            com.fasterxml.jackson.databind.node.ArrayNode nodes,
+            com.fasterxml.jackson.databind.node.ArrayNode viewNodes,
+            String id,
+            String type,
+            String label) {
+        var node = nodes.addObject();
+        node.put("id", id);
+        node.put("type", type);
+        node.put("label", label);
+        node.putObject("properties")
+                .putObject("uml")
+                .put("interaction", "interaction-place-order");
+        viewNodes.add(id);
     }
 
     private static String archimateJunctionSource(

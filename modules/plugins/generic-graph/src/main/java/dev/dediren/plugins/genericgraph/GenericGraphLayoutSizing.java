@@ -29,6 +29,10 @@ final class GenericGraphLayoutSizing {
         if (semanticProfile.equals("uml") && Uml.isCompactActivityNodeType(sourceNode.type())) {
             return 32.0;
         }
+        Double umlSequenceHint = umlSequenceWidthHint(sourceNode.type());
+        if (semanticProfile.equals("uml") && umlSequenceHint != null) {
+            return umlSequenceHint;
+        }
         if (semanticProfile.equals("uml") && isLargeUmlStructuralNodeType(sourceNode.type())) {
             return umlStructuralWidthHint(sourceNode);
         }
@@ -42,10 +46,34 @@ final class GenericGraphLayoutSizing {
         if (semanticProfile.equals("uml") && Uml.isCompactActivityNodeType(sourceNode.type())) {
             return 32.0;
         }
+        Double umlSequenceHint = umlSequenceHeightHint(sourceNode.type());
+        if (semanticProfile.equals("uml") && umlSequenceHint != null) {
+            return umlSequenceHint;
+        }
         if (semanticProfile.equals("uml") && isLargeUmlStructuralNodeType(sourceNode.type())) {
             return umlStructuralHeightHint(sourceNode);
         }
         return 80.0;
+    }
+
+    private static Double umlSequenceWidthHint(String nodeType) {
+        return switch (nodeType) {
+            case "Interaction" -> 360.0;
+            case "Lifeline" -> 140.0;
+            case "ExecutionSpecification" -> 16.0;
+            case "Gate", "DestructionOccurrenceSpecification" -> 24.0;
+            default -> null;
+        };
+    }
+
+    private static Double umlSequenceHeightHint(String nodeType) {
+        return switch (nodeType) {
+            case "Interaction" -> 260.0;
+            case "Lifeline" -> 48.0;
+            case "ExecutionSpecification" -> 72.0;
+            case "Gate", "DestructionOccurrenceSpecification" -> 24.0;
+            default -> null;
+        };
     }
 
     private static boolean isLargeUmlStructuralNodeType(String nodeType) {

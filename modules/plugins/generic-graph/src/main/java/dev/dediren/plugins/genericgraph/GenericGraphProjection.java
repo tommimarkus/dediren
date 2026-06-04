@@ -1,7 +1,9 @@
 package dev.dediren.plugins.genericgraph;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import dev.dediren.contracts.ContractVersions;
 import dev.dediren.contracts.layout.GroupProvenance;
+import dev.dediren.contracts.layout.LayoutConstraint;
 import dev.dediren.contracts.layout.LayoutEdge;
 import dev.dediren.contracts.layout.LayoutGroup;
 import dev.dediren.contracts.layout.LayoutLabel;
@@ -13,12 +15,16 @@ import dev.dediren.contracts.source.GenericGraphPluginData;
 import dev.dediren.contracts.source.GenericGraphView;
 import dev.dediren.contracts.source.GenericGraphViewGroup;
 import dev.dediren.contracts.source.GenericGraphViewGroupRole;
+import dev.dediren.contracts.source.GenericGraphViewKind;
 import dev.dediren.contracts.source.SourceDocument;
 import dev.dediren.contracts.source.SourceNode;
 import dev.dediren.contracts.source.SourceRelationship;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 
 final class GenericGraphProjection {
@@ -50,7 +56,7 @@ final class GenericGraphProjection {
             edges.put(relationship.id(), new RenderMetadataSelector(
                     relationship.type(),
                     relationship.id(),
-                    null));
+                    semanticProfile.equals("uml") ? relationship.properties().get("uml") : null));
         }
 
         var groups = new LinkedHashMap<String, RenderMetadataSelector>();
@@ -139,8 +145,53 @@ final class GenericGraphProjection {
                 edges,
                 groups,
                 labels,
-                List.of(),
+                projectLayoutConstraints(source, selectedView, semanticProfile),
                 selectedView.layoutPreferences());
+    }
+
+    private static List<LayoutConstraint> projectLayoutConstraints(
+            SourceDocument source,
+            GenericGraphView selectedView,
+            String semanticProfile) {
+        if (!semanticProfile.equals("uml") || selectedView.kind() != GenericGraphViewKind.UML_SEQUENCE) {
+            return List.of();
+        }
+
+        var selectedNodeIds = new LinkedHashSet<>(selectedView.nodes());
+        var lifelineIds = source.nodes().stream()
+                .filter(node -> selectedNodeIds.contains(node.id()))
+                .filter(node -> node.type().equals("Lifeline"))
+                .map(SourceNode::id)
+                .toList();
+
+        var sourceRelationshipOrder = new HashMap<String, Integer>();
+        for (int index = 0; index < source.relationships().size(); index++) {
+            sourceRelationshipOrder.put(source.relationships().get(index).id(), index);
+        }
+        var selectedRelationshipIds = new LinkedHashSet<>(selectedView.relationships());
+        var messageIds = source.relationships().stream()
+                .filter(relationship -> selectedRelationshipIds.contains(relationship.id()))
+                .filter(relationship -> relationship.type().equals("Message"))
+                .sorted(Comparator
+                        .comparingLong(GenericGraphProjection::umlMessageSequence)
+                        .thenComparingInt(relationship -> sourceRelationshipOrder.get(relationship.id())))
+                .map(SourceRelationship::id)
+                .toList();
+
+        return List.of(
+                new LayoutConstraint(
+                        selectedView.id() + ".uml.sequence.lifeline-order",
+                        "uml.sequence.lifeline-order",
+                        lifelineIds),
+                new LayoutConstraint(
+                        selectedView.id() + ".uml.sequence.message-order",
+                        "uml.sequence.message-order",
+                        messageIds));
+    }
+
+    private static long umlMessageSequence(SourceRelationship relationship) {
+        JsonNode umlProperties = relationship.properties().get("uml");
+        return umlProperties.get("sequence").longValue();
     }
 
     static String sourceSemanticProfile(GenericGraphPluginData pluginData) {
