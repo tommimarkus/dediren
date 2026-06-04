@@ -93,11 +93,12 @@ final class SequenceLayoutConstraints {
         if (!active()) {
             return result;
         }
+        List<LaidOutNode> normalizedNodes = normalizedLifelineNodes(result.nodes());
         return new LayoutResult(
             result.layoutResultSchemaVersion(),
             result.viewId(),
-            normalizedLifelineNodes(result.nodes()),
-            normalizedMessageEdges(result.edges()),
+            normalizedNodes,
+            normalizedMessageEdges(result.edges(), nodesById(normalizedNodes)),
             result.groups(),
             result.warnings());
     }
@@ -152,7 +153,9 @@ final class SequenceLayoutConstraints {
         return normalized;
     }
 
-    private List<LaidOutEdge> normalizedMessageEdges(List<LaidOutEdge> edges) {
+    private List<LaidOutEdge> normalizedMessageEdges(
+            List<LaidOutEdge> edges,
+            Map<String, LaidOutNode> normalizedNodesById) {
         Map<String, LaidOutEdge> edgesById = new HashMap<>();
         for (LaidOutEdge edge : edges) {
             edgesById.put(edge.id(), edge);
@@ -169,19 +172,10 @@ final class SequenceLayoutConstraints {
             return edges;
         }
 
-        List<Double> ySlots = orderedMessages.stream()
-            .map(edge -> edge.points().get(0).y())
-            .sorted()
-            .toList();
+        List<Double> ySlots = normalizedMessageYSlots(orderedMessages, normalizedNodesById);
         Map<String, Double> normalizedYById = new HashMap<>();
-        double previousY = Double.NEGATIVE_INFINITY;
         for (int index = 0; index < orderedMessages.size(); index++) {
-            double y = ySlots.get(index);
-            if (y <= previousY) {
-                y = previousY + MINIMUM_MESSAGE_Y_STEP;
-            }
-            normalizedYById.put(orderedMessages.get(index).id(), y);
-            previousY = y;
+            normalizedYById.put(orderedMessages.get(index).id(), ySlots.get(index));
         }
 
         List<LaidOutEdge> normalized = new ArrayList<>();
@@ -198,8 +192,93 @@ final class SequenceLayoutConstraints {
                 edge.sourceId(),
                 edge.projectionId(),
                 edge.routingHints(),
-                pointsAtY(edge.points(), y),
+                normalizedMessagePoints(edge, normalizedNodesById, y),
                 edge.label()));
+        }
+        return normalized;
+    }
+
+    private List<Point> normalizedMessagePoints(
+            LaidOutEdge edge,
+            Map<String, LaidOutNode> normalizedNodesById,
+            double y) {
+        LaidOutNode source = normalizedNodesById.get(edge.source());
+        LaidOutNode target = normalizedNodesById.get(edge.target());
+        Integer sourceIndex = lifelineIndexById.get(edge.source());
+        Integer targetIndex = lifelineIndexById.get(edge.target());
+        if (source == null || target == null || sourceIndex == null || targetIndex == null) {
+            return pointsAtY(edge.points(), y);
+        }
+
+        Point sourcePoint = new Point(sourceEndpointX(source, sourceIndex, targetIndex), y);
+        Point targetPoint = new Point(targetEndpointX(target, sourceIndex, targetIndex), y);
+        return List.of(sourcePoint, targetPoint);
+    }
+
+    private static double sourceEndpointX(
+            LaidOutNode source,
+            int sourceIndex,
+            int targetIndex) {
+        if (sourceIndex < targetIndex) {
+            return source.x() + source.width();
+        }
+        return source.x();
+    }
+
+    private static double targetEndpointX(
+            LaidOutNode target,
+            int sourceIndex,
+            int targetIndex) {
+        if (sourceIndex < targetIndex) {
+            return target.x();
+        }
+        return target.x() + target.width();
+    }
+
+    private List<Double> normalizedMessageYSlots(
+            List<LaidOutEdge> orderedMessages,
+            Map<String, LaidOutNode> normalizedNodesById) {
+        List<LaidOutNode> lifelines = new ArrayList<>();
+        for (String id : lifelineOrder) {
+            LaidOutNode node = normalizedNodesById.get(id);
+            if (node != null) {
+                lifelines.add(node);
+            }
+        }
+
+        double top = lifelines.stream()
+            .mapToDouble(LaidOutNode::y)
+            .max()
+            .orElse(Double.NaN);
+        double bottom = lifelines.stream()
+            .mapToDouble(node -> node.y() + node.height())
+            .min()
+            .orElse(Double.NaN);
+        if (Double.isFinite(top) && Double.isFinite(bottom) && bottom > top) {
+            double step = (bottom - top) / (orderedMessages.size() + 1.0);
+            List<Double> ySlots = new ArrayList<>();
+            for (int index = 0; index < orderedMessages.size(); index++) {
+                ySlots.add(top + (step * (index + 1.0)));
+            }
+            return ySlots;
+        }
+
+        return strictlyIncreasingYSlots(orderedMessages.stream()
+            .map(edge -> edge.points().get(0).y())
+            .sorted()
+            .toList());
+    }
+
+    private static List<Double> strictlyIncreasingYSlots(List<Double> ySlots) {
+        List<Double> normalized = new ArrayList<>();
+        double previousY = Double.NEGATIVE_INFINITY;
+        for (double slot : ySlots) {
+            double y = slot;
+            if (y <= previousY) {
+                y = previousY + MINIMUM_MESSAGE_Y_STEP;
+            }
+            normalized.add(y);
+            previousY = y;
         }
         return normalized;
     }
@@ -210,6 +289,14 @@ final class SequenceLayoutConstraints {
             normalized.add(new Point(point.x(), y));
         }
         return normalized;
+    }
+
+    private static Map<String, LaidOutNode> nodesById(List<LaidOutNode> nodes) {
+        Map<String, LaidOutNode> byId = new HashMap<>();
+        for (LaidOutNode node : nodes) {
+            byId.put(node.id(), node);
+        }
+        return byId;
     }
 
     private static Map<String, Integer> indexById(List<String> ids) {

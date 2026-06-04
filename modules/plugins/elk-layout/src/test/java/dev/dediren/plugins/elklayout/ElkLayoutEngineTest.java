@@ -159,6 +159,12 @@ class ElkLayoutEngineTest {
                 + edgeById(result, "m2").points()
                 + ", m3="
                 + edgeById(result, "m3").points());
+        assertRouteEndpointOnSide(result, "m1", "customer", true, PortSide.EAST);
+        assertRouteEndpointOnSide(result, "m1", "service", false, PortSide.WEST);
+        assertRouteEndpointOnSide(result, "m2", "service", true, PortSide.WEST);
+        assertRouteEndpointOnSide(result, "m2", "customer", false, PortSide.EAST);
+        assertRouteEndpointOnSide(result, "m3", "service", true, PortSide.WEST);
+        assertRouteEndpointOnSide(result, "m3", "customer", false, PortSide.EAST);
     }
 
     @Test
