@@ -11,6 +11,7 @@ import java.io.StringReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
+import java.util.function.Consumer;
 import javax.xml.parsers.DocumentBuilderFactory;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -55,6 +56,28 @@ class MainTest {
                     "schemas/svg-render-policy.schema.json",
                     "fixtures/render-policy/uml-svg.json"))
                     .isEmpty();
+        }
+
+        @Test
+        void rejectsMalformedUmlSequenceMessageMetadata() throws Exception {
+            assertInvalidUmlSequenceMessageMetadata(
+                    properties -> properties.remove("sequence"),
+                    "render_metadata.edges.m1.properties.sequence");
+            assertInvalidUmlSequenceMessageMetadata(
+                    properties -> properties.put("sequence", 0),
+                    "render_metadata.edges.m1.properties.sequence");
+            assertInvalidUmlSequenceMessageMetadata(
+                    properties -> properties.put("sequence", 1.25),
+                    "render_metadata.edges.m1.properties.sequence");
+            assertInvalidUmlSequenceMessageMetadata(
+                    properties -> properties.remove("message_sort"),
+                    "render_metadata.edges.m1.properties.message_sort");
+            assertInvalidUmlSequenceMessageMetadata(
+                    properties -> properties.put("message_sort", "lostMessage"),
+                    "render_metadata.edges.m1.properties.message_sort");
+            assertInvalidUmlSequenceMessageMetadata(
+                    properties -> properties.put("message_sort", 3),
+                    "render_metadata.edges.m1.properties.message_sort");
         }
 
         @Test
@@ -694,7 +717,7 @@ class MainTest {
             String content = okContent(render(umlSequenceStyleInput()));
             Document document = svgDocument(content);
 
-            assertThat(content).contains(">Place Order<", ">Customer<", ">Order Service<");
+            assertThat(content).contains(">Place Order<", ">Customer<", ">Order Service<", ">Receipt<");
 
             Element customerStem = elementWithAttribute(
                     document,
@@ -706,11 +729,17 @@ class MainTest {
                     "line",
                     "data-dediren-sequence-lifeline-stem",
                     "service");
+            Element receiptStem = elementWithAttribute(
+                    document,
+                    "line",
+                    "data-dediren-sequence-lifeline-stem",
+                    "receipt");
             assertThat(customerStem.getAttribute("stroke-dasharray")).isEqualTo("8 5");
             assertThat(serviceStem.getAttribute("stroke-dasharray")).isEqualTo("8 5");
+            assertThat(receiptStem.getAttribute("stroke-dasharray")).isEqualTo("8 5");
 
             assertThat(edgeLabelsInDomOrder(document))
-                    .containsExactly("placeOrder", "accepted", "receiptReady", "cancelOrder");
+                    .containsExactly("placeOrder", "accepted", "receiptReady", "createReceipt", "cancelOrder");
 
             Element reply = firstChildElement(groupWithAttribute(document, "data-dediren-edge-id", "m2"), "path");
             assertThat(reply.getAttribute("stroke-dasharray")).isEqualTo("8 5");
@@ -721,6 +750,11 @@ class MainTest {
 
             Element asyncSignal = firstChildElement(groupWithAttribute(document, "data-dediren-edge-id", "m3"), "path");
             assertMarkerForStyle(document, asyncSignal, "m3", "end", "open_arrow");
+
+            Element createMessage = firstChildElement(groupWithAttribute(document, "data-dediren-edge-id", "m4"), "path");
+            assertThat(createMessage.hasAttribute("stroke-dasharray")).isFalse();
+            assertThat(createMessage.getAttribute("d")).contains("L 600.0 96.0");
+            assertMarkerForStyle(document, createMessage, "m4", "end", "open_arrow");
 
             Element deleteMarker = groupWithAttribute(
                     document,
@@ -1252,6 +1286,18 @@ class MainTest {
         assertThat(envelope.at("/status").asText()).describedAs(result.stdout()).isEqualTo("error");
         assertThat(envelope.at("/diagnostics/0/code").asText()).isEqualTo(expectedCode);
         return envelope;
+    }
+
+    private static void assertInvalidUmlSequenceMessageMetadata(
+            Consumer<ObjectNode> mutation,
+            String expectedPath) throws Exception {
+        JsonNode input = umlSequenceStyleInput();
+        ObjectNode properties = (ObjectNode) input.at("/render_metadata/edges/m1/properties");
+        mutation.accept(properties);
+
+        JsonNode envelope = error(render(input), "DEDIREN_UML_MESSAGE_METADATA_INVALID");
+
+        assertThat(envelope.at("/diagnostics/0/path").asText()).isEqualTo(expectedPath);
     }
 
     private static JsonNode archimateStyleInput() throws Exception {

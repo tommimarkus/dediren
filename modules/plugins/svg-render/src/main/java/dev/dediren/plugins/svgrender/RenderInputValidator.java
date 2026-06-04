@@ -1,5 +1,6 @@
 package dev.dediren.plugins.svgrender;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import dev.dediren.archimate.Archimate;
 import dev.dediren.archimate.ArchimateTypeValidationException;
 import dev.dediren.contracts.layout.LaidOutEdge;
@@ -16,8 +17,17 @@ import dev.dediren.contracts.render.SvgStylePolicy;
 import dev.dediren.uml.Uml;
 import dev.dediren.uml.UmlValidationException;
 import java.util.Map;
+import java.util.Set;
 
 final class RenderInputValidator {
+    private static final Set<String> UML_SEQUENCE_MESSAGE_SORTS = Set.of(
+            "synchCall",
+            "asynchCall",
+            "asynchSignal",
+            "reply",
+            "createMessage",
+            "deleteMessage");
+
     private RenderInputValidator() {
     }
 
@@ -123,7 +133,7 @@ final class RenderInputValidator {
     }
 
     private static void validateUmlRenderMetadata(LayoutResult layout, RenderMetadata metadata)
-            throws UmlValidationException {
+            throws UmlValidationException, RenderMetadataUsageException {
         if (metadata == null || !"uml".equals(metadata.semanticProfile())) {
             return;
         }
@@ -131,7 +141,13 @@ final class RenderInputValidator {
             Uml.validateElementType(entry.getValue().type(), "render_metadata.nodes." + entry.getKey() + ".type");
         }
         for (Map.Entry<String, RenderMetadataSelector> entry : metadata.edges().entrySet()) {
-            Uml.validateRelationshipType(entry.getValue().type(), "render_metadata.edges." + entry.getKey() + ".type");
+            RenderMetadataSelector selector = entry.getValue();
+            Uml.validateRelationshipType(selector.type(), "render_metadata.edges." + entry.getKey() + ".type");
+            if ("Message".equals(selector.type())) {
+                validateUmlMessageRenderMetadata(
+                        selector.properties(),
+                        "render_metadata.edges." + entry.getKey() + ".properties");
+            }
         }
         for (Map.Entry<String, RenderMetadataSelector> entry : metadata.groups().entrySet()) {
             Uml.validateElementType(entry.getValue().type(), "render_metadata.groups." + entry.getKey() + ".type");
@@ -147,6 +163,28 @@ final class RenderInputValidator {
                         targetSelector.type(),
                         "render_metadata.edges." + edge.id());
             }
+        }
+    }
+
+    private static void validateUmlMessageRenderMetadata(JsonNode properties, String path)
+            throws RenderMetadataUsageException {
+        JsonNode sequence = properties == null || !properties.isObject() ? null : properties.get("sequence");
+        if (sequence == null || !sequence.isIntegralNumber() || !sequence.canConvertToLong() || sequence.asLong() <= 0) {
+            throw new RenderMetadataUsageException(
+                    "DEDIREN_UML_MESSAGE_METADATA_INVALID",
+                    path + ".sequence",
+                    "UML Message render metadata sequence must be a positive integer");
+        }
+
+        JsonNode messageSort = properties.get("message_sort");
+        if (messageSort == null
+                || !messageSort.isTextual()
+                || !UML_SEQUENCE_MESSAGE_SORTS.contains(messageSort.asText())) {
+            throw new RenderMetadataUsageException(
+                    "DEDIREN_UML_MESSAGE_METADATA_INVALID",
+                    path + ".message_sort",
+                    "UML Message render metadata message_sort must be one of "
+                            + UML_SEQUENCE_MESSAGE_SORTS);
         }
     }
 

@@ -20,6 +20,13 @@
         "interaction": "interaction-place-order"
       }
     },
+    "receipt": {
+      "type": "Lifeline",
+      "source_id": "receipt",
+      "properties": {
+        "interaction": "interaction-place-order"
+      }
+    },
     "service-execution": {
       "type": "ExecutionSpecification",
       "source_id": "service-execution",
@@ -71,6 +78,15 @@
       "properties": {
         "interaction": "interaction-place-order",
         "sequence": 4,
+        "message_sort": "createMessage"
+      }
+    },
+    "m5": {
+      "type": "Message",
+      "source_id": "m5",
+      "properties": {
+        "interaction": "interaction-place-order",
+        "sequence": 5,
         "message_sort": "deleteMessage"
       }
     }

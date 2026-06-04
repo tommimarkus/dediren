@@ -8,7 +8,7 @@
       "projection_id": "interaction-place-order",
       "x": 40,
       "y": 32,
-      "width": 520,
+      "width": 760,
       "height": 360,
       "label": "Place Order"
     },
@@ -33,6 +33,16 @@
       "label": "Order Service"
     },
     {
+      "id": "receipt",
+      "source_id": "receipt",
+      "projection_id": "receipt",
+      "x": 600,
+      "y": 72,
+      "width": 140,
+      "height": 48,
+      "label": "Receipt"
+    },
+    {
       "id": "service-execution",
       "source_id": "service-execution",
       "projection_id": "service-execution",
@@ -55,11 +65,11 @@
   ],
   "edges": [
     {
-      "id": "m4",
+      "id": "m5",
       "source": "customer",
       "target": "service-destroyed",
-      "source_id": "m4",
-      "projection_id": "m4",
+      "source_id": "m5",
+      "projection_id": "m5",
       "points": [
         {
           "x": 166,
@@ -71,6 +81,28 @@
         }
       ],
       "label": "cancelOrder"
+    },
+    {
+      "id": "m4",
+      "source": "service",
+      "target": "receipt",
+      "source_id": "m4",
+      "projection_id": "m4",
+      "points": [
+        {
+          "x": 442,
+          "y": 262
+        },
+        {
+          "x": 570,
+          "y": 262
+        },
+        {
+          "x": 600,
+          "y": 96
+        }
+      ],
+      "label": "createReceipt"
     },
     {
       "id": "m2",
