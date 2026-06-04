@@ -168,6 +168,25 @@ class ElkLayoutEngineTest {
     }
 
     @Test
+    void preservesSequenceMessageBendPointsDuringEndpointNormalization() {
+        LayoutResult result = new ElkLayoutEngine().layout(sequenceLayoutRequest());
+        ElkLayoutRenderArtifacts.write(result);
+        LaidOutEdge placeOrder = edgeById(result, "m1");
+        LaidOutEdge receiptReady = edgeById(result, "m3");
+
+        assertTrue(
+            placeOrder.points().size() > 2 || receiptReady.points().size() > 2,
+            "sequence endpoint normalization must preserve ELK-produced bend points, m1="
+                + placeOrder.points()
+                + ", m3="
+                + receiptReady.points());
+        assertRouteEndpointOnSide(result, "m1", "customer", true, PortSide.EAST);
+        assertRouteEndpointOnSide(result, "m1", "service", false, PortSide.WEST);
+        assertRouteEndpointOnSide(result, "m3", "service", true, PortSide.WEST);
+        assertRouteEndpointOnSide(result, "m3", "customer", false, PortSide.EAST);
+    }
+
+    @Test
     void ignoresSequenceConstraintsForNonSequenceGraphs() {
         LayoutRequest unconstrained = genericTwoNodeRequest(List.of());
         LayoutRequest constrained = genericTwoNodeRequest(List.of(new LayoutConstraint(

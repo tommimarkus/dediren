@@ -210,9 +210,11 @@ final class SequenceLayoutConstraints {
             return pointsAtY(edge.points(), y);
         }
 
-        Point sourcePoint = new Point(sourceEndpointX(source, sourceIndex, targetIndex), y);
-        Point targetPoint = new Point(targetEndpointX(target, sourceIndex, targetIndex), y);
-        return List.of(sourcePoint, targetPoint);
+        List<Point> normalized = pointsAtY(edge.points(), y);
+        int targetPointIndex = normalized.size() - 1;
+        normalized.set(0, new Point(sourceEndpointX(source, sourceIndex, targetIndex), y));
+        normalized.set(targetPointIndex, new Point(targetEndpointX(target, sourceIndex, targetIndex), y));
+        return normalized;
     }
 
     private static double sourceEndpointX(
