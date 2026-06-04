@@ -1,0 +1,106 @@
+{
+  "model_schema_version": "model.schema.v1",
+  "required_plugins": [
+    {
+      "id": "generic-graph",
+      "version": "0.20.0"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "interaction-place-order",
+      "type": "Interaction",
+      "label": "Place Order",
+      "properties": {
+        "uml": {}
+      }
+    },
+    {
+      "id": "customer",
+      "type": "Lifeline",
+      "label": "Customer",
+      "properties": {
+        "uml": {
+          "interaction": "interaction-place-order"
+        }
+      }
+    },
+    {
+      "id": "service",
+      "type": "Lifeline",
+      "label": "Order Service",
+      "properties": {
+        "uml": {
+          "interaction": "interaction-place-order"
+        }
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "id": "m1",
+      "type": "Message",
+      "source": "customer",
+      "target": "service",
+      "label": "placeOrder",
+      "properties": {
+        "uml": {
+          "interaction": "interaction-place-order",
+          "sequence": 1,
+          "message_sort": "synchCall"
+        }
+      }
+    },
+    {
+      "id": "m2",
+      "type": "Message",
+      "source": "service",
+      "target": "customer",
+      "label": "accepted",
+      "properties": {
+        "uml": {
+          "interaction": "interaction-place-order",
+          "sequence": 2,
+          "message_sort": "reply"
+        }
+      }
+    },
+    {
+      "id": "m3",
+      "type": "Message",
+      "source": "service",
+      "target": "customer",
+      "label": "receiptReady",
+      "properties": {
+        "uml": {
+          "interaction": "interaction-place-order",
+          "sequence": 3,
+          "message_sort": "asynchSignal"
+        }
+      }
+    }
+  ],
+  "plugins": {
+    "generic-graph": {
+      "semantic_profile": "uml",
+      "views": [
+        {
+          "id": "sequence-view",
+          "label": "Place Order Sequence",
+          "kind": "uml-sequence",
+          "nodes": ["interaction-place-order", "customer", "service"],
+          "relationships": ["m1", "m2", "m3"],
+          "layout_preferences": {
+            "direction": "right",
+            "density": "readable",
+            "routing": {
+              "style": "orthogonal",
+              "profile": "readable",
+              "endpoint_merging": "off"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

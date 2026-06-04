@@ -30,6 +30,8 @@ import dev.dediren.contracts.source.GenericGraphSemanticProfile;
 import dev.dediren.contracts.source.GenericGraphViewGroupRole;
 import dev.dediren.contracts.source.GenericGraphViewKind;
 import dev.dediren.contracts.source.SourceDocument;
+import dev.dediren.contracts.source.SourceRelationship;
+import dev.dediren.testsupport.SchemaAssertions;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
@@ -48,6 +50,44 @@ class ContractRoundTripTest {
                 .treeToValue(JsonSupport.objectMapper().valueToTree(source), SourceDocument.class);
 
         assertThat(reparsed).isEqualTo(source);
+    }
+
+    @Test
+    void umlSequenceSourceDocumentPreservesPublicSequenceSurface() throws Exception {
+        String fixture = "fixtures/source/valid-uml-sequence-basic.json";
+
+        assertThat(SchemaAssertions.validateFixture(workspaceRoot(), "schemas/model.schema.json", fixture))
+                .describedAs(fixture)
+                .isEmpty();
+
+        SourceDocument source = readFixture(fixture, SourceDocument.class);
+        GenericGraphPluginData genericGraph = JsonSupport.objectMapper()
+                .treeToValue(source.plugins().get("generic-graph"), GenericGraphPluginData.class);
+        var view = genericGraph.views().getFirst();
+
+        assertThat(genericGraph.semanticProfile()).isEqualTo(GenericGraphSemanticProfile.UML);
+        assertThat(view.kind().name()).isEqualTo("UML_SEQUENCE");
+        assertThat(JsonSupport.objectMapper().valueToTree(genericGraph).at("/views/0/kind").asText())
+                .isEqualTo("uml-sequence");
+        assertThat(view.relationships()).containsExactly("m1", "m2", "m3");
+        assertThat(source.relationships()).extracting(SourceRelationship::id).containsExactly("m1", "m2", "m3");
+
+        SourceDocument reparsed = JsonSupport.objectMapper()
+                .treeToValue(JsonSupport.objectMapper().valueToTree(source), SourceDocument.class);
+
+        assertThat(reparsed.relationships()).extracting(SourceRelationship::id).containsExactly("m1", "m2", "m3");
+        assertThat(reparsed.relationships())
+                .extracting(relationship -> relationship.properties().get("uml").get("sequence").isNumber())
+                .containsExactly(true, true, true);
+        assertThat(reparsed.relationships())
+                .extracting(relationship -> relationship.properties().get("uml").get("sequence").intValue())
+                .containsExactly(1, 2, 3);
+        assertThat(reparsed.relationships())
+                .extracting(relationship -> relationship.properties().get("uml").get("message_sort").isTextual())
+                .containsExactly(true, true, true);
+        assertThat(reparsed.relationships())
+                .extracting(relationship -> relationship.properties().get("uml").get("message_sort").textValue())
+                .containsExactly("synchCall", "reply", "asynchSignal");
     }
 
     @Test
