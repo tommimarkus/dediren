@@ -208,15 +208,14 @@ final class SequenceLayoutConstraints {
         LaidOutNode target = normalizedNodesById.get(edge.target());
         Integer sourceIndex = lifelineIndexById.get(edge.source());
         Integer targetIndex = lifelineIndexById.get(edge.target());
-        if (source == null || target == null || sourceIndex == null || targetIndex == null) {
+        if (source == null || target == null || sourceIndex == null || targetIndex == null
+                || sourceIndex.equals(targetIndex)) {
             return pointsAtY(edge.points(), y);
         }
 
-        List<Point> normalized = pointsAtY(edge.points(), y);
-        int targetPointIndex = normalized.size() - 1;
-        normalized.set(0, new Point(sourceEndpointX(source, sourceIndex, targetIndex), y));
-        normalized.set(targetPointIndex, new Point(targetEndpointX(target, sourceIndex, targetIndex), y));
-        return normalized;
+        return List.of(
+            new Point(sourceEndpointX(source, sourceIndex, targetIndex), y),
+            new Point(targetEndpointX(target, sourceIndex, targetIndex), y));
     }
 
     private static double sourceEndpointX(

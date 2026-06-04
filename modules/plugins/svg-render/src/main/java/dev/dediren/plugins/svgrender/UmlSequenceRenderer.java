@@ -1,5 +1,6 @@
 package dev.dediren.plugins.svgrender;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import dev.dediren.contracts.layout.LaidOutEdge;
 import dev.dediren.contracts.layout.LaidOutNode;
 import dev.dediren.contracts.layout.LayoutResult;
@@ -21,12 +22,16 @@ import java.util.Optional;
 
 final class UmlSequenceRenderer {
     private static final String DASH_PATTERN = "8 5";
+    private static final double INTERACTION_HORIZONTAL_PADDING = 48.0;
+    private static final double INTERACTION_TOP_PADDING = 40.0;
+    private static final double INTERACTION_BOTTOM_PADDING = 48.0;
 
     private final LayoutResult result;
     private final RenderPolicy policy;
     private final SequenceStyle base;
     private final UmlSequenceModel model;
     private final Map<String, LaidOutNode> nodesById;
+    private final Map<String, SequenceFrame> interactionFrames;
 
     UmlSequenceRenderer(LayoutResult result, RenderMetadata metadata, RenderPolicy policy) {
         this.result = result;
@@ -34,6 +39,7 @@ final class UmlSequenceRenderer {
         this.base = SequenceStyle.from(policy);
         this.model = UmlSequenceModel.from(result, metadata);
         this.nodesById = nodesById(result.nodes());
+        this.interactionFrames = interactionFrames();
     }
 
     static boolean isSequence(RenderMetadata metadata) {
@@ -48,8 +54,7 @@ final class UmlSequenceRenderer {
     }
 
     String render() {
-        double diagramBottom = diagramBottom();
-        SvgBox bounds = bounds(diagramBottom).padded(policy);
+        SvgBox bounds = bounds().padded(policy);
         StringBuilder svg = new StringBuilder();
         svg.append(String.format(
                 Locale.ROOT,
@@ -73,7 +78,7 @@ final class UmlSequenceRenderer {
 
         renderInteractions(svg);
         renderLifelineHeads(svg);
-        renderLifelineStems(svg, diagramBottom);
+        renderLifelineStems(svg);
         renderExecutions(svg);
         renderGates(svg);
         renderMessages(svg);
@@ -86,8 +91,11 @@ final class UmlSequenceRenderer {
     private void renderInteractions(StringBuilder svg) {
         for (UmlSequenceModel.SequenceNode interaction : model.interactions()) {
             LaidOutNode node = interaction.node();
+            SequenceFrame frame = interactionFrame(interaction);
             NodePaint paint = nodePaint(node.id(), interaction.selector().type());
-            double titleWidth = Math.max(96.0, Math.min(node.width() * 0.5, labelWidth(node.label(), base.fontSize()) + 24.0));
+            double titleWidth = Math.max(
+                    96.0,
+                    Math.min(frame.width() * 0.5, labelWidth(node.label(), base.fontSize()) + 24.0));
             double titleHeight = Math.max(24.0, base.fontSize() + 10.0);
             svg.append("<g data-dediren-node-id=\"").append(attr(node.id()))
                     .append("\" data-dediren-node-type=\"Interaction\"")
@@ -95,10 +103,10 @@ final class UmlSequenceRenderer {
             svg.append(String.format(
                     Locale.ROOT,
                     "<rect data-dediren-node-shape=\"uml_interaction\" x=\"%.1f\" y=\"%.1f\" width=\"%.1f\" height=\"%.1f\" rx=\"%s\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%s\"/>",
-                    node.x(),
-                    node.y(),
-                    node.width(),
-                    node.height(),
+                    frame.x(),
+                    frame.y(),
+                    frame.width(),
+                    frame.height(),
                     styleNumber(paint.rx()),
                     attr(paint.fill()),
                     attr(paint.stroke()),
@@ -106,21 +114,21 @@ final class UmlSequenceRenderer {
             svg.append(String.format(
                     Locale.ROOT,
                     "<path data-dediren-sequence-interaction-title=\"true\" d=\"M %.1f %.1f H %.1f L %.1f %.1f V %.1f H %.1f Z\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%s\"/>",
-                    node.x(),
-                    node.y(),
-                    node.x() + titleWidth,
-                    node.x() + titleWidth - 12.0,
-                    node.y() + titleHeight,
-                    node.y() + titleHeight,
-                    node.x(),
+                    frame.x(),
+                    frame.y(),
+                    frame.x() + titleWidth,
+                    frame.x() + titleWidth - 12.0,
+                    frame.y() + titleHeight,
+                    frame.y() + titleHeight,
+                    frame.x(),
                     attr(paint.fill()),
                     attr(paint.stroke()),
                     styleNumber(paint.strokeWidth())));
             svg.append(String.format(
                     Locale.ROOT,
                     "<text x=\"%.1f\" y=\"%.1f\" fill=\"%s\">%s</text>",
-                    node.x() + 10.0,
-                    node.y() + titleHeight - 8.0,
+                    frame.x() + 10.0,
+                    frame.y() + titleHeight - 8.0,
                     attr(paint.labelFill()),
                     text(node.label())));
             svg.append("</g>");
@@ -157,11 +165,12 @@ final class UmlSequenceRenderer {
         }
     }
 
-    private void renderLifelineStems(StringBuilder svg, double diagramBottom) {
+    private void renderLifelineStems(StringBuilder svg) {
         for (UmlSequenceModel.SequenceNode lifeline : model.lifelines()) {
             LaidOutNode node = lifeline.node();
             NodePaint paint = nodePaint(node.id(), lifeline.selector().type());
             double x = node.x() + node.width() / 2.0;
+            double bottom = stemBottom(lifeline);
             svg.append(String.format(
                     Locale.ROOT,
                     "<line data-dediren-sequence-lifeline-stem=\"%s\" x1=\"%.1f\" y1=\"%.1f\" x2=\"%.1f\" y2=\"%.1f\" stroke=\"%s\" stroke-width=\"%s\" stroke-dasharray=\"%s\"/>",
@@ -169,7 +178,7 @@ final class UmlSequenceRenderer {
                     x,
                     node.y() + node.height(),
                     x,
-                    diagramBottom,
+                    bottom,
                     attr(paint.stroke()),
                     styleNumber(paint.strokeWidth()),
                     DASH_PATTERN));
@@ -340,10 +349,12 @@ final class UmlSequenceRenderer {
     }
 
     private double diagramBottom() {
-        Optional<UmlSequenceModel.SequenceNode> firstInteraction = model.interactions().stream().findFirst();
-        if (firstInteraction.isPresent()) {
-            LaidOutNode node = firstInteraction.get().node();
-            return node.y() + node.height();
+        if (!interactionFrames.isEmpty()) {
+            double bottom = 0.0;
+            for (SequenceFrame frame : interactionFrames.values()) {
+                bottom = Math.max(bottom, frame.bottom());
+            }
+            return bottom;
         }
         double bottom = 0.0;
         for (LaidOutNode node : result.nodes()) {
@@ -357,14 +368,18 @@ final class UmlSequenceRenderer {
         return bottom + 48.0;
     }
 
-    private SvgBox bounds(double diagramBottom) {
+    private SvgBox bounds() {
         SvgBox box = SvgBox.empty();
+        for (UmlSequenceModel.SequenceNode interaction : model.interactions()) {
+            SequenceFrame frame = interactionFrame(interaction);
+            box = box.includeRect(frame.x(), frame.y(), frame.width(), frame.height());
+        }
         for (LaidOutNode node : result.nodes()) {
             box = box.includeRect(node.x(), node.y(), node.width(), node.height());
         }
         for (UmlSequenceModel.SequenceNode lifeline : model.lifelines()) {
             LaidOutNode node = lifeline.node();
-            box = box.includePoint(node.x() + node.width() / 2.0, diagramBottom);
+            box = box.includePoint(node.x() + node.width() / 2.0, stemBottom(lifeline));
         }
         for (LaidOutEdge edge : result.edges()) {
             for (Point point : edge.points()) {
@@ -382,6 +397,103 @@ final class UmlSequenceRenderer {
             return box.includeRect(0.0, 0.0, width, height);
         }
         return box;
+    }
+
+    private Map<String, SequenceFrame> interactionFrames() {
+        Map<String, SequenceFrame> frames = new HashMap<>();
+        for (UmlSequenceModel.SequenceNode interaction : model.interactions()) {
+            frames.put(sequenceInteractionId(interaction), calculateInteractionFrame(interaction));
+        }
+        return frames;
+    }
+
+    private SequenceFrame calculateInteractionFrame(UmlSequenceModel.SequenceNode interaction) {
+        LaidOutNode node = interaction.node();
+        String interactionId = sequenceInteractionId(interaction);
+        SvgBox content = SvgBox.empty();
+        for (UmlSequenceModel.SequenceNode lifeline : model.lifelines()) {
+            if (belongsToInteraction(lifeline, interactionId)) {
+                content = includeNode(content, lifeline.node());
+            }
+        }
+        for (UmlSequenceModel.SequenceNode execution : model.executions()) {
+            if (belongsToInteraction(execution, interactionId)) {
+                content = includeNode(content, execution.node());
+            }
+        }
+        for (UmlSequenceModel.SequenceNode gate : model.gates()) {
+            if (belongsToInteraction(gate, interactionId)) {
+                content = includeNode(content, gate.node());
+            }
+        }
+        for (UmlSequenceModel.SequenceNode destruction : model.destructions()) {
+            if (belongsToInteraction(destruction, interactionId)) {
+                content = includeNode(content, destruction.node());
+            }
+        }
+        for (UmlSequenceModel.SequenceMessage message : model.messages()) {
+            if (!belongsToInteraction(message, interactionId)) {
+                continue;
+            }
+            for (Point point : message.edge().points()) {
+                content = content.includePoint(point.x(), point.y());
+            }
+        }
+
+        if (content.isEmpty()) {
+            return new SequenceFrame(node.x(), node.y(), node.width(), node.height());
+        }
+
+        double left = Math.min(node.x(), content.minX() - INTERACTION_HORIZONTAL_PADDING);
+        double top = Math.min(node.y(), content.minY() - INTERACTION_TOP_PADDING);
+        double right = Math.max(node.x() + node.width(), content.maxX() + INTERACTION_HORIZONTAL_PADDING);
+        double bottom = Math.max(node.y() + node.height(), content.maxY() + INTERACTION_BOTTOM_PADDING);
+        return new SequenceFrame(left, top, right - left, bottom - top);
+    }
+
+    private SequenceFrame interactionFrame(UmlSequenceModel.SequenceNode interaction) {
+        return interactionFrames.getOrDefault(
+                sequenceInteractionId(interaction),
+                new SequenceFrame(
+                        interaction.node().x(),
+                        interaction.node().y(),
+                        interaction.node().width(),
+                        interaction.node().height()));
+    }
+
+    private double stemBottom(UmlSequenceModel.SequenceNode lifeline) {
+        String interactionId = propertyText(lifeline.selector().properties(), "interaction");
+        SequenceFrame frame = interactionId == null ? null : interactionFrames.get(interactionId);
+        if (frame == null && interactionFrames.size() == 1) {
+            frame = interactionFrames.values().iterator().next();
+        }
+        return frame == null ? diagramBottom() : frame.bottom();
+    }
+
+    private boolean belongsToInteraction(UmlSequenceModel.SequenceNode node, String interactionId) {
+        return belongsToInteraction(node.selector().properties(), interactionId);
+    }
+
+    private boolean belongsToInteraction(UmlSequenceModel.SequenceMessage message, String interactionId) {
+        return belongsToInteraction(message.selector().properties(), interactionId);
+    }
+
+    private boolean belongsToInteraction(JsonNode properties, String interactionId) {
+        String candidate = propertyText(properties, "interaction");
+        return interactionId.equals(candidate) || (candidate == null && model.interactions().size() == 1);
+    }
+
+    private static String sequenceInteractionId(UmlSequenceModel.SequenceNode interaction) {
+        return interaction.selector().sourceId();
+    }
+
+    private static String propertyText(JsonNode properties, String name) {
+        JsonNode value = properties == null ? null : properties.get(name);
+        return value != null && value.isTextual() ? value.asText() : null;
+    }
+
+    private static SvgBox includeNode(SvgBox box, LaidOutNode node) {
+        return box.includeRect(node.x(), node.y(), node.width(), node.height());
     }
 
     private NodePaint nodePaint(String nodeId, String type) {
@@ -548,5 +660,11 @@ final class UmlSequenceRenderer {
     }
 
     private record MarkerPoint(String id, double x, double y, double size) {
+    }
+
+    private record SequenceFrame(double x, double y, double width, double height) {
+        double bottom() {
+            return y + height;
+        }
     }
 }

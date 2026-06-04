@@ -5,14 +5,21 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.fasterxml.jackson.databind.JsonNode;
 import dev.dediren.contracts.json.JsonSupport;
 import java.io.File;
+import java.io.StringReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.StringJoiner;
+import javax.xml.parsers.DocumentBuilderFactory;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.xml.sax.InputSource;
 
 class MainTest {
     @TempDir
@@ -127,6 +134,7 @@ class MainTest {
                 "data-dediren-node-id=\"interaction-place-order\"",
                 "data-dediren-edge-id=\"m1\"",
                 "placeOrder");
+        assertSequenceSvgGeometry(svgDocument(svg));
 
         CliResult export = Main.executeForTesting(new String[]{
                 "export",
@@ -228,6 +236,89 @@ class MainTest {
         return Map.of("DEDIREN_XMI_SCHEMA_PATH", schemaPath.toString());
     }
 
+    private static void assertSequenceSvgGeometry(Document document) {
+        Element frame = elementWithAttribute(document, "rect", "data-dediren-node-shape", "uml_interaction");
+        double frameY = doubleAttribute(frame, "y");
+        double frameBottom = frameY + doubleAttribute(frame, "height");
+
+        for (String lifelineId : List.of("customer", "service")) {
+            Element lifeline = firstChildElement(groupWithAttribute(document, "data-dediren-node-id", lifelineId), "rect");
+            double lifelineY = doubleAttribute(lifeline, "y");
+            double lifelineBottom = lifelineY + doubleAttribute(lifeline, "height");
+            Element stem = elementWithAttribute(document, "line", "data-dediren-sequence-lifeline-stem", lifelineId);
+            double stemY1 = doubleAttribute(stem, "y1");
+            double stemY2 = doubleAttribute(stem, "y2");
+
+            assertThat(lifelineY).isGreaterThan(frameY);
+            assertThat(lifelineBottom).isLessThan(frameBottom);
+            assertThat(stemY1).isEqualTo(lifelineBottom);
+            assertThat(stemY2).isGreaterThan(stemY1);
+            assertThat(stemY2).isLessThanOrEqualTo(frameBottom);
+        }
+
+        for (String edgeId : List.of("m1", "m2", "m3")) {
+            Element path = firstChildElement(groupWithAttribute(document, "data-dediren-edge-id", edgeId), "path");
+            List<SvgPoint> points = pathPoints(path.getAttribute("d"));
+            assertThat(points).hasSize(2);
+            assertThat(points.getFirst().y()).isEqualTo(points.getLast().y());
+            for (SvgPoint point : points) {
+                assertThat(point.y()).isGreaterThan(frameY);
+                assertThat(point.y()).isLessThan(frameBottom);
+            }
+        }
+    }
+
+    private static Document svgDocument(String content) throws Exception {
+        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+        factory.setNamespaceAware(false);
+        return factory.newDocumentBuilder().parse(new InputSource(new StringReader(content)));
+    }
+
+    private static Element groupWithAttribute(Document document, String name, String value) {
+        var elements = document.getElementsByTagName("g");
+        for (int index = 0; index < elements.getLength(); index++) {
+            Element element = (Element) elements.item(index);
+            if (value.equals(element.getAttribute(name))) {
+                return element;
+            }
+        }
+        throw new AssertionError("expected SVG group with " + name + "=" + value);
+    }
+
+    private static Element elementWithAttribute(Document document, String tagName, String name, String value) {
+        var elements = document.getElementsByTagName(tagName);
+        for (int index = 0; index < elements.getLength(); index++) {
+            Element element = (Element) elements.item(index);
+            if (value.equals(element.getAttribute(name))) {
+                return element;
+            }
+        }
+        throw new AssertionError("expected <" + tagName + "> with " + name + "=" + value);
+    }
+
+    private static Element firstChildElement(Element parent, String tagName) {
+        var children = parent.getChildNodes();
+        for (int index = 0; index < children.getLength(); index++) {
+            if (children.item(index) instanceof Element child && child.getTagName().equals(tagName)) {
+                return child;
+            }
+        }
+        throw new AssertionError("expected <" + parent.getTagName() + "> to contain <" + tagName + ">");
+    }
+
+    private static List<SvgPoint> pathPoints(String pathData) {
+        String[] tokens = pathData.replace("M", "").replace("L", "").trim().split("\\s+");
+        List<SvgPoint> points = new ArrayList<>();
+        for (int index = 0; index < tokens.length; index += 2) {
+            points.add(new SvgPoint(Double.parseDouble(tokens[index]), Double.parseDouble(tokens[index + 1])));
+        }
+        return points;
+    }
+
+    private static double doubleAttribute(Element element, String name) {
+        return Double.parseDouble(element.getAttribute(name));
+    }
+
     private static Path workspaceRoot() {
         Path current = Path.of(System.getProperty("user.dir")).toAbsolutePath();
         while (current != null) {
@@ -237,5 +328,8 @@ class MainTest {
             current = current.getParent();
         }
         throw new IllegalStateException("Could not locate repository root from user.dir");
+    }
+
+    private record SvgPoint(double x, double y) {
     }
 }

@@ -187,15 +187,15 @@ class ElkLayoutEngineTest {
     }
 
     @Test
-    void preservesSequenceMessagePointOrderDuringEndpointNormalization() {
+    void normalizesSequenceMessagesToCleanHorizontalSegments() {
         LayoutResult normalized = SequenceLayoutConstraints.from(sequenceLayoutRequest())
             .normalize(sequenceLayoutResultWithMessageBendPoints());
         LaidOutEdge edge = edgeById(normalized, "m1");
         double messageY = firstSegmentY(edge);
 
-        assertEquals(4, edge.points().size(), "sequence normalization must not collapse route points");
-        assertEquals(700.0, edge.points().get(1).x(), GEOMETRY_EPSILON);
-        assertEquals(300.0, edge.points().get(2).x(), GEOMETRY_EPSILON);
+        assertEquals(2, edge.points().size(), "lifeline-to-lifeline sequence messages should render as direct horizontal segments");
+        assertEquals(240.0, edge.points().getFirst().x(), GEOMETRY_EPSILON);
+        assertEquals(520.0, edge.points().getLast().x(), GEOMETRY_EPSILON);
         for (Point point : edge.points()) {
             assertEquals(messageY, point.y(), GEOMETRY_EPSILON, "all message route points should share y");
         }
