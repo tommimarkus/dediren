@@ -81,9 +81,53 @@ class MainTest {
     }
 
     @Test
+    void exportsSequenceInteractionLifelinesAndMessages() throws Exception {
+        JsonNode input = exportSequenceInput();
+        ((ObjectNode) input.at("/source/relationships/0/properties/uml")).remove("message_sort");
+
+        String xml = exportXml(input);
+
+        assertThat(xml).isEqualTo(fixture("fixtures/export/uml-sequence-basic.xmi"));
+        assertThat(xml).contains(
+                "xmi:type=\"uml:Interaction\"",
+                "<lifeline xmi:id=\"id-customer\" name=\"Customer\"/>",
+                "<lifeline xmi:id=\"id-service\" name=\"Order Service\"/>",
+                "<message xmi:id=\"id-m1\" name=\"placeOrder\" messageSort=\"synchCall\""
+                        + " sendEvent=\"id-m1-send-event\" receiveEvent=\"id-m1-receive-event\"/>");
+    }
+
+    @Test
+    void exportsSequenceMessagesInSequenceOrder() throws Exception {
+        JsonNode input = exportSequenceInput();
+        ((ObjectNode) input.at("/source/relationships/0/properties/uml")).put("sequence", 2);
+        ((ObjectNode) input.at("/source/relationships/1/properties/uml")).put("sequence", 1);
+
+        String xml = exportXml(input);
+
+        assertThat(xml).containsSubsequence(
+                "<message xmi:id=\"id-m2\"",
+                "<message xmi:id=\"id-m1\"",
+                "<message xmi:id=\"id-m3\"");
+    }
+
+    @Test
     void rejectsInvalidUmlRelationshipEndpoint() throws Exception {
         JsonNode input = exportInput();
         ((ObjectNode) input.at("/source/relationships/0")).put("source", "initial-submit");
+
+        PluginResult result = Main.executeForTesting(
+                new String[]{"export"},
+                JsonSupport.objectMapper().writeValueAsString(input),
+                envWithXmiSchema());
+
+        assertThat(result.exitCode()).isEqualTo(3);
+        assertErrorCode(result, "DEDIREN_UML_RELATIONSHIP_ENDPOINT_UNSUPPORTED");
+    }
+
+    @Test
+    void rejectsInvalidSequenceMessageEndpoint() throws Exception {
+        JsonNode input = exportSequenceInput();
+        ((ObjectNode) input.at("/source/nodes/2")).put("type", "Class");
 
         PluginResult result = Main.executeForTesting(
                 new String[]{"export"},
@@ -184,6 +228,12 @@ class MainTest {
         return exportInput(
                 fixtureJson("fixtures/source/valid-uml-basic.json"),
                 fixtureJson("fixtures/layout-result/uml-basic.json"));
+    }
+
+    private JsonNode exportSequenceInput() throws Exception {
+        return exportInput(
+                fixtureJson("fixtures/source/valid-uml-sequence-basic.json"),
+                fixtureJson("fixtures/layout-result/uml-sequence-basic.json"));
     }
 
     private JsonNode exportInput(JsonNode source, JsonNode layout) throws Exception {

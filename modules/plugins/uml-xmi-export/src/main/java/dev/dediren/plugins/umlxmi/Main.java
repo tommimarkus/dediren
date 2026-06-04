@@ -24,9 +24,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintStream;
+import java.math.BigInteger;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -215,6 +217,15 @@ public final class Main {
                 case "DataType" -> writeClassifier(xml, ids, "uml:DataType", node, elementId);
                 case "Enumeration" -> writeEnumeration(xml, ids, node, elementId);
                 case "Activity" -> writeActivity(xml, node, elementId, request.source().nodes(), selectedRelationships, nodeIds, relationshipIds);
+                case "Interaction" -> writeInteraction(
+                        xml,
+                        ids,
+                        node,
+                        elementId,
+                        request.source().nodes(),
+                        selectedRelationships,
+                        nodeIds,
+                        relationshipIds);
                 default -> {
                 }
             }
@@ -278,6 +289,101 @@ public final class Main {
                     .append("\" name=\"").append(attr(name)).append("\"/>");
         }
         xml.append("</packagedElement>");
+    }
+
+    private static void writeInteraction(
+            StringBuilder xml,
+            IdentifierMap ids,
+            SourceNode interaction,
+            String interactionId,
+            List<SourceNode> sourceNodes,
+            List<SourceRelationship> selectedRelationships,
+            Map<String, String> nodeIds,
+            Map<String, String> relationshipIds) {
+        xml.append("<packagedElement xmi:type=\"uml:Interaction\" xmi:id=\"").append(attr(interactionId))
+                .append("\" name=\"").append(attr(interaction.label())).append("\">");
+        for (SourceNode node : sourceNodes) {
+            if (nodeIds.containsKey(node.id())
+                    && node.type().equals("Lifeline")
+                    && interaction.id().equals(umlString(node, "interaction"))) {
+                xml.append("<lifeline xmi:id=\"").append(attr(nodeIds.get(node.id())))
+                        .append("\" name=\"").append(attr(node.label())).append("\"/>");
+            }
+        }
+        List<MessageExport> messages = sequenceMessages(
+                ids,
+                interaction,
+                selectedRelationships,
+                nodeIds,
+                relationshipIds);
+        for (MessageExport message : messages) {
+            writeMessageOccurrence(xml, message, "send", message.sourceEventId(), message.sourceNodeId());
+            writeMessageOccurrence(xml, message, "receive", message.receiveEventId(), message.targetNodeId());
+        }
+        for (MessageExport message : messages) {
+            writeSequenceMessage(xml, message);
+        }
+        xml.append("</packagedElement>");
+    }
+
+    private static List<MessageExport> sequenceMessages(
+            IdentifierMap ids,
+            SourceNode interaction,
+            List<SourceRelationship> selectedRelationships,
+            Map<String, String> nodeIds,
+            Map<String, String> relationshipIds) {
+        var sourceOrder = new HashMap<String, Integer>();
+        for (int index = 0; index < selectedRelationships.size(); index++) {
+            sourceOrder.put(selectedRelationships.get(index).id(), index);
+        }
+        return selectedRelationships.stream()
+                .filter(relationship -> relationship.type().equals("Message"))
+                .filter(relationship -> interaction.id().equals(umlString(relationship, "interaction")))
+                .filter(relationship -> relationshipIds.containsKey(relationship.id()))
+                .map(relationship -> {
+                    String sourceNodeId = nodeIds.get(relationship.source());
+                    String targetNodeId = nodeIds.get(relationship.target());
+                    if (sourceNodeId == null || targetNodeId == null) {
+                        return null;
+                    }
+                    return new MessageExport(
+                            relationship,
+                            relationshipIds.get(relationship.id()),
+                            sourceNodeId,
+                            targetNodeId,
+                            ids.xmiId(relationship.id() + "-send-event"),
+                            ids.xmiId(relationship.id() + "-receive-event"),
+                            umlSequence(relationship),
+                            sourceOrder.get(relationship.id()),
+                            Optional.ofNullable(umlString(relationship, "message_sort")).orElse("synchCall"));
+                })
+                .filter(message -> message != null)
+                .sorted(Comparator.comparing(MessageExport::sequence)
+                        .thenComparingInt(MessageExport::sourceOrder))
+                .toList();
+    }
+
+    private static void writeMessageOccurrence(
+            StringBuilder xml,
+            MessageExport message,
+            String kind,
+            String eventId,
+            String coveredNodeId) {
+        xml.append("<fragment xmi:type=\"uml:MessageOccurrenceSpecification\" xmi:id=\"")
+                .append(attr(eventId))
+                .append("\" name=\"").append(attr(message.relationship().label())).append(" ").append(kind)
+                .append("\" covered=\"").append(attr(coveredNodeId))
+                .append("\" message=\"").append(attr(message.messageId()))
+                .append("\"/>");
+    }
+
+    private static void writeSequenceMessage(StringBuilder xml, MessageExport message) {
+        xml.append("<message xmi:id=\"").append(attr(message.messageId()))
+                .append("\" name=\"").append(attr(message.relationship().label()))
+                .append("\" messageSort=\"").append(attr(message.messageSort()))
+                .append("\" sendEvent=\"").append(attr(message.sourceEventId()))
+                .append("\" receiveEvent=\"").append(attr(message.receiveEventId()))
+                .append("\"/>");
     }
 
     private static void writeActivity(
@@ -508,6 +614,18 @@ public final class Main {
         return value != null && value.isTextual() ? value.asText() : null;
     }
 
+    private static String umlString(SourceRelationship relationship, String field) {
+        JsonNode value = relationship.properties().get("uml");
+        value = value == null ? null : value.get(field);
+        return value != null && value.isTextual() ? value.asText() : null;
+    }
+
+    private static BigInteger umlSequence(SourceRelationship relationship) {
+        JsonNode value = relationship.properties().get("uml");
+        value = value == null ? null : value.get("sequence");
+        return value != null && value.isIntegralNumber() ? value.bigIntegerValue() : BigInteger.valueOf(Long.MAX_VALUE);
+    }
+
     private static String textField(JsonNode value, String field, String fallback) {
         JsonNode fieldValue = value.get(field);
         return fieldValue != null && fieldValue.isTextual() ? fieldValue.asText() : fallback;
@@ -602,8 +720,48 @@ public final class Main {
             var relationshipIds = request.layoutResult().edges().stream()
                     .map(edge -> edge.sourceId())
                     .collect(Collectors.toCollection(LinkedHashSet::new));
+            for (SourceRelationship relationship : request.source().relationships()) {
+                if (!relationshipIds.contains(relationship.id()) || !relationship.type().equals("Message")) {
+                    continue;
+                }
+                addMessageLifelineEndpoint(nodeIds, sourceNodesById, relationship.source());
+                addMessageLifelineEndpoint(nodeIds, sourceNodesById, relationship.target());
+                String interactionId = umlString(relationship, "interaction");
+                if (interactionId != null) {
+                    nodeIds.add(interactionId);
+                }
+            }
+            var interactionIds = nodeIds.stream()
+                    .map(sourceNodesById::get)
+                    .filter(node -> node != null)
+                    .map(node -> umlString(node, "interaction"))
+                    .filter(value -> value != null)
+                    .toList();
+            nodeIds.addAll(interactionIds);
             return new ExportScope(nodeIds, relationshipIds);
         }
+
+        private static void addMessageLifelineEndpoint(
+                Set<String> nodeIds,
+                Map<String, SourceNode> sourceNodesById,
+                String endpointId) {
+            SourceNode endpoint = sourceNodesById.get(endpointId);
+            if (endpoint != null && endpoint.type().equals("Lifeline")) {
+                nodeIds.add(endpoint.id());
+            }
+        }
+    }
+
+    private record MessageExport(
+            SourceRelationship relationship,
+            String messageId,
+            String sourceNodeId,
+            String targetNodeId,
+            String sourceEventId,
+            String receiveEventId,
+            BigInteger sequence,
+            int sourceOrder,
+            String messageSort) {
     }
 
     private static final class IdentifierMap {
