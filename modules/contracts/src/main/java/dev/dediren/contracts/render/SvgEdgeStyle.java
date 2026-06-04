@@ -10,5 +10,6 @@ public record SvgEdgeStyle(
         SvgEdgeLabelHorizontalPosition labelHorizontalPosition,
         SvgEdgeLabelHorizontalSide labelHorizontalSide,
         SvgEdgeLabelVerticalPosition labelVerticalPosition,
-        SvgEdgeLabelVerticalSide labelVerticalSide) {
+        SvgEdgeLabelVerticalSide labelVerticalSide,
+        SvgEdgeLabelPresentation labelPresentation) {
 }

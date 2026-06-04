@@ -3,11 +3,11 @@
   "required_plugins": [
     {
       "id": "generic-graph",
-      "version": "0.18.2"
+      "version": "0.19.0"
     },
     {
       "id": "uml-xmi",
-      "version": "0.18.2"
+      "version": "0.19.0"
     }
   ],
   "nodes": [

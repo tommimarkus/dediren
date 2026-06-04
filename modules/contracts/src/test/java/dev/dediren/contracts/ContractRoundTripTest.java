@@ -20,6 +20,7 @@ import dev.dediren.contracts.plugin.RuntimeCapabilities;
 import dev.dediren.contracts.render.RenderMetadata;
 import dev.dediren.contracts.render.RenderPolicy;
 import dev.dediren.contracts.render.RenderResult;
+import dev.dediren.contracts.render.SvgEdgeLabelPresentation;
 import dev.dediren.contracts.render.SvgEdgeLineStyle;
 import dev.dediren.contracts.render.SvgEdgeMarkerEnd;
 import dev.dediren.contracts.render.SvgNodeDecorator;
@@ -150,6 +151,7 @@ class ContractRoundTripTest {
 
         assertThat(policy.svgRenderPolicySchemaVersion()).isEqualTo(ContractVersions.SVG_RENDER_POLICY_SCHEMA_VERSION);
         assertThat(policy.style().nodeOverrides().get("api").stroke()).isEqualTo("#0891b2");
+        assertThat(policy.style().edge().labelPresentation()).isEqualTo(SvgEdgeLabelPresentation.BACKGROUND);
         assertThat(metadata.renderMetadataSchemaVersion()).isEqualTo(ContractVersions.RENDER_METADATA_SCHEMA_VERSION);
 
         var decoratorPolicy = JsonSupport.readValue("""
@@ -229,7 +231,7 @@ class ContractRoundTripTest {
                 """, RuntimeCapabilities.class);
 
         assertThat(manifest.pluginManifestSchemaVersion()).isEqualTo("plugin-manifest.schema.v1");
-        assertThat(manifest.version()).isEqualTo("0.18.2");
+        assertThat(manifest.version()).isEqualTo("0.19.0");
         assertThat(manifest.allowedEnv()).containsExactly("JAVA_HOME", "PATH");
         assertThat(capabilities.pluginProtocolVersion()).isEqualTo(ContractVersions.PLUGIN_PROTOCOL_VERSION);
         assertThat(capabilities.runtime().get("java").asText()).isEqualTo("21");

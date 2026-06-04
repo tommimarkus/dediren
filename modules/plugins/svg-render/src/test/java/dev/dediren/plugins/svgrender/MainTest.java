@@ -773,7 +773,7 @@ class MainTest {
         }
 
         @Test
-        void paintsEdgeLabelWithBackgroundHalo() throws Exception {
+        void paintsEdgeLabelWithDefaultOutline() throws Exception {
             JsonNode input = styledInlineInput(
                     "[]",
                     "[]",
@@ -796,11 +796,63 @@ class MainTest {
                     "{ \"background\": { \"fill\": \"#f8fafc\" } }");
             Document document = svgDocument(okContent(render(input)));
 
-            Element label = firstChildElement(groupWithAttribute(document, "data-dediren-edge-id", "labeled-edge"), "text");
+            Element edge = groupWithAttribute(document, "data-dediren-edge-id", "labeled-edge");
+            java.util.List<Element> labels = childElements(edge, "text");
 
-            assertThat(label.getAttribute("paint-order")).isEqualTo("stroke");
-            assertThat(label.getAttribute("stroke")).isEqualTo("#f8fafc");
-            assertThat(label.getAttribute("stroke-width")).isEqualTo("4");
+            assertThat(labels).hasSize(2);
+            Element outline = labels.get(0);
+            Element label = labels.get(1);
+
+            assertThat(childElements(edge, "rect")).isEmpty();
+            assertThat(outline.getTextContent()).isEqualTo("clear label");
+            assertThat(outline.getAttribute("fill")).isEqualTo("none");
+            assertThat(outline.getAttribute("stroke")).isEqualTo("#f8fafc");
+            assertThat(outline.getAttribute("stroke-width")).isEqualTo("2");
+            assertThat(label.getTextContent()).isEqualTo("clear label");
+            assertThat(label.getAttribute("fill")).isEqualTo("#374151");
+            assertThat(label.getAttribute("paint-order")).isEmpty();
+            assertThat(label.getAttribute("stroke")).isEmpty();
+            assertThat(label.getAttribute("font-size")).isEqualTo("15.4");
+            assertThat(label.getAttribute("font-weight")).isEqualTo("600");
+        }
+
+        @Test
+        void paintsEdgeLabelOnReadableBackgroundWhenOptedIn() throws Exception {
+            JsonNode input = styledInlineInput(
+                    "[]",
+                    "[]",
+                    """
+                    [
+                      {
+                        "id": "labeled-edge",
+                        "source": "source-node",
+                        "target": "target-node",
+                        "source_id": "labeled-edge",
+                        "projection_id": "labeled-edge",
+                        "points": [
+                          { "x": 0, "y": 100 },
+                          { "x": 200, "y": 100 }
+                        ],
+                        "label": "clear label"
+                      }
+                    ]
+                    """,
+                    "{ \"background\": { \"fill\": \"#f8fafc\" }, \"edge\": { \"label_presentation\": \"background\" } }");
+            Document document = svgDocument(okContent(render(input)));
+
+            Element edge = groupWithAttribute(document, "data-dediren-edge-id", "labeled-edge");
+            Element background = firstElementWithAttribute(edge, "data-dediren-edge-label-background");
+            Element label = firstChildElement(edge, "text");
+
+            assertThat(background.getTagName()).isEqualTo("rect");
+            assertThat(background.getAttribute("fill")).isEqualTo("#f8fafc");
+            assertThat(background.getAttribute("rx")).isEqualTo("3");
+            assertThat(Double.parseDouble(background.getAttribute("x")))
+                    .isLessThan(Double.parseDouble(label.getAttribute("x")));
+            assertThat(label.getAttribute("paint-order")).isEmpty();
+            assertThat(label.getAttribute("stroke")).isEmpty();
+            assertThat(label.getAttribute("font-size")).isEqualTo("15.4");
+            assertThat(label.getAttribute("font-weight")).isEqualTo("600");
         }
 
         @Test
@@ -849,6 +901,51 @@ class MainTest {
                     .contains("Q 106.0 100.0 100.0 106.0");
             Element masks = childGroupWithAttribute(frontEdge, "data-dediren-line-jump-masks", "front-edge");
             assertThat(firstChildElement(masks, "path").getAttribute("stroke")).isEqualTo("#ffffff");
+        }
+
+        @Test
+        void keepsRoundedRouteCornersWhenAddingLineJumps() throws Exception {
+            JsonNode input = styledInlineInput(
+                    "[]",
+                    "[]",
+                    """
+                    [
+                      {
+                        "id": "first-edge",
+                        "source": "left",
+                        "target": "right",
+                        "source_id": "first-edge",
+                        "projection_id": "first-edge",
+                        "points": [
+                          { "x": 0, "y": 40 },
+                          { "x": 220, "y": 40 }
+                        ],
+                        "label": "first"
+                      },
+                      {
+                        "id": "front-edge",
+                        "source": "top",
+                        "target": "side",
+                        "source_id": "front-edge",
+                        "projection_id": "front-edge",
+                        "points": [
+                          { "x": 100, "y": 0 },
+                          { "x": 100, "y": 100 },
+                          { "x": 180, "y": 100 }
+                        ],
+                        "label": "front"
+                      }
+                    ]
+                    """,
+                    "{}");
+            Document document = svgDocument(okContent(render(input)));
+
+            Element frontEdge = groupWithAttribute(document, "data-dediren-edge-id", "front-edge");
+            Element frontPath = firstChildElement(frontEdge, "path");
+
+            assertThat(frontPath.getAttribute("d"))
+                    .contains("Q 106.0 40.0 100.0 46.0")
+                    .contains("L 100.0 92.0 Q 100.0 100.0 108.0 100.0");
         }
 
         @Test

@@ -20,6 +20,7 @@ import dev.dediren.contracts.render.RenderResult;
 import dev.dediren.contracts.render.SvgBackgroundStyle;
 import dev.dediren.contracts.render.SvgEdgeLabelHorizontalPosition;
 import dev.dediren.contracts.render.SvgEdgeLabelHorizontalSide;
+import dev.dediren.contracts.render.SvgEdgeLabelPresentation;
 import dev.dediren.contracts.render.SvgEdgeLabelVerticalPosition;
 import dev.dediren.contracts.render.SvgEdgeLabelVerticalSide;
 import dev.dediren.contracts.render.SvgEdgeLineStyle;
@@ -43,6 +44,13 @@ import java.util.Locale;
 import java.util.Optional;
 
 public final class Main {
+    private static final double EDGE_LABEL_BACKGROUND_PADDING_X = 5.0;
+    private static final double EDGE_LABEL_BACKGROUND_PADDING_Y = 3.0;
+    private static final double EDGE_LABEL_BACKGROUND_RX = 3.0;
+    private static final double EDGE_LABEL_FONT_SIZE_SCALE = 1.1;
+    private static final int EDGE_LABEL_FONT_WEIGHT = 600;
+    private static final double EDGE_LABEL_OUTLINE_WIDTH = 2.0;
+
     private Main() {
     }
 
@@ -185,17 +193,10 @@ public final class Main {
             svg.append(lineJumpMasks(edge, lineJumps, base.backgroundFill()));
             svg.append(edgePath(edge, style, lineJumps));
             if (edge.label() != null && !edge.label().isEmpty()) {
-                EdgeLabel label = edgeLabel(edge, style, occupiedLabelBoxes, base.fontSize());
-                svg.append(String.format(
-                        Locale.ROOT,
-                        "<text x=\"%.1f\" y=\"%.1f\" text-anchor=\"%s\" fill=\"%s\" paint-order=\"stroke\" stroke=\"%s\" stroke-width=\"4\">%s</text>",
-                        label.x(),
-                        label.y(),
-                        attr(label.anchor()),
-                        attr(style.labelFill()),
-                        attr(base.backgroundFill()),
-                        text(edge.label())));
-                occupiedLabelBoxes.add(label.bounds());
+                double edgeLabelFontSize = edgeLabelFontSize(base.fontSize());
+                EdgeLabel label = edgeLabel(edge, style, occupiedLabelBoxes, edgeLabelFontSize);
+                svg.append(edgeLabel(label, edge.label(), style, base.backgroundFill(), edgeLabelFontSize));
+                occupiedLabelBoxes.add(edgeLabelVisibleBox(label, style.labelPresentation()));
             }
             svg.append("</g>");
             renderedEdges.add(edge);
@@ -865,6 +866,79 @@ public final class Main {
                 + dash + markerStart + markerEnd + "/>";
     }
 
+    private static String edgeLabelBackground(EdgeLabel label, String backgroundFill) {
+        LabelBox bounds = edgeLabelBackgroundBox(label);
+        return String.format(
+                Locale.ROOT,
+                "<rect data-dediren-edge-label-background=\"true\" x=\"%.1f\" y=\"%.1f\" width=\"%.1f\" height=\"%.1f\" rx=\"%s\" fill=\"%s\"/>",
+                bounds.minX(),
+                bounds.minY(),
+                bounds.width(),
+                bounds.height(),
+                styleNumber(EDGE_LABEL_BACKGROUND_RX),
+                attr(backgroundFill));
+    }
+
+    private static String edgeLabel(
+            EdgeLabel label,
+            String text,
+            ResolvedEdgeStyle style,
+            String backgroundFill,
+            double fontSize) {
+        StringBuilder output = new StringBuilder();
+        if (style.labelPresentation() == SvgEdgeLabelPresentation.BACKGROUND) {
+            output.append(edgeLabelBackground(label, backgroundFill));
+            output.append(String.format(
+                    Locale.ROOT,
+                    "<text x=\"%.1f\" y=\"%.1f\" text-anchor=\"%s\" fill=\"%s\" font-size=\"%s\" font-weight=\"%d\">%s</text>",
+                    label.x(),
+                    label.y(),
+                    attr(label.anchor()),
+                    attr(style.labelFill()),
+                    styleNumber(fontSize),
+                    EDGE_LABEL_FONT_WEIGHT,
+                    text(text)));
+            return output.toString();
+        }
+        output.append(String.format(
+                Locale.ROOT,
+                "<text x=\"%.1f\" y=\"%.1f\" text-anchor=\"%s\" fill=\"none\" font-size=\"%s\" font-weight=\"%d\" stroke=\"%s\" stroke-width=\"%s\">%s</text>",
+                label.x(),
+                label.y(),
+                attr(label.anchor()),
+                styleNumber(fontSize),
+                EDGE_LABEL_FONT_WEIGHT,
+                attr(backgroundFill),
+                styleNumber(EDGE_LABEL_OUTLINE_WIDTH),
+                text(text)));
+        output.append(String.format(
+                Locale.ROOT,
+                "<text x=\"%.1f\" y=\"%.1f\" text-anchor=\"%s\" fill=\"%s\" font-size=\"%s\" font-weight=\"%d\">%s</text>",
+                label.x(),
+                label.y(),
+                attr(label.anchor()),
+                attr(style.labelFill()),
+                styleNumber(fontSize),
+                EDGE_LABEL_FONT_WEIGHT,
+                text(text)));
+        return output.toString();
+    }
+
+    private static LabelBox edgeLabelBackgroundBox(EdgeLabel label) {
+        return label.bounds().expanded(EDGE_LABEL_BACKGROUND_PADDING_X, EDGE_LABEL_BACKGROUND_PADDING_Y);
+    }
+
+    private static LabelBox edgeLabelVisibleBox(EdgeLabel label, SvgEdgeLabelPresentation presentation) {
+        if (presentation == SvgEdgeLabelPresentation.BACKGROUND) {
+            return edgeLabelBackgroundBox(label);
+        }
+        return label.bounds().expanded(EDGE_LABEL_OUTLINE_WIDTH, EDGE_LABEL_OUTLINE_WIDTH);
+    }
+
+    private static double edgeLabelFontSize(double baseFontSize) {
+        return Math.round(baseFontSize * EDGE_LABEL_FONT_SIZE_SCALE * 10.0) / 10.0;
+    }
+
     private static String markerName(SvgEdgeMarkerEnd marker) {
         return marker.name().toLowerCase(Locale.ROOT);
     }
@@ -888,15 +962,32 @@ public final class Main {
         if (lineJumps.isEmpty()) {
             return roundedPathData(edge.points());
         }
+        return roundedPathDataWithLineJumps(edge.points(), lineJumps);
+    }
+
+    private static String roundedPathDataWithLineJumps(List<Point> points, List<LineJump> lineJumps) {
+        if (points.isEmpty()) {
+            return "";
+        }
+        if (points.size() == 1) {
+            Point only = points.getFirst();
+            return String.format(Locale.ROOT, "M %.1f %.1f", only.x(), only.y());
+        }
         StringBuilder data = new StringBuilder();
-        Point first = edge.points().get(0);
+        Point first = points.getFirst();
         data.append(String.format(Locale.ROOT, "M %.1f %.1f", first.x(), first.y()));
-        for (int index = 0; index < edge.points().size() - 1; index++) {
+        for (int index = 0; index < points.size() - 1; index++) {
             int segmentIndex = index;
-            Point start = edge.points().get(index);
-            Point end = edge.points().get(index + 1);
+            Point start = points.get(index);
+            Point end = points.get(index + 1);
+            RoundedCorner rounded = index + 2 < points.size()
+                    ? roundedCorner(start, end, points.get(index + 2))
+                    : null;
+            Point segmentEnd = rounded == null ? end : rounded.before();
+            double segmentEndProgress = segmentProgress(start, end, segmentEnd.x(), segmentEnd.y());
             List<LineJump> segmentJumps = lineJumps.stream()
                     .filter(jump -> jump.segmentIndex() == segmentIndex)
+                    .filter(jump -> segmentProgress(start, end, jump.x(), jump.y()) <= segmentEndProgress + 0.001)
                     .sorted((left, right) -> Double.compare(
                             segmentProgress(start, end, left.x(), left.y()),
                             segmentProgress(start, end, right.x(), right.y())))
@@ -904,7 +995,16 @@ public final class Main {
             for (LineJump jump : segmentJumps) {
                 data.append(" ").append(jump.pathPrefix(start, end));
             }
-            data.append(String.format(Locale.ROOT, " L %.1f %.1f", end.x(), end.y()));
+            data.append(String.format(Locale.ROOT, " L %.1f %.1f", segmentEnd.x(), segmentEnd.y()));
+            if (rounded != null) {
+                data.append(String.format(
+                        Locale.ROOT,
+                        " Q %.1f %.1f %.1f %.1f",
+                        end.x(),
+                        end.y(),
+                        rounded.after().x(),
+                        rounded.after().y()));
+            }
         }
         return data.toString();
     }
@@ -1096,7 +1196,8 @@ public final class Main {
             for (double offset : offsets) {
                 for (double x : xCandidates) {
                     EdgeLabel candidate = edgeLabelCandidate(x, segment.start().y() + offset, "middle", edge.label(), fontSize);
-                    if (occupiedBoxes.stream().noneMatch(candidate.bounds()::overlaps)) {
+                    LabelBox candidateBox = edgeLabelVisibleBox(candidate, style.labelPresentation());
+                    if (occupiedBoxes.stream().noneMatch(candidateBox::overlaps)) {
                         return candidate;
                     }
                 }
@@ -1198,13 +1299,19 @@ public final class Main {
             if (edge.label() == null || edge.label().isEmpty()) {
                 continue;
             }
-            EdgeLabel label = edgeLabel(edge, edgeStyle(policy, metadata, edge.id(), base), occupiedBoxes, base.fontSize());
+            ResolvedEdgeStyle style = edgeStyle(policy, metadata, edge.id(), base);
+            EdgeLabel label = edgeLabel(
+                    edge,
+                    style,
+                    occupiedBoxes,
+                    edgeLabelFontSize(base.fontSize()));
+            LabelBox labelBox = edgeLabelVisibleBox(label, style.labelPresentation());
             bounds.includeRect(
-                    label.bounds().minX(),
-                    label.bounds().minY(),
-                    label.bounds().width(),
-                    label.bounds().height());
-            occupiedBoxes.add(label.bounds());
+                    labelBox.minX(),
+                    labelBox.minY(),
+                    labelBox.width(),
+                    labelBox.height());
+            occupiedBoxes.add(labelBox);
         }
         if (bounds.isEmpty()) {
             bounds.includeRect(0.0, 0.0, policy.page().width(), policy.page().height());
@@ -1244,7 +1351,8 @@ public final class Main {
                 SvgEdgeLabelHorizontalPosition.NEAR_START,
                 SvgEdgeLabelHorizontalSide.AUTO,
                 SvgEdgeLabelVerticalPosition.CENTER,
-                SvgEdgeLabelVerticalSide.LEFT);
+                SvgEdgeLabelVerticalSide.LEFT,
+                SvgEdgeLabelPresentation.OUTLINE);
         var defaultGroup = new ResolvedGroupStyle("#eff6ff", "#93c5fd", 1.0, 8.0, "#1e3a8a", 12.0, null);
         return new ResolvedStyle(
                 Optional.ofNullable(style)
@@ -1337,7 +1445,8 @@ public final class Main {
                 override.labelVerticalPosition() == null
                         ? base.labelVerticalPosition()
                         : override.labelVerticalPosition(),
-                override.labelVerticalSide() == null ? base.labelVerticalSide() : override.labelVerticalSide());
+                override.labelVerticalSide() == null ? base.labelVerticalSide() : override.labelVerticalSide(),
+                override.labelPresentation() == null ? base.labelPresentation() : override.labelPresentation());
     }
 
     private static ResolvedGroupStyle mergeGroupStyle(ResolvedGroupStyle base, SvgGroupStyle override) {
@@ -1394,6 +1503,14 @@ public final class Main {
                     && maxX > other.minX
                     && minY < other.maxY
                     && maxY > other.minY;
+        }
+
+        LabelBox expanded(double horizontalPadding, double verticalPadding) {
+            return new LabelBox(
+                    minX - horizontalPadding,
+                    minY - verticalPadding,
+                    maxX + horizontalPadding,
+                    maxY + verticalPadding);
         }
 
         double width() {
@@ -1558,7 +1675,8 @@ public final class Main {
             SvgEdgeLabelHorizontalPosition labelHorizontalPosition,
             SvgEdgeLabelHorizontalSide labelHorizontalSide,
             SvgEdgeLabelVerticalPosition labelVerticalPosition,
-            SvgEdgeLabelVerticalSide labelVerticalSide) {
+            SvgEdgeLabelVerticalSide labelVerticalSide,
+            SvgEdgeLabelPresentation labelPresentation) {
     }
 
     private record ResolvedGroupStyle(

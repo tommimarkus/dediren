@@ -8,6 +8,7 @@ import dev.dediren.contracts.layout.*;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import org.eclipse.elk.alg.layered.options.EdgeStraighteningStrategy;
 import org.eclipse.elk.alg.layered.options.LayeredOptions;
@@ -1335,6 +1336,258 @@ class ElkLayoutEngineTest {
                 + orderEdge.points());
     }
 
+    @Test
+    void complexGroupedServiceMeshKeepsRoutesValidAndBounded() {
+        LayoutRequest request = new LayoutRequest(
+            "layout-request.schema.v1",
+            "service-mesh",
+            List.of(
+                new LayoutNode("customer-mobile", "Mobile App", "customer-mobile", 160.0, 80.0),
+                new LayoutNode("customer-web", "Web Customer", "customer-web", 160.0, 80.0),
+                new LayoutNode("support-agent", "Support Agent", "support-agent", 160.0, 80.0),
+                new LayoutNode("cdn", "CDN", "cdn", 160.0, 80.0),
+                new LayoutNode("web-frontend", "Web Frontend", "web-frontend", 160.0, 80.0),
+                new LayoutNode("admin-portal", "Admin Portal", "admin-portal", 160.0, 80.0),
+                new LayoutNode("api-gateway", "API Gateway", "api-gateway", 160.0, 112.0),
+                new LayoutNode("identity-service", "Identity Service", "identity-service", 160.0, 80.0),
+                new LayoutNode("pricing-service", "Pricing Service", "pricing-service", 160.0, 80.0),
+                new LayoutNode("order-service", "Order Service", "order-service", 160.0, 80.0),
+                new LayoutNode("catalog-service", "Catalog Service", "catalog-service", 160.0, 80.0),
+                new LayoutNode("fulfillment-worker", "Fulfillment Worker", "fulfillment-worker", 160.0, 80.0),
+                new LayoutNode("session-cache", "Session Cache", "session-cache", 160.0, 80.0),
+                new LayoutNode("product-db", "Product DB", "product-db", 160.0, 80.0),
+                new LayoutNode("order-db", "Order DB", "order-db", 160.0, 80.0),
+                new LayoutNode("payment-provider", "Payment Provider", "payment-provider", 160.0, 80.0),
+                new LayoutNode("email-provider", "Email Provider", "email-provider", 160.0, 80.0)),
+            List.of(
+                new LayoutEdge(
+                    "mobile-enters-cdn",
+                    "customer-mobile",
+                    "cdn",
+                    "uses",
+                    "mobile-enters-cdn",
+                    "Association"),
+                new LayoutEdge(
+                    "web-enters-cdn",
+                    "customer-web",
+                    "cdn",
+                    "uses",
+                    "web-enters-cdn",
+                    "Association"),
+                new LayoutEdge(
+                    "mobile-calls-gateway",
+                    "customer-mobile",
+                    "api-gateway",
+                    "uses API",
+                    "mobile-calls-gateway",
+                    "Serving"),
+                new LayoutEdge(
+                    "web-user-calls-gateway",
+                    "customer-web",
+                    "api-gateway",
+                    "uses API",
+                    "web-user-calls-gateway",
+                    "Serving"),
+                new LayoutEdge(
+                    "support-calls-gateway",
+                    "support-agent",
+                    "api-gateway",
+                    "uses API",
+                    "support-calls-gateway",
+                    "Serving"),
+                new LayoutEdge("cdn-serves-web", "cdn", "web-frontend", "serves", "cdn-serves-web", "Serving"),
+                new LayoutEdge(
+                    "frontend-calls-gateway",
+                    "web-frontend",
+                    "api-gateway",
+                    "calls",
+                    "frontend-calls-gateway",
+                    "Serving"),
+                new LayoutEdge(
+                    "admin-calls-gateway",
+                    "admin-portal",
+                    "api-gateway",
+                    "calls",
+                    "admin-calls-gateway",
+                    "Serving"),
+                new LayoutEdge(
+                    "gateway-authenticates",
+                    "api-gateway",
+                    "identity-service",
+                    "authenticates",
+                    "gateway-authenticates",
+                    "Serving"),
+                new LayoutEdge(
+                    "gateway-prices-cart",
+                    "api-gateway",
+                    "pricing-service",
+                    "prices cart",
+                    "gateway-prices-cart",
+                    "Serving"),
+                new LayoutEdge(
+                    "gateway-places-order",
+                    "api-gateway",
+                    "order-service",
+                    "places order",
+                    "gateway-places-order",
+                    "Serving"),
+                new LayoutEdge(
+                    "gateway-queries-catalog",
+                    "api-gateway",
+                    "catalog-service",
+                    "queries catalog",
+                    "gateway-queries-catalog",
+                    "Serving"),
+                new LayoutEdge(
+                    "order-requests-payment",
+                    "order-service",
+                    "payment-provider",
+                    "requests payment",
+                    "order-requests-payment",
+                    "Flow"),
+                new LayoutEdge(
+                    "payment-confirms-order",
+                    "payment-provider",
+                    "order-service",
+                    "confirms payment",
+                    "payment-confirms-order",
+                    "Flow"),
+                new LayoutEdge(
+                    "order-writes-order-db",
+                    "order-service",
+                    "order-db",
+                    "writes order",
+                    "order-writes-order-db",
+                    "Access"),
+                new LayoutEdge(
+                    "pricing-reads-products",
+                    "pricing-service",
+                    "product-db",
+                    "reads products",
+                    "pricing-reads-products",
+                    "Access"),
+                new LayoutEdge(
+                    "catalog-reads-products",
+                    "catalog-service",
+                    "product-db",
+                    "reads products",
+                    "catalog-reads-products",
+                    "Access"),
+                new LayoutEdge(
+                    "identity-caches-session",
+                    "identity-service",
+                    "session-cache",
+                    "caches session",
+                    "identity-caches-session",
+                    "Access"),
+                new LayoutEdge(
+                    "order-publishes-fulfillment",
+                    "order-service",
+                    "fulfillment-worker",
+                    "publishes fulfillment",
+                    "order-publishes-fulfillment",
+                    "Triggering"),
+                new LayoutEdge(
+                    "fulfillment-reads-order-db",
+                    "fulfillment-worker",
+                    "order-db",
+                    "loads order",
+                    "fulfillment-reads-order-db",
+                    "Access"),
+                new LayoutEdge(
+                    "fulfillment-sends-email",
+                    "fulfillment-worker",
+                    "email-provider",
+                    "sends email",
+                    "fulfillment-sends-email",
+                    "Flow")),
+            List.of(
+                new LayoutGroup(
+                    "users",
+                    "Users",
+                    List.of("customer-mobile", "customer-web", "support-agent"),
+                    GroupProvenance.semanticBacked("users")),
+                new LayoutGroup(
+                    "edge-platform",
+                    "Edge Platform",
+                    List.of("cdn", "web-frontend", "admin-portal", "api-gateway"),
+                    GroupProvenance.semanticBacked("edge-platform")),
+                new LayoutGroup(
+                    "core-services",
+                    "Core Services",
+                    List.of(
+                        "identity-service",
+                        "pricing-service",
+                        "order-service",
+                        "catalog-service",
+                        "fulfillment-worker"),
+                    GroupProvenance.semanticBacked("core-services")),
+                new LayoutGroup(
+                    "data-platform",
+                    "Data Platform",
+                    List.of("session-cache", "product-db", "order-db"),
+                    GroupProvenance.semanticBacked("data-platform")),
+                new LayoutGroup(
+                    "external-systems",
+                    "External Systems",
+                    List.of("payment-provider", "email-provider"),
+                    GroupProvenance.semanticBacked("external-systems"))),
+            List.of(),
+            List.of(),
+            new LayoutPreferences(
+                LayoutDirection.RIGHT,
+                LayoutDensity.SPACIOUS,
+                null,
+                new LayoutRoutingPreferences(
+                    LayoutRoutingStyle.ORTHOGONAL,
+                    LayoutRoutingProfile.SPACIOUS,
+                    LayoutEndpointMerging.AUTO)));
+
+        LayoutResult result = new ElkLayoutEngine().layout(request);
+        ElkLayoutRenderArtifacts.write(result);
+
+        assertEquals(List.of(), result.warnings());
+        assertEquals(17, result.nodes().size());
+        assertEquals(21, result.edges().size());
+        for (LaidOutEdge edge : result.edges()) {
+            assertRouteEndpointsOnNodePerimeters(result, edge.id());
+            assertTrue(
+                cornerCount(edge.points()) <= 8,
+                edge.id() + " should keep a bounded corner count, points=" + edge.points());
+        }
+        for (LaidOutGroup group : result.groups()) {
+            assertGroupContainsMembers(result, group);
+        }
+        assertEquals(
+            0,
+            connectorThroughNodeCount(result),
+            "complex service mesh routes should avoid unrelated nodes");
+        List<String> detourEdges = excessiveRouteDetourIds(result);
+        assertTrue(
+            detourEdges.isEmpty() || detourEdges.equals(List.of("payment-confirms-order")),
+            "complex service mesh routes should only allow the reverse payment feedback detour, got "
+                + detourEdges);
+        for (String edgeId : List.of(
+            "mobile-calls-gateway",
+            "web-user-calls-gateway",
+            "support-calls-gateway")) {
+            assertEquals(
+                List.of("shared_target_junction"),
+                edgeById(result, edgeId).routingHints(),
+                "user entry routes should share the API gateway target endpoint");
+        }
+        for (String edgeId : List.of(
+            "gateway-authenticates",
+            "gateway-prices-cart",
+            "gateway-places-order",
+            "gateway-queries-catalog")) {
+            assertEquals(
+                List.of("shared_source_junction"),
+                edgeById(result, edgeId).routingHints(),
+                "gateway fan-out routes should share the gateway source endpoint");
+        }
+    }
+
     private static void assertRouted(LaidOutEdge edge) {
         assertTrue(
             edge.points().size() >= 2,
@@ -1589,20 +1842,28 @@ class ElkLayoutEngineTest {
     }
 
     private static int excessiveRouteDetourCount(LayoutResult result) {
-        int count = 0;
+        return excessiveRouteDetourIds(result).size();
+    }
+
+    private static List<String> excessiveRouteDetourIds(LayoutResult result) {
+        List<String> ids = new ArrayList<>();
         for (LaidOutEdge edge : result.edges()) {
-            if (edge.points().size() < 2) {
-                continue;
-            }
-            double routeLength = routeLength(edge.points());
-            Point start = edge.points().get(0);
-            Point end = edge.points().get(edge.points().size() - 1);
-            double directLength = Math.abs(start.x() - end.x()) + Math.abs(start.y() - end.y());
-            if (directLength > 0.0 && routeLength > directLength * 1.5 && routeLength - directLength > 240.0) {
-                count++;
+            if (hasExcessiveRouteDetour(edge)) {
+                ids.add(edge.id());
             }
         }
-        return count;
+        return ids;
+    }
+
+    private static boolean hasExcessiveRouteDetour(LaidOutEdge edge) {
+        if (edge.points().size() < 2) {
+            return false;
+        }
+        double routeLength = routeLength(edge.points());
+        Point start = edge.points().get(0);
+        Point end = edge.points().get(edge.points().size() - 1);
+        double directLength = Math.abs(start.x() - end.x()) + Math.abs(start.y() - end.y());
+        return directLength > 0.0 && routeLength > directLength * 1.5 && routeLength - directLength > 240.0;
     }
 
     private static int routeCrossingCountNearSource(

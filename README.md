@@ -46,8 +46,8 @@ release workflows cache that path separately from Maven artifacts.
 The `dist-build` profile creates an agent-ready archive under `dist/`:
 
 ```text
-dist/dediren-agent-bundle-0.18.2-x86_64-unknown-linux-gnu/
-dist/dediren-agent-bundle-0.18.2-x86_64-unknown-linux-gnu.tar.gz
+dist/dediren-agent-bundle-0.19.0-x86_64-unknown-linux-gnu/
+dist/dediren-agent-bundle-0.19.0-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Set a supported target with `DEDIREN_DIST_TARGET` when needed:
@@ -69,7 +69,7 @@ target must match the build host.
 ## Bundle Layout
 
 ```text
-dediren-agent-bundle-0.18.2-x86_64-unknown-linux-gnu/
+dediren-agent-bundle-0.19.0-x86_64-unknown-linux-gnu/
   bin/
     dediren
     dediren-plugin-generic-graph
@@ -101,7 +101,7 @@ the caller's current working directory.
 From an unpacked bundle:
 
 ```bash
-VERSION=0.18.2
+VERSION=0.19.0
 TARGET=x86_64-unknown-linux-gnu
 BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-${VERSION}-${TARGET}
 
@@ -172,7 +172,9 @@ Commands:
 Authored source graph JSON is semantic and plugin-typed. Do not put absolute
 positions, sizes, colors, fonts, or SVG shape choices in source JSON. Layout
 requests express layout intent. Layout results contain generated geometry.
-Render policies own SVG styling.
+Render policies own SVG styling. Edge labels default to outlined text; set
+`style.edge.label_presentation` to `background` when a filled label backing is
+preferred.
 
 The smallest useful source model is `fixtures/source/valid-basic.json`. Larger
 models can use relative file fragments declared in the source model; fragments

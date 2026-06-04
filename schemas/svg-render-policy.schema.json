@@ -218,6 +218,10 @@
         "label_vertical_side": {
           "type": "string",
           "enum": ["left", "right"]
+        },
+        "label_presentation": {
+          "type": "string",
+          "enum": ["outline", "background"]
         }
       }
     },
