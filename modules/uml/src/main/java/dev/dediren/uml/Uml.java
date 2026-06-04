@@ -8,6 +8,7 @@ import dev.dediren.contracts.source.SourceNode;
 import dev.dediren.contracts.source.SourceRelationship;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Set;
 
 public final class Uml {
     private static final List<String> STRUCTURAL_TYPES = List.of(
@@ -33,6 +34,10 @@ public final class Uml {
             "MergeNode",
             "ForkNode",
             "JoinNode");
+    private static final Set<String> SEQUENCE_TYPES = Set.of(
+            "Interaction",
+            "Lifeline",
+            "DestructionOccurrenceSpecification");
     private static final List<String> RELATIONSHIP_TYPES = List.of(
             "Association",
             "Composition",
@@ -41,7 +46,8 @@ public final class Uml {
             "Realization",
             "Dependency",
             "ControlFlow",
-            "ObjectFlow");
+            "ObjectFlow",
+            "Message");
     private static final List<String> STRUCTURAL_RELATIONSHIP_TYPES = List.of(
             "Association",
             "Composition",
@@ -50,6 +56,13 @@ public final class Uml {
             "Realization",
             "Dependency");
     private static final List<String> ACTIVITY_FLOW_TYPES = List.of("ControlFlow", "ObjectFlow");
+    private static final Set<String> MESSAGE_SORTS = Set.of(
+            "synchCall",
+            "asynchCall",
+            "asynchSignal",
+            "reply",
+            "createMessage",
+            "deleteMessage");
 
     private Uml() {
     }
@@ -87,6 +100,10 @@ public final class Uml {
             SourceRelationship relationship = source.relationships().get(relationshipIndex);
             validateRelationshipType(relationship.type(), "$.relationships[" + relationshipIndex + "].type");
             validateRelationshipMultiplicities(relationshipIndex, relationship.properties().get("uml"));
+            validateRelationshipProperties(
+                    relationship.type(),
+                    relationship.properties().get("uml"),
+                    "$.relationships[" + relationshipIndex + "]");
             String sourceType = nodeTypes.get(relationship.source());
             String targetType = nodeTypes.get(relationship.target());
             if (sourceType == null || targetType == null) {
@@ -104,9 +121,6 @@ public final class Uml {
             if (view.kind() == null) {
                 continue;
             }
-            validateViewKind(
-                    view.kind(),
-                    "$.plugins.generic-graph.views[" + viewIndex + "].kind");
             for (int nodeIndex = 0; nodeIndex < view.nodes().size(); nodeIndex++) {
                 String nodeType = nodeTypes.get(view.nodes().get(nodeIndex));
                 if (nodeType == null) {
@@ -121,7 +135,7 @@ public final class Uml {
     }
 
     public static void validateElementType(String value, String path) throws UmlValidationException {
-        if (!isStructuralType(value) && !isActivityType(value)) {
+        if (!isStructuralType(value) && !isActivityType(value) && !isSequenceType(value)) {
             throw new UmlValidationException(UmlTypeKind.ELEMENT, value, path);
         }
     }
@@ -142,6 +156,8 @@ public final class Uml {
             endpointsSupported = isStructuralType(sourceType) && isStructuralType(targetType);
         } else if (ACTIVITY_FLOW_TYPES.contains(relationshipType)) {
             endpointsSupported = isActivityType(sourceType) && isActivityType(targetType);
+        } else if ("Message".equals(relationshipType)) {
+            endpointsSupported = isMessageEndpoint(sourceType, targetType);
         } else {
             endpointsSupported = false;
         }
@@ -151,6 +167,14 @@ public final class Uml {
                     relationshipType + ": " + sourceType + " -> " + targetType,
                     path);
         }
+    }
+
+    public static void validateRelationshipProperties(String relationshipType, JsonNode umlProperties, String path)
+            throws UmlValidationException {
+        if (!"Message".equals(relationshipType)) {
+            return;
+        }
+        validateMessageProperties(umlProperties, path);
     }
 
     public static void validateMultiplicity(String value, String path) throws UmlValidationException {
@@ -200,12 +224,37 @@ public final class Uml {
         validateMultiplicity(value.asText(), path);
     }
 
-    private static void validateViewKind(GenericGraphViewKind viewKind, String path) throws UmlValidationException {
-        if (viewKind == GenericGraphViewKind.UML_SEQUENCE) {
+    private static void validateMessageProperties(JsonNode umlProperties, String path)
+            throws UmlValidationException {
+        String umlPath = path + ".properties.uml";
+        if (umlProperties == null || !umlProperties.isObject()) {
             throw new UmlValidationException(
-                    UmlTypeKind.VIEW_KIND,
-                    viewKindName(viewKind),
-                    path);
+                    UmlTypeKind.RELATIONSHIP,
+                    "Message.sequence",
+                    umlPath + ".sequence");
+        }
+
+        JsonNode sequence = umlProperties.get("sequence");
+        if (sequence == null) {
+            throw new UmlValidationException(
+                    UmlTypeKind.RELATIONSHIP,
+                    "Message.sequence",
+                    umlPath + ".sequence");
+        }
+        if (!sequence.isIntegralNumber() || sequence.bigIntegerValue().signum() < 1) {
+            throw new UmlValidationException(
+                    UmlTypeKind.RELATIONSHIP,
+                    sequence.toString(),
+                    umlPath + ".sequence");
+        }
+
+        JsonNode messageSort = umlProperties.get("message_sort");
+        if (messageSort != null
+                && (!messageSort.isTextual() || !MESSAGE_SORTS.contains(messageSort.asText()))) {
+            throw new UmlValidationException(
+                    UmlTypeKind.RELATIONSHIP,
+                    messageSort.isTextual() ? messageSort.asText() : messageSort.toString(),
+                    umlPath + ".message_sort");
         }
     }
 
@@ -215,7 +264,7 @@ public final class Uml {
             case GENERIC, ARCHIMATE -> true;
             case UML_CLASS, UML_DATA -> isStructuralType(nodeType);
             case UML_ACTIVITY -> isActivityType(nodeType);
-            case UML_SEQUENCE -> false;
+            case UML_SEQUENCE -> isSequenceType(nodeType);
         };
         if (!supported) {
             throw new UmlValidationException(
@@ -267,6 +316,15 @@ public final class Uml {
 
     private static boolean isActivityType(String value) {
         return ACTIVITY_TYPES.contains(value);
+    }
+
+    private static boolean isSequenceType(String value) {
+        return SEQUENCE_TYPES.contains(value);
+    }
+
+    private static boolean isMessageEndpoint(String sourceType, String targetType) {
+        return "Lifeline".equals(sourceType)
+                && ("Lifeline".equals(targetType) || "DestructionOccurrenceSpecification".equals(targetType));
     }
 
     private static String viewKindName(GenericGraphViewKind kind) {
