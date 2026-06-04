@@ -104,6 +104,9 @@ public final class Uml {
             if (view.kind() == null) {
                 continue;
             }
+            validateViewKind(
+                    view.kind(),
+                    "$.plugins.generic-graph.views[" + viewIndex + "].kind");
             for (int nodeIndex = 0; nodeIndex < view.nodes().size(); nodeIndex++) {
                 String nodeType = nodeTypes.get(view.nodes().get(nodeIndex));
                 if (nodeType == null) {
@@ -195,6 +198,15 @@ public final class Uml {
             throw new UmlValidationException(UmlTypeKind.MULTIPLICITY, value.toString(), path);
         }
         validateMultiplicity(value.asText(), path);
+    }
+
+    private static void validateViewKind(GenericGraphViewKind viewKind, String path) throws UmlValidationException {
+        if (viewKind == GenericGraphViewKind.UML_SEQUENCE) {
+            throw new UmlValidationException(
+                    UmlTypeKind.VIEW_KIND,
+                    viewKindName(viewKind),
+                    path);
+        }
     }
 
     private static void validateViewNodeType(GenericGraphViewKind viewKind, String nodeType, String path)

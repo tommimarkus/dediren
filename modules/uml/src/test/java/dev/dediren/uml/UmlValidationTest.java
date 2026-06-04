@@ -127,7 +127,32 @@ class UmlValidationTest {
                 () -> Uml.validateSource(fixture.source(), data));
 
         assertThat(error.code()).isEqualTo("DEDIREN_UML_VIEW_KIND_UNSUPPORTED_ELEMENT");
-        assertThat(error.value()).isEqualTo("Package in uml-sequence");
+        assertThat(error.value()).isEqualTo("uml-sequence");
+        assertThat(error.path()).isEqualTo("$.plugins.generic-graph.views[0].kind");
+    }
+
+    @Test
+    void rejectsEmptySequenceViewsUntilSequenceValidationIsImplemented() throws Exception {
+        Fixture fixture = loadUmlFixture();
+        var views = new java.util.ArrayList<>(fixture.pluginData().views());
+        var view = views.getFirst();
+        views.set(0, new dev.dediren.contracts.source.GenericGraphView(
+                view.id(),
+                view.label(),
+                dev.dediren.contracts.source.GenericGraphViewKind.UML_SEQUENCE,
+                java.util.List.of(),
+                java.util.List.of(),
+                view.layoutPreferences(),
+                view.groups()));
+        var data = new GenericGraphPluginData(fixture.pluginData().semanticProfile(), views);
+
+        UmlValidationException error = org.junit.jupiter.api.Assertions.assertThrows(
+                UmlValidationException.class,
+                () -> Uml.validateSource(fixture.source(), data));
+
+        assertThat(error.code()).isEqualTo("DEDIREN_UML_VIEW_KIND_UNSUPPORTED_ELEMENT");
+        assertThat(error.value()).isEqualTo("uml-sequence");
+        assertThat(error.path()).isEqualTo("$.plugins.generic-graph.views[0].kind");
     }
 
     private static Fixture loadUmlFixture() throws Exception {
