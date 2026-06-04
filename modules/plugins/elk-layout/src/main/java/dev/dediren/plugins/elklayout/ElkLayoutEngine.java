@@ -69,20 +69,27 @@ final class ElkLayoutEngine {
 
     private static LayoutResult layoutFlat(LayoutRequest request) {
         LayoutPreferences preferences = request.layoutPreferences();
-        Direction layoutDirection = ElkLayeredOptions.preferredDirection(preferences);
+        SequenceLayoutConstraints sequenceConstraints = SequenceLayoutConstraints.from(request);
+        Direction layoutDirection = sequenceConstraints.active()
+            ? Direction.RIGHT
+            : ElkLayeredOptions.preferredDirection(preferences);
         ElkNode root = ElkGraphUtil.createGraph();
         ElkLayeredOptions.configureRoot(root, layoutDirection, preferences);
 
         Map<String, LayoutNode> requestNodes = requestNodesById(request);
-        List<LayoutEdge> requestEdges = list(request.edges());
+        List<LayoutEdge> requestEdges = sequenceConstraints.orderedEdges(list(request.edges()));
         Map<String, EdgeEndpointMerge> endpointMerges =
-            flatEdgeEndpointMerges(requestEdges, requestNodes, preferences);
+            sequenceConstraints.active()
+                ? emptyEndpointMerges(requestEdges)
+                : flatEdgeEndpointMerges(requestEdges, requestNodes, preferences);
         Map<String, EdgeEndpointSides> endpointSides =
-            flatEdgeEndpointSides(requestEdges, requestNodes, endpointMerges, layoutDirection);
+            sequenceConstraints.active()
+                ? sequenceEdgeEndpointSides(requestEdges, requestNodes, sequenceConstraints)
+                : flatEdgeEndpointSides(requestEdges, requestNodes, endpointMerges, layoutDirection);
         Map<String, EnumMap<PortSide, Integer>> portCounts =
             flatPortCounts(requestEdges, requestNodes, endpointMerges, endpointSides);
         Map<String, ElkNode> elkNodes = new HashMap<>();
-        for (LayoutNode node : list(request.nodes())) {
+        for (LayoutNode node : sequenceConstraints.orderedNodes(list(request.nodes()))) {
             ElkNode elkNode = ElkGraphUtil.createNode(root);
             elkNode.setIdentifier(node.id());
             setGeneratedDimensions(elkNode, node, portCounts.get(node.id()), preferences);
@@ -163,13 +170,14 @@ final class ElkLayoutEngine {
         List<LaidOutGroup> groups =
             groups(request, nodes, warnings);
 
-        return new LayoutResult(
+        LayoutResult result = new LayoutResult(
             "layout-result.schema.v1",
             request.viewId(),
             nodes,
             edges,
             groups,
             warnings);
+        return sequenceConstraints.normalize(result);
     }
 
     private static LayoutResult layoutPacked(LayoutRequest request) {
@@ -528,6 +536,23 @@ final class ElkLayoutEngine {
                 targetSide = connectorBranchSide(direction, false, incomingIndex);
             }
             sidesByEdge.put(edge.id(), new EdgeEndpointSides(sourceSide, targetSide));
+        }
+        return sidesByEdge;
+    }
+
+    private static Map<String, EdgeEndpointSides> sequenceEdgeEndpointSides(
+        List<LayoutEdge> edges,
+        Map<String, LayoutNode> nodes,
+        SequenceLayoutConstraints sequenceConstraints) {
+        Map<String, EdgeEndpointSides> sidesByEdge = new HashMap<>();
+        EdgeEndpointSides defaultSides = defaultEndpointSides(Direction.RIGHT);
+        for (LayoutEdge edge : edges) {
+            if (!nodes.containsKey(edge.source()) || !nodes.containsKey(edge.target())) {
+                continue;
+            }
+            sidesByEdge.put(edge.id(), new EdgeEndpointSides(
+                sequenceConstraints.sourcePortSide(edge, defaultSides.sourceSide()),
+                sequenceConstraints.targetPortSide(edge, defaultSides.targetSide())));
         }
         return sidesByEdge;
     }

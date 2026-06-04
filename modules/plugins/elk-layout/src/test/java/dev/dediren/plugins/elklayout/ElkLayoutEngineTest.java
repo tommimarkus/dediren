@@ -124,6 +124,68 @@ class ElkLayoutEngineTest {
     }
 
     @Test
+    void laysOutSequenceLifelinesInConstraintOrder() {
+        LayoutResult result = new ElkLayoutEngine().layout(sequenceLayoutRequest());
+        ElkLayoutRenderArtifacts.write(result);
+        LaidOutNode customer = nodeById(result, "customer");
+        LaidOutNode service = nodeById(result, "service");
+
+        assertTrue(
+            customer.x() < service.x(),
+            "sequence lifelines should follow constraint order, customer="
+                + customer
+                + ", service="
+                + service);
+        assertEquals(
+            customer.y(),
+            service.y(),
+            PORT_SIDE_EPSILON,
+            "sequence lifeline heads should stay in one horizontal band");
+    }
+
+    @Test
+    void laysOutSequenceMessagesInConstraintOrder() {
+        LayoutResult result = new ElkLayoutEngine().layout(sequenceLayoutRequest());
+        ElkLayoutRenderArtifacts.write(result);
+        double firstMessageY = firstSegmentY(edgeById(result, "m1"));
+        double secondMessageY = firstSegmentY(edgeById(result, "m2"));
+        double thirdMessageY = firstSegmentY(edgeById(result, "m3"));
+
+        assertTrue(
+            firstMessageY < secondMessageY && secondMessageY < thirdMessageY,
+            "sequence message routes should follow constraint order, m1="
+                + edgeById(result, "m1").points()
+                + ", m2="
+                + edgeById(result, "m2").points()
+                + ", m3="
+                + edgeById(result, "m3").points());
+    }
+
+    @Test
+    void ignoresSequenceConstraintsForNonSequenceGraphs() {
+        LayoutRequest unconstrained = genericTwoNodeRequest(List.of());
+        LayoutRequest constrained = genericTwoNodeRequest(List.of(new LayoutConstraint(
+            "main.uml.sequence.lifeline-order",
+            "uml.sequence.lifeline-order",
+            List.of("service", "customer"))));
+
+        LayoutResult baseline = new ElkLayoutEngine().layout(unconstrained);
+        LayoutResult constrainedResult = new ElkLayoutEngine().layout(constrained);
+        ElkLayoutRenderArtifacts.write(constrainedResult);
+
+        assertEquals(
+            nodeById(baseline, "customer").x(),
+            nodeById(constrainedResult, "customer").x(),
+            GEOMETRY_EPSILON,
+            "partial sequence constraints must not affect ordinary graph layout");
+        assertEquals(
+            nodeById(baseline, "service").x(),
+            nodeById(constrainedResult, "service").x(),
+            GEOMETRY_EPSILON,
+            "partial sequence constraints must not affect ordinary graph layout");
+    }
+
+    @Test
     void packedLayoutPlacesDisconnectedNodesWithoutEdgesOrOverlaps() {
         LayoutRequest request = new LayoutRequest(
             "layout-request.schema.v1",
@@ -1679,6 +1741,68 @@ class ElkLayoutEngineTest {
                 edgeById(result, edgeId).routingHints(),
                 "gateway fan-out routes should share the gateway source endpoint");
         }
+    }
+
+    private static LayoutRequest sequenceLayoutRequest() {
+        return new LayoutRequest(
+            "layout-request.schema.v1",
+            "sequence-view",
+            List.of(
+                new LayoutNode("service", "Order Service", "service", 140.0, 48.0),
+                new LayoutNode(
+                    "interaction-place-order",
+                    "Place Order",
+                    "interaction-place-order",
+                    360.0,
+                    260.0),
+                new LayoutNode("customer", "Customer", "customer", 140.0, 48.0)),
+            List.of(
+                new LayoutEdge("m3", "service", "customer", "receiptReady", "m3", "Message"),
+                new LayoutEdge("m2", "service", "customer", "accepted", "m2", "Message"),
+                new LayoutEdge("m1", "customer", "service", "placeOrder", "m1", "Message")),
+            List.of(),
+            List.of(),
+            List.of(
+                new LayoutConstraint(
+                    "sequence-view.uml.sequence.lifeline-order",
+                    "uml.sequence.lifeline-order",
+                    List.of("customer", "service")),
+                new LayoutConstraint(
+                    "sequence-view.uml.sequence.message-order",
+                    "uml.sequence.message-order",
+                    List.of("m1", "m2", "m3"))),
+            new LayoutPreferences(
+                LayoutDirection.RIGHT,
+                LayoutDensity.READABLE,
+                null,
+                new LayoutRoutingPreferences(
+                    LayoutRoutingStyle.ORTHOGONAL,
+                    LayoutRoutingProfile.READABLE,
+                    LayoutEndpointMerging.OFF)));
+    }
+
+    private static LayoutRequest genericTwoNodeRequest(List<LayoutConstraint> constraints) {
+        return new LayoutRequest(
+            "layout-request.schema.v1",
+            "main",
+            List.of(
+                new LayoutNode("customer", "Customer", "customer", 160.0, 80.0),
+                new LayoutNode("service", "Service", "service", 160.0, 80.0)),
+            List.of(new LayoutEdge(
+                "customer-calls-service",
+                "customer",
+                "service",
+                "calls",
+                "customer-calls-service")),
+            List.of(),
+            List.of(),
+            constraints,
+            null);
+    }
+
+    private static double firstSegmentY(LaidOutEdge edge) {
+        assertRouted(edge);
+        return edge.points().get(0).y();
     }
 
     private static void assertRouted(LaidOutEdge edge) {
