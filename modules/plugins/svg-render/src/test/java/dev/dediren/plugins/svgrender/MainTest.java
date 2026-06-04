@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import dev.dediren.contracts.json.JsonSupport;
+import dev.dediren.testsupport.SchemaAssertions;
 import java.io.StringReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -45,6 +46,15 @@ class MainTest {
 
             assertThat(data.at("/render_result_schema_version").asText()).isEqualTo("render-result.schema.v1");
             assertThat(content).contains("<svg", "Client", "API");
+        }
+
+        @Test
+        void umlPolicyFixtureMatchesSvgPolicySchema() {
+            assertThat(SchemaAssertions.validateFixture(
+                    workspaceRoot(),
+                    "schemas/svg-render-policy.schema.json",
+                    "fixtures/render-policy/uml-svg.json"))
+                    .isEmpty();
         }
 
         @Test

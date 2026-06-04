@@ -157,7 +157,12 @@
             "uml_merge_node",
             "uml_fork_node",
             "uml_join_node",
-            "uml_object_node"
+            "uml_object_node",
+            "uml_interaction",
+            "uml_lifeline",
+            "uml_execution_specification",
+            "uml_gate",
+            "uml_destruction_occurrence"
           ]
         }
       }
