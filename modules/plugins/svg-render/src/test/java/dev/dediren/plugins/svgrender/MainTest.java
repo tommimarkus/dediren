@@ -628,6 +628,9 @@ class MainTest {
             for (var fields = nodeStyles.fields(); fields.hasNext(); ) {
                 var field = fields.next();
                 String nodeType = field.getKey();
+                if (isSequenceNodeType(nodeType)) {
+                    continue;
+                }
                 String id = "uml-node-" + index;
                 nodes.add(JsonSupport.objectMapper().readTree("""
                         {
@@ -663,6 +666,9 @@ class MainTest {
             for (var fields = nodeStyles.fields(); fields.hasNext(); ) {
                 var field = fields.next();
                 String id = "uml-node-" + index;
+                if (isSequenceNodeType(field.getKey())) {
+                    continue;
+                }
                 String expectedDecorator = field.getValue().at("/decorator").asText();
                 Element node = groupWithAttribute(document, "data-dediren-node-id", id);
                 Element shape = firstElementWithAttribute(node, "data-dediren-node-shape");
@@ -671,6 +677,46 @@ class MainTest {
                 index++;
             }
             assertThat(content).contains("&#171;interface&#187;", "&#171;dataType&#187;", "&#171;enumeration&#187;");
+        }
+
+        @Test
+        void rendersUmlSequenceDiagramLayers() throws Exception {
+            String content = okContent(render(umlSequenceStyleInput()));
+            Document document = svgDocument(content);
+
+            assertThat(content).contains(">Place Order<", ">Customer<", ">Order Service<");
+
+            Element customerStem = elementWithAttribute(
+                    document,
+                    "line",
+                    "data-dediren-sequence-lifeline-stem",
+                    "customer");
+            Element serviceStem = elementWithAttribute(
+                    document,
+                    "line",
+                    "data-dediren-sequence-lifeline-stem",
+                    "service");
+            assertThat(customerStem.getAttribute("stroke-dasharray")).isEqualTo("8 5");
+            assertThat(serviceStem.getAttribute("stroke-dasharray")).isEqualTo("8 5");
+
+            assertThat(edgeLabelsInDomOrder(document))
+                    .containsExactly("placeOrder", "accepted", "receiptReady", "cancelOrder");
+
+            Element reply = firstChildElement(groupWithAttribute(document, "data-dediren-edge-id", "m2"), "path");
+            assertThat(reply.getAttribute("stroke-dasharray")).isEqualTo("8 5");
+            assertMarkerForStyle(document, reply, "m2", "end", "open_arrow");
+
+            Element synchCall = firstChildElement(groupWithAttribute(document, "data-dediren-edge-id", "m1"), "path");
+            assertMarkerForStyle(document, synchCall, "m1", "end", "filled_arrow");
+
+            Element asyncSignal = firstChildElement(groupWithAttribute(document, "data-dediren-edge-id", "m3"), "path");
+            assertMarkerForStyle(document, asyncSignal, "m3", "end", "open_arrow");
+
+            Element deleteMarker = groupWithAttribute(
+                    document,
+                    "data-dediren-sequence-delete-marker",
+                    "service-destroyed");
+            assertThat(childElements(deleteMarker, "line")).hasSize(2);
         }
 
         @Test
@@ -1214,6 +1260,22 @@ class MainTest {
         return input;
     }
 
+    private static JsonNode umlSequenceStyleInput() throws Exception {
+        ObjectNode input = JsonSupport.objectMapper().createObjectNode();
+        input.set("layout_result", fixtureJson("fixtures/layout-result/uml-sequence-basic.json"));
+        input.set("render_metadata", fixtureJson("fixtures/render-metadata/uml-sequence-basic.json"));
+        input.set("policy", fixtureJson("fixtures/render-policy/uml-svg.json"));
+        return input;
+    }
+
+    private static boolean isSequenceNodeType(String type) {
+        return type.equals("Interaction")
+                || type.equals("Lifeline")
+                || type.equals("ExecutionSpecification")
+                || type.equals("Gate")
+                || type.equals("DestructionOccurrenceSpecification");
+    }
+
     private static JsonNode archimateRenderInput(
             JsonNode policy,
             String nodes,
@@ -1277,6 +1339,9 @@ class MainTest {
         int index = 0;
         for (var fields = edgeStyles.fields(); fields.hasNext(); ) {
             String relationshipType = fields.next().getKey();
+            if (isSequenceRelationshipType(semanticProfile, relationshipType)) {
+                continue;
+            }
             String id = semanticProfile + "-relationship-" + index;
             int y = 60 + index * 48;
             edges.add(JsonSupport.objectMapper().readTree("""
@@ -1313,6 +1378,9 @@ class MainTest {
         index = 0;
         for (var fields = edgeStyles.fields(); fields.hasNext(); ) {
             var field = fields.next();
+            if (isSequenceRelationshipType(semanticProfile, field.getKey())) {
+                continue;
+            }
             String id = semanticProfile + "-relationship-" + index;
             JsonNode style = field.getValue();
             Element edge = groupWithAttribute(document, "data-dediren-edge-id", id);
@@ -1324,6 +1392,10 @@ class MainTest {
             }
             index++;
         }
+    }
+
+    private static boolean isSequenceRelationshipType(String semanticProfile, String relationshipType) {
+        return "uml".equals(semanticProfile) && "Message".equals(relationshipType);
     }
 
     private static void assertMarkerForStyle(
@@ -1432,6 +1504,33 @@ class MainTest {
             }
         }
         throw new AssertionError("expected marker " + id);
+    }
+
+    private static Element elementWithAttribute(Document document, String tagName, String name, String value) {
+        var elements = document.getElementsByTagName(tagName);
+        for (int index = 0; index < elements.getLength(); index++) {
+            Element element = (Element) elements.item(index);
+            if (value.equals(element.getAttribute(name))) {
+                return element;
+            }
+        }
+        throw new AssertionError("expected <" + tagName + "> with " + name + "=" + value);
+    }
+
+    private static java.util.List<String> edgeLabelsInDomOrder(Document document) {
+        var labels = new java.util.ArrayList<String>();
+        var groups = document.getElementsByTagName("g");
+        for (int index = 0; index < groups.getLength(); index++) {
+            Element group = (Element) groups.item(index);
+            if (!group.hasAttribute("data-dediren-edge-id")) {
+                continue;
+            }
+            var texts = childElements(group, "text");
+            if (!texts.isEmpty()) {
+                labels.add(texts.get(0).getTextContent());
+            }
+        }
+        return labels;
     }
 
     private static java.util.List<Element> childElements(Element parent, String tagName) {

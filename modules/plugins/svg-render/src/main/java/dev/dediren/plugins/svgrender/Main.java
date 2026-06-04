@@ -129,6 +129,9 @@ public final class Main {
     }
 
     private static String renderSvg(LayoutResult result, RenderMetadata metadata, RenderPolicy policy) {
+        if (UmlSequenceRenderer.isSequence(metadata)) {
+            return new UmlSequenceRenderer(result, metadata, policy).render();
+        }
         ResolvedStyle base = baseStyle(policy);
         SvgBounds bounds = svgBounds(result, metadata, policy, base);
         StringBuilder svg = new StringBuilder();

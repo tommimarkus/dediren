@@ -154,5 +154,15 @@ public enum SvgNodeDecorator {
     @JsonProperty("uml_join_node")
     UML_JOIN_NODE,
     @JsonProperty("uml_object_node")
-    UML_OBJECT_NODE
+    UML_OBJECT_NODE,
+    @JsonProperty("uml_interaction")
+    UML_INTERACTION,
+    @JsonProperty("uml_lifeline")
+    UML_LIFELINE,
+    @JsonProperty("uml_execution_specification")
+    UML_EXECUTION_SPECIFICATION,
+    @JsonProperty("uml_gate")
+    UML_GATE,
+    @JsonProperty("uml_destruction_occurrence")
+    UML_DESTRUCTION_OCCURRENCE
 }
