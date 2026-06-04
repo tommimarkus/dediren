@@ -6,6 +6,7 @@ import dev.dediren.contracts.layout.LaidOutNode;
 import dev.dediren.contracts.layout.LayoutResult;
 import dev.dediren.contracts.render.RenderMetadata;
 import dev.dediren.contracts.render.RenderMetadataSelector;
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -48,7 +49,7 @@ record UmlSequenceModel(
             if (selector == null || !"Message".equals(selector.type())) {
                 continue;
             }
-            long fallbackSequence = index + 1L;
+            BigInteger fallbackSequence = BigInteger.valueOf(index + 1L);
             messages.add(new SequenceMessage(
                     edge,
                     selector,
@@ -56,15 +57,15 @@ record UmlSequenceModel(
                     messageSort(selector.properties()),
                     index));
         }
-        messages.sort(Comparator.comparingLong(SequenceMessage::sequence)
+        messages.sort(Comparator.comparing(SequenceMessage::sequence)
                 .thenComparingInt(SequenceMessage::sourceOrder));
 
         return new UmlSequenceModel(interactions, lifelines, executions, gates, destructions, messages);
     }
 
-    private static long sequence(JsonNode properties, long fallback) {
+    private static BigInteger sequence(JsonNode properties, BigInteger fallback) {
         JsonNode value = properties == null ? null : properties.get("sequence");
-        return value != null && value.canConvertToLong() ? value.asLong() : fallback;
+        return value != null && value.isIntegralNumber() ? value.bigIntegerValue() : fallback;
     }
 
     private static String messageSort(JsonNode properties) {
@@ -78,7 +79,7 @@ record UmlSequenceModel(
     record SequenceMessage(
             LaidOutEdge edge,
             RenderMetadataSelector selector,
-            long sequence,
+            BigInteger sequence,
             String messageSort,
             int sourceOrder) {
     }

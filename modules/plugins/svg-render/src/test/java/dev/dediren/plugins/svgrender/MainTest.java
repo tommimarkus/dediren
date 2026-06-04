@@ -775,6 +775,19 @@ class MainTest {
         }
 
         @Test
+        void ordersUmlSequenceMessagesWithLargeIntegralSequence() throws Exception {
+            JsonNode input = umlSequenceStyleInput();
+            ((ObjectNode) input.at("/render_metadata/edges/m1/properties"))
+                    .set("sequence", JsonSupport.objectMapper().getNodeFactory()
+                            .numberNode(new java.math.BigInteger("9223372036854775808")));
+
+            Document document = svgDocument(okContent(render(input)));
+
+            assertThat(edgeLabelsInDomOrder(document))
+                    .containsExactly("accepted", "receiptReady", "createReceipt", "cancelOrder", "placeOrder");
+        }
+
+        @Test
         void coversEachRelationshipTypeFromPolicies() throws Exception {
             assertRelationshipPolicyCoverage("archimate", "fixtures/render-policy/archimate-svg.json");
             assertRelationshipPolicyCoverage("uml", "fixtures/render-policy/uml-svg.json");

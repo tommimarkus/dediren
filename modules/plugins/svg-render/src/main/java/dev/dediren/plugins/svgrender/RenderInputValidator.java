@@ -169,7 +169,7 @@ final class RenderInputValidator {
     private static void validateUmlMessageRenderMetadata(JsonNode properties, String path)
             throws RenderMetadataUsageException {
         JsonNode sequence = properties == null || !properties.isObject() ? null : properties.get("sequence");
-        if (sequence == null || !sequence.isIntegralNumber() || !sequence.canConvertToLong() || sequence.asLong() <= 0) {
+        if (sequence == null || !sequence.isIntegralNumber() || sequence.bigIntegerValue().signum() < 1) {
             throw new RenderMetadataUsageException(
                     "DEDIREN_UML_MESSAGE_METADATA_INVALID",
                     path + ".sequence",
