@@ -10,20 +10,20 @@
   <packaging>pom</packaging>
 
   <modules>
-    <module>apps/cli</module>
-    <module>modules/archimate</module>
-    <module>modules/contracts</module>
-    <module>modules/core</module>
-    <module>modules/schema-cache</module>
-    <module>modules/uml</module>
-    <module>modules/plugins/archimate-oef-export</module>
-    <module>modules/plugins/elk-layout</module>
-    <module>modules/plugins/generic-graph</module>
-    <module>modules/plugins/svg-render</module>
-    <module>modules/plugins/uml-xmi-export</module>
+    <module>cli</module>
+    <module>archimate</module>
+    <module>contracts</module>
+    <module>core</module>
+    <module>schema-cache</module>
+    <module>uml</module>
+    <module>plugins/archimate-oef-export</module>
+    <module>plugins/elk-layout</module>
+    <module>plugins/generic-graph</module>
+    <module>plugins/svg-render</module>
+    <module>plugins/uml-xmi-export</module>
     <module>test-support</module>
     <module>testbeds/plugin-runtime</module>
-    <module>tools/dist</module>
+    <module>dist-tool</module>
   </modules>
 
   <properties>

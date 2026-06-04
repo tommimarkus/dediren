@@ -16,9 +16,9 @@ artifact. The initial visual artifact is SVG.
 
 ## Primary Decisions
 
-- Implementation language: Rust.
+- Implementation language: Java 21 or newer.
 - Repository license: MIT.
-- Repository shape: Cargo workspace.
+- Repository shape: Maven reactor built with the checked-in Maven Wrapper.
 - Native data format: JSON only.
 - Native source model: plugin-typed semantic graph.
 - Authored source geometry: forbidden. Source JSON must not contain absolute
@@ -242,7 +242,7 @@ V1 bundles these first-party plugins:
 - `svg-render`: layout result to SVG using the minimal SVG render policy.
 
 First-party plugins are real executable plugins even though they ship with the
-workspace. Plugins may share only protocol/schema Rust types with the core.
+reactor. Plugins may share only protocol/schema Java records with the core.
 They must not depend on core implementation logic.
 
 ## Command Output And Diagnostics
@@ -286,32 +286,42 @@ Initial public contract families include:
 
 ## Repository Structure
 
-The initial repository should be a Cargo workspace with this approximate shape:
+The repository should be a Maven reactor with this approximate shape:
 
 ```text
-Cargo.toml
+pom.xml
+mvnw
+.mvn/
 LICENSE
 README.md
 schemas/
-crates/
-  dediren-core/
-  dediren-cli/
-  dediren-contracts/
-  dediren-plugin-generic-graph/
-  dediren-plugin-elk-layout/
-  dediren-plugin-svg-render/
+cli/
+contracts/
+core/
+archimate/
+uml/
+schema-cache/
+plugins/
+  generic-graph/
+  elk-layout/
+  svg-render/
+  archimate-oef-export/
+  uml-xmi-export/
+test-support/
+testbeds/
+  plugin-runtime/
+dist-tool/
 fixtures/
-tests/
 docs/
 ```
 
-`dediren-contracts` contains shared Rust structs for public protocol and schema
+`contracts` contains shared Java records for public protocol and schema
 contracts only. The core and first-party plugins can depend on it. First-party
-plugins must not depend on `dediren-core`.
+plugins must not depend on `core`.
 
-Schemas are public versioned JSON Schema files under `schemas/`. Rust types are
-manual in v1 and verified with schema conformance tests. Schema-to-Rust codegen
-is intentionally deferred.
+Schemas are public versioned JSON Schema files under `schemas/`. Java records
+are manual in v1 and verified with schema conformance tests. Schema-to-Java
+codegen is intentionally deferred.
 
 ## Testing Strategy
 
@@ -336,17 +346,18 @@ The initial test suite should prioritize contract and plugin behavior:
 The first repository bootstrap should include:
 
 - MIT `LICENSE`;
-- workspace `Cargo.toml` and package metadata;
+- Maven Wrapper, root `pom.xml`, and module POM metadata;
 - README with the contract summary and v1 pipeline;
-- documented local `cargo install` path;
+- documented Maven build, test, distribution, and smoke-test lanes;
 - documented plugin lookup paths;
 - note that release binaries are intended later;
 - initial schema and fixture directories.
 
 ## Rejected Approaches
 
-The design rejects a Rust-library-first approach because it would make schemas
-and plugin protocol follow implementation details. The public contract must lead.
+The design rejects an implementation-library-first approach because it would
+make schemas and plugin protocol follow implementation details. The public
+contract must lead.
 
 The design rejects a core-owned semantic vocabulary because it would make the
 native model drift toward ArchiMate or another domain too early. Semantics belong
@@ -369,7 +380,7 @@ independent.
 - PNG rendering.
 - Rich SVG styling policy.
 - Render plugins beyond SVG.
-- Schema-to-Rust type generation.
+- Schema-to-Java type generation.
 - Third-party plugin publishing and signing.
 - OS-level sandboxing beyond basic process controls.
 - Release binary automation.

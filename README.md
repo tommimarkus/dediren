@@ -31,9 +31,9 @@ For a token-efficient authoring guide, see `docs/agent-usage.md`.
 ./mvnw test
 ./mvnw -Psecurity-sca -DskipTests package org.owasp:dependency-check-maven:aggregate
 ./mvnw -Psbom org.cyclonedx:cyclonedx-maven-plugin:makeAggregateBom
-./mvnw -pl tools/dist -am verify -Pthird-party-notices
-./mvnw -pl tools/dist -am verify -Pdist-build
-./mvnw -pl tools/dist -am verify -Pdist-smoke
+./mvnw -pl dist-tool -am verify -Pthird-party-notices
+./mvnw -pl dist-tool -am verify -Pdist-build
+./mvnw -pl dist-tool -am verify -Pdist-smoke
 ```
 
 Maven artifacts and wrapper state are repo-local under `.cache/maven` for
@@ -53,8 +53,8 @@ dist/dediren-agent-bundle-0.21.0-x86_64-unknown-linux-gnu.tar.gz
 Set a supported target with `DEDIREN_DIST_TARGET` when needed:
 
 ```bash
-DEDIREN_DIST_TARGET=x86_64-unknown-linux-gnu ./mvnw -pl tools/dist -am verify -Pdist-build
-DEDIREN_DIST_TARGET=x86_64-unknown-linux-gnu ./mvnw -pl tools/dist -am verify -Pdist-smoke
+DEDIREN_DIST_TARGET=x86_64-unknown-linux-gnu ./mvnw -pl dist-tool -am verify -Pdist-build
+DEDIREN_DIST_TARGET=x86_64-unknown-linux-gnu ./mvnw -pl dist-tool -am verify -Pdist-smoke
 ```
 
 Supported targets are:
@@ -278,16 +278,16 @@ decisions from stdout JSON.
 Use the narrowest useful lane first:
 
 ```bash
-./mvnw -pl modules/contracts -am test
-./mvnw -pl modules/core -am test
-./mvnw -pl apps/cli -am test
-./mvnw -pl modules/plugins/generic-graph -am test
-./mvnw -pl modules/plugins/elk-layout -am test
-./mvnw -pl modules/plugins/svg-render -am test
-./mvnw -pl modules/plugins/archimate-oef-export -am test
-./mvnw -pl modules/plugins/uml-xmi-export -am test
+./mvnw -pl contracts -am test
+./mvnw -pl core -am test
+./mvnw -pl cli -am test
+./mvnw -pl plugins/generic-graph -am test
+./mvnw -pl plugins/elk-layout -am test
+./mvnw -pl plugins/svg-render -am test
+./mvnw -pl plugins/archimate-oef-export -am test
+./mvnw -pl plugins/uml-xmi-export -am test
 ./mvnw test
-./mvnw -pl tools/dist -am verify -Pdist-smoke
+./mvnw -pl dist-tool -am verify -Pdist-smoke
 git diff --check
 ```
 
@@ -326,14 +326,14 @@ surfaces:
 | Surface | Files |
 | --- | --- |
 | Product version source | `pom.xml` |
-| Module parent versions | `apps/**/pom.xml`, `modules/**/pom.xml`, `test-support/pom.xml`, `testbeds/**/pom.xml`, `tools/**/pom.xml` |
+| Module parent versions | `cli/pom.xml`, `*/pom.xml`, `plugins/**/pom.xml`, `test-support/pom.xml`, `testbeds/**/pom.xml`, `dist-tool/pom.xml` |
 | First-party plugin manifests | `fixtures/plugins/*.manifest.json` |
 | Source fixture plugin requirements | `fixtures/source/*.json` `required_plugins[].version` entries |
 | Bundle and required-plugin examples | `README.md`, `docs/agent-usage.md` |
-| CLI version assertion | `apps/cli/src/test/java/dev/dediren/cli/MainTest.java` |
-| Manifest round-trip assertion | `modules/contracts/src/test/java/dev/dediren/contracts/ContractRoundTripTest.java` |
-| Export/plugin fixture assertions | `modules/plugins/archimate-oef-export/src/test/java/dev/dediren/plugins/archimateoef/MainTest.java`, `modules/plugins/generic-graph/src/test/java/dev/dediren/plugins/genericgraph/GenericGraphPluginTest.java` |
-| Distribution launcher assertion | `tools/dist/src/test/java/dev/dediren/tools/dist/DistModuleTest.java` |
+| CLI version assertion | `cli/src/test/java/dev/dediren/cli/MainTest.java` |
+| Manifest round-trip assertion | `contracts/src/test/java/dev/dediren/contracts/ContractRoundTripTest.java` |
+| Export/plugin fixture assertions | `plugins/archimate-oef-export/src/test/java/dev/dediren/plugins/archimateoef/MainTest.java`, `plugins/generic-graph/src/test/java/dev/dediren/plugins/genericgraph/GenericGraphPluginTest.java` |
+| Distribution launcher assertion | `dist-tool/src/test/java/dev/dediren/tools/dist/DistModuleTest.java` |
 | Release tag check | `.github/workflows/release.yml` validates `v<version>` against root `pom.xml`; update only if the version source changes |
 
 Before committing a version bump, run a stale-version search over the active
