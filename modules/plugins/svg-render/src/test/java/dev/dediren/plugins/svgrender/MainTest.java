@@ -70,9 +70,6 @@ class MainTest {
                     properties -> properties.put("sequence", 1.25),
                     "render_metadata.edges.m1.properties.sequence");
             assertInvalidUmlSequenceMessageMetadata(
-                    properties -> properties.remove("message_sort"),
-                    "render_metadata.edges.m1.properties.message_sort");
-            assertInvalidUmlSequenceMessageMetadata(
                     properties -> properties.put("message_sort", "lostMessage"),
                     "render_metadata.edges.m1.properties.message_sort");
             assertInvalidUmlSequenceMessageMetadata(
@@ -761,6 +758,20 @@ class MainTest {
                     "data-dediren-sequence-delete-marker",
                     "service-destroyed");
             assertThat(childElements(deleteMarker, "line")).hasSize(2);
+        }
+
+        @Test
+        void defaultsOmittedUmlSequenceMessageSortToSynchronousCall() throws Exception {
+            JsonNode input = umlSequenceStyleInput();
+            ((ObjectNode) input.at("/render_metadata/edges/m1/properties")).remove("message_sort");
+
+            Document document = svgDocument(okContent(render(input)));
+
+            Element message = groupWithAttribute(document, "data-dediren-edge-id", "m1");
+            assertThat(message.getAttribute("data-dediren-sequence-message-sort")).isEqualTo("synchCall");
+            Element path = firstChildElement(message, "path");
+            assertThat(path.hasAttribute("stroke-dasharray")).isFalse();
+            assertMarkerForStyle(document, path, "m1", "end", "filled_arrow");
         }
 
         @Test

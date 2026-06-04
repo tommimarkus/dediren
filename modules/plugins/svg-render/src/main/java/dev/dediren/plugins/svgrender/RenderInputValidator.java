@@ -177,13 +177,13 @@ final class RenderInputValidator {
         }
 
         JsonNode messageSort = properties.get("message_sort");
-        if (messageSort == null
-                || !messageSort.isTextual()
-                || !UML_SEQUENCE_MESSAGE_SORTS.contains(messageSort.asText())) {
+        if (messageSort != null
+                && (!messageSort.isTextual()
+                || !UML_SEQUENCE_MESSAGE_SORTS.contains(messageSort.asText()))) {
             throw new RenderMetadataUsageException(
                     "DEDIREN_UML_MESSAGE_METADATA_INVALID",
                     path + ".message_sort",
-                    "UML Message render metadata message_sort must be one of "
+                    "UML Message render metadata message_sort, when present, must be one of "
                             + UML_SEQUENCE_MESSAGE_SORTS);
         }
     }
