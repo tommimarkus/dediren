@@ -14,24 +14,35 @@ import dev.dediren.contracts.render.SvgEdgeStyle;
 import dev.dediren.contracts.render.SvgFontStyle;
 import dev.dediren.contracts.render.SvgNodeStyle;
 import dev.dediren.contracts.render.SvgStylePolicy;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 final class UmlSequenceRenderer {
     private static final String DASH_PATTERN = "8 5";
     private static final double INTERACTION_HORIZONTAL_PADDING = 48.0;
     private static final double INTERACTION_TOP_PADDING = 40.0;
     private static final double INTERACTION_BOTTOM_PADDING = 48.0;
+    private static final double FRAGMENT_HORIZONTAL_PADDING = 20.0;
+    private static final double FRAGMENT_VERTICAL_PADDING = 18.0;
+    private static final double FRAGMENT_HEADER_HEIGHT = 24.0;
 
     private final LayoutResult result;
     private final RenderPolicy policy;
     private final SequenceStyle base;
     private final UmlSequenceModel model;
     private final Map<String, LaidOutNode> nodesById;
+    private final Map<String, LaidOutEdge> edgesById;
     private final Map<String, SequenceFrame> interactionFrames;
+    private final Map<String, UmlSequenceModel.SequenceCombinedFragment> combinedFragmentsById;
+    private final Map<String, List<UmlSequenceModel.SequenceOperand>> operandsByFragmentId;
+    private final Map<String, SequenceFrame> combinedFragmentFrames;
 
     UmlSequenceRenderer(LayoutResult result, RenderMetadata metadata, RenderPolicy policy) {
         this.result = result;
@@ -39,7 +50,11 @@ final class UmlSequenceRenderer {
         this.base = SequenceStyle.from(policy);
         this.model = UmlSequenceModel.from(result, metadata);
         this.nodesById = nodesById(result.nodes());
+        this.edgesById = edgesById(result.edges());
         this.interactionFrames = interactionFrames();
+        this.combinedFragmentsById = combinedFragmentsById();
+        this.operandsByFragmentId = operandsByFragmentId();
+        this.combinedFragmentFrames = combinedFragmentFrames();
     }
 
     static boolean isSequence(RenderMetadata metadata) {
@@ -77,6 +92,7 @@ final class UmlSequenceRenderer {
                 .append("\" font-size=\"").append(styleNumber(base.fontSize())).append("\">");
 
         renderInteractions(svg);
+        renderCombinedFragments(svg);
         renderLifelineHeads(svg);
         renderLifelineStems(svg);
         renderExecutions(svg);
@@ -131,6 +147,62 @@ final class UmlSequenceRenderer {
                     frame.y() + titleHeight - 8.0,
                     attr(paint.labelFill()),
                     text(node.label())));
+            svg.append("</g>");
+        }
+    }
+
+    private void renderCombinedFragments(StringBuilder svg) {
+        List<UmlSequenceModel.SequenceCombinedFragment> fragments = model.combinedFragments().stream()
+                .filter(fragment -> combinedFragmentFrames.containsKey(fragment.id()))
+                .sorted(Comparator
+                        .<UmlSequenceModel.SequenceCombinedFragment>comparingInt(this::combinedFragmentDepth)
+                        .reversed()
+                        .thenComparingDouble(fragment -> combinedFragmentFrames.get(fragment.id()).y())
+                        .thenComparingDouble(fragment -> combinedFragmentFrames.get(fragment.id()).x())
+                        .thenComparing(UmlSequenceModel.SequenceCombinedFragment::id))
+                .toList();
+        for (UmlSequenceModel.SequenceCombinedFragment fragment : fragments) {
+            SequenceFrame frame = combinedFragmentFrames.get(fragment.id());
+            NodePaint paint = nodePaint(fragment.id(), fragment.selector().type());
+            double tabWidth = Math.max(
+                    44.0,
+                    Math.min(frame.width() * 0.5, labelWidth(fragment.operator(), base.fontSize()) + 24.0));
+            svg.append("<g data-dediren-sequence-combined-fragment=\"").append(attr(fragment.id()))
+                    .append("\" data-dediren-sequence-interaction-operator=\"")
+                    .append(attr(fragment.operator())).append("\">");
+            svg.append(String.format(
+                    Locale.ROOT,
+                    "<rect data-dediren-node-shape=\"uml_combined_fragment\" x=\"%.1f\" y=\"%.1f\" width=\"%.1f\" height=\"%.1f\" rx=\"%s\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%s\"/>",
+                    frame.x(),
+                    frame.y(),
+                    frame.width(),
+                    frame.height(),
+                    styleNumber(paint.rx()),
+                    attr(paint.fill()),
+                    attr(paint.stroke()),
+                    styleNumber(paint.strokeWidth())));
+            svg.append(String.format(
+                    Locale.ROOT,
+                    "<path data-dediren-sequence-fragment-operator-tab=\"true\" d=\"M %.1f %.1f H %.1f L %.1f %.1f V %.1f H %.1f Z\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%s\"/>",
+                    frame.x(),
+                    frame.y(),
+                    frame.x() + tabWidth,
+                    frame.x() + tabWidth - 10.0,
+                    frame.y() + FRAGMENT_HEADER_HEIGHT,
+                    frame.y() + FRAGMENT_HEADER_HEIGHT,
+                    frame.x(),
+                    attr(paint.fill()),
+                    attr(paint.stroke()),
+                    styleNumber(paint.strokeWidth())));
+            svg.append(String.format(
+                    Locale.ROOT,
+                    "<text data-dediren-sequence-fragment-operator=\"%s\" x=\"%.1f\" y=\"%.1f\" fill=\"%s\" font-weight=\"600\">%s</text>",
+                    attr(fragment.id()),
+                    frame.x() + 10.0,
+                    frame.y() + FRAGMENT_HEADER_HEIGHT - 7.0,
+                    attr(paint.labelFill()),
+                    text(fragment.operator())));
+            renderOperandSeparatorsAndGuards(svg, fragment, frame, paint);
             svg.append("</g>");
         }
     }
@@ -273,6 +345,55 @@ final class UmlSequenceRenderer {
         }
     }
 
+    private void renderOperandSeparatorsAndGuards(
+            StringBuilder svg,
+            UmlSequenceModel.SequenceCombinedFragment fragment,
+            SequenceFrame frame,
+            NodePaint paint) {
+        List<UmlSequenceModel.SequenceOperand> operands = operandsFor(fragment);
+        Map<String, SvgBox> operandBoxes = new HashMap<>();
+        Map<String, Double> separators = new HashMap<>();
+        for (UmlSequenceModel.SequenceOperand operand : operands) {
+            operandBoxes.put(operand.id(), operandContentBox(operand, new HashMap<>(), new HashSet<>()));
+        }
+        for (int index = 1; index < operands.size(); index++) {
+            UmlSequenceModel.SequenceOperand previous = operands.get(index - 1);
+            UmlSequenceModel.SequenceOperand current = operands.get(index);
+            double y = separatorY(frame, operandBoxes.get(previous.id()), operandBoxes.get(current.id()));
+            separators.put(current.id(), y);
+            svg.append(String.format(
+                    Locale.ROOT,
+                    "<line data-dediren-sequence-operand-separator=\"%s\" x1=\"%.1f\" y1=\"%.1f\" x2=\"%.1f\" y2=\"%.1f\" stroke=\"%s\" stroke-width=\"%s\"/>",
+                    attr(current.id()),
+                    frame.x(),
+                    y,
+                    frame.right(),
+                    y,
+                    attr(paint.stroke()),
+                    styleNumber(paint.strokeWidth())));
+        }
+        for (int index = 0; index < operands.size(); index++) {
+            UmlSequenceModel.SequenceOperand operand = operands.get(index);
+            if (operand.guard() == null || operand.guard().isBlank()) {
+                continue;
+            }
+            double y = index == 0
+                    ? Math.min(frame.y() + FRAGMENT_HEADER_HEIGHT + base.fontSize(), frame.bottom() - 4.0)
+                    : Math.min(separators.getOrDefault(operand.id(), frame.y()) + base.fontSize() + 6.0,
+                            frame.bottom() - 4.0);
+            svg.append(String.format(
+                    Locale.ROOT,
+                    "<text data-dediren-sequence-operand=\"%s\" data-dediren-sequence-operand-guard=\"%s\" x=\"%.1f\" y=\"%.1f\" fill=\"%s\" font-size=\"%s\">[%s]</text>",
+                    attr(operand.id()),
+                    attr(operand.guard()),
+                    frame.x() + 12.0,
+                    y,
+                    attr(paint.labelFill()),
+                    styleNumber(base.fontSize()),
+                    text(operand.guard())));
+        }
+    }
+
     private String edgeMarker(LaidOutEdge edge, SvgEdgeMarkerEnd marker, String stroke, String side) {
         if (marker == SvgEdgeMarkerEnd.NONE) {
             return "";
@@ -374,6 +495,9 @@ final class UmlSequenceRenderer {
             SequenceFrame frame = interactionFrame(interaction);
             box = box.includeRect(frame.x(), frame.y(), frame.width(), frame.height());
         }
+        for (SequenceFrame frame : combinedFragmentFrames.values()) {
+            box = box.includeRect(frame.x(), frame.y(), frame.width(), frame.height());
+        }
         for (LaidOutNode node : result.nodes()) {
             box = box.includeRect(node.x(), node.y(), node.width(), node.height());
         }
@@ -405,6 +529,115 @@ final class UmlSequenceRenderer {
             frames.put(sequenceInteractionId(interaction), calculateInteractionFrame(interaction));
         }
         return frames;
+    }
+
+    private Map<String, SequenceFrame> combinedFragmentFrames() {
+        Map<String, SequenceFrame> frames = new HashMap<>();
+        Set<String> visiting = new HashSet<>();
+        for (UmlSequenceModel.SequenceCombinedFragment fragment : model.combinedFragments()) {
+            calculateCombinedFragmentFrame(fragment, frames, visiting);
+        }
+        return frames;
+    }
+
+    private SequenceFrame calculateCombinedFragmentFrame(
+            UmlSequenceModel.SequenceCombinedFragment fragment,
+            Map<String, SequenceFrame> frames,
+            Set<String> visiting) {
+        SequenceFrame existing = frames.get(fragment.id());
+        if (existing != null) {
+            return existing;
+        }
+        if (!visiting.add(fragment.id())) {
+            return null;
+        }
+
+        SvgBox content = SvgBox.empty();
+        for (UmlSequenceModel.SequenceOperand operand : operandsFor(fragment)) {
+            SvgBox operandContent = operandContentBox(operand, frames, visiting);
+            if (!operandContent.isEmpty()) {
+                content = content.includeRect(
+                        operandContent.minX(),
+                        operandContent.minY(),
+                        operandContent.width(),
+                        operandContent.height());
+            }
+        }
+        content = includeCoveredLifelineExtents(content, fragment);
+        SequenceFrame frame = content.isEmpty() ? null : clipToInteractionFrame(fragment, content);
+        if (frame != null) {
+            frames.put(fragment.id(), frame);
+        }
+        visiting.remove(fragment.id());
+        return frame;
+    }
+
+    private SvgBox operandContentBox(
+            UmlSequenceModel.SequenceOperand operand,
+            Map<String, SequenceFrame> frames,
+            Set<String> visiting) {
+        SvgBox content = SvgBox.empty();
+        for (String fragmentId : operand.fragmentIds()) {
+            LaidOutEdge edge = edgesById.get(fragmentId);
+            if (edge != null) {
+                for (Point point : edge.points()) {
+                    content = content.includePoint(point.x(), point.y());
+                }
+                continue;
+            }
+            UmlSequenceModel.SequenceCombinedFragment nestedFragment = combinedFragmentsById.get(fragmentId);
+            if (nestedFragment == null) {
+                continue;
+            }
+            SequenceFrame nestedFrame = calculateCombinedFragmentFrame(nestedFragment, frames, visiting);
+            if (nestedFrame != null) {
+                content = content.includeRect(
+                        nestedFrame.x(),
+                        nestedFrame.y(),
+                        nestedFrame.width(),
+                        nestedFrame.height());
+            }
+        }
+        return content;
+    }
+
+    private SvgBox includeCoveredLifelineExtents(
+            SvgBox content,
+            UmlSequenceModel.SequenceCombinedFragment fragment) {
+        if (content.isEmpty()) {
+            return content;
+        }
+        for (String lifelineId : fragment.coveredLifelineIds()) {
+            LaidOutNode lifeline = nodesById.get(lifelineId);
+            if (lifeline == null) {
+                continue;
+            }
+            content = content
+                    .includePoint(lifeline.x(), content.minY())
+                    .includePoint(lifeline.x() + lifeline.width(), content.maxY());
+        }
+        return content;
+    }
+
+    private SequenceFrame clipToInteractionFrame(
+            UmlSequenceModel.SequenceCombinedFragment fragment,
+            SvgBox content) {
+        double left = content.minX() - FRAGMENT_HORIZONTAL_PADDING;
+        double top = content.minY() - FRAGMENT_VERTICAL_PADDING - FRAGMENT_HEADER_HEIGHT;
+        double right = content.maxX() + FRAGMENT_HORIZONTAL_PADDING;
+        double bottom = content.maxY() + FRAGMENT_VERTICAL_PADDING;
+
+        SequenceFrame interactionFrame = interactionFrame(fragment.interactionId());
+        if (interactionFrame != null) {
+            left = Math.max(left, interactionFrame.x());
+            top = Math.max(top, interactionFrame.y() + FRAGMENT_HEADER_HEIGHT);
+            right = Math.min(right, interactionFrame.right());
+            bottom = Math.min(bottom, interactionFrame.bottom());
+        }
+        if (right <= left || bottom <= top) {
+            return null;
+        }
+        return new SequenceFrame(left, top, right - left, bottom - top);
     }
 
     private SequenceFrame calculateInteractionFrame(UmlSequenceModel.SequenceNode interaction) {
@@ -452,22 +685,79 @@ final class UmlSequenceRenderer {
     }
 
     private SequenceFrame interactionFrame(UmlSequenceModel.SequenceNode interaction) {
-        return interactionFrames.getOrDefault(
-                sequenceInteractionId(interaction),
-                new SequenceFrame(
+        SequenceFrame frame = interactionFrame(sequenceInteractionId(interaction));
+        return frame == null
+                ? new SequenceFrame(
                         interaction.node().x(),
                         interaction.node().y(),
                         interaction.node().width(),
-                        interaction.node().height()));
+                        interaction.node().height())
+                : frame;
+    }
+
+    private SequenceFrame interactionFrame(String interactionId) {
+        SequenceFrame frame = interactionId == null ? null : interactionFrames.get(interactionId);
+        if (frame == null && interactionFrames.size() == 1) {
+            return interactionFrames.values().iterator().next();
+        }
+        return frame;
     }
 
     private double stemBottom(UmlSequenceModel.SequenceNode lifeline) {
         String interactionId = propertyText(lifeline.selector().properties(), "interaction");
-        SequenceFrame frame = interactionId == null ? null : interactionFrames.get(interactionId);
-        if (frame == null && interactionFrames.size() == 1) {
-            frame = interactionFrames.values().iterator().next();
-        }
+        SequenceFrame frame = interactionFrame(interactionId);
         return frame == null ? diagramBottom() : frame.bottom();
+    }
+
+    private List<UmlSequenceModel.SequenceOperand> operandsFor(
+            UmlSequenceModel.SequenceCombinedFragment fragment) {
+        return operandsByFragmentId.getOrDefault(fragment.id(), List.of()).stream()
+                .filter(operand -> fragment.operandIds().isEmpty() || fragment.operandIds().contains(operand.id()))
+                .sorted(Comparator
+                        .<UmlSequenceModel.SequenceOperand>comparingInt(operand -> operandIndex(fragment, operand))
+                        .thenComparingInt(UmlSequenceModel.SequenceOperand::order)
+                        .thenComparing(UmlSequenceModel.SequenceOperand::id))
+                .toList();
+    }
+
+    private static int operandIndex(
+            UmlSequenceModel.SequenceCombinedFragment fragment,
+            UmlSequenceModel.SequenceOperand operand) {
+        int index = fragment.operandIds().indexOf(operand.id());
+        return index >= 0 ? index : Integer.MAX_VALUE;
+    }
+
+    private double separatorY(SequenceFrame frame, SvgBox previous, SvgBox current) {
+        double y = frame.y() + FRAGMENT_HEADER_HEIGHT;
+        if (previous != null && current != null && !previous.isEmpty() && !current.isEmpty()) {
+            y = (previous.maxY() + current.minY()) / 2.0;
+        }
+        double min = frame.y() + FRAGMENT_HEADER_HEIGHT + 4.0;
+        double max = frame.bottom() - 4.0;
+        return Math.max(min, Math.min(max, y));
+    }
+
+    private int combinedFragmentDepth(UmlSequenceModel.SequenceCombinedFragment fragment) {
+        return combinedFragmentDepth(fragment, new HashSet<>());
+    }
+
+    private int combinedFragmentDepth(
+            UmlSequenceModel.SequenceCombinedFragment fragment,
+            Set<String> visiting) {
+        if (!visiting.add(fragment.id())) {
+            return 0;
+        }
+        int depth = 0;
+        for (UmlSequenceModel.SequenceOperand operand : operandsFor(fragment)) {
+            for (String fragmentId : operand.fragmentIds()) {
+                UmlSequenceModel.SequenceCombinedFragment nested = combinedFragmentsById.get(fragmentId);
+                if (nested != null) {
+                    depth = Math.max(depth, 1 + combinedFragmentDepth(nested, visiting));
+                }
+            }
+        }
+        visiting.remove(fragment.id());
+        return depth;
     }
 
     private boolean belongsToInteraction(UmlSequenceModel.SequenceNode node, String interactionId) {
@@ -518,6 +808,30 @@ final class UmlSequenceRenderer {
         Map<String, LaidOutNode> byId = new HashMap<>();
         for (LaidOutNode node : nodes) {
             byId.put(node.id(), node);
+        }
+        return byId;
+    }
+
+    private static Map<String, LaidOutEdge> edgesById(List<LaidOutEdge> edges) {
+        Map<String, LaidOutEdge> byId = new HashMap<>();
+        for (LaidOutEdge edge : edges) {
+            byId.put(edge.id(), edge);
+        }
+        return byId;
+    }
+
+    private Map<String, UmlSequenceModel.SequenceCombinedFragment> combinedFragmentsById() {
+        Map<String, UmlSequenceModel.SequenceCombinedFragment> byId = new HashMap<>();
+        for (UmlSequenceModel.SequenceCombinedFragment fragment : model.combinedFragments()) {
+            byId.put(fragment.id(), fragment);
+        }
+        return byId;
+    }
+
+    private Map<String, List<UmlSequenceModel.SequenceOperand>> operandsByFragmentId() {
+        Map<String, List<UmlSequenceModel.SequenceOperand>> byId = new HashMap<>();
+        for (UmlSequenceModel.SequenceOperand operand : model.operands()) {
+            byId.computeIfAbsent(operand.combinedFragmentId(), ignored -> new ArrayList<>()).add(operand);
         }
         return byId;
     }
@@ -663,6 +977,10 @@ final class UmlSequenceRenderer {
     }
 
     private record SequenceFrame(double x, double y, double width, double height) {
+        double right() {
+            return x + width;
+        }
+
         double bottom() {
             return y + height;
         }

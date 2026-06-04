@@ -138,7 +138,17 @@ final class RenderInputValidator {
             return;
         }
         for (Map.Entry<String, RenderMetadataSelector> entry : metadata.nodes().entrySet()) {
-            Uml.validateElementType(entry.getValue().type(), "render_metadata.nodes." + entry.getKey() + ".type");
+            RenderMetadataSelector selector = entry.getValue();
+            Uml.validateElementType(selector.type(), "render_metadata.nodes." + entry.getKey() + ".type");
+            if ("CombinedFragment".equals(selector.type())) {
+                validateUmlCombinedFragmentRenderMetadata(
+                        selector.properties(),
+                        "render_metadata.nodes." + entry.getKey() + ".properties");
+            } else if ("InteractionOperand".equals(selector.type())) {
+                validateUmlInteractionOperandRenderMetadata(
+                        selector.properties(),
+                        "render_metadata.nodes." + entry.getKey() + ".properties");
+            }
         }
         for (Map.Entry<String, RenderMetadataSelector> entry : metadata.edges().entrySet()) {
             RenderMetadataSelector selector = entry.getValue();
@@ -168,7 +178,7 @@ final class RenderInputValidator {
 
     private static void validateUmlMessageRenderMetadata(JsonNode properties, String path)
             throws RenderMetadataUsageException {
-        JsonNode sequence = properties == null || !properties.isObject() ? null : properties.get("sequence");
+        JsonNode sequence = metadataProperty(properties, "sequence");
         if (sequence == null || !sequence.isIntegralNumber() || sequence.bigIntegerValue().signum() < 1) {
             throw new RenderMetadataUsageException(
                     "DEDIREN_UML_MESSAGE_METADATA_INVALID",
@@ -176,7 +186,7 @@ final class RenderInputValidator {
                     "UML Message render metadata sequence must be a positive integer");
         }
 
-        JsonNode messageSort = properties.get("message_sort");
+        JsonNode messageSort = metadataProperty(properties, "message_sort");
         if (messageSort != null
                 && (!messageSort.isTextual()
                 || !UML_SEQUENCE_MESSAGE_SORTS.contains(messageSort.asText()))) {
@@ -186,6 +196,76 @@ final class RenderInputValidator {
                     "UML Message render metadata message_sort, when present, must be one of "
                             + UML_SEQUENCE_MESSAGE_SORTS);
         }
+    }
+
+    private static void validateUmlCombinedFragmentRenderMetadata(JsonNode properties, String path)
+            throws RenderMetadataUsageException {
+        JsonNode operator = metadataProperty(properties, "operator");
+        if (operator == null || !operator.isTextual()) {
+            throw new RenderMetadataUsageException(
+                    "DEDIREN_UML_COMBINED_FRAGMENT_METADATA_INVALID",
+                    path + ".operator",
+                    "UML CombinedFragment render metadata operator must be text");
+        }
+
+        JsonNode operands = metadataProperty(properties, "operands");
+        if (!isTextArray(operands)) {
+            throw new RenderMetadataUsageException(
+                    "DEDIREN_UML_COMBINED_FRAGMENT_METADATA_INVALID",
+                    path + ".operands",
+                    "UML CombinedFragment render metadata operands must be an array of text ids");
+        }
+
+        JsonNode covered = metadataProperty(properties, "covered");
+        if (covered != null && !isTextArray(covered)) {
+            throw new RenderMetadataUsageException(
+                    "DEDIREN_UML_COMBINED_FRAGMENT_METADATA_INVALID",
+                    path + ".covered",
+                    "UML CombinedFragment render metadata covered, when present, must be an array of text ids");
+        }
+    }
+
+    private static void validateUmlInteractionOperandRenderMetadata(JsonNode properties, String path)
+            throws RenderMetadataUsageException {
+        JsonNode combinedFragment = metadataProperty(properties, "combined_fragment");
+        if (combinedFragment == null || !combinedFragment.isTextual()) {
+            throw new RenderMetadataUsageException(
+                    "DEDIREN_UML_INTERACTION_OPERAND_METADATA_INVALID",
+                    path + ".combined_fragment",
+                    "UML InteractionOperand render metadata combined_fragment must be text");
+        }
+
+        JsonNode order = metadataProperty(properties, "order");
+        if (order == null || !order.isIntegralNumber() || order.bigIntegerValue().signum() < 1) {
+            throw new RenderMetadataUsageException(
+                    "DEDIREN_UML_INTERACTION_OPERAND_METADATA_INVALID",
+                    path + ".order",
+                    "UML InteractionOperand render metadata order must be a positive integer");
+        }
+
+        JsonNode fragments = metadataProperty(properties, "fragments");
+        if (!isTextArray(fragments)) {
+            throw new RenderMetadataUsageException(
+                    "DEDIREN_UML_INTERACTION_OPERAND_METADATA_INVALID",
+                    path + ".fragments",
+                    "UML InteractionOperand render metadata fragments must be an array of text ids");
+        }
+    }
+
+    private static JsonNode metadataProperty(JsonNode properties, String name) {
+        return properties == null || !properties.isObject() ? null : properties.get(name);
+    }
+
+    private static boolean isTextArray(JsonNode value) {
+        if (value == null || !value.isArray()) {
+            return false;
+        }
+        for (JsonNode item : value) {
+            if (!item.isTextual()) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static void validateRenderPolicy(RenderPolicy policy) throws PolicyValidationException {

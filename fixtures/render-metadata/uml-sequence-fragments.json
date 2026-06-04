@@ -1,0 +1,255 @@
+{
+  "render_metadata_schema_version": "render-metadata.schema.v1",
+  "semantic_profile": "uml",
+  "nodes": {
+    "interaction-place-order": {
+      "type": "Interaction",
+      "source_id": "interaction-place-order"
+    },
+    "customer": {
+      "type": "Lifeline",
+      "source_id": "customer",
+      "properties": {
+        "interaction": "interaction-place-order"
+      }
+    },
+    "service": {
+      "type": "Lifeline",
+      "source_id": "service",
+      "properties": {
+        "interaction": "interaction-place-order"
+      }
+    },
+    "inventory": {
+      "type": "Lifeline",
+      "source_id": "inventory",
+      "properties": {
+        "interaction": "interaction-place-order"
+      }
+    },
+    "payment": {
+      "type": "Lifeline",
+      "source_id": "payment",
+      "properties": {
+        "interaction": "interaction-place-order"
+      }
+    },
+    "cf-availability": {
+      "type": "CombinedFragment",
+      "source_id": "cf-availability",
+      "properties": {
+        "interaction": "interaction-place-order",
+        "operator": "alt",
+        "operands": ["op-in-stock", "op-backorder"],
+        "covered": ["customer", "service", "inventory"]
+      }
+    },
+    "op-in-stock": {
+      "type": "InteractionOperand",
+      "source_id": "op-in-stock",
+      "properties": {
+        "interaction": "interaction-place-order",
+        "combined_fragment": "cf-availability",
+        "order": 1,
+        "guard": "inStock",
+        "fragments": ["m1", "m2"]
+      }
+    },
+    "op-backorder": {
+      "type": "InteractionOperand",
+      "source_id": "op-backorder",
+      "properties": {
+        "interaction": "interaction-place-order",
+        "combined_fragment": "cf-availability",
+        "order": 2,
+        "guard": "else",
+        "fragments": ["m3", "m4"]
+      }
+    },
+    "cf-coupon": {
+      "type": "CombinedFragment",
+      "source_id": "cf-coupon",
+      "properties": {
+        "interaction": "interaction-place-order",
+        "operator": "opt",
+        "operands": ["op-coupon"],
+        "covered": ["customer", "service"]
+      }
+    },
+    "op-coupon": {
+      "type": "InteractionOperand",
+      "source_id": "op-coupon",
+      "properties": {
+        "interaction": "interaction-place-order",
+        "combined_fragment": "cf-coupon",
+        "order": 1,
+        "guard": "couponPresent",
+        "fragments": ["m5", "m6"]
+      }
+    },
+    "cf-retry": {
+      "type": "CombinedFragment",
+      "source_id": "cf-retry",
+      "properties": {
+        "interaction": "interaction-place-order",
+        "operator": "loop",
+        "operands": ["op-retry"],
+        "covered": ["service", "payment"]
+      }
+    },
+    "op-retry": {
+      "type": "InteractionOperand",
+      "source_id": "op-retry",
+      "properties": {
+        "interaction": "interaction-place-order",
+        "combined_fragment": "cf-retry",
+        "order": 1,
+        "guard": "whilePaymentPending",
+        "fragments": ["m7", "m8"]
+      }
+    },
+    "cf-parallel-closeout": {
+      "type": "CombinedFragment",
+      "source_id": "cf-parallel-closeout",
+      "properties": {
+        "interaction": "interaction-place-order",
+        "operator": "par",
+        "operands": ["op-charge", "op-confirm"],
+        "covered": ["customer", "service", "payment"]
+      }
+    },
+    "op-charge": {
+      "type": "InteractionOperand",
+      "source_id": "op-charge",
+      "properties": {
+        "interaction": "interaction-place-order",
+        "combined_fragment": "cf-parallel-closeout",
+        "order": 1,
+        "guard": "charge",
+        "fragments": ["m9", "m10"]
+      }
+    },
+    "op-confirm": {
+      "type": "InteractionOperand",
+      "source_id": "op-confirm",
+      "properties": {
+        "interaction": "interaction-place-order",
+        "combined_fragment": "cf-parallel-closeout",
+        "order": 2,
+        "guard": "confirm",
+        "fragments": ["m11", "m12"]
+      }
+    }
+  },
+  "edges": {
+    "m1": {
+      "type": "Message",
+      "source_id": "m1",
+      "properties": {
+        "interaction": "interaction-place-order",
+        "sequence": 1,
+        "message_sort": "synchCall"
+      }
+    },
+    "m2": {
+      "type": "Message",
+      "source_id": "m2",
+      "properties": {
+        "interaction": "interaction-place-order",
+        "sequence": 2,
+        "message_sort": "reply"
+      }
+    },
+    "m3": {
+      "type": "Message",
+      "source_id": "m3",
+      "properties": {
+        "interaction": "interaction-place-order",
+        "sequence": 3,
+        "message_sort": "synchCall"
+      }
+    },
+    "m4": {
+      "type": "Message",
+      "source_id": "m4",
+      "properties": {
+        "interaction": "interaction-place-order",
+        "sequence": 4,
+        "message_sort": "reply"
+      }
+    },
+    "m5": {
+      "type": "Message",
+      "source_id": "m5",
+      "properties": {
+        "interaction": "interaction-place-order",
+        "sequence": 5,
+        "message_sort": "synchCall"
+      }
+    },
+    "m6": {
+      "type": "Message",
+      "source_id": "m6",
+      "properties": {
+        "interaction": "interaction-place-order",
+        "sequence": 6,
+        "message_sort": "reply"
+      }
+    },
+    "m7": {
+      "type": "Message",
+      "source_id": "m7",
+      "properties": {
+        "interaction": "interaction-place-order",
+        "sequence": 7,
+        "message_sort": "synchCall"
+      }
+    },
+    "m8": {
+      "type": "Message",
+      "source_id": "m8",
+      "properties": {
+        "interaction": "interaction-place-order",
+        "sequence": 8,
+        "message_sort": "reply"
+      }
+    },
+    "m9": {
+      "type": "Message",
+      "source_id": "m9",
+      "properties": {
+        "interaction": "interaction-place-order",
+        "sequence": 9,
+        "message_sort": "synchCall"
+      }
+    },
+    "m10": {
+      "type": "Message",
+      "source_id": "m10",
+      "properties": {
+        "interaction": "interaction-place-order",
+        "sequence": 10,
+        "message_sort": "reply"
+      }
+    },
+    "m11": {
+      "type": "Message",
+      "source_id": "m11",
+      "properties": {
+        "interaction": "interaction-place-order",
+        "sequence": 11,
+        "message_sort": "asynchSignal"
+      }
+    },
+    "m12": {
+      "type": "Message",
+      "source_id": "m12",
+      "properties": {
+        "interaction": "interaction-place-order",
+        "sequence": 12,
+        "message_sort": "reply"
+      }
+    }
+  },
+  "groups": {}
+}
