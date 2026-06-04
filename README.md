@@ -146,6 +146,71 @@ jq -r '.data.content' render-result.json > diagram.svg
 Downstream commands accept either a full Dediren command envelope or the raw
 `.data` artifact JSON.
 
+## UML Sequence Workflow
+
+UML source uses `plugins.generic-graph.semantic_profile: "uml"`. Supported
+view kinds are `generic`, `archimate`, `uml-class`, `uml-data`,
+`uml-activity`, and `uml-sequence`. The sequence MVP source fixture is
+`fixtures/source/valid-uml-sequence-basic.json`: it declares an
+`Interaction` named `Place Order`, `Lifeline` nodes, and ordered `Message`
+relationships in `properties.uml.sequence` with `message_sort` values.
+
+Validate UML semantics, project layout and render metadata, lay out with ELK,
+render SVG, and export UML/XMI:
+
+```bash
+"$BUNDLE/bin/dediren" validate \
+  --plugin generic-graph \
+  --profile uml \
+  --input "$BUNDLE/fixtures/source/valid-uml-sequence-basic.json"
+
+"$BUNDLE/bin/dediren" project \
+  --target layout-request \
+  --plugin generic-graph \
+  --view sequence-view \
+  --input "$BUNDLE/fixtures/source/valid-uml-sequence-basic.json" \
+  > sequence-layout-request.json
+
+"$BUNDLE/bin/dediren" project \
+  --target render-metadata \
+  --plugin generic-graph \
+  --view sequence-view \
+  --input "$BUNDLE/fixtures/source/valid-uml-sequence-basic.json" \
+  > sequence-render-metadata.json
+
+"$BUNDLE/bin/dediren" layout \
+  --plugin elk-layout \
+  --input sequence-layout-request.json \
+  > sequence-layout-result.json
+
+"$BUNDLE/bin/dediren" render \
+  --plugin svg-render \
+  --policy "$BUNDLE/fixtures/render-policy/uml-svg.json" \
+  --metadata sequence-render-metadata.json \
+  --input sequence-layout-result.json \
+  > sequence-render-result.json
+
+jq -r '.data.content' sequence-render-result.json > sequence.svg
+
+"$BUNDLE/bin/dediren" export \
+  --plugin uml-xmi \
+  --policy "$BUNDLE/fixtures/export-policy/default-uml-xmi.json" \
+  --source "$BUNDLE/fixtures/source/valid-uml-sequence-basic.json" \
+  --layout sequence-layout-result.json \
+  > sequence-xmi-result.json
+
+jq -r '.data.content' sequence-xmi-result.json > sequence.xmi
+```
+
+Use generated render metadata for UML sequence SVG so the renderer receives
+lifeline, interaction, message order, and message sort semantics. The MVP UML
+sequence vocabulary is `Interaction`, `Lifeline`, `Message`,
+`ExecutionSpecification`, `Gate`, and
+`DestructionOccurrenceSpecification`. Supported message sorts are `synchCall`,
+`asynchCall`, `asynchSignal`, `reply`, `createMessage`, and `deleteMessage`.
+Combined fragments, state machines, use cases, deployment diagrams, and UMLDI
+are later slices.
+
 ## Pipeline
 
 ```text

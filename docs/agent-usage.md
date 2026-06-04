@@ -103,7 +103,8 @@ profile and use ArchiMate type names:
 ```
 
 For UML SVG notation or XMI export, use `semantic_profile: "uml"` and the
-`uml-xmi` plugin.
+`uml-xmi` plugin. Supported UML view kinds are `uml-class`, `uml-data`,
+`uml-activity`, and `uml-sequence`.
 
 ## Command Handoff
 
@@ -126,6 +127,61 @@ or the previous command envelope:
 
 jq -r '.data.content' render-result.json > diagram.svg
 ```
+
+## UML Sequence Handoff
+
+Use `fixtures/source/valid-uml-sequence-basic.json` for the sequence MVP
+shape: one `Interaction`, `Lifeline` nodes, and ordered `Message`
+relationships with `properties.uml.sequence` plus `message_sort`. The SVG
+sequence path needs generated render metadata.
+
+```bash
+"$BUNDLE/bin/dediren" validate \
+  --plugin generic-graph \
+  --profile uml \
+  --input "$BUNDLE/fixtures/source/valid-uml-sequence-basic.json"
+
+"$BUNDLE/bin/dediren" project \
+  --target layout-request \
+  --plugin generic-graph \
+  --view sequence-view \
+  --input "$BUNDLE/fixtures/source/valid-uml-sequence-basic.json" \
+  > sequence-layout-request.json
+
+"$BUNDLE/bin/dediren" project \
+  --target render-metadata \
+  --plugin generic-graph \
+  --view sequence-view \
+  --input "$BUNDLE/fixtures/source/valid-uml-sequence-basic.json" \
+  > sequence-render-metadata.json
+
+"$BUNDLE/bin/dediren" layout \
+  --plugin elk-layout \
+  --input sequence-layout-request.json \
+  > sequence-layout-result.json
+
+"$BUNDLE/bin/dediren" render \
+  --plugin svg-render \
+  --policy "$BUNDLE/fixtures/render-policy/uml-svg.json" \
+  --metadata sequence-render-metadata.json \
+  --input sequence-layout-result.json \
+  > sequence-render-result.json
+
+"$BUNDLE/bin/dediren" export \
+  --plugin uml-xmi \
+  --policy "$BUNDLE/fixtures/export-policy/default-uml-xmi.json" \
+  --source "$BUNDLE/fixtures/source/valid-uml-sequence-basic.json" \
+  --layout sequence-layout-result.json \
+  > sequence-xmi-result.json
+```
+
+Read `.status`, `.data`, and `.diagnostics[]` from stdout JSON envelopes for
+each command before continuing. The sequence MVP supports `Interaction`,
+`Lifeline`, `Message`, `ExecutionSpecification`, `Gate`, and
+`DestructionOccurrenceSpecification`; message sorts are `synchCall`,
+`asynchCall`, `asynchSignal`, `reply`, `createMessage`, and `deleteMessage`.
+Combined fragments, state machines, use cases, deployment, and UMLDI are later
+slices.
 
 ## Runtime Probes
 
