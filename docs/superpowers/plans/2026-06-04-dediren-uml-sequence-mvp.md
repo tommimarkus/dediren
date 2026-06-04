@@ -136,7 +136,7 @@ Implement this first slice as an additive UML surface:
 5. Run:
 
    ```bash
-   ./mvnw -pl modules/contracts -am test -Dtest=ContractRoundTripTest
+   ./mvnw -pl modules/contracts -am test -Dtest=ContractRoundTripTest -Dsurefire.failIfNoSpecifiedTests=false
    ```
 
    Expected before implementation: failure on missing view kind support. Expected after implementation: green contract tests.
@@ -246,7 +246,7 @@ Implement this first slice as an additive UML surface:
 5. Run:
 
    ```bash
-   ./mvnw -pl modules/plugins/generic-graph -am test -Dtest=GenericGraphPluginTest
+   ./mvnw -pl modules/plugins/generic-graph -am test -Dtest=GenericGraphPluginTest -Dsurefire.failIfNoSpecifiedTests=false
    ```
 
    Expected: projection tests pass and existing UML class/data/activity projection tests remain green.
@@ -382,7 +382,7 @@ Implement this first slice as an additive UML surface:
 7. Run:
 
    ```bash
-   ./mvnw -pl modules/plugins/svg-render -am test -Dtest=MainTest
+   ./mvnw -pl modules/plugins/svg-render -am test -Dtest=MainTest -Dsurefire.failIfNoSpecifiedTests=false
    ```
 
    Expected: SVG renderer tests pass.
@@ -433,7 +433,7 @@ Implement this first slice as an additive UML surface:
 5. Run:
 
    ```bash
-   ./mvnw -pl modules/plugins/uml-xmi-export -am test -Dtest=MainTest
+   ./mvnw -pl modules/plugins/uml-xmi-export -am test -Dtest=MainTest -Dsurefire.failIfNoSpecifiedTests=false
    ```
 
    Expected: UML/XMI export tests pass.
