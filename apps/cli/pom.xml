@@ -42,6 +42,12 @@
     </dependency>
     <dependency>
       <groupId>dev.dediren</groupId>
+      <artifactId>elk-layout</artifactId>
+      <version>${project.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>dev.dediren</groupId>
       <artifactId>svg-render</artifactId>
       <version>${project.version}</version>
       <scope>test</scope>
