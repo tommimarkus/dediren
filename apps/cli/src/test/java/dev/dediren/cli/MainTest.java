@@ -238,19 +238,28 @@ class MainTest {
 
     private static void assertSequenceSvgGeometry(Document document) {
         Element frame = elementWithAttribute(document, "rect", "data-dediren-node-shape", "uml_interaction");
+        double frameX = doubleAttribute(frame, "x");
         double frameY = doubleAttribute(frame, "y");
+        double frameRight = frameX + doubleAttribute(frame, "width");
         double frameBottom = frameY + doubleAttribute(frame, "height");
 
         for (String lifelineId : List.of("customer", "service")) {
             Element lifeline = firstChildElement(groupWithAttribute(document, "data-dediren-node-id", lifelineId), "rect");
+            double lifelineX = doubleAttribute(lifeline, "x");
             double lifelineY = doubleAttribute(lifeline, "y");
+            double lifelineRight = lifelineX + doubleAttribute(lifeline, "width");
             double lifelineBottom = lifelineY + doubleAttribute(lifeline, "height");
             Element stem = elementWithAttribute(document, "line", "data-dediren-sequence-lifeline-stem", lifelineId);
+            double stemX = doubleAttribute(stem, "x1");
             double stemY1 = doubleAttribute(stem, "y1");
             double stemY2 = doubleAttribute(stem, "y2");
 
+            assertThat(lifelineX).isGreaterThan(frameX);
             assertThat(lifelineY).isGreaterThan(frameY);
+            assertThat(lifelineRight).isLessThan(frameRight);
             assertThat(lifelineBottom).isLessThan(frameBottom);
+            assertThat(stemX).isGreaterThanOrEqualTo(frameX);
+            assertThat(stemX).isLessThanOrEqualTo(frameRight);
             assertThat(stemY1).isEqualTo(lifelineBottom);
             assertThat(stemY2).isGreaterThan(stemY1);
             assertThat(stemY2).isLessThanOrEqualTo(frameBottom);
@@ -262,6 +271,8 @@ class MainTest {
             assertThat(points).hasSize(2);
             assertThat(points.getFirst().y()).isEqualTo(points.getLast().y());
             for (SvgPoint point : points) {
+                assertThat(point.x()).isGreaterThanOrEqualTo(frameX);
+                assertThat(point.x()).isLessThanOrEqualTo(frameRight);
                 assertThat(point.y()).isGreaterThan(frameY);
                 assertThat(point.y()).isLessThan(frameBottom);
             }
