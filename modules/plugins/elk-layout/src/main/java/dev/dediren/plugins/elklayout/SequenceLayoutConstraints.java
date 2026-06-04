@@ -19,6 +19,8 @@ final class SequenceLayoutConstraints {
     private static final String LIFELINE_ORDER_KIND = "uml.sequence.lifeline-order";
     private static final String MESSAGE_ORDER_KIND = "uml.sequence.message-order";
     private static final double MINIMUM_MESSAGE_Y_STEP = 1.0;
+    private static final double MESSAGE_HEAD_GAP = 24.0;
+    private static final double MESSAGE_Y_STEP = 24.0;
 
     private final List<String> lifelineOrder;
     private final List<String> messageOrder;
@@ -248,19 +250,14 @@ final class SequenceLayoutConstraints {
             }
         }
 
-        double top = lifelines.stream()
-            .mapToDouble(LaidOutNode::y)
+        double headBottom = lifelines.stream()
+            .mapToDouble(node -> node.y() + node.height())
             .max()
             .orElse(Double.NaN);
-        double bottom = lifelines.stream()
-            .mapToDouble(node -> node.y() + node.height())
-            .min()
-            .orElse(Double.NaN);
-        if (Double.isFinite(top) && Double.isFinite(bottom) && bottom > top) {
-            double step = (bottom - top) / (orderedMessages.size() + 1.0);
+        if (Double.isFinite(headBottom)) {
             List<Double> ySlots = new ArrayList<>();
             for (int index = 0; index < orderedMessages.size(); index++) {
-                ySlots.add(top + (step * (index + 1.0)));
+                ySlots.add(headBottom + MESSAGE_HEAD_GAP + (MESSAGE_Y_STEP * index));
             }
             return ySlots;
         }

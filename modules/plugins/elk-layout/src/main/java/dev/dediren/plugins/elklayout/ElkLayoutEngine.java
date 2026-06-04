@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -77,7 +78,9 @@ final class ElkLayoutEngine {
         ElkLayeredOptions.configureRoot(root, layoutDirection, preferences);
 
         Map<String, LayoutNode> requestNodes = requestNodesById(request);
-        List<LayoutEdge> requestEdges = sequenceConstraints.orderedEdges(list(request.edges()));
+        List<LayoutEdge> originalRequestEdges = list(request.edges());
+        Map<LayoutEdge, Integer> originalEdgeIndexes = originalEdgeIndexes(originalRequestEdges);
+        List<LayoutEdge> requestEdges = sequenceConstraints.orderedEdges(originalRequestEdges);
         Map<String, EdgeEndpointMerge> endpointMerges =
             sequenceConstraints.active()
                 ? emptyEndpointMerges(requestEdges)
@@ -109,7 +112,7 @@ final class ElkLayoutEngine {
                     "DEDIREN_ELK_DANGLING_EDGE",
                     DiagnosticSeverity.WARNING,
                     "edge " + edge.id() + " references a missing endpoint",
-                    "$.edges[" + index + "]"));
+                    "$.edges[" + originalEdgeIndexes.getOrDefault(edge, index) + "]"));
                 continue;
             }
             EdgeEndpointMerge endpointMerge =
@@ -421,6 +424,14 @@ final class ElkLayoutEngine {
             endpointMerges.put(edge.id(), NO_ENDPOINT_MERGE);
         }
         return endpointMerges;
+    }
+
+    private static Map<LayoutEdge, Integer> originalEdgeIndexes(List<LayoutEdge> edges) {
+        Map<LayoutEdge, Integer> indexes = new IdentityHashMap<>();
+        for (int index = 0; index < edges.size(); index++) {
+            indexes.put(edges.get(index), index);
+        }
+        return indexes;
     }
 
     private static Direction internalDirection(

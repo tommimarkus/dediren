@@ -159,31 +159,48 @@ class ElkLayoutEngineTest {
                 + edgeById(result, "m2").points()
                 + ", m3="
                 + edgeById(result, "m3").points());
-        assertRouteEndpointOnSide(result, "m1", "customer", true, PortSide.EAST);
-        assertRouteEndpointOnSide(result, "m1", "service", false, PortSide.WEST);
-        assertRouteEndpointOnSide(result, "m2", "service", true, PortSide.WEST);
-        assertRouteEndpointOnSide(result, "m2", "customer", false, PortSide.EAST);
-        assertRouteEndpointOnSide(result, "m3", "service", true, PortSide.WEST);
-        assertRouteEndpointOnSide(result, "m3", "customer", false, PortSide.EAST);
+        assertSequenceRouteEndpointOnLifelineSide(result, "m1", "customer", true, PortSide.EAST);
+        assertSequenceRouteEndpointOnLifelineSide(result, "m1", "service", false, PortSide.WEST);
+        assertSequenceRouteEndpointOnLifelineSide(result, "m2", "service", true, PortSide.WEST);
+        assertSequenceRouteEndpointOnLifelineSide(result, "m2", "customer", false, PortSide.EAST);
+        assertSequenceRouteEndpointOnLifelineSide(result, "m3", "service", true, PortSide.WEST);
+        assertSequenceRouteEndpointOnLifelineSide(result, "m3", "customer", false, PortSide.EAST);
     }
 
     @Test
-    void preservesSequenceMessageBendPointsDuringEndpointNormalization() {
+    void laysOutSequenceMessagesBelowLifelineHeads() {
         LayoutResult result = new ElkLayoutEngine().layout(sequenceLayoutRequest());
         ElkLayoutRenderArtifacts.write(result);
-        LaidOutEdge placeOrder = edgeById(result, "m1");
-        LaidOutEdge receiptReady = edgeById(result, "m3");
+        List<LaidOutNode> lifelines = List.of(nodeById(result, "customer"), nodeById(result, "service"));
 
-        assertTrue(
-            placeOrder.points().size() > 2 || receiptReady.points().size() > 2,
-            "sequence endpoint normalization must preserve ELK-produced bend points, m1="
-                + placeOrder.points()
-                + ", m3="
-                + receiptReady.points());
-        assertRouteEndpointOnSide(result, "m1", "customer", true, PortSide.EAST);
-        assertRouteEndpointOnSide(result, "m1", "service", false, PortSide.WEST);
-        assertRouteEndpointOnSide(result, "m3", "service", true, PortSide.WEST);
-        assertRouteEndpointOnSide(result, "m3", "customer", false, PortSide.EAST);
+        for (String edgeId : List.of("m1", "m2", "m3")) {
+            double messageY = firstSegmentY(edgeById(result, edgeId));
+            for (LaidOutNode lifeline : lifelines) {
+                assertTrue(
+                    messageY > lifeline.y() + lifeline.height(),
+                    edgeId + " should be routed below lifeline heads, y="
+                        + messageY
+                        + ", lifeline="
+                        + lifeline);
+            }
+        }
+    }
+
+    @Test
+    void preservesSequenceMessagePointOrderDuringEndpointNormalization() {
+        LayoutResult normalized = SequenceLayoutConstraints.from(sequenceLayoutRequest())
+            .normalize(sequenceLayoutResultWithMessageBendPoints());
+        LaidOutEdge edge = edgeById(normalized, "m1");
+        double messageY = firstSegmentY(edge);
+
+        assertEquals(4, edge.points().size(), "sequence normalization must not collapse route points");
+        assertEquals(700.0, edge.points().get(1).x(), GEOMETRY_EPSILON);
+        assertEquals(300.0, edge.points().get(2).x(), GEOMETRY_EPSILON);
+        for (Point point : edge.points()) {
+            assertEquals(messageY, point.y(), GEOMETRY_EPSILON, "all message route points should share y");
+        }
+        assertSequenceRouteEndpointOnLifelineSide(normalized, "m1", "customer", true, PortSide.EAST);
+        assertSequenceRouteEndpointOnLifelineSide(normalized, "m1", "service", false, PortSide.WEST);
     }
 
     @Test
@@ -208,6 +225,41 @@ class ElkLayoutEngineTest {
             nodeById(constrainedResult, "service").x(),
             GEOMETRY_EPSILON,
             "partial sequence constraints must not affect ordinary graph layout");
+    }
+
+    @Test
+    void ignoresMessageOnlySequenceConstraintsForNonSequenceGraphs() {
+        LayoutRequest unconstrained = genericTwoNodeRequest(List.of());
+        LayoutRequest constrained = genericTwoNodeRequest(List.of(new LayoutConstraint(
+            "main.uml.sequence.message-order",
+            "uml.sequence.message-order",
+            List.of("customer-calls-service"))));
+
+        LayoutResult baseline = new ElkLayoutEngine().layout(unconstrained);
+        LayoutResult constrainedResult = new ElkLayoutEngine().layout(constrained);
+        ElkLayoutRenderArtifacts.write(constrainedResult);
+
+        assertEquals(
+            nodeById(baseline, "customer").x(),
+            nodeById(constrainedResult, "customer").x(),
+            GEOMETRY_EPSILON,
+            "message-only sequence constraints must not affect ordinary graph layout");
+        assertEquals(
+            nodeById(baseline, "service").x(),
+            nodeById(constrainedResult, "service").x(),
+            GEOMETRY_EPSILON,
+            "message-only sequence constraints must not affect ordinary graph layout");
+    }
+
+    @Test
+    void sequenceDanglingEdgeWarningUsesOriginalRequestEdgeIndex() {
+        LayoutResult result = new ElkLayoutEngine().layout(sequenceLayoutRequestWithDanglingMessage());
+
+        assertTrue(
+            result.warnings().stream()
+                .anyMatch(warning -> warning.code().equals("DEDIREN_ELK_DANGLING_EDGE")
+                    && warning.path().equals("$.edges[1]")),
+            "sequence edge ordering must not change warning paths, warnings=" + result.warnings());
     }
 
     @Test
@@ -1806,6 +1858,68 @@ class ElkLayoutEngineTest {
                     LayoutEndpointMerging.OFF)));
     }
 
+    private static LayoutRequest sequenceLayoutRequestWithDanglingMessage() {
+        return new LayoutRequest(
+            "layout-request.schema.v1",
+            "sequence-view",
+            List.of(
+                new LayoutNode("service", "Order Service", "service", 140.0, 48.0),
+                new LayoutNode(
+                    "interaction-place-order",
+                    "Place Order",
+                    "interaction-place-order",
+                    360.0,
+                    260.0),
+                new LayoutNode("customer", "Customer", "customer", 140.0, 48.0)),
+            List.of(
+                new LayoutEdge("m2", "service", "customer", "accepted", "m2", "Message"),
+                new LayoutEdge("m3", "service", "missing-customer", "receiptReady", "m3", "Message"),
+                new LayoutEdge("m1", "customer", "service", "placeOrder", "m1", "Message")),
+            List.of(),
+            List.of(),
+            List.of(
+                new LayoutConstraint(
+                    "sequence-view.uml.sequence.lifeline-order",
+                    "uml.sequence.lifeline-order",
+                    List.of("customer", "service")),
+                new LayoutConstraint(
+                    "sequence-view.uml.sequence.message-order",
+                    "uml.sequence.message-order",
+                    List.of("m1", "m2", "m3"))),
+            new LayoutPreferences(
+                LayoutDirection.RIGHT,
+                LayoutDensity.READABLE,
+                null,
+                new LayoutRoutingPreferences(
+                    LayoutRoutingStyle.ORTHOGONAL,
+                    LayoutRoutingProfile.READABLE,
+                    LayoutEndpointMerging.OFF)));
+    }
+
+    private static LayoutResult sequenceLayoutResultWithMessageBendPoints() {
+        return new LayoutResult(
+            "layout-result.schema.v1",
+            "sequence-view",
+            List.of(
+                new LaidOutNode("service", "service", "service", 520.0, 104.0, 140.0, 48.0, "Order Service"),
+                new LaidOutNode("customer", "customer", "customer", 100.0, 100.0, 140.0, 48.0, "Customer")),
+            List.of(new LaidOutEdge(
+                "m1",
+                "customer",
+                "service",
+                "m1",
+                "m1",
+                List.of(),
+                List.of(
+                    new Point(999.0, 10.0),
+                    new Point(700.0, 20.0),
+                    new Point(300.0, 30.0),
+                    new Point(-50.0, 40.0)),
+                "placeOrder")),
+            List.of(),
+            List.of());
+    }
+
     private static LayoutRequest genericTwoNodeRequest(List<LayoutConstraint> constraints) {
         return new LayoutRequest(
             "layout-request.schema.v1",
@@ -1887,6 +2001,32 @@ class ElkLayoutEngineTest {
             ? edge.points().get(0)
             : edge.points().get(edge.points().size() - 1);
         assertPointOnSide(point, node, side, edgeId + " endpoint for " + nodeId);
+    }
+
+    private static void assertSequenceRouteEndpointOnLifelineSide(
+        LayoutResult result,
+        String edgeId,
+        String nodeId,
+        boolean start,
+        PortSide side) {
+        LaidOutEdge edge = edgeById(result, edgeId);
+        LaidOutNode node = nodeById(result, nodeId);
+        assertRouted(edge);
+        Point point = start
+            ? edge.points().get(0)
+            : edge.points().get(edge.points().size() - 1);
+        switch (side) {
+            case WEST -> assertEquals(node.x(), point.x(), PORT_SIDE_EPSILON, edgeId + " endpoint for " + nodeId);
+            case EAST -> assertEquals(
+                node.x() + node.width(),
+                point.x(),
+                PORT_SIDE_EPSILON,
+                edgeId + " endpoint for " + nodeId);
+            default -> throw new IllegalArgumentException("unsupported sequence lifeline side " + side);
+        }
+        assertTrue(
+            point.y() > node.y() + node.height(),
+            edgeId + " endpoint should attach below lifeline head, point=" + point + ", node=" + node);
     }
 
     private static void assertRouteEndpointsOnNodePerimeters(
