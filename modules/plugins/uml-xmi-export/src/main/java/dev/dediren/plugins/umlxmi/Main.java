@@ -52,6 +52,8 @@ public final class Main {
     private static final String SCHEMA_FETCHER = "curl";
     private static final String UNSUPPORTED_SEQUENCE_MESSAGE_ENDPOINT =
             "DEDIREN_UML_XMI_SEQUENCE_MESSAGE_ENDPOINT_UNSUPPORTED";
+    private static final String MISSING_SEQUENCE_MESSAGE_INTERACTION =
+            "DEDIREN_UML_XMI_SEQUENCE_MESSAGE_INTERACTION_MISSING";
     private static final String UNSUPPORTED_SEQUENCE_NODE = "DEDIREN_UML_XMI_SEQUENCE_NODE_UNSUPPORTED";
 
     private Main() {
@@ -614,6 +616,12 @@ public final class Main {
             SourceRelationship relationship = request.source().relationships().get(index);
             if (!scope.relationshipIds().contains(relationship.id()) || !relationship.type().equals("Message")) {
                 continue;
+            }
+            if (umlString(relationship, "interaction") == null) {
+                throw new XmiExportException(
+                        MISSING_SEQUENCE_MESSAGE_INTERACTION,
+                        "UML/XMI sequence export requires selected Message relationships to define textual properties.uml.interaction",
+                        "$.relationships[" + index + "].properties.uml.interaction");
             }
             SourceNode source = sourceNodesById.get(relationship.source());
             SourceNode target = sourceNodesById.get(relationship.target());
