@@ -419,6 +419,76 @@ class GenericGraphPluginTest {
     }
 
     @Test
+    void projectsUmlSequenceFragmentRenderMetadata() throws Exception {
+        PluginResult result = Main.executeForTesting(
+                new String[]{"project", "--target", "render-metadata", "--view", "sequence-fragments-view"},
+                fixture("fixtures/source/valid-uml-sequence-fragments.json"));
+
+        JsonNode data = okData(result);
+
+        assertThat(jsonFieldNames(data.get("nodes")))
+                .contains(
+                        "cf-availability",
+                        "op-in-stock",
+                        "op-backorder",
+                        "cf-coupon",
+                        "op-coupon",
+                        "cf-retry",
+                        "op-retry",
+                        "cf-parallel-closeout",
+                        "op-charge",
+                        "op-confirm");
+        assertThat(data.at("/nodes/cf-availability/type").asText()).isEqualTo("CombinedFragment");
+        assertThat(data.at("/nodes/cf-availability/properties/operator").asText()).isEqualTo("alt");
+        assertThat(data.at("/nodes/op-in-stock/type").asText()).isEqualTo("InteractionOperand");
+        assertThat(data.at("/nodes/op-in-stock/properties/guard").asText()).isEqualTo("inStock");
+        assertSchemaValid("schemas/render-metadata.schema.json", data);
+    }
+
+    @Test
+    void excludesSequenceFragmentSemanticNodesFromLayoutRequest() throws Exception {
+        PluginResult result = Main.executeForTesting(
+                new String[]{"project", "--target", "layout-request", "--view", "sequence-fragments-view"},
+                fixture("fixtures/source/valid-uml-sequence-fragments.json"));
+
+        JsonNode data = okData(result);
+
+        assertThat(jsonTexts(data.get("nodes"), "id"))
+                .containsExactly("interaction-place-order", "customer", "service", "inventory", "payment")
+                .doesNotContain(
+                        "cf-availability",
+                        "op-in-stock",
+                        "op-backorder",
+                        "cf-coupon",
+                        "op-coupon",
+                        "cf-retry",
+                        "op-retry",
+                        "cf-parallel-closeout",
+                        "op-charge",
+                        "op-confirm");
+        assertThat(jsonTexts(data.get("labels"), "owner_id"))
+                .containsExactly("interaction-place-order", "customer", "service", "inventory", "payment");
+        assertThat(jsonTexts(data.get("edges"), "id"))
+                .containsExactly("m1", "m2", "m3", "m4", "m5", "m6", "m7", "m8", "m9", "m10", "m11", "m12");
+        assertThat(jsonTexts(data.get("constraints"), "kind"))
+                .containsExactly("uml.sequence.lifeline-order", "uml.sequence.message-order");
+        assertSchemaValid("schemas/layout-request.schema.json", data);
+    }
+
+    @Test
+    void filtersSequenceFragmentSemanticNodesFromLayoutGroups() throws Exception {
+        PluginResult result = Main.executeForTesting(
+                new String[]{"project", "--target", "layout-request", "--view", "sequence-fragments-view"},
+                sequenceFragmentsFixtureWithLayoutGroups());
+
+        JsonNode data = okData(result);
+
+        assertThat(jsonTexts(data.get("groups"), "id")).containsExactly("availability-band");
+        assertThat(jsonTexts(data.at("/groups/0/members"))).containsExactly("customer", "service");
+        assertSchemaValid("schemas/layout-request.schema.json", data);
+    }
+
+    @Test
     void projectsUmlSequenceLayoutConstraints() throws Exception {
         PluginResult result = Main.executeForTesting(
                 new String[]{"project", "--target", "layout-request", "--view", "sequence-view"},
@@ -939,8 +1009,47 @@ class GenericGraphPluginTest {
         return texts;
     }
 
+    private static java.util.List<String> jsonTexts(JsonNode values, String fieldName) {
+        var texts = new java.util.ArrayList<String>();
+        values.forEach(value -> texts.add(value.at("/" + fieldName).asText()));
+        return texts;
+    }
+
+    private static java.util.List<String> jsonFieldNames(JsonNode value) {
+        var names = new java.util.ArrayList<String>();
+        value.fieldNames().forEachRemaining(names::add);
+        return names;
+    }
+
     private static String fixture(String path) throws Exception {
         return Files.readString(workspaceRoot().resolve(path));
+    }
+
+    private static String sequenceFragmentsFixtureWithLayoutGroups() throws Exception {
+        JsonNode source = JsonSupport.objectMapper()
+                .readTree(fixture("fixtures/source/valid-uml-sequence-fragments.json"));
+        var view = (com.fasterxml.jackson.databind.node.ObjectNode) source.at("/plugins/generic-graph/views/0");
+        var groups = view.putArray("groups");
+
+        var availabilityBand = groups.addObject();
+        availabilityBand.put("id", "availability-band");
+        availabilityBand.put("label", "Availability Band");
+        availabilityBand.put("role", "layout-only");
+        var availabilityMembers = availabilityBand.putArray("members");
+        availabilityMembers.add("customer");
+        availabilityMembers.add("cf-availability");
+        availabilityMembers.add("op-in-stock");
+        availabilityMembers.add("service");
+
+        var fragmentOnlyBand = groups.addObject();
+        fragmentOnlyBand.put("id", "fragment-only-band");
+        fragmentOnlyBand.put("label", "Fragment Only Band");
+        fragmentOnlyBand.put("role", "layout-only");
+        var fragmentOnlyMembers = fragmentOnlyBand.putArray("members");
+        fragmentOnlyMembers.add("cf-coupon");
+        fragmentOnlyMembers.add("op-coupon");
+
+        return JsonSupport.objectMapper().writeValueAsString(source);
     }
 
     private static String sequenceFixtureWithAdditionalSequenceNodes() throws Exception {
