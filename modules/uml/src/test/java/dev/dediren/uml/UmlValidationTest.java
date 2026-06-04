@@ -54,7 +54,9 @@ class UmlValidationTest {
                 "Lifeline",
                 "ExecutionSpecification",
                 "DestructionOccurrenceSpecification",
-                "Gate"}) {
+                "Gate",
+                "CombinedFragment",
+                "InteractionOperand"}) {
             Uml.validateElementType(type, "$.type");
         }
         Uml.validateRelationshipType("Message", "$.type");
@@ -74,6 +76,341 @@ class UmlValidationTest {
         });
 
         Uml.validateSource(fixture.source(), fixture.pluginData());
+    }
+
+    @Test
+    void acceptsUmlSequenceCombinedFragments() throws Exception {
+        Fixture fixture = loadUmlSequenceFragmentsFixture();
+
+        Uml.validateSource(fixture.source(), fixture.pluginData());
+    }
+
+    @Test
+    void rejectsUnknownCombinedFragmentKeyword() throws Exception {
+        Fixture fixture = loadMutatedUmlSequenceFragmentsFixture(
+                source -> nodeUmlProperties(source, "cf-availability").put("operator", "unknownOperator"));
+
+        UmlValidationException error = org.junit.jupiter.api.Assertions.assertThrows(
+                UmlValidationException.class,
+                () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+
+        assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
+        assertThat(error.path()).contains("properties.uml.operator");
+    }
+
+    @Test
+    void rejectsOptFragmentWithMultipleOperands() throws Exception {
+        Fixture fixture = loadMutatedUmlSequenceFragmentsFixture(
+                source -> replaceTextArray(
+                        nodeUmlProperties(source, "cf-coupon"),
+                        "operands",
+                        "op-coupon",
+                        "op-in-stock"));
+
+        UmlValidationException error = org.junit.jupiter.api.Assertions.assertThrows(
+                UmlValidationException.class,
+                () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+
+        assertThat(error.path()).contains("properties.uml.operands");
+    }
+
+    @Test
+    void rejectsOperandListedByDifferentCombinedFragment() throws Exception {
+        Fixture fixture = loadMutatedUmlSequenceFragmentsFixture(
+                source -> replaceTextArray(
+                        nodeUmlProperties(source, "cf-availability"),
+                        "operands",
+                        "op-in-stock",
+                        "op-coupon"));
+
+        UmlValidationException error = org.junit.jupiter.api.Assertions.assertThrows(
+                UmlValidationException.class,
+                () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+
+        assertThat(error.path()).contains("properties.uml.operands[1]");
+    }
+
+    @Test
+    void rejectsOperandMessageFromDifferentInteraction() throws Exception {
+        Fixture fixture = loadMutatedUmlSequenceFragmentsFixture(source -> {
+            addSequenceNode(source, "interaction-return-order", "Interaction", "Return Order");
+            relationshipUmlProperties(source, "m5").put("interaction", "interaction-return-order");
+        });
+
+        UmlValidationException error = org.junit.jupiter.api.Assertions.assertThrows(
+                UmlValidationException.class,
+                () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+
+        assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
+        assertThat(error.path()).isEqualTo("$.nodes[9].properties.uml.fragments[0]");
+    }
+
+    @Test
+    void rejectsCombinedFragmentOperandMissingFromSequenceView() throws Exception {
+        Fixture fixture = loadMutatedUmlSequenceFragmentsFixture(
+                source -> removeViewNode(source, "op-backorder"));
+
+        UmlValidationException error = org.junit.jupiter.api.Assertions.assertThrows(
+                UmlValidationException.class,
+                () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+
+        assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
+        assertThat(error.path())
+                .isEqualTo("$.nodes[5].properties.uml.operands[1]");
+    }
+
+    @Test
+    void rejectsOperandMessageFragmentMissingFromSequenceView() throws Exception {
+        Fixture fixture = loadMutatedUmlSequenceFragmentsFixture(
+                source -> removeViewRelationship(source, "m5"));
+
+        UmlValidationException error = org.junit.jupiter.api.Assertions.assertThrows(
+                UmlValidationException.class,
+                () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+
+        assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
+        assertThat(error.path())
+                .isEqualTo("$.nodes[9].properties.uml.fragments[0]");
+    }
+
+    @Test
+    void rejectsOperandOwningCombinedFragmentMissingFromSequenceView() throws Exception {
+        Fixture fixture = loadMutatedUmlSequenceFragmentsFixture(
+                source -> removeViewNode(source, "cf-availability"));
+
+        UmlValidationException error = org.junit.jupiter.api.Assertions.assertThrows(
+                UmlValidationException.class,
+                () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+
+        assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
+        assertThat(error.path())
+                .isEqualTo("$.nodes[6].properties.uml.combined_fragment");
+    }
+
+    @Test
+    void rejectsCombinedFragmentCoveredLifelineMissingFromSequenceView() throws Exception {
+        Fixture fixture = loadMutatedUmlSequenceFragmentsFixture(
+                source -> removeViewNode(source, "inventory"));
+
+        UmlValidationException error = org.junit.jupiter.api.Assertions.assertThrows(
+                UmlValidationException.class,
+                () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+
+        assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
+        assertThat(error.path())
+                .isEqualTo("$.nodes[5].properties.uml.covered[2]");
+    }
+
+    @Test
+    void rejectsSelectedOperandMissingFromOwningCombinedFragmentOperands() throws Exception {
+        Fixture fixture = loadMutatedUmlSequenceFragmentsFixture(source -> {
+            replaceTextArray(nodeUmlProperties(source, "op-in-stock"), "fragments", "m2");
+            addInteractionOperand(
+                    source,
+                    "op-availability-extra",
+                    "Availability Extra",
+                    "cf-availability",
+                    2,
+                    "m1");
+            nodeUmlProperties(source, "op-backorder").put("order", 1);
+            replaceTextArray(
+                    nodeUmlProperties(source, "cf-availability"),
+                    "operands",
+                    "op-backorder",
+                    "op-availability-extra");
+        });
+
+        UmlValidationException error = org.junit.jupiter.api.Assertions.assertThrows(
+                UmlValidationException.class,
+                () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+
+        assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
+        assertThat(error.path()).isEqualTo("$.nodes[6].properties.uml.combined_fragment");
+    }
+
+    @Test
+    void rejectsOperandInteractionDifferentFromOwningFragment() throws Exception {
+        Fixture fixture = loadMutatedUmlSequenceFragmentsFixture(source -> {
+            addSequenceNode(source, "interaction-return-order", "Interaction", "Return Order");
+            nodeUmlProperties(source, "op-in-stock").put("interaction", "interaction-return-order");
+        });
+
+        UmlValidationException error = org.junit.jupiter.api.Assertions.assertThrows(
+                UmlValidationException.class,
+                () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+
+        assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
+        assertThat(error.path()).isEqualTo("$.nodes[5].properties.uml.operands[0]");
+    }
+
+    @Test
+    void rejectsCoveredLifelineInteractionDifferentFromCombinedFragment() throws Exception {
+        Fixture fixture = loadMutatedUmlSequenceFragmentsFixture(source -> {
+            addSequenceNode(source, "interaction-return-order", "Interaction", "Return Order");
+            nodeUmlProperties(source, "inventory").put("interaction", "interaction-return-order");
+        });
+
+        UmlValidationException error = org.junit.jupiter.api.Assertions.assertThrows(
+                UmlValidationException.class,
+                () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+
+        assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
+        assertThat(error.path()).isEqualTo("$.nodes[5].properties.uml.covered[2]");
+    }
+
+    @Test
+    void rejectsNestedCombinedFragmentInteractionDifferentFromOperand() throws Exception {
+        Fixture fixture = loadMutatedUmlSequenceFragmentsFixture(source -> {
+            addSequenceNode(source, "interaction-return-order", "Interaction", "Return Order");
+            nodeUmlProperties(source, "cf-coupon").put("interaction", "interaction-return-order");
+            replaceTextArray(nodeUmlProperties(source, "op-in-stock"), "fragments", "cf-coupon");
+        });
+
+        UmlValidationException error = org.junit.jupiter.api.Assertions.assertThrows(
+                UmlValidationException.class,
+                () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+
+        assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
+        assertThat(error.path()).isEqualTo("$.nodes[6].properties.uml.fragments[0]");
+    }
+
+    @Test
+    void rejectsOperandDirectlyNestingOwningCombinedFragment() throws Exception {
+        Fixture fixture = loadMutatedUmlSequenceFragmentsFixture(
+                source -> replaceTextArray(nodeUmlProperties(source, "op-in-stock"), "fragments", "cf-availability"));
+
+        UmlValidationException error = org.junit.jupiter.api.Assertions.assertThrows(
+                UmlValidationException.class,
+                () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+
+        assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
+        assertThat(error.path()).isEqualTo("$.nodes[6].properties.uml.fragments[0]");
+    }
+
+    @Test
+    void rejectsNestedCombinedFragmentCycle() throws Exception {
+        Fixture fixture = loadMutatedUmlSequenceFragmentsFixture(source -> {
+            replaceTextArray(nodeUmlProperties(source, "op-in-stock"), "fragments", "cf-coupon");
+            replaceTextArray(nodeUmlProperties(source, "op-coupon"), "fragments", "cf-availability");
+            replaceTextArray(nodeUmlProperties(source, "cf-coupon"), "covered", "customer", "service", "inventory");
+        });
+
+        UmlValidationException error = org.junit.jupiter.api.Assertions.assertThrows(
+                UmlValidationException.class,
+                () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+
+        assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
+        assertThat(error.path()).isEqualTo("$.nodes[6].properties.uml.fragments[0]");
+    }
+
+    @Test
+    void rejectsMessageFragmentEndpointOutsideOwningFragmentCoverage() throws Exception {
+        Fixture fixture = loadMutatedUmlSequenceFragmentsFixture(
+                source -> replaceTextArray(nodeUmlProperties(source, "cf-coupon"), "covered", "customer"));
+
+        UmlValidationException error = org.junit.jupiter.api.Assertions.assertThrows(
+                UmlValidationException.class,
+                () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+
+        assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
+        assertThat(error.path()).isEqualTo("$.nodes[9].properties.uml.fragments[0]");
+    }
+
+    @Test
+    void rejectsNestedCombinedFragmentCoverageOutsideOwningFragmentCoverage() throws Exception {
+        Fixture fixture = loadMutatedUmlSequenceFragmentsFixture(source -> {
+            replaceTextArray(nodeUmlProperties(source, "op-in-stock"), "fragments", "cf-coupon");
+            replaceTextArray(nodeUmlProperties(source, "cf-availability"), "covered", "customer");
+        });
+
+        UmlValidationException error = org.junit.jupiter.api.Assertions.assertThrows(
+                UmlValidationException.class,
+                () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+
+        assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
+        assertThat(error.path()).isEqualTo("$.nodes[6].properties.uml.fragments[0]");
+    }
+
+    @Test
+    void rejectsRepeatedMessageFragmentWithinOperand() throws Exception {
+        Fixture fixture = loadMutatedUmlSequenceFragmentsFixture(
+                source -> replaceTextArray(nodeUmlProperties(source, "op-in-stock"), "fragments", "m1", "m1"));
+
+        UmlValidationException error = org.junit.jupiter.api.Assertions.assertThrows(
+                UmlValidationException.class,
+                () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+
+        assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
+        assertThat(error.path()).isEqualTo("$.nodes[6].properties.uml.fragments[1]");
+    }
+
+    @Test
+    void rejectsMessageFragmentReusedAcrossSiblingOperands() throws Exception {
+        Fixture fixture = loadMutatedUmlSequenceFragmentsFixture(
+                source -> replaceTextArray(nodeUmlProperties(source, "op-backorder"), "fragments", "m1"));
+
+        UmlValidationException error = org.junit.jupiter.api.Assertions.assertThrows(
+                UmlValidationException.class,
+                () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+
+        assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
+        assertThat(error.path()).isEqualTo("$.nodes[7].properties.uml.fragments[0]");
+    }
+
+    @Test
+    void rejectsNestedCombinedFragmentReusedAcrossSiblingOperands() throws Exception {
+        Fixture fixture = loadMutatedUmlSequenceFragmentsFixture(source -> {
+            replaceTextArray(nodeUmlProperties(source, "op-in-stock"), "fragments", "cf-coupon");
+            replaceTextArray(nodeUmlProperties(source, "op-backorder"), "fragments", "cf-coupon");
+        });
+
+        UmlValidationException error = org.junit.jupiter.api.Assertions.assertThrows(
+                UmlValidationException.class,
+                () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+
+        assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
+        assertThat(error.path()).isEqualTo("$.nodes[7].properties.uml.fragments[0]");
+    }
+
+    @Test
+    void rejectsMalformedOperandOrderAtOperandPropertyPath() throws Exception {
+        Fixture fixture = loadMutatedUmlSequenceFragmentsFixture(
+                source -> nodeUmlProperties(source, "op-in-stock").put("order", 0));
+
+        UmlValidationException error = org.junit.jupiter.api.Assertions.assertThrows(
+                UmlValidationException.class,
+                () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+
+        assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
+        assertThat(error.path()).isEqualTo("$.nodes[6].properties.uml.order");
+    }
+
+    @Test
+    void rejectsDuplicateOperandOrder() throws Exception {
+        Fixture fixture = loadMutatedUmlSequenceFragmentsFixture(
+                source -> nodeUmlProperties(source, "op-backorder").put("order", 1));
+
+        UmlValidationException error = org.junit.jupiter.api.Assertions.assertThrows(
+                UmlValidationException.class,
+                () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+
+        assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
+        assertThat(error.path()).isEqualTo("$.nodes[5].properties.uml.operands[1]");
+    }
+
+    @Test
+    void rejectsOperandOrderDifferentFromListOrder() throws Exception {
+        Fixture fixture = loadMutatedUmlSequenceFragmentsFixture(source -> {
+            nodeUmlProperties(source, "op-in-stock").put("order", 2);
+            nodeUmlProperties(source, "op-backorder").put("order", 1);
+        });
+
+        UmlValidationException error = org.junit.jupiter.api.Assertions.assertThrows(
+                UmlValidationException.class,
+                () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+
+        assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
+        assertThat(error.path()).isEqualTo("$.nodes[5].properties.uml.operands[0]");
     }
 
     @Test
@@ -335,10 +672,32 @@ class UmlValidationTest {
         return new Fixture(source, data);
     }
 
+    private static Fixture loadUmlSequenceFragmentsFixture() throws Exception {
+        var source = JsonSupport.objectMapper().readValue(
+                Files.readString(workspaceRoot().resolve("fixtures/source/valid-uml-sequence-fragments.json")),
+                SourceDocument.class);
+        var data = JsonSupport.objectMapper().treeToValue(
+                source.plugins().get("generic-graph"),
+                GenericGraphPluginData.class);
+        return new Fixture(source, data);
+    }
+
     private static Fixture loadMutatedUmlSequenceFixture(java.util.function.Consumer<ObjectNode> mutate)
             throws Exception {
         var sourceJson = (ObjectNode) JsonSupport.objectMapper().readTree(
                 Files.readString(workspaceRoot().resolve("fixtures/source/valid-uml-sequence-basic.json")));
+        mutate.accept(sourceJson);
+        var source = JsonSupport.objectMapper().treeToValue(sourceJson, SourceDocument.class);
+        var data = JsonSupport.objectMapper().treeToValue(
+                source.plugins().get("generic-graph"),
+                GenericGraphPluginData.class);
+        return new Fixture(source, data);
+    }
+
+    private static Fixture loadMutatedUmlSequenceFragmentsFixture(java.util.function.Consumer<ObjectNode> mutate)
+            throws Exception {
+        var sourceJson = (ObjectNode) JsonSupport.objectMapper().readTree(
+                Files.readString(workspaceRoot().resolve("fixtures/source/valid-uml-sequence-fragments.json")));
         mutate.accept(sourceJson);
         var source = JsonSupport.objectMapper().treeToValue(sourceJson, SourceDocument.class);
         var data = JsonSupport.objectMapper().treeToValue(
@@ -355,6 +714,60 @@ class UmlValidationTest {
         return (ObjectNode) source.get("relationships").get(0).get("properties");
     }
 
+    private static ObjectNode nodeUmlProperties(ObjectNode source, String id) {
+        return (ObjectNode) nodeById(source, id).get("properties").get("uml");
+    }
+
+    private static ObjectNode nodeById(ObjectNode source, String id) {
+        for (var node : source.get("nodes")) {
+            if (id.equals(node.get("id").asText())) {
+                return (ObjectNode) node;
+            }
+        }
+        throw new IllegalArgumentException("Unknown source node id: " + id);
+    }
+
+    private static ObjectNode relationshipUmlProperties(ObjectNode source, String id) {
+        return (ObjectNode) relationshipById(source, id).get("properties").get("uml");
+    }
+
+    private static ObjectNode relationshipById(ObjectNode source, String id) {
+        for (var relationship : source.get("relationships")) {
+            if (id.equals(relationship.get("id").asText())) {
+                return (ObjectNode) relationship;
+            }
+        }
+        throw new IllegalArgumentException("Unknown source relationship id: " + id);
+    }
+
+    private static void replaceTextArray(ObjectNode object, String field, String... values) {
+        var array = JsonSupport.objectMapper().createArrayNode();
+        for (String value : values) {
+            array.add(value);
+        }
+        object.set(field, array);
+    }
+
+    private static void removeViewNode(ObjectNode source, String id) {
+        removeTextValue((ArrayNode) source.get("plugins").get("generic-graph").get("views").get(0).get("nodes"), id);
+    }
+
+    private static void removeViewRelationship(ObjectNode source, String id) {
+        removeTextValue(
+                (ArrayNode) source.get("plugins").get("generic-graph").get("views").get(0).get("relationships"),
+                id);
+    }
+
+    private static void removeTextValue(ArrayNode values, String id) {
+        for (int index = 0; index < values.size(); index++) {
+            if (id.equals(values.get(index).asText())) {
+                values.remove(index);
+                return;
+            }
+        }
+        throw new IllegalArgumentException("Unknown array value: " + id);
+    }
+
     private static void addSequenceNode(ObjectNode source, String id, String type, String label) {
         var node = JsonSupport.objectMapper().createObjectNode();
         node.put("id", id);
@@ -364,6 +777,21 @@ class UmlValidationTest {
                 .set("uml", JsonSupport.objectMapper().createObjectNode()));
         ((ArrayNode) source.get("nodes")).add(node);
         ((ArrayNode) source.get("plugins").get("generic-graph").get("views").get(0).get("nodes")).add(id);
+    }
+
+    private static void addInteractionOperand(
+            ObjectNode source,
+            String id,
+            String label,
+            String combinedFragment,
+            int order,
+            String... fragments) {
+        addSequenceNode(source, id, "InteractionOperand", label);
+        ObjectNode umlProperties = nodeUmlProperties(source, id);
+        umlProperties.put("interaction", "interaction-place-order");
+        umlProperties.put("combined_fragment", combinedFragment);
+        umlProperties.put("order", order);
+        replaceTextArray(umlProperties, "fragments", fragments);
     }
 
     private static Path workspaceRoot() {
