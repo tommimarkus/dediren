@@ -12,6 +12,7 @@ import dev.dediren.contracts.export.UmlXmiExportPolicy;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.contracts.layout.LaidOutGroup;
 import dev.dediren.contracts.source.GenericGraphPluginData;
+import dev.dediren.contracts.source.GenericGraphView;
 import dev.dediren.contracts.source.SourceNode;
 import dev.dediren.contracts.source.SourceRelationship;
 import dev.dediren.schemacache.SchemaCacheException;
@@ -52,11 +53,14 @@ public final class Main {
     private static final String SCHEMA_FETCHER = "curl";
     private static final String UNSUPPORTED_SEQUENCE_MESSAGE_ENDPOINT =
             "DEDIREN_UML_XMI_SEQUENCE_MESSAGE_ENDPOINT_UNSUPPORTED";
+    private static final String UNSUPPORTED_SEQUENCE_FRAGMENT_OPERATOR =
+            "DEDIREN_UML_XMI_SEQUENCE_FRAGMENT_OPERATOR_UNSUPPORTED";
     private static final String MISSING_SEQUENCE_MESSAGE_INTERACTION =
             "DEDIREN_UML_XMI_SEQUENCE_MESSAGE_INTERACTION_MISSING";
     private static final String UNSUPPORTED_SEQUENCE_MESSAGE_INTERACTION =
             "DEDIREN_UML_XMI_SEQUENCE_MESSAGE_INTERACTION_UNSUPPORTED";
     private static final String UNSUPPORTED_SEQUENCE_NODE = "DEDIREN_UML_XMI_SEQUENCE_NODE_UNSUPPORTED";
+    private static final Set<String> SUPPORTED_SEQUENCE_FRAGMENT_OPERATORS = Set.of("alt", "opt", "loop", "par");
 
     private Main() {
     }
@@ -152,9 +156,12 @@ public final class Main {
         GenericGraphPluginData pluginData;
         try {
             pluginData = genericGraphPluginData(request);
+            validateSelectedCombinedFragmentOperators(request, pluginData);
             Uml.validateSource(request.source(), pluginData);
         } catch (UmlValidationException error) {
             return exitWithDiagnostic(stdout, error.code(), error.message(), error.path());
+        } catch (XmiExportException error) {
+            return exitWithDiagnostic(stdout, error.code(), error.getMessage(), error.path());
         }
         try {
             validateExportableSequenceScope(request);
@@ -320,6 +327,12 @@ public final class Main {
                 selectedRelationships,
                 nodeIds,
                 relationshipIds);
+        List<CombinedFragmentExport> combinedFragments = combinedFragments(interaction, sourceNodes, nodeIds);
+        var combinedFragmentsById = combinedFragments.stream()
+                .collect(Collectors.toMap(fragment -> fragment.node().id(), fragment -> fragment));
+        var messagesBySourceId = messagesBySourceId(messages);
+        Set<String> nestedCombinedFragmentIds = nestedCombinedFragmentIds(combinedFragments);
+        Set<String> operandOwnedMessageIds = operandOwnedMessageIds(combinedFragments, messages);
         var messageEndpointIds = new HashSet<String>();
         for (MessageExport message : messages) {
             messageEndpointIds.add(message.sourceNodeId());
@@ -335,9 +348,16 @@ public final class Main {
                         .append("\" name=\"").append(attr(node.label())).append("\"/>");
             }
         }
+        for (CombinedFragmentExport combinedFragment : combinedFragments) {
+            if (!nestedCombinedFragmentIds.contains(combinedFragment.node().id())) {
+                writeCombinedFragment(xml, ids, combinedFragment, combinedFragmentsById, messagesBySourceId);
+            }
+        }
         for (MessageExport message : messages) {
-            writeMessageOccurrence(xml, message, "send", message.sourceEventId(), message.sourceNodeId());
-            writeMessageOccurrence(xml, message, "receive", message.receiveEventId(), message.targetNodeId());
+            if (!operandOwnedMessageIds.contains(message.relationship().id())) {
+                writeMessageOccurrence(xml, message, "send", message.sourceEventId(), message.sourceNodeId());
+                writeMessageOccurrence(xml, message, "receive", message.receiveEventId(), message.targetNodeId());
+            }
         }
         for (MessageExport message : messages) {
             writeSequenceMessage(xml, message);
@@ -380,6 +400,160 @@ public final class Main {
                 .sorted(Comparator.comparing(MessageExport::sequence)
                         .thenComparingInt(MessageExport::sourceOrder))
                 .toList();
+    }
+
+    private static List<CombinedFragmentExport> combinedFragments(
+            SourceNode interaction,
+            List<SourceNode> sourceNodes,
+            Map<String, String> nodeIds) {
+        var sourceOrder = new HashMap<String, Integer>();
+        var operandsById = new HashMap<String, OperandExport>();
+        for (int index = 0; index < sourceNodes.size(); index++) {
+            SourceNode node = sourceNodes.get(index);
+            sourceOrder.put(node.id(), index);
+            if (nodeIds.containsKey(node.id())
+                    && node.type().equals("InteractionOperand")
+                    && interaction.id().equals(umlString(node, "interaction"))) {
+                operandsById.put(node.id(), new OperandExport(
+                        node,
+                        nodeIds.get(node.id()),
+                        umlPositiveInt(node, "order", Integer.MAX_VALUE),
+                        umlString(node, "guard"),
+                        umlTextArray(node, "fragments"),
+                        index));
+            }
+        }
+
+        var combinedFragments = new java.util.ArrayList<CombinedFragmentExport>();
+        for (SourceNode node : sourceNodes) {
+            if (!nodeIds.containsKey(node.id())
+                    || !node.type().equals("CombinedFragment")
+                    || !interaction.id().equals(umlString(node, "interaction"))) {
+                continue;
+            }
+            List<String> operandIds = umlTextArray(node, "operands");
+            var operandListOrder = new HashMap<String, Integer>();
+            for (int index = 0; index < operandIds.size(); index++) {
+                operandListOrder.put(operandIds.get(index), index);
+            }
+            List<OperandExport> operands = operandIds.stream()
+                    .map(operandsById::get)
+                    .filter(operand -> operand != null)
+                    .sorted(Comparator
+                            .comparingInt((OperandExport operand) -> operandListOrder.getOrDefault(
+                                    operand.node().id(),
+                                    Integer.MAX_VALUE))
+                            .thenComparingInt(OperandExport::order)
+                            .thenComparingInt(OperandExport::sourceOrder))
+                    .toList();
+            List<String> coveredNodeIds = umlTextArray(node, "covered").stream()
+                    .map(nodeIds::get)
+                    .filter(coveredNodeId -> coveredNodeId != null)
+                    .toList();
+            combinedFragments.add(new CombinedFragmentExport(
+                    node,
+                    nodeIds.get(node.id()),
+                    umlString(node, "operator"),
+                    operands,
+                    coveredNodeIds,
+                    sourceOrder.get(node.id())));
+        }
+        return combinedFragments.stream()
+                .sorted(Comparator.comparingInt(CombinedFragmentExport::sourceOrder))
+                .toList();
+    }
+
+    private static Map<String, MessageExport> messagesBySourceId(List<MessageExport> messages) {
+        return messages.stream().collect(Collectors.toMap(message -> message.relationship().id(), message -> message));
+    }
+
+    private static Set<String> nestedCombinedFragmentIds(List<CombinedFragmentExport> combinedFragments) {
+        Set<String> combinedFragmentIds = combinedFragments.stream()
+                .map(fragment -> fragment.node().id())
+                .collect(Collectors.toSet());
+        var nestedIds = new HashSet<String>();
+        for (CombinedFragmentExport combinedFragment : combinedFragments) {
+            for (OperandExport operand : combinedFragment.operands()) {
+                for (String fragmentId : operand.fragmentIds()) {
+                    if (combinedFragmentIds.contains(fragmentId)) {
+                        nestedIds.add(fragmentId);
+                    }
+                }
+            }
+        }
+        return nestedIds;
+    }
+
+    private static Set<String> operandOwnedMessageIds(
+            List<CombinedFragmentExport> combinedFragments,
+            List<MessageExport> messages) {
+        Set<String> messageIds = messages.stream()
+                .map(message -> message.relationship().id())
+                .collect(Collectors.toSet());
+        var ownedMessageIds = new HashSet<String>();
+        for (CombinedFragmentExport combinedFragment : combinedFragments) {
+            for (OperandExport operand : combinedFragment.operands()) {
+                for (String fragmentId : operand.fragmentIds()) {
+                    if (messageIds.contains(fragmentId)) {
+                        ownedMessageIds.add(fragmentId);
+                    }
+                }
+            }
+        }
+        return ownedMessageIds;
+    }
+
+    private static void writeCombinedFragment(
+            StringBuilder xml,
+            IdentifierMap ids,
+            CombinedFragmentExport combinedFragment,
+            Map<String, CombinedFragmentExport> combinedFragmentsById,
+            Map<String, MessageExport> messagesBySourceId) {
+        xml.append("<fragment xmi:type=\"uml:CombinedFragment\" xmi:id=\"")
+                .append(attr(combinedFragment.fragmentId()))
+                .append("\" name=\"").append(attr(combinedFragment.node().label()))
+                .append("\" interactionOperator=\"").append(attr(combinedFragment.operator())).append("\"");
+        if (!combinedFragment.coveredNodeIds().isEmpty()) {
+            xml.append(" covered=\"").append(attr(String.join(" ", combinedFragment.coveredNodeIds()))).append("\"");
+        }
+        xml.append(">");
+        for (OperandExport operand : combinedFragment.operands()) {
+            writeOperand(xml, ids, operand, combinedFragmentsById, messagesBySourceId);
+        }
+        xml.append("</fragment>");
+    }
+
+    private static void writeOperand(
+            StringBuilder xml,
+            IdentifierMap ids,
+            OperandExport operand,
+            Map<String, CombinedFragmentExport> combinedFragmentsById,
+            Map<String, MessageExport> messagesBySourceId) {
+        xml.append("<operand xmi:id=\"").append(attr(operand.operandId()))
+                .append("\" name=\"").append(attr(operand.node().label())).append("\">");
+        if (operand.guard() != null) {
+            String guardId = ids.xmiId(operand.node().id() + "-guard");
+            String specificationId = ids.xmiId(operand.node().id() + "-guard-specification");
+            xml.append("<guard xmi:type=\"uml:InteractionConstraint\" xmi:id=\"").append(attr(guardId))
+                    .append("\" name=\"").append(attr(operand.guard())).append("\">")
+                    .append("<specification xmi:type=\"uml:OpaqueExpression\" xmi:id=\"")
+                    .append(attr(specificationId)).append("\">")
+                    .append("<body>").append(text(operand.guard())).append("</body>")
+                    .append("</specification></guard>");
+        }
+        for (String fragmentId : operand.fragmentIds()) {
+            MessageExport message = messagesBySourceId.get(fragmentId);
+            if (message != null) {
+                writeMessageOccurrence(xml, message, "send", message.sourceEventId(), message.sourceNodeId());
+                writeMessageOccurrence(xml, message, "receive", message.receiveEventId(), message.targetNodeId());
+                continue;
+            }
+            CombinedFragmentExport nestedCombinedFragment = combinedFragmentsById.get(fragmentId);
+            if (nestedCombinedFragment != null) {
+                writeCombinedFragment(xml, ids, nestedCombinedFragment, combinedFragmentsById, messagesBySourceId);
+            }
+        }
+        xml.append("</operand>");
     }
 
     private static void writeMessageOccurrence(
@@ -616,6 +790,25 @@ public final class Main {
         return 3;
     }
 
+    private static void validateSelectedCombinedFragmentOperators(
+            ExportRequest request,
+            GenericGraphPluginData pluginData) throws XmiExportException {
+        ExportScope scope = ExportScope.fromRequest(request, pluginData);
+        for (int index = 0; index < request.source().nodes().size(); index++) {
+            SourceNode node = request.source().nodes().get(index);
+            if (!scope.nodeIds().contains(node.id()) || !node.type().equals("CombinedFragment")) {
+                continue;
+            }
+            String operator = umlString(node, "operator");
+            if (operator != null && !SUPPORTED_SEQUENCE_FRAGMENT_OPERATORS.contains(operator)) {
+                throw new XmiExportException(
+                        UNSUPPORTED_SEQUENCE_FRAGMENT_OPERATOR,
+                        "UML/XMI sequence export supports CombinedFragment operators only: alt, opt, loop, par",
+                        "$.nodes[" + index + "].properties.uml.operator");
+            }
+        }
+    }
+
     private static void validateExportableSequenceScope(ExportRequest request) throws XmiExportException {
         ExportScope scope = ExportScope.fromRequest(request);
         var sourceNodesById = request.source().nodes().stream()
@@ -686,6 +879,30 @@ public final class Main {
         JsonNode value = node.properties().get("uml");
         value = value == null ? null : value.get(field);
         return value != null && value.isTextual() ? value.asText() : null;
+    }
+
+    private static List<String> umlTextArray(SourceNode node, String field) {
+        JsonNode value = node.properties().get("uml");
+        value = value == null ? null : value.get(field);
+        if (value == null || !value.isArray()) {
+            return List.of();
+        }
+        var values = new java.util.ArrayList<String>();
+        for (JsonNode item : value) {
+            if (item.isTextual()) {
+                values.add(item.asText());
+            }
+        }
+        return values;
+    }
+
+    private static int umlPositiveInt(SourceNode node, String field, int fallback) {
+        JsonNode value = node.properties().get("uml");
+        value = value == null ? null : value.get(field);
+        if (value == null || !value.isIntegralNumber() || value.intValue() < 1) {
+            return fallback;
+        }
+        return value.intValue();
     }
 
     private static String umlString(SourceRelationship relationship, String field) {
@@ -771,13 +988,31 @@ public final class Main {
                 .replace("\"", "&quot;");
     }
 
+    private static String text(String value) {
+        return (value == null ? "" : value)
+                .replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;");
+    }
+
     private record ExportScope(Set<String> nodeIds, Set<String> relationshipIds) {
         static ExportScope fromRequest(ExportRequest request) {
+            return fromRequest(request, genericGraphPluginData(request));
+        }
+
+        static ExportScope fromRequest(ExportRequest request, GenericGraphPluginData pluginData) {
             var sourceNodesById = request.source().nodes().stream()
                     .collect(Collectors.toMap(SourceNode::id, node -> node));
             var nodeIds = request.layoutResult().nodes().stream()
                     .map(node -> node.sourceId())
                     .collect(Collectors.toCollection(LinkedHashSet::new));
+            String viewId = request.layoutResult().viewId();
+            Optional<GenericGraphView> sourceView = viewId == null
+                    ? Optional.empty()
+                    : pluginData.views().stream()
+                            .filter(view -> viewId.equals(view.id()))
+                            .findFirst();
+            sourceView.ifPresent(view -> nodeIds.addAll(view.nodes()));
             for (LaidOutGroup group : request.layoutResult().groups()) {
                 String sourceId = semanticGroupSourceId(group);
                 if (sourceId != null) {
@@ -794,6 +1029,7 @@ public final class Main {
             var relationshipIds = request.layoutResult().edges().stream()
                     .map(edge -> edge.sourceId())
                     .collect(Collectors.toCollection(LinkedHashSet::new));
+            sourceView.ifPresent(view -> relationshipIds.addAll(view.relationships()));
             for (SourceRelationship relationship : request.source().relationships()) {
                 if (!relationshipIds.contains(relationship.id()) || !relationship.type().equals("Message")) {
                     continue;
@@ -824,6 +1060,24 @@ public final class Main {
                 nodeIds.add(endpoint.id());
             }
         }
+    }
+
+    private record CombinedFragmentExport(
+            SourceNode node,
+            String fragmentId,
+            String operator,
+            List<OperandExport> operands,
+            List<String> coveredNodeIds,
+            int sourceOrder) {
+    }
+
+    private record OperandExport(
+            SourceNode node,
+            String operandId,
+            int order,
+            String guard,
+            List<String> fragmentIds,
+            int sourceOrder) {
     }
 
     private record MessageExport(

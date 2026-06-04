@@ -97,6 +97,38 @@ class MainTest {
     }
 
     @Test
+    void exportsUmlSequenceCombinedFragments() throws Exception {
+        JsonNode input = exportInput(
+                fixtureJson("fixtures/source/valid-uml-sequence-fragments.json"),
+                fixtureJson("fixtures/layout-result/uml-sequence-fragments.json"));
+
+        PluginResult result = Main.executeForTesting(
+                new String[]{"export"},
+                input.toString(),
+                envWithXmiSchema());
+
+        String xml = okData(result).at("/content").asText();
+        assertThat(xml).isEqualTo(fixture("fixtures/export/uml-sequence-fragments.xmi"));
+    }
+
+    @Test
+    void nestsCombinedFragmentsReferencedByOperandFragments() throws Exception {
+        JsonNode input = exportInput(
+                fixtureJson("fixtures/source/valid-uml-sequence-fragments.json"),
+                fixtureJson("fixtures/layout-result/uml-sequence-fragments.json"));
+        ((com.fasterxml.jackson.databind.node.ArrayNode) input.at("/source/nodes/6/properties/uml/fragments"))
+                .add("cf-coupon");
+
+        String xml = exportXml(input);
+
+        assertThat(xml).containsOnlyOnce("xmi:id=\"id-cf-coupon\"");
+        assertThat(xml).containsSubsequence(
+                "<operand xmi:id=\"id-op-in-stock\"",
+                "<fragment xmi:type=\"uml:CombinedFragment\" xmi:id=\"id-cf-coupon\"",
+                "</operand><operand xmi:id=\"id-op-backorder\"");
+    }
+
+    @Test
     void exportsEndpointLifelineWhenOnlySelectedMessageOwnsInteraction() throws Exception {
         JsonNode input = exportSequenceInput();
         ((ObjectNode) input.at("/source/nodes/1/properties/uml")).remove("interaction");
@@ -248,6 +280,25 @@ class MainTest {
 
         assertThat(result.exitCode()).isEqualTo(3);
         assertError(result, "DEDIREN_UML_XMI_SEQUENCE_NODE_UNSUPPORTED", "$.nodes[3]");
+    }
+
+    @Test
+    void rejectsSelectedUnsupportedSequenceCombinedFragmentOperator() throws Exception {
+        JsonNode input = exportInput(
+                fixtureJson("fixtures/source/valid-uml-sequence-fragments.json"),
+                fixtureJson("fixtures/layout-result/uml-sequence-fragments.json"));
+        ((ObjectNode) input.at("/source/nodes/5/properties/uml")).put("operator", "ignore");
+
+        PluginResult result = Main.executeForTesting(
+                new String[]{"export"},
+                JsonSupport.objectMapper().writeValueAsString(input),
+                envWithXmiSchema());
+
+        assertThat(result.exitCode()).isEqualTo(3);
+        assertError(
+                result,
+                "DEDIREN_UML_XMI_SEQUENCE_FRAGMENT_OPERATOR_UNSUPPORTED",
+                "$.nodes[5].properties.uml.operator");
     }
 
     @Test
