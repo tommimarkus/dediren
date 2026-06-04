@@ -178,6 +178,40 @@ class MainTest {
     }
 
     @Test
+    void rejectsSelectedSequenceMessageWithUnknownInteraction() throws Exception {
+        JsonNode input = exportSequenceInput();
+        ((ObjectNode) input.at("/source/relationships/0/properties/uml")).put("interaction", "missing-interaction");
+
+        PluginResult result = Main.executeForTesting(
+                new String[]{"export"},
+                JsonSupport.objectMapper().writeValueAsString(input),
+                envWithXmiSchema());
+
+        assertThat(result.exitCode()).isEqualTo(3);
+        assertError(
+                result,
+                "DEDIREN_UML_XMI_SEQUENCE_MESSAGE_INTERACTION_UNSUPPORTED",
+                "$.relationships[0].properties.uml.interaction");
+    }
+
+    @Test
+    void rejectsSelectedSequenceMessageWithNonInteractionOwner() throws Exception {
+        JsonNode input = exportSequenceInput();
+        ((ObjectNode) input.at("/source/relationships/0/properties/uml")).put("interaction", "customer");
+
+        PluginResult result = Main.executeForTesting(
+                new String[]{"export"},
+                JsonSupport.objectMapper().writeValueAsString(input),
+                envWithXmiSchema());
+
+        assertThat(result.exitCode()).isEqualTo(3);
+        assertError(
+                result,
+                "DEDIREN_UML_XMI_SEQUENCE_MESSAGE_INTERACTION_UNSUPPORTED",
+                "$.relationships[0].properties.uml.interaction");
+    }
+
+    @Test
     void rejectsSelectedUnsupportedSequenceNode() throws Exception {
         JsonNode input = exportSequenceInput();
         ((com.fasterxml.jackson.databind.node.ArrayNode) input.at("/source/nodes")).add(

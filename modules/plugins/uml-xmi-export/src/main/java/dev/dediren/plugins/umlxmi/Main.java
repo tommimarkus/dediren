@@ -54,6 +54,8 @@ public final class Main {
             "DEDIREN_UML_XMI_SEQUENCE_MESSAGE_ENDPOINT_UNSUPPORTED";
     private static final String MISSING_SEQUENCE_MESSAGE_INTERACTION =
             "DEDIREN_UML_XMI_SEQUENCE_MESSAGE_INTERACTION_MISSING";
+    private static final String UNSUPPORTED_SEQUENCE_MESSAGE_INTERACTION =
+            "DEDIREN_UML_XMI_SEQUENCE_MESSAGE_INTERACTION_UNSUPPORTED";
     private static final String UNSUPPORTED_SEQUENCE_NODE = "DEDIREN_UML_XMI_SEQUENCE_NODE_UNSUPPORTED";
 
     private Main() {
@@ -617,10 +619,18 @@ public final class Main {
             if (!scope.relationshipIds().contains(relationship.id()) || !relationship.type().equals("Message")) {
                 continue;
             }
-            if (umlString(relationship, "interaction") == null) {
+            String interactionId = umlString(relationship, "interaction");
+            if (interactionId == null) {
                 throw new XmiExportException(
                         MISSING_SEQUENCE_MESSAGE_INTERACTION,
                         "UML/XMI sequence export requires selected Message relationships to define textual properties.uml.interaction",
+                        "$.relationships[" + index + "].properties.uml.interaction");
+            }
+            SourceNode interaction = sourceNodesById.get(interactionId);
+            if (interaction == null || !interaction.type().equals("Interaction")) {
+                throw new XmiExportException(
+                        UNSUPPORTED_SEQUENCE_MESSAGE_INTERACTION,
+                        "UML/XMI sequence export requires selected Message properties.uml.interaction to resolve to an Interaction node",
                         "$.relationships[" + index + "].properties.uml.interaction");
             }
             SourceNode source = sourceNodesById.get(relationship.source());
