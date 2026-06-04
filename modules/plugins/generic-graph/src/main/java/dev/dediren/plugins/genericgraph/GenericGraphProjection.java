@@ -20,6 +20,7 @@ import dev.dediren.contracts.source.SourceDocument;
 import dev.dediren.contracts.source.SourceNode;
 import dev.dediren.contracts.source.SourceRelationship;
 import java.io.IOException;
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -173,7 +174,7 @@ final class GenericGraphProjection {
                 .filter(relationship -> selectedRelationshipIds.contains(relationship.id()))
                 .filter(relationship -> relationship.type().equals("Message"))
                 .sorted(Comparator
-                        .comparingLong(GenericGraphProjection::umlMessageSequence)
+                        .comparing(GenericGraphProjection::umlMessageSequence)
                         .thenComparingInt(relationship -> sourceRelationshipOrder.get(relationship.id())))
                 .map(SourceRelationship::id)
                 .toList();
@@ -189,9 +190,9 @@ final class GenericGraphProjection {
                         messageIds));
     }
 
-    private static long umlMessageSequence(SourceRelationship relationship) {
+    private static BigInteger umlMessageSequence(SourceRelationship relationship) {
         JsonNode umlProperties = relationship.properties().get("uml");
-        return umlProperties.get("sequence").longValue();
+        return umlProperties.get("sequence").bigIntegerValue();
     }
 
     static String sourceSemanticProfile(GenericGraphPluginData pluginData) {

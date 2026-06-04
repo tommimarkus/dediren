@@ -440,6 +440,18 @@ class GenericGraphPluginTest {
     }
 
     @Test
+    void projectsUmlSequenceMessageOrderWithLargeIntegralSequence() throws Exception {
+        PluginResult result = Main.executeForTesting(
+                new String[]{"project", "--target", "layout-request", "--view", "sequence-view"},
+                sequenceFixtureWithLargeSequenceForConstraints());
+
+        JsonNode messageOrder = layoutRequestConstraint(okData(result), "uml.sequence.message-order");
+
+        assertThat(jsonTexts(messageOrder.get("subjects")))
+                .containsExactly("m3", "m2", "m1");
+    }
+
+    @Test
     void projectsUmlSequenceLifelineSizeHints() throws Exception {
         PluginResult result = Main.executeForTesting(
                 new String[]{"project", "--target", "layout-request", "--view", "sequence-view"},
@@ -951,6 +963,26 @@ class GenericGraphPluginTest {
         JsonNode m3 = relationships.get(2).deepCopy();
 
         ((com.fasterxml.jackson.databind.node.ObjectNode) m2.at("/properties/uml")).put("sequence", 1);
+        relationships.removeAll();
+        relationships.add(m3);
+        relationships.add(m2);
+        relationships.add(m1);
+
+        return JsonSupport.objectMapper().writeValueAsString(source);
+    }
+
+    private static String sequenceFixtureWithLargeSequenceForConstraints() throws Exception {
+        JsonNode source = JsonSupport.objectMapper().readTree(fixture("fixtures/source/valid-uml-sequence-basic.json"));
+        var relationships = (com.fasterxml.jackson.databind.node.ArrayNode) source.get("relationships");
+        JsonNode m1 = relationships.get(0).deepCopy();
+        JsonNode m2 = relationships.get(1).deepCopy();
+        JsonNode m3 = relationships.get(2).deepCopy();
+
+        ((com.fasterxml.jackson.databind.node.ObjectNode) m1.at("/properties/uml"))
+                .set("sequence", JsonSupport.objectMapper().getNodeFactory()
+                        .numberNode(new java.math.BigInteger("9223372036854775808")));
+        ((com.fasterxml.jackson.databind.node.ObjectNode) m2.at("/properties/uml")).put("sequence", 1);
+        ((com.fasterxml.jackson.databind.node.ObjectNode) m3.at("/properties/uml")).put("sequence", 1);
         relationships.removeAll();
         relationships.add(m3);
         relationships.add(m2);
