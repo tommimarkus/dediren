@@ -203,6 +203,7 @@ public final class Uml {
             case GENERIC, ARCHIMATE -> true;
             case UML_CLASS, UML_DATA -> isStructuralType(nodeType);
             case UML_ACTIVITY -> isActivityType(nodeType);
+            case UML_SEQUENCE -> false;
         };
         if (!supported) {
             throw new UmlValidationException(
@@ -263,6 +264,7 @@ public final class Uml {
             case UML_CLASS -> "uml-class";
             case UML_DATA -> "uml-data";
             case UML_ACTIVITY -> "uml-activity";
+            case UML_SEQUENCE -> "uml-sequence";
         };
     }
 }

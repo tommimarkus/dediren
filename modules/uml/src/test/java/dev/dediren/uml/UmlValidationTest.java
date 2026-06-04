@@ -107,6 +107,29 @@ class UmlValidationTest {
         assertThat(error.code()).isEqualTo("DEDIREN_UML_VIEW_KIND_UNSUPPORTED_ELEMENT");
     }
 
+    @Test
+    void rejectsSequenceViewElementsUntilSequenceValidationIsImplemented() throws Exception {
+        Fixture fixture = loadUmlFixture();
+        var views = new java.util.ArrayList<>(fixture.pluginData().views());
+        var view = views.getFirst();
+        views.set(0, new dev.dediren.contracts.source.GenericGraphView(
+                view.id(),
+                view.label(),
+                dev.dediren.contracts.source.GenericGraphViewKind.UML_SEQUENCE,
+                view.nodes(),
+                view.relationships(),
+                view.layoutPreferences(),
+                view.groups()));
+        var data = new GenericGraphPluginData(fixture.pluginData().semanticProfile(), views);
+
+        UmlValidationException error = org.junit.jupiter.api.Assertions.assertThrows(
+                UmlValidationException.class,
+                () -> Uml.validateSource(fixture.source(), data));
+
+        assertThat(error.code()).isEqualTo("DEDIREN_UML_VIEW_KIND_UNSUPPORTED_ELEMENT");
+        assertThat(error.value()).isEqualTo("Package in uml-sequence");
+    }
+
     private static Fixture loadUmlFixture() throws Exception {
         var source = JsonSupport.objectMapper().readValue(
                 Files.readString(workspaceRoot().resolve("fixtures/source/valid-uml-basic.json")),
