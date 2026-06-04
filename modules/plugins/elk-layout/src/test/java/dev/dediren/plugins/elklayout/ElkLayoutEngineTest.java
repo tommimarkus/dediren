@@ -124,6 +124,99 @@ class ElkLayoutEngineTest {
     }
 
     @Test
+    void packedLayoutPlacesDisconnectedNodesWithoutEdgesOrOverlaps() {
+        LayoutRequest request = new LayoutRequest(
+            "layout-request.schema.v1",
+            "map",
+            List.of(
+                new LayoutNode("crm", "CRM", "crm", 160.0, 80.0),
+                new LayoutNode("billing", "Billing", "billing", 160.0, 80.0),
+                new LayoutNode("warehouse", "Warehouse", "warehouse", 160.0, 80.0),
+                new LayoutNode("portal", "Portal", "portal", 160.0, 80.0)),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            new LayoutPreferences(LayoutMode.PACKED, null, LayoutDensity.READABLE, null, null));
+
+        LayoutResult result = new ElkLayoutEngine().layout(request);
+        ElkLayoutRenderArtifacts.write(result);
+
+        assertEquals(4, result.nodes().size());
+        assertEquals(List.of(), result.edges());
+        assertEquals(List.of(), result.warnings());
+        for (int leftIndex = 0; leftIndex < result.nodes().size(); leftIndex++) {
+            LaidOutNode left = result.nodes().get(leftIndex);
+            for (int rightIndex = leftIndex + 1; rightIndex < result.nodes().size(); rightIndex++) {
+                LaidOutNode right = result.nodes().get(rightIndex);
+                assertFalse(
+                    rectanglesOverlap(
+                        left.x(),
+                        left.y(),
+                        left.width(),
+                        left.height(),
+                        right.x(),
+                        right.y(),
+                        right.width(),
+                        right.height()),
+                    "packed layout should not overlap disconnected nodes");
+            }
+        }
+    }
+
+    @Test
+    void packedLayoutPlacesGroupedDisconnectedNodesInsidePackedGroupBounds() {
+        LayoutRequest request = new LayoutRequest(
+            "layout-request.schema.v1",
+            "map",
+            List.of(
+                new LayoutNode("crm", "CRM", "crm", 160.0, 80.0),
+                new LayoutNode("billing", "Billing", "billing", 160.0, 80.0),
+                new LayoutNode("warehouse", "Warehouse", "warehouse", 160.0, 80.0),
+                new LayoutNode("portal", "Portal", "portal", 160.0, 80.0)),
+            List.of(),
+            List.of(
+                new LayoutGroup(
+                    "customer-systems",
+                    "Customer Systems",
+                    List.of("crm", "billing"),
+                    GroupProvenance.visualOnlyGroup()),
+                new LayoutGroup(
+                    "operations",
+                    "Operations",
+                    List.of("warehouse", "portal"),
+                    GroupProvenance.visualOnlyGroup())),
+            List.of(),
+            List.of(),
+            new LayoutPreferences(LayoutMode.PACKED, null, LayoutDensity.READABLE, null, null));
+
+        LayoutResult result = new ElkLayoutEngine().layout(request);
+        ElkLayoutRenderArtifacts.write(result);
+
+        LaidOutGroup customerSystems = groupById(result, "customer-systems");
+        LaidOutGroup operations = groupById(result, "operations");
+        assertEquals(List.of("crm", "billing"), customerSystems.members());
+        assertEquals(List.of("warehouse", "portal"), operations.members());
+        assertEquals(List.of(), result.edges());
+        assertEquals(List.of(), result.warnings());
+        assertGroupContainsNode(customerSystems, nodeById(result, "crm"));
+        assertGroupContainsNode(customerSystems, nodeById(result, "billing"));
+        assertGroupContainsNode(operations, nodeById(result, "warehouse"));
+        assertGroupContainsNode(operations, nodeById(result, "portal"));
+        assertFalse(
+            rectanglesOverlap(
+                customerSystems.x(),
+                customerSystems.y(),
+                customerSystems.width(),
+                customerSystems.height(),
+                operations.x(),
+                operations.y(),
+                operations.width(),
+                operations.height()),
+            "packed layout should not overlap group bounds");
+    }
+
+    @Test
     void directionUpUsesNorthToSouthPorts() {
         LayoutRequest request = new LayoutRequest(
             "layout-request.schema.v1",
@@ -1619,6 +1712,17 @@ class ElkLayoutEngineTest {
             .filter(edge -> edge.id().equals(id))
             .findFirst()
             .orElseThrow();
+    }
+
+    private static void assertGroupContainsNode(
+        LaidOutGroup group,
+        LaidOutNode node) {
+        assertTrue(
+            node.x() >= group.x() - GEOMETRY_EPSILON
+                && node.y() >= group.y() - GEOMETRY_EPSILON
+                && node.x() + node.width() <= group.x() + group.width() + GEOMETRY_EPSILON
+                && node.y() + node.height() <= group.y() + group.height() + GEOMETRY_EPSILON,
+            "group " + group.id() + " should contain node " + node.id());
     }
 
     private static void assertRouteEndpointOnSide(

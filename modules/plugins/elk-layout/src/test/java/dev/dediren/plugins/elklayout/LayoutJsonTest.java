@@ -57,6 +57,7 @@ class LayoutJsonTest {
               "labels": [],
               "constraints": [],
               "layout_preferences": {
+                "mode": "packed",
                 "direction": "down",
                 "density": "readable",
                 "wrapping": "off",
@@ -72,6 +73,7 @@ class LayoutJsonTest {
         LayoutRequest request =
             JsonSupport.objectMapper().readValue(json, LayoutRequest.class);
 
+        assertEquals(LayoutMode.PACKED, request.layoutPreferences().mode());
         assertEquals(LayoutDirection.DOWN, request.layoutPreferences().direction());
         assertEquals(LayoutDensity.READABLE, request.layoutPreferences().density());
         assertEquals(LayoutWrapping.OFF, request.layoutPreferences().wrapping());

@@ -22,7 +22,12 @@ class MainTest {
         assertEquals("elk-layout", capabilities.path("id").asText());
         assertEquals("layout", capabilities.path("capabilities").get(0).asText());
         assertEquals("official-java-elk", capabilities.path("runtime").path("kind").asText());
-        assertEquals("org.eclipse.elk.layered", capabilities.path("runtime").path("algorithm").asText());
+        assertEquals(
+            "org.eclipse.elk.layered",
+            capabilities.path("runtime").path("algorithms").get(0).asText());
+        assertEquals(
+            "org.eclipse.elk.rectpacking",
+            capabilities.path("runtime").path("algorithms").get(1).asText());
     }
 
     @Test

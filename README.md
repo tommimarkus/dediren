@@ -46,8 +46,8 @@ release workflows cache that path separately from Maven artifacts.
 The `dist-build` profile creates an agent-ready archive under `dist/`:
 
 ```text
-dist/dediren-agent-bundle-0.19.0-x86_64-unknown-linux-gnu/
-dist/dediren-agent-bundle-0.19.0-x86_64-unknown-linux-gnu.tar.gz
+dist/dediren-agent-bundle-0.20.0-x86_64-unknown-linux-gnu/
+dist/dediren-agent-bundle-0.20.0-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Set a supported target with `DEDIREN_DIST_TARGET` when needed:
@@ -69,7 +69,7 @@ target must match the build host.
 ## Bundle Layout
 
 ```text
-dediren-agent-bundle-0.19.0-x86_64-unknown-linux-gnu/
+dediren-agent-bundle-0.20.0-x86_64-unknown-linux-gnu/
   bin/
     dediren
     dediren-plugin-generic-graph
@@ -101,7 +101,7 @@ the caller's current working directory.
 From an unpacked bundle:
 
 ```bash
-VERSION=0.19.0
+VERSION=0.20.0
 TARGET=x86_64-unknown-linux-gnu
 BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-${VERSION}-${TARGET}
 
@@ -161,7 +161,9 @@ Commands:
 - `project` asks `generic-graph` to generate a layout request or render
   metadata for a named view.
 - `layout` asks the official Java ELK plugin to generate node geometry and
-  edge routes.
+  edge routes. `layout_preferences.mode` may be `flow` for ELK Layered
+  flow diagrams or `packed` for edge-less node/group maps using ELK Rectangle
+  Packing; omit it or use `auto` for the default flow behavior.
 - `validate-layout` reports backend-neutral route and layout quality metrics.
 - `render` asks `svg-render` to generate SVG in `.data.content`.
 - `export` asks `archimate-oef` or `uml-xmi` to generate XML in
@@ -175,6 +177,11 @@ requests express layout intent. Layout results contain generated geometry.
 Render policies own SVG styling. Edge labels default to outlined text; set
 `style.edge.label_presentation` to `background` when a filled label backing is
 preferred.
+
+Use `layout_preferences.mode: "packed"` only for edge-less views such as
+grouped ArchiMate maps or inventories. Relationship-heavy diagrams should keep
+the default `auto` mode or set `mode: "flow"` so ELK Layered owns both
+placement and routing.
 
 The smallest useful source model is `fixtures/source/valid-basic.json`. Larger
 models can use relative file fragments declared in the source model; fragments

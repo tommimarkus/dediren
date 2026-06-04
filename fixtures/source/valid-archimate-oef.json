@@ -3,11 +3,11 @@
   "required_plugins": [
     {
       "id": "generic-graph",
-      "version": "0.19.0"
+      "version": "0.20.0"
     },
     {
       "id": "archimate-oef",
-      "version": "0.19.0"
+      "version": "0.20.0"
     }
   ],
   "nodes": [

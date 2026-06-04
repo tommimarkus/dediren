@@ -55,7 +55,9 @@ public final class Main {
     private static String capabilitiesJson() throws Exception {
         ObjectNode runtime = JsonSupport.objectMapper().createObjectNode();
         runtime.put("kind", "official-java-elk");
-        runtime.put("algorithm", "org.eclipse.elk.layered");
+        runtime.putArray("algorithms")
+            .add("org.eclipse.elk.layered")
+            .add("org.eclipse.elk.rectpacking");
         return JsonSupport.objectMapper().writeValueAsString(new dev.dediren.contracts.plugin.RuntimeCapabilities(
             ContractVersions.PLUGIN_PROTOCOL_VERSION,
             "elk-layout",

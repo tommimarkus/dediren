@@ -46,7 +46,7 @@ guidance in that package.
 {
   "model_schema_version": "model.schema.v1",
   "required_plugins": [
-    { "id": "generic-graph", "version": "0.19.0" }
+    { "id": "generic-graph", "version": "0.20.0" }
   ],
   "nodes": [
     { "id": "client", "type": "generic.actor", "label": "Client", "properties": {} },
@@ -90,8 +90,8 @@ profile and use ArchiMate type names:
 ```json
 {
   "required_plugins": [
-    { "id": "generic-graph", "version": "0.19.0" },
-    { "id": "archimate-oef", "version": "0.19.0" }
+    { "id": "generic-graph", "version": "0.20.0" },
+    { "id": "archimate-oef", "version": "0.20.0" }
   ],
   "plugins": {
     "generic-graph": {
@@ -130,7 +130,7 @@ jq -r '.data.content' render-result.json > diagram.svg
 ## Runtime Probes
 
 ```bash
-VERSION=0.19.0
+VERSION=0.20.0
 TARGET=x86_64-unknown-linux-gnu
 BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-${VERSION}-${TARGET}
 
@@ -176,7 +176,11 @@ from any current working directory.
 ```
 
 The `elk-layout` plugin uses official Eclipse ELK Java libraries and requires
-Java 21 or newer. It does not use external layout adapters.
+Java 21 or newer. It does not use external layout adapters. Use
+`layout_preferences.mode: "flow"` for directed diagrams that need ELK Layered
+placement and routing. Use `layout_preferences.mode: "packed"` only for
+edge-less node/group maps; this selects official ELK Rectangle Packing and
+returns no edge routes.
 
 ## Export
 

@@ -34,6 +34,7 @@ final class LayoutJson {
             return;
         }
 
+        rejectNull(preferences.get("mode"), "$.layout_preferences.mode");
         rejectNull(preferences.get("direction"), "$.layout_preferences.direction");
         rejectNull(preferences.get("density"), "$.layout_preferences.density");
         rejectNull(preferences.get("wrapping"), "$.layout_preferences.wrapping");
@@ -63,6 +64,10 @@ final class LayoutJson {
             return;
         }
 
+        rejectUnsupportedText(
+            preferences.get("mode"),
+            "$.layout_preferences.mode",
+            Set.of("auto", "flow", "packed"));
         rejectUnsupportedText(
             preferences.get("direction"),
             "$.layout_preferences.direction",

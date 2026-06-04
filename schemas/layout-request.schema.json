@@ -100,6 +100,7 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "mode": { "enum": ["auto", "flow", "packed"] },
         "direction": { "enum": ["right", "left", "down", "up"] },
         "density": { "enum": ["compact", "readable", "spacious"] },
         "wrapping": { "enum": ["auto", "off", "multi-edge"] },

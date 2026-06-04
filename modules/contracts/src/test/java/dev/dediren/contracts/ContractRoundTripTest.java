@@ -10,6 +10,7 @@ import dev.dediren.contracts.layout.GroupProvenance;
 import dev.dediren.contracts.layout.LayoutDensity;
 import dev.dediren.contracts.layout.LayoutDirection;
 import dev.dediren.contracts.layout.LayoutEndpointMerging;
+import dev.dediren.contracts.layout.LayoutMode;
 import dev.dediren.contracts.layout.LayoutRequest;
 import dev.dediren.contracts.layout.LayoutResult;
 import dev.dediren.contracts.layout.LayoutRoutingProfile;
@@ -62,6 +63,7 @@ class ContractRoundTripTest {
                       "nodes": ["class-order"],
                       "relationships": [],
                       "layout_preferences": {
+                        "mode": "packed",
                         "direction": "down",
                         "density": "readable",
                         "wrapping": "off",
@@ -90,6 +92,7 @@ class ContractRoundTripTest {
 
         assertThat(data.semanticProfile()).isEqualTo(GenericGraphSemanticProfile.UML);
         assertThat(view.kind()).isEqualTo(GenericGraphViewKind.UML_CLASS);
+        assertThat(preferences.mode()).isEqualTo(LayoutMode.PACKED);
         assertThat(preferences.direction()).isEqualTo(LayoutDirection.DOWN);
         assertThat(preferences.density()).isEqualTo(LayoutDensity.READABLE);
         assertThat(preferences.wrapping()).isEqualTo(LayoutWrapping.OFF);
@@ -102,6 +105,7 @@ class ContractRoundTripTest {
 
         assertThat(encoded.at("/semantic_profile").asText()).isEqualTo("uml");
         assertThat(encoded.at("/views/0/kind").asText()).isEqualTo("uml-class");
+        assertThat(encoded.at("/views/0/layout_preferences/mode").asText()).isEqualTo("packed");
         assertThat(encoded.at("/views/0/groups/0/role").asText()).isEqualTo("semantic-boundary");
     }
 
@@ -231,7 +235,7 @@ class ContractRoundTripTest {
                 """, RuntimeCapabilities.class);
 
         assertThat(manifest.pluginManifestSchemaVersion()).isEqualTo("plugin-manifest.schema.v1");
-        assertThat(manifest.version()).isEqualTo("0.19.0");
+        assertThat(manifest.version()).isEqualTo("0.20.0");
         assertThat(manifest.allowedEnv()).containsExactly("JAVA_HOME", "PATH");
         assertThat(capabilities.pluginProtocolVersion()).isEqualTo(ContractVersions.PLUGIN_PROTOCOL_VERSION);
         assertThat(capabilities.runtime().get("java").asText()).isEqualTo("21");

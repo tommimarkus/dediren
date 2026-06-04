@@ -7,7 +7,7 @@
   <parent>
     <groupId>dev.dediren</groupId>
     <artifactId>dediren</artifactId>
-    <version>0.19.0</version>
+    <version>0.20.0</version>
     <relativePath>../../../pom.xml</relativePath>
   </parent>
 
@@ -30,6 +30,10 @@
     <dependency>
       <groupId>org.eclipse.elk</groupId>
       <artifactId>org.eclipse.elk.alg.layered</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.eclipse.elk</groupId>
+      <artifactId>org.eclipse.elk.alg.rectpacking</artifactId>
     </dependency>
     <dependency>
       <groupId>com.google.guava</groupId>

@@ -10,6 +10,7 @@ import dev.dediren.contracts.layout.LayoutConstraint;
 import dev.dediren.contracts.layout.LayoutEdge;
 import dev.dediren.contracts.layout.LayoutGroup;
 import dev.dediren.contracts.layout.LayoutLabel;
+import dev.dediren.contracts.layout.LayoutMode;
 import dev.dediren.contracts.layout.LayoutNode;
 import dev.dediren.contracts.layout.LayoutPreferences;
 import dev.dediren.contracts.layout.LayoutRequest;
@@ -50,11 +51,20 @@ final class ElkLayoutEngine {
 
     LayoutResult layout(LayoutRequest request) {
         validate(request);
+        if (layoutMode(request.layoutPreferences()) == LayoutMode.PACKED) {
+            return layoutPacked(request);
+        }
         if (!list(request.groups()).isEmpty()) {
             return layoutGrouped(request);
         }
 
         return layoutFlat(request);
+    }
+
+    private static LayoutMode layoutMode(LayoutPreferences preferences) {
+        return preferences == null || preferences.mode() == null
+                ? LayoutMode.AUTO
+                : preferences.mode();
     }
 
     private static LayoutResult layoutFlat(LayoutRequest request) {
@@ -158,6 +168,76 @@ final class ElkLayoutEngine {
             request.viewId(),
             nodes,
             edges,
+            groups,
+            warnings);
+    }
+
+    private static LayoutResult layoutPacked(LayoutRequest request) {
+        if (!list(request.edges()).isEmpty()) {
+            throw new IllegalArgumentException("packed layout mode requires an edge-less request at $.edges");
+        }
+
+        LayoutPreferences preferences = request.layoutPreferences();
+        List<Diagnostic> warnings = new ArrayList<>();
+        ElkNode root = ElkGraphUtil.createGraph();
+        ElkPackedOptions.configureRoot(root, preferences);
+        Map<String, LayoutNode> requestNodes = requestNodesById(request);
+        Map<String, String> ownerByNode = ownerByNode(request);
+        Map<String, ElkNode> elkGroups = new HashMap<>();
+        for (LayoutGroup group : list(request.groups())) {
+            List<LayoutNode> members = list(group.members()).stream()
+                .map(requestNodes::get)
+                .filter(node -> node != null)
+                .toList();
+            if (members.isEmpty()) {
+                continue;
+            }
+            ElkNode elkGroup = ElkGraphUtil.createNode(root);
+            elkGroup.setIdentifier(group.id());
+            ElkGraphUtil.createLabel(elkGroup).setText(group.label());
+            ElkPackedOptions.configureRoot(elkGroup, preferences);
+            elkGroups.put(group.id(), elkGroup);
+        }
+
+        Map<String, ElkNode> elkNodes = new HashMap<>();
+        for (LayoutNode node : list(request.nodes())) {
+            ElkNode parent = ownerByNode.containsKey(node.id())
+                ? elkGroups.get(ownerByNode.get(node.id()))
+                : root;
+            if (parent == null) {
+                continue;
+            }
+            ElkNode elkNode = ElkGraphUtil.createNode(parent);
+            elkNode.setIdentifier(node.id());
+            setGeneratedDimensions(elkNode, node, null, preferences);
+            ElkGraphUtil.createLabel(elkNode).setText(node.label());
+            elkNodes.put(node.id(), elkNode);
+        }
+
+        new RecursiveGraphLayoutEngine().layout(root, new BasicProgressMonitor());
+
+        List<LaidOutNode> nodes = new ArrayList<>();
+        for (LayoutNode node : list(request.nodes())) {
+            ElkNode elkNode = elkNodes.get(node.id());
+            if (elkNode != null) {
+                nodes.add(new LaidOutNode(
+                    node.id(),
+                    node.sourceId(),
+                    node.id(),
+                    absoluteX(elkNode),
+                    absoluteY(elkNode),
+                    elkNode.getWidth(),
+                    elkNode.getHeight(),
+                    node.label()));
+            }
+        }
+
+        List<LaidOutGroup> groups = groupedBounds(request, elkGroups, elkNodes, warnings);
+        return new LayoutResult(
+            "layout-result.schema.v1",
+            request.viewId(),
+            nodes,
+            List.of(),
             groups,
             warnings);
     }
