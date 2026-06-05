@@ -1,0 +1,226 @@
+{
+  "model_schema_version": "model.schema.v1",
+  "required_plugins": [
+    {
+      "id": "generic-graph",
+      "version": "0.22.0"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "order-lifecycle",
+      "type": "StateMachine",
+      "label": "Order Lifecycle",
+      "properties": {
+        "uml": {}
+      }
+    },
+    {
+      "id": "main-region",
+      "type": "Region",
+      "label": "Main Region",
+      "properties": {
+        "uml": {
+          "state_machine": "order-lifecycle"
+        }
+      }
+    },
+    {
+      "id": "initial",
+      "type": "Pseudostate",
+      "label": "",
+      "properties": {
+        "uml": {
+          "region": "main-region",
+          "kind": "initial"
+        }
+      }
+    },
+    {
+      "id": "draft",
+      "type": "State",
+      "label": "Draft",
+      "properties": {
+        "uml": {
+          "region": "main-region"
+        }
+      }
+    },
+    {
+      "id": "submitted",
+      "type": "State",
+      "label": "Submitted",
+      "properties": {
+        "uml": {
+          "region": "main-region"
+        }
+      }
+    },
+    {
+      "id": "payment-choice",
+      "type": "Pseudostate",
+      "label": "",
+      "properties": {
+        "uml": {
+          "region": "main-region",
+          "kind": "choice"
+        }
+      }
+    },
+    {
+      "id": "fulfilled",
+      "type": "State",
+      "label": "Fulfilled",
+      "properties": {
+        "uml": {
+          "region": "main-region"
+        }
+      }
+    },
+    {
+      "id": "closed",
+      "type": "FinalState",
+      "label": "",
+      "properties": {
+        "uml": {
+          "region": "main-region"
+        }
+      }
+    },
+    {
+      "id": "rejected",
+      "type": "FinalState",
+      "label": "",
+      "properties": {
+        "uml": {
+          "region": "main-region"
+        }
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "id": "t-create",
+      "type": "Transition",
+      "source": "initial",
+      "target": "draft",
+      "label": "create",
+      "properties": {
+        "uml": {
+          "region": "main-region",
+          "kind": "external",
+          "trigger": "create"
+        }
+      }
+    },
+    {
+      "id": "t-submit",
+      "type": "Transition",
+      "source": "draft",
+      "target": "submitted",
+      "label": "submit",
+      "properties": {
+        "uml": {
+          "region": "main-region",
+          "kind": "external",
+          "trigger": "submit"
+        }
+      }
+    },
+    {
+      "id": "t-check-payment",
+      "type": "Transition",
+      "source": "submitted",
+      "target": "payment-choice",
+      "label": "authorize",
+      "properties": {
+        "uml": {
+          "region": "main-region",
+          "kind": "external",
+          "trigger": "authorizePayment"
+        }
+      }
+    },
+    {
+      "id": "t-approve",
+      "type": "Transition",
+      "source": "payment-choice",
+      "target": "fulfilled",
+      "label": "[paymentAuthorized]",
+      "properties": {
+        "uml": {
+          "region": "main-region",
+          "kind": "external",
+          "guard": "paymentAuthorized"
+        }
+      }
+    },
+    {
+      "id": "t-reject",
+      "type": "Transition",
+      "source": "payment-choice",
+      "target": "rejected",
+      "label": "[paymentRejected]",
+      "properties": {
+        "uml": {
+          "region": "main-region",
+          "kind": "external",
+          "guard": "paymentRejected"
+        }
+      }
+    },
+    {
+      "id": "t-close",
+      "type": "Transition",
+      "source": "fulfilled",
+      "target": "closed",
+      "label": "deliver",
+      "properties": {
+        "uml": {
+          "region": "main-region",
+          "kind": "external",
+          "trigger": "deliver"
+        }
+      }
+    }
+  ],
+  "plugins": {
+    "generic-graph": {
+      "semantic_profile": "uml",
+      "views": [
+        {
+          "id": "state-machine-view",
+          "label": "Order Lifecycle State Machine",
+          "kind": "uml-state-machine",
+          "nodes": ["initial", "draft", "submitted", "payment-choice", "fulfilled", "closed", "rejected"],
+          "relationships": ["t-create", "t-submit", "t-check-payment", "t-approve", "t-reject", "t-close"],
+          "layout_preferences": {
+            "direction": "right",
+            "density": "readable",
+            "routing": {
+              "style": "orthogonal",
+              "profile": "readable",
+              "endpoint_merging": "off"
+            }
+          },
+          "groups": [
+            {
+              "id": "order-lifecycle-frame",
+              "label": "Order Lifecycle",
+              "role": "semantic-boundary",
+              "semantic_source_id": "order-lifecycle",
+              "members": ["initial", "draft", "submitted", "payment-choice", "fulfilled", "closed", "rejected"]
+            },
+            {
+              "id": "main-region-frame",
+              "label": "Main Region",
+              "role": "semantic-boundary",
+              "semantic_source_id": "main-region",
+              "members": ["initial", "draft", "submitted", "payment-choice", "fulfilled", "closed", "rejected"]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
