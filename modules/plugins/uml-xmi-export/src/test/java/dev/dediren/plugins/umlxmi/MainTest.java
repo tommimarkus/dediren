@@ -112,6 +112,37 @@ class MainTest {
     }
 
     @Test
+    void keepsSequenceViewRelationshipsScopedToLayoutEdges() throws Exception {
+        JsonNode input = exportInput(
+                fixtureJson("fixtures/source/valid-uml-sequence-fragments.json"),
+                fixtureJson("fixtures/layout-result/uml-sequence-fragments.json"));
+        ((com.fasterxml.jackson.databind.node.ArrayNode) input.at("/source/relationships"))
+                .add(JsonSupport.objectMapper().readTree("""
+                {
+                  "id": "m-unlaid",
+                  "type": "Message",
+                  "source": "customer",
+                  "target": "service",
+                  "label": "notInLayout",
+                  "properties": {
+                    "uml": {
+                      "interaction": "interaction-place-order",
+                      "sequence": 13,
+                      "message_sort": "synchCall"
+                    }
+                  }
+                }
+                """));
+        ((com.fasterxml.jackson.databind.node.ArrayNode)
+                        input.at("/source/plugins/generic-graph/views/0/relationships"))
+                .add("m-unlaid");
+
+        String xml = exportXml(input);
+
+        assertThat(xml).doesNotContain("id-m-unlaid", "notInLayout");
+    }
+
+    @Test
     void interleavesTopLevelCombinedFragmentsAndStandaloneMessagesBySequence() throws Exception {
         JsonNode input = exportInput(
                 fixtureJson("fixtures/source/valid-uml-sequence-fragments.json"),

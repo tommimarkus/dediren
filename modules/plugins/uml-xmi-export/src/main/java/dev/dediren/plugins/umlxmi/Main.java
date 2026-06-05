@@ -13,6 +13,7 @@ import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.contracts.layout.LaidOutGroup;
 import dev.dediren.contracts.source.GenericGraphPluginData;
 import dev.dediren.contracts.source.GenericGraphView;
+import dev.dediren.contracts.source.GenericGraphViewKind;
 import dev.dediren.contracts.source.SourceNode;
 import dev.dediren.contracts.source.SourceRelationship;
 import dev.dediren.schemacache.SchemaCacheException;
@@ -1091,13 +1092,21 @@ public final class Main {
             var nodeIds = request.layoutResult().nodes().stream()
                     .map(node -> node.sourceId())
                     .collect(Collectors.toCollection(LinkedHashSet::new));
+            var relationshipIds = request.layoutResult().edges().stream()
+                    .map(edge -> edge.sourceId())
+                    .collect(Collectors.toCollection(LinkedHashSet::new));
             String viewId = request.layoutResult().viewId();
             Optional<GenericGraphView> sourceView = viewId == null
                     ? Optional.empty()
                     : pluginData.views().stream()
                             .filter(view -> viewId.equals(view.id()))
                             .findFirst();
-            sourceView.ifPresent(view -> nodeIds.addAll(view.nodes()));
+            sourceView.ifPresent(view -> addSelectedSourceOnlySequenceFragmentScope(
+                    nodeIds,
+                    relationshipIds,
+                    view,
+                    sourceNodesById,
+                    request.source().relationships()));
             for (LaidOutGroup group : request.layoutResult().groups()) {
                 String sourceId = semanticGroupSourceId(group);
                 if (sourceId != null) {
@@ -1111,10 +1120,6 @@ public final class Main {
                     .filter(value -> value != null)
                     .toList();
             nodeIds.addAll(activityIds);
-            var relationshipIds = request.layoutResult().edges().stream()
-                    .map(edge -> edge.sourceId())
-                    .collect(Collectors.toCollection(LinkedHashSet::new));
-            sourceView.ifPresent(view -> relationshipIds.addAll(view.relationships()));
             for (SourceRelationship relationship : request.source().relationships()) {
                 if (!relationshipIds.contains(relationship.id()) || !relationship.type().equals("Message")) {
                     continue;
@@ -1134,6 +1139,53 @@ public final class Main {
                     .toList();
             nodeIds.addAll(interactionIds);
             return new ExportScope(nodeIds, relationshipIds);
+        }
+
+        private static void addSelectedSourceOnlySequenceFragmentScope(
+                Set<String> nodeIds,
+                Set<String> relationshipIds,
+                GenericGraphView view,
+                Map<String, SourceNode> sourceNodesById,
+                List<SourceRelationship> sourceRelationships) {
+            if (view.kind() != GenericGraphViewKind.UML_SEQUENCE) {
+                return;
+            }
+            Set<String> viewRelationshipIds = new HashSet<>(view.relationships());
+            var sourceRelationshipsById = sourceRelationships.stream()
+                    .collect(Collectors.toMap(SourceRelationship::id, relationship -> relationship));
+            for (String nodeId : view.nodes()) {
+                SourceNode node = sourceNodesById.get(nodeId);
+                if (node == null || !isSourceOnlySequenceFragmentNode(node)) {
+                    continue;
+                }
+                nodeIds.add(node.id());
+                if (node.type().equals("InteractionOperand")) {
+                    addSelectedOperandMessageFragments(
+                            relationshipIds,
+                            viewRelationshipIds,
+                            sourceRelationshipsById,
+                            node);
+                }
+            }
+        }
+
+        private static boolean isSourceOnlySequenceFragmentNode(SourceNode node) {
+            return node.type().equals("CombinedFragment") || node.type().equals("InteractionOperand");
+        }
+
+        private static void addSelectedOperandMessageFragments(
+                Set<String> relationshipIds,
+                Set<String> viewRelationshipIds,
+                Map<String, SourceRelationship> sourceRelationshipsById,
+                SourceNode operand) {
+            for (String fragmentId : umlTextArray(operand, "fragments")) {
+                SourceRelationship relationship = sourceRelationshipsById.get(fragmentId);
+                if (relationship != null
+                        && relationship.type().equals("Message")
+                        && viewRelationshipIds.contains(fragmentId)) {
+                    relationshipIds.add(fragmentId);
+                }
+            }
         }
 
         private static void addMessageLifelineEndpoint(
