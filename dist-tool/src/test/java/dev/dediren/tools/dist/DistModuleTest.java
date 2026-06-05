@@ -16,7 +16,7 @@ class DistModuleTest {
             #!/bin/sh
             APP_HOME=$( cd -P "${APP_HOME:-./}.." > /dev/null && printf '%s\\n' "$PWD" ) || exit
 
-            DEFAULT_JVM_OPTS='"-Ddediren.version=0.22.0"'
+            DEFAULT_JVM_OPTS='"-Ddediren.version=0.23.0"'
             """;
 
         String rewritten = DistTool.withBundleRootExport(script);
