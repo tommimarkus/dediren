@@ -201,6 +201,44 @@ class MainTest {
     }
 
     @Test
+    void exportsComponentPortsAndRelationships() throws Exception {
+        JsonNode input = exportInput(
+                fixtureJson("fixtures/source/valid-uml-component-basic.json"),
+                fixtureJson("fixtures/layout-result/uml-component-basic.json"));
+
+        String xml = exportXml(input);
+
+        assertThat(xml).isEqualTo(fixture("fixtures/export/uml-component-basic.xmi"));
+        assertThat(xml).contains(
+                "xmi:type=\"uml:Component\"",
+                "xmi:type=\"uml:Port\"",
+                "provided=\"id-interface-order-api\"",
+                "required=\"id-interface-payment-gateway\"",
+                "xmi:type=\"uml:Usage\"",
+                "xmi:type=\"uml:Realization\"",
+                "client=\"id-component-order-api\" supplier=\"id-interface-payment-gateway\"");
+    }
+
+    @Test
+    void rejectsComponentPortOwnedByNonComponent() throws Exception {
+        JsonNode input = exportInput(
+                fixtureJson("fixtures/source/valid-uml-component-basic.json"),
+                fixtureJson("fixtures/layout-result/uml-component-basic.json"));
+        ((ObjectNode) input.at("/source/nodes/2/properties/uml")).put("component", "interface-order-api");
+
+        PluginResult result = Main.executeForTesting(
+                new String[]{"export"},
+                JsonSupport.objectMapper().writeValueAsString(input),
+                envWithXmiSchema());
+
+        assertThat(result.exitCode()).isEqualTo(3);
+        assertError(
+                result,
+                "DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED",
+                "$.nodes[2].properties.uml.component");
+    }
+
+    @Test
     void keepsSequenceViewRelationshipsScopedToLayoutEdges() throws Exception {
         JsonNode input = exportInput(
                 fixtureJson("fixtures/source/valid-uml-sequence-fragments.json"),

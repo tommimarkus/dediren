@@ -1,0 +1,337 @@
+{
+  "layout_result_schema_version": "layout-result.schema.v1",
+  "view_id": "component-view",
+  "nodes": [
+    {
+      "id": "component-order-api",
+      "source_id": "component-order-api",
+      "projection_id": "component-order-api",
+      "x": 662.0,
+      "y": 440.0,
+      "width": 180.0,
+      "height": 96.0,
+      "label": "Order API"
+    },
+    {
+      "id": "port-rest-api",
+      "source_id": "port-rest-api",
+      "projection_id": "port-rest-api",
+      "x": 735.5,
+      "y": 680.0,
+      "width": 32.0,
+      "height": 32.0,
+      "label": "REST"
+    },
+    {
+      "id": "component-payment-adapter",
+      "source_id": "component-payment-adapter",
+      "projection_id": "component-payment-adapter",
+      "x": 614.0,
+      "y": 976.0,
+      "width": 180.0,
+      "height": 96.0,
+      "label": "Payment Adapter"
+    },
+    {
+      "id": "port-payment-client",
+      "source_id": "port-payment-client",
+      "projection_id": "port-payment-client",
+      "x": 687.5,
+      "y": 872.0,
+      "width": 32.0,
+      "height": 32.0,
+      "label": "client"
+    },
+    {
+      "id": "interface-order-api",
+      "source_id": "interface-order-api",
+      "projection_id": "interface-order-api",
+      "x": 84.0,
+      "y": 236.0,
+      "width": 280.0,
+      "height": 120.0,
+      "label": "OrderApi"
+    },
+    {
+      "id": "interface-payment-gateway",
+      "source_id": "interface-payment-gateway",
+      "projection_id": "interface-payment-gateway",
+      "x": 44.0,
+      "y": 747.1666666666666,
+      "width": 320.0,
+      "height": 120.0,
+      "label": "PaymentGateway"
+    },
+    {
+      "id": "class-order-controller",
+      "source_id": "class-order-controller",
+      "projection_id": "class-order-controller",
+      "x": 124.0,
+      "y": 44.0,
+      "width": 240.0,
+      "height": 120.0,
+      "label": "OrderController"
+    }
+  ],
+  "edges": [
+    {
+      "id": "order-api-realizes-order-api",
+      "source": "component-order-api",
+      "target": "interface-order-api",
+      "source_id": "order-api-realizes-order-api",
+      "projection_id": "order-api-realizes-order-api",
+      "routing_hints": [],
+      "points": [
+        {
+          "x": 661.0,
+          "y": 471.25
+        },
+        {
+          "x": 613.0,
+          "y": 471.25
+        },
+        {
+          "x": 613.0,
+          "y": 392.0
+        },
+        {
+          "x": 751.5,
+          "y": 392.0
+        },
+        {
+          "x": 898.0,
+          "y": 392.0
+        },
+        {
+          "x": 946.0,
+          "y": 392.0
+        },
+        {
+          "x": 946.0,
+          "y": 296.0
+        },
+        {
+          "x": 715.5,
+          "y": 296.0
+        },
+        {
+          "x": 365.0,
+          "y": 296.0
+        }
+      ],
+      "label": "realizes"
+    },
+    {
+      "id": "order-api-uses-payment",
+      "source": "component-order-api",
+      "target": "interface-payment-gateway",
+      "source_id": "order-api-uses-payment",
+      "projection_id": "order-api-uses-payment",
+      "routing_hints": [],
+      "points": [
+        {
+          "x": 661.0,
+          "y": 488.0
+        },
+        {
+          "x": 565.0,
+          "y": 488.0
+        },
+        {
+          "x": 565.0,
+          "y": 632.0
+        },
+        {
+          "x": 751.5,
+          "y": 632.0
+        },
+        {
+          "x": 898.0,
+          "y": 632.0
+        },
+        {
+          "x": 946.0,
+          "y": 632.0
+        },
+        {
+          "x": 946.0,
+          "y": 792.0
+        },
+        {
+          "x": 715.5,
+          "y": 792.0
+        },
+        {
+          "x": 365.0,
+          "y": 792.0
+        }
+      ],
+      "label": "uses"
+    },
+    {
+      "id": "payment-adapter-realizes-gateway",
+      "source": "component-payment-adapter",
+      "target": "interface-payment-gateway",
+      "source_id": "payment-adapter-realizes-gateway",
+      "projection_id": "payment-adapter-realizes-gateway",
+      "routing_hints": [],
+      "points": [
+        {
+          "x": 613.0,
+          "y": 1024.0
+        },
+        {
+          "x": 565.0,
+          "y": 1024.0
+        },
+        {
+          "x": 565.0,
+          "y": 1120.0
+        },
+        {
+          "x": 703.5,
+          "y": 1120.0
+        },
+        {
+          "x": 850.0,
+          "y": 1120.0
+        },
+        {
+          "x": 946.0,
+          "y": 1120.0
+        },
+        {
+          "x": 946.0,
+          "y": 1216.0
+        },
+        {
+          "x": 715.5,
+          "y": 1216.0
+        },
+        {
+          "x": 413.0,
+          "y": 1216.0
+        },
+        {
+          "x": 413.0,
+          "y": 822.3333333333333
+        },
+        {
+          "x": 365.0,
+          "y": 822.3333333333333
+        }
+      ],
+      "label": "realizes"
+    },
+    {
+      "id": "order-api-depends-controller",
+      "source": "component-order-api",
+      "target": "class-order-controller",
+      "source_id": "order-api-depends-controller",
+      "projection_id": "order-api-depends-controller",
+      "routing_hints": [],
+      "points": [
+        {
+          "x": 661.0,
+          "y": 504.75
+        },
+        {
+          "x": 613.0,
+          "y": 504.75
+        },
+        {
+          "x": 613.0,
+          "y": 584.0
+        },
+        {
+          "x": 751.5,
+          "y": 584.0
+        },
+        {
+          "x": 898.0,
+          "y": 584.0
+        },
+        {
+          "x": 994.0,
+          "y": 584.0
+        },
+        {
+          "x": 994.0,
+          "y": 104.0
+        },
+        {
+          "x": 715.5,
+          "y": 104.0
+        },
+        {
+          "x": 365.0,
+          "y": 104.0
+        }
+      ],
+      "label": "uses"
+    }
+  ],
+  "groups": [
+    {
+      "id": "orders-package-boundary",
+      "source_id": "pkg-orders",
+      "projection_id": "orders-package-boundary",
+      "provenance": {
+        "semantic_backed": {
+          "source_id": "pkg-orders"
+        }
+      },
+      "x": 12.0,
+      "y": 12.0,
+      "width": 1014.0,
+      "height": 1240.0,
+      "members": [
+        "order-api-boundary",
+        "payment-adapter-boundary",
+        "interface-order-api",
+        "interface-payment-gateway",
+        "class-order-controller"
+      ],
+      "label": "Orders"
+    },
+    {
+      "id": "order-api-boundary",
+      "source_id": "component-order-api",
+      "projection_id": "order-api-boundary",
+      "provenance": {
+        "semantic_backed": {
+          "source_id": "component-order-api"
+        }
+      },
+      "x": 533.0,
+      "y": 344.0,
+      "width": 341.0,
+      "height": 400.0,
+      "members": [
+        "component-order-api",
+        "port-rest-api"
+      ],
+      "label": "Order API"
+    },
+    {
+      "id": "payment-adapter-boundary",
+      "source_id": "component-payment-adapter",
+      "projection_id": "payment-adapter-boundary",
+      "provenance": {
+        "semantic_backed": {
+          "source_id": "component-payment-adapter"
+        }
+      },
+      "x": 533.0,
+      "y": 840.0,
+      "width": 293.0,
+      "height": 328.0,
+      "members": [
+        "component-payment-adapter",
+        "port-payment-client"
+      ],
+      "label": "Payment Adapter"
+    }
+  ],
+  "warnings": []
+}

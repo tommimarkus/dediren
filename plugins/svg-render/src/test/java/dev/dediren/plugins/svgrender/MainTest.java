@@ -142,6 +142,41 @@ class MainTest {
         }
 
         @Test
+        void rendersUmlComponentNotation() throws Exception {
+            String content = okContent(render(renderInput(
+                    "fixtures/layout-result/uml-component-basic.json",
+                    "fixtures/render-policy/uml-svg.json",
+                    "fixtures/render-metadata/uml-component-basic.json")));
+            Document document = svgDocument(content);
+
+            assertThat(content).contains(">Order API<", ">REST<", ">PaymentGateway<");
+            groupWithAttribute(document, "data-dediren-node-id", "component-order-api");
+            groupWithAttribute(document, "data-dediren-node-id", "port-rest-api");
+            groupWithAttribute(document, "data-dediren-edge-id", "order-api-uses-payment");
+            groupWithAttribute(document, "data-dediren-group-id", "orders-package-boundary");
+            groupWithAttribute(document, "data-dediren-group-id", "order-api-boundary");
+
+            Element orderApi = groupWithAttribute(document, "data-dediren-node-id", "component-order-api");
+            Element componentShape = firstChildElement(orderApi, "rect");
+            assertThat(componentShape.getAttribute("data-dediren-node-shape")).isEqualTo("uml_component");
+            Element componentDecorator = childElementWithAttribute(
+                    orderApi,
+                    "g",
+                    "data-dediren-node-decorator",
+                    "uml_component");
+            assertThat(childElements(componentDecorator, "rect")).hasSizeGreaterThanOrEqualTo(2);
+
+            Element restPort = groupWithAttribute(document, "data-dediren-node-id", "port-rest-api");
+            Element portShape = firstChildElement(restPort, "rect");
+            assertThat(portShape.getAttribute("data-dediren-node-shape")).isEqualTo("uml_port");
+
+            Element usage = groupWithAttribute(document, "data-dediren-edge-id", "order-api-uses-payment");
+            Element usagePath = firstChildElement(usage, "path");
+            assertMarkerForStyle(document, usagePath, "order-api-uses-payment", "end", "open_arrow");
+            assertThat(usagePath.getAttribute("stroke-dasharray")).isEqualTo("8 5");
+        }
+
+        @Test
         void rejectsMalformedUmlSequenceMessageMetadata() throws Exception {
             assertInvalidUmlSequenceMessageMetadata(
                     properties -> properties.remove("sequence"),

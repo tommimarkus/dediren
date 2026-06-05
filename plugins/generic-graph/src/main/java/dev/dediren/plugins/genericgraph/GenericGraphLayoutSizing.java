@@ -41,6 +41,10 @@ final class GenericGraphLayoutSizing {
         if (semanticProfile.equals("uml") && umlUseCaseHint != null) {
             return umlUseCaseHint;
         }
+        Double umlComponentHint = umlComponentWidthHint(sourceNode.type());
+        if (semanticProfile.equals("uml") && umlComponentHint != null) {
+            return umlComponentHint;
+        }
         if (semanticProfile.equals("uml") && isLargeUmlStructuralNodeType(sourceNode.type())) {
             return umlStructuralWidthHint(sourceNode);
         }
@@ -65,6 +69,10 @@ final class GenericGraphLayoutSizing {
         Double umlUseCaseHint = umlUseCaseHeightHint(sourceNode.type());
         if (semanticProfile.equals("uml") && umlUseCaseHint != null) {
             return umlUseCaseHint;
+        }
+        Double umlComponentHint = umlComponentHeightHint(sourceNode.type());
+        if (semanticProfile.equals("uml") && umlComponentHint != null) {
+            return umlComponentHint;
         }
         if (semanticProfile.equals("uml") && isLargeUmlStructuralNodeType(sourceNode.type())) {
             return umlStructuralHeightHint(sourceNode);
@@ -122,6 +130,22 @@ final class GenericGraphLayoutSizing {
             case "Actor" -> 120.0;
             case "UseCase" -> 72.0;
             case "ExtensionPoint" -> 40.0;
+            default -> null;
+        };
+    }
+
+    private static Double umlComponentWidthHint(String nodeType) {
+        return switch (nodeType) {
+            case "Component" -> 180.0;
+            case "Port" -> 32.0;
+            default -> null;
+        };
+    }
+
+    private static Double umlComponentHeightHint(String nodeType) {
+        return switch (nodeType) {
+            case "Component" -> 96.0;
+            case "Port" -> 32.0;
             default -> null;
         };
     }

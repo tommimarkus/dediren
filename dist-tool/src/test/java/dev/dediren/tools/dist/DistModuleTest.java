@@ -20,8 +20,8 @@ class DistModuleTest {
 
     @Test
     void bundleNameUsesVersionOnlyForJavaArchive() {
-        assertThat(DistTool.bundleName("0.24.0"))
-            .isEqualTo("dediren-agent-bundle-0.24.0");
+        assertThat(DistTool.bundleName("0.25.0"))
+            .isEqualTo("dediren-agent-bundle-0.25.0");
     }
 
     @Test
@@ -34,13 +34,13 @@ class DistModuleTest {
         assertRetiredTargetFails(new String[] {
             "smoke",
             "--root", root.toString(),
-            "--version", "0.24.0",
+            "--version", "0.25.0",
             "--target", "x86_64-unknown-linux-gnu"
         });
         assertRetiredTargetFails(new String[] {
             "build",
             "--root", root.toString(),
-            "--version", "0.24.0",
+            "--version", "0.25.0",
             "--notices", root.resolve("THIRD-PARTY-NOTICES.md").toString(),
             "--target", "x86_64-unknown-linux-gnu"
         });
@@ -56,28 +56,28 @@ class DistModuleTest {
         writeMinimalDistributionRoot(root);
         Path notices = root.resolve("THIRD-PARTY-NOTICES.md");
         Files.writeString(notices, "# Notices\n");
-        Path staleBundle = root.resolve("dist/dediren-agent-bundle-0.24.0-x86_64-unknown-linux-gnu");
-        Path staleArchive = root.resolve("dist/dediren-agent-bundle-0.24.0-x86_64-unknown-linux-gnu.tar.gz");
+        Path staleBundle = root.resolve("dist/dediren-agent-bundle-0.25.0-x86_64-unknown-linux-gnu");
+        Path staleArchive = root.resolve("dist/dediren-agent-bundle-0.25.0-x86_64-unknown-linux-gnu.tar.gz");
         Files.createDirectories(staleBundle);
         Files.writeString(staleArchive, "stale archive");
 
         DistTool.run(new String[] {
             "build",
             "--root", root.toString(),
-            "--version", "0.24.0",
+            "--version", "0.25.0",
             "--notices", notices.toString()
         });
 
-        Path bundle = root.resolve("dist/dediren-agent-bundle-0.24.0");
+        Path bundle = root.resolve("dist/dediren-agent-bundle-0.25.0");
         assertThat(bundle).isDirectory();
-        Path archive = root.resolve("dist/dediren-agent-bundle-0.24.0.tar.gz");
+        Path archive = root.resolve("dist/dediren-agent-bundle-0.25.0.tar.gz");
         assertThat(archive).isRegularFile();
         assertThat(staleBundle).doesNotExist();
         assertThat(staleArchive).doesNotExist();
 
-        String archiveMetadata = readArchiveEntry(archive, "dediren-agent-bundle-0.24.0/bundle.json");
+        String archiveMetadata = readArchiveEntry(archive, "dediren-agent-bundle-0.25.0/bundle.json");
         JsonNode metadata = JsonSupport.objectMapper().readTree(archiveMetadata);
-        assertThat(metadata.path("version").asText()).isEqualTo("0.24.0");
+        assertThat(metadata.path("version").asText()).isEqualTo("0.25.0");
         assertThat(metadata.path("target").asText()).isEqualTo("java");
     }
 
@@ -87,7 +87,7 @@ class DistModuleTest {
             #!/bin/sh
             APP_HOME=$( cd -P "${APP_HOME:-./}.." > /dev/null && printf '%s\\n' "$PWD" ) || exit
 
-            DEFAULT_JVM_OPTS='"-Ddediren.version=0.24.0"'
+            DEFAULT_JVM_OPTS='"-Ddediren.version=0.25.0"'
             """;
 
         String rewritten = DistTool.withBundleRootExport(script);

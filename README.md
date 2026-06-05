@@ -46,8 +46,8 @@ release workflows cache that path separately from Maven artifacts.
 The `dist-build` profile creates an agent-ready archive under `dist/`:
 
 ```text
-dist/dediren-agent-bundle-0.24.0/
-dist/dediren-agent-bundle-0.24.0.tar.gz
+dist/dediren-agent-bundle-0.25.0/
+dist/dediren-agent-bundle-0.25.0.tar.gz
 ```
 
 The Java archive contains launch scripts and jars, not a bundled JRE. Java 21
@@ -57,7 +57,7 @@ platform-neutral and is not tied to CPU architecture.
 ## Bundle Layout
 
 ```text
-dediren-agent-bundle-0.24.0/
+dediren-agent-bundle-0.25.0/
   bin/
     dediren
     dediren-plugin-generic-graph
@@ -89,7 +89,7 @@ the caller's current working directory.
 From an unpacked bundle:
 
 ```bash
-VERSION=0.24.0
+VERSION=0.25.0
 BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-${VERSION}
 
 "$BUNDLE/bin/dediren" --version
@@ -137,7 +137,8 @@ Downstream commands accept either a full Dediren command envelope or the raw
 
 UML source uses `plugins.generic-graph.semantic_profile: "uml"`. Supported
 view kinds are `generic`, `archimate`, `uml-class`, `uml-data`,
-`uml-activity`, `uml-sequence`, `uml-state-machine`, and `uml-use-case`.
+`uml-activity`, `uml-sequence`, `uml-state-machine`, `uml-use-case`, and
+`uml-component`.
 Dediren supports the `uml-sequence` MVP plus combined fragments with `alt`,
 `opt`, `loop`, and `par` interaction operators. The sequence MVP source
 fixture is `fixtures/source/valid-uml-sequence-basic.json`: it declares an
@@ -340,6 +341,69 @@ direction. `Extend.properties.uml.extension_point`, when present, must
 reference an extension point owned by the extended target use case. This slice
 intentionally defers use-case generalization, collaboration use-case
 realizations, UMLDI, and deployment diagrams.
+
+## UML Component Workflow
+
+Use `fixtures/source/valid-uml-component-basic.json` for the component MVP
+shape: `Package`, `Component`, `Port`, `Interface`, and `Class` nodes with
+`Realization`, `Usage`, and `Dependency` relationships. `Port` nodes must set
+`properties.uml.component` to their owning component; optional
+`properties.uml.provided` and `properties.uml.required` arrays reference
+interface nodes. Component and package boundaries are semantic-backed groups
+via `semantic_source_id`.
+
+Validate UML semantics, project layout and render metadata, lay out with ELK,
+render SVG, and export UML/XMI:
+
+```bash
+"$BUNDLE/bin/dediren" validate \
+  --plugin generic-graph \
+  --profile uml \
+  --input "$BUNDLE/fixtures/source/valid-uml-component-basic.json"
+
+"$BUNDLE/bin/dediren" project \
+  --target layout-request \
+  --plugin generic-graph \
+  --view component-view \
+  --input "$BUNDLE/fixtures/source/valid-uml-component-basic.json" \
+  > component-layout-request.json
+
+"$BUNDLE/bin/dediren" project \
+  --target render-metadata \
+  --plugin generic-graph \
+  --view component-view \
+  --input "$BUNDLE/fixtures/source/valid-uml-component-basic.json" \
+  > component-render-metadata.json
+
+"$BUNDLE/bin/dediren" layout \
+  --plugin elk-layout \
+  --input component-layout-request.json \
+  > component-layout-result.json
+
+"$BUNDLE/bin/dediren" render \
+  --plugin svg-render \
+  --policy "$BUNDLE/fixtures/render-policy/uml-svg.json" \
+  --metadata component-render-metadata.json \
+  --input component-layout-result.json \
+  > component-render-result.json
+
+jq -r '.data.content' component-render-result.json > component.svg
+
+"$BUNDLE/bin/dediren" export \
+  --plugin uml-xmi \
+  --policy "$BUNDLE/fixtures/export-policy/default-uml-xmi.json" \
+  --source "$BUNDLE/fixtures/source/valid-uml-component-basic.json" \
+  --layout component-layout-result.json \
+  > component-xmi-result.json
+
+jq -r '.data.content' component-xmi-result.json > component.xmi
+```
+
+The UML component vocabulary is `Component` and `Port` plus structural
+classifiers `Package`, `Interface`, and `Class`. `Usage` connects a component
+or port to a structural classifier; `Realization` and `Dependency` reuse the
+structural relationship rules. This slice intentionally defers composite
+structure, connectors, collaborations, UMLDI, and deployment diagrams.
 
 ## Pipeline
 

@@ -23,7 +23,13 @@ class UmlValidationTest {
 
     @Test
     void exposesPublicUmlVocabulary() {
-        assertThat(Uml.structuralTypes()).containsExactly("Package", "Class", "Interface", "DataType", "Enumeration");
+        assertThat(Uml.structuralTypes()).containsExactly(
+                "Package",
+                "Class",
+                "Interface",
+                "DataType",
+                "Enumeration",
+                "Component");
         assertThat(Uml.activityTypes()).containsExactly(
                 "Activity",
                 "Action",
@@ -46,7 +52,8 @@ class UmlValidationTest {
                 "Message",
                 "Transition",
                 "Include",
-                "Extend");
+                "Extend",
+                "Usage");
     }
 
     @Test
@@ -104,6 +111,72 @@ class UmlValidationTest {
         Uml.validateRelationshipEndpointTypes("Include", "UseCase", "UseCase", "$.relationship");
         Uml.validateRelationshipEndpointTypes("Extend", "UseCase", "UseCase", "$.relationship");
         Uml.validateSource(fixture.source(), fixture.pluginData());
+    }
+
+    @Test
+    void acceptsUmlComponentVocabulary() throws Exception {
+        Fixture fixture = loadUmlComponentFixture();
+
+        for (String type : new String[]{"Component", "Port"}) {
+            Uml.validateElementType(type, "$.type");
+        }
+        Uml.validateRelationshipType("Usage", "$.type");
+        Uml.validateRelationshipEndpointTypes("Realization", "Component", "Interface", "$.relationship");
+        Uml.validateRelationshipEndpointTypes("Usage", "Component", "Interface", "$.relationship");
+        Uml.validateRelationshipEndpointTypes("Dependency", "Component", "Class", "$.relationship");
+        Uml.validateSource(fixture.source(), fixture.pluginData());
+    }
+
+    @Test
+    void rejectsPortWithoutOwningComponent() throws Exception {
+        Fixture fixture = loadMutatedUmlComponentFixture(
+                source -> nodeUmlProperties(source, "port-rest-api").remove("component"));
+
+        UmlValidationException error = org.junit.jupiter.api.Assertions.assertThrows(
+                UmlValidationException.class,
+                () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+
+        assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
+        assertThat(error.path()).isEqualTo("$.nodes[2].properties.uml.component");
+    }
+
+    @Test
+    void rejectsPortProvidedReferenceThatIsNotInterface() throws Exception {
+        Fixture fixture = loadMutatedUmlComponentFixture(
+                source -> replaceTextArray(nodeUmlProperties(source, "port-rest-api"), "provided", "component-order-api"));
+
+        UmlValidationException error = org.junit.jupiter.api.Assertions.assertThrows(
+                UmlValidationException.class,
+                () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+
+        assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
+        assertThat(error.path()).isEqualTo("$.nodes[2].properties.uml.provided[0]");
+    }
+
+    @Test
+    void rejectsUsageWithPortTargetEndpoint() throws Exception {
+        Fixture fixture = loadMutatedUmlComponentFixture(
+                source -> relationshipById(source, "order-api-uses-payment").put("target", "port-payment-client"));
+
+        UmlValidationException error = org.junit.jupiter.api.Assertions.assertThrows(
+                UmlValidationException.class,
+                () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+
+        assertThat(error.code()).isEqualTo("DEDIREN_UML_RELATIONSHIP_ENDPOINT_UNSUPPORTED");
+        assertThat(error.value()).isEqualTo("Usage: Component -> Port");
+    }
+
+    @Test
+    void rejectsComponentViewRelationshipEndpointOutsideView() throws Exception {
+        Fixture fixture = loadMutatedUmlComponentFixture(
+                source -> removeViewNode(source, "interface-payment-gateway"));
+
+        UmlValidationException error = org.junit.jupiter.api.Assertions.assertThrows(
+                UmlValidationException.class,
+                () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+
+        assertThat(error.code()).isEqualTo("DEDIREN_UML_RELATIONSHIP_ENDPOINT_UNSUPPORTED");
+        assertThat(error.path()).isEqualTo("$.plugins.generic-graph.views[0].relationships[1]");
     }
 
     @Test
@@ -1074,6 +1147,12 @@ class UmlValidationTest {
                 "generic-graph");
     }
 
+    private static Fixture loadUmlComponentFixture() throws Exception {
+        return fixture(
+                Files.readString(workspaceRoot().resolve("fixtures/source/valid-uml-component-basic.json")),
+                "generic-graph");
+    }
+
     private static Fixture loadMutatedUmlSequenceFixture(java.util.function.Consumer<ObjectNode> mutate)
             throws Exception {
         var sourceJson = (ObjectNode) JsonSupport.objectMapper().readTree(
@@ -1108,6 +1187,13 @@ class UmlValidationTest {
     private static Fixture loadMutatedUmlUseCaseFixture(Consumer<ObjectNode> mutate) throws Exception {
         ObjectNode source = (ObjectNode) JsonSupport.objectMapper().readTree(
                 Files.readString(workspaceRoot().resolve("fixtures/source/valid-uml-use-case-basic.json")));
+        mutate.accept(source);
+        return fixture(JsonSupport.objectMapper().writeValueAsString(source), "generic-graph");
+    }
+
+    private static Fixture loadMutatedUmlComponentFixture(Consumer<ObjectNode> mutate) throws Exception {
+        ObjectNode source = (ObjectNode) JsonSupport.objectMapper().readTree(
+                Files.readString(workspaceRoot().resolve("fixtures/source/valid-uml-component-basic.json")));
         mutate.accept(source);
         return fixture(JsonSupport.objectMapper().writeValueAsString(source), "generic-graph");
     }

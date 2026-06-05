@@ -180,5 +180,9 @@ public enum SvgNodeDecorator {
     @JsonProperty("uml_use_case")
     UML_USE_CASE,
     @JsonProperty("uml_extension_point")
-    UML_EXTENSION_POINT
+    UML_EXTENSION_POINT,
+    @JsonProperty("uml_component")
+    UML_COMPONENT,
+    @JsonProperty("uml_port")
+    UML_PORT
 }

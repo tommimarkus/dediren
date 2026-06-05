@@ -1,0 +1,233 @@
+{
+  "model_schema_version": "model.schema.v1",
+  "required_plugins": [
+    {
+      "id": "generic-graph",
+      "version": "0.25.0"
+    },
+    {
+      "id": "uml-xmi",
+      "version": "0.25.0"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "pkg-orders",
+      "type": "Package",
+      "label": "Orders",
+      "properties": {
+        "uml": {
+          "kind": "package"
+        }
+      }
+    },
+    {
+      "id": "component-order-api",
+      "type": "Component",
+      "label": "Order API",
+      "properties": {
+        "uml": {
+          "package": "pkg-orders"
+        }
+      }
+    },
+    {
+      "id": "port-rest-api",
+      "type": "Port",
+      "label": "REST",
+      "properties": {
+        "uml": {
+          "component": "component-order-api",
+          "provided": ["interface-order-api"],
+          "required": ["interface-payment-gateway"]
+        }
+      }
+    },
+    {
+      "id": "component-payment-adapter",
+      "type": "Component",
+      "label": "Payment Adapter",
+      "properties": {
+        "uml": {
+          "package": "pkg-orders"
+        }
+      }
+    },
+    {
+      "id": "port-payment-client",
+      "type": "Port",
+      "label": "client",
+      "properties": {
+        "uml": {
+          "component": "component-payment-adapter",
+          "provided": ["interface-payment-gateway"]
+        }
+      }
+    },
+    {
+      "id": "interface-order-api",
+      "type": "Interface",
+      "label": "OrderApi",
+      "properties": {
+        "uml": {
+          "operations": [
+            {
+              "name": "placeOrder",
+              "visibility": "public",
+              "parameters": [],
+              "return_type": "OrderReceipt"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "interface-payment-gateway",
+      "type": "Interface",
+      "label": "PaymentGateway",
+      "properties": {
+        "uml": {
+          "operations": [
+            {
+              "name": "authorize",
+              "visibility": "public",
+              "parameters": [],
+              "return_type": "PaymentAuthorization"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "class-order-controller",
+      "type": "Class",
+      "label": "OrderController",
+      "properties": {
+        "uml": {
+          "attributes": [],
+          "operations": [
+            {
+              "name": "submit",
+              "visibility": "public",
+              "parameters": [],
+              "return_type": "OrderReceipt"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "id": "order-api-realizes-order-api",
+      "type": "Realization",
+      "source": "component-order-api",
+      "target": "interface-order-api",
+      "label": "realizes",
+      "properties": {
+        "uml": {}
+      }
+    },
+    {
+      "id": "order-api-uses-payment",
+      "type": "Usage",
+      "source": "component-order-api",
+      "target": "interface-payment-gateway",
+      "label": "uses",
+      "properties": {
+        "uml": {}
+      }
+    },
+    {
+      "id": "payment-adapter-realizes-gateway",
+      "type": "Realization",
+      "source": "component-payment-adapter",
+      "target": "interface-payment-gateway",
+      "label": "realizes",
+      "properties": {
+        "uml": {}
+      }
+    },
+    {
+      "id": "order-api-depends-controller",
+      "type": "Dependency",
+      "source": "component-order-api",
+      "target": "class-order-controller",
+      "label": "uses",
+      "properties": {
+        "uml": {}
+      }
+    }
+  ],
+  "plugins": {
+    "generic-graph": {
+      "semantic_profile": "uml",
+      "views": [
+        {
+          "id": "component-view",
+          "label": "Orders Component Model",
+          "kind": "uml-component",
+          "nodes": [
+            "component-order-api",
+            "port-rest-api",
+            "component-payment-adapter",
+            "port-payment-client",
+            "interface-order-api",
+            "interface-payment-gateway",
+            "class-order-controller"
+          ],
+          "relationships": [
+            "order-api-realizes-order-api",
+            "order-api-uses-payment",
+            "payment-adapter-realizes-gateway",
+            "order-api-depends-controller"
+          ],
+          "layout_preferences": {
+            "direction": "right",
+            "density": "readable",
+            "routing": {
+              "style": "orthogonal",
+              "profile": "readable",
+              "endpoint_merging": "off"
+            }
+          },
+          "groups": [
+            {
+              "id": "orders-package-boundary",
+              "label": "Orders",
+              "role": "semantic-boundary",
+              "semantic_source_id": "pkg-orders",
+              "members": [
+                "order-api-boundary",
+                "payment-adapter-boundary",
+                "interface-order-api",
+                "interface-payment-gateway",
+                "class-order-controller"
+              ]
+            },
+            {
+              "id": "order-api-boundary",
+              "label": "Order API",
+              "role": "semantic-boundary",
+              "semantic_source_id": "component-order-api",
+              "members": [
+                "component-order-api",
+                "port-rest-api"
+              ]
+            },
+            {
+              "id": "payment-adapter-boundary",
+              "label": "Payment Adapter",
+              "role": "semantic-boundary",
+              "semantic_source_id": "component-payment-adapter",
+              "members": [
+                "component-payment-adapter",
+                "port-payment-client"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

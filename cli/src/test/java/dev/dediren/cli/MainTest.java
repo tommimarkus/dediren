@@ -35,7 +35,7 @@ class MainTest {
         CliResult result = Main.executeForTesting(new String[]{"--version"}, "");
 
         assertThat(result.exitCode()).isZero();
-        assertThat(result.stdout()).contains("dediren 0.24.0");
+        assertThat(result.stdout()).contains("dediren 0.25.0");
     }
 
     @Test
@@ -491,6 +491,122 @@ class MainTest {
                 "xmi:id=\"id-include-authentication\"",
                 "xmi:id=\"id-extend-discount\"",
                 "extensionLocation=\"id-payment-extension\"");
+    }
+
+    @Test
+    void componentFixtureRunsThroughDocumentedCliWorkflow() throws Exception {
+        Map<String, String> env = sequenceWorkflowEnv();
+        Path root = workspaceRoot();
+        Path source = root.resolve("fixtures/source/valid-uml-component-basic.json");
+
+        CliResult validate = Main.executeForTesting(new String[]{
+                "validate",
+                "--plugin",
+                "generic-graph",
+                "--profile",
+                "uml",
+                "--input",
+                source.toString()
+        }, "", env);
+
+        JsonNode validateData = okData(validate);
+        assertThat(validateData.at("/semantic_profile").asText()).isEqualTo("uml");
+        assertThat(validateData.at("/node_count").asInt()).isEqualTo(8);
+        assertThat(validateData.at("/relationship_count").asInt()).isEqualTo(4);
+
+        CliResult layoutRequest = Main.executeForTesting(new String[]{
+                "project",
+                "--plugin",
+                "generic-graph",
+                "--target",
+                "layout-request",
+                "--view",
+                "component-view",
+                "--input",
+                source.toString()
+        }, "", env);
+
+        JsonNode layoutRequestData = okData(layoutRequest);
+        assertThat(layoutRequestData.at("/view_id").asText()).isEqualTo("component-view");
+        assertThat(layoutRequestData.get("nodes"))
+                .extracting(node -> node.at("/id").asText())
+                .contains("component-order-api", "port-rest-api", "interface-payment-gateway");
+        Path layoutRequestFile = writeStdout("component-layout-request.json", layoutRequest);
+
+        CliResult renderMetadata = Main.executeForTesting(new String[]{
+                "project",
+                "--plugin",
+                "generic-graph",
+                "--target",
+                "render-metadata",
+                "--view",
+                "component-view",
+                "--input",
+                source.toString()
+        }, "", env);
+
+        JsonNode renderMetadataData = okData(renderMetadata);
+        assertThat(renderMetadataData.at("/nodes/component-order-api/type").asText()).isEqualTo("Component");
+        assertThat(renderMetadataData.at("/nodes/port-rest-api/type").asText()).isEqualTo("Port");
+        assertThat(renderMetadataData.at("/edges/order-api-uses-payment/type").asText()).isEqualTo("Usage");
+        Path renderMetadataFile = writeStdout("component-render-metadata.json", renderMetadata);
+
+        CliResult layout = Main.executeForTesting(new String[]{
+                "layout",
+                "--plugin",
+                "elk-layout",
+                "--input",
+                layoutRequestFile.toString()
+        }, "", env);
+
+        JsonNode layoutData = okData(layout);
+        assertThat(layoutData.at("/view_id").asText()).isEqualTo("component-view");
+        assertThat(layoutData.get("nodes"))
+                .extracting(node -> node.at("/id").asText())
+                .contains("component-order-api", "port-rest-api", "component-payment-adapter");
+        Path layoutFile = writeStdout("component-layout-result.json", layout);
+
+        CliResult render = Main.executeForTesting(new String[]{
+                "render",
+                "--plugin",
+                "svg-render",
+                "--policy",
+                root.resolve("fixtures/render-policy/uml-svg.json").toString(),
+                "--metadata",
+                renderMetadataFile.toString(),
+                "--input",
+                layoutFile.toString()
+        }, "", env);
+
+        JsonNode renderData = okData(render);
+        String svg = renderData.at("/content").asText();
+        assertThat(renderData.at("/artifact_kind").asText()).isEqualTo("svg");
+        assertThat(svg).contains(
+                "data-dediren-node-shape=\"uml_component\"",
+                "data-dediren-node-shape=\"uml_port\"",
+                "data-dediren-edge-id=\"order-api-uses-payment\"",
+                "PaymentGateway");
+
+        CliResult export = Main.executeForTesting(new String[]{
+                "export",
+                "--plugin",
+                "uml-xmi",
+                "--policy",
+                root.resolve("fixtures/export-policy/default-uml-xmi.json").toString(),
+                "--source",
+                source.toString(),
+                "--layout",
+                layoutFile.toString()
+        }, "", env);
+
+        JsonNode exportData = okData(export);
+        String xmi = exportData.at("/content").asText();
+        assertThat(exportData.at("/artifact_kind").asText()).isEqualTo("uml-xmi+xml");
+        assertThat(xmi).contains(
+                "xmi:type=\"uml:Component\"",
+                "xmi:type=\"uml:Port\"",
+                "xmi:type=\"uml:Usage\"",
+                "supplier=\"id-interface-payment-gateway\"");
     }
 
     private Path writeStdout(String fileName, CliResult result) throws Exception {

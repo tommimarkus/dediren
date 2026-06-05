@@ -46,7 +46,7 @@ guidance in that package.
 {
   "model_schema_version": "model.schema.v1",
   "required_plugins": [
-    { "id": "generic-graph", "version": "0.24.0" }
+    { "id": "generic-graph", "version": "0.25.0" }
   ],
   "nodes": [
     { "id": "client", "type": "generic.actor", "label": "Client", "properties": {} },
@@ -90,8 +90,8 @@ profile and use ArchiMate type names:
 ```json
 {
   "required_plugins": [
-    { "id": "generic-graph", "version": "0.24.0" },
-    { "id": "archimate-oef", "version": "0.24.0" }
+    { "id": "generic-graph", "version": "0.25.0" },
+    { "id": "archimate-oef", "version": "0.25.0" }
   ],
   "plugins": {
     "generic-graph": {
@@ -104,7 +104,8 @@ profile and use ArchiMate type names:
 
 For UML SVG notation or XMI export, use `semantic_profile: "uml"` and the
 `uml-xmi` plugin. Supported UML view kinds are `uml-class`, `uml-data`,
-`uml-activity`, `uml-sequence`, `uml-state-machine`, and `uml-use-case`.
+`uml-activity`, `uml-sequence`, `uml-state-machine`, `uml-use-case`, and
+`uml-component`.
 
 ## Command Handoff
 
@@ -301,10 +302,64 @@ extension point owned by the extended target use case. Deferred/non-goals:
 use-case generalization, collaboration use-case realizations, UMLDI, and
 deployment diagrams.
 
+## UML Component Handoff
+
+Use `fixtures/source/valid-uml-component-basic.json` for the component MVP.
+Author `Component` and `Port` nodes alongside `Package`, `Interface`, and
+`Class` classifiers. Put `Port.properties.uml.component` on each port; optional
+`provided` and `required` arrays reference interface ids. Use `Usage`,
+`Realization`, and `Dependency` relationships, and model package/component
+boundaries as semantic-backed view groups.
+
+```bash
+"$BUNDLE/bin/dediren" validate \
+  --plugin generic-graph \
+  --profile uml \
+  --input "$BUNDLE/fixtures/source/valid-uml-component-basic.json"
+
+"$BUNDLE/bin/dediren" project \
+  --target layout-request \
+  --plugin generic-graph \
+  --view component-view \
+  --input "$BUNDLE/fixtures/source/valid-uml-component-basic.json" \
+  > component-layout-request.json
+
+"$BUNDLE/bin/dediren" project \
+  --target render-metadata \
+  --plugin generic-graph \
+  --view component-view \
+  --input "$BUNDLE/fixtures/source/valid-uml-component-basic.json" \
+  > component-render-metadata.json
+
+"$BUNDLE/bin/dediren" layout \
+  --plugin elk-layout \
+  --input component-layout-request.json \
+  > component-layout-result.json
+
+"$BUNDLE/bin/dediren" render \
+  --plugin svg-render \
+  --policy "$BUNDLE/fixtures/render-policy/uml-svg.json" \
+  --metadata component-render-metadata.json \
+  --input component-layout-result.json \
+  > component-render-result.json
+
+"$BUNDLE/bin/dediren" export \
+  --plugin uml-xmi \
+  --policy "$BUNDLE/fixtures/export-policy/default-uml-xmi.json" \
+  --source "$BUNDLE/fixtures/source/valid-uml-component-basic.json" \
+  --layout component-layout-result.json \
+  > component-xmi-result.json
+```
+
+Rules: `Port.properties.uml.component` must reference a `Component`; `provided`
+and `required` entries must reference `Interface` nodes. Deferred/non-goals:
+composite structure, connectors, collaborations, UMLDI, and deployment
+diagrams.
+
 ## Runtime Probes
 
 ```bash
-VERSION=0.24.0
+VERSION=0.25.0
 BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-${VERSION}
 
 "$BUNDLE/bin/dediren" --version

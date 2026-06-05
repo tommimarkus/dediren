@@ -1,0 +1,122 @@
+{
+  "render_metadata_schema_version": "render-metadata.schema.v1",
+  "semantic_profile": "uml",
+  "nodes": {
+    "port-rest-api": {
+      "type": "Port",
+      "source_id": "port-rest-api",
+      "properties": {
+        "component": "component-order-api",
+        "provided": [
+          "interface-order-api"
+        ],
+        "required": [
+          "interface-payment-gateway"
+        ]
+      }
+    },
+    "component-payment-adapter": {
+      "type": "Component",
+      "source_id": "component-payment-adapter",
+      "properties": {
+        "package": "pkg-orders"
+      }
+    },
+    "interface-order-api": {
+      "type": "Interface",
+      "source_id": "interface-order-api",
+      "properties": {
+        "operations": [
+          {
+            "name": "placeOrder",
+            "visibility": "public",
+            "parameters": [],
+            "return_type": "OrderReceipt"
+          }
+        ]
+      }
+    },
+    "interface-payment-gateway": {
+      "type": "Interface",
+      "source_id": "interface-payment-gateway",
+      "properties": {
+        "operations": [
+          {
+            "name": "authorize",
+            "visibility": "public",
+            "parameters": [],
+            "return_type": "PaymentAuthorization"
+          }
+        ]
+      }
+    },
+    "class-order-controller": {
+      "type": "Class",
+      "source_id": "class-order-controller",
+      "properties": {
+        "attributes": [],
+        "operations": [
+          {
+            "name": "submit",
+            "visibility": "public",
+            "parameters": [],
+            "return_type": "OrderReceipt"
+          }
+        ]
+      }
+    },
+    "component-order-api": {
+      "type": "Component",
+      "source_id": "component-order-api",
+      "properties": {
+        "package": "pkg-orders"
+      }
+    },
+    "port-payment-client": {
+      "type": "Port",
+      "source_id": "port-payment-client",
+      "properties": {
+        "component": "component-payment-adapter",
+        "provided": [
+          "interface-payment-gateway"
+        ]
+      }
+    }
+  },
+  "edges": {
+    "order-api-uses-payment": {
+      "type": "Usage",
+      "source_id": "order-api-uses-payment",
+      "properties": {}
+    },
+    "order-api-realizes-order-api": {
+      "type": "Realization",
+      "source_id": "order-api-realizes-order-api",
+      "properties": {}
+    },
+    "order-api-depends-controller": {
+      "type": "Dependency",
+      "source_id": "order-api-depends-controller",
+      "properties": {}
+    },
+    "payment-adapter-realizes-gateway": {
+      "type": "Realization",
+      "source_id": "payment-adapter-realizes-gateway",
+      "properties": {}
+    }
+  },
+  "groups": {
+    "orders-package-boundary": {
+      "type": "Package",
+      "source_id": "pkg-orders"
+    },
+    "payment-adapter-boundary": {
+      "type": "Component",
+      "source_id": "component-payment-adapter"
+    },
+    "order-api-boundary": {
+      "type": "Component",
+      "source_id": "component-order-api"
+    }
+  }
+}

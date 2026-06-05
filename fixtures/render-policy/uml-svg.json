@@ -68,7 +68,9 @@
       "Pseudostate": { "fill": "#000000", "stroke": "#000000", "label_fill": "#000000", "decorator": "uml_pseudostate" },
       "Actor": { "fill": "#ffffff", "stroke": "#000000", "label_fill": "#000000", "decorator": "uml_actor" },
       "UseCase": { "fill": "#ffffff", "stroke": "#000000", "label_fill": "#000000", "decorator": "uml_use_case" },
-      "ExtensionPoint": { "fill": "#ffffff", "stroke": "#000000", "label_fill": "#000000", "decorator": "uml_extension_point" }
+      "ExtensionPoint": { "fill": "#ffffff", "stroke": "#000000", "label_fill": "#000000", "decorator": "uml_extension_point" },
+      "Component": { "fill": "#ffffff", "stroke": "#000000", "label_fill": "#000000", "decorator": "uml_component" },
+      "Port": { "fill": "#ffffff", "stroke": "#000000", "label_fill": "#000000", "decorator": "uml_port" }
     },
     "edge_type_overrides": {
       "Association": { "marker_start": "none", "marker_end": "none" },
@@ -95,6 +97,11 @@
         "line_style": "dashed",
         "marker_end": "open_arrow",
         "label_horizontal_position": "center"
+      },
+      "Usage": {
+        "line_style": "dashed",
+        "marker_end": "open_arrow",
+        "label_horizontal_position": "center"
       }
     },
     "group_type_overrides": {
@@ -117,6 +124,13 @@
         "label_fill": "#000000",
         "rx": 0,
         "decorator": "uml_region"
+      },
+      "Component": {
+        "fill": "#ffffff",
+        "stroke": "#000000",
+        "label_fill": "#000000",
+        "rx": 0,
+        "decorator": "uml_component"
       }
     },
     "node_overrides": {},

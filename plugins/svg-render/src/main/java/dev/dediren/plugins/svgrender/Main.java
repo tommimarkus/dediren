@@ -380,6 +380,18 @@ public final class Main {
                     attr(style.fill()),
                     attr(style.stroke()),
                     styleNumber(style.strokeWidth()));
+            case UML_COMPONENT, UML_PORT -> String.format(
+                    Locale.ROOT,
+                    "<rect data-dediren-node-shape=\"%s\" x=\"%.1f\" y=\"%.1f\" width=\"%.1f\" height=\"%.1f\" rx=\"%s\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%s\"/>",
+                    shapeName,
+                    node.x(),
+                    node.y(),
+                    node.width(),
+                    node.height(),
+                    styleNumber(style.rx()),
+                    attr(style.fill()),
+                    attr(style.stroke()),
+                    styleNumber(style.strokeWidth()));
             case UML_DECISION_NODE, UML_MERGE_NODE -> {
                 double centerX = node.x() + node.width() / 2.0;
                 double centerY = node.y() + node.height() / 2.0;
@@ -2065,8 +2077,48 @@ public final class Main {
                     node.y() + node.height() - 8.0,
                     attr(style.labelFill()),
                     text(node.label()));
+        } else if (decorator == SvgNodeDecorator.UML_COMPONENT) {
+            body = umlComponentGlyph(node, style);
         }
         return "<g data-dediren-node-decorator=\"" + attr(name) + "\">" + body + "</g>";
+    }
+
+    private static String umlComponentGlyph(LaidOutNode node, ResolvedNodeStyle style) {
+        double glyphWidth = Math.min(28.0, Math.max(18.0, node.width() * 0.18));
+        double glyphHeight = Math.min(24.0, Math.max(16.0, node.height() * 0.22));
+        double x = node.x() + node.width() - glyphWidth - 10.0;
+        double y = node.y() + 10.0;
+        double tabWidth = glyphWidth * 0.32;
+        double tabHeight = glyphHeight * 0.28;
+        String fill = attr(style.fill());
+        String stroke = attr(style.stroke());
+        String width = styleNumber(style.strokeWidth());
+        return String.format(
+                Locale.ROOT,
+                "<rect x=\"%.1f\" y=\"%.1f\" width=\"%.1f\" height=\"%.1f\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%s\"/>"
+                        + "<rect x=\"%.1f\" y=\"%.1f\" width=\"%.1f\" height=\"%.1f\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%s\"/>"
+                        + "<rect x=\"%.1f\" y=\"%.1f\" width=\"%.1f\" height=\"%.1f\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%s\"/>",
+                x,
+                y,
+                glyphWidth,
+                glyphHeight,
+                fill,
+                stroke,
+                width,
+                x - tabWidth * 0.45,
+                y + glyphHeight * 0.22,
+                tabWidth,
+                tabHeight,
+                fill,
+                stroke,
+                width,
+                x - tabWidth * 0.45,
+                y + glyphHeight * 0.58,
+                tabWidth,
+                tabHeight,
+                fill,
+                stroke,
+                width);
     }
 
     private static String umlClassifierNotation(

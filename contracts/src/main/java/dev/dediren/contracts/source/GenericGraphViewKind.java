@@ -24,6 +24,9 @@ public enum GenericGraphViewKind {
     @JsonProperty("uml-state-machine")
     UML_STATE_MACHINE,
 
+    @JsonProperty("uml-component")
+    UML_COMPONENT,
+
     @JsonProperty("uml-use-case")
     UML_USE_CASE
 }
