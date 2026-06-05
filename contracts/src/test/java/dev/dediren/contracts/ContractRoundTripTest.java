@@ -93,6 +93,40 @@ class ContractRoundTripTest {
     }
 
     @Test
+    void umlStateMachineSourceDocumentPreservesPublicStateMachineSurface() throws Exception {
+        String fixture = "fixtures/source/valid-uml-state-machine-basic.json";
+
+        assertThat(SchemaAssertions.validateFixture(workspaceRoot(), "schemas/model.schema.json", fixture))
+                .describedAs(fixture)
+                .isEmpty();
+
+        SourceDocument source = readFixture(fixture, SourceDocument.class);
+        GenericGraphPluginData genericGraph = JsonSupport.objectMapper()
+                .treeToValue(source.plugins().get("generic-graph"), GenericGraphPluginData.class);
+        var view = genericGraph.views().getFirst();
+
+        assertThat(genericGraph.semanticProfile()).isEqualTo(GenericGraphSemanticProfile.UML);
+        assertThat(view.kind()).isEqualTo(GenericGraphViewKind.UML_STATE_MACHINE);
+        assertThat(JsonSupport.objectMapper().valueToTree(genericGraph).at("/views/0/kind").asText())
+                .isEqualTo("uml-state-machine");
+        assertThat(view.nodes()).containsExactly(
+                "initial", "draft", "submitted", "payment-choice", "fulfilled", "closed", "rejected");
+        assertThat(view.relationships())
+                .containsExactly("t-create", "t-submit", "t-check-payment", "t-approve", "t-reject", "t-close");
+        assertThat(source.relationships()).extracting(SourceRelationship::id)
+                .containsExactly("t-create", "t-submit", "t-check-payment", "t-approve", "t-reject", "t-close");
+
+        SourceDocument reparsed = JsonSupport.objectMapper()
+                .treeToValue(JsonSupport.objectMapper().valueToTree(source), SourceDocument.class);
+
+        assertThat(reparsed.relationships())
+                .extracting(relationship -> relationship.properties().get("uml").get("kind").textValue())
+                .containsExactly("external", "external", "external", "external", "external", "external");
+        assertThat(JsonSupport.objectMapper().valueToTree(reparsed).at("/nodes/5/properties/uml/kind").asText())
+                .isEqualTo("choice");
+    }
+
+    @Test
     void umlSequenceFragmentsFixtureRoundTrips() throws Exception {
         String fixturePath = "fixtures/source/valid-uml-sequence-fragments.json";
         JsonNode source = JsonSupport.objectMapper().readTree(fixture(fixturePath));
@@ -295,7 +329,7 @@ class ContractRoundTripTest {
                 """, RuntimeCapabilities.class);
 
         assertThat(manifest.pluginManifestSchemaVersion()).isEqualTo("plugin-manifest.schema.v1");
-        assertThat(manifest.version()).isEqualTo("0.22.0");
+        assertThat(manifest.version()).isEqualTo("0.23.0");
         assertThat(manifest.allowedEnv()).containsExactly("JAVA_HOME", "PATH");
         assertThat(capabilities.pluginProtocolVersion()).isEqualTo(ContractVersions.PLUGIN_PROTOCOL_VERSION);
         assertThat(capabilities.runtime().get("java").asText()).isEqualTo("21");

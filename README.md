@@ -46,8 +46,8 @@ release workflows cache that path separately from Maven artifacts.
 The `dist-build` profile creates an agent-ready archive under `dist/`:
 
 ```text
-dist/dediren-agent-bundle-0.22.0-x86_64-unknown-linux-gnu/
-dist/dediren-agent-bundle-0.22.0-x86_64-unknown-linux-gnu.tar.gz
+dist/dediren-agent-bundle-0.23.0-x86_64-unknown-linux-gnu/
+dist/dediren-agent-bundle-0.23.0-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Set a supported target with `DEDIREN_DIST_TARGET` when needed:
@@ -69,7 +69,7 @@ target must match the build host.
 ## Bundle Layout
 
 ```text
-dediren-agent-bundle-0.22.0-x86_64-unknown-linux-gnu/
+dediren-agent-bundle-0.23.0-x86_64-unknown-linux-gnu/
   bin/
     dediren
     dediren-plugin-generic-graph
@@ -101,7 +101,7 @@ the caller's current working directory.
 From an unpacked bundle:
 
 ```bash
-VERSION=0.22.0
+VERSION=0.23.0
 TARGET=x86_64-unknown-linux-gnu
 BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-${VERSION}-${TARGET}
 
@@ -150,9 +150,9 @@ Downstream commands accept either a full Dediren command envelope or the raw
 
 UML source uses `plugins.generic-graph.semantic_profile: "uml"`. Supported
 view kinds are `generic`, `archimate`, `uml-class`, `uml-data`,
-`uml-activity`, and `uml-sequence`. Dediren supports the `uml-sequence` MVP
-plus combined fragments with `alt`, `opt`, `loop`, and `par` interaction
-operators. The sequence MVP source fixture is
+`uml-activity`, `uml-sequence`, and `uml-state-machine`. Dediren supports the
+`uml-sequence` MVP plus combined fragments with `alt`, `opt`, `loop`, and
+`par` interaction operators. The sequence MVP source fixture is
 `fixtures/source/valid-uml-sequence-basic.json`: it declares an `Interaction`
 named `Place Order`, `Lifeline` nodes, and ordered `Message` relationships in
 `properties.uml.sequence` with `message_sort` values.
@@ -221,8 +221,74 @@ semantics. The UML sequence vocabulary is `Interaction`, `Lifeline`, `Message`,
 `CombinedFragment`, and `InteractionOperand`. Supported message sorts are
 `synchCall`, `asynchCall`, `asynchSignal`, `reply`, `createMessage`, and
 `deleteMessage`. `InteractionUse`, `GeneralOrdering`, `ignore`, `consider`,
-UMLDI, state machines, use cases, and deployment diagrams are not yet
-supported.
+UMLDI, use cases, and deployment diagrams are not yet supported.
+
+## UML State Machine Workflow
+
+Use `fixtures/source/valid-uml-state-machine-basic.json` for the state-machine
+MVP shape: one `StateMachine`, one `Region`, state vertices, pseudostates, and
+`Transition` relationships. In `plugins.generic-graph.views[].groups`,
+`StateMachine` and `Region` are represented in the view as semantic-backed
+groups via `semantic_source_id`; states and transitions remain semantic
+nodes and relationships.
+
+Validate UML semantics, project layout and render metadata, lay out with ELK,
+render SVG, and export UML/XMI:
+
+```bash
+"$BUNDLE/bin/dediren" validate \
+  --plugin generic-graph \
+  --profile uml \
+  --input "$BUNDLE/fixtures/source/valid-uml-state-machine-basic.json"
+
+"$BUNDLE/bin/dediren" project \
+  --target layout-request \
+  --plugin generic-graph \
+  --view state-machine-view \
+  --input "$BUNDLE/fixtures/source/valid-uml-state-machine-basic.json" \
+  > state-machine-layout-request.json
+
+"$BUNDLE/bin/dediren" project \
+  --target render-metadata \
+  --plugin generic-graph \
+  --view state-machine-view \
+  --input "$BUNDLE/fixtures/source/valid-uml-state-machine-basic.json" \
+  > state-machine-render-metadata.json
+
+"$BUNDLE/bin/dediren" layout \
+  --plugin elk-layout \
+  --input state-machine-layout-request.json \
+  > state-machine-layout-result.json
+
+"$BUNDLE/bin/dediren" render \
+  --plugin svg-render \
+  --policy "$BUNDLE/fixtures/render-policy/uml-svg.json" \
+  --metadata state-machine-render-metadata.json \
+  --input state-machine-layout-result.json \
+  > state-machine-render-result.json
+
+jq -r '.data.content' state-machine-render-result.json > state-machine.svg
+
+"$BUNDLE/bin/dediren" export \
+  --plugin uml-xmi \
+  --policy "$BUNDLE/fixtures/export-policy/default-uml-xmi.json" \
+  --source "$BUNDLE/fixtures/source/valid-uml-state-machine-basic.json" \
+  --layout state-machine-layout-result.json \
+  > state-machine-xmi-result.json
+
+jq -r '.data.content' state-machine-xmi-result.json > state-machine.xmi
+```
+
+The UML state-machine vocabulary is `StateMachine`, `Region`, `State`,
+`FinalState`, `Pseudostate`, and `Transition`. Supported pseudostate kinds are
+`initial`, `deepHistory`, `shallowHistory`, `join`, `fork`, `junction`,
+`choice`, `entryPoint`, `exitPoint`, and `terminate`. Supported transition
+kinds are `internal`, `local`, and `external`.
+
+This slice intentionally defers `ConnectionPointReference`,
+`ProtocolStateMachine`, `ProtocolTransition`, submachine states, orthogonal
+multi-region internals, trigger event metaclasses, effects as behavior nodes,
+UMLDI, use cases, and deployment diagrams.
 
 ## Pipeline
 

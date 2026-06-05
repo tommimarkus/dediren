@@ -59,6 +59,48 @@ class MainTest {
         }
 
         @Test
+        void rendersUmlStateMachineNotation() throws Exception {
+            String content = okContent(render(renderInput(
+                    "fixtures/layout-result/uml-state-machine-basic.json",
+                    "fixtures/render-policy/uml-svg.json",
+                    "fixtures/render-metadata/uml-state-machine-basic.json")));
+            Document document = svgDocument(content);
+
+            assertThat(content).contains(">Draft<");
+            groupWithAttribute(document, "data-dediren-node-id", "draft");
+            groupWithAttribute(document, "data-dediren-node-id", "initial");
+            groupWithAttribute(document, "data-dediren-node-id", "payment-choice");
+            groupWithAttribute(document, "data-dediren-edge-id", "t-approve");
+            groupWithAttribute(document, "data-dediren-group-id", "order-lifecycle-frame");
+
+            Element draft = groupWithAttribute(document, "data-dediren-node-id", "draft");
+            Element draftShape = firstChildElement(draft, "rect");
+            assertThat(draftShape.getAttribute("data-dediren-node-shape")).isEqualTo("uml_state");
+            assertThat(Double.parseDouble(draftShape.getAttribute("rx"))).isGreaterThanOrEqualTo(14.0);
+
+            Element initial = groupWithAttribute(document, "data-dediren-node-id", "initial");
+            Element initialShape = firstChildElement(initial, "circle");
+            assertThat(initialShape.getAttribute("data-dediren-node-shape")).isEqualTo("uml_pseudostate");
+            assertThat(childElements(initial, "text")).isEmpty();
+
+            Element paymentChoice = groupWithAttribute(document, "data-dediren-node-id", "payment-choice");
+            Element choiceShape = firstChildElement(paymentChoice, "path");
+            assertThat(choiceShape.getAttribute("data-dediren-node-shape")).isEqualTo("uml_pseudostate");
+
+            Element approve = groupWithAttribute(document, "data-dediren-edge-id", "t-approve");
+            Element approvePath = firstChildElement(approve, "path");
+            assertMarkerForStyle(document, approvePath, "t-approve", "end", "open_arrow");
+            Element approveLabel = firstChildElement(approve, "text");
+            assertThat(approveLabel.getAttribute("text-anchor")).isEqualTo("middle");
+
+            Element closed = groupWithAttribute(document, "data-dediren-node-id", "closed");
+            Element finalShape = firstChildElement(closed, "g");
+            assertThat(finalShape.getAttribute("data-dediren-node-shape")).isEqualTo("uml_final_state");
+            assertThat(childElements(finalShape, "circle")).hasSize(2);
+            assertThat(childElements(closed, "text")).isEmpty();
+        }
+
+        @Test
         void rejectsMalformedUmlSequenceMessageMetadata() throws Exception {
             assertInvalidUmlSequenceMessageMetadata(
                     properties -> properties.remove("sequence"),
@@ -1667,6 +1709,12 @@ class MainTest {
         ObjectNode input = JsonSupport.objectMapper().createObjectNode();
         input.set("layout_result", fixtureJson(layoutPath));
         input.set("policy", fixtureJson(policyPath));
+        return input;
+    }
+
+    private static JsonNode renderInput(String layoutPath, String policyPath, String metadataPath) throws Exception {
+        ObjectNode input = (ObjectNode) renderInput(layoutPath, policyPath);
+        input.set("render_metadata", fixtureJson(metadataPath));
         return input;
     }
 

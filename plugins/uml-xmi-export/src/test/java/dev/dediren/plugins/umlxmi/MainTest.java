@@ -112,6 +112,56 @@ class MainTest {
     }
 
     @Test
+    void exportsStateMachineRegionVerticesAndTransitions() throws Exception {
+        JsonNode input = exportInput(
+                fixtureJson("fixtures/source/valid-uml-state-machine-basic.json"),
+                fixtureJson("fixtures/layout-result/uml-state-machine-basic.json"));
+
+        String xml = exportXml(input);
+
+        assertThat(xml).isEqualTo(fixture("fixtures/export/uml-state-machine-basic.xmi"));
+        assertThat(xml).contains(
+                "xmi:type=\"uml:StateMachine\"",
+                "<region xmi:id=\"id-main-region\" name=\"Main Region\"",
+                "xmi:type=\"uml:Pseudostate\"",
+                "kind=\"choice\"",
+                "xmi:type=\"uml:FinalState\"",
+                "<transition xmi:id=\"id-t-submit\"");
+    }
+
+    @Test
+    void rejectsSelectedStateMachineTransitionWithoutRegion() throws Exception {
+        JsonNode input = exportInput(
+                fixtureJson("fixtures/source/valid-uml-state-machine-basic.json"),
+                fixtureJson("fixtures/layout-result/uml-state-machine-basic.json"));
+        ((ObjectNode) input.at("/source/relationships/0/properties/uml")).remove("region");
+
+        PluginResult result = Main.executeForTesting(
+                new String[]{"export"},
+                JsonSupport.objectMapper().writeValueAsString(input),
+                envWithXmiSchema());
+
+        assertThat(result.exitCode()).isEqualTo(3);
+        assertError(
+                result,
+                "DEDIREN_UML_RELATIONSHIP_PROPERTY_INVALID",
+                "$.relationships[0].properties.uml.region");
+    }
+
+    @Test
+    void exportsStateMachineFrameNodesFromSemanticBackedGroups() throws Exception {
+        JsonNode input = exportInput(
+                fixtureJson("fixtures/source/valid-uml-state-machine-basic.json"),
+                fixtureJson("fixtures/layout-result/uml-state-machine-basic.json"));
+
+        String xml = exportXml(input);
+
+        assertThat(xml).contains(
+                "xmi:id=\"id-order-lifecycle\"",
+                "xmi:id=\"id-main-region\"");
+    }
+
+    @Test
     void keepsSequenceViewRelationshipsScopedToLayoutEdges() throws Exception {
         JsonNode input = exportInput(
                 fixtureJson("fixtures/source/valid-uml-sequence-fragments.json"),

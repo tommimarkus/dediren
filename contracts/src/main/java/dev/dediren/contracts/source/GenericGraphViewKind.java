@@ -19,5 +19,8 @@ public enum GenericGraphViewKind {
     UML_ACTIVITY,
 
     @JsonProperty("uml-sequence")
-    UML_SEQUENCE
+    UML_SEQUENCE,
+
+    @JsonProperty("uml-state-machine")
+    UML_STATE_MACHINE
 }

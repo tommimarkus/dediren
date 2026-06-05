@@ -193,21 +193,25 @@ final class ElkLayoutEngine {
         ElkNode root = ElkGraphUtil.createGraph();
         ElkPackedOptions.configureRoot(root, preferences);
         Map<String, LayoutNode> requestNodes = requestNodesById(request);
-        Map<String, String> ownerByNode = ownerByNode(request);
+        Map<String, String> ownerByNode = ownerByNode(request, requestNodes);
+        Map<String, LayoutGroup> requestGroupsById = requestGroupsById(request);
+        Map<String, String> ownerByGroup = ownerByGroup(request);
         Map<String, ElkNode> elkGroups = new HashMap<>();
+        Map<String, Direction> groupDirectionById = new HashMap<>();
         for (LayoutGroup group : list(request.groups())) {
-            List<LayoutNode> members = list(group.members()).stream()
-                .map(requestNodes::get)
-                .filter(node -> node != null)
-                .toList();
-            if (members.isEmpty()) {
-                continue;
-            }
-            ElkNode elkGroup = ElkGraphUtil.createNode(root);
-            elkGroup.setIdentifier(group.id());
-            ElkGraphUtil.createLabel(elkGroup).setText(group.label());
-            ElkPackedOptions.configureRoot(elkGroup, preferences);
-            elkGroups.put(group.id(), elkGroup);
+            createElkGroup(
+                group.id(),
+                root,
+                Direction.RIGHT,
+                requestGroupsById,
+                requestNodes,
+                ownerByNode,
+                ownerByGroup,
+                elkGroups,
+                groupDirectionById,
+                List.of(),
+                (elkGroup, ignored) -> ElkPackedOptions.configureRoot(elkGroup, preferences),
+                new HashSet<>());
         }
 
         Map<String, ElkNode> elkNodes = new HashMap<>();
@@ -258,7 +262,9 @@ final class ElkLayoutEngine {
         Direction rootDirection = ElkLayeredOptions.preferredDirection(preferences);
         List<Diagnostic> warnings = new ArrayList<>();
         Map<String, LayoutNode> requestNodes = requestNodesById(request);
-        Map<String, String> ownerByNode = ownerByNode(request);
+        Map<String, String> ownerByNode = ownerByNode(request, requestNodes);
+        Map<String, LayoutGroup> requestGroupsById = requestGroupsById(request);
+        Map<String, String> ownerByGroup = ownerByGroup(request);
         List<LayoutEdge> requestEdges = list(request.edges());
         ElkNode root = ElkGraphUtil.createGraph();
         ElkLayeredOptions.configureGroupedRoot(root, rootDirection, preferences);
@@ -270,25 +276,20 @@ final class ElkLayoutEngine {
         for (int groupIndex = 0; groupIndex < requestGroups.size(); groupIndex++) {
             LayoutGroup group = requestGroups.get(groupIndex);
             groupOrderById.put(group.id(), groupIndex);
-            List<LayoutNode> members = list(group.members()).stream()
-                .map(requestNodes::get)
-                .filter(node -> node != null)
-                .toList();
-            if (members.isEmpty()) {
-                continue;
-            }
-            List<LayoutEdge> internalEdges = list(request.edges()).stream()
-                .filter(edge -> group.id().equals(ownerByNode.get(edge.source()))
-                    && group.id().equals(ownerByNode.get(edge.target())))
-                .toList();
-
-            ElkNode elkGroup = ElkGraphUtil.createNode(root);
-            elkGroup.setIdentifier(group.id());
-            ElkGraphUtil.createLabel(elkGroup).setText(group.label());
-            Direction groupDirection = internalDirection(members, internalEdges);
-            ElkLayeredOptions.configureGroup(elkGroup, groupDirection, preferences);
-            elkGroups.put(group.id(), elkGroup);
-            groupDirectionById.put(group.id(), groupDirection);
+            createElkGroup(
+                group.id(),
+                root,
+                rootDirection,
+                requestGroupsById,
+                requestNodes,
+                ownerByNode,
+                ownerByGroup,
+                elkGroups,
+                groupDirectionById,
+                requestEdges,
+                (elkGroup, groupDirection) ->
+                    ElkLayeredOptions.configureGroup(elkGroup, groupDirection, preferences),
+                new HashSet<>());
         }
 
         Map<String, EdgeEndpointMerge> endpointMerges = groupedEdgeEndpointMerges(
@@ -1111,6 +1112,10 @@ final class ElkLayoutEngine {
         boolean sourceEndpoint,
         String relationshipType) {}
 
+    private interface ElkGroupConfigurator {
+        void configure(ElkNode group, Direction direction);
+    }
+
     private static Map<String, LayoutNode> requestNodesById(
         LayoutRequest request) {
         Map<String, LayoutNode> byId = new HashMap<>();
@@ -1120,14 +1125,117 @@ final class ElkLayoutEngine {
         return byId;
     }
 
-    private static Map<String, String> ownerByNode(LayoutRequest request) {
+    private static Map<String, String> ownerByNode(
+        LayoutRequest request,
+        Map<String, LayoutNode> requestNodes) {
         Map<String, String> ownerByNode = new HashMap<>();
         for (LayoutGroup group : list(request.groups())) {
             for (String member : list(group.members())) {
-                ownerByNode.putIfAbsent(member, group.id());
+                if (requestNodes.containsKey(member)) {
+                    ownerByNode.putIfAbsent(member, group.id());
+                }
             }
         }
         return ownerByNode;
+    }
+
+    private static Map<String, String> ownerByGroup(LayoutRequest request) {
+        Set<String> groupIds = new HashSet<>();
+        for (LayoutGroup group : list(request.groups())) {
+            groupIds.add(group.id());
+        }
+
+        Map<String, String> ownerByGroup = new HashMap<>();
+        for (LayoutGroup group : list(request.groups())) {
+            for (String member : list(group.members())) {
+                if (groupIds.contains(member)) {
+                    ownerByGroup.putIfAbsent(member, group.id());
+                }
+            }
+        }
+        return ownerByGroup;
+    }
+
+    private static Map<String, LayoutGroup> requestGroupsById(LayoutRequest request) {
+        Map<String, LayoutGroup> groups = new HashMap<>();
+        for (LayoutGroup group : list(request.groups())) {
+            groups.put(group.id(), group);
+        }
+        return groups;
+    }
+
+    private static ElkNode createElkGroup(
+        String groupId,
+        ElkNode root,
+        Direction rootDirection,
+        Map<String, LayoutGroup> requestGroups,
+        Map<String, LayoutNode> requestNodes,
+        Map<String, String> ownerByNode,
+        Map<String, String> ownerByGroup,
+        Map<String, ElkNode> elkGroups,
+        Map<String, Direction> groupDirectionById,
+        List<LayoutEdge> requestEdges,
+        ElkGroupConfigurator groupConfigurator,
+        Set<String> visiting) {
+        ElkNode existing = elkGroups.get(groupId);
+        if (existing != null) {
+            return existing;
+        }
+        LayoutGroup group = requestGroups.get(groupId);
+        if (group == null) {
+            return null;
+        }
+        if (!visiting.add(groupId)) {
+            throw new IllegalArgumentException("group hierarchy contains a cycle at " + groupId);
+        }
+
+        List<LayoutNode> directNodeMembers = list(group.members()).stream()
+            .map(requestNodes::get)
+            .filter(node -> node != null)
+            .toList();
+        boolean hasChildGroupMember = list(group.members()).stream()
+            .anyMatch(requestGroups::containsKey);
+        if (directNodeMembers.isEmpty() && !hasChildGroupMember) {
+            visiting.remove(groupId);
+            return null;
+        }
+
+        String parentGroupId = ownerByGroup.get(groupId);
+        ElkNode parent = parentGroupId == null
+            ? root
+            : createElkGroup(
+                parentGroupId,
+                root,
+                rootDirection,
+                requestGroups,
+                requestNodes,
+                ownerByNode,
+                ownerByGroup,
+                elkGroups,
+                groupDirectionById,
+                requestEdges,
+                groupConfigurator,
+                visiting);
+        if (parent == null) {
+            parent = root;
+        }
+
+        List<LayoutEdge> internalEdges = requestEdges.stream()
+            .filter(edge -> group.id().equals(ownerByNode.get(edge.source()))
+                && group.id().equals(ownerByNode.get(edge.target())))
+            .toList();
+
+        ElkNode elkGroup = ElkGraphUtil.createNode(parent);
+        elkGroup.setIdentifier(group.id());
+        ElkGraphUtil.createLabel(elkGroup).setText(group.label());
+        Direction groupDirection = directNodeMembers.isEmpty()
+            ? rootDirection
+            : internalDirection(directNodeMembers, internalEdges);
+        groupConfigurator.configure(elkGroup, groupDirection);
+        elkGroups.put(group.id(), elkGroup);
+        groupDirectionById.put(group.id(), groupDirection);
+        visiting.remove(groupId);
+        return elkGroup;
     }
 
     private static List<LaidOutGroup> groupedBounds(
@@ -1145,7 +1253,10 @@ final class ElkLayoutEngine {
             for (int memberIndex = 0; memberIndex < requestedMembers.size(); memberIndex++) {
                 String memberId = requestedMembers.get(memberIndex);
                 ElkNode memberNode = elkNodes.get(memberId);
-                if (memberNode == null || memberNode.getParent() != groupNode) {
+                ElkNode memberGroup = elkGroups.get(memberId);
+                boolean nodeMember = memberNode != null && memberNode.getParent() == groupNode;
+                boolean groupMember = memberGroup != null && memberGroup.getParent() == groupNode;
+                if (!nodeMember && !groupMember) {
                     warnings.add(new Diagnostic(
                         "DEDIREN_ELK_MISSING_GROUP_MEMBER",
                         DiagnosticSeverity.WARNING,

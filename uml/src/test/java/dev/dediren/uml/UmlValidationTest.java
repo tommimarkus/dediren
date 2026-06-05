@@ -43,7 +43,8 @@ class UmlValidationTest {
                 "Dependency",
                 "ControlFlow",
                 "ObjectFlow",
-                "Message");
+                "Message",
+                "Transition");
     }
 
     @Test
@@ -67,6 +68,108 @@ class UmlValidationTest {
                 "DestructionOccurrenceSpecification",
                 "$.relationship");
         Uml.validateSource(fixture.source(), fixture.pluginData());
+    }
+
+    @Test
+    void acceptsUmlStateMachineVocabulary() throws Exception {
+        Fixture fixture = loadUmlStateMachineFixture();
+
+        for (String type : new String[]{
+                "StateMachine",
+                "Region",
+                "State",
+                "FinalState",
+                "Pseudostate"}) {
+            Uml.validateElementType(type, "$.type");
+        }
+        Uml.validateRelationshipType("Transition", "$.type");
+        Uml.validateRelationshipEndpointTypes("Transition", "Pseudostate", "State", "$.relationship");
+        Uml.validateRelationshipEndpointTypes("Transition", "State", "FinalState", "$.relationship");
+        Uml.validateSource(fixture.source(), fixture.pluginData());
+    }
+
+    @Test
+    void rejectsUnknownPseudostateKind() throws Exception {
+        Fixture fixture = loadMutatedUmlStateMachineFixture(
+                source -> nodeUmlProperties(source, "initial").put("kind", "unknownKind"));
+
+        UmlValidationException error = org.junit.jupiter.api.Assertions.assertThrows(
+                UmlValidationException.class,
+                () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+
+        assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
+        assertThat(error.path()).contains("properties.uml.kind");
+    }
+
+    @Test
+    void rejectsTransitionAcrossRegions() throws Exception {
+        Fixture fixture = loadMutatedUmlStateMachineFixture(source -> {
+            var nodes = (ArrayNode) source.get("nodes");
+            nodes.add(jsonObject("""
+                    {
+                      "id": "other-region",
+                      "type": "Region",
+                      "label": "Other Region",
+                      "properties": {
+                        "uml": {
+                          "state_machine": "order-lifecycle"
+                        }
+                      }
+                    }
+                    """));
+            nodeUmlProperties(source, "fulfilled").put("region", "other-region");
+        });
+
+        UmlValidationException error = org.junit.jupiter.api.Assertions.assertThrows(
+                UmlValidationException.class,
+                () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+
+        assertThat(error.code()).isEqualTo("DEDIREN_UML_RELATIONSHIP_PROPERTY_INVALID");
+        assertThat(error.path()).contains("properties.uml.region");
+    }
+
+    @Test
+    void rejectsStateVertexMissingRegionAtNodePropertyPath() throws Exception {
+        Fixture fixture = loadMutatedUmlStateMachineFixture(
+                source -> nodeUmlProperties(source, "fulfilled").remove("region"));
+
+        UmlValidationException error = org.junit.jupiter.api.Assertions.assertThrows(
+                UmlValidationException.class,
+                () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+
+        assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
+        assertThat(error.path()).isEqualTo("$.nodes[6].properties.uml.region");
+    }
+
+    @Test
+    void rejectsOutgoingTransitionFromFinalState() throws Exception {
+        Fixture fixture = loadMutatedUmlStateMachineFixture(source -> {
+            var relationships = (ArrayNode) source.get("relationships");
+            relationships.add(jsonObject("""
+                    {
+                      "id": "t-reopen",
+                      "type": "Transition",
+                      "source": "closed",
+                      "target": "draft",
+                      "label": "reopen",
+                      "properties": {
+                        "uml": {
+                          "region": "main-region",
+                          "kind": "external",
+                          "trigger": "reopen"
+                        }
+                      }
+                    }
+                    """));
+            ((ArrayNode) source.at("/plugins/generic-graph/views/0/relationships")).add("t-reopen");
+        });
+
+        UmlValidationException error = org.junit.jupiter.api.Assertions.assertThrows(
+                UmlValidationException.class,
+                () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+
+        assertThat(error.code()).isEqualTo("DEDIREN_UML_RELATIONSHIP_ENDPOINT_UNSUPPORTED");
+        assertThat(error.path()).contains("$.relationships[6]");
     }
 
     @Test
@@ -875,6 +978,12 @@ class UmlValidationTest {
         return new Fixture(source, data);
     }
 
+    private static Fixture loadUmlStateMachineFixture() throws Exception {
+        return fixture(
+                Files.readString(workspaceRoot().resolve("fixtures/source/valid-uml-state-machine-basic.json")),
+                "generic-graph");
+    }
+
     private static Fixture loadMutatedUmlSequenceFixture(java.util.function.Consumer<ObjectNode> mutate)
             throws Exception {
         var sourceJson = (ObjectNode) JsonSupport.objectMapper().readTree(
@@ -895,6 +1004,21 @@ class UmlValidationTest {
         var source = JsonSupport.objectMapper().treeToValue(sourceJson, SourceDocument.class);
         var data = JsonSupport.objectMapper().treeToValue(
                 source.plugins().get("generic-graph"),
+                GenericGraphPluginData.class);
+        return new Fixture(source, data);
+    }
+
+    private static Fixture loadMutatedUmlStateMachineFixture(Consumer<ObjectNode> mutate) throws Exception {
+        ObjectNode source = (ObjectNode) JsonSupport.objectMapper().readTree(
+                Files.readString(workspaceRoot().resolve("fixtures/source/valid-uml-state-machine-basic.json")));
+        mutate.accept(source);
+        return fixture(JsonSupport.objectMapper().writeValueAsString(source), "generic-graph");
+    }
+
+    private static Fixture fixture(String sourceJson, String pluginId) throws Exception {
+        var source = JsonSupport.objectMapper().readValue(sourceJson, SourceDocument.class);
+        var data = JsonSupport.objectMapper().treeToValue(
+                source.plugins().get(pluginId),
                 GenericGraphPluginData.class);
         return new Fixture(source, data);
     }
@@ -952,6 +1076,14 @@ class UmlValidationTest {
             array.add(value);
         }
         object.set(field, array);
+    }
+
+    private static ObjectNode jsonObject(String content) {
+        try {
+            return (ObjectNode) JsonSupport.objectMapper().readTree(content);
+        } catch (java.io.IOException error) {
+            throw new IllegalArgumentException(error);
+        }
     }
 
     private static void removeViewNode(ObjectNode source, String id) {

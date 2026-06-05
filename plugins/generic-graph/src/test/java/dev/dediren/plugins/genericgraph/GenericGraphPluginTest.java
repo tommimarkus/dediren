@@ -399,6 +399,52 @@ class GenericGraphPluginTest {
     }
 
     @Test
+    void projectsUmlStateMachineViewKind() throws Exception {
+        PluginResult result = Main.executeForTesting(
+                new String[]{"project", "--target", "layout-request", "--view", "state-machine-view"},
+                fixture("fixtures/source/valid-uml-state-machine-basic.json"));
+
+        JsonNode data = okData(result);
+
+        assertThat(data.at("/view_id").asText()).isEqualTo("state-machine-view");
+        assertThat(jsonTexts(data.get("nodes"), "id"))
+                .containsExactly("initial", "draft", "submitted", "payment-choice", "fulfilled", "closed", "rejected");
+        assertThat(jsonTexts(data.get("edges"), "id"))
+                .containsExactly("t-create", "t-submit", "t-check-payment", "t-approve", "t-reject", "t-close");
+        assertThat(jsonTexts(data.get("groups"), "id"))
+                .containsExactly("order-lifecycle-frame", "main-region-frame");
+        assertThat(jsonTexts(layoutRequestGroup(data, "order-lifecycle-frame").get("members")))
+                .containsExactly("main-region-frame");
+        assertThat(jsonTexts(layoutRequestGroup(data, "main-region-frame").get("members")))
+                .containsExactly("initial", "draft", "submitted", "payment-choice", "fulfilled", "closed", "rejected");
+        assertThat(layoutRequestNode(data, "draft").at("/width_hint").asDouble()).isEqualTo(150.0);
+        assertThat(layoutRequestNode(data, "draft").at("/height_hint").asDouble()).isEqualTo(72.0);
+        assertThat(layoutRequestNode(data, "initial").at("/width_hint").asDouble()).isEqualTo(36.0);
+        assertThat(layoutRequestNode(data, "initial").at("/height_hint").asDouble()).isEqualTo(36.0);
+        assertThat(layoutRequestNode(data, "closed").at("/width_hint").asDouble()).isEqualTo(36.0);
+        assertThat(layoutRequestNode(data, "closed").at("/height_hint").asDouble()).isEqualTo(36.0);
+        assertSchemaValid("schemas/layout-request.schema.json", data);
+    }
+
+    @Test
+    void projectsUmlStateMachineRenderMetadata() throws Exception {
+        PluginResult result = Main.executeForTesting(
+                new String[]{"project", "--target", "render-metadata", "--view", "state-machine-view"},
+                fixture("fixtures/source/valid-uml-state-machine-basic.json"));
+
+        JsonNode data = okData(result);
+
+        assertThat(data.at("/semantic_profile").asText()).isEqualTo("uml");
+        assertThat(data.at("/nodes/payment-choice/type").asText()).isEqualTo("Pseudostate");
+        assertThat(data.at("/nodes/payment-choice/properties/kind").asText()).isEqualTo("choice");
+        assertThat(data.at("/edges/t-approve/type").asText()).isEqualTo("Transition");
+        assertThat(data.at("/edges/t-approve/properties/guard").asText()).isEqualTo("paymentAuthorized");
+        assertThat(data.at("/groups/order-lifecycle-frame/type").asText()).isEqualTo("StateMachine");
+        assertThat(data.at("/groups/main-region-frame/type").asText()).isEqualTo("Region");
+        assertSchemaValid("schemas/render-metadata.schema.json", data);
+    }
+
+    @Test
     void projectsUmlSequenceEdgeRenderMetadata() throws Exception {
         PluginResult result = Main.executeForTesting(
                 new String[]{"project", "--target", "render-metadata", "--view", "sequence-view"},
@@ -594,7 +640,7 @@ class GenericGraphPluginTest {
         ((com.fasterxml.jackson.databind.node.ObjectNode) source).putArray("required_plugins")
                 .addObject()
                 .put("id", "generic-graph")
-                .put("version", "0.22.0");
+                .put("version", "0.23.0");
         ((com.fasterxml.jackson.databind.node.ObjectNode) source.at("/plugins/generic-graph"))
                 .put("semantic_profile", "archimate");
 
@@ -666,8 +712,8 @@ class GenericGraphPluginTest {
                 {
                   "model_schema_version": "model.schema.v1",
                   "required_plugins": [
-                    { "id": "generic-graph", "version": "0.22.0" },
-                    { "id": "archimate-oef", "version": "0.22.0" }
+                    { "id": "generic-graph", "version": "0.23.0" },
+                    { "id": "archimate-oef", "version": "0.23.0" }
                   ],
                   "nodes": [
                     { "id": "api", "type": "ApplicationComponent", "label": "API", "properties": {} },
@@ -710,8 +756,8 @@ class GenericGraphPluginTest {
                 {
                   "model_schema_version": "model.schema.v1",
                   "required_plugins": [
-                    { "id": "generic-graph", "version": "0.22.0" },
-                    { "id": "archimate-oef", "version": "0.22.0" }
+                    { "id": "generic-graph", "version": "0.23.0" },
+                    { "id": "archimate-oef", "version": "0.23.0" }
                   ],
                   "nodes": [
                     { "id": "api", "type": "ApplicationComponent", "label": "API", "properties": {} },
@@ -774,8 +820,8 @@ class GenericGraphPluginTest {
                 {
                   "model_schema_version": "model.schema.v1",
                   "required_plugins": [
-                    { "id": "generic-graph", "version": "0.22.0" },
-                    { "id": "archimate-oef", "version": "0.22.0" }
+                    { "id": "generic-graph", "version": "0.23.0" },
+                    { "id": "archimate-oef", "version": "0.23.0" }
                   ],
                   "nodes": [
                     { "id": "api", "type": "ApplicationComponent", "label": "API", "properties": {} },
@@ -812,8 +858,8 @@ class GenericGraphPluginTest {
                 {
                   "model_schema_version": "model.schema.v1",
                   "required_plugins": [
-                    { "id": "generic-graph", "version": "0.22.0" },
-                    { "id": "archimate-oef", "version": "0.22.0" }
+                    { "id": "generic-graph", "version": "0.23.0" },
+                    { "id": "archimate-oef", "version": "0.23.0" }
                   ],
                   "nodes": [
                     { "id": "service", "type": "ApplicationService", "label": "Service", "properties": {} },
@@ -854,8 +900,8 @@ class GenericGraphPluginTest {
                 {
                   "model_schema_version": "model.schema.v1",
                   "required_plugins": [
-                    { "id": "generic-graph", "version": "0.22.0" },
-                    { "id": "archimate-oef", "version": "0.22.0" }
+                    { "id": "generic-graph", "version": "0.23.0" },
+                    { "id": "archimate-oef", "version": "0.23.0" }
                   ],
                   "nodes": [
                     { "id": "group", "type": "Grouping", "label": "Group", "properties": {} },
@@ -996,6 +1042,15 @@ class GenericGraphPluginTest {
         throw new AssertionError("expected layout request node " + nodeId);
     }
 
+    private static JsonNode layoutRequestGroup(JsonNode data, String groupId) {
+        for (JsonNode group : data.get("groups")) {
+            if (groupId.equals(group.at("/id").asText())) {
+                return group;
+            }
+        }
+        throw new AssertionError("expected layout request group " + groupId);
+    }
+
     private static JsonNode layoutRequestConstraint(JsonNode data, String kind) {
         for (JsonNode constraint : data.get("constraints")) {
             if (kind.equals(constraint.at("/kind").asText())) {
@@ -1131,8 +1186,8 @@ class GenericGraphPluginTest {
                 {
                   "model_schema_version": "model.schema.v1",
                   "required_plugins": [
-                    { "id": "generic-graph", "version": "0.22.0" },
-                    { "id": "archimate-oef", "version": "0.22.0" }
+                    { "id": "generic-graph", "version": "0.23.0" },
+                    { "id": "archimate-oef", "version": "0.23.0" }
                   ],
                   "nodes": [
                     { "id": "%s", "type": "%s", "label": "Source", "properties": {} },
@@ -1178,8 +1233,8 @@ class GenericGraphPluginTest {
                 {
                   "model_schema_version": "model.schema.v1",
                   "required_plugins": [
-                    { "id": "generic-graph", "version": "0.22.0" },
-                    { "id": "archimate-oef", "version": "0.22.0" }
+                    { "id": "generic-graph", "version": "0.23.0" },
+                    { "id": "archimate-oef", "version": "0.23.0" }
                   ],
                   "nodes": [
                     {

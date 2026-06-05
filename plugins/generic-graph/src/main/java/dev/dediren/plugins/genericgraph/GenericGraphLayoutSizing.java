@@ -33,6 +33,10 @@ final class GenericGraphLayoutSizing {
         if (semanticProfile.equals("uml") && umlSequenceHint != null) {
             return umlSequenceHint;
         }
+        Double umlStateMachineHint = umlStateMachineWidthHint(sourceNode.type());
+        if (semanticProfile.equals("uml") && umlStateMachineHint != null) {
+            return umlStateMachineHint;
+        }
         if (semanticProfile.equals("uml") && isLargeUmlStructuralNodeType(sourceNode.type())) {
             return umlStructuralWidthHint(sourceNode);
         }
@@ -49,6 +53,10 @@ final class GenericGraphLayoutSizing {
         Double umlSequenceHint = umlSequenceHeightHint(sourceNode.type());
         if (semanticProfile.equals("uml") && umlSequenceHint != null) {
             return umlSequenceHint;
+        }
+        Double umlStateMachineHint = umlStateMachineHeightHint(sourceNode.type());
+        if (semanticProfile.equals("uml") && umlStateMachineHint != null) {
+            return umlStateMachineHint;
         }
         if (semanticProfile.equals("uml") && isLargeUmlStructuralNodeType(sourceNode.type())) {
             return umlStructuralHeightHint(sourceNode);
@@ -72,6 +80,22 @@ final class GenericGraphLayoutSizing {
             case "Lifeline" -> 48.0;
             case "ExecutionSpecification" -> 72.0;
             case "Gate", "DestructionOccurrenceSpecification" -> 24.0;
+            default -> null;
+        };
+    }
+
+    private static Double umlStateMachineWidthHint(String nodeType) {
+        return switch (nodeType) {
+            case "State" -> 150.0;
+            case "FinalState", "Pseudostate" -> 36.0;
+            default -> null;
+        };
+    }
+
+    private static Double umlStateMachineHeightHint(String nodeType) {
+        return switch (nodeType) {
+            case "State" -> 72.0;
+            case "FinalState", "Pseudostate" -> 36.0;
             default -> null;
         };
     }

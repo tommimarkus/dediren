@@ -62,7 +62,10 @@
       "Lifeline": { "fill": "#ffffff", "stroke": "#000000", "label_fill": "#000000", "decorator": "uml_lifeline" },
       "ExecutionSpecification": { "fill": "#ffffff", "stroke": "#000000", "label_fill": "#000000", "decorator": "uml_execution_specification" },
       "Gate": { "fill": "#ffffff", "stroke": "#000000", "label_fill": "#000000", "decorator": "uml_gate" },
-      "DestructionOccurrenceSpecification": { "fill": "#ffffff", "stroke": "#000000", "label_fill": "#000000", "decorator": "uml_destruction_occurrence" }
+      "DestructionOccurrenceSpecification": { "fill": "#ffffff", "stroke": "#000000", "label_fill": "#000000", "decorator": "uml_destruction_occurrence" },
+      "State": { "fill": "#ffffff", "stroke": "#000000", "label_fill": "#000000", "rx": 16, "decorator": "uml_state" },
+      "FinalState": { "fill": "#ffffff", "stroke": "#000000", "label_fill": "#000000", "decorator": "uml_final_state" },
+      "Pseudostate": { "fill": "#000000", "stroke": "#000000", "label_fill": "#000000", "decorator": "uml_pseudostate" }
     },
     "edge_type_overrides": {
       "Association": { "marker_start": "none", "marker_end": "none" },
@@ -73,7 +76,13 @@
       "Dependency": { "line_style": "dashed", "marker_end": "open_arrow" },
       "ControlFlow": { "marker_end": "open_arrow" },
       "ObjectFlow": { "marker_end": "open_arrow" },
-      "Message": { "marker_end": "filled_arrow", "label_horizontal_position": "center" }
+      "Message": { "marker_end": "filled_arrow", "label_horizontal_position": "center" },
+      "Transition": {
+        "marker_end": "open_arrow",
+        "label_horizontal_position": "center",
+        "label_horizontal_side": "auto",
+        "label_vertical_position": "center"
+      }
     },
     "group_type_overrides": {
       "Package": {
@@ -81,6 +90,20 @@
         "stroke": "#000000",
         "label_fill": "#000000",
         "decorator": "uml_package"
+      },
+      "StateMachine": {
+        "fill": "#ffffff",
+        "stroke": "#000000",
+        "label_fill": "#000000",
+        "rx": 0,
+        "decorator": "uml_state_machine"
+      },
+      "Region": {
+        "fill": "#ffffff",
+        "stroke": "#000000",
+        "label_fill": "#000000",
+        "rx": 0,
+        "decorator": "uml_region"
       }
     },
     "node_overrides": {},

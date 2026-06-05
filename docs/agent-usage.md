@@ -46,7 +46,7 @@ guidance in that package.
 {
   "model_schema_version": "model.schema.v1",
   "required_plugins": [
-    { "id": "generic-graph", "version": "0.22.0" }
+    { "id": "generic-graph", "version": "0.23.0" }
   ],
   "nodes": [
     { "id": "client", "type": "generic.actor", "label": "Client", "properties": {} },
@@ -90,8 +90,8 @@ profile and use ArchiMate type names:
 ```json
 {
   "required_plugins": [
-    { "id": "generic-graph", "version": "0.22.0" },
-    { "id": "archimate-oef", "version": "0.22.0" }
+    { "id": "generic-graph", "version": "0.23.0" },
+    { "id": "archimate-oef", "version": "0.23.0" }
   ],
   "plugins": {
     "generic-graph": {
@@ -104,7 +104,7 @@ profile and use ArchiMate type names:
 
 For UML SVG notation or XMI export, use `semantic_profile: "uml"` and the
 `uml-xmi` plugin. Supported UML view kinds are `uml-class`, `uml-data`,
-`uml-activity`, and `uml-sequence`.
+`uml-activity`, `uml-sequence`, and `uml-state-machine`.
 
 ## Command Handoff
 
@@ -187,13 +187,69 @@ each command before continuing. The sequence MVP supports `Interaction`,
 `DestructionOccurrenceSpecification` plus `CombinedFragment` and
 `InteractionOperand`; message sorts are `synchCall`, `asynchCall`,
 `asynchSignal`, `reply`, `createMessage`, and `deleteMessage`. `InteractionUse`,
-`GeneralOrdering`, `ignore`, `consider`, UMLDI, state machines, use cases, and
-deployment diagrams are not yet supported.
+`GeneralOrdering`, `ignore`, `consider`, UMLDI, use cases, and deployment
+diagrams are not yet supported.
+
+## UML State Machine Handoff
+
+Use `fixtures/source/valid-uml-state-machine-basic.json` for the state-machine
+MVP. `StateMachine` and `Region` are semantic-backed groups in
+`plugins.generic-graph.views[].groups` with `semantic_source_id`; state
+vertices are nodes and transitions are relationships.
+
+```bash
+"$BUNDLE/bin/dediren" validate \
+  --plugin generic-graph \
+  --profile uml \
+  --input "$BUNDLE/fixtures/source/valid-uml-state-machine-basic.json"
+
+"$BUNDLE/bin/dediren" project \
+  --target layout-request \
+  --plugin generic-graph \
+  --view state-machine-view \
+  --input "$BUNDLE/fixtures/source/valid-uml-state-machine-basic.json" \
+  > state-machine-layout-request.json
+
+"$BUNDLE/bin/dediren" project \
+  --target render-metadata \
+  --plugin generic-graph \
+  --view state-machine-view \
+  --input "$BUNDLE/fixtures/source/valid-uml-state-machine-basic.json" \
+  > state-machine-render-metadata.json
+
+"$BUNDLE/bin/dediren" layout \
+  --plugin elk-layout \
+  --input state-machine-layout-request.json \
+  > state-machine-layout-result.json
+
+"$BUNDLE/bin/dediren" render \
+  --plugin svg-render \
+  --policy "$BUNDLE/fixtures/render-policy/uml-svg.json" \
+  --metadata state-machine-render-metadata.json \
+  --input state-machine-layout-result.json \
+  > state-machine-render-result.json
+
+"$BUNDLE/bin/dediren" export \
+  --plugin uml-xmi \
+  --policy "$BUNDLE/fixtures/export-policy/default-uml-xmi.json" \
+  --source "$BUNDLE/fixtures/source/valid-uml-state-machine-basic.json" \
+  --layout state-machine-layout-result.json \
+  > state-machine-xmi-result.json
+```
+
+Supported vocabulary: `StateMachine`, `Region`, `State`, `FinalState`,
+`Pseudostate`, `Transition`. Pseudostate kinds: `initial`, `deepHistory`,
+`shallowHistory`, `join`, `fork`, `junction`, `choice`, `entryPoint`,
+`exitPoint`, `terminate`. Transition kinds: `internal`, `local`, `external`.
+Deferred/non-goals: `ConnectionPointReference`, `ProtocolStateMachine`,
+`ProtocolTransition`, submachine states, orthogonal multi-region internals,
+trigger event metaclasses, effects as behavior nodes, UMLDI, use cases, and
+deployment diagrams.
 
 ## Runtime Probes
 
 ```bash
-VERSION=0.22.0
+VERSION=0.23.0
 TARGET=x86_64-unknown-linux-gnu
 BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-${VERSION}-${TARGET}
 

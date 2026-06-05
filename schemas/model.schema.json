@@ -75,7 +75,7 @@
       "properties": {
         "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" },
         "label": { "type": "string" },
-        "kind": { "enum": ["generic", "archimate", "uml-class", "uml-data", "uml-activity", "uml-sequence"] },
+        "kind": { "enum": ["generic", "archimate", "uml-class", "uml-data", "uml-activity", "uml-sequence", "uml-state-machine"] },
         "nodes": { "type": "array", "items": { "type": "string" } },
         "relationships": { "type": "array", "items": { "type": "string" } },
         "layout_preferences": { "$ref": "#/$defs/layoutPreferences" },

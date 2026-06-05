@@ -76,6 +76,44 @@ class LayoutQualityTest {
     }
 
     @Test
+    void nestedGroupMembersAreCountedAsGroupBoundaryMembers() {
+        var nodes = List.of(
+                node("source", 0.0, 0.0),
+                node("target", 200.0, 0.0));
+        var edges = List.of(edge("internal", "source", "target", List.of(
+                new Point(100.0, 40.0),
+                new Point(200.0, 40.0))));
+        var groups = List.of(
+                new LaidOutGroup(
+                        "outer",
+                        "outer",
+                        "outer",
+                        null,
+                        -30.0,
+                        -30.0,
+                        360.0,
+                        140.0,
+                        List.of("inner"),
+                        "Outer"),
+                new LaidOutGroup(
+                        "inner",
+                        "inner",
+                        "inner",
+                        null,
+                        -10.0,
+                        -10.0,
+                        320.0,
+                        100.0,
+                        List.of("source", "target"),
+                        "Inner"));
+
+        LayoutQualityReport report = LayoutQuality.validateLayout(layoutResult(nodes, edges, groups));
+
+        assertThat(report.groupBoundaryIssueCount()).isZero();
+        assertThat(report.status()).isEqualTo("ok");
+    }
+
+    @Test
     void excessiveDetoursAndCloseParallelRoutesAreCounted() {
         var edges = new ArrayList<LaidOutEdge>();
         edges.add(edge("detour", "detour-source", "detour-target", List.of(

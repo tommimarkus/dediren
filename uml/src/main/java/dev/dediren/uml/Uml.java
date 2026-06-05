@@ -46,6 +46,38 @@ public final class Uml {
             "DestructionOccurrenceSpecification",
             "CombinedFragment",
             "InteractionOperand");
+    private static final Set<String> STATE_MACHINE_TYPES = Set.of(
+            "StateMachine",
+            "Region",
+            "State",
+            "FinalState",
+            "Pseudostate");
+    private static final Set<String> STATE_VERTEX_TYPES = Set.of(
+            "State",
+            "FinalState",
+            "Pseudostate");
+    private static final Set<String> TRANSITION_SOURCE_TYPES = Set.of(
+            "State",
+            "Pseudostate");
+    private static final Set<String> TRANSITION_TARGET_TYPES = Set.of(
+            "State",
+            "FinalState",
+            "Pseudostate");
+    private static final Set<String> PSEUDOSTATE_KINDS = Set.of(
+            "initial",
+            "deepHistory",
+            "shallowHistory",
+            "join",
+            "fork",
+            "junction",
+            "choice",
+            "entryPoint",
+            "exitPoint",
+            "terminate");
+    private static final Set<String> TRANSITION_KINDS = Set.of(
+            "internal",
+            "local",
+            "external");
     private static final List<String> RELATIONSHIP_TYPES = List.of(
             "Association",
             "Composition",
@@ -55,7 +87,8 @@ public final class Uml {
             "Dependency",
             "ControlFlow",
             "ObjectFlow",
-            "Message");
+            "Message",
+            "Transition");
     private static final List<String> STRUCTURAL_RELATIONSHIP_TYPES = List.of(
             "Association",
             "Composition",
@@ -156,13 +189,14 @@ public final class Uml {
 
         for (int nodeIndex = 0; nodeIndex < source.nodes().size(); nodeIndex++) {
             SourceNode node = source.nodes().get(nodeIndex);
-            validateSequenceNodeProperties(
+            validateUmlNodeProperties(
                     node.id(),
                     node.type(),
                     node.properties().get("uml"),
                     "$.nodes[" + nodeIndex + "]",
                     context);
         }
+        validateTransitionRegionConsistency(source.relationships(), context);
         validateCombinedFragmentNesting(source.nodes(), context);
         validateInteractionOperandOwnerSelection(source.nodes(), context);
         validateInteractionFragmentOwnership(source.nodes(), context);
@@ -186,10 +220,13 @@ public final class Uml {
             if (view.kind() == GenericGraphViewKind.UML_SEQUENCE) {
                 validateUmlSequenceViewProperties(viewIndex, view, context);
             }
+            if (view.kind() == GenericGraphViewKind.UML_STATE_MACHINE) {
+                validateUmlStateMachineViewProperties(viewIndex, view, context);
+            }
         }
     }
 
-    private static void validateSequenceNodeProperties(
+    private static void validateUmlNodeProperties(
             String nodeId,
             String nodeType,
             JsonNode umlProperties,
@@ -203,6 +240,17 @@ public final class Uml {
                     context);
         } else if ("InteractionOperand".equals(nodeType)) {
             validateInteractionOperandProperties(
+                    umlProperties,
+                    path,
+                    context);
+        } else if ("Region".equals(nodeType)) {
+            validateRegionProperties(
+                    umlProperties,
+                    path,
+                    context);
+        } else if (isStateVertexType(nodeType)) {
+            validateStateVertexProperties(
+                    nodeType,
                     umlProperties,
                     path,
                     context);
@@ -233,6 +281,27 @@ public final class Uml {
                         selectedNodeIds,
                         selectedRelationshipIds,
                         context);
+            }
+        }
+    }
+
+    private static void validateUmlStateMachineViewProperties(
+            int viewIndex,
+            GenericGraphView view,
+            ValidationContext context) throws UmlValidationException {
+        var selectedNodeIds = new HashSet<>(view.nodes());
+        for (int relationshipIndex = 0; relationshipIndex < view.relationships().size(); relationshipIndex++) {
+            String relationshipId = view.relationships().get(relationshipIndex);
+            if (!"Transition".equals(context.relationshipTypes().get(relationshipId))) {
+                continue;
+            }
+            String source = context.relationshipSources().get(relationshipId);
+            String target = context.relationshipTargets().get(relationshipId);
+            if (!selectedNodeIds.contains(source) || !selectedNodeIds.contains(target)) {
+                throw new UmlValidationException(
+                        UmlTypeKind.RELATIONSHIP_ENDPOINT,
+                        relationshipId,
+                        "$.plugins.generic-graph.views[" + viewIndex + "].relationships[" + relationshipIndex + "]");
             }
         }
     }
@@ -313,7 +382,8 @@ public final class Uml {
     }
 
     public static void validateElementType(String value, String path) throws UmlValidationException {
-        if (!isStructuralType(value) && !isActivityType(value) && !isSequenceType(value)) {
+        if (!isStructuralType(value) && !isActivityType(value) && !isSequenceType(value)
+                && !isStateMachineType(value)) {
             throw new UmlValidationException(UmlTypeKind.ELEMENT, value, path);
         }
     }
@@ -336,6 +406,9 @@ public final class Uml {
             endpointsSupported = isActivityType(sourceType) && isActivityType(targetType);
         } else if ("Message".equals(relationshipType)) {
             endpointsSupported = isMessageEndpoint(sourceType, targetType);
+        } else if ("Transition".equals(relationshipType)) {
+            endpointsSupported = TRANSITION_SOURCE_TYPES.contains(sourceType)
+                    && TRANSITION_TARGET_TYPES.contains(targetType);
         } else {
             endpointsSupported = false;
         }
@@ -349,10 +422,11 @@ public final class Uml {
 
     public static void validateRelationshipProperties(String relationshipType, JsonNode umlProperties, String path)
             throws UmlValidationException {
-        if (!"Message".equals(relationshipType)) {
-            return;
+        if ("Message".equals(relationshipType)) {
+            validateMessageProperties(umlProperties, path);
+        } else if ("Transition".equals(relationshipType)) {
+            validateTransitionProperties(umlProperties, path);
         }
-        validateMessageProperties(umlProperties, path);
     }
 
     public static void validateMultiplicity(String value, String path) throws UmlValidationException {
@@ -400,6 +474,35 @@ public final class Uml {
             throw new UmlValidationException(UmlTypeKind.MULTIPLICITY, value.toString(), path);
         }
         validateMultiplicity(value.asText(), path);
+    }
+
+    private static void validateRegionProperties(
+            JsonNode umlProperties,
+            String path,
+            ValidationContext context) throws UmlValidationException {
+        String umlPath = path + ".properties.uml";
+        String stateMachine = requiredTextProperty(
+                umlProperties,
+                "state_machine",
+                "Region.state_machine",
+                umlPath);
+        requireNodeType(stateMachine, "StateMachine", context.nodeTypes(), umlPath + ".state_machine");
+    }
+
+    private static void validateStateVertexProperties(
+            String nodeType,
+            JsonNode umlProperties,
+            String path,
+            ValidationContext context) throws UmlValidationException {
+        String umlPath = path + ".properties.uml";
+        String region = requiredTextProperty(umlProperties, "region", nodeType + ".region", umlPath);
+        requireNodeType(region, "Region", context.nodeTypes(), umlPath + ".region");
+        if ("Pseudostate".equals(nodeType)) {
+            String kind = requiredTextProperty(umlProperties, "kind", "Pseudostate.kind", umlPath);
+            if (!PSEUDOSTATE_KINDS.contains(kind)) {
+                throw new UmlValidationException(UmlTypeKind.ELEMENT_PROPERTY, kind, umlPath + ".kind");
+            }
+        }
     }
 
     private static void validateCombinedFragmentProperties(
@@ -852,6 +955,84 @@ public final class Uml {
         }
     }
 
+    private static void validateTransitionProperties(JsonNode umlProperties, String path)
+            throws UmlValidationException {
+        String umlPath = path + ".properties.uml";
+        if (umlProperties == null || !umlProperties.isObject()) {
+            throw new UmlValidationException(
+                    UmlTypeKind.RELATIONSHIP_PROPERTY,
+                    "Transition.region",
+                    umlPath + ".region");
+        }
+        JsonNode region = umlProperties.get("region");
+        if (region == null || !region.isTextual()) {
+            throw new UmlValidationException(
+                    UmlTypeKind.RELATIONSHIP_PROPERTY,
+                    "Transition.region",
+                    umlPath + ".region");
+        }
+
+        JsonNode kind = umlProperties.get("kind");
+        if (kind != null && (!kind.isTextual() || !TRANSITION_KINDS.contains(kind.asText()))) {
+            throw new UmlValidationException(
+                    UmlTypeKind.RELATIONSHIP_PROPERTY,
+                    propertyValue(kind, "Transition.kind"),
+                    umlPath + ".kind");
+        }
+
+        for (String field : List.of("trigger", "guard", "effect")) {
+            JsonNode value = umlProperties.get(field);
+            if (value != null && !value.isTextual()) {
+                throw new UmlValidationException(
+                        UmlTypeKind.RELATIONSHIP_PROPERTY,
+                        value.toString(),
+                        umlPath + "." + field);
+            }
+        }
+    }
+
+    private static void validateTransitionRegionConsistency(
+            List<SourceRelationship> relationships,
+            ValidationContext context) throws UmlValidationException {
+        for (int relationshipIndex = 0; relationshipIndex < relationships.size(); relationshipIndex++) {
+            SourceRelationship relationship = relationships.get(relationshipIndex);
+            if (!"Transition".equals(relationship.type())) {
+                continue;
+            }
+            String path = "$.relationships[" + relationshipIndex + "]";
+            String region = readTextProperty(context.relationshipUmlProperties().get(relationship.id()), "region");
+            requireNodeType(region, "Region", context.nodeTypes(), path + ".properties.uml.region");
+
+            String sourceType = context.nodeTypes().get(relationship.source());
+            String targetType = context.nodeTypes().get(relationship.target());
+            if ("FinalState".equals(sourceType)) {
+                throw new UmlValidationException(
+                        UmlTypeKind.RELATIONSHIP_ENDPOINT,
+                        "Transition: FinalState -> " + targetType,
+                        path);
+            }
+            if ("Pseudostate".equals(targetType)
+                    && "initial".equals(readTextProperty(
+                            context.nodeUmlProperties().get(relationship.target()),
+                            "kind"))) {
+                throw new UmlValidationException(
+                        UmlTypeKind.RELATIONSHIP_ENDPOINT,
+                        "Transition target initial Pseudostate",
+                        path);
+            }
+
+            for (String endpoint : List.of(relationship.source(), relationship.target())) {
+                String endpointRegion = readTextProperty(context.nodeUmlProperties().get(endpoint), "region");
+                if (!region.equals(endpointRegion)) {
+                    throw new UmlValidationException(
+                            UmlTypeKind.RELATIONSHIP_PROPERTY,
+                            region,
+                            path + ".properties.uml.region");
+                }
+            }
+        }
+    }
+
     private static void validateFragmentCoverage(
             String ownerCombinedFragment,
             String fragmentId,
@@ -1239,6 +1420,7 @@ public final class Uml {
             case UML_CLASS, UML_DATA -> isStructuralType(nodeType);
             case UML_ACTIVITY -> isActivityType(nodeType);
             case UML_SEQUENCE -> isSequenceType(nodeType);
+            case UML_STATE_MACHINE -> isStateVertexType(nodeType);
         };
         if (!supported) {
             throw new UmlValidationException(
@@ -1296,6 +1478,14 @@ public final class Uml {
         return SEQUENCE_TYPES.contains(value);
     }
 
+    private static boolean isStateMachineType(String value) {
+        return STATE_MACHINE_TYPES.contains(value);
+    }
+
+    private static boolean isStateVertexType(String value) {
+        return STATE_VERTEX_TYPES.contains(value);
+    }
+
     private static boolean isMessageEndpoint(String sourceType, String targetType) {
         return "Lifeline".equals(sourceType)
                 && ("Lifeline".equals(targetType) || "DestructionOccurrenceSpecification".equals(targetType));
@@ -1317,6 +1507,7 @@ public final class Uml {
             case UML_DATA -> "uml-data";
             case UML_ACTIVITY -> "uml-activity";
             case UML_SEQUENCE -> "uml-sequence";
+            case UML_STATE_MACHINE -> "uml-state-machine";
         };
     }
 

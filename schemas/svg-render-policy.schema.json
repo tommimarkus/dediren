@@ -162,7 +162,12 @@
             "uml_lifeline",
             "uml_execution_specification",
             "uml_gate",
-            "uml_destruction_occurrence"
+            "uml_destruction_occurrence",
+            "uml_state_machine",
+            "uml_region",
+            "uml_state",
+            "uml_final_state",
+            "uml_pseudostate"
           ]
         }
       }

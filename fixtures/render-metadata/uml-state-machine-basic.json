@@ -1,0 +1,123 @@
+{
+  "render_metadata_schema_version": "render-metadata.schema.v1",
+  "semantic_profile": "uml",
+  "nodes": {
+    "submitted": {
+      "type": "State",
+      "source_id": "submitted",
+      "properties": {
+        "region": "main-region"
+      }
+    },
+    "initial": {
+      "type": "Pseudostate",
+      "source_id": "initial",
+      "properties": {
+        "region": "main-region",
+        "kind": "initial"
+      }
+    },
+    "fulfilled": {
+      "type": "State",
+      "source_id": "fulfilled",
+      "properties": {
+        "region": "main-region"
+      }
+    },
+    "closed": {
+      "type": "FinalState",
+      "source_id": "closed",
+      "properties": {
+        "region": "main-region"
+      }
+    },
+    "draft": {
+      "type": "State",
+      "source_id": "draft",
+      "properties": {
+        "region": "main-region"
+      }
+    },
+    "payment-choice": {
+      "type": "Pseudostate",
+      "source_id": "payment-choice",
+      "properties": {
+        "region": "main-region",
+        "kind": "choice"
+      }
+    },
+    "rejected": {
+      "type": "FinalState",
+      "source_id": "rejected",
+      "properties": {
+        "region": "main-region"
+      }
+    }
+  },
+  "edges": {
+    "t-create": {
+      "type": "Transition",
+      "source_id": "t-create",
+      "properties": {
+        "region": "main-region",
+        "kind": "external",
+        "trigger": "create"
+      }
+    },
+    "t-close": {
+      "type": "Transition",
+      "source_id": "t-close",
+      "properties": {
+        "region": "main-region",
+        "kind": "external",
+        "trigger": "deliver"
+      }
+    },
+    "t-check-payment": {
+      "type": "Transition",
+      "source_id": "t-check-payment",
+      "properties": {
+        "region": "main-region",
+        "kind": "external",
+        "trigger": "authorizePayment"
+      }
+    },
+    "t-reject": {
+      "type": "Transition",
+      "source_id": "t-reject",
+      "properties": {
+        "region": "main-region",
+        "kind": "external",
+        "guard": "paymentRejected"
+      }
+    },
+    "t-approve": {
+      "type": "Transition",
+      "source_id": "t-approve",
+      "properties": {
+        "region": "main-region",
+        "kind": "external",
+        "guard": "paymentAuthorized"
+      }
+    },
+    "t-submit": {
+      "type": "Transition",
+      "source_id": "t-submit",
+      "properties": {
+        "region": "main-region",
+        "kind": "external",
+        "trigger": "submit"
+      }
+    }
+  },
+  "groups": {
+    "order-lifecycle-frame": {
+      "type": "StateMachine",
+      "source_id": "order-lifecycle"
+    },
+    "main-region-frame": {
+      "type": "Region",
+      "source_id": "main-region"
+    }
+  }
+}
