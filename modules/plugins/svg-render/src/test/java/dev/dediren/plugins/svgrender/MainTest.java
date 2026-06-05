@@ -98,6 +98,9 @@ class MainTest {
                     properties -> properties.putArray("operands").add(3),
                     "render_metadata.nodes.cf-availability.properties.operands");
             assertInvalidUmlCombinedFragmentMetadata(
+                    properties -> properties.putArray("operands").add("op-missing"),
+                    "render_metadata.nodes.cf-availability.properties.operands");
+            assertInvalidUmlCombinedFragmentMetadata(
                     properties -> properties.put("covered", "customer"),
                     "render_metadata.nodes.cf-availability.properties.covered");
             assertInvalidUmlCombinedFragmentMetadata(
@@ -129,8 +132,22 @@ class MainTest {
                     properties -> properties.putArray("fragments").add(3),
                     "render_metadata.nodes.op-in-stock.properties.fragments");
             assertInvalidUmlInteractionOperandMetadata(
+                    properties -> properties.putArray("fragments").add("m-missing"),
+                    "render_metadata.nodes.op-in-stock.properties.fragments");
+            assertInvalidUmlInteractionOperandMetadata(
                     properties -> properties.put("guard", 3),
                     "render_metadata.nodes.op-in-stock.properties.guard");
+        }
+
+        @Test
+        void rejectsUmlSequenceCombinedFragmentMetadataWithInvalidOperandCount() throws Exception {
+            JsonNode input = umlSequenceFragmentsStyleInput();
+            ((ArrayNode) input.at("/render_metadata/nodes/cf-coupon/properties/operands")).add("op-in-stock");
+
+            JsonNode envelope = error(render(input), "DEDIREN_UML_COMBINED_FRAGMENT_METADATA_INVALID");
+
+            assertThat(envelope.at("/diagnostics/0/path").asText())
+                    .isEqualTo("render_metadata.nodes.cf-coupon.properties.operands");
         }
 
         @Test
