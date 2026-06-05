@@ -133,7 +133,11 @@ jq -r '.data.content' render-result.json > diagram.svg
 Use `fixtures/source/valid-uml-sequence-basic.json` for the sequence MVP
 shape: one `Interaction`, `Lifeline` nodes, and ordered `Message`
 relationships with `properties.uml.sequence` plus `message_sort`. The SVG
-sequence path needs generated render metadata.
+sequence path needs generated render metadata. For combined fragments, use
+`fixtures/source/valid-uml-sequence-fragments.json` and
+`--view sequence-fragments-view`; author `CombinedFragment` and
+`InteractionOperand` nodes under `properties.uml` for `alt`, `opt`, `loop`,
+and `par`.
 
 ```bash
 "$BUNDLE/bin/dediren" validate \
@@ -178,10 +182,11 @@ sequence path needs generated render metadata.
 Read `.status`, `.data`, and `.diagnostics[]` from stdout JSON envelopes for
 each command before continuing. The sequence MVP supports `Interaction`,
 `Lifeline`, `Message`, `ExecutionSpecification`, `Gate`, and
-`DestructionOccurrenceSpecification`; message sorts are `synchCall`,
-`asynchCall`, `asynchSignal`, `reply`, `createMessage`, and `deleteMessage`.
-Combined fragments, state machines, use cases, deployment, and UMLDI are later
-slices.
+`DestructionOccurrenceSpecification` plus `CombinedFragment` and
+`InteractionOperand`; message sorts are `synchCall`, `asynchCall`,
+`asynchSignal`, `reply`, `createMessage`, and `deleteMessage`. `InteractionUse`,
+`GeneralOrdering`, `ignore`, `consider`, UMLDI, state machines, use cases, and
+deployment diagrams are not yet supported.
 
 ## Runtime Probes
 
