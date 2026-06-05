@@ -101,6 +101,47 @@ class MainTest {
         }
 
         @Test
+        void rendersUmlUseCaseNotation() throws Exception {
+            String content = okContent(render(renderInput(
+                    "fixtures/layout-result/uml-use-case-basic.json",
+                    "fixtures/render-policy/uml-svg.json",
+                    "fixtures/render-metadata/uml-use-case-basic.json")));
+            Document document = svgDocument(content);
+
+            assertThat(content).contains(">Customer<", ">Place Order<", "Order Service");
+            groupWithAttribute(document, "data-dediren-node-id", "customer");
+            groupWithAttribute(document, "data-dediren-node-id", "place-order");
+            groupWithAttribute(document, "data-dediren-node-id", "payment-extension");
+            groupWithAttribute(document, "data-dediren-edge-id", "include-authentication");
+            groupWithAttribute(document, "data-dediren-edge-id", "extend-discount");
+            groupWithAttribute(document, "data-dediren-group-id", "order-service-boundary");
+
+            Element customer = groupWithAttribute(document, "data-dediren-node-id", "customer");
+            Element actorShape = firstChildElement(customer, "g");
+            assertThat(actorShape.getAttribute("data-dediren-node-shape")).isEqualTo("uml_actor");
+            assertThat(childElements(actorShape, "circle")).hasSize(1);
+            assertThat(childElements(actorShape, "path")).hasSize(1);
+
+            Element placeOrder = groupWithAttribute(document, "data-dediren-node-id", "place-order");
+            Element useCaseShape = firstChildElement(placeOrder, "ellipse");
+            assertThat(useCaseShape.getAttribute("data-dediren-node-shape")).isEqualTo("uml_use_case");
+
+            Element paymentExtension = groupWithAttribute(document, "data-dediren-node-id", "payment-extension");
+            Element extensionShape = firstChildElement(paymentExtension, "rect");
+            assertThat(extensionShape.getAttribute("data-dediren-node-shape")).isEqualTo("uml_extension_point");
+
+            Element include = groupWithAttribute(document, "data-dediren-edge-id", "include-authentication");
+            Element includePath = firstChildElement(include, "path");
+            assertMarkerForStyle(document, includePath, "include-authentication", "end", "open_arrow");
+            assertThat(includePath.getAttribute("stroke-dasharray")).isEqualTo("8 5");
+
+            Element extend = groupWithAttribute(document, "data-dediren-edge-id", "extend-discount");
+            Element extendPath = firstChildElement(extend, "path");
+            assertMarkerForStyle(document, extendPath, "extend-discount", "end", "open_arrow");
+            assertThat(extendPath.getAttribute("stroke-dasharray")).isEqualTo("8 5");
+        }
+
+        @Test
         void rejectsMalformedUmlSequenceMessageMetadata() throws Exception {
             assertInvalidUmlSequenceMessageMetadata(
                     properties -> properties.remove("sequence"),

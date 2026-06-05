@@ -46,7 +46,7 @@ guidance in that package.
 {
   "model_schema_version": "model.schema.v1",
   "required_plugins": [
-    { "id": "generic-graph", "version": "0.23.0" }
+    { "id": "generic-graph", "version": "0.24.0" }
   ],
   "nodes": [
     { "id": "client", "type": "generic.actor", "label": "Client", "properties": {} },
@@ -90,8 +90,8 @@ profile and use ArchiMate type names:
 ```json
 {
   "required_plugins": [
-    { "id": "generic-graph", "version": "0.23.0" },
-    { "id": "archimate-oef", "version": "0.23.0" }
+    { "id": "generic-graph", "version": "0.24.0" },
+    { "id": "archimate-oef", "version": "0.24.0" }
   ],
   "plugins": {
     "generic-graph": {
@@ -104,7 +104,7 @@ profile and use ArchiMate type names:
 
 For UML SVG notation or XMI export, use `semantic_profile: "uml"` and the
 `uml-xmi` plugin. Supported UML view kinds are `uml-class`, `uml-data`,
-`uml-activity`, `uml-sequence`, and `uml-state-machine`.
+`uml-activity`, `uml-sequence`, `uml-state-machine`, and `uml-use-case`.
 
 ## Command Handoff
 
@@ -187,8 +187,8 @@ each command before continuing. The sequence MVP supports `Interaction`,
 `DestructionOccurrenceSpecification` plus `CombinedFragment` and
 `InteractionOperand`; message sorts are `synchCall`, `asynchCall`,
 `asynchSignal`, `reply`, `createMessage`, and `deleteMessage`. `InteractionUse`,
-`GeneralOrdering`, `ignore`, `consider`, UMLDI, use cases, and deployment
-diagrams are not yet supported.
+`GeneralOrdering`, `ignore`, `consider`, UMLDI, and deployment diagrams are not
+yet supported.
 
 ## UML State Machine Handoff
 
@@ -243,13 +243,68 @@ Supported vocabulary: `StateMachine`, `Region`, `State`, `FinalState`,
 `exitPoint`, `terminate`. Transition kinds: `internal`, `local`, `external`.
 Deferred/non-goals: `ConnectionPointReference`, `ProtocolStateMachine`,
 `ProtocolTransition`, submachine states, orthogonal multi-region internals,
-trigger event metaclasses, effects as behavior nodes, UMLDI, use cases, and
+trigger event metaclasses, effects as behavior nodes, UMLDI, and deployment
+diagrams.
+
+## UML Use Case Handoff
+
+Use `fixtures/source/valid-uml-use-case-basic.json` for the use-case MVP.
+Author `Actor`, `UseCase`, and `ExtensionPoint` nodes; actor `Association`
+relationships; and `Include` or `Extend` relationships between use cases. Model
+the subject boundary as a semantic-backed view group whose `semantic_source_id`
+points at a UML structural classifier node. Put `UseCase.properties.uml.subject`
+on use cases and `ExtensionPoint.properties.uml.use_case` on extension points.
+
+```bash
+"$BUNDLE/bin/dediren" validate \
+  --plugin generic-graph \
+  --profile uml \
+  --input "$BUNDLE/fixtures/source/valid-uml-use-case-basic.json"
+
+"$BUNDLE/bin/dediren" project \
+  --target layout-request \
+  --plugin generic-graph \
+  --view use-case-view \
+  --input "$BUNDLE/fixtures/source/valid-uml-use-case-basic.json" \
+  > use-case-layout-request.json
+
+"$BUNDLE/bin/dediren" project \
+  --target render-metadata \
+  --plugin generic-graph \
+  --view use-case-view \
+  --input "$BUNDLE/fixtures/source/valid-uml-use-case-basic.json" \
+  > use-case-render-metadata.json
+
+"$BUNDLE/bin/dediren" layout \
+  --plugin elk-layout \
+  --input use-case-layout-request.json \
+  > use-case-layout-result.json
+
+"$BUNDLE/bin/dediren" render \
+  --plugin svg-render \
+  --policy "$BUNDLE/fixtures/render-policy/uml-svg.json" \
+  --metadata use-case-render-metadata.json \
+  --input use-case-layout-result.json \
+  > use-case-render-result.json
+
+"$BUNDLE/bin/dediren" export \
+  --plugin uml-xmi \
+  --policy "$BUNDLE/fixtures/export-policy/default-uml-xmi.json" \
+  --source "$BUNDLE/fixtures/source/valid-uml-use-case-basic.json" \
+  --layout use-case-layout-result.json \
+  > use-case-xmi-result.json
+```
+
+Rules: `Include` and `Extend` are `UseCase -> UseCase`.
+`Extend.properties.uml.extension_point`, when present, must reference an
+extension point owned by the extended target use case. Deferred/non-goals:
+use-case generalization, collaboration use-case realizations, UMLDI, and
 deployment diagrams.
 
 ## Runtime Probes
 
 ```bash
-VERSION=0.23.0
+VERSION=0.24.0
 BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-${VERSION}
 
 "$BUNDLE/bin/dediren" --version

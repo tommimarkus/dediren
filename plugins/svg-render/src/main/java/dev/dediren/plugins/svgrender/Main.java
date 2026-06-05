@@ -366,6 +366,20 @@ public final class Main {
                     styleNumber(style.strokeWidth()));
             case UML_FINAL_STATE -> umlFinalStateShape(node, style, shapeName);
             case UML_PSEUDOSTATE -> umlPseudostateShape(node, style, selector, shapeName);
+            case UML_ACTOR -> umlActorShape(node, style, shapeName);
+            case UML_USE_CASE -> umlUseCaseShape(node, style, shapeName);
+            case UML_EXTENSION_POINT -> String.format(
+                    Locale.ROOT,
+                    "<rect data-dediren-node-shape=\"%s\" x=\"%.1f\" y=\"%.1f\" width=\"%.1f\" height=\"%.1f\" rx=\"%s\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%s\"/>",
+                    shapeName,
+                    node.x(),
+                    node.y(),
+                    node.width(),
+                    node.height(),
+                    styleNumber(Math.max(style.rx(), 2.0)),
+                    attr(style.fill()),
+                    attr(style.stroke()),
+                    styleNumber(style.strokeWidth()));
             case UML_DECISION_NODE, UML_MERGE_NODE -> {
                 double centerX = node.x() + node.width() / 2.0;
                 double centerY = node.y() + node.height() / 2.0;
@@ -448,6 +462,61 @@ public final class Main {
                     attr(style.stroke()),
                     styleNumber(style.strokeWidth()));
         };
+    }
+
+    private static String umlActorShape(LaidOutNode node, ResolvedNodeStyle style, String shapeName) {
+        double centerX = node.x() + node.width() / 2.0;
+        double headRadius = Math.max(7.0, Math.min(node.width(), node.height()) * 0.11);
+        double headCenterY = node.y() + headRadius + 10.0;
+        double bodyTopY = headCenterY + headRadius;
+        double bodyBottomY = node.y() + node.height() * 0.58;
+        double armY = node.y() + node.height() * 0.38;
+        double armSpan = node.width() * 0.62;
+        double legSpan = node.width() * 0.44;
+        double legBottomY = node.y() + node.height() * 0.78;
+        String body = String.format(
+                Locale.ROOT,
+                "<circle cx=\"%.1f\" cy=\"%.1f\" r=\"%.1f\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%s\"/>"
+                        + "<path d=\"M %.1f %.1f L %.1f %.1f M %.1f %.1f L %.1f %.1f M %.1f %.1f L %.1f %.1f M %.1f %.1f L %.1f %.1f\" fill=\"none\" stroke=\"%s\" stroke-width=\"%s\" stroke-linecap=\"round\"/>",
+                centerX,
+                headCenterY,
+                headRadius,
+                attr(style.fill()),
+                attr(style.stroke()),
+                styleNumber(style.strokeWidth()),
+                centerX,
+                bodyTopY,
+                centerX,
+                bodyBottomY,
+                centerX - armSpan / 2.0,
+                armY,
+                centerX + armSpan / 2.0,
+                armY,
+                centerX,
+                bodyBottomY,
+                centerX - legSpan / 2.0,
+                legBottomY,
+                centerX,
+                bodyBottomY,
+                centerX + legSpan / 2.0,
+                legBottomY,
+                attr(style.stroke()),
+                styleNumber(style.strokeWidth()));
+        return "<g data-dediren-node-shape=\"" + attr(shapeName) + "\">" + body + "</g>";
+    }
+
+    private static String umlUseCaseShape(LaidOutNode node, ResolvedNodeStyle style, String shapeName) {
+        return String.format(
+                Locale.ROOT,
+                "<ellipse data-dediren-node-shape=\"%s\" cx=\"%.1f\" cy=\"%.1f\" rx=\"%.1f\" ry=\"%.1f\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%s\"/>",
+                shapeName,
+                node.x() + node.width() / 2.0,
+                node.y() + node.height() / 2.0,
+                Math.max(8.0, node.width() / 2.0),
+                Math.max(8.0, node.height() / 2.0),
+                attr(style.fill()),
+                attr(style.stroke()),
+                styleNumber(style.strokeWidth()));
     }
 
     private static String umlFinalStateShape(LaidOutNode node, ResolvedNodeStyle style, String shapeName) {
@@ -1988,6 +2057,14 @@ public final class Main {
                     node.y() + 16.0,
                     attr(style.labelFill()),
                     text(node.label()));
+        } else if (decorator == SvgNodeDecorator.UML_ACTOR) {
+            body = String.format(
+                    Locale.ROOT,
+                    "<text x=\"%.1f\" y=\"%.1f\" text-anchor=\"middle\" fill=\"%s\" font-size=\"12\">%s</text>",
+                    node.x() + node.width() / 2.0,
+                    node.y() + node.height() - 8.0,
+                    attr(style.labelFill()),
+                    text(node.label()));
         }
         return "<g data-dediren-node-decorator=\"" + attr(name) + "\">" + body + "</g>";
     }
@@ -2164,7 +2241,8 @@ public final class Main {
         return decorator == SvgNodeDecorator.UML_CLASS
                 || decorator == SvgNodeDecorator.UML_INTERFACE
                 || decorator == SvgNodeDecorator.UML_DATA_TYPE
-                || decorator == SvgNodeDecorator.UML_ENUMERATION;
+                || decorator == SvgNodeDecorator.UML_ENUMERATION
+                || decorator == SvgNodeDecorator.UML_ACTOR;
     }
 
     private static boolean isUmlDecorator(SvgNodeDecorator decorator) {

@@ -167,7 +167,10 @@
             "uml_region",
             "uml_state",
             "uml_final_state",
-            "uml_pseudostate"
+            "uml_pseudostate",
+            "uml_actor",
+            "uml_use_case",
+            "uml_extension_point"
           ]
         }
       }

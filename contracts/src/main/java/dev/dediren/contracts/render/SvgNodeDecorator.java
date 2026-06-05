@@ -174,5 +174,11 @@ public enum SvgNodeDecorator {
     @JsonProperty("uml_final_state")
     UML_FINAL_STATE,
     @JsonProperty("uml_pseudostate")
-    UML_PSEUDOSTATE
+    UML_PSEUDOSTATE,
+    @JsonProperty("uml_actor")
+    UML_ACTOR,
+    @JsonProperty("uml_use_case")
+    UML_USE_CASE,
+    @JsonProperty("uml_extension_point")
+    UML_EXTENSION_POINT
 }
