@@ -117,6 +117,10 @@ final class GenericGraphProjection {
                     relationship.type()));
         }
 
+        var selectedNodeIds = new LinkedHashSet<>(selectedView.nodes());
+        var selectedGroupIds = selectedView.groups().stream()
+                .map(GenericGraphViewGroup::id)
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
         var sourceNodeIds = source.nodes().stream().map(SourceNode::id).collect(java.util.stream.Collectors.toSet());
         var emittedLayoutNodeIds = nodes.stream()
                 .map(LayoutNode::id)
@@ -124,8 +128,9 @@ final class GenericGraphProjection {
         var groups = new ArrayList<LayoutGroup>();
         for (GenericGraphViewGroup group : selectedView.groups()) {
             for (String member : group.members()) {
-                if (!selectedView.nodes().contains(member)) {
-                    throw new IOException("group " + group.id() + " references node outside view: " + member);
+                if (!selectedNodeIds.contains(member) && !selectedGroupIds.contains(member)) {
+                    throw new IOException("group " + group.id()
+                            + " references node or group outside view: " + member);
                 }
             }
             GroupProvenance provenance;
@@ -140,7 +145,7 @@ final class GenericGraphProjection {
                 provenance = GroupProvenance.semanticBacked(sourceId);
             }
             var members = group.members().stream()
-                    .filter(emittedLayoutNodeIds::contains)
+                    .filter(member -> emittedLayoutNodeIds.contains(member) || selectedGroupIds.contains(member))
                     .toList();
             if (members.isEmpty()) {
                 continue;

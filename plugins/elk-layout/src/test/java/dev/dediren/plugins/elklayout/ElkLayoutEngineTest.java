@@ -356,6 +356,44 @@ class ElkLayoutEngineTest {
     }
 
     @Test
+    void packedLayoutSupportsNestedGroupMembers() {
+        LayoutRequest request = new LayoutRequest(
+            "layout-request.schema.v1",
+            "map",
+            List.of(
+                new LayoutNode("initial", "", "initial", 36.0, 36.0),
+                new LayoutNode("draft", "Draft", "draft", 150.0, 72.0)),
+            List.of(),
+            List.of(
+                new LayoutGroup(
+                    "outer-group",
+                    "Outer Group",
+                    List.of("inner-group"),
+                    GroupProvenance.visualOnlyGroup()),
+                new LayoutGroup(
+                    "inner-group",
+                    "Inner Group",
+                    List.of("initial", "draft"),
+                    GroupProvenance.visualOnlyGroup())),
+            List.of(),
+            List.of(),
+            new LayoutPreferences(LayoutMode.PACKED, null, LayoutDensity.READABLE, null, null));
+
+        LayoutResult result = new ElkLayoutEngine().layout(request);
+        ElkLayoutRenderArtifacts.write(result);
+
+        LaidOutGroup outer = groupById(result, "outer-group");
+        LaidOutGroup inner = groupById(result, "inner-group");
+        assertEquals(List.of(), result.warnings());
+        assertEquals(List.of("inner-group"), outer.members());
+        assertEquals(List.of("initial", "draft"), inner.members());
+        assertEquals(List.of(), result.edges());
+        assertGroupContainsGroup(outer, inner);
+        assertGroupContainsNode(inner, nodeById(result, "initial"));
+        assertGroupContainsNode(inner, nodeById(result, "draft"));
+    }
+
+    @Test
     void directionUpUsesNorthToSouthPorts() {
         LayoutRequest request = new LayoutRequest(
             "layout-request.schema.v1",
@@ -535,6 +573,43 @@ class ElkLayoutEngineTest {
                 external.width(),
                 external.height()),
             "ELK-generated group bounds should not overlap");
+    }
+
+    @Test
+    void groupedLayoutSupportsNestedGroupMembers() {
+        LayoutRequest request = new LayoutRequest(
+            "layout-request.schema.v1",
+            "state-machine",
+            List.of(
+                new LayoutNode("initial", "", "initial", 36.0, 36.0),
+                new LayoutNode("draft", "Draft", "draft", 150.0, 72.0)),
+            List.of(new LayoutEdge("create", "initial", "draft", "create", "create")),
+            List.of(
+                new LayoutGroup(
+                    "state-machine-frame",
+                    "State Machine",
+                    List.of("region-frame"),
+                    GroupProvenance.semanticBacked("state-machine")),
+                new LayoutGroup(
+                    "region-frame",
+                    "Region",
+                    List.of("initial", "draft"),
+                    GroupProvenance.semanticBacked("region"))),
+            List.of(),
+            List.of(),
+            null);
+
+        LayoutResult result = new ElkLayoutEngine().layout(request);
+        ElkLayoutRenderArtifacts.write(result);
+
+        LaidOutGroup outer = groupById(result, "state-machine-frame");
+        LaidOutGroup inner = groupById(result, "region-frame");
+        assertEquals(List.of(), result.warnings());
+        assertEquals(List.of("region-frame"), outer.members());
+        assertEquals(List.of("initial", "draft"), inner.members());
+        assertGroupContainsGroup(outer, inner);
+        assertGroupContainsNode(inner, nodeById(result, "initial"));
+        assertGroupContainsNode(inner, nodeById(result, "draft"));
     }
 
     @Test
@@ -1986,6 +2061,17 @@ class ElkLayoutEngineTest {
                 && node.x() + node.width() <= group.x() + group.width() + GEOMETRY_EPSILON
                 && node.y() + node.height() <= group.y() + group.height() + GEOMETRY_EPSILON,
             "group " + group.id() + " should contain node " + node.id());
+    }
+
+    private static void assertGroupContainsGroup(
+        LaidOutGroup outer,
+        LaidOutGroup inner) {
+        assertTrue(
+            inner.x() >= outer.x() - GEOMETRY_EPSILON
+                && inner.y() >= outer.y() - GEOMETRY_EPSILON
+                && inner.x() + inner.width() <= outer.x() + outer.width() + GEOMETRY_EPSILON
+                && inner.y() + inner.height() <= outer.y() + outer.height() + GEOMETRY_EPSILON,
+            "group " + outer.id() + " should contain child group " + inner.id());
     }
 
     private static void assertRouteEndpointOnSide(

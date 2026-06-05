@@ -3,11 +3,14 @@ package dev.dediren.core.quality;
 import dev.dediren.contracts.Diagnostic;
 import dev.dediren.contracts.DiagnosticSeverity;
 import dev.dediren.contracts.layout.LaidOutEdge;
+import dev.dediren.contracts.layout.LaidOutGroup;
 import dev.dediren.contracts.layout.LaidOutNode;
 import dev.dediren.contracts.layout.LayoutResult;
 import dev.dediren.contracts.layout.Point;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 public final class LayoutQuality {
     private static final double ROUTE_DETOUR_RATIO = 1.5;
@@ -171,14 +174,21 @@ public final class LayoutQuality {
         for (var group : result.groups()) {
             for (String memberId : group.members()) {
                 LaidOutNode node = findNode(result, memberId);
-                if (node == null) {
+                if (node != null) {
+                    if (!rectangleContains(
+                            group.x(), group.y(), group.width(), group.height(),
+                            node.x(), node.y(), node.width(), node.height())) {
+                        count++;
+                    }
                     continue;
                 }
-                boolean inside = node.x() >= group.x()
-                        && node.y() >= group.y()
-                        && node.x() + node.width() <= group.x() + group.width()
-                        && node.y() + node.height() <= group.y() + group.height();
-                if (!inside) {
+                LaidOutGroup childGroup = findGroup(result, memberId);
+                if (childGroup == null) {
+                    continue;
+                }
+                if (!rectangleContains(
+                        group.x(), group.y(), group.width(), group.height(),
+                        childGroup.x(), childGroup.y(), childGroup.width(), childGroup.height())) {
                     count++;
                 }
             }
@@ -188,7 +198,8 @@ public final class LayoutQuality {
                 Point start = edge.points().get(i);
                 Point end = edge.points().get(i + 1);
                 for (var group : result.groups()) {
-                    if (group.members().contains(edge.source()) || group.members().contains(edge.target())) {
+                    if (groupContainsNode(result, group, edge.source(), new HashSet<>())
+                            || groupContainsNode(result, group, edge.target(), new HashSet<>())) {
                         continue;
                     }
                     if (segmentIntersectsRect(start, end, group.x(), group.y(), group.width(), group.height())) {
@@ -199,6 +210,45 @@ public final class LayoutQuality {
             }
         }
         return count;
+    }
+
+    private static LaidOutGroup findGroup(LayoutResult result, String id) {
+        return result.groups().stream().filter(group -> id.equals(group.id())).findFirst().orElse(null);
+    }
+
+    private static boolean groupContainsNode(
+            LayoutResult result,
+            LaidOutGroup group,
+            String nodeId,
+            Set<String> visitedGroups) {
+        if (!visitedGroups.add(group.id())) {
+            return false;
+        }
+        for (String memberId : group.members()) {
+            if (memberId.equals(nodeId) && findNode(result, memberId) != null) {
+                return true;
+            }
+            LaidOutGroup childGroup = findGroup(result, memberId);
+            if (childGroup != null && groupContainsNode(result, childGroup, nodeId, visitedGroups)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean rectangleContains(
+            double outerX,
+            double outerY,
+            double outerWidth,
+            double outerHeight,
+            double innerX,
+            double innerY,
+            double innerWidth,
+            double innerHeight) {
+        return innerX >= outerX
+                && innerY >= outerY
+                && innerX + innerWidth <= outerX + outerWidth
+                && innerY + innerHeight <= outerY + outerHeight;
     }
 
     private static int countCloseParallelRoutes(LayoutResult result) {

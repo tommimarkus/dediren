@@ -209,7 +209,7 @@
               "label": "Order Lifecycle",
               "role": "semantic-boundary",
               "semantic_source_id": "order-lifecycle",
-              "members": ["initial", "draft", "submitted", "payment-choice", "fulfilled", "closed", "rejected"]
+              "members": ["main-region-frame"]
             },
             {
               "id": "main-region-frame",
