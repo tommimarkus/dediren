@@ -461,6 +461,26 @@ class UmlValidationTest {
     }
 
     @Test
+    void rejectsOperandMessageFragmentsWithStandaloneSequenceHole() throws Exception {
+        assertUmlSequenceFragmentsMutationRejected(
+                source -> {
+                    replaceTextArray(nodeUmlProperties(source, "op-in-stock"), "fragments", "m1", "m3");
+                    replaceTextArray(nodeUmlProperties(source, "op-backorder"), "fragments", "m2", "m4");
+                },
+                "$.nodes[6].properties.uml.fragments[1]");
+    }
+
+    @Test
+    void rejectsCombinedFragmentWithStandaloneSequenceHoleBetweenOperands() throws Exception {
+        assertUmlSequenceFragmentsMutationRejected(
+                source -> {
+                    replaceTextArray(nodeUmlProperties(source, "op-in-stock"), "fragments", "m1");
+                    replaceTextArray(nodeUmlProperties(source, "op-backorder"), "fragments", "m3");
+                },
+                "$.nodes[5].properties.uml.operands");
+    }
+
+    @Test
     void rejectsMessageFragmentReusedAcrossSiblingOperands() throws Exception {
         Fixture fixture = loadMutatedUmlSequenceFragmentsFixture(
                 source -> replaceTextArray(nodeUmlProperties(source, "op-backorder"), "fragments", "m1"));
@@ -714,6 +734,20 @@ class UmlValidationTest {
         assertThat(error.code()).isEqualTo("DEDIREN_UML_RELATIONSHIP_PROPERTY_INVALID");
         assertThat(error.value()).isEqualTo("null");
         assertThat(error.path()).isEqualTo("$.relationships[0].properties.uml.sequence");
+    }
+
+    @Test
+    void rejectsDuplicateMessageSequenceWithinInteraction() throws Exception {
+        Fixture fixture = loadMutatedUmlSequenceFixture(
+                source -> relationshipUmlProperties(source, "m2").put("sequence", 1));
+
+        UmlValidationException error = org.junit.jupiter.api.Assertions.assertThrows(
+                UmlValidationException.class,
+                () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+
+        assertThat(error.code()).isEqualTo("DEDIREN_UML_RELATIONSHIP_PROPERTY_INVALID");
+        assertThat(error.value()).isEqualTo("Message.sequence");
+        assertThat(error.path()).isEqualTo("$.relationships[1].properties.uml.sequence");
     }
 
     @Test

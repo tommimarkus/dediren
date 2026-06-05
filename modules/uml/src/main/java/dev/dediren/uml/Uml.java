@@ -152,6 +152,7 @@ public final class Uml {
                     targetType,
                     "$.relationships[" + relationshipIndex + "]");
         }
+        validateMessageSequenceUniqueness(source.relationships());
 
         for (int nodeIndex = 0; nodeIndex < source.nodes().size(); nodeIndex++) {
             SourceNode node = source.nodes().get(nodeIndex);
@@ -164,6 +165,7 @@ public final class Uml {
         }
         validateCombinedFragmentNesting(source.nodes(), context);
         validateInteractionFragmentOwnership(source.nodes(), context);
+        validateCombinedFragmentSequenceContiguity(source.nodes(), context);
 
         for (int viewIndex = 0; viewIndex < pluginData.views().size(); viewIndex++) {
             var view = pluginData.views().get(viewIndex);
@@ -548,7 +550,8 @@ public final class Uml {
                 "fragments",
                 "InteractionOperand.fragments",
                 umlPath);
-        BigInteger previousFragmentSequence = null;
+        InteractionFragmentInterval previousFragmentInterval = null;
+        var ownedMessageIds = new HashSet<String>();
         for (int fragmentIndex = 0; fragmentIndex < fragments.size(); fragmentIndex++) {
             String fragmentId = requiredTextArrayEntry(
                     fragments,
@@ -583,17 +586,27 @@ public final class Uml {
                         fragmentId,
                         fragmentPath);
             }
-            BigInteger fragmentSequence = interactionFragmentSequence(fragmentId, context, new HashSet<>());
-            if (previousFragmentSequence != null
-                    && fragmentSequence != null
-                    && fragmentSequence.compareTo(previousFragmentSequence) < 0) {
+            InteractionFragmentInterval fragmentInterval = interactionFragmentInterval(
+                    fragmentId,
+                    context,
+                    new HashSet<>());
+            if (previousFragmentInterval != null
+                    && fragmentInterval != null
+                    && (fragmentInterval.firstSequence().compareTo(previousFragmentInterval.lastSequence()) <= 0
+                            || hasUnownedMessageBetween(
+                                    interaction,
+                                    previousFragmentInterval.lastSequence(),
+                                    fragmentInterval.firstSequence(),
+                                    ownedMessageIds,
+                                    context))) {
                 throw new UmlValidationException(
                         UmlTypeKind.ELEMENT_PROPERTY,
                         fragmentId,
                         fragmentPath);
             }
-            if (fragmentSequence != null) {
-                previousFragmentSequence = fragmentSequence;
+            if (fragmentInterval != null) {
+                ownedMessageIds.addAll(fragmentInterval.messageIds());
+                previousFragmentInterval = fragmentInterval;
             }
         }
 
@@ -608,12 +621,116 @@ public final class Uml {
         }
     }
 
-    private static BigInteger interactionFragmentSequence(
+    private static void validateCombinedFragmentSequenceContiguity(
+            List<SourceNode> nodes,
+            ValidationContext context) throws UmlValidationException {
+        for (SourceNode node : nodes) {
+            if (!"CombinedFragment".equals(context.nodeTypes().get(node.id()))) {
+                continue;
+            }
+            JsonNode umlProperties = context.nodeUmlProperties().get(node.id());
+            String interaction = readTextProperty(umlProperties, "interaction");
+            if (interaction == null) {
+                continue;
+            }
+            validateCombinedFragmentSequenceContiguity(
+                    node.id(),
+                    interaction,
+                    context.nodePaths().get(node.id()) + ".properties.uml.operands",
+                    context);
+        }
+    }
+
+    private static void validateCombinedFragmentSequenceContiguity(
+            String nodeId,
+            String interaction,
+            String path,
+            ValidationContext context) throws UmlValidationException {
+        if (hasUnlistedOperandOwner(nodeId, context)) {
+            return;
+        }
+        InteractionFragmentInterval interval = interactionFragmentInterval(
+                nodeId,
+                context,
+                new HashSet<>());
+        if (interval == null) {
+            return;
+        }
+        if (hasUnownedMessageWithin(
+                interaction,
+                interval.firstSequence(),
+                interval.lastSequence(),
+                interval.messageIds(),
+                context)) {
+            throw new UmlValidationException(
+                    UmlTypeKind.ELEMENT_PROPERTY,
+                    nodeId,
+                    path);
+        }
+    }
+
+    private static boolean hasUnlistedOperandOwner(String combinedFragmentId, ValidationContext context) {
+        JsonNode operands = optionalProperty(
+                context.nodeUmlProperties().get(combinedFragmentId),
+                "operands");
+        if (operands == null || !operands.isArray()) {
+            return false;
+        }
+        Set<String> operandIds = textValueSet(operands);
+        for (String nodeId : context.nodeTypes().keySet()) {
+            if ("InteractionOperand".equals(context.nodeTypes().get(nodeId))
+                    && combinedFragmentId.equals(readTextProperty(
+                            context.nodeUmlProperties().get(nodeId),
+                            "combined_fragment"))
+                    && !operandIds.contains(nodeId)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static void validateMessageSequenceUniqueness(List<SourceRelationship> relationships)
+            throws UmlValidationException {
+        var seenSequencesByInteraction = new HashMap<String, Set<BigInteger>>();
+        for (int relationshipIndex = 0; relationshipIndex < relationships.size(); relationshipIndex++) {
+            SourceRelationship relationship = relationships.get(relationshipIndex);
+            if (!"Message".equals(relationship.type())) {
+                continue;
+            }
+            JsonNode umlProperties = relationship.properties().get("uml");
+            String interaction = readTextProperty(umlProperties, "interaction");
+            if (interaction == null) {
+                continue;
+            }
+            JsonNode sequence = optionalProperty(umlProperties, "sequence");
+            if (sequence == null || !sequence.isIntegralNumber()) {
+                continue;
+            }
+            Set<BigInteger> seenSequences = seenSequencesByInteraction.computeIfAbsent(
+                    interaction,
+                    key -> new HashSet<>());
+            if (!seenSequences.add(sequence.bigIntegerValue())) {
+                throw new UmlValidationException(
+                        UmlTypeKind.RELATIONSHIP_PROPERTY,
+                        "Message.sequence",
+                        "$.relationships[" + relationshipIndex + "].properties.uml.sequence");
+            }
+        }
+    }
+
+    private static InteractionFragmentInterval interactionFragmentInterval(
             String fragmentId,
             ValidationContext context,
             Set<String> visitedCombinedFragments) {
         if ("Message".equals(context.relationshipTypes().get(fragmentId))) {
-            return messageSequence(fragmentId, context);
+            BigInteger sequence = messageSequence(fragmentId, context);
+            if (sequence == null) {
+                return null;
+            }
+            return new InteractionFragmentInterval(
+                    sequence,
+                    sequence,
+                    Set.of(fragmentId));
         }
         if (!"CombinedFragment".equals(context.nodeTypes().get(fragmentId))
                 || !visitedCombinedFragments.add(fragmentId)) {
@@ -621,6 +738,8 @@ public final class Uml {
         }
 
         BigInteger firstSequence = null;
+        BigInteger lastSequence = null;
+        var messageIds = new HashSet<String>();
         JsonNode operands = optionalProperty(
                 context.nodeUmlProperties().get(fragmentId),
                 "operands");
@@ -641,17 +760,77 @@ public final class Uml {
                 if (!nestedFragment.isTextual()) {
                     continue;
                 }
-                BigInteger nestedSequence = interactionFragmentSequence(
+                InteractionFragmentInterval nestedInterval = interactionFragmentInterval(
                         nestedFragment.asText(),
                         context,
                         visitedCombinedFragments);
-                if (nestedSequence != null
-                        && (firstSequence == null || nestedSequence.compareTo(firstSequence) < 0)) {
-                    firstSequence = nestedSequence;
+                if (nestedInterval == null) {
+                    continue;
+                }
+                messageIds.addAll(nestedInterval.messageIds());
+                if (firstSequence == null || nestedInterval.firstSequence().compareTo(firstSequence) < 0) {
+                    firstSequence = nestedInterval.firstSequence();
+                }
+                if (lastSequence == null || nestedInterval.lastSequence().compareTo(lastSequence) > 0) {
+                    lastSequence = nestedInterval.lastSequence();
                 }
             }
         }
-        return firstSequence;
+        if (firstSequence == null || lastSequence == null) {
+            return null;
+        }
+        return new InteractionFragmentInterval(
+                firstSequence,
+                lastSequence,
+                messageIds);
+    }
+
+    private static boolean hasUnownedMessageBetween(
+            String interaction,
+            BigInteger lowerExclusive,
+            BigInteger upperExclusive,
+            Set<String> ownedMessageIds,
+            ValidationContext context) {
+        for (String messageId : context.relationshipTypes().keySet()) {
+            if (!"Message".equals(context.relationshipTypes().get(messageId))
+                    || ownedMessageIds.contains(messageId)
+                    || !interaction.equals(readTextProperty(
+                            context.relationshipUmlProperties().get(messageId),
+                            "interaction"))) {
+                continue;
+            }
+            BigInteger sequence = messageSequence(messageId, context);
+            if (sequence != null
+                    && sequence.compareTo(lowerExclusive) > 0
+                    && sequence.compareTo(upperExclusive) < 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean hasUnownedMessageWithin(
+            String interaction,
+            BigInteger lowerInclusive,
+            BigInteger upperInclusive,
+            Set<String> ownedMessageIds,
+            ValidationContext context) {
+        for (String messageId : context.relationshipTypes().keySet()) {
+            if (!"Message".equals(context.relationshipTypes().get(messageId))
+                    || ownedMessageIds.contains(messageId)
+                    || !interaction.equals(readTextProperty(
+                            context.relationshipUmlProperties().get(messageId),
+                            "interaction"))) {
+                continue;
+            }
+            BigInteger sequence = messageSequence(messageId, context);
+            if (sequence != null
+                    && sequence.compareTo(lowerInclusive) >= 0
+                    && sequence.compareTo(upperInclusive) <= 0) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static BigInteger messageSequence(String messageId, ValidationContext context) {
@@ -1032,6 +1211,12 @@ public final class Uml {
                     "CombinedFragment." + operator + ".operands",
                     path);
         }
+    }
+
+    private record InteractionFragmentInterval(
+            BigInteger firstSequence,
+            BigInteger lastSequence,
+            Set<String> messageIds) {
     }
 
     private static String propertyValue(JsonNode value, String fallback) {

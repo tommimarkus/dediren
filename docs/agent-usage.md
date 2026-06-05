@@ -137,8 +137,9 @@ sequence path needs generated render metadata. For combined fragments, use
 `fixtures/source/valid-uml-sequence-fragments.json` and
 `--view sequence-fragments-view`; author `CombinedFragment` and
 `InteractionOperand` nodes under `properties.uml` for `alt`, `opt`, `loop`,
-and `par`. Keep each operand's `fragments` list in the referenced messages'
-`sequence` order.
+and `par`. Keep message `sequence` values unique within an interaction, keep
+each operand's `fragments` list in sequence order, and do not leave standalone
+messages inside a combined fragment's owned sequence span.
 
 ```bash
 "$BUNDLE/bin/dediren" validate \
