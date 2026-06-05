@@ -46,8 +46,8 @@ release workflows cache that path separately from Maven artifacts.
 The `dist-build` profile creates an agent-ready archive under `dist/`:
 
 ```text
-dist/dediren-agent-bundle-0.21.0-x86_64-unknown-linux-gnu/
-dist/dediren-agent-bundle-0.21.0-x86_64-unknown-linux-gnu.tar.gz
+dist/dediren-agent-bundle-0.22.0-x86_64-unknown-linux-gnu/
+dist/dediren-agent-bundle-0.22.0-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Set a supported target with `DEDIREN_DIST_TARGET` when needed:
@@ -69,7 +69,7 @@ target must match the build host.
 ## Bundle Layout
 
 ```text
-dediren-agent-bundle-0.21.0-x86_64-unknown-linux-gnu/
+dediren-agent-bundle-0.22.0-x86_64-unknown-linux-gnu/
   bin/
     dediren
     dediren-plugin-generic-graph
@@ -101,7 +101,7 @@ the caller's current working directory.
 From an unpacked bundle:
 
 ```bash
-VERSION=0.21.0
+VERSION=0.22.0
 TARGET=x86_64-unknown-linux-gnu
 BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-${VERSION}-${TARGET}
 
