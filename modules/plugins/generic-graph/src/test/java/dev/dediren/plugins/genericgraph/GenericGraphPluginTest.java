@@ -972,7 +972,9 @@ class GenericGraphPluginTest {
 
     private static JsonNode okData(PluginResult result) throws Exception {
         JsonNode envelope = JsonSupport.objectMapper().readTree(result.stdout());
-        assertThat(envelope.at("/status").asText()).isEqualTo("ok");
+        assertThat(envelope.at("/status").asText())
+                .describedAs(result.stdout())
+                .isEqualTo("ok");
         return envelope.get("data");
     }
 
@@ -1071,6 +1073,7 @@ class GenericGraphPluginTest {
         JsonNode m2 = relationships.get(1).deepCopy();
         JsonNode m3 = relationships.get(2).deepCopy();
 
+        ((com.fasterxml.jackson.databind.node.ObjectNode) m1.at("/properties/uml")).put("sequence", 2);
         ((com.fasterxml.jackson.databind.node.ObjectNode) m2.at("/properties/uml")).put("sequence", 1);
         relationships.removeAll();
         relationships.add(m3);
@@ -1090,7 +1093,7 @@ class GenericGraphPluginTest {
         ((com.fasterxml.jackson.databind.node.ObjectNode) m1.at("/properties/uml"))
                 .set("sequence", JsonSupport.objectMapper().getNodeFactory()
                         .numberNode(new java.math.BigInteger("9223372036854775808")));
-        ((com.fasterxml.jackson.databind.node.ObjectNode) m2.at("/properties/uml")).put("sequence", 1);
+        ((com.fasterxml.jackson.databind.node.ObjectNode) m2.at("/properties/uml")).put("sequence", 2);
         ((com.fasterxml.jackson.databind.node.ObjectNode) m3.at("/properties/uml")).put("sequence", 1);
         relationships.removeAll();
         relationships.add(m3);
