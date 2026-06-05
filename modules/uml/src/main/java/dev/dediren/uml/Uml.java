@@ -548,6 +548,7 @@ public final class Uml {
                 "fragments",
                 "InteractionOperand.fragments",
                 umlPath);
+        BigInteger previousFragmentSequence = null;
         for (int fragmentIndex = 0; fragmentIndex < fragments.size(); fragmentIndex++) {
             String fragmentId = requiredTextArrayEntry(
                     fragments,
@@ -582,6 +583,18 @@ public final class Uml {
                         fragmentId,
                         fragmentPath);
             }
+            BigInteger fragmentSequence = interactionFragmentSequence(fragmentId, context, new HashSet<>());
+            if (previousFragmentSequence != null
+                    && fragmentSequence != null
+                    && fragmentSequence.compareTo(previousFragmentSequence) < 0) {
+                throw new UmlValidationException(
+                        UmlTypeKind.ELEMENT_PROPERTY,
+                        fragmentId,
+                        fragmentPath);
+            }
+            if (fragmentSequence != null) {
+                previousFragmentSequence = fragmentSequence;
+            }
         }
 
         JsonNode guard = optionalProperty(
@@ -593,6 +606,59 @@ public final class Uml {
                     guard.toString(),
                     umlPath + ".guard");
         }
+    }
+
+    private static BigInteger interactionFragmentSequence(
+            String fragmentId,
+            ValidationContext context,
+            Set<String> visitedCombinedFragments) {
+        if ("Message".equals(context.relationshipTypes().get(fragmentId))) {
+            return messageSequence(fragmentId, context);
+        }
+        if (!"CombinedFragment".equals(context.nodeTypes().get(fragmentId))
+                || !visitedCombinedFragments.add(fragmentId)) {
+            return null;
+        }
+
+        BigInteger firstSequence = null;
+        JsonNode operands = optionalProperty(
+                context.nodeUmlProperties().get(fragmentId),
+                "operands");
+        if (operands == null || !operands.isArray()) {
+            return null;
+        }
+        for (JsonNode operand : operands) {
+            if (!operand.isTextual()) {
+                continue;
+            }
+            JsonNode fragments = optionalProperty(
+                    context.nodeUmlProperties().get(operand.asText()),
+                    "fragments");
+            if (fragments == null || !fragments.isArray()) {
+                continue;
+            }
+            for (JsonNode nestedFragment : fragments) {
+                if (!nestedFragment.isTextual()) {
+                    continue;
+                }
+                BigInteger nestedSequence = interactionFragmentSequence(
+                        nestedFragment.asText(),
+                        context,
+                        visitedCombinedFragments);
+                if (nestedSequence != null
+                        && (firstSequence == null || nestedSequence.compareTo(firstSequence) < 0)) {
+                    firstSequence = nestedSequence;
+                }
+            }
+        }
+        return firstSequence;
+    }
+
+    private static BigInteger messageSequence(String messageId, ValidationContext context) {
+        JsonNode sequence = optionalProperty(
+                context.relationshipUmlProperties().get(messageId),
+                "sequence");
+        return sequence != null && sequence.isIntegralNumber() ? sequence.bigIntegerValue() : null;
     }
 
     private static void validateMessageProperties(JsonNode umlProperties, String path)

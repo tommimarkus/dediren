@@ -348,17 +348,15 @@ public final class Main {
                         .append("\" name=\"").append(attr(node.label())).append("\"/>");
             }
         }
-        for (CombinedFragmentExport combinedFragment : combinedFragments) {
-            if (!nestedCombinedFragmentIds.contains(combinedFragment.node().id())) {
-                writeCombinedFragment(xml, ids, combinedFragment, combinedFragmentsById, messagesBySourceId);
-            }
-        }
-        for (MessageExport message : messages) {
-            if (!operandOwnedMessageIds.contains(message.relationship().id())) {
-                writeMessageOccurrence(xml, message, "send", message.sourceEventId(), message.sourceNodeId());
-                writeMessageOccurrence(xml, message, "receive", message.receiveEventId(), message.targetNodeId());
-            }
-        }
+        writeTopLevelInteractionFragments(
+                xml,
+                ids,
+                combinedFragments,
+                combinedFragmentsById,
+                messages,
+                messagesBySourceId,
+                nestedCombinedFragmentIds,
+                operandOwnedMessageIds);
         for (MessageExport message : messages) {
             writeSequenceMessage(xml, message);
         }
@@ -501,6 +499,93 @@ public final class Main {
             }
         }
         return ownedMessageIds;
+    }
+
+    private static void writeTopLevelInteractionFragments(
+            StringBuilder xml,
+            IdentifierMap ids,
+            List<CombinedFragmentExport> combinedFragments,
+            Map<String, CombinedFragmentExport> combinedFragmentsById,
+            List<MessageExport> messages,
+            Map<String, MessageExport> messagesBySourceId,
+            Set<String> nestedCombinedFragmentIds,
+            Set<String> operandOwnedMessageIds) {
+        var fragments = new java.util.ArrayList<TopLevelInteractionFragment>();
+        for (CombinedFragmentExport combinedFragment : combinedFragments) {
+            if (nestedCombinedFragmentIds.contains(combinedFragment.node().id())) {
+                continue;
+            }
+            fragments.add(new TopLevelInteractionFragment(
+                    combinedFragmentSequence(combinedFragment, combinedFragmentsById, messagesBySourceId),
+                    combinedFragment.sourceOrder(),
+                    combinedFragment,
+                    null));
+        }
+        for (MessageExport message : messages) {
+            if (operandOwnedMessageIds.contains(message.relationship().id())) {
+                continue;
+            }
+            fragments.add(new TopLevelInteractionFragment(
+                    message.sequence(),
+                    message.sourceOrder(),
+                    null,
+                    message));
+        }
+        fragments.sort(Comparator.comparing(TopLevelInteractionFragment::sequence)
+                .thenComparingInt(TopLevelInteractionFragment::sourceOrder));
+        for (TopLevelInteractionFragment fragment : fragments) {
+            if (fragment.combinedFragment() != null) {
+                writeCombinedFragment(xml, ids, fragment.combinedFragment(), combinedFragmentsById, messagesBySourceId);
+            } else if (fragment.message() != null) {
+                MessageExport message = fragment.message();
+                writeMessageOccurrence(xml, message, "send", message.sourceEventId(), message.sourceNodeId());
+                writeMessageOccurrence(xml, message, "receive", message.receiveEventId(), message.targetNodeId());
+            }
+        }
+    }
+
+    private static BigInteger combinedFragmentSequence(
+            CombinedFragmentExport combinedFragment,
+            Map<String, CombinedFragmentExport> combinedFragmentsById,
+            Map<String, MessageExport> messagesBySourceId) {
+        return combinedFragmentSequence(
+                combinedFragment,
+                combinedFragmentsById,
+                messagesBySourceId,
+                new HashSet<>());
+    }
+
+    private static BigInteger combinedFragmentSequence(
+            CombinedFragmentExport combinedFragment,
+            Map<String, CombinedFragmentExport> combinedFragmentsById,
+            Map<String, MessageExport> messagesBySourceId,
+            Set<String> visitedCombinedFragmentIds) {
+        if (!visitedCombinedFragmentIds.add(combinedFragment.node().id())) {
+            return BigInteger.valueOf(Integer.MAX_VALUE);
+        }
+
+        BigInteger firstSequence = null;
+        for (OperandExport operand : combinedFragment.operands()) {
+            for (String fragmentId : operand.fragmentIds()) {
+                MessageExport message = messagesBySourceId.get(fragmentId);
+                BigInteger sequence = message == null ? null : message.sequence();
+                if (sequence == null) {
+                    CombinedFragmentExport nestedCombinedFragment = combinedFragmentsById.get(fragmentId);
+                    sequence = nestedCombinedFragment == null
+                            ? null
+                            : combinedFragmentSequence(
+                                    nestedCombinedFragment,
+                                    combinedFragmentsById,
+                                    messagesBySourceId,
+                                    visitedCombinedFragmentIds);
+                }
+                if (sequence != null
+                        && (firstSequence == null || sequence.compareTo(firstSequence) < 0)) {
+                    firstSequence = sequence;
+                }
+            }
+        }
+        return firstSequence == null ? BigInteger.valueOf(Integer.MAX_VALUE) : firstSequence;
     }
 
     private static void writeCombinedFragment(
@@ -1078,6 +1163,13 @@ public final class Main {
             String guard,
             List<String> fragmentIds,
             int sourceOrder) {
+    }
+
+    private record TopLevelInteractionFragment(
+            BigInteger sequence,
+            int sourceOrder,
+            CombinedFragmentExport combinedFragment,
+            MessageExport message) {
     }
 
     private record MessageExport(

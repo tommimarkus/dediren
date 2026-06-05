@@ -158,7 +158,9 @@ named `Place Order`, `Lifeline` nodes, and ordered `Message` relationships in
 `properties.uml.sequence` with `message_sort` values.
 
 Combined fragment authoring uses `CombinedFragment` and `InteractionOperand`
-nodes with fragment membership and guards under `properties.uml`. Use
+nodes with fragment membership and guards under `properties.uml`. Operand
+`fragments` entries must follow the referenced messages' `sequence` order so
+rendered SVG and exported XMI preserve the same interaction order. Use
 `fixtures/source/valid-uml-sequence-fragments.json` with
 `--view sequence-fragments-view` in the `project` commands to run the same
 pipeline against `alt`, `opt`, `loop`, and `par` examples.

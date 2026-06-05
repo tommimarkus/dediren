@@ -149,6 +149,12 @@ class UmlValidationTest {
     @Test
     void rejectsMalformedCombinedFragmentRequiredProperties() throws Exception {
         assertUmlSequenceFragmentsMutationRejected(
+                source -> nodeUmlProperties(source, "cf-availability").remove("interaction"),
+                "$.nodes[5].properties.uml.interaction");
+        assertUmlSequenceFragmentsMutationRejected(
+                source -> nodeUmlProperties(source, "cf-availability").put("interaction", 3),
+                "$.nodes[5].properties.uml.interaction");
+        assertUmlSequenceFragmentsMutationRejected(
                 source -> nodeUmlProperties(source, "cf-availability").remove("operator"),
                 "$.nodes[5].properties.uml.operator");
         assertUmlSequenceFragmentsMutationRejected(
@@ -166,13 +172,39 @@ class UmlValidationTest {
     }
 
     @Test
+    void rejectsMalformedCombinedFragmentCoveredProperty() throws Exception {
+        assertUmlSequenceFragmentsMutationRejected(
+                source -> nodeUmlProperties(source, "cf-availability").put("covered", "customer"),
+                "$.nodes[5].properties.uml.covered");
+        assertUmlSequenceFragmentsMutationRejected(
+                source -> {
+                    var covered = JsonSupport.objectMapper().createArrayNode();
+                    covered.add(3);
+                    nodeUmlProperties(source, "cf-availability").set("covered", covered);
+                },
+                "$.nodes[5].properties.uml.covered[0]");
+    }
+
+    @Test
     void rejectsMalformedInteractionOperandRequiredProperties() throws Exception {
+        assertUmlSequenceFragmentsMutationRejected(
+                source -> nodeUmlProperties(source, "op-in-stock").remove("interaction"),
+                "$.nodes[6].properties.uml.interaction");
+        assertUmlSequenceFragmentsMutationRejected(
+                source -> nodeUmlProperties(source, "op-in-stock").put("interaction", 3),
+                "$.nodes[6].properties.uml.interaction");
         assertUmlSequenceFragmentsMutationRejected(
                 source -> nodeUmlProperties(source, "op-in-stock").remove("combined_fragment"),
                 "$.nodes[6].properties.uml.combined_fragment");
         assertUmlSequenceFragmentsMutationRejected(
                 source -> nodeUmlProperties(source, "op-in-stock").put("combined_fragment", 3),
                 "$.nodes[6].properties.uml.combined_fragment");
+        assertUmlSequenceFragmentsMutationRejected(
+                source -> nodeUmlProperties(source, "op-in-stock").remove("order"),
+                "$.nodes[6].properties.uml.order");
+        assertUmlSequenceFragmentsMutationRejected(
+                source -> nodeUmlProperties(source, "op-in-stock").put("order", 1.5),
+                "$.nodes[6].properties.uml.order");
         assertUmlSequenceFragmentsMutationRejected(
                 source -> nodeUmlProperties(source, "op-in-stock").remove("fragments"),
                 "$.nodes[6].properties.uml.fragments");
@@ -419,6 +451,13 @@ class UmlValidationTest {
 
         assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
         assertThat(error.path()).isEqualTo("$.nodes[6].properties.uml.fragments[1]");
+    }
+
+    @Test
+    void rejectsOperandMessageFragmentsOutOfSequenceOrder() throws Exception {
+        assertUmlSequenceFragmentsMutationRejected(
+                source -> replaceTextArray(nodeUmlProperties(source, "op-in-stock"), "fragments", "m2", "m1"),
+                "$.nodes[6].properties.uml.fragments[1]");
     }
 
     @Test
