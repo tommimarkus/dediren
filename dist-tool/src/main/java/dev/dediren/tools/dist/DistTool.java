@@ -16,17 +16,12 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
 public final class DistTool {
-    private static final String DEFAULT_TARGET = "x86_64-unknown-linux-gnu";
-    private static final List<DistTarget> TARGETS = List.of(
-        new DistTarget("x86_64-unknown-linux-gnu", "linux", "x86_64"),
-        new DistTarget("aarch64-unknown-linux-gnu", "linux", "aarch64"),
-        new DistTarget("aarch64-apple-darwin", "macos", "aarch64"));
+    private static final String BUNDLE_METADATA_TARGET = "java";
     private static final List<Launcher> LAUNCHERS = List.of(
         new Launcher("cli/target/appassembler", "cli", "dediren", null),
         new Launcher("plugins/generic-graph/target/appassembler", "generic-graph",
@@ -72,17 +67,17 @@ public final class DistTool {
             }
             case "build" -> {
                 String version = required(options, "version");
-                DistTarget target = resolveTarget(options.get("target"));
+                rejectRetiredTargetOption(options);
                 Path notices = Path.of(required(options, "notices")).toAbsolutePath().normalize();
-                build(root, version, target, notices);
+                build(root, version, notices);
                 yield 0;
             }
             case "smoke" -> {
                 String version = required(options, "version");
-                DistTarget target = resolveTarget(options.get("target"));
+                rejectRetiredTargetOption(options);
                 Path archive = options.containsKey("archive")
                     ? Path.of(options.get("archive"))
-                    : root.resolve("dist").resolve(bundleName(version, target.triple()) + ".tar.gz");
+                    : root.resolve("dist").resolve(bundleName(version) + ".tar.gz");
                 smoke(root, archive.toAbsolutePath().normalize(), version);
                 yield 0;
             }
@@ -93,10 +88,9 @@ public final class DistTool {
         };
     }
 
-    private static void build(Path root, String version, DistTarget target, Path notices) throws Exception {
-        ensureHostCanBuild(target);
+    private static void build(Path root, String version, Path notices) throws Exception {
         Path dist = root.resolve("dist");
-        Path bundle = dist.resolve(bundleName(version, target.triple()));
+        Path bundle = dist.resolve(bundleName(version));
         Path archive = dist.resolve(bundle.getFileName() + ".tar.gz");
 
         deleteIfExists(bundle);
@@ -116,7 +110,7 @@ public final class DistTool {
             StandardCopyOption.REPLACE_EXISTING);
         Files.copy(root.resolve("LICENSE"), bundle.resolve("LICENSE"), StandardCopyOption.REPLACE_EXISTING);
         Files.copy(notices, bundle.resolve("THIRD-PARTY-NOTICES.md"), StandardCopyOption.REPLACE_EXISTING);
-        writeBundleMetadata(bundle, version, target.triple());
+        writeBundleMetadata(bundle, version);
 
         runCommand(root, List.of("tar", "-C", dist.toString(), "-czf", archive.toString(),
             bundle.getFileName().toString()), null);
@@ -299,7 +293,7 @@ public final class DistTool {
         }
     }
 
-    private static void writeBundleMetadata(Path bundle, String version, String target) throws IOException {
+    private static void writeBundleMetadata(Path bundle, String version) throws IOException {
         List<Map<String, String>> plugins = new ArrayList<>();
         for (String plugin : bundledPluginIds()) {
             plugins.add(Map.of("id", plugin, "version", version));
@@ -308,7 +302,7 @@ public final class DistTool {
         metadata.put("bundle_schema_version", "dediren-bundle.schema.v1");
         metadata.put("product", "dediren");
         metadata.put("version", version);
-        metadata.put("target", target);
+        metadata.put("target", bundleMetadataTarget());
         metadata.put("built_at_utc", Instant.now().toString());
         metadata.put("plugins", plugins);
         metadata.put("schemas_dir", "schemas");
@@ -528,62 +522,19 @@ public final class DistTool {
         return major;
     }
 
-    private static DistTarget resolveTarget(String requested) {
-        String value = requested;
-        if (value == null || value.isBlank()) {
-            value = System.getenv("DEDIREN_DIST_TARGET");
-        }
-        if (value == null || value.isBlank()) {
-            DistTarget current = currentHostTarget();
-            value = current == null ? DEFAULT_TARGET : current.triple();
-        }
-        String selected = value;
-        return TARGETS.stream()
-            .filter(target -> target.triple().equals(selected))
-            .findFirst()
-            .orElseThrow(() -> new IllegalArgumentException("unsupported distribution target: " + selected));
+    static String bundleMetadataTarget() {
+        return BUNDLE_METADATA_TARGET;
     }
 
-    private static void ensureHostCanBuild(DistTarget target) {
-        String os = normalizedOs();
-        String arch = normalizedArch();
-        if (!target.hostOs().equals(os) || !target.hostArch().equals(arch)) {
-            throw new IllegalStateException("distribution target " + target.triple() + " must be built on "
-                + target.hostOs() + " " + target.hostArch() + "; current host is " + os + " " + arch);
+    static String bundleName(String version) {
+        return "dediren-agent-bundle-" + version;
+    }
+
+    private static void rejectRetiredTargetOption(Map<String, String> options) {
+        if (options.containsKey("target")) {
+            throw new IllegalArgumentException(
+                "--target is no longer supported; Java distribution archives are platform-neutral");
         }
-    }
-
-    private static DistTarget currentHostTarget() {
-        String os = normalizedOs();
-        String arch = normalizedArch();
-        return TARGETS.stream()
-            .filter(target -> target.hostOs().equals(os) && target.hostArch().equals(arch))
-            .findFirst()
-            .orElse(null);
-    }
-
-    private static String normalizedOs() {
-        String os = System.getProperty("os.name").toLowerCase(Locale.ROOT);
-        if (os.contains("mac")) {
-            return "macos";
-        }
-        if (os.contains("linux")) {
-            return "linux";
-        }
-        return os;
-    }
-
-    private static String normalizedArch() {
-        String arch = System.getProperty("os.arch").toLowerCase(Locale.ROOT);
-        return switch (arch) {
-            case "amd64" -> "x86_64";
-            case "aarch64", "arm64" -> "aarch64";
-            default -> arch;
-        };
-    }
-
-    private static String bundleName(String version, String target) {
-        return "dediren-agent-bundle-" + version + "-" + target;
     }
 
     private static void pruneStaleArtifacts(Path dist, String currentBundle) throws IOException {
@@ -593,7 +544,10 @@ public final class DistTool {
         try (var entries = Files.list(dist)) {
             for (Path path : entries.toList()) {
                 String name = path.getFileName().toString();
-                if (!name.startsWith("dediren-agent-bundle-") || name.startsWith(currentBundle)) {
+                if (!name.startsWith("dediren-agent-bundle-")) {
+                    continue;
+                }
+                if (name.equals(currentBundle) || name.equals(currentBundle + ".tar.gz")) {
                     continue;
                 }
                 deleteIfExists(path);
@@ -720,10 +674,7 @@ public final class DistTool {
     }
 
     private static void usage() {
-        System.err.println("usage: DistTool notices|build|smoke --root PATH [--version VERSION] [--target TRIPLE]");
-    }
-
-    private record DistTarget(String triple, String hostOs, String hostArch) {
+        System.err.println("usage: DistTool notices|build|smoke --root PATH [--version VERSION]");
     }
 
     private record InsertionPoint(int index, String variable) {

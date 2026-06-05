@@ -250,8 +250,7 @@ deployment diagrams.
 
 ```bash
 VERSION=0.23.0
-TARGET=x86_64-unknown-linux-gnu
-BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-${VERSION}-${TARGET}
+BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-${VERSION}
 
 "$BUNDLE/bin/dediren" --version
 "$BUNDLE/bin/dediren-plugin-generic-graph" capabilities
