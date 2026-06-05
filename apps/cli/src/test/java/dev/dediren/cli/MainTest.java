@@ -35,7 +35,7 @@ class MainTest {
         CliResult result = Main.executeForTesting(new String[]{"--version"}, "");
 
         assertThat(result.exitCode()).isZero();
-        assertThat(result.stdout()).contains("dediren 0.21.0");
+        assertThat(result.stdout()).contains("dediren 0.22.0");
     }
 
     @Test
@@ -157,6 +157,110 @@ class MainTest {
                         "name=\"placeOrder\"",
                         "name=\"accepted\"",
                         "name=\"receiptReady\"");
+    }
+
+    @Test
+    void sequenceFragmentsFixtureRunsThroughDocumentedCliWorkflow() throws Exception {
+        Map<String, String> env = sequenceWorkflowEnv();
+        Path root = workspaceRoot();
+        Path source = root.resolve("fixtures/source/valid-uml-sequence-fragments.json");
+
+        CliResult validate = Main.executeForTesting(new String[]{
+                "validate",
+                "--plugin",
+                "generic-graph",
+                "--profile",
+                "uml",
+                "--input",
+                source.toString()
+        }, "", env);
+
+        JsonNode validateData = okData(validate);
+        assertThat(validateData.at("/semantic_profile").asText()).isEqualTo("uml");
+        assertThat(validateData.at("/node_count").asInt()).isGreaterThan(0);
+
+        CliResult layoutRequest = Main.executeForTesting(new String[]{
+                "project",
+                "--plugin",
+                "generic-graph",
+                "--target",
+                "layout-request",
+                "--view",
+                "sequence-fragments-view",
+                "--input",
+                source.toString()
+        }, "", env);
+
+        JsonNode layoutRequestData = okData(layoutRequest);
+        assertThat(layoutRequestData.at("/view_id").asText()).isEqualTo("sequence-fragments-view");
+        assertThat(layoutRequestData.get("nodes"))
+                .extracting(node -> node.at("/id").asText())
+                .containsExactly("interaction-place-order", "customer", "service", "inventory", "payment")
+                .doesNotContain("cf-availability");
+        Path layoutRequestFile = writeStdout("sequence-fragments-layout-request.json", layoutRequest);
+
+        CliResult renderMetadata = Main.executeForTesting(new String[]{
+                "project",
+                "--plugin",
+                "generic-graph",
+                "--target",
+                "render-metadata",
+                "--view",
+                "sequence-fragments-view",
+                "--input",
+                source.toString()
+        }, "", env);
+
+        JsonNode renderMetadataData = okData(renderMetadata);
+        assertThat(renderMetadataData.at("/nodes/cf-availability/type").asText()).isEqualTo("CombinedFragment");
+        assertThat(renderMetadataData.at("/nodes/cf-availability/properties/operator").asText()).isEqualTo("alt");
+        Path renderMetadataFile = writeStdout("sequence-fragments-render-metadata.json", renderMetadata);
+
+        CliResult layout = Main.executeForTesting(new String[]{
+                "layout",
+                "--plugin",
+                "elk-layout",
+                "--input",
+                layoutRequestFile.toString()
+        }, "", env);
+
+        JsonNode layoutData = okData(layout);
+        assertThat(layoutData.at("/view_id").asText()).isEqualTo("sequence-fragments-view");
+        Path layoutFile = writeStdout("sequence-fragments-layout-result.json", layout);
+
+        CliResult render = Main.executeForTesting(new String[]{
+                "render",
+                "--plugin",
+                "svg-render",
+                "--policy",
+                root.resolve("fixtures/render-policy/uml-svg.json").toString(),
+                "--metadata",
+                renderMetadataFile.toString(),
+                "--input",
+                layoutFile.toString()
+        }, "", env);
+
+        JsonNode renderData = okData(render);
+        String svg = renderData.at("/content").asText();
+        assertThat(renderData.at("/artifact_kind").asText()).isEqualTo("svg");
+        assertThat(svg).contains("data-dediren-sequence-combined-fragment=\"cf-availability\"");
+
+        CliResult export = Main.executeForTesting(new String[]{
+                "export",
+                "--plugin",
+                "uml-xmi",
+                "--policy",
+                root.resolve("fixtures/export-policy/default-uml-xmi.json").toString(),
+                "--source",
+                source.toString(),
+                "--layout",
+                layoutFile.toString()
+        }, "", env);
+
+        JsonNode exportData = okData(export);
+        String xmi = exportData.at("/content").asText();
+        assertThat(exportData.at("/artifact_kind").asText()).isEqualTo("uml-xmi+xml");
+        assertThat(xmi).contains("uml:CombinedFragment", "interactionOperator=\"alt\"");
     }
 
     private Path writeStdout(String fileName, CliResult result) throws Exception {

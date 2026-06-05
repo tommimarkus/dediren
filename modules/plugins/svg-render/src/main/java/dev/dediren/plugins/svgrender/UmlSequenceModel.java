@@ -17,6 +17,8 @@ record UmlSequenceModel(
         List<UmlSequenceModel.SequenceNode> executions,
         List<UmlSequenceModel.SequenceNode> gates,
         List<UmlSequenceModel.SequenceNode> destructions,
+        List<UmlSequenceModel.SequenceCombinedFragment> combinedFragments,
+        List<UmlSequenceModel.SequenceOperand> operands,
         List<UmlSequenceModel.SequenceMessage> messages) {
     static UmlSequenceModel from(LayoutResult result, RenderMetadata metadata) {
         List<SequenceNode> interactions = new ArrayList<>();
@@ -42,6 +44,32 @@ record UmlSequenceModel(
             }
         }
 
+        List<SequenceCombinedFragment> combinedFragments = new ArrayList<>();
+        List<SequenceOperand> operands = new ArrayList<>();
+        for (var entry : metadata.nodes().entrySet()) {
+            RenderMetadataSelector selector = entry.getValue();
+            JsonNode properties = selector.properties();
+            switch (selector.type()) {
+                case "CombinedFragment" -> combinedFragments.add(new SequenceCombinedFragment(
+                        entry.getKey(),
+                        selector,
+                        propertyText(properties, "interaction"),
+                        propertyText(properties, "operator"),
+                        textArray(properties, "operands"),
+                        textArray(properties, "covered")));
+                case "InteractionOperand" -> operands.add(new SequenceOperand(
+                        entry.getKey(),
+                        selector,
+                        propertyText(properties, "interaction"),
+                        propertyText(properties, "combined_fragment"),
+                        positiveInt(properties, "order"),
+                        propertyText(properties, "guard"),
+                        textArray(properties, "fragments")));
+                default -> {
+                }
+            }
+        }
+
         List<SequenceMessage> messages = new ArrayList<>();
         for (int index = 0; index < result.edges().size(); index++) {
             LaidOutEdge edge = result.edges().get(index);
@@ -60,7 +88,15 @@ record UmlSequenceModel(
         messages.sort(Comparator.comparing(SequenceMessage::sequence)
                 .thenComparingInt(SequenceMessage::sourceOrder));
 
-        return new UmlSequenceModel(interactions, lifelines, executions, gates, destructions, messages);
+        return new UmlSequenceModel(
+                interactions,
+                lifelines,
+                executions,
+                gates,
+                destructions,
+                combinedFragments,
+                operands,
+                messages);
     }
 
     private static BigInteger sequence(JsonNode properties, BigInteger fallback) {
@@ -73,7 +109,53 @@ record UmlSequenceModel(
         return value != null && value.isTextual() ? value.asText() : "synchCall";
     }
 
+    private static String propertyText(JsonNode properties, String name) {
+        JsonNode value = properties == null ? null : properties.get(name);
+        return value != null && value.isTextual() ? value.asText() : null;
+    }
+
+    private static List<String> textArray(JsonNode properties, String name) {
+        JsonNode value = properties == null ? null : properties.get(name);
+        if (value == null || !value.isArray()) {
+            return List.of();
+        }
+        List<String> values = new ArrayList<>();
+        for (JsonNode item : value) {
+            if (item.isTextual()) {
+                values.add(item.asText());
+            }
+        }
+        return values;
+    }
+
+    private static int positiveInt(JsonNode properties, String name) {
+        JsonNode value = properties == null ? null : properties.get(name);
+        if (value != null && value.isIntegralNumber() && value.bigIntegerValue().signum() >= 1) {
+            return value.canConvertToInt() ? value.intValue() : Integer.MAX_VALUE;
+        }
+        return Integer.MAX_VALUE;
+    }
+
     record SequenceNode(LaidOutNode node, RenderMetadataSelector selector) {
+    }
+
+    record SequenceCombinedFragment(
+            String id,
+            RenderMetadataSelector selector,
+            String interactionId,
+            String operator,
+            List<String> operandIds,
+            List<String> coveredLifelineIds) {
+    }
+
+    record SequenceOperand(
+            String id,
+            RenderMetadataSelector selector,
+            String interactionId,
+            String combinedFragmentId,
+            int order,
+            String guard,
+            List<String> fragmentIds) {
     }
 
     record SequenceMessage(

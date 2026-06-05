@@ -46,8 +46,8 @@ release workflows cache that path separately from Maven artifacts.
 The `dist-build` profile creates an agent-ready archive under `dist/`:
 
 ```text
-dist/dediren-agent-bundle-0.21.0-x86_64-unknown-linux-gnu/
-dist/dediren-agent-bundle-0.21.0-x86_64-unknown-linux-gnu.tar.gz
+dist/dediren-agent-bundle-0.22.0-x86_64-unknown-linux-gnu/
+dist/dediren-agent-bundle-0.22.0-x86_64-unknown-linux-gnu.tar.gz
 ```
 
 Set a supported target with `DEDIREN_DIST_TARGET` when needed:
@@ -69,7 +69,7 @@ target must match the build host.
 ## Bundle Layout
 
 ```text
-dediren-agent-bundle-0.21.0-x86_64-unknown-linux-gnu/
+dediren-agent-bundle-0.22.0-x86_64-unknown-linux-gnu/
   bin/
     dediren
     dediren-plugin-generic-graph
@@ -101,7 +101,7 @@ the caller's current working directory.
 From an unpacked bundle:
 
 ```bash
-VERSION=0.21.0
+VERSION=0.22.0
 TARGET=x86_64-unknown-linux-gnu
 BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-${VERSION}-${TARGET}
 
@@ -150,10 +150,22 @@ Downstream commands accept either a full Dediren command envelope or the raw
 
 UML source uses `plugins.generic-graph.semantic_profile: "uml"`. Supported
 view kinds are `generic`, `archimate`, `uml-class`, `uml-data`,
-`uml-activity`, and `uml-sequence`. The sequence MVP source fixture is
-`fixtures/source/valid-uml-sequence-basic.json`: it declares an
-`Interaction` named `Place Order`, `Lifeline` nodes, and ordered `Message`
-relationships in `properties.uml.sequence` with `message_sort` values.
+`uml-activity`, and `uml-sequence`. Dediren supports the `uml-sequence` MVP
+plus combined fragments with `alt`, `opt`, `loop`, and `par` interaction
+operators. The sequence MVP source fixture is
+`fixtures/source/valid-uml-sequence-basic.json`: it declares an `Interaction`
+named `Place Order`, `Lifeline` nodes, and ordered `Message` relationships in
+`properties.uml.sequence` with `message_sort` values.
+
+Combined fragment authoring uses `CombinedFragment` and `InteractionOperand`
+nodes with fragment membership and guards under `properties.uml`. Operand
+`fragments` entries must follow the referenced messages' `sequence` order,
+message sequence values must be unique within an interaction, and combined
+fragments must not leave standalone messages inside their owned sequence span.
+These rules keep rendered SVG and exported XMI in the same interaction order. Use
+`fixtures/source/valid-uml-sequence-fragments.json` with
+`--view sequence-fragments-view` in the `project` commands to run the same
+pipeline against `alt`, `opt`, `loop`, and `par` examples.
 
 Validate UML semantics, project layout and render metadata, lay out with ELK,
 render SVG, and export UML/XMI:
@@ -203,13 +215,14 @@ jq -r '.data.content' sequence-xmi-result.json > sequence.xmi
 ```
 
 Use generated render metadata for UML sequence SVG so the renderer receives
-lifeline, interaction, message order, and message sort semantics. The MVP UML
-sequence vocabulary is `Interaction`, `Lifeline`, `Message`,
-`ExecutionSpecification`, `Gate`, and
-`DestructionOccurrenceSpecification`. Supported message sorts are `synchCall`,
-`asynchCall`, `asynchSignal`, `reply`, `createMessage`, and `deleteMessage`.
-Combined fragments, state machines, use cases, deployment diagrams, and UMLDI
-are later slices.
+lifeline, interaction, message order, message sort, and combined-fragment
+semantics. The UML sequence vocabulary is `Interaction`, `Lifeline`, `Message`,
+`ExecutionSpecification`, `Gate`, `DestructionOccurrenceSpecification`,
+`CombinedFragment`, and `InteractionOperand`. Supported message sorts are
+`synchCall`, `asynchCall`, `asynchSignal`, `reply`, `createMessage`, and
+`deleteMessage`. `InteractionUse`, `GeneralOrdering`, `ignore`, `consider`,
+UMLDI, state machines, use cases, and deployment diagrams are not yet
+supported.
 
 ## Pipeline
 

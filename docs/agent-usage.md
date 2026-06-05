@@ -46,7 +46,7 @@ guidance in that package.
 {
   "model_schema_version": "model.schema.v1",
   "required_plugins": [
-    { "id": "generic-graph", "version": "0.21.0" }
+    { "id": "generic-graph", "version": "0.22.0" }
   ],
   "nodes": [
     { "id": "client", "type": "generic.actor", "label": "Client", "properties": {} },
@@ -90,8 +90,8 @@ profile and use ArchiMate type names:
 ```json
 {
   "required_plugins": [
-    { "id": "generic-graph", "version": "0.21.0" },
-    { "id": "archimate-oef", "version": "0.21.0" }
+    { "id": "generic-graph", "version": "0.22.0" },
+    { "id": "archimate-oef", "version": "0.22.0" }
   ],
   "plugins": {
     "generic-graph": {
@@ -133,7 +133,13 @@ jq -r '.data.content' render-result.json > diagram.svg
 Use `fixtures/source/valid-uml-sequence-basic.json` for the sequence MVP
 shape: one `Interaction`, `Lifeline` nodes, and ordered `Message`
 relationships with `properties.uml.sequence` plus `message_sort`. The SVG
-sequence path needs generated render metadata.
+sequence path needs generated render metadata. For combined fragments, use
+`fixtures/source/valid-uml-sequence-fragments.json` and
+`--view sequence-fragments-view`; author `CombinedFragment` and
+`InteractionOperand` nodes under `properties.uml` for `alt`, `opt`, `loop`,
+and `par`. Keep message `sequence` values unique within an interaction, keep
+each operand's `fragments` list in sequence order, and do not leave standalone
+messages inside a combined fragment's owned sequence span.
 
 ```bash
 "$BUNDLE/bin/dediren" validate \
@@ -178,15 +184,16 @@ sequence path needs generated render metadata.
 Read `.status`, `.data`, and `.diagnostics[]` from stdout JSON envelopes for
 each command before continuing. The sequence MVP supports `Interaction`,
 `Lifeline`, `Message`, `ExecutionSpecification`, `Gate`, and
-`DestructionOccurrenceSpecification`; message sorts are `synchCall`,
-`asynchCall`, `asynchSignal`, `reply`, `createMessage`, and `deleteMessage`.
-Combined fragments, state machines, use cases, deployment, and UMLDI are later
-slices.
+`DestructionOccurrenceSpecification` plus `CombinedFragment` and
+`InteractionOperand`; message sorts are `synchCall`, `asynchCall`,
+`asynchSignal`, `reply`, `createMessage`, and `deleteMessage`. `InteractionUse`,
+`GeneralOrdering`, `ignore`, `consider`, UMLDI, state machines, use cases, and
+deployment diagrams are not yet supported.
 
 ## Runtime Probes
 
 ```bash
-VERSION=0.21.0
+VERSION=0.22.0
 TARGET=x86_64-unknown-linux-gnu
 BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-${VERSION}-${TARGET}
 

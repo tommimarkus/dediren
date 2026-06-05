@@ -16,6 +16,7 @@ import dev.dediren.contracts.render.SvgNodeStyle;
 import dev.dediren.contracts.render.SvgStylePolicy;
 import dev.dediren.uml.Uml;
 import dev.dediren.uml.UmlValidationException;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
@@ -27,6 +28,11 @@ final class RenderInputValidator {
             "reply",
             "createMessage",
             "deleteMessage");
+    private static final Set<String> UML_SEQUENCE_COMBINED_FRAGMENT_OPERATORS = Set.of(
+            "alt",
+            "opt",
+            "loop",
+            "par");
 
     private RenderInputValidator() {
     }
@@ -138,7 +144,17 @@ final class RenderInputValidator {
             return;
         }
         for (Map.Entry<String, RenderMetadataSelector> entry : metadata.nodes().entrySet()) {
-            Uml.validateElementType(entry.getValue().type(), "render_metadata.nodes." + entry.getKey() + ".type");
+            RenderMetadataSelector selector = entry.getValue();
+            Uml.validateElementType(selector.type(), "render_metadata.nodes." + entry.getKey() + ".type");
+            if ("CombinedFragment".equals(selector.type())) {
+                validateUmlCombinedFragmentRenderMetadata(
+                        selector.properties(),
+                        "render_metadata.nodes." + entry.getKey() + ".properties");
+            } else if ("InteractionOperand".equals(selector.type())) {
+                validateUmlInteractionOperandRenderMetadata(
+                        selector.properties(),
+                        "render_metadata.nodes." + entry.getKey() + ".properties");
+            }
         }
         for (Map.Entry<String, RenderMetadataSelector> entry : metadata.edges().entrySet()) {
             RenderMetadataSelector selector = entry.getValue();
@@ -152,6 +168,7 @@ final class RenderInputValidator {
         for (Map.Entry<String, RenderMetadataSelector> entry : metadata.groups().entrySet()) {
             Uml.validateElementType(entry.getValue().type(), "render_metadata.groups." + entry.getKey() + ".type");
         }
+        validateUmlSequenceFragmentRenderMetadataReferences(layout, metadata);
         for (LaidOutEdge edge : layout.edges()) {
             RenderMetadataSelector edgeSelector = metadata.edges().get(edge.id());
             RenderMetadataSelector sourceSelector = metadata.nodes().get(edge.source());
@@ -166,9 +183,116 @@ final class RenderInputValidator {
         }
     }
 
+    private static void validateUmlSequenceFragmentRenderMetadataReferences(LayoutResult layout, RenderMetadata metadata)
+            throws RenderMetadataUsageException {
+        Set<String> layoutEdgeIds = new HashSet<>();
+        for (LaidOutEdge edge : layout.edges()) {
+            layoutEdgeIds.add(edge.id());
+        }
+        for (Map.Entry<String, RenderMetadataSelector> entry : metadata.nodes().entrySet()) {
+            RenderMetadataSelector selector = entry.getValue();
+            String path = "render_metadata.nodes." + entry.getKey() + ".properties";
+            if ("CombinedFragment".equals(selector.type())) {
+                validateCombinedFragmentOperandReferences(entry.getKey(), selector.properties(), metadata, path);
+                validateCombinedFragmentCoveredReferences(selector.properties(), metadata, path);
+            } else if ("InteractionOperand".equals(selector.type())) {
+                validateInteractionOperandFragmentReferences(selector.properties(), metadata, layoutEdgeIds, path);
+            }
+        }
+    }
+
+    private static void validateCombinedFragmentOperandReferences(
+            String combinedFragmentId,
+            JsonNode properties,
+            RenderMetadata metadata,
+            String path) throws RenderMetadataUsageException {
+        String operator = metadataProperty(properties, "operator").asText();
+        JsonNode operands = metadataProperty(properties, "operands");
+        if (!hasSupportedCombinedFragmentOperandCount(operator, operands.size())) {
+            throw new RenderMetadataUsageException(
+                    "DEDIREN_UML_COMBINED_FRAGMENT_METADATA_INVALID",
+                    path + ".operands",
+                    "UML CombinedFragment render metadata operand count does not match operator " + operator);
+        }
+        for (JsonNode operandId : operands) {
+            RenderMetadataSelector operand = metadata.nodes().get(operandId.asText());
+            JsonNode owner = operand == null ? null : metadataProperty(operand.properties(), "combined_fragment");
+            if (operand == null
+                    || !"InteractionOperand".equals(operand.type())
+                    || owner == null
+                    || !owner.isTextual()
+                    || !combinedFragmentId.equals(owner.asText())) {
+                throw new RenderMetadataUsageException(
+                        "DEDIREN_UML_COMBINED_FRAGMENT_METADATA_INVALID",
+                        path + ".operands",
+                        "UML CombinedFragment render metadata operands must reference owned InteractionOperand metadata");
+            }
+        }
+    }
+
+    private static boolean hasSupportedCombinedFragmentOperandCount(String operator, int count) {
+        return switch (operator) {
+            case "opt", "loop" -> count == 1;
+            case "alt", "par" -> count >= 2;
+            default -> false;
+        };
+    }
+
+    private static void validateCombinedFragmentCoveredReferences(
+            JsonNode properties,
+            RenderMetadata metadata,
+            String path) throws RenderMetadataUsageException {
+        JsonNode covered = metadataProperty(properties, "covered");
+        if (covered == null) {
+            return;
+        }
+        for (JsonNode coveredId : covered) {
+            RenderMetadataSelector lifeline = metadata.nodes().get(coveredId.asText());
+            if (lifeline == null || !"Lifeline".equals(lifeline.type())) {
+                throw new RenderMetadataUsageException(
+                        "DEDIREN_UML_COMBINED_FRAGMENT_METADATA_INVALID",
+                        path + ".covered",
+                        "UML CombinedFragment render metadata covered ids must reference Lifeline metadata");
+            }
+        }
+    }
+
+    private static void validateInteractionOperandFragmentReferences(
+            JsonNode properties,
+            RenderMetadata metadata,
+            Set<String> layoutEdgeIds,
+            String path) throws RenderMetadataUsageException {
+        JsonNode combinedFragment = metadataProperty(properties, "combined_fragment");
+        RenderMetadataSelector owner = metadata.nodes().get(combinedFragment.asText());
+        if (owner == null || !"CombinedFragment".equals(owner.type())) {
+            throw new RenderMetadataUsageException(
+                    "DEDIREN_UML_INTERACTION_OPERAND_METADATA_INVALID",
+                    path + ".combined_fragment",
+                    "UML InteractionOperand render metadata combined_fragment must reference CombinedFragment metadata");
+        }
+
+        JsonNode fragments = metadataProperty(properties, "fragments");
+        for (JsonNode fragmentId : fragments) {
+            String id = fragmentId.asText();
+            RenderMetadataSelector message = metadata.edges().get(id);
+            if (message != null && "Message".equals(message.type()) && layoutEdgeIds.contains(id)) {
+                continue;
+            }
+            RenderMetadataSelector nestedFragment = metadata.nodes().get(id);
+            if (nestedFragment != null && "CombinedFragment".equals(nestedFragment.type())) {
+                continue;
+            }
+            throw new RenderMetadataUsageException(
+                    "DEDIREN_UML_INTERACTION_OPERAND_METADATA_INVALID",
+                    path + ".fragments",
+                    "UML InteractionOperand render metadata fragments must reference laid out Message edges "
+                            + "or CombinedFragment metadata");
+        }
+    }
+
     private static void validateUmlMessageRenderMetadata(JsonNode properties, String path)
             throws RenderMetadataUsageException {
-        JsonNode sequence = properties == null || !properties.isObject() ? null : properties.get("sequence");
+        JsonNode sequence = metadataProperty(properties, "sequence");
         if (sequence == null || !sequence.isIntegralNumber() || sequence.bigIntegerValue().signum() < 1) {
             throw new RenderMetadataUsageException(
                     "DEDIREN_UML_MESSAGE_METADATA_INVALID",
@@ -176,7 +300,7 @@ final class RenderInputValidator {
                     "UML Message render metadata sequence must be a positive integer");
         }
 
-        JsonNode messageSort = properties.get("message_sort");
+        JsonNode messageSort = metadataProperty(properties, "message_sort");
         if (messageSort != null
                 && (!messageSort.isTextual()
                 || !UML_SEQUENCE_MESSAGE_SORTS.contains(messageSort.asText()))) {
@@ -186,6 +310,91 @@ final class RenderInputValidator {
                     "UML Message render metadata message_sort, when present, must be one of "
                             + UML_SEQUENCE_MESSAGE_SORTS);
         }
+    }
+
+    private static void validateUmlCombinedFragmentRenderMetadata(JsonNode properties, String path)
+            throws RenderMetadataUsageException {
+        JsonNode operator = metadataProperty(properties, "operator");
+        if (operator == null
+                || !operator.isTextual()
+                || !UML_SEQUENCE_COMBINED_FRAGMENT_OPERATORS.contains(operator.asText())) {
+            throw new RenderMetadataUsageException(
+                    "DEDIREN_UML_COMBINED_FRAGMENT_METADATA_INVALID",
+                    path + ".operator",
+                    "UML CombinedFragment render metadata operator must be one of "
+                            + UML_SEQUENCE_COMBINED_FRAGMENT_OPERATORS);
+        }
+
+        JsonNode operands = metadataProperty(properties, "operands");
+        if (!isNonEmptyTextArray(operands)) {
+            throw new RenderMetadataUsageException(
+                    "DEDIREN_UML_COMBINED_FRAGMENT_METADATA_INVALID",
+                    path + ".operands",
+                    "UML CombinedFragment render metadata operands must be a non-empty array of text ids");
+        }
+
+        JsonNode covered = metadataProperty(properties, "covered");
+        if (covered != null && !isTextArray(covered)) {
+            throw new RenderMetadataUsageException(
+                    "DEDIREN_UML_COMBINED_FRAGMENT_METADATA_INVALID",
+                    path + ".covered",
+                    "UML CombinedFragment render metadata covered, when present, must be an array of text ids");
+        }
+    }
+
+    private static void validateUmlInteractionOperandRenderMetadata(JsonNode properties, String path)
+            throws RenderMetadataUsageException {
+        JsonNode combinedFragment = metadataProperty(properties, "combined_fragment");
+        if (combinedFragment == null || !combinedFragment.isTextual()) {
+            throw new RenderMetadataUsageException(
+                    "DEDIREN_UML_INTERACTION_OPERAND_METADATA_INVALID",
+                    path + ".combined_fragment",
+                    "UML InteractionOperand render metadata combined_fragment must be text");
+        }
+
+        JsonNode order = metadataProperty(properties, "order");
+        if (order == null || !order.isIntegralNumber() || order.bigIntegerValue().signum() < 1) {
+            throw new RenderMetadataUsageException(
+                    "DEDIREN_UML_INTERACTION_OPERAND_METADATA_INVALID",
+                    path + ".order",
+                    "UML InteractionOperand render metadata order must be a positive integer");
+        }
+
+        JsonNode fragments = metadataProperty(properties, "fragments");
+        if (!isNonEmptyTextArray(fragments)) {
+            throw new RenderMetadataUsageException(
+                    "DEDIREN_UML_INTERACTION_OPERAND_METADATA_INVALID",
+                    path + ".fragments",
+                    "UML InteractionOperand render metadata fragments must be a non-empty array of text ids");
+        }
+
+        JsonNode guard = metadataProperty(properties, "guard");
+        if (guard != null && !guard.isTextual()) {
+            throw new RenderMetadataUsageException(
+                    "DEDIREN_UML_INTERACTION_OPERAND_METADATA_INVALID",
+                    path + ".guard",
+                    "UML InteractionOperand render metadata guard, when present, must be text");
+        }
+    }
+
+    private static JsonNode metadataProperty(JsonNode properties, String name) {
+        return properties == null || !properties.isObject() ? null : properties.get(name);
+    }
+
+    private static boolean isTextArray(JsonNode value) {
+        if (value == null || !value.isArray()) {
+            return false;
+        }
+        for (JsonNode item : value) {
+            if (!item.isTextual()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean isNonEmptyTextArray(JsonNode value) {
+        return value != null && value.isArray() && !value.isEmpty() && isTextArray(value);
     }
 
     private static void validateRenderPolicy(RenderPolicy policy) throws PolicyValidationException {

@@ -1,0 +1,417 @@
+{
+  "model_schema_version": "model.schema.v1",
+  "required_plugins": [
+    {
+      "id": "generic-graph",
+      "version": "0.22.0"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "interaction-place-order",
+      "type": "Interaction",
+      "label": "Place Order",
+      "properties": {
+        "uml": {}
+      }
+    },
+    {
+      "id": "customer",
+      "type": "Lifeline",
+      "label": "Customer",
+      "properties": {
+        "uml": {
+          "interaction": "interaction-place-order"
+        }
+      }
+    },
+    {
+      "id": "service",
+      "type": "Lifeline",
+      "label": "Order Service",
+      "properties": {
+        "uml": {
+          "interaction": "interaction-place-order"
+        }
+      }
+    },
+    {
+      "id": "inventory",
+      "type": "Lifeline",
+      "label": "Inventory",
+      "properties": {
+        "uml": {
+          "interaction": "interaction-place-order"
+        }
+      }
+    },
+    {
+      "id": "payment",
+      "type": "Lifeline",
+      "label": "Payment",
+      "properties": {
+        "uml": {
+          "interaction": "interaction-place-order"
+        }
+      }
+    },
+    {
+      "id": "cf-availability",
+      "type": "CombinedFragment",
+      "label": "Availability",
+      "properties": {
+        "uml": {
+          "interaction": "interaction-place-order",
+          "operator": "alt",
+          "operands": ["op-in-stock", "op-backorder"],
+          "covered": ["customer", "service", "inventory"]
+        }
+      }
+    },
+    {
+      "id": "op-in-stock",
+      "type": "InteractionOperand",
+      "label": "In Stock",
+      "properties": {
+        "uml": {
+          "interaction": "interaction-place-order",
+          "combined_fragment": "cf-availability",
+          "order": 1,
+          "guard": "inStock",
+          "fragments": ["m1", "m2"]
+        }
+      }
+    },
+    {
+      "id": "op-backorder",
+      "type": "InteractionOperand",
+      "label": "Backorder",
+      "properties": {
+        "uml": {
+          "interaction": "interaction-place-order",
+          "combined_fragment": "cf-availability",
+          "order": 2,
+          "guard": "else",
+          "fragments": ["m3", "m4"]
+        }
+      }
+    },
+    {
+      "id": "cf-coupon",
+      "type": "CombinedFragment",
+      "label": "Coupon",
+      "properties": {
+        "uml": {
+          "interaction": "interaction-place-order",
+          "operator": "opt",
+          "operands": ["op-coupon"],
+          "covered": ["customer", "service"]
+        }
+      }
+    },
+    {
+      "id": "op-coupon",
+      "type": "InteractionOperand",
+      "label": "Coupon Present",
+      "properties": {
+        "uml": {
+          "interaction": "interaction-place-order",
+          "combined_fragment": "cf-coupon",
+          "order": 1,
+          "guard": "couponPresent",
+          "fragments": ["m5", "m6"]
+        }
+      }
+    },
+    {
+      "id": "cf-retry",
+      "type": "CombinedFragment",
+      "label": "Retry Authorization",
+      "properties": {
+        "uml": {
+          "interaction": "interaction-place-order",
+          "operator": "loop",
+          "operands": ["op-retry"],
+          "covered": ["service", "payment"]
+        }
+      }
+    },
+    {
+      "id": "op-retry",
+      "type": "InteractionOperand",
+      "label": "Retry",
+      "properties": {
+        "uml": {
+          "interaction": "interaction-place-order",
+          "combined_fragment": "cf-retry",
+          "order": 1,
+          "guard": "whilePaymentPending",
+          "fragments": ["m7", "m8"]
+        }
+      }
+    },
+    {
+      "id": "cf-parallel-closeout",
+      "type": "CombinedFragment",
+      "label": "Parallel Closeout",
+      "properties": {
+        "uml": {
+          "interaction": "interaction-place-order",
+          "operator": "par",
+          "operands": ["op-charge", "op-confirm"],
+          "covered": ["customer", "service", "payment"]
+        }
+      }
+    },
+    {
+      "id": "op-charge",
+      "type": "InteractionOperand",
+      "label": "Charge",
+      "properties": {
+        "uml": {
+          "interaction": "interaction-place-order",
+          "combined_fragment": "cf-parallel-closeout",
+          "order": 1,
+          "guard": "charge",
+          "fragments": ["m9", "m10"]
+        }
+      }
+    },
+    {
+      "id": "op-confirm",
+      "type": "InteractionOperand",
+      "label": "Confirm",
+      "properties": {
+        "uml": {
+          "interaction": "interaction-place-order",
+          "combined_fragment": "cf-parallel-closeout",
+          "order": 2,
+          "guard": "confirm",
+          "fragments": ["m11", "m12"]
+        }
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "id": "m1",
+      "type": "Message",
+      "source": "service",
+      "target": "inventory",
+      "label": "checkAvailability",
+      "properties": {
+        "uml": {
+          "interaction": "interaction-place-order",
+          "sequence": 1,
+          "message_sort": "synchCall"
+        }
+      }
+    },
+    {
+      "id": "m2",
+      "type": "Message",
+      "source": "inventory",
+      "target": "service",
+      "label": "inStock",
+      "properties": {
+        "uml": {
+          "interaction": "interaction-place-order",
+          "sequence": 2,
+          "message_sort": "reply"
+        }
+      }
+    },
+    {
+      "id": "m3",
+      "type": "Message",
+      "source": "service",
+      "target": "inventory",
+      "label": "requestBackorder",
+      "properties": {
+        "uml": {
+          "interaction": "interaction-place-order",
+          "sequence": 3,
+          "message_sort": "synchCall"
+        }
+      }
+    },
+    {
+      "id": "m4",
+      "type": "Message",
+      "source": "inventory",
+      "target": "service",
+      "label": "backorderAccepted",
+      "properties": {
+        "uml": {
+          "interaction": "interaction-place-order",
+          "sequence": 4,
+          "message_sort": "reply"
+        }
+      }
+    },
+    {
+      "id": "m5",
+      "type": "Message",
+      "source": "customer",
+      "target": "service",
+      "label": "applyCoupon",
+      "properties": {
+        "uml": {
+          "interaction": "interaction-place-order",
+          "sequence": 5,
+          "message_sort": "synchCall"
+        }
+      }
+    },
+    {
+      "id": "m6",
+      "type": "Message",
+      "source": "service",
+      "target": "customer",
+      "label": "couponAccepted",
+      "properties": {
+        "uml": {
+          "interaction": "interaction-place-order",
+          "sequence": 6,
+          "message_sort": "reply"
+        }
+      }
+    },
+    {
+      "id": "m7",
+      "type": "Message",
+      "source": "service",
+      "target": "payment",
+      "label": "authorizePayment",
+      "properties": {
+        "uml": {
+          "interaction": "interaction-place-order",
+          "sequence": 7,
+          "message_sort": "synchCall"
+        }
+      }
+    },
+    {
+      "id": "m8",
+      "type": "Message",
+      "source": "payment",
+      "target": "service",
+      "label": "retryNeeded",
+      "properties": {
+        "uml": {
+          "interaction": "interaction-place-order",
+          "sequence": 8,
+          "message_sort": "reply"
+        }
+      }
+    },
+    {
+      "id": "m9",
+      "type": "Message",
+      "source": "service",
+      "target": "payment",
+      "label": "capturePayment",
+      "properties": {
+        "uml": {
+          "interaction": "interaction-place-order",
+          "sequence": 9,
+          "message_sort": "synchCall"
+        }
+      }
+    },
+    {
+      "id": "m10",
+      "type": "Message",
+      "source": "payment",
+      "target": "service",
+      "label": "charged",
+      "properties": {
+        "uml": {
+          "interaction": "interaction-place-order",
+          "sequence": 10,
+          "message_sort": "reply"
+        }
+      }
+    },
+    {
+      "id": "m11",
+      "type": "Message",
+      "source": "service",
+      "target": "customer",
+      "label": "sendConfirmation",
+      "properties": {
+        "uml": {
+          "interaction": "interaction-place-order",
+          "sequence": 11,
+          "message_sort": "asynchSignal"
+        }
+      }
+    },
+    {
+      "id": "m12",
+      "type": "Message",
+      "source": "customer",
+      "target": "service",
+      "label": "confirmReceipt",
+      "properties": {
+        "uml": {
+          "interaction": "interaction-place-order",
+          "sequence": 12,
+          "message_sort": "reply"
+        }
+      }
+    }
+  ],
+  "plugins": {
+    "generic-graph": {
+      "semantic_profile": "uml",
+      "views": [
+        {
+          "id": "sequence-fragments-view",
+          "label": "Place Order Sequence Fragments",
+          "kind": "uml-sequence",
+          "nodes": [
+            "interaction-place-order",
+            "customer",
+            "service",
+            "inventory",
+            "payment",
+            "cf-availability",
+            "op-in-stock",
+            "op-backorder",
+            "cf-coupon",
+            "op-coupon",
+            "cf-retry",
+            "op-retry",
+            "cf-parallel-closeout",
+            "op-charge",
+            "op-confirm"
+          ],
+          "relationships": [
+            "m1",
+            "m2",
+            "m3",
+            "m4",
+            "m5",
+            "m6",
+            "m7",
+            "m8",
+            "m9",
+            "m10",
+            "m11",
+            "m12"
+          ],
+          "layout_preferences": {
+            "direction": "right",
+            "density": "readable",
+            "routing": {
+              "style": "orthogonal",
+              "profile": "readable",
+              "endpoint_merging": "off"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

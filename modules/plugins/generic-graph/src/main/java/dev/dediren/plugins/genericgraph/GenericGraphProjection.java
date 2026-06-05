@@ -91,6 +91,9 @@ final class GenericGraphProjection {
                     .filter(node -> node.id().equals(id))
                     .findFirst()
                     .orElseThrow(() -> new IOException("view references missing node " + id));
+            if (isSourceOnlySequenceFragment(semanticProfile, selectedView, sourceNode)) {
+                continue;
+            }
             nodes.add(new LayoutNode(
                     sourceNode.id(),
                     sourceNode.label(),
@@ -115,6 +118,9 @@ final class GenericGraphProjection {
         }
 
         var sourceNodeIds = source.nodes().stream().map(SourceNode::id).collect(java.util.stream.Collectors.toSet());
+        var emittedLayoutNodeIds = nodes.stream()
+                .map(LayoutNode::id)
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
         var groups = new ArrayList<LayoutGroup>();
         for (GenericGraphViewGroup group : selectedView.groups()) {
             for (String member : group.members()) {
@@ -133,7 +139,13 @@ final class GenericGraphProjection {
                 }
                 provenance = GroupProvenance.semanticBacked(sourceId);
             }
-            groups.add(new LayoutGroup(group.id(), group.label(), group.members(), provenance));
+            var members = group.members().stream()
+                    .filter(emittedLayoutNodeIds::contains)
+                    .toList();
+            if (members.isEmpty()) {
+                continue;
+            }
+            groups.add(new LayoutGroup(group.id(), group.label(), members, provenance));
         }
 
         var labels = nodes.stream()
@@ -188,6 +200,15 @@ final class GenericGraphProjection {
                         selectedView.id() + ".uml.sequence.message-order",
                         "uml.sequence.message-order",
                         messageIds));
+    }
+
+    private static boolean isSourceOnlySequenceFragment(
+            String semanticProfile,
+            GenericGraphView selectedView,
+            SourceNode node) {
+        return semanticProfile.equals("uml")
+                && selectedView.kind() == GenericGraphViewKind.UML_SEQUENCE
+                && (node.type().equals("CombinedFragment") || node.type().equals("InteractionOperand"));
     }
 
     private static BigInteger umlMessageSequence(SourceRelationship relationship) {

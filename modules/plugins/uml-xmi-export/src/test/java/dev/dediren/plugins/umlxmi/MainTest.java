@@ -97,6 +97,119 @@ class MainTest {
     }
 
     @Test
+    void exportsUmlSequenceCombinedFragments() throws Exception {
+        JsonNode input = exportInput(
+                fixtureJson("fixtures/source/valid-uml-sequence-fragments.json"),
+                fixtureJson("fixtures/layout-result/uml-sequence-fragments.json"));
+
+        PluginResult result = Main.executeForTesting(
+                new String[]{"export"},
+                input.toString(),
+                envWithXmiSchema());
+
+        String xml = okData(result).at("/content").asText();
+        assertThat(xml).isEqualTo(fixture("fixtures/export/uml-sequence-fragments.xmi"));
+    }
+
+    @Test
+    void keepsSequenceViewRelationshipsScopedToLayoutEdges() throws Exception {
+        JsonNode input = exportInput(
+                fixtureJson("fixtures/source/valid-uml-sequence-fragments.json"),
+                fixtureJson("fixtures/layout-result/uml-sequence-fragments.json"));
+        ((com.fasterxml.jackson.databind.node.ArrayNode) input.at("/source/relationships"))
+                .add(JsonSupport.objectMapper().readTree("""
+                {
+                  "id": "m-unlaid",
+                  "type": "Message",
+                  "source": "customer",
+                  "target": "service",
+                  "label": "notInLayout",
+                  "properties": {
+                    "uml": {
+                      "interaction": "interaction-place-order",
+                      "sequence": 13,
+                      "message_sort": "synchCall"
+                    }
+                  }
+                }
+                """));
+        ((com.fasterxml.jackson.databind.node.ArrayNode)
+                        input.at("/source/plugins/generic-graph/views/0/relationships"))
+                .add("m-unlaid");
+
+        String xml = exportXml(input);
+
+        assertThat(xml).doesNotContain("id-m-unlaid", "notInLayout");
+    }
+
+    @Test
+    void interleavesTopLevelCombinedFragmentsAndStandaloneMessagesBySequence() throws Exception {
+        JsonNode input = exportInput(
+                fixtureJson("fixtures/source/valid-uml-sequence-fragments.json"),
+                fixtureJson("fixtures/layout-result/uml-sequence-fragments.json"));
+        var relationships = (com.fasterxml.jackson.databind.node.ArrayNode) input.at("/source/relationships");
+        for (int index = 4; index < relationships.size(); index++) {
+            ObjectNode uml = (ObjectNode) relationships.get(index).get("properties").get("uml");
+            uml.put("sequence", uml.get("sequence").intValue() + 1);
+        }
+        relationships.add(JsonSupport.objectMapper().readTree("""
+                {
+                  "id": "m-between-fragments",
+                  "type": "Message",
+                  "source": "service",
+                  "target": "payment",
+                  "label": "authorizeStandalone",
+                  "properties": {
+                    "uml": {
+                      "interaction": "interaction-place-order",
+                      "sequence": 5,
+                      "message_sort": "synchCall"
+                    }
+                  }
+                }
+                """));
+        ((com.fasterxml.jackson.databind.node.ArrayNode) input.at("/layout_result/edges"))
+                .add(JsonSupport.objectMapper().readTree("""
+                {
+                  "id": "m-between-fragments",
+                  "source": "service",
+                  "target": "payment",
+                  "source_id": "m-between-fragments",
+                  "projection_id": "m-between-fragments",
+                  "points": [
+                    { "x": 394, "y": 360 },
+                    { "x": 850, "y": 360 }
+                  ],
+                  "label": "authorizeStandalone"
+                }
+                """));
+
+        String xml = exportXml(input);
+
+        assertThat(xml).containsSubsequence(
+                "<fragment xmi:type=\"uml:CombinedFragment\" xmi:id=\"id-cf-availability\"",
+                "xmi:id=\"id-m-between-fragments-send-event\"",
+                "<fragment xmi:type=\"uml:CombinedFragment\" xmi:id=\"id-cf-coupon\"");
+    }
+
+    @Test
+    void nestsCombinedFragmentsReferencedByOperandFragments() throws Exception {
+        JsonNode input = exportInput(
+                fixtureJson("fixtures/source/valid-uml-sequence-fragments.json"),
+                fixtureJson("fixtures/layout-result/uml-sequence-fragments.json"));
+        ((com.fasterxml.jackson.databind.node.ArrayNode) input.at("/source/nodes/7/properties/uml/fragments"))
+                .add("cf-coupon");
+
+        String xml = exportXml(input);
+
+        assertThat(xml).containsOnlyOnce("xmi:id=\"id-cf-coupon\"");
+        assertThat(xml).containsSubsequence(
+                "<operand xmi:id=\"id-op-backorder\"",
+                "<fragment xmi:type=\"uml:CombinedFragment\" xmi:id=\"id-cf-coupon\"",
+                "</operand></fragment></operand></fragment><fragment xmi:type=\"uml:CombinedFragment\" xmi:id=\"id-cf-retry\"");
+    }
+
+    @Test
     void exportsEndpointLifelineWhenOnlySelectedMessageOwnsInteraction() throws Exception {
         JsonNode input = exportSequenceInput();
         ((ObjectNode) input.at("/source/nodes/1/properties/uml")).remove("interaction");
@@ -248,6 +361,25 @@ class MainTest {
 
         assertThat(result.exitCode()).isEqualTo(3);
         assertError(result, "DEDIREN_UML_XMI_SEQUENCE_NODE_UNSUPPORTED", "$.nodes[3]");
+    }
+
+    @Test
+    void rejectsSelectedUnsupportedSequenceCombinedFragmentOperator() throws Exception {
+        JsonNode input = exportInput(
+                fixtureJson("fixtures/source/valid-uml-sequence-fragments.json"),
+                fixtureJson("fixtures/layout-result/uml-sequence-fragments.json"));
+        ((ObjectNode) input.at("/source/nodes/5/properties/uml")).put("operator", "ignore");
+
+        PluginResult result = Main.executeForTesting(
+                new String[]{"export"},
+                JsonSupport.objectMapper().writeValueAsString(input),
+                envWithXmiSchema());
+
+        assertThat(result.exitCode()).isEqualTo(3);
+        assertError(
+                result,
+                "DEDIREN_UML_XMI_SEQUENCE_FRAGMENT_OPERATOR_UNSUPPORTED",
+                "$.nodes[5].properties.uml.operator");
     }
 
     @Test

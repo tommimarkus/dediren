@@ -34,6 +34,8 @@ import dev.dediren.contracts.source.SourceRelationship;
 import dev.dediren.testsupport.SchemaAssertions;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class ContractRoundTripTest {
@@ -88,6 +90,24 @@ class ContractRoundTripTest {
         assertThat(reparsed.relationships())
                 .extracting(relationship -> relationship.properties().get("uml").get("message_sort").textValue())
                 .containsExactly("synchCall", "reply", "asynchSignal");
+    }
+
+    @Test
+    void umlSequenceFragmentsFixtureRoundTrips() throws Exception {
+        String fixturePath = "fixtures/source/valid-uml-sequence-fragments.json";
+        JsonNode source = JsonSupport.objectMapper().readTree(fixture(fixturePath));
+
+        assertThat(SchemaAssertions.validateFixture(workspaceRoot(), "schemas/model.schema.json", fixturePath))
+                .describedAs(fixturePath)
+                .isEmpty();
+        assertUmlSequenceFragmentSurface(source);
+
+        SourceDocument decoded = JsonSupport.objectMapper().treeToValue(source, SourceDocument.class);
+        SourceDocument roundTripped = JsonSupport.objectMapper()
+                .treeToValue(JsonSupport.objectMapper().valueToTree(decoded), SourceDocument.class);
+        JsonNode encoded = JsonSupport.objectMapper().valueToTree(roundTripped);
+
+        assertUmlSequenceFragmentSurface(encoded);
     }
 
     @Test
@@ -275,7 +295,7 @@ class ContractRoundTripTest {
                 """, RuntimeCapabilities.class);
 
         assertThat(manifest.pluginManifestSchemaVersion()).isEqualTo("plugin-manifest.schema.v1");
-        assertThat(manifest.version()).isEqualTo("0.21.0");
+        assertThat(manifest.version()).isEqualTo("0.22.0");
         assertThat(manifest.allowedEnv()).containsExactly("JAVA_HOME", "PATH");
         assertThat(capabilities.pluginProtocolVersion()).isEqualTo(ContractVersions.PLUGIN_PROTOCOL_VERSION);
         assertThat(capabilities.runtime().get("java").asText()).isEqualTo("21");
@@ -283,6 +303,101 @@ class ContractRoundTripTest {
 
     private static <T> T readFixture(String fixture, Class<T> type) throws Exception {
         return JsonSupport.readValue(Files.readString(workspaceRoot().resolve(fixture)), type);
+    }
+
+    private static String fixture(String fixture) throws Exception {
+        return Files.readString(workspaceRoot().resolve(fixture));
+    }
+
+    private static JsonNode nodeById(JsonNode source, String id) {
+        for (JsonNode node : source.get("nodes")) {
+            if (id.equals(node.get("id").asText())) {
+                return node;
+            }
+        }
+        throw new AssertionError("Missing node " + id);
+    }
+
+    private static void assertUmlSequenceFragmentSurface(JsonNode source) {
+        assertThat(source.at("/plugins/generic-graph/views/0/kind").asText()).isEqualTo("uml-sequence");
+
+        assertCombinedFragment(
+                source,
+                "cf-availability",
+                "alt",
+                List.of("op-in-stock", "op-backorder"),
+                List.of("customer", "service", "inventory"));
+        assertCombinedFragment(source, "cf-coupon", "opt", List.of("op-coupon"), List.of("customer", "service"));
+        assertCombinedFragment(source, "cf-retry", "loop", List.of("op-retry"), List.of("service", "payment"));
+        assertCombinedFragment(
+                source,
+                "cf-parallel-closeout",
+                "par",
+                List.of("op-charge", "op-confirm"),
+                List.of("customer", "service", "payment"));
+
+        assertOperand(source, "op-in-stock", "cf-availability", 1, "inStock", "m1", "m2");
+        assertOperand(source, "op-backorder", "cf-availability", 2, "else", "m3", "m4");
+        assertOperand(source, "op-coupon", "cf-coupon", 1, "couponPresent", "m5", "m6");
+        assertOperand(source, "op-retry", "cf-retry", 1, "whilePaymentPending", "m7", "m8");
+        assertOperand(source, "op-charge", "cf-parallel-closeout", 1, "charge", "m9", "m10");
+        assertOperand(source, "op-confirm", "cf-parallel-closeout", 2, "confirm", "m11", "m12");
+
+        assertOrderedSequenceMessages(source);
+    }
+
+    private static void assertCombinedFragment(
+            JsonNode source, String id, String operator, List<String> operands, List<String> covered) {
+        JsonNode fragment = nodeById(source, id);
+
+        assertThat(fragment.get("type").asText()).isEqualTo("CombinedFragment");
+        assertThat(fragment.at("/properties/uml/interaction").asText()).isEqualTo("interaction-place-order");
+        assertThat(fragment.at("/properties/uml/operator").asText()).isEqualTo(operator);
+        assertThat(textValues(fragment.at("/properties/uml/operands"))).containsExactlyElementsOf(operands);
+        assertThat(textValues(fragment.at("/properties/uml/covered"))).containsExactlyElementsOf(covered);
+    }
+
+    private static void assertOperand(
+            JsonNode source, String id, String combinedFragment, int order, String guard, String... fragments) {
+        JsonNode operand = nodeById(source, id);
+
+        assertThat(operand.get("type").asText()).isEqualTo("InteractionOperand");
+        assertThat(operand.at("/properties/uml/interaction").asText()).isEqualTo("interaction-place-order");
+        assertThat(operand.at("/properties/uml/combined_fragment").asText()).isEqualTo(combinedFragment);
+        assertThat(operand.at("/properties/uml/order").intValue()).isEqualTo(order);
+        assertThat(operand.at("/properties/uml/guard").asText()).isEqualTo(guard);
+        assertThat(textValues(operand.at("/properties/uml/fragments"))).containsExactly(fragments);
+    }
+
+    private static List<String> textValues(JsonNode array) {
+        List<String> values = new ArrayList<>();
+        for (JsonNode item : array) {
+            values.add(item.asText());
+        }
+        return values;
+    }
+
+    private static void assertOrderedSequenceMessages(JsonNode source) {
+        assertThat(relationshipIds(source))
+                .containsExactly("m1", "m2", "m3", "m4", "m5", "m6", "m7", "m8", "m9", "m10", "m11", "m12");
+        assertThat(sequenceValues(source))
+                .containsExactly(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12);
+    }
+
+    private static List<String> relationshipIds(JsonNode source) {
+        List<String> ids = new ArrayList<>();
+        for (JsonNode relationship : source.get("relationships")) {
+            ids.add(relationship.get("id").asText());
+        }
+        return ids;
+    }
+
+    private static List<Integer> sequenceValues(JsonNode source) {
+        List<Integer> values = new ArrayList<>();
+        for (JsonNode relationship : source.get("relationships")) {
+            values.add(relationship.at("/properties/uml/sequence").intValue());
+        }
+        return values;
     }
 
     private static Path workspaceRoot() {

@@ -15,6 +15,7 @@ public final class UmlValidationException extends Exception {
     public String code() {
         return switch (kind) {
             case ELEMENT -> "DEDIREN_UML_ELEMENT_TYPE_UNSUPPORTED";
+            case ELEMENT_PROPERTY -> "DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED";
             case RELATIONSHIP -> "DEDIREN_UML_RELATIONSHIP_TYPE_UNSUPPORTED";
             case RELATIONSHIP_PROPERTY -> "DEDIREN_UML_RELATIONSHIP_PROPERTY_INVALID";
             case RELATIONSHIP_ENDPOINT -> "DEDIREN_UML_RELATIONSHIP_ENDPOINT_UNSUPPORTED";
@@ -38,6 +39,7 @@ public final class UmlValidationException extends Exception {
     private static String message(UmlTypeKind kind, String value) {
         return switch (kind) {
             case ELEMENT -> "unsupported UML element type: " + value;
+            case ELEMENT_PROPERTY -> "invalid UML element property: " + value;
             case RELATIONSHIP -> "unsupported UML relationship type: " + value;
             case RELATIONSHIP_PROPERTY -> "invalid UML relationship property: " + value;
             case RELATIONSHIP_ENDPOINT -> "unsupported UML relationship endpoint: " + value;

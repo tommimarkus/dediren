@@ -2,6 +2,7 @@ package dev.dediren.uml;
 
 public enum UmlTypeKind {
     ELEMENT,
+    ELEMENT_PROPERTY,
     RELATIONSHIP,
     RELATIONSHIP_PROPERTY,
     RELATIONSHIP_ENDPOINT,

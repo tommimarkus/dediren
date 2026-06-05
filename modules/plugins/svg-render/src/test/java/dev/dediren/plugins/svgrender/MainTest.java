@@ -78,6 +78,79 @@ class MainTest {
         }
 
         @Test
+        void rejectsMalformedUmlSequenceCombinedFragmentMetadata() throws Exception {
+            assertInvalidUmlCombinedFragmentMetadata(
+                    properties -> properties.remove("operator"),
+                    "render_metadata.nodes.cf-availability.properties.operator");
+            assertInvalidUmlCombinedFragmentMetadata(
+                    properties -> properties.put("operator", 3),
+                    "render_metadata.nodes.cf-availability.properties.operator");
+            assertInvalidUmlCombinedFragmentMetadata(
+                    properties -> properties.put("operator", "ignore"),
+                    "render_metadata.nodes.cf-availability.properties.operator");
+            assertInvalidUmlCombinedFragmentMetadata(
+                    properties -> properties.put("operands", "op-in-stock"),
+                    "render_metadata.nodes.cf-availability.properties.operands");
+            assertInvalidUmlCombinedFragmentMetadata(
+                    properties -> properties.putArray("operands"),
+                    "render_metadata.nodes.cf-availability.properties.operands");
+            assertInvalidUmlCombinedFragmentMetadata(
+                    properties -> properties.putArray("operands").add(3),
+                    "render_metadata.nodes.cf-availability.properties.operands");
+            assertInvalidUmlCombinedFragmentMetadata(
+                    properties -> properties.putArray("operands").add("op-missing"),
+                    "render_metadata.nodes.cf-availability.properties.operands");
+            assertInvalidUmlCombinedFragmentMetadata(
+                    properties -> properties.put("covered", "customer"),
+                    "render_metadata.nodes.cf-availability.properties.covered");
+            assertInvalidUmlCombinedFragmentMetadata(
+                    properties -> properties.putArray("covered").add(3),
+                    "render_metadata.nodes.cf-availability.properties.covered");
+        }
+
+        @Test
+        void rejectsMalformedUmlSequenceInteractionOperandMetadata() throws Exception {
+            assertInvalidUmlInteractionOperandMetadata(
+                    properties -> properties.remove("combined_fragment"),
+                    "render_metadata.nodes.op-in-stock.properties.combined_fragment");
+            assertInvalidUmlInteractionOperandMetadata(
+                    properties -> properties.put("combined_fragment", 3),
+                    "render_metadata.nodes.op-in-stock.properties.combined_fragment");
+            assertInvalidUmlInteractionOperandMetadata(
+                    properties -> properties.put("order", 0),
+                    "render_metadata.nodes.op-in-stock.properties.order");
+            assertInvalidUmlInteractionOperandMetadata(
+                    properties -> properties.put("order", 1.25),
+                    "render_metadata.nodes.op-in-stock.properties.order");
+            assertInvalidUmlInteractionOperandMetadata(
+                    properties -> properties.put("fragments", "m1"),
+                    "render_metadata.nodes.op-in-stock.properties.fragments");
+            assertInvalidUmlInteractionOperandMetadata(
+                    properties -> properties.putArray("fragments"),
+                    "render_metadata.nodes.op-in-stock.properties.fragments");
+            assertInvalidUmlInteractionOperandMetadata(
+                    properties -> properties.putArray("fragments").add(3),
+                    "render_metadata.nodes.op-in-stock.properties.fragments");
+            assertInvalidUmlInteractionOperandMetadata(
+                    properties -> properties.putArray("fragments").add("m-missing"),
+                    "render_metadata.nodes.op-in-stock.properties.fragments");
+            assertInvalidUmlInteractionOperandMetadata(
+                    properties -> properties.put("guard", 3),
+                    "render_metadata.nodes.op-in-stock.properties.guard");
+        }
+
+        @Test
+        void rejectsUmlSequenceCombinedFragmentMetadataWithInvalidOperandCount() throws Exception {
+            JsonNode input = umlSequenceFragmentsStyleInput();
+            ((ArrayNode) input.at("/render_metadata/nodes/cf-coupon/properties/operands")).add("op-in-stock");
+
+            JsonNode envelope = error(render(input), "DEDIREN_UML_COMBINED_FRAGMENT_METADATA_INVALID");
+
+            assertThat(envelope.at("/diagnostics/0/path").asText())
+                    .isEqualTo("render_metadata.nodes.cf-coupon.properties.operands");
+        }
+
+        @Test
         void appliesRichPolicyStyles() throws Exception {
             String content = okContent(render(renderInput("fixtures/layout-result/basic.json", "fixtures/render-policy/rich-svg.json")));
             Document document = svgDocument(content);
@@ -761,6 +834,51 @@ class MainTest {
         }
 
         @Test
+        void rendersUmlSequenceCombinedFragments() throws Exception {
+            ObjectNode input = (ObjectNode) renderInput(
+                    "fixtures/layout-result/uml-sequence-fragments.json",
+                    "fixtures/render-policy/uml-svg.json");
+            input.set("render_metadata", fixtureJson("fixtures/render-metadata/uml-sequence-fragments.json"));
+
+            Document document = svgDocument(okContent(render(input)));
+
+            assertThat(combinedFragmentIds(document)).containsExactly(
+                    "cf-availability",
+                    "cf-coupon",
+                    "cf-retry",
+                    "cf-parallel-closeout");
+            assertCombinedFragment(document, "cf-availability", "alt");
+            assertCombinedFragment(document, "cf-coupon", "opt");
+            assertCombinedFragment(document, "cf-retry", "loop");
+            assertCombinedFragment(document, "cf-parallel-closeout", "par");
+            assertOperandGuard(document, "cf-availability", "op-in-stock", "inStock");
+            assertOperandGuard(document, "cf-availability", "op-backorder", "else");
+            assertOperandSeparator(document, "cf-availability", "op-backorder");
+            assertOperandGuard(document, "cf-coupon", "op-coupon", "couponPresent");
+            assertOperandGuard(document, "cf-retry", "op-retry", "whilePaymentPending");
+            assertOperandGuard(document, "cf-parallel-closeout", "op-charge", "charge");
+            assertOperandGuard(document, "cf-parallel-closeout", "op-confirm", "confirm");
+            assertOperandSeparator(document, "cf-parallel-closeout", "op-confirm");
+
+            ObjectNode reorderedInput = reorderUmlSequenceFragmentMetadataNodes(umlSequenceFragmentsStyleInput());
+            Document reorderedDocument = svgDocument(okContent(render(reorderedInput)));
+            assertThat(combinedFragmentStructures(reorderedDocument))
+                    .containsExactlyElementsOf(combinedFragmentStructures(document));
+        }
+
+        @Test
+        void rendersNestedUmlSequenceCombinedFragmentsInsideOwnerFrame() throws Exception {
+            ObjectNode input = (ObjectNode) umlSequenceFragmentsStyleInput();
+            ((ArrayNode) input.at("/render_metadata/nodes/op-backorder/properties/fragments"))
+                    .add("cf-coupon");
+
+            Document document = svgDocument(okContent(render(input)));
+
+            assertCombinedFragment(document, "cf-coupon", "opt");
+            assertCombinedFragmentContainedWithin(document, "cf-coupon", "cf-availability");
+        }
+
+        @Test
         void defaultsOmittedUmlSequenceMessageSortToSynchronousCall() throws Exception {
             JsonNode input = umlSequenceStyleInput();
             ((ObjectNode) input.at("/render_metadata/edges/m1/properties")).remove("message_sort");
@@ -1324,6 +1442,30 @@ class MainTest {
         assertThat(envelope.at("/diagnostics/0/path").asText()).isEqualTo(expectedPath);
     }
 
+    private static void assertInvalidUmlCombinedFragmentMetadata(
+            Consumer<ObjectNode> mutation,
+            String expectedPath) throws Exception {
+        JsonNode input = umlSequenceFragmentsStyleInput();
+        ObjectNode properties = (ObjectNode) input.at("/render_metadata/nodes/cf-availability/properties");
+        mutation.accept(properties);
+
+        JsonNode envelope = error(render(input), "DEDIREN_UML_COMBINED_FRAGMENT_METADATA_INVALID");
+
+        assertThat(envelope.at("/diagnostics/0/path").asText()).isEqualTo(expectedPath);
+    }
+
+    private static void assertInvalidUmlInteractionOperandMetadata(
+            Consumer<ObjectNode> mutation,
+            String expectedPath) throws Exception {
+        JsonNode input = umlSequenceFragmentsStyleInput();
+        ObjectNode properties = (ObjectNode) input.at("/render_metadata/nodes/op-in-stock/properties");
+        mutation.accept(properties);
+
+        JsonNode envelope = error(render(input), "DEDIREN_UML_INTERACTION_OPERAND_METADATA_INVALID");
+
+        assertThat(envelope.at("/diagnostics/0/path").asText()).isEqualTo(expectedPath);
+    }
+
     private static JsonNode archimateStyleInput() throws Exception {
         ObjectNode input = JsonSupport.objectMapper().createObjectNode();
         input.set("layout_result", fixtureJson("fixtures/layout-result/archimate-oef-basic.json"));
@@ -1348,12 +1490,38 @@ class MainTest {
         return input;
     }
 
+    private static JsonNode umlSequenceFragmentsStyleInput() throws Exception {
+        ObjectNode input = JsonSupport.objectMapper().createObjectNode();
+        input.set("layout_result", fixtureJson("fixtures/layout-result/uml-sequence-fragments.json"));
+        input.set("render_metadata", fixtureJson("fixtures/render-metadata/uml-sequence-fragments.json"));
+        input.set("policy", fixtureJson("fixtures/render-policy/uml-svg.json"));
+        return input;
+    }
+
+    private static ObjectNode reorderUmlSequenceFragmentMetadataNodes(JsonNode input) {
+        ObjectNode object = (ObjectNode) input;
+        ObjectNode metadata = (ObjectNode) object.at("/render_metadata");
+        ObjectNode nodes = (ObjectNode) metadata.get("nodes");
+        var entries = new java.util.ArrayList<Map.Entry<String, JsonNode>>();
+        nodes.fields().forEachRemaining(entries::add);
+        java.util.Collections.reverse(entries);
+
+        ObjectNode reordered = JsonSupport.objectMapper().createObjectNode();
+        for (Map.Entry<String, JsonNode> entry : entries) {
+            reordered.set(entry.getKey(), entry.getValue());
+        }
+        metadata.set("nodes", reordered);
+        return object;
+    }
+
     private static boolean isSequenceNodeType(String type) {
         return type.equals("Interaction")
                 || type.equals("Lifeline")
                 || type.equals("ExecutionSpecification")
                 || type.equals("Gate")
-                || type.equals("DestructionOccurrenceSpecification");
+                || type.equals("DestructionOccurrenceSpecification")
+                || type.equals("CombinedFragment")
+                || type.equals("InteractionOperand");
     }
 
     private static JsonNode archimateRenderInput(
@@ -1544,6 +1712,138 @@ class MainTest {
             }
         }
         throw new AssertionError("expected SVG group with " + name + "=" + value);
+    }
+
+    private static void assertCombinedFragment(Document document, String id, String operator) {
+        Element fragment = groupWithAttribute(document, "data-dediren-sequence-combined-fragment", id);
+        assertThat(fragment.getAttribute("data-dediren-sequence-interaction-operator")).isEqualTo(operator);
+        Element shape = childElementWithAttribute(
+                fragment,
+                "rect",
+                "data-dediren-node-shape",
+                "uml_combined_fragment");
+        assertThat(shape.getAttribute("data-dediren-node-shape")).isEqualTo("uml_combined_fragment");
+        childElementWithAttribute(fragment, "path", "data-dediren-sequence-fragment-operator-tab", "true");
+        Element operatorText = childElementWithAttribute(
+                fragment,
+                "text",
+                "data-dediren-sequence-fragment-operator",
+                id);
+        assertThat(operatorText.getTextContent()).isEqualTo(operator);
+    }
+
+    private static void assertOperandGuard(
+            Document document,
+            String fragmentId,
+            String operandId,
+            String guard) {
+        Element fragment = groupWithAttribute(
+                document,
+                "data-dediren-sequence-combined-fragment",
+                fragmentId);
+        Element guardText = childElementWithAttribute(fragment, "text", "data-dediren-sequence-operand", operandId);
+        assertThat(guardText.getAttribute("data-dediren-sequence-operand-guard")).isEqualTo(guard);
+        assertThat(guardText.getTextContent()).isEqualTo("[" + guard + "]");
+    }
+
+    private static void assertOperandSeparator(Document document, String fragmentId, String operandId) {
+        Element fragment = groupWithAttribute(
+                document,
+                "data-dediren-sequence-combined-fragment",
+                fragmentId);
+        childElementWithAttribute(fragment, "line", "data-dediren-sequence-operand-separator", operandId);
+    }
+
+    private static void assertCombinedFragmentContainedWithin(Document document, String innerId, String outerId) {
+        Element inner = combinedFragmentShape(document, innerId);
+        Element outer = combinedFragmentShape(document, outerId);
+
+        double innerX = Double.parseDouble(inner.getAttribute("x"));
+        double innerY = Double.parseDouble(inner.getAttribute("y"));
+        double innerRight = innerX + Double.parseDouble(inner.getAttribute("width"));
+        double innerBottom = innerY + Double.parseDouble(inner.getAttribute("height"));
+        double outerX = Double.parseDouble(outer.getAttribute("x"));
+        double outerY = Double.parseDouble(outer.getAttribute("y"));
+        double outerRight = outerX + Double.parseDouble(outer.getAttribute("width"));
+        double outerBottom = outerY + Double.parseDouble(outer.getAttribute("height"));
+
+        assertThat(innerX).isGreaterThanOrEqualTo(outerX - 0.1);
+        assertThat(innerY).isGreaterThanOrEqualTo(outerY - 0.1);
+        assertThat(innerRight).isLessThanOrEqualTo(outerRight + 0.1);
+        assertThat(innerBottom).isLessThanOrEqualTo(outerBottom + 0.1);
+    }
+
+    private static Element combinedFragmentShape(Document document, String id) {
+        return childElementWithAttribute(
+                groupWithAttribute(document, "data-dediren-sequence-combined-fragment", id),
+                "rect",
+                "data-dediren-node-shape",
+                "uml_combined_fragment");
+    }
+
+    private static java.util.List<String> combinedFragmentIds(Document document) {
+        return combinedFragmentGroups(document).stream()
+                .map(group -> group.getAttribute("data-dediren-sequence-combined-fragment"))
+                .toList();
+    }
+
+    private static java.util.List<String> combinedFragmentStructures(Document document) {
+        var structures = new java.util.ArrayList<String>();
+        for (Element group : combinedFragmentGroups(document)) {
+            StringBuilder structure = new StringBuilder();
+            structure.append(group.getAttribute("data-dediren-sequence-combined-fragment"))
+                    .append("|")
+                    .append(group.getAttribute("data-dediren-sequence-interaction-operator"));
+            for (Element text : childElements(group, "text")) {
+                if (text.hasAttribute("data-dediren-sequence-fragment-operator")) {
+                    structure.append("|operator:")
+                            .append(text.getAttribute("data-dediren-sequence-fragment-operator"))
+                            .append("=")
+                            .append(text.getTextContent());
+                }
+                if (text.hasAttribute("data-dediren-sequence-operand")) {
+                    structure.append("|guard:")
+                            .append(text.getAttribute("data-dediren-sequence-operand"))
+                            .append("=")
+                            .append(text.getAttribute("data-dediren-sequence-operand-guard"))
+                            .append(":")
+                            .append(text.getTextContent());
+                }
+            }
+            for (Element line : childElements(group, "line")) {
+                if (line.hasAttribute("data-dediren-sequence-operand-separator")) {
+                    structure.append("|separator:")
+                            .append(line.getAttribute("data-dediren-sequence-operand-separator"));
+                }
+            }
+            structures.add(structure.toString());
+        }
+        return structures;
+    }
+
+    private static java.util.List<Element> combinedFragmentGroups(Document document) {
+        var matches = new java.util.ArrayList<Element>();
+        var groups = document.getElementsByTagName("g");
+        for (int index = 0; index < groups.getLength(); index++) {
+            Element group = (Element) groups.item(index);
+            if (group.hasAttribute("data-dediren-sequence-combined-fragment")) {
+                matches.add(group);
+            }
+        }
+        return matches;
+    }
+
+    private static Element childElementWithAttribute(
+            Element parent,
+            String tagName,
+            String name,
+            String value) {
+        for (Element element : childElements(parent, tagName)) {
+            if (value.equals(element.getAttribute(name))) {
+                return element;
+            }
+        }
+        throw new AssertionError("expected child <" + tagName + "> with " + name + "=" + value);
     }
 
     private static Element firstChildElement(Element parent, String tagName) {
