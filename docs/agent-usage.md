@@ -46,7 +46,7 @@ guidance in that package.
 {
   "model_schema_version": "model.schema.v1",
   "required_plugins": [
-    { "id": "generic-graph", "version": "0.22.0" }
+    { "id": "generic-graph", "version": "0.22.1" }
   ],
   "nodes": [
     { "id": "client", "type": "generic.actor", "label": "Client", "properties": {} },
@@ -90,8 +90,8 @@ profile and use ArchiMate type names:
 ```json
 {
   "required_plugins": [
-    { "id": "generic-graph", "version": "0.22.0" },
-    { "id": "archimate-oef", "version": "0.22.0" }
+    { "id": "generic-graph", "version": "0.22.1" },
+    { "id": "archimate-oef", "version": "0.22.1" }
   ],
   "plugins": {
     "generic-graph": {
@@ -193,9 +193,8 @@ deployment diagrams are not yet supported.
 ## Runtime Probes
 
 ```bash
-VERSION=0.22.0
-TARGET=x86_64-unknown-linux-gnu
-BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-${VERSION}-${TARGET}
+VERSION=0.22.1
+BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-${VERSION}
 
 "$BUNDLE/bin/dediren" --version
 "$BUNDLE/bin/dediren-plugin-generic-graph" capabilities

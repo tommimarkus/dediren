@@ -46,30 +46,18 @@ release workflows cache that path separately from Maven artifacts.
 The `dist-build` profile creates an agent-ready archive under `dist/`:
 
 ```text
-dist/dediren-agent-bundle-0.22.0-x86_64-unknown-linux-gnu/
-dist/dediren-agent-bundle-0.22.0-x86_64-unknown-linux-gnu.tar.gz
+dist/dediren-agent-bundle-0.22.1/
+dist/dediren-agent-bundle-0.22.1.tar.gz
 ```
 
-Set a supported target with `DEDIREN_DIST_TARGET` when needed:
-
-```bash
-DEDIREN_DIST_TARGET=x86_64-unknown-linux-gnu ./mvnw -pl dist-tool -am verify -Pdist-build
-DEDIREN_DIST_TARGET=x86_64-unknown-linux-gnu ./mvnw -pl dist-tool -am verify -Pdist-smoke
-```
-
-Supported targets are:
-
-- `x86_64-unknown-linux-gnu`
-- `aarch64-unknown-linux-gnu`
-- `aarch64-apple-darwin`
-
-The Java archive contains launch scripts and jars, not a bundled JRE. The host
-target must match the build host.
+The Java archive contains launch scripts and jars, not a bundled JRE. Java 21
+or newer must be available on `PATH` at runtime. The archive is
+platform-neutral and is not tied to CPU architecture.
 
 ## Bundle Layout
 
 ```text
-dediren-agent-bundle-0.22.0-x86_64-unknown-linux-gnu/
+dediren-agent-bundle-0.22.1/
   bin/
     dediren
     dediren-plugin-generic-graph
@@ -101,9 +89,8 @@ the caller's current working directory.
 From an unpacked bundle:
 
 ```bash
-VERSION=0.22.0
-TARGET=x86_64-unknown-linux-gnu
-BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-${VERSION}-${TARGET}
+VERSION=0.22.1
+BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-${VERSION}
 
 "$BUNDLE/bin/dediren" --version
 "$BUNDLE/bin/dediren-plugin-generic-graph" capabilities
@@ -363,12 +350,12 @@ matching annotated tag on that commit:
 git tag -a v<version> -m "Release <version>"
 ```
 
-GitHub Releases publish target-specific archives, `SHA256SUMS`, and CycloneDX
-SBOMs. The release workflow generates GitHub artifact attestations for archives
-and verifies those attestations before publishing. Verify a downloaded archive
+GitHub Releases publish one Java archive, `SHA256SUMS`, and CycloneDX SBOMs.
+The release workflow generates GitHub artifact attestations for archives and
+verifies those attestations before publishing. Verify a downloaded archive
 with:
 
 ```bash
-gh attestation verify dediren-agent-bundle-<version>-<target>.tar.gz \
+gh attestation verify dediren-agent-bundle-<version>.tar.gz \
   --repo tommimarkus/dediren
 ```
