@@ -166,16 +166,16 @@ class MainTest {
         JsonNode input = exportInput(
                 fixtureJson("fixtures/source/valid-uml-sequence-fragments.json"),
                 fixtureJson("fixtures/layout-result/uml-sequence-fragments.json"));
-        ((com.fasterxml.jackson.databind.node.ArrayNode) input.at("/source/nodes/6/properties/uml/fragments"))
+        ((com.fasterxml.jackson.databind.node.ArrayNode) input.at("/source/nodes/7/properties/uml/fragments"))
                 .add("cf-coupon");
 
         String xml = exportXml(input);
 
         assertThat(xml).containsOnlyOnce("xmi:id=\"id-cf-coupon\"");
         assertThat(xml).containsSubsequence(
-                "<operand xmi:id=\"id-op-in-stock\"",
+                "<operand xmi:id=\"id-op-backorder\"",
                 "<fragment xmi:type=\"uml:CombinedFragment\" xmi:id=\"id-cf-coupon\"",
-                "</operand><operand xmi:id=\"id-op-backorder\"");
+                "</operand></fragment></operand></fragment><fragment xmi:type=\"uml:CombinedFragment\" xmi:id=\"id-cf-retry\"");
     }
 
     @Test
