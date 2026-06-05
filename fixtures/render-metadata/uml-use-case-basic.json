@@ -1,0 +1,93 @@
+{
+  "render_metadata_schema_version": "render-metadata.schema.v1",
+  "semantic_profile": "uml",
+  "nodes": {
+    "customer": {
+      "type": "Actor",
+      "source_id": "customer",
+      "properties": {}
+    },
+    "support-agent": {
+      "type": "Actor",
+      "source_id": "support-agent",
+      "properties": {}
+    },
+    "place-order": {
+      "type": "UseCase",
+      "source_id": "place-order",
+      "properties": {
+        "subject": "order-service"
+      }
+    },
+    "track-order": {
+      "type": "UseCase",
+      "source_id": "track-order",
+      "properties": {
+        "subject": "order-service"
+      }
+    },
+    "authenticate-customer": {
+      "type": "UseCase",
+      "source_id": "authenticate-customer",
+      "properties": {
+        "subject": "order-service"
+      }
+    },
+    "apply-discount": {
+      "type": "UseCase",
+      "source_id": "apply-discount",
+      "properties": {
+        "subject": "order-service"
+      }
+    },
+    "cancel-order": {
+      "type": "UseCase",
+      "source_id": "cancel-order",
+      "properties": {
+        "subject": "order-service"
+      }
+    },
+    "payment-extension": {
+      "type": "ExtensionPoint",
+      "source_id": "payment-extension",
+      "properties": {
+        "use_case": "place-order"
+      }
+    }
+  },
+  "edges": {
+    "customer-place-order": {
+      "type": "Association",
+      "source_id": "customer-place-order",
+      "properties": {}
+    },
+    "customer-track-order": {
+      "type": "Association",
+      "source_id": "customer-track-order",
+      "properties": {}
+    },
+    "support-cancel-order": {
+      "type": "Association",
+      "source_id": "support-cancel-order",
+      "properties": {}
+    },
+    "include-authentication": {
+      "type": "Include",
+      "source_id": "include-authentication",
+      "properties": {}
+    },
+    "extend-discount": {
+      "type": "Extend",
+      "source_id": "extend-discount",
+      "properties": {
+        "extension_point": "payment-extension"
+      }
+    }
+  },
+  "groups": {
+    "order-service-boundary": {
+      "type": "Class",
+      "source_id": "order-service"
+    }
+  }
+}

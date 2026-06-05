@@ -44,7 +44,9 @@ class UmlValidationTest {
                 "ControlFlow",
                 "ObjectFlow",
                 "Message",
-                "Transition");
+                "Transition",
+                "Include",
+                "Extend");
     }
 
     @Test
@@ -86,6 +88,88 @@ class UmlValidationTest {
         Uml.validateRelationshipEndpointTypes("Transition", "Pseudostate", "State", "$.relationship");
         Uml.validateRelationshipEndpointTypes("Transition", "State", "FinalState", "$.relationship");
         Uml.validateSource(fixture.source(), fixture.pluginData());
+    }
+
+    @Test
+    void acceptsUmlUseCaseVocabulary() throws Exception {
+        Fixture fixture = loadUmlUseCaseFixture();
+
+        for (String type : new String[]{"Actor", "UseCase", "ExtensionPoint"}) {
+            Uml.validateElementType(type, "$.type");
+        }
+        Uml.validateRelationshipType("Include", "$.type");
+        Uml.validateRelationshipType("Extend", "$.type");
+        Uml.validateRelationshipEndpointTypes("Association", "Actor", "UseCase", "$.relationship");
+        Uml.validateRelationshipEndpointTypes("Association", "UseCase", "Actor", "$.relationship");
+        Uml.validateRelationshipEndpointTypes("Include", "UseCase", "UseCase", "$.relationship");
+        Uml.validateRelationshipEndpointTypes("Extend", "UseCase", "UseCase", "$.relationship");
+        Uml.validateSource(fixture.source(), fixture.pluginData());
+    }
+
+    @Test
+    void rejectsIncludeFromActorEndpoint() throws Exception {
+        Fixture fixture = loadMutatedUmlUseCaseFixture(
+                source -> relationshipById(source, "include-authentication").put("source", "customer"));
+
+        UmlValidationException error = org.junit.jupiter.api.Assertions.assertThrows(
+                UmlValidationException.class,
+                () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+
+        assertThat(error.code()).isEqualTo("DEDIREN_UML_RELATIONSHIP_ENDPOINT_UNSUPPORTED");
+        assertThat(error.value()).isEqualTo("Include: Actor -> UseCase");
+        assertThat(error.path()).isEqualTo("$.relationships[3]");
+    }
+
+    @Test
+    void rejectsExtendWithExtensionPointOwnedByDifferentUseCase() throws Exception {
+        Fixture fixture = loadMutatedUmlUseCaseFixture(
+                source -> nodeUmlProperties(source, "payment-extension").put("use_case", "track-order"));
+
+        UmlValidationException error = org.junit.jupiter.api.Assertions.assertThrows(
+                UmlValidationException.class,
+                () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+
+        assertThat(error.code()).isEqualTo("DEDIREN_UML_RELATIONSHIP_PROPERTY_INVALID");
+        assertThat(error.path()).isEqualTo("$.relationships[4].properties.uml.extension_point");
+    }
+
+    @Test
+    void rejectsExtensionPointWithoutOwningUseCase() throws Exception {
+        Fixture fixture = loadMutatedUmlUseCaseFixture(
+                source -> nodeUmlProperties(source, "payment-extension").remove("use_case"));
+
+        UmlValidationException error = org.junit.jupiter.api.Assertions.assertThrows(
+                UmlValidationException.class,
+                () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+
+        assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
+        assertThat(error.path()).isEqualTo("$.nodes[8].properties.uml.use_case");
+    }
+
+    @Test
+    void rejectsUseCaseSubjectThatIsNotStructuralClassifier() throws Exception {
+        Fixture fixture = loadMutatedUmlUseCaseFixture(
+                source -> nodeUmlProperties(source, "place-order").put("subject", "customer"));
+
+        UmlValidationException error = org.junit.jupiter.api.Assertions.assertThrows(
+                UmlValidationException.class,
+                () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+
+        assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
+        assertThat(error.path()).isEqualTo("$.nodes[3].properties.uml.subject");
+    }
+
+    @Test
+    void rejectsUseCaseViewWithSubjectClassifierAsSelectedNode() throws Exception {
+        Fixture fixture = loadMutatedUmlUseCaseFixture(
+                source -> ((ArrayNode) source.at("/plugins/generic-graph/views/0/nodes")).add("order-service"));
+
+        UmlValidationException error = org.junit.jupiter.api.Assertions.assertThrows(
+                UmlValidationException.class,
+                () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+
+        assertThat(error.code()).isEqualTo("DEDIREN_UML_VIEW_KIND_UNSUPPORTED_ELEMENT");
+        assertThat(error.value()).isEqualTo("Class in uml-use-case");
     }
 
     @Test
@@ -984,6 +1068,12 @@ class UmlValidationTest {
                 "generic-graph");
     }
 
+    private static Fixture loadUmlUseCaseFixture() throws Exception {
+        return fixture(
+                Files.readString(workspaceRoot().resolve("fixtures/source/valid-uml-use-case-basic.json")),
+                "generic-graph");
+    }
+
     private static Fixture loadMutatedUmlSequenceFixture(java.util.function.Consumer<ObjectNode> mutate)
             throws Exception {
         var sourceJson = (ObjectNode) JsonSupport.objectMapper().readTree(
@@ -1011,6 +1101,13 @@ class UmlValidationTest {
     private static Fixture loadMutatedUmlStateMachineFixture(Consumer<ObjectNode> mutate) throws Exception {
         ObjectNode source = (ObjectNode) JsonSupport.objectMapper().readTree(
                 Files.readString(workspaceRoot().resolve("fixtures/source/valid-uml-state-machine-basic.json")));
+        mutate.accept(source);
+        return fixture(JsonSupport.objectMapper().writeValueAsString(source), "generic-graph");
+    }
+
+    private static Fixture loadMutatedUmlUseCaseFixture(Consumer<ObjectNode> mutate) throws Exception {
+        ObjectNode source = (ObjectNode) JsonSupport.objectMapper().readTree(
+                Files.readString(workspaceRoot().resolve("fixtures/source/valid-uml-use-case-basic.json")));
         mutate.accept(source);
         return fixture(JsonSupport.objectMapper().writeValueAsString(source), "generic-graph");
     }

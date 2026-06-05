@@ -1,0 +1,172 @@
+{
+  "layout_result_schema_version": "layout-result.schema.v1",
+  "view_id": "use-case-view",
+  "nodes": [
+    {
+      "id": "customer",
+      "source_id": "customer",
+      "projection_id": "customer",
+      "x": 36.0,
+      "y": 104.0,
+      "width": 80.0,
+      "height": 120.0,
+      "label": "Customer"
+    },
+    {
+      "id": "support-agent",
+      "source_id": "support-agent",
+      "projection_id": "support-agent",
+      "x": 36.0,
+      "y": 312.0,
+      "width": 80.0,
+      "height": 120.0,
+      "label": "Support Agent"
+    },
+    {
+      "id": "place-order",
+      "source_id": "place-order",
+      "projection_id": "place-order",
+      "x": 276.0,
+      "y": 84.0,
+      "width": 160.0,
+      "height": 72.0,
+      "label": "Place Order"
+    },
+    {
+      "id": "track-order",
+      "source_id": "track-order",
+      "projection_id": "track-order",
+      "x": 276.0,
+      "y": 184.0,
+      "width": 160.0,
+      "height": 72.0,
+      "label": "Track Order"
+    },
+    {
+      "id": "authenticate-customer",
+      "source_id": "authenticate-customer",
+      "projection_id": "authenticate-customer",
+      "x": 560.0,
+      "y": 84.0,
+      "width": 180.0,
+      "height": 72.0,
+      "label": "Authenticate Customer"
+    },
+    {
+      "id": "apply-discount",
+      "source_id": "apply-discount",
+      "projection_id": "apply-discount",
+      "x": 560.0,
+      "y": 204.0,
+      "width": 160.0,
+      "height": 72.0,
+      "label": "Apply Discount"
+    },
+    {
+      "id": "cancel-order",
+      "source_id": "cancel-order",
+      "projection_id": "cancel-order",
+      "x": 276.0,
+      "y": 340.0,
+      "width": 160.0,
+      "height": 72.0,
+      "label": "Cancel Order"
+    },
+    {
+      "id": "payment-extension",
+      "source_id": "payment-extension",
+      "projection_id": "payment-extension",
+      "x": 560.0,
+      "y": 320.0,
+      "width": 140.0,
+      "height": 40.0,
+      "label": "payment authorized"
+    }
+  ],
+  "edges": [
+    {
+      "id": "customer-place-order",
+      "source": "customer",
+      "target": "place-order",
+      "source_id": "customer-place-order",
+      "projection_id": "customer-place-order",
+      "routing_hints": [],
+      "points": [
+        { "x": 116.0, "y": 164.0 },
+        { "x": 276.0, "y": 120.0 }
+      ],
+      "label": ""
+    },
+    {
+      "id": "customer-track-order",
+      "source": "customer",
+      "target": "track-order",
+      "source_id": "customer-track-order",
+      "projection_id": "customer-track-order",
+      "routing_hints": [],
+      "points": [
+        { "x": 116.0, "y": 184.0 },
+        { "x": 276.0, "y": 220.0 }
+      ],
+      "label": ""
+    },
+    {
+      "id": "support-cancel-order",
+      "source": "support-agent",
+      "target": "cancel-order",
+      "source_id": "support-cancel-order",
+      "projection_id": "support-cancel-order",
+      "routing_hints": [],
+      "points": [
+        { "x": 116.0, "y": 372.0 },
+        { "x": 276.0, "y": 376.0 }
+      ],
+      "label": ""
+    },
+    {
+      "id": "include-authentication",
+      "source": "place-order",
+      "target": "authenticate-customer",
+      "source_id": "include-authentication",
+      "projection_id": "include-authentication",
+      "routing_hints": [],
+      "points": [
+        { "x": 436.0, "y": 120.0 },
+        { "x": 560.0, "y": 120.0 }
+      ],
+      "label": "<<include>>"
+    },
+    {
+      "id": "extend-discount",
+      "source": "apply-discount",
+      "target": "place-order",
+      "source_id": "extend-discount",
+      "projection_id": "extend-discount",
+      "routing_hints": [],
+      "points": [
+        { "x": 560.0, "y": 240.0 },
+        { "x": 498.0, "y": 240.0 },
+        { "x": 498.0, "y": 120.0 },
+        { "x": 436.0, "y": 120.0 }
+      ],
+      "label": "<<extend>>"
+    }
+  ],
+  "groups": [
+    {
+      "id": "order-service-boundary",
+      "source_id": "order-service",
+      "projection_id": "order-service-boundary",
+      "provenance": {
+        "semantic_backed": {
+          "source_id": "order-service"
+        }
+      },
+      "x": 236.0,
+      "y": 36.0,
+      "width": 544.0,
+      "height": 420.0,
+      "label": "Order Service"
+    }
+  ]
+}

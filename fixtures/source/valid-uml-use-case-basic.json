@@ -1,0 +1,205 @@
+{
+  "model_schema_version": "model.schema.v1",
+  "required_plugins": [
+    {
+      "id": "generic-graph",
+      "version": "0.24.0"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "order-service",
+      "type": "Class",
+      "label": "Order Service",
+      "properties": {
+        "uml": {
+          "use_case_subject": true
+        }
+      }
+    },
+    {
+      "id": "customer",
+      "type": "Actor",
+      "label": "Customer",
+      "properties": {
+        "uml": {}
+      }
+    },
+    {
+      "id": "support-agent",
+      "type": "Actor",
+      "label": "Support Agent",
+      "properties": {
+        "uml": {}
+      }
+    },
+    {
+      "id": "place-order",
+      "type": "UseCase",
+      "label": "Place Order",
+      "properties": {
+        "uml": {
+          "subject": "order-service"
+        }
+      }
+    },
+    {
+      "id": "track-order",
+      "type": "UseCase",
+      "label": "Track Order",
+      "properties": {
+        "uml": {
+          "subject": "order-service"
+        }
+      }
+    },
+    {
+      "id": "authenticate-customer",
+      "type": "UseCase",
+      "label": "Authenticate Customer",
+      "properties": {
+        "uml": {
+          "subject": "order-service"
+        }
+      }
+    },
+    {
+      "id": "apply-discount",
+      "type": "UseCase",
+      "label": "Apply Discount",
+      "properties": {
+        "uml": {
+          "subject": "order-service"
+        }
+      }
+    },
+    {
+      "id": "cancel-order",
+      "type": "UseCase",
+      "label": "Cancel Order",
+      "properties": {
+        "uml": {
+          "subject": "order-service"
+        }
+      }
+    },
+    {
+      "id": "payment-extension",
+      "type": "ExtensionPoint",
+      "label": "payment authorized",
+      "properties": {
+        "uml": {
+          "use_case": "place-order"
+        }
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "id": "customer-place-order",
+      "type": "Association",
+      "source": "customer",
+      "target": "place-order",
+      "label": "",
+      "properties": {
+        "uml": {}
+      }
+    },
+    {
+      "id": "customer-track-order",
+      "type": "Association",
+      "source": "customer",
+      "target": "track-order",
+      "label": "",
+      "properties": {
+        "uml": {}
+      }
+    },
+    {
+      "id": "support-cancel-order",
+      "type": "Association",
+      "source": "support-agent",
+      "target": "cancel-order",
+      "label": "",
+      "properties": {
+        "uml": {}
+      }
+    },
+    {
+      "id": "include-authentication",
+      "type": "Include",
+      "source": "place-order",
+      "target": "authenticate-customer",
+      "label": "include",
+      "properties": {
+        "uml": {}
+      }
+    },
+    {
+      "id": "extend-discount",
+      "type": "Extend",
+      "source": "apply-discount",
+      "target": "place-order",
+      "label": "extend",
+      "properties": {
+        "uml": {
+          "extension_point": "payment-extension"
+        }
+      }
+    }
+  ],
+  "plugins": {
+    "generic-graph": {
+      "semantic_profile": "uml",
+      "views": [
+        {
+          "id": "use-case-view",
+          "label": "Order Service Use Cases",
+          "kind": "uml-use-case",
+          "nodes": [
+            "customer",
+            "support-agent",
+            "place-order",
+            "track-order",
+            "authenticate-customer",
+            "apply-discount",
+            "cancel-order",
+            "payment-extension"
+          ],
+          "relationships": [
+            "customer-place-order",
+            "customer-track-order",
+            "support-cancel-order",
+            "include-authentication",
+            "extend-discount"
+          ],
+          "layout_preferences": {
+            "direction": "right",
+            "density": "readable",
+            "routing": {
+              "style": "orthogonal",
+              "profile": "readable",
+              "endpoint_merging": "off"
+            }
+          },
+          "groups": [
+            {
+              "id": "order-service-boundary",
+              "label": "Order Service",
+              "role": "semantic-boundary",
+              "semantic_source_id": "order-service",
+              "members": [
+                "place-order",
+                "track-order",
+                "authenticate-customer",
+                "apply-discount",
+                "cancel-order",
+                "payment-extension"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

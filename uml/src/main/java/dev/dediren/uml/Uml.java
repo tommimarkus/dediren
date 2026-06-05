@@ -52,6 +52,10 @@ public final class Uml {
             "State",
             "FinalState",
             "Pseudostate");
+    private static final Set<String> USE_CASE_TYPES = Set.of(
+            "Actor",
+            "UseCase",
+            "ExtensionPoint");
     private static final Set<String> STATE_VERTEX_TYPES = Set.of(
             "State",
             "FinalState",
@@ -88,7 +92,9 @@ public final class Uml {
             "ControlFlow",
             "ObjectFlow",
             "Message",
-            "Transition");
+            "Transition",
+            "Include",
+            "Extend");
     private static final List<String> STRUCTURAL_RELATIONSHIP_TYPES = List.of(
             "Association",
             "Composition",
@@ -197,6 +203,7 @@ public final class Uml {
                     context);
         }
         validateTransitionRegionConsistency(source.relationships(), context);
+        validateUseCaseRelationships(source.relationships(), context);
         validateCombinedFragmentNesting(source.nodes(), context);
         validateInteractionOperandOwnerSelection(source.nodes(), context);
         validateInteractionFragmentOwnership(source.nodes(), context);
@@ -222,6 +229,9 @@ public final class Uml {
             }
             if (view.kind() == GenericGraphViewKind.UML_STATE_MACHINE) {
                 validateUmlStateMachineViewProperties(viewIndex, view, context);
+            }
+            if (view.kind() == GenericGraphViewKind.UML_USE_CASE) {
+                validateUmlUseCaseViewProperties(viewIndex, view, context);
             }
         }
     }
@@ -251,6 +261,16 @@ public final class Uml {
         } else if (isStateVertexType(nodeType)) {
             validateStateVertexProperties(
                     nodeType,
+                    umlProperties,
+                    path,
+                    context);
+        } else if ("UseCase".equals(nodeType)) {
+            validateUseCaseProperties(
+                    umlProperties,
+                    path,
+                    context);
+        } else if ("ExtensionPoint".equals(nodeType)) {
+            validateExtensionPointProperties(
                     umlProperties,
                     path,
                     context);
@@ -293,6 +313,28 @@ public final class Uml {
         for (int relationshipIndex = 0; relationshipIndex < view.relationships().size(); relationshipIndex++) {
             String relationshipId = view.relationships().get(relationshipIndex);
             if (!"Transition".equals(context.relationshipTypes().get(relationshipId))) {
+                continue;
+            }
+            String source = context.relationshipSources().get(relationshipId);
+            String target = context.relationshipTargets().get(relationshipId);
+            if (!selectedNodeIds.contains(source) || !selectedNodeIds.contains(target)) {
+                throw new UmlValidationException(
+                        UmlTypeKind.RELATIONSHIP_ENDPOINT,
+                        relationshipId,
+                        "$.plugins.generic-graph.views[" + viewIndex + "].relationships[" + relationshipIndex + "]");
+            }
+        }
+    }
+
+    private static void validateUmlUseCaseViewProperties(
+            int viewIndex,
+            GenericGraphView view,
+            ValidationContext context) throws UmlValidationException {
+        var selectedNodeIds = new HashSet<>(view.nodes());
+        for (int relationshipIndex = 0; relationshipIndex < view.relationships().size(); relationshipIndex++) {
+            String relationshipId = view.relationships().get(relationshipIndex);
+            String relationshipType = context.relationshipTypes().get(relationshipId);
+            if (!isUseCaseRelationshipType(relationshipType)) {
                 continue;
             }
             String source = context.relationshipSources().get(relationshipId);
@@ -383,7 +425,7 @@ public final class Uml {
 
     public static void validateElementType(String value, String path) throws UmlValidationException {
         if (!isStructuralType(value) && !isActivityType(value) && !isSequenceType(value)
-                && !isStateMachineType(value)) {
+                && !isStateMachineType(value) && !isUseCaseType(value)) {
             throw new UmlValidationException(UmlTypeKind.ELEMENT, value, path);
         }
     }
@@ -401,7 +443,8 @@ public final class Uml {
             String path) throws UmlValidationException {
         boolean endpointsSupported;
         if (STRUCTURAL_RELATIONSHIP_TYPES.contains(relationshipType)) {
-            endpointsSupported = isStructuralType(sourceType) && isStructuralType(targetType);
+            endpointsSupported = isStructuralType(sourceType) && isStructuralType(targetType)
+                    || "Association".equals(relationshipType) && isActorUseCasePair(sourceType, targetType);
         } else if (ACTIVITY_FLOW_TYPES.contains(relationshipType)) {
             endpointsSupported = isActivityType(sourceType) && isActivityType(targetType);
         } else if ("Message".equals(relationshipType)) {
@@ -409,6 +452,8 @@ public final class Uml {
         } else if ("Transition".equals(relationshipType)) {
             endpointsSupported = TRANSITION_SOURCE_TYPES.contains(sourceType)
                     && TRANSITION_TARGET_TYPES.contains(targetType);
+        } else if ("Include".equals(relationshipType) || "Extend".equals(relationshipType)) {
+            endpointsSupported = "UseCase".equals(sourceType) && "UseCase".equals(targetType);
         } else {
             endpointsSupported = false;
         }
@@ -503,6 +548,36 @@ public final class Uml {
                 throw new UmlValidationException(UmlTypeKind.ELEMENT_PROPERTY, kind, umlPath + ".kind");
             }
         }
+    }
+
+    private static void validateUseCaseProperties(
+            JsonNode umlProperties,
+            String path,
+            ValidationContext context) throws UmlValidationException {
+        String umlPath = path + ".properties.uml";
+        JsonNode subject = optionalProperty(umlProperties, "subject");
+        if (subject == null) {
+            return;
+        }
+        if (!subject.isTextual() || !isUseCaseSubjectClassifier(context.nodeTypes().get(subject.asText()))) {
+            throw new UmlValidationException(
+                    UmlTypeKind.ELEMENT_PROPERTY,
+                    propertyValue(subject, "UseCase.subject"),
+                    umlPath + ".subject");
+        }
+    }
+
+    private static void validateExtensionPointProperties(
+            JsonNode umlProperties,
+            String path,
+            ValidationContext context) throws UmlValidationException {
+        String umlPath = path + ".properties.uml";
+        String useCase = requiredTextProperty(
+                umlProperties,
+                "use_case",
+                "ExtensionPoint.use_case",
+                umlPath);
+        requireNodeType(useCase, "UseCase", context.nodeTypes(), umlPath + ".use_case");
     }
 
     private static void validateCombinedFragmentProperties(
@@ -1033,6 +1108,33 @@ public final class Uml {
         }
     }
 
+    private static void validateUseCaseRelationships(
+            List<SourceRelationship> relationships,
+            ValidationContext context) throws UmlValidationException {
+        for (int relationshipIndex = 0; relationshipIndex < relationships.size(); relationshipIndex++) {
+            SourceRelationship relationship = relationships.get(relationshipIndex);
+            if (!"Extend".equals(relationship.type())) {
+                continue;
+            }
+            String extensionPoint = readTextProperty(
+                    context.relationshipUmlProperties().get(relationship.id()),
+                    "extension_point");
+            if (extensionPoint == null) {
+                continue;
+            }
+            String path = "$.relationships[" + relationshipIndex + "].properties.uml.extension_point";
+            if (!"ExtensionPoint".equals(context.nodeTypes().get(extensionPoint))
+                    || !relationship.target().equals(readTextProperty(
+                            context.nodeUmlProperties().get(extensionPoint),
+                            "use_case"))) {
+                throw new UmlValidationException(
+                        UmlTypeKind.RELATIONSHIP_PROPERTY,
+                        extensionPoint,
+                        path);
+            }
+        }
+    }
+
     private static void validateFragmentCoverage(
             String ownerCombinedFragment,
             String fragmentId,
@@ -1421,6 +1523,7 @@ public final class Uml {
             case UML_ACTIVITY -> isActivityType(nodeType);
             case UML_SEQUENCE -> isSequenceType(nodeType);
             case UML_STATE_MACHINE -> isStateVertexType(nodeType);
+            case UML_USE_CASE -> isUseCaseViewNodeType(nodeType);
         };
         if (!supported) {
             throw new UmlValidationException(
@@ -1482,8 +1585,32 @@ public final class Uml {
         return STATE_MACHINE_TYPES.contains(value);
     }
 
+    private static boolean isUseCaseType(String value) {
+        return USE_CASE_TYPES.contains(value);
+    }
+
     private static boolean isStateVertexType(String value) {
         return STATE_VERTEX_TYPES.contains(value);
+    }
+
+    private static boolean isUseCaseViewNodeType(String value) {
+        return USE_CASE_TYPES.contains(value);
+    }
+
+    private static boolean isUseCaseRelationshipType(String value) {
+        return "Association".equals(value) || "Include".equals(value) || "Extend".equals(value);
+    }
+
+    private static boolean isActorUseCasePair(String sourceType, String targetType) {
+        return "Actor".equals(sourceType) && "UseCase".equals(targetType)
+                || "UseCase".equals(sourceType) && "Actor".equals(targetType);
+    }
+
+    private static boolean isUseCaseSubjectClassifier(String value) {
+        return "Class".equals(value)
+                || "Interface".equals(value)
+                || "DataType".equals(value)
+                || "Enumeration".equals(value);
     }
 
     private static boolean isMessageEndpoint(String sourceType, String targetType) {
@@ -1508,6 +1635,7 @@ public final class Uml {
             case UML_ACTIVITY -> "uml-activity";
             case UML_SEQUENCE -> "uml-sequence";
             case UML_STATE_MACHINE -> "uml-state-machine";
+            case UML_USE_CASE -> "uml-use-case";
         };
     }
 

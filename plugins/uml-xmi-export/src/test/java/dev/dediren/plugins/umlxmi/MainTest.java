@@ -162,6 +162,45 @@ class MainTest {
     }
 
     @Test
+    void exportsUseCaseActorsUseCasesAndRelationships() throws Exception {
+        JsonNode input = exportInput(
+                fixtureJson("fixtures/source/valid-uml-use-case-basic.json"),
+                fixtureJson("fixtures/layout-result/uml-use-case-basic.json"));
+
+        String xml = exportXml(input);
+
+        assertThat(xml).isEqualTo(fixture("fixtures/export/uml-use-case-basic.xmi"));
+        assertThat(xml).contains(
+                "xmi:type=\"uml:Actor\"",
+                "xmi:type=\"uml:UseCase\"",
+                "subject=\"id-order-service\"",
+                "<extensionPoint xmi:id=\"id-payment-extension\" name=\"payment authorized\"/>",
+                "<include xmi:id=\"id-include-authentication\" name=\"include\" addition=\"id-authenticate-customer\"/>",
+                "<extend xmi:id=\"id-extend-discount\" name=\"extend\""
+                        + " extendedCase=\"id-place-order\" extensionLocation=\"id-payment-extension\"/>");
+        assertThat(xml).doesNotContain("xmi:type=\"uml:ExtensionPoint\"");
+    }
+
+    @Test
+    void rejectsUseCaseExtendWithExtensionPointOwnedByAnotherUseCase() throws Exception {
+        JsonNode input = exportInput(
+                fixtureJson("fixtures/source/valid-uml-use-case-basic.json"),
+                fixtureJson("fixtures/layout-result/uml-use-case-basic.json"));
+        ((ObjectNode) input.at("/source/nodes/8/properties/uml")).put("use_case", "track-order");
+
+        PluginResult result = Main.executeForTesting(
+                new String[]{"export"},
+                JsonSupport.objectMapper().writeValueAsString(input),
+                envWithXmiSchema());
+
+        assertThat(result.exitCode()).isEqualTo(3);
+        assertError(
+                result,
+                "DEDIREN_UML_RELATIONSHIP_PROPERTY_INVALID",
+                "$.relationships[4].properties.uml.extension_point");
+    }
+
+    @Test
     void keepsSequenceViewRelationshipsScopedToLayoutEdges() throws Exception {
         JsonNode input = exportInput(
                 fixtureJson("fixtures/source/valid-uml-sequence-fragments.json"),

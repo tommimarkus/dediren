@@ -35,7 +35,7 @@ class MainTest {
         CliResult result = Main.executeForTesting(new String[]{"--version"}, "");
 
         assertThat(result.exitCode()).isZero();
-        assertThat(result.stdout()).contains("dediren 0.23.0");
+        assertThat(result.stdout()).contains("dediren 0.24.0");
     }
 
     @Test
@@ -366,6 +366,131 @@ class MainTest {
         String xmi = exportData.at("/content").asText();
         assertThat(exportData.at("/artifact_kind").asText()).isEqualTo("uml-xmi+xml");
         assertThat(xmi).contains("uml:StateMachine", "id-order-lifecycle", "id-t-submit");
+    }
+
+    @Test
+    void useCaseFixtureRunsThroughDocumentedCliWorkflow() throws Exception {
+        Map<String, String> env = sequenceWorkflowEnv();
+        Path root = workspaceRoot();
+        Path source = root.resolve("fixtures/source/valid-uml-use-case-basic.json");
+
+        CliResult validate = Main.executeForTesting(new String[]{
+                "validate",
+                "--plugin",
+                "generic-graph",
+                "--profile",
+                "uml",
+                "--input",
+                source.toString()
+        }, "", env);
+
+        JsonNode validateData = okData(validate);
+        assertThat(validateData.at("/semantic_profile").asText()).isEqualTo("uml");
+        assertThat(validateData.at("/node_count").asInt()).isEqualTo(9);
+        assertThat(validateData.at("/relationship_count").asInt()).isEqualTo(5);
+
+        CliResult layoutRequest = Main.executeForTesting(new String[]{
+                "project",
+                "--plugin",
+                "generic-graph",
+                "--target",
+                "layout-request",
+                "--view",
+                "use-case-view",
+                "--input",
+                source.toString()
+        }, "", env);
+
+        JsonNode layoutRequestData = okData(layoutRequest);
+        assertThat(layoutRequestData.at("/view_id").asText()).isEqualTo("use-case-view");
+        assertThat(layoutRequestData.get("nodes"))
+                .extracting(node -> node.at("/id").asText())
+                .contains("customer", "place-order", "payment-extension");
+        Path layoutRequestFile = writeStdout("use-case-layout-request.json", layoutRequest);
+
+        CliResult renderMetadata = Main.executeForTesting(new String[]{
+                "project",
+                "--plugin",
+                "generic-graph",
+                "--target",
+                "render-metadata",
+                "--view",
+                "use-case-view",
+                "--input",
+                source.toString()
+        }, "", env);
+
+        JsonNode renderMetadataData = okData(renderMetadata);
+        assertThat(renderMetadataData.at("/nodes/customer/type").asText()).isEqualTo("Actor");
+        assertThat(renderMetadataData.at("/nodes/place-order/type").asText()).isEqualTo("UseCase");
+        assertThat(renderMetadataData.at("/nodes/payment-extension/type").asText()).isEqualTo("ExtensionPoint");
+        assertThat(renderMetadataData.at("/edges/include-authentication/type").asText()).isEqualTo("Include");
+        assertThat(renderMetadataData.at("/edges/extend-discount/properties/extension_point").asText())
+                .isEqualTo("payment-extension");
+        Path renderMetadataFile = writeStdout("use-case-render-metadata.json", renderMetadata);
+
+        CliResult layout = Main.executeForTesting(new String[]{
+                "layout",
+                "--plugin",
+                "elk-layout",
+                "--input",
+                layoutRequestFile.toString()
+        }, "", env);
+
+        JsonNode layoutData = okData(layout);
+        assertThat(layoutData.at("/view_id").asText()).isEqualTo("use-case-view");
+        assertThat(layoutData.get("nodes"))
+                .extracting(node -> node.at("/id").asText())
+                .contains("customer", "place-order", "authenticate-customer");
+        Path layoutFile = writeStdout("use-case-layout-result.json", layout);
+
+        CliResult render = Main.executeForTesting(new String[]{
+                "render",
+                "--plugin",
+                "svg-render",
+                "--policy",
+                root.resolve("fixtures/render-policy/uml-svg.json").toString(),
+                "--metadata",
+                renderMetadataFile.toString(),
+                "--input",
+                layoutFile.toString()
+        }, "", env);
+
+        JsonNode renderData = okData(render);
+        String svg = renderData.at("/content").asText();
+        assertThat(renderData.at("/artifact_kind").asText()).isEqualTo("svg");
+        assertThat(svg).contains(
+                "<svg",
+                "Order Service",
+                "data-dediren-node-id=\"customer\"",
+                "data-dediren-node-shape=\"uml_actor\"",
+                "data-dediren-node-shape=\"uml_use_case\"",
+                "data-dediren-node-id=\"payment-extension\"",
+                "data-dediren-edge-id=\"include-authentication\"",
+                "data-dediren-edge-id=\"extend-discount\"");
+
+        CliResult export = Main.executeForTesting(new String[]{
+                "export",
+                "--plugin",
+                "uml-xmi",
+                "--policy",
+                root.resolve("fixtures/export-policy/default-uml-xmi.json").toString(),
+                "--source",
+                source.toString(),
+                "--layout",
+                layoutFile.toString()
+        }, "", env);
+
+        JsonNode exportData = okData(export);
+        String xmi = exportData.at("/content").asText();
+        assertThat(exportData.at("/artifact_kind").asText()).isEqualTo("uml-xmi+xml");
+        assertThat(xmi).contains(
+                "xmi:type=\"uml:Actor\"",
+                "xmi:type=\"uml:UseCase\"",
+                "subject=\"id-order-service\"",
+                "xmi:id=\"id-include-authentication\"",
+                "xmi:id=\"id-extend-discount\"",
+                "extensionLocation=\"id-payment-extension\"");
     }
 
     private Path writeStdout(String fileName, CliResult result) throws Exception {
