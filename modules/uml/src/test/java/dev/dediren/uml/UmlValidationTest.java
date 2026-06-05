@@ -338,6 +338,28 @@ class UmlValidationTest {
     }
 
     @Test
+    void rejectsUnselectedOperandMissingFromOwningCombinedFragmentOperands() throws Exception {
+        Fixture fixture = loadMutatedUmlSequenceFragmentsFixture(source -> {
+            replaceTextArray(nodeUmlProperties(source, "op-in-stock"), "fragments", "m1");
+            addInteractionOperand(
+                    source,
+                    "op-availability-hidden",
+                    "Availability Hidden",
+                    "cf-availability",
+                    3,
+                    "m2");
+            removeViewNode(source, "op-availability-hidden");
+        });
+
+        UmlValidationException error = org.junit.jupiter.api.Assertions.assertThrows(
+                UmlValidationException.class,
+                () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+
+        assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
+        assertThat(error.path()).isEqualTo("$.nodes[15].properties.uml.combined_fragment");
+    }
+
+    @Test
     void rejectsOperandInteractionDifferentFromOwningFragment() throws Exception {
         Fixture fixture = loadMutatedUmlSequenceFragmentsFixture(source -> {
             addSequenceNode(source, "interaction-return-order", "Interaction", "Return Order");
@@ -751,6 +773,27 @@ class UmlValidationTest {
     }
 
     @Test
+    void acceptsDuplicateMessageSequenceAcrossInteractions() throws Exception {
+        Fixture fixture = loadMutatedUmlSequenceFixture(source -> {
+            addSequenceNode(source, "interaction-return-order", "Interaction", "Return Order");
+            addSequenceNode(source, "return-customer", "Lifeline", "Return Customer");
+            addSequenceNode(source, "return-service", "Lifeline", "Return Service");
+            nodeUmlProperties(source, "return-customer").put("interaction", "interaction-return-order");
+            nodeUmlProperties(source, "return-service").put("interaction", "interaction-return-order");
+            addSequenceMessage(
+                    source,
+                    "return-m1",
+                    "return-customer",
+                    "return-service",
+                    "requestReturn",
+                    "interaction-return-order",
+                    1);
+        });
+
+        Uml.validateSource(fixture.source(), fixture.pluginData());
+    }
+
+    @Test
     void rejectsUnknownMessageSort() throws Exception {
         Fixture fixture = loadMutatedUmlSequenceFixture(
                 source -> firstMessageUmlProperties(source).put("message_sort", "lostMessage"));
@@ -940,6 +983,33 @@ class UmlValidationTest {
                 .set("uml", JsonSupport.objectMapper().createObjectNode()));
         ((ArrayNode) source.get("nodes")).add(node);
         ((ArrayNode) source.get("plugins").get("generic-graph").get("views").get(0).get("nodes")).add(id);
+    }
+
+    private static void addSequenceMessage(
+            ObjectNode source,
+            String id,
+            String sourceId,
+            String targetId,
+            String label,
+            String interaction,
+            int sequence) {
+        var relationship = JsonSupport.objectMapper().createObjectNode();
+        relationship.put("id", id);
+        relationship.put("type", "Message");
+        relationship.put("source", sourceId);
+        relationship.put("target", targetId);
+        relationship.put("label", label);
+
+        var umlProperties = JsonSupport.objectMapper().createObjectNode();
+        umlProperties.put("interaction", interaction);
+        umlProperties.put("sequence", sequence);
+        umlProperties.put("message_sort", "synchCall");
+        relationship.set("properties", JsonSupport.objectMapper().createObjectNode()
+                .set("uml", umlProperties));
+
+        ((ArrayNode) source.get("relationships")).add(relationship);
+        ((ArrayNode) source.get("plugins").get("generic-graph").get("views").get(0).get("relationships"))
+                .add(id);
     }
 
     private static void addInteractionOperand(

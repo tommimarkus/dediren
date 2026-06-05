@@ -217,11 +217,11 @@ final class RenderInputValidator {
         }
 
         JsonNode operands = metadataProperty(properties, "operands");
-        if (!isTextArray(operands)) {
+        if (!isNonEmptyTextArray(operands)) {
             throw new RenderMetadataUsageException(
                     "DEDIREN_UML_COMBINED_FRAGMENT_METADATA_INVALID",
                     path + ".operands",
-                    "UML CombinedFragment render metadata operands must be an array of text ids");
+                    "UML CombinedFragment render metadata operands must be a non-empty array of text ids");
         }
 
         JsonNode covered = metadataProperty(properties, "covered");
@@ -252,11 +252,11 @@ final class RenderInputValidator {
         }
 
         JsonNode fragments = metadataProperty(properties, "fragments");
-        if (!isTextArray(fragments)) {
+        if (!isNonEmptyTextArray(fragments)) {
             throw new RenderMetadataUsageException(
                     "DEDIREN_UML_INTERACTION_OPERAND_METADATA_INVALID",
                     path + ".fragments",
-                    "UML InteractionOperand render metadata fragments must be an array of text ids");
+                    "UML InteractionOperand render metadata fragments must be a non-empty array of text ids");
         }
 
         JsonNode guard = metadataProperty(properties, "guard");
@@ -282,6 +282,10 @@ final class RenderInputValidator {
             }
         }
         return true;
+    }
+
+    private static boolean isNonEmptyTextArray(JsonNode value) {
+        return value != null && value.isArray() && !value.isEmpty() && isTextArray(value);
     }
 
     private static void validateRenderPolicy(RenderPolicy policy) throws PolicyValidationException {

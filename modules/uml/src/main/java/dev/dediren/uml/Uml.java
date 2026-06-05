@@ -164,6 +164,7 @@ public final class Uml {
                     context);
         }
         validateCombinedFragmentNesting(source.nodes(), context);
+        validateInteractionOperandOwnerSelection(source.nodes(), context);
         validateInteractionFragmentOwnership(source.nodes(), context);
         validateCombinedFragmentSequenceContiguity(source.nodes(), context);
 
@@ -646,9 +647,6 @@ public final class Uml {
             String interaction,
             String path,
             ValidationContext context) throws UmlValidationException {
-        if (hasUnlistedOperandOwner(nodeId, context)) {
-            return;
-        }
         InteractionFragmentInterval interval = interactionFragmentInterval(
                 nodeId,
                 context,
@@ -667,26 +665,6 @@ public final class Uml {
                     nodeId,
                     path);
         }
-    }
-
-    private static boolean hasUnlistedOperandOwner(String combinedFragmentId, ValidationContext context) {
-        JsonNode operands = optionalProperty(
-                context.nodeUmlProperties().get(combinedFragmentId),
-                "operands");
-        if (operands == null || !operands.isArray()) {
-            return false;
-        }
-        Set<String> operandIds = textValueSet(operands);
-        for (String nodeId : context.nodeTypes().keySet()) {
-            if ("InteractionOperand".equals(context.nodeTypes().get(nodeId))
-                    && combinedFragmentId.equals(readTextProperty(
-                            context.nodeUmlProperties().get(nodeId),
-                            "combined_fragment"))
-                    && !operandIds.contains(nodeId)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private static void validateMessageSequenceUniqueness(List<SourceRelationship> relationships)
@@ -1005,6 +983,34 @@ public final class Uml {
             }
         }
         return false;
+    }
+
+    private static void validateInteractionOperandOwnerSelection(
+            List<SourceNode> nodes,
+            ValidationContext context) throws UmlValidationException {
+        for (SourceNode node : nodes) {
+            if (!"InteractionOperand".equals(context.nodeTypes().get(node.id()))) {
+                continue;
+            }
+            String ownerCombinedFragment = readTextProperty(
+                    context.nodeUmlProperties().get(node.id()),
+                    "combined_fragment");
+            if (!"CombinedFragment".equals(context.nodeTypes().get(ownerCombinedFragment))) {
+                continue;
+            }
+            JsonNode ownerOperands = optionalProperty(
+                    context.nodeUmlProperties().get(ownerCombinedFragment),
+                    "operands");
+            if (ownerOperands == null || !ownerOperands.isArray()) {
+                continue;
+            }
+            if (!containsTextValue(ownerOperands, node.id())) {
+                throw new UmlValidationException(
+                        UmlTypeKind.ELEMENT_PROPERTY,
+                        ownerCombinedFragment,
+                        context.nodePaths().get(node.id()) + ".properties.uml.combined_fragment");
+            }
+        }
     }
 
     private static void validateInteractionFragmentOwnership(

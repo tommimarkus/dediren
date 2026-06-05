@@ -92,6 +92,9 @@ class MainTest {
                     properties -> properties.put("operands", "op-in-stock"),
                     "render_metadata.nodes.cf-availability.properties.operands");
             assertInvalidUmlCombinedFragmentMetadata(
+                    properties -> properties.putArray("operands"),
+                    "render_metadata.nodes.cf-availability.properties.operands");
+            assertInvalidUmlCombinedFragmentMetadata(
                     properties -> properties.putArray("operands").add(3),
                     "render_metadata.nodes.cf-availability.properties.operands");
             assertInvalidUmlCombinedFragmentMetadata(
@@ -118,6 +121,9 @@ class MainTest {
                     "render_metadata.nodes.op-in-stock.properties.order");
             assertInvalidUmlInteractionOperandMetadata(
                     properties -> properties.put("fragments", "m1"),
+                    "render_metadata.nodes.op-in-stock.properties.fragments");
+            assertInvalidUmlInteractionOperandMetadata(
+                    properties -> properties.putArray("fragments"),
                     "render_metadata.nodes.op-in-stock.properties.fragments");
             assertInvalidUmlInteractionOperandMetadata(
                     properties -> properties.putArray("fragments").add(3),
@@ -841,6 +847,18 @@ class MainTest {
             Document reorderedDocument = svgDocument(okContent(render(reorderedInput)));
             assertThat(combinedFragmentStructures(reorderedDocument))
                     .containsExactlyElementsOf(combinedFragmentStructures(document));
+        }
+
+        @Test
+        void rendersNestedUmlSequenceCombinedFragmentsInsideOwnerFrame() throws Exception {
+            ObjectNode input = (ObjectNode) umlSequenceFragmentsStyleInput();
+            ((ArrayNode) input.at("/render_metadata/nodes/op-backorder/properties/fragments"))
+                    .add("cf-coupon");
+
+            Document document = svgDocument(okContent(render(input)));
+
+            assertCombinedFragment(document, "cf-coupon", "opt");
+            assertCombinedFragmentContainedWithin(document, "cf-coupon", "cf-availability");
         }
 
         @Test
@@ -1717,6 +1735,33 @@ class MainTest {
                 "data-dediren-sequence-combined-fragment",
                 fragmentId);
         childElementWithAttribute(fragment, "line", "data-dediren-sequence-operand-separator", operandId);
+    }
+
+    private static void assertCombinedFragmentContainedWithin(Document document, String innerId, String outerId) {
+        Element inner = combinedFragmentShape(document, innerId);
+        Element outer = combinedFragmentShape(document, outerId);
+
+        double innerX = Double.parseDouble(inner.getAttribute("x"));
+        double innerY = Double.parseDouble(inner.getAttribute("y"));
+        double innerRight = innerX + Double.parseDouble(inner.getAttribute("width"));
+        double innerBottom = innerY + Double.parseDouble(inner.getAttribute("height"));
+        double outerX = Double.parseDouble(outer.getAttribute("x"));
+        double outerY = Double.parseDouble(outer.getAttribute("y"));
+        double outerRight = outerX + Double.parseDouble(outer.getAttribute("width"));
+        double outerBottom = outerY + Double.parseDouble(outer.getAttribute("height"));
+
+        assertThat(innerX).isGreaterThanOrEqualTo(outerX - 0.1);
+        assertThat(innerY).isGreaterThanOrEqualTo(outerY - 0.1);
+        assertThat(innerRight).isLessThanOrEqualTo(outerRight + 0.1);
+        assertThat(innerBottom).isLessThanOrEqualTo(outerBottom + 0.1);
+    }
+
+    private static Element combinedFragmentShape(Document document, String id) {
+        return childElementWithAttribute(
+                groupWithAttribute(document, "data-dediren-sequence-combined-fragment", id),
+                "rect",
+                "data-dediren-node-shape",
+                "uml_combined_fragment");
     }
 
     private static java.util.List<String> combinedFragmentIds(Document document) {
