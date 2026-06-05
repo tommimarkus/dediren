@@ -17,8 +17,8 @@
   using a Dediren archive. Keep it bundle-local and command-oriented.
 - Treat plans as task guidance and implementation history. Live code and tests
   are the current truth when they disagree with a plan.
-- Do not revive stale Rust, Cargo, SDKMAN, Gradle, or `elkrs` guidance from old
-  plans. The live product is Java 21+ built with the checked-in Maven Wrapper.
+- Do not revive retired pre-Maven guidance from old plans. The live product is
+  Java 21+ built with the checked-in Maven Wrapper.
 - For ELK layout/routing changes, start from the ELK-first rule: try official
   ELK Layered options, graph structure, ports, hierarchy, and real-render
   evidence before adding custom placement or route geometry code.
@@ -48,15 +48,14 @@
 - Keep `dediren` contract-first. Public JSON schemas, fixtures, command
   envelopes, diagnostics, plugin manifests, and runtime capability output are
   the stable product surface.
-- Keep `apps:cli` thin. CLI code should parse arguments, assemble requests,
-  call `modules:core`, and print envelopes.
+- Keep `cli` thin. CLI code should parse arguments, assemble requests, call
+  `core`, and print envelopes.
 - Keep orchestration, validation, plugin discovery, plugin execution, and
-  backend-neutral quality checks in `modules:core`.
+  backend-neutral quality checks in `core`.
 - Keep shared protocol records and schema-version constants in
-  `modules:contracts`. Do not put orchestration or plugin implementation logic
-  there.
+  `contracts`. Do not put orchestration or plugin implementation logic there.
 - First-party plugins are executable process-boundary plugins. They may depend
-  on `modules:contracts`; they must not depend on `modules:core`.
+  on `contracts`; they must not depend on `core`.
 - Do not duplicate layout or routing features already provided by ELK. Express
   layout intent through ELK graph structure, ports, hierarchy, and options,
   then let ELK compute geometry and routes.
@@ -67,8 +66,8 @@
 
 ## Files That Move Together
 
-- Public JSON shape changes: update `schemas/`, `modules:contracts`,
-  fixtures, plugin mapping code, and schema/round-trip tests together.
+- Public JSON shape changes: update `schemas/`, `contracts`, fixtures, plugin
+  mapping code, and schema/round-trip tests together.
 - Plugin protocol or runtime changes: update manifests, runtime capability
   handling, plugin envelope validation, CLI behavior, README notes, and
   compatibility tests together.
@@ -78,17 +77,17 @@
 - Bundle-local agent guide changes that affect examples, redistributed files,
   command handoff, diagnostics, runtime probes, or plugin environment variables
   must stay consistent with `README.md` and distribution tests.
-- ELK layout changes: update `modules/plugins/elk-layout`, CLI/distribution
+- ELK layout changes: update `plugins/elk-layout`, CLI/distribution
   smoke coverage, and README/agent runtime notes together.
 - SVG render policy changes: update `schemas/svg-render-policy.schema.json`,
-  `modules:contracts`, render fixtures, `modules/plugins/svg-render`, CLI
-  render tests, and README examples together.
-- OEF export changes: update export schemas, policy fixtures, source/layout
-  fixtures, `modules/plugins/archimate-oef-export`, CLI export tests, and
+  `contracts`, render fixtures, `plugins/svg-render`, CLI render tests, and
   README examples together.
+- OEF export changes: update export schemas, policy fixtures, source/layout
+  fixtures, `plugins/archimate-oef-export`, CLI export tests, and README
+  examples together.
 - UML/XMI export changes: update export schemas, policy fixtures,
-  source/layout fixtures, `modules/plugins/uml-xmi-export`, CLI export tests,
-  and README examples together.
+  source/layout fixtures, `plugins/uml-xmi-export`, CLI export tests, and
+  README examples together.
 
 ## Versioning
 
@@ -109,11 +108,11 @@
   `docs/agent-usage.md` examples, distribution metadata, and tests that assert
   version strings must match the product version.
 - Known version assertion surfaces include
-  `apps/cli/src/test/java/dev/dediren/cli/MainTest.java`,
-  `modules/contracts/src/test/java/dev/dediren/contracts/ContractRoundTripTest.java`,
-  `modules/plugins/archimate-oef-export/src/test/java/dev/dediren/plugins/archimateoef/MainTest.java`,
-  `modules/plugins/generic-graph/src/test/java/dev/dediren/plugins/genericgraph/GenericGraphPluginTest.java`,
-  and `tools/dist/src/test/java/dev/dediren/tools/dist/DistModuleTest.java`.
+  `cli/src/test/java/dev/dediren/cli/MainTest.java`,
+  `contracts/src/test/java/dev/dediren/contracts/ContractRoundTripTest.java`,
+  `plugins/archimate-oef-export/src/test/java/dev/dediren/plugins/archimateoef/MainTest.java`,
+  `plugins/generic-graph/src/test/java/dev/dediren/plugins/genericgraph/GenericGraphPluginTest.java`,
+  and `dist-tool/src/test/java/dev/dediren/tools/dist/DistModuleTest.java`.
 - `.github/workflows/release.yml` validates tag `v<version>` against root
   `pom.xml`; update it only if the product version source changes.
 - Use SemVer intent while pre-1.0:
@@ -142,7 +141,7 @@
 
 ## ELK Runtime
 
-- `modules/plugins/elk-layout` is the first-party official Java ELK plugin.
+- `plugins/elk-layout` is the first-party official Java ELK plugin.
 - It uses Eclipse ELK Java libraries and the Maven appassembler launcher.
 - Java 21 or newer is required.
 
@@ -166,45 +165,45 @@ General Java changes:
 Contract/schema changes:
 
 ```bash
-./mvnw -pl modules/contracts -am test
+./mvnw -pl contracts -am test
 ```
 
 Plugin runtime changes:
 
 ```bash
-./mvnw -pl modules/core,apps/cli -am test
+./mvnw -pl core,cli -am test
 ```
 
 ELK changes:
 
 ```bash
-./mvnw -pl modules/plugins/elk-layout -am test
-./mvnw -pl tools/dist -am verify -Pdist-smoke
+./mvnw -pl plugins/elk-layout -am test
+./mvnw -pl dist-tool -am verify -Pdist-smoke
 ```
 
 SVG render changes:
 
 ```bash
-./mvnw -pl modules/plugins/svg-render,apps/cli -am test
+./mvnw -pl plugins/svg-render,cli -am test
 ```
 
 OEF export changes:
 
 ```bash
-./mvnw -pl modules/plugins/archimate-oef-export,apps/cli -am test
+./mvnw -pl plugins/archimate-oef-export,cli -am test
 ```
 
 UML/XMI export changes:
 
 ```bash
-./mvnw -pl modules/plugins/uml-xmi-export,apps/cli -am test
+./mvnw -pl plugins/uml-xmi-export,cli -am test
 ```
 
 Distribution/release changes:
 
 ```bash
 ./mvnw test
-./mvnw -pl tools/dist -am verify -Pdist-smoke
+./mvnw -pl dist-tool -am verify -Pdist-smoke
 git diff --check
 ```
 
