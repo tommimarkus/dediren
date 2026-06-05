@@ -208,9 +208,9 @@ public final class Main {
             ResolvedNodeStyle style = nodeStyle(policy, metadata, node.id(), base);
             RenderMetadataSelector selector = metadata == null ? null : metadata.nodes().get(node.id());
             svg.append("<g data-dediren-node-id=\"").append(attr(node.id())).append("\">");
-            svg.append(nodeShape(node, style));
+            svg.append(nodeShape(node, style, selector));
             svg.append(nodeDecorator(node, style, selector));
-            if (!umlDecoratorSuppliesNodeLabel(style.decorator())) {
+            if (shouldRenderPlainNodeLabel(node, style.decorator())) {
                 svg.append(String.format(
                         Locale.ROOT,
                         "<text x=\"%.1f\" y=\"%.1f\" text-anchor=\"middle\" fill=\"%s\">%s</text>",
@@ -250,7 +250,7 @@ public final class Main {
                 + " data-dediren-icon-size=\"22\">" + body + "</g>";
     }
 
-    private static String nodeShape(LaidOutNode node, ResolvedNodeStyle style) {
+    private static String nodeShape(LaidOutNode node, ResolvedNodeStyle style, RenderMetadataSelector selector) {
         SvgNodeDecorator decorator = style.decorator();
         if (decorator == SvgNodeDecorator.ARCHIMATE_AND_JUNCTION
                 || decorator == SvgNodeDecorator.ARCHIMATE_OR_JUNCTION) {
@@ -268,7 +268,7 @@ public final class Main {
                     styleNumber(style.strokeWidth()));
         }
         if (decorator != null && isUmlDecorator(decorator)) {
-            return umlNodeShape(node, style, decorator);
+            return umlNodeShape(node, style, decorator, selector);
         }
         String shapeName = "archimate_rectangle";
         double rx = 0.0;
@@ -320,7 +320,11 @@ public final class Main {
                 styleNumber(style.strokeWidth()));
     }
 
-    private static String umlNodeShape(LaidOutNode node, ResolvedNodeStyle style, SvgNodeDecorator decorator) {
+    private static String umlNodeShape(
+            LaidOutNode node,
+            ResolvedNodeStyle style,
+            SvgNodeDecorator decorator,
+            RenderMetadataSelector selector) {
         String shapeName = decoratorName(decorator);
         return switch (decorator) {
             case UML_INITIAL_NODE -> {
@@ -353,6 +357,20 @@ public final class Main {
                         innerRadius,
                         attr(style.stroke()));
             }
+            case UML_STATE -> String.format(
+                    Locale.ROOT,
+                    "<rect data-dediren-node-shape=\"%s\" x=\"%.1f\" y=\"%.1f\" width=\"%.1f\" height=\"%.1f\" rx=\"%s\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%s\"/>",
+                    shapeName,
+                    node.x(),
+                    node.y(),
+                    node.width(),
+                    node.height(),
+                    styleNumber(Math.max(style.rx(), 14.0)),
+                    attr(style.fill()),
+                    attr(style.stroke()),
+                    styleNumber(style.strokeWidth()));
+            case UML_FINAL_STATE -> umlFinalStateShape(node, style, shapeName);
+            case UML_PSEUDOSTATE -> umlPseudostateShape(node, style, selector, shapeName);
             case UML_DECISION_NODE, UML_MERGE_NODE -> {
                 double centerX = node.x() + node.width() / 2.0;
                 double centerY = node.y() + node.height() / 2.0;
@@ -435,6 +453,121 @@ public final class Main {
                     attr(style.stroke()),
                     styleNumber(style.strokeWidth()));
         };
+    }
+
+    private static String umlFinalStateShape(LaidOutNode node, ResolvedNodeStyle style, String shapeName) {
+        double centerX = node.x() + node.width() / 2.0;
+        double centerY = node.y() + node.height() / 2.0;
+        double radius = Math.max(5.0, Math.min(node.width(), node.height()) / 2.0 - style.strokeWidth());
+        double innerRadius = Math.max(3.0, radius * 0.48);
+        return String.format(
+                Locale.ROOT,
+                "<g data-dediren-node-shape=\"%s\"><circle cx=\"%.1f\" cy=\"%.1f\" r=\"%.1f\" fill=\"#ffffff\" stroke=\"%s\" stroke-width=\"%s\"/><circle cx=\"%.1f\" cy=\"%.1f\" r=\"%.1f\" fill=\"%s\"/></g>",
+                shapeName,
+                centerX,
+                centerY,
+                radius,
+                attr(style.stroke()),
+                styleNumber(style.strokeWidth()),
+                centerX,
+                centerY,
+                innerRadius,
+                attr(style.stroke()));
+    }
+
+    private static String umlPseudostateShape(
+            LaidOutNode node,
+            ResolvedNodeStyle style,
+            RenderMetadataSelector selector,
+            String shapeName) {
+        String kind = textField(selector == null ? null : selector.properties(), "kind", "initial");
+        return switch (kind) {
+            case "choice", "junction" -> umlDiamondShape(node, style, shapeName);
+            case "fork", "join" -> umlBarShape(node, style, shapeName);
+            case "deepHistory" -> umlTextCircleShape(node, style, shapeName, "H*");
+            case "shallowHistory" -> umlTextCircleShape(node, style, shapeName, "H");
+            case "entryPoint" -> umlTextCircleShape(node, style, shapeName, "E");
+            case "exitPoint", "terminate" -> umlTextCircleShape(node, style, shapeName, "X");
+            default -> umlFilledCircleShape(node, style, shapeName);
+        };
+    }
+
+    private static String umlFilledCircleShape(LaidOutNode node, ResolvedNodeStyle style, String shapeName) {
+        double radius = Math.max(4.0, Math.min(node.width(), node.height()) / 2.0 - style.strokeWidth());
+        return String.format(
+                Locale.ROOT,
+                "<circle data-dediren-node-shape=\"%s\" cx=\"%.1f\" cy=\"%.1f\" r=\"%.1f\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%s\"/>",
+                shapeName,
+                node.x() + node.width() / 2.0,
+                node.y() + node.height() / 2.0,
+                radius,
+                attr(style.fill()),
+                attr(style.stroke()),
+                styleNumber(style.strokeWidth()));
+    }
+
+    private static String umlDiamondShape(LaidOutNode node, ResolvedNodeStyle style, String shapeName) {
+        double centerX = node.x() + node.width() / 2.0;
+        double centerY = node.y() + node.height() / 2.0;
+        return String.format(
+                Locale.ROOT,
+                "<path data-dediren-node-shape=\"%s\" d=\"M %.1f %.1f L %.1f %.1f L %.1f %.1f L %.1f %.1f Z\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%s\"/>",
+                shapeName,
+                centerX,
+                node.y(),
+                node.x() + node.width(),
+                centerY,
+                centerX,
+                node.y() + node.height(),
+                node.x(),
+                centerY,
+                attr(style.fill()),
+                attr(style.stroke()),
+                styleNumber(style.strokeWidth()));
+    }
+
+    private static String umlBarShape(LaidOutNode node, ResolvedNodeStyle style, String shapeName) {
+        boolean horizontal = node.width() >= node.height();
+        double width = horizontal ? node.width() : Math.min(node.width(), 14.0);
+        double height = horizontal ? Math.min(node.height(), 14.0) : node.height();
+        double x = node.x() + (node.width() - width) / 2.0;
+        double y = node.y() + (node.height() - height) / 2.0;
+        return String.format(
+                Locale.ROOT,
+                "<rect data-dediren-node-shape=\"%s\" x=\"%.1f\" y=\"%.1f\" width=\"%.1f\" height=\"%.1f\" rx=\"0\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%s\"/>",
+                shapeName,
+                x,
+                y,
+                width,
+                height,
+                attr(style.fill()),
+                attr(style.stroke()),
+                styleNumber(style.strokeWidth()));
+    }
+
+    private static String umlTextCircleShape(
+            LaidOutNode node,
+            ResolvedNodeStyle style,
+            String shapeName,
+            String symbol) {
+        double centerX = node.x() + node.width() / 2.0;
+        double centerY = node.y() + node.height() / 2.0;
+        double radius = Math.max(5.0, Math.min(node.width(), node.height()) / 2.0 - style.strokeWidth());
+        double fontSize = Math.max(10.0, Math.min(14.0, radius * 0.9));
+        return String.format(
+                Locale.ROOT,
+                "<circle data-dediren-node-shape=\"%s\" cx=\"%.1f\" cy=\"%.1f\" r=\"%.1f\" fill=\"#ffffff\" stroke=\"%s\" stroke-width=\"%s\"/><text x=\"%.1f\" y=\"%.1f\" text-anchor=\"middle\" fill=\"%s\" font-size=\"%s\">%s</text>",
+                shapeName,
+                centerX,
+                centerY,
+                radius,
+                attr(style.stroke()),
+                styleNumber(style.strokeWidth()),
+                centerX,
+                centerY + fontSize / 3.0,
+                attr(style.labelFill()),
+                styleNumber(fontSize),
+                text(symbol));
     }
 
     private static String nodeDecorator(LaidOutNode node, ResolvedNodeStyle style, RenderMetadataSelector selector) {
@@ -747,6 +880,14 @@ public final class Main {
     private static String textField(JsonNode value, String field, String fallback) {
         JsonNode fieldValue = value == null ? null : value.get(field);
         return fieldValue != null && fieldValue.isTextual() ? fieldValue.asText() : fallback;
+    }
+
+    private static boolean shouldRenderPlainNodeLabel(LaidOutNode node, SvgNodeDecorator decorator) {
+        return node.label() != null
+                && !node.label().isEmpty()
+                && !umlDecoratorSuppliesNodeLabel(decorator)
+                && decorator != SvgNodeDecorator.UML_FINAL_STATE
+                && decorator != SvgNodeDecorator.UML_PSEUDOSTATE;
     }
 
     private static boolean umlDecoratorSuppliesNodeLabel(SvgNodeDecorator decorator) {

@@ -164,5 +164,15 @@ public enum SvgNodeDecorator {
     @JsonProperty("uml_gate")
     UML_GATE,
     @JsonProperty("uml_destruction_occurrence")
-    UML_DESTRUCTION_OCCURRENCE
+    UML_DESTRUCTION_OCCURRENCE,
+    @JsonProperty("uml_state_machine")
+    UML_STATE_MACHINE,
+    @JsonProperty("uml_region")
+    UML_REGION,
+    @JsonProperty("uml_state")
+    UML_STATE,
+    @JsonProperty("uml_final_state")
+    UML_FINAL_STATE,
+    @JsonProperty("uml_pseudostate")
+    UML_PSEUDOSTATE
 }
