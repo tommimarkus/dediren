@@ -86,6 +86,9 @@ class MainTest {
                     properties -> properties.put("operator", 3),
                     "render_metadata.nodes.cf-availability.properties.operator");
             assertInvalidUmlCombinedFragmentMetadata(
+                    properties -> properties.put("operator", "ignore"),
+                    "render_metadata.nodes.cf-availability.properties.operator");
+            assertInvalidUmlCombinedFragmentMetadata(
                     properties -> properties.put("operands", "op-in-stock"),
                     "render_metadata.nodes.cf-availability.properties.operands");
             assertInvalidUmlCombinedFragmentMetadata(
@@ -119,6 +122,9 @@ class MainTest {
             assertInvalidUmlInteractionOperandMetadata(
                     properties -> properties.putArray("fragments").add(3),
                     "render_metadata.nodes.op-in-stock.properties.fragments");
+            assertInvalidUmlInteractionOperandMetadata(
+                    properties -> properties.put("guard", 3),
+                    "render_metadata.nodes.op-in-stock.properties.guard");
         }
 
         @Test
@@ -825,6 +831,8 @@ class MainTest {
             assertOperandGuard(document, "cf-availability", "op-in-stock", "inStock");
             assertOperandGuard(document, "cf-availability", "op-backorder", "else");
             assertOperandSeparator(document, "cf-availability", "op-backorder");
+            assertOperandGuard(document, "cf-coupon", "op-coupon", "couponPresent");
+            assertOperandGuard(document, "cf-retry", "op-retry", "whilePaymentPending");
             assertOperandGuard(document, "cf-parallel-closeout", "op-charge", "charge");
             assertOperandGuard(document, "cf-parallel-closeout", "op-confirm", "confirm");
             assertOperandSeparator(document, "cf-parallel-closeout", "op-confirm");

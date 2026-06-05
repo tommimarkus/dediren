@@ -10,6 +10,7 @@ import dev.dediren.contracts.source.GenericGraphPluginData;
 import dev.dediren.contracts.source.SourceDocument;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
 
 class UmlValidationTest {
@@ -112,6 +113,82 @@ class UmlValidationTest {
                 () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
 
         assertThat(error.path()).contains("properties.uml.operands");
+    }
+
+    @Test
+    void rejectsLoopFragmentWithMultipleOperands() throws Exception {
+        assertUmlSequenceFragmentsMutationRejected(
+                source -> replaceTextArray(
+                        nodeUmlProperties(source, "cf-retry"),
+                        "operands",
+                        "op-retry",
+                        "op-charge"),
+                "$.nodes[10].properties.uml.operands");
+    }
+
+    @Test
+    void rejectsAltFragmentWithOneOperand() throws Exception {
+        assertUmlSequenceFragmentsMutationRejected(
+                source -> replaceTextArray(
+                        nodeUmlProperties(source, "cf-availability"),
+                        "operands",
+                        "op-in-stock"),
+                "$.nodes[5].properties.uml.operands");
+    }
+
+    @Test
+    void rejectsParFragmentWithOneOperand() throws Exception {
+        assertUmlSequenceFragmentsMutationRejected(
+                source -> replaceTextArray(
+                        nodeUmlProperties(source, "cf-parallel-closeout"),
+                        "operands",
+                        "op-charge"),
+                "$.nodes[12].properties.uml.operands");
+    }
+
+    @Test
+    void rejectsMalformedCombinedFragmentRequiredProperties() throws Exception {
+        assertUmlSequenceFragmentsMutationRejected(
+                source -> nodeUmlProperties(source, "cf-availability").remove("operator"),
+                "$.nodes[5].properties.uml.operator");
+        assertUmlSequenceFragmentsMutationRejected(
+                source -> nodeUmlProperties(source, "cf-availability").put("operator", 3),
+                "$.nodes[5].properties.uml.operator");
+        assertUmlSequenceFragmentsMutationRejected(
+                source -> nodeUmlProperties(source, "cf-availability").remove("operands"),
+                "$.nodes[5].properties.uml.operands");
+        assertUmlSequenceFragmentsMutationRejected(
+                source -> nodeUmlProperties(source, "cf-availability").put("operands", "op-in-stock"),
+                "$.nodes[5].properties.uml.operands");
+        assertUmlSequenceFragmentsMutationRejected(
+                source -> nodeUmlProperties(source, "cf-availability").putArray("operands"),
+                "$.nodes[5].properties.uml.operands");
+    }
+
+    @Test
+    void rejectsMalformedInteractionOperandRequiredProperties() throws Exception {
+        assertUmlSequenceFragmentsMutationRejected(
+                source -> nodeUmlProperties(source, "op-in-stock").remove("combined_fragment"),
+                "$.nodes[6].properties.uml.combined_fragment");
+        assertUmlSequenceFragmentsMutationRejected(
+                source -> nodeUmlProperties(source, "op-in-stock").put("combined_fragment", 3),
+                "$.nodes[6].properties.uml.combined_fragment");
+        assertUmlSequenceFragmentsMutationRejected(
+                source -> nodeUmlProperties(source, "op-in-stock").remove("fragments"),
+                "$.nodes[6].properties.uml.fragments");
+        assertUmlSequenceFragmentsMutationRejected(
+                source -> nodeUmlProperties(source, "op-in-stock").put("fragments", "m1"),
+                "$.nodes[6].properties.uml.fragments");
+        assertUmlSequenceFragmentsMutationRejected(
+                source -> nodeUmlProperties(source, "op-in-stock").putArray("fragments"),
+                "$.nodes[6].properties.uml.fragments");
+    }
+
+    @Test
+    void rejectsMalformedInteractionOperandGuard() throws Exception {
+        assertUmlSequenceFragmentsMutationRejected(
+                source -> nodeUmlProperties(source, "op-in-stock").put("guard", 3),
+                "$.nodes[6].properties.uml.guard");
     }
 
     @Test
@@ -694,7 +771,7 @@ class UmlValidationTest {
         return new Fixture(source, data);
     }
 
-    private static Fixture loadMutatedUmlSequenceFragmentsFixture(java.util.function.Consumer<ObjectNode> mutate)
+    private static Fixture loadMutatedUmlSequenceFragmentsFixture(Consumer<ObjectNode> mutate)
             throws Exception {
         var sourceJson = (ObjectNode) JsonSupport.objectMapper().readTree(
                 Files.readString(workspaceRoot().resolve("fixtures/source/valid-uml-sequence-fragments.json")));
@@ -704,6 +781,19 @@ class UmlValidationTest {
                 source.plugins().get("generic-graph"),
                 GenericGraphPluginData.class);
         return new Fixture(source, data);
+    }
+
+    private static void assertUmlSequenceFragmentsMutationRejected(
+            Consumer<ObjectNode> mutate,
+            String expectedPath) throws Exception {
+        Fixture fixture = loadMutatedUmlSequenceFragmentsFixture(mutate);
+
+        UmlValidationException error = org.junit.jupiter.api.Assertions.assertThrows(
+                UmlValidationException.class,
+                () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+
+        assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
+        assertThat(error.path()).isEqualTo(expectedPath);
     }
 
     private static ObjectNode firstMessageUmlProperties(ObjectNode source) {

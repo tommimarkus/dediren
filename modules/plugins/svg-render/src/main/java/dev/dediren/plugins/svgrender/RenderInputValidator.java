@@ -27,6 +27,11 @@ final class RenderInputValidator {
             "reply",
             "createMessage",
             "deleteMessage");
+    private static final Set<String> UML_SEQUENCE_COMBINED_FRAGMENT_OPERATORS = Set.of(
+            "alt",
+            "opt",
+            "loop",
+            "par");
 
     private RenderInputValidator() {
     }
@@ -201,11 +206,14 @@ final class RenderInputValidator {
     private static void validateUmlCombinedFragmentRenderMetadata(JsonNode properties, String path)
             throws RenderMetadataUsageException {
         JsonNode operator = metadataProperty(properties, "operator");
-        if (operator == null || !operator.isTextual()) {
+        if (operator == null
+                || !operator.isTextual()
+                || !UML_SEQUENCE_COMBINED_FRAGMENT_OPERATORS.contains(operator.asText())) {
             throw new RenderMetadataUsageException(
                     "DEDIREN_UML_COMBINED_FRAGMENT_METADATA_INVALID",
                     path + ".operator",
-                    "UML CombinedFragment render metadata operator must be text");
+                    "UML CombinedFragment render metadata operator must be one of "
+                            + UML_SEQUENCE_COMBINED_FRAGMENT_OPERATORS);
         }
 
         JsonNode operands = metadataProperty(properties, "operands");
@@ -249,6 +257,14 @@ final class RenderInputValidator {
                     "DEDIREN_UML_INTERACTION_OPERAND_METADATA_INVALID",
                     path + ".fragments",
                     "UML InteractionOperand render metadata fragments must be an array of text ids");
+        }
+
+        JsonNode guard = metadataProperty(properties, "guard");
+        if (guard != null && !guard.isTextual()) {
+            throw new RenderMetadataUsageException(
+                    "DEDIREN_UML_INTERACTION_OPERAND_METADATA_INVALID",
+                    path + ".guard",
+                    "UML InteractionOperand render metadata guard, when present, must be text");
         }
     }
 
