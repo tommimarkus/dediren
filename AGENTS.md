@@ -229,6 +229,17 @@ handoff, then rerun affected checks.
 - Treat pre-existing modified, staged, or untracked files as user work unless
   you created them in this turn.
 - Do not revert, restage, format, or otherwise clean up unrelated user work.
+- Treat checked-in third-party, upstream-generated, vendored, wrapper,
+  generated, and legal/canonical files as protected surfaces. Do not make
+  incidental edits to their line endings, executable bits, whitespace,
+  formatting, comments, checksums, URLs, versions, or generated content.
+- In this repo, protected examples include `mvnw`, `mvnw.cmd`,
+  `.mvn/wrapper/maven-wrapper.properties`, ignored Maven Wrapper artifacts,
+  generated `THIRD-PARTY-NOTICES.md`, bundled dependency/SBOM/checksum outputs
+  under `target/` or `dist/`, and canonical legal text such as `LICENSE`.
+- Edit protected surfaces only when the user request or an approved plan
+  specifically targets that surface. If tooling rewrites one accidentally,
+  inspect the diff and restore only the accidental change before continuing.
 - Before staging, review `git diff -- <path>` for each file you touched and
   stage only intentional changes.
 - Do not use `git add -A` when unrelated files exist. Prefer explicit paths.
