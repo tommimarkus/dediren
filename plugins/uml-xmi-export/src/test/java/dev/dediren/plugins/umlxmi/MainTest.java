@@ -239,6 +239,49 @@ class MainTest {
     }
 
     @Test
+    void exportsDeploymentTargetsArtifactsAndRelationships() throws Exception {
+        JsonNode input = exportInput(
+                fixtureJson("fixtures/source/valid-uml-deployment-basic.json"),
+                fixtureJson("fixtures/layout-result/uml-deployment-basic.json"));
+
+        String xml = exportXml(input);
+
+        assertThat(xml).isEqualTo(fixture("fixtures/export/uml-deployment-basic.xmi"));
+        assertThat(xml).contains(
+                "xmi:type=\"uml:Device\"",
+                "xmi:type=\"uml:ExecutionEnvironment\"",
+                "xmi:type=\"uml:Node\"",
+                "xmi:type=\"uml:Artifact\"",
+                "xmi:type=\"uml:DeploymentSpecification\"",
+                "xmi:type=\"uml:Deployment\"",
+                "deployedArtifact=\"id-artifact-orders-service\"",
+                "location=\"id-ee-orders-runtime\"",
+                "xmi:type=\"uml:Manifestation\"",
+                "utilizedElement=\"id-component-order-api\"",
+                "xmi:type=\"uml:CommunicationPath\"",
+                "endType=\"id-ee-orders-runtime id-node-payment-network\"");
+    }
+
+    @Test
+    void rejectsDeploymentWithNonArtifactSource() throws Exception {
+        JsonNode input = exportInput(
+                fixtureJson("fixtures/source/valid-uml-deployment-basic.json"),
+                fixtureJson("fixtures/layout-result/uml-deployment-basic.json"));
+        ((ObjectNode) input.at("/source/relationships/0")).put("source", "component-order-api");
+
+        PluginResult result = Main.executeForTesting(
+                new String[]{"export"},
+                JsonSupport.objectMapper().writeValueAsString(input),
+                envWithXmiSchema());
+
+        assertThat(result.exitCode()).isEqualTo(3);
+        assertError(
+                result,
+                "DEDIREN_UML_RELATIONSHIP_ENDPOINT_UNSUPPORTED",
+                "$.relationships[0]");
+    }
+
+    @Test
     void keepsSequenceViewRelationshipsScopedToLayoutEdges() throws Exception {
         JsonNode input = exportInput(
                 fixtureJson("fixtures/source/valid-uml-sequence-fragments.json"),

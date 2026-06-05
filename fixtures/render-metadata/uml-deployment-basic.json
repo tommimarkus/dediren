@@ -1,0 +1,73 @@
+{
+  "render_metadata_schema_version": "render-metadata.schema.v1",
+  "semantic_profile": "uml",
+  "nodes": {
+    "ee-orders-runtime": {
+      "type": "ExecutionEnvironment",
+      "source_id": "ee-orders-runtime",
+      "properties": {
+        "node": "device-prod-node"
+      }
+    },
+    "artifact-migration-job": {
+      "type": "Artifact",
+      "source_id": "artifact-migration-job",
+      "properties": {}
+    },
+    "artifact-orders-service": {
+      "type": "Artifact",
+      "source_id": "artifact-orders-service",
+      "properties": {}
+    },
+    "node-payment-network": {
+      "type": "Node",
+      "source_id": "node-payment-network",
+      "properties": {}
+    },
+    "device-prod-node": {
+      "type": "Device",
+      "source_id": "device-prod-node",
+      "properties": {
+        "kind": "device"
+      }
+    },
+    "deployment-spec-orders": {
+      "type": "DeploymentSpecification",
+      "source_id": "deployment-spec-orders",
+      "properties": {}
+    },
+    "component-order-api": {
+      "type": "Component",
+      "source_id": "component-order-api",
+      "properties": {}
+    }
+  },
+  "edges": {
+    "deploy-orders-spec": {
+      "type": "Deployment",
+      "source_id": "deploy-orders-spec",
+      "properties": {}
+    },
+    "artifact-manifests-order-api": {
+      "type": "Manifestation",
+      "source_id": "artifact-manifests-order-api",
+      "properties": {}
+    },
+    "orders-runtime-payment-path": {
+      "type": "CommunicationPath",
+      "source_id": "orders-runtime-payment-path",
+      "properties": {}
+    },
+    "deploy-orders-service": {
+      "type": "Deployment",
+      "source_id": "deploy-orders-service",
+      "properties": {}
+    }
+  },
+  "groups": {
+    "prod-node-boundary": {
+      "type": "Device",
+      "source_id": "device-prod-node"
+    }
+  }
+}

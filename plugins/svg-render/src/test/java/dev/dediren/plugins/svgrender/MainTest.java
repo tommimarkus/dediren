@@ -177,6 +177,65 @@ class MainTest {
         }
 
         @Test
+        void rendersUmlDeploymentNotation() throws Exception {
+            String content = okContent(render(renderInput(
+                    "fixtures/layout-result/uml-deployment-basic.json",
+                    "fixtures/render-policy/uml-svg.json",
+                    "fixtures/render-metadata/uml-deployment-basic.json")));
+            Document document = svgDocument(content);
+
+            assertThat(content).contains(
+                    ">Production Node<",
+                    ">Orders Runtime<",
+                    ">orders-service.jar<",
+                    "&#171;device&#187;",
+                    "&#171;executionEnvironment&#187;");
+            groupWithAttribute(document, "data-dediren-node-id", "device-prod-node");
+            groupWithAttribute(document, "data-dediren-node-id", "ee-orders-runtime");
+            groupWithAttribute(document, "data-dediren-node-id", "artifact-orders-service");
+            groupWithAttribute(document, "data-dediren-node-id", "deployment-spec-orders");
+            groupWithAttribute(document, "data-dediren-edge-id", "deploy-orders-service");
+            groupWithAttribute(document, "data-dediren-edge-id", "artifact-manifests-order-api");
+            groupWithAttribute(document, "data-dediren-edge-id", "orders-runtime-payment-path");
+            groupWithAttribute(document, "data-dediren-group-id", "prod-node-boundary");
+
+            Element device = groupWithAttribute(document, "data-dediren-node-id", "device-prod-node");
+            Element deviceShape = firstChildElement(device, "g");
+            assertThat(deviceShape.getAttribute("data-dediren-node-shape")).isEqualTo("uml_device");
+            assertThat(childElements(deviceShape, "rect")).hasSize(1);
+            assertThat(childElements(deviceShape, "path"))
+                    .extracting(path -> path.getAttribute("data-dediren-deployment-target-part"))
+                    .contains("top", "side");
+
+            Element artifact = groupWithAttribute(document, "data-dediren-node-id", "artifact-orders-service");
+            Element artifactShape = firstChildElement(artifact, "g");
+            assertThat(artifactShape.getAttribute("data-dediren-node-shape")).isEqualTo("uml_artifact");
+            assertThat(childElements(artifactShape, "path"))
+                    .extracting(path -> path.getAttribute("data-dediren-artifact-part"))
+                    .contains("body", "fold");
+
+            Element spec = groupWithAttribute(document, "data-dediren-node-id", "deployment-spec-orders");
+            Element specShape = firstChildElement(spec, "g");
+            assertThat(specShape.getAttribute("data-dediren-node-shape"))
+                    .isEqualTo("uml_deployment_specification");
+
+            Element deployment = groupWithAttribute(document, "data-dediren-edge-id", "deploy-orders-service");
+            Element deploymentPath = firstChildElement(deployment, "path");
+            assertMarkerForStyle(document, deploymentPath, "deploy-orders-service", "end", "open_arrow");
+            assertThat(deploymentPath.getAttribute("stroke-dasharray")).isEqualTo("8 5");
+
+            Element manifestation = groupWithAttribute(document, "data-dediren-edge-id", "artifact-manifests-order-api");
+            Element manifestationPath = firstChildElement(manifestation, "path");
+            assertMarkerForStyle(document, manifestationPath, "artifact-manifests-order-api", "end", "open_arrow");
+            assertThat(manifestationPath.getAttribute("stroke-dasharray")).isEqualTo("8 5");
+
+            Element communicationPath = groupWithAttribute(document, "data-dediren-edge-id", "orders-runtime-payment-path");
+            Element communicationPathShape = firstChildElement(communicationPath, "path");
+            assertThat(communicationPathShape.hasAttribute("marker-end")).isFalse();
+            assertThat(communicationPathShape.hasAttribute("stroke-dasharray")).isFalse();
+        }
+
+        @Test
         void rejectsMalformedUmlSequenceMessageMetadata() throws Exception {
             assertInvalidUmlSequenceMessageMetadata(
                     properties -> properties.remove("sequence"),

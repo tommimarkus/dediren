@@ -46,7 +46,7 @@ guidance in that package.
 {
   "model_schema_version": "model.schema.v1",
   "required_plugins": [
-    { "id": "generic-graph", "version": "0.25.0" }
+    { "id": "generic-graph", "version": "0.26.0" }
   ],
   "nodes": [
     { "id": "client", "type": "generic.actor", "label": "Client", "properties": {} },
@@ -90,8 +90,8 @@ profile and use ArchiMate type names:
 ```json
 {
   "required_plugins": [
-    { "id": "generic-graph", "version": "0.25.0" },
-    { "id": "archimate-oef", "version": "0.25.0" }
+    { "id": "generic-graph", "version": "0.26.0" },
+    { "id": "archimate-oef", "version": "0.26.0" }
   ],
   "plugins": {
     "generic-graph": {
@@ -188,8 +188,7 @@ each command before continuing. The sequence MVP supports `Interaction`,
 `DestructionOccurrenceSpecification` plus `CombinedFragment` and
 `InteractionOperand`; message sorts are `synchCall`, `asynchCall`,
 `asynchSignal`, `reply`, `createMessage`, and `deleteMessage`. `InteractionUse`,
-`GeneralOrdering`, `ignore`, `consider`, UMLDI, and deployment diagrams are not
-yet supported.
+`GeneralOrdering`, `ignore`, `consider`, and UMLDI are not yet supported.
 
 ## UML State Machine Handoff
 
@@ -244,8 +243,7 @@ Supported vocabulary: `StateMachine`, `Region`, `State`, `FinalState`,
 `exitPoint`, `terminate`. Transition kinds: `internal`, `local`, `external`.
 Deferred/non-goals: `ConnectionPointReference`, `ProtocolStateMachine`,
 `ProtocolTransition`, submachine states, orthogonal multi-region internals,
-trigger event metaclasses, effects as behavior nodes, UMLDI, and deployment
-diagrams.
+trigger event metaclasses, effects as behavior nodes, and UMLDI.
 
 ## UML Use Case Handoff
 
@@ -299,8 +297,7 @@ on use cases and `ExtensionPoint.properties.uml.use_case` on extension points.
 Rules: `Include` and `Extend` are `UseCase -> UseCase`.
 `Extend.properties.uml.extension_point`, when present, must reference an
 extension point owned by the extended target use case. Deferred/non-goals:
-use-case generalization, collaboration use-case realizations, UMLDI, and
-deployment diagrams.
+use-case generalization, collaboration use-case realizations, and UMLDI.
 
 ## UML Component Handoff
 
@@ -353,13 +350,67 @@ boundaries as semantic-backed view groups.
 
 Rules: `Port.properties.uml.component` must reference a `Component`; `provided`
 and `required` entries must reference `Interface` nodes. Deferred/non-goals:
-composite structure, connectors, collaborations, UMLDI, and deployment
-diagrams.
+composite structure, connectors, collaborations, and UMLDI.
+
+## UML Deployment Handoff
+
+Use `fixtures/source/valid-uml-deployment-basic.json` for the deployment MVP.
+Author `Node`, `Device`, `ExecutionEnvironment`, `Artifact`, and
+`DeploymentSpecification` nodes alongside manifested structural classifiers.
+Put optional `ExecutionEnvironment.properties.uml.node` on nested runtimes. Use
+`Deployment`, `Manifestation`, and `CommunicationPath` relationships, and model
+deployment target boundaries as semantic-backed view groups.
+
+```bash
+"$BUNDLE/bin/dediren" validate \
+  --plugin generic-graph \
+  --profile uml \
+  --input "$BUNDLE/fixtures/source/valid-uml-deployment-basic.json"
+
+"$BUNDLE/bin/dediren" project \
+  --target layout-request \
+  --plugin generic-graph \
+  --view deployment-view \
+  --input "$BUNDLE/fixtures/source/valid-uml-deployment-basic.json" \
+  > deployment-layout-request.json
+
+"$BUNDLE/bin/dediren" project \
+  --target render-metadata \
+  --plugin generic-graph \
+  --view deployment-view \
+  --input "$BUNDLE/fixtures/source/valid-uml-deployment-basic.json" \
+  > deployment-render-metadata.json
+
+"$BUNDLE/bin/dediren" layout \
+  --plugin elk-layout \
+  --input deployment-layout-request.json \
+  > deployment-layout-result.json
+
+"$BUNDLE/bin/dediren" render \
+  --plugin svg-render \
+  --policy "$BUNDLE/fixtures/render-policy/uml-svg.json" \
+  --metadata deployment-render-metadata.json \
+  --input deployment-layout-result.json \
+  > deployment-render-result.json
+
+"$BUNDLE/bin/dediren" export \
+  --plugin uml-xmi \
+  --policy "$BUNDLE/fixtures/export-policy/default-uml-xmi.json" \
+  --source "$BUNDLE/fixtures/source/valid-uml-deployment-basic.json" \
+  --layout deployment-layout-result.json \
+  > deployment-xmi-result.json
+```
+
+Rules: `Deployment` connects an `Artifact` or `DeploymentSpecification` to a
+deployment target; `Manifestation` connects an artifact or deployment
+specification to a structural classifier; `CommunicationPath` connects
+deployment targets. Deferred/non-goals: full nested part/property modeling,
+deployment slots, and UMLDI.
 
 ## Runtime Probes
 
 ```bash
-VERSION=0.25.0
+VERSION=0.26.0
 BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-${VERSION}
 
 "$BUNDLE/bin/dediren" --version

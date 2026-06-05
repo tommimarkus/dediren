@@ -35,7 +35,7 @@ class MainTest {
         CliResult result = Main.executeForTesting(new String[]{"--version"}, "");
 
         assertThat(result.exitCode()).isZero();
-        assertThat(result.stdout()).contains("dediren 0.25.0");
+        assertThat(result.stdout()).contains("dediren 0.26.0");
     }
 
     @Test
@@ -607,6 +607,126 @@ class MainTest {
                 "xmi:type=\"uml:Port\"",
                 "xmi:type=\"uml:Usage\"",
                 "supplier=\"id-interface-payment-gateway\"");
+    }
+
+    @Test
+    void deploymentFixtureRunsThroughDocumentedCliWorkflow() throws Exception {
+        Map<String, String> env = sequenceWorkflowEnv();
+        Path root = workspaceRoot();
+        Path source = root.resolve("fixtures/source/valid-uml-deployment-basic.json");
+
+        CliResult validate = Main.executeForTesting(new String[]{
+                "validate",
+                "--plugin",
+                "generic-graph",
+                "--profile",
+                "uml",
+                "--input",
+                source.toString()
+        }, "", env);
+
+        JsonNode validateData = okData(validate);
+        assertThat(validateData.at("/semantic_profile").asText()).isEqualTo("uml");
+        assertThat(validateData.at("/node_count").asInt()).isEqualTo(7);
+        assertThat(validateData.at("/relationship_count").asInt()).isEqualTo(4);
+
+        CliResult layoutRequest = Main.executeForTesting(new String[]{
+                "project",
+                "--plugin",
+                "generic-graph",
+                "--target",
+                "layout-request",
+                "--view",
+                "deployment-view",
+                "--input",
+                source.toString()
+        }, "", env);
+
+        JsonNode layoutRequestData = okData(layoutRequest);
+        assertThat(layoutRequestData.at("/view_id").asText()).isEqualTo("deployment-view");
+        assertThat(layoutRequestData.get("nodes"))
+                .extracting(node -> node.at("/id").asText())
+                .contains("device-prod-node", "ee-orders-runtime", "artifact-orders-service");
+        Path layoutRequestFile = writeStdout("deployment-layout-request.json", layoutRequest);
+
+        CliResult renderMetadata = Main.executeForTesting(new String[]{
+                "project",
+                "--plugin",
+                "generic-graph",
+                "--target",
+                "render-metadata",
+                "--view",
+                "deployment-view",
+                "--input",
+                source.toString()
+        }, "", env);
+
+        JsonNode renderMetadataData = okData(renderMetadata);
+        assertThat(renderMetadataData.at("/nodes/device-prod-node/type").asText()).isEqualTo("Device");
+        assertThat(renderMetadataData.at("/nodes/ee-orders-runtime/type").asText())
+                .isEqualTo("ExecutionEnvironment");
+        assertThat(renderMetadataData.at("/edges/deploy-orders-service/type").asText()).isEqualTo("Deployment");
+        assertThat(renderMetadataData.at("/edges/artifact-manifests-order-api/type").asText())
+                .isEqualTo("Manifestation");
+        Path renderMetadataFile = writeStdout("deployment-render-metadata.json", renderMetadata);
+
+        CliResult layout = Main.executeForTesting(new String[]{
+                "layout",
+                "--plugin",
+                "elk-layout",
+                "--input",
+                layoutRequestFile.toString()
+        }, "", env);
+
+        JsonNode layoutData = okData(layout);
+        assertThat(layoutData.at("/view_id").asText()).isEqualTo("deployment-view");
+        assertThat(layoutData.get("nodes"))
+                .extracting(node -> node.at("/id").asText())
+                .contains("device-prod-node", "ee-orders-runtime", "deployment-spec-orders");
+        Path layoutFile = writeStdout("deployment-layout-result.json", layout);
+
+        CliResult render = Main.executeForTesting(new String[]{
+                "render",
+                "--plugin",
+                "svg-render",
+                "--policy",
+                root.resolve("fixtures/render-policy/uml-svg.json").toString(),
+                "--metadata",
+                renderMetadataFile.toString(),
+                "--input",
+                layoutFile.toString()
+        }, "", env);
+
+        JsonNode renderData = okData(render);
+        String svg = renderData.at("/content").asText();
+        assertThat(renderData.at("/artifact_kind").asText()).isEqualTo("svg");
+        assertThat(svg).contains(
+                "data-dediren-node-shape=\"uml_device\"",
+                "data-dediren-node-shape=\"uml_execution_environment\"",
+                "data-dediren-node-shape=\"uml_artifact\"",
+                "data-dediren-edge-id=\"deploy-orders-service\"");
+
+        CliResult export = Main.executeForTesting(new String[]{
+                "export",
+                "--plugin",
+                "uml-xmi",
+                "--policy",
+                root.resolve("fixtures/export-policy/default-uml-xmi.json").toString(),
+                "--source",
+                source.toString(),
+                "--layout",
+                layoutFile.toString()
+        }, "", env);
+
+        JsonNode exportData = okData(export);
+        String xmi = exportData.at("/content").asText();
+        assertThat(exportData.at("/artifact_kind").asText()).isEqualTo("uml-xmi+xml");
+        assertThat(xmi).contains(
+                "xmi:type=\"uml:Device\"",
+                "xmi:type=\"uml:Artifact\"",
+                "xmi:type=\"uml:Deployment\"",
+                "xmi:type=\"uml:Manifestation\"",
+                "xmi:type=\"uml:CommunicationPath\"");
     }
 
     private Path writeStdout(String fileName, CliResult result) throws Exception {

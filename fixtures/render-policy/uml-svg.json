@@ -70,7 +70,12 @@
       "UseCase": { "fill": "#ffffff", "stroke": "#000000", "label_fill": "#000000", "decorator": "uml_use_case" },
       "ExtensionPoint": { "fill": "#ffffff", "stroke": "#000000", "label_fill": "#000000", "decorator": "uml_extension_point" },
       "Component": { "fill": "#ffffff", "stroke": "#000000", "label_fill": "#000000", "decorator": "uml_component" },
-      "Port": { "fill": "#ffffff", "stroke": "#000000", "label_fill": "#000000", "decorator": "uml_port" }
+      "Port": { "fill": "#ffffff", "stroke": "#000000", "label_fill": "#000000", "decorator": "uml_port" },
+      "Node": { "fill": "#ffffff", "stroke": "#000000", "label_fill": "#000000", "decorator": "uml_node" },
+      "Device": { "fill": "#ffffff", "stroke": "#000000", "label_fill": "#000000", "decorator": "uml_device" },
+      "ExecutionEnvironment": { "fill": "#ffffff", "stroke": "#000000", "label_fill": "#000000", "decorator": "uml_execution_environment" },
+      "Artifact": { "fill": "#ffffff", "stroke": "#000000", "label_fill": "#000000", "decorator": "uml_artifact" },
+      "DeploymentSpecification": { "fill": "#ffffff", "stroke": "#000000", "label_fill": "#000000", "decorator": "uml_deployment_specification" }
     },
     "edge_type_overrides": {
       "Association": { "marker_start": "none", "marker_end": "none" },
@@ -102,6 +107,21 @@
         "line_style": "dashed",
         "marker_end": "open_arrow",
         "label_horizontal_position": "center"
+      },
+      "Deployment": {
+        "line_style": "dashed",
+        "marker_end": "open_arrow",
+        "label_horizontal_position": "center"
+      },
+      "Manifestation": {
+        "line_style": "dashed",
+        "marker_end": "open_arrow",
+        "label_horizontal_position": "center"
+      },
+      "CommunicationPath": {
+        "marker_start": "none",
+        "marker_end": "none",
+        "label_horizontal_position": "center"
       }
     },
     "group_type_overrides": {
@@ -131,6 +151,13 @@
         "label_fill": "#000000",
         "rx": 0,
         "decorator": "uml_component"
+      },
+      "Device": {
+        "fill": "#ffffff",
+        "stroke": "#000000",
+        "label_fill": "#000000",
+        "rx": 0,
+        "decorator": "uml_device"
       }
     },
     "node_overrides": {},

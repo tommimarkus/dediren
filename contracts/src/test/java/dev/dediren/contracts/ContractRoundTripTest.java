@@ -221,6 +221,52 @@ class ContractRoundTripTest {
     }
 
     @Test
+    void umlDeploymentSourceDocumentPreservesPublicDeploymentSurface() throws Exception {
+        String fixture = "fixtures/source/valid-uml-deployment-basic.json";
+
+        assertThat(SchemaAssertions.validateFixture(workspaceRoot(), "schemas/model.schema.json", fixture))
+                .describedAs(fixture)
+                .isEmpty();
+
+        SourceDocument source = readFixture(fixture, SourceDocument.class);
+        GenericGraphPluginData genericGraph = JsonSupport.objectMapper()
+                .treeToValue(source.plugins().get("generic-graph"), GenericGraphPluginData.class);
+        var view = genericGraph.views().getFirst();
+
+        assertThat(genericGraph.semanticProfile()).isEqualTo(GenericGraphSemanticProfile.UML);
+        assertThat(view.kind()).isEqualTo(GenericGraphViewKind.UML_DEPLOYMENT);
+        assertThat(JsonSupport.objectMapper().valueToTree(genericGraph).at("/views/0/kind").asText())
+                .isEqualTo("uml-deployment");
+        assertThat(view.nodes())
+                .containsExactly(
+                        "device-prod-node",
+                        "ee-orders-runtime",
+                        "node-payment-network",
+                        "artifact-orders-service",
+                        "artifact-migration-job",
+                        "deployment-spec-orders",
+                        "component-order-api");
+        assertThat(view.relationships())
+                .containsExactly(
+                        "deploy-orders-service",
+                        "deploy-orders-spec",
+                        "artifact-manifests-order-api",
+                        "orders-runtime-payment-path");
+        assertThat(view.groups()).hasSize(1);
+        assertThat(view.groups().getFirst().semanticSourceId()).isEqualTo("device-prod-node");
+
+        SourceDocument reparsed = JsonSupport.objectMapper()
+                .treeToValue(JsonSupport.objectMapper().valueToTree(source), SourceDocument.class);
+
+        assertThat(reparsed.nodes()).extracting(node -> node.type())
+                .contains("Device", "ExecutionEnvironment", "Node", "Artifact", "DeploymentSpecification");
+        assertThat(reparsed.relationships()).extracting(SourceRelationship::type)
+                .contains("Deployment", "Manifestation", "CommunicationPath");
+        assertThat(JsonSupport.objectMapper().valueToTree(reparsed).at("/nodes/1/properties/uml/node").asText())
+                .isEqualTo("device-prod-node");
+    }
+
+    @Test
     void umlSequenceFragmentsFixtureRoundTrips() throws Exception {
         String fixturePath = "fixtures/source/valid-uml-sequence-fragments.json";
         JsonNode source = JsonSupport.objectMapper().readTree(fixture(fixturePath));
@@ -423,7 +469,7 @@ class ContractRoundTripTest {
                 """, RuntimeCapabilities.class);
 
         assertThat(manifest.pluginManifestSchemaVersion()).isEqualTo("plugin-manifest.schema.v1");
-        assertThat(manifest.version()).isEqualTo("0.25.0");
+        assertThat(manifest.version()).isEqualTo("0.26.0");
         assertThat(manifest.allowedEnv()).containsExactly("JAVA_HOME", "PATH");
         assertThat(capabilities.pluginProtocolVersion()).isEqualTo(ContractVersions.PLUGIN_PROTOCOL_VERSION);
         assertThat(capabilities.runtime().get("java").asText()).isEqualTo("21");

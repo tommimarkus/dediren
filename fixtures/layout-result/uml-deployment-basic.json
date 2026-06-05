@@ -1,0 +1,226 @@
+{
+  "layout_result_schema_version": "layout-result.schema.v1",
+  "view_id": "deployment-view",
+  "nodes": [
+    {
+      "id": "device-prod-node",
+      "source_id": "device-prod-node",
+      "projection_id": "device-prod-node",
+      "x": 225.5,
+      "y": 12.0,
+      "width": 200.0,
+      "height": 120.0,
+      "label": "Production Node"
+    },
+    {
+      "id": "ee-orders-runtime",
+      "source_id": "ee-orders-runtime",
+      "projection_id": "ee-orders-runtime",
+      "x": 402.0,
+      "y": 571.0,
+      "width": 180.0,
+      "height": 96.0,
+      "label": "Orders Runtime"
+    },
+    {
+      "id": "node-payment-network",
+      "source_id": "node-payment-network",
+      "projection_id": "node-payment-network",
+      "x": 808.0,
+      "y": 475.0,
+      "width": 200.0,
+      "height": 120.0,
+      "label": "Payment Network"
+    },
+    {
+      "id": "artifact-orders-service",
+      "source_id": "artifact-orders-service",
+      "projection_id": "artifact-orders-service",
+      "x": 83.0,
+      "y": 403.0,
+      "width": 150.0,
+      "height": 70.0,
+      "label": "orders-service.jar"
+    },
+    {
+      "id": "artifact-migration-job",
+      "source_id": "artifact-migration-job",
+      "projection_id": "artifact-migration-job",
+      "x": 64.0,
+      "y": 570.0,
+      "width": 150.0,
+      "height": 70.0,
+      "label": "migration-job.jar"
+    },
+    {
+      "id": "deployment-spec-orders",
+      "source_id": "deployment-spec-orders",
+      "projection_id": "deployment-spec-orders",
+      "x": 44.0,
+      "y": 236.0,
+      "width": 190.0,
+      "height": 70.0,
+      "label": "orders-deployment.yaml"
+    },
+    {
+      "id": "component-order-api",
+      "source_id": "component-order-api",
+      "projection_id": "component-order-api",
+      "x": 808.0,
+      "y": 667.0,
+      "width": 180.0,
+      "height": 96.0,
+      "label": "Order API"
+    }
+  ],
+  "edges": [
+    {
+      "id": "deploy-orders-service",
+      "source": "artifact-orders-service",
+      "target": "ee-orders-runtime",
+      "source_id": "deploy-orders-service",
+      "projection_id": "deploy-orders-service",
+      "routing_hints": [],
+      "points": [
+        {
+          "x": 158.0,
+          "y": 474.0
+        },
+        {
+          "x": 158.0,
+          "y": 522.0
+        },
+        {
+          "x": 467.16666666666663,
+          "y": 522.0
+        },
+        {
+          "x": 467.16666666666663,
+          "y": 570.0
+        }
+      ],
+      "label": "deploy"
+    },
+    {
+      "id": "deploy-orders-spec",
+      "source": "deployment-spec-orders",
+      "target": "ee-orders-runtime",
+      "source_id": "deploy-orders-spec",
+      "projection_id": "deploy-orders-spec",
+      "routing_hints": [],
+      "points": [
+        {
+          "x": 139.0,
+          "y": 307.0
+        },
+        {
+          "x": 139.0,
+          "y": 355.0
+        },
+        {
+          "x": 516.8333333333333,
+          "y": 355.0
+        },
+        {
+          "x": 516.8333333333333,
+          "y": 570.0
+        }
+      ],
+      "label": "applies"
+    },
+    {
+      "id": "artifact-manifests-order-api",
+      "source": "artifact-orders-service",
+      "target": "component-order-api",
+      "source_id": "artifact-manifests-order-api",
+      "projection_id": "artifact-manifests-order-api",
+      "routing_hints": [],
+      "points": [
+        {
+          "x": 234.0,
+          "y": 438.0
+        },
+        {
+          "x": 282.0,
+          "y": 438.0
+        },
+        {
+          "x": 282.0,
+          "y": 715.0
+        },
+        {
+          "x": 330.0,
+          "y": 715.0
+        },
+        {
+          "x": 492.5,
+          "y": 715.0
+        },
+        {
+          "x": 639.0,
+          "y": 715.0
+        },
+        {
+          "x": 807.0,
+          "y": 715.0
+        }
+      ],
+      "label": "manifests"
+    },
+    {
+      "id": "orders-runtime-payment-path",
+      "source": "ee-orders-runtime",
+      "target": "node-payment-network",
+      "source_id": "orders-runtime-payment-path",
+      "projection_id": "orders-runtime-payment-path",
+      "routing_hints": [],
+      "points": [
+        {
+          "x": 583.0,
+          "y": 619.0
+        },
+        {
+          "x": 639.0,
+          "y": 619.0
+        },
+        {
+          "x": 687.0,
+          "y": 619.0
+        },
+        {
+          "x": 687.0,
+          "y": 535.0
+        },
+        {
+          "x": 807.0,
+          "y": 535.0
+        }
+      ],
+      "label": "HTTPS"
+    }
+  ],
+  "groups": [
+    {
+      "id": "prod-node-boundary",
+      "source_id": "device-prod-node",
+      "projection_id": "prod-node-boundary",
+      "provenance": {
+        "semantic_backed": {
+          "source_id": "device-prod-node"
+        }
+      },
+      "x": 12.0,
+      "y": 204.0,
+      "width": 603.0,
+      "height": 559.0,
+      "members": [
+        "ee-orders-runtime",
+        "artifact-orders-service",
+        "artifact-migration-job",
+        "deployment-spec-orders"
+      ],
+      "label": "Production Node"
+    }
+  ],
+  "warnings": []
+}

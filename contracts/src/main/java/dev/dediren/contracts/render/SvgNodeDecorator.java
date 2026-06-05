@@ -184,5 +184,15 @@ public enum SvgNodeDecorator {
     @JsonProperty("uml_component")
     UML_COMPONENT,
     @JsonProperty("uml_port")
-    UML_PORT
+    UML_PORT,
+    @JsonProperty("uml_node")
+    UML_NODE,
+    @JsonProperty("uml_device")
+    UML_DEVICE,
+    @JsonProperty("uml_execution_environment")
+    UML_EXECUTION_ENVIRONMENT,
+    @JsonProperty("uml_artifact")
+    UML_ARTIFACT,
+    @JsonProperty("uml_deployment_specification")
+    UML_DEPLOYMENT_SPECIFICATION
 }

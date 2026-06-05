@@ -172,7 +172,12 @@
             "uml_use_case",
             "uml_extension_point",
             "uml_component",
-            "uml_port"
+            "uml_port",
+            "uml_node",
+            "uml_device",
+            "uml_execution_environment",
+            "uml_artifact",
+            "uml_deployment_specification"
           ]
         }
       }

@@ -53,7 +53,10 @@ class UmlValidationTest {
                 "Transition",
                 "Include",
                 "Extend",
-                "Usage");
+                "Usage",
+                "Deployment",
+                "Manifestation",
+                "CommunicationPath");
     }
 
     @Test
@@ -125,6 +128,93 @@ class UmlValidationTest {
         Uml.validateRelationshipEndpointTypes("Usage", "Component", "Interface", "$.relationship");
         Uml.validateRelationshipEndpointTypes("Dependency", "Component", "Class", "$.relationship");
         Uml.validateSource(fixture.source(), fixture.pluginData());
+    }
+
+    @Test
+    void acceptsUmlDeploymentVocabulary() throws Exception {
+        Fixture fixture = loadUmlDeploymentFixture();
+
+        for (String type : new String[]{
+                "Node",
+                "Device",
+                "ExecutionEnvironment",
+                "Artifact",
+                "DeploymentSpecification"}) {
+            Uml.validateElementType(type, "$.type");
+        }
+        Uml.validateRelationshipType("Deployment", "$.type");
+        Uml.validateRelationshipType("Manifestation", "$.type");
+        Uml.validateRelationshipType("CommunicationPath", "$.type");
+        Uml.validateRelationshipEndpointTypes("Deployment", "Artifact", "ExecutionEnvironment", "$.relationship");
+        Uml.validateRelationshipEndpointTypes("Deployment", "DeploymentSpecification", "Device", "$.relationship");
+        Uml.validateRelationshipEndpointTypes("Manifestation", "Artifact", "Component", "$.relationship");
+        Uml.validateRelationshipEndpointTypes("CommunicationPath", "ExecutionEnvironment", "Node", "$.relationship");
+        Uml.validateSource(fixture.source(), fixture.pluginData());
+    }
+
+    @Test
+    void rejectsExecutionEnvironmentParentThatIsNotDeploymentTarget() throws Exception {
+        Fixture fixture = loadMutatedUmlDeploymentFixture(
+                source -> nodeUmlProperties(source, "ee-orders-runtime").put("node", "artifact-orders-service"));
+
+        UmlValidationException error = org.junit.jupiter.api.Assertions.assertThrows(
+                UmlValidationException.class,
+                () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+
+        assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
+        assertThat(error.path()).isEqualTo("$.nodes[1].properties.uml.node");
+    }
+
+    @Test
+    void rejectsDeploymentWithComponentSourceEndpoint() throws Exception {
+        Fixture fixture = loadMutatedUmlDeploymentFixture(
+                source -> relationshipById(source, "deploy-orders-service").put("source", "component-order-api"));
+
+        UmlValidationException error = org.junit.jupiter.api.Assertions.assertThrows(
+                UmlValidationException.class,
+                () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+
+        assertThat(error.code()).isEqualTo("DEDIREN_UML_RELATIONSHIP_ENDPOINT_UNSUPPORTED");
+        assertThat(error.value()).isEqualTo("Deployment: Component -> ExecutionEnvironment");
+    }
+
+    @Test
+    void rejectsManifestationWithDeploymentTargetSourceEndpoint() throws Exception {
+        Fixture fixture = loadMutatedUmlDeploymentFixture(
+                source -> relationshipById(source, "artifact-manifests-order-api").put("source", "ee-orders-runtime"));
+
+        UmlValidationException error = org.junit.jupiter.api.Assertions.assertThrows(
+                UmlValidationException.class,
+                () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+
+        assertThat(error.code()).isEqualTo("DEDIREN_UML_RELATIONSHIP_ENDPOINT_UNSUPPORTED");
+        assertThat(error.value()).isEqualTo("Manifestation: ExecutionEnvironment -> Component");
+    }
+
+    @Test
+    void rejectsCommunicationPathWithArtifactEndpoint() throws Exception {
+        Fixture fixture = loadMutatedUmlDeploymentFixture(
+                source -> relationshipById(source, "orders-runtime-payment-path").put("target", "artifact-orders-service"));
+
+        UmlValidationException error = org.junit.jupiter.api.Assertions.assertThrows(
+                UmlValidationException.class,
+                () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+
+        assertThat(error.code()).isEqualTo("DEDIREN_UML_RELATIONSHIP_ENDPOINT_UNSUPPORTED");
+        assertThat(error.value()).isEqualTo("CommunicationPath: ExecutionEnvironment -> Artifact");
+    }
+
+    @Test
+    void rejectsDeploymentViewRelationshipEndpointOutsideView() throws Exception {
+        Fixture fixture = loadMutatedUmlDeploymentFixture(
+                source -> removeViewNode(source, "node-payment-network"));
+
+        UmlValidationException error = org.junit.jupiter.api.Assertions.assertThrows(
+                UmlValidationException.class,
+                () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+
+        assertThat(error.code()).isEqualTo("DEDIREN_UML_RELATIONSHIP_ENDPOINT_UNSUPPORTED");
+        assertThat(error.path()).isEqualTo("$.plugins.generic-graph.views[0].relationships[3]");
     }
 
     @Test
@@ -1153,6 +1243,12 @@ class UmlValidationTest {
                 "generic-graph");
     }
 
+    private static Fixture loadUmlDeploymentFixture() throws Exception {
+        return fixture(
+                Files.readString(workspaceRoot().resolve("fixtures/source/valid-uml-deployment-basic.json")),
+                "generic-graph");
+    }
+
     private static Fixture loadMutatedUmlSequenceFixture(java.util.function.Consumer<ObjectNode> mutate)
             throws Exception {
         var sourceJson = (ObjectNode) JsonSupport.objectMapper().readTree(
@@ -1194,6 +1290,13 @@ class UmlValidationTest {
     private static Fixture loadMutatedUmlComponentFixture(Consumer<ObjectNode> mutate) throws Exception {
         ObjectNode source = (ObjectNode) JsonSupport.objectMapper().readTree(
                 Files.readString(workspaceRoot().resolve("fixtures/source/valid-uml-component-basic.json")));
+        mutate.accept(source);
+        return fixture(JsonSupport.objectMapper().writeValueAsString(source), "generic-graph");
+    }
+
+    private static Fixture loadMutatedUmlDeploymentFixture(Consumer<ObjectNode> mutate) throws Exception {
+        ObjectNode source = (ObjectNode) JsonSupport.objectMapper().readTree(
+                Files.readString(workspaceRoot().resolve("fixtures/source/valid-uml-deployment-basic.json")));
         mutate.accept(source);
         return fixture(JsonSupport.objectMapper().writeValueAsString(source), "generic-graph");
     }

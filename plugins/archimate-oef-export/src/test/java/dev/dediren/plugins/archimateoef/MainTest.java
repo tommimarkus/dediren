@@ -145,8 +145,8 @@ class MainTest {
                 {
                   "model_schema_version": "model.schema.v1",
                   "required_plugins": [
-                    { "id": "generic-graph", "version": "0.25.0" },
-                    { "id": "archimate-oef", "version": "0.25.0" }
+                    { "id": "generic-graph", "version": "0.26.0" },
+                    { "id": "archimate-oef", "version": "0.26.0" }
                   ],
                   "nodes": [
                     { "id": "api", "type": "ApplicationComponent", "label": "API", "properties": {} },
@@ -198,8 +198,8 @@ class MainTest {
                 {
                   "model_schema_version": "model.schema.v1",
                   "required_plugins": [
-                    { "id": "generic-graph", "version": "0.25.0" },
-                    { "id": "archimate-oef", "version": "0.25.0" }
+                    { "id": "generic-graph", "version": "0.26.0" },
+                    { "id": "archimate-oef", "version": "0.26.0" }
                   ],
                   "nodes": [
                     { "id": "group", "type": "Grouping", "label": "Group", "properties": {} },

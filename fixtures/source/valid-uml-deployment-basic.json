@@ -1,0 +1,167 @@
+{
+  "model_schema_version": "model.schema.v1",
+  "required_plugins": [
+    {
+      "id": "generic-graph",
+      "version": "0.26.0"
+    },
+    {
+      "id": "uml-xmi",
+      "version": "0.26.0"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "device-prod-node",
+      "type": "Device",
+      "label": "Production Node",
+      "properties": {
+        "uml": {
+          "kind": "device"
+        }
+      }
+    },
+    {
+      "id": "ee-orders-runtime",
+      "type": "ExecutionEnvironment",
+      "label": "Orders Runtime",
+      "properties": {
+        "uml": {
+          "node": "device-prod-node"
+        }
+      }
+    },
+    {
+      "id": "node-payment-network",
+      "type": "Node",
+      "label": "Payment Network",
+      "properties": {
+        "uml": {}
+      }
+    },
+    {
+      "id": "artifact-orders-service",
+      "type": "Artifact",
+      "label": "orders-service.jar",
+      "properties": {
+        "uml": {}
+      }
+    },
+    {
+      "id": "artifact-migration-job",
+      "type": "Artifact",
+      "label": "migration-job.jar",
+      "properties": {
+        "uml": {}
+      }
+    },
+    {
+      "id": "deployment-spec-orders",
+      "type": "DeploymentSpecification",
+      "label": "orders-deployment.yaml",
+      "properties": {
+        "uml": {}
+      }
+    },
+    {
+      "id": "component-order-api",
+      "type": "Component",
+      "label": "Order API",
+      "properties": {
+        "uml": {}
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "id": "deploy-orders-service",
+      "type": "Deployment",
+      "source": "artifact-orders-service",
+      "target": "ee-orders-runtime",
+      "label": "deploy",
+      "properties": {
+        "uml": {}
+      }
+    },
+    {
+      "id": "deploy-orders-spec",
+      "type": "Deployment",
+      "source": "deployment-spec-orders",
+      "target": "ee-orders-runtime",
+      "label": "applies",
+      "properties": {
+        "uml": {}
+      }
+    },
+    {
+      "id": "artifact-manifests-order-api",
+      "type": "Manifestation",
+      "source": "artifact-orders-service",
+      "target": "component-order-api",
+      "label": "manifests",
+      "properties": {
+        "uml": {}
+      }
+    },
+    {
+      "id": "orders-runtime-payment-path",
+      "type": "CommunicationPath",
+      "source": "ee-orders-runtime",
+      "target": "node-payment-network",
+      "label": "HTTPS",
+      "properties": {
+        "uml": {}
+      }
+    }
+  ],
+  "plugins": {
+    "generic-graph": {
+      "semantic_profile": "uml",
+      "views": [
+        {
+          "id": "deployment-view",
+          "label": "Orders Deployment",
+          "kind": "uml-deployment",
+          "nodes": [
+            "device-prod-node",
+            "ee-orders-runtime",
+            "node-payment-network",
+            "artifact-orders-service",
+            "artifact-migration-job",
+            "deployment-spec-orders",
+            "component-order-api"
+          ],
+          "relationships": [
+            "deploy-orders-service",
+            "deploy-orders-spec",
+            "artifact-manifests-order-api",
+            "orders-runtime-payment-path"
+          ],
+          "layout_preferences": {
+            "direction": "right",
+            "density": "readable",
+            "routing": {
+              "style": "orthogonal",
+              "profile": "readable",
+              "endpoint_merging": "off"
+            }
+          },
+          "groups": [
+            {
+              "id": "prod-node-boundary",
+              "label": "Production Node",
+              "role": "semantic-boundary",
+              "semantic_source_id": "device-prod-node",
+              "members": [
+                "ee-orders-runtime",
+                "artifact-orders-service",
+                "artifact-migration-job",
+                "deployment-spec-orders"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

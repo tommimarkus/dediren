@@ -28,5 +28,8 @@ public enum GenericGraphViewKind {
     UML_COMPONENT,
 
     @JsonProperty("uml-use-case")
-    UML_USE_CASE
+    UML_USE_CASE,
+
+    @JsonProperty("uml-deployment")
+    UML_DEPLOYMENT
 }

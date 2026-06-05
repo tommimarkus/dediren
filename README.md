@@ -46,8 +46,8 @@ release workflows cache that path separately from Maven artifacts.
 The `dist-build` profile creates an agent-ready archive under `dist/`:
 
 ```text
-dist/dediren-agent-bundle-0.25.0/
-dist/dediren-agent-bundle-0.25.0.tar.gz
+dist/dediren-agent-bundle-0.26.0/
+dist/dediren-agent-bundle-0.26.0.tar.gz
 ```
 
 The Java archive contains launch scripts and jars, not a bundled JRE. Java 21
@@ -57,7 +57,7 @@ platform-neutral and is not tied to CPU architecture.
 ## Bundle Layout
 
 ```text
-dediren-agent-bundle-0.25.0/
+dediren-agent-bundle-0.26.0/
   bin/
     dediren
     dediren-plugin-generic-graph
@@ -89,7 +89,7 @@ the caller's current working directory.
 From an unpacked bundle:
 
 ```bash
-VERSION=0.25.0
+VERSION=0.26.0
 BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-${VERSION}
 
 "$BUNDLE/bin/dediren" --version
@@ -209,7 +209,7 @@ semantics. The UML sequence vocabulary is `Interaction`, `Lifeline`, `Message`,
 `CombinedFragment`, and `InteractionOperand`. Supported message sorts are
 `synchCall`, `asynchCall`, `asynchSignal`, `reply`, `createMessage`, and
 `deleteMessage`. `InteractionUse`, `GeneralOrdering`, `ignore`, `consider`,
-UMLDI, and deployment diagrams are not yet supported.
+and UMLDI are not yet supported.
 
 ## UML State Machine Workflow
 
@@ -276,7 +276,7 @@ kinds are `internal`, `local`, and `external`.
 This slice intentionally defers `ConnectionPointReference`,
 `ProtocolStateMachine`, `ProtocolTransition`, submachine states, orthogonal
 multi-region internals, trigger event metaclasses, effects as behavior nodes,
-UMLDI, and deployment diagrams.
+and UMLDI.
 
 ## UML Use Case Workflow
 
@@ -340,7 +340,7 @@ The UML use-case vocabulary is `Actor`, `UseCase`, and `ExtensionPoint` plus
 direction. `Extend.properties.uml.extension_point`, when present, must
 reference an extension point owned by the extended target use case. This slice
 intentionally defers use-case generalization, collaboration use-case
-realizations, UMLDI, and deployment diagrams.
+realizations, and UMLDI.
 
 ## UML Component Workflow
 
@@ -403,7 +403,70 @@ The UML component vocabulary is `Component` and `Port` plus structural
 classifiers `Package`, `Interface`, and `Class`. `Usage` connects a component
 or port to a structural classifier; `Realization` and `Dependency` reuse the
 structural relationship rules. This slice intentionally defers composite
-structure, connectors, collaborations, UMLDI, and deployment diagrams.
+structure, connectors, collaborations, and UMLDI.
+
+## UML Deployment Workflow
+
+Use `fixtures/source/valid-uml-deployment-basic.json` for the deployment MVP
+shape: `Node`, `Device`, `ExecutionEnvironment`, `Artifact`,
+`DeploymentSpecification`, and manifested structural classifiers. Put optional
+`ExecutionEnvironment.properties.uml.node` on nested runtimes. Use
+`Deployment`, `Manifestation`, and `CommunicationPath` relationships, and model
+deployment target boundaries as semantic-backed groups via
+`semantic_source_id`.
+
+Validate UML semantics, project layout and render metadata, lay out with ELK,
+render SVG, and export UML/XMI:
+
+```bash
+"$BUNDLE/bin/dediren" validate \
+  --plugin generic-graph \
+  --profile uml \
+  --input "$BUNDLE/fixtures/source/valid-uml-deployment-basic.json"
+
+"$BUNDLE/bin/dediren" project \
+  --target layout-request \
+  --plugin generic-graph \
+  --view deployment-view \
+  --input "$BUNDLE/fixtures/source/valid-uml-deployment-basic.json" \
+  > deployment-layout-request.json
+
+"$BUNDLE/bin/dediren" project \
+  --target render-metadata \
+  --plugin generic-graph \
+  --view deployment-view \
+  --input "$BUNDLE/fixtures/source/valid-uml-deployment-basic.json" \
+  > deployment-render-metadata.json
+
+"$BUNDLE/bin/dediren" layout \
+  --plugin elk-layout \
+  --input deployment-layout-request.json \
+  > deployment-layout-result.json
+
+"$BUNDLE/bin/dediren" render \
+  --plugin svg-render \
+  --policy "$BUNDLE/fixtures/render-policy/uml-svg.json" \
+  --metadata deployment-render-metadata.json \
+  --input deployment-layout-result.json \
+  > deployment-render-result.json
+
+jq -r '.data.content' deployment-render-result.json > deployment.svg
+
+"$BUNDLE/bin/dediren" export \
+  --plugin uml-xmi \
+  --policy "$BUNDLE/fixtures/export-policy/default-uml-xmi.json" \
+  --source "$BUNDLE/fixtures/source/valid-uml-deployment-basic.json" \
+  --layout deployment-layout-result.json \
+  > deployment-xmi-result.json
+
+jq -r '.data.content' deployment-xmi-result.json > deployment.xmi
+```
+
+`Deployment` connects an `Artifact` or `DeploymentSpecification` to a `Node`,
+`Device`, or `ExecutionEnvironment`. `Manifestation` connects an artifact or
+deployment specification to a structural classifier. `CommunicationPath`
+connects deployment targets in either direction. This slice intentionally
+defers full nested part/property modeling, UMLDI, and deployment slots.
 
 ## Pipeline
 

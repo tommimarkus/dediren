@@ -45,6 +45,10 @@ final class GenericGraphLayoutSizing {
         if (semanticProfile.equals("uml") && umlComponentHint != null) {
             return umlComponentHint;
         }
+        Double umlDeploymentHint = umlDeploymentWidthHint(sourceNode.type());
+        if (semanticProfile.equals("uml") && umlDeploymentHint != null) {
+            return umlDeploymentHint;
+        }
         if (semanticProfile.equals("uml") && isLargeUmlStructuralNodeType(sourceNode.type())) {
             return umlStructuralWidthHint(sourceNode);
         }
@@ -73,6 +77,10 @@ final class GenericGraphLayoutSizing {
         Double umlComponentHint = umlComponentHeightHint(sourceNode.type());
         if (semanticProfile.equals("uml") && umlComponentHint != null) {
             return umlComponentHint;
+        }
+        Double umlDeploymentHint = umlDeploymentHeightHint(sourceNode.type());
+        if (semanticProfile.equals("uml") && umlDeploymentHint != null) {
+            return umlDeploymentHint;
         }
         if (semanticProfile.equals("uml") && isLargeUmlStructuralNodeType(sourceNode.type())) {
             return umlStructuralHeightHint(sourceNode);
@@ -146,6 +154,25 @@ final class GenericGraphLayoutSizing {
         return switch (nodeType) {
             case "Component" -> 96.0;
             case "Port" -> 32.0;
+            default -> null;
+        };
+    }
+
+    private static Double umlDeploymentWidthHint(String nodeType) {
+        return switch (nodeType) {
+            case "Device", "Node" -> 200.0;
+            case "ExecutionEnvironment" -> 180.0;
+            case "Artifact" -> 150.0;
+            case "DeploymentSpecification" -> 190.0;
+            default -> null;
+        };
+    }
+
+    private static Double umlDeploymentHeightHint(String nodeType) {
+        return switch (nodeType) {
+            case "Device", "Node" -> 120.0;
+            case "ExecutionEnvironment" -> 96.0;
+            case "Artifact", "DeploymentSpecification" -> 70.0;
             default -> null;
         };
     }

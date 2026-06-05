@@ -392,6 +392,14 @@ public final class Main {
                     attr(style.fill()),
                     attr(style.stroke()),
                     styleNumber(style.strokeWidth()));
+            case UML_NODE, UML_DEVICE, UML_EXECUTION_ENVIRONMENT -> umlDeploymentTargetShape(
+                    node,
+                    style,
+                    shapeName);
+            case UML_ARTIFACT, UML_DEPLOYMENT_SPECIFICATION -> umlArtifactShape(
+                    node,
+                    style,
+                    shapeName);
             case UML_DECISION_NODE, UML_MERGE_NODE -> {
                 double centerX = node.x() + node.width() / 2.0;
                 double centerY = node.y() + node.height() / 2.0;
@@ -474,6 +482,91 @@ public final class Main {
                     attr(style.stroke()),
                     styleNumber(style.strokeWidth()));
         };
+    }
+
+    private static String umlDeploymentTargetShape(
+            LaidOutNode node,
+            ResolvedNodeStyle style,
+            String shapeName) {
+        double depth = Math.max(10.0, Math.min(18.0, Math.min(node.width(), node.height()) * 0.13));
+        double frontX = node.x();
+        double frontY = node.y() + depth;
+        double frontWidth = Math.max(20.0, node.width() - depth);
+        double frontHeight = Math.max(20.0, node.height() - depth);
+        String fill = attr(style.fill());
+        String stroke = attr(style.stroke());
+        String width = styleNumber(style.strokeWidth());
+        return String.format(
+                Locale.ROOT,
+                "<g data-dediren-node-shape=\"%s\">"
+                        + "<rect x=\"%.1f\" y=\"%.1f\" width=\"%.1f\" height=\"%.1f\" rx=\"%s\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%s\"/>"
+                        + "<path data-dediren-deployment-target-part=\"top\" d=\"M %.1f %.1f L %.1f %.1f L %.1f %.1f L %.1f %.1f Z\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%s\"/>"
+                        + "<path data-dediren-deployment-target-part=\"side\" d=\"M %.1f %.1f L %.1f %.1f L %.1f %.1f L %.1f %.1f Z\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%s\"/>"
+                        + "</g>",
+                shapeName,
+                frontX,
+                frontY,
+                frontWidth,
+                frontHeight,
+                styleNumber(style.rx()),
+                fill,
+                stroke,
+                width,
+                frontX,
+                frontY,
+                frontX + depth,
+                node.y(),
+                frontX + frontWidth + depth,
+                node.y(),
+                frontX + frontWidth,
+                frontY,
+                fill,
+                stroke,
+                width,
+                frontX + frontWidth,
+                frontY,
+                frontX + frontWidth + depth,
+                node.y(),
+                frontX + frontWidth + depth,
+                node.y() + frontHeight,
+                frontX + frontWidth,
+                frontY + frontHeight,
+                fill,
+                stroke,
+                width);
+    }
+
+    private static String umlArtifactShape(
+            LaidOutNode node,
+            ResolvedNodeStyle style,
+            String shapeName) {
+        double fold = Math.max(12.0, Math.min(22.0, Math.min(node.width(), node.height()) * 0.24));
+        String fill = attr(style.fill());
+        String stroke = attr(style.stroke());
+        String width = styleNumber(style.strokeWidth());
+        return String.format(
+                Locale.ROOT,
+                "<g data-dediren-node-shape=\"%s\">"
+                        + "<path data-dediren-artifact-part=\"body\" d=\"M %.1f %.1f H %.1f L %.1f %.1f V %.1f H %.1f Z\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%s\"/>"
+                        + "<path data-dediren-artifact-part=\"fold\" d=\"M %.1f %.1f V %.1f H %.1f\" fill=\"none\" stroke=\"%s\" stroke-width=\"%s\"/>"
+                        + "</g>",
+                shapeName,
+                node.x(),
+                node.y(),
+                node.x() + node.width() - fold,
+                node.x() + node.width(),
+                node.y() + fold,
+                node.y() + node.height(),
+                node.x(),
+                fill,
+                stroke,
+                width,
+                node.x() + node.width() - fold,
+                node.y(),
+                node.y() + fold,
+                node.x() + node.width(),
+                stroke,
+                width);
     }
 
     private static String umlActorShape(LaidOutNode node, ResolvedNodeStyle style, String shapeName) {
@@ -2079,8 +2172,31 @@ public final class Main {
                     text(node.label()));
         } else if (decorator == SvgNodeDecorator.UML_COMPONENT) {
             body = umlComponentGlyph(node, style);
+        } else if (decorator == SvgNodeDecorator.UML_DEVICE
+                || decorator == SvgNodeDecorator.UML_EXECUTION_ENVIRONMENT
+                || decorator == SvgNodeDecorator.UML_DEPLOYMENT_SPECIFICATION) {
+            body = umlStereotypeLabel(node, style, decorator);
         }
         return "<g data-dediren-node-decorator=\"" + attr(name) + "\">" + body + "</g>";
+    }
+
+    private static String umlStereotypeLabel(
+            LaidOutNode node,
+            ResolvedNodeStyle style,
+            SvgNodeDecorator decorator) {
+        String stereotype = switch (decorator) {
+            case UML_DEVICE -> "&#171;device&#187;";
+            case UML_EXECUTION_ENVIRONMENT -> "&#171;executionEnvironment&#187;";
+            case UML_DEPLOYMENT_SPECIFICATION -> "&#171;deployment spec&#187;";
+            default -> "";
+        };
+        return String.format(
+                Locale.ROOT,
+                "<text x=\"%.1f\" y=\"%.1f\" text-anchor=\"middle\" fill=\"%s\" font-size=\"11\">%s</text>",
+                node.x() + node.width() / 2.0,
+                node.y() + 17.0,
+                attr(style.labelFill()),
+                stereotype);
     }
 
     private static String umlComponentGlyph(LaidOutNode node, ResolvedNodeStyle style) {
