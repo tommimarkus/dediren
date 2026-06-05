@@ -683,13 +683,15 @@ class MainTest {
                 index++;
             }
 
-            Document document = svgDocument(okContent(render(semanticRenderInput(
+            String content = okContent(render(semanticRenderInput(
                     "archimate",
                     nodes,
                     JsonSupport.objectMapper().createArrayNode(),
                     metadataNodes,
                     JsonSupport.objectMapper().createObjectNode(),
-                    policy))));
+                    policy)));
+            assertThat(writeRenderArtifact("svg_renderer_covers_each_archimate_node_type", content)).exists();
+            Document document = svgDocument(content);
 
             index = 0;
             for (var fields = nodeStyles.fields(); fields.hasNext(); ) {
@@ -705,7 +707,11 @@ class MainTest {
                 assertThat(shape.getAttribute("stroke")).isEqualTo(field.getValue().at("/stroke").asText());
                 if (!"archimate_and_junction".equals(expectedDecorator)
                         && !"archimate_or_junction".equals(expectedDecorator)) {
-                    childGroupWithAttribute(node, "data-dediren-node-decorator", expectedDecorator);
+                    Element decorator = childGroupWithAttribute(node, "data-dediren-node-decorator", expectedDecorator);
+                    String expectedKind = expectedArchimateIconKind(field.getKey());
+                    assertThat(decorator.getAttribute("data-dediren-icon-kind")).isEqualTo(expectedKind);
+                    assertThat(decorator.getAttribute("data-dediren-icon-size")).isEqualTo("22");
+                    assertDistinctArchimateIconMorphology(field.getKey(), expectedKind, decorator);
                 }
                 index++;
             }
@@ -805,6 +811,7 @@ class MainTest {
                     metadataNodes,
                     JsonSupport.objectMapper().createObjectNode(),
                     policy)));
+            assertThat(writeRenderArtifact("svg_renderer_covers_each_uml_node_type", content)).exists();
             Document document = svgDocument(content);
 
             index = 0;
@@ -1407,6 +1414,141 @@ class MainTest {
         }
 
         @Test
+        void wrapsNodeLabelsToFitInsideNodeWidth() throws Exception {
+            JsonNode input = styledInlineInput(
+                    "[]",
+                    """
+                    [
+                      {
+                        "id": "payment-node",
+                        "source_id": "payment-node",
+                        "projection_id": "payment-node",
+                        "x": 80,
+                        "y": 64,
+                        "width": 100,
+                        "height": 68,
+                        "label": "PaymentAuthorizationProcess"
+                      }
+                    ]
+                    """,
+                    "[]",
+                    "{}");
+            Document document = svgDocument(okContent(render(input)));
+
+            Element label = firstChildElement(
+                    groupWithAttribute(document, "data-dediren-node-id", "payment-node"),
+                    "text");
+            java.util.List<String> lines = textLinesFromSvg(label);
+            double fontSize = svgFontSize(label);
+
+            assertThat(lines).containsExactly("Payment", "Authorization", "Process");
+            assertThat(lines)
+                    .allSatisfy(line -> assertThat(estimatedSvgTextWidth(line, fontSize))
+                            .isLessThanOrEqualTo(80.0));
+        }
+
+        @Test
+        void positionsCompactUmlControlNodeLabelsOutsideTheShape() throws Exception {
+            JsonNode policy = fixtureJson("fixtures/render-policy/uml-svg.json");
+            ArrayNode nodes = JsonSupport.objectMapper().createArrayNode();
+            nodes.add(JsonSupport.objectMapper().readTree("""
+                    {
+                      "id": "decision",
+                      "source_id": "decision",
+                      "projection_id": "decision",
+                      "x": 120,
+                      "y": 120,
+                      "width": 32,
+                      "height": 32,
+                      "label": "StockAvailableDecision"
+                    }
+                    """));
+            ObjectNode metadataNodes = JsonSupport.objectMapper().createObjectNode();
+            metadataNodes.set("decision", JsonSupport.objectMapper().readTree("""
+                    {
+                      "type": "DecisionNode",
+                      "source_id": "decision"
+                    }
+                    """));
+            Document document = svgDocument(okContent(render(semanticRenderInput(
+                    "uml",
+                    nodes,
+                    JsonSupport.objectMapper().createArrayNode(),
+                    metadataNodes,
+                    JsonSupport.objectMapper().createObjectNode(),
+                    policy))));
+
+            Element label = firstChildElement(
+                    groupWithAttribute(document, "data-dediren-node-id", "decision"),
+                    "text");
+
+            assertThat(Double.parseDouble(label.getAttribute("x"))).isLessThan(120.0);
+            assertThat(Double.parseDouble(label.getAttribute("y"))).isLessThan(120.0);
+        }
+
+        @Test
+        void keepsLargeUmlControlNodeLabelsNearTheShape() throws Exception {
+            JsonNode policy = fixtureJson("fixtures/render-policy/uml-svg.json");
+            ArrayNode nodes = JsonSupport.objectMapper().createArrayNode();
+            nodes.add(JsonSupport.objectMapper().readTree("""
+                    {
+                      "id": "decision",
+                      "source_id": "decision",
+                      "projection_id": "decision",
+                      "x": 260,
+                      "y": 320,
+                      "width": 180,
+                      "height": 96,
+                      "label": "DecisionNode"
+                    }
+                    """));
+            nodes.add(JsonSupport.objectMapper().readTree("""
+                    {
+                      "id": "activity-final",
+                      "source_id": "activity-final",
+                      "projection_id": "activity-final",
+                      "x": 40,
+                      "y": 320,
+                      "width": 180,
+                      "height": 96,
+                      "label": "ActivityFinalNode"
+                    }
+                    """));
+            ObjectNode metadataNodes = JsonSupport.objectMapper().createObjectNode();
+            metadataNodes.set("decision", JsonSupport.objectMapper().readTree("""
+                    {
+                      "type": "DecisionNode",
+                      "source_id": "decision"
+                    }
+                    """));
+            metadataNodes.set("activity-final", JsonSupport.objectMapper().readTree("""
+                    {
+                      "type": "ActivityFinalNode",
+                      "source_id": "activity-final"
+                    }
+                    """));
+            Document document = svgDocument(okContent(render(semanticRenderInput(
+                    "uml",
+                    nodes,
+                    JsonSupport.objectMapper().createArrayNode(),
+                    metadataNodes,
+                    JsonSupport.objectMapper().createObjectNode(),
+                    policy))));
+
+            Element decisionLabel = firstChildElement(
+                    groupWithAttribute(document, "data-dediren-node-id", "decision"),
+                    "text");
+            Element finalLabel = firstChildElement(
+                    groupWithAttribute(document, "data-dediren-node-id", "activity-final"),
+                    "text");
+
+            assertThat(Double.parseDouble(decisionLabel.getAttribute("x"))).isBetween(256.0, 350.0);
+            assertThat(Double.parseDouble(decisionLabel.getAttribute("y"))).isBetween(296.0, 368.0);
+            assertThat(Double.parseDouble(finalLabel.getAttribute("x"))).isBetween(36.0, 130.0);
+            assertThat(Double.parseDouble(finalLabel.getAttribute("y"))).isBetween(296.0, 368.0);
+        }
+
+        @Test
         void separatesLabelsForParallelHorizontalEdges() throws Exception {
             JsonNode input = styledInlineInput(
                     "[]",
@@ -1624,6 +1766,7 @@ class MainTest {
     private static void assertRelationshipPolicyCoverage(String semanticProfile, String policyPath) throws Exception {
         JsonNode policy = fixtureJson(policyPath);
         ObjectNode edgeStyles = (ObjectNode) policy.at("/style/edge_type_overrides");
+        ArrayNode nodes = JsonSupport.objectMapper().createArrayNode();
         ArrayNode edges = JsonSupport.objectMapper().createArrayNode();
         ObjectNode metadataEdges = JsonSupport.objectMapper().createObjectNode();
         int index = 0;
@@ -1634,6 +1777,30 @@ class MainTest {
             }
             String id = semanticProfile + "-relationship-" + index;
             int y = 60 + index * 48;
+            nodes.add(JsonSupport.objectMapper().readTree("""
+                    {
+                      "id": "source-%d",
+                      "source_id": "source-%d",
+                      "projection_id": "source-%d",
+                      "x": 40,
+                      "y": %d,
+                      "width": 80,
+                      "height": 32,
+                      "label": "Source"
+                    }
+                    """.formatted(index, index, index, y - 16)));
+            nodes.add(JsonSupport.objectMapper().readTree("""
+                    {
+                      "id": "target-%d",
+                      "source_id": "target-%d",
+                      "projection_id": "target-%d",
+                      "x": 260,
+                      "y": %d,
+                      "width": 80,
+                      "height": 32,
+                      "label": "Target"
+                    }
+                    """.formatted(index, index, index, y - 16)));
             edges.add(JsonSupport.objectMapper().readTree("""
                     {
                       "id": "%s",
@@ -1657,13 +1824,17 @@ class MainTest {
             index++;
         }
 
-        Document document = svgDocument(okContent(render(semanticRenderInput(
+        String content = okContent(render(semanticRenderInput(
                 semanticProfile,
-                JsonSupport.objectMapper().createArrayNode(),
+                nodes,
                 edges,
                 JsonSupport.objectMapper().createObjectNode(),
                 metadataEdges,
-                policy))));
+                policy)));
+        assertThat(writeRenderArtifact(
+                "svg_renderer_covers_each_" + semanticProfile + "_relationship_type",
+                content)).exists();
+        Document document = svgDocument(content);
 
         index = 0;
         for (var fields = edgeStyles.fields(); fields.hasNext(); ) {
@@ -1673,6 +1844,8 @@ class MainTest {
             }
             String id = semanticProfile + "-relationship-" + index;
             JsonNode style = field.getValue();
+            groupWithAttribute(document, "data-dediren-node-id", "source-" + index);
+            groupWithAttribute(document, "data-dediren-node-id", "target-" + index);
             Element edge = groupWithAttribute(document, "data-dediren-edge-id", id);
             Element path = firstChildElement(edge, "path");
             assertMarkerForStyle(document, path, id, "start", style.at("/marker_start").asText("none"));
@@ -1945,6 +2118,130 @@ class MainTest {
         throw new AssertionError("expected <" + tagName + "> with " + name + "=" + value);
     }
 
+    private static String expectedArchimateIconKind(String nodeType) {
+        return switch (nodeType) {
+            case "BusinessInterface", "ApplicationInterface", "TechnologyInterface" -> "interface";
+            case "BusinessCollaboration", "ApplicationCollaboration", "TechnologyCollaboration" -> "collaboration";
+            case "BusinessActor" -> "actor";
+            case "BusinessRole" -> "role";
+            case "BusinessService", "ApplicationService", "TechnologyService" -> "service";
+            case "BusinessInteraction", "ApplicationInteraction", "TechnologyInteraction" -> "interaction";
+            case "BusinessFunction", "ApplicationFunction", "TechnologyFunction" -> "function";
+            case "BusinessProcess", "ApplicationProcess", "TechnologyProcess" -> "process";
+            case "BusinessEvent", "ApplicationEvent", "TechnologyEvent", "ImplementationEvent" -> "event";
+            case "BusinessObject", "DataObject" -> "object";
+            case "ApplicationComponent" -> "component";
+            case "Contract" -> "contract";
+            case "Product" -> "product";
+            case "Representation" -> "representation";
+            case "Location" -> "location";
+            case "Grouping" -> "grouping";
+            case "Stakeholder" -> "stakeholder";
+            case "Driver" -> "driver";
+            case "Assessment" -> "assessment";
+            case "Goal" -> "goal";
+            case "Outcome" -> "outcome";
+            case "Value" -> "value";
+            case "Meaning" -> "meaning";
+            case "Constraint" -> "constraint";
+            case "Requirement" -> "requirement";
+            case "Principle" -> "principle";
+            case "CourseOfAction" -> "course_of_action";
+            case "Resource" -> "resource";
+            case "ValueStream" -> "value_stream";
+            case "Capability" -> "capability";
+            case "Plateau" -> "plateau";
+            case "WorkPackage" -> "work_package";
+            case "Deliverable" -> "deliverable";
+            case "Gap" -> "gap";
+            case "Artifact" -> "artifact";
+            case "SystemSoftware" -> "system_software";
+            case "Device" -> "device";
+            case "Facility" -> "facility";
+            case "Equipment" -> "equipment";
+            case "Node" -> "node";
+            case "Material" -> "material";
+            case "CommunicationNetwork" -> "network";
+            case "DistributionNetwork" -> "distribution_network";
+            case "Path" -> "path";
+            default -> throw new AssertionError("missing expected icon kind for " + nodeType);
+        };
+    }
+
+    private static void assertDistinctArchimateIconMorphology(
+            String nodeType,
+            String expectedKind,
+            Element decorator) {
+        java.util.List<Element> paths = childElements(decorator, "path");
+        assertThat(paths).as(nodeType + " should not use the generic triangular fallback")
+                .noneMatch(path -> expectedKind.equals(path.getAttribute("data-dediren-icon-part"))
+                        && paths.size() == 1
+                        && childElements(decorator, "rect").isEmpty()
+                        && childElements(decorator, "ellipse").isEmpty()
+                        && childElements(decorator, "circle").isEmpty());
+        java.util.List<String> primitiveParts = iconPrimitiveParts(decorator);
+        for (String requiredPart : requiredArchimateIconParts(nodeType)) {
+            assertThat(primitiveParts)
+                    .as(nodeType + " should expose ArchiMate icon part " + requiredPart)
+                    .contains(requiredPart);
+        }
+    }
+
+    private static java.util.List<String> iconPrimitiveParts(Element decorator) {
+        var parts = new java.util.ArrayList<String>();
+        for (String tagName : java.util.List.of("path", "rect", "ellipse", "circle")) {
+            for (Element element : childElements(decorator, tagName)) {
+                if (element.hasAttribute("data-dediren-icon-part")) {
+                    parts.add(element.getAttribute("data-dediren-icon-part"));
+                }
+            }
+        }
+        return parts;
+    }
+
+    private static java.util.List<String> requiredArchimateIconParts(String nodeType) {
+        return switch (nodeType) {
+            case "BusinessCollaboration", "ApplicationCollaboration", "TechnologyCollaboration" ->
+                    java.util.List.of("collaboration-circles");
+            case "BusinessRole", "Stakeholder" -> java.util.List.of("side-cylinder", "side-cylinder-end");
+            case "BusinessInteraction", "ApplicationInteraction", "TechnologyInteraction" ->
+                    java.util.List.of("interaction-half");
+            case "BusinessFunction", "ApplicationFunction", "TechnologyFunction" ->
+                    java.util.List.of("function-bookmark");
+            case "BusinessProcess", "ApplicationProcess", "TechnologyProcess" ->
+                    java.util.List.of("process-arrow");
+            case "BusinessEvent", "ApplicationEvent", "TechnologyEvent", "ImplementationEvent" ->
+                    java.util.List.of("event-pill");
+            case "BusinessObject", "DataObject" -> java.util.List.of("document-body", "document-header");
+            case "ApplicationComponent" -> java.util.List.of();
+            case "Contract" -> java.util.List.of("contract-document-body", "contract-lines");
+            case "Product" -> java.util.List.of("product-tab");
+            case "Representation" -> java.util.List.of("wavy-representation");
+            case "Driver" -> java.util.List.of("driver-spokes");
+            case "Assessment" -> java.util.List.of("assessment-handle");
+            case "Outcome" -> java.util.List.of("target-arrow");
+            case "Constraint" -> java.util.List.of("constraint-parallelogram", "constraint-left-line");
+            case "Requirement" -> java.util.List.of("requirement-parallelogram");
+            case "CourseOfAction" -> java.util.List.of("course-of-action-handle");
+            case "Resource" -> java.util.List.of("resource-capsule", "resource-tab", "resource-bars");
+            case "ValueStream" -> java.util.List.of("value-stream-chevron");
+            case "Capability" -> java.util.List.of("capability-step");
+            case "WorkPackage" -> java.util.List.of("work-package-loop-arrow");
+            case "Deliverable" -> java.util.List.of("wavy-document");
+            case "Gap" -> java.util.List.of("gap-lines");
+            case "Artifact" -> java.util.List.of("artifact-document");
+            case "SystemSoftware" -> java.util.List.of("system-software-disks");
+            case "Device" -> java.util.List.of("device-stand");
+            case "Facility" -> java.util.List.of("factory-silhouette");
+            case "Equipment" -> java.util.List.of("equipment-gear-large", "equipment-gear-small");
+            case "Node" -> java.util.List.of("node-3d-edges");
+            case "Material" -> java.util.List.of("material-hexagon", "material-lines");
+            case "DistributionNetwork" -> java.util.List.of("distribution-network-arrows");
+            case "Path" -> java.util.List.of("path-line", "path-arrowheads");
+            default -> java.util.List.of();
+        };
+    }
+
     private static java.util.List<String> edgeLabelsInDomOrder(Document document) {
         var labels = new java.util.ArrayList<String>();
         var groups = document.getElementsByTagName("g");
@@ -1970,6 +2267,24 @@ class MainTest {
             }
         }
         return elements;
+    }
+
+    private static java.util.List<String> textLinesFromSvg(Element label) {
+        java.util.List<Element> tspans = childElements(label, "tspan");
+        if (tspans.isEmpty()) {
+            return java.util.List.of(label.getTextContent());
+        }
+        return tspans.stream().map(Element::getTextContent).toList();
+    }
+
+    private static double estimatedSvgTextWidth(String text, double fontSize) {
+        return text.codePointCount(0, text.length()) * fontSize * 0.62;
+    }
+
+    private static double svgFontSize(Element label) {
+        return label.hasAttribute("font-size") && !label.getAttribute("font-size").isEmpty()
+                ? Double.parseDouble(label.getAttribute("font-size"))
+                : 14.0;
     }
 
     private static boolean textBoxesOverlap(Element left, Element right) {
@@ -2004,6 +2319,15 @@ class MainTest {
 
     private static String fixture(String path) throws Exception {
         return Files.readString(workspaceRoot().resolve(path));
+    }
+
+    private static Path writeRenderArtifact(String testName, String content) throws Exception {
+        Path output = workspaceRoot()
+                .resolve(".test-output/renders/svg-render-plugin")
+                .resolve(testName + ".svg");
+        Files.createDirectories(output.getParent());
+        Files.writeString(output, content);
+        return output;
     }
 
     private static Path workspaceRoot() {
