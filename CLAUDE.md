@@ -36,11 +36,11 @@ agent tools should be pointed here from their own entrypoint files (for example,
   API/app/infra design, and repo-specific operational posture. They are
   complementary: let Superpowers shape how the work proceeds and Sour Old
   Geezer shape what "good" means inside the changed domain.
-- This file initializes `souroldgeezer-policy:release-policy` under
-  `## Versioning`. Workflow rules live in `## Git Hygiene`; release rules live
-  in `## Versioning`; the user-facing release runbook lives in `README.md`.
-  Keep other policy-skill initialization out of this file unless a section
-  explicitly adopts it.
+- This file initializes `souroldgeezer-policy:git-workflow-policy` under
+  `## Git Hygiene` and `souroldgeezer-policy:release-policy` under
+  `## Versioning`. The user-facing release runbook lives in `README.md`. Keep
+  other policy-skill initialization out of this file unless a section explicitly
+  adopts it.
 - Use `souroldgeezer-design:software-design` for module boundaries,
   dependency direction, responsibility ownership, coupling, refactors,
   plugin/core split, Java code shape, or plan-to-code design drift.
@@ -242,6 +242,26 @@ handoff, then rerun affected checks.
 
 ## Git Hygiene
 
+`git-workflow-policy: direct main allowed (branches optional), integration at
+author discretion, clean worktree, explicit-path staging`
+
+The line above initializes `souroldgeezer-policy:git-workflow-policy` for this
+repository, overriding the skill's `no direct main` / `feature branches`
+defaults. The rules below are its options and exceptions and are standing
+enforcement authority for matching branch, staging, commit, merge, and
+integration actions.
+
+- Branches are optional. Direct commits to `main` are allowed for any change;
+  use a feature/fix branch when isolation helps. Do not mix unrelated tasks in
+  one commit or branch.
+- Integration is at author discretion: land a branch into `main` with a local
+  `--no-ff` merge or a GitHub Pull Request, chosen per change. Delegate PR
+  lifecycle writes to `pr-ops`.
+- Version-edit placement: version files may change on any branch, including
+  `main`. `## Versioning` (`release-policy`) governs the version source, the
+  separate-commit rule, tagging, and release execution.
+- Stop before destructive git actions: history rewrites, force-push, branch
+  deletion, and tags. Tags and releases are governed by `release-policy`.
 - Start and finish by checking `git status --short --branch`.
 - Treat pre-existing modified, staged, or untracked files as user work unless
   you created them in this turn.
