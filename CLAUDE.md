@@ -36,8 +36,11 @@ agent tools should be pointed here from their own entrypoint files (for example,
   API/app/infra design, and repo-specific operational posture. They are
   complementary: let Superpowers shape how the work proceeds and Sour Old
   Geezer shape what "good" means inside the changed domain.
-- Keep policy-skill initialization out of this file. Project-local workflow and
-  release rules live in `## Git Hygiene`, `## Versioning`, and `README.md`.
+- This file initializes `souroldgeezer-policy:release-policy` under
+  `## Versioning`. Workflow rules live in `## Git Hygiene`; release rules live
+  in `## Versioning`; the user-facing release runbook lives in `README.md`.
+  Keep other policy-skill initialization out of this file unless a section
+  explicitly adopts it.
 - Use `souroldgeezer-design:software-design` for module boundaries,
   dependency direction, responsibility ownership, coupling, refactors,
   plugin/core split, Java code shape, or plan-to-code design drift.
@@ -95,18 +98,32 @@ agent tools should be pointed here from their own entrypoint files (for example,
 
 ## Versioning
 
+`release-policy: calver YYYY.0M.MICRO, annotated v<version> git tags, version
+bump in its own commit`
+
+The line above initializes `souroldgeezer-policy:release-policy` for this
+repository. The rules below are its options and exceptions; they are standing
+enforcement authority for matching version, tag, and release actions.
+
 - The product version source is root `pom.xml`.
-- Prefer Maven-calculated version bumps for POM changes so the next numeric
-  version is not hand-entered. For a patch bump, run:
-  `./mvnw build-helper:parse-version versions:set -DnewVersion='${parsedVersion.majorVersion}.${parsedVersion.minorVersion}.${parsedVersion.nextIncrementalVersion}' -DprocessAllModules=true -DgenerateBackupPoms=false`.
-  For minor use
-  `-DnewVersion='${parsedVersion.majorVersion}.${parsedVersion.nextMinorVersion}.0'`;
-  for major use
-  `-DnewVersion='${parsedVersion.nextMajorVersion}.0.0'`.
-- Version bumps live in the same commit as the content change that requires
-  them.
-- Every product/plugin version bump must also create the matching annotated git
-  tag `v<version>` on the commit containing that bump before pushing.
+- Use CalVer with the shape `YYYY.0M.MICRO`: four-digit year, zero-padded
+  month, and a within-month micro counter (for example `2026.06.0`, then
+  `2026.06.1`).
+  - First release in a new month: set the new year and zero-padded month with
+    micro `0`:
+    `./mvnw versions:set -DnewVersion='<YYYY>.<0M>.0' -DprocessAllModules=true -DgenerateBackupPoms=false`.
+  - Additional release in the same month: increment the micro:
+    `./mvnw versions:set -DnewVersion='<YYYY>.<0M>.<next-micro>' -DprocessAllModules=true -DgenerateBackupPoms=false`.
+  - Set the version explicitly. Do not use `build-helper:parse-version` for the
+    bump; it drops the zero-padded month.
+- CalVer encodes the release date, not compatibility. Communicate
+  backwards-incompatible product or plugin contract changes in the release
+  notes and through schema-id changes, never through the version number.
+- A version bump lives in its own commit, separate from the content change that
+  motivates it. The version-bump commit contains only the version-source update
+  and the synchronized version-assertion surfaces listed below.
+- Every product/plugin version bump must create the matching annotated git tag
+  `v<version>` on the version-bump commit before pushing.
 - First-party plugin manifests under `fixtures/plugins/*.manifest.json`,
   source fixture `required_plugins[].version` entries, README bundle examples,
   `docs/agent-usage.md` examples, distribution metadata, and tests that assert
@@ -119,13 +136,9 @@ agent tools should be pointed here from their own entrypoint files (for example,
   and `dist-tool/src/test/java/dev/dediren/tools/dist/DistModuleTest.java`.
 - `.github/workflows/release.yml` validates tag `v<version>` against root
   `pom.xml`; update it only if the product version source changes.
-- Use SemVer intent while pre-1.0:
-  - Major: backwards-incompatible public product or plugin contract changes.
-  - Minor: additive compatible public surface changes or runtime migration
-    cutovers.
-  - Patch: compatible fixes, docs, tests, and internal refactors.
 - Public schema ids such as `model.schema.v1` change only when the contract
-  family intentionally changes.
+  family intentionally changes. They are the durable compatibility signal,
+  since CalVer does not encode compatibility.
 - After every product/plugin version bump, run a stale-version search over
   `pom.xml`, `README.md`, `docs/agent-usage.md`, `fixtures/plugins`, and
   `fixtures/source`.

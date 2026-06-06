@@ -555,27 +555,25 @@ root `pom.xml`. First-party plugin manifests, source fixture
 `required_plugins[].version` entries, bundle examples, and release workflow
 checks must move with the product version.
 
-Use SemVer intent while the project is pre-1.0:
+The product uses CalVer with the shape `YYYY.0M.MICRO`: four-digit year,
+zero-padded month, and a within-month micro counter (for example `2026.06.0`,
+then `2026.06.1`). The version encodes the release date, not compatibility;
+call out backwards-incompatible product or plugin contract changes in the
+release notes and through schema-id changes.
 
-- Patch: compatible fixes, documentation, tests, and internal refactors.
-- Minor: additive compatible public surface changes or runtime migration
-  cutovers.
-- Major: backwards-incompatible public product or plugin contract changes.
-
-Maven can calculate the next version for the POMs, which avoids manually
-typing the next numeric version. For a patch bump:
+Set the version explicitly across the POMs. For the first release in a new
+month, use micro `0`:
 
 ```bash
-./mvnw build-helper:parse-version versions:set \
-  -DnewVersion='${parsedVersion.majorVersion}.${parsedVersion.minorVersion}.${parsedVersion.nextIncrementalVersion}' \
+./mvnw versions:set \
+  -DnewVersion='2026.06.0' \
   -DprocessAllModules=true \
   -DgenerateBackupPoms=false
 ```
 
-For a minor bump, use
-`-DnewVersion='${parsedVersion.majorVersion}.${parsedVersion.nextMinorVersion}.0'`.
-For a major bump, use
-`-DnewVersion='${parsedVersion.nextMajorVersion}.0.0'`.
+For an additional release in the same month, increment the micro (for example
+`2026.06.1`). Set the version explicitly rather than with
+`build-helper:parse-version`, which drops the zero-padded month.
 
 After Maven updates the POMs, update the remaining checked-in product version
 surfaces:
@@ -600,8 +598,9 @@ version surfaces:
 rg "<old-version>" pom.xml README.md docs/agent-usage.md fixtures/plugins fixtures/source
 ```
 
-Then commit the content change and version bump together, and create the
-matching annotated tag on that commit:
+Commit the version bump in its own commit, separate from the content change
+that motivates it, then create the matching annotated tag on the version-bump
+commit:
 
 ```bash
 git tag -a v<version> -m "Release <version>"
