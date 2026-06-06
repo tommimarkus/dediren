@@ -3,7 +3,7 @@
   "required_plugins": [
     {
       "id": "generic-graph",
-      "version": "0.26.0"
+      "version": "2026.06.0"
     }
   ],
   "nodes": [

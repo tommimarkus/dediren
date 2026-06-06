@@ -833,7 +833,7 @@ class GenericGraphPluginTest {
         ((com.fasterxml.jackson.databind.node.ObjectNode) source).putArray("required_plugins")
                 .addObject()
                 .put("id", "generic-graph")
-                .put("version", "0.26.0");
+                .put("version", "2026.06.0");
         ((com.fasterxml.jackson.databind.node.ObjectNode) source.at("/plugins/generic-graph"))
                 .put("semantic_profile", "archimate");
 
@@ -905,8 +905,8 @@ class GenericGraphPluginTest {
                 {
                   "model_schema_version": "model.schema.v1",
                   "required_plugins": [
-                    { "id": "generic-graph", "version": "0.26.0" },
-                    { "id": "archimate-oef", "version": "0.26.0" }
+                    { "id": "generic-graph", "version": "2026.06.0" },
+                    { "id": "archimate-oef", "version": "2026.06.0" }
                   ],
                   "nodes": [
                     { "id": "api", "type": "ApplicationComponent", "label": "API", "properties": {} },
@@ -949,8 +949,8 @@ class GenericGraphPluginTest {
                 {
                   "model_schema_version": "model.schema.v1",
                   "required_plugins": [
-                    { "id": "generic-graph", "version": "0.26.0" },
-                    { "id": "archimate-oef", "version": "0.26.0" }
+                    { "id": "generic-graph", "version": "2026.06.0" },
+                    { "id": "archimate-oef", "version": "2026.06.0" }
                   ],
                   "nodes": [
                     { "id": "api", "type": "ApplicationComponent", "label": "API", "properties": {} },
@@ -1013,8 +1013,8 @@ class GenericGraphPluginTest {
                 {
                   "model_schema_version": "model.schema.v1",
                   "required_plugins": [
-                    { "id": "generic-graph", "version": "0.26.0" },
-                    { "id": "archimate-oef", "version": "0.26.0" }
+                    { "id": "generic-graph", "version": "2026.06.0" },
+                    { "id": "archimate-oef", "version": "2026.06.0" }
                   ],
                   "nodes": [
                     { "id": "api", "type": "ApplicationComponent", "label": "API", "properties": {} },
@@ -1051,8 +1051,8 @@ class GenericGraphPluginTest {
                 {
                   "model_schema_version": "model.schema.v1",
                   "required_plugins": [
-                    { "id": "generic-graph", "version": "0.26.0" },
-                    { "id": "archimate-oef", "version": "0.26.0" }
+                    { "id": "generic-graph", "version": "2026.06.0" },
+                    { "id": "archimate-oef", "version": "2026.06.0" }
                   ],
                   "nodes": [
                     { "id": "service", "type": "ApplicationService", "label": "Service", "properties": {} },
@@ -1093,8 +1093,8 @@ class GenericGraphPluginTest {
                 {
                   "model_schema_version": "model.schema.v1",
                   "required_plugins": [
-                    { "id": "generic-graph", "version": "0.26.0" },
-                    { "id": "archimate-oef", "version": "0.26.0" }
+                    { "id": "generic-graph", "version": "2026.06.0" },
+                    { "id": "archimate-oef", "version": "2026.06.0" }
                   ],
                   "nodes": [
                     { "id": "group", "type": "Grouping", "label": "Group", "properties": {} },
@@ -1379,8 +1379,8 @@ class GenericGraphPluginTest {
                 {
                   "model_schema_version": "model.schema.v1",
                   "required_plugins": [
-                    { "id": "generic-graph", "version": "0.26.0" },
-                    { "id": "archimate-oef", "version": "0.26.0" }
+                    { "id": "generic-graph", "version": "2026.06.0" },
+                    { "id": "archimate-oef", "version": "2026.06.0" }
                   ],
                   "nodes": [
                     { "id": "%s", "type": "%s", "label": "Source", "properties": {} },
@@ -1426,8 +1426,8 @@ class GenericGraphPluginTest {
                 {
                   "model_schema_version": "model.schema.v1",
                   "required_plugins": [
-                    { "id": "generic-graph", "version": "0.26.0" },
-                    { "id": "archimate-oef", "version": "0.26.0" }
+                    { "id": "generic-graph", "version": "2026.06.0" },
+                    { "id": "archimate-oef", "version": "2026.06.0" }
                   ],
                   "nodes": [
                     {
