@@ -1,7 +1,9 @@
 package dev.dediren.core.source;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
@@ -33,6 +35,38 @@ class SourceValidatorTest {
                     """, null);
 
             assertThat(result.exitCode()).isZero();
+            JsonNode data = result.envelope().data();
+            assertThat(data.path("node_count").asInt()).isZero();
+            assertThat(data.path("relationship_count").asInt()).isZero();
+            assertThat(data.path("model_schema_version").asText()).isEqualTo("model.schema.v1");
+        } finally {
+            restoreProperty("user.dir", originalUserDir);
+            restoreProperty("dediren.bundle.root", originalBundleRoot);
+        }
+    }
+
+    @Test
+    void validateSourceFailsWhenBundleRootIsAbsentAndCwdHasNoSchema() throws Exception {
+        Path outsideBundle = temp.resolve("outside-bundle-no-schema");
+        Files.createDirectories(outsideBundle); // deliberately no schemas/ dir
+        String originalUserDir = System.getProperty("user.dir");
+        String originalBundleRoot = System.getProperty("dediren.bundle.root");
+        System.setProperty("user.dir", outsideBundle.toString());
+        System.clearProperty("dediren.bundle.root");
+        try {
+            // DedirenPaths.productRoot() throws IllegalStateException when neither
+            // dediren.bundle.root nor a schemas/model.schema.json ancestor is found;
+            // validateSourceJson does not catch it, so it propagates as the failure signal.
+            assertThatThrownBy(() -> SourceValidator.validateSourceJson("""
+                    {
+                      "model_schema_version": "model.schema.v1",
+                      "nodes": [],
+                      "relationships": [],
+                      "plugins": { "generic-graph": { "views": [] } }
+                    }
+                    """, null))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("dediren.bundle.root");
         } finally {
             restoreProperty("user.dir", originalUserDir);
             restoreProperty("dediren.bundle.root", originalBundleRoot);
