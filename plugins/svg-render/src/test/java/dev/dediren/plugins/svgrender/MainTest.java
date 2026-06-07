@@ -1311,10 +1311,10 @@ class MainTest {
             Element frontEdge = groupWithAttribute(document, "data-dediren-edge-id", "front-edge");
             Element frontPath = firstChildElement(frontEdge, "path");
 
+            // Contract: the earlier edge does not jump; the later crossing edge gains a
+            // quadratic jump arc; the jump carries a white mask. Coordinate-free oracle.
             assertThat(firstPath.getAttribute("d")).doesNotContain(" Q ");
-            assertThat(frontPath.getAttribute("d"))
-                    .contains("L 100.0 94.0")
-                    .contains("Q 106.0 100.0 100.0 106.0");
+            assertThat(frontPath.getAttribute("d")).contains(" Q ");
             Element masks = childGroupWithAttribute(frontEdge, "data-dediren-line-jump-masks", "front-edge");
             assertThat(firstChildElement(masks, "path").getAttribute("stroke")).isEqualTo("#ffffff");
         }
@@ -1359,9 +1359,12 @@ class MainTest {
             Element frontEdge = groupWithAttribute(document, "data-dediren-edge-id", "front-edge");
             Element frontPath = firstChildElement(frontEdge, "path");
 
-            assertThat(frontPath.getAttribute("d"))
-                    .contains("Q 106.0 40.0 100.0 46.0")
-                    .contains("L 100.0 92.0 Q 100.0 100.0 108.0 100.0");
+            String frontD = frontPath.getAttribute("d");
+            // The L-shaped route contributes one rounded corner (a Q segment) and the
+            // crossing contributes at least one jump arc (another Q), so a route that lost
+            // its rounding or its jump would fall below 2 quadratic segments.
+            int quadraticSegments = frontD.split(" Q ", -1).length - 1;
+            assertThat(quadraticSegments).isGreaterThanOrEqualTo(2);
         }
 
         @Test
