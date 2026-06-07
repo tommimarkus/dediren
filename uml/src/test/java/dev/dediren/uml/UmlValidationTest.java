@@ -12,6 +12,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class UmlValidationTest {
     @Test
@@ -947,20 +949,20 @@ class UmlValidationTest {
         assertThat(error.path()).isEqualTo("$.nodes[0].type");
     }
 
-    @Test
-    void rejectsInvalidMultiplicity() {
+    @ParameterizedTest
+    @ValueSource(strings = {"", "abc", "-1", "1..", "2..1", "1..0"})
+    void rejectsInvalidMultiplicity(String multiplicity) {
         UmlValidationException error = org.junit.jupiter.api.Assertions.assertThrows(
                 UmlValidationException.class,
-                () -> Uml.validateMultiplicity("2..1", "$.multiplicity"));
+                () -> Uml.validateMultiplicity(multiplicity, "$.multiplicity"));
 
         assertThat(error.code()).isEqualTo("DEDIREN_UML_MULTIPLICITY_INVALID");
     }
 
-    @Test
-    void acceptsValidMultiplicities() throws Exception {
-        for (String value : new String[]{"1..*", "0..1", "1", "*"}) {
-            Uml.validateMultiplicity(value, "$.multiplicity");
-        }
+    @ParameterizedTest
+    @ValueSource(strings = {"1..*", "0..1", "1", "*"})
+    void acceptsValidMultiplicities(String multiplicity) throws Exception {
+        Uml.validateMultiplicity(multiplicity, "$.multiplicity");
     }
 
     @Test
