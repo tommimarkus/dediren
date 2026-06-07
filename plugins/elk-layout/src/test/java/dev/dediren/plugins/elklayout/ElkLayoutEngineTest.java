@@ -25,19 +25,6 @@ class ElkLayoutEngineTest {
     private static final double PORT_SIDE_EPSILON = 1.0;
 
     @Test
-    void elkModuleUsesLayeredOnly() throws IOException {
-        String modulePom = Files.readString(Path.of("pom.xml"));
-        String rootPom = Files.readString(Path.of("../..", "pom.xml"));
-
-        assertFalse(
-            modulePom.contains("org.eclipse.elk.alg.libavoid"),
-            "ELK module must not declare the Libavoid backend");
-        assertFalse(
-            rootPom.contains("org.eclipse.elk.alg.libavoid"),
-            "ELK root dependency management must not include the Libavoid backend");
-    }
-
-    @Test
     void elkHelperDoesNotOwnPostElkRouteGeometry() throws IOException {
         String source = Files.readString(Path.of(
             "src/main/java/dev/dediren/plugins/elklayout/ElkLayoutEngine.java"));

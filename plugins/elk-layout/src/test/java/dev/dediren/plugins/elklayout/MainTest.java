@@ -1,6 +1,7 @@
 package dev.dediren.plugins.elklayout;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -28,6 +29,12 @@ class MainTest {
         assertEquals(
             "org.eclipse.elk.rectpacking",
             capabilities.path("runtime").path("algorithms").get(1).asText());
+        JsonNode algorithms = capabilities.path("runtime").path("algorithms");
+        for (JsonNode algorithm : algorithms) {
+            assertFalse(
+                algorithm.asText().contains("libavoid"),
+                "ELK runtime must not advertise a Libavoid backend algorithm");
+        }
     }
 
     @Test
