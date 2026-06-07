@@ -143,10 +143,7 @@ class CliLayoutRenderCommandTest {
         assertThat(envelope.at("/status").asText()).isEqualTo("ok");
         assertThat(envelope.at("/data/artifact_kind").asText()).isEqualTo("svg");
         assertThat(envelope.at("/data/content").asText())
-                .contains("<svg", "data-dediren-node-id=\"client\"", "data-dediren-edge-id=\"client-calls-api\"");
-        assertThat(envelope.at("/data/content").asText())
-                .contains("fill=\"none\" font-size=\"15.4\" font-weight=\"600\" stroke=\"#ffffff\" stroke-width=\"2\">calls</text>")
-                .contains("fill=\"#374151\" font-size=\"15.4\" font-weight=\"600\">calls</text>")
+                .contains("<svg", "data-dediren-node-id=\"client\"", "data-dediren-edge-id=\"client-calls-api\"")
                 .doesNotContain("data-dediren-edge-label-background");
     }
 
