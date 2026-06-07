@@ -39,8 +39,14 @@ class MainTest {
     void outputsXmi() throws Exception {
         String xml = exportXml(exportInput());
 
+        assertThat(xml).containsSubsequence(
+                "<uml:Model",
+                "xmi:type=\"uml:Class\"",
+                "<ownedAttribute",
+                "<ownedOperation");
+        // Regression backstop only; the spec-named assertions above are the primary oracle.
+        // Update this golden via a reviewed baseline refresh when the XMI contract changes intentionally.
         assertThat(xml).isEqualTo(fixture("fixtures/export/uml-basic.xmi"));
-        assertThat(xml).contains("uml:Class");
         assertThat(xml).doesNotContain("xmi:version", "uml:Activity");
     }
 
@@ -108,6 +114,13 @@ class MainTest {
                 envWithXmiSchema());
 
         String xml = okData(result).at("/content").asText();
+        assertThat(xml).containsSubsequence(
+                "<uml:Model",
+                "xmi:type=\"uml:CombinedFragment\"",
+                "interactionOperator=\"alt\"",
+                "<operand");
+        // Regression backstop only; the spec-named assertions above are the primary oracle.
+        // Update this golden via a reviewed baseline refresh when the XMI contract changes intentionally.
         assertThat(xml).isEqualTo(fixture("fixtures/export/uml-sequence-fragments.xmi"));
     }
 
