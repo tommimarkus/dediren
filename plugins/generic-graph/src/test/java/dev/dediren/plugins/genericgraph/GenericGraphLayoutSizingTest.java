@@ -22,23 +22,23 @@ class GenericGraphLayoutSizingTest {
         JsonNode uml = JsonSupport.objectMapper().readTree("""
                 {
                   "attributes": [
-                    {"visibility": "private", "name": "customerIdentifier", "type": "String"}
+                    {"visibility": "private", "name": "a", "type": "B"},
+                    {"visibility": "private", "name": "c", "type": "D"},
+                    {"visibility": "private", "name": "e", "type": "F"}
                   ],
                   "operations": [
-                    {
-                      "visibility": "public",
-                      "name": "lookupCustomerByIdentifier",
-                      "return_type": "Customer",
-                      "parameters": [
-                        {"name": "identifier", "type": "String"}
-                      ]
-                    }
+                    {"visibility": "public", "name": "g", "return_type": "H"},
+                    {"visibility": "public", "name": "i", "return_type": "J"}
                   ]
                 }
                 """);
-        SourceNode classifier = new SourceNode("repository", "Class", "CustomerRepository", Map.of("uml", uml));
+        // 26-char label dominates width; 3 attrs + 2 ops push height above the 120 floor.
+        SourceNode classifier = new SourceNode(
+                "repository", "Class", "CustomerRepositoryGatewayA", Map.of("uml", uml));
 
-        assertThat(GenericGraphLayoutSizing.widthHint("uml", classifier)).isGreaterThan(220.0);
-        assertThat(GenericGraphLayoutSizing.heightHint("uml", classifier)).isGreaterThanOrEqualTo(120.0);
+        // width  = roundUp(max(26*8 + 32, 220), 20) = roundUp(240, 20) = 240.0
+        // height = roundUp(max(28 + (3*14+8) + (2*14+8) + 14, 120), 10) = roundUp(128, 10) = 130.0
+        assertThat(GenericGraphLayoutSizing.widthHint("uml", classifier)).isEqualTo(240.0);
+        assertThat(GenericGraphLayoutSizing.heightHint("uml", classifier)).isEqualTo(130.0);
     }
 }
