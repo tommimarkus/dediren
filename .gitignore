@@ -2,6 +2,7 @@
 /dist/
 /.cache/
 /.worktrees/
+/.claude/worktrees/
 /.test-output/
 .mvn/wrapper/maven-wrapper.jar
 .mvn/wrapper/MavenWrapperDownloader.class
