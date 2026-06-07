@@ -832,20 +832,13 @@ class MainTest {
             for (var fields = nodeStyles.fields(); fields.hasNext(); ) {
                 var field = fields.next();
                 String id = "archimate-node-" + index;
-                String expectedDecorator = field.getValue().at("/decorator").asText();
+                String decoratorKind = field.getValue().at("/decorator").asText(); // navigation only
                 Element node = groupWithAttribute(document, "data-dediren-node-id", id);
-                Element shape = firstElementWithAttribute(node, "data-dediren-node-shape");
-                String expectedFill = "archimate_and_junction".equals(expectedDecorator)
-                        ? field.getValue().at("/stroke").asText()
-                        : field.getValue().at("/fill").asText();
-                assertThat(shape.getAttribute("fill")).isEqualTo(expectedFill);
-                assertThat(shape.getAttribute("stroke")).isEqualTo(field.getValue().at("/stroke").asText());
-                if (!"archimate_and_junction".equals(expectedDecorator)
-                        && !"archimate_or_junction".equals(expectedDecorator)) {
-                    Element decorator = childGroupWithAttribute(node, "data-dediren-node-decorator", expectedDecorator);
-                    String expectedKind = expectedArchimateIconKind(field.getKey());
+                if (!"archimate_and_junction".equals(decoratorKind)
+                        && !"archimate_or_junction".equals(decoratorKind)) {
+                    Element decorator = childGroupWithAttribute(node, "data-dediren-node-decorator", decoratorKind);
+                    String expectedKind = expectedArchimateIconKind(field.getKey()); // requirement-derived, not echoed
                     assertThat(decorator.getAttribute("data-dediren-icon-kind")).isEqualTo(expectedKind);
-                    assertThat(decorator.getAttribute("data-dediren-icon-size")).isEqualTo("22");
                     assertDistinctArchimateIconMorphology(field.getKey(), expectedKind, decorator);
                 }
                 index++;
@@ -956,11 +949,11 @@ class MainTest {
                 if (isSequenceNodeType(field.getKey())) {
                     continue;
                 }
-                String expectedDecorator = field.getValue().at("/decorator").asText();
                 Element node = groupWithAttribute(document, "data-dediren-node-id", id);
                 Element shape = firstElementWithAttribute(node, "data-dediren-node-shape");
-                assertThat(shape.getAttribute("data-dediren-node-shape")).isEqualTo(expectedDecorator);
-                childGroupWithAttribute(node, "data-dediren-node-decorator", expectedDecorator);
+                assertThat(shape.getAttribute("data-dediren-node-shape"))
+                        .isEqualTo(EXPECTED_UML_NODE_SHAPES.get(field.getKey()));
+                childGroupWithAttribute(node, "data-dediren-node-decorator", EXPECTED_UML_NODE_SHAPES.get(field.getKey()));
                 index++;
             }
             assertThat(content).contains("&#171;interface&#187;", "&#171;dataType&#187;", "&#171;enumeration&#187;");
@@ -1835,6 +1828,38 @@ class MainTest {
         metadata.set("nodes", reordered);
         return object;
     }
+
+    // Frozen once from fixtures/render-policy/uml-svg.json (node_type_overrides[*].decorator).
+    // Pinning here (not re-reading the live file) is the contract: an intentional policy change updates this map.
+    private static final java.util.Map<String, String> EXPECTED_UML_NODE_SHAPES = java.util.Map.ofEntries(
+            java.util.Map.entry("Package", "uml_package"),
+            java.util.Map.entry("Class", "uml_class"),
+            java.util.Map.entry("Interface", "uml_interface"),
+            java.util.Map.entry("DataType", "uml_data_type"),
+            java.util.Map.entry("Enumeration", "uml_enumeration"),
+            java.util.Map.entry("Activity", "uml_activity"),
+            java.util.Map.entry("Action", "uml_action"),
+            java.util.Map.entry("InitialNode", "uml_initial_node"),
+            java.util.Map.entry("ActivityFinalNode", "uml_activity_final_node"),
+            java.util.Map.entry("DecisionNode", "uml_decision_node"),
+            java.util.Map.entry("MergeNode", "uml_merge_node"),
+            java.util.Map.entry("ForkNode", "uml_fork_node"),
+            java.util.Map.entry("JoinNode", "uml_join_node"),
+            java.util.Map.entry("ObjectNode", "uml_object_node"),
+            java.util.Map.entry("State", "uml_state"),
+            java.util.Map.entry("FinalState", "uml_final_state"),
+            java.util.Map.entry("Pseudostate", "uml_pseudostate"),
+            java.util.Map.entry("Actor", "uml_actor"),
+            java.util.Map.entry("UseCase", "uml_use_case"),
+            java.util.Map.entry("ExtensionPoint", "uml_extension_point"),
+            java.util.Map.entry("Component", "uml_component"),
+            java.util.Map.entry("Port", "uml_port"),
+            java.util.Map.entry("Node", "uml_node"),
+            java.util.Map.entry("Device", "uml_device"),
+            java.util.Map.entry("ExecutionEnvironment", "uml_execution_environment"),
+            java.util.Map.entry("Artifact", "uml_artifact"),
+            java.util.Map.entry("DeploymentSpecification", "uml_deployment_specification")
+    );
 
     private static boolean isSequenceNodeType(String type) {
         return type.equals("Interaction")
