@@ -14,6 +14,9 @@ final class ElkLayoutRenderArtifacts {
     }
 
     static void write(LayoutResult result) {
+        if (!Boolean.getBoolean("dediren.elk.render-artifacts")) {
+            return; // debug-only; default test runs stay hermetic and do not boot svg-render
+        }
         try {
             writeSvg(testMethodName(), result);
         } catch (Exception error) {
