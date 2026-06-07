@@ -262,16 +262,6 @@ integration actions.
   separate-commit rule, tagging, and release execution.
 - Stop before destructive git actions: history rewrites, force-push, branch
   deletion, and tags. Tags and releases are governed by `release-policy`.
-- Create git worktrees only under the gitignored `.worktrees/` directory (root
-  `.gitignore` already ignores `/.worktrees/`). Do not use `.claude/worktrees/`:
-  it is not gitignored and shows up as untracked clutter. The native
-  `EnterWorktree` tool defaults to `.claude/worktrees/`, so prefer
-  `git worktree add .worktrees/<name> -b <branch>` here, and remove finished
-  worktrees with `git worktree remove`. Note the harness bind-mounts
-  `.git`, `.mcp.json`, and `.claude/{settings*,skills,hooks,agents,commands}`
-  into each worktree; a plain `rm -rf` of a worktree fails with
-  "Device or resource busy" until those mounts release (typically at session
-  exit) — use `git worktree remove` instead.
 - Start and finish by checking `git status --short --branch`.
 - Treat pre-existing modified, staged, or untracked files as user work unless
   you created them in this turn.
