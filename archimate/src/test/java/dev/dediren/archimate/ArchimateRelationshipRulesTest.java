@@ -83,4 +83,44 @@ class ArchimateRelationshipRulesTest {
         assertThat(error.code()).isEqualTo("DEDIREN_ARCHIMATE_JUNCTION_RELATIONSHIP_MIXED");
         assertThat(error.message()).contains("junction", "Flow", "Serving");
     }
+
+    @Test
+    void rejectsJunctionWithOnlyOutgoingRelationships() {
+        ArchimateJunctionValidationException error = org.junit.jupiter.api.Assertions.assertThrows(
+                ArchimateJunctionValidationException.class,
+                () -> Archimate.validateJunctionRelationshipSemantics(
+                        java.util.List.of(
+                                new JunctionValidationNode("junction", "AndJunction", "$.nodes[0]"),
+                                new JunctionValidationNode("orders", "ApplicationService", "$.nodes[1]"),
+                                new JunctionValidationNode("billing", "ApplicationService", "$.nodes[2]")),
+                        java.util.List.of(
+                                new JunctionValidationRelationship("Flow", "junction", "orders"),
+                                new JunctionValidationRelationship("Flow", "junction", "billing"))));
+
+        assertThat(error.code()).isEqualTo("DEDIREN_ARCHIMATE_JUNCTION_DIRECTION_INCOMPLETE");
+        assertThat(error.path()).isEqualTo("$.nodes[0]");
+        assertThat(error.message()).contains("junction");
+    }
+
+    @Test
+    void rejectsUnsupportedElementType() {
+        ArchimateTypeValidationException error = org.junit.jupiter.api.Assertions.assertThrows(
+                ArchimateTypeValidationException.class,
+                () -> Archimate.validateElementType("TechnologyNode", "$.nodes[0].type"));
+
+        assertThat(error.code()).isEqualTo("DEDIREN_ARCHIMATE_ELEMENT_TYPE_UNSUPPORTED");
+        assertThat(error.path()).isEqualTo("$.nodes[0].type");
+        assertThat(error.message()).contains("TechnologyNode");
+    }
+
+    @Test
+    void rejectsUnsupportedRelationshipType() {
+        ArchimateTypeValidationException error = org.junit.jupiter.api.Assertions.assertThrows(
+                ArchimateTypeValidationException.class,
+                () -> Archimate.validateRelationshipType("ConnectsTo", "$.relationships[0].type"));
+
+        assertThat(error.code()).isEqualTo("DEDIREN_ARCHIMATE_RELATIONSHIP_TYPE_UNSUPPORTED");
+        assertThat(error.path()).isEqualTo("$.relationships[0].type");
+        assertThat(error.message()).contains("ConnectsTo");
+    }
 }

@@ -239,6 +239,41 @@ class MainTest {
     }
 
     @Test
+    void rejectsGroupWhoseSourceNodeIsNotGroupingType() throws Exception {
+        JsonNode input = exportInputJson();
+        // Add an ApplicationComponent node as the semantic source of a layout group
+        ((com.fasterxml.jackson.databind.node.ArrayNode) input.at("/source/nodes"))
+                .addObject()
+                .put("id", "not-a-grouping")
+                .put("type", "ApplicationComponent")
+                .put("label", "Not A Grouping")
+                .set("properties", JsonSupport.objectMapper().createObjectNode());
+        JsonNode layout = input.get("layout_result");
+        var groups = JsonSupport.objectMapper().createArrayNode();
+        groups.addObject()
+                .put("id", "semantic-group-bad-source")
+                .put("source_id", "not-a-grouping")
+                .put("projection_id", "semantic-group-bad-source")
+                .set("provenance", JsonSupport.objectMapper().createObjectNode()
+                        .set("semantic_backed", JsonSupport.objectMapper().createObjectNode()
+                                .put("source_id", "not-a-grouping")));
+        ((ObjectNode) groups.get(0))
+                .put("x", 0.0).put("y", 0.0).put("width", 200.0).put("height", 100.0)
+                .put("label", "Not A Grouping")
+                .set("members", JsonSupport.objectMapper().createArrayNode());
+        ((ObjectNode) layout).set("groups", groups);
+
+        PluginResult result = Main.executeForTesting(
+                new String[]{"export"},
+                JsonSupport.objectMapper().writeValueAsString(input),
+                envWithOefSchemas());
+
+        assertThat(result.exitCode()).isEqualTo(3);
+        assertErrorCode(result, "DEDIREN_ARCHIMATE_GROUP_SOURCE_NOT_GROUPING");
+        assertThat(result.stdout()).contains("not-a-grouping", "ApplicationComponent");
+    }
+
+    @Test
     void rejectsInvalidPolicyWithErrorEnvelope() throws Exception {
         JsonNode input = exportInputJson();
         ((ObjectNode) input.get("policy")).remove("model_identifier");

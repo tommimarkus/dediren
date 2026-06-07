@@ -55,6 +55,48 @@ class SchemaCacheModuleTest {
     }
 
     @Test
+    void explicitCacheDirTakesPrecedenceOverAllPlatformFallbacks() throws Exception {
+        // All four env vars present — explicit DEDIREN_SCHEMA_CACHE_DIR must win
+        Path result = SchemaCacheModule.schemaCacheBaseDir(
+                Map.of(
+                        "DEDIREN_SCHEMA_CACHE_DIR", tempDir.resolve("explicit").toString(),
+                        "XDG_CACHE_HOME", tempDir.resolve("xdg").toString(),
+                        "LOCALAPPDATA", tempDir.resolve("local").toString(),
+                        "HOME", tempDir.resolve("home").toString()),
+                "DEDIREN_SCHEMA_CACHE_DIR",
+                "DEDIREN_XMI_SCHEMA_PATH");
+
+        assertThat(result).isEqualTo(tempDir.resolve("explicit"));
+    }
+
+    @Test
+    void xdgCacheHomeTakesPrecedenceOverLocalAppDataAndHome() throws Exception {
+        // XDG_CACHE_HOME, LOCALAPPDATA and HOME present — XDG_CACHE_HOME must win
+        Path result = SchemaCacheModule.schemaCacheBaseDir(
+                Map.of(
+                        "XDG_CACHE_HOME", tempDir.resolve("xdg").toString(),
+                        "LOCALAPPDATA", tempDir.resolve("local").toString(),
+                        "HOME", tempDir.resolve("home").toString()),
+                "DEDIREN_SCHEMA_CACHE_DIR",
+                "DEDIREN_XMI_SCHEMA_PATH");
+
+        assertThat(result).isEqualTo(tempDir.resolve("xdg").resolve("dediren").resolve("schemas"));
+    }
+
+    @Test
+    void localAppDataTakesPrecedenceOverHome() throws Exception {
+        // Both LOCALAPPDATA and HOME present — LOCALAPPDATA must win
+        Path result = SchemaCacheModule.schemaCacheBaseDir(
+                Map.of(
+                        "LOCALAPPDATA", tempDir.resolve("local").toString(),
+                        "HOME", tempDir.resolve("home").toString()),
+                "DEDIREN_SCHEMA_CACHE_DIR",
+                "DEDIREN_XMI_SCHEMA_PATH");
+
+        assertThat(result).isEqualTo(tempDir.resolve("local").resolve("dediren").resolve("schemas"));
+    }
+
+    @Test
     void reportsMissingCacheDirectoryConfiguration() {
         assertThatThrownBy(() -> SchemaCacheModule.schemaCacheBaseDir(
                         Map.of(),

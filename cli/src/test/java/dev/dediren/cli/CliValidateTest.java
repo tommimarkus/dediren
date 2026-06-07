@@ -219,6 +219,28 @@ class CliValidateTest {
         assertThat(envelope.at("/diagnostics/0/code").asText()).isEqualTo("DEDIREN_COMMAND_INPUT_INVALID");
     }
 
+    @Test
+    void validateWithPluginButWithoutProfileReturnsProfileRequiredEnvelope() throws Exception {
+        CliResult result = Main.executeForTesting(
+                new String[]{"validate", "--plugin", "archimate-oef"}, "{}");
+
+        JsonNode envelope = JsonSupport.objectMapper().readTree(result.stdout());
+
+        assertThat(result.exitCode()).isEqualTo(2);
+        assertThat(envelope.at("/diagnostics/0/code").asText()).isEqualTo("DEDIREN_VALIDATE_PROFILE_REQUIRED");
+    }
+
+    @Test
+    void validateWithProfileButWithoutPluginReturnsPluginRequiredEnvelope() throws Exception {
+        CliResult result = Main.executeForTesting(
+                new String[]{"validate", "--profile", "archimate"}, "{}");
+
+        JsonNode envelope = JsonSupport.objectMapper().readTree(result.stdout());
+
+        assertThat(result.exitCode()).isEqualTo(2);
+        assertThat(envelope.at("/diagnostics/0/code").asText()).isEqualTo("DEDIREN_VALIDATE_PLUGIN_REQUIRED");
+    }
+
     private static Path workspaceRoot() {
         Path current = Path.of(System.getProperty("user.dir")).toAbsolutePath();
         while (current != null) {
