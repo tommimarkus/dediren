@@ -24,6 +24,11 @@ class ElkLayoutEngineTest {
     private static final double GEOMETRY_EPSILON = 0.001;
     private static final double PORT_SIDE_EPSILON = 1.0;
 
+    // Architectural fitness function for the ELK-first rule (CLAUDE.md): the helper must not
+    // re-implement post-ELK route geometry. Intentionally a source-text guard, not behavioral —
+    // accepted per the 2026-06-07 test-quality audit. The geometry-outcome tests in this class
+    // (route-through-node count, corner counts) prove the rendered result; this guard prevents
+    // the prohibited code from being added in the first place.
     @Test
     void elkHelperDoesNotOwnPostElkRouteGeometry() throws IOException {
         String source = Files.readString(Path.of(
