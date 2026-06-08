@@ -122,6 +122,14 @@ enforcement authority for matching version, tag, and release actions.
 - A version bump lives in its own commit, separate from the content change that
   motivates it. The version-bump commit contains only the version-source update
   and the synchronized version-assertion surfaces listed below.
+- Sequence the bump after integration: once the motivating change is merged or
+  rebased onto the integration branch (`main`), assess whether it is being
+  released; if so, add the separate version-bump commit and its `v<version>` tag
+  on `main` as a follow-on. A change is being released when release work is
+  requested or it reaches an explicit release/distribution surface; a change
+  that is not being released leaves the version untouched. The bump never rides
+  inside the content commit or ahead of it, and one bump may cover several
+  already-integrated changes.
 - Every product/plugin version bump must create the matching annotated git tag
   `v<version>` on the version-bump commit before pushing.
 - First-party plugin manifests under `fixtures/plugins/*.manifest.json`,
