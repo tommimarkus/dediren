@@ -57,6 +57,22 @@ class SchemaValidatorTest {
     }
 
     @Test
+    void layoutResultNodeRoleFieldIsOptional() {
+        assertThat(SchemaAssertions.validateFixture(
+                workspaceRoot(),
+                "schemas/layout-result.schema.json",
+                "fixtures/layout-result/uml-sequence-validatable.json"))
+                .describedAs("role-bearing layout-result should validate")
+                .isEmpty();
+        assertThat(SchemaAssertions.validateFixture(
+                workspaceRoot(),
+                "schemas/layout-result.schema.json",
+                "fixtures/layout-result/basic.json"))
+                .describedAs("role-less layout-result should still validate")
+                .isEmpty();
+    }
+
+    @Test
     void firstPartyPluginManifestsMatchSchema() {
         for (String manifest : PLUGIN_MANIFESTS) {
             assertThat(SchemaAssertions.validateFixture(workspaceRoot(), "schemas/plugin-manifest.schema.json", manifest))

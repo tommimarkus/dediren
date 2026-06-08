@@ -7,10 +7,12 @@ import dev.dediren.contracts.export.ExportRequest;
 import dev.dediren.contracts.export.UmlXmiExportPolicy;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.contracts.layout.GroupProvenance;
+import dev.dediren.contracts.layout.LaidOutNode;
 import dev.dediren.contracts.layout.LayoutDensity;
 import dev.dediren.contracts.layout.LayoutDirection;
 import dev.dediren.contracts.layout.LayoutEndpointMerging;
 import dev.dediren.contracts.layout.LayoutMode;
+import dev.dediren.contracts.layout.LayoutNode;
 import dev.dediren.contracts.layout.LayoutRequest;
 import dev.dediren.contracts.layout.LayoutResult;
 import dev.dediren.contracts.layout.LayoutRoutingProfile;
@@ -376,6 +378,33 @@ class ContractRoundTripTest {
 
         assertThat(grouped.groups().getFirst().provenance())
                 .isEqualTo(GroupProvenance.semanticBacked("system-group"));
+    }
+
+    @Test
+    void layoutNodesCarryOptionalRoleThatRoundTrips() throws Exception {
+        LaidOutNode lifeline = new LaidOutNode("customer", "customer", "customer", 0, 0, 140, 48, "Customer", "lifeline");
+        LayoutNode input = new LayoutNode("customer", "Customer", "customer", 140.0, 48.0, "lifeline");
+
+        assertThat(lifeline.role()).isEqualTo("lifeline");
+        assertThat(input.role()).isEqualTo("lifeline");
+        assertThat(JsonSupport.objectMapper().valueToTree(lifeline).at("/role").asText()).isEqualTo("lifeline");
+        assertThat(JsonSupport.objectMapper().valueToTree(input).at("/role").asText()).isEqualTo("lifeline");
+
+        LaidOutNode ordinaryOut = new LaidOutNode("api", "api", "api", 0, 0, 140, 48, "Api");
+        LayoutNode ordinaryIn = new LayoutNode("api", "Api", "api", 140.0, 48.0);
+
+        assertThat(ordinaryOut.role()).isNull();
+        assertThat(ordinaryIn.role()).isNull();
+        assertThat(JsonSupport.objectMapper().valueToTree(ordinaryOut).has("role")).isFalse();
+        assertThat(JsonSupport.objectMapper().valueToTree(ordinaryIn).has("role")).isFalse();
+
+        LaidOutNode reparsedOut = JsonSupport.objectMapper()
+                .treeToValue(JsonSupport.objectMapper().valueToTree(lifeline), LaidOutNode.class);
+        LayoutNode reparsedIn = JsonSupport.objectMapper()
+                .treeToValue(JsonSupport.objectMapper().valueToTree(input), LayoutNode.class);
+
+        assertThat(reparsedOut).isEqualTo(lifeline);
+        assertThat(reparsedIn).isEqualTo(input);
     }
 
     @Test

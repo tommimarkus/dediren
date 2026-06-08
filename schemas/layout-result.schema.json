@@ -25,7 +25,8 @@
         "y": { "type": "number" },
         "width": { "type": "number", "exclusiveMinimum": 0 },
         "height": { "type": "number", "exclusiveMinimum": 0 },
-        "label": { "type": "string" }
+        "label": { "type": "string" },
+        "role": { "type": "string" }
       }
     },
     "edge": {

@@ -20,7 +20,8 @@
       "y": 72,
       "width": 140,
       "height": 48,
-      "label": "Customer"
+      "label": "Customer",
+      "role": "lifeline"
     },
     {
       "id": "service",
@@ -30,7 +31,8 @@
       "y": 72,
       "width": 140,
       "height": 48,
-      "label": "Order Service"
+      "label": "Order Service",
+      "role": "lifeline"
     },
     {
       "id": "inventory",
@@ -40,7 +42,8 @@
       "y": 72,
       "width": 140,
       "height": 48,
-      "label": "Inventory"
+      "label": "Inventory",
+      "role": "lifeline"
     },
     {
       "id": "payment",
@@ -50,7 +53,8 @@
       "y": 72,
       "width": 140,
       "height": 48,
-      "label": "Payment"
+      "label": "Payment",
+      "role": "lifeline"
     }
   ],
   "edges": [

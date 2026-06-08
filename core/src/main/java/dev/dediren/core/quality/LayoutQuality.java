@@ -79,13 +79,13 @@ public final class LayoutQuality {
             if (source == null || target == null) {
                 continue;
             }
-            if (!pointOnNodePerimeter(edge.points().getFirst(), source, ROUTE_ENDPOINT_TOLERANCE)) {
+            if (!endpointAccepted(edge.points().getFirst(), source, ROUTE_ENDPOINT_TOLERANCE)) {
                 diagnostics.add(routeError(
                         "DEDIREN_LAYOUT_ROUTE_ENDPOINT_OFF_NODE_PERIMETER",
                         "edge '" + edge.id() + "' first route point is not on source node '" + edge.source() + "' perimeter",
                         "$.edges[" + edgeIndex + "].points[0]"));
             }
-            if (!pointOnNodePerimeter(edge.points().getLast(), target, ROUTE_ENDPOINT_TOLERANCE)) {
+            if (!endpointAccepted(edge.points().getLast(), target, ROUTE_ENDPOINT_TOLERANCE)) {
                 diagnostics.add(routeError(
                         "DEDIREN_LAYOUT_ROUTE_ENDPOINT_OFF_NODE_PERIMETER",
                         "edge '" + edge.id() + "' last route point is not on target node '" + edge.target() + "' perimeter",
@@ -108,8 +108,8 @@ public final class LayoutQuality {
         if (source == null || target == null) {
             return false;
         }
-        return !pointOnNodePerimeter(edge.points().getFirst(), source, ROUTE_ENDPOINT_TOLERANCE)
-                || !pointOnNodePerimeter(edge.points().getLast(), target, ROUTE_ENDPOINT_TOLERANCE);
+        return !endpointAccepted(edge.points().getFirst(), source, ROUTE_ENDPOINT_TOLERANCE)
+                || !endpointAccepted(edge.points().getLast(), target, ROUTE_ENDPOINT_TOLERANCE);
     }
 
     private static LaidOutNode findNode(LayoutResult result, String id) {
@@ -129,6 +129,22 @@ public final class LayoutQuality {
                 || sameWithin(point.x(), right, tolerance)
                 || sameWithin(point.y(), top, tolerance)
                 || sameWithin(point.y(), bottom, tolerance));
+    }
+
+    private static boolean endpointAccepted(Point point, LaidOutNode node, double tolerance) {
+        if (pointOnNodePerimeter(point, node, tolerance)) {
+            return true;
+        }
+        return "lifeline".equals(node.role()) && onLifelineAxis(point, node, tolerance);
+    }
+
+    // Sequence Message endpoints anchor to the lifeline axis: the participant head's vertical
+    // edge extended downward. ELK places them at the head's left/right edge x, below the head box.
+    private static boolean onLifelineAxis(Point point, LaidOutNode node, double tolerance) {
+        double left = node.x();
+        double right = node.x() + node.width();
+        return point.y() >= node.y() - tolerance
+                && (sameWithin(point.x(), left, tolerance) || sameWithin(point.x(), right, tolerance));
     }
 
     private static boolean sameWithin(double left, double right, double tolerance) {

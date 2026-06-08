@@ -32,6 +32,40 @@ class CliLayoutRenderCommandTest {
     }
 
     @Test
+    void validateLayoutAcceptsSequenceLifelineMessageEndpoints() throws Exception {
+        Path fixture = workspaceRoot().resolve("fixtures/layout-result/uml-sequence-validatable.json");
+
+        CliResult result = Main.executeForTesting(new String[]{
+                "validate-layout",
+                "--input",
+                fixture.toString()
+        }, "");
+
+        JsonNode envelope = JsonSupport.objectMapper().readTree(result.stdout());
+
+        assertThat(result.exitCode()).isZero();
+        assertThat(envelope.at("/data/status").asText()).isEqualTo("ok");
+
+        // Negative control: identical geometry without the lifeline role still trips the perimeter check,
+        // proving the acceptance is gated on role rather than loosened for everyone.
+        String roleless = Files.readString(fixture).replace(",\n      \"role\": \"lifeline\"", "");
+        Path stripped = temp.resolve("sequence-without-role.json");
+        Files.writeString(stripped, roleless);
+
+        CliResult control = Main.executeForTesting(new String[]{
+                "validate-layout",
+                "--input",
+                stripped.toString()
+        }, "");
+
+        JsonNode controlEnvelope = JsonSupport.objectMapper().readTree(control.stdout());
+
+        assertThat(control.exitCode()).isEqualTo(2);
+        assertThat(controlEnvelope.at("/diagnostics/0/code").asText())
+                .isEqualTo("DEDIREN_LAYOUT_ROUTE_ENDPOINT_OFF_NODE_PERIMETER");
+    }
+
+    @Test
     void validateLayoutRejectsEmptyRoutesAndEndpointMisses() throws Exception {
         Path layout = temp.resolve("invalid-route-layout.json");
         Files.writeString(layout, """
