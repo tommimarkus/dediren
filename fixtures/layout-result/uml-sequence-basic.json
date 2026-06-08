@@ -20,7 +20,8 @@
       "y": 72,
       "width": 140,
       "height": 48,
-      "label": "Customer"
+      "label": "Customer",
+      "role": "lifeline"
     },
     {
       "id": "service",
@@ -30,7 +31,8 @@
       "y": 72,
       "width": 140,
       "height": 48,
-      "label": "Order Service"
+      "label": "Order Service",
+      "role": "lifeline"
     },
     {
       "id": "receipt",
@@ -40,7 +42,8 @@
       "y": 72,
       "width": 140,
       "height": 48,
-      "label": "Receipt"
+      "label": "Receipt",
+      "role": "lifeline"
     },
     {
       "id": "service-execution",

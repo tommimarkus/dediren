@@ -1,0 +1,68 @@
+{
+  "layout_result_schema_version": "layout-result.schema.v1",
+  "view_id": "sequence-view",
+  "nodes": [
+    {
+      "id": "customer",
+      "source_id": "customer",
+      "projection_id": "customer",
+      "x": 100,
+      "y": 100,
+      "width": 140,
+      "height": 48,
+      "label": "Customer",
+      "role": "lifeline"
+    },
+    {
+      "id": "service",
+      "source_id": "service",
+      "projection_id": "service",
+      "x": 520,
+      "y": 104,
+      "width": 140,
+      "height": 48,
+      "label": "Order Service",
+      "role": "lifeline"
+    }
+  ],
+  "edges": [
+    {
+      "id": "m1",
+      "source": "customer",
+      "target": "service",
+      "source_id": "m1",
+      "projection_id": "m1",
+      "points": [
+        { "x": 240, "y": 180 },
+        { "x": 520, "y": 180 }
+      ],
+      "label": "placeOrder"
+    },
+    {
+      "id": "m2",
+      "source": "service",
+      "target": "customer",
+      "source_id": "m2",
+      "projection_id": "m2",
+      "points": [
+        { "x": 520, "y": 220 },
+        { "x": 240, "y": 220 }
+      ],
+      "label": "accepted"
+    },
+    {
+      "id": "m3",
+      "source": "service",
+      "target": "customer",
+      "source_id": "m3",
+      "projection_id": "m3",
+      "points": [
+        { "x": 520, "y": 260 },
+        { "x": 240, "y": 260 }
+      ],
+      "label": "receiptReady"
+    }
+  ],
+  "groups": [],
+  "warnings": []
+}

@@ -48,6 +48,56 @@ class LayoutQualityTest {
     }
 
     @Test
+    void lifelineMessageEndpointsOnLifelineAxisAreAccepted() {
+        var nodes = new ArrayList<LaidOutNode>();
+        nodes.add(lifelineNode("customer", 100.0, 100.0, 140.0, 48.0));
+        nodes.add(lifelineNode("service", 520.0, 104.0, 140.0, 48.0));
+        var edges = new ArrayList<LaidOutEdge>();
+        edges.add(edge("m1", "customer", "service", List.of(
+                new Point(240.0, 180.0),
+                new Point(520.0, 180.0))));
+
+        LayoutResult result = layoutResult(nodes, edges, List.of());
+
+        assertThat(LayoutQuality.validateLayoutDiagnostics(result)).isEmpty();
+        assertThat(LayoutQuality.validateLayout(result).status()).isEqualTo("ok");
+    }
+
+    @Test
+    void lifelineMessageEndpointOffLifelineAxisIsStillRejected() {
+        var nodes = new ArrayList<LaidOutNode>();
+        nodes.add(lifelineNode("customer", 100.0, 100.0, 140.0, 48.0));
+        nodes.add(lifelineNode("service", 520.0, 104.0, 140.0, 48.0));
+        var edges = new ArrayList<LaidOutEdge>();
+        edges.add(edge("m1", "customer", "service", List.of(
+                new Point(240.0, 180.0),
+                new Point(400.0, 180.0))));
+
+        var diagnostics = LayoutQuality.validateLayoutDiagnostics(layoutResult(nodes, edges, List.of()));
+
+        assertThat(diagnostics).extracting(diagnostic -> diagnostic.code())
+                .containsExactly("DEDIREN_LAYOUT_ROUTE_ENDPOINT_OFF_NODE_PERIMETER");
+        assertThat(diagnostics.get(0).path()).isEqualTo("$.edges[0].points[-1]");
+    }
+
+    @Test
+    void ordinaryNodeEndpointOnVerticalAxisBelowNodeIsStillRejected() {
+        var nodes = new ArrayList<LaidOutNode>();
+        nodes.add(node("source", 0.0, 0.0));
+        nodes.add(node("target", 300.0, 0.0));
+        var edges = new ArrayList<LaidOutEdge>();
+        edges.add(edge("m1", "source", "target", List.of(
+                new Point(0.0, 40.0),
+                new Point(300.0, 200.0))));
+
+        var diagnostics = LayoutQuality.validateLayoutDiagnostics(layoutResult(nodes, edges, List.of()));
+
+        assertThat(diagnostics).extracting(diagnostic -> diagnostic.code())
+                .containsExactly("DEDIREN_LAYOUT_ROUTE_ENDPOINT_OFF_NODE_PERIMETER");
+        assertThat(diagnostics.get(0).path()).isEqualTo("$.edges[0].points[-1]");
+    }
+
+    @Test
     void routeAndBoundaryIssuesAreCounted() {
         var nodes = new ArrayList<LaidOutNode>();
         nodes.add(node("source", 0.0, 0.0));
@@ -147,6 +197,10 @@ class LayoutQualityTest {
 
     private static LaidOutNode node(String id, double x, double y) {
         return new LaidOutNode(id, id, id, x, y, 100.0, 80.0, id);
+    }
+
+    private static LaidOutNode lifelineNode(String id, double x, double y, double width, double height) {
+        return new LaidOutNode(id, id, id, x, y, width, height, id, "lifeline");
     }
 
     private static LaidOutEdge edge(String id, String source, String target, List<Point> points) {

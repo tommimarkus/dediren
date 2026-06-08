@@ -399,6 +399,20 @@ class GenericGraphPluginTest {
     }
 
     @Test
+    void projectsLifelineRoleOntoSequenceLayoutNodes() throws Exception {
+        PluginResult result = Main.executeForTesting(
+                new String[]{"project", "--target", "layout-request", "--view", "sequence-view"},
+                fixture("fixtures/source/valid-uml-sequence-basic.json"));
+
+        JsonNode data = okData(result);
+
+        assertThat(layoutRequestNode(data, "customer").at("/role").asText()).isEqualTo("lifeline");
+        assertThat(layoutRequestNode(data, "service").at("/role").asText()).isEqualTo("lifeline");
+        assertThat(layoutRequestNode(data, "interaction-place-order").has("role")).isFalse();
+        assertSchemaValid("schemas/layout-request.schema.json", data);
+    }
+
+    @Test
     void projectsUmlStateMachineViewKind() throws Exception {
         PluginResult result = Main.executeForTesting(
                 new String[]{"project", "--target", "layout-request", "--view", "state-machine-view"},

@@ -2,6 +2,7 @@ package dev.dediren.plugins.elklayout;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import dev.dediren.contracts.layout.*;
@@ -133,6 +134,15 @@ class ElkLayoutEngineTest {
             service.y(),
             PORT_SIDE_EPSILON,
             "sequence lifeline heads should stay in one horizontal band");
+    }
+
+    @Test
+    void sequenceLayoutPreservesLifelineRoleOnNodes() {
+        LayoutResult result = new ElkLayoutEngine().layout(sequenceLayoutRequest());
+
+        assertEquals("lifeline", nodeById(result, "customer").role(), "customer lifeline role");
+        assertEquals("lifeline", nodeById(result, "service").role(), "service lifeline role");
+        assertNull(nodeById(result, "interaction-place-order").role(), "interaction frame should stay role-less");
     }
 
     @Test
@@ -1892,14 +1902,14 @@ class ElkLayoutEngineTest {
             "layout-request.schema.v1",
             "sequence-view",
             List.of(
-                new LayoutNode("service", "Order Service", "service", 140.0, 48.0),
+                new LayoutNode("service", "Order Service", "service", 140.0, 48.0, "lifeline"),
                 new LayoutNode(
                     "interaction-place-order",
                     "Place Order",
                     "interaction-place-order",
                     360.0,
                     260.0),
-                new LayoutNode("customer", "Customer", "customer", 140.0, 48.0)),
+                new LayoutNode("customer", "Customer", "customer", 140.0, 48.0, "lifeline")),
             List.of(
                 new LayoutEdge("m3", "service", "customer", "receiptReady", "m3", "Message"),
                 new LayoutEdge("m2", "service", "customer", "accepted", "m2", "Message"),

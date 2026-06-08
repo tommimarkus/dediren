@@ -5,5 +5,15 @@ public record LayoutNode(
         String label,
         String sourceId,
         Double widthHint,
-        Double heightHint) {
+        Double heightHint,
+        String role) {
+
+    public LayoutNode(
+            String id,
+            String label,
+            String sourceId,
+            Double widthHint,
+            Double heightHint) {
+        this(id, label, sourceId, widthHint, heightHint, null);
+    }
 }

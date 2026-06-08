@@ -150,7 +150,8 @@ final class ElkLayoutEngine {
                     elkNode.getY(),
                     elkNode.getWidth(),
                     elkNode.getHeight(),
-                    node.label()));
+                    node.label(),
+                    node.role()));
             }
         }
 
@@ -243,7 +244,8 @@ final class ElkLayoutEngine {
                     absoluteY(elkNode),
                     elkNode.getWidth(),
                     elkNode.getHeight(),
-                    node.label()));
+                    node.label(),
+                    node.role()));
             }
         }
 
@@ -385,7 +387,8 @@ final class ElkLayoutEngine {
                     absoluteY(elkNode),
                     elkNode.getWidth(),
                     elkNode.getHeight(),
-                    node.label()));
+                    node.label(),
+                    node.role()));
             }
         }
 

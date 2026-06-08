@@ -99,7 +99,8 @@ final class GenericGraphProjection {
                     sourceNode.label(),
                     sourceNode.id(),
                     GenericGraphLayoutSizing.widthHint(semanticProfile, sourceNode),
-                    GenericGraphLayoutSizing.heightHint(semanticProfile, sourceNode)));
+                    GenericGraphLayoutSizing.heightHint(semanticProfile, sourceNode),
+                    layoutRole(sourceNode.type())));
         }
 
         var edges = new ArrayList<LayoutEdge>();
@@ -205,6 +206,12 @@ final class GenericGraphProjection {
                         selectedView.id() + ".uml.sequence.message-order",
                         "uml.sequence.message-order",
                         messageIds));
+    }
+
+    // Carry the lifeline role into the layout-request so backend-neutral layout-quality checks can
+    // accept Message endpoints anchored on the lifeline axis. Other source types stay role-less.
+    private static String layoutRole(String sourceType) {
+        return "Lifeline".equals(sourceType) ? "lifeline" : null;
     }
 
     private static boolean isSourceOnlySequenceFragment(

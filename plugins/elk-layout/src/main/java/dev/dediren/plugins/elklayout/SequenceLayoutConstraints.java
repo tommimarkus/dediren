@@ -150,7 +150,8 @@ final class SequenceLayoutConstraints {
                 bandY,
                 node.width(),
                 node.height(),
-                node.label()));
+                node.label(),
+                node.role()));
         }
         return normalized;
     }
