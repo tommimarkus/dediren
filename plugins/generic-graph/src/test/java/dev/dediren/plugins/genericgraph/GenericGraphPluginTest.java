@@ -421,6 +421,7 @@ class GenericGraphPluginTest {
         JsonNode data = okData(result);
 
         assertThat(layoutRequestNode(data, "fulfillment-junction").at("/role").asText()).isEqualTo("junction");
+        assertThat(layoutRequestNode(data, "approval-junction").at("/role").asText()).isEqualTo("junction");
         assertThat(layoutRequestNode(data, "order-intake").has("role")).isFalse();
         assertSchemaValid("schemas/layout-request.schema.json", data);
     }

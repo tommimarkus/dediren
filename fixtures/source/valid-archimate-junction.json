@@ -30,6 +30,12 @@
       "type": "ApplicationService",
       "label": "Notification",
       "properties": {}
+    },
+    {
+      "id": "approval-junction",
+      "type": "AndJunction",
+      "label": "and",
+      "properties": {}
     }
   ],
   "relationships": [
@@ -56,6 +62,22 @@
       "target": "notification",
       "label": "notify",
       "properties": {}
+    },
+    {
+      "id": "fulfillment-flows-approval",
+      "type": "Flow",
+      "source": "fulfillment",
+      "target": "approval-junction",
+      "label": "fulfilled",
+      "properties": {}
+    },
+    {
+      "id": "approval-flows-notification",
+      "type": "Flow",
+      "source": "approval-junction",
+      "target": "notification",
+      "label": "approved",
+      "properties": {}
     }
   ],
   "plugins": {
@@ -69,12 +91,15 @@
             "order-intake",
             "fulfillment-junction",
             "fulfillment",
-            "notification"
+            "notification",
+            "approval-junction"
           ],
           "relationships": [
             "intake-flows-junction",
             "junction-flows-fulfillment",
-            "junction-flows-notification"
+            "junction-flows-notification",
+            "fulfillment-flows-approval",
+            "approval-flows-notification"
           ]
         }
       ]
