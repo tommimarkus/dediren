@@ -521,6 +521,16 @@ variables. Important explicit variables:
 - `DEDIREN_OEF_SCHEMA_DIR`: local OEF schema directory.
 - `DEDIREN_XMI_SCHEMA_PATH`: local XMI schema file.
 - `DEDIREN_SCHEMA_CACHE_DIR`: cache directory for schema downloads.
+- `DEDIREN_CDS_DIR`: directory for Class-Data-Sharing archives (see below).
+
+Each `bin/dediren*` launcher auto-creates a Class-Data-Sharing archive on its
+first invocation to speed JVM startup on subsequent calls. Archives are written
+to `<bundle>/cds/` by default (one `.jsa` file per launcher). If that directory
+is read-only, the launcher falls back to `${XDG_CACHE_HOME:-$HOME/.cache}/dediren/cds`.
+Set `DEDIREN_CDS_DIR` to an explicit writable path to relocate all archives.
+The feature is based on `-XX:+AutoCreateSharedArchive` and degrades silently if
+the archive directory is unwritable — startup continues at normal speed without
+any error.
 
 Keep stderr for human debugging only. Agents should decide success or failure
 from stdout JSON.

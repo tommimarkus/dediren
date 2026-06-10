@@ -73,6 +73,7 @@ dediren-agent-bundle-2026.06.1/
   LICENSE
   THIRD-PARTY-NOTICES.md
   bundle.json
+  cds/          (generated at runtime — not a tracked artifact)
 ```
 
 First-party plugin manifests live under `plugins/`. Manifest executable names
@@ -83,6 +84,13 @@ discovered implicitly from `PATH`.
 Bundle launchers set `DEDIREN_BUNDLE_ROOT` from their installation root so
 commands can locate bundled `schemas/`, `plugins/`, and `bin/` regardless of
 the caller's current working directory.
+
+Each `bin/dediren*` launcher auto-creates a Class-Data-Sharing archive
+(`-XX:+AutoCreateSharedArchive`) on first use to speed JVM startup on
+subsequent calls. Archives are written to `cds/` inside the bundle directory
+(or `$HOME/.cache/dediren/cds` if the bundle dir is read-only). Set
+`DEDIREN_CDS_DIR` to relocate them. The feature degrades silently if the
+archive directory is unwritable.
 
 ## First Run
 
