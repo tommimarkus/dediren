@@ -461,10 +461,11 @@ public final class DistTool {
 
     private static void assertSvgRenderOutput(String stdout) throws IOException {
         JsonNode data = okData(stdout);
-        if (!"svg".equals(data.path("artifact_kind").asText())) {
+        JsonNode artifact = data.path("artifacts").path(0);
+        if (!"svg".equals(artifact.path("artifact_kind").asText())) {
             throw new IllegalStateException("render smoke output artifact_kind should be svg");
         }
-        if (!data.path("content").asText().contains("<svg")) {
+        if (!artifact.path("content").asText().contains("<svg")) {
             throw new IllegalStateException("render smoke output should contain SVG content");
         }
     }
