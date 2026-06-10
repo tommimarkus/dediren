@@ -305,6 +305,31 @@ public final class DistTool {
         copyDirectoryContents(install.resolve("lib"), bundle.resolve("lib"));
     }
 
+    static String withCdsArchive(String script, String cdsName) {
+        if (script.contains("DEDIREN_CDS_DIR=")) {
+            return script;
+        }
+        String marker = "export DEDIREN_BUNDLE_ROOT";
+        int markerIndex = script.indexOf(marker);
+        if (markerIndex < 0) {
+            throw new IllegalArgumentException(
+                "launcher script must contain the DEDIREN_BUNDLE_ROOT export before CDS injection");
+        }
+        int lineEnd = script.indexOf('\n', markerIndex);
+        int insertionPoint = lineEnd < 0 ? script.length() : lineEnd + 1;
+        String nl = script.contains("\r\n") ? "\r\n" : "\n";
+        String block = ""
+            + "DEDIREN_CDS_DIR=\"${DEDIREN_CDS_DIR:-$DEDIREN_BUNDLE_ROOT/cds}\"" + nl
+            + "if ! mkdir -p \"$DEDIREN_CDS_DIR\" 2>/dev/null || [ ! -w \"$DEDIREN_CDS_DIR\" ]; then" + nl
+            + "  DEDIREN_CDS_DIR=\"${XDG_CACHE_HOME:-$HOME/.cache}/dediren/cds\"" + nl
+            + "  mkdir -p \"$DEDIREN_CDS_DIR\" 2>/dev/null || true" + nl
+            + "fi" + nl
+            + "JAVA_OPTS=\"$JAVA_OPTS -XX:+AutoCreateSharedArchive"
+            + " -XX:SharedArchiveFile=$DEDIREN_CDS_DIR/" + cdsName + ".jsa\"" + nl
+            + "export JAVA_OPTS" + nl;
+        return script.substring(0, insertionPoint) + block + script.substring(insertionPoint);
+    }
+
     static String withBundleRootExport(String script) {
         if (script.contains("DEDIREN_BUNDLE_ROOT=")) {
             return script;

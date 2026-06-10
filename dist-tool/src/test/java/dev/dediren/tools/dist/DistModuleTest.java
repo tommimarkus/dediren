@@ -299,6 +299,32 @@ class DistModuleTest {
         return output;
     }
 
+    @Test
+    void withCdsArchiveInjectsAutoCreateAfterBundleRootExport() {
+        String base = "#!/bin/sh\n"
+            + "BASEDIR=$(dirname \"$0\")/..\n"
+            + "DEDIREN_BUNDLE_ROOT=\"${DEDIREN_BUNDLE_ROOT:-$BASEDIR}\"\n"
+            + "export DEDIREN_BUNDLE_ROOT\n"
+            + "exec \"$JAVACMD\" $JAVA_OPTS -classpath \"$CLASSPATH\" dev.dediren.Main \"$@\"\n";
+        String rewritten = DistTool.withCdsArchive(base, "elk-layout");
+        org.assertj.core.api.Assertions.assertThat(rewritten)
+            .contains("DEDIREN_CDS_DIR=\"${DEDIREN_CDS_DIR:-$DEDIREN_BUNDLE_ROOT/cds}\"")
+            .contains("-XX:+AutoCreateSharedArchive")
+            .contains("-XX:SharedArchiveFile=$DEDIREN_CDS_DIR/elk-layout.jsa")
+            .contains("${XDG_CACHE_HOME:-$HOME/.cache}/dediren/cds");
+        // exec line still present and after the injected block
+        org.assertj.core.api.Assertions.assertThat(rewritten.indexOf("DEDIREN_CDS_DIR="))
+            .isLessThan(rewritten.indexOf("exec "));
+    }
+
+    @Test
+    void withCdsArchiveIsIdempotent() {
+        String base = "#!/bin/sh\nexport DEDIREN_BUNDLE_ROOT\nexec x\n";
+        String once = DistTool.withCdsArchive(base, "cli");
+        String twice = DistTool.withCdsArchive(once, "cli");
+        org.assertj.core.api.Assertions.assertThat(twice).isEqualTo(once);
+    }
+
     private static void writeLauncher(Path root, String installDir, String sourceScript) throws Exception {
         Path install = root.resolve(installDir);
         Files.createDirectories(install.resolve("bin"));
