@@ -638,6 +638,23 @@ class MainTest {
 
             error(render(input), "DEDIREN_SVG_POLICY_INVALID");
         }
+
+        @Test
+        void interactionStyleOverridesAppearInCss() throws Exception {
+            String svg = okData(render(renderInput(
+                    "fixtures/layout-result/basic.json", "fixtures/render-policy/interactive-svg.json")))
+                    .at("/artifacts/0/content").asText();
+
+            assertThat(svg).contains("stroke:#ff8800", "stroke-width:5");
+        }
+
+        @Test
+        void interactionStyleDefaultsWhenOmitted() throws Exception {
+            String svg = okContent(render(renderInput(
+                    "fixtures/layout-result/basic.json", "fixtures/render-policy/default-svg.json")));
+
+            assertThat(svg).contains("stroke:#1f6feb", "stroke-width:3");
+        }
     }
 
     @Nested
