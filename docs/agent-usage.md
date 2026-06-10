@@ -126,7 +126,7 @@ or the previous command envelope:
   --input layout-result.json \
   > render-result.json
 
-jq -r '.data.content' render-result.json > diagram.svg
+jq -r '.data.artifacts[] | select(.artifact_kind=="svg") | .content' render-result.json > diagram.svg
 ```
 
 ## UML Sequence Handoff

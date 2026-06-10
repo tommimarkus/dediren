@@ -140,8 +140,16 @@ Project, layout, validate, and render:
   --input layout-result.json \
   > render-result.json
 
-jq -r '.data.content' render-result.json > diagram.svg
+jq -r '.data.artifacts[] | select(.artifact_kind=="svg") | .content' render-result.json > diagram.svg
 ```
+
+The SVG render policy accepts an optional `interactive` mode: `none` (static),
+`svg` (default — a self-contained interactive SVG that highlights a node's
+edges on click), `html` (an HTML page wrapping the interactive SVG), or `both`
+(an `svg` and an `html` artifact). The render result returns an ordered
+`artifacts[]` list; select the artifact you want by `artifact_kind`. Optional
+`style.interaction.highlight_stroke` and `style.interaction.highlight_stroke_width`
+control the highlight appearance.
 
 Downstream commands accept either a full Dediren command envelope or the raw
 `.data` artifact JSON.
@@ -203,7 +211,7 @@ render SVG, and export UML/XMI:
   --input sequence-layout-result.json \
   > sequence-render-result.json
 
-jq -r '.data.content' sequence-render-result.json > sequence.svg
+jq -r '.data.artifacts[] | select(.artifact_kind=="svg") | .content' sequence-render-result.json > sequence.svg
 
 "$BUNDLE/bin/dediren" export \
   --plugin uml-xmi \
@@ -268,7 +276,7 @@ render SVG, and export UML/XMI:
   --input state-machine-layout-result.json \
   > state-machine-render-result.json
 
-jq -r '.data.content' state-machine-render-result.json > state-machine.svg
+jq -r '.data.artifacts[] | select(.artifact_kind=="svg") | .content' state-machine-render-result.json > state-machine.svg
 
 "$BUNDLE/bin/dediren" export \
   --plugin uml-xmi \
@@ -335,7 +343,7 @@ render SVG, and export UML/XMI:
   --input use-case-layout-result.json \
   > use-case-render-result.json
 
-jq -r '.data.content' use-case-render-result.json > use-case.svg
+jq -r '.data.artifacts[] | select(.artifact_kind=="svg") | .content' use-case-render-result.json > use-case.svg
 
 "$BUNDLE/bin/dediren" export \
   --plugin uml-xmi \
@@ -400,7 +408,7 @@ render SVG, and export UML/XMI:
   --input component-layout-result.json \
   > component-render-result.json
 
-jq -r '.data.content' component-render-result.json > component.svg
+jq -r '.data.artifacts[] | select(.artifact_kind=="svg") | .content' component-render-result.json > component.svg
 
 "$BUNDLE/bin/dediren" export \
   --plugin uml-xmi \
@@ -463,7 +471,7 @@ render SVG, and export UML/XMI:
   --input deployment-layout-result.json \
   > deployment-render-result.json
 
-jq -r '.data.content' deployment-render-result.json > deployment.svg
+jq -r '.data.artifacts[] | select(.artifact_kind=="svg") | .content' deployment-render-result.json > deployment.svg
 
 "$BUNDLE/bin/dediren" export \
   --plugin uml-xmi \
