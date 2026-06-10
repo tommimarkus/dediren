@@ -22,6 +22,13 @@ public final class LayoutQuality {
     // Layout units reserved for the group title row; svg-render draws the group label inside the
     // top of the group rect, so members inside this band collide with the label visually.
     private static final double GROUP_LABEL_BAND_HEIGHT = 24.0;
+    // Conservative label-fit estimate: generous per-char width and line height, and only flag
+    // labels needing more than LABEL_OVERFLOW_FACTOR times the estimated capacity, so renderer
+    // font differences cannot produce false positives.
+    private static final double LABEL_CHAR_WIDTH = 7.0;
+    private static final double LABEL_LINE_HEIGHT = 16.0;
+    private static final double LABEL_PADDING = 8.0;
+    private static final int LABEL_OVERFLOW_FACTOR = 2;
 
     private LayoutQuality() {
     }
@@ -38,7 +45,7 @@ public final class LayoutQuality {
         int routeCloseParallelCount = countCloseParallelRoutes(result);
         int groupBoundaryIssueCount = countGroupBoundaryIssues(result);
         int groupLabelBandIssueCount = countGroupLabelBandIssues(result);
-        int labelSpaceIssueCount = 0;
+        int labelSpaceIssueCount = countLabelSpaceIssues(result);
         int edgeCrossingCount = countEdgeCrossings(result);
         int warningCount = result.warnings().size();
         // edgeCrossingCount is informational: crossings can be unavoidable in non-planar graphs,
@@ -263,6 +270,23 @@ public final class LayoutQuality {
                         childGroup.x(), childGroup.y(), childGroup.width(), childGroup.height())) {
                     count++;
                 }
+            }
+        }
+        return count;
+    }
+
+    private static int countLabelSpaceIssues(LayoutResult result) {
+        int count = 0;
+        for (LaidOutNode node : result.nodes()) {
+            if (node.label() == null || node.label().isBlank() || "junction".equals(node.role())) {
+                continue;
+            }
+            int charsPerLine = (int) Math.max(1.0,
+                    Math.floor((node.width() - 2 * LABEL_PADDING) / LABEL_CHAR_WIDTH));
+            int lines = (int) Math.max(1.0,
+                    Math.floor((node.height() - 2 * LABEL_PADDING) / LABEL_LINE_HEIGHT));
+            if (node.label().length() > charsPerLine * lines * LABEL_OVERFLOW_FACTOR) {
+                count++;
             }
         }
         return count;

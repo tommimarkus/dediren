@@ -189,6 +189,36 @@ class LayoutQualityTest {
     }
 
     @Test
+    void labelClearlyOverflowingNodeCapacityIsCounted() {
+        var nodes = List.of(new LaidOutNode("tiny", "tiny", "tiny", 0.0, 0.0, 60.0, 24.0,
+                "An extremely long label that cannot possibly fit", null));
+
+        LayoutQualityReport report = LayoutQuality.validateLayout(layoutResult(nodes, List.of(), List.of()));
+
+        assertThat(report.labelSpaceIssueCount()).isEqualTo(1);
+        assertThat(report.status()).isEqualTo("warning");
+    }
+
+    @Test
+    void typicalLabelsWithinNodeCapacityAreAccepted() {
+        var nodes = List.of(node("api", 0.0, 0.0));
+
+        LayoutQualityReport report = LayoutQuality.validateLayout(layoutResult(nodes, List.of(), List.of()));
+
+        assertThat(report.labelSpaceIssueCount()).isZero();
+        assertThat(report.status()).isEqualTo("ok");
+    }
+
+    @Test
+    void junctionLabelsAreExemptFromLabelSpaceCheck() {
+        var nodes = List.of(new LaidOutNode("junction", "junction", "junction", 0.0, 0.0, 28.0, 28.0,
+                "a junction label rendered adjacent to the dot", "junction"));
+
+        assertThat(LayoutQuality.validateLayout(layoutResult(nodes, List.of(), List.of()))
+                .labelSpaceIssueCount()).isZero();
+    }
+
+    @Test
     void groupMembersInsideLabelBandAreCounted() {
         var nodes = List.of(node("member", 10.0, 10.0));
         var groups = List.of(new LaidOutGroup(
