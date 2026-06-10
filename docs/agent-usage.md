@@ -454,6 +454,14 @@ from any current working directory.
   > render-result.json
 ```
 
+`validate-layout` quality fields: `overlap_count`, `connector_through_node_count`,
+`invalid_route_count`, `route_detour_count`, `route_close_parallel_count`,
+`group_boundary_issue_count`, `group_label_band_issue_count`,
+`label_space_issue_count`, `edge_crossing_count` (informational only), and
+`warning_count`. `status` is `ok` only when all non-informational counts and
+warnings are zero. ArchiMate junction nodes detached from an incident edge
+route fail with `DEDIREN_LAYOUT_JUNCTION_OFF_INCIDENT_ROUTE`.
+
 The `elk-layout` plugin uses official Eclipse ELK Java libraries and requires
 Java 21 or newer. It does not use external layout adapters. Use
 `layout_preferences.mode: "flow"` for directed diagrams that need ELK Layered
