@@ -556,6 +556,42 @@ class MainTest {
             assertThat(envelope.at("/diagnostics/0/path").asText())
                     .isEqualTo("policy.style.node_type_overrides.BogusUml");
         }
+
+        @Test
+        void defaultModeEmitsInteractionLayerAndEdgeEndpoints() throws Exception {
+            String content = okContent(render(renderInput(
+                    "fixtures/layout-result/basic.json", "fixtures/render-policy/default-svg.json")));
+
+            assertThat(content).contains("data-dediren-edge-source", "data-dediren-edge-target");
+            assertThat(content).contains("<style", "dediren-edge-highlighted");
+            assertThat(content).contains("<script", "data-dediren-node-id");
+
+            Document document = svgDocument(content);
+            var edges = document.getElementsByTagName("g");
+            boolean anyEdgeHasSource = false;
+            for (int i = 0; i < edges.getLength(); i++) {
+                Element g = (Element) edges.item(i);
+                if (!g.getAttribute("data-dediren-edge-id").isEmpty()) {
+                    assertThat(g.getAttribute("data-dediren-edge-source")).isNotEmpty();
+                    assertThat(g.getAttribute("data-dediren-edge-target")).isNotEmpty();
+                    anyEdgeHasSource = true;
+                }
+            }
+            assertThat(anyEdgeHasSource).isTrue();
+        }
+
+        @Test
+        void noneModeSuppressesInteractionLayer() throws Exception {
+            ObjectNode input = (ObjectNode) renderInput(
+                    "fixtures/layout-result/basic.json", "fixtures/render-policy/default-svg.json");
+            ((ObjectNode) input.at("/policy")).put("interactive", "none");
+
+            String content = okContent(render(input));
+
+            assertThat(content).doesNotContain("data-dediren-edge-source");
+            assertThat(content).doesNotContain("<script");
+            assertThat(content).doesNotContain("dediren-edge-highlighted");
+        }
     }
 
     @Nested
