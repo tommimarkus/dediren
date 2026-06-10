@@ -81,6 +81,15 @@ public final class DistTool {
                 smoke(root, archive.toAbsolutePath().normalize(), version);
                 yield 0;
             }
+            case "bench" -> {
+                String version = required(options, "version");
+                int runs = options.containsKey("runs") ? Integer.parseInt(options.get("runs")) : 5;
+                Path archive = options.containsKey("archive")
+                    ? Path.of(options.get("archive"))
+                    : root.resolve("dist").resolve(bundleName(version) + ".tar.gz");
+                bench(root, archive.toAbsolutePath().normalize(), runs);
+                yield 0;
+            }
             default -> {
                 usage();
                 yield 2;
@@ -219,6 +228,62 @@ public final class DistTool {
         } finally {
             deleteIfExists(temp);
         }
+    }
+
+    private static void bench(Path root, Path archive, int runs) throws Exception {
+        if (!Files.isRegularFile(archive)) {
+            throw new IllegalStateException("archive not found: " + archive);
+        }
+        ensureJavaRuntime();
+        Path temp = Files.createTempDirectory("dediren-dist-bench-");
+        try {
+            runCommand(root, List.of("tar", "-xzf", archive.toString(), "-C", temp.toString()), null);
+            Path bundle = findBundleDir(temp);
+            Path dediren = bundle.resolve("bin/dediren");
+
+            // Prepare a layout request once so the layout bench has real input.
+            String projectOutput = runBundleCommand(dediren, bundle, List.of(
+                "project", "--target", "layout-request", "--plugin", "generic-graph", "--view", "main",
+                "--input", bundle.resolve("fixtures/source/valid-pipeline-rich.json").toString()), null);
+            Path request = temp.resolve("request.json");
+            Files.writeString(request, projectOutput, StandardCharsets.UTF_8);
+
+            List<Bench.Stat> stats = new ArrayList<>();
+            stats.add(timeCommand("cli --version", runs, () -> {
+                runBundleCommand(dediren, bundle, List.of("--version"), null);
+            }));
+            stats.add(timeCommand("elk-layout capabilities", runs, () -> {
+                runBundleCommand(bundle.resolve("bin/dediren-plugin-elk-layout"), bundle,
+                    List.of("capabilities"), null);
+            }));
+            stats.add(timeCommand("elk-layout layout (probe+work)", runs, () -> {
+                runBundleCommand(dediren, bundle,
+                    List.of("layout", "--plugin", "elk-layout", "--input", request.toString()), null);
+            }));
+            stats.add(timeCommand("generic-graph capabilities", runs, () -> {
+                runBundleCommand(bundle.resolve("bin/dediren-plugin-generic-graph"), bundle,
+                    List.of("capabilities"), null);
+            }));
+
+            System.out.println(Bench.renderReport(stats));
+        } finally {
+            deleteIfExists(temp);
+        }
+    }
+
+    private static Bench.Stat timeCommand(String label, int runs, BenchInvocation invocation) throws Exception {
+        List<Long> millis = new ArrayList<>();
+        for (int index = 0; index < runs; index++) {
+            long start = System.nanoTime();
+            invocation.run();
+            millis.add((System.nanoTime() - start) / 1_000_000L);
+        }
+        return Bench.summarize(label, millis);
+    }
+
+    @FunctionalInterface
+    private interface BenchInvocation {
+        void run() throws Exception;
     }
 
     private static void installLauncher(Path root, Path bundle, Launcher launcher) throws IOException {
