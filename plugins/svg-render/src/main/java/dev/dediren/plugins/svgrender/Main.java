@@ -118,10 +118,10 @@ public final class Main {
             return exitWithDiagnostic(stdout, error.code(), error.message(), error.path());
         }
 
-        String content = renderSvg(input.layoutResult(), input.renderMetadata(), input.policy());
+        String svg = renderSvg(input.layoutResult(), input.renderMetadata(), input.policy());
         var result = new RenderResult(
                 ContractVersions.RENDER_RESULT_SCHEMA_VERSION,
-                List.of(new RenderArtifact("svg", content)));
+                buildArtifacts(interactiveMode(input.policy()), svg));
         stdout.println(JsonSupport.objectMapper().writeValueAsString(CommandEnvelope.ok(result)));
         return 0;
     }
@@ -274,6 +274,19 @@ public final class Main {
                 + "document.addEventListener('keydown',function(ev){if(ev.key==='Escape'){clear();}});\n"
                 + "})();\n"
                 + "//]]></script>";
+    }
+
+    private static List<RenderArtifact> buildArtifacts(String mode, String svg) {
+        return switch (mode) {
+            case "html" -> List.of(new RenderArtifact("html", htmlWrap(svg)));
+            case "both" -> List.of(new RenderArtifact("svg", svg), new RenderArtifact("html", htmlWrap(svg)));
+            default -> List.of(new RenderArtifact("svg", svg));
+        };
+    }
+
+    private static String htmlWrap(String svg) {
+        return "<!DOCTYPE html>\n<html lang=\"en\">\n<head><meta charset=\"utf-8\">"
+                + "<title>dediren diagram</title></head>\n<body>\n" + svg + "</body>\n</html>\n";
     }
 
     private static String groupDecorator(LaidOutGroup group, ResolvedGroupStyle style) {

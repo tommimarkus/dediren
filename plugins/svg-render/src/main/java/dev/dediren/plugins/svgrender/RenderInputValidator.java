@@ -399,6 +399,15 @@ final class RenderInputValidator {
     }
 
     private static void validateRenderPolicy(RenderPolicy policy) throws PolicyValidationException {
+        String interactive = policy.interactive();
+        if (interactive != null
+                && !interactive.equals("none")
+                && !interactive.equals("svg")
+                && !interactive.equals("html")
+                && !interactive.equals("both")) {
+            throw new PolicyValidationException(
+                    "interactive", "SVG render policy interactive must be one of none, svg, html, both");
+        }
         SvgStylePolicy style = policy.style();
         if (style == null) {
             return;

@@ -602,6 +602,42 @@ class MainTest {
 
             error(render(input), "DEDIREN_SVG_POLICY_INVALID");
         }
+
+        @Test
+        void htmlModeWrapsInteractiveSvg() throws Exception {
+            ObjectNode input = (ObjectNode) renderInput(
+                    "fixtures/layout-result/basic.json", "fixtures/render-policy/default-svg.json");
+            ((ObjectNode) input.at("/policy")).put("interactive", "html");
+
+            JsonNode data = okData(render(input));
+
+            assertThat(data.at("/artifacts").size()).isEqualTo(1);
+            assertThat(data.at("/artifacts/0/artifact_kind").asText()).isEqualTo("html");
+            String html = data.at("/artifacts/0/content").asText();
+            assertThat(html).startsWith("<!DOCTYPE html");
+            assertThat(html).contains("<svg", "<script", "data-dediren-edge-source");
+        }
+
+        @Test
+        void bothModeReturnsSvgThenHtml() throws Exception {
+            JsonNode data = okData(render(renderInput(
+                    "fixtures/layout-result/basic.json", "fixtures/render-policy/interactive-svg.json")));
+
+            assertThat(data.at("/artifacts").size()).isEqualTo(2);
+            assertThat(data.at("/artifacts/0/artifact_kind").asText()).isEqualTo("svg");
+            assertThat(data.at("/artifacts/1/artifact_kind").asText()).isEqualTo("html");
+            assertThat(data.at("/artifacts/0/content").asText()).startsWith("<svg");
+            assertThat(data.at("/artifacts/1/content").asText()).startsWith("<!DOCTYPE html");
+        }
+
+        @Test
+        void invalidInteractiveModeIsRejected() throws Exception {
+            ObjectNode input = (ObjectNode) renderInput(
+                    "fixtures/layout-result/basic.json", "fixtures/render-policy/default-svg.json");
+            ((ObjectNode) input.at("/policy")).put("interactive", "bogus");
+
+            error(render(input), "DEDIREN_SVG_POLICY_INVALID");
+        }
     }
 
     @Nested
