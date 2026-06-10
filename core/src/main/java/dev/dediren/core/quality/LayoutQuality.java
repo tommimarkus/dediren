@@ -19,6 +19,9 @@ public final class LayoutQuality {
     private static final double ROUTE_CLOSE_PARALLEL_MIN_OVERLAP = 40.0;
     private static final double GEOMETRY_EPSILON = 0.001;
     private static final double ROUTE_ENDPOINT_TOLERANCE = 1.5;
+    // Layout units reserved for the group title row; svg-render draws the group label inside the
+    // top of the group rect, so members inside this band collide with the label visually.
+    private static final double GROUP_LABEL_BAND_HEIGHT = 24.0;
 
     private LayoutQuality() {
     }
@@ -34,7 +37,7 @@ public final class LayoutQuality {
                 .count();
         int routeCloseParallelCount = countCloseParallelRoutes(result);
         int groupBoundaryIssueCount = countGroupBoundaryIssues(result);
-        int groupLabelBandIssueCount = 0;
+        int groupLabelBandIssueCount = countGroupLabelBandIssues(result);
         int labelSpaceIssueCount = 0;
         int edgeCrossingCount = countEdgeCrossings(result);
         int warningCount = result.warnings().size();
@@ -232,6 +235,33 @@ public final class LayoutQuality {
                         count++;
                         break;
                     }
+                }
+            }
+        }
+        return count;
+    }
+
+    private static int countGroupLabelBandIssues(LayoutResult result) {
+        int count = 0;
+        for (LaidOutGroup group : result.groups()) {
+            if (group.label() == null || group.label().isBlank()) {
+                continue;
+            }
+            for (String memberId : group.members()) {
+                LaidOutNode node = findNode(result, memberId);
+                if (node != null) {
+                    if (rectanglesOverlap(
+                            group.x(), group.y(), group.width(), GROUP_LABEL_BAND_HEIGHT,
+                            node.x(), node.y(), node.width(), node.height())) {
+                        count++;
+                    }
+                    continue;
+                }
+                LaidOutGroup childGroup = findGroup(result, memberId);
+                if (childGroup != null && rectanglesOverlap(
+                        group.x(), group.y(), group.width(), GROUP_LABEL_BAND_HEIGHT,
+                        childGroup.x(), childGroup.y(), childGroup.width(), childGroup.height())) {
+                    count++;
                 }
             }
         }

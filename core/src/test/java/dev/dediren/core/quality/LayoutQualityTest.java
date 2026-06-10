@@ -128,8 +128,8 @@ class LayoutQualityTest {
     @Test
     void nestedGroupMembersAreCountedAsGroupBoundaryMembers() {
         var nodes = List.of(
-                node("source", 0.0, 0.0),
-                node("target", 200.0, 0.0));
+                node("source", 0.0, 30.0),
+                node("target", 200.0, 30.0));
         var edges = List.of(edge("internal", "source", "target", List.of(
                 new Point(100.0, 40.0),
                 new Point(200.0, 40.0))));
@@ -142,7 +142,7 @@ class LayoutQualityTest {
                         -30.0,
                         -30.0,
                         360.0,
-                        140.0,
+                        200.0,
                         List.of("inner"),
                         "Outer"),
                 new LaidOutGroup(
@@ -151,9 +151,9 @@ class LayoutQualityTest {
                         "inner",
                         null,
                         -10.0,
-                        -10.0,
+                        0.0,
                         320.0,
-                        100.0,
+                        140.0,
                         List.of("source", "target"),
                         "Inner"));
 
@@ -185,6 +185,75 @@ class LayoutQualityTest {
 
         assertThat(report.routeDetourCount()).isEqualTo(1);
         assertThat(report.routeCloseParallelCount()).isEqualTo(1);
+        assertThat(report.status()).isEqualTo("warning");
+    }
+
+    @Test
+    void groupMembersInsideLabelBandAreCounted() {
+        var nodes = List.of(node("member", 10.0, 10.0));
+        var groups = List.of(new LaidOutGroup(
+                "zone", "zone", "zone", null, 0.0, 0.0, 300.0, 200.0, List.of("member"), "Zone"));
+
+        LayoutQualityReport report = LayoutQuality.validateLayout(layoutResult(nodes, List.of(), groups));
+
+        assertThat(report.groupLabelBandIssueCount()).isEqualTo(1);
+        assertThat(report.status()).isEqualTo("warning");
+    }
+
+    @Test
+    void groupMembersBelowLabelBandAreAccepted() {
+        var nodes = List.of(node("member", 10.0, 32.0));
+        var groups = List.of(new LaidOutGroup(
+                "zone", "zone", "zone", null, 0.0, 0.0, 300.0, 200.0, List.of("member"), "Zone"));
+
+        LayoutQualityReport report = LayoutQuality.validateLayout(layoutResult(nodes, List.of(), groups));
+
+        assertThat(report.groupLabelBandIssueCount()).isZero();
+        assertThat(report.status()).isEqualTo("ok");
+    }
+
+    @Test
+    void unlabeledGroupHasNoLabelBandReservation() {
+        var nodes = List.of(node("member", 10.0, 10.0));
+        var groups = List.of(new LaidOutGroup(
+                "zone", "zone", "zone", null, 0.0, 0.0, 300.0, 200.0, List.of("member"), null));
+
+        assertThat(LayoutQuality.validateLayout(layoutResult(nodes, List.of(), groups))
+                .groupLabelBandIssueCount()).isZero();
+    }
+
+    @Test
+    void threeLevelNestedContainmentValidatesCleanly() {
+        var nodes = List.of(node("leaf", 60.0, 110.0));
+        var groups = List.of(
+                new LaidOutGroup("outer", "outer", "outer", null, 0.0, 0.0, 400.0, 320.0,
+                        List.of("middle"), "Outer"),
+                new LaidOutGroup("middle", "middle", "middle", null, 30.0, 40.0, 320.0, 240.0,
+                        List.of("inner"), "Middle"),
+                new LaidOutGroup("inner", "inner", "inner", null, 50.0, 80.0, 260.0, 160.0,
+                        List.of("leaf"), "Inner"));
+
+        LayoutQualityReport report = LayoutQuality.validateLayout(layoutResult(nodes, List.of(), groups));
+
+        assertThat(report.groupBoundaryIssueCount()).isZero();
+        assertThat(report.groupLabelBandIssueCount()).isZero();
+        assertThat(report.status()).isEqualTo("ok");
+    }
+
+    @Test
+    void memberEscapingDeepNestedGroupIsCounted() {
+        var nodes = List.of(node("leaf", 290.0, 110.0));
+        var groups = List.of(
+                new LaidOutGroup("outer", "outer", "outer", null, 0.0, 0.0, 400.0, 320.0,
+                        List.of("middle"), "Outer"),
+                new LaidOutGroup("middle", "middle", "middle", null, 30.0, 40.0, 320.0, 240.0,
+                        List.of("inner"), "Middle"),
+                new LaidOutGroup("inner", "inner", "inner", null, 50.0, 80.0, 260.0, 160.0,
+                        List.of("leaf"), "Inner"));
+
+        LayoutQualityReport report = LayoutQuality.validateLayout(layoutResult(nodes, List.of(), groups));
+
+        assertThat(report.groupBoundaryIssueCount()).isEqualTo(1);
         assertThat(report.status()).isEqualTo("warning");
     }
 
