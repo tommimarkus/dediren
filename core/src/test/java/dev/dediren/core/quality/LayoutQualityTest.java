@@ -188,6 +188,38 @@ class LayoutQualityTest {
         assertThat(report.status()).isEqualTo("warning");
     }
 
+    @Test
+    void crossingEdgePairsAreCountedAsInformationOnly() {
+        var nodes = List.of(
+                node("a", 0.0, 0.0),
+                node("b", 400.0, 400.0),
+                node("c", 0.0, 400.0),
+                node("d", 400.0, 0.0));
+        var edges = List.of(
+                edge("a-b", "a", "b", List.of(new Point(100.0, 80.0), new Point(400.0, 440.0))),
+                edge("c-d", "c", "d", List.of(new Point(100.0, 440.0), new Point(400.0, 40.0))));
+
+        LayoutQualityReport report = LayoutQuality.validateLayout(layoutResult(nodes, edges, List.of()));
+
+        assertThat(report.edgeCrossingCount()).isEqualTo(1);
+        assertThat(report.status()).isEqualTo("ok");
+    }
+
+    @Test
+    void edgesSharingAnEndpointNodeAreNotCountedAsCrossings() {
+        var nodes = List.of(
+                node("hub", 0.0, 0.0),
+                node("left", 300.0, 0.0),
+                node("right", 300.0, 200.0));
+        var edges = List.of(
+                edge("hub-left", "hub", "left", List.of(new Point(100.0, 40.0), new Point(300.0, 40.0))),
+                edge("hub-right", "hub", "right", List.of(new Point(100.0, 40.0), new Point(300.0, 240.0))));
+
+        LayoutQualityReport report = LayoutQuality.validateLayout(layoutResult(nodes, edges, List.of()));
+
+        assertThat(report.edgeCrossingCount()).isZero();
+    }
+
     private static LayoutResult layoutResult(
             List<LaidOutNode> nodes,
             List<LaidOutEdge> edges,

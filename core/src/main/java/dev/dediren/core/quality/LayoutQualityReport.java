@@ -9,5 +9,8 @@ public record LayoutQualityReport(
         int routeDetourCount,
         int routeCloseParallelCount,
         int groupBoundaryIssueCount,
+        int groupLabelBandIssueCount,
+        int labelSpaceIssueCount,
+        int edgeCrossingCount,
         int warningCount) {
 }

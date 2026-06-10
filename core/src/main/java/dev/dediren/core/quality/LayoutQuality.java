@@ -34,13 +34,20 @@ public final class LayoutQuality {
                 .count();
         int routeCloseParallelCount = countCloseParallelRoutes(result);
         int groupBoundaryIssueCount = countGroupBoundaryIssues(result);
+        int groupLabelBandIssueCount = 0;
+        int labelSpaceIssueCount = 0;
+        int edgeCrossingCount = countEdgeCrossings(result);
         int warningCount = result.warnings().size();
+        // edgeCrossingCount is informational: crossings can be unavoidable in non-planar graphs,
+        // so it never degrades status. Per-fixture thresholds are asserted in tests instead.
         String status = overlapCount == 0
                 && connectorThroughNodeCount == 0
                 && invalidRouteCount == 0
                 && routeDetourCount == 0
                 && routeCloseParallelCount == 0
                 && groupBoundaryIssueCount == 0
+                && groupLabelBandIssueCount == 0
+                && labelSpaceIssueCount == 0
                 && warningCount == 0
                 ? "ok"
                 : "warning";
@@ -53,6 +60,9 @@ public final class LayoutQuality {
                 routeDetourCount,
                 routeCloseParallelCount,
                 groupBoundaryIssueCount,
+                groupLabelBandIssueCount,
+                labelSpaceIssueCount,
+                edgeCrossingCount,
                 warningCount);
     }
 
@@ -375,6 +385,57 @@ public final class LayoutQuality {
                 rectY,
                 rectWidth,
                 rectHeight);
+    }
+
+    private static int countEdgeCrossings(LayoutResult result) {
+        int count = 0;
+        for (int i = 0; i < result.edges().size(); i++) {
+            for (int j = i + 1; j < result.edges().size(); j++) {
+                LaidOutEdge left = result.edges().get(i);
+                LaidOutEdge right = result.edges().get(j);
+                if (edgesShareEndpointNode(left, right)) {
+                    continue;
+                }
+                if (routesProperlyCross(left.points(), right.points())) {
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
+
+    private static boolean edgesShareEndpointNode(LaidOutEdge left, LaidOutEdge right) {
+        return left.source().equals(right.source())
+                || left.source().equals(right.target())
+                || left.target().equals(right.source())
+                || left.target().equals(right.target());
+    }
+
+    private static boolean routesProperlyCross(List<Point> leftPoints, List<Point> rightPoints) {
+        for (int i = 0; i + 1 < leftPoints.size(); i++) {
+            for (int j = 0; j + 1 < rightPoints.size(); j++) {
+                if (segmentsProperlyCross(
+                        leftPoints.get(i), leftPoints.get(i + 1),
+                        rightPoints.get(j), rightPoints.get(j + 1))) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    // Proper crossing only (interiors intersect). Touches and collinear overlaps are excluded so
+    // orthogonal routes that share a corner coordinate do not count as crossings.
+    private static boolean segmentsProperlyCross(Point a, Point b, Point c, Point d) {
+        double o1 = orientation(a, b, c);
+        double o2 = orientation(a, b, d);
+        double o3 = orientation(c, d, a);
+        double o4 = orientation(c, d, b);
+        return o1 * o2 < 0 && o3 * o4 < 0;
+    }
+
+    private static double orientation(Point a, Point b, Point c) {
+        return (b.x() - a.x()) * (c.y() - a.y()) - (b.y() - a.y()) * (c.x() - a.x());
     }
 
     private enum Orientation {
