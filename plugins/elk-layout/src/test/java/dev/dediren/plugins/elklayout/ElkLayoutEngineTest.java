@@ -1897,6 +1897,72 @@ class ElkLayoutEngineTest {
         }
     }
 
+    @Test
+    void junctionRoleSurvivesLayoutAndPassesQualityGeometry() {
+        var request = new LayoutRequest(
+                "layout-request.schema.v1",
+                "main",
+                List.of(
+                        new LayoutNode("order-intake", "Order Intake", "order-intake", 160.0, 80.0, null),
+                        new LayoutNode("fulfillment-junction", "or", "fulfillment-junction", 28.0, 28.0, "junction"),
+                        new LayoutNode("fulfillment", "Fulfillment", "fulfillment", 160.0, 80.0, null),
+                        new LayoutNode("notification", "Notification", "notification", 160.0, 80.0, null)),
+                List.of(
+                        new LayoutEdge("intake-flows-junction", "order-intake", "fulfillment-junction",
+                                "order accepted", "intake-flows-junction", "Flow"),
+                        new LayoutEdge("junction-flows-fulfillment", "fulfillment-junction", "fulfillment",
+                                "fulfil", "junction-flows-fulfillment", "Flow"),
+                        new LayoutEdge("junction-flows-notification", "fulfillment-junction", "notification",
+                                "notify", "junction-flows-notification", "Flow")),
+                List.of(),
+                List.of(),
+                List.of(),
+                null);
+
+        LayoutResult result = new ElkLayoutEngine().layout(request);
+        ElkLayoutRenderArtifacts.write(result);
+
+        LaidOutNode junction = result.nodes().stream()
+                .filter(node -> node.id().equals("fulfillment-junction"))
+                .findFirst()
+                .orElseThrow();
+        assertEquals("junction", junction.role(), "junction role must survive ELK layout");
+
+        for (LaidOutEdge edge : result.edges()) {
+            boolean incident = junction.id().equals(edge.source()) || junction.id().equals(edge.target());
+            if (!incident) {
+                continue;
+            }
+            double centerX = junction.x() + junction.width() / 2.0;
+            double centerY = junction.y() + junction.height() / 2.0;
+            double reach = Math.min(junction.width(), junction.height()) / 2.0 + 2.0;
+            double distance = minDistanceToRoute(centerX, centerY, edge.points());
+            assertTrue(
+                    distance <= reach,
+                    "junction must sit on the route of " + edge.id()
+                            + ", distance=" + distance
+                            + ", reach=" + reach
+                            + ", junction=" + junction
+                            + ", points=" + edge.points());
+        }
+    }
+
+    private static double minDistanceToRoute(double x, double y, List<Point> points) {
+        double min = Double.MAX_VALUE;
+        for (int i = 0; i + 1 < points.size(); i++) {
+            double dx = points.get(i + 1).x() - points.get(i).x();
+            double dy = points.get(i + 1).y() - points.get(i).y();
+            double lengthSquared = dx * dx + dy * dy;
+            double t = lengthSquared == 0.0
+                    ? 0.0
+                    : Math.clamp(((x - points.get(i).x()) * dx + (y - points.get(i).y()) * dy) / lengthSquared, 0.0, 1.0);
+            min = Math.min(min, Math.hypot(
+                    x - (points.get(i).x() + t * dx),
+                    y - (points.get(i).y() + t * dy)));
+        }
+        return min;
+    }
+
     private static LayoutRequest sequenceLayoutRequest() {
         return new LayoutRequest(
             "layout-request.schema.v1",
