@@ -37,6 +37,7 @@ public final class DistTool {
         new Launcher("plugins/uml-xmi-export/target/appassembler", "uml-xmi-export",
             "dediren-plugin-uml-xmi-export", "uml-xmi"));
     private static final List<String> CLEAN_ENV = List.of(
+        "DEDIREN_CDS_DIR",
         "DEDIREN_PLUGIN_DIRS",
         "DEDIREN_PLUGIN_GENERIC_GRAPH",
         "DEDIREN_PLUGIN_ELK_LAYOUT",
