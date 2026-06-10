@@ -29,6 +29,9 @@ class CliLayoutRenderCommandTest {
         assertThat(result.exitCode()).isZero();
         assertThat(envelope.at("/data/status").asText()).isEqualTo("ok");
         assertThat(envelope.at("/data/overlap_count").asInt()).isZero();
+        assertThat(envelope.at("/data/group_label_band_issue_count").asInt()).isZero();
+        assertThat(envelope.at("/data/label_space_issue_count").asInt()).isZero();
+        assertThat(envelope.at("/data/edge_crossing_count").isInt()).isTrue();
     }
 
     @Test
