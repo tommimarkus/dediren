@@ -1928,11 +1928,13 @@ class ElkLayoutEngineTest {
                 .orElseThrow();
         assertEquals("junction", junction.role(), "junction role must survive ELK layout");
 
+        int incidentEdges = 0;
         for (LaidOutEdge edge : result.edges()) {
             boolean incident = junction.id().equals(edge.source()) || junction.id().equals(edge.target());
             if (!incident) {
                 continue;
             }
+            incidentEdges++;
             double centerX = junction.x() + junction.width() / 2.0;
             double centerY = junction.y() + junction.height() / 2.0;
             double reach = Math.min(junction.width(), junction.height()) / 2.0 + 2.0;
@@ -1945,6 +1947,7 @@ class ElkLayoutEngineTest {
                             + ", junction=" + junction
                             + ", points=" + edge.points());
         }
+        assertEquals(3, incidentEdges, "all three junction edges must survive layout with original endpoint ids");
     }
 
     private static double minDistanceToRoute(double x, double y, List<Point> points) {
