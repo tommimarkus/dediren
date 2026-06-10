@@ -44,6 +44,10 @@ public final class PluginRunner {
         }
 
         Map<String, String> allowedEnv = allowedEnv(options, loaded);
+        if (!capabilitiesCommand && manifestTrustEnabled(options)) {
+            ProcessOutput trusted = runExecutable(pluginId, executable, args, input, options.timeout(), allowedEnv);
+            return normalizePluginOutput(pluginId, requiredCapability, args, trusted);
+        }
         ProcessOutput capabilities = runExecutable(pluginId, executable, List.of("capabilities"), "", options.timeout(), allowedEnv);
         RuntimeCapabilities runtimeCapabilities = normalizeRuntimeCapabilities(pluginId, capabilities);
         if (!loaded.manifest().id().equals(runtimeCapabilities.id())) {
@@ -78,6 +82,14 @@ public final class PluginRunner {
             }
         }
         return allowed;
+    }
+
+    private static boolean manifestTrustEnabled(PluginRunOptions options) {
+        String value = options.candidateEnv().get("DEDIREN_TRUST_MANIFEST_CAPABILITIES");
+        if (value == null) {
+            value = System.getenv("DEDIREN_TRUST_MANIFEST_CAPABILITIES");
+        }
+        return "1".equals(value) || "true".equalsIgnoreCase(value);
     }
 
     private static Path executablePath(LoadedPluginManifest loaded, PluginRunOptions options) {
