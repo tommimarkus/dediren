@@ -72,9 +72,28 @@ so failures reproduce. Output is generated at test runtime, not checked into
 ### Regression repros
 
 Intake convention `fixtures/source/regressions/<id>-<slug>.json`, each with a
-description field referencing the originating bug. Initial entries come from
-the user-provided repro models (reduced first); every failure the new checks
-discover in curated/stress runs is also pinned here.
+description field referencing the originating bug. Every failure the new
+checks discover in curated/stress runs is also pinned here.
+
+Entries arrive through a URL-based evidence workflow rather than requiring
+pre-reduced models:
+
+1. The user provides one or more URLs to problematic renders (SVG preferred;
+   raster screenshots accepted), either with a description of what is wrong
+   or with a request to analyze the render and identify defects.
+2. The agent fetches the evidence and analyzes it. Rendered SVGs carry
+   `data-dediren-*` attributes, so defects can be located to concrete
+   element/edge/group ids and classified against the in-scope failure-mode
+   taxonomy even without the source model. Raster images are analyzed
+   visually and classified the same way.
+3. If the originating source model is available (provided or recoverable),
+   the defect is reproduced through the local pipeline and reduced to a
+   minimal source model that still triggers it. If not, the agent authors a
+   minimal source model that reproduces the same defect class.
+4. The reduced model is pinned under `fixtures/source/regressions/` with a
+   sidecar metadata entry: evidence URL, user description or agent analysis,
+   defect classification, and the check that now covers it. The check must
+   fail on the pinned fixture before the fix and pass after.
 
 ## 2. Layout-level checks (product surface)
 
@@ -187,5 +206,7 @@ exception.
   the full known-good fixture set.
 - Default-build runtime impact stays modest; stress sweep runs only under
   `-Prender-stress`.
-- User-provided repro models are reduced, pinned under
-  `fixtures/source/regressions/`, and covered by the checks.
+- The URL-based evidence workflow is exercised at least once end to end:
+  user-provided render URL → analysis → reduced model pinned under
+  `fixtures/source/regressions/` with sidecar metadata → covering check
+  fails before the fix and passes after.
