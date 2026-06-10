@@ -1187,6 +1187,21 @@ class MainTest {
             assertRelationshipPolicyCoverage("archimate", "fixtures/render-policy/archimate-svg.json");
             assertRelationshipPolicyCoverage("uml", "fixtures/render-policy/uml-svg.json");
         }
+
+        @Test
+        void umlSequencePackagedButNotScripted() throws Exception {
+            ObjectNode input = (ObjectNode) umlSequenceStyleInput();
+            ((ObjectNode) input.at("/policy")).put("interactive", "both");
+
+            JsonNode data = okData(render(input));
+
+            assertThat(data.at("/artifacts").size()).isEqualTo(2);
+            assertThat(data.at("/artifacts/0/artifact_kind").asText()).isEqualTo("svg");
+            assertThat(data.at("/artifacts/1/artifact_kind").asText()).isEqualTo("html");
+            String svg = data.at("/artifacts/0/content").asText();
+            assertThat(svg).doesNotContain("<script");
+            assertThat(svg).doesNotContain("data-dediren-edge-source");
+        }
     }
 
     @Nested
