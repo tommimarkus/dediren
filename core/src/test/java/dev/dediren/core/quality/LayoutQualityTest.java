@@ -227,7 +227,7 @@ class LayoutQualityTest {
 
     @Test
     void labelClearlyOverflowingNodeCapacityIsCounted() {
-        var nodes = List.of(new LaidOutNode("tiny", "tiny", "tiny", 0.0, 0.0, 60.0, 24.0,
+        var nodes = List.of(new LaidOutNode("tiny", "tiny", "tiny", 0.0, 0.0, 60.0, 48.0,
                 "An extremely long label that cannot possibly fit", null));
 
         LayoutQualityReport report = LayoutQuality.validateLayout(layoutResult(nodes, List.of(), List.of()));
@@ -244,6 +244,17 @@ class LayoutQualityTest {
 
         assertThat(report.labelSpaceIssueCount()).isZero();
         assertThat(report.status()).isEqualTo("ok");
+    }
+
+    @Test
+    void smallIconNodeLabelsAreExemptFromLabelSpaceCheck() {
+        // UML ports, gates, and pseudostates are icon-sized boxes whose labels render adjacent to
+        // the shape, not inside it: a 32x32 port labeled "client" must not fire.
+        var nodes = List.of(new LaidOutNode("port", "port", "port", 0.0, 0.0, 32.0, 32.0,
+                "client", null));
+
+        assertThat(LayoutQuality.validateLayout(layoutResult(nodes, List.of(), List.of()))
+                .labelSpaceIssueCount()).isZero();
     }
 
     @Test

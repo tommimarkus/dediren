@@ -29,6 +29,10 @@ public final class LayoutQuality {
     private static final double LABEL_LINE_HEIGHT = 16.0;
     private static final double LABEL_PADDING = 8.0;
     private static final int LABEL_OVERFLOW_FACTOR = 2;
+    // Nodes below this dimension are icon-like (UML ports, gates, pseudostates, junction dots);
+    // renderers draw their labels adjacent to the shape, not inside it, so box capacity does
+    // not constrain the label.
+    private static final double LABEL_SPACE_MIN_DIMENSION = 40.0;
     private static final double JUNCTION_ROUTE_TOLERANCE = 2.0;
 
     private LayoutQuality() {
@@ -303,7 +307,8 @@ public final class LayoutQuality {
     private static int countLabelSpaceIssues(LayoutResult result) {
         int count = 0;
         for (LaidOutNode node : result.nodes()) {
-            if (node.label() == null || node.label().isBlank() || "junction".equals(node.role())) {
+            if (node.label() == null || node.label().isBlank() || "junction".equals(node.role())
+                    || Math.min(node.width(), node.height()) < LABEL_SPACE_MIN_DIMENSION) {
                 continue;
             }
             int charsPerLine = (int) Math.max(1.0,
