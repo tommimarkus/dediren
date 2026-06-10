@@ -38,9 +38,20 @@ class LayoutQualityFixtureSweepTest {
     }
 
     static Stream<Path> layoutResultFixtures() throws IOException {
-        Path dir = Path.of("..", "fixtures", "layout-result").normalize().toAbsolutePath();
+        Path dir = workspaceRoot().resolve("fixtures/layout-result");
         try (Stream<Path> files = Files.list(dir)) {
             return files.filter(path -> path.toString().endsWith(".json")).sorted().toList().stream();
         }
+    }
+
+    private static Path workspaceRoot() {
+        Path current = Path.of(System.getProperty("user.dir")).toAbsolutePath();
+        while (current != null) {
+            if (Files.exists(current.resolve("schemas/model.schema.json"))) {
+                return current;
+            }
+            current = current.getParent();
+        }
+        throw new IllegalStateException("Could not locate repository root from user.dir");
     }
 }
