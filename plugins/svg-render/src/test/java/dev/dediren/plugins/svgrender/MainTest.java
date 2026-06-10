@@ -43,9 +43,10 @@ class MainTest {
         void outputsSvg() throws Exception {
             JsonNode data = okData(render(renderInput("fixtures/layout-result/basic.json", "fixtures/render-policy/default-svg.json")));
 
-            String content = data.at("/content").asText();
+            String content = data.at("/artifacts/0/content").asText();
 
-            assertThat(data.at("/render_result_schema_version").asText()).isEqualTo("render-result.schema.v1");
+            assertThat(data.at("/render_result_schema_version").asText()).isEqualTo("render-result.schema.v2");
+            assertThat(data.at("/artifacts/0/artifact_kind").asText()).isEqualTo("svg");
             assertThat(content).contains("<svg", "Client", "API");
         }
 
@@ -1734,7 +1735,7 @@ class MainTest {
     }
 
     private static String okContent(PluginResult result) throws Exception {
-        return okData(result).at("/content").asText();
+        return okData(result).at("/artifacts/0/content").asText();
     }
 
     private static JsonNode error(PluginResult result, String expectedCode) throws Exception {

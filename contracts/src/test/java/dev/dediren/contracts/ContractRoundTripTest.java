@@ -413,8 +413,7 @@ class ContractRoundTripTest {
         RenderMetadata metadata = readFixture("fixtures/render-metadata/uml-basic.json", RenderMetadata.class);
         RenderResult result = new RenderResult(
                 ContractVersions.RENDER_RESULT_SCHEMA_VERSION,
-                "svg",
-                "<svg></svg>");
+                List.of(new dev.dediren.contracts.render.RenderArtifact("svg", "<svg></svg>")));
 
         assertThat(policy.svgRenderPolicySchemaVersion()).isEqualTo(ContractVersions.SVG_RENDER_POLICY_SCHEMA_VERSION);
         assertThat(policy.style().nodeOverrides().get("api").stroke()).isEqualTo("#0891b2");
@@ -449,7 +448,10 @@ class ContractRoundTripTest {
                 .isEqualTo(SvgEdgeLineStyle.DASHED);
         assertThat(decoratorPolicy.style().edgeTypeOverrides().get("Realization").markerEnd())
                 .isEqualTo(SvgEdgeMarkerEnd.HOLLOW_TRIANGLE);
-        assertThat(JsonSupport.objectMapper().valueToTree(result).get("artifact_kind").asText()).isEqualTo("svg");
+        assertThat(JsonSupport.objectMapper().valueToTree(result).at("/artifacts/0/artifact_kind").asText())
+                .isEqualTo("svg");
+        assertThat(JsonSupport.objectMapper().valueToTree(result).at("/render_result_schema_version").asText())
+                .isEqualTo("render-result.schema.v2");
     }
 
     @Test

@@ -16,6 +16,7 @@ import dev.dediren.contracts.layout.Point;
 import dev.dediren.contracts.render.RenderMetadata;
 import dev.dediren.contracts.render.RenderMetadataSelector;
 import dev.dediren.contracts.render.RenderPolicy;
+import dev.dediren.contracts.render.RenderArtifact;
 import dev.dediren.contracts.render.RenderResult;
 import dev.dediren.contracts.render.SvgBackgroundStyle;
 import dev.dediren.contracts.render.SvgEdgeLabelHorizontalPosition;
@@ -117,7 +118,9 @@ public final class Main {
         }
 
         String content = renderSvg(input.layoutResult(), input.renderMetadata(), input.policy());
-        var result = new RenderResult(ContractVersions.RENDER_RESULT_SCHEMA_VERSION, "svg", content);
+        var result = new RenderResult(
+                ContractVersions.RENDER_RESULT_SCHEMA_VERSION,
+                List.of(new RenderArtifact("svg", content)));
         stdout.println(JsonSupport.objectMapper().writeValueAsString(CommandEnvelope.ok(result)));
         return 0;
     }

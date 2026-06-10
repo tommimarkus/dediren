@@ -3,10 +3,21 @@
   "$id": "https://dediren.dev/schemas/render-result.schema.json",
   "type": "object",
   "additionalProperties": false,
-  "required": ["render_result_schema_version", "artifact_kind", "content"],
+  "required": ["render_result_schema_version", "artifacts"],
   "properties": {
-    "render_result_schema_version": { "const": "render-result.schema.v1" },
-    "artifact_kind": { "const": "svg" },
-    "content": { "type": "string" }
+    "render_result_schema_version": { "const": "render-result.schema.v2" },
+    "artifacts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["artifact_kind", "content"],
+        "properties": {
+          "artifact_kind": { "enum": ["svg", "html"] },
+          "content": { "type": "string" }
+        }
+      }
+    }
   }
 }

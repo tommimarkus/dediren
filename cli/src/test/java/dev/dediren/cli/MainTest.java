@@ -126,8 +126,8 @@ class MainTest {
         }, "", env);
 
         JsonNode renderData = okData(render);
-        String svg = renderData.at("/content").asText();
-        assertThat(renderData.at("/artifact_kind").asText()).isEqualTo("svg");
+        String svg = renderData.at("/artifacts/0/content").asText();
+        assertThat(renderData.at("/artifacts/0/artifact_kind").asText()).isEqualTo("svg");
         assertThat(svg).contains(
                 "<svg",
                 "Place Order",
@@ -241,8 +241,8 @@ class MainTest {
         }, "", env);
 
         JsonNode renderData = okData(render);
-        String svg = renderData.at("/content").asText();
-        assertThat(renderData.at("/artifact_kind").asText()).isEqualTo("svg");
+        String svg = renderData.at("/artifacts/0/content").asText();
+        assertThat(renderData.at("/artifacts/0/artifact_kind").asText()).isEqualTo("svg");
         assertThat(svg).contains("data-dediren-sequence-combined-fragment=\"cf-availability\"");
 
         CliResult export = Main.executeForTesting(new String[]{
@@ -342,8 +342,8 @@ class MainTest {
         }, "", env);
 
         JsonNode renderData = okData(render);
-        String svg = renderData.at("/content").asText();
-        assertThat(renderData.at("/artifact_kind").asText()).isEqualTo("svg");
+        String svg = renderData.at("/artifacts/0/content").asText();
+        assertThat(renderData.at("/artifacts/0/artifact_kind").asText()).isEqualTo("svg");
         assertThat(svg).contains(
                 "<svg",
                 "Order Lifecycle",
@@ -457,8 +457,8 @@ class MainTest {
         }, "", env);
 
         JsonNode renderData = okData(render);
-        String svg = renderData.at("/content").asText();
-        assertThat(renderData.at("/artifact_kind").asText()).isEqualTo("svg");
+        String svg = renderData.at("/artifacts/0/content").asText();
+        assertThat(renderData.at("/artifacts/0/artifact_kind").asText()).isEqualTo("svg");
         assertThat(svg).contains(
                 "<svg",
                 "Order Service",
@@ -579,8 +579,8 @@ class MainTest {
         }, "", env);
 
         JsonNode renderData = okData(render);
-        String svg = renderData.at("/content").asText();
-        assertThat(renderData.at("/artifact_kind").asText()).isEqualTo("svg");
+        String svg = renderData.at("/artifacts/0/content").asText();
+        assertThat(renderData.at("/artifacts/0/artifact_kind").asText()).isEqualTo("svg");
         assertThat(svg).contains(
                 "data-dediren-node-shape=\"uml_component\"",
                 "data-dediren-node-shape=\"uml_port\"",
@@ -698,8 +698,8 @@ class MainTest {
         }, "", env);
 
         JsonNode renderData = okData(render);
-        String svg = renderData.at("/content").asText();
-        assertThat(renderData.at("/artifact_kind").asText()).isEqualTo("svg");
+        String svg = renderData.at("/artifacts/0/content").asText();
+        assertThat(renderData.at("/artifacts/0/artifact_kind").asText()).isEqualTo("svg");
         assertThat(svg).contains(
                 "data-dediren-node-shape=\"uml_device\"",
                 "data-dediren-node-shape=\"uml_execution_environment\"",
