@@ -197,6 +197,8 @@ class LayoutQualityTest {
         var nodes = List.of(
                 node("upstream", 0.0, 0.0),
                 junctionNode("junction", 200.0, 26.0));
+        // Endpoint (200, 28) is on the junction box perimeter (passes the endpoint check) but
+        // ~18.4 from the center (214, 40), just past reach = min(28, 28)/2 + tolerance = 16.
         var edges = List.of(edge("into-junction", "upstream", "junction", List.of(
                 new Point(100.0, 40.0),
                 new Point(200.0, 28.0))));
@@ -214,6 +216,8 @@ class LayoutQualityTest {
         var nodes = List.of(
                 node("upstream", 0.0, 0.0),
                 junctionNode("junction", 200.0, 26.0));
+        // Endpoint (200, 40) is level with the junction center (214, 40): 14 from it, within
+        // reach = min(28, 28)/2 + tolerance = 16.
         var edges = List.of(edge("into-junction", "upstream", "junction", List.of(
                 new Point(100.0, 40.0),
                 new Point(200.0, 40.0))));
