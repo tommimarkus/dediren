@@ -12,6 +12,7 @@ import dev.dediren.contracts.render.SvgBackgroundStyle;
 import dev.dediren.contracts.render.SvgEdgeStyle;
 import dev.dediren.contracts.render.SvgFontStyle;
 import dev.dediren.contracts.render.SvgGroupStyle;
+import dev.dediren.contracts.render.SvgInteractionStyle;
 import dev.dediren.contracts.render.SvgNodeStyle;
 import dev.dediren.contracts.render.SvgStylePolicy;
 import dev.dediren.uml.Uml;
@@ -407,6 +408,7 @@ final class RenderInputValidator {
         validateNodeStyle(style.node(), "style.node");
         validateEdgeStyle(style.edge(), "style.edge");
         validateGroupStyle(style.group(), "style.group");
+        validateInteractionStyle(style.interaction(), "style.interaction");
         for (Map.Entry<String, SvgNodeStyle> entry : style.nodeTypeOverrides().entrySet()) {
             validateNodeStyle(entry.getValue(), "style.node_type_overrides." + entry.getKey());
         }
@@ -431,6 +433,13 @@ final class RenderInputValidator {
             throws PolicyValidationException {
         if (style != null) {
             validateColor(style.fill(), path + ".fill");
+        }
+    }
+
+    private static void validateInteractionStyle(SvgInteractionStyle style, String path)
+            throws PolicyValidationException {
+        if (style != null) {
+            validateColor(style.highlightStroke(), path + ".highlight_stroke");
         }
     }
 

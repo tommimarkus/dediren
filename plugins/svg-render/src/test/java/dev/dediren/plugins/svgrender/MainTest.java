@@ -592,6 +592,16 @@ class MainTest {
             assertThat(content).doesNotContain("<script");
             assertThat(content).doesNotContain("dediren-edge-highlighted");
         }
+
+        @Test
+        void invalidHighlightStrokeIsRejected() throws Exception {
+            ObjectNode input = (ObjectNode) renderInput(
+                    "fixtures/layout-result/basic.json", "fixtures/render-policy/default-svg.json");
+            ObjectNode style = ((ObjectNode) input.at("/policy")).putObject("style");
+            style.putObject("interaction").put("highlight_stroke", "#000;} *{display:none");
+
+            error(render(input), "DEDIREN_SVG_POLICY_INVALID");
+        }
     }
 
     @Nested
