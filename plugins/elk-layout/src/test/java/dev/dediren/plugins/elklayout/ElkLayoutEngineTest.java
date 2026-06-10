@@ -1937,6 +1937,8 @@ class ElkLayoutEngineTest {
             incidentEdges++;
             double centerX = junction.x() + junction.width() / 2.0;
             double centerY = junction.y() + junction.height() / 2.0;
+            // Mirrors core LayoutQuality's junction check: the rendered dot radius tracks
+            // min(w,h)/2 and 2.0 is core's JUNCTION_ROUTE_TOLERANCE.
             double reach = Math.min(junction.width(), junction.height()) / 2.0 + 2.0;
             double distance = minDistanceToRoute(centerX, centerY, edge.points());
             assertTrue(
@@ -1950,6 +1952,8 @@ class ElkLayoutEngineTest {
         assertEquals(3, incidentEdges, "all three junction edges must survive layout with original endpoint ids");
     }
 
+    // Inlined copy of core LayoutQuality's distanceToRoute/distanceToSegment math: plugins must
+    // not depend on core, and this e2e test corroborates that product check against real ELK.
     private static double minDistanceToRoute(double x, double y, List<Point> points) {
         double min = Double.MAX_VALUE;
         for (int i = 0; i + 1 < points.size(); i++) {
