@@ -1,6 +1,7 @@
 package dev.dediren.plugins.genericgraph;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import dev.dediren.archimate.Archimate;
 import dev.dediren.contracts.ContractVersions;
 import dev.dediren.contracts.layout.GroupProvenance;
 import dev.dediren.contracts.layout.LayoutConstraint;
@@ -17,7 +18,6 @@ import dev.dediren.contracts.source.GenericGraphViewGroup;
 import dev.dediren.contracts.source.GenericGraphViewGroupRole;
 import dev.dediren.contracts.source.GenericGraphViewKind;
 import dev.dediren.contracts.source.SourceDocument;
-import dev.dediren.archimate.Archimate;
 import dev.dediren.contracts.source.SourceNode;
 import dev.dediren.contracts.source.SourceRelationship;
 import java.io.IOException;
