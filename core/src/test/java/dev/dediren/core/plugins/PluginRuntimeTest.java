@@ -244,6 +244,48 @@ class PluginRuntimeTest {
         }
     }
 
+    @Test
+    void manifestTrustSkipsProbeAndBypassesRuntimeIdCheck() throws Exception {
+        writeManifest(temp, "runtime-testbed", testbedExecutable().toString(), List.of("layout"));
+        var options = PluginRunOptions.defaults().withCandidateEnv(Map.of(
+                "DEDIREN_TEST_PLUGIN_MODE", "ok",
+                "DEDIREN_TEST_PLUGIN_CAPABILITIES", "layout",
+                "DEDIREN_TEST_PLUGIN_ID", "different-plugin",
+                "DEDIREN_TRUST_MANIFEST_CAPABILITIES", "1"));
+
+        PluginRunOutcome outcome = PluginRunner.runForCapabilityWithRegistry(
+                PluginRegistry.fromDirs(List.of(temp)),
+                "runtime-testbed",
+                "layout",
+                List.of("layout"),
+                "{}",
+                options);
+
+        // Probe is skipped, so the mismatched runtime id is never inspected and the work command runs.
+        assertThat(outcome.exitCode()).isZero();
+        assertThat(outcome.stdout()).contains("\"layout_result_schema_version\"");
+    }
+
+    @Test
+    void manifestTrustStillValidatesWorkOutput() throws Exception {
+        writeManifest(temp, "runtime-testbed", testbedExecutable().toString(), List.of("layout"));
+        var options = PluginRunOptions.defaults().withCandidateEnv(Map.of(
+                "DEDIREN_TEST_PLUGIN_MODE", "invalid-data",
+                "DEDIREN_TEST_PLUGIN_CAPABILITIES", "layout",
+                "DEDIREN_TRUST_MANIFEST_CAPABILITIES", "true"));
+
+        assertThatThrownBy(() -> PluginRunner.runForCapabilityWithRegistry(
+                PluginRegistry.fromDirs(List.of(temp)),
+                "runtime-testbed",
+                "layout",
+                List.of("layout"),
+                "{}",
+                options))
+                .isInstanceOf(PluginExecutionException.class)
+                .extracting(error -> ((PluginExecutionException) error).diagnostic().code())
+                .isEqualTo("DEDIREN_PLUGIN_OUTPUT_INVALID_DATA");
+    }
+
     private static void restoreProperty(String name, String value) {
         if (value == null) {
             System.clearProperty(name);
