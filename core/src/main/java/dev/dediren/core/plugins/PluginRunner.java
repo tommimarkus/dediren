@@ -44,6 +44,8 @@ public final class PluginRunner {
         }
 
         Map<String, String> allowedEnv = allowedEnv(options, loaded);
+        // Trust mode: skip the capabilities probe (and its runtime id-mismatch check).
+        // Only appropriate for trusted, integrity-checked bundles. Default (unset) keeps the probe.
         if (!capabilitiesCommand && manifestTrustEnabled(options)) {
             ProcessOutput trusted = runExecutable(pluginId, executable, args, input, options.timeout(), allowedEnv);
             return normalizePluginOutput(pluginId, requiredCapability, args, trusted);

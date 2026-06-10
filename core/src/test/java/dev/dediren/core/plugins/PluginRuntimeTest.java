@@ -286,6 +286,25 @@ class PluginRuntimeTest {
                 .isEqualTo("DEDIREN_PLUGIN_OUTPUT_INVALID_DATA");
     }
 
+    @Test
+    void manifestTrustDoesNotShortCircuitExplicitCapabilitiesCommand() throws Exception {
+        writeManifest(temp, "runtime-testbed", testbedExecutable().toString(), List.of("layout"));
+        var options = PluginRunOptions.defaults().withCandidateEnv(Map.of(
+                "DEDIREN_TRUST_MANIFEST_CAPABILITIES", "1",
+                "DEDIREN_TEST_PLUGIN_CAPABILITIES", "layout"));
+
+        PluginRunOutcome outcome = PluginRunner.runForCapabilityWithRegistry(
+                PluginRegistry.fromDirs(List.of(temp)),
+                "runtime-testbed",
+                "capabilities",
+                List.of("capabilities"),
+                "",
+                options);
+
+        assertThat(outcome.exitCode()).isZero();
+        assertThat(outcome.stdout()).contains("\"id\"");
+    }
+
     private static void restoreProperty(String name, String value) {
         if (value == null) {
             System.clearProperty(name);
