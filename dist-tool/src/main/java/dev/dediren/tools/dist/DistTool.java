@@ -165,6 +165,7 @@ public final class DistTool {
             runCommand(root, List.of("tar", "-xzf", archive.toString(), "-C", temp.toString()), null);
             Path bundle = findBundleDir(temp);
             assertLauncherJvmFlags(bundle);
+            assertCdsConfigured(bundle);
             if (Files.exists(bundle.resolve("fixtures/plugins"))) {
                 throw new IllegalStateException("archive must not include source fixture plugin manifests");
             }
@@ -202,6 +203,7 @@ public final class DistTool {
             String layoutOutput = runBundleCommand(dediren, bundle, List.of(
                 "layout", "--plugin", "elk-layout", "--input", request.toString()), null);
             Files.writeString(layout, layoutOutput, StandardCharsets.UTF_8);
+            assertCdsArchiveCreated(bundle, "elk-layout");
             assertQualityOutput(runBundleCommand(dediren, bundle, List.of(
                 "validate-layout", "--input", layout.toString()), null));
 
@@ -297,10 +299,9 @@ public final class DistTool {
         }
         Path targetBin = bundle.resolve("bin").resolve(launcher.bundleScript());
         Files.copy(sourceBin, targetBin, StandardCopyOption.REPLACE_EXISTING);
-        Files.writeString(
-            targetBin,
-            withBundleRootExport(Files.readString(targetBin, StandardCharsets.UTF_8)),
-            StandardCharsets.UTF_8);
+        String script = withBundleRootExport(Files.readString(targetBin, StandardCharsets.UTF_8));
+        script = withCdsArchive(script, launcher.sourceScript());
+        Files.writeString(targetBin, script, StandardCharsets.UTF_8);
         makeExecutable(targetBin);
         copyDirectoryContents(install.resolve("lib"), bundle.resolve("lib"));
     }
@@ -514,6 +515,25 @@ public final class DistTool {
                         "launcher " + launcher.bundleScript() + " is missing JVM flag " + flag);
                 }
             }
+        }
+    }
+
+    private static void assertCdsConfigured(Path bundle) throws IOException {
+        for (Launcher launcher : LAUNCHERS) {
+            String text = Files.readString(
+                bundle.resolve("bin").resolve(launcher.bundleScript()), StandardCharsets.UTF_8);
+            if (!text.contains("-XX:+AutoCreateSharedArchive")
+                || !text.contains(launcher.sourceScript() + ".jsa")) {
+                throw new IllegalStateException(
+                    "launcher " + launcher.bundleScript() + " is missing its CDS configuration");
+            }
+        }
+    }
+
+    private static void assertCdsArchiveCreated(Path bundle, String cdsName) {
+        Path archive = bundle.resolve("cds").resolve(cdsName + ".jsa");
+        if (!Files.isRegularFile(archive)) {
+            throw new IllegalStateException("expected CDS archive was not auto-created: " + archive);
         }
     }
 
