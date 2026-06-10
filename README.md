@@ -515,7 +515,8 @@ Commands:
   count never degrades `status`). Junction-role nodes (`AndJunction`/`OrJunction`
   in ArchiMate views) must sit on the routes of their incident edges; a detached
   junction is the error diagnostic `DEDIREN_LAYOUT_JUNCTION_OFF_INCIDENT_ROUTE`.
-- `render` asks `svg-render` to generate SVG in `.data.content`.
+- `render` asks `svg-render` to generate SVG in `.data.artifacts[]` (each
+  entry has `artifact_kind` and `content`; select the `svg` or `html` entry).
 - `export` asks `archimate-oef` or `uml-xmi` to generate XML in
   `.data.content`.
 

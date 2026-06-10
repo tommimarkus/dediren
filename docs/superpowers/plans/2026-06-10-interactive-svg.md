@@ -31,6 +31,7 @@ This is an atomic contract reshape: the `RenderResult` record signature changes,
 - Modify: `schemas/render-result.schema.json`
 - Modify: `plugins/svg-render/src/main/java/dev/dediren/plugins/svgrender/Main.java:119-121`
 - Modify: `testbeds/plugin-runtime/src/main/java/dev/dediren/testbeds/pluginruntime/Main.java:76-78,118-120`
+- Modify: `dist-tool/src/main/java/dev/dediren/tools/dist/DistTool.java` (`assertSvgRenderOutput` reads `artifacts[0]`; leave `assertArtifactKind` export check as-is)
 - Test (modify): `contracts/src/test/java/dev/dediren/contracts/ContractVersionsTest.java:17`
 - Test (modify): `contracts/src/test/java/dev/dediren/contracts/ContractRoundTripTest.java:414-419,452`
 - Test (modify): `plugins/svg-render/src/test/java/dev/dediren/plugins/svgrender/MainTest.java:44-49,1736-1738`
