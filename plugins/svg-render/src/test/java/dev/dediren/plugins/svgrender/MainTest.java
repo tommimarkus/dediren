@@ -655,6 +655,30 @@ class MainTest {
 
             assertThat(svg).contains("stroke:#1f6feb", "stroke-width:3");
         }
+
+        @Test
+        void invalidHighlightStrokeWidthIsRejected() throws Exception {
+            ObjectNode input = (ObjectNode) renderInput(
+                    "fixtures/layout-result/basic.json", "fixtures/render-policy/default-svg.json");
+            ObjectNode style = ((ObjectNode) input.at("/policy")).putObject("style");
+            style.putObject("interaction").put("highlight_stroke_width", 999);
+
+            error(render(input), "DEDIREN_SVG_POLICY_INVALID");
+        }
+
+        @Test
+        void svgModeKeepsInteractionLayer() throws Exception {
+            ObjectNode input = (ObjectNode) renderInput(
+                    "fixtures/layout-result/basic.json", "fixtures/render-policy/default-svg.json");
+            ((ObjectNode) input.at("/policy")).put("interactive", "svg");
+
+            JsonNode data = okData(render(input));
+
+            assertThat(data.at("/artifacts").size()).isEqualTo(1);
+            assertThat(data.at("/artifacts/0/artifact_kind").asText()).isEqualTo("svg");
+            String svg = data.at("/artifacts/0/content").asText();
+            assertThat(svg).contains("<script", "data-dediren-edge-source");
+        }
     }
 
     @Nested

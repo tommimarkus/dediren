@@ -449,6 +449,7 @@ final class RenderInputValidator {
             throws PolicyValidationException {
         if (style != null) {
             validateColor(style.highlightStroke(), path + ".highlight_stroke");
+            validateNumber(style.highlightStrokeWidth(), path + ".highlight_stroke_width", Bound.MIN, 0.0, 24.0);
         }
     }
 
