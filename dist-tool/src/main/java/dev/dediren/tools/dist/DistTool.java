@@ -22,6 +22,8 @@ import java.util.Set;
 
 public final class DistTool {
     private static final String BUNDLE_METADATA_TARGET = "java";
+    private static final List<String> EXPECTED_LAUNCHER_FLAGS =
+        List.of("-XX:TieredStopAtLevel=1", "-XX:+UseSerialGC");
     private static final List<Launcher> LAUNCHERS = List.of(
         new Launcher("cli/target/appassembler", "cli", "dediren", null),
         new Launcher("plugins/generic-graph/target/appassembler", "generic-graph",
@@ -162,6 +164,7 @@ public final class DistTool {
         try {
             runCommand(root, List.of("tar", "-xzf", archive.toString(), "-C", temp.toString()), null);
             Path bundle = findBundleDir(temp);
+            assertLauncherJvmFlags(bundle);
             if (Files.exists(bundle.resolve("fixtures/plugins"))) {
                 throw new IllegalStateException("archive must not include source fixture plugin manifests");
             }
@@ -473,6 +476,19 @@ public final class DistTool {
     private static void assertContains(String text, String expected, String label) {
         if (!text.contains(expected)) {
             throw new IllegalStateException(label + " should contain " + expected + ": " + text);
+        }
+    }
+
+    private static void assertLauncherJvmFlags(Path bundle) throws IOException {
+        for (Launcher launcher : LAUNCHERS) {
+            Path script = bundle.resolve("bin").resolve(launcher.bundleScript());
+            String text = Files.readString(script, StandardCharsets.UTF_8);
+            for (String flag : EXPECTED_LAUNCHER_FLAGS) {
+                if (!text.contains(flag)) {
+                    throw new IllegalStateException(
+                        "launcher " + launcher.bundleScript() + " is missing JVM flag " + flag);
+                }
+            }
         }
     }
 
