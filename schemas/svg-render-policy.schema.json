@@ -12,6 +12,9 @@
       "maxLength": 80,
       "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
     },
+    "interactive": {
+      "enum": ["none", "svg", "html", "both"]
+    },
     "page": {
       "type": "object",
       "additionalProperties": false,
@@ -296,7 +299,16 @@
         "group_type_overrides": { "$ref": "#/$defs/groupOverrideMap" },
         "node_overrides": { "$ref": "#/$defs/nodeOverrideMap" },
         "edge_overrides": { "$ref": "#/$defs/edgeOverrideMap" },
-        "group_overrides": { "$ref": "#/$defs/groupOverrideMap" }
+        "group_overrides": { "$ref": "#/$defs/groupOverrideMap" },
+        "interaction": { "$ref": "#/$defs/interaction" }
+      }
+    },
+    "interaction": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "highlight_stroke": { "$ref": "#/$defs/color" },
+        "highlight_stroke_width": { "type": "number", "minimum": 0, "maximum": 24 }
       }
     }
   }

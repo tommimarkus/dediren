@@ -452,6 +452,25 @@ class ContractRoundTripTest {
                 .isEqualTo("svg");
         assertThat(JsonSupport.objectMapper().valueToTree(result).at("/render_result_schema_version").asText())
                 .isEqualTo("render-result.schema.v2");
+
+        var interactivePolicy = JsonSupport.readValue("""
+                {
+                  "svg_render_policy_schema_version": "svg-render-policy.schema.v1",
+                  "interactive": "both",
+                  "page": { "width": 640, "height": 360 },
+                  "margin": { "top": 24, "right": 24, "bottom": 24, "left": 24 },
+                  "style": {
+                    "interaction": {
+                      "highlight_stroke": "#ff8800",
+                      "highlight_stroke_width": 5
+                    }
+                  }
+                }
+                """, RenderPolicy.class);
+
+        assertThat(interactivePolicy.interactive()).isEqualTo("both");
+        assertThat(interactivePolicy.style().interaction().highlightStroke()).isEqualTo("#ff8800");
+        assertThat(interactivePolicy.style().interaction().highlightStrokeWidth()).isEqualTo(5.0);
     }
 
     @Test

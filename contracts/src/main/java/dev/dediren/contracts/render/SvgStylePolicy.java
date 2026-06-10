@@ -15,7 +15,8 @@ public record SvgStylePolicy(
         Map<String, SvgGroupStyle> groupTypeOverrides,
         Map<String, SvgNodeStyle> nodeOverrides,
         Map<String, SvgEdgeStyle> edgeOverrides,
-        Map<String, SvgGroupStyle> groupOverrides) {
+        Map<String, SvgGroupStyle> groupOverrides,
+        SvgInteractionStyle interaction) {
     public SvgStylePolicy {
         nodeTypeOverrides = mapOrEmpty(nodeTypeOverrides);
         edgeTypeOverrides = mapOrEmpty(edgeTypeOverrides);
