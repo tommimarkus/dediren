@@ -188,6 +188,39 @@ class LayoutQualityTest {
         assertThat(report.status()).isEqualTo("warning");
     }
 
+    private static LaidOutNode junctionNode(String id, double x, double y) {
+        return new LaidOutNode(id, id, id, x, y, 28.0, 28.0, "", "junction");
+    }
+
+    @Test
+    void junctionCornerAttachedEdgeIsReported() {
+        var nodes = List.of(
+                node("upstream", 0.0, 0.0),
+                junctionNode("junction", 200.0, 26.0));
+        var edges = List.of(edge("into-junction", "upstream", "junction", List.of(
+                new Point(100.0, 40.0),
+                new Point(200.0, 28.0))));
+
+        var diagnostics = LayoutQuality.validateLayoutDiagnostics(layoutResult(nodes, edges, List.of()));
+
+        assertThat(diagnostics).extracting(diagnostic -> diagnostic.code())
+                .containsExactly("DEDIREN_LAYOUT_JUNCTION_OFF_INCIDENT_ROUTE");
+        assertThat(diagnostics.get(0).severity()).isEqualTo(DiagnosticSeverity.ERROR);
+        assertThat(diagnostics.get(0).path()).isEqualTo("$.nodes[1]");
+    }
+
+    @Test
+    void junctionCenterAttachedEdgeIsAccepted() {
+        var nodes = List.of(
+                node("upstream", 0.0, 0.0),
+                junctionNode("junction", 200.0, 26.0));
+        var edges = List.of(edge("into-junction", "upstream", "junction", List.of(
+                new Point(100.0, 40.0),
+                new Point(200.0, 40.0))));
+
+        assertThat(LayoutQuality.validateLayoutDiagnostics(layoutResult(nodes, edges, List.of()))).isEmpty();
+    }
+
     @Test
     void labelClearlyOverflowingNodeCapacityIsCounted() {
         var nodes = List.of(new LaidOutNode("tiny", "tiny", "tiny", 0.0, 0.0, 60.0, 24.0,

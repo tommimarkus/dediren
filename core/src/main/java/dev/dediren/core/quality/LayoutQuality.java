@@ -29,6 +29,7 @@ public final class LayoutQuality {
     private static final double LABEL_LINE_HEIGHT = 16.0;
     private static final double LABEL_PADDING = 8.0;
     private static final int LABEL_OVERFLOW_FACTOR = 2;
+    private static final double JUNCTION_ROUTE_TOLERANCE = 2.0;
 
     private LayoutQuality() {
     }
@@ -110,6 +111,30 @@ public final class LayoutQuality {
                         "DEDIREN_LAYOUT_ROUTE_ENDPOINT_OFF_NODE_PERIMETER",
                         "edge '" + edge.id() + "' last route point is not on target node '" + edge.target() + "' perimeter",
                         "$.edges[" + edgeIndex + "].points[-1]"));
+            }
+        }
+        for (int nodeIndex = 0; nodeIndex < result.nodes().size(); nodeIndex++) {
+            LaidOutNode node = result.nodes().get(nodeIndex);
+            if (!"junction".equals(node.role())) {
+                continue;
+            }
+            double centerX = node.x() + node.width() / 2.0;
+            double centerY = node.y() + node.height() / 2.0;
+            // The rendered junction dot radius tracks min(w,h)/2; routes must reach the dot,
+            // not merely the bounding box, or the line shows a visible gap.
+            double reach = Math.min(node.width(), node.height()) / 2.0 + JUNCTION_ROUTE_TOLERANCE;
+            for (LaidOutEdge edge : result.edges()) {
+                boolean incident = node.id().equals(edge.source()) || node.id().equals(edge.target());
+                if (!incident || edge.points().size() < 2) {
+                    continue;
+                }
+                if (distanceToRoute(centerX, centerY, edge.points()) > reach) {
+                    diagnostics.add(routeError(
+                            "DEDIREN_LAYOUT_JUNCTION_OFF_INCIDENT_ROUTE",
+                            "junction '" + node.id() + "' is not on the route of incident edge '"
+                                    + edge.id() + "'",
+                            "$.nodes[" + nodeIndex + "]"));
+                }
             }
         }
         return diagnostics;
@@ -439,6 +464,24 @@ public final class LayoutQuality {
                 rectY,
                 rectWidth,
                 rectHeight);
+    }
+
+    private static double distanceToRoute(double x, double y, List<Point> points) {
+        double min = Double.MAX_VALUE;
+        for (int i = 0; i + 1 < points.size(); i++) {
+            min = Math.min(min, distanceToSegment(x, y, points.get(i), points.get(i + 1)));
+        }
+        return min;
+    }
+
+    private static double distanceToSegment(double x, double y, Point start, Point end) {
+        double dx = end.x() - start.x();
+        double dy = end.y() - start.y();
+        double lengthSquared = dx * dx + dy * dy;
+        double t = lengthSquared == 0.0
+                ? 0.0
+                : Math.clamp(((x - start.x()) * dx + (y - start.y()) * dy) / lengthSquared, 0.0, 1.0);
+        return Math.hypot(x - (start.x() + t * dx), y - (start.y() + t * dy));
     }
 
     private static int countEdgeCrossings(LayoutResult result) {
