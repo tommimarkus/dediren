@@ -38,6 +38,7 @@ public final class DistTool {
             "dediren-plugin-uml-xmi-export", "uml-xmi"));
     private static final List<String> CLEAN_ENV = List.of(
         "DEDIREN_CDS_DIR",
+        "DEDIREN_TRUST_MANIFEST_CAPABILITIES",
         "DEDIREN_PLUGIN_DIRS",
         "DEDIREN_PLUGIN_GENERIC_GRAPH",
         "DEDIREN_PLUGIN_ELK_LAYOUT",
@@ -801,7 +802,7 @@ public final class DistTool {
     }
 
     private static void usage() {
-        System.err.println("usage: DistTool notices|build|smoke --root PATH [--version VERSION]");
+        System.err.println("usage: DistTool notices|build|smoke|bench --root PATH [--version VERSION] [--runs N]");
     }
 
     private record InsertionPoint(int index, String variable) {

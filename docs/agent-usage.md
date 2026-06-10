@@ -522,6 +522,10 @@ variables. Important explicit variables:
 - `DEDIREN_XMI_SCHEMA_PATH`: local XMI schema file.
 - `DEDIREN_SCHEMA_CACHE_DIR`: cache directory for schema downloads.
 - `DEDIREN_CDS_DIR`: directory for Class-Data-Sharing archives (see below).
+- `DEDIREN_TRUST_MANIFEST_CAPABILITIES`: opt-in; trusts each plugin's static
+  manifest capabilities and skips the per-call runtime probe, removing one JVM
+  start per plugin operation; bypasses the runtime id-mismatch pre-check.
+  Default (unset) keeps the probe and all integrity checks.
 
 Each `bin/dediren*` launcher auto-creates a Class-Data-Sharing archive on its
 first invocation to speed JVM startup on subsequent calls. Archives are written
