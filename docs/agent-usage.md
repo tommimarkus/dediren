@@ -532,5 +532,12 @@ The feature is based on `-XX:+AutoCreateSharedArchive` and degrades silently if
 the archive directory is unwritable — startup continues at normal speed without
 any error.
 
+Setting `DEDIREN_TRUST_MANIFEST_CAPABILITIES=1` (or `true`) makes dediren trust
+each plugin's static manifest capabilities and skip the per-call runtime
+capability probe, removing one JVM start per plugin operation. The tradeoff is
+that the runtime `id`-mismatch pre-flight check is bypassed, so use it only with
+trusted, integrity-checked bundles. Default (unset) keeps the probe and all
+integrity checks.
+
 Keep stderr for human debugging only. Agents should decide success or failure
 from stdout JSON.

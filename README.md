@@ -92,6 +92,11 @@ subsequent calls. Archives are written to `cds/` inside the bundle directory
 `DEDIREN_CDS_DIR` to relocate them. The feature degrades silently if the
 archive directory is unwritable.
 
+Set `DEDIREN_TRUST_MANIFEST_CAPABILITIES=1` (or `true`) to skip the per-call
+runtime capability probe, removing one JVM start per plugin operation. This
+bypasses the runtime id-mismatch pre-flight check; use it only with trusted
+bundles. Default (unset) keeps the probe.
+
 ## First Run
 
 From an unpacked bundle:
