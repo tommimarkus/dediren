@@ -413,6 +413,19 @@ class GenericGraphPluginTest {
     }
 
     @Test
+    void projectsJunctionRoleOntoArchimateLayoutNodes() throws Exception {
+        PluginResult result = Main.executeForTesting(
+                new String[]{"project", "--target", "layout-request", "--view", "main"},
+                fixture("fixtures/source/valid-archimate-junction.json"));
+
+        JsonNode data = okData(result);
+
+        assertThat(layoutRequestNode(data, "fulfillment-junction").at("/role").asText()).isEqualTo("junction");
+        assertThat(layoutRequestNode(data, "order-intake").has("role")).isFalse();
+        assertSchemaValid("schemas/layout-request.schema.json", data);
+    }
+
+    @Test
     void projectsUmlStateMachineViewKind() throws Exception {
         PluginResult result = Main.executeForTesting(
                 new String[]{"project", "--target", "layout-request", "--view", "state-machine-view"},

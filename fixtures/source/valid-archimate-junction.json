@@ -1,0 +1,83 @@
+{
+  "model_schema_version": "model.schema.v1",
+  "required_plugins": [
+    {
+      "id": "generic-graph",
+      "version": "2026.06.3"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "order-intake",
+      "type": "ApplicationService",
+      "label": "Order Intake",
+      "properties": {}
+    },
+    {
+      "id": "fulfillment-junction",
+      "type": "OrJunction",
+      "label": "or",
+      "properties": {}
+    },
+    {
+      "id": "fulfillment",
+      "type": "ApplicationService",
+      "label": "Fulfillment",
+      "properties": {}
+    },
+    {
+      "id": "notification",
+      "type": "ApplicationService",
+      "label": "Notification",
+      "properties": {}
+    }
+  ],
+  "relationships": [
+    {
+      "id": "intake-flows-junction",
+      "type": "Flow",
+      "source": "order-intake",
+      "target": "fulfillment-junction",
+      "label": "order accepted",
+      "properties": {}
+    },
+    {
+      "id": "junction-flows-fulfillment",
+      "type": "Flow",
+      "source": "fulfillment-junction",
+      "target": "fulfillment",
+      "label": "fulfil",
+      "properties": {}
+    },
+    {
+      "id": "junction-flows-notification",
+      "type": "Flow",
+      "source": "fulfillment-junction",
+      "target": "notification",
+      "label": "notify",
+      "properties": {}
+    }
+  ],
+  "plugins": {
+    "generic-graph": {
+      "semantic_profile": "archimate",
+      "views": [
+        {
+          "id": "main",
+          "label": "Fulfillment Flow",
+          "nodes": [
+            "order-intake",
+            "fulfillment-junction",
+            "fulfillment",
+            "notification"
+          ],
+          "relationships": [
+            "intake-flows-junction",
+            "junction-flows-fulfillment",
+            "junction-flows-notification"
+          ]
+        }
+      ]
+    }
+  }
+}

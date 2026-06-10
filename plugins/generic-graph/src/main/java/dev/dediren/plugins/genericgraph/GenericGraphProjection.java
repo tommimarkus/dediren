@@ -17,6 +17,7 @@ import dev.dediren.contracts.source.GenericGraphViewGroup;
 import dev.dediren.contracts.source.GenericGraphViewGroupRole;
 import dev.dediren.contracts.source.GenericGraphViewKind;
 import dev.dediren.contracts.source.SourceDocument;
+import dev.dediren.archimate.Archimate;
 import dev.dediren.contracts.source.SourceNode;
 import dev.dediren.contracts.source.SourceRelationship;
 import java.io.IOException;
@@ -100,7 +101,7 @@ final class GenericGraphProjection {
                     sourceNode.id(),
                     GenericGraphLayoutSizing.widthHint(semanticProfile, sourceNode),
                     GenericGraphLayoutSizing.heightHint(semanticProfile, sourceNode),
-                    layoutRole(sourceNode.type())));
+                    layoutRole(semanticProfile, sourceNode.type())));
         }
 
         var edges = new ArrayList<LayoutEdge>();
@@ -208,10 +209,17 @@ final class GenericGraphProjection {
                         messageIds));
     }
 
-    // Carry the lifeline role into the layout-request so backend-neutral layout-quality checks can
-    // accept Message endpoints anchored on the lifeline axis. Other source types stay role-less.
-    private static String layoutRole(String sourceType) {
-        return "Lifeline".equals(sourceType) ? "lifeline" : null;
+    // Carry roles into the layout-request so backend-neutral layout-quality checks can apply
+    // role-aware geometry rules (lifeline message anchors, junction route proximity).
+    // Other source types stay role-less.
+    private static String layoutRole(String semanticProfile, String sourceType) {
+        if ("Lifeline".equals(sourceType)) {
+            return "lifeline";
+        }
+        if (semanticProfile.equals("archimate") && Archimate.isRelationshipConnectorType(sourceType)) {
+            return "junction";
+        }
+        return null;
     }
 
     private static boolean isSourceOnlySequenceFragment(
