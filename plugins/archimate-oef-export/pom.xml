@@ -65,6 +65,7 @@
               <goal>assemble</goal>
             </goals>
             <configuration>
+              <extraJvmArguments>${dediren.launcher.jvmArgs}</extraJvmArguments>
               <programs>
                 <program>
                   <mainClass>dev.dediren.plugins.archimateoef.Main</mainClass>

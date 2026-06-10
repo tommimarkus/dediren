@@ -83,7 +83,7 @@
               <goal>assemble</goal>
             </goals>
             <configuration>
-              <extraJvmArguments>-Ddediren.version=${project.version}</extraJvmArguments>
+              <extraJvmArguments>${dediren.launcher.jvmArgs} -Ddediren.version=${project.version}</extraJvmArguments>
               <programs>
                 <program>
                   <mainClass>dev.dediren.cli.Main</mainClass>

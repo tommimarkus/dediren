@@ -60,6 +60,7 @@
               <goal>assemble</goal>
             </goals>
             <configuration>
+              <extraJvmArguments>${dediren.launcher.jvmArgs}</extraJvmArguments>
               <programs>
                 <program>
                   <mainClass>dev.dediren.plugins.svgrender.Main</mainClass>
