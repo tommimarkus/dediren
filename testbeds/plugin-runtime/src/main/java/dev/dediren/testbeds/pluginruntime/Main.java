@@ -8,6 +8,7 @@ import dev.dediren.contracts.DiagnosticSeverity;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.contracts.layout.LayoutResult;
 import dev.dediren.contracts.plugin.RuntimeCapabilities;
+import dev.dediren.contracts.render.RenderArtifact;
 import dev.dediren.contracts.render.RenderResult;
 import java.io.IOException;
 import java.util.Arrays;
@@ -75,8 +76,7 @@ public final class Main {
                 System.out.println(JsonSupport.objectMapper().writeValueAsString(CommandEnvelope.ok(
                         JsonSupport.objectMapper().valueToTree(new RenderResult(
                                 ContractVersions.RENDER_RESULT_SCHEMA_VERSION,
-                                "svg",
-                                "x".repeat(1024 * 1024))))));
+                                List.of(new RenderArtifact("svg", "x".repeat(1024 * 1024))))))));
                 return;
             }
             case "large-output" -> System.err.write("x".repeat(1024 * 1024).getBytes());
@@ -117,8 +117,7 @@ public final class Main {
         return switch (command) {
             case "render" -> mapper.valueToTree(new RenderResult(
                     ContractVersions.RENDER_RESULT_SCHEMA_VERSION,
-                    "svg",
-                    "<svg data-input-length=\"" + inputLength + "\"></svg>"));
+                    List.of(new RenderArtifact("svg", "<svg data-input-length=\"" + inputLength + "\"></svg>"))));
             case "layout" -> mapper.valueToTree(new LayoutResult(
                     ContractVersions.LAYOUT_RESULT_SCHEMA_VERSION,
                     "test",

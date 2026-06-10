@@ -43,9 +43,10 @@ class MainTest {
         void outputsSvg() throws Exception {
             JsonNode data = okData(render(renderInput("fixtures/layout-result/basic.json", "fixtures/render-policy/default-svg.json")));
 
-            String content = data.at("/content").asText();
+            String content = data.at("/artifacts/0/content").asText();
 
-            assertThat(data.at("/render_result_schema_version").asText()).isEqualTo("render-result.schema.v1");
+            assertThat(data.at("/render_result_schema_version").asText()).isEqualTo("render-result.schema.v2");
+            assertThat(data.at("/artifacts/0/artifact_kind").asText()).isEqualTo("svg");
             assertThat(content).contains("<svg", "Client", "API");
         }
 
@@ -554,6 +555,129 @@ class MainTest {
 
             assertThat(envelope.at("/diagnostics/0/path").asText())
                     .isEqualTo("policy.style.node_type_overrides.BogusUml");
+        }
+
+        @Test
+        void defaultModeEmitsInteractionLayerAndEdgeEndpoints() throws Exception {
+            String content = okContent(render(renderInput(
+                    "fixtures/layout-result/basic.json", "fixtures/render-policy/default-svg.json")));
+
+            assertThat(content).contains("data-dediren-edge-source", "data-dediren-edge-target");
+            assertThat(content).contains("<style", "dediren-edge-highlighted");
+            assertThat(content).contains("<script", "data-dediren-node-id");
+
+            Document document = svgDocument(content);
+            var edges = document.getElementsByTagName("g");
+            boolean anyEdgeHasSource = false;
+            for (int i = 0; i < edges.getLength(); i++) {
+                Element g = (Element) edges.item(i);
+                if (!g.getAttribute("data-dediren-edge-id").isEmpty()) {
+                    assertThat(g.getAttribute("data-dediren-edge-source")).isNotEmpty();
+                    assertThat(g.getAttribute("data-dediren-edge-target")).isNotEmpty();
+                    anyEdgeHasSource = true;
+                }
+            }
+            assertThat(anyEdgeHasSource).isTrue();
+        }
+
+        @Test
+        void noneModeSuppressesInteractionLayer() throws Exception {
+            ObjectNode input = (ObjectNode) renderInput(
+                    "fixtures/layout-result/basic.json", "fixtures/render-policy/default-svg.json");
+            ((ObjectNode) input.at("/policy")).put("interactive", "none");
+
+            String content = okContent(render(input));
+
+            assertThat(content).doesNotContain("data-dediren-edge-source");
+            assertThat(content).doesNotContain("<script");
+            assertThat(content).doesNotContain("dediren-edge-highlighted");
+        }
+
+        @Test
+        void invalidHighlightStrokeIsRejected() throws Exception {
+            ObjectNode input = (ObjectNode) renderInput(
+                    "fixtures/layout-result/basic.json", "fixtures/render-policy/default-svg.json");
+            ObjectNode style = ((ObjectNode) input.at("/policy")).putObject("style");
+            style.putObject("interaction").put("highlight_stroke", "#000;} *{display:none");
+
+            error(render(input), "DEDIREN_SVG_POLICY_INVALID");
+        }
+
+        @Test
+        void htmlModeWrapsInteractiveSvg() throws Exception {
+            ObjectNode input = (ObjectNode) renderInput(
+                    "fixtures/layout-result/basic.json", "fixtures/render-policy/default-svg.json");
+            ((ObjectNode) input.at("/policy")).put("interactive", "html");
+
+            JsonNode data = okData(render(input));
+
+            assertThat(data.at("/artifacts").size()).isEqualTo(1);
+            assertThat(data.at("/artifacts/0/artifact_kind").asText()).isEqualTo("html");
+            String html = data.at("/artifacts/0/content").asText();
+            assertThat(html).startsWith("<!DOCTYPE html");
+            assertThat(html).contains("<svg", "<script", "data-dediren-edge-source");
+        }
+
+        @Test
+        void bothModeReturnsSvgThenHtml() throws Exception {
+            JsonNode data = okData(render(renderInput(
+                    "fixtures/layout-result/basic.json", "fixtures/render-policy/interactive-svg.json")));
+
+            assertThat(data.at("/artifacts").size()).isEqualTo(2);
+            assertThat(data.at("/artifacts/0/artifact_kind").asText()).isEqualTo("svg");
+            assertThat(data.at("/artifacts/1/artifact_kind").asText()).isEqualTo("html");
+            assertThat(data.at("/artifacts/0/content").asText()).startsWith("<svg");
+            assertThat(data.at("/artifacts/1/content").asText()).startsWith("<!DOCTYPE html");
+        }
+
+        @Test
+        void invalidInteractiveModeIsRejected() throws Exception {
+            ObjectNode input = (ObjectNode) renderInput(
+                    "fixtures/layout-result/basic.json", "fixtures/render-policy/default-svg.json");
+            ((ObjectNode) input.at("/policy")).put("interactive", "bogus");
+
+            error(render(input), "DEDIREN_SVG_POLICY_INVALID");
+        }
+
+        @Test
+        void interactionStyleOverridesAppearInCss() throws Exception {
+            String svg = okData(render(renderInput(
+                    "fixtures/layout-result/basic.json", "fixtures/render-policy/interactive-svg.json")))
+                    .at("/artifacts/0/content").asText();
+
+            assertThat(svg).contains("stroke:#ff8800", "stroke-width:5");
+        }
+
+        @Test
+        void interactionStyleDefaultsWhenOmitted() throws Exception {
+            String svg = okContent(render(renderInput(
+                    "fixtures/layout-result/basic.json", "fixtures/render-policy/default-svg.json")));
+
+            assertThat(svg).contains("stroke:#1f6feb", "stroke-width:3");
+        }
+
+        @Test
+        void invalidHighlightStrokeWidthIsRejected() throws Exception {
+            ObjectNode input = (ObjectNode) renderInput(
+                    "fixtures/layout-result/basic.json", "fixtures/render-policy/default-svg.json");
+            ObjectNode style = ((ObjectNode) input.at("/policy")).putObject("style");
+            style.putObject("interaction").put("highlight_stroke_width", 999);
+
+            error(render(input), "DEDIREN_SVG_POLICY_INVALID");
+        }
+
+        @Test
+        void svgModeKeepsInteractionLayer() throws Exception {
+            ObjectNode input = (ObjectNode) renderInput(
+                    "fixtures/layout-result/basic.json", "fixtures/render-policy/default-svg.json");
+            ((ObjectNode) input.at("/policy")).put("interactive", "svg");
+
+            JsonNode data = okData(render(input));
+
+            assertThat(data.at("/artifacts").size()).isEqualTo(1);
+            assertThat(data.at("/artifacts/0/artifact_kind").asText()).isEqualTo("svg");
+            String svg = data.at("/artifacts/0/content").asText();
+            assertThat(svg).contains("<script", "data-dediren-edge-source");
         }
     }
 
@@ -1086,6 +1210,21 @@ class MainTest {
         void coversEachRelationshipTypeFromPolicies() throws Exception {
             assertRelationshipPolicyCoverage("archimate", "fixtures/render-policy/archimate-svg.json");
             assertRelationshipPolicyCoverage("uml", "fixtures/render-policy/uml-svg.json");
+        }
+
+        @Test
+        void umlSequencePackagedButNotScripted() throws Exception {
+            ObjectNode input = (ObjectNode) umlSequenceStyleInput();
+            ((ObjectNode) input.at("/policy")).put("interactive", "both");
+
+            JsonNode data = okData(render(input));
+
+            assertThat(data.at("/artifacts").size()).isEqualTo(2);
+            assertThat(data.at("/artifacts/0/artifact_kind").asText()).isEqualTo("svg");
+            assertThat(data.at("/artifacts/1/artifact_kind").asText()).isEqualTo("html");
+            String svg = data.at("/artifacts/0/content").asText();
+            assertThat(svg).doesNotContain("<script");
+            assertThat(svg).doesNotContain("data-dediren-edge-source");
         }
     }
 
@@ -1734,7 +1873,7 @@ class MainTest {
     }
 
     private static String okContent(PluginResult result) throws Exception {
-        return okData(result).at("/content").asText();
+        return okData(result).at("/artifacts/0/content").asText();
     }
 
     private static JsonNode error(PluginResult result, String expectedCode) throws Exception {

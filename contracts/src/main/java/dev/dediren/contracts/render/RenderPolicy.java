@@ -5,5 +5,6 @@ public record RenderPolicy(
         String semanticProfile,
         Page page,
         Margin margin,
-        SvgStylePolicy style) {
+        SvgStylePolicy style,
+        String interactive) {
 }
