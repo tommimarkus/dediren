@@ -46,8 +46,8 @@ release workflows cache that path separately from Maven artifacts.
 The `dist-build` profile creates an agent-ready archive under `dist/`:
 
 ```text
-dist/dediren-agent-bundle-2026.06.3/
-dist/dediren-agent-bundle-2026.06.3.tar.gz
+dist/dediren-agent-bundle-2026.06.4/
+dist/dediren-agent-bundle-2026.06.4.tar.gz
 ```
 
 The Java archive contains launch scripts and jars, not a bundled JRE. Java 21
@@ -57,7 +57,7 @@ platform-neutral and is not tied to CPU architecture.
 ## Bundle Layout
 
 ```text
-dediren-agent-bundle-2026.06.3/
+dediren-agent-bundle-2026.06.4/
   bin/
     dediren
     dediren-plugin-generic-graph
@@ -102,7 +102,7 @@ bundles. Default (unset) keeps the probe.
 From an unpacked bundle:
 
 ```bash
-VERSION=2026.06.3
+VERSION=2026.06.4
 BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-${VERSION}
 
 "$BUNDLE/bin/dediren" --version

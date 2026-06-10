@@ -1,7 +1,7 @@
 {
   "plugin_manifest_schema_version": "plugin-manifest.schema.v1",
   "id": "uml-xmi",
-  "version": "2026.06.3",
+  "version": "2026.06.4",
   "executable": "dediren-plugin-uml-xmi-export",
   "capabilities": ["export"],
   "allowed_env": ["DEDIREN_XMI_SCHEMA_PATH", "DEDIREN_SCHEMA_CACHE_DIR", "JAVA_HOME", "PATH"]
