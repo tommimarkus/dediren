@@ -226,6 +226,73 @@ class LayoutQualityTest {
     }
 
     @Test
+    void junctionEdgeJustInsideReachIsAccepted() {
+        // Endpoint (200, 47.7) is sqrt(14^2 + 7.7^2) = 15.98 from the center: just inside reach 16.
+        var nodes = List.of(
+                node("upstream", 0.0, 0.0),
+                junctionNode("junction", 200.0, 26.0));
+        var edges = List.of(edge("into-junction", "upstream", "junction", List.of(
+                new Point(100.0, 47.7),
+                new Point(200.0, 47.7))));
+
+        assertThat(LayoutQuality.validateLayoutDiagnostics(layoutResult(nodes, edges, List.of()))).isEmpty();
+    }
+
+    @Test
+    void junctionEdgeJustOutsideReachIsReported() {
+        // Endpoint (200, 48) is sqrt(14^2 + 8^2) = 16.12 from the center: just past reach 16.
+        var nodes = List.of(
+                node("upstream", 0.0, 0.0),
+                junctionNode("junction", 200.0, 26.0));
+        var edges = List.of(edge("into-junction", "upstream", "junction", List.of(
+                new Point(100.0, 48.0),
+                new Point(200.0, 48.0))));
+
+        assertThat(LayoutQuality.validateLayoutDiagnostics(layoutResult(nodes, edges, List.of())))
+                .extracting(diagnostic -> diagnostic.code())
+                .containsExactly("DEDIREN_LAYOUT_JUNCTION_OFF_INCIDENT_ROUTE");
+    }
+
+    @Test
+    void labelAtExactlyTwiceCapacityIsAccepted() {
+        // 60x48 box: capacity = floor((60-16)/7) * floor((48-16)/16) = 6 * 2 = 12; threshold 12 * 2 = 24.
+        var nodes = List.of(new LaidOutNode("edge-case", "edge-case", "edge-case", 0.0, 0.0, 60.0, 48.0,
+                "x".repeat(24), null));
+
+        assertThat(LayoutQuality.validateLayout(layoutResult(nodes, List.of(), List.of()))
+                .labelSpaceIssueCount()).isZero();
+    }
+
+    @Test
+    void labelOneCharOverTwiceCapacityIsCounted() {
+        var nodes = List.of(new LaidOutNode("edge-case", "edge-case", "edge-case", 0.0, 0.0, 60.0, 48.0,
+                "x".repeat(25), null));
+
+        assertThat(LayoutQuality.validateLayout(layoutResult(nodes, List.of(), List.of()))
+                .labelSpaceIssueCount()).isEqualTo(1);
+    }
+
+    @Test
+    void nodeAtExactlyTheIconFloorIsChecked() {
+        // 40x40 sits exactly at LABEL_SPACE_MIN_DIMENSION, so it is NOT exempt:
+        // capacity = floor((40-16)/7) * max(1, floor((40-16)/16)) = 3 * 1 = 3; threshold 6; 8 chars fire.
+        var nodes = List.of(new LaidOutNode("at-floor", "at-floor", "at-floor", 0.0, 0.0, 40.0, 40.0,
+                "overflow", null));
+
+        assertThat(LayoutQuality.validateLayout(layoutResult(nodes, List.of(), List.of()))
+                .labelSpaceIssueCount()).isEqualTo(1);
+    }
+
+    @Test
+    void nodeJustBelowTheIconFloorIsExempt() {
+        var nodes = List.of(new LaidOutNode("below-floor", "below-floor", "below-floor", 0.0, 0.0, 39.0, 39.0,
+                "overflow", null));
+
+        assertThat(LayoutQuality.validateLayout(layoutResult(nodes, List.of(), List.of()))
+                .labelSpaceIssueCount()).isZero();
+    }
+
+    @Test
     void labelClearlyOverflowingNodeCapacityIsCounted() {
         var nodes = List.of(new LaidOutNode("tiny", "tiny", "tiny", 0.0, 0.0, 60.0, 48.0,
                 "An extremely long label that cannot possibly fit", null));
@@ -259,11 +326,33 @@ class LayoutQualityTest {
 
     @Test
     void junctionLabelsAreExemptFromLabelSpaceCheck() {
+        // The 28x28 size also triggers the icon floor; the role check is the junction's explicit guard.
         var nodes = List.of(new LaidOutNode("junction", "junction", "junction", 0.0, 0.0, 28.0, 28.0,
                 "a junction label rendered adjacent to the dot", "junction"));
 
         assertThat(LayoutQuality.validateLayout(layoutResult(nodes, List.of(), List.of()))
                 .labelSpaceIssueCount()).isZero();
+    }
+
+    @Test
+    void memberTouchingLabelBandLowerEdgeIsAccepted() {
+        // Band is group y 0..24 exclusive at the boundary: a member starting exactly at y 24 clears it.
+        var nodes = List.of(node("member", 10.0, 24.0));
+        var groups = List.of(new LaidOutGroup(
+                "zone", "zone", "zone", null, 0.0, 0.0, 300.0, 200.0, List.of("member"), "Zone"));
+
+        assertThat(LayoutQuality.validateLayout(layoutResult(nodes, List.of(), groups))
+                .groupLabelBandIssueCount()).isZero();
+    }
+
+    @Test
+    void memberOneUnitInsideLabelBandIsCounted() {
+        var nodes = List.of(node("member", 10.0, 23.0));
+        var groups = List.of(new LaidOutGroup(
+                "zone", "zone", "zone", null, 0.0, 0.0, 300.0, 200.0, List.of("member"), "Zone"));
+
+        assertThat(LayoutQuality.validateLayout(layoutResult(nodes, List.of(), groups))
+                .groupLabelBandIssueCount()).isEqualTo(1);
     }
 
     @Test
@@ -288,6 +377,16 @@ class LayoutQualityTest {
 
         assertThat(report.groupLabelBandIssueCount()).isZero();
         assertThat(report.status()).isEqualTo("ok");
+    }
+
+    @Test
+    void blankLabeledGroupHasNoLabelBandReservation() {
+        var nodes = List.of(node("member", 10.0, 10.0));
+        var groups = List.of(new LaidOutGroup(
+                "zone", "zone", "zone", null, 0.0, 0.0, 300.0, 200.0, List.of("member"), "  "));
+
+        assertThat(LayoutQuality.validateLayout(layoutResult(nodes, List.of(), groups))
+                .groupLabelBandIssueCount()).isZero();
     }
 
     @Test
@@ -365,6 +464,29 @@ class LayoutQualityTest {
         LayoutQualityReport report = LayoutQuality.validateLayout(layoutResult(nodes, edges, List.of()));
 
         assertThat(report.edgeCrossingCount()).isZero();
+    }
+
+    @Test
+    void allSharedEndpointCombinationsAreExcludedFromCrossings() {
+        var crossing = List.of(new Point(0.0, 0.0), new Point(200.0, 200.0));
+        var counterCrossing = List.of(new Point(0.0, 200.0), new Point(200.0, 0.0));
+
+        var sharedTarget = List.of(
+                edge("p-q", "p", "q", crossing),
+                edge("r-q", "r", "q", counterCrossing));
+        var sourceIsOthersTarget = List.of(
+                edge("p-q", "p", "q", crossing),
+                edge("q-r", "q", "r", counterCrossing));
+        var targetIsOthersSource = List.of(
+                edge("q-p", "q", "p", crossing),
+                edge("r-q", "r", "q", counterCrossing));
+
+        assertThat(LayoutQuality.validateLayout(layoutResult(List.of(), sharedTarget, List.of()))
+                .edgeCrossingCount()).isZero();
+        assertThat(LayoutQuality.validateLayout(layoutResult(List.of(), sourceIsOthersTarget, List.of()))
+                .edgeCrossingCount()).isZero();
+        assertThat(LayoutQuality.validateLayout(layoutResult(List.of(), targetIsOthersSource, List.of()))
+                .edgeCrossingCount()).isZero();
     }
 
     private static LayoutResult layoutResult(
