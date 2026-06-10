@@ -84,6 +84,9 @@ agent tools should be pointed here from their own entrypoint files (for example,
 - Bundle-local agent guide changes that affect examples, redistributed files,
   command handoff, diagnostics, runtime probes, or plugin environment variables
   must stay consistent with `README.md` and distribution tests.
+  `AgentUsageDocConsistencyTest` (dist-tool) enforces that every `DEDIREN_*`
+  token and CalVer version string in `docs/agent-usage.md` exists in source and
+  matches the product version; keep it green when renaming codes or env vars.
 - ELK layout changes: update `plugins/elk-layout`, CLI/distribution
   smoke coverage, and README/agent runtime notes together.
 - SVG render policy changes: update `schemas/svg-render-policy.schema.json`,

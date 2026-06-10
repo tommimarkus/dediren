@@ -491,13 +491,13 @@ stable cache location is desired.
 
 ## Repair Rules
 
-- `DEDIREN_SOURCE_SCHEMA_INVALID`: validate against `schemas/model.schema.json`.
-- `DEDIREN_SOURCE_DUPLICATE_ID`: make node, relationship, view, and group ids
-  unique.
-- `DEDIREN_SOURCE_DANGLING_RELATIONSHIP`: repair relationship source/target
-  ids or include the missing node.
-- `DEDIREN_SOURCE_AUTHORED_GEOMETRY`: remove authored geometry from source
-  JSON.
+- `DEDIREN_SCHEMA_INVALID`: validate against `schemas/model.schema.json`. A
+  common cause is authored geometry (`x`, `y`, `width`, `height`) or other
+  fields the schema rejects on a node — source JSON is semantic only, so remove
+  them.
+- `DEDIREN_DUPLICATE_ID`: make node, relationship, view, and group ids unique.
+- `DEDIREN_DANGLING_ENDPOINT`: repair relationship source/target ids or include
+  the missing node.
 - `DEDIREN_PLUGIN_UNKNOWN`: inspect `plugins/*.manifest.json` in the bundle or
   explicit `DEDIREN_PLUGIN_DIRS`.
 - `DEDIREN_PLUGIN_MISSING_EXECUTABLE`: inspect the manifest executable and the
