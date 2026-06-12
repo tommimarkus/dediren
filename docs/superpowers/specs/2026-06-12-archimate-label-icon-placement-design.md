@@ -82,6 +82,42 @@ icon (and junctions, handled in §3) keep full-box centering.
 Gating predicate: the node has a non-null ArchiMate decorator that draws a
 corner icon — i.e. not a junction and not a non-ArchiMate (UML) decorator.
 
+Before (today) — the first line lands in the icon band and the wide first word
+runs under the icon:
+
+```
+        +------------------------+
+        |                  +----+ |  <- icon band: node.y+9 … node.y+31
+        |     Applicati·· (|icon|)|     "Application" overlaps the icon
+        |        Component  +----+ |
+        |                        |
+        +------------------------+
+```
+
+After — the whole label block is centered in the region below the icon band, so
+it clears the icon both vertically and horizontally:
+
+```
+        +------------------------+
+        |                  +----+ |  icon band (unchanged)
+        |                  |icon| |
+        |  - - - - - - - - +----+ |  <- regionTop = node.y+33
+        |       Application       |     label block centered in
+        |        Component        |     [regionTop, node.y+height-4]
+        +------------------------+
+```
+
+Single-line icon-bearing nodes shift down the same way (uniform rule):
+
+```
+   before                 after
++--------------+      +--------------+
+|        +---+ |      |        +---+ |
+|   Driv(|icn|)|      |        |icn| |
+|        +---+ |      |   Driver     |   centered in lower band
++--------------+      +--------------+
+```
+
 ### 2. Height-aware font shrink
 
 Extend `nodeLabelLinesAndSize` so the chosen font respects the available
@@ -109,6 +145,27 @@ Add `archimateJunctionLabelOutside(decorator)` mirroring the existing
   background below it, so the dark foreground colour is readable.
 
 The circle shape, radius, and fill are unchanged.
+
+Before — the label is sized to the full node box, so it overflows the small
+circle; `And Junction`'s text is the same colour as its black fill and
+disappears:
+
+```
+   And Ju███unction          Or Jun(   )ction
+        (███)                       (   )
+   (text hidden in the        (text overflows the
+    black fill, spills         white circle on both
+    out both sides)            sides)
+```
+
+After — the name sits centered below the circle in the foreground colour:
+
+```
+         ( ● )                      (   )
+      And Junction               Or Junction
+   (dark text on white,       (centered under the dot,
+    below the black dot)       no overflow)
+```
 
 ### 4. Tests (TDD — written first)
 
