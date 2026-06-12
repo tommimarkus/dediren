@@ -125,9 +125,10 @@ Junctions are ~28px circles; a label cannot fit inside. Add
 
 - Render the name centered horizontally at the node center, **below** the circle
   (`y = cy + radius + gap + fontSize`), `text-anchor="middle"`.
-- Fill with `style.labelFill()` (foreground) on the page background, so the
-  `And Junction` name is readable below its black dot instead of vanishing into
-  the fill.
+- Keep `style.labelFill()` (foreground). Readability is fixed **positionally**:
+  the name now sits on the page background below the filled circle rather than
+  on top of the black `And Junction` fill (where the same foreground colour was
+  invisible). No colour change is needed or made.
 
 The circle shape, radius, and fill are unchanged.
 
@@ -152,8 +153,8 @@ The circle shape, radius, and fill are unchanged.
 - For an icon-bearing two-line node, the label is centered vertically (block
   straddles the node's vertical center — not pushed down) and its widest line's
   horizontal extent stays left of the icon's column.
-- Junction label `y` is below `cy + radius`, and its `fill` differs from the
-  circle's fill.
+- Junction label `y` is below `cy + radius` (off the filled circle, on the page
+  background), so the `And Junction` name is no longer drawn over its black fill.
 - The synthetic coverage test sizes nodes representatively (label-aware or
   per-node sizes, not a flat 128×68) so the artifact mirrors real proportions.
 
