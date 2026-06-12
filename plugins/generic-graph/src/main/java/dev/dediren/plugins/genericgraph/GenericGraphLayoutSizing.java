@@ -19,12 +19,24 @@ final class GenericGraphLayoutSizing {
     private static final double UML_COMPARTMENT_PADDING = 8.0;
     private static final double UML_OPERATION_COMPARTMENT_EXTRA = 14.0;
 
+    private static final double ARCHIMATE_MIN_WIDTH = 160.0;
+    private static final double ARCHIMATE_MIN_HEIGHT = 80.0;
+    private static final double ARCHIMATE_TEXT_CHAR_WIDTH = 8.7;
+    // Must equal ARCHIMATE_LABEL_ICON_RESERVE in plugins/svg-render Main: per-side
+    // room reserved so a centered label clears the upper-right type icon.
+    private static final double ARCHIMATE_LABEL_ICON_RESERVE = 34.0;
+    private static final double ARCHIMATE_LINE_HEIGHT = 18.0;
+    private static final double ARCHIMATE_VERTICAL_PADDING = 28.0;
+
     private GenericGraphLayoutSizing() {
     }
 
     static double widthHint(String semanticProfile, SourceNode sourceNode) {
         if (semanticProfile.equals("archimate") && Archimate.isRelationshipConnectorType(sourceNode.type())) {
             return 28.0;
+        }
+        if (semanticProfile.equals("archimate")) {
+            return archimateWidthHint(sourceNode);
         }
         if (semanticProfile.equals("uml") && Uml.isCompactActivityNodeType(sourceNode.type())) {
             return 32.0;
@@ -59,6 +71,9 @@ final class GenericGraphLayoutSizing {
         if (semanticProfile.equals("archimate") && Archimate.isRelationshipConnectorType(sourceNode.type())) {
             return 28.0;
         }
+        if (semanticProfile.equals("archimate")) {
+            return archimateHeightHint(sourceNode);
+        }
         if (semanticProfile.equals("uml") && Uml.isCompactActivityNodeType(sourceNode.type())) {
             return 32.0;
         }
@@ -86,6 +101,35 @@ final class GenericGraphLayoutSizing {
             return umlStructuralHeightHint(sourceNode);
         }
         return 80.0;
+    }
+
+    private static double archimateWidthHint(SourceNode sourceNode) {
+        double content = archimateLongestTokenChars(sourceNode.label()) * ARCHIMATE_TEXT_CHAR_WIDTH
+                + 2.0 * ARCHIMATE_LABEL_ICON_RESERVE;
+        return roundUp(Math.max(content, ARCHIMATE_MIN_WIDTH), 10.0);
+    }
+
+    private static double archimateHeightHint(SourceNode sourceNode) {
+        double widthBudget = archimateWidthHint(sourceNode) - 2.0 * ARCHIMATE_LABEL_ICON_RESERVE;
+        double content = archimateEstimatedLineCount(sourceNode.label(), widthBudget) * ARCHIMATE_LINE_HEIGHT
+                + ARCHIMATE_VERTICAL_PADDING;
+        return roundUp(Math.max(content, ARCHIMATE_MIN_HEIGHT), 10.0);
+    }
+
+    private static int archimateLongestTokenChars(String label) {
+        int longest = 0;
+        for (String token : label.trim().split("\\s+")) {
+            longest = Math.max(longest, token.length());
+        }
+        return Math.max(longest, 1);
+    }
+
+    private static int archimateEstimatedLineCount(String label, double widthBudget) {
+        if (widthBudget <= 0.0) {
+            return 1;
+        }
+        double total = label.trim().length() * ARCHIMATE_TEXT_CHAR_WIDTH;
+        return Math.max(1, (int) Math.ceil(total / widthBudget));
     }
 
     private static Double umlSequenceWidthHint(String nodeType) {
