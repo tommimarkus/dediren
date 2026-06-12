@@ -923,6 +923,7 @@ class MainTest {
                 String id = "archimate-node-" + index;
                 // The renderer wraps camelCase type keys (e.g. "ImplementationEvent") into
                 // separate lines, so size width from the longest camel/space token.
+                // (8.7 and 68.0 mirror ARCHIMATE_TEXT_CHAR_WIDTH and 2*ARCHIMATE_LABEL_ICON_RESERVE in the SUT.)
                 int longestToken = 1;
                 for (String token : nodeType.replaceAll("(?<=[a-z])(?=[A-Z])", " ").trim().split("\\s+")) {
                     longestToken = Math.max(longestToken, token.length());
@@ -1052,7 +1053,8 @@ class MainTest {
             // Centered vertically: middle baseline, anchored at/above the node center (never pushed below it).
             assertThat(label.getAttribute("dominant-baseline")).isEqualTo("middle");
             double labelY = Double.parseDouble(label.getAttribute("y"));
-            assertThat(labelY).isBetween(60.0, 80.0); // node center = 80; first of two lines sits just above it
+            // Centered block: first of two lines sits just above the node center (80), not pushed down.
+            assertThat(labelY).isBetween(70.0, 79.0);
 
             // Wraps to two lines, each centered on the node center x.
             org.w3c.dom.NodeList tspans = label.getElementsByTagName("tspan");
@@ -1098,6 +1100,9 @@ class MainTest {
 
             // Label sits below the filled circle, on the page background (not over the black fill).
             assertThat(labelY).isGreaterThan(70.0 + radius);
+            double fontSize = Double.parseDouble(label.getAttribute("font-size"));
+            double expectedY = 70.0 + radius + 6.0 + fontSize; // cy + radius + gap + fontSize
+            assertThat(labelY).isBetween(expectedY - 0.5, expectedY + 0.5);
             assertThat(label.getAttribute("dominant-baseline")).isEmpty();
             assertThat(Double.parseDouble(label.getAttribute("x"))).isEqualTo(70.0);
         }

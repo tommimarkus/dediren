@@ -1018,6 +1018,8 @@ class GenericGraphPluginTest {
         assertThat(layoutRequestNode(data, "flow-junction").at("/width_hint").asDouble()).isEqualTo(28.0);
         assertThat(layoutRequestNode(data, "flow-junction").at("/height_hint").asDouble()).isEqualTo(28.0);
         assertThat(longHeight).isGreaterThan(shortHeight);
+        assertThat(longWidth).isEqualTo(190.0);
+        assertThat(longHeight).isEqualTo(100.0);
     }
 
     @Test
