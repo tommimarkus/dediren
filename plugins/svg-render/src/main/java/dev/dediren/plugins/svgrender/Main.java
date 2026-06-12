@@ -931,6 +931,10 @@ public final class Main {
             double fontSize,
             int lineCount) {
         if (archimateJunctionLabelOutside(style.decorator())) {
+            // Top-aligned below the circle: the first line's baseline sits `gap` below the
+            // circle's southmost point and any wrapped lines grow downward. Junctions carry
+            // empty labels in practice, so block-centering (as in the UML branch below) is
+            // unnecessary here.
             double radius = archimateJunctionRadius(node, style);
             double gap = 6.0;
             double firstLineY = node.y() + node.height() / 2.0 + radius + gap + fontSize;
