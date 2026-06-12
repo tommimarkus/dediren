@@ -982,7 +982,7 @@ class GenericGraphPluginTest {
                   ],
                   "nodes": [
                     { "id": "short", "type": "ApplicationComponent", "label": "API", "properties": {} },
-                    { "id": "long", "type": "ApplicationComponent", "label": "Application Collaboration", "properties": {} },
+                    { "id": "long", "type": "ApplicationComponent", "label": "Application Collaboration Service Component", "properties": {} },
                     { "id": "flow-junction", "type": "AndJunction", "label": "", "properties": {} }
                   ],
                   "relationships": [
@@ -1010,11 +1010,14 @@ class GenericGraphPluginTest {
         double longWidth = layoutRequestNode(data, "long").at("/width_hint").asDouble();
         double shortHeight = layoutRequestNode(data, "short").at("/height_hint").asDouble();
 
+        double longHeight = layoutRequestNode(data, "long").at("/height_hint").asDouble();
+
         assertThat(shortWidth).isEqualTo(160.0);
         assertThat(shortHeight).isEqualTo(80.0);
         assertThat(longWidth).isGreaterThan(shortWidth);
         assertThat(layoutRequestNode(data, "flow-junction").at("/width_hint").asDouble()).isEqualTo(28.0);
         assertThat(layoutRequestNode(data, "flow-junction").at("/height_hint").asDouble()).isEqualTo(28.0);
+        assertThat(longHeight).isGreaterThan(shortHeight);
     }
 
     @Test

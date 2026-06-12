@@ -110,7 +110,8 @@ final class GenericGraphLayoutSizing {
     }
 
     private static double archimateHeightHint(SourceNode sourceNode) {
-        double widthBudget = archimateWidthHint(sourceNode) - 2.0 * ARCHIMATE_LABEL_ICON_RESERVE;
+        double width = archimateWidthHint(sourceNode);
+        double widthBudget = width - 2.0 * ARCHIMATE_LABEL_ICON_RESERVE;
         double content = archimateEstimatedLineCount(sourceNode.label(), widthBudget) * ARCHIMATE_LINE_HEIGHT
                 + ARCHIMATE_VERTICAL_PADDING;
         return roundUp(Math.max(content, ARCHIMATE_MIN_HEIGHT), 10.0);
