@@ -1022,6 +1022,47 @@ class MainTest {
         }
 
         @Test
+        void archimateLabelStaysCenteredAndClearsCornerIcon() throws Exception {
+            JsonNode input = archimateRenderInput(
+                    fixtureJson("fixtures/render-policy/archimate-svg.json"),
+                    """
+                    [
+                      { "id": "appcomp", "source_id": "appcomp", "projection_id": "appcomp", "x": 40, "y": 40, "width": 190, "height": 80, "label": "Application Component" }
+                    ]
+                    """,
+                    "[]",
+                    """
+                    {
+                      "appcomp": { "type": "ApplicationComponent", "source_id": "appcomp" }
+                    }
+                    """,
+                    "{}");
+
+            Document document = svgDocument(okContent(render(input)));
+            Element node = groupWithAttribute(document, "data-dediren-node-id", "appcomp");
+            Element label = (Element) node.getElementsByTagName("text").item(0);
+
+            // Centered vertically: middle baseline, anchored at/above the node center (never pushed below it).
+            assertThat(label.getAttribute("dominant-baseline")).isEqualTo("middle");
+            double labelY = Double.parseDouble(label.getAttribute("y"));
+            assertThat(labelY).isBetween(60.0, 80.0); // node center = 80; first of two lines sits just above it
+
+            // Wraps to two lines, each centered on the node center x.
+            org.w3c.dom.NodeList tspans = label.getElementsByTagName("tspan");
+            assertThat(tspans.getLength()).isEqualTo(2);
+            assertThat(Double.parseDouble(label.getAttribute("x"))).isEqualTo(135.0); // 40 + 190/2
+
+            // Widest line clears the icon column (icon left edge = x + width - 28 = 202).
+            double fontSize = Double.parseDouble(label.getAttribute("font-size"));
+            int widestChars = 0;
+            for (int i = 0; i < tspans.getLength(); i++) {
+                widestChars = Math.max(widestChars, tspans.item(i).getTextContent().length());
+            }
+            double widestHalf = widestChars * fontSize * 0.62 / 2.0;
+            assertThat(135.0 + widestHalf).isLessThanOrEqualTo(202.0);
+        }
+
+        @Test
         void coversEachUmlNodeTypeFromPolicy() throws Exception {
             JsonNode policy = fixtureJson("fixtures/render-policy/uml-svg.json");
             ObjectNode nodeStyles = (ObjectNode) policy.at("/style/node_type_overrides");
