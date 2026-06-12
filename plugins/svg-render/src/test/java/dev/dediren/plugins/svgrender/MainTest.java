@@ -921,6 +921,13 @@ class MainTest {
                 var field = fields.next();
                 String nodeType = field.getKey();
                 String id = "archimate-node-" + index;
+                // The renderer wraps camelCase type keys (e.g. "ImplementationEvent") into
+                // separate lines, so size width from the longest camel/space token.
+                int longestToken = 1;
+                for (String token : nodeType.replaceAll("(?<=[a-z])(?=[A-Z])", " ").trim().split("\\s+")) {
+                    longestToken = Math.max(longestToken, token.length());
+                }
+                int nodeWidth = (int) Math.max(160.0, Math.ceil((longestToken * 8.7 + 68.0) / 10.0) * 10.0);
                 nodes.add(JsonSupport.objectMapper().readTree("""
                         {
                           "id": "%s",
@@ -928,11 +935,11 @@ class MainTest {
                           "projection_id": "%s",
                           "x": %d,
                           "y": %d,
-                          "width": 128,
-                          "height": 68,
+                          "width": %d,
+                          "height": 80,
                           "label": "%s"
                         }
-                        """.formatted(id, id, id, 32 + (index % 6) * 150, 40 + (index / 6) * 95, nodeType)));
+                        """.formatted(id, id, id, 32 + (index % 6) * 220, 40 + (index / 6) * 110, nodeWidth, nodeType)));
                 metadataNodes.set(id, JsonSupport.objectMapper().readTree("""
                         {
                           "type": "%s",
