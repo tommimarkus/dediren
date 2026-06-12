@@ -1027,7 +1027,7 @@ class MainTest {
                     fixtureJson("fixtures/render-policy/archimate-svg.json"),
                     """
                     [
-                      { "id": "appcomp", "source_id": "appcomp", "projection_id": "appcomp", "x": 40, "y": 40, "width": 190, "height": 80, "label": "Application Component" }
+                      { "id": "appcomp", "source_id": "appcomp", "projection_id": "appcomp", "x": 40, "y": 40, "width": 190, "height": 80, "label": "Telecommunications Service" }
                     ]
                     """,
                     "[]",
