@@ -2553,7 +2553,10 @@ public final class Main {
                 || decorator == SvgNodeDecorator.ARCHIMATE_TECHNOLOGY_SERVICE
                 || decorator == SvgNodeDecorator.ARCHIMATE_TECHNOLOGY_FUNCTION
                 || decorator == SvgNodeDecorator.ARCHIMATE_TECHNOLOGY_PROCESS
-                || decorator == SvgNodeDecorator.ARCHIMATE_TECHNOLOGY_EVENT;
+                || decorator == SvgNodeDecorator.ARCHIMATE_TECHNOLOGY_EVENT
+                || decorator == SvgNodeDecorator.ARCHIMATE_BUSINESS_INTERACTION
+                || decorator == SvgNodeDecorator.ARCHIMATE_APPLICATION_INTERACTION
+                || decorator == SvgNodeDecorator.ARCHIMATE_TECHNOLOGY_INTERACTION;
     }
 
     private static ArchimateIconKind archimateIconKind(SvgNodeDecorator decorator) {

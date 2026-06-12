@@ -978,6 +978,43 @@ class MainTest {
         }
 
         @Test
+        void archimateInteractionElementsRenderRoundedRectangle() throws Exception {
+            JsonNode policy = fixtureJson("fixtures/render-policy/archimate-svg.json");
+            for (String type : java.util.List.of(
+                    "BusinessInteraction", "ApplicationInteraction", "TechnologyInteraction")) {
+                ArrayNode nodes = JsonSupport.objectMapper().createArrayNode();
+                nodes.add(JsonSupport.objectMapper().readTree("""
+                        {
+                          "id": "n",
+                          "source_id": "n",
+                          "projection_id": "n",
+                          "x": 40, "y": 40, "width": 180, "height": 80,
+                          "label": "%s"
+                        }
+                        """.formatted(type)));
+                ObjectNode metadataNodes = JsonSupport.objectMapper().createObjectNode();
+                metadataNodes.set("n", JsonSupport.objectMapper().readTree("""
+                        { "type": "%s", "source_id": "n" }
+                        """.formatted(type)));
+
+                Document document = svgDocument(okContent(render(semanticRenderInput(
+                        "archimate",
+                        nodes,
+                        JsonSupport.objectMapper().createArrayNode(),
+                        metadataNodes,
+                        JsonSupport.objectMapper().createObjectNode(),
+                        policy))));
+
+                Element shape = firstElementWithAttribute(
+                        groupWithAttribute(document, "data-dediren-node-id", "n"),
+                        "data-dediren-node-shape");
+                assertThat(shape.getAttribute("data-dediren-node-shape"))
+                        .as("%s is a behavior element and must render rounded", type)
+                        .isEqualTo("archimate_rounded_rectangle");
+            }
+        }
+
+        @Test
         void rendersDetailedArchimateIconMorphology() throws Exception {
             JsonNode input = archimateRenderInput(
                     fixtureJson("fixtures/render-policy/archimate-svg.json"),
