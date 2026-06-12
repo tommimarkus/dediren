@@ -320,11 +320,15 @@ public final class Main {
                 + " data-dediren-icon-size=\"22\">" + body + "</g>";
     }
 
+    private static double archimateJunctionRadius(LaidOutNode node, ResolvedNodeStyle style) {
+        return Math.max(4.0, Math.min(node.width(), node.height()) / 2.0 - style.strokeWidth());
+    }
+
     private static String nodeShape(LaidOutNode node, ResolvedNodeStyle style, RenderMetadataSelector selector) {
         SvgNodeDecorator decorator = style.decorator();
         if (decorator == SvgNodeDecorator.ARCHIMATE_AND_JUNCTION
                 || decorator == SvgNodeDecorator.ARCHIMATE_OR_JUNCTION) {
-            double radius = Math.max(4.0, Math.min(node.width(), node.height()) / 2.0 - style.strokeWidth());
+            double radius = archimateJunctionRadius(node, style);
             String fill = decorator == SvgNodeDecorator.ARCHIMATE_AND_JUNCTION ? style.stroke() : style.fill();
             return String.format(
                     Locale.ROOT,
@@ -926,6 +930,12 @@ public final class Main {
             ResolvedNodeStyle style,
             double fontSize,
             int lineCount) {
+        if (archimateJunctionLabelOutside(style.decorator())) {
+            double radius = archimateJunctionRadius(node, style);
+            double gap = 6.0;
+            double firstLineY = node.y() + node.height() / 2.0 + radius + gap + fontSize;
+            return new NodeLabelPosition(node.x() + node.width() / 2.0, firstLineY, false);
+        }
         if (umlCompactControlNodeLabelOutside(style.decorator())) {
             double lineHeight = nodeLabelLineHeight(fontSize);
             double lineSpan = Math.max(0, lineCount - 1) * lineHeight;
@@ -947,6 +957,11 @@ public final class Main {
                 || decorator == SvgNodeDecorator.UML_ACTIVITY_FINAL_NODE
                 || decorator == SvgNodeDecorator.UML_DECISION_NODE
                 || decorator == SvgNodeDecorator.UML_MERGE_NODE;
+    }
+
+    private static boolean archimateJunctionLabelOutside(SvgNodeDecorator decorator) {
+        return decorator == SvgNodeDecorator.ARCHIMATE_AND_JUNCTION
+                || decorator == SvgNodeDecorator.ARCHIMATE_OR_JUNCTION;
     }
 
     private static double nodeLabelMaxWidth(LaidOutNode node, ResolvedNodeStyle style, double fontSize) {

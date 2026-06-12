@@ -1063,6 +1063,39 @@ class MainTest {
         }
 
         @Test
+        void archimateJunctionLabelRendersBelowCircle() throws Exception {
+            JsonNode input = archimateRenderInput(
+                    fixtureJson("fixtures/render-policy/archimate-svg.json"),
+                    """
+                    [
+                      { "id": "j", "source_id": "j", "projection_id": "j", "x": 40, "y": 40, "width": 60, "height": 60, "label": "And Junction" }
+                    ]
+                    """,
+                    "[]",
+                    """
+                    {
+                      "j": { "type": "AndJunction", "source_id": "j" }
+                    }
+                    """,
+                    "{}");
+
+            Document document = svgDocument(okContent(render(input)));
+            Element node = groupWithAttribute(document, "data-dediren-node-id", "j");
+            Element label = (Element) node.getElementsByTagName("text").item(0);
+
+            // Circle: cx,cy = node center (70,70); radius = min(60,60)/2 - strokeWidth.
+            double strokeWidth = Double.parseDouble(
+                    ((Element) node.getElementsByTagName("circle").item(0)).getAttribute("stroke-width"));
+            double radius = 30.0 - strokeWidth;
+            double labelY = Double.parseDouble(label.getAttribute("y"));
+
+            // Label sits below the filled circle, on the page background (not over the black fill).
+            assertThat(labelY).isGreaterThan(70.0 + radius);
+            assertThat(label.getAttribute("dominant-baseline")).isEmpty();
+            assertThat(Double.parseDouble(label.getAttribute("x"))).isEqualTo(70.0);
+        }
+
+        @Test
         void coversEachUmlNodeTypeFromPolicy() throws Exception {
             JsonNode policy = fixtureJson("fixtures/render-policy/uml-svg.json");
             ObjectNode nodeStyles = (ObjectNode) policy.at("/style/node_type_overrides");
