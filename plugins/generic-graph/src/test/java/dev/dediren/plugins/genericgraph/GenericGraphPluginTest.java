@@ -970,6 +970,59 @@ class GenericGraphPluginTest {
     }
 
     @Test
+    void sizesArchimateNodesToFitLabelAndCornerIcon() throws Exception {
+        PluginResult result = Main.executeForTesting(
+                new String[]{"project", "--target", "layout-request", "--view", "main"},
+                """
+                {
+                  "model_schema_version": "model.schema.v1",
+                  "required_plugins": [
+                    { "id": "generic-graph", "version": "2026.06.4" },
+                    { "id": "archimate-oef", "version": "2026.06.4" }
+                  ],
+                  "nodes": [
+                    { "id": "short", "type": "ApplicationComponent", "label": "API", "properties": {} },
+                    { "id": "long", "type": "ApplicationComponent", "label": "Application Collaboration Service Component", "properties": {} },
+                    { "id": "flow-junction", "type": "AndJunction", "label": "", "properties": {} }
+                  ],
+                  "relationships": [
+                    { "id": "long-to-junction", "type": "Flow", "source": "long", "target": "flow-junction", "label": "", "properties": {} },
+                    { "id": "junction-to-short", "type": "Flow", "source": "flow-junction", "target": "short", "label": "", "properties": {} }
+                  ],
+                  "plugins": {
+                    "generic-graph": {
+                      "semantic_profile": "archimate",
+                      "views": [
+                        {
+                          "id": "main",
+                          "label": "Main",
+                          "nodes": ["short", "long", "flow-junction"],
+                          "relationships": ["long-to-junction", "junction-to-short"]
+                        }
+                      ]
+                    }
+                  }
+                }
+                """);
+
+        JsonNode data = okData(result);
+        double shortWidth = layoutRequestNode(data, "short").at("/width_hint").asDouble();
+        double longWidth = layoutRequestNode(data, "long").at("/width_hint").asDouble();
+        double shortHeight = layoutRequestNode(data, "short").at("/height_hint").asDouble();
+
+        double longHeight = layoutRequestNode(data, "long").at("/height_hint").asDouble();
+
+        assertThat(shortWidth).isEqualTo(160.0);
+        assertThat(shortHeight).isEqualTo(80.0);
+        assertThat(longWidth).isGreaterThan(shortWidth);
+        assertThat(layoutRequestNode(data, "flow-junction").at("/width_hint").asDouble()).isEqualTo(28.0);
+        assertThat(layoutRequestNode(data, "flow-junction").at("/height_hint").asDouble()).isEqualTo(28.0);
+        assertThat(longHeight).isGreaterThan(shortHeight);
+        assertThat(longWidth).isEqualTo(190.0);
+        assertThat(longHeight).isEqualTo(100.0);
+    }
+
+    @Test
     void projectsArchimateJunctionRenderMetadata() throws Exception {
         PluginResult result = Main.executeForTesting(
                 new String[]{"project", "--target", "render-metadata", "--view", "main"},

@@ -921,6 +921,14 @@ class MainTest {
                 var field = fields.next();
                 String nodeType = field.getKey();
                 String id = "archimate-node-" + index;
+                // The renderer wraps camelCase type keys (e.g. "ImplementationEvent") into
+                // separate lines, so size width from the longest camel/space token.
+                // (8.7 and 68.0 mirror ARCHIMATE_TEXT_CHAR_WIDTH and 2*ARCHIMATE_LABEL_ICON_RESERVE in the SUT.)
+                int longestToken = 1;
+                for (String token : nodeType.replaceAll("(?<=[a-z])(?=[A-Z])", " ").trim().split("\\s+")) {
+                    longestToken = Math.max(longestToken, token.length());
+                }
+                int nodeWidth = (int) Math.max(160.0, Math.ceil((longestToken * 8.7 + 68.0) / 10.0) * 10.0);
                 nodes.add(JsonSupport.objectMapper().readTree("""
                         {
                           "id": "%s",
@@ -928,11 +936,11 @@ class MainTest {
                           "projection_id": "%s",
                           "x": %d,
                           "y": %d,
-                          "width": 128,
-                          "height": 68,
+                          "width": %d,
+                          "height": 80,
                           "label": "%s"
                         }
-                        """.formatted(id, id, id, 32 + (index % 6) * 150, 40 + (index / 6) * 95, nodeType)));
+                        """.formatted(id, id, id, 32 + (index % 6) * 220, 40 + (index / 6) * 110, nodeWidth, nodeType)));
                 metadataNodes.set(id, JsonSupport.objectMapper().readTree("""
                         {
                           "type": "%s",
@@ -1019,6 +1027,84 @@ class MainTest {
                     "archimate_technology_node");
             assertThat(firstElementWithAttribute(node, "data-dediren-icon-part").getAttribute("data-dediren-icon-part"))
                     .isEqualTo("node-3d-edges");
+        }
+
+        @Test
+        void archimateLabelStaysCenteredAndClearsCornerIcon() throws Exception {
+            JsonNode input = archimateRenderInput(
+                    fixtureJson("fixtures/render-policy/archimate-svg.json"),
+                    """
+                    [
+                      { "id": "appcomp", "source_id": "appcomp", "projection_id": "appcomp", "x": 40, "y": 40, "width": 190, "height": 80, "label": "Telecommunications Service" }
+                    ]
+                    """,
+                    "[]",
+                    """
+                    {
+                      "appcomp": { "type": "ApplicationComponent", "source_id": "appcomp" }
+                    }
+                    """,
+                    "{}");
+
+            Document document = svgDocument(okContent(render(input)));
+            Element node = groupWithAttribute(document, "data-dediren-node-id", "appcomp");
+            Element label = (Element) node.getElementsByTagName("text").item(0);
+
+            // Centered vertically: middle baseline, anchored at/above the node center (never pushed below it).
+            assertThat(label.getAttribute("dominant-baseline")).isEqualTo("middle");
+            double labelY = Double.parseDouble(label.getAttribute("y"));
+            // Centered block: first of two lines sits just above the node center (80), not pushed down.
+            assertThat(labelY).isBetween(70.0, 79.0);
+
+            // Wraps to two lines, each centered on the node center x.
+            org.w3c.dom.NodeList tspans = label.getElementsByTagName("tspan");
+            assertThat(tspans.getLength()).isEqualTo(2);
+            assertThat(Double.parseDouble(label.getAttribute("x"))).isEqualTo(135.0); // 40 + 190/2
+
+            // Widest line clears the icon column (icon left edge = x + width - 28 = 202).
+            double fontSize = Double.parseDouble(label.getAttribute("font-size"));
+            int widestChars = 0;
+            for (int i = 0; i < tspans.getLength(); i++) {
+                widestChars = Math.max(widestChars, tspans.item(i).getTextContent().length());
+            }
+            double widestHalf = widestChars * fontSize * 0.62 / 2.0;
+            assertThat(135.0 + widestHalf).isLessThanOrEqualTo(202.0);
+        }
+
+        @Test
+        void archimateJunctionLabelRendersBelowCircle() throws Exception {
+            JsonNode input = archimateRenderInput(
+                    fixtureJson("fixtures/render-policy/archimate-svg.json"),
+                    """
+                    [
+                      { "id": "j", "source_id": "j", "projection_id": "j", "x": 40, "y": 40, "width": 60, "height": 60, "label": "And Junction" }
+                    ]
+                    """,
+                    "[]",
+                    """
+                    {
+                      "j": { "type": "AndJunction", "source_id": "j" }
+                    }
+                    """,
+                    "{}");
+
+            Document document = svgDocument(okContent(render(input)));
+            Element node = groupWithAttribute(document, "data-dediren-node-id", "j");
+            Element label = (Element) node.getElementsByTagName("text").item(0);
+
+            // Circle: cx,cy = node center (70,70); radius = min(60,60)/2 - strokeWidth.
+            double strokeWidth = Double.parseDouble(
+                    ((Element) node.getElementsByTagName("circle").item(0)).getAttribute("stroke-width"));
+            double radius = 30.0 - strokeWidth;
+            double labelY = Double.parseDouble(label.getAttribute("y"));
+
+            // Label sits below the filled circle, on the page background (not over the black fill).
+            assertThat(labelY).isGreaterThan(70.0 + radius);
+            double fontSize = Double.parseDouble(label.getAttribute("font-size"));
+            double expectedY = 70.0 + radius + 6.0 + fontSize; // cy + radius + gap + fontSize
+            assertThat(labelY).isBetween(expectedY - 0.5, expectedY + 0.5);
+            assertThat(label.getAttribute("dominant-baseline")).isEmpty();
+            assertThat(Double.parseDouble(label.getAttribute("x"))).isEqualTo(70.0);
         }
 
         @Test

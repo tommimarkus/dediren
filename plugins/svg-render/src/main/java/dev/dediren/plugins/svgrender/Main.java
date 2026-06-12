@@ -53,6 +53,12 @@ public final class Main {
     private static final int EDGE_LABEL_FONT_WEIGHT = 600;
     private static final double EDGE_LABEL_OUTLINE_WIDTH = 2.0;
     private static final double ARCHIMATE_ICON_SIZE = 22.0;
+    // Must equal ARCHIMATE_LABEL_ICON_RESERVE in plugins/generic-graph
+    // GenericGraphLayoutSizing: per-side room reserved so a centered label clears
+    // the upper-right type icon.
+    private static final double ARCHIMATE_LABEL_ICON_RESERVE = 34.0;
+    private static final double NODE_LABEL_VERTICAL_PADDING = 8.0;
+    private static final double NODE_LABEL_MIN_FONT_SIZE = 9.0;
 
     private Main() {
     }
@@ -314,11 +320,15 @@ public final class Main {
                 + " data-dediren-icon-size=\"22\">" + body + "</g>";
     }
 
+    private static double archimateJunctionRadius(LaidOutNode node, ResolvedNodeStyle style) {
+        return Math.max(4.0, Math.min(node.width(), node.height()) / 2.0 - style.strokeWidth());
+    }
+
     private static String nodeShape(LaidOutNode node, ResolvedNodeStyle style, RenderMetadataSelector selector) {
         SvgNodeDecorator decorator = style.decorator();
         if (decorator == SvgNodeDecorator.ARCHIMATE_AND_JUNCTION
                 || decorator == SvgNodeDecorator.ARCHIMATE_OR_JUNCTION) {
-            double radius = Math.max(4.0, Math.min(node.width(), node.height()) / 2.0 - style.strokeWidth());
+            double radius = archimateJunctionRadius(node, style);
             String fill = decorator == SvgNodeDecorator.ARCHIMATE_AND_JUNCTION ? style.stroke() : style.fill();
             return String.format(
                     Locale.ROOT,
@@ -809,7 +819,7 @@ public final class Main {
     }
 
     private static String nodeLabel(LaidOutNode node, ResolvedNodeStyle style, double fontSize) {
-        NodeLabelLines label = nodeLabelLinesAndSize(node, fontSize);
+        NodeLabelLines label = nodeLabelLinesAndSize(node, style, fontSize);
         NodeLabelPosition position = nodeLabelPosition(node, style, label.fontSize(), label.lines().size());
         String baselineAttribute = position.centerBaseline() ? " dominant-baseline=\"middle\"" : "";
         if (label.lines().size() == 1) {
@@ -845,22 +855,24 @@ public final class Main {
         return svg.toString();
     }
 
-    private static NodeLabelLines nodeLabelLinesAndSize(LaidOutNode node, double fontSize) {
-        List<String> lines = wrappedNodeLabelLines(node, fontSize);
-        double maxWidth = nodeLabelMaxWidth(node, fontSize);
+    private static NodeLabelLines nodeLabelLinesAndSize(LaidOutNode node, ResolvedNodeStyle style, double fontSize) {
+        List<String> lines = wrappedNodeLabelLines(node, style, fontSize);
+        double maxWidth = nodeLabelMaxWidth(node, style, fontSize);
         double widestLine = lines.stream()
                 .mapToDouble(line -> estimateTextWidth(line, fontSize))
                 .max()
                 .orElse(0.0);
-        double labelFontSize = widestLine > maxWidth
-                ? Math.max(fontSize * maxWidth / widestLine, 9.0)
-                : fontSize;
+        double widthFontSize = widestLine > maxWidth ? fontSize * maxWidth / widestLine : fontSize;
+        double availableHeight = node.height() - NODE_LABEL_VERTICAL_PADDING;
+        double blockHeight = lines.size() * nodeLabelLineHeight(fontSize);
+        double heightFontSize = blockHeight > availableHeight ? fontSize * availableHeight / blockHeight : fontSize;
+        double labelFontSize = Math.max(Math.min(widthFontSize, heightFontSize), NODE_LABEL_MIN_FONT_SIZE);
         return new NodeLabelLines(lines, labelFontSize);
     }
 
-    private static List<String> wrappedNodeLabelLines(LaidOutNode node, double fontSize) {
+    private static List<String> wrappedNodeLabelLines(LaidOutNode node, ResolvedNodeStyle style, double fontSize) {
         String rawLabel = node.label() == null ? "" : node.label();
-        double maxWidth = nodeLabelMaxWidth(node, fontSize);
+        double maxWidth = nodeLabelMaxWidth(node, style, fontSize);
         List<String> tokens = labelWrapTokens(rawLabel);
         List<String> lines = new ArrayList<>();
         String current = "";
@@ -918,6 +930,16 @@ public final class Main {
             ResolvedNodeStyle style,
             double fontSize,
             int lineCount) {
+        if (archimateJunctionLabelOutside(style.decorator())) {
+            // Top-aligned below the circle: the first line's baseline sits `gap` below the
+            // circle's southmost point and any wrapped lines grow downward. Junctions carry
+            // empty labels in practice, so block-centering (as in the UML branch below) is
+            // unnecessary here.
+            double radius = archimateJunctionRadius(node, style);
+            double gap = 6.0;
+            double firstLineY = node.y() + node.height() / 2.0 + radius + gap + fontSize;
+            return new NodeLabelPosition(node.x() + node.width() / 2.0, firstLineY, false);
+        }
         if (umlCompactControlNodeLabelOutside(style.decorator())) {
             double lineHeight = nodeLabelLineHeight(fontSize);
             double lineSpan = Math.max(0, lineCount - 1) * lineHeight;
@@ -941,8 +963,16 @@ public final class Main {
                 || decorator == SvgNodeDecorator.UML_MERGE_NODE;
     }
 
-    private static double nodeLabelMaxWidth(LaidOutNode node, double fontSize) {
-        return Math.max(node.width() - 20.0, fontSize * 3.0);
+    private static boolean archimateJunctionLabelOutside(SvgNodeDecorator decorator) {
+        return decorator == SvgNodeDecorator.ARCHIMATE_AND_JUNCTION
+                || decorator == SvgNodeDecorator.ARCHIMATE_OR_JUNCTION;
+    }
+
+    private static double nodeLabelMaxWidth(LaidOutNode node, ResolvedNodeStyle style, double fontSize) {
+        double reserve = hasArchimateCornerIcon(style.decorator())
+                ? 2.0 * ARCHIMATE_LABEL_ICON_RESERVE
+                : 20.0;
+        return Math.max(node.width() - reserve, fontSize * 3.0);
     }
 
     private static double nodeLabelLineHeight(double fontSize) {
@@ -2486,6 +2516,13 @@ public final class Main {
         return decorator != null && decorator.name().startsWith("UML_");
     }
 
+    private static boolean hasArchimateCornerIcon(SvgNodeDecorator decorator) {
+        return decorator != null
+                && !isUmlDecorator(decorator)
+                && decorator != SvgNodeDecorator.ARCHIMATE_AND_JUNCTION
+                && decorator != SvgNodeDecorator.ARCHIMATE_OR_JUNCTION;
+    }
+
     private static boolean isArchimateCutCornerRectangle(SvgNodeDecorator decorator) {
         return decorator == SvgNodeDecorator.ARCHIMATE_STAKEHOLDER
                 || decorator == SvgNodeDecorator.ARCHIMATE_DRIVER
@@ -3196,7 +3233,7 @@ public final class Main {
     }
 
     private static List<LabelBox> nodeLabelBoxes(LaidOutNode node, ResolvedNodeStyle style, double fontSize) {
-        NodeLabelLines label = nodeLabelLinesAndSize(node, fontSize);
+        NodeLabelLines label = nodeLabelLinesAndSize(node, style, fontSize);
         NodeLabelPosition position = nodeLabelPosition(node, style, label.fontSize(), label.lines().size());
         List<LabelBox> boxes = new ArrayList<>();
         double lineHeight = nodeLabelLineHeight(label.fontSize());
