@@ -964,6 +964,10 @@ public final class Main {
                 true);
     }
 
+    // Reviewed (ARCH-V-002, won't-fix): these compact glyphs deliberately place their
+    // label diagonally up-left (see nodeLabelPosition) to keep it clear of the in/out
+    // flows that enter and leave initial/final/decision/merge nodes. This is intentional
+    // and differs from ArchiMate junction labels, which center below the circle.
     private static boolean umlCompactControlNodeLabelOutside(SvgNodeDecorator decorator) {
         return decorator == SvgNodeDecorator.UML_INITIAL_NODE
                 || decorator == SvgNodeDecorator.UML_ACTIVITY_FINAL_NODE
@@ -2507,6 +2511,9 @@ public final class Main {
         return fieldValue != null && fieldValue.isTextual() ? fieldValue.asText() : fallback;
     }
 
+    // Reviewed (ARCH-L-004, won't-fix): final states and pseudostates are intentionally
+    // unlabeled. Unnamed final/initial pseudostates are valid UML, so these glyph-only
+    // shapes suppress the plain label rather than rendering an empty or placeholder name.
     private static boolean shouldRenderPlainNodeLabel(LaidOutNode node, SvgNodeDecorator decorator) {
         return node.label() != null
                 && !node.label().isEmpty()
