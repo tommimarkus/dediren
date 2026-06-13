@@ -2259,7 +2259,10 @@ public final class Main {
             RenderMetadataSelector selector) {
         String name = decoratorName(decorator);
         String body = "";
-        if (umlDecoratorSuppliesNodeLabel(decorator)) {
+        // Actor is in umlDecoratorSuppliesNodeLabel (so the generic plain label is
+        // suppressed) but supplies its own label below the figure, not classifier
+        // notation — so it is excluded from this classifier branch and handled below.
+        if (umlDecoratorSuppliesNodeLabel(decorator) && decorator != SvgNodeDecorator.UML_ACTOR) {
             body = umlClassifierNotation(node, style, decorator, selector);
         } else if (decorator == SvgNodeDecorator.UML_PACKAGE) {
             body = String.format(

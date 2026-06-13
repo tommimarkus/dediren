@@ -776,6 +776,46 @@ class MainTest {
         }
 
         @Test
+        void umlActorLabelSitsBelowFigure() throws Exception {
+            JsonNode policy = fixtureJson("fixtures/render-policy/uml-svg.json");
+            ArrayNode nodes = JsonSupport.objectMapper().createArrayNode();
+            nodes.add(JsonSupport.objectMapper().readTree("""
+                    {
+                      "id": "n",
+                      "source_id": "n",
+                      "projection_id": "n",
+                      "x": 40, "y": 40, "width": 180, "height": 96,
+                      "label": "Actor"
+                    }
+                    """));
+            ObjectNode metadataNodes = JsonSupport.objectMapper().createObjectNode();
+            metadataNodes.set("n", JsonSupport.objectMapper().readTree("""
+                    { "type": "Actor", "source_id": "n" }
+                    """));
+
+            Document document = svgDocument(okContent(render(semanticRenderInput(
+                    "uml",
+                    nodes,
+                    JsonSupport.objectMapper().createArrayNode(),
+                    metadataNodes,
+                    JsonSupport.objectMapper().createObjectNode(),
+                    policy))));
+
+            Element node = groupWithAttribute(document, "data-dediren-node-id", "n");
+            org.w3c.dom.NodeList texts = node.getElementsByTagName("text");
+            assertThat(texts.getLength()).as("actor renders exactly one label").isEqualTo(1);
+            Element label = (Element) texts.item(0);
+            // Stick-figure feet are at node.y() + height * 0.78 = 40 + 74.88 = 114.88.
+            double feetY = 40 + 96 * 0.78;
+            assertThat(Double.parseDouble(label.getAttribute("y")))
+                    .as("label must sit below the figure")
+                    .isGreaterThan(feetY);
+            // Exact placement contract: node.y() + height - 8.
+            assertThat(Double.parseDouble(label.getAttribute("y"))).isEqualTo(40 + 96 - 8.0);
+            assertThat(Double.parseDouble(label.getAttribute("x"))).isEqualTo(40 + 180 / 2.0);
+        }
+
+        @Test
         void rendersUmlEnumerationLiterals() throws Exception {
             String content = okContent(render(umlStyleInput()));
             Document document = svgDocument(content);
