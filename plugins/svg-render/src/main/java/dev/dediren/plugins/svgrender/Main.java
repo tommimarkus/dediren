@@ -178,9 +178,12 @@ public final class Main {
                         .append("\" data-dediren-group-source-id=\"").append(attr(selector.sourceId())).append("\"");
             }
             svg.append(">");
+            String groupDashArray = style.decorator() == SvgNodeDecorator.ARCHIMATE_GROUPING
+                    ? " stroke-dasharray=\"3 2\""
+                    : "";
             svg.append(String.format(
                     Locale.ROOT,
-                    "<rect x=\"%.1f\" y=\"%.1f\" width=\"%.1f\" height=\"%.1f\" rx=\"%s\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%s\"/>",
+                    "<rect x=\"%.1f\" y=\"%.1f\" width=\"%.1f\" height=\"%.1f\" rx=\"%s\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%s\"%s/>",
                     group.x(),
                     group.y(),
                     group.width(),
@@ -188,7 +191,8 @@ public final class Main {
                     styleNumber(style.rx()),
                     attr(style.fill()),
                     attr(style.stroke()),
-                    styleNumber(style.strokeWidth())));
+                    styleNumber(style.strokeWidth()),
+                    groupDashArray));
             svg.append(groupDecorator(group, style));
             svg.append(String.format(
                     Locale.ROOT,
@@ -346,6 +350,7 @@ public final class Main {
         }
         String shapeName = "archimate_rectangle";
         double rx = 0.0;
+        String dashArray = "";
         if (decorator == null) {
             rx = style.rx();
         } else if (isArchimateCutCornerRectangle(decorator)) {
@@ -353,10 +358,12 @@ public final class Main {
         } else if (isArchimateRoundedRectangle(decorator)) {
             rx = Math.max(1.0, style.rx());
             shapeName = "archimate_rounded_rectangle";
+        } else if (decorator == SvgNodeDecorator.ARCHIMATE_GROUPING) {
+            dashArray = " stroke-dasharray=\"3 2\"";
         }
         return String.format(
                 Locale.ROOT,
-                "<rect data-dediren-node-shape=\"%s\" x=\"%.1f\" y=\"%.1f\" width=\"%.1f\" height=\"%.1f\" rx=\"%s\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%s\"/>",
+                "<rect data-dediren-node-shape=\"%s\" x=\"%.1f\" y=\"%.1f\" width=\"%.1f\" height=\"%.1f\" rx=\"%s\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%s\"%s/>",
                 shapeName,
                 node.x(),
                 node.y(),
@@ -365,7 +372,8 @@ public final class Main {
                 styleNumber(rx),
                 attr(style.fill()),
                 attr(style.stroke()),
-                styleNumber(style.strokeWidth()));
+                styleNumber(style.strokeWidth()),
+                dashArray);
     }
 
     private static String archimateCutCornerShape(LaidOutNode node, ResolvedNodeStyle style) {
@@ -956,6 +964,10 @@ public final class Main {
                 true);
     }
 
+    // Reviewed (ARCH-V-002, won't-fix): these compact glyphs deliberately place their
+    // label diagonally up-left (see nodeLabelPosition) to keep it clear of the in/out
+    // flows that enter and leave initial/final/decision/merge nodes. This is intentional
+    // and differs from ArchiMate junction labels, which center below the circle.
     private static boolean umlCompactControlNodeLabelOutside(SvgNodeDecorator decorator) {
         return decorator == SvgNodeDecorator.UML_INITIAL_NODE
                 || decorator == SvgNodeDecorator.UML_ACTIVITY_FINAL_NODE
@@ -2251,7 +2263,10 @@ public final class Main {
             RenderMetadataSelector selector) {
         String name = decoratorName(decorator);
         String body = "";
-        if (umlDecoratorSuppliesNodeLabel(decorator)) {
+        // Actor is in umlDecoratorSuppliesNodeLabel (so the generic plain label is
+        // suppressed) but supplies its own label below the figure, not classifier
+        // notation — so it is excluded from this classifier branch and handled below.
+        if (umlDecoratorSuppliesNodeLabel(decorator) && decorator != SvgNodeDecorator.UML_ACTOR) {
             body = umlClassifierNotation(node, style, decorator, selector);
         } else if (decorator == SvgNodeDecorator.UML_PACKAGE) {
             body = String.format(
@@ -2496,6 +2511,9 @@ public final class Main {
         return fieldValue != null && fieldValue.isTextual() ? fieldValue.asText() : fallback;
     }
 
+    // Reviewed (ARCH-L-004, won't-fix): final states and pseudostates are intentionally
+    // unlabeled. Unnamed final/initial pseudostates are valid UML, so these glyph-only
+    // shapes suppress the plain label rather than rendering an empty or placeholder name.
     private static boolean shouldRenderPlainNodeLabel(LaidOutNode node, SvgNodeDecorator decorator) {
         return node.label() != null
                 && !node.label().isEmpty()
@@ -2553,7 +2571,10 @@ public final class Main {
                 || decorator == SvgNodeDecorator.ARCHIMATE_TECHNOLOGY_SERVICE
                 || decorator == SvgNodeDecorator.ARCHIMATE_TECHNOLOGY_FUNCTION
                 || decorator == SvgNodeDecorator.ARCHIMATE_TECHNOLOGY_PROCESS
-                || decorator == SvgNodeDecorator.ARCHIMATE_TECHNOLOGY_EVENT;
+                || decorator == SvgNodeDecorator.ARCHIMATE_TECHNOLOGY_EVENT
+                || decorator == SvgNodeDecorator.ARCHIMATE_BUSINESS_INTERACTION
+                || decorator == SvgNodeDecorator.ARCHIMATE_APPLICATION_INTERACTION
+                || decorator == SvgNodeDecorator.ARCHIMATE_TECHNOLOGY_INTERACTION;
     }
 
     private static ArchimateIconKind archimateIconKind(SvgNodeDecorator decorator) {

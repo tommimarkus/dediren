@@ -776,6 +776,46 @@ class MainTest {
         }
 
         @Test
+        void umlActorLabelSitsBelowFigure() throws Exception {
+            JsonNode policy = fixtureJson("fixtures/render-policy/uml-svg.json");
+            ArrayNode nodes = JsonSupport.objectMapper().createArrayNode();
+            nodes.add(JsonSupport.objectMapper().readTree("""
+                    {
+                      "id": "n",
+                      "source_id": "n",
+                      "projection_id": "n",
+                      "x": 40, "y": 40, "width": 180, "height": 96,
+                      "label": "Actor"
+                    }
+                    """));
+            ObjectNode metadataNodes = JsonSupport.objectMapper().createObjectNode();
+            metadataNodes.set("n", JsonSupport.objectMapper().readTree("""
+                    { "type": "Actor", "source_id": "n" }
+                    """));
+
+            Document document = svgDocument(okContent(render(semanticRenderInput(
+                    "uml",
+                    nodes,
+                    JsonSupport.objectMapper().createArrayNode(),
+                    metadataNodes,
+                    JsonSupport.objectMapper().createObjectNode(),
+                    policy))));
+
+            Element node = groupWithAttribute(document, "data-dediren-node-id", "n");
+            org.w3c.dom.NodeList texts = node.getElementsByTagName("text");
+            assertThat(texts.getLength()).as("actor renders exactly one label").isEqualTo(1);
+            Element label = (Element) texts.item(0);
+            // Stick-figure feet are at node.y() + height * 0.78 = 40 + 74.88 = 114.88.
+            double feetY = 40 + 96 * 0.78;
+            assertThat(Double.parseDouble(label.getAttribute("y")))
+                    .as("label must sit below the figure")
+                    .isGreaterThan(feetY);
+            // Exact placement contract: node.y() + height - 8.
+            assertThat(Double.parseDouble(label.getAttribute("y"))).isEqualTo(40 + 96 - 8.0);
+            assertThat(Double.parseDouble(label.getAttribute("x"))).isEqualTo(40 + 180 / 2.0);
+        }
+
+        @Test
         void rendersUmlEnumerationLiterals() throws Exception {
             String content = okContent(render(umlStyleInput()));
             Document document = svgDocument(content);
@@ -907,7 +947,69 @@ class MainTest {
             Element group = groupWithAttribute(document, "data-dediren-group-id", "customer-domain");
             assertThat(group.getAttribute("data-dediren-group-type")).isEqualTo("Grouping");
             assertThat(group.getAttribute("data-dediren-group-source-id")).isEqualTo("customer-domain");
+            Element groupRect = firstChildElement(group, "rect");
+            assertThat(groupRect.getAttribute("stroke-dasharray")).isEqualTo("3 2");
             childGroupWithAttribute(group, "data-dediren-group-decorator", "archimate_grouping");
+        }
+
+        @Test
+        void nonGroupingGroupContainerRendersSolidBorder() throws Exception {
+            ObjectNode layout = JsonSupport.objectMapper().createObjectNode();
+            layout.put("layout_result_schema_version", "layout-result.schema.v1");
+            layout.put("view_id", "main");
+            layout.set("nodes", JsonSupport.objectMapper().createArrayNode());
+            layout.set("edges", JsonSupport.objectMapper().createArrayNode());
+            layout.set("groups", JsonSupport.objectMapper().readTree("""
+                    [
+                      {
+                        "id": "app-domain",
+                        "source_id": "app-domain",
+                        "projection_id": "app-domain",
+                        "provenance": { "semantic_backed": { "source_id": "app-domain" } },
+                        "x": 20,
+                        "y": 20,
+                        "width": 240,
+                        "height": 140,
+                        "members": [],
+                        "label": "Application Domain"
+                      }
+                    ]
+                    """));
+            layout.set("warnings", JsonSupport.objectMapper().createArrayNode());
+
+            ObjectNode metadata = JsonSupport.objectMapper().createObjectNode();
+            metadata.put("render_metadata_schema_version", "render-metadata.schema.v1");
+            metadata.put("semantic_profile", "archimate");
+            metadata.set("nodes", JsonSupport.objectMapper().createObjectNode());
+            metadata.set("edges", JsonSupport.objectMapper().createObjectNode());
+            metadata.set("groups", JsonSupport.objectMapper().readTree("""
+                    {
+                      "app-domain": {
+                        "type": "ApplicationComponent",
+                        "source_id": "app-domain"
+                      }
+                    }
+                    """));
+
+            // No group_type_overrides: "ApplicationComponent" has no archimate_grouping decorator.
+            JsonNode policy = JsonSupport.objectMapper().readTree("""
+                    {
+                      "svg_render_policy_schema_version": "svg-render-policy.schema.v1",
+                      "semantic_profile": "archimate",
+                      "page": { "width": 400, "height": 240 },
+                      "margin": { "top": 24, "right": 24, "bottom": 24, "left": 24 }
+                    }
+                    """);
+
+            ObjectNode input = JsonSupport.objectMapper().createObjectNode();
+            input.set("layout_result", layout);
+            input.set("render_metadata", metadata);
+            input.set("policy", policy);
+
+            Document document = svgDocument(okContent(render(input)));
+
+            Element group = groupWithAttribute(document, "data-dediren-group-id", "app-domain");
+            assertThat(firstChildElement(group, "rect").hasAttribute("stroke-dasharray")).isFalse();
         }
 
         @Test
@@ -975,6 +1077,76 @@ class MainTest {
                 }
                 index++;
             }
+        }
+
+        @Test
+        void archimateInteractionElementsRenderRoundedRectangle() throws Exception {
+            JsonNode policy = fixtureJson("fixtures/render-policy/archimate-svg.json");
+            for (String type : java.util.List.of(
+                    "BusinessInteraction", "ApplicationInteraction", "TechnologyInteraction")) {
+                ArrayNode nodes = JsonSupport.objectMapper().createArrayNode();
+                nodes.add(JsonSupport.objectMapper().readTree("""
+                        {
+                          "id": "n",
+                          "source_id": "n",
+                          "projection_id": "n",
+                          "x": 40, "y": 40, "width": 180, "height": 80,
+                          "label": "%s"
+                        }
+                        """.formatted(type)));
+                ObjectNode metadataNodes = JsonSupport.objectMapper().createObjectNode();
+                metadataNodes.set("n", JsonSupport.objectMapper().readTree("""
+                        { "type": "%s", "source_id": "n" }
+                        """.formatted(type)));
+
+                Document document = svgDocument(okContent(render(semanticRenderInput(
+                        "archimate",
+                        nodes,
+                        JsonSupport.objectMapper().createArrayNode(),
+                        metadataNodes,
+                        JsonSupport.objectMapper().createObjectNode(),
+                        policy))));
+
+                Element shape = firstElementWithAttribute(
+                        groupWithAttribute(document, "data-dediren-node-id", "n"),
+                        "data-dediren-node-shape");
+                assertThat(shape.getAttribute("data-dediren-node-shape"))
+                        .as("%s is a behavior element and must render rounded", type)
+                        .isEqualTo("archimate_rounded_rectangle");
+            }
+        }
+
+        @Test
+        void archimateGroupingNodeRendersDashedBorder() throws Exception {
+            JsonNode policy = fixtureJson("fixtures/render-policy/archimate-svg.json");
+            ArrayNode nodes = JsonSupport.objectMapper().createArrayNode();
+            nodes.add(JsonSupport.objectMapper().readTree("""
+                    {
+                      "id": "n",
+                      "source_id": "n",
+                      "projection_id": "n",
+                      "x": 40, "y": 40, "width": 160, "height": 80,
+                      "label": "Grouping"
+                    }
+                    """));
+            ObjectNode metadataNodes = JsonSupport.objectMapper().createObjectNode();
+            metadataNodes.set("n", JsonSupport.objectMapper().readTree("""
+                    { "type": "Grouping", "source_id": "n" }
+                    """));
+
+            Document document = svgDocument(okContent(render(semanticRenderInput(
+                    "archimate",
+                    nodes,
+                    JsonSupport.objectMapper().createArrayNode(),
+                    metadataNodes,
+                    JsonSupport.objectMapper().createObjectNode(),
+                    policy))));
+
+            Element shape = firstElementWithAttribute(
+                    groupWithAttribute(document, "data-dediren-node-id", "n"),
+                    "data-dediren-node-shape");
+            assertThat(shape.getAttribute("data-dediren-node-shape")).isEqualTo("archimate_rectangle");
+            assertThat(shape.getAttribute("stroke-dasharray")).isEqualTo("3 2");
         }
 
         @Test
