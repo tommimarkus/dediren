@@ -178,9 +178,12 @@ public final class Main {
                         .append("\" data-dediren-group-source-id=\"").append(attr(selector.sourceId())).append("\"");
             }
             svg.append(">");
+            String groupDashArray = style.decorator() == SvgNodeDecorator.ARCHIMATE_GROUPING
+                    ? " stroke-dasharray=\"3 2\""
+                    : "";
             svg.append(String.format(
                     Locale.ROOT,
-                    "<rect x=\"%.1f\" y=\"%.1f\" width=\"%.1f\" height=\"%.1f\" rx=\"%s\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%s\"/>",
+                    "<rect x=\"%.1f\" y=\"%.1f\" width=\"%.1f\" height=\"%.1f\" rx=\"%s\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%s\"%s/>",
                     group.x(),
                     group.y(),
                     group.width(),
@@ -188,7 +191,8 @@ public final class Main {
                     styleNumber(style.rx()),
                     attr(style.fill()),
                     attr(style.stroke()),
-                    styleNumber(style.strokeWidth())));
+                    styleNumber(style.strokeWidth()),
+                    groupDashArray));
             svg.append(groupDecorator(group, style));
             svg.append(String.format(
                     Locale.ROOT,
@@ -346,6 +350,7 @@ public final class Main {
         }
         String shapeName = "archimate_rectangle";
         double rx = 0.0;
+        String dashArray = "";
         if (decorator == null) {
             rx = style.rx();
         } else if (isArchimateCutCornerRectangle(decorator)) {
@@ -353,10 +358,12 @@ public final class Main {
         } else if (isArchimateRoundedRectangle(decorator)) {
             rx = Math.max(1.0, style.rx());
             shapeName = "archimate_rounded_rectangle";
+        } else if (decorator == SvgNodeDecorator.ARCHIMATE_GROUPING) {
+            dashArray = " stroke-dasharray=\"3 2\"";
         }
         return String.format(
                 Locale.ROOT,
-                "<rect data-dediren-node-shape=\"%s\" x=\"%.1f\" y=\"%.1f\" width=\"%.1f\" height=\"%.1f\" rx=\"%s\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%s\"/>",
+                "<rect data-dediren-node-shape=\"%s\" x=\"%.1f\" y=\"%.1f\" width=\"%.1f\" height=\"%.1f\" rx=\"%s\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%s\"%s/>",
                 shapeName,
                 node.x(),
                 node.y(),
@@ -365,7 +372,8 @@ public final class Main {
                 styleNumber(rx),
                 attr(style.fill()),
                 attr(style.stroke()),
-                styleNumber(style.strokeWidth()));
+                styleNumber(style.strokeWidth()),
+                dashArray);
     }
 
     private static String archimateCutCornerShape(LaidOutNode node, ResolvedNodeStyle style) {
