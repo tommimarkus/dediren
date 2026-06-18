@@ -15,7 +15,7 @@ class SchemaValidatorTest {
             "schemas/layout-request.schema.json",
             "schemas/layout-result.schema.json",
             "schemas/semantic-validation-result.schema.json",
-            "schemas/svg-render-policy.schema.json",
+            "schemas/render-policy.schema.json",
             "schemas/render-metadata.schema.json",
             "schemas/render-result.schema.json",
             "schemas/export-request.schema.json",

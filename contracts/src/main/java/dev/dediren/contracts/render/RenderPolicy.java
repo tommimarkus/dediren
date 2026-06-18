@@ -1,7 +1,7 @@
 package dev.dediren.contracts.render;
 
 public record RenderPolicy(
-        String svgRenderPolicySchemaVersion,
+        String renderPolicySchemaVersion,
         String semanticProfile,
         Page page,
         Margin margin,

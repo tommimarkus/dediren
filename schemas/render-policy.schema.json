@@ -1,11 +1,11 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://dediren.dev/schemas/svg-render-policy.schema.json",
+  "$id": "https://dediren.dev/schemas/render-policy.schema.json",
   "type": "object",
   "additionalProperties": false,
-  "required": ["svg_render_policy_schema_version", "page", "margin"],
+  "required": ["render_policy_schema_version", "page", "margin"],
   "properties": {
-    "svg_render_policy_schema_version": { "const": "svg-render-policy.schema.v1" },
+    "render_policy_schema_version": { "const": "render-policy.schema.v1" },
     "semantic_profile": {
       "type": "string",
       "minLength": 1,

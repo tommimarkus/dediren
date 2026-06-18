@@ -15,7 +15,7 @@ class ContractVersionsTest {
         assertThat(ContractVersions.SEMANTIC_VALIDATION_RESULT_SCHEMA_VERSION)
                 .isEqualTo("semantic-validation-result.schema.v1");
         assertThat(ContractVersions.RENDER_RESULT_SCHEMA_VERSION).isEqualTo("render-result.schema.v2");
-        assertThat(ContractVersions.SVG_RENDER_POLICY_SCHEMA_VERSION).isEqualTo("svg-render-policy.schema.v1");
+        assertThat(ContractVersions.RENDER_POLICY_SCHEMA_VERSION).isEqualTo("render-policy.schema.v1");
         assertThat(ContractVersions.RENDER_METADATA_SCHEMA_VERSION).isEqualTo("render-metadata.schema.v1");
         assertThat(ContractVersions.EXPORT_REQUEST_SCHEMA_VERSION).isEqualTo("export-request.schema.v1");
         assertThat(ContractVersions.EXPORT_RESULT_SCHEMA_VERSION).isEqualTo("export-result.schema.v1");

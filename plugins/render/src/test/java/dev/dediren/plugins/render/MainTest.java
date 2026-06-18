@@ -54,7 +54,7 @@ class MainTest {
         void umlPolicyFixtureMatchesSvgPolicySchema() {
             assertThat(SchemaAssertions.validateFixture(
                     workspaceRoot(),
-                    "schemas/svg-render-policy.schema.json",
+                    "schemas/render-policy.schema.json",
                     "fixtures/render-policy/uml-svg.json"))
                     .isEmpty();
         }
@@ -921,7 +921,7 @@ class MainTest {
 
             JsonNode policy = JsonSupport.objectMapper().readTree("""
                     {
-                      "svg_render_policy_schema_version": "svg-render-policy.schema.v1",
+                      "render_policy_schema_version": "render-policy.schema.v1",
                       "semantic_profile": "archimate",
                       "page": { "width": 400, "height": 240 },
                       "margin": { "top": 24, "right": 24, "bottom": 24, "left": 24 },
@@ -994,7 +994,7 @@ class MainTest {
             // No group_type_overrides: "ApplicationComponent" has no archimate_grouping decorator.
             JsonNode policy = JsonSupport.objectMapper().readTree("""
                     {
-                      "svg_render_policy_schema_version": "svg-render-policy.schema.v1",
+                      "render_policy_schema_version": "render-policy.schema.v1",
                       "semantic_profile": "archimate",
                       "page": { "width": 400, "height": 240 },
                       "margin": { "top": 24, "right": 24, "bottom": 24, "left": 24 }
@@ -2461,7 +2461,7 @@ class MainTest {
         layout.set("warnings", JsonSupport.objectMapper().createArrayNode());
 
         ObjectNode policy = JsonSupport.objectMapper().createObjectNode();
-        policy.put("svg_render_policy_schema_version", "svg-render-policy.schema.v1");
+        policy.put("render_policy_schema_version", "render-policy.schema.v1");
         ObjectNode page = policy.putObject("page");
         page.put("width", 640);
         page.put("height", 360);

@@ -415,14 +415,14 @@ class ContractRoundTripTest {
                 ContractVersions.RENDER_RESULT_SCHEMA_VERSION,
                 List.of(new dev.dediren.contracts.render.RenderArtifact("svg", "<svg></svg>")));
 
-        assertThat(policy.svgRenderPolicySchemaVersion()).isEqualTo(ContractVersions.SVG_RENDER_POLICY_SCHEMA_VERSION);
+        assertThat(policy.renderPolicySchemaVersion()).isEqualTo(ContractVersions.RENDER_POLICY_SCHEMA_VERSION);
         assertThat(policy.style().nodeOverrides().get("api").stroke()).isEqualTo("#0891b2");
         assertThat(policy.style().edge().labelPresentation()).isEqualTo(SvgEdgeLabelPresentation.BACKGROUND);
         assertThat(metadata.renderMetadataSchemaVersion()).isEqualTo(ContractVersions.RENDER_METADATA_SCHEMA_VERSION);
 
         var decoratorPolicy = JsonSupport.readValue("""
                 {
-                  "svg_render_policy_schema_version": "svg-render-policy.schema.v1",
+                  "render_policy_schema_version": "render-policy.schema.v1",
                   "semantic_profile": "archimate",
                   "page": { "width": 640, "height": 360 },
                   "margin": { "top": 24, "right": 24, "bottom": 24, "left": 24 },
@@ -455,7 +455,7 @@ class ContractRoundTripTest {
 
         var interactivePolicy = JsonSupport.readValue("""
                 {
-                  "svg_render_policy_schema_version": "svg-render-policy.schema.v1",
+                  "render_policy_schema_version": "render-policy.schema.v1",
                   "interactive": "both",
                   "page": { "width": 640, "height": 360 },
                   "margin": { "top": 24, "right": 24, "bottom": 24, "left": 24 },
