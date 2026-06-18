@@ -107,17 +107,29 @@ git commit -m "refactor(render): rename svg-render plugin module to render"
 
 ---
 
-### Task 2: Rename manifest, source-fixture plugin id, dist-tool launcher and env token
+### Task 2: Repoint every plugin-id / artifactId / package / path reference to `render`
+
+**Scope note:** Task 1 renamed the module's `artifactId` to `render` but left
+downstream Maven dependencies, CLI/dist-tool tests, and code comments pointing
+at `svg-render`, so the full reactor build is currently broken. This task fixes
+*every* reference to the plugin **identity** (id, executable, env token,
+artifactId, Java package, module path) across the repo. It explicitly does NOT
+touch the `svg-render-policy` schema family or the policy fixtures'
+`svg_render_policy_schema_version` field — those are Task 3.
 
 **Files:**
 - Rename: `fixtures/plugins/svg-render.manifest.json` → `fixtures/plugins/render.manifest.json`
-- Modify: `fixtures/source/**` entries with `required_plugins[].id == "svg-render"`
-- Modify: `dist-tool/src/main/java/dev/dediren/tools/dist/DistTool.java` (lines ~33-34 launcher, ~45 env token, ~198 env token, ~213 render command)
-- Modify: any dist-tool test asserting the old id/executable/env token
+- Modify: any `fixtures/source/**` entry with `required_plugins[].id == "svg-render"`
+- Modify Maven dependency artifactId (`<artifactId>svg-render</artifactId>` → `render`): `cli/pom.xml:51`, `plugins/elk-layout/pom.xml:54`, `dist-tool/pom.xml:42`
+- Modify: `dist-tool/src/main/java/dev/dediren/tools/dist/DistTool.java` (launcher tuple, env token, render command)
+- Modify: `dist-tool/src/test/java/dev/dediren/tools/dist/DistModuleTest.java` (id, module path, launcher)
+- Modify: `cli/src/test/java/dev/dediren/cli/MainTest.java` (plugin-id literals + `pluginEnv("svg-render", "dev.dediren.plugins.svgrender.Main")`)
+- Modify: `cli/src/test/java/dev/dediren/cli/CliLayoutRenderCommandTest.java` (same)
+- Modify code comments referencing the old plugin name/path: `core/src/main/java/dev/dediren/core/quality/LayoutQuality.java:22`, `plugins/generic-graph/src/main/java/dev/dediren/plugins/genericgraph/GenericGraphLayoutSizing.java:25`, `plugins/elk-layout/src/test/java/dev/dediren/plugins/elklayout/ElkLayoutRenderArtifacts.java:18`
 
 **Interfaces:**
-- Consumes: plugin id `render`, executable `dediren-plugin-render` (Task 1).
-- Produces: manifest fixture `fixtures/plugins/render.manifest.json` (id `render`, executable `dediren-plugin-render`); env override token `DEDIREN_PLUGIN_RENDER`.
+- Consumes: plugin id `render`, executable `dediren-plugin-render`, artifactId `render`, Java package `dev.dediren.plugins.render` (Task 1).
+- Produces: manifest fixture `fixtures/plugins/render.manifest.json` (id `render`, executable `dediren-plugin-render`); env override token `DEDIREN_PLUGIN_RENDER`; a fully green full-reactor build at the rename stage.
 
 - [ ] **Step 1: Rename the manifest fixture and update its fields**
 
@@ -129,7 +141,7 @@ sed -i -e 's/"id": "svg-render"/"id": "render"/' \
   fixtures/plugins/render.manifest.json
 ```
 
-Confirm capabilities stays `["render"]` (unchanged).
+Confirm `capabilities` stays `["render"]` (unchanged).
 
 - [ ] **Step 2: Update source fixtures that require the plugin by id**
 
@@ -140,9 +152,17 @@ grep -rln '"id": *"svg-render"' fixtures/source | xargs --no-run-if-empty sed -i
 
 (Leave any `version` values at `2026.06.6`.)
 
-- [ ] **Step 3: Update dist-tool launcher, env token, and render command**
+- [ ] **Step 3: Repoint the downstream Maven dependency artifactId**
 
-In `dist-tool/src/main/java/dev/dediren/tools/dist/DistTool.java`, replace the svg-render launcher/paths/env/command references:
+`cli`, `elk-layout`, and `dist-tool` declare a dependency on the renamed module. Update the artifactId in each. Be precise — only the `svg-render` artifactId, not the policy schema:
+
+```bash
+cd /home/souroldgeezer/repos/dediren
+sed -i 's#<artifactId>svg-render</artifactId>#<artifactId>render</artifactId>#' \
+  cli/pom.xml plugins/elk-layout/pom.xml dist-tool/pom.xml
+```
+
+- [ ] **Step 4: Update the dist-tool launcher source**
 
 ```bash
 cd /home/souroldgeezer/repos/dediren
@@ -155,32 +175,69 @@ sed -i \
   dist-tool/src/main/java/dev/dediren/tools/dist/DistTool.java
 ```
 
-Then read the file around the edited lines to confirm the `Launcher(...)` arguments and the `render --plugin render` smoke command are coherent (the launcher tuple should read `("plugins/render/target/appassembler", "render", "dediren-plugin-render", "render")`).
+Read the edited lines and confirm the `Launcher(...)` tuple reads `("plugins/render/target/appassembler", "render", "dediren-plugin-render", "render")` and the smoke command is `render --plugin render`.
 
-- [ ] **Step 4: Update any dist-tool tests asserting the old names**
+- [ ] **Step 5: Update the dist-tool and CLI tests (plugin id, module path, main class)**
 
 ```bash
 cd /home/souroldgeezer/repos/dediren
-grep -rln 'svg-render\|DEDIREN_PLUGIN_SVG_RENDER\|dediren-plugin-svg-render' dist-tool/src/test | \
-  xargs --no-run-if-empty sed -i \
+# dist-tool test: id, module path, launcher name
+sed -i \
+  -e 's#plugins/svg-render/target/appassembler#plugins/render/target/appassembler#g' \
   -e 's#dediren-plugin-svg-render#dediren-plugin-render#g' \
   -e 's#DEDIREN_PLUGIN_SVG_RENDER#DEDIREN_PLUGIN_RENDER#g' \
-  -e 's#svg-render#render#g'
+  -e 's#"svg-render"#"render"#g' \
+  dist-tool/src/test/java/dev/dediren/tools/dist/DistModuleTest.java
+# CLI tests: plugin-id literals and the pluginEnv(id, mainClass) helper call
+sed -i \
+  -e 's#"svg-render"#"render"#g' \
+  -e 's#dev\.dediren\.plugins\.svgrender\.Main#dev.dediren.plugins.render.Main#g' \
+  cli/src/test/java/dev/dediren/cli/MainTest.java \
+  cli/src/test/java/dev/dediren/cli/CliLayoutRenderCommandTest.java
 ```
 
-Review each touched test for false replacements (e.g. comments) before continuing.
+Read each touched test region and confirm no false replacement landed inside an unrelated string (the only intended `"svg-render"` hits are the plugin-id argument and the `pluginEnv(...)` first argument).
 
-- [ ] **Step 5: Verify dist-tool builds and unit tests pass**
+- [ ] **Step 6: Update the stale code comments**
 
-Run (sandbox disabled): `./mvnw -pl dist-tool -am test`
-Expected: BUILD SUCCESS. (The dist-smoke profile is exercised in Task 7 once the launcher is fully built.)
-
-- [ ] **Step 6: Commit**
+These are comments that name the plugin by its old id/path. Update the name/path only:
+- `core/.../LayoutQuality.java:22` — comment "svg-render draws the group label" → "render draws the group label".
+- `plugins/generic-graph/.../GenericGraphLayoutSizing.java:25` — comment "Must equal ARCHIMATE_LABEL_ICON_RESERVE in plugins/svg-render Main" → "...in plugins/render Main".
+- `plugins/elk-layout/.../ElkLayoutRenderArtifacts.java:18` — comment "do not boot svg-render" → "do not boot render".
 
 ```bash
 cd /home/souroldgeezer/repos/dediren
-git add fixtures/plugins fixtures/source dist-tool
-git commit -m "refactor(render): point manifest, fixtures, and dist-tool at the render plugin id"
+sed -i 's#svg-render draws#render draws#' core/src/main/java/dev/dediren/core/quality/LayoutQuality.java
+sed -i 's#plugins/svg-render Main#plugins/render Main#' plugins/generic-graph/src/main/java/dev/dediren/plugins/genericgraph/GenericGraphLayoutSizing.java
+sed -i 's#do not boot svg-render#do not boot render#' plugins/elk-layout/src/test/java/dev/dediren/plugins/elklayout/ElkLayoutRenderArtifacts.java
+```
+
+- [ ] **Step 7: Verify the full reactor builds and all tests pass**
+
+Run (sandbox disabled): `./mvnw test`
+Expected: BUILD SUCCESS across all modules. This confirms the rename is reactor-consistent (cli, elk-layout, dist-tool, and the render plugin all resolve `render`). At this stage only the rename has been applied — contracts/schema are still at their original versions, so the suite should be fully green. The dist-smoke profile is exercised in Task 7.
+
+If any test still fails on a `svg-render` plugin-id, a missing `render` artifact, or a `dev.dediren.plugins.svgrender` class, fix that reference and re-run before committing.
+
+- [ ] **Step 8: Confirm no plugin-identity references remain (schema family excluded)**
+
+```bash
+cd /home/souroldgeezer/repos/dediren
+grep -rn 'svg-render\|svgrender\|DEDIREN_PLUGIN_SVG_RENDER\|dediren-plugin-svg-render' \
+  --include=*.java --include=*.json --include=*.xml \
+  cli core plugins dist-tool fixtures/plugins fixtures/source | grep -v '/target/'
+```
+Expected: no matches. (The `svg-render-policy` schema in `schemas/`, `contracts/`, and `fixtures/render-policy/` is intentionally still present — Task 3 renames it. The git-ignored `.test-output/.../svg-render-plugin` literal in the render `MainTest` is a known Minor deferred to the final review.)
+
+- [ ] **Step 9: Commit**
+
+```bash
+cd /home/souroldgeezer/repos/dediren
+git add fixtures/plugins fixtures/source cli/pom.xml plugins/elk-layout/pom.xml dist-tool/pom.xml \
+  dist-tool/src cli/src/test core/src/main/java/dev/dediren/core/quality/LayoutQuality.java \
+  plugins/generic-graph/src/main/java/dev/dediren/plugins/genericgraph/GenericGraphLayoutSizing.java \
+  plugins/elk-layout/src/test/java/dev/dediren/plugins/elklayout/ElkLayoutRenderArtifacts.java
+git commit -m "refactor(render): repoint all plugin-id, dependency, and path references to render"
 ```
 
 ---
