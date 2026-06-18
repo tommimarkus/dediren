@@ -45,7 +45,7 @@ class MainTest {
 
             String content = data.at("/artifacts/0/content").asText();
 
-            assertThat(data.at("/render_result_schema_version").asText()).isEqualTo("render-result.schema.v2");
+            assertThat(data.at("/render_result_schema_version").asText()).isEqualTo("render-result.schema.v3");
             assertThat(data.at("/artifacts/0/artifact_kind").asText()).isEqualTo("svg");
             assertThat(content).contains("<svg", "Client", "API");
         }
