@@ -451,7 +451,7 @@ class ContractRoundTripTest {
         assertThat(JsonSupport.objectMapper().valueToTree(result).at("/artifacts/0/artifact_kind").asText())
                 .isEqualTo("svg");
         assertThat(JsonSupport.objectMapper().valueToTree(result).at("/render_result_schema_version").asText())
-                .isEqualTo("render-result.schema.v2");
+                .isEqualTo("render-result.schema.v3");
 
         var interactivePolicy = JsonSupport.readValue("""
                 {
