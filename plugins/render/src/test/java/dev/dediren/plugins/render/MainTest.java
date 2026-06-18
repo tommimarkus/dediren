@@ -1,4 +1,4 @@
-package dev.dediren.plugins.svgrender;
+package dev.dediren.plugins.render;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

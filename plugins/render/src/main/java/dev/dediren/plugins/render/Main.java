@@ -1,4 +1,4 @@
-package dev.dediren.plugins.svgrender;
+package dev.dediren.plugins.render;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -64,7 +64,7 @@ public final class Main {
     }
 
     public static String moduleName() {
-        return "svg-render";
+        return "render";
     }
 
     public static void main(String[] args) throws Exception {
@@ -104,7 +104,7 @@ public final class Main {
     private static String capabilitiesJson() throws IOException {
         ObjectNode root = JsonSupport.objectMapper().createObjectNode();
         root.put("plugin_protocol_version", ContractVersions.PLUGIN_PROTOCOL_VERSION);
-        root.put("id", "svg-render");
+        root.put("id", "render");
         root.set("capabilities", JsonSupport.objectMapper().createArrayNode().add("render"));
         root.putObject("runtime").put("artifact_kind", "svg");
         return JsonSupport.objectMapper().writeValueAsString(root);

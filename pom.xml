@@ -19,7 +19,7 @@
     <module>plugins/archimate-oef-export</module>
     <module>plugins/elk-layout</module>
     <module>plugins/generic-graph</module>
-    <module>plugins/svg-render</module>
+    <module>plugins/render</module>
     <module>plugins/uml-xmi-export</module>
     <module>test-support</module>
     <module>testbeds/plugin-runtime</module>
@@ -230,7 +230,7 @@
                 <param>dev.dediren.contracts.*</param>
                 <param>dev.dediren.plugins.genericgraph.GenericGraphLayoutSizing</param>
                 <param>dev.dediren.plugins.elklayout.*</param>
-                <param>dev.dediren.plugins.svgrender.*</param>
+                <param>dev.dediren.plugins.render.*</param>
                 <param>dev.dediren.plugins.umlxmi.*</param>
               </targetClasses>
               <outputFormats>

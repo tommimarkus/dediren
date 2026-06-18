@@ -1,4 +1,4 @@
-package dev.dediren.plugins.svgrender;
+package dev.dediren.plugins.render;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import dev.dediren.archimate.Archimate;
