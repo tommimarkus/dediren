@@ -1,9 +1,11 @@
 package dev.dediren.tools.dist;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import dev.dediren.contracts.json.JsonSupport;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -215,6 +217,21 @@ public final class DistTool {
                 "--input", layout.toString()), null);
             Files.writeString(render, renderOutput, StandardCharsets.UTF_8);
             assertSvgRenderOutput(renderOutput);
+
+            // Second render: raster-enabled policy (PNG / Batik path)
+            JsonNode svgPolicyJson = JsonSupport.objectMapper()
+                .readTree(Files.readString(bundle.resolve("fixtures/render-policy/rich-svg.json"), StandardCharsets.UTF_8));
+            ObjectNode rasterPolicyJson = ((ObjectNode) svgPolicyJson).deepCopy();
+            rasterPolicyJson.putObject("raster").put("scale", 2);
+            Path rasterPolicyFile = temp.resolve("raster-policy.json");
+            Files.writeString(rasterPolicyFile,
+                JsonSupport.objectMapper().writeValueAsString(rasterPolicyJson), StandardCharsets.UTF_8);
+            String pngRenderOutput = runBundleCommand(dediren, bundle, List.of(
+                "render", "--plugin", "render",
+                "--policy", rasterPolicyFile.toString(),
+                "--input", layout.toString()), null);
+            assertPngRenderOutput(pngRenderOutput);
+
             Path oefSchemas = writeOefSchemas(temp.resolve("oef-schemas"));
             String oefOutput = runBundleCommand(dediren, bundle, List.of(
                 "export", "--plugin", "archimate-oef",
@@ -467,6 +484,34 @@ public final class DistTool {
         }
         if (!artifact.path("content").asText().contains("<svg")) {
             throw new IllegalStateException("render smoke output should contain SVG content");
+        }
+    }
+
+    private static void assertPngRenderOutput(String stdout) throws IOException {
+        JsonNode data = okData(stdout);
+        JsonNode artifacts = data.path("artifacts");
+        JsonNode pngArtifact = null;
+        for (JsonNode artifact : artifacts) {
+            if ("png".equals(artifact.path("artifact_kind").asText())) {
+                pngArtifact = artifact;
+                break;
+            }
+        }
+        if (pngArtifact == null) {
+            throw new IllegalStateException("raster render smoke output should contain a png artifact: " + stdout);
+        }
+        if (!"base64".equals(pngArtifact.path("encoding").asText())) {
+            throw new IllegalStateException("png artifact encoding should be base64: " + stdout);
+        }
+        byte[] pngBytes = Base64.getDecoder().decode(pngArtifact.path("content").asText());
+        // PNG magic: 0x89 'P' 'N' 'G'
+        if (pngBytes.length < 4
+                || (pngBytes[0] & 0xFF) != 0x89
+                || pngBytes[1] != 'P'
+                || pngBytes[2] != 'N'
+                || pngBytes[3] != 'G') {
+            throw new IllegalStateException(
+                "png artifact content does not start with PNG magic bytes");
         }
     }
 

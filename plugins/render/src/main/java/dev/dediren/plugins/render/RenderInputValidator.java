@@ -399,6 +399,9 @@ final class RenderInputValidator {
         return value != null && value.isArray() && !value.isEmpty() && isTextArray(value);
     }
 
+    private static final java.util.regex.Pattern HEX_COLOR =
+            java.util.regex.Pattern.compile("^#[0-9a-fA-F]{6}$");
+
     private static void validateRenderPolicy(RenderPolicy policy) throws PolicyValidationException {
         RasterPolicy raster = policy.raster();
         if (raster != null && raster.scale() != null) {
@@ -407,6 +410,12 @@ final class RenderInputValidator {
                 throw new PolicyValidationException(
                         "raster.scale", "render policy raster.scale must be greater than 0 and at most 8");
             }
+        }
+        if (raster != null && raster.background() != null
+                && !HEX_COLOR.matcher(raster.background()).matches()) {
+            throw new PolicyValidationException(
+                    "raster.background",
+                    "render policy raster.background must be a #RRGGBB hex color");
         }
         String interactive = policy.interactive();
         if (interactive != null

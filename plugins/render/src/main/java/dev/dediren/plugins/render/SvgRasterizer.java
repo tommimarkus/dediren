@@ -51,8 +51,15 @@ final class SvgRasterizer {
     }
 
     private static Color parseColor(String hex) {
-        int rgb = Integer.parseInt(hex.substring(1), 16);
-        return new Color(rgb, false);
+        if (hex == null || hex.length() != 7 || hex.charAt(0) != '#') {
+            throw new RasterizationException("raster.background must be a #RRGGBB hex color: " + hex);
+        }
+        try {
+            int rgb = Integer.parseInt(hex.substring(1), 16);
+            return new Color(rgb, false);
+        } catch (NumberFormatException e) {
+            throw new RasterizationException("raster.background must be a #RRGGBB hex color: " + hex);
+        }
     }
 
     static final class RasterizationException extends RuntimeException {
