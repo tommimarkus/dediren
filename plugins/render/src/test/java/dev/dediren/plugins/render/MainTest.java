@@ -22,7 +22,7 @@ import org.xml.sax.InputSource;
 class MainTest {
     @Test
     void moduleLoads() {
-        assertThat(Main.moduleName()).isEqualTo("svg-render");
+        assertThat(Main.moduleName()).isEqualTo("render");
     }
 
     @Test
@@ -32,7 +32,7 @@ class MainTest {
         JsonNode capabilities = JsonSupport.objectMapper().readTree(result.stdout());
 
         assertThat(result.exitCode()).isZero();
-        assertThat(capabilities.at("/id").asText()).isEqualTo("svg-render");
+        assertThat(capabilities.at("/id").asText()).isEqualTo("render");
         assertThat(capabilities.at("/runtime/artifact_kind").asText()).isEqualTo("svg");
         assertThat(capabilities.at("/capabilities").toString()).contains("render");
     }
