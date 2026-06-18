@@ -32,7 +32,7 @@ guidance in that package.
 | Artifact | Agent authors it? | Schema | Example |
 | --- | --- | --- | --- |
 | Source model | Yes | `schemas/model.schema.json` | `fixtures/source/valid-basic.json` |
-| SVG render policy | Usually reuse | `schemas/svg-render-policy.schema.json` | `fixtures/render-policy/default-svg.json` |
+| Render policy | Usually reuse | `schemas/render-policy.schema.json` | `fixtures/render-policy/default-svg.json` |
 | OEF export policy | Usually reuse | `schemas/oef-export-policy.schema.json` | `fixtures/export-policy/default-oef.json` |
 | UML/XMI export policy | Usually reuse | `schemas/uml-xmi-export-policy.schema.json` | `fixtures/export-policy/default-uml-xmi.json` |
 | Layout request | Usually generated | `schemas/layout-request.schema.json` | `fixtures/layout-request/basic.json` |
@@ -121,13 +121,15 @@ or the previous command envelope:
   --input layout-request.json \
   > layout-result.json
 
-"$BUNDLE/bin/dediren" render --plugin svg-render \
+"$BUNDLE/bin/dediren" render --plugin render \
   --policy "$BUNDLE/fixtures/render-policy/default-svg.json" \
   --input layout-result.json \
   > render-result.json
 
 jq -r '.data.artifacts[] | select(.artifact_kind=="svg") | .content' render-result.json > diagram.svg
 ```
+
+The `render` plugin also emits a base64-encoded `png` artifact (`encoding: base64`) when the policy includes a `raster` block (e.g. `"raster": { "scale": 2 }`); decode it with `base64 -d > diagram.png`.
 
 ## UML Sequence Handoff
 
@@ -168,7 +170,7 @@ messages inside a combined fragment's owned sequence span.
   > sequence-layout-result.json
 
 "$BUNDLE/bin/dediren" render \
-  --plugin svg-render \
+  --plugin render \
   --policy "$BUNDLE/fixtures/render-policy/uml-svg.json" \
   --metadata sequence-render-metadata.json \
   --input sequence-layout-result.json \
@@ -223,7 +225,7 @@ vertices are nodes and transitions are relationships.
   > state-machine-layout-result.json
 
 "$BUNDLE/bin/dediren" render \
-  --plugin svg-render \
+  --plugin render \
   --policy "$BUNDLE/fixtures/render-policy/uml-svg.json" \
   --metadata state-machine-render-metadata.json \
   --input state-machine-layout-result.json \
@@ -280,7 +282,7 @@ on use cases and `ExtensionPoint.properties.uml.use_case` on extension points.
   > use-case-layout-result.json
 
 "$BUNDLE/bin/dediren" render \
-  --plugin svg-render \
+  --plugin render \
   --policy "$BUNDLE/fixtures/render-policy/uml-svg.json" \
   --metadata use-case-render-metadata.json \
   --input use-case-layout-result.json \
@@ -334,7 +336,7 @@ boundaries as semantic-backed view groups.
   > component-layout-result.json
 
 "$BUNDLE/bin/dediren" render \
-  --plugin svg-render \
+  --plugin render \
   --policy "$BUNDLE/fixtures/render-policy/uml-svg.json" \
   --metadata component-render-metadata.json \
   --input component-layout-result.json \
@@ -387,7 +389,7 @@ deployment target boundaries as semantic-backed view groups.
   > deployment-layout-result.json
 
 "$BUNDLE/bin/dediren" render \
-  --plugin svg-render \
+  --plugin render \
   --policy "$BUNDLE/fixtures/render-policy/uml-svg.json" \
   --metadata deployment-render-metadata.json \
   --input deployment-layout-result.json \
@@ -416,7 +418,7 @@ BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-${VERSION}
 "$BUNDLE/bin/dediren" --version
 "$BUNDLE/bin/dediren-plugin-generic-graph" capabilities
 "$BUNDLE/bin/dediren-plugin-elk-layout" capabilities
-"$BUNDLE/bin/dediren-plugin-svg-render" capabilities
+"$BUNDLE/bin/dediren-plugin-render" capabilities
 "$BUNDLE/bin/dediren-plugin-archimate-oef-export" capabilities
 "$BUNDLE/bin/dediren-plugin-uml-xmi-export" capabilities
 ```
@@ -448,7 +450,7 @@ from any current working directory.
   --input layout-result.json
 
 "$BUNDLE/bin/dediren" render \
-  --plugin svg-render \
+  --plugin render \
   --policy "$BUNDLE/fixtures/render-policy/default-svg.json" \
   --input layout-result.json \
   > render-result.json

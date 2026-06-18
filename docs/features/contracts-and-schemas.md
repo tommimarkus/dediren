@@ -20,7 +20,7 @@ bundle. Shared protocol records and schema-version constants live in the
 | [`render-metadata.schema.json`](../../schemas/render-metadata.schema.json) | Generated notation metadata (output of `project --target render-metadata`). |
 | [`render-result.schema.json`](../../schemas/render-result.schema.json) | `render` envelope with `artifacts[]`. |
 | [`export-request.schema.json`](../../schemas/export-request.schema.json) / [`export-result.schema.json`](../../schemas/export-result.schema.json) | `export` request/result. |
-| [`svg-render-policy.schema.json`](../../schemas/svg-render-policy.schema.json) | SVG presentation policy. |
+| [`render-policy.schema.json`](../../schemas/render-policy.schema.json) | SVG/PNG presentation policy. |
 | [`oef-export-policy.schema.json`](../../schemas/oef-export-policy.schema.json) / [`uml-xmi-export-policy.schema.json`](../../schemas/uml-xmi-export-policy.schema.json) | Export policies. |
 | [`semantic-validation-result.schema.json`](../../schemas/semantic-validation-result.schema.json) | Plugin semantic-validation result. |
 | [`plugin-manifest.schema.json`](../../schemas/plugin-manifest.schema.json) | First-party plugin manifest shape. |

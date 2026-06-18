@@ -27,7 +27,7 @@ dediren-agent-bundle-<version>/
     dediren
     dediren-plugin-generic-graph
     dediren-plugin-elk-layout
-    dediren-plugin-svg-render
+    dediren-plugin-render
     dediren-plugin-archimate-oef-export
     dediren-plugin-uml-xmi-export
   lib/
@@ -61,7 +61,7 @@ Plugin child processes receive only the variables listed in their manifests.
 | --- | --- |
 | `DEDIREN_BUNDLE_ROOT` | Bundle/repo root for schemas, manifests, launchers. Set automatically by packaged launchers; override only for custom launchers or tests. |
 | `DEDIREN_PLUGIN_DIRS` | Additional manifest directories (platform path separator). |
-| `DEDIREN_PLUGIN_<PLUGIN_ID>` | Per-plugin executable override, e.g. `DEDIREN_PLUGIN_SVG_RENDER`. |
+| `DEDIREN_PLUGIN_<PLUGIN_ID>` | Per-plugin executable override, e.g. `DEDIREN_PLUGIN_RENDER`. |
 | `DEDIREN_OEF_SCHEMA_DIR` | Local OEF schema directory (offline export validation). |
 | `DEDIREN_XMI_SCHEMA_PATH` | Local XMI schema file (offline export validation). |
 | `DEDIREN_SCHEMA_CACHE_DIR` | Cache directory for schema downloads. |

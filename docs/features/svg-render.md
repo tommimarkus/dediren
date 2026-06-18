@@ -1,19 +1,19 @@
 # SVG Rendering
 
-The `svg-render` plugin turns a layout result into a deterministic SVG artifact
-(and, optionally, an interactive HTML page). All SVG styling lives in the render
-policy and the plugin — never in source JSON.
+The `render` plugin turns a layout result into a deterministic SVG artifact
+(and, optionally, an interactive HTML page or a PNG raster image). All SVG
+styling lives in the render policy and the plugin — never in source JSON.
 
 [← Back to feature index](README.md)
 
-Plugin: `svg-render` (`dediren-plugin-svg-render`) ·
-Policy schema: [`schemas/svg-render-policy.schema.json`](../../schemas/svg-render-policy.schema.json) ·
+Plugin: `render` (`dediren-plugin-render`) ·
+Policy schema: [`schemas/render-policy.schema.json`](../../schemas/render-policy.schema.json) ·
 Result schema: [`schemas/render-result.schema.json`](../../schemas/render-result.schema.json)
 
 ## Result Shape: `artifacts[]`
 
 `render` returns an ordered `.data.artifacts[]` list. Each entry has an
-`artifact_kind` (`svg` or `html`) and `content`. Select the one you want:
+`artifact_kind` (`svg`, `html`, or `png`) and `content`. Select the one you want:
 
 ```bash
 jq -r '.data.artifacts[] | select(.artifact_kind=="svg") | .content' \
@@ -64,7 +64,7 @@ interaction, message order, message sort, and combined-fragment structure):
 dediren project --target render-metadata --plugin generic-graph \
   --view sequence-view --input source.json > render-metadata.json
 
-dediren render --plugin svg-render \
+dediren render --plugin render \
   --policy fixtures/render-policy/uml-svg.json \
   --metadata render-metadata.json \
   --input layout-result.json > render-result.json

@@ -89,8 +89,8 @@ agent tools should be pointed here from their own entrypoint files (for example,
   matches the product version; keep it green when renaming codes or env vars.
 - ELK layout changes: update `plugins/elk-layout`, CLI/distribution
   smoke coverage, and README/agent runtime notes together.
-- SVG render policy changes: update `schemas/svg-render-policy.schema.json`,
-  `contracts`, render fixtures, `plugins/svg-render`, CLI render tests, and
+- Render policy changes: update `schemas/render-policy.schema.json`,
+  `contracts`, render fixtures, `plugins/render`, CLI render tests, and
   README examples together.
 - OEF export changes: update export schemas, policy fixtures, source/layout
   fixtures, `plugins/archimate-oef-export`, CLI export tests, and README
@@ -212,7 +212,7 @@ ELK changes:
 SVG render changes:
 
 ```bash
-./mvnw -pl plugins/svg-render,cli -am test
+./mvnw -pl plugins/render,cli -am test
 ```
 
 OEF export changes:

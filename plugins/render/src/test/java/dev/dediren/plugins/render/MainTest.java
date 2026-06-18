@@ -2935,7 +2935,7 @@ class MainTest {
 
     private static Path writeRenderArtifact(String testName, String content) throws Exception {
         Path output = workspaceRoot()
-                .resolve(".test-output/renders/svg-render-plugin")
+                .resolve(".test-output/renders/render-plugin")
                 .resolve(testName + ".svg");
         Files.createDirectories(output.getParent());
         Files.writeString(output, content);

@@ -62,7 +62,7 @@ dediren-agent-bundle-2026.06.6/
     dediren
     dediren-plugin-generic-graph
     dediren-plugin-elk-layout
-    dediren-plugin-svg-render
+    dediren-plugin-render
     dediren-plugin-archimate-oef-export
     dediren-plugin-uml-xmi-export
   lib/
@@ -108,7 +108,7 @@ BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-${VERSION}
 "$BUNDLE/bin/dediren" --version
 "$BUNDLE/bin/dediren-plugin-generic-graph" capabilities
 "$BUNDLE/bin/dediren-plugin-elk-layout" capabilities
-"$BUNDLE/bin/dediren-plugin-svg-render" capabilities
+"$BUNDLE/bin/dediren-plugin-render" capabilities
 "$BUNDLE/bin/dediren-plugin-archimate-oef-export" capabilities
 "$BUNDLE/bin/dediren-plugin-uml-xmi-export" capabilities
 ```
@@ -135,12 +135,20 @@ Project, layout, validate, and render:
   --input layout-result.json
 
 "$BUNDLE/bin/dediren" render \
-  --plugin svg-render \
+  --plugin render \
   --policy "$BUNDLE/fixtures/render-policy/default-svg.json" \
   --input layout-result.json \
   > render-result.json
 
 jq -r '.data.artifacts[] | select(.artifact_kind=="svg") | .content' render-result.json > diagram.svg
+```
+
+To also get a PNG, add a `raster` block to the render policy
+(`"raster": { "scale": 2 }`) and decode the base64 `png` artifact:
+
+```bash
+jq -r '.data.artifacts[] | select(.artifact_kind=="png") | .content' render-result.json \
+  | base64 -d > diagram.png
 ```
 
 The SVG render policy accepts an optional `interactive` mode: `none` (static),
@@ -205,7 +213,7 @@ render SVG, and export UML/XMI:
   > sequence-layout-result.json
 
 "$BUNDLE/bin/dediren" render \
-  --plugin svg-render \
+  --plugin render \
   --policy "$BUNDLE/fixtures/render-policy/uml-svg.json" \
   --metadata sequence-render-metadata.json \
   --input sequence-layout-result.json \
@@ -270,7 +278,7 @@ render SVG, and export UML/XMI:
   > state-machine-layout-result.json
 
 "$BUNDLE/bin/dediren" render \
-  --plugin svg-render \
+  --plugin render \
   --policy "$BUNDLE/fixtures/render-policy/uml-svg.json" \
   --metadata state-machine-render-metadata.json \
   --input state-machine-layout-result.json \
@@ -337,7 +345,7 @@ render SVG, and export UML/XMI:
   > use-case-layout-result.json
 
 "$BUNDLE/bin/dediren" render \
-  --plugin svg-render \
+  --plugin render \
   --policy "$BUNDLE/fixtures/render-policy/uml-svg.json" \
   --metadata use-case-render-metadata.json \
   --input use-case-layout-result.json \
@@ -402,7 +410,7 @@ render SVG, and export UML/XMI:
   > component-layout-result.json
 
 "$BUNDLE/bin/dediren" render \
-  --plugin svg-render \
+  --plugin render \
   --policy "$BUNDLE/fixtures/render-policy/uml-svg.json" \
   --metadata component-render-metadata.json \
   --input component-layout-result.json \
@@ -465,7 +473,7 @@ render SVG, and export UML/XMI:
   > deployment-layout-result.json
 
 "$BUNDLE/bin/dediren" render \
-  --plugin svg-render \
+  --plugin render \
   --policy "$BUNDLE/fixtures/render-policy/uml-svg.json" \
   --metadata deployment-render-metadata.json \
   --input deployment-layout-result.json \
@@ -515,8 +523,8 @@ Commands:
   count never degrades `status`). Junction-role nodes (`AndJunction`/`OrJunction`
   in ArchiMate views) must sit on the routes of their incident edges; a detached
   junction is the error diagnostic `DEDIREN_LAYOUT_JUNCTION_OFF_INCIDENT_ROUTE`.
-- `render` asks `svg-render` to generate SVG in `.data.artifacts[]` (each
-  entry has `artifact_kind` and `content`; select the `svg` or `html` entry).
+- `render` asks `render` to generate SVG (and optionally PNG) in `.data.artifacts[]` (each
+  entry has `artifact_kind` and `content`; select the `svg`, `html`, or `png` entry).
 - `export` asks `archimate-oef` or `uml-xmi` to generate XML in
   `.data.content`.
 
@@ -550,7 +558,7 @@ in their manifests. Important explicit variables:
 - `DEDIREN_PLUGIN_DIRS`: additional manifest directories, separated with the
   platform path separator.
 - `DEDIREN_PLUGIN_<PLUGIN_ID>`: per-plugin executable override, for example
-  `DEDIREN_PLUGIN_SVG_RENDER`.
+  `DEDIREN_PLUGIN_RENDER`.
 - `DEDIREN_OEF_SCHEMA_DIR`: local directory containing official OEF schema
   files.
 - `DEDIREN_XMI_SCHEMA_PATH`: local XMI schema file.
@@ -569,7 +577,7 @@ Use the narrowest useful lane first:
 ./mvnw -pl cli -am test
 ./mvnw -pl plugins/generic-graph -am test
 ./mvnw -pl plugins/elk-layout -am test
-./mvnw -pl plugins/svg-render -am test
+./mvnw -pl plugins/render -am test
 ./mvnw -pl plugins/archimate-oef-export -am test
 ./mvnw -pl plugins/uml-xmi-export -am test
 ./mvnw test
