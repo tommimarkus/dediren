@@ -11,7 +11,7 @@
 ## Global Constraints
 
 - Java 21+, built with the checked-in Maven Wrapper `./mvnw`. Never reintroduce pre-Maven guidance.
-- Product version is `2026.06.6` and is **not** bumped in this plan. The version bump + `v<version>` tag is a separate follow-on commit per `release-policy`, sequenced after this work integrates. Leave every version string at `2026.06.6`.
+- Product version is `2026.06.7` and is **not** bumped in this plan. The version bump + `v<version>` tag is a separate follow-on commit per `release-policy`, sequenced after this work integrates. Leave every version string at `2026.06.7`.
 - `./mvnw test` must run with the command sandbox disabled — JUnit `@TempDir` needs a writable temp dir (repo memory: "Maven tests need sandbox disabled").
 - Module-scoped runs need `-am` (siblings are not installed): `./mvnw -pl <module> -am test`.
 - Staging is explicit-path only; never `git add -A`. Untracked dotfiles in the worktree are pre-existing user work — never stage them. Do not stage generated/ignored outputs (`target/`, `dist/`, `*.svg`).
@@ -150,7 +150,7 @@ cd /home/souroldgeezer/repos/dediren
 grep -rln '"id": *"svg-render"' fixtures/source | xargs --no-run-if-empty sed -i 's/"id": *"svg-render"/"id": "render"/'
 ```
 
-(Leave any `version` values at `2026.06.6`.)
+(Leave any `version` values at `2026.06.7`.)
 
 - [ ] **Step 3: Repoint the downstream Maven dependency artifactId**
 
@@ -839,7 +839,7 @@ git commit -m "feat(render): rasterize svg to png via batik when raster policy i
 
 **Interfaces:**
 - Consumes: all renamed names and the new png/raster behavior.
-- Produces: docs consistent with source (token `DEDIREN_PLUGIN_RENDER`, plugin id `render`, version `2026.06.6`).
+- Produces: docs consistent with source (token `DEDIREN_PLUGIN_RENDER`, plugin id `render`, version `2026.06.7`).
 
 - [ ] **Step 1: Update README command/token/path references**
 
@@ -889,7 +889,7 @@ sed -i \
   docs/agent-usage.md
 ```
 
-Then add a one-line note that the `render` plugin emits a base64 `png` artifact (`encoding: base64`) when the policy includes a `raster` block, decoded with `base64 -d`. Keep every CalVer string at `2026.06.6`.
+Then add a one-line note that the `render` plugin emits a base64 `png` artifact (`encoding: base64`) when the policy includes a `raster` block, decoded with `base64 -d`. Keep every CalVer string at `2026.06.7`.
 
 - [ ] **Step 4: Update the feature docs' env-token examples**
 
