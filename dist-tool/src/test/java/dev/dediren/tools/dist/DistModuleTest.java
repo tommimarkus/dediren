@@ -120,7 +120,7 @@ class DistModuleTest {
             .containsExactly(
                 "generic-graph",
                 "elk-layout",
-                "svg-render",
+                "render",
                 "archimate-oef",
                 "uml-xmi");
     }
@@ -132,7 +132,7 @@ class DistModuleTest {
                 "cli/target/appassembler",
                 "plugins/generic-graph/target/appassembler",
                 "plugins/elk-layout/target/appassembler",
-                "plugins/svg-render/target/appassembler",
+                "plugins/render/target/appassembler",
                 "plugins/archimate-oef-export/target/appassembler",
                 "plugins/uml-xmi-export/target/appassembler");
     }
@@ -277,7 +277,7 @@ class DistModuleTest {
         writeLauncher(root, "cli/target/appassembler", "cli");
         writeLauncher(root, "plugins/generic-graph/target/appassembler", "generic-graph");
         writeLauncher(root, "plugins/elk-layout/target/appassembler", "elk-layout");
-        writeLauncher(root, "plugins/svg-render/target/appassembler", "svg-render");
+        writeLauncher(root, "plugins/render/target/appassembler", "render");
         writeLauncher(root, "plugins/archimate-oef-export/target/appassembler", "archimate-oef-export");
         writeLauncher(root, "plugins/uml-xmi-export/target/appassembler", "uml-xmi-export");
         Files.createDirectories(root.resolve("fixtures/plugins"));

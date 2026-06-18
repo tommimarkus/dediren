@@ -125,7 +125,7 @@ class CliLayoutRenderCommandTest {
         CliResult result = Main.executeForTesting(new String[]{
                 "render",
                 "--plugin",
-                "svg-render",
+                "render",
                 "--policy",
                 temp.resolve("missing-policy.json").toString(),
                 "--input",
@@ -168,12 +168,12 @@ class CliLayoutRenderCommandTest {
         CliResult result = Main.executeForTesting(new String[]{
                 "render",
                 "--plugin",
-                "svg-render",
+                "render",
                 "--policy",
                 workspaceRoot().resolve("fixtures/render-policy/default-svg.json").toString(),
                 "--input",
                 workspaceRoot().resolve("fixtures/layout-result/basic.json").toString()
-        }, "", pluginEnv("svg-render", "dev.dediren.plugins.svgrender.Main"));
+        }, "", pluginEnv("render", "dev.dediren.plugins.render.Main"));
 
         JsonNode envelope = JsonSupport.objectMapper().readTree(result.stdout());
 

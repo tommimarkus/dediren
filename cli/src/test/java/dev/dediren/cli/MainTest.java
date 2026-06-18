@@ -116,7 +116,7 @@ class MainTest {
         CliResult render = Main.executeForTesting(new String[]{
                 "render",
                 "--plugin",
-                "svg-render",
+                "render",
                 "--policy",
                 root.resolve("fixtures/render-policy/uml-svg.json").toString(),
                 "--metadata",
@@ -231,7 +231,7 @@ class MainTest {
         CliResult render = Main.executeForTesting(new String[]{
                 "render",
                 "--plugin",
-                "svg-render",
+                "render",
                 "--policy",
                 root.resolve("fixtures/render-policy/uml-svg.json").toString(),
                 "--metadata",
@@ -332,7 +332,7 @@ class MainTest {
         CliResult render = Main.executeForTesting(new String[]{
                 "render",
                 "--plugin",
-                "svg-render",
+                "render",
                 "--policy",
                 root.resolve("fixtures/render-policy/uml-svg.json").toString(),
                 "--metadata",
@@ -447,7 +447,7 @@ class MainTest {
         CliResult render = Main.executeForTesting(new String[]{
                 "render",
                 "--plugin",
-                "svg-render",
+                "render",
                 "--policy",
                 root.resolve("fixtures/render-policy/uml-svg.json").toString(),
                 "--metadata",
@@ -569,7 +569,7 @@ class MainTest {
         CliResult render = Main.executeForTesting(new String[]{
                 "render",
                 "--plugin",
-                "svg-render",
+                "render",
                 "--policy",
                 root.resolve("fixtures/render-policy/uml-svg.json").toString(),
                 "--metadata",
@@ -688,7 +688,7 @@ class MainTest {
         CliResult render = Main.executeForTesting(new String[]{
                 "render",
                 "--plugin",
-                "svg-render",
+                "render",
                 "--policy",
                 root.resolve("fixtures/render-policy/uml-svg.json").toString(),
                 "--metadata",
@@ -747,7 +747,7 @@ class MainTest {
         Map<String, String> env = new LinkedHashMap<>();
         env.putAll(pluginEnv("generic-graph", "dev.dediren.plugins.genericgraph.Main"));
         env.putAll(pluginEnv("elk-layout", "dev.dediren.plugins.elklayout.Main"));
-        env.putAll(pluginEnv("svg-render", "dev.dediren.plugins.svgrender.Main"));
+        env.putAll(pluginEnv("render", "dev.dediren.plugins.render.Main"));
         env.putAll(pluginEnv("uml-xmi", "dev.dediren.plugins.umlxmi.Main"));
         env.putAll(envWithXmiSchema());
         return env;

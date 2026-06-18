@@ -30,8 +30,8 @@ public final class DistTool {
             "dediren-plugin-generic-graph", "generic-graph"),
         new Launcher("plugins/elk-layout/target/appassembler", "elk-layout",
             "dediren-plugin-elk-layout", "elk-layout"),
-        new Launcher("plugins/svg-render/target/appassembler", "svg-render",
-            "dediren-plugin-svg-render", "svg-render"),
+        new Launcher("plugins/render/target/appassembler", "render",
+            "dediren-plugin-render", "render"),
         new Launcher("plugins/archimate-oef-export/target/appassembler",
             "archimate-oef-export", "dediren-plugin-archimate-oef-export", "archimate-oef"),
         new Launcher("plugins/uml-xmi-export/target/appassembler", "uml-xmi-export",
@@ -42,7 +42,7 @@ public final class DistTool {
         "DEDIREN_PLUGIN_DIRS",
         "DEDIREN_PLUGIN_GENERIC_GRAPH",
         "DEDIREN_PLUGIN_ELK_LAYOUT",
-        "DEDIREN_PLUGIN_SVG_RENDER",
+        "DEDIREN_PLUGIN_RENDER",
         "DEDIREN_PLUGIN_ARCHIMATE_OEF",
         "DEDIREN_PLUGIN_UML_XMI");
 
@@ -195,7 +195,7 @@ public final class DistTool {
             Map<String, String> dirtyPluginEnv = Map.of(
                 "DEDIREN_PLUGIN_GENERIC_GRAPH", temp.resolve("missing-generic-graph").toString(),
                 "DEDIREN_PLUGIN_ELK_LAYOUT", temp.resolve("missing-elk-layout").toString(),
-                "DEDIREN_PLUGIN_SVG_RENDER", temp.resolve("missing-svg-render").toString());
+                "DEDIREN_PLUGIN_RENDER", temp.resolve("missing-render").toString());
             String projectOutput = runBundleCommand(dediren, bundle, List.of(
                 "project", "--target", "layout-request", "--plugin", "generic-graph", "--view", "main",
                 "--input", bundle.resolve("fixtures/source/valid-pipeline-rich.json").toString()), null,
@@ -210,7 +210,7 @@ public final class DistTool {
                 "validate-layout", "--input", layout.toString()), null));
 
             String renderOutput = runBundleCommand(dediren, bundle, List.of(
-                "render", "--plugin", "svg-render",
+                "render", "--plugin", "render",
                 "--policy", bundle.resolve("fixtures/render-policy/rich-svg.json").toString(),
                 "--input", layout.toString()), null);
             Files.writeString(render, renderOutput, StandardCharsets.UTF_8);

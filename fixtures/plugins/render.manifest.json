@@ -1,8 +1,8 @@
 {
   "plugin_manifest_schema_version": "plugin-manifest.schema.v1",
-  "id": "svg-render",
+  "id": "render",
   "version": "2026.06.6",
-  "executable": "dediren-plugin-svg-render",
+  "executable": "dediren-plugin-render",
   "capabilities": ["render"],
   "allowed_env": ["JAVA_HOME", "PATH"]
 }

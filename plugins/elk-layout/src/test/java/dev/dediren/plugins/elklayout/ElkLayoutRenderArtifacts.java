@@ -15,7 +15,7 @@ final class ElkLayoutRenderArtifacts {
 
     static void write(LayoutResult result) {
         if (!Boolean.getBoolean("dediren.elk.render-artifacts")) {
-            return; // debug-only; default test runs stay hermetic and do not boot svg-render
+            return; // debug-only; default test runs stay hermetic and do not boot render
         }
         try {
             writeSvg(testMethodName(), result);
@@ -35,8 +35,8 @@ final class ElkLayoutRenderArtifacts {
                 .resolve("fixtures/render-policy/default-svg.json")
                 .toFile()));
 
-        dev.dediren.plugins.svgrender.PluginResult renderResult =
-                dev.dediren.plugins.svgrender.Main.executeForTesting(
+        dev.dediren.plugins.render.PluginResult renderResult =
+                dev.dediren.plugins.render.Main.executeForTesting(
                         new String[]{"render"},
                         JsonSupport.objectMapper().writeValueAsString(input));
         JsonNode envelope = JsonSupport.objectMapper().readTree(renderResult.stdout());

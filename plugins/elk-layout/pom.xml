@@ -51,7 +51,7 @@
     </dependency>
     <dependency>
       <groupId>dev.dediren</groupId>
-      <artifactId>svg-render</artifactId>
+      <artifactId>render</artifactId>
       <version>${project.version}</version>
       <scope>test</scope>
     </dependency>

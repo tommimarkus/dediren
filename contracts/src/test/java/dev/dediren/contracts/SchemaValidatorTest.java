@@ -30,7 +30,7 @@ class SchemaValidatorTest {
             "fixtures/plugins/archimate-oef.manifest.json",
             "fixtures/plugins/elk-layout.manifest.json",
             "fixtures/plugins/generic-graph.manifest.json",
-            "fixtures/plugins/svg-render.manifest.json",
+            "fixtures/plugins/render.manifest.json",
             "fixtures/plugins/uml-xmi.manifest.json");
 
     @Test
