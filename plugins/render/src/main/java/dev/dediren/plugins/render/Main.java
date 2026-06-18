@@ -125,9 +125,15 @@ public final class Main {
         }
 
         String svg = renderSvg(input.layoutResult(), input.renderMetadata(), input.policy());
-        var result = new RenderResult(
-                ContractVersions.RENDER_RESULT_SCHEMA_VERSION,
-                buildArtifacts(interactiveMode(input.policy()), svg));
+        List<RenderArtifact> artifacts = new ArrayList<>(buildArtifacts(interactiveMode(input.policy()), svg));
+        if (input.policy().raster() != null) {
+            try {
+                artifacts.add(new RenderArtifact("png", SvgRasterizer.toPngBase64(svg, input.policy().raster()), "base64"));
+            } catch (SvgRasterizer.RasterizationException error) {
+                return exitWithDiagnostic(stdout, "DEDIREN_SVG_RASTERIZE_FAILED", error.getMessage(), "raster");
+            }
+        }
+        var result = new RenderResult(ContractVersions.RENDER_RESULT_SCHEMA_VERSION, artifacts);
         stdout.println(JsonSupport.objectMapper().writeValueAsString(CommandEnvelope.ok(result)));
         return 0;
     }

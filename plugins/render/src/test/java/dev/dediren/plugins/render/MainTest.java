@@ -20,6 +20,9 @@ import org.w3c.dom.Element;
 import org.xml.sax.InputSource;
 
 class MainTest {
+    private static final String MINIMAL_LAYOUT = """
+            {"layout_result_schema_version":"layout-result.schema.v1","view_id":"t","nodes":[{"id":"n","source_id":"n","projection_id":"n","x":0,"y":0,"width":200,"height":100,"label":"Node"}],"edges":[],"groups":[],"warnings":[]}""";
+
     @Test
     void moduleLoads() {
         assertThat(Main.moduleName()).isEqualTo("render");
@@ -2449,6 +2452,42 @@ class MainTest {
         assertThat(path.getAttribute(attributeName)).isEqualTo("url(#" + markerId + ")");
         Element marker = marker(document, markerId, "data-dediren-edge-marker-" + side);
         assertThat(marker.getAttribute("data-dediren-edge-marker-" + side)).isEqualTo(markerName);
+    }
+
+    @Test
+    void emitsPngArtifactWhenRasterRequested() throws Exception {
+        String policy = """
+            {"render_policy_schema_version":"render-policy.schema.v1",
+             "page":{"width":800,"height":600},
+             "margin":{"top":0,"right":0,"bottom":0,"left":0},
+             "raster":{"scale":1}}""";
+        String stdin = renderInputJson(MINIMAL_LAYOUT, null, policy);
+        PluginResult result = Main.executeForTesting(new String[] {"render"}, stdin);
+        assertThat(result.exitCode()).isZero();
+        assertThat(result.stdout()).contains("\"artifact_kind\":\"png\"");
+        assertThat(result.stdout()).contains("\"encoding\":\"base64\"");
+    }
+
+    @Test
+    void omitsPngArtifactWithoutRaster() throws Exception {
+        String policy = """
+            {"render_policy_schema_version":"render-policy.schema.v1",
+             "page":{"width":800,"height":600},
+             "margin":{"top":0,"right":0,"bottom":0,"left":0}}""";
+        String stdin = renderInputJson(MINIMAL_LAYOUT, null, policy);
+        PluginResult result = Main.executeForTesting(new String[] {"render"}, stdin);
+        assertThat(result.exitCode()).isZero();
+        assertThat(result.stdout()).doesNotContain("\"artifact_kind\":\"png\"");
+    }
+
+    private static String renderInputJson(String layoutJson, String metadataJson, String policyJson) {
+        StringBuilder sb = new StringBuilder("{\"layout_result\":");
+        sb.append(layoutJson);
+        if (metadataJson != null) {
+            sb.append(",\"render_metadata\":").append(metadataJson);
+        }
+        sb.append(",\"policy\":").append(policyJson).append("}");
+        return sb.toString();
     }
 
     private static JsonNode renderInput(String layoutPath, String policyPath) throws Exception {
