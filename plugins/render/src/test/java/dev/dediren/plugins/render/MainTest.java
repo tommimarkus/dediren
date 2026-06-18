@@ -640,6 +640,19 @@ class MainTest {
         }
 
         @Test
+        void rejectsRasterScaleAboveMax() throws Exception {
+            ObjectNode input = (ObjectNode) renderInput(
+                    "fixtures/layout-result/basic.json", "fixtures/render-policy/default-svg.json");
+            ((ObjectNode) input.at("/policy")).set("raster",
+                    JsonSupport.objectMapper().readTree("{\"scale\":99}"));
+
+            PluginResult result = render(input);
+            assertThat(result.exitCode()).isEqualTo(3);
+            assertThat(result.stdout()).contains("DEDIREN_SVG_POLICY_INVALID");
+            assertThat(result.stdout()).contains("raster.scale");
+        }
+
+        @Test
         void interactionStyleOverridesAppearInCss() throws Exception {
             String svg = okData(render(renderInput(
                     "fixtures/layout-result/basic.json", "fixtures/render-policy/interactive-svg.json")))

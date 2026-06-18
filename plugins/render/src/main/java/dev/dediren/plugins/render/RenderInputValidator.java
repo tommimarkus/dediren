@@ -5,6 +5,7 @@ import dev.dediren.archimate.Archimate;
 import dev.dediren.archimate.ArchimateTypeValidationException;
 import dev.dediren.contracts.layout.LaidOutEdge;
 import dev.dediren.contracts.layout.LayoutResult;
+import dev.dediren.contracts.render.RasterPolicy;
 import dev.dediren.contracts.render.RenderMetadata;
 import dev.dediren.contracts.render.RenderMetadataSelector;
 import dev.dediren.contracts.render.RenderPolicy;
@@ -399,6 +400,14 @@ final class RenderInputValidator {
     }
 
     private static void validateRenderPolicy(RenderPolicy policy) throws PolicyValidationException {
+        RasterPolicy raster = policy.raster();
+        if (raster != null && raster.scale() != null) {
+            double scale = raster.scale();
+            if (scale <= 0 || scale > 8) {
+                throw new PolicyValidationException(
+                        "raster.scale", "render policy raster.scale must be greater than 0 and at most 8");
+            }
+        }
         String interactive = policy.interactive();
         if (interactive != null
                 && !interactive.equals("none")

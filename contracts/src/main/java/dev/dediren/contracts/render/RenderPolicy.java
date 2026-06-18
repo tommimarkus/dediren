@@ -6,5 +6,6 @@ public record RenderPolicy(
         Page page,
         Margin margin,
         SvgStylePolicy style,
-        String interactive) {
+        String interactive,
+        RasterPolicy raster) {
 }
