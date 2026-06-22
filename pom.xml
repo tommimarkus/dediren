@@ -206,6 +206,12 @@
             <configuration>
               <dataDirectory>${maven.multiModuleProjectDirectory}/.cache/dependency-check</dataDirectory>
               <failBuildOnCVSS>7.0</failBuildOnCVSS>
+              <!-- Reuse cached NVD data for a day so warm runs never contact the
+                   flaky NVD API, and retry harder through transient 5xx/429s on
+                   the rare cold-start update. Keeps the CVSS gate authoritative
+                   while stopping NVD outages from failing unrelated builds. -->
+              <nvdValidForHours>24</nvdValidForHours>
+              <nvdMaxRetryCount>30</nvdMaxRetryCount>
               <formats>
                 <format>HTML</format>
                 <format>JSON</format>

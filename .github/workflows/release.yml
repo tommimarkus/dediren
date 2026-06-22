@@ -46,18 +46,27 @@ jobs:
       - name: Check whitespace
         run: git diff --check
 
-      - name: Cache Dependency-Check data
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      - name: Restore Dependency-Check data
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: .cache/dependency-check
-          key: dependency-check-${{ runner.os }}-${{ github.run_id }}
+          key: dependency-check-v2-${{ runner.os }}-${{ github.run_id }}
           restore-keys: |
-            dependency-check-${{ runner.os }}-
+            dependency-check-v2-${{ runner.os }}-
 
       - name: Check dependency vulnerabilities
         env:
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
         run: ./mvnw -B -ntp -Psecurity-sca -DskipTests package org.owasp:dependency-check-maven:aggregate
+
+      # Persist the NVD database only on success so a failed/partial update never
+      # poisons the cache and traps later runs in a repeating cold-start failure.
+      - name: Save Dependency-Check data
+        if: success()
+        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: .cache/dependency-check
+          key: dependency-check-v2-${{ runner.os }}-${{ github.run_id }}
 
   build:
     needs: validate
