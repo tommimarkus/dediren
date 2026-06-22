@@ -46,6 +46,20 @@ jobs:
       - name: Check whitespace
         run: git diff --check
 
+      # NVD-independent supply-chain gate (Grype + GitHub Advisory DB / OSV)
+      # that keeps releases scanned while the dependency-check steps below are
+      # paused by the NVD outage. Fails on High/Critical advisories.
+      - name: Generate SBOM
+        run: ./mvnw -B -ntp -Psbom org.cyclonedx:cyclonedx-maven-plugin:makeAggregateBom
+
+      - name: Scan SBOM for known vulnerabilities
+        uses: anchore/scan-action@e1165082ffb1fe366ebaf02d8526e7c4989ea9d2 # v7.4.0
+        with:
+          sbom: target/bom.json
+          fail-build: true
+          severity-cutoff: high
+          output-format: table
+
       # TEMPORARY: the NVD API is returning 503 across the board, so the OWASP
       # dependency-check NVD data update cannot complete. The three steps below
       # are skipped to unblock releases. Re-enable by removing the `if: false`

@@ -96,3 +96,42 @@ jobs:
         with:
           path: .cache/dependency-check
           key: dependency-check-v2-${{ runner.os }}-${{ github.run_id }}
+
+  vulnerability-scan:
+    # NVD-independent supply-chain gate: Grype matches the CycloneDX SBOM
+    # against the GitHub Advisory DB / OSV (a prebuilt vulnerability database,
+    # not the live NVD API), so it keeps working while the dependency-check job
+    # above is paused by the NVD outage. Fails on High/Critical advisories,
+    # mirroring the dependency-check failBuildOnCVSS=7.0 threshold.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+
+      - name: Set up Java
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Cache Maven artifacts
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: .cache/maven
+          key: maven-${{ runner.os }}-${{ hashFiles('**/pom.xml', '.mvn/wrapper/maven-wrapper.properties') }}
+          restore-keys: |
+            maven-${{ runner.os }}-
+
+      - name: Generate SBOM
+        run: ./mvnw -B -ntp -Psbom org.cyclonedx:cyclonedx-maven-plugin:makeAggregateBom
+
+      - name: Scan SBOM for known vulnerabilities
+        uses: anchore/scan-action@e1165082ffb1fe366ebaf02d8526e7c4989ea9d2 # v7.4.0
+        with:
+          sbom: target/bom.json
+          fail-build: true
+          severity-cutoff: high
+          output-format: table
