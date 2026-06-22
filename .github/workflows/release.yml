@@ -46,7 +46,13 @@ jobs:
       - name: Check whitespace
         run: git diff --check
 
+      # TEMPORARY: the NVD API is returning 503 across the board, so the OWASP
+      # dependency-check NVD data update cannot complete. The three steps below
+      # are skipped to unblock releases. Re-enable by removing the `if: false`
+      # (and restoring the Save step's `if: success()`) once
+      # https://nvd.nist.gov/ recovers.
       - name: Restore Dependency-Check data
+        if: false
         uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: .cache/dependency-check
@@ -55,6 +61,7 @@ jobs:
             dependency-check-v2-${{ runner.os }}-
 
       - name: Check dependency vulnerabilities
+        if: false
         env:
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
         run: ./mvnw -B -ntp -Psecurity-sca -DskipTests package org.owasp:dependency-check-maven:aggregate
@@ -62,7 +69,7 @@ jobs:
       # Persist the NVD database only on success so a failed/partial update never
       # poisons the cache and traps later runs in a repeating cold-start failure.
       - name: Save Dependency-Check data
-        if: success()
+        if: false
         uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: .cache/dependency-check
