@@ -32,6 +32,7 @@
     <argLine>-Dfile.encoding=UTF-8</argLine>
     <dediren.launcher.jvmArgs>-XX:TieredStopAtLevel=1 -XX:+UseSerialGC</dediren.launcher.jvmArgs>
     <assertj.version>3.27.7</assertj.version>
+    <commons-io.version>2.20.0</commons-io.version>
     <eclipse-elk.version>0.11.0</eclipse-elk.version>
     <guava.version>33.6.0-jre</guava.version>
     <jackson.version>2.22.0</jackson.version>
@@ -116,6 +117,14 @@
         <groupId>org.apache.xmlgraphics</groupId>
         <artifactId>batik-codec</artifactId>
         <version>1.17</version>
+      </dependency>
+      <!-- Force the patched commons-io across the reactor. Batik 1.17 pulls
+           commons-io 2.11.0 transitively, which is affected by CVE-2024-47554
+           (GHSA-78wr-2p64-hpwj, CVSS 7.5); 2.14.0+ fixes it. -->
+      <dependency>
+        <groupId>commons-io</groupId>
+        <artifactId>commons-io</artifactId>
+        <version>${commons-io.version}</version>
       </dependency>
       <dependency>
         <groupId>org.xmlunit</groupId>
