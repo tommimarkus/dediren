@@ -32,22 +32,22 @@
     <argLine>-Dfile.encoding=UTF-8</argLine>
     <dediren.launcher.jvmArgs>-XX:TieredStopAtLevel=1 -XX:+UseSerialGC</dediren.launcher.jvmArgs>
     <assertj.version>3.27.7</assertj.version>
-    <commons-io.version>2.20.0</commons-io.version>
+    <commons-io.version>2.22.0</commons-io.version>
     <eclipse-elk.version>0.11.0</eclipse-elk.version>
     <guava.version>33.6.0-jre</guava.version>
     <jackson.version>2.22.0</jackson.version>
-    <json-schema-validator.version>3.0.4</json-schema-validator.version>
+    <json-schema-validator.version>3.0.5</json-schema-validator.version>
     <junit.version>6.1.0</junit.version>
     <picocli.version>4.7.7</picocli.version>
     <xmlunit.version>2.12.0</xmlunit.version>
     <xtext-xbase.version>2.43.0</xtext-xbase.version>
     <appassembler-maven-plugin.version>2.1.0</appassembler-maven-plugin.version>
-    <cyclonedx-maven-plugin.version>2.9.1</cyclonedx-maven-plugin.version>
+    <cyclonedx-maven-plugin.version>2.9.2</cyclonedx-maven-plugin.version>
     <dependency-check-maven.version>12.2.2</dependency-check-maven.version>
     <exec-maven-plugin.version>3.6.3</exec-maven-plugin.version>
     <maven-compiler-plugin.version>3.15.0</maven-compiler-plugin.version>
     <maven-surefire-plugin.version>3.5.6</maven-surefire-plugin.version>
-    <pitest-maven-plugin.version>1.25.4</pitest-maven-plugin.version>
+    <pitest-maven-plugin.version>1.25.5</pitest-maven-plugin.version>
     <pitest-junit5-plugin.version>1.2.3</pitest-junit5-plugin.version>
   </properties>
 
@@ -111,12 +111,12 @@
       <dependency>
         <groupId>org.apache.xmlgraphics</groupId>
         <artifactId>batik-transcoder</artifactId>
-        <version>1.17</version>
+        <version>1.19</version>
       </dependency>
       <dependency>
         <groupId>org.apache.xmlgraphics</groupId>
         <artifactId>batik-codec</artifactId>
-        <version>1.17</version>
+        <version>1.19</version>
       </dependency>
       <!-- Force the patched commons-io across the reactor. Batik 1.17 pulls
            commons-io 2.11.0 transitively, which is affected by CVE-2024-47554
