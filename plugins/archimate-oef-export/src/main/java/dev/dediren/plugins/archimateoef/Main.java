@@ -346,9 +346,7 @@ public final class Main {
         for (int index = 1; index < points.size() - 1; index++) {
             writeLocation(xml, "bendpoint", points.get(index));
         }
-        if (points.size() > 1) {
-            writeLocation(xml, "targetAttachment", points.get(points.size() - 1));
-        }
+        writeLocation(xml, "targetAttachment", points.get(points.size() - 1));
     }
 
     private static void writeLocation(StringBuilder xml, String elementName, Point point) {

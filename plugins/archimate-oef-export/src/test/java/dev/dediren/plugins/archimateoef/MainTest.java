@@ -97,6 +97,33 @@ class MainTest {
     }
 
     @Test
+    void emitsSourceAndTargetAttachmentsForOnePointRoute() throws Exception {
+        JsonNode source = fixtureJson("fixtures/source/valid-archimate-oef.json");
+        JsonNode layout = fixtureJson("fixtures/layout-result/archimate-oef-basic.json");
+        ArrayNode points = (ArrayNode) layout.at("/edges/0/points");
+        points.remove(1);
+        ((ObjectNode) points.get(0)).put("x", 220.6);
+        ((ObjectNode) points.get(0)).put("y", 80.2);
+
+        String xml = exportXml(source, layout);
+
+        assertThat(xml).contains("<sourceAttachment x=\"221\" y=\"80\"/>"
+                + "<targetAttachment x=\"221\" y=\"80\"/>");
+        assertThat(xml).doesNotContain("<bendpoint ");
+    }
+
+    @Test
+    void emitsNoConnectionGeometryForEmptyRoute() throws Exception {
+        JsonNode source = fixtureJson("fixtures/source/valid-archimate-oef.json");
+        JsonNode layout = fixtureJson("fixtures/layout-result/archimate-oef-basic.json");
+        ((ArrayNode) layout.at("/edges/0/points")).removeAll();
+
+        String connection = connectionXml(exportXml(source, layout));
+
+        assertThat(connection).doesNotContain("sourceAttachment", "bendpoint", "targetAttachment");
+    }
+
+    @Test
     void rejectsUnknownArchimateNodeTypeWithErrorEnvelope() throws Exception {
         JsonNode input = exportInputJson();
         ((ObjectNode) input.at("/source/nodes/0")).put("type", "TechnologyNode");
@@ -451,6 +478,12 @@ class MainTest {
 
     private static JsonNode fixtureJson(String path) throws Exception {
         return JsonSupport.objectMapper().readTree(fixture(path));
+    }
+
+    private static String connectionXml(String xml) {
+        int start = xml.indexOf("<connection ");
+        int end = xml.indexOf("</connection>", start) + "</connection>".length();
+        return xml.substring(start, end);
     }
 
     private static String fixture(String path) throws Exception {
