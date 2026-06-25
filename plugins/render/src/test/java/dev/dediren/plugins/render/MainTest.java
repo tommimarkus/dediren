@@ -7,11 +7,14 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.testsupport.SchemaAssertions;
+import java.io.ByteArrayInputStream;
 import java.io.StringReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Base64;
 import java.util.Map;
 import java.util.function.Consumer;
+import javax.imageio.ImageIO;
 import javax.xml.parsers.DocumentBuilderFactory;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -2476,9 +2479,32 @@ class MainTest {
              "raster":{"scale":1}}""";
         String stdin = renderInputJson(MINIMAL_LAYOUT, null, policy);
         PluginResult result = Main.executeForTesting(new String[] {"render"}, stdin);
-        assertThat(result.exitCode()).isZero();
-        assertThat(result.stdout()).contains("\"artifact_kind\":\"png\"");
-        assertThat(result.stdout()).contains("\"encoding\":\"base64\"");
+        JsonNode data = okData(result);
+
+        JsonNode svgArtifact = artifact(data, "svg");
+        String svg = svgArtifact.at("/content").asText();
+        assertThat(svg).isNotBlank().startsWith("<svg").contains(">Node<");
+        Path svgOutput = writeRenderArtifact("emits_png_artifact_when_raster_requested", svg);
+        assertThat(svgOutput).isRegularFile();
+        assertThat(Files.size(svgOutput)).isGreaterThan(0L);
+
+        JsonNode pngArtifact = artifact(data, "png");
+        assertThat(pngArtifact.at("/encoding").asText()).isEqualTo("base64");
+        String encodedPng = pngArtifact.at("/content").asText();
+        assertThat(encodedPng).isNotBlank();
+        byte[] png = Base64.getDecoder().decode(encodedPng);
+        assertThat(png.length).isGreaterThan(0);
+        assertThat(png[0] & 0xFF).isEqualTo(0x89);
+        assertThat(new String(png, 1, 3, java.nio.charset.StandardCharsets.US_ASCII)).isEqualTo("PNG");
+
+        Path pngOutput = writeBinaryRenderArtifact("emits_png_artifact_when_raster_requested", "png", png);
+        assertThat(pngOutput).isRegularFile();
+        assertThat(Files.size(pngOutput)).isGreaterThan(0L);
+
+        var image = ImageIO.read(new ByteArrayInputStream(png));
+        assertThat(image).isNotNull();
+        assertThat(image.getWidth()).isGreaterThan(0);
+        assertThat(image.getHeight()).isGreaterThan(0);
     }
 
     @Test
@@ -2501,6 +2527,15 @@ class MainTest {
         }
         sb.append(",\"policy\":").append(policyJson).append("}");
         return sb.toString();
+    }
+
+    private static JsonNode artifact(JsonNode data, String artifactKind) {
+        for (JsonNode artifact : data.path("artifacts")) {
+            if (artifactKind.equals(artifact.path("artifact_kind").asText())) {
+                return artifact;
+            }
+        }
+        throw new AssertionError("Missing render artifact: " + artifactKind);
     }
 
     private static JsonNode renderInput(String layoutPath, String policyPath) throws Exception {
@@ -2952,6 +2987,15 @@ class MainTest {
                 .resolve(testName + ".svg");
         Files.createDirectories(output.getParent());
         Files.writeString(output, content);
+        return output;
+    }
+
+    private static Path writeBinaryRenderArtifact(String testName, String extension, byte[] content) throws Exception {
+        Path output = workspaceRoot()
+                .resolve(".test-output/renders/render-plugin")
+                .resolve(testName + "." + extension);
+        Files.createDirectories(output.getParent());
+        Files.write(output, content);
         return output;
     }
 

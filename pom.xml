@@ -29,8 +29,8 @@
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <maven.compiler.release>21</maven.compiler.release>
-    <argLine>-Dfile.encoding=UTF-8</argLine>
-    <dediren.launcher.jvmArgs>-XX:TieredStopAtLevel=1 -XX:+UseSerialGC</dediren.launcher.jvmArgs>
+    <argLine>-Dfile.encoding=UTF-8 -Djava.awt.headless=true</argLine>
+    <dediren.launcher.jvmArgs>-XX:TieredStopAtLevel=1 -XX:+UseSerialGC -Djava.awt.headless=true</dediren.launcher.jvmArgs>
     <assertj.version>3.27.7</assertj.version>
     <commons-io.version>2.22.0</commons-io.version>
     <eclipse-elk.version>0.11.0</eclipse-elk.version>

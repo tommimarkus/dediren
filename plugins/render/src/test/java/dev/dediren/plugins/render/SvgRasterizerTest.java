@@ -14,6 +14,11 @@ class SvgRasterizerTest {
             + "<rect x=\"0\" y=\"0\" width=\"100\" height=\"40\" fill=\"#ffffff\"/></svg>\n";
 
     @Test
+    void runsWithAwtHeadlessEnabledByDefault() {
+        assertThat(System.getProperty("java.awt.headless")).isEqualTo("true");
+    }
+
+    @Test
     void producesPngOfIntrinsicSizeAtScaleOne() throws Exception {
         byte[] png = Base64.getDecoder().decode(SvgRasterizer.toPngBase64(SVG, new RasterPolicy(null, null)));
         assertThat(png[0] & 0xFF).isEqualTo(0x89);
