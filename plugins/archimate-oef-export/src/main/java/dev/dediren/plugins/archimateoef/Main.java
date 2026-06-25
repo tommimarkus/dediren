@@ -18,6 +18,7 @@ import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.contracts.layout.LaidOutGroup;
 import dev.dediren.contracts.layout.Point;
 import dev.dediren.contracts.source.SourceNode;
+import dev.dediren.contracts.source.SourceRelationship;
 import dev.dediren.schemacache.SchemaCacheException;
 import dev.dediren.schemacache.SchemaCacheModule;
 import java.io.ByteArrayInputStream;
@@ -145,6 +146,7 @@ public final class Main {
             validateArchimateTypes(request);
             validateArchimateJunctionSemantics(request);
             validateArchimateGroupSemantics(request);
+            validateLayoutReferences(request);
         } catch (ArchimateTypeValidationException error) {
             return exitWithDiagnostic(stdout, error.code(), error.message(), error.path());
         } catch (ArchimateJunctionValidationException error) {
@@ -247,6 +249,29 @@ public final class Main {
                         "$.layout_result.groups[" + index + "].provenance",
                         "layout group " + group.id() + " semantic source " + sourceId
                                 + " has ArchiMate type " + sourceNode.type() + ", expected Grouping");
+            }
+        }
+    }
+
+    private static void validateLayoutReferences(ExportRequest request) {
+        var sourceNodeIds = request.source().nodes().stream()
+                .map(SourceNode::id)
+                .collect(Collectors.toSet());
+        var sourceRelationshipIds = request.source().relationships().stream()
+                .map(SourceRelationship::id)
+                .collect(Collectors.toSet());
+        for (var node : request.layoutResult().nodes()) {
+            if (!sourceNodeIds.contains(node.sourceId())) {
+                throw new IllegalArgumentException(
+                        "Layout node '" + node.id() + "' references missing source node '"
+                                + node.sourceId() + "' while exporting ArchiMate OEF");
+            }
+        }
+        for (var edge : request.layoutResult().edges()) {
+            if (!sourceRelationshipIds.contains(edge.sourceId())) {
+                throw new IllegalArgumentException(
+                        "Layout edge '" + edge.id() + "' references missing source relationship '"
+                                + edge.sourceId() + "' while exporting ArchiMate OEF");
             }
         }
     }

@@ -1,6 +1,7 @@
 package dev.dediren.plugins.archimateoef;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -121,6 +122,32 @@ class MainTest {
         String connection = connectionXml(exportXml(source, layout));
 
         assertThat(connection).doesNotContain("sourceAttachment", "bendpoint", "targetAttachment");
+    }
+
+    @Test
+    void rejectsLayoutNodeWhoseSourceIdDoesNotResolveToSourceNode() throws Exception {
+        JsonNode source = fixtureJson("fixtures/source/valid-archimate-oef.json");
+        JsonNode layout = fixtureJson("fixtures/layout-result/archimate-oef-basic.json");
+        ((ObjectNode) layout.at("/nodes/0")).put("id", "node-customer");
+        ((ObjectNode) layout.at("/nodes/0")).put("source_id", "missing-source-node");
+
+        assertThatThrownBy(() -> exportXml(source, layout))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Layout node 'node-customer' references missing source node 'missing-source-node'")
+                .hasMessageContaining("while exporting ArchiMate OEF");
+    }
+
+    @Test
+    void rejectsLayoutEdgeWhoseRelationshipRefDoesNotResolveToSourceRelationship() throws Exception {
+        JsonNode source = fixtureJson("fixtures/source/valid-archimate-oef.json");
+        JsonNode layout = fixtureJson("fixtures/layout-result/archimate-oef-basic.json");
+        ((ObjectNode) layout.at("/edges/0")).put("id", "rel-serve");
+        ((ObjectNode) layout.at("/edges/0")).put("source_id", "missing-relationship");
+
+        assertThatThrownBy(() -> exportXml(source, layout))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Layout edge 'rel-serve' references missing source relationship 'missing-relationship'")
+                .hasMessageContaining("while exporting ArchiMate OEF");
     }
 
     @Test
