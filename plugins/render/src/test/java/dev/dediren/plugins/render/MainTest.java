@@ -1670,6 +1670,115 @@ class MainTest {
         }
 
         @Test
+        void keepsIdenticalOtherRouteSegmentAsEdgeLabelObstacle() throws Exception {
+            JsonNode input = styledInlineInput(
+                    "[]",
+                    "[]",
+                    """
+                    [
+                      {
+                        "id": "labeled-edge",
+                        "source": "left",
+                        "target": "right",
+                        "source_id": "labeled-edge",
+                        "projection_id": "labeled-edge",
+                        "points": [
+                          { "x": 100, "y": 200 },
+                          { "x": 300, "y": 200 }
+                        ],
+                        "label": "shared route label"
+                      },
+                      {
+                        "id": "identical-route",
+                        "source": "left-copy",
+                        "target": "right-copy",
+                        "source_id": "identical-route",
+                        "projection_id": "identical-route",
+                        "points": [
+                          { "x": 100, "y": 200 },
+                          { "x": 300, "y": 200 }
+                        ],
+                        "label": ""
+                      }
+                    ]
+                    """,
+                    "{ \"edge\": { \"label_horizontal_position\": \"center\" } }");
+            Document document = svgDocument(okContent(render(input)));
+
+            Element edge = groupWithAttribute(document, "data-dediren-edge-id", "labeled-edge");
+            java.util.List<Element> labels = childElements(edge, "text");
+            Element label = labels.get(labels.size() - 1);
+
+            assertThat(rectIntersectsHorizontalSegment(textBox(label), 100.0, 300.0, 200.0, 6.0)).isFalse();
+        }
+
+        @Test
+        void movesMixedRouteLabelToVerticalBranchWhenHorizontalCandidatesAreBlocked() throws Exception {
+            JsonNode input = styledInlineInput(
+                    "[]",
+                    "[]",
+                    """
+                    [
+                      {
+                        "id": "mixed-route",
+                        "source": "left",
+                        "target": "bottom",
+                        "source_id": "mixed-route",
+                        "projection_id": "mixed-route",
+                        "points": [
+                          { "x": 100, "y": 200 },
+                          { "x": 300, "y": 200 },
+                          { "x": 300, "y": 330 }
+                        ],
+                        "label": "vertical fallback clear"
+                      },
+                      {
+                        "id": "left-candidate-blocker",
+                        "source": "block-top-left",
+                        "target": "block-bottom-left",
+                        "source_id": "left-candidate-blocker",
+                        "projection_id": "left-candidate-blocker",
+                        "points": [
+                          { "x": 100, "y": 50 },
+                          { "x": 100, "y": 380 }
+                        ],
+                        "label": ""
+                      },
+                      {
+                        "id": "middle-candidate-blocker",
+                        "source": "block-top-middle",
+                        "target": "block-bottom-middle",
+                        "source_id": "middle-candidate-blocker",
+                        "projection_id": "middle-candidate-blocker",
+                        "points": [
+                          { "x": 250, "y": 50 },
+                          { "x": 250, "y": 380 }
+                        ],
+                        "label": ""
+                      }
+                    ]
+                    """,
+                    """
+                    {
+                      "edge": {
+                        "label_horizontal_position": "center",
+                        "label_horizontal_side": "below",
+                        "label_vertical_side": "right"
+                      }
+                    }
+                    """);
+            Document document = svgDocument(okContent(render(input)));
+
+            Element edge = groupWithAttribute(document, "data-dediren-edge-id", "mixed-route");
+            java.util.List<Element> labels = childElements(edge, "text");
+            Element label = labels.get(labels.size() - 1);
+
+            assertThat(label.getAttribute("text-anchor")).isEqualTo("start");
+            assertThat(Double.parseDouble(label.getAttribute("x"))).isGreaterThan(300.0);
+            assertThat(rectanglesIntersect(textBox(label), 50.0, 50.0, 300.0, 380.0)).isFalse();
+        }
+
+        @Test
         void movesEdgeLabelAwayFromGroupTitleBand() throws Exception {
             JsonNode input = styledInlineInput(
                     """
