@@ -52,6 +52,9 @@ public final class Main {
     private static final double EDGE_LABEL_FONT_SIZE_SCALE = 1.1;
     private static final int EDGE_LABEL_FONT_WEIGHT = 600;
     private static final double EDGE_LABEL_OUTLINE_WIDTH = 2.0;
+    private static final double EDGE_ROUTE_LABEL_OBSTACLE_PADDING = 6.0;
+    private static final double GROUP_BORDER_LABEL_OBSTACLE_PADDING = 4.0;
+    private static final double GROUP_TITLE_LABEL_OBSTACLE_HEIGHT = 24.0;
     private static final double ARCHIMATE_ICON_SIZE = 22.0;
     // Must equal ARCHIMATE_LABEL_ICON_RESERVE in plugins/generic-graph
     // GenericGraphLayoutSizing: per-side room reserved so a centered label clears
@@ -211,7 +214,7 @@ public final class Main {
             svg.append("</g>");
         }
         List<LaidOutEdge> renderedEdges = new ArrayList<>();
-        List<LabelBox> occupiedLabelBoxes = nodeObstacleBoxes(result);
+        List<LabelBox> occupiedLabelBoxes = labelObstacleBoxes(result);
         for (LaidOutEdge edge : result.edges()) {
             ResolvedEdgeStyle style = edgeStyle(policy, metadata, edge.id(), base);
             List<LineJump> lineJumps = lineJumps(edge, renderedEdges);
@@ -227,7 +230,11 @@ public final class Main {
             svg.append(edgePath(edge, style, lineJumps));
             if (edge.label() != null && !edge.label().isEmpty()) {
                 double edgeLabelFontSize = edgeLabelFontSize(base.fontSize());
-                EdgeLabel label = edgeLabel(edge, style, occupiedLabelBoxes, edgeLabelFontSize);
+                EdgeLabel label = edgeLabel(
+                        edge,
+                        style,
+                        labelObstacleBoxesForEdge(occupiedLabelBoxes, edge),
+                        edgeLabelFontSize);
                 svg.append(edgeLabel(label, edge.label(), style, base.backgroundFill(), edgeLabelFontSize));
                 occupiedLabelBoxes.add(edgeLabelVisibleBox(label, style.labelPresentation()));
             }
@@ -3096,14 +3103,7 @@ public final class Main {
                 case AUTO -> autoHorizontalLabelOffset(edge, segment.index());
             };
             List<Double> xCandidates = orderedValues(preferredX, centerX, nearStartX, nearEndX);
-            double oppositeOffset = baseOffset < 0.0 ? 18.0 : -10.0;
-            List<Double> offsets = orderedValues(
-                    baseOffset,
-                    oppositeOffset,
-                    baseOffset + 28.0,
-                    baseOffset - 28.0,
-                    baseOffset + 56.0,
-                    baseOffset - 56.0);
+            List<Double> offsets = labelOffsetCandidates(baseOffset);
             for (double offset : offsets) {
                 for (double x : xCandidates) {
                     EdgeLabel candidate = edgeLabelCandidate(x, segment.start().y() + offset, "middle", edge.label(), fontSize);
@@ -3120,12 +3120,19 @@ public final class Main {
             Segment segment = vertical.get();
             double minY = edge.points().stream().mapToDouble(Point::y).min().orElse(segment.start().y());
             double maxY = edge.points().stream().mapToDouble(Point::y).max().orElse(segment.end().y());
-            return edgeLabelCandidate(
-                    segment.start().x() - 6.0,
+            List<EdgeLabel> candidates = verticalLabelCandidates(
+                    edge,
+                    style,
+                    segment.start().x(),
                     (minY + maxY) / 2.0,
-                    "end",
-                    edge.label(),
                     fontSize);
+            for (EdgeLabel candidate : candidates) {
+                LabelBox candidateBox = edgeLabelVisibleBox(candidate, style.labelPresentation());
+                if (occupiedBoxes.stream().noneMatch(candidateBox::overlaps)) {
+                    return candidate;
+                }
+            }
+            return candidates.get(0);
         }
         Point point = edge.points().isEmpty() ? new Point(0.0, 0.0) : edge.points().get(edge.points().size() / 2);
         return edgeLabelCandidate(point.x(), point.y() - 6.0, "middle", edge.label(), fontSize);
@@ -3144,6 +3151,43 @@ public final class Main {
             }
         }
         return ordered;
+    }
+
+    private static List<Double> labelOffsetCandidates(double baseOffset) {
+        double oppositeOffset = baseOffset < 0.0 ? 18.0 : -10.0;
+        return orderedValues(
+                baseOffset,
+                oppositeOffset,
+                baseOffset + 28.0,
+                baseOffset - 28.0,
+                baseOffset + 56.0,
+                baseOffset - 56.0,
+                baseOffset + 84.0,
+                baseOffset - 84.0,
+                baseOffset + 112.0,
+                baseOffset - 112.0,
+                baseOffset + 140.0,
+                baseOffset - 140.0);
+    }
+
+    private static List<EdgeLabel> verticalLabelCandidates(
+            LaidOutEdge edge,
+            ResolvedEdgeStyle style,
+            double segmentX,
+            double y,
+            double fontSize) {
+        List<EdgeLabel> candidates = new ArrayList<>();
+        List<SvgEdgeLabelVerticalSide> sides = style.labelVerticalSide() == SvgEdgeLabelVerticalSide.RIGHT
+                ? List.of(SvgEdgeLabelVerticalSide.RIGHT, SvgEdgeLabelVerticalSide.LEFT)
+                : List.of(SvgEdgeLabelVerticalSide.LEFT, SvgEdgeLabelVerticalSide.RIGHT);
+        for (double offset : List.of(6.0, 34.0, 62.0)) {
+            for (SvgEdgeLabelVerticalSide side : sides) {
+                double x = side == SvgEdgeLabelVerticalSide.RIGHT ? segmentX + offset : segmentX - offset;
+                String anchor = side == SvgEdgeLabelVerticalSide.RIGHT ? "start" : "end";
+                candidates.add(edgeLabelCandidate(x, y, anchor, edge.label(), fontSize));
+            }
+        }
+        return candidates;
     }
 
     private static double autoHorizontalLabelOffset(LaidOutEdge edge, int segmentIndex) {
@@ -3215,7 +3259,7 @@ public final class Main {
                 }
             }
         }
-        List<LabelBox> occupiedBoxes = nodeObstacleBoxes(result);
+        List<LabelBox> occupiedBoxes = labelObstacleBoxes(result);
         for (LaidOutEdge edge : result.edges()) {
             if (edge.label() == null || edge.label().isEmpty()) {
                 continue;
@@ -3224,7 +3268,7 @@ public final class Main {
             EdgeLabel label = edgeLabel(
                     edge,
                     style,
-                    occupiedBoxes,
+                    labelObstacleBoxesForEdge(occupiedBoxes, edge),
                     edgeLabelFontSize(base.fontSize()));
             LabelBox labelBox = edgeLabelVisibleBox(label, style.labelPresentation());
             bounds.includeRect(
@@ -3244,6 +3288,62 @@ public final class Main {
         List<LabelBox> boxes = new ArrayList<>();
         for (LaidOutNode node : result.nodes()) {
             boxes.add(new LabelBox(node.x(), node.y(), node.x() + node.width(), node.y() + node.height()));
+        }
+        return boxes;
+    }
+
+    private static List<LabelBox> labelObstacleBoxes(LayoutResult result) {
+        List<LabelBox> boxes = nodeObstacleBoxes(result);
+        boxes.addAll(groupObstacleBoxes(result));
+        boxes.addAll(edgeRouteObstacleBoxes(result.edges()));
+        return boxes;
+    }
+
+    private static List<LabelBox> labelObstacleBoxesForEdge(List<LabelBox> occupiedBoxes, LaidOutEdge edge) {
+        List<LabelBox> boxes = new ArrayList<>(occupiedBoxes);
+        boxes.removeAll(edgeRouteObstacleBoxes(List.of(edge)));
+        return boxes;
+    }
+
+    private static List<LabelBox> groupObstacleBoxes(LayoutResult result) {
+        List<LabelBox> boxes = new ArrayList<>();
+        for (LaidOutGroup group : result.groups()) {
+            double minX = group.x();
+            double minY = group.y();
+            double maxX = group.x() + group.width();
+            double maxY = group.y() + group.height();
+            double padding = GROUP_BORDER_LABEL_OBSTACLE_PADDING;
+            boxes.add(new LabelBox(minX, minY, maxX, minY + GROUP_TITLE_LABEL_OBSTACLE_HEIGHT));
+            boxes.add(new LabelBox(minX - padding, minY - padding, maxX + padding, minY + padding));
+            boxes.add(new LabelBox(minX - padding, maxY - padding, maxX + padding, maxY + padding));
+            boxes.add(new LabelBox(minX - padding, minY - padding, minX + padding, maxY + padding));
+            boxes.add(new LabelBox(maxX - padding, minY - padding, maxX + padding, maxY + padding));
+        }
+        return boxes;
+    }
+
+    private static List<LabelBox> edgeRouteObstacleBoxes(List<LaidOutEdge> edges) {
+        List<LabelBox> boxes = new ArrayList<>();
+        for (LaidOutEdge edge : edges) {
+            for (int index = 0; index < edge.points().size() - 1; index++) {
+                Point start = edge.points().get(index);
+                Point end = edge.points().get(index + 1);
+                if (nearlyEqual(start.x(), end.x()) && nearlyEqual(start.y(), end.y())) {
+                    continue;
+                }
+                double minX = Math.min(start.x(), end.x());
+                double maxX = Math.max(start.x(), end.x());
+                double minY = Math.min(start.y(), end.y());
+                double maxY = Math.max(start.y(), end.y());
+                double padding = EDGE_ROUTE_LABEL_OBSTACLE_PADDING;
+                if (nearlyEqual(start.y(), end.y())) {
+                    boxes.add(new LabelBox(minX, start.y() - padding, maxX, start.y() + padding));
+                } else if (nearlyEqual(start.x(), end.x())) {
+                    boxes.add(new LabelBox(start.x() - padding, minY, start.x() + padding, maxY));
+                } else {
+                    boxes.add(new LabelBox(minX - padding, minY - padding, maxX + padding, maxY + padding));
+                }
+            }
         }
         return boxes;
     }

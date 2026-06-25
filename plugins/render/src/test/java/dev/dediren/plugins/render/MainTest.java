@@ -1611,6 +1611,109 @@ class MainTest {
         }
 
         @Test
+        void movesEdgeLabelAwayFromOtherRouteSegments() throws Exception {
+            JsonNode input = styledInlineInput(
+                    "[]",
+                    """
+                    [
+                      {
+                        "id": "source-node",
+                        "source_id": "source-node",
+                        "projection_id": "source-node",
+                        "x": 300,
+                        "y": 190,
+                        "width": 170,
+                        "height": 90,
+                        "label": "Source"
+                      }
+                    ]
+                    """,
+                    """
+                    [
+                      {
+                        "id": "labeled-edge",
+                        "source": "source-node",
+                        "target": "target-node",
+                        "source_id": "labeled-edge",
+                        "projection_id": "labeled-edge",
+                        "points": [
+                          { "x": 478, "y": 248 },
+                          { "x": 542, "y": 248 },
+                          { "x": 688, "y": 248 },
+                          { "x": 849, "y": 248 },
+                          { "x": 849, "y": 361 }
+                        ],
+                        "label": "requests payment authorization"
+                      },
+                      {
+                        "id": "crossing-route",
+                        "source": "left",
+                        "target": "right",
+                        "source_id": "crossing-route",
+                        "projection_id": "crossing-route",
+                        "points": [
+                          { "x": 397, "y": 313 },
+                          { "x": 687, "y": 313 }
+                        ],
+                        "label": ""
+                      }
+                    ]
+                    """,
+                    "{ \"edge\": { \"label_horizontal_position\": \"near_start\" } }");
+            Document document = svgDocument(okContent(render(input)));
+
+            Element edge = groupWithAttribute(document, "data-dediren-edge-id", "labeled-edge");
+            java.util.List<Element> labels = childElements(edge, "text");
+            Element label = labels.get(labels.size() - 1);
+
+            assertThat(rectIntersectsHorizontalSegment(textBox(label), 397.0, 687.0, 313.0, 6.0)).isFalse();
+        }
+
+        @Test
+        void movesEdgeLabelAwayFromGroupTitleBand() throws Exception {
+            JsonNode input = styledInlineInput(
+                    """
+                    [
+                      {
+                        "id": "application-services",
+                        "source_id": "application-services",
+                        "projection_id": "application-services",
+                        "x": 250,
+                        "y": 70,
+                        "width": 590,
+                        "height": 450,
+                        "label": "Application Services"
+                      }
+                    ]
+                    """,
+                    "[]",
+                    """
+                    [
+                      {
+                        "id": "group-title-edge",
+                        "source": "left",
+                        "target": "right",
+                        "source_id": "group-title-edge",
+                        "projection_id": "group-title-edge",
+                        "points": [
+                          { "x": 300, "y": 80 },
+                          { "x": 620, "y": 80 }
+                        ],
+                        "label": "must clear group label"
+                      }
+                    ]
+                    """,
+                    "{ \"edge\": { \"label_horizontal_position\": \"center\", \"label_horizontal_side\": \"above\" } }");
+            Document document = svgDocument(okContent(render(input)));
+
+            Element edge = groupWithAttribute(document, "data-dediren-edge-id", "group-title-edge");
+            java.util.List<Element> labels = childElements(edge, "text");
+            Element label = labels.get(labels.size() - 1);
+
+            assertThat(rectanglesIntersect(textBox(label), 250.0, 70.0, 840.0, 94.0)).isFalse();
+        }
+
+        @Test
         void paintsEdgeLabelWithDefaultOutline() throws Exception {
             JsonNode input = styledInlineInput(
                     "[]",
@@ -2954,6 +3057,19 @@ class MainTest {
                 && leftBox[2] > rightBox[0]
                 && leftBox[1] < rightBox[3]
                 && leftBox[3] > rightBox[1];
+    }
+
+    private static boolean rectIntersectsHorizontalSegment(
+            double[] box,
+            double segmentMinX,
+            double segmentMaxX,
+            double segmentY,
+            double padding) {
+        return rectanglesIntersect(box, segmentMinX, segmentY - padding, segmentMaxX, segmentY + padding);
+    }
+
+    private static boolean rectanglesIntersect(double[] box, double minX, double minY, double maxX, double maxY) {
+        return box[0] < maxX && box[2] > minX && box[1] < maxY && box[3] > minY;
     }
 
     private static double[] textBox(Element label) {
