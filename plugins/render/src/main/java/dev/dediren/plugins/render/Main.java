@@ -227,7 +227,7 @@ public final class Main {
             svg.append(">");
             svg.append(edgeMarker(edge, style, "start"));
             svg.append(edgeMarker(edge, style, "end"));
-            svg.append(lineJumpMasks(edge, lineJumps, base.backgroundFill()));
+            svg.append(lineJumpMasks(edge, lineJumps, result, metadata, policy, base));
             svg.append(edgePath(edge, style, lineJumps));
             if (edge.label() != null && !edge.label().isEmpty()) {
                 double edgeLabelFontSize = edgeLabelFontSize(base.fontSize());
@@ -2752,19 +2752,46 @@ public final class Main {
                 + body + "</marker>";
     }
 
-    private static String lineJumpMasks(LaidOutEdge edge, List<LineJump> lineJumps, String backgroundFill) {
+    private static String lineJumpMasks(
+            LaidOutEdge edge,
+            List<LineJump> lineJumps,
+            LayoutResult result,
+            RenderMetadata metadata,
+            RenderPolicy policy,
+            ResolvedStyle base) {
         if (lineJumps.isEmpty()) {
             return "";
         }
         StringBuilder masks = new StringBuilder();
         masks.append("<g data-dediren-line-jump-masks=\"").append(attr(edge.id())).append("\">");
         for (LineJump jump : lineJumps) {
+            String maskFill = backdropFillAt(jump.x(), jump.y(), result, metadata, policy, base);
             masks.append("<path d=\"").append(attr(jump.maskPath()))
-                    .append("\" fill=\"none\" stroke=\"").append(attr(backgroundFill))
+                    .append("\" fill=\"none\" stroke=\"").append(attr(maskFill))
                     .append("\" stroke-width=\"6\"/>");
         }
         masks.append("</g>");
         return masks.toString();
+    }
+
+    private static String backdropFillAt(
+            double x,
+            double y,
+            LayoutResult result,
+            RenderMetadata metadata,
+            RenderPolicy policy,
+            ResolvedStyle base) {
+        for (int index = result.groups().size() - 1; index >= 0; index--) {
+            LaidOutGroup group = result.groups().get(index);
+            if (pointInsideRect(x, y, group.x(), group.y(), group.width(), group.height())) {
+                return groupStyle(policy, metadata, group.id(), base).fill();
+            }
+        }
+        return base.backgroundFill();
+    }
+
+    private static boolean pointInsideRect(double x, double y, double rectX, double rectY, double width, double height) {
+        return x >= rectX && x <= rectX + width && y >= rectY && y <= rectY + height;
     }
 
     private static String edgePath(LaidOutEdge edge, ResolvedEdgeStyle style, List<LineJump> lineJumps) {

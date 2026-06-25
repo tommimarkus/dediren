@@ -2040,6 +2040,62 @@ class MainTest {
         }
 
         @Test
+        void usesGroupFillForLineJumpMaskInsideGroup() throws Exception {
+            JsonNode input = styledInlineInput(
+                    """
+                    [
+                      {
+                        "id": "colored-group",
+                        "source_id": "colored-group",
+                        "projection_id": "colored-group",
+                        "x": 40,
+                        "y": 40,
+                        "width": 240,
+                        "height": 220,
+                        "members": [],
+                        "label": "Colored Group"
+                      }
+                    ]
+                    """,
+                    "[]",
+                    """
+                    [
+                      {
+                        "id": "back-edge",
+                        "source": "left",
+                        "target": "right",
+                        "source_id": "back-edge",
+                        "projection_id": "back-edge",
+                        "points": [
+                          { "x": 60, "y": 140 },
+                          { "x": 260, "y": 140 }
+                        ],
+                        "label": "back"
+                      },
+                      {
+                        "id": "front-edge",
+                        "source": "top",
+                        "target": "bottom",
+                        "source_id": "front-edge",
+                        "projection_id": "front-edge",
+                        "points": [
+                          { "x": 160, "y": 60 },
+                          { "x": 160, "y": 240 }
+                        ],
+                        "label": "front"
+                      }
+                    ]
+                    """,
+                    "{ \"background\": { \"fill\": \"#ffffff\" }, \"group\": { \"fill\": \"#fef3c7\", \"stroke\": \"#d97706\" } }");
+            Document document = svgDocument(okContent(render(input)));
+
+            Element frontEdge = groupWithAttribute(document, "data-dediren-edge-id", "front-edge");
+            Element masks = childGroupWithAttribute(frontEdge, "data-dediren-line-jump-masks", "front-edge");
+
+            assertThat(firstChildElement(masks, "path").getAttribute("stroke")).isEqualTo("#fef3c7");
+        }
+
+        @Test
         void keepsRoundedRouteCornersWhenAddingLineJumps() throws Exception {
             JsonNode input = styledInlineInput(
                     "[]",
