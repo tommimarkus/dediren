@@ -215,7 +215,8 @@ public final class Main {
         }
         List<LaidOutEdge> renderedEdges = new ArrayList<>();
         List<LabelBox> placedLabelBoxes = new ArrayList<>();
-        for (LaidOutEdge edge : result.edges()) {
+        for (int edgeIndex = 0; edgeIndex < result.edges().size(); edgeIndex++) {
+            LaidOutEdge edge = result.edges().get(edgeIndex);
             ResolvedEdgeStyle style = edgeStyle(policy, metadata, edge.id(), base);
             List<LineJump> lineJumps = lineJumps(edge, renderedEdges);
             svg.append("<g data-dediren-edge-id=\"").append(attr(edge.id())).append("\"");
@@ -233,7 +234,7 @@ public final class Main {
                 EdgeLabel label = edgeLabel(
                         edge,
                         style,
-                        labelObstacleBoxesForEdge(result, edge, placedLabelBoxes),
+                        labelObstacleBoxesForEdge(result, edgeIndex, placedLabelBoxes),
                         edgeLabelFontSize);
                 svg.append(edgeLabel(label, edge.label(), style, base.backgroundFill(), edgeLabelFontSize));
                 placedLabelBoxes.add(edgeLabelVisibleBox(label, style.labelPresentation()));
@@ -3261,10 +3262,6 @@ public final class Main {
         return Optional.empty();
     }
 
-    private static Optional<Segment> firstVerticalSegment(LaidOutEdge edge) {
-        return verticalSegments(edge).stream().findFirst();
-    }
-
     private static List<Segment> verticalSegments(LaidOutEdge edge) {
         List<Segment> segments = new ArrayList<>();
         for (int index = 0; index < edge.points().size() - 1; index++) {
@@ -3305,7 +3302,8 @@ public final class Main {
             }
         }
         List<LabelBox> placedLabelBoxes = new ArrayList<>();
-        for (LaidOutEdge edge : result.edges()) {
+        for (int edgeIndex = 0; edgeIndex < result.edges().size(); edgeIndex++) {
+            LaidOutEdge edge = result.edges().get(edgeIndex);
             if (edge.label() == null || edge.label().isEmpty()) {
                 continue;
             }
@@ -3313,7 +3311,7 @@ public final class Main {
             EdgeLabel label = edgeLabel(
                     edge,
                     style,
-                    labelObstacleBoxesForEdge(result, edge, placedLabelBoxes),
+                    labelObstacleBoxesForEdge(result, edgeIndex, placedLabelBoxes),
                     edgeLabelFontSize(base.fontSize()));
             LabelBox labelBox = edgeLabelVisibleBox(label, style.labelPresentation());
             bounds.includeRect(
@@ -3339,11 +3337,11 @@ public final class Main {
 
     private static List<LabelBox> labelObstacleBoxesForEdge(
             LayoutResult result,
-            LaidOutEdge currentEdge,
+            int currentEdgeIndex,
             List<LabelBox> placedLabelBoxes) {
         List<LabelBox> boxes = nodeObstacleBoxes(result);
         boxes.addAll(groupObstacleBoxes(result));
-        boxes.addAll(edgeRouteObstacleBoxesForOtherEdges(result.edges(), currentEdge));
+        boxes.addAll(edgeRouteObstacleBoxesForOtherEdges(result.edges(), currentEdgeIndex));
         boxes.addAll(placedLabelBoxes);
         return boxes;
     }
@@ -3393,11 +3391,15 @@ public final class Main {
 
     private static List<LabelBox> edgeRouteObstacleBoxesForOtherEdges(
             List<LaidOutEdge> edges,
-            LaidOutEdge currentEdge) {
-        List<LaidOutEdge> otherEdges = edges.stream()
-                .filter(edge -> !edge.id().equals(currentEdge.id()))
-                .toList();
-        return edgeRouteObstacleBoxes(otherEdges);
+            int currentEdgeIndex) {
+        List<LabelBox> boxes = new ArrayList<>();
+        for (int edgeIndex = 0; edgeIndex < edges.size(); edgeIndex++) {
+            if (edgeIndex == currentEdgeIndex) {
+                continue;
+            }
+            boxes.addAll(edgeRouteObstacleBoxes(List.of(edges.get(edgeIndex))));
+        }
+        return boxes;
     }
 
     private static LabelBox labelBox(double x, double y, String anchor, String text, double fontSize) {

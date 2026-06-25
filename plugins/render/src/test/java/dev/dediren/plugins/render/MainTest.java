@@ -1713,6 +1713,49 @@ class MainTest {
         }
 
         @Test
+        void keepsSameIdOtherRouteSegmentAsEdgeLabelObstacle() throws Exception {
+            JsonNode input = styledInlineInput(
+                    "[]",
+                    "[]",
+                    """
+                    [
+                      {
+                        "id": "duplicate-route",
+                        "source": "left",
+                        "target": "right",
+                        "source_id": "duplicate-route",
+                        "projection_id": "duplicate-route",
+                        "points": [
+                          { "x": 100, "y": 200 },
+                          { "x": 300, "y": 200 }
+                        ],
+                        "label": "shared route label"
+                      },
+                      {
+                        "id": "duplicate-route",
+                        "source": "left-copy",
+                        "target": "right-copy",
+                        "source_id": "duplicate-route-copy",
+                        "projection_id": "duplicate-route-copy",
+                        "points": [
+                          { "x": 100, "y": 200 },
+                          { "x": 300, "y": 200 }
+                        ],
+                        "label": ""
+                      }
+                    ]
+                    """,
+                    "{ \"edge\": { \"label_horizontal_position\": \"center\" } }");
+            Document document = svgDocument(okContent(render(input)));
+
+            Element edge = groupWithAttribute(document, "data-dediren-edge-id", "duplicate-route");
+            java.util.List<Element> labels = childElements(edge, "text");
+            Element label = labels.get(labels.size() - 1);
+
+            assertThat(rectIntersectsHorizontalSegment(textBox(label), 100.0, 300.0, 200.0, 6.0)).isFalse();
+        }
+
+        @Test
         void movesEdgeLabelAwayFromRouteSegmentEndpointPadding() throws Exception {
             JsonNode input = styledInlineInput(
                     "[]",
