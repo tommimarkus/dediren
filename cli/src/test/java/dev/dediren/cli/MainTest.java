@@ -765,6 +765,7 @@ class MainTest {
                 """.formatted(java, classpath, mainClass), StandardCharsets.UTF_8);
         script.toFile().setExecutable(true);
         return Map.of(
+                "DEDIREN_PLUGIN_DIRS", workspaceRoot().resolve("fixtures/plugins").toString(),
                 "DEDIREN_PLUGIN_" + pluginId.toUpperCase().replace('-', '_'),
                 script.toString());
     }

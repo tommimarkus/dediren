@@ -497,7 +497,9 @@ UML/XMI:
 
 Use `DEDIREN_OEF_SCHEMA_DIR` or `DEDIREN_XMI_SCHEMA_PATH` for offline schema
 validation. Use `DEDIREN_SCHEMA_CACHE_DIR` when downloads are allowed and a
-stable cache location is desired.
+stable cache location is desired. Give these paths as absolute: plugins run from
+the bundle's product root, so a relative value resolves against that root rather
+than your current directory.
 
 ## Repair Rules
 
@@ -534,8 +536,10 @@ variables. Important explicit variables:
 - `DEDIREN_CDS_DIR`: directory for Class-Data-Sharing archives (see below).
 - `DEDIREN_TRUST_MANIFEST_CAPABILITIES`: opt-in; trusts each plugin's static
   manifest capabilities and skips the per-call runtime probe, removing one JVM
-  start per plugin operation; bypasses the runtime id-mismatch pre-check.
-  Default (unset) keeps the probe and all integrity checks.
+  start per plugin operation; bypasses the runtime id-mismatch pre-check. Honored
+  only for bundled first-party plugins; manifests in `.dediren/plugins` or
+  `DEDIREN_PLUGIN_DIRS` always keep the probe. Default (unset) keeps the probe
+  and all integrity checks.
 
 Each `bin/dediren*` launcher auto-creates a Class-Data-Sharing archive on its
 first invocation to speed JVM startup on subsequent calls. Archives are written
@@ -549,9 +553,11 @@ any error.
 Setting `DEDIREN_TRUST_MANIFEST_CAPABILITIES=1` (or `true`) makes dediren trust
 each plugin's static manifest capabilities and skip the per-call runtime
 capability probe, removing one JVM start per plugin operation. The tradeoff is
-that the runtime `id`-mismatch pre-flight check is bypassed, so use it only with
-trusted, integrity-checked bundles. Default (unset) keeps the probe and all
-integrity checks.
+that the runtime `id`-mismatch pre-flight check is bypassed, so the flag is
+honored only for bundled first-party plugins (manifests in the bundle's
+`plugins/` directory). Manifests discovered in `.dediren/plugins` or a
+`DEDIREN_PLUGIN_DIRS` entry always keep the probe regardless of this flag.
+Default (unset) keeps the probe and all integrity checks.
 
 Keep stderr for human debugging only. Agents should decide success or failure
 from stdout JSON.

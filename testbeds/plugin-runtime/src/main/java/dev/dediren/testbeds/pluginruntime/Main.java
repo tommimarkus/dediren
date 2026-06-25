@@ -104,6 +104,16 @@ public final class Main {
                 printErrorEnvelope();
                 return;
             }
+            case "report-cwd" -> {
+                var diagnostic = new Diagnostic(
+                        "DEDIREN_TESTBED_CWD",
+                        DiagnosticSeverity.ERROR,
+                        System.getProperty("user.dir"),
+                        "$.cwd");
+                System.out.println(JsonSupport.objectMapper().writeValueAsString(
+                        CommandEnvelope.error(List.of(diagnostic))));
+                return;
+            }
             default -> {
             }
         }

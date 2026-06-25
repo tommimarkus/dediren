@@ -98,8 +98,10 @@ archive directory is unwritable.
 
 Set `DEDIREN_TRUST_MANIFEST_CAPABILITIES=1` (or `true`) to skip the per-call
 runtime capability probe, removing one JVM start per plugin operation. This
-bypasses the runtime id-mismatch pre-flight check; use it only with trusted
-bundles. Default (unset) keeps the probe.
+bypasses the runtime id-mismatch pre-flight check, so it is honored only for
+bundled first-party plugins (manifests in the bundle's `plugins/` directory);
+manifests discovered in `.dediren/plugins` or `DEDIREN_PLUGIN_DIRS` always keep
+the probe regardless of this flag. Default (unset) keeps the probe.
 
 ## First Run
 

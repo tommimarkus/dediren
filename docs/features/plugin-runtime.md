@@ -12,9 +12,16 @@ stdin/stdout. The core orchestrates them but owns none of their domain logic.
   decide success or failure from a plugin's stdout JSON alone.
 - A valid plugin **error envelope** is preserved and surfaced with a non-zero CLI
   exit.
-- The core **normalizes boundary failures** into structured diagnostics:
-  missing executable, timeout, invalid JSON, schema mismatch, unsupported
-  capability, id mismatch, and missing runtime dependency.
+- The core **normalizes the boundary failures it can observe** into structured
+  diagnostics: missing executable, timeout, invalid JSON, schema mismatch,
+  unsupported capability, id mismatch, and process failure.
+- A **missing runtime dependency** is reported by the plugin that owns it, as a
+  structured error envelope core preserves (the export plugins emit
+  `DEDIREN_OEF_SCHEMA_VALIDATOR_UNAVAILABLE` /
+  `DEDIREN_XMI_SCHEMA_VALIDATOR_UNAVAILABLE` when `xmllint` is absent). A
+  launcher that fails to start its runtime (the ELK launcher without `java`)
+  surfaces as a generic plugin failure, typically
+  `DEDIREN_PLUGIN_CAPABILITY_PROBE_FAILED` from the runtime probe.
 - **stderr is for human debugging only.**
 
 Manifest schema: [`schemas/plugin-manifest.schema.json`](../../schemas/plugin-manifest.schema.json) ·
@@ -58,9 +65,10 @@ pre-flight). This costs one JVM start per operation.
 
 Set `DEDIREN_TRUST_MANIFEST_CAPABILITIES=1` (or `true`) to trust each plugin's
 **static manifest** capabilities and skip the probe, removing that JVM start.
-This bypasses the id-mismatch pre-check, so use it only with trusted,
-integrity-checked bundles. Default (unset) keeps the probe and all integrity
-checks.
+This bypasses the id-mismatch pre-check, so it is honored only for **bundled
+first-party plugins** (manifests in the bundle's `plugins/` directory); a
+manifest from `.dediren/plugins` or a `DEDIREN_PLUGIN_DIRS` entry always keeps
+the probe. Default (unset) keeps the probe and all integrity checks.
 
 ## Process Controls
 
