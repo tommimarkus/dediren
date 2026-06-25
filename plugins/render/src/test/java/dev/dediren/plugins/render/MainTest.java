@@ -2096,6 +2096,89 @@ class MainTest {
         }
 
         @Test
+        void usesTopmostResolvedGroupFillForLineJumpMaskInOverlappingGroups() throws Exception {
+            JsonNode input = styledInlineInput(
+                    """
+                    [
+                      {
+                        "id": "base-group",
+                        "source_id": "base-group",
+                        "projection_id": "base-group",
+                        "x": 40,
+                        "y": 40,
+                        "width": 240,
+                        "height": 220,
+                        "members": [],
+                        "label": "Base Group"
+                      },
+                      {
+                        "id": "top-group",
+                        "source_id": "top-group",
+                        "projection_id": "top-group",
+                        "x": 80,
+                        "y": 80,
+                        "width": 160,
+                        "height": 120,
+                        "members": [],
+                        "label": "Top Group"
+                      }
+                    ]
+                    """,
+                    "[]",
+                    """
+                    [
+                      {
+                        "id": "back-edge",
+                        "source": "left",
+                        "target": "right",
+                        "source_id": "back-edge",
+                        "projection_id": "back-edge",
+                        "points": [
+                          { "x": 60, "y": 140 },
+                          { "x": 260, "y": 140 }
+                        ],
+                        "label": "back"
+                      },
+                      {
+                        "id": "front-edge",
+                        "source": "top",
+                        "target": "bottom",
+                        "source_id": "front-edge",
+                        "projection_id": "front-edge",
+                        "points": [
+                          { "x": 160, "y": 60 },
+                          { "x": 160, "y": 240 }
+                        ],
+                        "label": "front"
+                      }
+                    ]
+                    """,
+                    """
+                    {
+                      "background": { "fill": "#ffffff" },
+                      "group": { "fill": "#fee2e2", "stroke": "#991b1b" },
+                      "group_overrides": {
+                        "top-group": { "fill": "#dcfce7", "stroke": "#15803d" }
+                      }
+                    }
+                    """);
+            Document document = svgDocument(okContent(render(input)));
+
+            Element baseGroup = groupWithAttribute(document, "data-dediren-group-id", "base-group");
+            Element topGroup = groupWithAttribute(document, "data-dediren-group-id", "top-group");
+            Element frontEdge = groupWithAttribute(document, "data-dediren-edge-id", "front-edge");
+            Element masks = childGroupWithAttribute(frontEdge, "data-dediren-line-jump-masks", "front-edge");
+            Element maskPath = firstChildElement(masks, "path");
+
+            assertThat(firstChildElement(baseGroup, "rect").getAttribute("fill")).isEqualTo("#fee2e2");
+            assertThat(firstChildElement(topGroup, "rect").getAttribute("fill")).isEqualTo("#dcfce7");
+            assertThat(maskPath.getAttribute("stroke"))
+                    .isEqualTo("#dcfce7")
+                    .isNotEqualTo("#fee2e2")
+                    .isNotEqualTo("#ffffff");
+        }
+
+        @Test
         void keepsRoundedRouteCornersWhenAddingLineJumps() throws Exception {
             JsonNode input = styledInlineInput(
                     "[]",
