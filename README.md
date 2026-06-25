@@ -37,11 +37,15 @@ For a token-efficient authoring guide, see `docs/agent-usage.md`.
 ```
 
 Maven artifacts and wrapper state are repo-local under `.cache/maven` for
-sandbox-friendly builds. Set `NVD_API_KEY` before running the `security-sca`
-profile so OWASP Dependency-Check uses the authenticated NVD API path. CI and
-release workflows read the same value from the GitHub Actions `NVD_API_KEY`
-secret. Vulnerability data is stored under `.cache/dependency-check`; CI and
-release workflows cache that path separately from Maven artifacts.
+sandbox-friendly builds. Supply-chain scanning runs in two layers. Grype scans
+the CycloneDX SBOM against the GitHub Advisory DB / OSV and is the blocking gate
+in CI (`ci.yml`) and release (`release.yml`), failing on High/Critical
+advisories without depending on the live NVD API. OWASP Dependency-Check is a
+non-blocking second opinion that runs weekly in `dependency-audit.yml`, and on
+demand locally via the `security-sca` profile shown above. Set `NVD_API_KEY` so
+Dependency-Check uses the authenticated NVD API path; CI reads the same value
+from the GitHub Actions `NVD_API_KEY` secret. Dependency-Check NVD data is
+cached under `.cache/dependency-check`, separately from Maven artifacts.
 
 The `dist-build` profile creates an agent-ready archive under `dist/`:
 
