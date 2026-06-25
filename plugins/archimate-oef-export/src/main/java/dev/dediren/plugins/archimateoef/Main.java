@@ -153,6 +153,8 @@ public final class Main {
             return exitWithDiagnostic(stdout, error.code(), error.message(), error.path());
         } catch (GroupSemanticValidationException error) {
             return exitWithDiagnostic(stdout, error.code(), error.getMessage(), error.path());
+        } catch (OefReferenceValidationException error) {
+            return exitWithDiagnostic(stdout, error.code(), error.getMessage(), error.path());
         }
 
         String content = buildOef(request, policy);
@@ -253,23 +255,28 @@ public final class Main {
         }
     }
 
-    private static void validateLayoutReferences(ExportRequest request) {
+    private static void validateLayoutReferences(ExportRequest request)
+            throws OefReferenceValidationException {
         var sourceNodeIds = request.source().nodes().stream()
                 .map(SourceNode::id)
                 .collect(Collectors.toSet());
         var sourceRelationshipIds = request.source().relationships().stream()
                 .map(SourceRelationship::id)
                 .collect(Collectors.toSet());
-        for (var node : request.layoutResult().nodes()) {
+        for (int index = 0; index < request.layoutResult().nodes().size(); index++) {
+            var node = request.layoutResult().nodes().get(index);
             if (!sourceNodeIds.contains(node.sourceId())) {
-                throw new IllegalArgumentException(
+                throw new OefReferenceValidationException(
+                        "$.layout_result.nodes[" + index + "].source_id",
                         "Layout node '" + node.id() + "' references missing source node '"
                                 + node.sourceId() + "' while exporting ArchiMate OEF");
             }
         }
-        for (var edge : request.layoutResult().edges()) {
+        for (int index = 0; index < request.layoutResult().edges().size(); index++) {
+            var edge = request.layoutResult().edges().get(index);
             if (!sourceRelationshipIds.contains(edge.sourceId())) {
-                throw new IllegalArgumentException(
+                throw new OefReferenceValidationException(
+                        "$.layout_result.edges[" + index + "].source_id",
                         "Layout edge '" + edge.id() + "' references missing source relationship '"
                                 + edge.sourceId() + "' while exporting ArchiMate OEF");
             }
@@ -561,6 +568,24 @@ public final class Main {
 
         String code() {
             return code;
+        }
+
+        String path() {
+            return path;
+        }
+    }
+
+    private static final class OefReferenceValidationException extends Exception {
+        private static final String CODE = "DEDIREN_OEF_LAYOUT_REFERENCE_MISSING";
+        private final String path;
+
+        private OefReferenceValidationException(String path, String message) {
+            super(message);
+            this.path = path;
+        }
+
+        String code() {
+            return CODE;
         }
 
         String path() {
