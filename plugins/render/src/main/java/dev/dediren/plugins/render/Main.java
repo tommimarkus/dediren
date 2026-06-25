@@ -3183,19 +3183,31 @@ public final class Main {
             LaidOutEdge edge,
             ResolvedEdgeStyle style,
             double fontSize) {
-        Optional<Segment> vertical = firstVerticalSegment(edge);
-        if (vertical.isEmpty()) {
+        List<Segment> verticalSegments = verticalSegments(edge);
+        if (verticalSegments.isEmpty()) {
             return List.of();
         }
-        Segment segment = vertical.get();
-        double minY = edge.points().stream().mapToDouble(Point::y).min().orElse(segment.start().y());
-        double maxY = edge.points().stream().mapToDouble(Point::y).max().orElse(segment.end().y());
-        return verticalLabelCandidates(
-                edge,
-                style,
-                segment.start().x(),
-                (minY + maxY) / 2.0,
-                fontSize);
+        if (firstHorizontalSegment(edge).isEmpty()) {
+            Segment segment = verticalSegments.get(0);
+            double minY = edge.points().stream().mapToDouble(Point::y).min().orElse(segment.start().y());
+            double maxY = edge.points().stream().mapToDouble(Point::y).max().orElse(segment.end().y());
+            return verticalLabelCandidates(
+                    edge,
+                    style,
+                    segment.start().x(),
+                    (minY + maxY) / 2.0,
+                    fontSize);
+        }
+        List<EdgeLabel> candidates = new ArrayList<>();
+        for (Segment segment : verticalSegments) {
+            candidates.addAll(verticalLabelCandidates(
+                    edge,
+                    style,
+                    segment.start().x(),
+                    (segment.start().y() + segment.end().y()) / 2.0,
+                    fontSize));
+        }
+        return candidates;
     }
 
     private static List<EdgeLabel> verticalLabelCandidates(
@@ -3250,14 +3262,19 @@ public final class Main {
     }
 
     private static Optional<Segment> firstVerticalSegment(LaidOutEdge edge) {
+        return verticalSegments(edge).stream().findFirst();
+    }
+
+    private static List<Segment> verticalSegments(LaidOutEdge edge) {
+        List<Segment> segments = new ArrayList<>();
         for (int index = 0; index < edge.points().size() - 1; index++) {
             Point start = edge.points().get(index);
             Point end = edge.points().get(index + 1);
             if (nearlyEqual(start.x(), end.x()) && Math.abs(start.y() - end.y()) > 0.001) {
-                return Optional.of(new Segment(index, start, end));
+                segments.add(new Segment(index, start, end));
             }
         }
-        return Optional.empty();
+        return segments;
     }
 
     private static SvgBounds svgBounds(
@@ -3363,9 +3380,9 @@ public final class Main {
                 double maxY = Math.max(start.y(), end.y());
                 double padding = EDGE_ROUTE_LABEL_OBSTACLE_PADDING;
                 if (nearlyEqual(start.y(), end.y())) {
-                    boxes.add(new LabelBox(minX, start.y() - padding, maxX, start.y() + padding));
+                    boxes.add(new LabelBox(minX, start.y(), maxX, start.y()).expanded(padding, padding));
                 } else if (nearlyEqual(start.x(), end.x())) {
-                    boxes.add(new LabelBox(start.x() - padding, minY, start.x() + padding, maxY));
+                    boxes.add(new LabelBox(start.x(), minY, start.x(), maxY).expanded(padding, padding));
                 } else {
                     boxes.add(new LabelBox(minX - padding, minY - padding, maxX + padding, maxY + padding));
                 }

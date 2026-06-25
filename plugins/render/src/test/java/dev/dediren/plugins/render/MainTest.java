@@ -1713,6 +1713,49 @@ class MainTest {
         }
 
         @Test
+        void movesEdgeLabelAwayFromRouteSegmentEndpointPadding() throws Exception {
+            JsonNode input = styledInlineInput(
+                    "[]",
+                    "[]",
+                    """
+                    [
+                      {
+                        "id": "labeled-edge",
+                        "source": "left",
+                        "target": "right",
+                        "source_id": "labeled-edge",
+                        "projection_id": "labeled-edge",
+                        "points": [
+                          { "x": 300, "y": 120 },
+                          { "x": 500, "y": 120 }
+                        ],
+                        "label": "pay"
+                      },
+                      {
+                        "id": "endpoint-route",
+                        "source": "near-left",
+                        "target": "near-right",
+                        "source_id": "endpoint-route",
+                        "projection_id": "endpoint-route",
+                        "points": [
+                          { "x": 240, "y": 138 },
+                          { "x": 300, "y": 138 }
+                        ],
+                        "label": ""
+                      }
+                    ]
+                    """,
+                    "{ \"edge\": { \"label_horizontal_position\": \"near_start\" } }");
+            Document document = svgDocument(okContent(render(input)));
+
+            Element edge = groupWithAttribute(document, "data-dediren-edge-id", "labeled-edge");
+            java.util.List<Element> labels = childElements(edge, "text");
+            Element label = labels.get(labels.size() - 1);
+
+            assertThat(rectanglesIntersect(textBox(label), 234.0, 132.0, 306.0, 144.0)).isFalse();
+        }
+
+        @Test
         void movesMixedRouteLabelToVerticalBranchWhenHorizontalCandidatesAreBlocked() throws Exception {
             JsonNode input = styledInlineInput(
                     "[]",
