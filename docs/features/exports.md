@@ -49,6 +49,13 @@ model. The export emits ArchiMate Open Exchange Format XML. ArchiMate
 junction-role nodes (`AndJunction`/`OrJunction`) participate in layout/render and
 must stay on incident edge routes (see [Layout](layout.md#junction-routing)).
 
+OEF diagram connections preserve generated layout routes using OEF attachment
+semantics: the first route point is emitted as `sourceAttachment`, the last route
+point as `targetAttachment`, and only intermediate route points are emitted as
+`bendpoint`. This keeps schema-valid XML closer to how importing tools expect
+relationship anchors and avoids treating node attachment points as free-standing
+bendpoints.
+
 ## UML/XMI
 
 Use `semantic_profile: "uml"` and the `uml-xmi` plugin. View kinds: `uml-class`,

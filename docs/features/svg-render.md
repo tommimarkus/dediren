@@ -39,6 +39,11 @@ Edge labels default to **outlined text**. Set
 `style.edge.label_presentation` to `background` when a filled label backing is
 preferred.
 
+Edge label placement avoids node boxes, group title/border bands, existing route
+segments, and labels already placed earlier in the SVG. Line-jump masks use the
+local group fill when the jump occurs inside a group, falling back to the page
+background outside groups.
+
 ## Interactive Modes
 
 The policy accepts an optional `interactive` mode:
