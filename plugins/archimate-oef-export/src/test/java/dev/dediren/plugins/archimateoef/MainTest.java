@@ -3,6 +3,7 @@ package dev.dediren.plugins.archimateoef;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import dev.dediren.contracts.json.JsonSupport;
 import java.nio.charset.StandardCharsets;
@@ -53,7 +54,7 @@ class MainTest {
     @Test
     void emitsSemanticGroupingViewNodeAndIgnoresLayoutOnlyGroup() throws Exception {
         JsonNode source = fixtureJson("fixtures/source/valid-archimate-oef.json");
-        ((com.fasterxml.jackson.databind.node.ArrayNode) source.get("nodes")).addObject()
+        ((ArrayNode) source.get("nodes")).addObject()
                 .put("id", "customer-domain")
                 .put("type", "Grouping")
                 .put("label", "Customer Domain")
@@ -68,9 +69,9 @@ class MainTest {
     }
 
     @Test
-    void roundsDecimalGeometryToIntegerOefCoordinates() throws Exception {
+    void emitsAttachmentsForRouteEndpointsAndBendpointsOnlyForIntermediatePoints() throws Exception {
         JsonNode source = fixtureJson("fixtures/source/valid-archimate-oef.json");
-        ((com.fasterxml.jackson.databind.node.ArrayNode) source.get("nodes")).addObject()
+        ((ArrayNode) source.get("nodes")).addObject()
                 .put("id", "customer-domain")
                 .put("type", "Grouping")
                 .put("label", "Customer Domain")
@@ -80,15 +81,19 @@ class MainTest {
         ((ObjectNode) layout.at("/nodes/0")).put("y", 40.75);
         ((ObjectNode) layout.at("/nodes/0")).put("width", 180.6);
         ((ObjectNode) layout.at("/nodes/0")).put("height", 80.4);
-        ((ObjectNode) layout.at("/edges/0/points/0")).put("x", 220.2);
-        ((ObjectNode) layout.at("/edges/0/points/0")).put("y", 80.8);
+        ArrayNode points = (ArrayNode) layout.at("/edges/0/points");
+        ((ObjectNode) points.get(0)).put("x", 220.2);
+        ((ObjectNode) points.get(0)).put("y", 80.8);
+        points.insertObject(1).put("x", 260.6).put("y", 80.4);
         layoutWithGroups(layout, 10.6, 11.5, 520.4, 180.6);
 
         String xml = exportXml(source, layout);
 
         assertThat(xml).contains("x=\"11\" y=\"12\" w=\"520\" h=\"181\"");
         assertThat(xml).contains("x=\"40\" y=\"41\" w=\"181\" h=\"80\"");
-        assertThat(xml).contains("<bendpoint x=\"220\" y=\"81\"/>");
+        assertThat(xml).contains("<sourceAttachment x=\"220\" y=\"81\"/><bendpoint x=\"261\" y=\"80\"/>"
+                + "<targetAttachment x=\"300\" y=\"80\"/>");
+        assertThat(xml).doesNotContain("<bendpoint x=\"220\" y=\"81\"/>", "<bendpoint x=\"300\" y=\"80\"/>");
     }
 
     @Test
@@ -242,7 +247,7 @@ class MainTest {
     void rejectsGroupWhoseSourceNodeIsNotGroupingType() throws Exception {
         JsonNode input = exportInputJson();
         // Add an ApplicationComponent node as the semantic source of a layout group
-        ((com.fasterxml.jackson.databind.node.ArrayNode) input.at("/source/nodes"))
+        ((ArrayNode) input.at("/source/nodes"))
                 .addObject()
                 .put("id", "not-a-grouping")
                 .put("type", "ApplicationComponent")

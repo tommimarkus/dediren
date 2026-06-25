@@ -16,6 +16,7 @@ import dev.dediren.contracts.export.ExportResult;
 import dev.dediren.contracts.export.OefExportPolicy;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.contracts.layout.LaidOutGroup;
+import dev.dediren.contracts.layout.Point;
 import dev.dediren.contracts.source.SourceNode;
 import dev.dediren.schemacache.SchemaCacheException;
 import dev.dediren.schemacache.SchemaCacheModule;
@@ -330,14 +331,31 @@ public final class Main {
                     .append("\" source=\"").append(attr(viewNodeIds.get(edge.source())))
                     .append("\" target=\"").append(attr(viewNodeIds.get(edge.target())))
                     .append("\">");
-            for (var point : edge.points()) {
-                xml.append("<bendpoint x=\"").append(formatNumber(point.x()))
-                        .append("\" y=\"").append(formatNumber(point.y())).append("\"/>");
-            }
+            writeConnectionGeometry(xml, edge.points());
             xml.append("</connection>");
         }
         xml.append("</view></diagrams></views></model>\n");
         return xml.toString();
+    }
+
+    private static void writeConnectionGeometry(StringBuilder xml, List<Point> points) {
+        if (points == null || points.isEmpty()) {
+            return;
+        }
+        writeLocation(xml, "sourceAttachment", points.get(0));
+        for (int index = 1; index < points.size() - 1; index++) {
+            writeLocation(xml, "bendpoint", points.get(index));
+        }
+        if (points.size() > 1) {
+            writeLocation(xml, "targetAttachment", points.get(points.size() - 1));
+        }
+    }
+
+    private static void writeLocation(StringBuilder xml, String elementName, Point point) {
+        xml.append("<").append(elementName)
+                .append(" x=\"").append(formatNumber(point.x()))
+                .append("\" y=\"").append(formatNumber(point.y()))
+                .append("\"/>");
     }
 
     private static void validateOfficialOefSchema(String content, Map<String, String> env)
