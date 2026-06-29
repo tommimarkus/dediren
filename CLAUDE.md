@@ -159,9 +159,17 @@ enforcement authority for matching version, tag, and release actions.
 - Plugins communicate with JSON stdin/stdout and command envelopes. Agents
   should be able to decide success or failure from stdout JSON alone.
 - Preserve valid plugin error envelopes and return a non-zero CLI exit.
-- Normalize runtime boundary failures into structured diagnostics, including
-  missing executable, timeout, invalid JSON, schema mismatch, unsupported
-  capability, id mismatch, and missing runtime dependency cases.
+- Normalize the runtime boundary failures core can observe into structured
+  diagnostics: missing executable, timeout, invalid JSON, schema mismatch,
+  unsupported capability, id mismatch, and process failure.
+- A missing runtime dependency is reported by the plugin that owns the
+  dependency, as a structured error envelope core preserves (for example the
+  export plugins emit `DEDIREN_OEF_SCHEMA_VALIDATOR_UNAVAILABLE` /
+  `DEDIREN_XMI_SCHEMA_VALIDATOR_UNAVAILABLE` when `xmllint` is absent). Core
+  does not synthesize this category, because a launcher that fails to start its
+  runtime (for example the ELK launcher when `java` is missing) only yields a
+  raw non-zero exit, which core surfaces as a generic plugin failure (typically
+  `DEDIREN_PLUGIN_CAPABILITY_PROBE_FAILED` from the runtime probe).
 - Do not add implicit plugin discovery from `PATH`. Discovery is explicit:
   bundled first-party plugins, project plugin directories such as
   `.dediren/plugins`, then user-configured directories.

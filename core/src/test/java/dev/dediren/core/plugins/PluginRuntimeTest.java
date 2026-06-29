@@ -66,6 +66,19 @@ class PluginRuntimeTest {
     }
 
     @Test
+    void failedCapabilityProbeIsStructured() throws Exception {
+        // A plugin (or launcher) that cannot start its runtime exits non-zero during the probe,
+        // which core normalizes into a structured diagnostic rather than leaking a raw failure.
+        // This is the path a missing runtime dependency (e.g. ELK without Java) takes.
+        writeManifest(temp, "runtime-testbed", testbedExecutable().toString(), List.of("render"));
+
+        assertThatThrownBy(() -> runWithMode("capabilities-nonzero", "render", List.of("render")))
+                .isInstanceOf(PluginExecutionException.class)
+                .extracting(error -> ((PluginExecutionException) error).diagnostic().code())
+                .isEqualTo("DEDIREN_PLUGIN_CAPABILITY_PROBE_FAILED");
+    }
+
+    @Test
     void invalidSuccessOutputIsStructured() throws Exception {
         writeManifest(temp, "runtime-testbed", testbedExecutable().toString(), List.of("render"));
 
@@ -103,6 +116,25 @@ class PluginRuntimeTest {
 
         assertThat(outcome.exitCode()).isEqualTo(3);
         assertThat(outcome.stdout()).contains("DEDIREN_TESTBED_ERROR");
+    }
+
+    @Test
+    void pluginRunsFromDeterministicProductRootWorkingDirectory() throws Exception {
+        writeManifest(temp, "runtime-testbed", testbedExecutable().toString(), List.of("render"));
+
+        PluginRunOutcome outcome = runWithMode("report-cwd", "render", List.of("render"));
+
+        // The testbed reports its own working directory in the error-envelope message; core must
+        // launch it from the product root, not the caller's inherited working directory. Assert
+        // equality (not substring): the inherited test-fork cwd is a child of the product root, so
+        // a substring check would pass even without the fix.
+        String reportedCwd = JsonSupport.objectMapper()
+                .readTree(outcome.stdout())
+                .at("/diagnostics/0/message")
+                .asText();
+        assertThat(outcome.exitCode()).isEqualTo(3);
+        assertThat(reportedCwd).isEqualTo(dev.dediren.core.DedirenPaths.productRoot().toString());
+        assertThat(reportedCwd).isNotEqualTo(System.getProperty("user.dir"));
     }
 
     @Test
@@ -164,6 +196,30 @@ class PluginRuntimeTest {
             assertThat(manifest.path()).isEqualTo(plugins.resolve("runtime-testbed.manifest.json"));
         } finally {
             System.setProperty("user.dir", originalUserDir);
+        }
+    }
+
+    @Test
+    void bundledRegistryDiscoversConfiguredDirectoriesFromEnvAndMarksThemUntrusted() throws Exception {
+        Path bundleRoot = temp.resolve("bundle-root");
+        Path schemas = bundleRoot.resolve("schemas");
+        Path configured = temp.resolve("user-plugins");
+        Files.createDirectories(schemas);
+        Files.createDirectories(bundleRoot.resolve("plugins"));
+        Files.createDirectories(configured);
+        writePermissiveSchemas(schemas, "model.schema.json", "plugin-manifest.schema.json");
+        writeManifest(configured, "runtime-testbed", testbedExecutable().toString(), List.of("render"), List.of());
+        String originalBundleRoot = System.getProperty("dediren.bundle.root");
+        System.setProperty("dediren.bundle.root", bundleRoot.toString());
+        try {
+            PluginRegistry registry = PluginRegistry.bundled(
+                    Map.of("DEDIREN_PLUGIN_DIRS", configured.toString()));
+            LoadedPluginManifest manifest = registry.loadManifest("runtime-testbed");
+
+            assertThat(manifest.path()).isEqualTo(configured.resolve("runtime-testbed.manifest.json"));
+            assertThat(manifest.trusted()).isFalse();
+        } finally {
+            restoreProperty("dediren.bundle.root", originalBundleRoot);
         }
     }
 
@@ -254,7 +310,7 @@ class PluginRuntimeTest {
                 "DEDIREN_TRUST_MANIFEST_CAPABILITIES", "1"));
 
         PluginRunOutcome outcome = PluginRunner.runForCapabilityWithRegistry(
-                PluginRegistry.fromDirs(List.of(temp)),
+                PluginRegistry.fromDirs(List.of(temp), List.of(temp)),
                 "runtime-testbed",
                 "layout",
                 List.of("layout"),
@@ -267,6 +323,29 @@ class PluginRuntimeTest {
     }
 
     @Test
+    void manifestTrustIsIgnoredForUntrustedDiscoveryDirectory() throws Exception {
+        writeManifest(temp, "runtime-testbed", testbedExecutable().toString(), List.of("layout"));
+        var options = PluginRunOptions.defaults().withCandidateEnv(Map.of(
+                "DEDIREN_TEST_PLUGIN_MODE", "ok",
+                "DEDIREN_TEST_PLUGIN_CAPABILITIES", "layout",
+                "DEDIREN_TEST_PLUGIN_ID", "different-plugin",
+                "DEDIREN_TRUST_MANIFEST_CAPABILITIES", "1"));
+
+        // A manifest from an untrusted directory cannot use trust mode to skip the probe, so the
+        // runtime id mismatch is still caught even though trust is requested.
+        assertThatThrownBy(() -> PluginRunner.runForCapabilityWithRegistry(
+                PluginRegistry.fromDirs(List.of(temp)),
+                "runtime-testbed",
+                "layout",
+                List.of("layout"),
+                "{}",
+                options))
+                .isInstanceOf(PluginExecutionException.class)
+                .extracting(error -> ((PluginExecutionException) error).diagnostic().code())
+                .isEqualTo("DEDIREN_PLUGIN_ID_MISMATCH");
+    }
+
+    @Test
     void manifestTrustStillValidatesWorkOutput() throws Exception {
         writeManifest(temp, "runtime-testbed", testbedExecutable().toString(), List.of("layout"));
         var options = PluginRunOptions.defaults().withCandidateEnv(Map.of(
@@ -275,7 +354,7 @@ class PluginRuntimeTest {
                 "DEDIREN_TRUST_MANIFEST_CAPABILITIES", "true"));
 
         assertThatThrownBy(() -> PluginRunner.runForCapabilityWithRegistry(
-                PluginRegistry.fromDirs(List.of(temp)),
+                PluginRegistry.fromDirs(List.of(temp), List.of(temp)),
                 "runtime-testbed",
                 "layout",
                 List.of("layout"),

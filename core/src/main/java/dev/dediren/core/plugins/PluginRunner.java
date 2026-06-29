@@ -44,13 +44,22 @@ public final class PluginRunner {
         }
 
         Map<String, String> allowedEnv = allowedEnv(options, loaded);
+        // Run plugins from a deterministic working directory (the product root) rather than the
+        // directory the CLI happened to be invoked from. Resolve it once: the product root is
+        // already required (and resolved) by manifest loading, so a failure here is not an
+        // executable-runtime I/O error and should not be classified as one.
+        Path workingDirectory = DedirenPaths.productRoot();
         // Trust mode: skip the capabilities probe (and its runtime id-mismatch check).
-        // Only appropriate for trusted, integrity-checked bundles. Default (unset) keeps the probe.
-        if (!capabilitiesCommand && manifestTrustEnabled(options)) {
-            ProcessOutput trusted = runExecutable(pluginId, executable, args, input, options.timeout(), allowedEnv);
+        // Honored only for manifests discovered in the trusted bundled first-party plugin
+        // directory; a manifest from a project-local or user-configured directory can never
+        // bypass the probe this way. Default (unset) keeps the probe.
+        if (!capabilitiesCommand && loaded.trusted() && manifestTrustEnabled(options)) {
+            ProcessOutput trusted =
+                    runExecutable(pluginId, executable, args, input, options.timeout(), allowedEnv, workingDirectory);
             return normalizePluginOutput(pluginId, requiredCapability, args, trusted);
         }
-        ProcessOutput capabilities = runExecutable(pluginId, executable, List.of("capabilities"), "", options.timeout(), allowedEnv);
+        ProcessOutput capabilities = runExecutable(
+                pluginId, executable, List.of("capabilities"), "", options.timeout(), allowedEnv, workingDirectory);
         RuntimeCapabilities runtimeCapabilities = normalizeRuntimeCapabilities(pluginId, capabilities);
         if (!loaded.manifest().id().equals(runtimeCapabilities.id())) {
             throw PluginExecutionException.plugin(
@@ -68,7 +77,8 @@ public final class PluginRunner {
             return new PluginRunOutcome(capabilities.stdout(), 0);
         }
 
-        ProcessOutput output = runExecutable(pluginId, executable, args, input, options.timeout(), allowedEnv);
+        ProcessOutput output =
+                runExecutable(pluginId, executable, args, input, options.timeout(), allowedEnv, workingDirectory);
         return normalizePluginOutput(pluginId, requiredCapability, args, output);
     }
 
@@ -237,12 +247,15 @@ public final class PluginRunner {
             List<String> args,
             String input,
             Duration timeout,
-            Map<String, String> env) throws PluginExecutionException {
+            Map<String, String> env,
+            Path workingDirectory) throws PluginExecutionException {
         try {
             var command = new java.util.ArrayList<String>();
             command.add(executable.toString());
             command.addAll(args);
             ProcessBuilder builder = new ProcessBuilder(command);
+            // Reproducible, caller-independent working directory (see runForCapabilityWithRegistry).
+            builder.directory(workingDirectory.toFile());
             builder.environment().clear();
             builder.environment().putAll(env);
             Process process = builder.start();
