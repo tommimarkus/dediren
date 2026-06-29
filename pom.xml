@@ -37,7 +37,7 @@
     <guava.version>33.6.0-jre</guava.version>
     <jackson.version>2.22.0</jackson.version>
     <json-schema-validator.version>3.0.5</json-schema-validator.version>
-    <junit.version>6.1.0</junit.version>
+    <junit.version>6.1.1</junit.version>
     <picocli.version>4.7.7</picocli.version>
     <xmlunit.version>2.12.0</xmlunit.version>
     <xtext-xbase.version>2.43.0</xtext-xbase.version>
