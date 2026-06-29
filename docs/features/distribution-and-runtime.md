@@ -66,7 +66,7 @@ Plugin child processes receive only the variables listed in their manifests.
 | `DEDIREN_XMI_SCHEMA_PATH` | Local XMI schema file (offline export validation). |
 | `DEDIREN_SCHEMA_CACHE_DIR` | Cache directory for schema downloads. |
 | `DEDIREN_CDS_DIR` | Relocate Class-Data-Sharing archives (see below). |
-| `DEDIREN_TRUST_MANIFEST_CAPABILITIES` | Opt-in: trust static manifest capabilities, skip the per-call runtime probe (one fewer JVM start per op); bypasses the id-mismatch pre-check. Use only with trusted bundles. Default keeps the probe. |
+| `DEDIREN_TRUST_MANIFEST_CAPABILITIES` | Opt-in: trust static manifest capabilities, skip the per-call runtime probe (one fewer JVM start per op); bypasses the id-mismatch pre-check. Honored only for bundled first-party plugins; manifests in `.dediren/plugins` or `DEDIREN_PLUGIN_DIRS` always keep the probe. Default keeps the probe. |
 
 ## Startup Optimization (Class-Data-Sharing)
 

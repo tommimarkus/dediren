@@ -35,7 +35,7 @@ class MainTest {
         CliResult result = Main.executeForTesting(new String[]{"--version"}, "");
 
         assertThat(result.exitCode()).isZero();
-        assertThat(result.stdout()).contains("dediren 2026.06.7");
+        assertThat(result.stdout()).contains("dediren 2026.06.8");
     }
 
     @Test
@@ -765,6 +765,7 @@ class MainTest {
                 """.formatted(java, classpath, mainClass), StandardCharsets.UTF_8);
         script.toFile().setExecutable(true);
         return Map.of(
+                "DEDIREN_PLUGIN_DIRS", workspaceRoot().resolve("fixtures/plugins").toString(),
                 "DEDIREN_PLUGIN_" + pluginId.toUpperCase().replace('-', '_'),
                 script.toString());
     }
