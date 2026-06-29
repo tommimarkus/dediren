@@ -36,7 +36,7 @@ public final class CoreCommands {
             String plugin,
             String inputText,
             Map<String, String> env) throws PluginExecutionException {
-        return layoutCommand(new LayoutCommandInput(plugin, inputText, PluginRegistry.bundled(), env));
+        return layoutCommand(new LayoutCommandInput(plugin, inputText, PluginRegistry.bundled(env), env));
     }
 
     public static PluginRunOutcome layoutCommand(LayoutCommandInput input) throws PluginExecutionException {
@@ -73,7 +73,7 @@ public final class CoreCommands {
             return errorOutcome(error.diagnostics());
         }
         return PluginRunner.runForCapabilityWithRegistry(
-                PluginRegistry.bundled(),
+                PluginRegistry.bundled(env),
                 plugin,
                 "projection",
                 List.of("project", "--target", target, "--view", view),
@@ -109,7 +109,7 @@ public final class CoreCommands {
             return errorOutcome(error.diagnostics());
         }
         return PluginRunner.runForCapabilityWithRegistry(
-                PluginRegistry.bundled(),
+                PluginRegistry.bundled(env),
                 plugin,
                 "semantic-validation",
                 List.of("validate", "--profile", profile),
@@ -158,7 +158,7 @@ public final class CoreCommands {
             input.set("render_metadata", JsonSupport.objectMapper().valueToTree(metadata));
         }
         return PluginRunner.runForCapabilityWithRegistry(
-                PluginRegistry.bundled(),
+                PluginRegistry.bundled(env),
                 plugin,
                 "render",
                 List.of("render"),
@@ -196,7 +196,7 @@ public final class CoreCommands {
                 layoutResult,
                 policy);
         return PluginRunner.runForCapabilityWithRegistry(
-                PluginRegistry.bundled(),
+                PluginRegistry.bundled(env),
                 plugin,
                 "export",
                 List.of("export"),
