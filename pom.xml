@@ -6,7 +6,7 @@
 
   <groupId>dev.dediren</groupId>
   <artifactId>dediren</artifactId>
-  <version>2026.06.7</version>
+  <version>2026.06.8</version>
   <packaging>pom</packaging>
 
   <modules>

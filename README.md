@@ -50,8 +50,8 @@ cached under `.cache/dependency-check`, separately from Maven artifacts.
 The `dist-build` profile creates an agent-ready archive under `dist/`:
 
 ```text
-dist/dediren-agent-bundle-2026.06.7/
-dist/dediren-agent-bundle-2026.06.7.tar.gz
+dist/dediren-agent-bundle-2026.06.8/
+dist/dediren-agent-bundle-2026.06.8.tar.gz
 ```
 
 The Java archive contains launch scripts and jars, not a bundled JRE. Java 21
@@ -61,7 +61,7 @@ platform-neutral and is not tied to CPU architecture.
 ## Bundle Layout
 
 ```text
-dediren-agent-bundle-2026.06.7/
+dediren-agent-bundle-2026.06.8/
   bin/
     dediren
     dediren-plugin-generic-graph
@@ -108,7 +108,7 @@ the probe regardless of this flag. Default (unset) keeps the probe.
 From an unpacked bundle:
 
 ```bash
-VERSION=2026.06.7
+VERSION=2026.06.8
 BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-${VERSION}
 
 "$BUNDLE/bin/dediren" --version
