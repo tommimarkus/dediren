@@ -2,6 +2,7 @@ package dev.dediren.core.plugins;
 
 import dev.dediren.core.DedirenPaths;
 import dev.dediren.core.schema.SchemaValidator;
+import dev.dediren.contracts.DiagnosticCode;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.contracts.plugin.PluginManifest;
 import java.io.IOException;
@@ -72,27 +73,27 @@ public final class PluginRegistry {
                         .validate("schemas/plugin-manifest.schema.json", value);
                 if (!errors.isEmpty()) {
                     throw PluginExecutionException.plugin(
-                            "DEDIREN_PLUGIN_MANIFEST_INVALID",
+                            DiagnosticCode.PLUGIN_MANIFEST_INVALID.code(),
                             pluginId,
                             "plugin manifest for " + pluginId + " is invalid: " + errors.getFirst());
                 }
                 PluginManifest manifest = JsonSupport.objectMapper().treeToValue(value, PluginManifest.class);
                 if (!pluginId.equals(manifest.id())) {
                     throw PluginExecutionException.plugin(
-                            "DEDIREN_PLUGIN_MANIFEST_INVALID",
+                            DiagnosticCode.PLUGIN_MANIFEST_INVALID.code(),
                             pluginId,
                             "manifest id '" + manifest.id() + "' did not match requested id");
                 }
                 return new LoadedPluginManifest(manifest, path, trustedDirs.contains(normalize(dir)));
             } catch (IOException error) {
                 throw PluginExecutionException.plugin(
-                        "DEDIREN_PLUGIN_MANIFEST_INVALID",
+                        DiagnosticCode.PLUGIN_MANIFEST_INVALID.code(),
                         pluginId,
                         "plugin manifest for " + pluginId + " is invalid: " + error.getMessage());
             }
         }
         throw PluginExecutionException.plugin(
-                "DEDIREN_PLUGIN_UNKNOWN",
+                DiagnosticCode.PLUGIN_UNKNOWN.code(),
                 pluginId,
                 "unknown plugin id: " + pluginId);
     }

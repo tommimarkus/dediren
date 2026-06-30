@@ -3,6 +3,7 @@ package dev.dediren.core.plugins;
 import com.fasterxml.jackson.databind.JsonNode;
 import dev.dediren.core.DedirenPaths;
 import dev.dediren.core.schema.SchemaValidator;
+import dev.dediren.contracts.DiagnosticCode;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.contracts.plugin.RuntimeCapabilities;
 import java.io.IOException;
@@ -175,7 +176,7 @@ public final class PluginRunner {
             return new PluginRunOutcome(output.stdout(), 0);
         }
         throw PluginExecutionException.plugin(
-                "DEDIREN_PLUGIN_PROCESS_FAILED",
+                DiagnosticCode.PLUGIN_PROCESS_FAILED.code(),
                 pluginId,
                 "plugin " + pluginId + " exited with status " + output.exitCode() + ": " + output.stderr());
     }
@@ -285,7 +286,7 @@ public final class PluginRunner {
             throw timeout(pluginId, timeout);
         } catch (Exception error) {
             throw PluginExecutionException.plugin(
-                    "DEDIREN_PLUGIN_IO_ERROR",
+                    DiagnosticCode.PLUGIN_IO_ERROR.code(),
                     pluginId,
                     "plugin " + pluginId + " I/O error: " + error.getMessage());
         }
@@ -301,7 +302,7 @@ public final class PluginRunner {
 
     private static PluginExecutionException timeout(String pluginId, Duration timeout) {
         return PluginExecutionException.plugin(
-                "DEDIREN_PLUGIN_TIMEOUT",
+                DiagnosticCode.PLUGIN_TIMEOUT.code(),
                 pluginId,
                 "plugin " + pluginId + " timed out after " + timeout.toMillis() + " ms");
     }
