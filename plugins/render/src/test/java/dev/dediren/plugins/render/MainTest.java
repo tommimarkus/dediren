@@ -1276,6 +1276,76 @@ class MainTest {
         }
 
         @Test
+        void multiLineNodeLabelPinsRenderedWidthToLayoutMetric() throws Exception {
+            // Box sized so each wrapped line keeps the full font (no width/height shrink),
+            // so the rendered font-size is exactly the policy font-size.
+            JsonNode input = archimateRenderInput(
+                    fixtureJson("fixtures/render-policy/archimate-svg.json"),
+                    """
+                    [
+                      { "id": "appcomp", "source_id": "appcomp", "projection_id": "appcomp", "x": 40, "y": 40, "width": 190, "height": 110, "label": "Customer Identity Service" }
+                    ]
+                    """,
+                    "[]",
+                    """
+                    {
+                      "appcomp": { "type": "ApplicationComponent", "source_id": "appcomp" }
+                    }
+                    """,
+                    "{}");
+
+            Document document = svgDocument(okContent(render(input)));
+            Element node = groupWithAttribute(document, "data-dediren-node-id", "appcomp");
+            Element label = (Element) node.getElementsByTagName("text").item(0);
+            double fontSize = Double.parseDouble(label.getAttribute("font-size"));
+
+            org.w3c.dom.NodeList tspans = label.getElementsByTagName("tspan");
+            assertThat(tspans.getLength()).isGreaterThan(1);
+            for (int i = 0; i < tspans.getLength(); i++) {
+                Element tspan = (Element) tspans.item(i);
+                String content = tspan.getTextContent();
+                // Each wrapped line pins its rendered width to the layout metric
+                // (chars x fontSize x 0.62) via textLength + lengthAdjust, so the displayed
+                // label size — and its clearance from the corner decorator — is independent
+                // of the viewer's installed font.
+                double metric = content.codePointCount(0, content.length()) * fontSize * 0.62;
+                assertThat(tspan.getAttribute("lengthAdjust")).isEqualTo("spacingAndGlyphs");
+                assertThat(Double.parseDouble(tspan.getAttribute("textLength")))
+                        .isCloseTo(metric, org.assertj.core.data.Offset.offset(0.15));
+            }
+        }
+
+        @Test
+        void singleLineNodeLabelPinsRenderedWidthToLayoutMetric() throws Exception {
+            JsonNode input = archimateRenderInput(
+                    fixtureJson("fixtures/render-policy/archimate-svg.json"),
+                    """
+                    [
+                      { "id": "appcomp", "source_id": "appcomp", "projection_id": "appcomp", "x": 40, "y": 40, "width": 190, "height": 80, "label": "Auth" }
+                    ]
+                    """,
+                    "[]",
+                    """
+                    {
+                      "appcomp": { "type": "ApplicationComponent", "source_id": "appcomp" }
+                    }
+                    """,
+                    "{}");
+
+            Document document = svgDocument(okContent(render(input)));
+            Element node = groupWithAttribute(document, "data-dediren-node-id", "appcomp");
+            Element label = (Element) node.getElementsByTagName("text").item(0);
+
+            // Single-line labels emit no tspan; the metric pin lands on <text> itself.
+            assertThat(label.getElementsByTagName("tspan").getLength()).isZero();
+            double fontSize = Double.parseDouble(label.getAttribute("font-size"));
+            double metric = "Auth".codePointCount(0, "Auth".length()) * fontSize * 0.62;
+            assertThat(label.getAttribute("lengthAdjust")).isEqualTo("spacingAndGlyphs");
+            assertThat(Double.parseDouble(label.getAttribute("textLength")))
+                    .isCloseTo(metric, org.assertj.core.data.Offset.offset(0.15));
+        }
+
+        @Test
         void archimateJunctionLabelRendersBelowCircle() throws Exception {
             JsonNode input = archimateRenderInput(
                     fixtureJson("fixtures/render-policy/archimate-svg.json"),
