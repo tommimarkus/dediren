@@ -32,3 +32,20 @@ GitHub release archives target SLSA Build Level 2 evidence:
 - first-party Java is statically analyzed by CodeQL on pull requests, pushes to
   `main`, and weekly; high-severity alerts surface in the repository's code
   scanning view.
+
+## Branch Protection (deferred)
+
+While the project is pre-release and maintained by a single author, the default
+branch (`main`) is intentionally left without required-review branch protection
+to keep solo iteration fast. Direct pushes to `main` are an accepted risk for
+now. Compensating controls run on every push and pull request:
+
+- the blocking Grype/SBOM supply-chain gate (`ci.yml`) fails on High/Critical
+  advisories;
+- the full test suite and whitespace check run in the same workflow;
+- `CODEOWNERS` records review ownership for when protection is enabled.
+
+This decision is revisited when the project starts accepting external
+contributions or reaches a stable release. At that point, enable a `main`
+ruleset that requires the `test` and `vulnerability-scan` status checks (and,
+optionally, `CODEOWNERS` review).
