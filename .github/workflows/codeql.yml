@@ -1,0 +1,62 @@
+name: CodeQL
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+  schedule:
+    # Weekly, Tuesday 06:00 UTC — offset from Dependabot (Mon) and the OWASP
+    # dependency-audit cross-check (Thu).
+    - cron: "0 6 * * 2"
+
+permissions:
+  contents: read
+
+env:
+  SEGMENT_DOWNLOAD_TIMEOUT_MINS: "5"
+  MAVEN_USER_HOME: ${{ github.workspace }}/.cache/maven/user-home
+
+jobs:
+  analyze:
+    name: Analyze Java
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write # upload SARIF to GitHub code scanning
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Java
+        uses: actions/setup-java@1bcf9fb12cf4aa7d266a90ae39939e61372fe520 # v5.4.0
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Cache Maven artifacts
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .cache/maven
+          key: maven-${{ runner.os }}-${{ hashFiles('**/pom.xml', '.mvn/wrapper/maven-wrapper.properties') }}
+          restore-keys: |
+            maven-${{ runner.os }}-
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@dd903d2e4f5405488e5ef1422510ee31c8b32357 # v3
+        with:
+          languages: java-kotlin
+          build-mode: manual
+
+      - name: Build for analysis
+        run: ./mvnw -B -ntp -DskipTests clean compile
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@dd903d2e4f5405488e5ef1422510ee31c8b32357 # v3
+        with:
+          category: "/language:java-kotlin"

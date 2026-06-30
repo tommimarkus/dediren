@@ -28,4 +28,7 @@ GitHub release archives target SLSA Build Level 2 evidence:
 - release workflow jobs run on GitHub-hosted runners with SHA-pinned actions;
 - archive provenance is generated with GitHub artifact attestations;
 - each release publishes archive checksums and CycloneDX SBOMs;
-- the publish job verifies archive attestations before creating the release.
+- the publish job verifies archive attestations before creating the release;
+- first-party Java is statically analyzed by CodeQL on pull requests, pushes to
+  `main`, and weekly; high-severity alerts surface in the repository's code
+  scanning view.
