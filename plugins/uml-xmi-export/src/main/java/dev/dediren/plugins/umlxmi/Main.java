@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import dev.dediren.contracts.CommandEnvelope;
 import dev.dediren.contracts.ContractVersions;
 import dev.dediren.contracts.Diagnostic;
+import dev.dediren.contracts.DiagnosticCode;
 import dev.dediren.contracts.DiagnosticSeverity;
 import dev.dediren.contracts.export.ExportRequest;
 import dev.dediren.contracts.export.ExportResult;
@@ -1192,10 +1193,11 @@ public final class Main {
     private static void validateOmgXmiSchema(String content, Map<String, String> env)
             throws XmiValidationException {
         Path schemaPath = resolveOmgXmiSchemaPath(env);
+        String validator = xmiSchemaValidator(env);
         Process process;
         try {
             process = new ProcessBuilder(
-                            XMI_SCHEMA_VALIDATOR,
+                            validator,
                             "--nonet",
                             "--noout",
                             "--schema",
@@ -1204,15 +1206,15 @@ public final class Main {
                     .start();
         } catch (IOException error) {
             throw new XmiValidationException(
-                    "DEDIREN_XMI_SCHEMA_VALIDATOR_UNAVAILABLE",
-                    "failed to run OMG XMI schema validator " + XMI_SCHEMA_VALIDATOR + ": " + error.getMessage());
+                    DiagnosticCode.XMI_SCHEMA_VALIDATOR_UNAVAILABLE.code(),
+                    "failed to run OMG XMI schema validator " + validator + ": " + error.getMessage());
         }
         try (OutputStream stdin = process.getOutputStream()) {
             stdin.write(content.getBytes(StandardCharsets.UTF_8));
         } catch (IOException error) {
             throw new XmiValidationException(
-                    "DEDIREN_XMI_SCHEMA_VALIDATOR_UNAVAILABLE",
-                    "failed to write UML/XMI XML to OMG XMI schema validator " + XMI_SCHEMA_VALIDATOR + ": "
+                    DiagnosticCode.XMI_SCHEMA_VALIDATOR_UNAVAILABLE.code(),
+                    "failed to write UML/XMI XML to OMG XMI schema validator " + validator + ": "
                             + error.getMessage());
         }
         try {
@@ -1222,7 +1224,7 @@ public final class Main {
             if (exitCode == 0) {
                 return;
             }
-            String details = SchemaCacheModule.commandOutputDetails(XMI_SCHEMA_VALIDATOR, exitCode, stdout, stderr);
+            String details = SchemaCacheModule.commandOutputDetails(validator, exitCode, stdout, stderr);
             if (xmiSchemaErrorsAreOnlyUnavailableUmlSchema(details)) {
                 return;
             }
@@ -1231,14 +1233,19 @@ public final class Main {
                     "generated UML/XMI XML does not validate against OMG XMI.xsd: " + details);
         } catch (IOException error) {
             throw new XmiValidationException(
-                    "DEDIREN_XMI_SCHEMA_VALIDATOR_UNAVAILABLE",
+                    DiagnosticCode.XMI_SCHEMA_VALIDATOR_UNAVAILABLE.code(),
                     "failed to read OMG XMI schema validator output: " + error.getMessage());
         } catch (InterruptedException error) {
             Thread.currentThread().interrupt();
             throw new XmiValidationException(
-                    "DEDIREN_XMI_SCHEMA_VALIDATOR_UNAVAILABLE",
+                    DiagnosticCode.XMI_SCHEMA_VALIDATOR_UNAVAILABLE.code(),
                     "OMG XMI schema validator interrupted");
         }
+    }
+
+    private static String xmiSchemaValidator(Map<String, String> env) {
+        String configured = env.get("DEDIREN_XMI_SCHEMA_VALIDATOR");
+        return configured == null || configured.isBlank() ? XMI_SCHEMA_VALIDATOR : configured;
     }
 
     private static Path resolveOmgXmiSchemaPath(Map<String, String> env) throws XmiValidationException {

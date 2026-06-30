@@ -5,7 +5,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import dev.dediren.contracts.DiagnosticCode;
 import dev.dediren.contracts.json.JsonSupport;
+import dev.dediren.testsupport.CommandEnvelopeAssertions;
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -51,6 +53,17 @@ class MainTest {
         // Update this golden via a reviewed baseline refresh when the XMI contract changes intentionally.
         assertThat(xml).isEqualTo(fixture("fixtures/export/uml-basic.xmi"));
         assertThat(xml).doesNotContain("xmi:version", "uml:Activity");
+    }
+
+    @Test
+    void missingXmiSchemaValidatorIsStructured() throws Exception {
+        Map<String, String> env = new java.util.HashMap<>(envWithXmiSchema());
+        env.put("DEDIREN_XMI_SCHEMA_VALIDATOR", tempDir.resolve("no-such-validator").toString());
+
+        PluginResult result = Main.executeForTesting(new String[]{"export"}, exportInput().toString(), env);
+
+        CommandEnvelopeAssertions.assertErrorCode(
+                result.stdout(), DiagnosticCode.XMI_SCHEMA_VALIDATOR_UNAVAILABLE.code());
     }
 
     @Test
