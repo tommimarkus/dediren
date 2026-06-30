@@ -52,6 +52,9 @@ agent tools should be pointed here from their own entrypoint files (for example,
 
 ## Architecture Rules
 
+- The rules below are the quick reference. Full rationale, the allowed
+  dependency-edge table, stability tiers, enforcement (ArchUnit/Enforcer), and
+  the known-debt register live in `docs/architecture-guidelines.md`.
 - Keep `dediren` contract-first. Public JSON schemas, fixtures, command
   envelopes, diagnostics, plugin manifests, and runtime capability output are
   the stable product surface.
