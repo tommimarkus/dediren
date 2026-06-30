@@ -3,6 +3,7 @@ package dev.dediren.core.plugins;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import dev.dediren.contracts.DiagnosticCode;
 import dev.dediren.contracts.json.JsonSupport;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -382,6 +383,51 @@ class PluginRuntimeTest {
 
         assertThat(outcome.exitCode()).isZero();
         assertThat(outcome.stdout()).contains("\"id\"");
+    }
+
+    @Test
+    void exceededWorkCommandTimeoutReturnsTypedDiagnostic() throws Exception {
+        writeManifest(temp, "runtime-testbed", testbedExecutable().toString(), List.of("render"));
+        var options = PluginRunOptions.defaults()
+                .withCandidateEnv(Map.of("DEDIREN_TEST_PLUGIN_MODE", "sleep"))
+                .withTimeout(Duration.ofMillis(200));
+
+        assertThatThrownBy(() -> PluginRunner.runForCapabilityWithRegistry(
+                PluginRegistry.fromDirs(List.of(temp)), "runtime-testbed", "render", List.of("render"), "{}", options))
+                .isInstanceOf(PluginExecutionException.class)
+                .extracting(error -> ((PluginExecutionException) error).diagnostic().code())
+                .isEqualTo(DiagnosticCode.PLUGIN_TIMEOUT.code());
+    }
+
+    @Test
+    void okEnvelopeWithNonZeroExitIsStructuredProcessFailure() throws Exception {
+        writeManifest(temp, "runtime-testbed", testbedExecutable().toString(), List.of("render"));
+
+        assertThatThrownBy(() -> runWithMode("ok-envelope-nonzero", "render", List.of("render")))
+                .isInstanceOf(PluginExecutionException.class)
+                .extracting(error -> ((PluginExecutionException) error).diagnostic().code())
+                .isEqualTo(DiagnosticCode.PLUGIN_PROCESS_FAILED.code());
+    }
+
+    @Test
+    void unknownPluginIdIsStructured() throws Exception {
+        assertThatThrownBy(() -> PluginRegistry.fromDirs(List.of(temp)).loadManifest("does-not-exist"))
+                .isInstanceOf(PluginExecutionException.class)
+                .extracting(error -> ((PluginExecutionException) error).diagnostic().code())
+                .isEqualTo(DiagnosticCode.PLUGIN_UNKNOWN.code());
+    }
+
+    @Test
+    void schemaInvalidManifestIsStructured() throws Exception {
+        // A manifest missing the required "id"/"executable"/"capabilities" fields must fail the
+        // plugin-manifest schema.
+        Files.writeString(temp.resolve("broken.manifest.json"),
+                "{\"plugin_manifest_schema_version\":\"plugin-manifest.schema.v1\"}");
+
+        assertThatThrownBy(() -> PluginRegistry.fromDirs(List.of(temp)).loadManifest("broken"))
+                .isInstanceOf(PluginExecutionException.class)
+                .extracting(error -> ((PluginExecutionException) error).diagnostic().code())
+                .isEqualTo(DiagnosticCode.PLUGIN_MANIFEST_INVALID.code());
     }
 
     private static void restoreProperty(String name, String value) {
