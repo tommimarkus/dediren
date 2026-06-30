@@ -61,7 +61,7 @@ public final class Main {
     private static final double ARCHIMATE_ICON_TOP_INSET = 9.0;
     // Must equal ARCHIMATE_LABEL_ICON_RESERVE in plugins/generic-graph
     // GenericGraphLayoutSizing: per-side room reserved so a centered label clears
-    // the upper-right type icon.
+    // the upper-right type icon. Enforced by dist-tool ArchimateLabelReserveConsistencyTest.
     private static final double ARCHIMATE_LABEL_ICON_RESERVE = 34.0;
     private static final double NODE_LABEL_VERTICAL_PADDING = 8.0;
     private static final double NODE_LABEL_MIN_FONT_SIZE = 9.0;

@@ -24,6 +24,7 @@ final class GenericGraphLayoutSizing {
     private static final double ARCHIMATE_TEXT_CHAR_WIDTH = 8.7;
     // Must equal ARCHIMATE_LABEL_ICON_RESERVE in plugins/render Main: per-side
     // room reserved so a centered label clears the upper-right type icon.
+    // Enforced by dist-tool ArchimateLabelReserveConsistencyTest.
     private static final double ARCHIMATE_LABEL_ICON_RESERVE = 34.0;
     private static final double ARCHIMATE_LINE_HEIGHT = 18.0;
     private static final double ARCHIMATE_VERTICAL_PADDING = 28.0;
