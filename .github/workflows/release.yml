@@ -229,4 +229,4 @@ jobs:
             release-assets/SHA256SUMS \
             --verify-tag \
             --title "Dediren $GITHUB_REF_NAME" \
-            --notes "Dediren agent bundle release."
+            --generate-notes
