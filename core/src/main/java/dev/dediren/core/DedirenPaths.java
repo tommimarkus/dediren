@@ -13,13 +13,26 @@ public final class DedirenPaths {
     }
 
     public static Path productRoot() {
-        Optional<Path> configuredRoot = configuredRoot(BUNDLE_ROOT_PROPERTY, System::getProperty)
-                .or(() -> configuredRoot(BUNDLE_ROOT_ENV, System::getenv));
-        if (configuredRoot.isPresent()) {
-            return requireProductRoot(configuredRoot.get(), configuredRootSource());
-        }
+        return productRoot(System::getProperty, System::getenv, Path.of(System.getProperty("user.dir")));
+    }
 
-        Path current = Path.of(System.getProperty("user.dir")).toAbsolutePath();
+    /**
+     * Resolves the product root from explicit inputs: a configured {@code dediren.bundle.root}
+     * property, then a {@code DEDIREN_BUNDLE_ROOT} environment variable, then a walk up from
+     * {@code workingDir}. Pure with respect to JVM globals so callers and tests can resolve a root
+     * without mutating {@code System} properties.
+     */
+    static Path productRoot(
+            Function<String, String> properties, Function<String, String> env, Path workingDir) {
+        Optional<Path> fromProperty = configuredRoot(BUNDLE_ROOT_PROPERTY, properties);
+        if (fromProperty.isPresent()) {
+            return requireProductRoot(fromProperty.get(), BUNDLE_ROOT_PROPERTY);
+        }
+        Optional<Path> fromEnv = configuredRoot(BUNDLE_ROOT_ENV, env);
+        if (fromEnv.isPresent()) {
+            return requireProductRoot(fromEnv.get(), BUNDLE_ROOT_ENV);
+        }
+        Path current = workingDir.toAbsolutePath();
         while (current != null) {
             if (isProductRoot(current)) {
                 return current;
@@ -28,7 +41,7 @@ public final class DedirenPaths {
         }
         throw new IllegalStateException(
                 "Could not locate Dediren product root from " + BUNDLE_ROOT_PROPERTY
-                        + ", " + BUNDLE_ROOT_ENV + ", or user.dir");
+                        + ", " + BUNDLE_ROOT_ENV + ", or working directory " + workingDir);
     }
 
     private static Optional<Path> configuredRoot(String name, Function<String, String> source) {
@@ -37,12 +50,6 @@ public final class DedirenPaths {
             return Optional.empty();
         }
         return Optional.of(Path.of(value).toAbsolutePath().normalize());
-    }
-
-    private static String configuredRootSource() {
-        return configuredRoot(BUNDLE_ROOT_PROPERTY, System::getProperty).isPresent()
-                ? BUNDLE_ROOT_PROPERTY
-                : BUNDLE_ROOT_ENV;
     }
 
     private static Path requireProductRoot(Path root, String source) {
