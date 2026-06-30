@@ -31,4 +31,13 @@
       <artifactId>junit-jupiter</artifactId>
     </dependency>
   </dependencies>
+
+  <profiles>
+    <profile>
+      <id>coverage</id>
+      <properties>
+        <jacoco.skip>true</jacoco.skip>
+      </properties>
+    </profile>
+  </profiles>
 </project>
