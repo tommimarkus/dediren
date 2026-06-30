@@ -847,12 +847,13 @@ public final class Main {
         if (label.lines().size() == 1) {
             return String.format(
                     Locale.ROOT,
-                    "<text x=\"%.1f\" y=\"%.1f\" text-anchor=\"middle\"%s fill=\"%s\" font-size=\"%s\">%s</text>",
+                    "<text x=\"%.1f\" y=\"%.1f\" text-anchor=\"middle\"%s fill=\"%s\" font-size=\"%s\"%s>%s</text>",
                     position.x(),
                     position.y(),
                     baselineAttribute,
                     attr(style.labelFill()),
                     labelNumber(label.fontSize()),
+                    labelLengthAttributes(label.lines().get(0), label.fontSize()),
                     text(label.lines().get(0)));
         }
 
@@ -868,13 +869,26 @@ public final class Main {
             String dy = index == 0 ? "0" : labelNumber(nodeLabelLineHeight(label.fontSize()));
             svg.append(String.format(
                     Locale.ROOT,
-                    "<tspan x=\"%.1f\" dy=\"%s\">%s</tspan>",
+                    "<tspan x=\"%.1f\" dy=\"%s\"%s>%s</tspan>",
                     position.x(),
                     dy,
+                    labelLengthAttributes(label.lines().get(index), label.fontSize()),
                     text(label.lines().get(index))));
         }
         svg.append("</text>");
         return svg.toString();
+    }
+
+    // Pin each rendered label line to the layout metric (estimateTextWidth) via
+    // textLength + lengthAdjust, so the displayed width — and thus the label's
+    // clearance from the corner decorator and node border — is independent of the
+    // viewer's installed font rather than the layout's internal metric. See issue #25.
+    private static String labelLengthAttributes(String line, double fontSize) {
+        double width = estimateTextWidth(line, fontSize);
+        if (width <= 0.0) {
+            return "";
+        }
+        return " textLength=\"" + labelNumber(width) + "\" lengthAdjust=\"spacingAndGlyphs\"";
     }
 
     private static NodeLabelLines nodeLabelLinesAndSize(LaidOutNode node, ResolvedNodeStyle style, double fontSize) {
