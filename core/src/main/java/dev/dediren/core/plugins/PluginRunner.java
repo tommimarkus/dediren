@@ -3,7 +3,9 @@ package dev.dediren.core.plugins;
 import com.fasterxml.jackson.databind.JsonNode;
 import dev.dediren.core.DedirenPaths;
 import dev.dediren.core.schema.SchemaValidator;
+import dev.dediren.contracts.CommandExitCode;
 import dev.dediren.contracts.DiagnosticCode;
+import dev.dediren.contracts.EnvelopeStatus;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.contracts.plugin.RuntimeCapabilities;
 import java.io.IOException;
@@ -31,7 +33,7 @@ public final class PluginRunner {
         boolean capabilitiesCommand = !args.isEmpty() && "capabilities".equals(args.getFirst());
         if (!capabilitiesCommand && !loaded.manifest().capabilities().contains(requiredCapability)) {
             throw PluginExecutionException.plugin(
-                    "DEDIREN_PLUGIN_UNSUPPORTED_CAPABILITY",
+                    DiagnosticCode.PLUGIN_UNSUPPORTED_CAPABILITY.code(),
                     pluginId,
                     "plugin " + pluginId + " does not support capability " + requiredCapability);
         }
@@ -39,7 +41,7 @@ public final class PluginRunner {
         Path executable = executablePath(loaded, options);
         if (!Files.exists(executable)) {
             throw PluginExecutionException.plugin(
-                    "DEDIREN_PLUGIN_MISSING_EXECUTABLE",
+                    DiagnosticCode.PLUGIN_MISSING_EXECUTABLE.code(),
                     pluginId,
                     "plugin " + pluginId + " executable does not exist: " + executable);
         }
@@ -64,18 +66,18 @@ public final class PluginRunner {
         RuntimeCapabilities runtimeCapabilities = normalizeRuntimeCapabilities(pluginId, capabilities);
         if (!loaded.manifest().id().equals(runtimeCapabilities.id())) {
             throw PluginExecutionException.plugin(
-                    "DEDIREN_PLUGIN_ID_MISMATCH",
+                    DiagnosticCode.PLUGIN_ID_MISMATCH.code(),
                     pluginId,
                     "plugin " + pluginId + " runtime id " + runtimeCapabilities.id() + " does not match manifest id");
         }
         if (!capabilitiesCommand && !runtimeCapabilities.capabilities().contains(requiredCapability)) {
             throw PluginExecutionException.plugin(
-                    "DEDIREN_PLUGIN_UNSUPPORTED_CAPABILITY",
+                    DiagnosticCode.PLUGIN_UNSUPPORTED_CAPABILITY.code(),
                     pluginId,
                     "plugin " + pluginId + " does not support capability " + requiredCapability);
         }
         if (capabilitiesCommand) {
-            return new PluginRunOutcome(capabilities.stdout(), 0);
+            return new PluginRunOutcome(capabilities.stdout(), CommandExitCode.OK.code());
         }
 
         ProcessOutput output =
@@ -131,7 +133,7 @@ public final class PluginRunner {
             throws PluginExecutionException {
         if (output.exitCode() != 0) {
             throw PluginExecutionException.plugin(
-                    "DEDIREN_PLUGIN_CAPABILITY_PROBE_FAILED",
+                    DiagnosticCode.PLUGIN_CAPABILITY_PROBE_FAILED.code(),
                     pluginId,
                     "plugin " + pluginId + " capability probe failed: " + output.stderr());
         }
@@ -140,14 +142,14 @@ public final class PluginRunner {
             value = JsonSupport.objectMapper().readTree(output.stdout());
         } catch (IOException error) {
             throw PluginExecutionException.plugin(
-                    "DEDIREN_PLUGIN_CAPABILITY_INVALID_JSON",
+                    DiagnosticCode.PLUGIN_CAPABILITY_INVALID_JSON.code(),
                     pluginId,
                     "plugin " + pluginId + " capability output is not valid JSON: " + error.getMessage());
         }
         List<String> errors = validator().validate("schemas/runtime-capability.schema.json", value);
         if (!errors.isEmpty()) {
             throw PluginExecutionException.plugin(
-                    "DEDIREN_PLUGIN_CAPABILITY_SCHEMA_INVALID",
+                    DiagnosticCode.PLUGIN_CAPABILITY_SCHEMA_INVALID.code(),
                     pluginId,
                     "plugin " + pluginId + " capability output does not match the runtime schema: " + errors.getFirst());
         }
@@ -155,7 +157,7 @@ public final class PluginRunner {
             return JsonSupport.objectMapper().treeToValue(value, RuntimeCapabilities.class);
         } catch (IOException error) {
             throw PluginExecutionException.plugin(
-                    "DEDIREN_PLUGIN_CAPABILITY_SCHEMA_INVALID",
+                    DiagnosticCode.PLUGIN_CAPABILITY_SCHEMA_INVALID.code(),
                     pluginId,
                     error.getMessage());
         }
@@ -167,13 +169,15 @@ public final class PluginRunner {
             List<String> args,
             ProcessOutput output) throws PluginExecutionException {
         JsonNode envelope = commandEnvelope(pluginId, output.stdout());
-        String status = envelope.path("status").asText("error");
-        if ("error".equals(status)) {
-            return new PluginRunOutcome(output.stdout(), output.exitCode() == 0 ? 3 : output.exitCode());
+        String status = envelope.path("status").asText(EnvelopeStatus.ERROR.wire());
+        if (EnvelopeStatus.ERROR.wire().equals(status)) {
+            return new PluginRunOutcome(
+                    output.stdout(),
+                    output.exitCode() == 0 ? CommandExitCode.PLUGIN_ERROR.code() : output.exitCode());
         }
         if (output.exitCode() == 0) {
             validateSuccessData(pluginId, requiredCapability, args, envelope);
-            return new PluginRunOutcome(output.stdout(), 0);
+            return new PluginRunOutcome(output.stdout(), CommandExitCode.OK.code());
         }
         throw PluginExecutionException.plugin(
                 DiagnosticCode.PLUGIN_PROCESS_FAILED.code(),
@@ -187,14 +191,14 @@ public final class PluginRunner {
             value = JsonSupport.objectMapper().readTree(stdout);
         } catch (IOException error) {
             throw PluginExecutionException.plugin(
-                    "DEDIREN_PLUGIN_OUTPUT_INVALID_JSON",
+                    DiagnosticCode.PLUGIN_OUTPUT_INVALID_JSON.code(),
                     pluginId,
                     "plugin " + pluginId + " stdout is not valid JSON: " + error.getMessage());
         }
         List<String> errors = validator().validate("schemas/envelope.schema.json", value);
         if (!errors.isEmpty()) {
             throw PluginExecutionException.plugin(
-                    "DEDIREN_PLUGIN_OUTPUT_INVALID_ENVELOPE",
+                    DiagnosticCode.PLUGIN_OUTPUT_INVALID_ENVELOPE.code(),
                     pluginId,
                     "plugin " + pluginId + " stdout does not match the command envelope schema: " + errors.getFirst());
         }
@@ -222,7 +226,7 @@ public final class PluginRunner {
 
     private static PluginExecutionException outputInvalidData(String pluginId, String capability, String message) {
         return PluginExecutionException.plugin(
-                "DEDIREN_PLUGIN_OUTPUT_INVALID_DATA",
+                DiagnosticCode.PLUGIN_OUTPUT_INVALID_DATA.code(),
                 pluginId,
                 "plugin " + pluginId + " successful " + capability
                         + " output data does not match the capability schema: " + message);

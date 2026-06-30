@@ -7,7 +7,7 @@ import java.util.Objects;
 
 public record CommandEnvelope<T>(
         String envelopeSchemaVersion,
-        String status,
+        EnvelopeStatus status,
         T data,
         List<Diagnostic> diagnostics) {
     public CommandEnvelope {
@@ -19,7 +19,7 @@ public record CommandEnvelope<T>(
     public static <T> CommandEnvelope<T> ok(T data) {
         return new CommandEnvelope<>(
                 ContractVersions.ENVELOPE_SCHEMA_VERSION,
-                "ok",
+                EnvelopeStatus.OK,
                 data,
                 List.of());
     }
@@ -27,7 +27,7 @@ public record CommandEnvelope<T>(
     public static CommandEnvelope<JsonNode> error(List<Diagnostic> diagnostics) {
         return new CommandEnvelope<>(
                 ContractVersions.ENVELOPE_SCHEMA_VERSION,
-                "error",
+                EnvelopeStatus.ERROR,
                 null,
                 diagnostics);
     }

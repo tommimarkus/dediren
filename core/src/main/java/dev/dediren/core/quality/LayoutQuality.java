@@ -1,6 +1,7 @@
 package dev.dediren.core.quality;
 
 import dev.dediren.contracts.Diagnostic;
+import dev.dediren.contracts.DiagnosticCode;
 import dev.dediren.contracts.DiagnosticSeverity;
 import dev.dediren.contracts.layout.LaidOutEdge;
 import dev.dediren.contracts.layout.LaidOutGroup;
@@ -87,14 +88,14 @@ public final class LayoutQuality {
             LaidOutEdge edge = result.edges().get(edgeIndex);
             if (edge.points().isEmpty()) {
                 diagnostics.add(routeError(
-                        "DEDIREN_LAYOUT_ROUTE_POINTS_EMPTY",
+                        DiagnosticCode.LAYOUT_ROUTE_POINTS_EMPTY,
                         "edge '" + edge.id() + "' has no route points",
                         "$.edges[" + edgeIndex + "].points"));
                 continue;
             }
             if (edge.points().size() < 2) {
                 diagnostics.add(routeError(
-                        "DEDIREN_LAYOUT_ROUTE_POINTS_INSUFFICIENT",
+                        DiagnosticCode.LAYOUT_ROUTE_POINTS_INSUFFICIENT,
                         "edge '" + edge.id() + "' must have at least start and end route points",
                         "$.edges[" + edgeIndex + "].points"));
                 continue;
@@ -106,13 +107,13 @@ public final class LayoutQuality {
             }
             if (!endpointAccepted(edge.points().getFirst(), source, ROUTE_ENDPOINT_TOLERANCE)) {
                 diagnostics.add(routeError(
-                        "DEDIREN_LAYOUT_ROUTE_ENDPOINT_OFF_NODE_PERIMETER",
+                        DiagnosticCode.LAYOUT_ROUTE_ENDPOINT_OFF_NODE_PERIMETER,
                         "edge '" + edge.id() + "' first route point is not on source node '" + edge.source() + "' perimeter",
                         "$.edges[" + edgeIndex + "].points[0]"));
             }
             if (!endpointAccepted(edge.points().getLast(), target, ROUTE_ENDPOINT_TOLERANCE)) {
                 diagnostics.add(routeError(
-                        "DEDIREN_LAYOUT_ROUTE_ENDPOINT_OFF_NODE_PERIMETER",
+                        DiagnosticCode.LAYOUT_ROUTE_ENDPOINT_OFF_NODE_PERIMETER,
                         "edge '" + edge.id() + "' last route point is not on target node '" + edge.target() + "' perimeter",
                         "$.edges[" + edgeIndex + "].points[-1]"));
             }
@@ -134,7 +135,7 @@ public final class LayoutQuality {
                 }
                 if (distanceToRoute(centerX, centerY, edge.points()) > reach) {
                     diagnostics.add(routeError(
-                            "DEDIREN_LAYOUT_JUNCTION_OFF_INCIDENT_ROUTE",
+                            DiagnosticCode.LAYOUT_JUNCTION_OFF_INCIDENT_ROUTE,
                             "junction '" + node.id() + "' is not on the route of incident edge '"
                                     + edge.id() + "'",
                             "$.nodes[" + nodeIndex + "]"));
@@ -144,8 +145,8 @@ public final class LayoutQuality {
         return diagnostics;
     }
 
-    private static Diagnostic routeError(String code, String message, String path) {
-        return new Diagnostic(code, DiagnosticSeverity.ERROR, message, path);
+    private static Diagnostic routeError(DiagnosticCode code, String message, String path) {
+        return new Diagnostic(code.code(), DiagnosticSeverity.ERROR, message, path);
     }
 
     private static boolean routeHasIntegrityIssue(LaidOutEdge edge, LayoutResult result) {

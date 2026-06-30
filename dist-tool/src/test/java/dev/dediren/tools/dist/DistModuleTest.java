@@ -179,14 +179,7 @@ class DistModuleTest {
     }
 
     private static Path workspaceRoot() {
-        Path current = Path.of("").toAbsolutePath();
-        while (current != null) {
-            if (Files.exists(current.resolve(".github/workflows/release.yml"))) {
-                return current;
-            }
-            current = current.getParent();
-        }
-        throw new IllegalStateException("workspace root not found");
+        return dev.dediren.testsupport.TestSupport.workspaceRoot();
     }
 
     private static String workflowJob(String workflow, String jobName) {

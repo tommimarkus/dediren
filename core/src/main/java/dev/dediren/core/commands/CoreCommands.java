@@ -2,8 +2,10 @@ package dev.dediren.core.commands;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import dev.dediren.contracts.CommandEnvelope;
+import dev.dediren.contracts.CommandExitCode;
 import dev.dediren.contracts.ContractVersions;
 import dev.dediren.contracts.Diagnostic;
+import dev.dediren.contracts.DiagnosticCode;
 import dev.dediren.contracts.export.ExportRequest;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.contracts.layout.LayoutRequest;
@@ -122,9 +124,9 @@ public final class CoreCommands {
             LayoutResult result = JsonInput.parseCommandData(inputText, LayoutResult.class);
             List<Diagnostic> diagnostics = LayoutQuality.validateLayoutDiagnostics(result);
             if (!diagnostics.isEmpty()) {
-                return new ValidationResult(2, CommandEnvelope.error(diagnostics));
+                return new ValidationResult(CommandExitCode.INPUT_ERROR.code(), CommandEnvelope.error(diagnostics));
             }
-            return new ValidationResult(0, CommandEnvelope.ok(JsonSupport.objectMapper()
+            return new ValidationResult(CommandExitCode.OK.code(), CommandEnvelope.ok(JsonSupport.objectMapper()
                     .valueToTree(LayoutQuality.validateLayout(result))));
         } catch (RuntimeException | IOException error) {
             return commandInputValidationResult("validate-layout", error);
@@ -207,7 +209,7 @@ public final class CoreCommands {
     static PluginRunOutcome errorOutcome(List<Diagnostic> diagnostics) {
         try {
             return new PluginRunOutcome(JsonSupport.objectMapper()
-                    .writeValueAsString(CommandEnvelope.error(diagnostics)), 2);
+                    .writeValueAsString(CommandEnvelope.error(diagnostics)), CommandExitCode.INPUT_ERROR.code());
         } catch (IOException error) {
             throw new IllegalStateException("error envelope should serialize", error);
         }
@@ -240,17 +242,17 @@ public final class CoreCommands {
 
     private static PluginExecutionException commandInputInvalid(String command, Exception error) {
         return PluginExecutionException.command(
-                "DEDIREN_COMMAND_INPUT_INVALID",
+                DiagnosticCode.COMMAND_INPUT_INVALID.code(),
                 command,
                 error.getMessage());
     }
 
     private static ValidationResult commandInputValidationResult(String command, Exception error) {
         var diagnostic = PluginExecutionException.command(
-                "DEDIREN_COMMAND_INPUT_INVALID",
+                DiagnosticCode.COMMAND_INPUT_INVALID.code(),
                 command,
                 error.getMessage()).diagnostic();
-        return new ValidationResult(2, CommandEnvelope.error(List.of(diagnostic)));
+        return new ValidationResult(CommandExitCode.INPUT_ERROR.code(), CommandEnvelope.error(List.of(diagnostic)));
     }
 
 }

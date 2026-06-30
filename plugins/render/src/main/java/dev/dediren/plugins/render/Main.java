@@ -1,5 +1,11 @@
 package dev.dediren.plugins.render;
 
+import static dev.dediren.plugins.render.Svg.attr;
+import static dev.dediren.plugins.render.Svg.estimateTextWidth;
+import static dev.dediren.plugins.render.Svg.labelNumber;
+import static dev.dediren.plugins.render.Svg.styleNumber;
+import static dev.dediren.plugins.render.Svg.text;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import dev.dediren.archimate.ArchimateTypeValidationException;
@@ -1040,15 +1046,6 @@ public final class Main {
         return hasArchimateCornerIcon(style.decorator())
                 ? ARCHIMATE_ICON_TOP_INSET + ARCHIMATE_ICON_SIZE
                 : 0.0;
-    }
-
-    private static double estimateTextWidth(String value, double fontSize) {
-        return (value == null ? 0 : value.codePointCount(0, value.length())) * fontSize * 0.62;
-    }
-
-    private static String labelNumber(double value) {
-        double floored = Math.floor(value * 10.0) / 10.0;
-        return String.format(Locale.ROOT, "%.1f", floored);
     }
 
     private static String nodeDecorator(LaidOutNode node, ResolvedNodeStyle style, RenderMetadataSelector selector) {
@@ -3614,28 +3611,6 @@ public final class Main {
                 override.labelFill() == null ? base.labelFill() : override.labelFill(),
                 override.labelSize() == null ? base.labelSize() : override.labelSize(),
                 override.decorator() == null ? base.decorator() : override.decorator());
-    }
-
-    private static String styleNumber(double value) {
-        if (Math.rint(value) == value) {
-            return Long.toString(Math.round(value));
-        }
-        return Double.toString(value);
-    }
-
-    private static String attr(String value) {
-        return (value == null ? "" : value)
-                .replace("&", "&amp;")
-                .replace("<", "&lt;")
-                .replace(">", "&gt;")
-                .replace("\"", "&quot;");
-    }
-
-    private static String text(String value) {
-        return (value == null ? "" : value)
-                .replace("&", "&amp;")
-                .replace("<", "&lt;")
-                .replace(">", "&gt;");
     }
 
     private record RenderInput(LayoutResult layoutResult, RenderMetadata renderMetadata, RenderPolicy policy) {
