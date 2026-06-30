@@ -5,7 +5,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import dev.dediren.contracts.DiagnosticCode;
 import dev.dediren.contracts.json.JsonSupport;
+import dev.dediren.testsupport.CommandEnvelopeAssertions;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -49,6 +51,21 @@ class MainTest {
         assertThat(result.exitCode()).isZero();
         assertThat(data.at("/artifact_kind").asText()).isEqualTo("archimate-oef+xml");
         assertThat(data.at("/content").asText()).isEqualTo(fixture("fixtures/export/oef-basic.xml"));
+    }
+
+    @Test
+    void missingOefSchemaValidatorIsStructured() throws Exception {
+        Map<String, String> env = new java.util.HashMap<>(envWithOefSchemas());
+        env.put("DEDIREN_OEF_SCHEMA_VALIDATOR", tempDir.resolve("no-such-validator").toString());
+
+        PluginResult result = Main.executeForTesting(
+                new String[]{"export"},
+                exportInput(fixtureJson("fixtures/source/valid-archimate-oef.json"),
+                        fixtureJson("fixtures/layout-result/archimate-oef-basic.json")),
+                env);
+
+        CommandEnvelopeAssertions.assertErrorCode(
+                result.stdout(), DiagnosticCode.OEF_SCHEMA_VALIDATOR_UNAVAILABLE.code());
     }
 
     @Test

@@ -10,6 +10,7 @@ import dev.dediren.archimate.JunctionValidationRelationship;
 import dev.dediren.contracts.CommandEnvelope;
 import dev.dediren.contracts.ContractVersions;
 import dev.dediren.contracts.Diagnostic;
+import dev.dediren.contracts.DiagnosticCode;
 import dev.dediren.contracts.DiagnosticSeverity;
 import dev.dediren.contracts.export.ExportRequest;
 import dev.dediren.contracts.export.ExportResult;
@@ -392,10 +393,11 @@ public final class Main {
             throws OefSchemaValidationException {
         Path schemaDir = resolveOfficialOefSchemaDir(env);
         Path schemaPath = schemaDir.resolve("archimate3_Diagram.xsd");
+        String validator = oefSchemaValidator(env);
         Process process;
         try {
             process = new ProcessBuilder(
-                            OEF_SCHEMA_VALIDATOR,
+                            validator,
                             "--nonet",
                             "--noout",
                             "--schema",
@@ -404,15 +406,15 @@ public final class Main {
                     .start();
         } catch (IOException error) {
             throw new OefSchemaValidationException(
-                    "DEDIREN_OEF_SCHEMA_VALIDATOR_UNAVAILABLE",
-                    "failed to run official OEF schema validator " + OEF_SCHEMA_VALIDATOR + ": " + error.getMessage());
+                    DiagnosticCode.OEF_SCHEMA_VALIDATOR_UNAVAILABLE.code(),
+                    "failed to run official OEF schema validator " + validator + ": " + error.getMessage());
         }
         try (OutputStream stdin = process.getOutputStream()) {
             stdin.write(content.getBytes(StandardCharsets.UTF_8));
         } catch (IOException error) {
             throw new OefSchemaValidationException(
-                    "DEDIREN_OEF_SCHEMA_VALIDATOR_UNAVAILABLE",
-                    "failed to write OEF XML to official OEF schema validator " + OEF_SCHEMA_VALIDATOR + ": "
+                    DiagnosticCode.OEF_SCHEMA_VALIDATOR_UNAVAILABLE.code(),
+                    "failed to write OEF XML to official OEF schema validator " + validator + ": "
                             + error.getMessage());
         }
         try {
@@ -426,20 +428,25 @@ public final class Main {
                     "DEDIREN_OEF_SCHEMA_INVALID",
                     "generated OEF XML does not validate against the official OEF schema: "
                             + SchemaCacheModule.commandOutputDetails(
-                                    OEF_SCHEMA_VALIDATOR,
+                                    validator,
                                     exitCode,
                                     stdout,
                                     stderr));
         } catch (IOException error) {
             throw new OefSchemaValidationException(
-                    "DEDIREN_OEF_SCHEMA_VALIDATOR_UNAVAILABLE",
+                    DiagnosticCode.OEF_SCHEMA_VALIDATOR_UNAVAILABLE.code(),
                     "failed to read official OEF schema validator output: " + error.getMessage());
         } catch (InterruptedException error) {
             Thread.currentThread().interrupt();
             throw new OefSchemaValidationException(
-                    "DEDIREN_OEF_SCHEMA_VALIDATOR_UNAVAILABLE",
+                    DiagnosticCode.OEF_SCHEMA_VALIDATOR_UNAVAILABLE.code(),
                     "official OEF schema validator interrupted");
         }
+    }
+
+    private static String oefSchemaValidator(Map<String, String> env) {
+        String configured = env.get("DEDIREN_OEF_SCHEMA_VALIDATOR");
+        return configured == null || configured.isBlank() ? OEF_SCHEMA_VALIDATOR : configured;
     }
 
     private static Path resolveOfficialOefSchemaDir(Map<String, String> env)
