@@ -3,7 +3,6 @@ package dev.dediren.contracts;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.dediren.testsupport.SchemaAssertions;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -82,13 +81,6 @@ class SchemaValidatorTest {
     }
 
     private static Path workspaceRoot() {
-        Path current = Path.of(System.getProperty("user.dir")).toAbsolutePath();
-        while (current != null) {
-            if (Files.exists(current.resolve("schemas/model.schema.json"))) {
-                return current;
-            }
-            current = current.getParent();
-        }
-        throw new IllegalStateException("Could not locate repository root from user.dir");
+        return dev.dediren.testsupport.TestSupport.workspaceRoot();
     }
 }

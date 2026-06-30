@@ -51,14 +51,6 @@ class ArchimateLabelReserveConsistencyTest {
     }
 
     private static Path repoRoot() {
-        Path dir = Path.of(System.getProperty("user.dir")).toAbsolutePath();
-        while (dir != null) {
-            if (Files.exists(dir.resolve("pom.xml")) && Files.exists(dir.resolve("schemas"))) {
-                return dir;
-            }
-            dir = dir.getParent();
-        }
-        throw new IllegalStateException(
-            "could not locate repo root from " + System.getProperty("user.dir"));
+        return dev.dediren.testsupport.TestSupport.workspaceRoot();
     }
 }

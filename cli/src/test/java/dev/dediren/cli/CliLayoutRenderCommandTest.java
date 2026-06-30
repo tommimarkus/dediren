@@ -344,13 +344,6 @@ class CliLayoutRenderCommandTest {
     }
 
     private static Path workspaceRoot() {
-        Path current = Path.of(System.getProperty("user.dir")).toAbsolutePath();
-        while (current != null) {
-            if (Files.exists(current.resolve("schemas/model.schema.json"))) {
-                return current;
-            }
-            current = current.getParent();
-        }
-        throw new IllegalStateException("Could not locate repository root from user.dir");
+        return dev.dediren.testsupport.TestSupport.workspaceRoot();
     }
 }
