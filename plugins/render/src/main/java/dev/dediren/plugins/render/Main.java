@@ -910,7 +910,9 @@ public final class Main {
     }
 
     private static List<String> wrappedNodeLabelLines(LaidOutNode node, ResolvedNodeStyle style, double fontSize) {
-        String rawLabel = node.label() == null ? "" : node.label();
+        // Reached only via shouldRenderPlainNodeLabel, which already requires a non-null, non-empty
+        // label; the model schema also makes node label required. So node.label() is non-null here.
+        String rawLabel = node.label();
         double maxWidth = nodeLabelMaxWidth(node, style, fontSize);
         List<String> tokens = labelWrapTokens(rawLabel);
         List<String> lines = new ArrayList<>();
