@@ -104,6 +104,14 @@ public final class Main {
                 printErrorEnvelope();
                 return;
             }
+            case "ok-envelope-nonzero" -> {
+                // Valid ok envelope but a non-zero exit: the only state that reaches
+                // DEDIREN_PLUGIN_PROCESS_FAILED in PluginRunner.normalizePluginOutput.
+                System.out.println(JsonSupport.objectMapper()
+                        .writeValueAsString(CommandEnvelope.ok(successData(args, input.length()))));
+                System.exit(3);
+                return;
+            }
             case "report-cwd" -> {
                 var diagnostic = new Diagnostic(
                         "DEDIREN_TESTBED_CWD",
