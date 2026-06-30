@@ -1,10 +1,12 @@
 package dev.dediren.plugins.umlxmi;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import dev.dediren.contracts.json.JsonSupport;
+import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -12,6 +14,7 @@ import java.util.HashSet;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.xml.sax.SAXParseException;
 
 class MainTest {
     @TempDir
@@ -669,6 +672,18 @@ class MainTest {
             String value = id.substring(0, id.indexOf('"'));
             assertThat(seen.add(value)).describedAs("duplicate xmi:id " + value).isTrue();
         }
+    }
+
+    @Test
+    void xmiValidationParserRejectsDoctype() throws Exception {
+        var builder = Main.secureXmiDocumentBuilderFactory().newDocumentBuilder();
+        String hostile = "<!DOCTYPE XMI [<!ENTITY xxe SYSTEM \"file:///etc/passwd\">]>"
+                + "<XMI xmlns=\"http://www.omg.org/spec/XMI/20131001\">&xxe;</XMI>";
+
+        assertThatThrownBy(() ->
+                builder.parse(new ByteArrayInputStream(hostile.getBytes(StandardCharsets.UTF_8))))
+                .isInstanceOf(SAXParseException.class)
+                .hasMessageContaining("DOCTYPE");
     }
 
     private String exportXml(JsonNode input) throws Exception {

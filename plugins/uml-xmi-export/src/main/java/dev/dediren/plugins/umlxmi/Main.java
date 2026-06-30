@@ -39,7 +39,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
 import org.w3c.dom.Element;
 
 public final class Main {
@@ -1131,8 +1133,7 @@ public final class Main {
 
     private static void validateXmiDocumentAndIds(String content) throws XmiValidationException {
         try {
-            var factory = DocumentBuilderFactory.newInstance();
-            factory.setNamespaceAware(true);
+            var factory = secureXmiDocumentBuilderFactory();
             var document = factory.newDocumentBuilder()
                     .parse(new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8)));
             Element root = document.getDocumentElement();
@@ -1172,6 +1173,20 @@ public final class Main {
                     "DEDIREN_XMI_XML_INVALID",
                     "generated UML/XMI XML is not well-formed: " + error.getMessage());
         }
+    }
+
+    // Defense in depth: this validator only ever parses Dediren's own generated
+    // XMI, which never contains a DOCTYPE. Hardening the factory keeps XXE and
+    // entity-expansion classes off the table regardless of what the parser is
+    // ever pointed at. Package-private so the same-package test can exercise it.
+    static DocumentBuilderFactory secureXmiDocumentBuilderFactory() throws ParserConfigurationException {
+        var factory = DocumentBuilderFactory.newInstance();
+        factory.setNamespaceAware(true);
+        factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+        factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+        factory.setXIncludeAware(false);
+        factory.setExpandEntityReferences(false);
+        return factory;
     }
 
     private static void validateOmgXmiSchema(String content, Map<String, String> env)
