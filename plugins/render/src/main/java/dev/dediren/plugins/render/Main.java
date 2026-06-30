@@ -56,6 +56,9 @@ public final class Main {
     private static final double GROUP_BORDER_LABEL_OBSTACLE_PADDING = 4.0;
     private static final double GROUP_TITLE_LABEL_OBSTACLE_HEIGHT = 24.0;
     private static final double ARCHIMATE_ICON_SIZE = 22.0;
+    // Top inset of the corner type decorator from the node box top. Must match the
+    // y origin used in archimateNodeDecorator; it feeds the label's vertical reserve.
+    private static final double ARCHIMATE_ICON_TOP_INSET = 9.0;
     // Must equal ARCHIMATE_LABEL_ICON_RESERVE in plugins/generic-graph
     // GenericGraphLayoutSizing: per-side room reserved so a centered label clears
     // the upper-right type icon.
@@ -899,7 +902,7 @@ public final class Main {
                 .max()
                 .orElse(0.0);
         double widthFontSize = widestLine > maxWidth ? fontSize * maxWidth / widestLine : fontSize;
-        double availableHeight = node.height() - NODE_LABEL_VERTICAL_PADDING;
+        double availableHeight = node.height() - NODE_LABEL_VERTICAL_PADDING - archimateLabelTopReserve(style);
         double blockHeight = lines.size() * nodeLabelLineHeight(fontSize);
         double heightFontSize = blockHeight > availableHeight ? fontSize * availableHeight / blockHeight : fontSize;
         double labelFontSize = Math.max(Math.min(widthFontSize, heightFontSize), NODE_LABEL_MIN_FONT_SIZE);
@@ -988,7 +991,7 @@ public final class Main {
         }
         return new NodeLabelPosition(
                 node.x() + node.width() / 2.0,
-                nodeLabelFirstLineY(node, fontSize, lineCount),
+                nodeLabelFirstLineY(node, style, fontSize, lineCount),
                 true);
     }
 
@@ -1019,9 +1022,22 @@ public final class Main {
         return fontSize * 1.15;
     }
 
-    private static double nodeLabelFirstLineY(LaidOutNode node, double fontSize, int lineCount) {
-        return node.y() + node.height() / 2.0
-                - (Math.max(0, lineCount - 1) * nodeLabelLineHeight(fontSize)) / 2.0;
+    // Center the label block in the box area below the corner-decorator's reserved band
+    // (the icon's top inset + glyph box) so a multi-line label's top line never lands at
+    // the decorator's vertical level — the vertical complement of the horizontal
+    // textLength gutter shipped for #25. Nodes without a corner icon reserve nothing and
+    // stay centered over the full box height. See issue #27.
+    private static double nodeLabelFirstLineY(
+            LaidOutNode node, ResolvedNodeStyle style, double fontSize, int lineCount) {
+        double topReserve = archimateLabelTopReserve(style);
+        double areaCenterY = node.y() + topReserve + (node.height() - topReserve) / 2.0;
+        return areaCenterY - (Math.max(0, lineCount - 1) * nodeLabelLineHeight(fontSize)) / 2.0;
+    }
+
+    private static double archimateLabelTopReserve(ResolvedNodeStyle style) {
+        return hasArchimateCornerIcon(style.decorator())
+                ? ARCHIMATE_ICON_TOP_INSET + ARCHIMATE_ICON_SIZE
+                : 0.0;
     }
 
     private static double estimateTextWidth(String value, double fontSize) {
@@ -1050,7 +1066,7 @@ public final class Main {
         ArchimateIconKind kind = archimateIconKind(decorator);
         double size = ARCHIMATE_ICON_SIZE;
         double x = node.x() + node.width() - size - 6.0;
-        double y = node.y() + 9.0;
+        double y = node.y() + ARCHIMATE_ICON_TOP_INSET;
         String body = archimateIconBody(decorator, kind, x, y, size, style);
         return "<g data-dediren-node-decorator=\"" + attr(name)
                 + "\" data-dediren-icon-kind=\"" + kind.value()

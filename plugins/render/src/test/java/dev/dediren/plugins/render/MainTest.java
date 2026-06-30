@@ -1254,11 +1254,12 @@ class MainTest {
             Element node = groupWithAttribute(document, "data-dediren-node-id", "appcomp");
             Element label = (Element) node.getElementsByTagName("text").item(0);
 
-            // Centered vertically: middle baseline, anchored at/above the node center (never pushed below it).
+            // Centered vertically in the box area BELOW the reserved corner-decorator band
+            // (issue #27): middle baseline, with the first line clearing the band.
             assertThat(label.getAttribute("dominant-baseline")).isEqualTo("middle");
             double labelY = Double.parseDouble(label.getAttribute("y"));
-            // Centered block: first of two lines sits just above the node center (80), not pushed down.
-            assertThat(labelY).isBetween(70.0, 79.0);
+            // First of two lines sits at/below the decorator band bottom (40 + 9 + 22 = 71).
+            assertThat(labelY).isGreaterThanOrEqualTo(71.0);
 
             // Wraps to two lines, each centered on the node center x.
             org.w3c.dom.NodeList tspans = label.getElementsByTagName("tspan");
@@ -1273,6 +1274,53 @@ class MainTest {
             }
             double widestHalf = widestChars * fontSize * 0.62 / 2.0;
             assertThat(135.0 + widestHalf).isLessThanOrEqualTo(202.0);
+        }
+
+        @Test
+        void multiLineNodeLabelClearsCornerDecoratorVertically() throws Exception {
+            // Repro from issue #27: a multi-line ArchiMate corner-icon label was centered
+            // over the FULL box height, so its top line landed inside the top-right type
+            // decorator's vertical band. The label must instead be centered in the box area
+            // BELOW the reserved decorator band (top inset 9 + icon size 22 = 31 from the box
+            // top) — the vertical complement of the #25 horizontal textLength gutter.
+            JsonNode input = archimateRenderInput(
+                    fixtureJson("fixtures/render-policy/archimate-svg.json"),
+                    """
+                    [
+                      { "id": "appcomp", "source_id": "appcomp", "projection_id": "appcomp", "x": 40, "y": 40, "width": 160, "height": 100, "label": "Customer Identity Provider Service" }
+                    ]
+                    """,
+                    "[]",
+                    """
+                    {
+                      "appcomp": { "type": "ApplicationComponent", "source_id": "appcomp" }
+                    }
+                    """,
+                    "{}");
+
+            Document document = svgDocument(okContent(render(input)));
+            Element node = groupWithAttribute(document, "data-dediren-node-id", "appcomp");
+            Element label = (Element) node.getElementsByTagName("text").item(0);
+
+            // Multi-line: dominant-baseline=middle and the first tspan has dy=0, so the
+            // <text> y is the first line's vertical center.
+            org.w3c.dom.NodeList tspans = label.getElementsByTagName("tspan");
+            assertThat(tspans.getLength()).isGreaterThan(1);
+            assertThat(label.getAttribute("dominant-baseline")).isEqualTo("middle");
+
+            double boxTop = 40.0;
+            double decoratorBandBottom = boxTop + 9.0 + 22.0; // ARCHIMATE_ICON_TOP_INSET + ARCHIMATE_ICON_SIZE
+            double firstLineCenterY = Double.parseDouble(label.getAttribute("y"));
+            // The top line sits at or below the reserved decorator band.
+            assertThat(firstLineCenterY).isGreaterThanOrEqualTo(decoratorBandBottom);
+
+            // The label block is centered in the remaining area below the band, not merely
+            // shoved down: its mid-line aligns with the center of [top+reserve, top+height].
+            double fontSize = Double.parseDouble(label.getAttribute("font-size"));
+            double lineHeight = fontSize * 1.15;
+            double blockCenterY = firstLineCenterY + (tspans.getLength() - 1) * lineHeight / 2.0;
+            double areaCenterY = boxTop + (100.0 + (9.0 + 22.0)) / 2.0;
+            assertThat(blockCenterY).isCloseTo(areaCenterY, org.assertj.core.data.Offset.offset(0.5));
         }
 
         @Test
