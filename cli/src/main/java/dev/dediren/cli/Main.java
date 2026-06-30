@@ -3,6 +3,7 @@ package dev.dediren.cli;
 import com.fasterxml.jackson.databind.JsonNode;
 import dev.dediren.contracts.CommandEnvelope;
 import dev.dediren.contracts.Diagnostic;
+import dev.dediren.contracts.DiagnosticCode;
 import dev.dediren.contracts.DiagnosticSeverity;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.core.commands.CoreCommands;
@@ -125,12 +126,12 @@ public final class Main {
         public Integer call() throws Exception {
             if (plugin != null && profile == null) {
                 return printEnvelope(usageError(
-                        "DEDIREN_VALIDATE_PROFILE_REQUIRED",
+                        DiagnosticCode.VALIDATE_PROFILE_REQUIRED.code(),
                         "validate --plugin requires --profile"));
             }
             if (plugin == null && profile != null) {
                 return printEnvelope(usageError(
-                        "DEDIREN_VALIDATE_PLUGIN_REQUIRED",
+                        DiagnosticCode.VALIDATE_PLUGIN_REQUIRED.code(),
                         "validate --profile requires --plugin"));
             }
             JsonInputText inputText = readInput("input", input, stdin);
@@ -424,7 +425,7 @@ public final class Main {
     private static CommandEnvelope<JsonNode> commandInputError(String label, Path path, IOException error) {
         String diagnosticPath = path == null ? label : label + ":" + path;
         return CommandEnvelope.error(List.of(new Diagnostic(
-                "DEDIREN_COMMAND_INPUT_INVALID",
+                DiagnosticCode.COMMAND_INPUT_INVALID.code(),
                 DiagnosticSeverity.ERROR,
                 "failed to read " + label + ": " + error.getMessage(),
                 diagnosticPath)));

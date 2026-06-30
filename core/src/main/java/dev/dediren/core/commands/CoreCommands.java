@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import dev.dediren.contracts.CommandEnvelope;
 import dev.dediren.contracts.ContractVersions;
 import dev.dediren.contracts.Diagnostic;
+import dev.dediren.contracts.DiagnosticCode;
 import dev.dediren.contracts.export.ExportRequest;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.contracts.layout.LayoutRequest;
@@ -240,14 +241,14 @@ public final class CoreCommands {
 
     private static PluginExecutionException commandInputInvalid(String command, Exception error) {
         return PluginExecutionException.command(
-                "DEDIREN_COMMAND_INPUT_INVALID",
+                DiagnosticCode.COMMAND_INPUT_INVALID.code(),
                 command,
                 error.getMessage());
     }
 
     private static ValidationResult commandInputValidationResult(String command, Exception error) {
         var diagnostic = PluginExecutionException.command(
-                "DEDIREN_COMMAND_INPUT_INVALID",
+                DiagnosticCode.COMMAND_INPUT_INVALID.code(),
                 command,
                 error.getMessage()).diagnostic();
         return new ValidationResult(2, CommandEnvelope.error(List.of(diagnostic)));

@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import dev.dediren.contracts.CommandEnvelope;
 import dev.dediren.contracts.ContractVersions;
 import dev.dediren.contracts.Diagnostic;
+import dev.dediren.contracts.DiagnosticCode;
 import dev.dediren.contracts.DiagnosticSeverity;
 import dev.dediren.core.DedirenPaths;
 import dev.dediren.core.schema.SchemaValidator;
@@ -56,7 +57,7 @@ public final class SourceValidator {
         }
         if (baseDir == null) {
             throw new SourceDiagnosticsException(List.of(error(
-                    "DEDIREN_FRAGMENT_BASE_DIR_REQUIRED",
+                    DiagnosticCode.FRAGMENT_BASE_DIR_REQUIRED,
                     "source fragments require file input so relative fragment paths can be resolved",
                     "$.fragments")));
         }
@@ -70,7 +71,7 @@ public final class SourceValidator {
             Path fragmentPath = Path.of(fragment);
             if (fragmentPath.isAbsolute()) {
                 throw new SourceDiagnosticsException(List.of(error(
-                        "DEDIREN_FRAGMENT_PATH_UNSUPPORTED",
+                        DiagnosticCode.FRAGMENT_PATH_UNSUPPORTED,
                         "fragment '" + fragment + "' must be relative to the source model",
                         "$.fragments[" + i + "]")));
             }
@@ -79,13 +80,13 @@ public final class SourceValidator {
                 fragmentDocument = parseSourceDocument(Files.readString(baseDir.resolve(fragmentPath)));
             } catch (IOException readError) {
                 throw new SourceDiagnosticsException(List.of(error(
-                        "DEDIREN_FRAGMENT_READ_FAILED",
+                        DiagnosticCode.FRAGMENT_READ_FAILED,
                         "failed to read fragment '" + fragment + "': " + readError.getMessage(),
                         "$.fragments[" + i + "]")));
             }
             if (!fragmentDocument.fragments().isEmpty()) {
                 throw new SourceDiagnosticsException(List.of(error(
-                        "DEDIREN_FRAGMENT_NESTED_UNSUPPORTED",
+                        DiagnosticCode.FRAGMENT_NESTED_UNSUPPORTED,
                         "fragment '" + fragment + "' declares nested fragments",
                         "$.fragments[" + i + "]")));
             }
@@ -128,25 +129,25 @@ public final class SourceValidator {
         var nodeIds = new java.util.HashSet<String>();
         for (SourceNode node : document.nodes()) {
             if (!ids.add(node.id())) {
-                diagnostics.add(error("DEDIREN_DUPLICATE_ID", "duplicate id '" + node.id() + "'",
+                diagnostics.add(error(DiagnosticCode.DUPLICATE_ID, "duplicate id '" + node.id() + "'",
                         "$.nodes[?(@.id=='" + node.id() + "')]"));
             }
             nodeIds.add(node.id());
         }
         for (SourceRelationship relationship : document.relationships()) {
             if (!ids.add(relationship.id())) {
-                diagnostics.add(error("DEDIREN_DUPLICATE_ID", "duplicate id '" + relationship.id() + "'",
+                diagnostics.add(error(DiagnosticCode.DUPLICATE_ID, "duplicate id '" + relationship.id() + "'",
                         "$.relationships[?(@.id=='" + relationship.id() + "')]"));
             }
             if (!nodeIds.contains(relationship.source())) {
                 diagnostics.add(error(
-                        "DEDIREN_DANGLING_ENDPOINT",
+                        DiagnosticCode.DANGLING_ENDPOINT,
                         "relationship '" + relationship.id() + "' references missing source '" + relationship.source() + "'",
                         "$.relationships[?(@.id=='" + relationship.id() + "')].source"));
             }
             if (!nodeIds.contains(relationship.target())) {
                 diagnostics.add(error(
-                        "DEDIREN_DANGLING_ENDPOINT",
+                        DiagnosticCode.DANGLING_ENDPOINT,
                         "relationship '" + relationship.id() + "' references missing target '" + relationship.target() + "'",
                         "$.relationships[?(@.id=='" + relationship.id() + "')].target"));
             }
@@ -162,7 +163,7 @@ public final class SourceValidator {
                     .findFirst();
             if (existing.isPresent() && !existing.get().version().equals(requirement.version())) {
                 throw new SourceDiagnosticsException(List.of(error(
-                        "DEDIREN_FRAGMENT_CONFLICT",
+                        DiagnosticCode.FRAGMENT_CONFLICT,
                         "required plugin '" + requirement.id() + "' has conflicting versions '"
                                 + existing.get().version() + "' and '" + requirement.version() + "'",
                         "$.required_plugins")));
@@ -207,17 +208,17 @@ public final class SourceValidator {
             return target;
         }
         throw new SourceDiagnosticsException(List.of(error(
-                "DEDIREN_FRAGMENT_CONFLICT",
+                DiagnosticCode.FRAGMENT_CONFLICT,
                 "fragment value conflicts at " + path,
                 path)));
     }
 
     private static Diagnostic schemaError(String message) {
-        return error("DEDIREN_SCHEMA_INVALID", message, null);
+        return error(DiagnosticCode.SCHEMA_INVALID, message, null);
     }
 
-    private static Diagnostic error(String code, String message, String path) {
-        return new Diagnostic(code, DiagnosticSeverity.ERROR, message, path);
+    private static Diagnostic error(DiagnosticCode code, String message, String path) {
+        return new Diagnostic(code.code(), DiagnosticSeverity.ERROR, message, path);
     }
 
     public static final class SourceDiagnosticsException extends Exception {
