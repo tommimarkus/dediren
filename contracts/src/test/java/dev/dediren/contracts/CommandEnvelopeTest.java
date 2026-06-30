@@ -16,7 +16,7 @@ class CommandEnvelopeTest {
         var mapper = JsonSupport.objectMapper();
         var envelope = new CommandEnvelope<>(
                 ContractVersions.ENVELOPE_SCHEMA_VERSION,
-                "ok",
+                EnvelopeStatus.OK,
                 mapper.readTree("""
                         {"kind":"sample"}
                         """),
@@ -36,7 +36,7 @@ class CommandEnvelopeTest {
 
         var decoded = JsonSupport.readValue(encoded.toString(), CommandEnvelope.jsonNodeEnvelopeType());
 
-        assertThat(decoded.status()).isEqualTo("ok");
+        assertThat(decoded.status()).isEqualTo(EnvelopeStatus.OK);
         assertThat(decoded.data().get("kind").asText()).isEqualTo("sample");
         assertThat(decoded.diagnostics()).containsExactly(new Diagnostic(
                 "DEDIREN_TEST",
@@ -58,12 +58,12 @@ class CommandEnvelopeTest {
                 null)));
 
         assertThat(ok.envelopeSchemaVersion()).isEqualTo(ContractVersions.ENVELOPE_SCHEMA_VERSION);
-        assertThat(ok.status()).isEqualTo("ok");
+        assertThat(ok.status()).isEqualTo(EnvelopeStatus.OK);
         assertThat(ok.data()).isEqualTo(data);
         assertThat(ok.diagnostics()).isEmpty();
 
         assertThat(error.envelopeSchemaVersion()).isEqualTo(ContractVersions.ENVELOPE_SCHEMA_VERSION);
-        assertThat(error.status()).isEqualTo("error");
+        assertThat(error.status()).isEqualTo(EnvelopeStatus.ERROR);
         assertThat(error.data()).isNull();
         assertThat(error.diagnostics()).extracting(Diagnostic::severity).containsExactly(DiagnosticSeverity.ERROR);
     }

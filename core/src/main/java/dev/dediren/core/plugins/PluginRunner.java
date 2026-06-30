@@ -3,7 +3,9 @@ package dev.dediren.core.plugins;
 import com.fasterxml.jackson.databind.JsonNode;
 import dev.dediren.core.DedirenPaths;
 import dev.dediren.core.schema.SchemaValidator;
+import dev.dediren.contracts.CommandExitCode;
 import dev.dediren.contracts.DiagnosticCode;
+import dev.dediren.contracts.EnvelopeStatus;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.contracts.plugin.RuntimeCapabilities;
 import java.io.IOException;
@@ -75,7 +77,7 @@ public final class PluginRunner {
                     "plugin " + pluginId + " does not support capability " + requiredCapability);
         }
         if (capabilitiesCommand) {
-            return new PluginRunOutcome(capabilities.stdout(), 0);
+            return new PluginRunOutcome(capabilities.stdout(), CommandExitCode.OK.code());
         }
 
         ProcessOutput output =
@@ -167,13 +169,15 @@ public final class PluginRunner {
             List<String> args,
             ProcessOutput output) throws PluginExecutionException {
         JsonNode envelope = commandEnvelope(pluginId, output.stdout());
-        String status = envelope.path("status").asText("error");
-        if ("error".equals(status)) {
-            return new PluginRunOutcome(output.stdout(), output.exitCode() == 0 ? 3 : output.exitCode());
+        String status = envelope.path("status").asText(EnvelopeStatus.ERROR.wire());
+        if (EnvelopeStatus.ERROR.wire().equals(status)) {
+            return new PluginRunOutcome(
+                    output.stdout(),
+                    output.exitCode() == 0 ? CommandExitCode.PLUGIN_ERROR.code() : output.exitCode());
         }
         if (output.exitCode() == 0) {
             validateSuccessData(pluginId, requiredCapability, args, envelope);
-            return new PluginRunOutcome(output.stdout(), 0);
+            return new PluginRunOutcome(output.stdout(), CommandExitCode.OK.code());
         }
         throw PluginExecutionException.plugin(
                 DiagnosticCode.PLUGIN_PROCESS_FAILED.code(),

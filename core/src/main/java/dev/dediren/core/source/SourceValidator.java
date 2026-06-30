@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import dev.dediren.contracts.CommandEnvelope;
+import dev.dediren.contracts.CommandExitCode;
 import dev.dediren.contracts.ContractVersions;
 import dev.dediren.contracts.Diagnostic;
 import dev.dediren.contracts.DiagnosticCode;
@@ -34,9 +35,9 @@ public final class SourceValidator {
             data.put("model_schema_version", document.modelSchemaVersion());
             data.put("node_count", document.nodes().size());
             data.put("relationship_count", document.relationships().size());
-            return new ValidationResult(0, CommandEnvelope.ok(data));
+            return new ValidationResult(CommandExitCode.OK.code(), CommandEnvelope.ok(data));
         } catch (SourceDiagnosticsException error) {
-            return new ValidationResult(2, CommandEnvelope.error(error.diagnostics()));
+            return new ValidationResult(CommandExitCode.INPUT_ERROR.code(), CommandEnvelope.error(error.diagnostics()));
         }
     }
 

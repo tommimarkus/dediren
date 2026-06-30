@@ -2,6 +2,7 @@ package dev.dediren.cli;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import dev.dediren.contracts.CommandEnvelope;
+import dev.dediren.contracts.CommandExitCode;
 import dev.dediren.contracts.Diagnostic;
 import dev.dediren.contracts.DiagnosticCode;
 import dev.dediren.contracts.DiagnosticSeverity;
@@ -159,7 +160,7 @@ public final class Main {
         }
 
         private Integer printEnvelope(CommandEnvelope<JsonNode> envelope) throws IOException {
-            return writeEnvelope(spec, envelope, 2);
+            return writeEnvelope(spec, envelope, CommandExitCode.INPUT_ERROR);
         }
 
         private Integer printPluginOutcome(PluginRunOutcome outcome) {
@@ -200,7 +201,7 @@ public final class Main {
         public Integer call() throws Exception {
             JsonInputText inputText = readInput("input", input, stdin);
             if (inputText.error() != null) {
-                return writeEnvelope(spec, inputText.error(), 2);
+                return writeEnvelope(spec, inputText.error(), CommandExitCode.INPUT_ERROR);
             }
             try {
                 return writePluginOutcome(spec, CoreCommands.projectCommand(
@@ -239,7 +240,7 @@ public final class Main {
         public Integer call() throws Exception {
             JsonInputText inputText = readInput("input", input, stdin);
             if (inputText.error() != null) {
-                return writeEnvelope(spec, inputText.error(), 2);
+                return writeEnvelope(spec, inputText.error(), CommandExitCode.INPUT_ERROR);
             }
             try {
                 return writePluginOutcome(spec, CoreCommands.layoutCommand(plugin, inputText.text(), env));
@@ -267,7 +268,7 @@ public final class Main {
         public Integer call() throws Exception {
             JsonInputText inputText = readInput("input", input, stdin);
             if (inputText.error() != null) {
-                return writeEnvelope(spec, inputText.error(), 2);
+                return writeEnvelope(spec, inputText.error(), CommandExitCode.INPUT_ERROR);
             }
             return writeValidationResult(spec, CoreCommands.validateLayoutCommand(inputText.text()));
         }
@@ -302,15 +303,15 @@ public final class Main {
         public Integer call() throws Exception {
             JsonInputText layoutText = readInput("input", input, stdin);
             if (layoutText.error() != null) {
-                return writeEnvelope(spec, layoutText.error(), 2);
+                return writeEnvelope(spec, layoutText.error(), CommandExitCode.INPUT_ERROR);
             }
             JsonInputText policyText = readFile("policy", policy);
             if (policyText.error() != null) {
-                return writeEnvelope(spec, policyText.error(), 2);
+                return writeEnvelope(spec, policyText.error(), CommandExitCode.INPUT_ERROR);
             }
             JsonInputText metadataText = metadata == null ? null : readFile("metadata", metadata);
             if (metadataText != null && metadataText.error() != null) {
-                return writeEnvelope(spec, metadataText.error(), 2);
+                return writeEnvelope(spec, metadataText.error(), CommandExitCode.INPUT_ERROR);
             }
             try {
                 return writePluginOutcome(spec, CoreCommands.renderCommand(
@@ -352,15 +353,15 @@ public final class Main {
         public Integer call() throws Exception {
             JsonInputText sourceText = readFile("source", source);
             if (sourceText.error() != null) {
-                return writeEnvelope(spec, sourceText.error(), 2);
+                return writeEnvelope(spec, sourceText.error(), CommandExitCode.INPUT_ERROR);
             }
             JsonInputText policyText = readFile("policy", policy);
             if (policyText.error() != null) {
-                return writeEnvelope(spec, policyText.error(), 2);
+                return writeEnvelope(spec, policyText.error(), CommandExitCode.INPUT_ERROR);
             }
             JsonInputText layoutText = readFile("layout", layout);
             if (layoutText.error() != null) {
-                return writeEnvelope(spec, layoutText.error(), 2);
+                return writeEnvelope(spec, layoutText.error(), CommandExitCode.INPUT_ERROR);
             }
             try {
                 return writePluginOutcome(spec, CoreCommands.exportCommand(
@@ -401,10 +402,10 @@ public final class Main {
         return result.exitCode();
     }
 
-    private static Integer writeEnvelope(CommandSpec spec, CommandEnvelope<JsonNode> envelope, int exitCode)
+    private static Integer writeEnvelope(CommandSpec spec, CommandEnvelope<JsonNode> envelope, CommandExitCode exitCode)
             throws IOException {
         spec.commandLine().getOut().println(JsonSupport.objectMapper().writeValueAsString(envelope));
-        return exitCode;
+        return exitCode.code();
     }
 
     private static Integer writePluginOutcome(CommandSpec spec, PluginRunOutcome outcome) {
@@ -415,7 +416,7 @@ public final class Main {
     }
 
     private static Integer writePluginError(CommandSpec spec, PluginExecutionException error) throws IOException {
-        return writeEnvelope(spec, CommandEnvelope.error(List.of(error.diagnostic())), 3);
+        return writeEnvelope(spec, CommandEnvelope.error(List.of(error.diagnostic())), CommandExitCode.PLUGIN_ERROR);
     }
 
     private static CommandEnvelope<JsonNode> usageError(String code, String message) {
