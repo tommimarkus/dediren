@@ -64,7 +64,6 @@ class MainTest {
                 {"id": "client-calls-api", "source": "client", "target": "api", "label": "calls", "source_id": "client-calls-api"}
               ],
               "groups": [],
-              "labels": [],
               "constraints": []
             }
             """;
@@ -93,7 +92,6 @@ class MainTest {
               ],
               "edges": [],
               "groups": [],
-              "labels": [],
               "constraints": []
             }
             """;
@@ -117,7 +115,6 @@ class MainTest {
               "nodes": [],
               "edges": [],
               "groups": [],
-              "labels": [],
               "constraints": [],
               "layout_preferences": {
                 "direction": "diagonal"
@@ -145,7 +142,6 @@ class MainTest {
               "nodes": [],
               "edges": [],
               "groups": [],
-              "labels": [],
               "constraints": [],
               "layout_preferences": null
             }
@@ -170,7 +166,6 @@ class MainTest {
               "nodes": [],
               "edges": [],
               "groups": [],
-              "labels": [],
               "constraints": [],
               "layout_preferences": {
                 "routing": {
@@ -203,7 +198,6 @@ class MainTest {
               "groups": [
                 {"id": "group-1", "label": "Group", "members": ["client"], "provenance": "not-object"}
               ],
-              "labels": [],
               "constraints": []
             }
             """;
@@ -231,7 +225,6 @@ class MainTest {
               "groups": [
                 {"id": "group-1", "label": "Group", "members": ["client"], "provenance": {"unknown": {}}}
               ],
-              "labels": [],
               "constraints": []
             }
             """;
@@ -267,7 +260,6 @@ class MainTest {
                   }
                 }
               ],
-              "labels": [],
               "constraints": []
             }
             """;
@@ -293,7 +285,6 @@ class MainTest {
               ],
               "edges": [],
               "groups": [],
-              "labels": [],
               "constraints": []
             }
             """;

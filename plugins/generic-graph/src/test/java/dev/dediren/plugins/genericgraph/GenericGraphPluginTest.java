@@ -733,8 +733,6 @@ class GenericGraphPluginTest {
                         "cf-parallel-closeout",
                         "op-charge",
                         "op-confirm");
-        assertThat(jsonTexts(data.get("labels"), "owner_id"))
-                .containsExactly("interaction-place-order", "customer", "service", "inventory", "payment");
         assertThat(jsonTexts(data.get("edges"), "id"))
                 .containsExactly("m1", "m2", "m3", "m4", "m5", "m6", "m7", "m8", "m9", "m10", "m11", "m12");
         assertThat(jsonTexts(data.get("constraints"), "kind"))

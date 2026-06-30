@@ -16,7 +16,6 @@ class LayoutJsonTest {
               "nodes": [],
               "edges": [],
               "groups": [],
-              "labels": [],
               "constraints": [],
               "layout_preferences": {
                 "mode": "packed",

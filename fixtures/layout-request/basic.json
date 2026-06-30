@@ -27,15 +27,5 @@
     }
   ],
   "groups": [],
-  "labels": [
-    {
-      "owner_id": "client",
-      "text": "Client"
-    },
-    {
-      "owner_id": "api",
-      "text": "API"
-    }
-  ],
   "constraints": []
 }

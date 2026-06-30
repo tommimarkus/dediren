@@ -7,7 +7,6 @@ import dev.dediren.contracts.layout.GroupProvenance;
 import dev.dediren.contracts.layout.LayoutConstraint;
 import dev.dediren.contracts.layout.LayoutEdge;
 import dev.dediren.contracts.layout.LayoutGroup;
-import dev.dediren.contracts.layout.LayoutLabel;
 import dev.dediren.contracts.layout.LayoutNode;
 import dev.dediren.contracts.layout.LayoutRequest;
 import dev.dediren.contracts.render.RenderMetadata;
@@ -155,16 +154,12 @@ final class GenericGraphProjection {
             groups.add(new LayoutGroup(group.id(), group.label(), members, provenance));
         }
 
-        var labels = nodes.stream()
-                .map(node -> new LayoutLabel(node.id(), node.label()))
-                .toList();
         return new LayoutRequest(
                 ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION,
                 selectedView.id(),
                 nodes,
                 edges,
                 groups,
-                labels,
                 projectLayoutConstraints(source, selectedView, semanticProfile),
                 selectedView.layoutPreferences());
     }

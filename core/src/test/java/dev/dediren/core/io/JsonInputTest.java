@@ -17,7 +17,6 @@ class JsonInputTest {
                   "nodes": [],
                   "edges": [],
                   "groups": [],
-                  "labels": [],
                   "constraints": []
                 }
                 """, LayoutRequest.class);
@@ -38,7 +37,6 @@ class JsonInputTest {
                     "nodes": [],
                     "edges": [],
                     "groups": [],
-                    "labels": [],
                     "constraints": []
                   },
                   "diagnostics": []

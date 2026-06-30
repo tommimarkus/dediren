@@ -60,7 +60,6 @@ class CoreCommandsTest {
                   "nodes": [],
                   "edges": [],
                   "groups": [],
-                  "labels": [],
                   "constraints": []
                 }
                 """;

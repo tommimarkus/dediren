@@ -9,7 +9,6 @@ import dev.dediren.contracts.layout.LaidOutNode;
 import dev.dediren.contracts.layout.LayoutConstraint;
 import dev.dediren.contracts.layout.LayoutEdge;
 import dev.dediren.contracts.layout.LayoutGroup;
-import dev.dediren.contracts.layout.LayoutLabel;
 import dev.dediren.contracts.layout.LayoutMode;
 import dev.dediren.contracts.layout.LayoutNode;
 import dev.dediren.contracts.layout.LayoutPreferences;
@@ -1412,7 +1411,6 @@ final class ElkLayoutEngine {
         requireNonNull(request.nodes(), "$.nodes");
         requireNonNull(request.edges(), "$.edges");
         requireNonNull(request.groups(), "$.groups");
-        requireNonNull(request.labels(), "$.labels");
         requireNonNull(request.constraints(), "$.constraints");
         validateLayoutPreferences(request.layoutPreferences(), "$.layout_preferences");
 
@@ -1452,14 +1450,6 @@ final class ElkLayoutEngine {
                     group.members().get(memberIndex),
                     path + ".members[" + memberIndex + "]");
             }
-        }
-
-        for (int index = 0; index < request.labels().size(); index++) {
-            LayoutLabel label = request.labels().get(index);
-            String path = "$.labels[" + index + "]";
-            requireNonNull(label, path);
-            requireNonNull(label.ownerId(), path + ".owner_id");
-            requireNonNull(label.text(), path + ".text");
         }
 
         for (int index = 0; index < request.constraints().size(); index++) {

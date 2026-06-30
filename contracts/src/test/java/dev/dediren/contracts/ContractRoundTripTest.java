@@ -369,7 +369,6 @@ class ContractRoundTripTest {
                       "provenance": { "semantic_backed": { "source_id": "system-group" } }
                     }
                   ],
-                  "labels": [],
                   "constraints": []
                 }
                 """;

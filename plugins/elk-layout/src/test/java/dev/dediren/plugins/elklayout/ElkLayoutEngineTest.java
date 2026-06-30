@@ -89,7 +89,6 @@ class ElkLayoutEngineTest {
                 "client-calls-api", "client", "api", "calls", "client-calls-api")),
             List.of(),
             List.of(),
-            List.of(),
             null);
 
         LayoutResult result = new ElkLayoutEngine().layout(request);
@@ -277,7 +276,6 @@ class ElkLayoutEngineTest {
             List.of(),
             List.of(),
             List.of(),
-            List.of(),
             new LayoutPreferences(LayoutMode.PACKED, null, LayoutDensity.READABLE, null, null));
 
         LayoutResult result = new ElkLayoutEngine().layout(request);
@@ -328,7 +326,6 @@ class ElkLayoutEngineTest {
                     List.of("warehouse", "portal"),
                     GroupProvenance.visualOnlyGroup())),
             List.of(),
-            List.of(),
             new LayoutPreferences(LayoutMode.PACKED, null, LayoutDensity.READABLE, null, null));
 
         LayoutResult result = new ElkLayoutEngine().layout(request);
@@ -378,7 +375,6 @@ class ElkLayoutEngineTest {
                     List.of("initial", "draft"),
                     GroupProvenance.visualOnlyGroup())),
             List.of(),
-            List.of(),
             new LayoutPreferences(LayoutMode.PACKED, null, LayoutDensity.READABLE, null, null));
 
         LayoutResult result = new ElkLayoutEngine().layout(request);
@@ -407,7 +403,6 @@ class ElkLayoutEngineTest {
                 "worker-polls-queue", "worker", "queue", "polls", "worker-polls-queue")),
             List.of(),
             List.of(),
-            List.of(),
             new LayoutPreferences(LayoutDirection.UP, null, null, null));
 
         LayoutResult result = new ElkLayoutEngine().layout(request);
@@ -431,7 +426,6 @@ class ElkLayoutEngineTest {
                     "check-cache-cached", "check-cache", "cached", "cached", "check-cache-cached", "ControlFlow"),
                 new LayoutEdge(
                     "check-cache-stale", "check-cache", "stale", "stale", "check-cache-stale", "ControlFlow")),
-            List.of(),
             List.of(),
             List.of(),
             null);
@@ -468,7 +462,6 @@ class ElkLayoutEngineTest {
                 List.of("client", "missing"),
                 GroupProvenance.semanticBacked("system-group"))),
             List.of(),
-            List.of(),
             null);
 
         LayoutResult result = new ElkLayoutEngine().layout(request);
@@ -496,7 +489,6 @@ class ElkLayoutEngineTest {
                 "Visual Column",
                 List.of("client"),
                 new GroupProvenance(true, null))),
-            List.of(),
             List.of(),
             null);
 
@@ -543,7 +535,6 @@ class ElkLayoutEngineTest {
                     "External Dependencies",
                     List.of("payments", "database"),
                     GroupProvenance.semanticBacked("external-dependencies"))),
-            List.of(),
             List.of(),
             null);
 
@@ -598,7 +589,6 @@ class ElkLayoutEngineTest {
                     List.of("initial", "draft"),
                     GroupProvenance.semanticBacked("region"))),
             List.of(),
-            List.of(),
             null);
 
         LayoutResult result = new ElkLayoutEngine().layout(request);
@@ -644,7 +634,6 @@ class ElkLayoutEngineTest {
                     "External Dependencies",
                     List.of("payments", "database"),
                     GroupProvenance.semanticBacked("external-dependencies"))),
-            List.of(),
             List.of(),
             null);
 
@@ -696,7 +685,6 @@ class ElkLayoutEngineTest {
                 List.of("order-service", "catalog-service", "payment-service", "fulfillment-service"),
                 GroupProvenance.semanticBacked("core-services"))),
             List.of(),
-            List.of(),
             null);
 
         LayoutResult result = new ElkLayoutEngine().layout(request);
@@ -741,7 +729,6 @@ class ElkLayoutEngineTest {
                     List.of("payments", "database"),
                     GroupProvenance.semanticBacked("external-dependencies"))),
             List.of(),
-            List.of(),
             null);
 
         LayoutResult result = new ElkLayoutEngine().layout(request);
@@ -780,7 +767,6 @@ class ElkLayoutEngineTest {
                     "gateway-pricing", "gateway", "pricing", "prices", "gateway-pricing"),
                 new LayoutEdge(
                     "gateway-orders", "gateway", "orders", "orders", "gateway-orders")),
-            List.of(),
             List.of(),
             List.of(),
             null);
@@ -824,7 +810,6 @@ class ElkLayoutEngineTest {
                     "Core Services",
                     List.of("identity-service", "pricing-service", "order-service", "catalog-service"),
                     GroupProvenance.semanticBacked("core-services"))),
-            List.of(),
             List.of(),
             null);
 
@@ -882,7 +867,6 @@ class ElkLayoutEngineTest {
                     List.of("identity-service", "pricing-service", "order-service", "catalog-service"),
                     GroupProvenance.semanticBacked("core-services"))),
             List.of(),
-            List.of(),
             null);
 
         LayoutResult result = new ElkLayoutEngine().layout(request);
@@ -918,7 +902,6 @@ class ElkLayoutEngineTest {
                 new LayoutEdge("edge-a", "source", "target-a", "realizes", "edge-a", "Realization"),
                 new LayoutEdge("edge-b", "source", "target-b", "realizes", "edge-b", "Realization"),
                 new LayoutEdge("edge-c", "source", "target-c", "realizes", "edge-c", "Realization")),
-            List.of(),
             List.of(),
             List.of(),
             new LayoutPreferences(
@@ -965,7 +948,6 @@ class ElkLayoutEngineTest {
                 new LayoutEdge("edge-e", "source", "target-e", "calls", "edge-e")),
             List.of(),
             List.of(),
-            List.of(),
             new LayoutPreferences(
                 null,
                 LayoutDensity.SPACIOUS,
@@ -1008,7 +990,6 @@ class ElkLayoutEngineTest {
                     List.of("identity-service", "pricing-service", "order-service"),
                     GroupProvenance.semanticBacked("core-services"))),
             List.of(),
-            List.of(),
             null);
 
         LayoutResult result = new ElkLayoutEngine().layout(request);
@@ -1045,7 +1026,6 @@ class ElkLayoutEngineTest {
                 "Core Services",
                 List.of("api-gateway", "identity-service", "pricing-service", "order-service"),
                 GroupProvenance.semanticBacked("core-services"))),
-            List.of(),
             List.of(),
             null);
 
@@ -1093,7 +1073,6 @@ class ElkLayoutEngineTest {
                     List.of("identity-provider"),
                     GroupProvenance.semanticBacked("external-systems"))),
             List.of(),
-            List.of(),
             null);
 
         LayoutResult result = new ElkLayoutEngine().layout(request);
@@ -1140,7 +1119,6 @@ class ElkLayoutEngineTest {
                     "Data Platform",
                     List.of("session-cache", "product-db"),
                     GroupProvenance.semanticBacked("data-platform"))),
-            List.of(),
             List.of(),
             null);
 
@@ -1199,7 +1177,6 @@ class ElkLayoutEngineTest {
                     List.of("cdn", "web-frontend", "admin-portal", "api-gateway", "gateway-and-junction"),
                     GroupProvenance.semanticBacked("edge-platform"))),
             List.of(),
-            List.of(),
             null);
 
         LayoutResult result = new ElkLayoutEngine().layout(request);
@@ -1249,7 +1226,6 @@ class ElkLayoutEngineTest {
                     List.of("orders-api"),
                     GroupProvenance.semanticBacked("application-services"))),
             List.of(),
-            List.of(),
             null);
 
         LayoutResult result = new ElkLayoutEngine().layout(request);
@@ -1296,7 +1272,6 @@ class ElkLayoutEngineTest {
                     "Application Services",
                     List.of("orders-api"),
                     GroupProvenance.semanticBacked("application-services"))),
-            List.of(),
             List.of(),
             null);
 
@@ -1349,7 +1324,6 @@ class ElkLayoutEngineTest {
                     List.of("payments", "database"),
                     GroupProvenance.semanticBacked("external-dependencies"))),
             List.of(),
-            List.of(),
             null);
 
         LayoutResult result = new ElkLayoutEngine().layout(request);
@@ -1387,7 +1361,6 @@ class ElkLayoutEngineTest {
                     "External Dependencies",
                     List.of("payments", "database"),
                     GroupProvenance.semanticBacked("external-dependencies"))),
-            List.of(),
             List.of(),
             null);
 
@@ -1436,7 +1409,6 @@ class ElkLayoutEngineTest {
                     "Worker",
                     List.of("worker-entry", "worker-return"),
                     GroupProvenance.semanticBacked("worker"))),
-            List.of(),
             List.of(),
             new LayoutPreferences(LayoutDirection.DOWN, null, null, null));
 
@@ -1573,7 +1545,6 @@ class ElkLayoutEngineTest {
                 List.of("actor-electronic-applicant", "actor-ulosottolaitos"),
                 GroupProvenance.semanticBacked("grp-uljas-business-stakeholders"))),
             List.of(),
-            List.of(),
             new LayoutPreferences(
                 LayoutDirection.RIGHT,
                 LayoutDensity.SPACIOUS,
@@ -1619,7 +1590,6 @@ class ElkLayoutEngineTest {
                 "Async Processing",
                 List.of("event-bus", "event-dispatch-or-junction", "order-worker"),
                 GroupProvenance.semanticBacked("async-processing"))),
-            List.of(),
             List.of(),
             null);
 
@@ -1842,7 +1812,6 @@ class ElkLayoutEngineTest {
                     List.of("payment-provider", "email-provider"),
                     GroupProvenance.semanticBacked("external-systems"))),
             List.of(),
-            List.of(),
             new LayoutPreferences(
                 LayoutDirection.RIGHT,
                 LayoutDensity.SPACIOUS,
@@ -1916,7 +1885,6 @@ class ElkLayoutEngineTest {
                                 "notify", "junction-flows-notification", "Flow")),
                 List.of(),
                 List.of(),
-                List.of(),
                 null);
 
         LayoutResult result = new ElkLayoutEngine().layout(request);
@@ -1988,7 +1956,6 @@ class ElkLayoutEngineTest {
                 new LayoutEdge("m2", "service", "customer", "accepted", "m2", "Message"),
                 new LayoutEdge("m1", "customer", "service", "placeOrder", "m1", "Message")),
             List.of(),
-            List.of(),
             List.of(
                 new LayoutConstraint(
                     "sequence-view.uml.sequence.lifeline-order",
@@ -2025,7 +1992,6 @@ class ElkLayoutEngineTest {
                 new LayoutEdge("m2", "service", "customer", "accepted", "m2", "Message"),
                 new LayoutEdge("m3", "service", "missing-customer", "receiptReady", "m3", "Message"),
                 new LayoutEdge("m1", "customer", "service", "placeOrder", "m1", "Message")),
-            List.of(),
             List.of(),
             List.of(
                 new LayoutConstraint(
@@ -2083,7 +2049,6 @@ class ElkLayoutEngineTest {
                 "service",
                 "calls",
                 "customer-calls-service")),
-            List.of(),
             List.of(),
             constraints,
             null);
@@ -2363,7 +2328,6 @@ class ElkLayoutEngineTest {
                 "Group",
                 List.of("a", "b"),
                 GroupProvenance.semanticBacked("group"))),
-            List.of(),
             List.of(),
             null);
 
