@@ -103,6 +103,44 @@ class ArchimateRelationshipRulesTest {
     }
 
     @Test
+    void acceptsJunctionContainedInGroupingWithReachableValidEndpoints() throws Exception {
+        // A valid AndJunction routes a Realization from ApplicationComponent to ApplicationService and is
+        // visually contained in a Grouping via Composition. The containment relationship must be skipped by
+        // the junction semantics (not treated as a mixed or direction-incomplete junction relationship), and
+        // the reachable endpoint (ApplicationComponent -> ApplicationService) is a supported Realization.
+        Archimate.validateJunctionRelationshipSemantics(
+                java.util.List.of(
+                        new JunctionValidationNode("api", "ApplicationComponent", "$.nodes[0]"),
+                        new JunctionValidationNode("junction", "AndJunction", "$.nodes[1]"),
+                        new JunctionValidationNode("orders", "ApplicationService", "$.nodes[2]"),
+                        new JunctionValidationNode("group", "Grouping", "$.nodes[3]")),
+                java.util.List.of(
+                        new JunctionValidationRelationship("Realization", "api", "junction"),
+                        new JunctionValidationRelationship("Realization", "junction", "orders"),
+                        new JunctionValidationRelationship("Composition", "group", "junction")));
+    }
+
+    @Test
+    void rejectsJunctionWhoseReachableEndpointTypeIsInvalid() {
+        // The junction routes a Realization whose resolved endpoints (ApplicationService -> ApplicationComponent)
+        // are an unsupported direction; the reachable-targets check must surface that endpoint violation.
+        ArchimateJunctionValidationException error = org.junit.jupiter.api.Assertions.assertThrows(
+                ArchimateJunctionValidationException.class,
+                () -> Archimate.validateJunctionRelationshipSemantics(
+                        java.util.List.of(
+                                new JunctionValidationNode("svc", "ApplicationService", "$.nodes[0]"),
+                                new JunctionValidationNode("junction", "AndJunction", "$.nodes[1]"),
+                                new JunctionValidationNode("comp", "ApplicationComponent", "$.nodes[2]")),
+                        java.util.List.of(
+                                new JunctionValidationRelationship("Realization", "svc", "junction"),
+                                new JunctionValidationRelationship("Realization", "junction", "comp"))));
+
+        assertThat(error.code()).isEqualTo("DEDIREN_ARCHIMATE_RELATIONSHIP_ENDPOINT_UNSUPPORTED");
+        assertThat(error.path()).isEqualTo("$.nodes[1]");
+        assertThat(error.message()).contains("ApplicationService", "Realization", "ApplicationComponent");
+    }
+
+    @Test
     void rejectsUnsupportedElementType() {
         ArchimateTypeValidationException error = org.junit.jupiter.api.Assertions.assertThrows(
                 ArchimateTypeValidationException.class,
