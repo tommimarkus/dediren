@@ -83,11 +83,7 @@
         <artifactId>appassembler-maven-plugin</artifactId>
         <executions>
           <execution>
-            <id>assemble-cli</id>
-            <phase>package</phase>
-            <goals>
-              <goal>assemble</goal>
-            </goals>
+            <id>assemble</id>
             <configuration>
               <extraJvmArguments>${dediren.launcher.jvmArgs} -Ddediren.version=${project.version}</extraJvmArguments>
               <programs>

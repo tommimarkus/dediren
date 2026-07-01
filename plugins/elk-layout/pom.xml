@@ -74,11 +74,7 @@
         <artifactId>appassembler-maven-plugin</artifactId>
         <executions>
           <execution>
-            <id>assemble-elk-layout</id>
-            <phase>package</phase>
-            <goals>
-              <goal>assemble</goal>
-            </goals>
+            <id>assemble</id>
             <configuration>
               <extraJvmArguments>${dediren.launcher.jvmArgs}</extraJvmArguments>
               <programs>

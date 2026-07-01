@@ -59,11 +59,7 @@
         <artifactId>appassembler-maven-plugin</artifactId>
         <executions>
           <execution>
-            <id>assemble-archimate-oef-export</id>
-            <phase>package</phase>
-            <goals>
-              <goal>assemble</goal>
-            </goals>
+            <id>assemble</id>
             <configuration>
               <extraJvmArguments>${dediren.launcher.jvmArgs}</extraJvmArguments>
               <programs>

@@ -77,4 +77,24 @@
     <Bug pattern="NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"/>
   </Match>
 
+
+  <!-- EI_EXPOSE_REP / EI_EXPOSE_REP2: NodeLabelLines (render) and ExportScope
+       (uml-xmi) are plugin-internal value records extracted from the former
+       Main god-files during the god-file split. They hold List/Set components
+       consumed read-only within their plugin; they are not part of the public
+       JSON contract surface and never cross the process boundary. As with the
+       contracts.* records above, EI_EXPOSE_REP/REP2 is suppressed rather than
+       defensive-copied (out of scope for the gate). Tracked in
+       architecture-guidelines.md §12. -->
+  <Match>
+    <Or>
+      <Class name="dev.dediren.plugins.render.node.NodeLabelLines"/>
+      <Class name="dev.dediren.plugins.umlxmi.build.ExportScope"/>
+    </Or>
+    <Or>
+      <Bug pattern="EI_EXPOSE_REP"/>
+      <Bug pattern="EI_EXPOSE_REP2"/>
+    </Or>
+  </Match>
+
 </FindBugsFilter>

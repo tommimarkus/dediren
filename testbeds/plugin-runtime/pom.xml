@@ -38,11 +38,7 @@
         <artifactId>appassembler-maven-plugin</artifactId>
         <executions>
           <execution>
-            <id>assemble-plugin-runtime-testbed</id>
-            <phase>package</phase>
-            <goals>
-              <goal>assemble</goal>
-            </goals>
+            <id>assemble</id>
             <configuration>
               <programs>
                 <program>

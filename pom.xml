@@ -218,6 +218,15 @@
             <repositoryLayout>flat</repositoryLayout>
             <repositoryName>lib</repositoryName>
           </configuration>
+          <executions>
+            <execution>
+              <id>assemble</id>
+              <phase>package</phase>
+              <goals>
+                <goal>assemble</goal>
+              </goals>
+            </execution>
+          </executions>
         </plugin>
         <plugin>
           <groupId>org.codehaus.mojo</groupId>
