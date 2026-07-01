@@ -10,3 +10,4 @@
 .codex/rules/default.rules
 .codex/config.toml
 .mcp.json
+/.idea
