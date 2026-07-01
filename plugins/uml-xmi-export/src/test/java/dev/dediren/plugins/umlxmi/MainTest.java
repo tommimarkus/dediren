@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import dev.dediren.contracts.DiagnosticCode;
 import dev.dediren.contracts.json.JsonSupport;
+import dev.dediren.plugins.umlxmi.schema.SchemaValidation;
 import dev.dediren.testsupport.CommandEnvelopeAssertions;
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
@@ -753,7 +754,7 @@ class MainTest {
 
   @Test
   void xmiValidationParserRejectsDoctype() throws Exception {
-    var builder = Main.secureXmiDocumentBuilderFactory().newDocumentBuilder();
+    var builder = SchemaValidation.secureXmiDocumentBuilderFactory().newDocumentBuilder();
     String hostile =
         "<!DOCTYPE XMI [<!ENTITY xxe SYSTEM \"file:///etc/passwd\">]>"
             + "<XMI xmlns=\"http://www.omg.org/spec/XMI/20131001\">&xxe;</XMI>";
