@@ -1,4 +1,4 @@
-package dev.dediren.plugins.render;
+package dev.dediren.plugins.render.node.uml;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import dev.dediren.contracts.layout.LaidOutEdge;
@@ -24,7 +24,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
-final class UmlSequenceRenderer {
+public final class UmlSequenceRenderer {
   private static final String DASH_PATTERN = "8 5";
   private static final double INTERACTION_HORIZONTAL_PADDING = 48.0;
   private static final double INTERACTION_TOP_PADDING = 40.0;
@@ -44,7 +44,7 @@ final class UmlSequenceRenderer {
   private final Map<String, List<UmlSequenceModel.SequenceOperand>> operandsByFragmentId;
   private final Map<String, SequenceFrame> combinedFragmentFrames;
 
-  UmlSequenceRenderer(LayoutResult result, RenderMetadata metadata, RenderPolicy policy) {
+  public UmlSequenceRenderer(LayoutResult result, RenderMetadata metadata, RenderPolicy policy) {
     this.result = result;
     this.policy = policy;
     this.base = SequenceStyle.from(policy);
@@ -57,7 +57,7 @@ final class UmlSequenceRenderer {
     this.combinedFragmentFrames = combinedFragmentFrames();
   }
 
-  static boolean isSequence(RenderMetadata metadata) {
+  public static boolean isSequence(RenderMetadata metadata) {
     if (metadata == null || !"uml".equals(metadata.semanticProfile())) {
       return false;
     }
@@ -68,7 +68,7 @@ final class UmlSequenceRenderer {
     return hasLifeline || hasMessage;
   }
 
-  String render() {
+  public String render() {
     SvgBox bounds = bounds().padded(policy);
     StringBuilder svg = new StringBuilder();
     svg.append(

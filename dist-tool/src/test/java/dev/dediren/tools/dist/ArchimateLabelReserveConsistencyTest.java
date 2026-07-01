@@ -25,7 +25,7 @@ class ArchimateLabelReserveConsistencyTest {
       Path.of(
           "plugins/generic-graph/src/main/java/dev/dediren/plugins/genericgraph/GenericGraphLayoutSizing.java");
   private static final Path RENDER =
-      Path.of("plugins/render/src/main/java/dev/dediren/plugins/render/Main.java");
+      Path.of("plugins/render/src/main/java/dev/dediren/plugins/render/node/NodeLabels.java");
   private static final Pattern RESERVE =
       Pattern.compile("ARCHIMATE_LABEL_ICON_RESERVE\\s*=\\s*([0-9]+(?:\\.[0-9]+)?)");
 

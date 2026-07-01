@@ -1,4 +1,4 @@
-package dev.dediren.plugins.render;
+package dev.dediren.plugins.render.node.uml;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import dev.dediren.archimate.Archimate;
@@ -22,7 +22,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-final class RenderInputValidator {
+public final class RenderInputValidator {
   private static final Set<String> UML_SEQUENCE_MESSAGE_SORTS =
       Set.of("synchCall", "asynchCall", "asynchSignal", "reply", "createMessage", "deleteMessage");
   private static final Set<String> UML_SEQUENCE_COMBINED_FRAGMENT_OPERATORS =
@@ -30,7 +30,7 @@ final class RenderInputValidator {
 
   private RenderInputValidator() {}
 
-  static void validate(LayoutResult layout, RenderMetadata metadata, RenderPolicy policy)
+  public static void validate(LayoutResult layout, RenderMetadata metadata, RenderPolicy policy)
       throws PolicyValidationException,
           RenderMetadataUsageException,
           ArchimateTypeValidationException,
@@ -556,7 +556,7 @@ final class RenderInputValidator {
     EXCLUSIVE_MIN
   }
 
-  static final class PolicyValidationException extends Exception {
+  public static final class PolicyValidationException extends Exception {
     private final String path;
 
     private PolicyValidationException(String path, String message) {
@@ -564,12 +564,12 @@ final class RenderInputValidator {
       this.path = path;
     }
 
-    String path() {
+    public String path() {
       return path;
     }
   }
 
-  static final class RenderMetadataUsageException extends Exception {
+  public static final class RenderMetadataUsageException extends Exception {
     private final String code;
     private final String path;
 
@@ -579,11 +579,11 @@ final class RenderInputValidator {
       this.path = path;
     }
 
-    String code() {
+    public String code() {
       return code;
     }
 
-    String path() {
+    public String path() {
       return path;
     }
   }

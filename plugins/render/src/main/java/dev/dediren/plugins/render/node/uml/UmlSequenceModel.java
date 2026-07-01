@@ -1,4 +1,4 @@
-package dev.dediren.plugins.render;
+package dev.dediren.plugins.render.node.uml;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import dev.dediren.contracts.layout.LaidOutEdge;
