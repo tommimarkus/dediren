@@ -184,6 +184,17 @@ enforcement authority for matching version, tag, and release actions.
 - It uses Eclipse ELK Java libraries and the Maven appassembler launcher.
 - Java 21 or newer is required.
 
+## Code Style
+
+- Java is formatted by **google-java-format (GOOGLE style)** enforced via
+  Spotless; SpotBugs (Max effort, Medium threshold, correctness only) runs
+  alongside it. Both live in the opt-in `quality` profile.
+- Run `./mvnw -Pquality spotless:apply` before committing Java changes; the gate
+  (`./mvnw -Pquality verify`) fails on unformatted code or SpotBugs findings.
+- SpotBugs suppressions live in `spotbugs-exclude.xml` and must be recorded as
+  known debt in `docs/architecture-guidelines.md §12` — never suppress silently.
+- Security scanning is CodeQL's job (CI), not SpotBugs; do not add FindSecBugs.
+
 ## Verification
 
 Start with the narrow lane for the files touched, then run broader checks when
@@ -205,6 +216,15 @@ Coverage (local, opt-in JaCoCo gate — LINE + BRANCH, not run in CI):
 
 ```bash
 ./mvnw -Pcoverage verify
+```
+
+Code style + static analysis (local, opt-in gate — fails on violations; CI runs
+the same checks report-only):
+
+```bash
+./mvnw -Pquality verify          # full gate (format + SpotBugs + tests)
+./mvnw -Pquality spotless:check  # formatting only
+./mvnw -Pquality spotless:apply  # auto-fix formatting
 ```
 
 Contract/schema changes:

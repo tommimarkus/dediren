@@ -40,6 +40,12 @@ Run `./mvnw -Pcoverage verify` for the opt-in JaCoCo coverage report and gate
 (LINE + BRANCH; per-module reports plus an aggregate under
 `coverage-report/target/site/jacoco-aggregate/`).
 
+Run `./mvnw -Pquality verify` for the opt-in code-quality gate: google-java-format
+(GOOGLE style) via Spotless plus SpotBugs. Auto-fix formatting with
+`./mvnw -Pquality spotless:apply`. The gate fails the build locally; CI runs the
+same checks report-only. To skip the bulk-reformat commit in blame, run
+`git config blame.ignoreRevsFile .git-blame-ignore-revs`.
+
 Maven artifacts and wrapper state are repo-local under `.cache/maven` for
 sandbox-friendly builds. Supply-chain scanning runs in two layers. Grype scans
 the CycloneDX SBOM against the GitHub Advisory DB / OSV and is the blocking gate
