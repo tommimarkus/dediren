@@ -1,0 +1,3 @@
+# Bulk reformat: adopt google-java-format (GOOGLE style) via Spotless.
+# Semantics-preserving; ignore in git blame. See docs/superpowers/specs/2026-07-01-spotless-spotbugs-quality-gates-design.md
+95a6cdd51de6cbb08148812b461a351b7c37f92a
