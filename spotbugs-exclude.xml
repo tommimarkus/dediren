@@ -5,13 +5,18 @@
      See docs/superpowers/specs/2026-07-01-spotless-spotbugs-quality-gates-design.md §3 -->
 <FindBugsFilter>
 
-  <!-- EI_EXPOSE_REP / EI_EXPOSE_REP2: contract-first value records carry
-       immutable List.of(...)/array components and share the reference through
-       generated accessors/constructors. Defensive-copying every accessor and
-       compact constructor across the stable public contract surface is a large,
-       cross-cutting change out of scope for wiring the quality gate. Each class
-       is enumerated (class + pattern), not a blanket pattern-wide suppression.
-       Tracked in architecture-guidelines.md §12. -->
+  <!-- EI_EXPOSE_REP / EI_EXPOSE_REP2: two distinct cases, enumerated per class
+       (not a blanket pattern-wide suppression) because their justification
+       differs. The contracts.* records wrap their List/Map components via
+       ContractCollections.listOrEmpty(...)/mapOrEmpty(...) (List.copyOf/
+       Map.copyOf), so the shared reference is genuinely immutable.
+       schemacache.SchemaFetchResult is different: it holds mutable byte[]
+       stdout/stderr exposed by reference (arrays are never immutable in
+       Java); it is not part of the public contracts surface, but a
+       short-lived internal schema-cache result whose buffers are never
+       mutated after construction. Defensive-copying either case is out of
+       scope for wiring the quality gate. Tracked in
+       architecture-guidelines.md §12. -->
   <Match>
     <Or>
       <Class name="dev.dediren.contracts.layout.LaidOutEdge"/>
@@ -40,9 +45,11 @@
   </Match>
 
   <!-- MS_EXPOSE_REP: JsonSupport.objectMapper() intentionally returns the
-       shared, pre-configured, thread-safe singleton ObjectMapper. Exposing the
-       shared instance is by design (one canonical mapper), not mutable-state
-       leakage to fix. Tracked in architecture-guidelines.md §12. -->
+       shared ObjectMapper singleton. It is mutable in place (.configure(),
+       .registerModule()) and exposed by design (one canonical mapper). The
+       reconfiguration risk is first-party/same-JVM only: plugins communicate
+       cross-process over stdin/stdout JSON, so this singleton never crosses a
+       process/trust boundary. Tracked in architecture-guidelines.md §12. -->
   <Match>
     <Class name="dev.dediren.contracts.json.JsonSupport"/>
     <Bug pattern="MS_EXPOSE_REP"/>
@@ -66,6 +73,7 @@
        out of scope for the gate. Tracked in architecture-guidelines.md §12. -->
   <Match>
     <Class name="dev.dediren.core.plugins.PluginRunner"/>
+    <Method name="executablePath"/>
     <Bug pattern="NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"/>
   </Match>
 
