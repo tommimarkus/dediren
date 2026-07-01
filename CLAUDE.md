@@ -201,6 +201,12 @@ General Java changes:
 ./mvnw test
 ```
 
+Coverage (local, opt-in JaCoCo gate — LINE + BRANCH, not run in CI):
+
+```bash
+./mvnw -Pcoverage verify
+```
+
 Contract/schema changes:
 
 ```bash
