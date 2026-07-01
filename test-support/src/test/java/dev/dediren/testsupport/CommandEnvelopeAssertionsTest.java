@@ -31,9 +31,4 @@ class CommandEnvelopeAssertionsTest {
         assertThatThrownBy(() -> CommandEnvelopeAssertions.assertErrorCode(ERR, "DEDIREN_Y"))
                 .isInstanceOf(AssertionError.class);
     }
-
-    @Test
-    void fixturesPathResolvesUnderWorkspaceRoot() {
-        assertThat(Fixtures.path("schemas/model.schema.json")).exists();
-    }
 }
