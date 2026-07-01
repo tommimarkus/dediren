@@ -1,4 +1,3 @@
 package dev.dediren.contracts.render;
 
-public record Page(double width, double height) {
-}
+public record Page(double width, double height) {}

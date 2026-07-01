@@ -8,9 +8,11 @@ import dev.dediren.contracts.layout.LayoutRequest;
 import org.junit.jupiter.api.Test;
 
 class JsonInputTest {
-    @Test
-    void parseCommandDataReadsRawJson() throws Exception {
-        LayoutRequest request = JsonInput.parseCommandData("""
+  @Test
+  void parseCommandDataReadsRawJson() throws Exception {
+    LayoutRequest request =
+        JsonInput.parseCommandData(
+            """
                 {
                   "layout_request_schema_version": "layout-request.schema.v1",
                   "view_id": "main",
@@ -19,15 +21,19 @@ class JsonInputTest {
                   "groups": [],
                   "constraints": []
                 }
-                """, LayoutRequest.class);
+                """,
+            LayoutRequest.class);
 
-        assertThat(request.layoutRequestSchemaVersion()).isEqualTo(ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION);
-        assertThat(request.viewId()).isEqualTo("main");
-    }
+    assertThat(request.layoutRequestSchemaVersion())
+        .isEqualTo(ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION);
+    assertThat(request.viewId()).isEqualTo("main");
+  }
 
-    @Test
-    void parseCommandDataReadsDataFromSuccessEnvelope() throws Exception {
-        LayoutRequest request = JsonInput.parseCommandData("""
+  @Test
+  void parseCommandDataReadsDataFromSuccessEnvelope() throws Exception {
+    LayoutRequest request =
+        JsonInput.parseCommandData(
+            """
                 {
                   "envelope_schema_version": "envelope.schema.v1",
                   "status": "ok",
@@ -41,21 +47,26 @@ class JsonInputTest {
                   },
                   "diagnostics": []
                 }
-                """, LayoutRequest.class);
+                """,
+            LayoutRequest.class);
 
-        assertThat(request.viewId()).isEqualTo("main");
-    }
+    assertThat(request.viewId()).isEqualTo("main");
+  }
 
-    @Test
-    void parseCommandDataRejectsEnvelopeWithoutData() {
-        assertThatThrownBy(() -> JsonInput.parseCommandData("""
+  @Test
+  void parseCommandDataRejectsEnvelopeWithoutData() {
+    assertThatThrownBy(
+            () ->
+                JsonInput.parseCommandData(
+                    """
                 {
                   "envelope_schema_version": "envelope.schema.v1",
                   "status": "ok",
                   "diagnostics": []
                 }
-                """, LayoutRequest.class))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("does not contain data");
-    }
+                """,
+                    LayoutRequest.class))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("does not contain data");
+  }
 }

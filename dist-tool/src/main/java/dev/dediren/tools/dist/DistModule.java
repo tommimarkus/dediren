@@ -1,10 +1,9 @@
 package dev.dediren.tools.dist;
 
 public final class DistModule {
-    private DistModule() {
-    }
+  private DistModule() {}
 
-    public static String moduleName() {
-        return "dist";
-    }
+  public static String moduleName() {
+    return "dist";
+  }
 }

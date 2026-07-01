@@ -8,20 +8,22 @@ package dev.dediren.contracts;
  * and must never change for an existing constant.
  */
 public enum CommandExitCode {
-    /** Command succeeded; stdout carries an {@code ok} envelope. */
-    OK(0),
-    /** Command input or validation failure; stdout carries an {@code error} envelope. */
-    INPUT_ERROR(2),
-    /** Plugin execution failed or produced invalid output; stdout carries an {@code error} envelope. */
-    PLUGIN_ERROR(3);
+  /** Command succeeded; stdout carries an {@code ok} envelope. */
+  OK(0),
+  /** Command input or validation failure; stdout carries an {@code error} envelope. */
+  INPUT_ERROR(2),
+  /**
+   * Plugin execution failed or produced invalid output; stdout carries an {@code error} envelope.
+   */
+  PLUGIN_ERROR(3);
 
-    private final int code;
+  private final int code;
 
-    CommandExitCode(int code) {
-        this.code = code;
-    }
+  CommandExitCode(int code) {
+    this.code = code;
+  }
 
-    public int code() {
-        return code;
-    }
+  public int code() {
+    return code;
+  }
 }

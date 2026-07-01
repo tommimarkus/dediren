@@ -5,9 +5,8 @@ import static dev.dediren.contracts.util.ContractCollections.listOrEmpty;
 import java.util.List;
 
 public record GenericGraphPluginData(
-        GenericGraphSemanticProfile semanticProfile,
-        List<GenericGraphView> views) {
-    public GenericGraphPluginData {
-        views = listOrEmpty(views);
-    }
+    GenericGraphSemanticProfile semanticProfile, List<GenericGraphView> views) {
+  public GenericGraphPluginData {
+    views = listOrEmpty(views);
+  }
 }

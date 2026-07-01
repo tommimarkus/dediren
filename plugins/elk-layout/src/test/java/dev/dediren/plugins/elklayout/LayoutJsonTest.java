@@ -7,9 +7,10 @@ import dev.dediren.contracts.layout.*;
 import org.junit.jupiter.api.Test;
 
 class LayoutJsonTest {
-    @Test
-    void readsLayoutPreferences() throws Exception {
-        String json = """
+  @Test
+  void readsLayoutPreferences() throws Exception {
+    String json =
+        """
             {
               "layout_request_schema_version": "layout-request.schema.v1",
               "view_id": "main",
@@ -31,15 +32,15 @@ class LayoutJsonTest {
             }
             """;
 
-        LayoutRequest request =
-            JsonSupport.objectMapper().readValue(json, LayoutRequest.class);
+    LayoutRequest request = JsonSupport.objectMapper().readValue(json, LayoutRequest.class);
 
-        assertEquals(LayoutMode.PACKED, request.layoutPreferences().mode());
-        assertEquals(LayoutDirection.DOWN, request.layoutPreferences().direction());
-        assertEquals(LayoutDensity.READABLE, request.layoutPreferences().density());
-        assertEquals(LayoutWrapping.OFF, request.layoutPreferences().wrapping());
-        assertEquals(LayoutRoutingStyle.ORTHOGONAL, request.layoutPreferences().routing().style());
-        assertEquals(LayoutRoutingProfile.SPACIOUS, request.layoutPreferences().routing().profile());
-        assertEquals(LayoutEndpointMerging.OFF, request.layoutPreferences().routing().endpointMerging());
-    }
+    assertEquals(LayoutMode.PACKED, request.layoutPreferences().mode());
+    assertEquals(LayoutDirection.DOWN, request.layoutPreferences().direction());
+    assertEquals(LayoutDensity.READABLE, request.layoutPreferences().density());
+    assertEquals(LayoutWrapping.OFF, request.layoutPreferences().wrapping());
+    assertEquals(LayoutRoutingStyle.ORTHOGONAL, request.layoutPreferences().routing().style());
+    assertEquals(LayoutRoutingProfile.SPACIOUS, request.layoutPreferences().routing().profile());
+    assertEquals(
+        LayoutEndpointMerging.OFF, request.layoutPreferences().routing().endpointMerging());
+  }
 }

@@ -16,221 +16,240 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 class MainTest {
-    @TempDir
-    Path tempDir;
+  @TempDir Path tempDir;
 
-    @Test
-    void moduleLoads() {
-        assertThat(Main.moduleName()).isEqualTo("archimate-oef-export");
-    }
+  @Test
+  void moduleLoads() {
+    assertThat(Main.moduleName()).isEqualTo("archimate-oef-export");
+  }
 
-    @Test
-    void reportsCapabilities() throws Exception {
-        PluginResult result = Main.executeForTesting(new String[]{"capabilities"}, "", envWithOefSchemas());
+  @Test
+  void reportsCapabilities() throws Exception {
+    PluginResult result =
+        Main.executeForTesting(new String[] {"capabilities"}, "", envWithOefSchemas());
 
-        JsonNode capabilities = JsonSupport.objectMapper().readTree(result.stdout());
+    JsonNode capabilities = JsonSupport.objectMapper().readTree(result.stdout());
 
-        assertThat(result.exitCode()).isZero();
-        assertThat(capabilities.at("/id").asText()).isEqualTo("archimate-oef");
-        assertThat(capabilities.at("/runtime/artifact_kind").asText()).isEqualTo("archimate-oef+xml");
-        assertThat(capabilities.at("/runtime/schema_validation/kind").asText()).isEqualTo("official-oef-xsd");
-        assertThat(capabilities.at("/runtime/schema_validation/validator").asText()).isEqualTo("xmllint");
-        assertThat(capabilities.at("/capabilities").toString()).contains("export");
-    }
+    assertThat(result.exitCode()).isZero();
+    assertThat(capabilities.at("/id").asText()).isEqualTo("archimate-oef");
+    assertThat(capabilities.at("/runtime/artifact_kind").asText()).isEqualTo("archimate-oef+xml");
+    assertThat(capabilities.at("/runtime/schema_validation/kind").asText())
+        .isEqualTo("official-oef-xsd");
+    assertThat(capabilities.at("/runtime/schema_validation/validator").asText())
+        .isEqualTo("xmllint");
+    assertThat(capabilities.at("/capabilities").toString()).contains("export");
+  }
 
-    @Test
-    void outputsModelValidOefXml() throws Exception {
-        PluginResult result = Main.executeForTesting(
-                new String[]{"export"},
-                exportInput(fixtureJson("fixtures/source/valid-archimate-oef.json"),
-                        fixtureJson("fixtures/layout-result/archimate-oef-basic.json")),
-                envWithOefSchemas());
+  @Test
+  void outputsModelValidOefXml() throws Exception {
+    PluginResult result =
+        Main.executeForTesting(
+            new String[] {"export"},
+            exportInput(
+                fixtureJson("fixtures/source/valid-archimate-oef.json"),
+                fixtureJson("fixtures/layout-result/archimate-oef-basic.json")),
+            envWithOefSchemas());
 
-        JsonNode data = okData(result);
+    JsonNode data = okData(result);
 
-        assertThat(result.exitCode()).isZero();
-        assertThat(data.at("/artifact_kind").asText()).isEqualTo("archimate-oef+xml");
-        assertThat(data.at("/content").asText()).isEqualTo(fixture("fixtures/export/oef-basic.xml"));
-    }
+    assertThat(result.exitCode()).isZero();
+    assertThat(data.at("/artifact_kind").asText()).isEqualTo("archimate-oef+xml");
+    assertThat(data.at("/content").asText()).isEqualTo(fixture("fixtures/export/oef-basic.xml"));
+  }
 
-    @Test
-    void missingOefSchemaValidatorIsStructured() throws Exception {
-        Map<String, String> env = new java.util.HashMap<>(envWithOefSchemas());
-        env.put("DEDIREN_OEF_SCHEMA_VALIDATOR", tempDir.resolve("no-such-validator").toString());
+  @Test
+  void missingOefSchemaValidatorIsStructured() throws Exception {
+    Map<String, String> env = new java.util.HashMap<>(envWithOefSchemas());
+    env.put("DEDIREN_OEF_SCHEMA_VALIDATOR", tempDir.resolve("no-such-validator").toString());
 
-        PluginResult result = Main.executeForTesting(
-                new String[]{"export"},
-                exportInput(fixtureJson("fixtures/source/valid-archimate-oef.json"),
-                        fixtureJson("fixtures/layout-result/archimate-oef-basic.json")),
-                env);
+    PluginResult result =
+        Main.executeForTesting(
+            new String[] {"export"},
+            exportInput(
+                fixtureJson("fixtures/source/valid-archimate-oef.json"),
+                fixtureJson("fixtures/layout-result/archimate-oef-basic.json")),
+            env);
 
-        CommandEnvelopeAssertions.assertErrorCode(
-                result.stdout(), DiagnosticCode.OEF_SCHEMA_VALIDATOR_UNAVAILABLE.code());
-    }
+    CommandEnvelopeAssertions.assertErrorCode(
+        result.stdout(), DiagnosticCode.OEF_SCHEMA_VALIDATOR_UNAVAILABLE.code());
+  }
 
-    @Test
-    void emitsSemanticGroupingViewNodeAndIgnoresLayoutOnlyGroup() throws Exception {
-        JsonNode source = fixtureJson("fixtures/source/valid-archimate-oef.json");
-        ((ArrayNode) source.get("nodes")).addObject()
-                .put("id", "customer-domain")
-                .put("type", "Grouping")
-                .put("label", "Customer Domain")
-                .set("properties", JsonSupport.objectMapper().createObjectNode());
-        JsonNode layout = fixtureJson("fixtures/layout-result/archimate-oef-basic.json");
-        layoutWithGroups(layout, 10.0, 10.0, 520.0, 180.0);
+  @Test
+  void emitsSemanticGroupingViewNodeAndIgnoresLayoutOnlyGroup() throws Exception {
+    JsonNode source = fixtureJson("fixtures/source/valid-archimate-oef.json");
+    ((ArrayNode) source.get("nodes"))
+        .addObject()
+        .put("id", "customer-domain")
+        .put("type", "Grouping")
+        .put("label", "Customer Domain")
+        .set("properties", JsonSupport.objectMapper().createObjectNode());
+    JsonNode layout = fixtureJson("fixtures/layout-result/archimate-oef-basic.json");
+    layoutWithGroups(layout, 10.0, 10.0, 520.0, 180.0);
 
-        String xml = exportXml(source, layout);
+    String xml = exportXml(source, layout);
 
-        assertThat(xml).contains("id-el-customer-domain", "Customer Domain", "x=\"10\"", "w=\"520\"");
-        assertThat(xml).doesNotContain("Visual Column");
-    }
+    assertThat(xml).contains("id-el-customer-domain", "Customer Domain", "x=\"10\"", "w=\"520\"");
+    assertThat(xml).doesNotContain("Visual Column");
+  }
 
-    @Test
-    void emitsAttachmentsForRouteEndpointsAndBendpointsOnlyForIntermediatePoints() throws Exception {
-        JsonNode source = fixtureJson("fixtures/source/valid-archimate-oef.json");
-        ((ArrayNode) source.get("nodes")).addObject()
-                .put("id", "customer-domain")
-                .put("type", "Grouping")
-                .put("label", "Customer Domain")
-                .set("properties", JsonSupport.objectMapper().createObjectNode());
-        JsonNode layout = fixtureJson("fixtures/layout-result/archimate-oef-basic.json");
-        ((ObjectNode) layout.at("/nodes/0")).put("x", 40.25);
-        ((ObjectNode) layout.at("/nodes/0")).put("y", 40.75);
-        ((ObjectNode) layout.at("/nodes/0")).put("width", 180.6);
-        ((ObjectNode) layout.at("/nodes/0")).put("height", 80.4);
-        ArrayNode points = (ArrayNode) layout.at("/edges/0/points");
-        ((ObjectNode) points.get(0)).put("x", 220.2);
-        ((ObjectNode) points.get(0)).put("y", 80.8);
-        points.insertObject(1).put("x", 260.6).put("y", 80.4);
-        layoutWithGroups(layout, 10.6, 11.5, 520.4, 180.6);
+  @Test
+  void emitsAttachmentsForRouteEndpointsAndBendpointsOnlyForIntermediatePoints() throws Exception {
+    JsonNode source = fixtureJson("fixtures/source/valid-archimate-oef.json");
+    ((ArrayNode) source.get("nodes"))
+        .addObject()
+        .put("id", "customer-domain")
+        .put("type", "Grouping")
+        .put("label", "Customer Domain")
+        .set("properties", JsonSupport.objectMapper().createObjectNode());
+    JsonNode layout = fixtureJson("fixtures/layout-result/archimate-oef-basic.json");
+    ((ObjectNode) layout.at("/nodes/0")).put("x", 40.25);
+    ((ObjectNode) layout.at("/nodes/0")).put("y", 40.75);
+    ((ObjectNode) layout.at("/nodes/0")).put("width", 180.6);
+    ((ObjectNode) layout.at("/nodes/0")).put("height", 80.4);
+    ArrayNode points = (ArrayNode) layout.at("/edges/0/points");
+    ((ObjectNode) points.get(0)).put("x", 220.2);
+    ((ObjectNode) points.get(0)).put("y", 80.8);
+    points.insertObject(1).put("x", 260.6).put("y", 80.4);
+    layoutWithGroups(layout, 10.6, 11.5, 520.4, 180.6);
 
-        String xml = exportXml(source, layout);
+    String xml = exportXml(source, layout);
 
-        assertThat(xml).contains("x=\"11\" y=\"12\" w=\"520\" h=\"181\"");
-        assertThat(xml).contains("x=\"40\" y=\"41\" w=\"181\" h=\"80\"");
-        assertThat(xml).contains("<sourceAttachment x=\"220\" y=\"81\"/><bendpoint x=\"261\" y=\"80\"/>"
+    assertThat(xml).contains("x=\"11\" y=\"12\" w=\"520\" h=\"181\"");
+    assertThat(xml).contains("x=\"40\" y=\"41\" w=\"181\" h=\"80\"");
+    assertThat(xml)
+        .contains(
+            "<sourceAttachment x=\"220\" y=\"81\"/><bendpoint x=\"261\" y=\"80\"/>"
                 + "<targetAttachment x=\"300\" y=\"80\"/>");
-        assertThat(xml).doesNotContain("<bendpoint x=\"220\" y=\"81\"/>", "<bendpoint x=\"300\" y=\"80\"/>");
-    }
+    assertThat(xml)
+        .doesNotContain("<bendpoint x=\"220\" y=\"81\"/>", "<bendpoint x=\"300\" y=\"80\"/>");
+  }
 
-    @Test
-    void emitsSourceAndTargetAttachmentsForOnePointRoute() throws Exception {
-        JsonNode source = fixtureJson("fixtures/source/valid-archimate-oef.json");
-        JsonNode layout = fixtureJson("fixtures/layout-result/archimate-oef-basic.json");
-        ArrayNode points = (ArrayNode) layout.at("/edges/0/points");
-        points.remove(1);
-        ((ObjectNode) points.get(0)).put("x", 220.6);
-        ((ObjectNode) points.get(0)).put("y", 80.2);
+  @Test
+  void emitsSourceAndTargetAttachmentsForOnePointRoute() throws Exception {
+    JsonNode source = fixtureJson("fixtures/source/valid-archimate-oef.json");
+    JsonNode layout = fixtureJson("fixtures/layout-result/archimate-oef-basic.json");
+    ArrayNode points = (ArrayNode) layout.at("/edges/0/points");
+    points.remove(1);
+    ((ObjectNode) points.get(0)).put("x", 220.6);
+    ((ObjectNode) points.get(0)).put("y", 80.2);
 
-        String xml = exportXml(source, layout);
+    String xml = exportXml(source, layout);
 
-        assertThat(xml).contains("<sourceAttachment x=\"221\" y=\"80\"/>"
-                + "<targetAttachment x=\"221\" y=\"80\"/>");
-        assertThat(xml).doesNotContain("<bendpoint ");
-    }
+    assertThat(xml)
+        .contains(
+            "<sourceAttachment x=\"221\" y=\"80\"/>" + "<targetAttachment x=\"221\" y=\"80\"/>");
+    assertThat(xml).doesNotContain("<bendpoint ");
+  }
 
-    @Test
-    void emitsNoConnectionGeometryForEmptyRoute() throws Exception {
-        JsonNode source = fixtureJson("fixtures/source/valid-archimate-oef.json");
-        JsonNode layout = fixtureJson("fixtures/layout-result/archimate-oef-basic.json");
-        ((ArrayNode) layout.at("/edges/0/points")).removeAll();
+  @Test
+  void emitsNoConnectionGeometryForEmptyRoute() throws Exception {
+    JsonNode source = fixtureJson("fixtures/source/valid-archimate-oef.json");
+    JsonNode layout = fixtureJson("fixtures/layout-result/archimate-oef-basic.json");
+    ((ArrayNode) layout.at("/edges/0/points")).removeAll();
 
-        String connection = connectionXml(exportXml(source, layout));
+    String connection = connectionXml(exportXml(source, layout));
 
-        assertThat(connection).doesNotContain("sourceAttachment", "bendpoint", "targetAttachment");
-    }
+    assertThat(connection).doesNotContain("sourceAttachment", "bendpoint", "targetAttachment");
+  }
 
-    @Test
-    void rejectsLayoutNodeWhoseSourceIdDoesNotResolveToSourceNode() throws Exception {
-        JsonNode source = fixtureJson("fixtures/source/valid-archimate-oef.json");
-        JsonNode layout = fixtureJson("fixtures/layout-result/archimate-oef-basic.json");
-        ((ObjectNode) layout.at("/nodes/0")).put("id", "node-customer");
-        ((ObjectNode) layout.at("/nodes/0")).put("source_id", "missing-source-node");
+  @Test
+  void rejectsLayoutNodeWhoseSourceIdDoesNotResolveToSourceNode() throws Exception {
+    JsonNode source = fixtureJson("fixtures/source/valid-archimate-oef.json");
+    JsonNode layout = fixtureJson("fixtures/layout-result/archimate-oef-basic.json");
+    ((ObjectNode) layout.at("/nodes/0")).put("id", "node-customer");
+    ((ObjectNode) layout.at("/nodes/0")).put("source_id", "missing-source-node");
 
-        PluginResult result = Main.executeForTesting(
-                new String[]{"export"},
-                exportInput(source, layout),
-                envWithOefSchemas());
+    PluginResult result =
+        Main.executeForTesting(
+            new String[] {"export"}, exportInput(source, layout), envWithOefSchemas());
 
-        assertThat(result.exitCode()).isEqualTo(3);
-        assertErrorCode(result, "DEDIREN_OEF_LAYOUT_REFERENCE_MISSING");
-        assertThat(result.stdout())
-                .contains("Layout node 'node-customer' references missing source node 'missing-source-node'")
-                .contains("while exporting ArchiMate OEF")
-                .contains("$.layout_result.nodes[0].source_id");
-    }
+    assertThat(result.exitCode()).isEqualTo(3);
+    assertErrorCode(result, "DEDIREN_OEF_LAYOUT_REFERENCE_MISSING");
+    assertThat(result.stdout())
+        .contains(
+            "Layout node 'node-customer' references missing source node 'missing-source-node'")
+        .contains("while exporting ArchiMate OEF")
+        .contains("$.layout_result.nodes[0].source_id");
+  }
 
-    @Test
-    void rejectsLayoutEdgeWhoseRelationshipRefDoesNotResolveToSourceRelationship() throws Exception {
-        JsonNode source = fixtureJson("fixtures/source/valid-archimate-oef.json");
-        JsonNode layout = fixtureJson("fixtures/layout-result/archimate-oef-basic.json");
-        ((ObjectNode) layout.at("/edges/0")).put("id", "rel-serve");
-        ((ObjectNode) layout.at("/edges/0")).put("source_id", "missing-relationship");
+  @Test
+  void rejectsLayoutEdgeWhoseRelationshipRefDoesNotResolveToSourceRelationship() throws Exception {
+    JsonNode source = fixtureJson("fixtures/source/valid-archimate-oef.json");
+    JsonNode layout = fixtureJson("fixtures/layout-result/archimate-oef-basic.json");
+    ((ObjectNode) layout.at("/edges/0")).put("id", "rel-serve");
+    ((ObjectNode) layout.at("/edges/0")).put("source_id", "missing-relationship");
 
-        PluginResult result = Main.executeForTesting(
-                new String[]{"export"},
-                exportInput(source, layout),
-                envWithOefSchemas());
+    PluginResult result =
+        Main.executeForTesting(
+            new String[] {"export"}, exportInput(source, layout), envWithOefSchemas());
 
-        assertThat(result.exitCode()).isEqualTo(3);
-        assertErrorCode(result, "DEDIREN_OEF_LAYOUT_REFERENCE_MISSING");
-        assertThat(result.stdout())
-                .contains("Layout edge 'rel-serve' references missing source relationship 'missing-relationship'")
-                .contains("while exporting ArchiMate OEF")
-                .contains("$.layout_result.edges[0].source_id");
-    }
+    assertThat(result.exitCode()).isEqualTo(3);
+    assertErrorCode(result, "DEDIREN_OEF_LAYOUT_REFERENCE_MISSING");
+    assertThat(result.stdout())
+        .contains(
+            "Layout edge 'rel-serve' references missing source relationship 'missing-relationship'")
+        .contains("while exporting ArchiMate OEF")
+        .contains("$.layout_result.edges[0].source_id");
+  }
 
-    @Test
-    void rejectsUnknownArchimateNodeTypeWithErrorEnvelope() throws Exception {
-        JsonNode input = exportInputJson();
-        ((ObjectNode) input.at("/source/nodes/0")).put("type", "TechnologyNode");
+  @Test
+  void rejectsUnknownArchimateNodeTypeWithErrorEnvelope() throws Exception {
+    JsonNode input = exportInputJson();
+    ((ObjectNode) input.at("/source/nodes/0")).put("type", "TechnologyNode");
 
-        PluginResult result = Main.executeForTesting(
-                new String[]{"export"},
-                JsonSupport.objectMapper().writeValueAsString(input),
-                envWithOefSchemas());
+    PluginResult result =
+        Main.executeForTesting(
+            new String[] {"export"},
+            JsonSupport.objectMapper().writeValueAsString(input),
+            envWithOefSchemas());
 
-        assertThat(result.exitCode()).isEqualTo(3);
-        assertErrorCode(result, "DEDIREN_ARCHIMATE_ELEMENT_TYPE_UNSUPPORTED");
-        assertThat(result.stdout()).contains("TechnologyNode");
-    }
+    assertThat(result.exitCode()).isEqualTo(3);
+    assertErrorCode(result, "DEDIREN_ARCHIMATE_ELEMENT_TYPE_UNSUPPORTED");
+    assertThat(result.stdout()).contains("TechnologyNode");
+  }
 
-    @Test
-    void rejectsUnknownArchimateRelationshipTypeWithErrorEnvelope() throws Exception {
-        JsonNode input = exportInputJson();
-        ((ObjectNode) input.at("/source/relationships/0")).put("type", "ConnectsTo");
+  @Test
+  void rejectsUnknownArchimateRelationshipTypeWithErrorEnvelope() throws Exception {
+    JsonNode input = exportInputJson();
+    ((ObjectNode) input.at("/source/relationships/0")).put("type", "ConnectsTo");
 
-        PluginResult result = Main.executeForTesting(
-                new String[]{"export"},
-                JsonSupport.objectMapper().writeValueAsString(input),
-                envWithOefSchemas());
+    PluginResult result =
+        Main.executeForTesting(
+            new String[] {"export"},
+            JsonSupport.objectMapper().writeValueAsString(input),
+            envWithOefSchemas());
 
-        assertThat(result.exitCode()).isEqualTo(3);
-        assertErrorCode(result, "DEDIREN_ARCHIMATE_RELATIONSHIP_TYPE_UNSUPPORTED");
-        assertThat(result.stdout()).contains("ConnectsTo");
-    }
+    assertThat(result.exitCode()).isEqualTo(3);
+    assertErrorCode(result, "DEDIREN_ARCHIMATE_RELATIONSHIP_TYPE_UNSUPPORTED");
+    assertThat(result.stdout()).contains("ConnectsTo");
+  }
 
-    @Test
-    void rejectsInvalidArchimateRelationshipEndpointWithErrorEnvelope() throws Exception {
-        JsonNode input = exportInputJson();
-        ((ObjectNode) input.at("/source/nodes/0")).put("type", "ApplicationService");
-        ((ObjectNode) input.at("/source/nodes/1")).put("type", "ApplicationComponent");
-        ((ObjectNode) input.at("/source/relationships/0")).put("type", "Realization");
+  @Test
+  void rejectsInvalidArchimateRelationshipEndpointWithErrorEnvelope() throws Exception {
+    JsonNode input = exportInputJson();
+    ((ObjectNode) input.at("/source/nodes/0")).put("type", "ApplicationService");
+    ((ObjectNode) input.at("/source/nodes/1")).put("type", "ApplicationComponent");
+    ((ObjectNode) input.at("/source/relationships/0")).put("type", "Realization");
 
-        PluginResult result = Main.executeForTesting(
-                new String[]{"export"},
-                JsonSupport.objectMapper().writeValueAsString(input),
-                envWithOefSchemas());
+    PluginResult result =
+        Main.executeForTesting(
+            new String[] {"export"},
+            JsonSupport.objectMapper().writeValueAsString(input),
+            envWithOefSchemas());
 
-        assertThat(result.exitCode()).isEqualTo(3);
-        assertErrorCode(result, "DEDIREN_ARCHIMATE_RELATIONSHIP_ENDPOINT_UNSUPPORTED");
-        assertThat(result.stdout()).contains("ApplicationService", "Realization", "ApplicationComponent");
-    }
+    assertThat(result.exitCode()).isEqualTo(3);
+    assertErrorCode(result, "DEDIREN_ARCHIMATE_RELATIONSHIP_ENDPOINT_UNSUPPORTED");
+    assertThat(result.stdout())
+        .contains("ApplicationService", "Realization", "ApplicationComponent");
+  }
 
-    @Test
-    void emitsArchimateRelationshipConnectorJunctions() throws Exception {
-        String xml = exportXml(
-                JsonSupport.objectMapper().readTree("""
+  @Test
+  void emitsArchimateRelationshipConnectorJunctions() throws Exception {
+    String xml =
+        exportXml(
+            JsonSupport.objectMapper()
+                .readTree(
+                    """
                 {
                   "model_schema_version": "model.schema.v1",
                   "required_plugins": [
@@ -251,7 +270,9 @@ class MainTest {
                   "plugins": {}
                 }
                 """),
-                JsonSupport.objectMapper().readTree("""
+            JsonSupport.objectMapper()
+                .readTree(
+                    """
                 {
                   "layout_result_schema_version": "layout-result.schema.v1",
                   "view_id": "main",
@@ -271,19 +292,23 @@ class MainTest {
                 }
                 """));
 
-        assertThat(xml).contains(
-                "id-el-flow-junction",
-                "xsi:type=\"AndJunction\"",
-                "id-vn-main-flow-junction",
-                "relationshipRef=\"id-rel-api-to-junction\"",
-                "target=\"id-vn-main-flow-junction\"",
-                "source=\"id-vn-main-flow-junction\"");
-    }
+    assertThat(xml)
+        .contains(
+            "id-el-flow-junction",
+            "xsi:type=\"AndJunction\"",
+            "id-vn-main-flow-junction",
+            "relationshipRef=\"id-rel-api-to-junction\"",
+            "target=\"id-vn-main-flow-junction\"",
+            "source=\"id-vn-main-flow-junction\"");
+  }
 
-    @Test
-    void allowsJunctionContainmentRelationship() throws Exception {
-        String xml = exportXml(
-                JsonSupport.objectMapper().readTree("""
+  @Test
+  void allowsJunctionContainmentRelationship() throws Exception {
+    String xml =
+        exportXml(
+            JsonSupport.objectMapper()
+                .readTree(
+                    """
                 {
                   "model_schema_version": "model.schema.v1",
                   "required_plugins": [
@@ -304,7 +329,9 @@ class MainTest {
                   "plugins": {}
                 }
                 """),
-                JsonSupport.objectMapper().readTree("""
+            JsonSupport.objectMapper()
+                .readTree(
+                    """
                 {
                   "layout_result_schema_version": "layout-result.schema.v1",
                   "view_id": "main",
@@ -324,138 +351,164 @@ class MainTest {
                 }
                 """));
 
-        assertThat(xml).contains("id-rel-group-contains-junction", "id-el-junction");
-    }
+    assertThat(xml).contains("id-rel-group-contains-junction", "id-el-junction");
+  }
 
-    @Test
-    void rejectsGroupWhoseSourceNodeIsNotGroupingType() throws Exception {
-        JsonNode input = exportInputJson();
-        // Add an ApplicationComponent node as the semantic source of a layout group
-        ((ArrayNode) input.at("/source/nodes"))
-                .addObject()
-                .put("id", "not-a-grouping")
-                .put("type", "ApplicationComponent")
-                .put("label", "Not A Grouping")
-                .set("properties", JsonSupport.objectMapper().createObjectNode());
-        JsonNode layout = input.get("layout_result");
-        var groups = JsonSupport.objectMapper().createArrayNode();
-        groups.addObject()
-                .put("id", "semantic-group-bad-source")
-                .put("source_id", "not-a-grouping")
-                .put("projection_id", "semantic-group-bad-source")
-                .set("provenance", JsonSupport.objectMapper().createObjectNode()
-                        .set("semantic_backed", JsonSupport.objectMapper().createObjectNode()
-                                .put("source_id", "not-a-grouping")));
-        ((ObjectNode) groups.get(0))
-                .put("x", 0.0).put("y", 0.0).put("width", 200.0).put("height", 100.0)
-                .put("label", "Not A Grouping")
-                .set("members", JsonSupport.objectMapper().createArrayNode());
-        ((ObjectNode) layout).set("groups", groups);
+  @Test
+  void rejectsGroupWhoseSourceNodeIsNotGroupingType() throws Exception {
+    JsonNode input = exportInputJson();
+    // Add an ApplicationComponent node as the semantic source of a layout group
+    ((ArrayNode) input.at("/source/nodes"))
+        .addObject()
+        .put("id", "not-a-grouping")
+        .put("type", "ApplicationComponent")
+        .put("label", "Not A Grouping")
+        .set("properties", JsonSupport.objectMapper().createObjectNode());
+    JsonNode layout = input.get("layout_result");
+    var groups = JsonSupport.objectMapper().createArrayNode();
+    groups
+        .addObject()
+        .put("id", "semantic-group-bad-source")
+        .put("source_id", "not-a-grouping")
+        .put("projection_id", "semantic-group-bad-source")
+        .set(
+            "provenance",
+            JsonSupport.objectMapper()
+                .createObjectNode()
+                .set(
+                    "semantic_backed",
+                    JsonSupport.objectMapper()
+                        .createObjectNode()
+                        .put("source_id", "not-a-grouping")));
+    ((ObjectNode) groups.get(0))
+        .put("x", 0.0)
+        .put("y", 0.0)
+        .put("width", 200.0)
+        .put("height", 100.0)
+        .put("label", "Not A Grouping")
+        .set("members", JsonSupport.objectMapper().createArrayNode());
+    ((ObjectNode) layout).set("groups", groups);
 
-        PluginResult result = Main.executeForTesting(
-                new String[]{"export"},
-                JsonSupport.objectMapper().writeValueAsString(input),
-                envWithOefSchemas());
+    PluginResult result =
+        Main.executeForTesting(
+            new String[] {"export"},
+            JsonSupport.objectMapper().writeValueAsString(input),
+            envWithOefSchemas());
 
-        assertThat(result.exitCode()).isEqualTo(3);
-        assertErrorCode(result, "DEDIREN_ARCHIMATE_GROUP_SOURCE_NOT_GROUPING");
-        assertThat(result.stdout()).contains("not-a-grouping", "ApplicationComponent");
-    }
+    assertThat(result.exitCode()).isEqualTo(3);
+    assertErrorCode(result, "DEDIREN_ARCHIMATE_GROUP_SOURCE_NOT_GROUPING");
+    assertThat(result.stdout()).contains("not-a-grouping", "ApplicationComponent");
+  }
 
-    @Test
-    void rejectsInvalidPolicyWithErrorEnvelope() throws Exception {
-        JsonNode input = exportInputJson();
-        ((ObjectNode) input.get("policy")).remove("model_identifier");
+  @Test
+  void rejectsInvalidPolicyWithErrorEnvelope() throws Exception {
+    JsonNode input = exportInputJson();
+    ((ObjectNode) input.get("policy")).remove("model_identifier");
 
-        PluginResult result = Main.executeForTesting(
-                new String[]{"export"},
-                JsonSupport.objectMapper().writeValueAsString(input),
-                envWithOefSchemas());
+    PluginResult result =
+        Main.executeForTesting(
+            new String[] {"export"},
+            JsonSupport.objectMapper().writeValueAsString(input),
+            envWithOefSchemas());
 
-        assertThat(result.exitCode()).isEqualTo(3);
-        assertErrorCode(result, "DEDIREN_OEF_POLICY_INVALID");
-        assertThat(result.stdout()).contains("model_identifier");
-    }
+    assertThat(result.exitCode()).isEqualTo(3);
+    assertErrorCode(result, "DEDIREN_OEF_POLICY_INVALID");
+    assertThat(result.stdout()).contains("model_identifier");
+  }
 
-    @Test
-    void rejectsGeneratedXmlThatFailsOfficialOefSchema() throws Exception {
-        JsonNode input = exportInputJson();
-        ((ObjectNode) input.get("policy")).put("model_identifier", "not a valid xml id");
+  @Test
+  void rejectsGeneratedXmlThatFailsOfficialOefSchema() throws Exception {
+    JsonNode input = exportInputJson();
+    ((ObjectNode) input.get("policy")).put("model_identifier", "not a valid xml id");
 
-        PluginResult result = Main.executeForTesting(
-                new String[]{"export"},
-                JsonSupport.objectMapper().writeValueAsString(input),
-                envWithOefSchemas());
+    PluginResult result =
+        Main.executeForTesting(
+            new String[] {"export"},
+            JsonSupport.objectMapper().writeValueAsString(input),
+            envWithOefSchemas());
 
-        assertThat(result.exitCode()).isEqualTo(3);
-        assertErrorCode(result, "DEDIREN_OEF_SCHEMA_INVALID");
-        assertThat(result.stdout()).contains("official OEF schema");
-    }
+    assertThat(result.exitCode()).isEqualTo(3);
+    assertErrorCode(result, "DEDIREN_OEF_SCHEMA_INVALID");
+    assertThat(result.stdout()).contains("official OEF schema");
+  }
 
-    private String exportXml(JsonNode source, JsonNode layout) throws Exception {
-        PluginResult result = Main.executeForTesting(
-                new String[]{"export"},
-                exportInput(source, layout),
-                envWithOefSchemas());
-        return okData(result).at("/content").asText();
-    }
+  private String exportXml(JsonNode source, JsonNode layout) throws Exception {
+    PluginResult result =
+        Main.executeForTesting(
+            new String[] {"export"}, exportInput(source, layout), envWithOefSchemas());
+    return okData(result).at("/content").asText();
+  }
 
-    private JsonNode exportInputJson() throws Exception {
-        return JsonSupport.objectMapper().readTree(exportInput(
+  private JsonNode exportInputJson() throws Exception {
+    return JsonSupport.objectMapper()
+        .readTree(
+            exportInput(
                 fixtureJson("fixtures/source/valid-archimate-oef.json"),
                 fixtureJson("fixtures/layout-result/archimate-oef-basic.json")));
-    }
+  }
 
-    private String exportInput(JsonNode source, JsonNode layout) throws Exception {
-        return exportInput(source, layout, fixtureJson("fixtures/export-policy/default-oef.json"));
-    }
+  private String exportInput(JsonNode source, JsonNode layout) throws Exception {
+    return exportInput(source, layout, fixtureJson("fixtures/export-policy/default-oef.json"));
+  }
 
-    private String exportInput(JsonNode source, JsonNode layout, JsonNode policy) throws Exception {
-        ObjectNode input = JsonSupport.objectMapper().createObjectNode();
-        input.put("export_request_schema_version", "export-request.schema.v1");
-        input.set("source", source);
-        input.set("layout_result", layout);
-        input.set("policy", policy);
-        return JsonSupport.objectMapper().writeValueAsString(input);
-    }
+  private String exportInput(JsonNode source, JsonNode layout, JsonNode policy) throws Exception {
+    ObjectNode input = JsonSupport.objectMapper().createObjectNode();
+    input.put("export_request_schema_version", "export-request.schema.v1");
+    input.set("source", source);
+    input.set("layout_result", layout);
+    input.set("policy", policy);
+    return JsonSupport.objectMapper().writeValueAsString(input);
+  }
 
-    private void layoutWithGroups(JsonNode layout, double x, double y, double width, double height) {
-        var groups = JsonSupport.objectMapper().createArrayNode();
-        groups.addObject()
-                .put("id", "customer-domain-group")
-                .put("source_id", "customer-domain")
-                .put("projection_id", "customer-domain-group")
-                .set("provenance", JsonSupport.objectMapper().createObjectNode()
-                        .set("semantic_backed", JsonSupport.objectMapper().createObjectNode()
-                                .put("source_id", "customer-domain")));
-        ((ObjectNode) groups.get(0))
-                .put("x", x)
-                .put("y", y)
-                .put("width", width)
-                .put("height", height)
-                .set("members", JsonSupport.objectMapper().createArrayNode()
-                        .add("orders-component")
-                        .add("orders-service"));
-        ((ObjectNode) groups.get(0)).put("label", "Customer Domain");
-        groups.addObject()
-                .put("id", "visual-column")
-                .put("source_id", "visual-column")
-                .put("projection_id", "visual-column")
-                .set("provenance", JsonSupport.objectMapper().createObjectNode().put("visual_only", true));
-        ((ObjectNode) groups.get(1))
-                .put("x", 40.0)
-                .put("y", 40.0)
-                .put("width", 200.0)
-                .put("height", 120.0)
-                .set("members", JsonSupport.objectMapper().createArrayNode().add("orders-component"));
-        ((ObjectNode) groups.get(1)).put("label", "Visual Column");
-        ((ObjectNode) layout).set("groups", groups);
-    }
+  private void layoutWithGroups(JsonNode layout, double x, double y, double width, double height) {
+    var groups = JsonSupport.objectMapper().createArrayNode();
+    groups
+        .addObject()
+        .put("id", "customer-domain-group")
+        .put("source_id", "customer-domain")
+        .put("projection_id", "customer-domain-group")
+        .set(
+            "provenance",
+            JsonSupport.objectMapper()
+                .createObjectNode()
+                .set(
+                    "semantic_backed",
+                    JsonSupport.objectMapper()
+                        .createObjectNode()
+                        .put("source_id", "customer-domain")));
+    ((ObjectNode) groups.get(0))
+        .put("x", x)
+        .put("y", y)
+        .put("width", width)
+        .put("height", height)
+        .set(
+            "members",
+            JsonSupport.objectMapper()
+                .createArrayNode()
+                .add("orders-component")
+                .add("orders-service"));
+    ((ObjectNode) groups.get(0)).put("label", "Customer Domain");
+    groups
+        .addObject()
+        .put("id", "visual-column")
+        .put("source_id", "visual-column")
+        .put("projection_id", "visual-column")
+        .set("provenance", JsonSupport.objectMapper().createObjectNode().put("visual_only", true));
+    ((ObjectNode) groups.get(1))
+        .put("x", 40.0)
+        .put("y", 40.0)
+        .put("width", 200.0)
+        .put("height", 120.0)
+        .set("members", JsonSupport.objectMapper().createArrayNode().add("orders-component"));
+    ((ObjectNode) groups.get(1)).put("label", "Visual Column");
+    ((ObjectNode) layout).set("groups", groups);
+  }
 
-    private Map<String, String> envWithOefSchemas() throws Exception {
-        Path schemaDir = tempDir.resolve("oef-schemas");
-        Files.createDirectories(schemaDir);
-        String schema = """
+  private Map<String, String> envWithOefSchemas() throws Exception {
+    Path schemaDir = tempDir.resolve("oef-schemas");
+    Files.createDirectories(schemaDir);
+    String schema =
+        """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
                   targetNamespace="http://www.opengroup.org/xsd/archimate/3.0/"
@@ -513,48 +566,46 @@ class MainTest {
                   </xs:complexType>
                 </xs:schema>
                 """;
-        for (String fileName : new String[]{
-                "archimate3_Model.xsd",
-                "archimate3_View.xsd",
-                "archimate3_Diagram.xsd"}) {
-            Files.writeString(schemaDir.resolve(fileName), schema, StandardCharsets.UTF_8);
-        }
-        return Map.of("DEDIREN_OEF_SCHEMA_DIR", schemaDir.toString());
+    for (String fileName :
+        new String[] {"archimate3_Model.xsd", "archimate3_View.xsd", "archimate3_Diagram.xsd"}) {
+      Files.writeString(schemaDir.resolve(fileName), schema, StandardCharsets.UTF_8);
     }
+    return Map.of("DEDIREN_OEF_SCHEMA_DIR", schemaDir.toString());
+  }
 
-    private static JsonNode okData(PluginResult result) throws Exception {
-        JsonNode envelope = JsonSupport.objectMapper().readTree(result.stdout());
-        assertThat(envelope.at("/status").asText()).describedAs(result.stdout()).isEqualTo("ok");
-        return envelope.get("data");
-    }
+  private static JsonNode okData(PluginResult result) throws Exception {
+    JsonNode envelope = JsonSupport.objectMapper().readTree(result.stdout());
+    assertThat(envelope.at("/status").asText()).describedAs(result.stdout()).isEqualTo("ok");
+    return envelope.get("data");
+  }
 
-    private static void assertErrorCode(PluginResult result, String expectedCode) throws Exception {
-        JsonNode envelope = JsonSupport.objectMapper().readTree(result.stdout());
-        assertThat(envelope.at("/diagnostics/0/code").asText()).isEqualTo(expectedCode);
-    }
+  private static void assertErrorCode(PluginResult result, String expectedCode) throws Exception {
+    JsonNode envelope = JsonSupport.objectMapper().readTree(result.stdout());
+    assertThat(envelope.at("/diagnostics/0/code").asText()).isEqualTo(expectedCode);
+  }
 
-    private static JsonNode fixtureJson(String path) throws Exception {
-        return JsonSupport.objectMapper().readTree(fixture(path));
-    }
+  private static JsonNode fixtureJson(String path) throws Exception {
+    return JsonSupport.objectMapper().readTree(fixture(path));
+  }
 
-    private static String connectionXml(String xml) {
-        int start = xml.indexOf("<connection ");
-        int end = xml.indexOf("</connection>", start) + "</connection>".length();
-        return xml.substring(start, end);
-    }
+  private static String connectionXml(String xml) {
+    int start = xml.indexOf("<connection ");
+    int end = xml.indexOf("</connection>", start) + "</connection>".length();
+    return xml.substring(start, end);
+  }
 
-    private static String fixture(String path) throws Exception {
-        return Files.readString(workspaceRoot().resolve(path));
-    }
+  private static String fixture(String path) throws Exception {
+    return Files.readString(workspaceRoot().resolve(path));
+  }
 
-    private static Path workspaceRoot() {
-        Path current = Path.of(System.getProperty("user.dir")).toAbsolutePath();
-        while (current != null) {
-            if (Files.exists(current.resolve("schemas/model.schema.json"))) {
-                return current;
-            }
-            current = current.getParent();
-        }
-        throw new IllegalStateException("Could not locate repository root from user.dir");
+  private static Path workspaceRoot() {
+    Path current = Path.of(System.getProperty("user.dir")).toAbsolutePath();
+    while (current != null) {
+      if (Files.exists(current.resolve("schemas/model.schema.json"))) {
+        return current;
+      }
+      current = current.getParent();
     }
+    throw new IllegalStateException("Could not locate repository root from user.dir");
+  }
 }

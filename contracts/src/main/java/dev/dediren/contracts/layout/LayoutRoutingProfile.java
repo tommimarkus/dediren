@@ -3,12 +3,12 @@ package dev.dediren.contracts.layout;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 public enum LayoutRoutingProfile {
-    @JsonProperty("compact")
-    COMPACT,
+  @JsonProperty("compact")
+  COMPACT,
 
-    @JsonProperty("readable")
-    READABLE,
+  @JsonProperty("readable")
+  READABLE,
 
-    @JsonProperty("spacious")
-    SPACIOUS
+  @JsonProperty("spacious")
+  SPACIOUS
 }

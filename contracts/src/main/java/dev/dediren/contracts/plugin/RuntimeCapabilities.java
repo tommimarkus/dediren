@@ -6,11 +6,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.util.List;
 
 public record RuntimeCapabilities(
-        String pluginProtocolVersion,
-        String id,
-        List<String> capabilities,
-        JsonNode runtime) {
-    public RuntimeCapabilities {
-        capabilities = listOrEmpty(capabilities);
-    }
+    String pluginProtocolVersion, String id, List<String> capabilities, JsonNode runtime) {
+  public RuntimeCapabilities {
+    capabilities = listOrEmpty(capabilities);
+  }
 }

@@ -1,10 +1,9 @@
 package dev.dediren.core;
 
 public final class CoreModule {
-    private CoreModule() {
-    }
+  private CoreModule() {}
 
-    public static String moduleName() {
-        return "core";
-    }
+  public static String moduleName() {
+    return "core";
+  }
 }

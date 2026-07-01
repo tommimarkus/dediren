@@ -10,18 +10,18 @@ import com.fasterxml.jackson.annotation.JsonValue;
  * constant.
  */
 public enum EnvelopeStatus {
-    OK("ok"),
-    WARNING("warning"),
-    ERROR("error");
+  OK("ok"),
+  WARNING("warning"),
+  ERROR("error");
 
-    private final String wire;
+  private final String wire;
 
-    EnvelopeStatus(String wire) {
-        this.wire = wire;
-    }
+  EnvelopeStatus(String wire) {
+    this.wire = wire;
+  }
 
-    @JsonValue
-    public String wire() {
-        return wire;
-    }
+  @JsonValue
+  public String wire() {
+    return wire;
+  }
 }

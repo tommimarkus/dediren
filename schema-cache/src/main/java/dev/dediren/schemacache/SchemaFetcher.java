@@ -5,5 +5,5 @@ import java.nio.file.Path;
 
 @FunctionalInterface
 public interface SchemaFetcher {
-    SchemaFetchResult fetch(URI url, Path destination) throws Exception;
+  SchemaFetchResult fetch(URI url, Path destination) throws Exception;
 }

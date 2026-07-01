@@ -13,46 +13,46 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class MainTest {
-    @Test
-    void capabilitiesReportOfficialJavaElkRuntime() throws Exception {
-        PluginResult result = Main.executeForTesting(new String[]{"capabilities"}, "");
+  @Test
+  void capabilitiesReportOfficialJavaElkRuntime() throws Exception {
+    PluginResult result = Main.executeForTesting(new String[] {"capabilities"}, "");
 
-        assertEquals(0, result.exitCode());
-        JsonNode capabilities = EnvelopeAssertions.parseJson(result.stdout());
-        assertEquals("plugin.protocol.v1", capabilities.path("plugin_protocol_version").asText());
-        assertEquals("elk-layout", capabilities.path("id").asText());
-        assertEquals("layout", capabilities.path("capabilities").get(0).asText());
-        assertEquals("official-java-elk", capabilities.path("runtime").path("kind").asText());
-        assertEquals(
-            "org.eclipse.elk.layered",
-            capabilities.path("runtime").path("algorithms").get(0).asText());
-        assertEquals(
-            "org.eclipse.elk.rectpacking",
-            capabilities.path("runtime").path("algorithms").get(1).asText());
-        JsonNode algorithms = capabilities.path("runtime").path("algorithms");
-        for (JsonNode algorithm : algorithms) {
-            assertFalse(
-                algorithm.asText().contains("libavoid"),
-                "ELK runtime must not advertise a Libavoid backend algorithm");
-        }
+    assertEquals(0, result.exitCode());
+    JsonNode capabilities = EnvelopeAssertions.parseJson(result.stdout());
+    assertEquals("plugin.protocol.v1", capabilities.path("plugin_protocol_version").asText());
+    assertEquals("elk-layout", capabilities.path("id").asText());
+    assertEquals("layout", capabilities.path("capabilities").get(0).asText());
+    assertEquals("official-java-elk", capabilities.path("runtime").path("kind").asText());
+    assertEquals(
+        "org.eclipse.elk.layered", capabilities.path("runtime").path("algorithms").get(0).asText());
+    assertEquals(
+        "org.eclipse.elk.rectpacking",
+        capabilities.path("runtime").path("algorithms").get(1).asText());
+    JsonNode algorithms = capabilities.path("runtime").path("algorithms");
+    for (JsonNode algorithm : algorithms) {
+      assertFalse(
+          algorithm.asText().contains("libavoid"),
+          "ELK runtime must not advertise a Libavoid backend algorithm");
     }
+  }
 
-    @Test
-    void invalidJsonReturnsStructuredErrorEnvelope() throws Exception {
-        ByteArrayInputStream stdin =
-            new ByteArrayInputStream("not-json".getBytes(StandardCharsets.UTF_8));
-        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+  @Test
+  void invalidJsonReturnsStructuredErrorEnvelope() throws Exception {
+    ByteArrayInputStream stdin =
+        new ByteArrayInputStream("not-json".getBytes(StandardCharsets.UTF_8));
+    ByteArrayOutputStream stdout = new ByteArrayOutputStream();
 
-        int exitCode = Main.run(stdin, new PrintStream(stdout, true, StandardCharsets.UTF_8));
+    int exitCode = Main.run(stdin, new PrintStream(stdout, true, StandardCharsets.UTF_8));
 
-        String text = stdout.toString(StandardCharsets.UTF_8);
-        assertEquals(3, exitCode);
-        EnvelopeAssertions.errorEnvelope(text, "DEDIREN_ELK_INPUT_INVALID_JSON");
-    }
+    String text = stdout.toString(StandardCharsets.UTF_8);
+    assertEquals(3, exitCode);
+    EnvelopeAssertions.errorEnvelope(text, "DEDIREN_ELK_INPUT_INVALID_JSON");
+  }
 
-    @Test
-    void validRequestReturnsOkEnvelopeWithLayoutResult() throws Exception {
-        String request = """
+  @Test
+  void validRequestReturnsOkEnvelopeWithLayoutResult() throws Exception {
+    String request =
+        """
             {
               "layout_request_schema_version": "layout-request.schema.v1",
               "view_id": "main",
@@ -67,23 +67,23 @@ class MainTest {
               "constraints": []
             }
             """;
-        ByteArrayInputStream stdin =
-            new ByteArrayInputStream(request.getBytes(StandardCharsets.UTF_8));
-        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+    ByteArrayInputStream stdin = new ByteArrayInputStream(request.getBytes(StandardCharsets.UTF_8));
+    ByteArrayOutputStream stdout = new ByteArrayOutputStream();
 
-        int exitCode = Main.run(stdin, new PrintStream(stdout, true, StandardCharsets.UTF_8));
+    int exitCode = Main.run(stdin, new PrintStream(stdout, true, StandardCharsets.UTF_8));
 
-        String text = stdout.toString(StandardCharsets.UTF_8);
-        assertEquals(0, exitCode);
-        JsonNode data = EnvelopeAssertions.okData(text);
-        ElkLayoutRenderArtifacts.write(data);
-        assertEquals("layout-result.schema.v1", data.path("layout_result_schema_version").asText());
-        assertEquals("client-calls-api", data.path("edges").get(0).path("id").asText());
-    }
+    String text = stdout.toString(StandardCharsets.UTF_8);
+    assertEquals(0, exitCode);
+    JsonNode data = EnvelopeAssertions.okData(text);
+    ElkLayoutRenderArtifacts.write(data);
+    assertEquals("layout-result.schema.v1", data.path("layout_result_schema_version").asText());
+    assertEquals("client-calls-api", data.path("edges").get(0).path("id").asText());
+  }
 
-    @Test
-    void requestMissingRequiredNodeLabelReturnsErrorEnvelope() throws Exception {
-        String request = """
+  @Test
+  void requestMissingRequiredNodeLabelReturnsErrorEnvelope() throws Exception {
+    String request =
+        """
             {
               "layout_request_schema_version": "layout-request.schema.v1",
               "view_id": "main",
@@ -95,20 +95,20 @@ class MainTest {
               "constraints": []
             }
             """;
-        ByteArrayInputStream stdin =
-            new ByteArrayInputStream(request.getBytes(StandardCharsets.UTF_8));
-        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+    ByteArrayInputStream stdin = new ByteArrayInputStream(request.getBytes(StandardCharsets.UTF_8));
+    ByteArrayOutputStream stdout = new ByteArrayOutputStream();
 
-        int exitCode = Main.run(stdin, new PrintStream(stdout, true, StandardCharsets.UTF_8));
+    int exitCode = Main.run(stdin, new PrintStream(stdout, true, StandardCharsets.UTF_8));
 
-        String text = stdout.toString(StandardCharsets.UTF_8);
-        assertEquals(3, exitCode);
-        EnvelopeAssertions.errorEnvelope(text, "DEDIREN_ELK_LAYOUT_FAILED");
-    }
+    String text = stdout.toString(StandardCharsets.UTF_8);
+    assertEquals(3, exitCode);
+    EnvelopeAssertions.errorEnvelope(text, "DEDIREN_ELK_LAYOUT_FAILED");
+  }
 
-    @Test
-    void requestWithUnknownLayoutPreferenceReturnsErrorEnvelope() throws Exception {
-        String request = """
+  @Test
+  void requestWithUnknownLayoutPreferenceReturnsErrorEnvelope() throws Exception {
+    String request =
+        """
             {
               "layout_request_schema_version": "layout-request.schema.v1",
               "view_id": "main",
@@ -121,21 +121,21 @@ class MainTest {
               }
             }
             """;
-        ByteArrayInputStream stdin =
-            new ByteArrayInputStream(request.getBytes(StandardCharsets.UTF_8));
-        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+    ByteArrayInputStream stdin = new ByteArrayInputStream(request.getBytes(StandardCharsets.UTF_8));
+    ByteArrayOutputStream stdout = new ByteArrayOutputStream();
 
-        int exitCode = Main.run(stdin, new PrintStream(stdout, true, StandardCharsets.UTF_8));
+    int exitCode = Main.run(stdin, new PrintStream(stdout, true, StandardCharsets.UTF_8));
 
-        String text = stdout.toString(StandardCharsets.UTF_8);
-        assertEquals(3, exitCode);
-        EnvelopeAssertions.errorEnvelope(text, "DEDIREN_ELK_LAYOUT_FAILED");
-        assertTrue(text.contains("$.layout_preferences.direction"));
-    }
+    String text = stdout.toString(StandardCharsets.UTF_8);
+    assertEquals(3, exitCode);
+    EnvelopeAssertions.errorEnvelope(text, "DEDIREN_ELK_LAYOUT_FAILED");
+    assertTrue(text.contains("$.layout_preferences.direction"));
+  }
 
-    @Test
-    void requestWithNullLayoutPreferencesReturnsInputErrorEnvelope() throws Exception {
-        String request = """
+  @Test
+  void requestWithNullLayoutPreferencesReturnsInputErrorEnvelope() throws Exception {
+    String request =
+        """
             {
               "layout_request_schema_version": "layout-request.schema.v1",
               "view_id": "main",
@@ -146,20 +146,20 @@ class MainTest {
               "layout_preferences": null
             }
             """;
-        ByteArrayInputStream stdin =
-            new ByteArrayInputStream(request.getBytes(StandardCharsets.UTF_8));
-        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+    ByteArrayInputStream stdin = new ByteArrayInputStream(request.getBytes(StandardCharsets.UTF_8));
+    ByteArrayOutputStream stdout = new ByteArrayOutputStream();
 
-        int exitCode = Main.run(stdin, new PrintStream(stdout, true, StandardCharsets.UTF_8));
+    int exitCode = Main.run(stdin, new PrintStream(stdout, true, StandardCharsets.UTF_8));
 
-        String text = stdout.toString(StandardCharsets.UTF_8);
-        assertEquals(3, exitCode);
-        EnvelopeAssertions.errorEnvelope(text, "DEDIREN_ELK_INPUT_INVALID_JSON");
-    }
+    String text = stdout.toString(StandardCharsets.UTF_8);
+    assertEquals(3, exitCode);
+    EnvelopeAssertions.errorEnvelope(text, "DEDIREN_ELK_INPUT_INVALID_JSON");
+  }
 
-    @Test
-    void requestWithNullRoutingStyleReturnsInputErrorEnvelope() throws Exception {
-        String request = """
+  @Test
+  void requestWithNullRoutingStyleReturnsInputErrorEnvelope() throws Exception {
+    String request =
+        """
             {
               "layout_request_schema_version": "layout-request.schema.v1",
               "view_id": "main",
@@ -174,20 +174,20 @@ class MainTest {
               }
             }
             """;
-        ByteArrayInputStream stdin =
-            new ByteArrayInputStream(request.getBytes(StandardCharsets.UTF_8));
-        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+    ByteArrayInputStream stdin = new ByteArrayInputStream(request.getBytes(StandardCharsets.UTF_8));
+    ByteArrayOutputStream stdout = new ByteArrayOutputStream();
 
-        int exitCode = Main.run(stdin, new PrintStream(stdout, true, StandardCharsets.UTF_8));
+    int exitCode = Main.run(stdin, new PrintStream(stdout, true, StandardCharsets.UTF_8));
 
-        String text = stdout.toString(StandardCharsets.UTF_8);
-        assertEquals(3, exitCode);
-        EnvelopeAssertions.errorEnvelope(text, "DEDIREN_ELK_INPUT_INVALID_JSON");
-    }
+    String text = stdout.toString(StandardCharsets.UTF_8);
+    assertEquals(3, exitCode);
+    EnvelopeAssertions.errorEnvelope(text, "DEDIREN_ELK_INPUT_INVALID_JSON");
+  }
 
-    @Test
-    void requestWithScalarGroupProvenanceReturnsErrorEnvelope() throws Exception {
-        String request = """
+  @Test
+  void requestWithScalarGroupProvenanceReturnsErrorEnvelope() throws Exception {
+    String request =
+        """
             {
               "layout_request_schema_version": "layout-request.schema.v1",
               "view_id": "main",
@@ -201,20 +201,20 @@ class MainTest {
               "constraints": []
             }
             """;
-        ByteArrayInputStream stdin =
-            new ByteArrayInputStream(request.getBytes(StandardCharsets.UTF_8));
-        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+    ByteArrayInputStream stdin = new ByteArrayInputStream(request.getBytes(StandardCharsets.UTF_8));
+    ByteArrayOutputStream stdout = new ByteArrayOutputStream();
 
-        int exitCode = Main.run(stdin, new PrintStream(stdout, true, StandardCharsets.UTF_8));
+    int exitCode = Main.run(stdin, new PrintStream(stdout, true, StandardCharsets.UTF_8));
 
-        String text = stdout.toString(StandardCharsets.UTF_8);
-        assertEquals(3, exitCode);
-        EnvelopeAssertions.errorEnvelope(text, "DEDIREN_ELK_INPUT_INVALID_JSON");
-    }
+    String text = stdout.toString(StandardCharsets.UTF_8);
+    assertEquals(3, exitCode);
+    EnvelopeAssertions.errorEnvelope(text, "DEDIREN_ELK_INPUT_INVALID_JSON");
+  }
 
-    @Test
-    void requestWithUnknownGroupProvenanceShapeReturnsErrorEnvelope() throws Exception {
-        String request = """
+  @Test
+  void requestWithUnknownGroupProvenanceShapeReturnsErrorEnvelope() throws Exception {
+    String request =
+        """
             {
               "layout_request_schema_version": "layout-request.schema.v1",
               "view_id": "main",
@@ -228,20 +228,20 @@ class MainTest {
               "constraints": []
             }
             """;
-        ByteArrayInputStream stdin =
-            new ByteArrayInputStream(request.getBytes(StandardCharsets.UTF_8));
-        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+    ByteArrayInputStream stdin = new ByteArrayInputStream(request.getBytes(StandardCharsets.UTF_8));
+    ByteArrayOutputStream stdout = new ByteArrayOutputStream();
 
-        int exitCode = Main.run(stdin, new PrintStream(stdout, true, StandardCharsets.UTF_8));
+    int exitCode = Main.run(stdin, new PrintStream(stdout, true, StandardCharsets.UTF_8));
 
-        String text = stdout.toString(StandardCharsets.UTF_8);
-        assertEquals(3, exitCode);
-        EnvelopeAssertions.errorEnvelope(text, "DEDIREN_ELK_INPUT_INVALID_JSON");
-    }
+    String text = stdout.toString(StandardCharsets.UTF_8);
+    assertEquals(3, exitCode);
+    EnvelopeAssertions.errorEnvelope(text, "DEDIREN_ELK_INPUT_INVALID_JSON");
+  }
 
-    @Test
-    void requestWithAmbiguousGroupProvenanceReturnsErrorEnvelope() throws Exception {
-        String request = """
+  @Test
+  void requestWithAmbiguousGroupProvenanceReturnsErrorEnvelope() throws Exception {
+    String request =
+        """
             {
               "layout_request_schema_version": "layout-request.schema.v1",
               "view_id": "main",
@@ -263,20 +263,20 @@ class MainTest {
               "constraints": []
             }
             """;
-        ByteArrayInputStream stdin =
-            new ByteArrayInputStream(request.getBytes(StandardCharsets.UTF_8));
-        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+    ByteArrayInputStream stdin = new ByteArrayInputStream(request.getBytes(StandardCharsets.UTF_8));
+    ByteArrayOutputStream stdout = new ByteArrayOutputStream();
 
-        int exitCode = Main.run(stdin, new PrintStream(stdout, true, StandardCharsets.UTF_8));
+    int exitCode = Main.run(stdin, new PrintStream(stdout, true, StandardCharsets.UTF_8));
 
-        String text = stdout.toString(StandardCharsets.UTF_8);
-        assertEquals(3, exitCode);
-        EnvelopeAssertions.errorEnvelope(text, "DEDIREN_ELK_LAYOUT_FAILED");
-    }
+    String text = stdout.toString(StandardCharsets.UTF_8);
+    assertEquals(3, exitCode);
+    EnvelopeAssertions.errorEnvelope(text, "DEDIREN_ELK_LAYOUT_FAILED");
+  }
 
-    @Test
-    void requestWithOverflowingWidthHintReturnsErrorEnvelope() throws Exception {
-        String request = """
+  @Test
+  void requestWithOverflowingWidthHintReturnsErrorEnvelope() throws Exception {
+    String request =
+        """
             {
               "layout_request_schema_version": "layout-request.schema.v1",
               "view_id": "main",
@@ -288,21 +288,19 @@ class MainTest {
               "constraints": []
             }
             """;
-        ByteArrayInputStream stdin =
-            new ByteArrayInputStream(request.getBytes(StandardCharsets.UTF_8));
-        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+    ByteArrayInputStream stdin = new ByteArrayInputStream(request.getBytes(StandardCharsets.UTF_8));
+    ByteArrayOutputStream stdout = new ByteArrayOutputStream();
 
-        int exitCode = Main.run(stdin, new PrintStream(stdout, true, StandardCharsets.UTF_8));
+    int exitCode = Main.run(stdin, new PrintStream(stdout, true, StandardCharsets.UTF_8));
 
-        String text = stdout.toString(StandardCharsets.UTF_8);
-        assertEquals(3, exitCode);
-        JsonNode envelope = EnvelopeAssertions.parseJson(text);
-        assertEquals("error", envelope.path("status").asText());
-        List<String> codes = EnvelopeAssertions.diagnosticCodes(envelope);
-        assertTrue(
-            codes.contains("DEDIREN_ELK_LAYOUT_FAILED")
-                || codes.contains("DEDIREN_ELK_INPUT_INVALID_JSON"),
-            "expected ELK layout or input diagnostic, got " + codes
-        );
-    }
+    String text = stdout.toString(StandardCharsets.UTF_8);
+    assertEquals(3, exitCode);
+    JsonNode envelope = EnvelopeAssertions.parseJson(text);
+    assertEquals("error", envelope.path("status").asText());
+    List<String> codes = EnvelopeAssertions.diagnosticCodes(envelope);
+    assertTrue(
+        codes.contains("DEDIREN_ELK_LAYOUT_FAILED")
+            || codes.contains("DEDIREN_ELK_INPUT_INVALID_JSON"),
+        "expected ELK layout or input diagnostic, got " + codes);
+  }
 }

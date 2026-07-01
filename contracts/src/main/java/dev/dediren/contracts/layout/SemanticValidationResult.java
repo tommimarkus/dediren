@@ -1,8 +1,7 @@
 package dev.dediren.contracts.layout;
 
 public record SemanticValidationResult(
-        String semanticValidationResultSchemaVersion,
-        String semanticProfile,
-        long nodeCount,
-        long relationshipCount) {
-}
+    String semanticValidationResultSchemaVersion,
+    String semanticProfile,
+    long nodeCount,
+    long relationshipCount) {}

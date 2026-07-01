@@ -7,19 +7,19 @@ import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 
 class TestSupportTest {
-    @Test
-    void resolvesRepositoryRootContainingSchemaSentinel() {
-        Path root = TestSupport.workspaceRoot();
+  @Test
+  void resolvesRepositoryRootContainingSchemaSentinel() {
+    Path root = TestSupport.workspaceRoot();
 
-        assertThat(root.resolve("schemas/model.schema.json")).exists();
-        assertThat(Files.isDirectory(root)).isTrue();
-    }
+    assertThat(root.resolve("schemas/model.schema.json")).exists();
+    assertThat(Files.isDirectory(root)).isTrue();
+  }
 
-    @Test
-    void returnsAbsoluteNormalizedPath() {
-        Path root = TestSupport.workspaceRoot();
+  @Test
+  void returnsAbsoluteNormalizedPath() {
+    Path root = TestSupport.workspaceRoot();
 
-        assertThat(root).isAbsolute();
-        assertThat(root).isEqualTo(root.normalize());
-    }
+    assertThat(root).isAbsolute();
+    assertThat(root).isEqualTo(root.normalize());
+  }
 }

@@ -1,10 +1,9 @@
 package dev.dediren.contracts;
 
 public final class ContractsModule {
-    private ContractsModule() {
-    }
+  private ContractsModule() {}
 
-    public static String moduleName() {
-        return "contracts";
-    }
+  public static String moduleName() {
+    return "contracts";
+  }
 }

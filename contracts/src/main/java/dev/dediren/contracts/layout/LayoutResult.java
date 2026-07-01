@@ -6,16 +6,16 @@ import dev.dediren.contracts.Diagnostic;
 import java.util.List;
 
 public record LayoutResult(
-        String layoutResultSchemaVersion,
-        String viewId,
-        List<LaidOutNode> nodes,
-        List<LaidOutEdge> edges,
-        List<LaidOutGroup> groups,
-        List<Diagnostic> warnings) {
-    public LayoutResult {
-        nodes = listOrEmpty(nodes);
-        edges = listOrEmpty(edges);
-        groups = listOrEmpty(groups);
-        warnings = listOrEmpty(warnings);
-    }
+    String layoutResultSchemaVersion,
+    String viewId,
+    List<LaidOutNode> nodes,
+    List<LaidOutEdge> edges,
+    List<LaidOutGroup> groups,
+    List<Diagnostic> warnings) {
+  public LayoutResult {
+    nodes = listOrEmpty(nodes);
+    edges = listOrEmpty(edges);
+    groups = listOrEmpty(groups);
+    warnings = listOrEmpty(warnings);
+  }
 }

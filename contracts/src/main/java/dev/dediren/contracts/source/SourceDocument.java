@@ -8,17 +8,17 @@ import java.util.List;
 import java.util.Map;
 
 public record SourceDocument(
-        String modelSchemaVersion,
-        List<String> fragments,
-        List<PluginRequirement> requiredPlugins,
-        List<SourceNode> nodes,
-        List<SourceRelationship> relationships,
-        Map<String, JsonNode> plugins) {
-    public SourceDocument {
-        fragments = listOrEmpty(fragments);
-        requiredPlugins = listOrEmpty(requiredPlugins);
-        nodes = listOrEmpty(nodes);
-        relationships = listOrEmpty(relationships);
-        plugins = mapOrEmpty(plugins);
-    }
+    String modelSchemaVersion,
+    List<String> fragments,
+    List<PluginRequirement> requiredPlugins,
+    List<SourceNode> nodes,
+    List<SourceRelationship> relationships,
+    Map<String, JsonNode> plugins) {
+  public SourceDocument {
+    fragments = listOrEmpty(fragments);
+    requiredPlugins = listOrEmpty(requiredPlugins);
+    nodes = listOrEmpty(nodes);
+    relationships = listOrEmpty(relationships);
+    plugins = mapOrEmpty(plugins);
+  }
 }

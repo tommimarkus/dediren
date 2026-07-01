@@ -16,35 +16,35 @@ import org.junit.jupiter.params.provider.MethodSource;
 // must stay silent on all of them (issue #13 regression class).
 class LayoutQualityFixtureSweepTest {
 
-    @ParameterizedTest
-    @MethodSource("layoutResultFixtures")
-    void newQualityChecksStaySilentOnKnownGoodLayouts(Path fixture) throws IOException {
-        LayoutResult result = JsonSupport.objectMapper()
-                .readValue(Files.readString(fixture), LayoutResult.class);
+  @ParameterizedTest
+  @MethodSource("layoutResultFixtures")
+  void newQualityChecksStaySilentOnKnownGoodLayouts(Path fixture) throws IOException {
+    LayoutResult result =
+        JsonSupport.objectMapper().readValue(Files.readString(fixture), LayoutResult.class);
 
-        LayoutQualityReport report = LayoutQuality.validateLayout(result);
+    LayoutQualityReport report = LayoutQuality.validateLayout(result);
 
-        assertThat(report.labelSpaceIssueCount())
-                .as("label-space false positive in %s", fixture.getFileName())
-                .isZero();
-        assertThat(report.groupLabelBandIssueCount())
-                .as("group-label-band false positive in %s", fixture.getFileName())
-                .isZero();
-        assertThat(LayoutQuality.validateLayoutDiagnostics(result))
-                .filteredOn(diagnostic -> diagnostic.code()
-                        .equals("DEDIREN_LAYOUT_JUNCTION_OFF_INCIDENT_ROUTE"))
-                .as("junction false positive in %s", fixture.getFileName())
-                .isEmpty();
+    assertThat(report.labelSpaceIssueCount())
+        .as("label-space false positive in %s", fixture.getFileName())
+        .isZero();
+    assertThat(report.groupLabelBandIssueCount())
+        .as("group-label-band false positive in %s", fixture.getFileName())
+        .isZero();
+    assertThat(LayoutQuality.validateLayoutDiagnostics(result))
+        .filteredOn(
+            diagnostic -> diagnostic.code().equals("DEDIREN_LAYOUT_JUNCTION_OFF_INCIDENT_ROUTE"))
+        .as("junction false positive in %s", fixture.getFileName())
+        .isEmpty();
+  }
+
+  static Stream<Path> layoutResultFixtures() throws IOException {
+    Path dir = workspaceRoot().resolve("fixtures/layout-result");
+    try (Stream<Path> files = Files.list(dir)) {
+      return files.filter(path -> path.toString().endsWith(".json")).sorted().toList().stream();
     }
+  }
 
-    static Stream<Path> layoutResultFixtures() throws IOException {
-        Path dir = workspaceRoot().resolve("fixtures/layout-result");
-        try (Stream<Path> files = Files.list(dir)) {
-            return files.filter(path -> path.toString().endsWith(".json")).sorted().toList().stream();
-        }
-    }
-
-    private static Path workspaceRoot() {
-        return dev.dediren.testsupport.TestSupport.workspaceRoot();
-    }
+  private static Path workspaceRoot() {
+    return dev.dediren.testsupport.TestSupport.workspaceRoot();
+  }
 }

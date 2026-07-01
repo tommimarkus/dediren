@@ -1,4 +1,3 @@
 package dev.dediren.contracts.layout;
 
-public record SemanticBackedGroupProvenance(String sourceId) {
-}
+public record SemanticBackedGroupProvenance(String sourceId) {}
