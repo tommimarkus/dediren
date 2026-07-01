@@ -48,6 +48,53 @@ jobs:
       - name: Check whitespace
         run: git diff --check
 
+  quality-report:
+    # Non-blocking: Spotless + SpotBugs run here report-only. The local
+    # `./mvnw -Pquality verify` gate is where these fail; CI only surfaces
+    # findings as artifacts. See
+    # docs/superpowers/specs/2026-07-01-spotless-spotbugs-quality-gates-design.md
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Java
+        uses: actions/setup-java@1bcf9fb12cf4aa7d266a90ae39939e61372fe520 # v5.4.0
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Cache Maven artifacts
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .cache/maven
+          key: maven-${{ runner.os }}-${{ hashFiles('**/pom.xml', '.mvn/wrapper/maven-wrapper.properties') }}
+          restore-keys: |
+            maven-${{ runner.os }}-
+
+      - name: SpotBugs (report-only)
+        continue-on-error: true
+        run: ./mvnw -B -ntp -Pquality -Dquality.fail=false -Dspotless.check.skip=true -DskipTests verify
+
+      - name: Spotless drift (report-only)
+        continue-on-error: true
+        run: |
+          ./mvnw -B -ntp -Pquality spotless:apply
+          git --no-pager diff > spotless-drift.patch || true
+
+      - name: Upload quality reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: quality-reports
+          path: |
+            **/target/spotbugsXml.xml
+            spotless-drift.patch
+          if-no-files-found: ignore
+
   vulnerability-scan:
     # Blocking supply-chain gate: Grype matches the CycloneDX SBOM against the
     # GitHub Advisory DB / OSV (a prebuilt database, not the live NVD API), so it
