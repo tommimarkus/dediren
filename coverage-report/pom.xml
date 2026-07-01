@@ -25,6 +25,10 @@
     <profile>
       <id>coverage</id>
       <dependencies>
+        <!-- Aggregate coverage set: the 11 gated product modules. Keep this in
+             sync with the product modules — a new product module must be added
+             here to appear in the reactor aggregate report (it is gated by the
+             root profile automatically unless skipped). -->
         <dependency>
           <groupId>dev.dediren</groupId>
           <artifactId>contracts</artifactId>

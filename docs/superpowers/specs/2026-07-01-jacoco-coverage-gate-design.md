@@ -52,31 +52,34 @@ so modules inherit, with these executions:
   is not skipped (§4).
 - `report` (verify) — per-module HTML + XML at `target/site/jacoco/`.
 - `check` (verify) — the hard gate (§3). Gated modules only.
-- `report-aggregate` (verify) — **`dist-tool` only** → merged reactor report at
-  `dist-tool/target/site/jacoco-aggregate/`.
+- `report-aggregate` (verify) — **`coverage-report` module only** → merged
+  reactor report at `coverage-report/target/site/jacoco-aggregate/`.
 
-## 2. Aggregate host: reuse `dist-tool`, no new module
+## 2. Aggregate host: dedicated build-only `coverage-report` module
 
-`report-aggregate` covers exactly the reactor modules reachable in the host
-module's dependency closure. `dist-tool` is the top-of-graph assembly module
-("nothing depends on it") and already depends on `cli` + every plugin. Its
-closure reaches every product module:
+> Corrected during implementation. The original plan hosted `report-aggregate`
+> in `dist-tool` on the premise that its transitive dependency closure reached
+> every product module. That premise is false: JaCoCo `report-aggregate`
+> collects coverage only from a host module's **direct** declared dependencies,
+> not the transitive closure. `dist-tool`'s direct deps are `contracts`
+> (compile) plus `cli` and the plugins (runtime); `core`, `archimate`, `uml`,
+> and `schema-cache` are transitive-only, so a `dist-tool`-hosted aggregate
+> would silently drop four product modules — and adding them as direct deps
+> would put non-charter edges on the assembly module.
 
-- `core` ← `cli`
-- `contracts` ← direct + transitive
-- `archimate` ← `archimate-oef-export`, `generic-graph`, `render`
-- `uml` ← `uml-xmi-export`, `generic-graph`, `render`
-- `schema-cache` ← `archimate-oef-export`, `uml-xmi-export`
-- all 5 plugins + `cli` ← direct dependencies
+The aggregate lives in a dedicated build-only `coverage-report` module that
+declares all 11 product modules as direct `runtime` dependencies and hosts
+`report-aggregate` → `coverage-report/target/site/jacoco-aggregate/`. The module
+ships nothing and nothing depends on it; both its product-module dependencies
+and the `report-aggregate` execution are confined to the `coverage` profile, so
+the default build treats it as an inert empty module and the dependency spine is
+untouched. It is documented in `docs/architecture-guidelines.md` §2 (allowed-edge
+table) and §3 (module charter).
 
-So hosting `report-aggregate` in `dist-tool` covers the whole product reactor
-with **zero new modules and zero new dependencies**. `testbeds/plugin-runtime`
-is not in the closure (correctly excluded); `test-support` is skipped at the
-source (§4) so its classes do not pollute the aggregate.
-
-Considered and rejected: a dedicated `coverage-report` aggregator module —
-guaranteed-complete but adds a reactor module depending on everything. Rejected
-under YAGNI because `dist-tool` already provides full reach.
+The aggregate's coverage set is the hand-maintained dependency list in
+`coverage-report/pom.xml`; a new product module must be added there to appear in
+the aggregate (it is gated automatically unless skipped). `dist-tool`,
+`test-support`, and `testbeds/plugin-runtime` are intentionally excluded.
 
 ## 3. The gate: LINE + BRANCH, ratcheted to baseline
 
