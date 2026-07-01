@@ -24,6 +24,7 @@
     <module>test-support</module>
     <module>testbeds/plugin-runtime</module>
     <module>dist-tool</module>
+    <module>coverage-report</module>
   </modules>
 
   <properties>

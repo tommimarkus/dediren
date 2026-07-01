@@ -68,6 +68,7 @@ Stable Dependencies Principle).
 | `archimate-oef-export` (plugin) | `contracts`, `archimate`, `schema-cache` | 2 — leaf plugin |
 | `uml-xmi-export` (plugin) | `contracts`, `uml`, `schema-cache` | 2 — leaf plugin |
 | `dist-tool` | `contracts` (compile); `cli` + every plugin (runtime, for bundling) | 3 — assembly |
+| `coverage-report` | *(nothing in the default build)*; every product module (runtime, **`coverage`-profile-scoped only**, for JaCoCo `report-aggregate`) | 3 — build tooling |
 
 Rules that fall out of this table and must be enforced, not just hoped for:
 
@@ -84,6 +85,12 @@ Rules that fall out of this table and must be enforced, not just hoped for:
   are `test`-scope, for end-to-end coverage, and must stay that way).
 - **`contracts` depends on nothing internal.** It is the most-depended-on module
   and must stay the most stable (*Martin 2017*, SDP).
+- **`coverage-report` is build-only.** It exists solely to host JaCoCo
+  `report-aggregate` under `-Pcoverage`. Its dependencies on every product
+  module are runtime-scope and confined to the `coverage` profile, so they
+  never enter the default build or the shipped product graph. Nothing depends
+  on it and `dist-tool` does not bundle it — it is not a compile-scope edge on
+  the spine.
 
 ### A noted exception to Stable Abstractions
 

@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>dev.dediren</groupId>
+    <artifactId>dediren</artifactId>
+    <version>2026.06.10</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <artifactId>coverage-report</artifactId>
+  <packaging>pom</packaging>
+
+  <!-- Build-only aggregation module. Hosts JaCoCo report-aggregate for the
+       whole product reactor and ships nothing (nothing depends on it;
+       dist-tool does not bundle it). Its dependencies on the product modules
+       and the report-aggregate execution are confined to the `coverage`
+       profile, so the default build treats this as an inert, empty module.
+       See docs/architecture-guidelines.md sec. 2. -->
+
+  <profiles>
+    <profile>
+      <id>coverage</id>
+      <dependencies>
+        <dependency>
+          <groupId>dev.dediren</groupId>
+          <artifactId>contracts</artifactId>
+          <version>${project.version}</version>
+          <scope>runtime</scope>
+        </dependency>
+        <dependency>
+          <groupId>dev.dediren</groupId>
+          <artifactId>core</artifactId>
+          <version>${project.version}</version>
+          <scope>runtime</scope>
+        </dependency>
+        <dependency>
+          <groupId>dev.dediren</groupId>
+          <artifactId>cli</artifactId>
+          <version>${project.version}</version>
+          <scope>runtime</scope>
+        </dependency>
+        <dependency>
+          <groupId>dev.dediren</groupId>
+          <artifactId>archimate</artifactId>
+          <version>${project.version}</version>
+          <scope>runtime</scope>
+        </dependency>
+        <dependency>
+          <groupId>dev.dediren</groupId>
+          <artifactId>uml</artifactId>
+          <version>${project.version}</version>
+          <scope>runtime</scope>
+        </dependency>
+        <dependency>
+          <groupId>dev.dediren</groupId>
+          <artifactId>schema-cache</artifactId>
+          <version>${project.version}</version>
+          <scope>runtime</scope>
+        </dependency>
+        <dependency>
+          <groupId>dev.dediren</groupId>
+          <artifactId>archimate-oef-export</artifactId>
+          <version>${project.version}</version>
+          <scope>runtime</scope>
+        </dependency>
+        <dependency>
+          <groupId>dev.dediren</groupId>
+          <artifactId>elk-layout</artifactId>
+          <version>${project.version}</version>
+          <scope>runtime</scope>
+        </dependency>
+        <dependency>
+          <groupId>dev.dediren</groupId>
+          <artifactId>generic-graph</artifactId>
+          <version>${project.version}</version>
+          <scope>runtime</scope>
+        </dependency>
+        <dependency>
+          <groupId>dev.dediren</groupId>
+          <artifactId>render</artifactId>
+          <version>${project.version}</version>
+          <scope>runtime</scope>
+        </dependency>
+        <dependency>
+          <groupId>dev.dediren</groupId>
+          <artifactId>uml-xmi-export</artifactId>
+          <version>${project.version}</version>
+          <scope>runtime</scope>
+        </dependency>
+      </dependencies>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.jacoco</groupId>
+            <artifactId>jacoco-maven-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>jacoco-aggregate</id>
+                <phase>verify</phase>
+                <goals>
+                  <goal>report-aggregate</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
+</project>
