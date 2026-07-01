@@ -443,6 +443,10 @@ speculatively):
 | Plugin `Main.java` god-files | `render/Main.java` (~3,851 LOC), `uml-xmi-export/Main.java` (~1,734 LOC) | §8 thinness/cohesion | `java.SD-B` / `SD-Q` |
 | Notation-core asymmetry (dependency + endpoint-rule modeling) | `archimate` (standalone, explicit triples) vs `uml` (→`contracts`, inline conditionals) | §6 symmetric role | `SD-S` (low) |
 | `CLAUDE.md` "semantics belong in export plugin" reads as contradicting shared cores | wording vs `archimate`/`uml` consumers | §6 validation-vs-mapping distinction | doc/code drift |
+| SpotBugs `EI_EXPOSE_REP`/`EI_EXPOSE_REP2` suppressed across the contract DTO records (17 `contracts` value records + `schemacache.SchemaFetchResult`) | `spotbugs-exclude.xml` | §6 contract surface | deferred: value records intentionally share immutable `List.of`/array refs; defensive-copying the stable public contract surface is out of scope for the quality-gate wiring |
+| SpotBugs `MS_EXPOSE_REP` suppressed in `JsonSupport.objectMapper()` | `spotbugs-exclude.xml` | quality gate | by design: returns the shared, thread-safe, pre-configured singleton `ObjectMapper` (one canonical mapper), not mutable-state leakage |
+| SpotBugs `NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE` suppressed in `DistTool` (5 sites) | `spotbugs-exclude.xml` | quality gate | deferred: `Path.getFileName()`/`getParent()` on `Files.list(dir)` entries and real bundle/output paths; null branch infeasible; build/dist tool, not shipped runtime |
+| SpotBugs `NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE` suppressed in `PluginRunner.executablePath` | `spotbugs-exclude.xml` | quality gate | deferred: discovered manifest path always resolves under a plugins dir, so `getParent()` is non-null in practice; defining behavior for the infeasible null case is out of scope |
 
 None of these block the architecture; they are propagation-cost and clarity
 debts with a clear, local fix when their files are next worked.

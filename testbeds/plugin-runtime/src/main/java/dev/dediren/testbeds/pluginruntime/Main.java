@@ -11,6 +11,7 @@ import dev.dediren.contracts.plugin.RuntimeCapabilities;
 import dev.dediren.contracts.render.RenderArtifact;
 import dev.dediren.contracts.render.RenderResult;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
 
@@ -68,7 +69,7 @@ public final class Main {
       return;
     }
 
-    String input = new String(System.in.readAllBytes());
+    String input = new String(System.in.readAllBytes(), StandardCharsets.UTF_8);
     switch (mode()) {
       case "sleep" -> Thread.sleep(2_000);
       case "large-stdout" -> {
@@ -84,7 +85,8 @@ public final class Main {
                                         new RenderArtifact("svg", "x".repeat(1024 * 1024))))))));
         return;
       }
-      case "large-output" -> System.err.write("x".repeat(1024 * 1024).getBytes());
+      case "large-output" ->
+          System.err.write("x".repeat(1024 * 1024).getBytes(StandardCharsets.UTF_8));
       case "invalid-json" -> {
         System.out.println("not-json");
         return;

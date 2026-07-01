@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SpotBugs suppression filter. Every <Match> below is tracked known debt:
+     add a matching row to docs/architecture-guidelines.md §12 stating the
+     reason. Do not suppress silently.
+     See docs/superpowers/specs/2026-07-01-spotless-spotbugs-quality-gates-design.md §3 -->
+<FindBugsFilter>
+
+  <!-- EI_EXPOSE_REP / EI_EXPOSE_REP2: contract-first value records carry
+       immutable List.of(...)/array components and share the reference through
+       generated accessors/constructors. Defensive-copying every accessor and
+       compact constructor across the stable public contract surface is a large,
+       cross-cutting change out of scope for wiring the quality gate. Each class
+       is enumerated (class + pattern), not a blanket pattern-wide suppression.
+       Tracked in architecture-guidelines.md §12. -->
+  <Match>
+    <Or>
+      <Class name="dev.dediren.contracts.layout.LaidOutEdge"/>
+      <Class name="dev.dediren.contracts.layout.LaidOutGroup"/>
+      <Class name="dev.dediren.contracts.layout.LayoutConstraint"/>
+      <Class name="dev.dediren.contracts.layout.LayoutGroup"/>
+      <Class name="dev.dediren.contracts.layout.LayoutRequest"/>
+      <Class name="dev.dediren.contracts.layout.LayoutResult"/>
+      <Class name="dev.dediren.contracts.plugin.PluginManifest"/>
+      <Class name="dev.dediren.contracts.plugin.RuntimeCapabilities"/>
+      <Class name="dev.dediren.contracts.render.RenderMetadata"/>
+      <Class name="dev.dediren.contracts.render.RenderResult"/>
+      <Class name="dev.dediren.contracts.render.SvgStylePolicy"/>
+      <Class name="dev.dediren.contracts.source.GenericGraphPluginData"/>
+      <Class name="dev.dediren.contracts.source.GenericGraphView"/>
+      <Class name="dev.dediren.contracts.source.GenericGraphViewGroup"/>
+      <Class name="dev.dediren.contracts.source.SourceDocument"/>
+      <Class name="dev.dediren.contracts.source.SourceNode"/>
+      <Class name="dev.dediren.contracts.source.SourceRelationship"/>
+      <Class name="dev.dediren.schemacache.SchemaFetchResult"/>
+    </Or>
+    <Or>
+      <Bug pattern="EI_EXPOSE_REP"/>
+      <Bug pattern="EI_EXPOSE_REP2"/>
+    </Or>
+  </Match>
+
+  <!-- MS_EXPOSE_REP: JsonSupport.objectMapper() intentionally returns the
+       shared, pre-configured, thread-safe singleton ObjectMapper. Exposing the
+       shared instance is by design (one canonical mapper), not mutable-state
+       leakage to fix. Tracked in architecture-guidelines.md §12. -->
+  <Match>
+    <Class name="dev.dediren.contracts.json.JsonSupport"/>
+    <Bug pattern="MS_EXPOSE_REP"/>
+  </Match>
+
+  <!-- NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE: Path.getFileName()/getParent()
+       return values dereferenced for entries produced by Files.list(dir) or for
+       real bundle/output file paths. The null branch is infeasible for these
+       inputs; adding defensive null handling would require defining new
+       behavior for cases that cannot occur here. Build/dist tool, not shipped
+       runtime. Tracked in architecture-guidelines.md §12. -->
+  <Match>
+    <Class name="dev.dediren.tools.dist.DistTool"/>
+    <Bug pattern="NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"/>
+  </Match>
+
+  <!-- NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE: PluginRunner.executablePath
+       dereferences loaded.path().getParent(); a discovered manifest path always
+       resolves under a plugins directory, so the parent is non-null in
+       practice. Defining error behavior for the infeasible null-parent case is
+       out of scope for the gate. Tracked in architecture-guidelines.md §12. -->
+  <Match>
+    <Class name="dev.dediren.core.plugins.PluginRunner"/>
+    <Bug pattern="NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"/>
+  </Match>
+
+</FindBugsFilter>

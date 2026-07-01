@@ -56,8 +56,8 @@ public final class Main {
     int exitCode =
         commandLine(
                 System.in,
-                new PrintWriter(System.out, true),
-                new PrintWriter(System.err, true),
+                new PrintWriter(System.out, true, StandardCharsets.UTF_8),
+                new PrintWriter(System.err, true, StandardCharsets.UTF_8),
                 System.getenv())
             .execute(args);
     if (exitCode != 0) {
@@ -75,8 +75,8 @@ public final class Main {
     int exitCode =
         commandLine(
                 new ByteArrayInputStream(stdin.getBytes(StandardCharsets.UTF_8)),
-                new PrintWriter(stdout, true),
-                new PrintWriter(stderr, true),
+                new PrintWriter(stdout, true, StandardCharsets.UTF_8),
+                new PrintWriter(stderr, true, StandardCharsets.UTF_8),
                 env)
             .execute(args);
     return new CliResult(

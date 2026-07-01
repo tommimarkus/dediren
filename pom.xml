@@ -56,6 +56,7 @@
     <pitest-junit5-plugin.version>1.2.3</pitest-junit5-plugin.version>
     <jacoco-maven-plugin.version>0.8.13</jacoco-maven-plugin.version>
     <spotless-maven-plugin.version>2.44.5</spotless-maven-plugin.version>
+    <spotbugs-maven-plugin.version>4.9.6.0</spotbugs-maven-plugin.version>
   </properties>
 
   <dependencyManagement>
@@ -475,12 +476,38 @@
                 </execution>
               </executions>
             </plugin>
+            <plugin>
+              <groupId>com.github.spotbugs</groupId>
+              <artifactId>spotbugs-maven-plugin</artifactId>
+              <version>${spotbugs-maven-plugin.version}</version>
+              <configuration>
+                <effort>Max</effort>
+                <threshold>Medium</threshold>
+                <!-- ${quality.fail}=true → local gate; CI passes false for report-only. -->
+                <failOnError>${quality.fail}</failOnError>
+                <includeTests>false</includeTests>
+                <excludeFilterFile>${maven.multiModuleProjectDirectory}/spotbugs-exclude.xml</excludeFilterFile>
+              </configuration>
+              <executions>
+                <execution>
+                  <id>spotbugs-check</id>
+                  <phase>verify</phase>
+                  <goals>
+                    <goal>check</goal>
+                  </goals>
+                </execution>
+              </executions>
+            </plugin>
           </plugins>
         </pluginManagement>
         <plugins>
           <plugin>
             <groupId>com.diffplug.spotless</groupId>
             <artifactId>spotless-maven-plugin</artifactId>
+          </plugin>
+          <plugin>
+            <groupId>com.github.spotbugs</groupId>
+            <artifactId>spotbugs-maven-plugin</artifactId>
           </plugin>
         </plugins>
       </build>
