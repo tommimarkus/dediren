@@ -36,6 +36,10 @@ For a token-efficient authoring guide, see `docs/agent-usage.md`.
 ./mvnw -pl dist-tool -am verify -Pdist-smoke
 ```
 
+Run `./mvnw -Pcoverage verify` for the opt-in JaCoCo coverage report and gate
+(LINE + BRANCH; per-module reports plus an aggregate under
+`coverage-report/target/site/jacoco-aggregate/`).
+
 Maven artifacts and wrapper state are repo-local under `.cache/maven` for
 sandbox-friendly builds. Supply-chain scanning runs in two layers. Grype scans
 the CycloneDX SBOM against the GitHub Advisory DB / OSV and is the blocking gate

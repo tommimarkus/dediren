@@ -166,6 +166,11 @@ charter below is the contract for "what changes for this reason lives here."
   into a runnable distribution, third-party-notice and SBOM generation, dist
   smoke. Top of the graph; nothing depends on it.
 
+- **`coverage-report`** — build-only JaCoCo aggregation: hosts `report-aggregate`
+  over the product reactor under `-Pcoverage`. Ships nothing and nothing depends
+  on it; its product-module dependencies stay confined to the `coverage`
+  profile. See §2.
+
 - **`test-support`, `testbeds/plugin-runtime`** — test-only scaffolding;
   `test`-scope only, never on a production compile path.
 
