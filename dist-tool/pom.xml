@@ -71,6 +71,14 @@
       <artifactId>junit-jupiter</artifactId>
       <scope>test</scope>
     </dependency>
+    <!-- Whole-reactor dependency-rule test (ArchitectureRulesTest). dist-tool is
+         the only non-profile module whose (transitive) classpath sees every
+         product module, so the §2 edge rules can be asserted here in one place. -->
+    <dependency>
+      <groupId>com.tngtech.archunit</groupId>
+      <artifactId>archunit</artifactId>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 
   <build>

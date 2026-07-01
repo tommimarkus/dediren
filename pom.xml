@@ -32,11 +32,13 @@
     <maven.compiler.release>21</maven.compiler.release>
     <argLine>-Dfile.encoding=UTF-8 -Djava.awt.headless=true</argLine>
     <dediren.launcher.jvmArgs>-XX:TieredStopAtLevel=1 -XX:+UseSerialGC -Djava.awt.headless=true</dediren.launcher.jvmArgs>
+    <archunit.version>1.4.1</archunit.version>
     <assertj.version>3.27.7</assertj.version>
     <commons-io.version>2.22.0</commons-io.version>
     <eclipse-elk.version>0.11.0</eclipse-elk.version>
     <guava.version>33.6.0-jre</guava.version>
     <jackson.version>2.22.0</jackson.version>
+    <jackson-annotations.version>2.22</jackson-annotations.version>
     <jackson3.version>3.1.4</jackson3.version>
     <json-schema-validator.version>3.0.5</json-schema-validator.version>
     <junit.version>6.1.1</junit.version>
@@ -61,6 +63,16 @@
         <groupId>com.fasterxml.jackson.core</groupId>
         <artifactId>jackson-databind</artifactId>
         <version>${jackson.version}</version>
+      </dependency>
+      <!-- Converge jackson-annotations to one version across the reactor
+           (enforcer dependencyConvergence, §2). The Jackson 2 databind
+           (2.22.0) pulls annotations 2.22, while the Jackson 3 stack reached
+           transitively via json-schema-validator resolves annotations 2.21.
+           Pin the newer 2.x so both stacks share one version. -->
+      <dependency>
+        <groupId>com.fasterxml.jackson.core</groupId>
+        <artifactId>jackson-annotations</artifactId>
+        <version>${jackson-annotations.version}</version>
       </dependency>
       <dependency>
         <groupId>com.networknt</groupId>
@@ -133,6 +145,14 @@
         <groupId>org.junit.jupiter</groupId>
         <artifactId>junit-jupiter</artifactId>
         <version>${junit.version}</version>
+      </dependency>
+      <!-- Core ArchUnit only (no archunit-junit5 engine): the dependency-rule
+           test runs as a plain JUnit Jupiter test via rule.check(...), which
+           avoids coupling to ArchUnit's JUnit 5 engine on this JUnit 6 build. -->
+      <dependency>
+        <groupId>com.tngtech.archunit</groupId>
+        <artifactId>archunit</artifactId>
+        <version>${archunit.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.xmlgraphics</groupId>
@@ -223,6 +243,24 @@
                   <version>[21,)</version>
                   <message>This build requires Java 21 or newer (any JDK 21+, no upper bound). Point JAVA_HOME at a JDK 21 or later.</message>
                 </requireJavaVersion>
+              </rules>
+            </configuration>
+          </execution>
+          <execution>
+            <!-- Backs the dependency-spine guarantees in
+                 docs/architecture-guidelines.md §2/§11: keep the reactor an
+                 acyclic, single-version graph. reactorModuleConvergence checks
+                 inter-module consistency across the reactor;
+                 dependencyConvergence forces transitive versions to resolve to
+                 one set per module. -->
+            <id>enforce-dependency-and-module-convergence</id>
+            <goals>
+              <goal>enforce</goal>
+            </goals>
+            <configuration>
+              <rules>
+                <reactorModuleConvergence/>
+                <dependencyConvergence/>
               </rules>
             </configuration>
           </execution>
