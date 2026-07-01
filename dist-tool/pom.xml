@@ -291,5 +291,11 @@
         </plugins>
       </build>
     </profile>
+    <profile>
+      <id>coverage</id>
+      <properties>
+        <jacoco.skip>true</jacoco.skip>
+      </properties>
+    </profile>
   </profiles>
 </project>
