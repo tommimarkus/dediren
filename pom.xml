@@ -55,6 +55,7 @@
     <pitest-maven-plugin.version>1.25.5</pitest-maven-plugin.version>
     <pitest-junit5-plugin.version>1.2.3</pitest-junit5-plugin.version>
     <jacoco-maven-plugin.version>0.8.13</jacoco-maven-plugin.version>
+    <spotless-maven-plugin.version>2.44.5</spotless-maven-plugin.version>
   </properties>
 
   <dependencyManagement>
@@ -435,6 +436,51 @@
           <plugin>
             <groupId>org.jacoco</groupId>
             <artifactId>jacoco-maven-plugin</artifactId>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
+      <!-- Opt-in code-quality gate: Spotless (formatting) + SpotBugs (added in
+           a later change). Local `./mvnw -Pquality verify` is a hard gate;
+           CI runs the same checks report-only. `quality.fail` toggles SpotBugs'
+           fail-on-bug behavior; Spotless always gates when this profile runs.
+           See docs/superpowers/specs/2026-07-01-spotless-spotbugs-quality-gates-design.md -->
+      <id>quality</id>
+      <properties>
+        <quality.fail>true</quality.fail>
+      </properties>
+      <build>
+        <pluginManagement>
+          <plugins>
+            <plugin>
+              <groupId>com.diffplug.spotless</groupId>
+              <artifactId>spotless-maven-plugin</artifactId>
+              <version>${spotless-maven-plugin.version}</version>
+              <configuration>
+                <java>
+                  <googleJavaFormat>
+                    <style>GOOGLE</style>
+                  </googleJavaFormat>
+                  <removeUnusedImports/>
+                </java>
+              </configuration>
+              <executions>
+                <execution>
+                  <id>spotless-check</id>
+                  <phase>verify</phase>
+                  <goals>
+                    <goal>check</goal>
+                  </goals>
+                </execution>
+              </executions>
+            </plugin>
+          </plugins>
+        </pluginManagement>
+        <plugins>
+          <plugin>
+            <groupId>com.diffplug.spotless</groupId>
+            <artifactId>spotless-maven-plugin</artifactId>
           </plugin>
         </plugins>
       </build>
