@@ -667,6 +667,18 @@ commit:
 git tag -a v<version> -m "Release <version>"
 ```
 
+Distribution builds are hermetic and self-verifying: every archive-producing
+lane (`-Pdist-build`, `-Pdist-smoke`, `-Pdist-bench`, and the release
+workflow) deletes and regenerates each module's `target/appassembler` staging
+directory before packaging, and the dist build fails with a diagnostic naming
+the jar if the packaged `lib/` diverges from the launcher classpaths (stale,
+foreign, or missing jars). Runtime-generated `cds/` and `*.jsa` content is
+excluded from the archive. A locally built
+`dist/dediren-agent-bundle-<version>.tar.gz` is therefore safe to distribute
+without a preceding `clean`. Future release automation must preserve both
+guards: the `clean-appassembler-staging` execution in the root `pom.xml` and
+the packaged-lib verification in `DistTool`.
+
 GitHub Releases publish one Java archive, `SHA256SUMS`, and CycloneDX SBOMs.
 The release workflow generates GitHub artifact attestations for archives and
 verifies those attestations before publishing. Verify a downloaded archive
