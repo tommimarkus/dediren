@@ -265,6 +265,185 @@ class LayoutQualityTest {
     assertThat(report.status()).isEqualTo("warning");
   }
 
+  @Test
+  void labeledEdgeTrappedInDenseParallelBandIsCountedAsDissociation() {
+    // Three unrelated labeled edges running parallel 44px apart (ELK's edge-edge spacing band):
+    // the middle edge cannot host a centered label without it landing on a neighbour's route,
+    // which is exactly the render dissociation issue #31 describes. Only the trapped middle edge
+    // (neighbours on both sides) is counted; the two outer edges have open space on one side.
+    var edges =
+        List.of(
+            horizontalEdge("top", 200.0),
+            horizontalEdge("middle", 244.0),
+            horizontalEdge("bottom", 288.0));
+
+    LayoutQualityReport report =
+        LayoutQuality.validateLayout(layoutResult(List.of(), edges, List.of()));
+
+    assertThat(report.edgeLabelDissociationCount()).isEqualTo(1);
+    assertThat(report.status()).isEqualTo("warning");
+  }
+
+  @Test
+  void dissociationEmitsAQualityWarningPointingIntoData() {
+    var edges =
+        List.of(
+            horizontalEdge("top", 200.0),
+            horizontalEdge("middle", 244.0),
+            horizontalEdge("bottom", 288.0));
+
+    LayoutQualityReport report =
+        LayoutQuality.validateLayout(layoutResult(List.of(), edges, List.of()));
+    var warnings = LayoutQuality.layoutQualityWarnings(report);
+
+    assertThat(warnings)
+        .extracting(diagnostic -> diagnostic.path())
+        .contains("$.data.edge_label_dissociation_count");
+  }
+
+  @Test
+  void twoParallelLabeledEdgesAreNotDissociated() {
+    // A pair has open space above and below to host both labels; dissociation needs a band of 3+.
+    var edges = List.of(horizontalEdge("top", 200.0), horizontalEdge("bottom", 244.0));
+
+    LayoutQualityReport report =
+        LayoutQuality.validateLayout(layoutResult(List.of(), edges, List.of()));
+
+    assertThat(report.edgeLabelDissociationCount()).isZero();
+    assertThat(report.status()).isEqualTo("ok");
+  }
+
+  @Test
+  void wellSpacedParallelLabeledEdgesAreNotDissociated() {
+    // 70px apart clears the band gap: each label fits between the routes without dissociating.
+    var edges =
+        List.of(
+            horizontalEdge("top", 200.0),
+            horizontalEdge("middle", 270.0),
+            horizontalEdge("bottom", 340.0));
+
+    assertThat(
+            LayoutQuality.validateLayout(layoutResult(List.of(), edges, List.of()))
+                .edgeLabelDissociationCount())
+        .isZero();
+  }
+
+  @Test
+  void neighbourExactlyAtBandGapIsCounted() {
+    // Band gap is inclusive (<= 52px): a middle edge whose neighbours sit exactly 52px away on
+    // both sides is trapped. Pins the lower boundary so a narrowing of the gap constant is caught.
+    var edges =
+        List.of(
+            horizontalEdge("top", 200.0),
+            horizontalEdge("middle", 252.0),
+            horizontalEdge("bottom", 304.0));
+
+    assertThat(
+            LayoutQuality.validateLayout(layoutResult(List.of(), edges, List.of()))
+                .edgeLabelDissociationCount())
+        .isEqualTo(1);
+  }
+
+  @Test
+  void neighbourJustBeyondBandGapIsNotCounted() {
+    // 54px between routes clears the 52px band gap: the middle edge has no qualifying neighbour.
+    // Pins the upper boundary so a widening of the gap constant is caught.
+    var edges =
+        List.of(
+            horizontalEdge("top", 200.0),
+            horizontalEdge("middle", 254.0),
+            horizontalEdge("bottom", 308.0));
+
+    assertThat(
+            LayoutQuality.validateLayout(layoutResult(List.of(), edges, List.of()))
+                .edgeLabelDissociationCount())
+        .isZero();
+  }
+
+  @Test
+  void verticalTrappedBandIsCountedLikeHorizontal() {
+    // The check is orientation-agnostic: a middle vertical run boxed in by parallel vertical
+    // neighbours dissociates its label just as a horizontal band does.
+    var edges =
+        List.of(
+            verticalEdge("left", 200.0),
+            verticalEdge("middle", 244.0),
+            verticalEdge("right", 288.0));
+
+    LayoutQualityReport report =
+        LayoutQuality.validateLayout(layoutResult(List.of(), edges, List.of()));
+
+    assertThat(report.edgeLabelDissociationCount()).isEqualTo(1);
+    assertThat(report.status()).isEqualTo("warning");
+  }
+
+  @Test
+  void unlabeledParallelEdgesAreNotDissociated() {
+    // No labels means no attribution to lose; the check applies only to labeled edges.
+    var edges =
+        List.of(
+            unlabeledHorizontalEdge("top", 200.0),
+            unlabeledHorizontalEdge("middle", 244.0),
+            unlabeledHorizontalEdge("bottom", 288.0));
+
+    assertThat(
+            LayoutQuality.validateLayout(layoutResult(List.of(), edges, List.of()))
+                .edgeLabelDissociationCount())
+        .isZero();
+  }
+
+  @Test
+  void parallelEdgesSharingAnEndpointNodeAreNotDissociated() {
+    // Edges fanning out from a shared node are visually grouped; a reader attributes them by their
+    // shared origin, so they are excluded like the crossing and close-parallel checks.
+    var edges =
+        List.of(
+            edge("a", "hub", "x", List.of(new Point(100.0, 200.0), new Point(500.0, 200.0))),
+            edge("b", "hub", "y", List.of(new Point(100.0, 244.0), new Point(500.0, 244.0))),
+            edge("c", "hub", "z", List.of(new Point(100.0, 288.0), new Point(500.0, 288.0))));
+
+    assertThat(
+            LayoutQuality.validateLayout(layoutResult(List.of(), edges, List.of()))
+                .edgeLabelDissociationCount())
+        .isZero();
+  }
+
+  private static LaidOutEdge horizontalEdge(String id, double y) {
+    return new LaidOutEdge(
+        id,
+        "src-" + id,
+        "tgt-" + id,
+        id,
+        id,
+        List.of(),
+        List.of(new Point(100.0, y), new Point(500.0, y)),
+        id);
+  }
+
+  private static LaidOutEdge unlabeledHorizontalEdge(String id, double y) {
+    return new LaidOutEdge(
+        id,
+        "src-" + id,
+        "tgt-" + id,
+        id,
+        id,
+        List.of(),
+        List.of(new Point(100.0, y), new Point(500.0, y)),
+        "");
+  }
+
+  private static LaidOutEdge verticalEdge(String id, double x) {
+    return new LaidOutEdge(
+        id,
+        "src-" + id,
+        "tgt-" + id,
+        id,
+        id,
+        List.of(),
+        List.of(new Point(x, 100.0), new Point(x, 500.0)),
+        id);
+  }
+
   private static LaidOutNode junctionNode(String id, double x, double y) {
     return new LaidOutNode(id, id, id, x, y, 28.0, 28.0, "", "junction");
   }

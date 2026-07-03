@@ -542,7 +542,10 @@ Commands:
 - `validate-layout` reports backend-neutral route and layout quality metrics.
   It additionally reports `group_label_band_issue_count` (members overlapping
   a labeled group's title band), `label_space_issue_count` (node labels that
-  clearly cannot fit their computed box; icon-sized nodes are exempt), and
+  clearly cannot fit their computed box; icon-sized nodes are exempt),
+  `edge_label_dissociation_count` (labeled edges trapped in a dense band of
+  parallel labeled edges, where a centered edge label cannot stay on its own
+  route and drifts toward a neighbour), and
   `edge_crossing_count` (informational; crossings can be unavoidable, so this
   count never degrades `status`). When any non-informational count is nonzero the
   command envelope surfaces the verdict: envelope `status` becomes `warning` and

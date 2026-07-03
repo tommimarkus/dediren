@@ -11,5 +11,6 @@ public record LayoutQualityReport(
     int groupBoundaryIssueCount,
     int groupLabelBandIssueCount,
     int labelSpaceIssueCount,
+    int edgeLabelDissociationCount,
     int edgeCrossingCount,
     int warningCount) {}

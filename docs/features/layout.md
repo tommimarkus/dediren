@@ -51,6 +51,7 @@ is zero**.
 | `group_boundary_issue_count` | Members escaping their group boundary. |
 | `group_label_band_issue_count` | Members overlapping a labeled group's title band. |
 | `label_space_issue_count` | Node labels that clearly cannot fit their box (icon-sized nodes are exempt). |
+| `edge_label_dissociation_count` | Labeled edges trapped in a dense band of parallel labeled edges, where a centered edge label cannot stay on its own route and drifts toward a neighbour (edges sharing an endpoint node are exempt). |
 | `edge_crossing_count` | Edge crossings — **informational only**; crossings can be unavoidable, so this never degrades `status`. |
 | `warning_count` | Aggregate warning count. |
 

@@ -35,6 +35,14 @@ public final class LayoutQuality {
   // not constrain the label.
   private static final double LABEL_SPACE_MIN_DIMENSION = 40.0;
   private static final double JUNCTION_ROUTE_TOLERANCE = 2.0;
+  // Edge-label dissociation band (issue #31). LABEL_BAND_GAP spans ELK Layered's compact/readable
+  // edge-edge spacing (40-48px) so genuinely adjacent parallel labeled runs qualify, while spacious
+  // spacing (64px) and roomy layouts stay clear. LABEL_BAND_MIN_OVERLAP is the parallel run length
+  // needed to actually host an edge label. LABEL_BAND_MIN_NEIGHBOURS makes a band three-plus edges,
+  // so only a trapped edge (labeled neighbours on both sides) counts.
+  private static final double LABEL_BAND_GAP = 52.0;
+  private static final double LABEL_BAND_MIN_OVERLAP = 48.0;
+  private static final int LABEL_BAND_MIN_NEIGHBOURS = 2;
 
   private LayoutQuality() {}
 
@@ -49,6 +57,7 @@ public final class LayoutQuality {
     int groupBoundaryIssueCount = countGroupBoundaryIssues(result);
     int groupLabelBandIssueCount = countGroupLabelBandIssues(result);
     int labelSpaceIssueCount = countLabelSpaceIssues(result);
+    int edgeLabelDissociationCount = countEdgeLabelDissociations(result);
     int edgeCrossingCount = countEdgeCrossings(result);
     int warningCount = result.warnings().size();
     // edgeCrossingCount is informational: crossings can be unavoidable in non-planar graphs,
@@ -62,6 +71,7 @@ public final class LayoutQuality {
                 && groupBoundaryIssueCount == 0
                 && groupLabelBandIssueCount == 0
                 && labelSpaceIssueCount == 0
+                && edgeLabelDissociationCount == 0
                 && warningCount == 0
             ? "ok"
             : "warning";
@@ -76,6 +86,7 @@ public final class LayoutQuality {
         groupBoundaryIssueCount,
         groupLabelBandIssueCount,
         labelSpaceIssueCount,
+        edgeLabelDissociationCount,
         edgeCrossingCount,
         warningCount);
   }
@@ -100,6 +111,8 @@ public final class LayoutQuality {
     addQualityWarning(
         diagnostics, "group_label_band_issue_count", report.groupLabelBandIssueCount());
     addQualityWarning(diagnostics, "label_space_issue_count", report.labelSpaceIssueCount());
+    addQualityWarning(
+        diagnostics, "edge_label_dissociation_count", report.edgeLabelDissociationCount());
     addQualityWarning(diagnostics, "warning_count", report.warningCount());
     return List.copyOf(diagnostics);
   }
@@ -409,6 +422,79 @@ public final class LayoutQuality {
     return count;
   }
 
+  // Detects the layout precondition behind issue #31: a labeled edge trapped between parallel
+  // labeled neighbours so close that a centered edge label cannot sit on its own route without
+  // landing on a neighbour's route. The renderer then displaces the label away from its edge
+  // (often nearer a different edge), and the reader misattributes the relationship. Counting the
+  // trapped edges turns that otherwise-invisible dissociation into a nonzero, envelope-visible
+  // quality signal.
+  //
+  // An edge is trapped when it has at least LABEL_BAND_MIN_NEIGHBOURS unrelated labeled edges whose
+  // same-orientation run sits within LABEL_BAND_GAP perpendicular and overlaps its own run by at
+  // least LABEL_BAND_MIN_OVERLAP. The gap covers ELK Layered's compact/readable edge-edge spacing
+  // (40-48px); a band therefore needs three-plus members, so the outer edges of a band (open space
+  // on one side) and benign two-edge parallels are not counted. Edges sharing an endpoint node are
+  // excluded, matching the crossing and close-parallel checks: a reader groups a fan by its shared
+  // node.
+  private static int countEdgeLabelDissociations(LayoutResult result) {
+    List<LabeledEdgeRuns> labeled = new ArrayList<>();
+    List<LaidOutEdge> edges = result.edges();
+    for (int edgeIndex = 0; edgeIndex < edges.size(); edgeIndex++) {
+      LaidOutEdge edge = edges.get(edgeIndex);
+      if (edge.label() == null || edge.label().isBlank()) {
+        continue;
+      }
+      List<RouteSegment> segments = new ArrayList<>();
+      for (int i = 0; i + 1 < edge.points().size(); i++) {
+        RouteSegment segment =
+            routeSegment(
+                edgeIndex,
+                edge.source(),
+                edge.target(),
+                edge.points().get(i),
+                edge.points().get(i + 1));
+        if (segment != null) {
+          segments.add(segment);
+        }
+      }
+      if (!segments.isEmpty()) {
+        labeled.add(new LabeledEdgeRuns(edge, segments));
+      }
+    }
+    int count = 0;
+    for (LabeledEdgeRuns edge : labeled) {
+      int neighbours = 0;
+      for (LabeledEdgeRuns other : labeled) {
+        if (other == edge || edgesShareEndpointNode(edge.edge(), other.edge())) {
+          continue;
+        }
+        if (runsCompeteForLabelBand(edge.segments(), other.segments())) {
+          neighbours++;
+        }
+      }
+      if (neighbours >= LABEL_BAND_MIN_NEIGHBOURS) {
+        count++;
+      }
+    }
+    return count;
+  }
+
+  private static boolean runsCompeteForLabelBand(
+      List<RouteSegment> left, List<RouteSegment> right) {
+    for (RouteSegment leftSegment : left) {
+      for (RouteSegment rightSegment : right) {
+        if (leftSegment.orientation() == rightSegment.orientation()
+            && Math.abs(leftSegment.fixed() - rightSegment.fixed()) <= LABEL_BAND_GAP
+            && overlapLength(
+                    leftSegment.min(), leftSegment.max(), rightSegment.min(), rightSegment.max())
+                >= LABEL_BAND_MIN_OVERLAP) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
   private static LaidOutGroup findGroup(LayoutResult result, String id) {
     return result.groups().stream().filter(group -> id.equals(group.id())).findFirst().orElse(null);
   }
@@ -661,4 +747,6 @@ public final class LayoutQuality {
       double fixed,
       double min,
       double max) {}
+
+  private record LabeledEdgeRuns(LaidOutEdge edge, List<RouteSegment> segments) {}
 }

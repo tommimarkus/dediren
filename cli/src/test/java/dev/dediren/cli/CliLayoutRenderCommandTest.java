@@ -33,6 +33,7 @@ class CliLayoutRenderCommandTest {
     assertThat(envelope.at("/data/overlap_count").asInt()).isZero();
     assertThat(envelope.at("/data/group_label_band_issue_count").asInt()).isZero();
     assertThat(envelope.at("/data/label_space_issue_count").asInt()).isZero();
+    assertThat(envelope.at("/data/edge_label_dissociation_count").asInt()).isZero();
     // Presence pin, not value pin: the fixture's crossing topology is ELK-determined, not
     // spec-derived.
     assertThat(envelope.at("/data/edge_crossing_count").isInt()).isTrue();

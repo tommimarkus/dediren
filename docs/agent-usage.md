@@ -464,7 +464,8 @@ from any current working directory.
 `validate-layout` quality fields: `overlap_count`, `connector_through_node_count`,
 `invalid_route_count`, `route_detour_count`, `route_close_parallel_count`,
 `group_boundary_issue_count`, `group_label_band_issue_count`,
-`label_space_issue_count`, `edge_crossing_count` (informational only), and
+`label_space_issue_count`, `edge_label_dissociation_count`,
+`edge_crossing_count` (informational only), and
 `warning_count`. The payload `data.status` is `ok` only when all
 non-informational counts and warnings are zero; otherwise it is `warning`, and
 the command envelope now restates that verdict so consumers reading only
