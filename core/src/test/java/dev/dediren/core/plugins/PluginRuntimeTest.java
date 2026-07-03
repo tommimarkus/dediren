@@ -313,7 +313,8 @@ class PluginRuntimeTest {
   @Test
   void bundledRegistryDiscoversProjectPluginsFromCallerWorkingDirectory() throws Exception {
     // `.dediren/plugins` is a project-level registration directory: it resolves against the
-    // CLI process's own working directory, not the bundle root.
+    // CLI process's own working directory, not the bundle root. It is discovered only when the
+    // caller opts in with DEDIREN_ALLOW_PROJECT_PLUGINS (here "1"), and it stays untrusted.
     Path bundleRoot = temp.resolve("bundle-root");
     Path schemas = bundleRoot.resolve("schemas");
     Path project = temp.resolve("project");
@@ -333,7 +334,79 @@ class PluginRuntimeTest {
     System.setProperty("user.dir", project.toString());
     System.setProperty("dediren.bundle.root", bundleRoot.toString());
     try {
-      LoadedPluginManifest manifest = PluginRegistry.bundled().loadManifest("runtime-testbed");
+      LoadedPluginManifest manifest =
+          PluginRegistry.bundled(Map.of("DEDIREN_ALLOW_PROJECT_PLUGINS", "1"))
+              .loadManifest("runtime-testbed");
+
+      assertThat(manifest.path())
+          .isEqualTo(projectPlugins.resolve("runtime-testbed.manifest.json"));
+      assertThat(manifest.trusted()).isFalse();
+    } finally {
+      restoreProperty("user.dir", originalUserDir);
+      restoreProperty("dediren.bundle.root", originalBundleRoot);
+    }
+  }
+
+  @Test
+  void projectPluginsInCallerWorkingDirectoryAreNotDiscoveredWithoutOptIn() throws Exception {
+    // Security gate (PB-1): with DEDIREN_ALLOW_PROJECT_PLUGINS unset, a manifest present only in
+    // the caller-cwd `.dediren/plugins` directory is not discovered at all. Invoking an executable
+    // registered in an untrusted cloned repo is arbitrary code execution with the caller's
+    // privileges, so cwd project-plugin discovery is opt-in and closed by default.
+    Path bundleRoot = temp.resolve("bundle-root");
+    Path schemas = bundleRoot.resolve("schemas");
+    Path project = temp.resolve("project");
+    Path projectPlugins = project.resolve(".dediren/plugins");
+    Files.createDirectories(schemas);
+    Files.createDirectories(bundleRoot.resolve("plugins"));
+    Files.createDirectories(projectPlugins);
+    writePermissiveSchemas(schemas, "model.schema.json", "plugin-manifest.schema.json");
+    writeManifest(
+        projectPlugins,
+        "runtime-testbed",
+        testbedExecutable().toString(),
+        List.of("export"),
+        List.of());
+    String originalUserDir = System.getProperty("user.dir");
+    String originalBundleRoot = System.getProperty("dediren.bundle.root");
+    System.setProperty("user.dir", project.toString());
+    System.setProperty("dediren.bundle.root", bundleRoot.toString());
+    try {
+      assertThatThrownBy(() -> PluginRegistry.bundled(Map.of()).loadManifest("runtime-testbed"))
+          .isInstanceOf(PluginExecutionException.class)
+          .extracting(error -> ((PluginExecutionException) error).diagnostic().code())
+          .isEqualTo(DiagnosticCode.PLUGIN_UNKNOWN.code());
+    } finally {
+      restoreProperty("user.dir", originalUserDir);
+      restoreProperty("dediren.bundle.root", originalBundleRoot);
+    }
+  }
+
+  @Test
+  void projectPluginsInCallerWorkingDirectoryAreDiscoveredWhenOptInIsTrue() throws Exception {
+    // The gate also opens for the case-insensitive "true" spelling, not just "1".
+    Path bundleRoot = temp.resolve("bundle-root");
+    Path schemas = bundleRoot.resolve("schemas");
+    Path project = temp.resolve("project");
+    Path projectPlugins = project.resolve(".dediren/plugins");
+    Files.createDirectories(schemas);
+    Files.createDirectories(bundleRoot.resolve("plugins"));
+    Files.createDirectories(projectPlugins);
+    writePermissiveSchemas(schemas, "model.schema.json", "plugin-manifest.schema.json");
+    writeManifest(
+        projectPlugins,
+        "runtime-testbed",
+        testbedExecutable().toString(),
+        List.of("export"),
+        List.of());
+    String originalUserDir = System.getProperty("user.dir");
+    String originalBundleRoot = System.getProperty("dediren.bundle.root");
+    System.setProperty("user.dir", project.toString());
+    System.setProperty("dediren.bundle.root", bundleRoot.toString());
+    try {
+      LoadedPluginManifest manifest =
+          PluginRegistry.bundled(Map.of("DEDIREN_ALLOW_PROJECT_PLUGINS", "true"))
+              .loadManifest("runtime-testbed");
 
       assertThat(manifest.path())
           .isEqualTo(projectPlugins.resolve("runtime-testbed.manifest.json"));
@@ -368,7 +441,12 @@ class PluginRuntimeTest {
     System.setProperty("dediren.bundle.root", bundleRoot.toString());
     try {
       PluginRegistry registry =
-          PluginRegistry.bundled(Map.of("DEDIREN_PLUGIN_DIRS", configured.toString()));
+          PluginRegistry.bundled(
+              Map.of(
+                  "DEDIREN_PLUGIN_DIRS",
+                  configured.toString(),
+                  "DEDIREN_ALLOW_PROJECT_PLUGINS",
+                  "1"));
 
       assertThat(registry.loadManifest("runtime-testbed").path())
           .isEqualTo(bundledPlugins.resolve("runtime-testbed.manifest.json"));
