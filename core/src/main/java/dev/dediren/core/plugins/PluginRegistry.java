@@ -40,9 +40,17 @@ public final class PluginRegistry {
   public static PluginRegistry bundled(Map<String, String> env) {
     Path root = DedirenPaths.productRoot();
     Path bundledPlugins = root.resolve("plugins");
-    var dirs = new ArrayList<Path>();
-    dirs.add(bundledPlugins);
-    dirs.add(root.resolve(".dediren/plugins"));
+    // Discovery order: bundled first-party plugins, then the project plugin directory, then
+    // user-configured directories. Discovery is always explicit; plugins are never discovered
+    // from PATH.
+    var dirs = new LinkedHashSet<Path>();
+    dirs.add(normalize(bundledPlugins));
+    // Project-level registration: `.dediren/plugins` resolves against the CLI process's own
+    // working directory (the caller's project). Plugin child processes run with cwd = product
+    // root, so this must key off the CLI's cwd, not the child's. The bundle-root variant is
+    // kept as a later lookup for manifests registered inside the bundle itself.
+    dirs.add(normalize(Path.of(System.getProperty("user.dir")).resolve(".dediren/plugins")));
+    dirs.add(normalize(root.resolve(".dediren/plugins")));
     String configured = env == null ? null : env.get("DEDIREN_PLUGIN_DIRS");
     if (configured == null || configured.isBlank()) {
       configured = System.getenv("DEDIREN_PLUGIN_DIRS");
@@ -50,14 +58,14 @@ public final class PluginRegistry {
     if (configured != null && !configured.isBlank()) {
       for (String part : configured.split(java.io.File.pathSeparator)) {
         if (!part.isBlank()) {
-          dirs.add(Path.of(part));
+          dirs.add(normalize(Path.of(part)));
         }
       }
     }
     // Only the bundled first-party plugin directory is trusted. Project-local and
     // user-configured directories are untrusted, so a manifest discovered there can never
     // claim trust mode (DEDIREN_TRUST_MANIFEST_CAPABILITIES) to skip the runtime probe.
-    return new PluginRegistry(dirs, Set.of(bundledPlugins));
+    return new PluginRegistry(new ArrayList<>(dirs), Set.of(bundledPlugins));
   }
 
   LoadedPluginManifest loadManifest(String pluginId) throws PluginExecutionException {

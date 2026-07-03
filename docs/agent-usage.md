@@ -585,8 +585,9 @@ value resolves against that root rather than your current directory.
 - `DEDIREN_DUPLICATE_ID`: make node, relationship, view, and group ids unique.
 - `DEDIREN_DANGLING_ENDPOINT`: repair relationship source/target ids or include
   the missing node.
-- `DEDIREN_PLUGIN_UNKNOWN`: inspect `plugins/*.manifest.json` in the bundle or
-  explicit `DEDIREN_PLUGIN_DIRS`.
+- `DEDIREN_PLUGIN_UNKNOWN`: inspect `plugins/*.manifest.json` in the bundle,
+  `.dediren/plugins/*.manifest.json` under the directory you run the CLI from,
+  or explicit `DEDIREN_PLUGIN_DIRS`.
 - `DEDIREN_PLUGIN_MISSING_EXECUTABLE`: inspect the manifest executable and the
   bundle `bin/` directory.
 - `DEDIREN_PLUGIN_OUTPUT_INVALID_*`: treat plugin stdout as invalid and do not
@@ -603,7 +604,9 @@ variables. Important explicit variables:
 - `DEDIREN_BUNDLE_ROOT`: explicit bundle or repository root for bundled
   schemas, plugin manifests, and launchers. Packaged launchers set this
   automatically.
-- `DEDIREN_PLUGIN_DIRS`: additional manifest directories.
+- `DEDIREN_PLUGIN_DIRS`: additional manifest directories. Discovery order is
+  bundled plugins, then `.dediren/plugins` under the CLI's current working
+  directory (project-level registration), then these directories; never `PATH`.
 - `DEDIREN_PLUGIN_<PLUGIN_ID>`: per-plugin executable override.
 - `DEDIREN_OEF_SCHEMA_DIR`: local OEF schema directory.
 - `DEDIREN_XMI_SCHEMA_PATH`: local XMI schema file.

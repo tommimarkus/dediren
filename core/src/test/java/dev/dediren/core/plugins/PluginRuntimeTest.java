@@ -311,6 +311,76 @@ class PluginRuntimeTest {
   }
 
   @Test
+  void bundledRegistryDiscoversProjectPluginsFromCallerWorkingDirectory() throws Exception {
+    // `.dediren/plugins` is a project-level registration directory: it resolves against the
+    // CLI process's own working directory, not the bundle root.
+    Path bundleRoot = temp.resolve("bundle-root");
+    Path schemas = bundleRoot.resolve("schemas");
+    Path project = temp.resolve("project");
+    Path projectPlugins = project.resolve(".dediren/plugins");
+    Files.createDirectories(schemas);
+    Files.createDirectories(bundleRoot.resolve("plugins"));
+    Files.createDirectories(projectPlugins);
+    writePermissiveSchemas(schemas, "model.schema.json", "plugin-manifest.schema.json");
+    writeManifest(
+        projectPlugins,
+        "runtime-testbed",
+        testbedExecutable().toString(),
+        List.of("export"),
+        List.of());
+    String originalUserDir = System.getProperty("user.dir");
+    String originalBundleRoot = System.getProperty("dediren.bundle.root");
+    System.setProperty("user.dir", project.toString());
+    System.setProperty("dediren.bundle.root", bundleRoot.toString());
+    try {
+      LoadedPluginManifest manifest = PluginRegistry.bundled().loadManifest("runtime-testbed");
+
+      assertThat(manifest.path())
+          .isEqualTo(projectPlugins.resolve("runtime-testbed.manifest.json"));
+      assertThat(manifest.trusted()).isFalse();
+    } finally {
+      restoreProperty("user.dir", originalUserDir);
+      restoreProperty("dediren.bundle.root", originalBundleRoot);
+    }
+  }
+
+  @Test
+  void projectPluginDirectoryIsOrderedAfterBundledAndBeforeConfiguredDirs() throws Exception {
+    Path bundleRoot = temp.resolve("bundle-root");
+    Path schemas = bundleRoot.resolve("schemas");
+    Path bundledPlugins = bundleRoot.resolve("plugins");
+    Path project = temp.resolve("project");
+    Path projectPlugins = project.resolve(".dediren/plugins");
+    Path configured = temp.resolve("user-plugins");
+    Files.createDirectories(schemas);
+    Files.createDirectories(bundledPlugins);
+    Files.createDirectories(projectPlugins);
+    Files.createDirectories(configured);
+    writePermissiveSchemas(schemas, "model.schema.json", "plugin-manifest.schema.json");
+    String executable = testbedExecutable().toString();
+    writeManifest(bundledPlugins, "runtime-testbed", executable, List.of("export"), List.of());
+    writeManifest(projectPlugins, "runtime-testbed", executable, List.of("export"), List.of());
+    writeManifest(projectPlugins, "other-plugin", executable, List.of("export"), List.of());
+    writeManifest(configured, "other-plugin", executable, List.of("export"), List.of());
+    String originalUserDir = System.getProperty("user.dir");
+    String originalBundleRoot = System.getProperty("dediren.bundle.root");
+    System.setProperty("user.dir", project.toString());
+    System.setProperty("dediren.bundle.root", bundleRoot.toString());
+    try {
+      PluginRegistry registry =
+          PluginRegistry.bundled(Map.of("DEDIREN_PLUGIN_DIRS", configured.toString()));
+
+      assertThat(registry.loadManifest("runtime-testbed").path())
+          .isEqualTo(bundledPlugins.resolve("runtime-testbed.manifest.json"));
+      assertThat(registry.loadManifest("other-plugin").path())
+          .isEqualTo(projectPlugins.resolve("other-plugin.manifest.json"));
+    } finally {
+      restoreProperty("user.dir", originalUserDir);
+      restoreProperty("dediren.bundle.root", originalBundleRoot);
+    }
+  }
+
+  @Test
   void bundledRegistryUsesExplicitBundleRootOutsideCurrentWorkingDirectory() throws Exception {
     Path bundleRoot = temp.resolve("runtime-bundle");
     Path schemas = bundleRoot.resolve("schemas");

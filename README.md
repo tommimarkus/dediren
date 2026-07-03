@@ -91,9 +91,11 @@ dediren-agent-bundle-2026.07.0/
 ```
 
 First-party plugin manifests live under `plugins/`. Manifest executable names
-resolve to bundled launchers under `bin/`. Project plugin directories and
-`DEDIREN_PLUGIN_DIRS` remain explicit later lookup sources; plugins are not
-discovered implicitly from `PATH`.
+resolve to bundled launchers under `bin/`. Third-party plugins register
+explicitly, in discovery order: bundled plugins first, then the project plugin
+directory `.dediren/plugins` (resolved against the directory the CLI is run
+from), then `DEDIREN_PLUGIN_DIRS`. Plugins are not discovered implicitly from
+`PATH`.
 
 Bundle launchers set `DEDIREN_BUNDLE_ROOT` from their installation root so
 commands can locate bundled `schemas/`, `plugins/`, and `bin/` regardless of
@@ -580,7 +582,9 @@ in their manifests. Important explicit variables:
   bundled plugin manifests, and bundled launchers. Packaged launchers set this
   automatically; override it only for custom launchers or tests.
 - `DEDIREN_PLUGIN_DIRS`: additional manifest directories, separated with the
-  platform path separator.
+  platform path separator. Looked up after bundled plugins and the project
+  `.dediren/plugins` directory (resolved against the CLI's current working
+  directory).
 - `DEDIREN_PLUGIN_<PLUGIN_ID>`: per-plugin executable override, for example
   `DEDIREN_PLUGIN_RENDER`.
 - `DEDIREN_OEF_SCHEMA_DIR`: local directory containing official OEF schema
