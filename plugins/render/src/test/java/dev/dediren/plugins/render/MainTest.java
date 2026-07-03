@@ -1,6 +1,7 @@
 package dev.dediren.plugins.render;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -1084,6 +1085,204 @@ class MainTest {
 
       assertThat(path.getAttribute("marker-start")).isEqualTo("url(#marker-start-order-has-lines)");
       assertThat(content).contains("data-dediren-edge-marker-start=\"filled_diamond\"");
+    }
+
+    @Test
+    void rendersUmlAssociationEndAdornments() throws Exception {
+      // Issue #37: end multiplicities and role names reach render metadata (the model's
+      // properties.uml.*) but were never drawn, so the SVG was silently lossier than the model.
+      JsonNode policy = fixtureJson("fixtures/render-policy/uml-svg.json");
+      ArrayNode nodes = JsonSupport.objectMapper().createArrayNode();
+      nodes.add(
+          JsonSupport.objectMapper()
+              .readTree(
+                  """
+                  {
+                    "id": "class-customer", "source_id": "class-customer",
+                    "projection_id": "class-customer",
+                    "x": 40, "y": 60, "width": 160, "height": 80, "label": "Customer"
+                  }
+                  """));
+      nodes.add(
+          JsonSupport.objectMapper()
+              .readTree(
+                  """
+                  {
+                    "id": "class-order", "source_id": "class-order",
+                    "projection_id": "class-order",
+                    "x": 400, "y": 60, "width": 160, "height": 80, "label": "Order"
+                  }
+                  """));
+      ArrayNode edges = JsonSupport.objectMapper().createArrayNode();
+      edges.add(
+          JsonSupport.objectMapper()
+              .readTree(
+                  """
+                  {
+                    "id": "customer-places-order",
+                    "source": "class-customer", "target": "class-order",
+                    "source_id": "customer-places-order",
+                    "projection_id": "customer-places-order",
+                    "points": [{"x": 200, "y": 100}, {"x": 400, "y": 100}],
+                    "label": "places"
+                  }
+                  """));
+      ObjectNode metadataNodes = JsonSupport.objectMapper().createObjectNode();
+      metadataNodes.set(
+          "class-customer",
+          JsonSupport.objectMapper()
+              .readTree("{\"type\":\"Class\",\"source_id\":\"class-customer\"}"));
+      metadataNodes.set(
+          "class-order",
+          JsonSupport.objectMapper()
+              .readTree("{\"type\":\"Class\",\"source_id\":\"class-order\"}"));
+      ObjectNode metadataEdges = JsonSupport.objectMapper().createObjectNode();
+      metadataEdges.set(
+          "customer-places-order",
+          JsonSupport.objectMapper()
+              .readTree(
+                  """
+                  {
+                    "type": "Association", "source_id": "customer-places-order",
+                    "properties": {
+                      "source_multiplicity": "1", "target_multiplicity": "0..*",
+                      "source_role": "customer", "target_role": "orders"
+                    }
+                  }
+                  """));
+
+      String content =
+          okContent(
+              render(
+                  semanticRenderInput("uml", nodes, edges, metadataNodes, metadataEdges, policy)));
+      Document document = svgDocument(content);
+
+      // Every authored end adornment is now present as SVG text.
+      assertThat(content).contains(">0..*<", ">customer<", ">orders<");
+
+      Element edge = groupWithAttribute(document, "data-dediren-edge-id", "customer-places-order");
+      Element targetMultiplicity =
+          childGroupWithAttribute(edge, "data-dediren-edge-adornment", "target_multiplicity");
+      Element sourceMultiplicity =
+          childGroupWithAttribute(edge, "data-dediren-edge-adornment", "source_multiplicity");
+      Element targetRole =
+          childGroupWithAttribute(edge, "data-dediren-edge-adornment", "target_role");
+      Element sourceRole =
+          childGroupWithAttribute(edge, "data-dediren-edge-adornment", "source_role");
+
+      assertThat(targetMultiplicity.getAttribute("data-dediren-edge-adornment-end"))
+          .isEqualTo("target");
+      assertThat(firstChildElement(targetMultiplicity, "text").getTextContent()).isEqualTo("0..*");
+      assertThat(firstChildElement(sourceMultiplicity, "text").getTextContent()).isEqualTo("1");
+      assertThat(firstChildElement(targetRole, "text").getTextContent()).isEqualTo("orders");
+      assertThat(firstChildElement(sourceRole, "text").getTextContent()).isEqualTo("customer");
+
+      // Each adornment sits at its own end: the target multiplicity is nearer the target node
+      // (to the right) than the source multiplicity, per UML class-diagram notation.
+      double targetX =
+          Double.parseDouble(firstChildElement(targetMultiplicity, "text").getAttribute("x"));
+      double sourceX =
+          Double.parseDouble(firstChildElement(sourceMultiplicity, "text").getAttribute("x"));
+      assertThat(sourceX)
+          .as("source multiplicity sits at the source (left) end")
+          .isBetween(200.0, 300.0);
+      assertThat(targetX)
+          .as("target multiplicity sits at the target (right) end")
+          .isBetween(300.0, 400.0);
+      assertThat(targetX)
+          .as("target multiplicity is nearer the target node than the source multiplicity")
+          .isGreaterThan(sourceX);
+    }
+
+    @Test
+    void rendersPartialEndAdornmentOnVerticalEdge() throws Exception {
+      // Partition coverage for issue #37: a vertically routed edge carrying only ONE end
+      // adornment. Exercises the vertical-route anchor branch (text-anchor start/end) and the
+      // partial-property path (no role, no source multiplicity) that the horizontal test cannot.
+      JsonNode policy = fixtureJson("fixtures/render-policy/uml-svg.json");
+      ArrayNode nodes = JsonSupport.objectMapper().createArrayNode();
+      nodes.add(
+          JsonSupport.objectMapper()
+              .readTree(
+                  """
+                  {
+                    "id": "class-order", "source_id": "class-order",
+                    "projection_id": "class-order",
+                    "x": 420, "y": 40, "width": 180, "height": 90, "label": "Order"
+                  }
+                  """));
+      nodes.add(
+          JsonSupport.objectMapper()
+              .readTree(
+                  """
+                  {
+                    "id": "class-order-line", "source_id": "class-order-line",
+                    "projection_id": "class-order-line",
+                    "x": 420, "y": 320, "width": 180, "height": 90, "label": "OrderLine"
+                  }
+                  """));
+      ArrayNode edges = JsonSupport.objectMapper().createArrayNode();
+      edges.add(
+          JsonSupport.objectMapper()
+              .readTree(
+                  """
+                  {
+                    "id": "order-has-lines",
+                    "source": "class-order", "target": "class-order-line",
+                    "source_id": "order-has-lines", "projection_id": "order-has-lines",
+                    "points": [{"x": 510, "y": 130}, {"x": 510, "y": 320}],
+                    "label": "lines"
+                  }
+                  """));
+      ObjectNode metadataNodes = JsonSupport.objectMapper().createObjectNode();
+      metadataNodes.set(
+          "class-order",
+          JsonSupport.objectMapper()
+              .readTree("{\"type\":\"Class\",\"source_id\":\"class-order\"}"));
+      metadataNodes.set(
+          "class-order-line",
+          JsonSupport.objectMapper()
+              .readTree("{\"type\":\"Class\",\"source_id\":\"class-order-line\"}"));
+      ObjectNode metadataEdges = JsonSupport.objectMapper().createObjectNode();
+      metadataEdges.set(
+          "order-has-lines",
+          JsonSupport.objectMapper()
+              .readTree(
+                  """
+                  {
+                    "type": "Composition", "source_id": "order-has-lines",
+                    "properties": { "target_multiplicity": "1..*" }
+                  }
+                  """));
+
+      Document document =
+          svgDocument(
+              okContent(
+                  render(
+                      semanticRenderInput(
+                          "uml", nodes, edges, metadataNodes, metadataEdges, policy))));
+
+      Element edge = groupWithAttribute(document, "data-dediren-edge-id", "order-has-lines");
+      Element targetMultiplicity =
+          childGroupWithAttribute(edge, "data-dediren-edge-adornment", "target_multiplicity");
+      Element text = firstChildElement(targetMultiplicity, "text");
+      assertThat(text.getTextContent()).isEqualTo("1..*");
+      // Only the one authored adornment is drawn: no role and no source multiplicity are invented.
+      assertThatThrownBy(
+              () -> childGroupWithAttribute(edge, "data-dediren-edge-adornment", "target_role"))
+          .isInstanceOf(AssertionError.class);
+      assertThatThrownBy(
+              () ->
+                  childGroupWithAttribute(
+                      edge, "data-dediren-edge-adornment", "source_multiplicity"))
+          .isInstanceOf(AssertionError.class);
+      // Vertical route: the adornment is pushed off the line horizontally with a side anchor,
+      // and its baseline sits between the two stacked nodes rather than at an endpoint.
+      assertThat(text.getAttribute("text-anchor")).isIn("start", "end");
+      double baselineY = Double.parseDouble(text.getAttribute("y"));
+      assertThat(baselineY)
+          .as("adornment sits near the target (lower) end")
+          .isBetween(130.0, 320.0);
     }
 
     @Test

@@ -558,7 +558,12 @@ Commands:
   incident edges; a detached junction is the error diagnostic
   `DEDIREN_LAYOUT_JUNCTION_OFF_INCIDENT_ROUTE`.
 - `render` asks `render` to generate SVG (and optionally PNG) in `.data.artifacts[]` (each
-  entry has `artifact_kind` and `content`; select the `svg`, `html`, or `png` entry).
+  entry has `artifact_kind` and `content`; select the `svg`, `html`, or `png` entry). UML
+  association end adornments carried in render metadata (the model's
+  `properties.uml.{source,target}_multiplicity` and `properties.uml.{source,target}_role`) are
+  drawn beside their own ends of the edge, each wrapped in a
+  `data-dediren-edge-adornment="<source|target>_<multiplicity|role>"` group so consumers can find
+  them; multiplicity sits at each end and role names at their ends per UML class-diagram notation.
 - `export` asks `archimate-oef` or `uml-xmi` to generate XML in
   `.data.content`. A `uml-xmi` export covers the single laid-out view it is
   handed; a `uml-class`/`uml-data` view now emits class relationships and nests
