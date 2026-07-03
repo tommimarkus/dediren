@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** draft — needs owner decision (Tasks 1 and 2 change public contract surfaces).
+**Status:** complete — implemented on main (owner chose Task 1 option (b), Task 2 option (a), Task 4 separate docs/plugin-authoring.md).
 
 **Goal:** Make the third-party plugin story honest: an outside author can build,
 register, and ship a working plugin from the published surface alone, without
@@ -62,15 +62,15 @@ or (b) keep the strict enum for bundled first-party plugin ids and validate
 third-party export output against the relaxed base only. Option (b) keeps
 first-party regression protection; recommend (b).
 
-- [ ] Step 1: Reproduce PA-1 (failing state): run the review's PA-1 repro —
+- [x] Step 1: Reproduce PA-1 (failing state): run the review's PA-1 repro —
       a plugin emitting `artifact_kind: "ticket-stats+json"` is rejected with
       `DEDIREN_PLUGIN_OUTPUT_INVALID_DATA`. Expected: exit 3.
-- [ ] Step 2: Write a failing core test: third-party manifest + export output
+- [x] Step 2: Write a failing core test: third-party manifest + export output
       with a non-first-party `artifact_kind` must be accepted.
-- [ ] Step 3: Implement the chosen option across schema + contracts + core.
-- [ ] Step 4: Re-run the PA-1 repro — expected: status ok, exit 0, with the
+- [x] Step 3: Implement the chosen option across schema + contracts + core.
+- [x] Step 4: Re-run the PA-1 repro — expected: status ok, exit 0, with the
       honest artifact kind. First-party export tests stay green.
-- [ ] Step 5: `./mvnw -pl contracts,core,cli -am test`; commit.
+- [x] Step 5: `./mvnw -pl contracts,core,cli -am test`; commit.
 
 ### Task 2: Make project plugin discovery match its documentation (OWNER DECISION)
 
@@ -87,14 +87,14 @@ is `DEDIREN_PLUGIN_DIRS` only. (a) matches the long-stated design intent
 recommend (a) with cwd lookup ordered after bundled plugins and before
 user-configured dirs.
 
-- [ ] Step 1: Reproduce PA-3 (failing state): the review's PA-3 repro from a
+- [x] Step 1: Reproduce PA-3 (failing state): the review's PA-3 repro from a
       project dir fails with `DEDIREN_PLUGIN_UNKNOWN`.
-- [ ] Step 2: Failing test for the chosen behavior (core discovery test or
+- [x] Step 2: Failing test for the chosen behavior (core discovery test or
       doc-consistency assertion).
-- [ ] Step 3: Implement; keep the no-PATH-discovery rule intact.
-- [ ] Step 4: PA-3 repro now passes from the project directory (option a) or
+- [x] Step 3: Implement; keep the no-PATH-discovery rule intact.
+- [x] Step 4: PA-3 repro now passes from the project directory (option a) or
       docs no longer promise it (option b).
-- [ ] Step 5: `./mvnw -pl core,cli -am test`; update README + agent-usage in
+- [x] Step 5: `./mvnw -pl core,cli -am test`; update README + agent-usage in
       the same commit; commit.
 
 ### Task 3: Align export-request `policy` schema with the pass-through contract
@@ -105,10 +105,10 @@ user-configured dirs.
   first-party plugin requests)
 - Test: contracts round-trip + a request fixture with a free-form policy
 
-- [ ] Step 1: Reproduce PA-4: a request the CLI actually sends a third-party
+- [x] Step 1: Reproduce PA-4: a request the CLI actually sends a third-party
       plugin fails validation against the published request schema.
-- [ ] Step 2: Failing round-trip test with a third-party policy document.
-- [ ] Step 3: Schema change; Step 4: repro validates; Step 5:
+- [x] Step 2: Failing round-trip test with a third-party policy document.
+- [x] Step 3: Schema change; Step 4: repro validates; Step 5:
       `./mvnw -pl contracts -am test`; commit.
 
 ### Task 4: Publish the plugin-author contract document
@@ -131,9 +131,9 @@ in the repair rules (PA-7); export envelope shape `.data.artifact_kind` /
 `.data.content` with a jq extraction example (CS-2); mandatory per-call probe
 for non-bundled manifests (PA-7).
 
-- [ ] Step 1: Failing check — the review's PA-2 repro grep finds no
+- [x] Step 1: Failing check — the review's PA-2 repro grep finds no
       executable-contract documentation.
-- [ ] Step 2: Write the document; wire bundle shipping + consistency tests.
-- [ ] Step 3: PA-2/PA-5/PA-6 repro greps now hit documentation.
-- [ ] Step 4: `./mvnw -pl dist-tool -am verify -Pdist-smoke` and
+- [x] Step 2: Write the document; wire bundle shipping + consistency tests.
+- [x] Step 3: PA-2/PA-5/PA-6 repro greps now hit documentation.
+- [x] Step 4: `./mvnw -pl dist-tool -am verify -Pdist-smoke` and
       `git diff --check`; commit.
