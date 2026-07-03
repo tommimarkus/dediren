@@ -4,5 +4,16 @@
   "version": "2026.07.0",
   "executable": "dediren-plugin-archimate-oef-export",
   "capabilities": ["export"],
-  "allowed_env": ["DEDIREN_OEF_SCHEMA_DIR", "DEDIREN_SCHEMA_CACHE_DIR", "JAVA_HOME", "PATH"]
+  "allowed_env": [
+    "DEDIREN_OEF_SCHEMA_DIR",
+    "DEDIREN_SCHEMA_CACHE_DIR",
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "NO_PROXY",
+    "http_proxy",
+    "https_proxy",
+    "no_proxy",
+    "JAVA_HOME",
+    "PATH"
+  ]
 }

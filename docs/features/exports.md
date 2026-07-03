@@ -38,9 +38,17 @@ OEF and UML/XMI export paths validate against the official standards schemas
 using `xmllint` (required on `PATH`). Schema sources:
 
 - **Online:** `curl` fetches schemas into a cache; set
-  `DEDIREN_SCHEMA_CACHE_DIR` for a stable cache location.
+  `DEDIREN_SCHEMA_CACHE_DIR` for a stable cache location. Behind a proxy, set
+  `HTTP_PROXY`, `HTTPS_PROXY`, and `NO_PROXY` (or their lowercase forms): the
+  export plugins declare these in their manifests, so the core forwards them to
+  the plugin child and `curl` honors them.
 - **Offline:** provide local schema files with `DEDIREN_OEF_SCHEMA_DIR` (OEF
   directory) and `DEDIREN_XMI_SCHEMA_PATH` (XMI schema file).
+
+When a download fails, `DEDIREN_OEF_SCHEMA_UNAVAILABLE` /
+`DEDIREN_XMI_SCHEMA_UNAVAILABLE` names both remediations in its message — the
+proxy variables to expose and the offline schema path to set — so an agent can
+recover from stdout JSON alone.
 
 ## ArchiMate OEF
 

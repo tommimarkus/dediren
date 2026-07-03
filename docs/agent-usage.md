@@ -552,6 +552,13 @@ stable cache location is desired. Give these paths as absolute: plugins run from
 the bundle's product root, so a relative value resolves against that root rather
 than your current directory.
 
+When schema downloads must go through a proxy, set `HTTP_PROXY`, `HTTPS_PROXY`,
+and `NO_PROXY` (or their lowercase forms) before invoking `dediren`; the export
+plugins forward them to `curl`. If a download still fails, the
+`DEDIREN_OEF_SCHEMA_UNAVAILABLE` / `DEDIREN_XMI_SCHEMA_UNAVAILABLE` diagnostic
+message names both the proxy variables and the offline schema-path fallback, so
+you can recover from stdout JSON alone.
+
 ## Repair Rules
 
 - `DEDIREN_SCHEMA_INVALID`: validate against `schemas/model.schema.json`. A
@@ -585,6 +592,8 @@ variables. Important explicit variables:
 - `DEDIREN_XMI_SCHEMA_PATH`: local XMI schema file, or a driver schema that
   imports `XMI.xsd` plus a UML 2.5.1 XSD to also validate UML content.
 - `DEDIREN_SCHEMA_CACHE_DIR`: cache directory for schema downloads.
+- `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY` (and their lowercase forms): forwarded
+  to the export plugins so `curl` can download standards schemas through a proxy.
 - `DEDIREN_CDS_DIR`: directory for Class-Data-Sharing archives (see below).
 - `DEDIREN_TRUST_MANIFEST_CAPABILITIES`: opt-in; trusts each plugin's static
   manifest capabilities and skips the per-call runtime probe, removing one JVM

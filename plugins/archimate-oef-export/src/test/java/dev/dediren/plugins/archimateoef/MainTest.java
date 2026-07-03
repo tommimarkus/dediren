@@ -75,6 +75,33 @@ class MainTest {
   }
 
   @Test
+  void schemaDownloadFailureNamesProxyAndOfflineRemediation() throws Exception {
+    // Issue #35: the OEF schema download runs curl in the plugin child. When it cannot fetch the
+    // schema (proxied/sandboxed environment), DEDIREN_OEF_SCHEMA_UNAVAILABLE must name both
+    // remediations agents can self-serve from stdout JSON alone: expose proxy env to the plugin,
+    // or pre-fetch the XSDs and point DEDIREN_OEF_SCHEMA_DIR at them. Force the download path
+    // (DEDIREN_OEF_SCHEMA_DIR unset) to fail deterministically without a network by pointing the
+    // cache dir under a regular file so the cache directory cannot be created.
+    Path blocker = tempDir.resolve("not-a-directory");
+    Files.writeString(blocker, "x", StandardCharsets.UTF_8);
+    Map<String, String> env =
+        Map.of("DEDIREN_SCHEMA_CACHE_DIR", blocker.resolve("cache").toString());
+
+    PluginResult result =
+        Main.executeForTesting(
+            new String[] {"export"},
+            exportInput(
+                fixtureJson("fixtures/source/valid-archimate-oef.json"),
+                fixtureJson("fixtures/layout-result/archimate-oef-basic.json")),
+            env);
+
+    JsonNode diagnostic = JsonSupport.objectMapper().readTree(result.stdout()).at("/diagnostics/0");
+    assertThat(diagnostic.at("/code").asText()).isEqualTo("DEDIREN_OEF_SCHEMA_UNAVAILABLE");
+    assertThat(diagnostic.at("/message").asText())
+        .contains("HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "DEDIREN_OEF_SCHEMA_DIR");
+  }
+
+  @Test
   void emitsSemanticGroupingViewNodeAndIgnoresLayoutOnlyGroup() throws Exception {
     JsonNode source = fixtureJson("fixtures/source/valid-archimate-oef.json");
     ((ArrayNode) source.get("nodes"))

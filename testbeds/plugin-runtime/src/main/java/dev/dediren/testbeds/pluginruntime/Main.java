@@ -120,6 +120,19 @@ public final class Main {
         System.exit(3);
         return;
       }
+      case "report-env" -> {
+        // Echo the value the child process actually received for the env var named by
+        // DEDIREN_TEST_REPORT_ENV. Used to prove core forwards a manifest-listed variable (e.g. a
+        // proxy var) across the process boundary.
+        String name = envOrDefault("DEDIREN_TEST_REPORT_ENV", "");
+        var diagnostic =
+            new Diagnostic(
+                "DEDIREN_TESTBED_ENV", DiagnosticSeverity.ERROR, envOrDefault(name, ""), "$.env");
+        System.out.println(
+            JsonSupport.objectMapper()
+                .writeValueAsString(CommandEnvelope.error(List.of(diagnostic))));
+        return;
+      }
       case "report-cwd" -> {
         var diagnostic =
             new Diagnostic(

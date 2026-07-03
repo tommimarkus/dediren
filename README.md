@@ -23,7 +23,10 @@ For a token-efficient authoring guide, see `docs/agent-usage.md`.
   export paths.
 - `curl` on `PATH` only when export validation needs to populate a standards
   schema cache. Offline runs can provide schema files with
-  `DEDIREN_OEF_SCHEMA_DIR` and `DEDIREN_XMI_SCHEMA_PATH`.
+  `DEDIREN_OEF_SCHEMA_DIR` and `DEDIREN_XMI_SCHEMA_PATH`. In a proxied
+  environment, set the standard proxy variables (`HTTP_PROXY`, `HTTPS_PROXY`,
+  `NO_PROXY`) so `curl` can reach the schema hosts; the export plugins forward
+  them to their child process.
 
 ## Build And Test
 
@@ -621,6 +624,11 @@ in their manifests. Important explicit variables:
 - `DEDIREN_XMI_SCHEMA_PATH`: local XMI schema file, or a driver schema that
   imports `XMI.xsd` plus a UML 2.5.1 XSD to also validate UML content.
 - `DEDIREN_SCHEMA_CACHE_DIR`: cache directory for schema downloads.
+- `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY` (and their lowercase forms): standard
+  proxy configuration. The export plugins declare them in their manifests, so
+  the core forwards them to the export child process when set — `curl` honors
+  them when downloading standards schemas from behind a proxy. No other plugin
+  receives them, and no other environment variables cross the boundary.
 
 Stderr is for human debugging only. Agents should make success or failure
 decisions from stdout JSON.

@@ -62,6 +62,13 @@ public final class Main {
   private static final String SCHEMA_FETCHER = "curl";
   private static final List<String> OFFICIAL_OEF_SCHEMA_FILES =
       List.of("archimate3_Model.xsd", "archimate3_View.xsd", "archimate3_Diagram.xsd");
+  // Names both self-serve remediations for a failed schema download (issue #35): expose proxy
+  // configuration to the plugin child, or skip the download by supplying the XSDs offline. Appended
+  // to DEDIREN_OEF_SCHEMA_UNAVAILABLE so an agent can recover from stdout JSON alone.
+  private static final String OEF_SCHEMA_DOWNLOAD_REMEDIATION =
+      "To download through an HTTP proxy, expose HTTP_PROXY, HTTPS_PROXY, and NO_PROXY (or their"
+          + " lowercase forms) to this plugin. To skip the download, pre-fetch the ArchiMate 3.1"
+          + " OEF XSD files and set DEDIREN_OEF_SCHEMA_DIR to their absolute directory.";
 
   private Main() {}
 
@@ -617,7 +624,9 @@ public final class Main {
             SchemaCacheModule.curlFetcher(SCHEMA_FETCHER));
       }
     } catch (SchemaCacheException error) {
-      throw new OefSchemaValidationException("DEDIREN_OEF_SCHEMA_UNAVAILABLE", error.getMessage());
+      throw new OefSchemaValidationException(
+          "DEDIREN_OEF_SCHEMA_UNAVAILABLE",
+          error.getMessage() + " " + OEF_SCHEMA_DOWNLOAD_REMEDIATION);
     }
     return schemaDir;
   }
