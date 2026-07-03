@@ -34,7 +34,7 @@ public final class TypeResolver {
 
   public TypeResolver(IdentifierMap ids, Map<String, String> classifierIdByName) {
     this.ids = ids;
-    this.classifierIdByName = classifierIdByName;
+    this.classifierIdByName = Map.copyOf(classifierIdByName);
   }
 
   /**
