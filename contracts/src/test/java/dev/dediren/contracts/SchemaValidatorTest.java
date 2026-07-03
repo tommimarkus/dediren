@@ -124,6 +124,55 @@ class SchemaValidatorTest {
         .isNotEmpty();
   }
 
+  @Test
+  void exportRequestPolicyIsPassThroughForAnyExportPlugin() throws Exception {
+    // The CLI forwards the --policy document verbatim to the target export plugin, so the
+    // published request schema must accept a third-party policy shape, not just the two
+    // first-party ones.
+    assertThat(
+            SchemaAssertions.validate(
+                workspaceRoot(),
+                "schemas/export-request.schema.json",
+                exportRequest(thirdPartyPolicy())))
+        .isEmpty();
+    for (String fixture :
+        List.of(
+            "fixtures/export-policy/default-oef.json",
+            "fixtures/export-policy/default-uml-xmi.json")) {
+      assertThat(
+              SchemaAssertions.validate(
+                  workspaceRoot(),
+                  "schemas/export-request.schema.json",
+                  exportRequest(readJson(fixture))))
+          .describedAs(fixture)
+          .isEmpty();
+    }
+  }
+
+  private static com.fasterxml.jackson.databind.JsonNode exportRequest(
+      com.fasterxml.jackson.databind.JsonNode policy) {
+    var mapper = dev.dediren.contracts.json.JsonSupport.objectMapper();
+    var request = mapper.createObjectNode();
+    request.put("export_request_schema_version", "export-request.schema.v1");
+    request.putObject("source").put("model_schema_version", "model.schema.v1");
+    request
+        .putObject("layout_result")
+        .put("layout_result_schema_version", "layout-result.schema.v1");
+    request.set("policy", policy);
+    return request;
+  }
+
+  private static com.fasterxml.jackson.databind.JsonNode thirdPartyPolicy() {
+    var policy = dev.dediren.contracts.json.JsonSupport.objectMapper().createObjectNode();
+    policy.put("ticket_stats_policy", "v1");
+    return policy;
+  }
+
+  private static com.fasterxml.jackson.databind.JsonNode readJson(String path) throws Exception {
+    return dev.dediren.contracts.json.JsonSupport.objectMapper()
+        .readTree(java.nio.file.Files.readString(workspaceRoot().resolve(path)));
+  }
+
   private static com.fasterxml.jackson.databind.JsonNode exportResult(String artifactKind) {
     var document = dev.dediren.contracts.json.JsonSupport.objectMapper().createObjectNode();
     document.put("export_result_schema_version", "export-result.schema.v1");
