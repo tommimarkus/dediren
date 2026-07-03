@@ -231,6 +231,24 @@ design removes. Do not migrate a plugin in-process for performance without a
 measured latency requirement that justifies losing isolation (a `[runtime]`
 quality scenario, §9).
 
+**In-process transport initiative — considered and closed (2026-07).** A
+trust-tiered in-process transport for first-party plugins (typed SPI over
+`contracts` records, feature-flagged dispatch, ArchUnit replacing the OS wall)
+was designed on 2026-07-01 but the spec was never committed and the working
+file was lost. The initiative was formally closed after the 2026-07-03
+multi-viewpoint review measured the baseline this rule demands: roughly
+330 ms irreducible per-stage process overhead after all three shipped startup
+tiers, about 2.5 s for a six-stage 100-element pipeline, and only ~50 ms per
+operation recoverable via the manifest-trust flag
+(`docs/superpowers/reviews/2026-07-03-multi-viewpoint-product-review.md`,
+findings PF-1/PF-2 and the appendix). The maintainer-viewpoint analysis
+(MT-7) judged the added load — dual transports, a doubled failure taxonomy,
+per-plugin adapters, and converting the ArchUnit
+plugins-do-not-depend-on-core rule from structurally guaranteed into a
+load-bearing last defense — not worth that recovery. If startup cost
+resurfaces, execute Tier 4 (Leyden AOT, §13c) first; reopening in-process
+transport requires a `[runtime]` scenario these baselines fail.
+
 ### Rules for the boundary
 
 - **Discovery is explicit, never from `PATH`.** Order: bundled first-party
@@ -400,6 +418,33 @@ common changes:
   generically stays a core diagnostic. Add the structured code; do not leak it to
   stderr.
 
+- **Break a public schema (vN → vN+1).** Policy: **big-bang by design** — one
+  schema file per family, replaced in place; there is no dual-read window, no
+  `migrate` subcommand, and no deprecation period. Consumers pin bundle
+  versions, and the schema id (not CalVer) is the compatibility signal, so a
+  break ships with release notes containing an explicit old→new field mapping
+  agents can apply mechanically. Measured change surface for
+  `model.schema.v1` (2026-07-03): ~30 files — the schema `const`,
+  `contracts/ContractVersions`, 16 `fixtures/source/` documents, test
+  hotspots (`GenericGraphPluginTest`, `CliValidateTest`), and 5 docs. The
+  recipe is the three precedent bumps: `1087f95` (render-result v2, 11
+  files), `db09a7b` (v3, 6 files), `238da5a` (family rename, 12 files);
+  round-trip tests fail loudly on any surface you forget. If a future
+  consumer base makes big-bang untenable, design a dual-read window as its
+  own spec first — do not improvise one mid-bump.
+
+- **Bump or migrate Jackson.** The product JSON stack is Jackson 2
+  (`com.fasterxml.jackson`, 60 main-source files, `contracts` alone 30);
+  Jackson 3 (`tools.jackson`) is already on the classpath transitively via
+  networknt `json-schema-validator`, which is hand-pinned for two High CVEs
+  (GHSA-j3rv-43j4-c7qm, GHSA-rmj7-2vxq-3g9f) with `jackson-annotations`
+  pinned separately to keep Enforcer `dependencyConvergence` green across
+  both stacks. Routine bumps must move both stacks together and re-verify
+  convergence. The 2→3 migration is a repo-wide package-rename sweep with no
+  incremental path; its trigger conditions are Jackson 2 EOL, networknt
+  dropping the Jackson-2-compatible line, or an unfixed 2.x CVE — when one
+  fires, plan the sweep as a dedicated slice, contracts module first.
+
 ---
 
 ## 11. Enforcing these guidelines
@@ -451,6 +496,42 @@ speculatively):
 
 None of these block the architecture; they are propagation-cost and clarity
 debts with a clear, local fix when their files are next worked.
+
+---
+
+## 13. Decision history and operational rationale
+
+Decisions a maintainer needs that used to live only in retired plans or git
+archaeology (promoted 2026-07-03 after the multi-viewpoint review, MT-5).
+
+- **(a) Build lineage.** The product began as a Rust/Cargo workspace,
+  replaced in place by a Java 21 + Gradle build (`4933d79`), then switched to
+  the Maven Wrapper (`657c4fa`). The Maven pivot's driver, previously
+  recorded nowhere: **Gradle does not work in the sandboxed agent
+  environments this repository is developed in** (daemon, cache, and
+  network-resolution behavior fail under the sandbox), while the Maven
+  Wrapper runs cleanly. Pre-Java contract rationale requires archaeology
+  below `4933d79`; per `CLAUDE.md`, do not revive retired pre-Maven guidance.
+
+- **(b) Enforced launcher flags.** Every bundle launcher ships
+  `-XX:TieredStopAtLevel=1 -XX:+UseSerialGC`, asserted by `DistTool`
+  (`EXPECTED_LAUNCHER_FLAGS`). Measured justification: elk-layout −102 ms
+  (−12.9%) wall per call (JVM tier-1 plan/results, 2026-06-10). Rollback
+  lever if C1-only ever regresses large ELK layouts: the separate
+  `dediren.layout.jvmArgs` property overrides flags for the layout launcher
+  alone. `-Xmx` is deliberately excluded — do not add heap caps to
+  launchers.
+
+- **(c) JVM startup tiers.** Startup cost is attacked in ordered tiers:
+  Tier 1 launcher flags (shipped), Tier 2 AppCDS auto-created `.jsa`
+  archives (shipped; seeding caveat — archives are seeded by the first
+  invocation and a probe-seeded archive is ~30% slower per call than a
+  workload-seeded one, see `docs/agent-usage.md`), Tier 3 manifest-trust
+  probe skip via `DEDIREN_TRUST_MANIFEST_CAPABILITIES` (shipped, first-party
+  manifests only, ~50 ms/op), Tier 4 Leyden AOT cache (planned successor;
+  gated on the pending Java 25 baseline decision). Tier 4 supersedes Tier 2
+  when adopted. The 2026-07-03 review appendix holds the measured baseline
+  for all of this.
 
 ---
 
