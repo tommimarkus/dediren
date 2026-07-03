@@ -197,7 +197,12 @@ class CliLayoutRenderCommandTest {
     assertThat(envelope.at("/data/artifacts/0/artifact_kind").asText()).isEqualTo("svg");
     assertThat(envelope.at("/data/artifacts/0/content").asText())
         .contains(
-            "<svg", "data-dediren-node-id=\"client\"", "data-dediren-edge-id=\"client-calls-api\"")
+            "<svg",
+            "role=\"img\"",
+            // default-svg.json has no accessibility title, so the accessible name is the view_id.
+            "<title>main</title>",
+            "data-dediren-node-id=\"client\"",
+            "data-dediren-edge-id=\"client-calls-api\"")
         .doesNotContain("data-dediren-edge-label-background");
   }
 

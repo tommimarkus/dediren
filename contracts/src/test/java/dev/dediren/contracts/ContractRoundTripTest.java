@@ -483,6 +483,9 @@ class ContractRoundTripTest {
 
     assertThat(policy.renderPolicySchemaVersion())
         .isEqualTo(ContractVersions.RENDER_POLICY_SCHEMA_VERSION);
+    assertThat(policy.accessibility().title()).isEqualTo("Payment authorization flow");
+    assertThat(policy.accessibility().description())
+        .isEqualTo("Checkout service calling the payment gateway");
     assertThat(policy.style().nodeOverrides().get("api").stroke()).isEqualTo("#0891b2");
     assertThat(policy.style().edge().labelPresentation())
         .isEqualTo(SvgEdgeLabelPresentation.BACKGROUND);

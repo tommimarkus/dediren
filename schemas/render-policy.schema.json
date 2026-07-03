@@ -36,7 +36,8 @@
       }
     },
     "style": { "$ref": "#/$defs/style" },
-    "raster": { "$ref": "#/$defs/raster" }
+    "raster": { "$ref": "#/$defs/raster" },
+    "accessibility": { "$ref": "#/$defs/accessibility" }
   },
   "$defs": {
     "color": {
@@ -318,6 +319,14 @@
       "properties": {
         "scale": { "type": "number", "exclusiveMinimum": 0, "maximum": 8 },
         "background": { "$ref": "#/$defs/color" }
+      }
+    },
+    "accessibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "title": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "description": { "type": "string", "minLength": 1, "maxLength": 1000 }
       }
     }
   }

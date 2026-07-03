@@ -7,4 +7,5 @@ public record RenderPolicy(
     Margin margin,
     SvgStylePolicy style,
     String interactive,
-    RasterPolicy raster) {}
+    RasterPolicy raster,
+    SvgAccessibility accessibility) {}

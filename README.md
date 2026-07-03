@@ -175,6 +175,14 @@ edges on click), `html` (an HTML page wrapping the interactive SVG), or `both`
 `style.interaction.highlight_stroke` and `style.interaction.highlight_stroke_width`
 control the highlight appearance.
 
+Every emitted SVG names itself for assistive technology (WCAG 2.2 SC 1.1.1): the
+root `<svg>` carries `role="img"` plus a `<title>`, and a `<desc>` when a
+description is supplied. Set the text with an optional `accessibility` block in
+the render policy (`"accessibility": { "title": "Payment authorization flow",
+"description": "Checkout service calling the payment gateway" }`). When
+`accessibility.title` is omitted, the `<title>` falls back to the layout
+`view_id`.
+
 Downstream commands accept either a full Dediren command envelope or the raw
 `.data` artifact JSON.
 

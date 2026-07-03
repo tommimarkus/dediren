@@ -63,13 +63,14 @@ public final class SvgDocument {
     svg.append(
         String.format(
             Locale.ROOT,
-            "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"%.0f\" height=\"%.0f\" viewBox=\"%.1f %.1f %.1f %.1f\">",
+            "<svg xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" width=\"%.0f\" height=\"%.0f\" viewBox=\"%.1f %.1f %.1f %.1f\">",
             bounds.width(),
             bounds.height(),
             bounds.minX(),
             bounds.minY(),
             bounds.width(),
             bounds.height()));
+    svg.append(SvgAccessibleName.markup(policy, result.viewId()));
     svg.append(
         String.format(
             Locale.ROOT,

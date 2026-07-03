@@ -10,6 +10,10 @@
     "bottom": 32,
     "left": 32
   },
+  "accessibility": {
+    "title": "Payment authorization flow",
+    "description": "Checkout service calling the payment gateway"
+  },
   "style": {
     "background": {
       "fill": "#f8fafc"

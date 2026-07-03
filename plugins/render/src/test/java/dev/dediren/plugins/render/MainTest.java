@@ -64,12 +64,113 @@ class MainTest {
     }
 
     @Test
+    void emitsAccessibleNameFromPolicyAccessibility() throws Exception {
+      String content =
+          okContent(
+              render(
+                  renderInput(
+                      "fixtures/layout-result/basic.json",
+                      "fixtures/render-policy/rich-svg.json")));
+      Document document = svgDocument(content);
+      Element root = document.getDocumentElement();
+
+      // WCAG 2.2 SC 1.1.1: role="img" + a <title> give the graphic an accessible name.
+      assertThat(root.getAttribute("role")).isEqualTo("img");
+      assertThat(firstChildElement(root, "title").getTextContent())
+          .isEqualTo("Payment authorization flow");
+      assertThat(firstChildElement(root, "desc").getTextContent())
+          .isEqualTo("Checkout service calling the payment gateway");
+      // The accessible-name recipe requires <title>/<desc> to precede rendered content.
+      assertThat(content.indexOf("<title>")).isLessThan(content.indexOf("<desc>"));
+      assertThat(content.indexOf("<desc>")).isLessThan(content.indexOf("<rect"));
+    }
+
+    @Test
+    void fallsBackToViewIdWhenPolicyOmitsAccessibilityTitle() throws Exception {
+      String content =
+          okContent(
+              render(
+                  renderInput(
+                      "fixtures/layout-result/basic.json",
+                      "fixtures/render-policy/default-svg.json")));
+      Document document = svgDocument(content);
+      Element root = document.getDocumentElement();
+
+      assertThat(root.getAttribute("role")).isEqualTo("img");
+      // basic.json carries view_id "main"; no policy description means no <desc>.
+      assertThat(firstChildElement(root, "title").getTextContent()).isEqualTo("main");
+      assertThat(childElements(root, "desc")).isEmpty();
+    }
+
+    @Test
+    void emitsGenericTitleWhenViewIdBlankAndNoPolicyTitle() throws Exception {
+      // view_id is schema-legal when empty; role="img" must still get a non-empty accessible name.
+      ObjectNode input =
+          (ObjectNode)
+              renderInput(
+                  "fixtures/layout-result/basic.json", "fixtures/render-policy/default-svg.json");
+      ((ObjectNode) input.at("/layout_result")).put("view_id", "");
+
+      Document document = svgDocument(okContent(render(input)));
+      Element root = document.getDocumentElement();
+
+      assertThat(root.getAttribute("role")).isEqualTo("img");
+      assertThat(firstChildElement(root, "title").getTextContent()).isEqualTo("Diagram");
+    }
+
+    @Test
+    void escapesXmlMetacharactersInAccessibleName() throws Exception {
+      ObjectNode input =
+          (ObjectNode)
+              renderInput(
+                  "fixtures/layout-result/basic.json", "fixtures/render-policy/default-svg.json");
+      ((ObjectNode) input.at("/policy"))
+          .putObject("accessibility")
+          .put("title", "A <b> & \"C\"")
+          .put("description", "x < y & z");
+
+      String content = okContent(render(input));
+
+      // Policy-supplied text is written into the SVG and must be XML-escaped, never emitted raw.
+      assertThat(content).contains("<title>A &lt;b&gt; &amp; \"C\"</title>");
+      assertThat(content).contains("<desc>x &lt; y &amp; z</desc>");
+      assertThat(content).doesNotContain("<b>");
+    }
+
+    @Test
+    void emitsAccessibleNameOnUmlSequenceRoot() throws Exception {
+      String content =
+          okContent(
+              render(
+                  renderInput(
+                      "fixtures/layout-result/uml-sequence-basic.json",
+                      "fixtures/render-policy/uml-svg.json",
+                      "fixtures/render-metadata/uml-sequence-basic.json")));
+      Document document = svgDocument(content);
+      Element root = document.getDocumentElement();
+
+      assertThat(root.getAttribute("role")).isEqualTo("img");
+      assertThat(firstChildElement(root, "title").getTextContent()).isEqualTo("sequence-view");
+    }
+
+    @Test
     void umlPolicyFixtureMatchesSvgPolicySchema() {
       assertThat(
               SchemaAssertions.validateFixture(
                   workspaceRoot(),
                   "schemas/render-policy.schema.json",
                   "fixtures/render-policy/uml-svg.json"))
+          .isEmpty();
+    }
+
+    @Test
+    void accessibilityBearingPolicyFixtureMatchesSvgPolicySchema() {
+      assertThat(
+              SchemaAssertions.validateFixture(
+                  workspaceRoot(),
+                  "schemas/render-policy.schema.json",
+                  "fixtures/render-policy/rich-svg.json"))
+          .describedAs("a render policy carrying an accessibility block must satisfy the schema")
           .isEmpty();
     }
 
