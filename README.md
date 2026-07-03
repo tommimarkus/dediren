@@ -557,7 +557,12 @@ Commands:
 - `render` asks `render` to generate SVG (and optionally PNG) in `.data.artifacts[]` (each
   entry has `artifact_kind` and `content`; select the `svg`, `html`, or `png` entry).
 - `export` asks `archimate-oef` or `uml-xmi` to generate XML in
-  `.data.content`.
+  `.data.content`. A `uml-xmi` export covers the single laid-out view it is
+  handed; a `uml-class`/`uml-data` view now emits class relationships and nests
+  classifiers under their `Package`. Source content outside the exported view is
+  declared (not silently dropped) with `info` diagnostics
+  `DEDIREN_XMI_ELEMENTS_OMITTED` / `DEDIREN_XMI_RELATIONSHIPS_OMITTED` (status
+  stays `ok`); read `.diagnostics[]` to see what a given XMI omits.
 
 ## Source JSON Rules
 

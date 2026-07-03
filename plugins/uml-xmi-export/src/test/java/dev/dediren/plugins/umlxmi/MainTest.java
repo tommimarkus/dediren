@@ -90,6 +90,102 @@ class MainTest {
   }
 
   @Test
+  void emitsClassRelationshipsAsAssociationsDependenciesAndRealizations() throws Exception {
+    JsonNode input =
+        exportInput(
+            fixtureJson("fixtures/source/valid-uml-complex.json"),
+            fixtureJson("fixtures/layout-result/uml-complex-class.json"));
+
+    String xml = exportXml(input);
+
+    assertThat(xml)
+        .contains(
+            // Composition order-has-lines: composite aggregation on the part (target) end.
+            "xmi:type=\"uml:Association\"",
+            "aggregation=\"composite\"",
+            // Aggregation order-has-payment: shared aggregation.
+            "aggregation=\"shared\"",
+            // Association customer-places-order with roles and multiplicities.
+            "<ownedEnd",
+            "name=\"customer\"",
+            "name=\"orders\"",
+            "upperValue=\"*\"",
+            // Dependency and Realization between classifiers.
+            "xmi:type=\"uml:Dependency\"",
+            "xmi:type=\"uml:Realization\"",
+            "client=\"id-class-card-payment\" supplier=\"id-interface-payment-gateway\"");
+  }
+
+  @Test
+  void nestsClassifiersUnderTheirOwningPackage() throws Exception {
+    JsonNode input =
+        exportInput(
+            fixtureJson("fixtures/source/valid-uml-complex.json"),
+            fixtureJson("fixtures/layout-result/uml-complex-class.json"));
+
+    String xml = exportXml(input);
+
+    // The Commerce package is no longer an empty sibling; its classifiers nest inside it.
+    assertThat(xml).doesNotContain("xmi:id=\"id-pkg-commerce\" name=\"Commerce\"/>");
+    assertThat(xml)
+        .containsSubsequence(
+            "<packagedElement xmi:type=\"uml:Package\" xmi:id=\"id-pkg-commerce\" name=\"Commerce\">",
+            "xmi:type=\"uml:Class\" xmi:id=\"id-class-customer\"",
+            "</packagedElement>",
+            "<packagedElement xmi:type=\"uml:Package\" xmi:id=\"id-pkg-fulfillment\""
+                + " name=\"Fulfillment\">",
+            "xmi:type=\"uml:Class\" xmi:id=\"id-class-shipment\"");
+  }
+
+  @Test
+  void declaresOutOfViewContentAsInfoCoverageDiagnostics() throws Exception {
+    JsonNode input =
+        exportInput(
+            fixtureJson("fixtures/source/valid-uml-complex.json"),
+            fixtureJson("fixtures/layout-result/uml-complex-class.json"));
+
+    PluginResult result =
+        Main.executeForTesting(new String[] {"export"}, input.toString(), envWithXmiSchema());
+
+    JsonNode envelope = JsonSupport.objectMapper().readTree(result.stdout());
+    assertThat(result.exitCode()).isZero();
+    assertThat(envelope.at("/status").asText()).isEqualTo("ok");
+    JsonNode elements = diagnostic(envelope, "DEDIREN_XMI_ELEMENTS_OMITTED");
+    assertThat(elements.at("/severity").asText()).isEqualTo("info");
+    assertThat(elements.at("/path").asText()).isEqualTo("source.nodes");
+    assertThat(elements.at("/message").asText()).contains("Activity=1", "Action=4");
+    JsonNode relationships = diagnostic(envelope, "DEDIREN_XMI_RELATIONSHIPS_OMITTED");
+    assertThat(relationships.at("/severity").asText()).isEqualTo("info");
+    assertThat(relationships.at("/message").asText()).contains("ControlFlow=8", "ObjectFlow=2");
+  }
+
+  @Test
+  void singleViewExportWithoutOmissionsHasNoCoverageDiagnostics() throws Exception {
+    PluginResult result =
+        Main.executeForTesting(
+            new String[] {"export"}, exportSequenceInput().toString(), envWithXmiSchema());
+
+    JsonNode envelope = JsonSupport.objectMapper().readTree(result.stdout());
+    assertThat(envelope.at("/status").asText()).isEqualTo("ok");
+    assertThat(envelope.at("/diagnostics").size()).isZero();
+  }
+
+  @Test
+  void exportsComplexClassViewGolden() throws Exception {
+    JsonNode input =
+        exportInput(
+            fixtureJson("fixtures/source/valid-uml-complex.json"),
+            fixtureJson("fixtures/layout-result/uml-complex-class.json"));
+
+    String xml = exportXml(input);
+
+    // Regression backstop only; the spec-named assertions in the sibling tests are the primary
+    // oracle. Update this golden via a reviewed baseline refresh when the XMI contract changes
+    // intentionally.
+    assertThat(xml).isEqualTo(fixture("fixtures/export/uml-complex-class.xmi"));
+  }
+
+  @Test
   void emitsActivityNodesAndFlowsForActivityView() throws Exception {
     JsonNode input =
         exportInput(
@@ -817,6 +913,15 @@ class MainTest {
                 """,
         StandardCharsets.UTF_8);
     return Map.of("DEDIREN_XMI_SCHEMA_PATH", schemaPath.toString());
+  }
+
+  private static JsonNode diagnostic(JsonNode envelope, String code) {
+    for (JsonNode diagnostic : envelope.at("/diagnostics")) {
+      if (diagnostic.at("/code").asText().equals(code)) {
+        return diagnostic;
+      }
+    }
+    throw new AssertionError("no diagnostic with code " + code + " in " + envelope);
   }
 
   private static JsonNode okData(PluginResult result) throws Exception {

@@ -112,6 +112,20 @@ For UML SVG notation or XMI export, use `semantic_profile: "uml"` and the
 `uml-activity`, `uml-sequence`, `uml-state-machine`, `uml-use-case`, and
 `uml-component`.
 
+A `uml-xmi` export represents the single laid-out view it is handed, not the
+whole source model. In a `uml-class`/`uml-data` view it emits class
+relationships (`Association`, `Aggregation`, `Composition`, `Dependency`, and
+`Realization` between classifiers) as owned `packagedElement`s and nests
+classifiers under the `Package` they declare via `properties.uml.package`. When
+the source model contains elements or relationships outside the exported view,
+the export declares them (rather than dropping them silently) with `info`
+diagnostics `DEDIREN_XMI_ELEMENTS_OMITTED` and
+`DEDIREN_XMI_RELATIONSHIPS_OMITTED`, each listing the omitted count and a
+per-type breakdown; the envelope `status` stays `ok`. Read those diagnostics
+from `.diagnostics[]` to know exactly what a given XMI does and does not cover
+(for example, to disclose "classes only") and export the other views to
+represent their content.
+
 ## Command Handoff
 
 Commands that consume generated artifacts accept either the raw artifact JSON
