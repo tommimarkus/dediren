@@ -239,6 +239,7 @@ public final class DistTool {
       Path bundle = findBundleDir(temp);
       assertLauncherJvmFlags(bundle);
       assertCdsConfigured(bundle);
+      assertFirstLaunchStdoutClean(bundle, temp, version);
       if (Files.exists(bundle.resolve("fixtures/plugins"))) {
         throw new IllegalStateException("archive must not include source fixture plugin manifests");
       }
@@ -614,7 +615,12 @@ public final class DistTool {
             + "JAVA_OPTS=\"$JAVA_OPTS -XX:+AutoCreateSharedArchive"
             + " -XX:SharedArchiveFile=$DEDIREN_CDS_DIR/"
             + cdsName
-            + ".jsa\""
+            // Route first-launch AutoCreateSharedArchive warnings off stdout and onto stderr (the
+            // human debug channel) so a freshly unpacked bundle's first command keeps stdout
+            // JSON-pure. cds=warning:stderr alone only ADDS a stderr sink; the default stdout sink
+            // still emits them, so cds=off:stdout is required to actually clear stdout while
+            // preserving the warnings on stderr and leaving all other JVM logging untouched.
+            + ".jsa -Xlog:cds=off:stdout -Xlog:cds=warning:stderr\""
             + nl
             + "export JAVA_OPTS"
             + nl;
@@ -844,13 +850,63 @@ public final class DistTool {
     }
   }
 
+  /**
+   * First-launch stdout purity guard. On the very first launch against a not-yet-seeded CDS
+   * directory, {@code -XX:+AutoCreateSharedArchive} emits ~150 {@code [warning][cds]} lines. Those
+   * must land on stderr (the human debug channel), never stdout: an agent whose first command
+   * against a freshly unpacked bundle pipes stdout to {@code jq} must still see only the version
+   * line / a single JSON envelope. Each probe uses its own fresh, empty CDS dir so it is a genuine
+   * cold start with the archive absent.
+   */
+  private static void assertFirstLaunchStdoutClean(Path bundle, Path temp, String version)
+      throws Exception {
+    Path dediren = bundle.resolve("bin/dediren");
+    String versionStdout =
+        runBundleCommand(
+            dediren,
+            bundle,
+            List.of("--version"),
+            null,
+            Map.of("DEDIREN_CDS_DIR", temp.resolve("fresh-cds-version").toString()),
+            Map.of());
+    assertNoCdsLines(versionStdout, "first-launch --version");
+    if (!versionStdout.strip().equals("dediren " + version)) {
+      throw new IllegalStateException(
+          "first-launch --version stdout must be exactly the version line: " + versionStdout);
+    }
+    String validateStdout =
+        runBundleCommand(
+            dediren,
+            bundle,
+            List.of(
+                "validate",
+                "--input",
+                bundle.resolve("fixtures/source/valid-basic.json").toString()),
+            null,
+            Map.of("DEDIREN_CDS_DIR", temp.resolve("fresh-cds-validate").toString()),
+            Map.of());
+    assertNoCdsLines(validateStdout, "first-launch validate");
+    // Must parse as a single ok JSON envelope, not JSON interleaved with CDS log noise.
+    okData(validateStdout);
+  }
+
+  private static void assertNoCdsLines(String stdout, String label) {
+    for (String line : stdout.split("\n", -1)) {
+      if (line.contains("[cds]")) {
+        throw new IllegalStateException(
+            label + " stdout must not contain CDS log lines (they belong on stderr): " + line);
+      }
+    }
+  }
+
   private static void assertCdsConfigured(Path bundle) throws IOException {
     for (Launcher launcher : LAUNCHERS) {
       String text =
           Files.readString(
               bundle.resolve("bin").resolve(launcher.bundleScript()), StandardCharsets.UTF_8);
       if (!text.contains("-XX:+AutoCreateSharedArchive")
-          || !text.contains(launcher.sourceScript() + ".jsa")) {
+          || !text.contains(launcher.sourceScript() + ".jsa")
+          || !text.contains("-Xlog:cds=off:stdout -Xlog:cds=warning:stderr")) {
         throw new IllegalStateException(
             "launcher " + launcher.bundleScript() + " is missing its CDS configuration");
       }

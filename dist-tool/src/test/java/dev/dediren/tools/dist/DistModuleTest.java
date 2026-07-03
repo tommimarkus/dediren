@@ -327,6 +327,11 @@ class DistModuleTest {
         .contains("DEDIREN_CDS_DIR=\"${DEDIREN_CDS_DIR:-$DEDIREN_BUNDLE_ROOT/cds}\"")
         .contains("-XX:+AutoCreateSharedArchive")
         .contains("-XX:SharedArchiveFile=$DEDIREN_CDS_DIR/elk-layout.jsa")
+        // First-launch CDS warnings must be routed OFF stdout and onto stderr so a fresh-bundle
+        // first command's stdout stays JSON-pure (agents decide success from stdout alone).
+        // cds=warning:stderr alone only adds a stderr sink; cds=off:stdout clears the default
+        // stdout sink so the warnings stop polluting stdout.
+        .contains("-Xlog:cds=off:stdout -Xlog:cds=warning:stderr")
         .contains("${XDG_CACHE_HOME:-$HOME/.cache}/dediren/cds");
     // exec line still present and after the injected block
     org.assertj.core.api.Assertions.assertThat(rewritten.indexOf("DEDIREN_CDS_DIR="))
