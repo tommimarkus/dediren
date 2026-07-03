@@ -126,6 +126,20 @@ from `.diagnostics[]` to know exactly what a given XMI does and does not cover
 (for example, to disclose "classes only") and export the other views to
 represent their content.
 
+Class content is canonical UML 2.5.1: every attribute `type` resolves to an
+`xmi:id` in the document (an emitted classifier, or a self-contained
+`uml:PrimitiveType`/`uml:DataType` synthesized for standard primitives and
+domain types) rather than a dangling type-name string, and multiplicities are
+owned `lowerValue` (`uml:LiteralInteger`) / `upperValue`
+(`uml:LiteralUnlimitedNatural`, `*` for unbounded) value-specification children
+rather than XML attributes. To schema-check the emitted UML content, point
+`DEDIREN_XMI_SCHEMA_PATH` at a driver schema that imports the OMG `XMI.xsd` and
+a UML 2.5.1 XSD and run `xmllint --nonet --noout --schema <driver.xsd>
+<document>`; OMG does not publish an importable UML 2.5.1 XSD, so supply or
+generate one, or import the document into a UML tool. Without a UML schema only
+the XMI envelope is checked. The `capabilities` command reports this recipe
+under `runtime.schema_validation.uml_content_validation`.
+
 ## Command Handoff
 
 Commands that consume generated artifacts accept either the raw artifact JSON
@@ -557,7 +571,8 @@ variables. Important explicit variables:
 - `DEDIREN_PLUGIN_DIRS`: additional manifest directories.
 - `DEDIREN_PLUGIN_<PLUGIN_ID>`: per-plugin executable override.
 - `DEDIREN_OEF_SCHEMA_DIR`: local OEF schema directory.
-- `DEDIREN_XMI_SCHEMA_PATH`: local XMI schema file.
+- `DEDIREN_XMI_SCHEMA_PATH`: local XMI schema file, or a driver schema that
+  imports `XMI.xsd` plus a UML 2.5.1 XSD to also validate UML content.
 - `DEDIREN_SCHEMA_CACHE_DIR`: cache directory for schema downloads.
 - `DEDIREN_CDS_DIR`: directory for Class-Data-Sharing archives (see below).
 - `DEDIREN_TRUST_MANIFEST_CAPABILITIES`: opt-in; trusts each plugin's static

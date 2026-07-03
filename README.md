@@ -563,6 +563,19 @@ Commands:
   declared (not silently dropped) with `info` diagnostics
   `DEDIREN_XMI_ELEMENTS_OMITTED` / `DEDIREN_XMI_RELATIONSHIPS_OMITTED` (status
   stays `ok`); read `.diagnostics[]` to see what a given XMI omits.
+- The `uml-xmi` class serialization is canonical UML 2.5.1: every attribute
+  `type` resolves to an `xmi:id` in the document (an emitted classifier, or a
+  self-contained `uml:PrimitiveType`/`uml:DataType` synthesized for standard
+  primitives and domain types), and multiplicities are owned `lowerValue`
+  (`uml:LiteralInteger`) / `upperValue` (`uml:LiteralUnlimitedNatural`, `*` for
+  unbounded) value-specification children rather than XML attributes. To
+  schema-check the emitted UML content, point `DEDIREN_XMI_SCHEMA_PATH` at a
+  driver schema that imports the OMG `XMI.xsd` and a UML 2.5.1 XSD and run
+  `xmllint --nonet --noout --schema <driver.xsd> <document>`; OMG does not
+  publish an importable UML 2.5.1 XSD, so supply or generate one (or import the
+  document into a UML tool). Without a UML schema only the XMI envelope is
+  checked. `dediren-plugin-uml-xmi-export capabilities` reports this recipe
+  under `runtime.schema_validation.uml_content_validation`.
 
 ## Source JSON Rules
 
@@ -597,7 +610,8 @@ in their manifests. Important explicit variables:
   `DEDIREN_PLUGIN_RENDER`.
 - `DEDIREN_OEF_SCHEMA_DIR`: local directory containing official OEF schema
   files.
-- `DEDIREN_XMI_SCHEMA_PATH`: local XMI schema file.
+- `DEDIREN_XMI_SCHEMA_PATH`: local XMI schema file, or a driver schema that
+  imports `XMI.xsd` plus a UML 2.5.1 XSD to also validate UML content.
 - `DEDIREN_SCHEMA_CACHE_DIR`: cache directory for schema downloads.
 
 Stderr is for human debugging only. Agents should make success or failure

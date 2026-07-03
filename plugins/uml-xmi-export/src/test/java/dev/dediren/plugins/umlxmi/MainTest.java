@@ -39,6 +39,9 @@ class MainTest {
     assertThat(capabilities.at("/runtime/artifact_kind").asText()).isEqualTo("uml-xmi+xml");
     assertThat(capabilities.at("/runtime/schema_validation/kind").asText())
         .isEqualTo("omg-xmi-xsd-partial");
+    // The UML-content validation recipe is a published capability hint (issue #33 defect 3).
+    assertThat(capabilities.at("/runtime/schema_validation/uml_content_validation").asText())
+        .contains("DEDIREN_XMI_SCHEMA_PATH", "UML 2.5.1 XSD", "xmllint");
     assertThat(capabilities.at("/capabilities").toString()).contains("export");
   }
 
@@ -54,6 +57,98 @@ class MainTest {
     // intentionally.
     assertThat(xml).isEqualTo(fixture("fixtures/export/uml-basic.xmi"));
     assertThat(xml).doesNotContain("xmi:version", "uml:Activity");
+  }
+
+  @Test
+  void resolvesAttributeTypesToInDocumentIdsWithNoDanglingStrings() throws Exception {
+    String xml = exportXml(exportInput());
+
+    // A domain type present in the view resolves to that element's xmi:id; primitives and domain
+    // types absent from the view resolve to synthesized packagedElement ids (issue #33 defect 1).
+    assertThat(xml)
+        .contains(
+            "type=\"id-enum-order-status\"", // OrderStatus -> the emitted Enumeration
+            "type=\"id-datatype-orderid\"", // OrderId -> synthesized uml:DataType
+            "type=\"id-primitive-string\"", // String -> synthesized uml:PrimitiveType
+            "type=\"id-primitive-integer\"", // Integer -> synthesized uml:PrimitiveType
+            "<packagedElement xmi:type=\"uml:DataType\" xmi:id=\"id-datatype-orderid\""
+                + " name=\"OrderId\"/>",
+            "<packagedElement xmi:type=\"uml:PrimitiveType\" xmi:id=\"id-primitive-string\""
+                + " name=\"String\"/>",
+            "<packagedElement xmi:type=\"uml:PrimitiveType\" xmi:id=\"id-primitive-integer\""
+                + " name=\"Integer\"/>");
+    // No attribute type survives as a dangling type-name string reference.
+    assertThat(xml)
+        .doesNotContain(
+            "type=\"OrderId\"", "type=\"OrderStatus\"", "type=\"String\"", "type=\"Integer\"");
+  }
+
+  @Test
+  void mapsPrimitiveAliasesToUmlStandardPrimitiveTypes() throws Exception {
+    JsonNode input = exportInput();
+    // OrderLine.sku/quantity are nodes[3].attributes[0]/[1]; retype to the Java-ish aliases.
+    ((ObjectNode) input.at("/source/nodes/3/properties/uml/attributes/0")).put("type", "boolean");
+    ((ObjectNode) input.at("/source/nodes/3/properties/uml/attributes/1")).put("type", "int");
+
+    String xml = exportXml(input);
+
+    assertThat(xml)
+        .contains(
+            "type=\"id-primitive-integer\"",
+            "<packagedElement xmi:type=\"uml:PrimitiveType\" xmi:id=\"id-primitive-integer\""
+                + " name=\"Integer\"/>",
+            "type=\"id-primitive-boolean\"",
+            "<packagedElement xmi:type=\"uml:PrimitiveType\" xmi:id=\"id-primitive-boolean\""
+                + " name=\"Boolean\"/>");
+    assertThat(xml)
+        .doesNotContain("type=\"int\"", "name=\"int\"", "type=\"boolean\"", "name=\"boolean\"");
+  }
+
+  @Test
+  void serializesAttributeMultiplicitiesAsOwnedValueSpecificationElements() throws Exception {
+    String xml = exportXml(exportInput());
+
+    // Multiplicities are owned LiteralInteger/LiteralUnlimitedNatural children, not XML attributes
+    // on ownedAttribute (issue #33 defect 2).
+    assertThat(xml)
+        .contains(
+            "<lowerValue xmi:type=\"uml:LiteralInteger\" xmi:id=\"id-class-order-id-lower\""
+                + " value=\"1\"/>",
+            "<upperValue xmi:type=\"uml:LiteralUnlimitedNatural\""
+                + " xmi:id=\"id-class-order-id-upper\" value=\"1\"/>");
+    assertThat(xml).doesNotContain("lowerValue=\"", "upperValue=\"");
+  }
+
+  @Test
+  void serializesAssociationEndMultiplicitiesAsOwnedValueSpecificationsIncludingUnlimited()
+      throws Exception {
+    String xml = exportXml(exportInput());
+
+    // The composition part end is 1..*, so its upperValue is LiteralUnlimitedNatural "*".
+    assertThat(xml)
+        .containsSubsequence(
+            "<ownedEnd xmi:id=\"id-order-has-lines-target-end\"",
+            "<lowerValue xmi:type=\"uml:LiteralInteger\""
+                + " xmi:id=\"id-order-has-lines-target-end-lower\" value=\"1\"/>",
+            "<upperValue xmi:type=\"uml:LiteralUnlimitedNatural\""
+                + " xmi:id=\"id-order-has-lines-target-end-upper\" value=\"*\"/>",
+            "</ownedEnd>");
+  }
+
+  @Test
+  void validatesUmlContentAgainstSuppliedUmlDeclaringSchemaSet() throws Exception {
+    // The plugin accepts DEDIREN_XMI_SCHEMA_PATH pointing at a schema (set). Supplying a schema
+    // that also declares the UML namespace elements makes UML-content validation possible: xmllint
+    // then resolves the emitted uml:* elements against real global declarations under a strict
+    // wildcard instead of skipping them. This exercises the documented recipe end to end against
+    // the canonical serialization (issue #33 defect 3).
+    PluginResult result =
+        Main.executeForTesting(
+            new String[] {"export"}, exportInput().toString(), envWithXmiAndUmlSchema());
+
+    JsonNode envelope = JsonSupport.objectMapper().readTree(result.stdout());
+    assertThat(result.exitCode()).describedAs(result.stdout()).isZero();
+    assertThat(envelope.at("/status").asText()).isEqualTo("ok");
   }
 
   @Test
@@ -90,6 +185,28 @@ class MainTest {
   }
 
   @Test
+  void deduplicatesSynthesizedTypesAndResolvesInScopeDomainTypesToTheirElements() throws Exception {
+    JsonNode input =
+        exportInput(
+            fixtureJson("fixtures/source/valid-uml-complex.json"),
+            fixtureJson("fixtures/layout-result/uml-complex-class.json"));
+
+    String xml = exportXml(input);
+
+    // A synthesized primitive is declared exactly once no matter how many attributes reference it
+    // (String is used by nine attributes here), and an in-scope domain DataType resolves to its
+    // emitted element rather than being re-synthesized as a duplicate (issue #33 defect 1). These
+    // invariants would otherwise be guarded only by the golden fixture.
+    assertThat(xml)
+        .containsOnlyOnce(
+            "<packagedElement xmi:type=\"uml:PrimitiveType\" xmi:id=\"id-primitive-string\""
+                + " name=\"String\"/>");
+    assertThat(xml)
+        .contains("type=\"id-datatype-order-id\""); // OrderId -> its emitted uml:DataType
+    assertThat(xml).doesNotContain("id-datatype-orderid"); // no synthesized OrderId duplicate
+  }
+
+  @Test
   void emitsClassRelationshipsAsAssociationsDependenciesAndRealizations() throws Exception {
     JsonNode input =
         exportInput(
@@ -109,7 +226,7 @@ class MainTest {
             "<ownedEnd",
             "name=\"customer\"",
             "name=\"orders\"",
-            "upperValue=\"*\"",
+            "<upperValue xmi:type=\"uml:LiteralUnlimitedNatural\"",
             // Dependency and Realization between classifiers.
             "xmi:type=\"uml:Dependency\"",
             "xmi:type=\"uml:Realization\"",
@@ -913,6 +1030,59 @@ class MainTest {
                 """,
         StandardCharsets.UTF_8);
     return Map.of("DEDIREN_XMI_SCHEMA_PATH", schemaPath.toString());
+  }
+
+  /**
+   * Writes the documented UML-content validation schema set: an XMI driver schema whose {@code
+   * xmi:XMI} demands a strict global element declaration for its non-XMI children, importing a UML
+   * schema that declares the emitted {@code uml:} elements. Pointing {@code
+   * DEDIREN_XMI_SCHEMA_PATH} at the driver lets {@code xmllint} validate UML content rather than
+   * skipping it.
+   */
+  private Map<String, String> envWithXmiAndUmlSchema() throws Exception {
+    Files.writeString(
+        tempDir.resolve("uml.xsd"),
+        """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+                            targetNamespace="http://www.omg.org/spec/UML/20161101"
+                            xmlns="http://www.omg.org/spec/UML/20161101"
+                            elementFormDefault="qualified">
+                  <xsd:element name="Model">
+                    <xsd:complexType>
+                      <xsd:sequence>
+                        <xsd:any namespace="##any" processContents="lax"
+                                 minOccurs="0" maxOccurs="unbounded"/>
+                      </xsd:sequence>
+                      <xsd:anyAttribute processContents="lax"/>
+                    </xsd:complexType>
+                  </xsd:element>
+                </xsd:schema>
+                """,
+        StandardCharsets.UTF_8);
+    Path driverPath = tempDir.resolve("XMI.xsd");
+    Files.writeString(
+        driverPath,
+        """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+                            targetNamespace="http://www.omg.org/spec/XMI/20131001"
+                            xmlns="http://www.omg.org/spec/XMI/20131001"
+                            elementFormDefault="qualified">
+                  <xsd:import namespace="http://www.omg.org/spec/UML/20161101"
+                              schemaLocation="uml.xsd"/>
+                  <xsd:element name="XMI">
+                    <xsd:complexType>
+                      <xsd:choice minOccurs="0" maxOccurs="unbounded">
+                        <xsd:any namespace="##other" processContents="strict"/>
+                      </xsd:choice>
+                      <xsd:anyAttribute processContents="lax"/>
+                    </xsd:complexType>
+                  </xsd:element>
+                </xsd:schema>
+                """,
+        StandardCharsets.UTF_8);
+    return Map.of("DEDIREN_XMI_SCHEMA_PATH", driverPath.toString());
   }
 
   private static JsonNode diagnostic(JsonNode envelope, String code) {

@@ -109,6 +109,13 @@ public final class Main {
     schemaValidation.put("fetcher", SCHEMA_FETCHER);
     schemaValidation.put(
         "limitation", "UML 2.5.1 is published as an XMI metamodel, not an importable XML Schema");
+    schemaValidation.put(
+        "uml_content_validation",
+        "To schema-check the emitted uml:* content, point DEDIREN_XMI_SCHEMA_PATH at a driver schema"
+            + " that imports the OMG XMI.xsd and a UML 2.5.1 XSD, then run: xmllint --nonet --noout"
+            + " --schema <driver.xsd> <document>. OMG does not publish an importable UML 2.5.1 XSD,"
+            + " so supply or generate one (for example from the Eclipse UML2 metamodel) or import"
+            + " the document into a UML tool. Without a UML schema only the XMI envelope is checked.");
     return JsonSupport.objectMapper().writeValueAsString(root);
   }
 

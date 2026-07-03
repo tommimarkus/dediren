@@ -3,6 +3,7 @@ package dev.dediren.plugins.umlxmi.write.classifier;
 import static dev.dediren.plugins.umlxmi.build.XmiHelpers.attr;
 import static dev.dediren.plugins.umlxmi.build.XmiHelpers.multiplicityBounds;
 import static dev.dediren.plugins.umlxmi.build.XmiHelpers.umlString;
+import static dev.dediren.plugins.umlxmi.build.XmiHelpers.writeMultiplicityValues;
 
 import dev.dediren.contracts.source.SourceNode;
 import dev.dediren.contracts.source.SourceRelationship;
@@ -122,11 +123,9 @@ public final class ClassRelationshipWriter {
         .append(attr(aggregation))
         .append("\" association=\"")
         .append(attr(associationId))
-        .append("\" lowerValue=\"")
-        .append(attr(bounds[0]))
-        .append("\" upperValue=\"")
-        .append(attr(bounds[1]))
-        .append("\"/>");
+        .append("\">");
+    writeMultiplicityValues(xml, endId, bounds);
+    xml.append("</ownedEnd>");
   }
 
   private static void writeClientSupplier(

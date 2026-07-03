@@ -31,6 +31,10 @@ public final class XmiBuilder {
 
   private XmiBuilder() {}
 
+  /** Node types whose emitted elements can be the target of an attribute type reference. */
+  private static final Set<String> CLASSIFIER_TYPES =
+      Set.of("Class", "Interface", "DataType", "Enumeration");
+
   public static String buildXmi(ExportRequest request, UmlXmiExportPolicy policy) {
     var ids = new IdentifierMap(policy.modelIdentifier());
     ExportScope scope = ExportScope.fromRequest(request);
@@ -49,6 +53,16 @@ public final class XmiBuilder {
     var relationshipIds = new HashMap<String, String>();
     selectedRelationships.forEach(
         relationship -> relationshipIds.put(relationship.id(), ids.xmiId(relationship.id())));
+
+    // Index emitted classifiers by name so attribute type references resolve to a real xmi:id
+    // instead of a dangling type-name string; unresolved names are synthesized by TypeResolver.
+    var classifierIdByName = new HashMap<String, String>();
+    for (SourceNode node : selectedNodes) {
+      if (CLASSIFIER_TYPES.contains(node.type())) {
+        classifierIdByName.putIfAbsent(node.label(), nodeIds.get(node.id()));
+      }
+    }
+    var types = new TypeResolver(ids, classifierIdByName);
 
     // Nest classifiers under the Package they declare via properties.uml.package, when that
     // Package is itself in scope; everything else stays a direct Model child.
@@ -89,6 +103,7 @@ public final class XmiBuilder {
         writePackage(
             xml,
             ids,
+            types,
             request,
             node,
             elementId,
@@ -101,6 +116,7 @@ public final class XmiBuilder {
         writeNodeElement(
             xml,
             ids,
+            types,
             request,
             node,
             elementId,
@@ -116,6 +132,9 @@ public final class XmiBuilder {
         xml, selectedRelationships, sourceNodesById, nodeIds, relationshipIds);
     writeDeploymentRelationships(
         xml, selectedRelationships, sourceNodesById, nodeIds, relationshipIds);
+    // Emit the primitive/data type targets referenced by attributes above, after every classifier
+    // has been written so all referenced types are known. XML idrefs need not precede their target.
+    types.writeSynthesizedTypes(xml);
     xml.append("</uml:Model></xmi:XMI>\n");
     return xml.toString();
   }
@@ -123,6 +142,7 @@ public final class XmiBuilder {
   private static void writePackage(
       StringBuilder xml,
       IdentifierMap ids,
+      TypeResolver types,
       ExportRequest request,
       SourceNode packageNode,
       String elementId,
@@ -144,6 +164,7 @@ public final class XmiBuilder {
       writeNodeElement(
           xml,
           ids,
+          types,
           request,
           member,
           nodeIds.get(member.id()),
@@ -158,6 +179,7 @@ public final class XmiBuilder {
   private static void writeNodeElement(
       StringBuilder xml,
       IdentifierMap ids,
+      TypeResolver types,
       ExportRequest request,
       SourceNode node,
       String elementId,
@@ -168,9 +190,9 @@ public final class XmiBuilder {
     switch (node.type()) {
       case "Package" -> writeEmptyPackagedElement(xml, "uml:Package", node, elementId);
       case "Component" -> writeComponent(xml, node, elementId, selectedNodes, nodeIds);
-      case "Class" -> writeClassifier(xml, ids, "uml:Class", node, elementId);
-      case "Interface" -> writeClassifier(xml, ids, "uml:Interface", node, elementId);
-      case "DataType" -> writeClassifier(xml, ids, "uml:DataType", node, elementId);
+      case "Class" -> writeClassifier(xml, ids, types, "uml:Class", node, elementId);
+      case "Interface" -> writeClassifier(xml, ids, types, "uml:Interface", node, elementId);
+      case "DataType" -> writeClassifier(xml, ids, types, "uml:DataType", node, elementId);
       case "Enumeration" -> writeEnumeration(xml, ids, node, elementId);
       case "Node" -> writeEmptyPackagedElement(xml, "uml:Node", node, elementId);
       case "Device" -> writeEmptyPackagedElement(xml, "uml:Device", node, elementId);
