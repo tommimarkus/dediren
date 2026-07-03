@@ -172,11 +172,14 @@ jq -r '.data.artifacts[] | select(.artifact_kind=="png") | .content' render-resu
   | base64 -d > diagram.png
 ```
 
-The SVG render policy accepts an optional `interactive` mode: `none` (static),
-`svg` (default — a self-contained interactive SVG that highlights a node's
-edges on click), `html` (an HTML page wrapping the interactive SVG), or `both`
-(an `svg` and an `html` artifact). The render result returns an ordered
-`artifacts[]` list; select the artifact you want by `artifact_kind`. Optional
+The SVG render policy accepts an optional `interactive` mode: `none` (default —
+a static SVG with no embedded script), `svg` (a self-contained interactive SVG
+that highlights a node's edges on click), `html` (an HTML page wrapping the
+interactive SVG), or `both` (an `svg` and an `html` artifact). Interactivity is
+opt-in: omitting `interactive` produces a static SVG, and the interaction script
+is emitted only when you explicitly request a non-`none` mode. The render result
+returns an ordered `artifacts[]` list; select the artifact you want by
+`artifact_kind`. Optional
 `style.interaction.highlight_stroke` and `style.interaction.highlight_stroke_width`
 control the highlight appearance.
 

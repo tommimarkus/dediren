@@ -47,17 +47,21 @@ occurs inside a group, falling back to the page background outside groups.
 
 ## Interactive Modes
 
-The policy accepts an optional `interactive` mode:
+The policy accepts an optional `interactive` mode. Interactivity is opt-in:
+omitting `interactive` (or setting `none`) produces a static SVG, and the
+click-to-highlight `<script>` is embedded only when a non-`none` mode is
+explicitly requested. This rule applies uniformly to every view.
 
 | `interactive` | Output |
 | --- | --- |
-| `none` | Static SVG. |
-| `svg` (default) | Self-contained interactive SVG that highlights a node's edges on click. |
+| `none` (default) | Static SVG, no embedded script. |
+| `svg` | Self-contained interactive SVG that highlights a node's edges on click. |
 | `html` | An HTML page wrapping the interactive SVG. |
 | `both` | An `svg` artifact **and** an `html` artifact. |
 
 Highlight appearance is controlled by `style.interaction.highlight_stroke` and
-`style.interaction.highlight_stroke_width`.
+`style.interaction.highlight_stroke_width`. UML sequence views carry no highlight
+script (there is no node→edge model to highlight) but follow the same packaging.
 
 ## Notation Rendering & Render Metadata
 

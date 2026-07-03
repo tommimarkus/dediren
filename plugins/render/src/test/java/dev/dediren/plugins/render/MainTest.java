@@ -707,7 +707,7 @@ class MainTest {
     }
 
     @Test
-    void defaultModeEmitsInteractionLayerAndEdgeEndpoints() throws Exception {
+    void defaultModeIsStaticWithoutInteractionLayer() throws Exception {
       String content =
           okContent(
               render(
@@ -715,22 +715,27 @@ class MainTest {
                       "fixtures/layout-result/basic.json",
                       "fixtures/render-policy/default-svg.json")));
 
-      assertThat(content).contains("data-dediren-edge-source", "data-dediren-edge-target");
-      assertThat(content).contains("<style", "dediren-edge-highlighted");
-      assertThat(content).contains("<script", "data-dediren-node-id");
+      // The documented default is "none": a static SVG. No interaction script, no highlight
+      // <style>, and no edge source/target hooks that only make sense with the script.
+      assertThat(content).doesNotContain("<script");
+      assertThat(content).doesNotContain("dediren-edge-highlighted");
+      assertThat(content).doesNotContain("data-dediren-edge-source");
+      assertThat(content).doesNotContain("data-dediren-edge-target");
+      // Stable node ids remain; only the interaction layer is absent.
+      assertThat(content).contains("data-dediren-node-id");
 
       Document document = svgDocument(content);
       var edges = document.getElementsByTagName("g");
-      boolean anyEdgeHasSource = false;
+      boolean anyEdge = false;
       for (int i = 0; i < edges.getLength(); i++) {
         Element g = (Element) edges.item(i);
         if (!g.getAttribute("data-dediren-edge-id").isEmpty()) {
-          assertThat(g.getAttribute("data-dediren-edge-source")).isNotEmpty();
-          assertThat(g.getAttribute("data-dediren-edge-target")).isNotEmpty();
-          anyEdgeHasSource = true;
+          assertThat(g.getAttribute("data-dediren-edge-source")).isEmpty();
+          assertThat(g.getAttribute("data-dediren-edge-target")).isEmpty();
+          anyEdge = true;
         }
       }
-      assertThat(anyEdgeHasSource).isTrue();
+      assertThat(anyEdge).isTrue();
     }
 
     @Test
@@ -850,12 +855,15 @@ class MainTest {
 
     @Test
     void interactionStyleDefaultsWhenOmitted() throws Exception {
-      String svg =
-          okContent(
-              render(
-                  renderInput(
-                      "fixtures/layout-result/basic.json",
-                      "fixtures/render-policy/default-svg.json")));
+      // Interactivity is opt-in; with it enabled but style.interaction omitted, the highlight
+      // appearance falls back to the built-in defaults.
+      ObjectNode input =
+          (ObjectNode)
+              renderInput(
+                  "fixtures/layout-result/basic.json", "fixtures/render-policy/default-svg.json");
+      ((ObjectNode) input.at("/policy")).put("interactive", "svg");
+
+      String svg = okContent(render(input));
 
       assertThat(svg).contains("stroke:#1f6feb", "stroke-width:3");
     }

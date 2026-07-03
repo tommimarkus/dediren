@@ -240,7 +240,12 @@ class CliLayoutRenderCommandTest {
             "<title>main</title>",
             "data-dediren-node-id=\"client\"",
             "data-dediren-edge-id=\"client-calls-api\"")
-        .doesNotContain("data-dediren-edge-label-background");
+        // The documented default is "none": a static SVG with no interaction script or hooks.
+        .doesNotContain(
+            "data-dediren-edge-label-background",
+            "<script",
+            "data-dediren-edge-source",
+            "dediren-edge-highlighted");
   }
 
   @Test

@@ -194,7 +194,11 @@ public final class SvgDocument {
 
   public static String interactiveMode(RenderPolicy policy) {
     String mode = policy.interactive();
-    return mode == null ? "svg" : mode;
+    // The documented default is "none": omitting the field yields a static SVG with no
+    // interaction script. Interactivity is opt-in via an explicit "svg", "html", or "both".
+    // This rule is uniform across every view; the UML sequence renderer additionally never
+    // emits the highlight script even when interactivity is requested (nothing to highlight).
+    return mode == null ? "none" : mode;
   }
 
   private static String interactionStyleBlock(RenderPolicy policy) {
