@@ -35,6 +35,14 @@ Verdicts: 22 qualitative findings verified by independent reproduction —
 performance findings are measurements and carry their own re-runnable
 commands per the spec.
 
+> **Remediation status (2026-07-04).** All four follow-up clusters were
+> executed on `main`: dist hermeticity (SEED-1), agent-usage doc gaps
+> (CS-1..CS-6, PF-3), evolution-readiness docs (MT-1/MT-2/MT-5, plus the
+> transport-initiative closure record MT-6/MT-7), and the third-party plugin
+> contract (PA-1..PA-8, CS-2). A post-implementation audit of the plugin
+> changes surfaced one new security item, addressed in the same wave — see
+> **Post-Remediation Audit Addendum** at the end of this report.
+
 | Rank | ID | Severity | Verdict | Title | Viewpoint |
 | ---- | -- | -------- | ------- | ----- | --------- |
 | 1 | PA-1 | block | confirmed | Closed export-result schema: third-party export plugins cannot declare their own artifact kind | Plugin author |
@@ -410,3 +418,41 @@ future plugin-transport / startup-latency decision.
   verification.
 - Set A/B perf numbers carry ~110 ms/call recoverable headroom from CDS
   seeding order (PF-3); developer-loop timings are single runs by design.
+
+## Post-Remediation Audit Addendum (2026-07-04)
+
+Fixing PA-1..PA-8 changed the plugin process boundary, so the CLAUDE.md audit
+gates for plugin-runtime work were run on the remediation commits: a quick
+DevSecOps pass and a deep test-quality pass. Neither returned a block.
+
+The load-bearing DevSecOps finding (PB-1, warn / high risk): the PA-3 fix made
+`<cwd>/.dediren/plugins` executables runnable by the CLI, and because the
+runtime capability probe executes the manifest's binary, an agent instructed
+by a cloned repo's own files to run an ordinary-looking `dediren <verb>
+--plugin <id>` inside that repo would execute attacker-controlled code with
+the agent's privileges. The auditor corrected the original review framing —
+this is not zero-click (every plugin command needs an explicit `--plugin <id>`
+argument; there is no auto-enumeration) — but judged the gate too weak for an
+agent audience and noted the originating review had no adversarial viewpoint.
+Two supporting items: `allowed_env` is attacker-authored for an untrusted
+manifest and is not a boundary against a malicious author (PB-2), and
+`docs/plugin-authoring.md` taught the registration→invocation sequence with no
+trust caveat (PB-3).
+
+Resolution (owner decision): cwd project-plugin discovery is now opt-in behind
+`DEDIREN_ALLOW_PROJECT_PLUGINS` (off by default, direnv-style); bundled
+plugins and `DEDIREN_PLUGIN_DIRS` are unaffected. PB-2/PB-3 landed as doc
+caveats in `docs/plugin-authoring.md`, `docs/agent-usage.md`, and
+architecture-guidelines §5. The relaxed export-result validation (772cf3e) and
+the open policy pass-through (f728047) were both judged pure functional
+loosenings with no weakened security property, since trust tiering is keyed on
+directory identity, not on the plugin's self-declared id.
+
+The deep test-quality pass found no block but one false-confidence defect —
+`DistHermeticityTest`'s CDS-exclusion assertion planted `.jsa` fixtures where
+the allowlist copy never looks, so the `tar --exclude` flags it claimed to
+guard were unreachable by the test — plus coverage gaps (single conflated
+`artifact_kind` negative; missing first-party-id-from-untrusted-dir spoofing
+test; no `export-request` policy negative). All were remediated in the same
+wave, and the CDS test was confirmed to fail when the exclude flags are
+removed.
