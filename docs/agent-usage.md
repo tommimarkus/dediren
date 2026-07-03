@@ -84,8 +84,10 @@ geometry. Render policy contains presentation.
 
 Every emitted SVG names itself for assistive technology: the root `<svg>` has
 `role="img"` with a `<title>` (and a `<desc>` when supplied). Set the text with
-an optional `accessibility` block in the render policy; without it the `<title>`
-falls back to the layout `view_id`.
+an optional `accessibility` block in the render policy, for example
+`"accessibility": { "title": "Order Processing", "description": "Application cooperation view" }`;
+without it the `<title>` falls back to the layout `view_id`, so shipped
+diagrams should use a policy copy with a real title.
 
 ## Semantic Profiles
 
@@ -111,6 +113,46 @@ For UML SVG notation or XMI export, use `semantic_profile: "uml"` and the
 `uml-xmi` plugin. Supported UML view kinds are `uml-class`, `uml-data`,
 `uml-activity`, `uml-sequence`, `uml-state-machine`, `uml-use-case`, and
 `uml-component`.
+
+## ArchiMate Handoff
+
+The `archimate` profile accepts exactly these type names.
+
+Elements: `Plateau`, `WorkPackage`, `Deliverable`, `ImplementationEvent`,
+`Gap`, `AndJunction`, `OrJunction`, `Grouping`, `Location`, `Stakeholder`,
+`Driver`, `Assessment`, `Goal`, `Outcome`, `Value`, `Meaning`, `Constraint`,
+`Requirement`, `Principle`, `CourseOfAction`, `Resource`, `ValueStream`,
+`Capability`, `BusinessInterface`, `BusinessCollaboration`, `BusinessActor`,
+`BusinessRole`, `BusinessProcess`, `BusinessService`, `BusinessInteraction`,
+`BusinessFunction`, `BusinessEvent`, `Product`, `BusinessObject`, `Contract`,
+`Representation`, `ApplicationInterface`, `ApplicationCollaboration`,
+`ApplicationComponent`, `ApplicationService`, `ApplicationInteraction`,
+`ApplicationFunction`, `ApplicationProcess`, `ApplicationEvent`, `DataObject`,
+`TechnologyInterface`, `TechnologyCollaboration`, `Node`, `SystemSoftware`,
+`Device`, `Facility`, `Equipment`, `Path`, `TechnologyService`,
+`TechnologyInteraction`, `TechnologyFunction`, `TechnologyProcess`,
+`TechnologyEvent`, `Artifact`, `Material`, `CommunicationNetwork`,
+`DistributionNetwork`.
+
+Relationships: `Composition`, `Aggregation`, `Assignment`, `Realization`,
+`Specialization`, `Serving`, `Access`, `Influence`, `Flow`, `Triggering`,
+`Association`. `AndJunction`/`OrJunction` are relationship connector nodes.
+
+Relationship endpoint pairs are semantically validated with the relationship
+direction mattering (for example `ApplicationComponent --Realization-->
+ApplicationService` and `ApplicationService --Serving--> BusinessActor` are
+valid; the reversed directions are diagnosed).
+
+```bash
+"$BUNDLE/bin/dediren" validate \
+  --plugin generic-graph \
+  --profile archimate \
+  --input "$BUNDLE/fixtures/source/valid-pipeline-archimate.json"
+```
+
+Continue with the Bundle Smoke Workflow commands, using
+`--policy "$BUNDLE/fixtures/render-policy/archimate-svg.json"` for ArchiMate
+SVG notation, and the OEF export under `## Export`.
 
 ## Command Handoff
 
@@ -500,11 +542,39 @@ UML/XMI:
   > xmi-result.json
 ```
 
+Export envelopes carry one artifact directly at `.data.artifact_kind` and
+`.data.content` — unlike render's `.data.artifacts[]` array:
+
+```bash
+jq -r '.data.content' oef-result.json > model-oef.xml
+```
+
+The default export policies hard-code fixture identity: `default-oef.json`
+sets `model_identifier: "id-dediren-oef-basic-model"` and
+`model_name: "Dediren OEF Basic"`. Export succeeds with them unchanged, so
+copy the policy and replace the identity fields for a real model:
+
+```json
+{
+  "oef_export_policy_schema_version": "oef-export-policy.schema.v1",
+  "model_identifier": "id-my-model",
+  "model_name": "My Model",
+  "view_identifier": "id-view-main",
+  "view_name": "Main",
+  "viewpoint": "Application Cooperation"
+}
+```
+
 Use `DEDIREN_OEF_SCHEMA_DIR` or `DEDIREN_XMI_SCHEMA_PATH` for offline schema
-validation. Use `DEDIREN_SCHEMA_CACHE_DIR` when downloads are allowed and a
-stable cache location is desired. Give these paths as absolute: plugins run from
-the bundle's product root, so a relative value resolves against that root rather
-than your current directory.
+validation. `DEDIREN_OEF_SCHEMA_DIR` must point at a flat directory containing
+the ArchiMate 3.1 XSDs (`archimate3_Model.xsd`, `archimate3_View.xsd`,
+`archimate3_Diagram.xsd`); `DEDIREN_XMI_SCHEMA_PATH` points at the XMI 2.5.1
+`XMI.xsd` file itself. Use `DEDIREN_SCHEMA_CACHE_DIR` when downloads are
+allowed and a stable cache location is desired; one online run populates a
+reusable offline cache (subtrees `opengroup/archimate/3.1/` and
+`omg/xmi/2.5.1/`, which also satisfy the two offline variables). Give these
+paths as absolute: plugins run from the bundle's product root, so a relative
+value resolves against that root rather than your current directory.
 
 ## Repair Rules
 
@@ -554,6 +624,15 @@ Set `DEDIREN_CDS_DIR` to an explicit writable path to relocate all archives.
 The feature is based on `-XX:+AutoCreateSharedArchive` and degrades silently if
 the archive directory is unwritable — startup continues at normal speed without
 any error.
+
+Each archive is seeded by that launcher's first invocation and is not
+regenerated while it stays valid, and its contents depend on what that first
+command loaded: an archive seeded by `--version` or a `capabilities` probe
+stays measurably slower (about 30% per call) than one seeded by real work.
+Seed each launcher with a representative workload command — running the
+Bundle Smoke Workflow once covers the whole pipeline — before or instead of
+trivial probes. To reseed, delete the `.jsa` files or point `DEDIREN_CDS_DIR`
+at a fresh directory.
 
 Setting `DEDIREN_TRUST_MANIFEST_CAPABILITIES=1` (or `true`) makes dediren trust
 each plugin's static manifest capabilities and skip the per-call runtime
