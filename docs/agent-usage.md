@@ -107,6 +107,17 @@ profile and use ArchiMate type names:
 }
 ```
 
+An `archimate-oef` export renders the single laid-out view it is handed and
+preserves node/relationship `properties` via OEF `<propertyDefinitions>` and
+per-element `<property>` values, so evidence-classification markers survive the
+export. When the source declares more views than the exported one, the omission
+is declared (rather than dropped silently) with the `info` diagnostic
+`DEDIREN_OEF_VIEWS_OMITTED`, which names the omitted view ids and counts; the
+envelope `status` stays `ok`. Because the document always carries a
+`<views>`/`<diagrams>` element it declares and validates against
+`archimate3_Diagram.xsd`, not the model-only `archimate3_Model.xsd`; point
+`DEDIREN_OEF_SCHEMA_DIR` at a directory holding all three ArchiMate 3.1 OEF XSDs.
+
 For UML SVG notation or XMI export, use `semantic_profile: "uml"` and the
 `uml-xmi` plugin. Supported UML view kinds are `uml-class`, `uml-data`,
 `uml-activity`, `uml-sequence`, `uml-state-machine`, `uml-use-case`, and

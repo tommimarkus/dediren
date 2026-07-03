@@ -56,6 +56,27 @@ point as `targetAttachment`, and only intermediate route points are emitted as
 relationship anchors and avoids treating node attachment points as free-standing
 bendpoints.
 
+Because the emitted document always carries a `<views>`/`<diagrams>` element, it
+declares (and validates against) the diagram-bearing `archimate3_Diagram.xsd`,
+not the model-only `archimate3_Model.xsd` — a diagram-bearing OEF fails the
+latter. `DEDIREN_OEF_SCHEMA_DIR` must therefore contain all three ArchiMate 3.1
+OEF XSDs (`archimate3_Model.xsd`, `archimate3_View.xsd`, `archimate3_Diagram.xsd`)
+so `xmllint` can resolve the include/redefine chain.
+
+Node and relationship `properties` are preserved through the OEF property
+mechanism: each distinct key becomes a model-level `<propertyDefinition>` and each
+value is emitted as a `<property propertyDefinitionRef="…">` on its element or
+relationship. This keeps evidence-classification markers (for example
+`candidate-from-source`, a confidence score, or a source path) attached to the
+exported concept instead of being dropped.
+
+An OEF export renders exactly the one laid-out view it is handed. When the source
+declares more views than the exported one, the omission is declared (not silently
+dropped) with an `info` diagnostic `DEDIREN_OEF_VIEWS_OMITTED` that names the
+omitted view ids and counts; the envelope `status` stays `ok`. Read
+`.diagnostics[]` to see which diagrams a given OEF does not carry, and export the
+other views to represent them.
+
 ## UML/XMI
 
 Use `semantic_profile: "uml"` and the `uml-xmi` plugin. View kinds: `uml-class`,

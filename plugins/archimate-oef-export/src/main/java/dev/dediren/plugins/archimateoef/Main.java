@@ -12,12 +12,15 @@ import dev.dediren.contracts.ContractVersions;
 import dev.dediren.contracts.Diagnostic;
 import dev.dediren.contracts.DiagnosticCode;
 import dev.dediren.contracts.DiagnosticSeverity;
+import dev.dediren.contracts.EnvelopeStatus;
 import dev.dediren.contracts.export.ExportRequest;
 import dev.dediren.contracts.export.ExportResult;
 import dev.dediren.contracts.export.OefExportPolicy;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.contracts.layout.LaidOutGroup;
 import dev.dediren.contracts.layout.Point;
+import dev.dediren.contracts.source.GenericGraphPluginData;
+import dev.dediren.contracts.source.GenericGraphView;
 import dev.dediren.contracts.source.SourceNode;
 import dev.dediren.contracts.source.SourceRelationship;
 import dev.dediren.schemacache.SchemaCacheException;
@@ -31,19 +34,27 @@ import java.io.PrintStream;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 public final class Main {
   private static final String OEF_NS = "http://www.opengroup.org/xsd/archimate/3.0/";
   private static final String XSI_NS = "http://www.w3.org/2001/XMLSchema-instance";
+  // A Dediren OEF always carries a <views>/<diagrams> element, which the model-only
+  // archimate3_Model.xsd rejects ("element views: not expected"); the diagram-bearing
+  // archimate3_Diagram.xsd is the schema the document actually conforms to, and it is the
+  // schema this plugin validates against below, so the declared schemaLocation must name it too
+  // (issue #34).
   private static final String OEF_SCHEMA =
-      "http://www.opengroup.org/xsd/archimate/3.1/archimate3_Model.xsd";
+      "http://www.opengroup.org/xsd/archimate/3.1/archimate3_Diagram.xsd";
   private static final String OEF_SCHEMA_VALIDATOR = "xmllint";
   private static final String OEF_SCHEMA_BASE_URL = "https://www.opengroup.org/xsd/archimate/3.1";
   private static final String OEF_SCHEMA_DIR_ENV = "DEDIREN_OEF_SCHEMA_DIR";
@@ -164,15 +175,80 @@ public final class Main {
       return exitWithDiagnostic(stdout, error.code(), error.getMessage(), "content");
     }
 
-    stdout.println(
-        JsonSupport.objectMapper()
-            .writeValueAsString(
-                CommandEnvelope.ok(
-                    new ExportResult(
-                        ContractVersions.EXPORT_RESULT_SCHEMA_VERSION,
-                        "archimate-oef+xml",
-                        content))));
+    var result =
+        new ExportResult(
+            ContractVersions.EXPORT_RESULT_SCHEMA_VERSION, "archimate-oef+xml", content);
+    stdout.println(JsonSupport.objectMapper().writeValueAsString(exportEnvelope(result, request)));
     return 0;
+  }
+
+  /**
+   * Wraps the export result, declaring any ArchiMate views the source defines that this OEF does
+   * not carry. A Dediren OEF export renders exactly the one laid-out view it is handed, so a
+   * package with several views would silently lose diagrams; instead the omission is surfaced as an
+   * {@code info} diagnostic a consumer can read from stdout JSON alone (issue #34, following the
+   * #32 uml-xmi coverage precedent). The verdict is informational, not a failure, so {@code status}
+   * stays {@code ok}.
+   */
+  private static CommandEnvelope<ExportResult> exportEnvelope(
+      ExportResult result, ExportRequest request) {
+    List<Diagnostic> diagnostics = viewCoverageDiagnostics(request);
+    if (diagnostics.isEmpty()) {
+      return CommandEnvelope.ok(result);
+    }
+    return new CommandEnvelope<>(
+        ContractVersions.ENVELOPE_SCHEMA_VERSION, EnvelopeStatus.OK, result, diagnostics);
+  }
+
+  private static List<Diagnostic> viewCoverageDiagnostics(ExportRequest request) {
+    List<GenericGraphView> declaredViews = declaredViews(request);
+    if (declaredViews.isEmpty()) {
+      return List.of();
+    }
+    // Compare declared view ids against the one exported view rather than gating on the declared
+    // count: a source that declares a single view whose id is not the exported view is still a
+    // silent diagram loss, so it must be declared too (issue #34).
+    String exportedViewId = request.layoutResult().viewId();
+    List<String> omitted =
+        declaredViews.stream()
+            .map(GenericGraphView::id)
+            .filter(id -> id != null && !id.equals(exportedViewId))
+            .distinct()
+            .sorted()
+            .toList();
+    if (omitted.isEmpty()) {
+      return List.of();
+    }
+    return List.of(
+        new Diagnostic(
+            "DEDIREN_OEF_VIEWS_OMITTED",
+            DiagnosticSeverity.INFO,
+            omitted.size()
+                + " of "
+                + declaredViews.size()
+                + " ArchiMate views declared in the source are not represented in this OEF"
+                + " (omitted: "
+                + String.join(", ", omitted)
+                + "). This export covers the single laid-out view '"
+                + exportedViewId
+                + "'; export the other views to represent them.",
+            "source.plugins.generic-graph.views"));
+  }
+
+  private static List<GenericGraphView> declaredViews(ExportRequest request) {
+    JsonNode pluginData = request.source().plugins().get("generic-graph");
+    if (pluginData == null || !pluginData.isObject()) {
+      return List.of();
+    }
+    try {
+      return JsonSupport.objectMapper()
+          .convertValue(pluginData, GenericGraphPluginData.class)
+          .views();
+    } catch (IllegalArgumentException error) {
+      // Malformed generic-graph plugin data is not this export's concern to reject; the pipeline
+      // validates source structure upstream. Absent a readable view list, declare no omissions.
+      return List.of();
+    }
   }
 
   private static void validatePolicy(JsonNode policy) {
@@ -312,6 +388,7 @@ public final class Main {
         .forEach(
             relationship ->
                 relationshipIds.put(relationship.id(), ids.oefId("rel", relationship.id())));
+    var propertyDefinitionIds = collectPropertyDefinitionIds(request, ids);
     var sourceNodesById =
         request.source().nodes().stream().collect(Collectors.toMap(SourceNode::id, node -> node));
     var semanticGroups =
@@ -366,6 +443,7 @@ public final class Main {
           .append(attr(node.type()))
           .append("\">");
       writeTextElement(xml, "name", node.label());
+      writePropertyValues(xml, node.properties(), propertyDefinitionIds);
       xml.append("</element>");
     }
     xml.append("</elements>");
@@ -382,9 +460,11 @@ public final class Main {
           .append(attr(relationship.type()))
           .append("\">");
       writeTextElement(xml, "name", relationship.label());
+      writePropertyValues(xml, relationship.properties(), propertyDefinitionIds);
       xml.append("</relationship>");
     }
     xml.append("</relationships>");
+    writePropertyDefinitions(xml, propertyDefinitionIds);
 
     xml.append("<views><diagrams><view identifier=\"")
         .append(attr(policy.viewIdentifier()))
@@ -564,6 +644,77 @@ public final class Main {
     stdout.println(
         JsonSupport.objectMapper().writeValueAsString(CommandEnvelope.error(List.of(diagnostic))));
     return 3;
+  }
+
+  /**
+   * Assigns one OEF property-definition identifier per distinct property key across every source
+   * node and relationship. The Open Group exchange format models properties by reference: each key
+   * is declared once in the model-level {@code <propertyDefinitions>} and each value points back at
+   * that definition, so a shared key needs a single definition. Keys are gathered in sorted order
+   * for deterministic output (a {@link SourceNode#properties()} map has no defined iteration
+   * order).
+   */
+  private static Map<String, String> collectPropertyDefinitionIds(
+      ExportRequest request, IdentifierMap ids) {
+    var keys = new TreeSet<String>();
+    request.source().nodes().forEach(node -> keys.addAll(node.properties().keySet()));
+    request.source().relationships().forEach(rel -> keys.addAll(rel.properties().keySet()));
+    var definitionIds = new LinkedHashMap<String, String>();
+    for (String key : keys) {
+      definitionIds.put(key, ids.oefId("prop", key));
+    }
+    return definitionIds;
+  }
+
+  private static void writePropertyDefinitions(
+      StringBuilder xml, Map<String, String> propertyDefinitionIds) {
+    if (propertyDefinitionIds.isEmpty()) {
+      return;
+    }
+    xml.append("<propertyDefinitions>");
+    propertyDefinitionIds.forEach(
+        (key, definitionId) -> {
+          xml.append("<propertyDefinition identifier=\"")
+              .append(attr(definitionId))
+              .append("\" type=\"string\">");
+          writeTextElement(xml, "name", key);
+          xml.append("</propertyDefinition>");
+        });
+    xml.append("</propertyDefinitions>");
+  }
+
+  private static void writePropertyValues(
+      StringBuilder xml,
+      Map<String, JsonNode> properties,
+      Map<String, String> propertyDefinitionIds) {
+    if (properties.isEmpty()) {
+      return;
+    }
+    var keys = new ArrayList<>(properties.keySet());
+    keys.sort(null);
+    var rendered = new StringBuilder();
+    for (String key : keys) {
+      String definitionId = propertyDefinitionIds.get(key);
+      if (definitionId == null) {
+        continue;
+      }
+      rendered
+          .append("<property propertyDefinitionRef=\"")
+          .append(attr(definitionId))
+          .append("\">");
+      writeTextElement(rendered, "value", propertyValueText(properties.get(key)));
+      rendered.append("</property>");
+    }
+    if (rendered.length() > 0) {
+      xml.append("<properties>").append(rendered).append("</properties>");
+    }
+  }
+
+  private static String propertyValueText(JsonNode value) {
+    if (value == null || value.isNull()) {
+      return "";
+    }
+    return value.isValueNode() ? value.asText() : value.toString();
   }
 
   private static void writeTextElement(StringBuilder xml, String name, String text) {

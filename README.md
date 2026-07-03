@@ -563,6 +563,14 @@ Commands:
   declared (not silently dropped) with `info` diagnostics
   `DEDIREN_XMI_ELEMENTS_OMITTED` / `DEDIREN_XMI_RELATIONSHIPS_OMITTED` (status
   stays `ok`); read `.diagnostics[]` to see what a given XMI omits.
+- An `archimate-oef` export likewise renders the single laid-out view it is
+  handed and preserves node/relationship `properties` through OEF
+  `<propertyDefinitions>`/`<property>` (so evidence-classification markers survive
+  the round trip). When the source declares more views than the exported one, the
+  omission is declared with the `info` diagnostic `DEDIREN_OEF_VIEWS_OMITTED`
+  (status stays `ok`). Because the document always carries `<views>`/`<diagrams>`,
+  it declares and validates against `archimate3_Diagram.xsd` (the model-only
+  `archimate3_Model.xsd` rejects a diagram-bearing OEF).
 - The `uml-xmi` class serialization is canonical UML 2.5.1: every attribute
   `type` resolves to an `xmi:id` in the document (an emitted classifier, or a
   self-contained `uml:PrimitiveType`/`uml:DataType` synthesized for standard
