@@ -132,6 +132,21 @@ public final class DistTool {
   }
 
   private static void build(Path root, String version, Path notices) throws Exception {
+    build(root, version, notices, staged -> {});
+  }
+
+  /**
+   * Staging seam (package-private for tests): {@code afterStage} runs against the fully staged
+   * bundle directory immediately before it is archived. It lets a test inject the runtime-generated
+   * residue a launcher writes at first run — {@code cds/*.jsa} under {@code
+   * $DEDIREN_BUNDLE_ROOT/cds}, a sibling of {@code lib/} — so the archive's {@code --exclude=cds}
+   * and {@code --exclude=*.jsa} hermeticity filters are actually exercised. Production callers pass
+   * a no-op; the seam runs after all staging and metadata writes, so it cannot perturb the packaged
+   * {@code lib/} verification.
+   */
+  static void build(
+      Path root, String version, Path notices, java.util.function.Consumer<Path> afterStage)
+      throws Exception {
     Path dist = root.resolve("dist");
     Path bundle = dist.resolve(bundleName(version));
     Path archive = dist.resolve(bundle.getFileName() + ".tar.gz");
@@ -164,6 +179,8 @@ public final class DistTool {
     Files.copy(
         notices, bundle.resolve("THIRD-PARTY-NOTICES.md"), StandardCopyOption.REPLACE_EXISTING);
     writeBundleMetadata(bundle, version);
+    // Test seam: inject runtime-generated CDS residue into the staged tree just before archiving.
+    afterStage.accept(bundle);
 
     runCommand(
         root,

@@ -13,6 +13,8 @@ import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class PluginRuntimeTest {
   @TempDir Path temp;
@@ -161,15 +163,28 @@ class PluginRuntimeTest {
         .isEqualTo("DEDIREN_PLUGIN_OUTPUT_INVALID_DATA");
   }
 
-  @Test
-  void thirdPartyExportArtifactKindMustStillMatchTheBasePattern() throws Exception {
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "Archimate-OEF+xml", // uppercase leading/id characters
+        "ticket-stats", // missing +suffix
+        "", // empty string
+        "ticket-stats+yaml", // unknown suffix
+        "tïcket+json" // non-ASCII id character
+      })
+  void thirdPartyExportArtifactKindMustStillMatchTheBasePattern(String artifactKind)
+      throws Exception {
+    // Distinct rejection partitions for ^[a-z0-9][a-z0-9.-]*\+(xml|json|text)$, each independently
+    // caught as DEDIREN_PLUGIN_OUTPUT_INVALID_DATA against the relaxed base export-result schema.
     writeManifest(temp, "runtime-testbed", testbedExecutable().toString(), List.of("export"));
     var options =
         PluginRunOptions.defaults()
             .withCandidateEnv(
                 Map.of(
-                    "DEDIREN_TEST_PLUGIN_CAPABILITIES", "export",
-                    "DEDIREN_TEST_PLUGIN_ARTIFACT_KIND", "Not A Valid Kind"));
+                    "DEDIREN_TEST_PLUGIN_CAPABILITIES",
+                    "export",
+                    "DEDIREN_TEST_PLUGIN_ARTIFACT_KIND",
+                    artifactKind));
 
     assertThatThrownBy(
             () ->
@@ -183,6 +198,35 @@ class PluginRuntimeTest {
         .isInstanceOf(PluginExecutionException.class)
         .extracting(error -> ((PluginExecutionException) error).diagnostic().code())
         .isEqualTo("DEDIREN_PLUGIN_OUTPUT_INVALID_DATA");
+  }
+
+  @Test
+  void firstPartyIdFromUntrustedDirectoryStillGetsRelaxedBaseSchema() throws Exception {
+    // Identity-spoofing guard (P0b): trust — and therefore the closed first-party artifact_kind
+    // enum — is keyed on the discovery directory, not on the id a manifest claims. A manifest that
+    // claims a real first-party id ("archimate-oef") but is discovered in an UNTRUSTED directory is
+    // validated against the relaxed base export-result schema, so a pattern-valid, non-enum kind
+    // ("archimate-oef+text") is accepted. A spoofed id cannot borrow first-party trust.
+    writeManifest(temp, "archimate-oef", testbedExecutable().toString(), List.of("export"));
+    var options =
+        PluginRunOptions.defaults()
+            .withCandidateEnv(
+                Map.of(
+                    "DEDIREN_TEST_PLUGIN_ID", "archimate-oef",
+                    "DEDIREN_TEST_PLUGIN_CAPABILITIES", "export",
+                    "DEDIREN_TEST_PLUGIN_ARTIFACT_KIND", "archimate-oef+text"));
+
+    PluginRunOutcome outcome =
+        PluginRunner.runForCapabilityWithRegistry(
+            PluginRegistry.fromDirs(List.of(temp)),
+            "archimate-oef",
+            "export",
+            List.of("export"),
+            "{}",
+            options);
+
+    assertThat(outcome.exitCode()).isZero();
+    assertThat(outcome.stdout()).contains("\"archimate-oef+text\"");
   }
 
   @Test
@@ -452,6 +496,48 @@ class PluginRuntimeTest {
           .isEqualTo(bundledPlugins.resolve("runtime-testbed.manifest.json"));
       assertThat(registry.loadManifest("other-plugin").path())
           .isEqualTo(projectPlugins.resolve("other-plugin.manifest.json"));
+    } finally {
+      restoreProperty("user.dir", originalUserDir);
+      restoreProperty("dediren.bundle.root", originalBundleRoot);
+    }
+  }
+
+  @Test
+  void bundledManifestWinsWhenSameIdIsRegisteredInEveryDiscoveryTier() throws Exception {
+    // P2(i): with the same id present in the bundled, caller-cwd project (opt-in on), and
+    // DEDIREN_PLUGIN_DIRS tiers at once, the trusted bundled manifest wins by discovery order.
+    Path bundleRoot = temp.resolve("bundle-root");
+    Path schemas = bundleRoot.resolve("schemas");
+    Path bundledPlugins = bundleRoot.resolve("plugins");
+    Path project = temp.resolve("project");
+    Path projectPlugins = project.resolve(".dediren/plugins");
+    Path configured = temp.resolve("user-plugins");
+    Files.createDirectories(schemas);
+    Files.createDirectories(bundledPlugins);
+    Files.createDirectories(projectPlugins);
+    Files.createDirectories(configured);
+    writePermissiveSchemas(schemas, "model.schema.json", "plugin-manifest.schema.json");
+    String executable = testbedExecutable().toString();
+    writeManifest(bundledPlugins, "runtime-testbed", executable, List.of("export"), List.of());
+    writeManifest(projectPlugins, "runtime-testbed", executable, List.of("export"), List.of());
+    writeManifest(configured, "runtime-testbed", executable, List.of("export"), List.of());
+    String originalUserDir = System.getProperty("user.dir");
+    String originalBundleRoot = System.getProperty("dediren.bundle.root");
+    System.setProperty("user.dir", project.toString());
+    System.setProperty("dediren.bundle.root", bundleRoot.toString());
+    try {
+      PluginRegistry registry =
+          PluginRegistry.bundled(
+              Map.of(
+                  "DEDIREN_PLUGIN_DIRS",
+                  configured.toString(),
+                  "DEDIREN_ALLOW_PROJECT_PLUGINS",
+                  "1"));
+      LoadedPluginManifest manifest = registry.loadManifest("runtime-testbed");
+
+      assertThat(manifest.path())
+          .isEqualTo(bundledPlugins.resolve("runtime-testbed.manifest.json"));
+      assertThat(manifest.trusted()).isTrue();
     } finally {
       restoreProperty("user.dir", originalUserDir);
       restoreProperty("dediren.bundle.root", originalBundleRoot);

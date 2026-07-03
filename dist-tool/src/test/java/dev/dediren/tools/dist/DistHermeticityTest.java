@@ -47,13 +47,27 @@ class DistHermeticityTest {
   void buildPackagesExactlyDeclaredJarsAndExcludesRuntimeGeneratedCdsContent(@TempDir Path root)
       throws Exception {
     writeDistributionRoot(root);
-    // Runtime-generated CDS residue in the staged input must be excluded, not shipped.
-    Files.writeString(root.resolve("cli/target/appassembler/lib/cli.jsa"), "cds archive");
-    Files.createDirectories(root.resolve("cli/target/appassembler/lib/cds"));
-    Files.writeString(
-        root.resolve("cli/target/appassembler/lib/cds/elk-layout.jsa"), "cds archive");
-
-    runBuild(root);
+    // A launcher writes CDS archives at first run to DEDIREN_CDS_DIR, which defaults to
+    // $DEDIREN_BUNDLE_ROOT/cds — i.e. <bundle-staging-root>/cds, a sibling of lib/. That residue
+    // only exists AFTER staging, so plant it via the staging seam (after staging, before tar) at
+    // the REAL runtime location. This is what makes the tar --exclude=cds / --exclude=*.jsa flags
+    // load-bearing: injecting it inside cli/target/appassembler/lib would never reach the archive
+    // because copyDeclaredJars only copies allowlisted classpath jars, so the flags would never
+    // fire. A stray top-level *.jsa is added too, so each exclude flag is independently required.
+    DistTool.build(
+        root,
+        VERSION,
+        root.resolve("THIRD-PARTY-NOTICES.md"),
+        bundle -> {
+          try {
+            Files.createDirectories(bundle.resolve("cds"));
+            Files.writeString(bundle.resolve("cds/cli.jsa"), "cds archive");
+            Files.writeString(bundle.resolve("cds/elk-layout.jsa"), "cds archive");
+            Files.writeString(bundle.resolve("stray.jsa"), "cds archive");
+          } catch (java.io.IOException error) {
+            throw new java.io.UncheckedIOException(error);
+          }
+        });
 
     Path archive = root.resolve("dist/dediren-agent-bundle-" + VERSION + ".tar.gz");
     assertThat(archive).isRegularFile();
