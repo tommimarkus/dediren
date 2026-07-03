@@ -156,6 +156,10 @@ public final class DistTool {
         bundle.resolve("docs/agent-usage.md"),
         StandardCopyOption.REPLACE_EXISTING);
     Files.copy(
+        root.resolve("docs/plugin-authoring.md"),
+        bundle.resolve("docs/plugin-authoring.md"),
+        StandardCopyOption.REPLACE_EXISTING);
+    Files.copy(
         root.resolve("LICENSE"), bundle.resolve("LICENSE"), StandardCopyOption.REPLACE_EXISTING);
     Files.copy(
         notices, bundle.resolve("THIRD-PARTY-NOTICES.md"), StandardCopyOption.REPLACE_EXISTING);

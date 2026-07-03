@@ -92,6 +92,12 @@ class DistModuleTest {
     JsonNode metadata = JsonSupport.objectMapper().readTree(archiveMetadata);
     assertThat(metadata.path("version").asText()).isEqualTo("2026.06.0");
     assertThat(metadata.path("target").asText()).isEqualTo("java");
+
+    // Both shipped agent-facing docs ride in the bundle next to each other.
+    assertThat(readArchiveEntry(archive, "dediren-agent-bundle-2026.06.0/docs/agent-usage.md"))
+        .contains("# Agent usage");
+    assertThat(readArchiveEntry(archive, "dediren-agent-bundle-2026.06.0/docs/plugin-authoring.md"))
+        .contains("# Plugin authoring");
   }
 
   @Test
@@ -294,6 +300,7 @@ class DistModuleTest {
     Files.createDirectories(root.resolve("fixtures/source"));
     Files.createDirectories(root.resolve("docs"));
     Files.writeString(root.resolve("docs/agent-usage.md"), "# Agent usage\n");
+    Files.writeString(root.resolve("docs/plugin-authoring.md"), "# Plugin authoring\n");
     Files.writeString(root.resolve("LICENSE"), "test license\n");
   }
 

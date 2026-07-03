@@ -35,6 +35,7 @@ dediren-agent-bundle-<version>/
   schemas/
   fixtures/
   docs/agent-usage.md
+  docs/plugin-authoring.md
   LICENSE
   THIRD-PARTY-NOTICES.md
   bundle.json

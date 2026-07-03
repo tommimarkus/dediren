@@ -13,7 +13,9 @@ The stable product surface is machine-readable:
 - first-party plugin manifests and runtime capability probes;
 - deterministic diagnostics that agents can inspect without scraping stderr.
 
-For a token-efficient authoring guide, see `docs/agent-usage.md`.
+For a token-efficient authoring guide, see `docs/agent-usage.md`. For the
+third-party plugin-author contract (manifest, executable lifecycle, envelopes,
+failure signaling), see `docs/plugin-authoring.md`; both ship in the bundle.
 
 ## Requirements
 
@@ -84,6 +86,7 @@ dediren-agent-bundle-2026.07.0/
   schemas/
   fixtures/
   docs/agent-usage.md
+  docs/plugin-authoring.md
   LICENSE
   THIRD-PARTY-NOTICES.md
   bundle.json
@@ -95,7 +98,8 @@ resolve to bundled launchers under `bin/`. Third-party plugins register
 explicitly, in discovery order: bundled plugins first, then the project plugin
 directory `.dediren/plugins` (resolved against the directory the CLI is run
 from), then `DEDIREN_PLUGIN_DIRS`. Plugins are not discovered implicitly from
-`PATH`.
+`PATH`. The full plugin-author contract lives in
+[`docs/plugin-authoring.md`](docs/plugin-authoring.md).
 
 Bundle launchers set `DEDIREN_BUNDLE_ROOT` from their installation root so
 commands can locate bundled `schemas/`, `plugins/`, and `bin/` regardless of

@@ -49,13 +49,16 @@ launcher `dediren-plugin-archimate-oef-export`).
 Plugin discovery is **explicit and ordered** — never implicit from `PATH`:
 
 1. bundled first-party plugins (manifests under the bundle's `plugins/`);
-2. project plugin directories such as `.dediren/plugins`;
+2. the project plugin directory `.dediren/plugins`, resolved against the
+   CLI's current working directory (then the bundle root);
 3. user-configured directories from `DEDIREN_PLUGIN_DIRS` (platform path
    separator).
 
 Manifest executable names resolve to bundled launchers under `bin/`. A per-plugin
 override `DEDIREN_PLUGIN_<PLUGIN_ID>` (e.g. `DEDIREN_PLUGIN_RENDER`) points a
-single plugin at a custom executable.
+single plugin at a custom executable. The full third-party plugin-author
+contract (manifest, executable lifecycle, envelopes, failure signaling) lives
+in [`docs/plugin-authoring.md`](../plugin-authoring.md), shipped in the bundle.
 
 ## Capability Probing
 

@@ -104,6 +104,7 @@ class DistHermeticityTest {
     Files.createDirectories(root.resolve("fixtures/source"));
     Files.createDirectories(root.resolve("docs"));
     Files.writeString(root.resolve("docs/agent-usage.md"), "# Agent usage\n");
+    Files.writeString(root.resolve("docs/plugin-authoring.md"), "# Plugin authoring\n");
     Files.writeString(root.resolve("LICENSE"), "test license\n");
     Files.writeString(root.resolve("THIRD-PARTY-NOTICES.md"), "# Notices\n");
   }
