@@ -27,6 +27,57 @@ class LayoutQualityTest {
   }
 
   @Test
+  void qualityWarningsAreEmittedPerNonzeroNonInformationalCountPointingIntoData() {
+    var nodes = new ArrayList<LaidOutNode>();
+    nodes.add(node("a", 0.0, 0.0));
+    nodes.add(node("b", 50.0, 20.0));
+
+    LayoutQualityReport report =
+        LayoutQuality.validateLayout(layoutResult(nodes, List.of(), List.of()));
+    var warnings = LayoutQuality.layoutQualityWarnings(report);
+
+    assertThat(warnings)
+        .extracting(diagnostic -> diagnostic.code())
+        .containsExactly("DEDIREN_LAYOUT_QUALITY_WARNING");
+    assertThat(warnings)
+        .extracting(diagnostic -> diagnostic.severity())
+        .containsOnly(DiagnosticSeverity.WARNING);
+    assertThat(warnings.get(0).path()).isEqualTo("$.data.overlap_count");
+    assertThat(warnings.get(0).message()).contains("overlap_count").contains("1");
+  }
+
+  @Test
+  void cleanLayoutEmitsNoQualityWarnings() {
+    var nodes = List.of(node("api", 0.0, 0.0));
+
+    LayoutQualityReport report =
+        LayoutQuality.validateLayout(layoutResult(nodes, List.of(), List.of()));
+
+    assertThat(LayoutQuality.layoutQualityWarnings(report)).isEmpty();
+  }
+
+  @Test
+  void informationalEdgeCrossingsAloneEmitNoQualityWarnings() {
+    var nodes =
+        List.of(
+            node("a", 0.0, 0.0),
+            node("b", 400.0, 400.0),
+            node("c", 0.0, 400.0),
+            node("d", 400.0, 0.0));
+    var edges =
+        List.of(
+            edge("a-b", "a", "b", List.of(new Point(100.0, 80.0), new Point(400.0, 440.0))),
+            edge("c-d", "c", "d", List.of(new Point(100.0, 440.0), new Point(400.0, 40.0))));
+
+    LayoutQualityReport report =
+        LayoutQuality.validateLayout(layoutResult(nodes, edges, List.of()));
+
+    assertThat(report.edgeCrossingCount()).isEqualTo(1);
+    assertThat(report.status()).isEqualTo("ok");
+    assertThat(LayoutQuality.layoutQualityWarnings(report)).isEmpty();
+  }
+
+  @Test
   void routeDiagnosticsReportEmptyRoutesAndEndpointMisses() {
     var nodes = new ArrayList<LaidOutNode>();
     nodes.add(node("source", 0.0, 0.0));

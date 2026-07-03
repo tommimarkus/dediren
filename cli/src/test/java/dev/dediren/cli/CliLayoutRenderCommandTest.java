@@ -39,6 +39,42 @@ class CliLayoutRenderCommandTest {
   }
 
   @Test
+  void validateLayoutSurfacesQualityWarningInEnvelopeStatusAndDiagnostics() throws Exception {
+    Path layout = temp.resolve("overlapping-layout.json");
+    Files.writeString(
+        layout,
+        """
+                {
+                  "layout_result_schema_version": "layout-result.schema.v1",
+                  "view_id": "main",
+                  "nodes": [
+                    { "id": "a", "source_id": "a", "projection_id": "a", "x": 0.0, "y": 0.0, "width": 100.0, "height": 80.0, "label": "A" },
+                    { "id": "b", "source_id": "b", "projection_id": "b", "x": 50.0, "y": 20.0, "width": 100.0, "height": 80.0, "label": "B" }
+                  ],
+                  "edges": [],
+                  "groups": [],
+                  "warnings": []
+                }
+                """);
+
+    CliResult result =
+        Main.executeForTesting(new String[] {"validate-layout", "--input", layout.toString()}, "");
+
+    JsonNode envelope = JsonSupport.objectMapper().readTree(result.stdout());
+
+    // A warning verdict is not a failure: exit stays 0, but the envelope status and diagnostics
+    // now carry the quality verdict so a consumer reading only .status/.diagnostics[] sees it.
+    assertThat(result.exitCode()).isZero();
+    assertThat(envelope.at("/status").asText()).isEqualTo("warning");
+    assertThat(envelope.at("/diagnostics/0/code").asText())
+        .isEqualTo("DEDIREN_LAYOUT_QUALITY_WARNING");
+    assertThat(envelope.at("/diagnostics/0/severity").asText()).isEqualTo("warning");
+    assertThat(envelope.at("/diagnostics/0/path").asText()).isEqualTo("$.data.overlap_count");
+    assertThat(envelope.at("/data/status").asText()).isEqualTo("warning");
+    assertThat(envelope.at("/data/overlap_count").asInt()).isEqualTo(1);
+  }
+
+  @Test
   void validateLayoutAcceptsSequenceLifelineMessageEndpoints() throws Exception {
     Path fixture = workspaceRoot().resolve("fixtures/layout-result/uml-sequence-validatable.json");
 

@@ -18,6 +18,17 @@ public record CommandEnvelope<T>(
         ContractVersions.ENVELOPE_SCHEMA_VERSION, EnvelopeStatus.OK, data, List.of());
   }
 
+  /**
+   * A non-failing result whose payload still carries a quality verdict the envelope must surface.
+   * Unlike {@link #ok(Object)} it keeps {@code data} and attaches {@code warning}-severity
+   * diagnostics, so a consumer reading only the envelope {@code status}/{@code diagnostics} sees
+   * the verdict without descending into {@code data}.
+   */
+  public static <T> CommandEnvelope<T> warning(T data, List<Diagnostic> diagnostics) {
+    return new CommandEnvelope<>(
+        ContractVersions.ENVELOPE_SCHEMA_VERSION, EnvelopeStatus.WARNING, data, diagnostics);
+  }
+
   public static CommandEnvelope<JsonNode> error(List<Diagnostic> diagnostics) {
     return new CommandEnvelope<>(
         ContractVersions.ENVELOPE_SCHEMA_VERSION, EnvelopeStatus.ERROR, null, diagnostics);

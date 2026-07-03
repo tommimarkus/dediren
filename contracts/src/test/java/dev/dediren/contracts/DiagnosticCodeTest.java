@@ -53,6 +53,8 @@ class DiagnosticCodeTest {
         .isEqualTo("DEDIREN_LAYOUT_ROUTE_POINTS_EMPTY");
     assertThat(DiagnosticCode.LAYOUT_JUNCTION_OFF_INCIDENT_ROUTE.code())
         .isEqualTo("DEDIREN_LAYOUT_JUNCTION_OFF_INCIDENT_ROUTE");
+    assertThat(DiagnosticCode.LAYOUT_QUALITY_WARNING.code())
+        .isEqualTo("DEDIREN_LAYOUT_QUALITY_WARNING");
   }
 
   @Test

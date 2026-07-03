@@ -465,9 +465,15 @@ from any current working directory.
 `invalid_route_count`, `route_detour_count`, `route_close_parallel_count`,
 `group_boundary_issue_count`, `group_label_band_issue_count`,
 `label_space_issue_count`, `edge_crossing_count` (informational only), and
-`warning_count`. `status` is `ok` only when all non-informational counts and
-warnings are zero. ArchiMate junction nodes detached from an incident edge
-route fail with `DEDIREN_LAYOUT_JUNCTION_OFF_INCIDENT_ROUTE`.
+`warning_count`. The payload `data.status` is `ok` only when all
+non-informational counts and warnings are zero; otherwise it is `warning`, and
+the command envelope now restates that verdict so consumers reading only
+`.status`/`.diagnostics[]` see it: envelope `status` becomes `warning` and one
+`DEDIREN_LAYOUT_QUALITY_WARNING` diagnostic (severity `warning`, `path` pointing
+at the offending `data.*` count) is emitted per nonzero non-informational count.
+A warning verdict is not a failure — the exit code stays `0`. ArchiMate junction
+nodes detached from an incident edge route fail with
+`DEDIREN_LAYOUT_JUNCTION_OFF_INCIDENT_ROUTE`.
 
 The `elk-layout` plugin uses official Eclipse ELK Java libraries and requires
 Java 21 or newer. It does not use external layout adapters. Use

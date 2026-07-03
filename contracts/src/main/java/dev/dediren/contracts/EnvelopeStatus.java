@@ -4,9 +4,10 @@ import com.fasterxml.jackson.annotation.JsonValue;
 
 /**
  * Owner of the command-envelope {@code status} vocabulary. {@link #OK} and {@link #ERROR} are the
- * statuses {@code core} and {@code cli} produce today; {@link #WARNING} is a reserved member of the
- * published envelope contract (a plugin may emit it) that the first-party pipeline does not yet
- * produce. The {@link #wire()} string is the contract and must never change for an existing
+ * baseline success/failure statuses {@code core} and {@code cli} produce; {@link #WARNING} is
+ * produced by {@code validate-layout} when a layout carries a non-informational quality issue (and
+ * a plugin may emit it too) — a non-failing result whose envelope still restates the payload
+ * verdict. The {@link #wire()} string is the contract and must never change for an existing
  * constant.
  */
 public enum EnvelopeStatus {

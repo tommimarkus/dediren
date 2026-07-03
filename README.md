@@ -544,9 +544,13 @@ Commands:
   a labeled group's title band), `label_space_issue_count` (node labels that
   clearly cannot fit their computed box; icon-sized nodes are exempt), and
   `edge_crossing_count` (informational; crossings can be unavoidable, so this
-  count never degrades `status`). Junction-role nodes (`AndJunction`/`OrJunction`
-  in ArchiMate views) must sit on the routes of their incident edges; a detached
-  junction is the error diagnostic `DEDIREN_LAYOUT_JUNCTION_OFF_INCIDENT_ROUTE`.
+  count never degrades `status`). When any non-informational count is nonzero the
+  command envelope surfaces the verdict: envelope `status` becomes `warning` and
+  one `DEDIREN_LAYOUT_QUALITY_WARNING` diagnostic is emitted per offending count
+  (exit code stays `0`, since a warning is not a failure). Junction-role nodes
+  (`AndJunction`/`OrJunction` in ArchiMate views) must sit on the routes of their
+  incident edges; a detached junction is the error diagnostic
+  `DEDIREN_LAYOUT_JUNCTION_OFF_INCIDENT_ROUTE`.
 - `render` asks `render` to generate SVG (and optionally PNG) in `.data.artifacts[]` (each
   entry has `artifact_kind` and `content`; select the `svg`, `html`, or `png` entry).
 - `export` asks `archimate-oef` or `uml-xmi` to generate XML in

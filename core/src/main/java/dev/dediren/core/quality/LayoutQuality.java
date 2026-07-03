@@ -80,6 +80,42 @@ public final class LayoutQuality {
         warningCount);
   }
 
+  /**
+   * Envelope-level restatement of a warning verdict: one {@code warning}-severity diagnostic per
+   * nonzero non-informational quality count, each pointing at its {@code data.*} field. Returned
+   * empty when the report is clean, so {@code non-empty} is exactly the {@code "warning"} verdict
+   * (the informational {@code edge_crossing_count} never contributes). Consumers that read only the
+   * command envelope's {@code status}/{@code diagnostics} then see the verdict without descending
+   * into {@code data}.
+   */
+  public static List<Diagnostic> layoutQualityWarnings(LayoutQualityReport report) {
+    var diagnostics = new ArrayList<Diagnostic>();
+    addQualityWarning(diagnostics, "overlap_count", report.overlapCount());
+    addQualityWarning(
+        diagnostics, "connector_through_node_count", report.connectorThroughNodeCount());
+    addQualityWarning(diagnostics, "invalid_route_count", report.invalidRouteCount());
+    addQualityWarning(diagnostics, "route_detour_count", report.routeDetourCount());
+    addQualityWarning(diagnostics, "route_close_parallel_count", report.routeCloseParallelCount());
+    addQualityWarning(diagnostics, "group_boundary_issue_count", report.groupBoundaryIssueCount());
+    addQualityWarning(
+        diagnostics, "group_label_band_issue_count", report.groupLabelBandIssueCount());
+    addQualityWarning(diagnostics, "label_space_issue_count", report.labelSpaceIssueCount());
+    addQualityWarning(diagnostics, "warning_count", report.warningCount());
+    return List.copyOf(diagnostics);
+  }
+
+  private static void addQualityWarning(List<Diagnostic> diagnostics, String field, int count) {
+    if (count <= 0) {
+      return;
+    }
+    diagnostics.add(
+        new Diagnostic(
+            DiagnosticCode.LAYOUT_QUALITY_WARNING.code(),
+            DiagnosticSeverity.WARNING,
+            "layout quality metric '" + field + "' is " + count,
+            "$.data." + field));
+  }
+
   public static List<Diagnostic> validateLayoutDiagnostics(LayoutResult result) {
     var diagnostics = new ArrayList<Diagnostic>();
     for (int edgeIndex = 0; edgeIndex < result.edges().size(); edgeIndex++) {

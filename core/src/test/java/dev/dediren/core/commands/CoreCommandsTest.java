@@ -2,6 +2,8 @@ package dev.dediren.core.commands;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dev.dediren.contracts.Diagnostic;
+import dev.dediren.contracts.EnvelopeStatus;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.core.plugins.PluginRegistry;
 import dev.dediren.core.plugins.PluginRunOutcome;
@@ -44,6 +46,57 @@ class CoreCommandsTest {
 
     assertThat(outcome.exitCode()).isEqualTo(2);
     assertThat(outcome.stdout()).contains("DEDIREN_DANGLING_ENDPOINT");
+  }
+
+  @Test
+  void validateLayoutCommandSurfacesQualityWarningAtEnvelopeLevel() throws Exception {
+    String layout =
+        """
+                {
+                  "layout_result_schema_version": "layout-result.schema.v1",
+                  "view_id": "main",
+                  "nodes": [
+                    { "id": "a", "source_id": "a", "projection_id": "a", "x": 0.0, "y": 0.0, "width": 100.0, "height": 80.0, "label": "A" },
+                    { "id": "b", "source_id": "b", "projection_id": "b", "x": 50.0, "y": 20.0, "width": 100.0, "height": 80.0, "label": "B" }
+                  ],
+                  "edges": [],
+                  "groups": [],
+                  "warnings": []
+                }
+                """;
+
+    var result = CoreCommands.validateLayoutCommand(layout);
+
+    assertThat(result.exitCode()).isZero();
+    assertThat(result.envelope().status()).isEqualTo(EnvelopeStatus.WARNING);
+    assertThat(result.envelope().diagnostics())
+        .extracting(Diagnostic::code)
+        .containsOnly("DEDIREN_LAYOUT_QUALITY_WARNING");
+    assertThat(result.envelope().data().at("/status").asText()).isEqualTo("warning");
+    assertThat(result.envelope().data().at("/overlap_count").asInt()).isEqualTo(1);
+  }
+
+  @Test
+  void validateLayoutCommandKeepsOkEnvelopeForCleanLayout() throws Exception {
+    String layout =
+        """
+                {
+                  "layout_result_schema_version": "layout-result.schema.v1",
+                  "view_id": "main",
+                  "nodes": [
+                    { "id": "a", "source_id": "a", "projection_id": "a", "x": 0.0, "y": 0.0, "width": 100.0, "height": 80.0, "label": "A" }
+                  ],
+                  "edges": [],
+                  "groups": [],
+                  "warnings": []
+                }
+                """;
+
+    var result = CoreCommands.validateLayoutCommand(layout);
+
+    assertThat(result.exitCode()).isZero();
+    assertThat(result.envelope().status()).isEqualTo(EnvelopeStatus.OK);
+    assertThat(result.envelope().diagnostics()).isEmpty();
   }
 
   @Test
