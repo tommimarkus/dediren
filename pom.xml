@@ -37,9 +37,7 @@
     <commons-io.version>2.22.0</commons-io.version>
     <eclipse-elk.version>0.11.0</eclipse-elk.version>
     <guava.version>33.6.0-jre</guava.version>
-    <jackson.version>2.22.0</jackson.version>
-    <jackson-annotations.version>2.22</jackson-annotations.version>
-    <jackson3.version>3.1.4</jackson3.version>
+    <jackson.version>3.1.4</jackson.version>
     <json-schema-validator.version>3.0.5</json-schema-validator.version>
     <junit.version>6.1.1</junit.version>
     <picocli.version>4.7.7</picocli.version>
@@ -63,46 +61,30 @@
   <dependencyManagement>
     <dependencies>
       <dependency>
-        <groupId>com.fasterxml.jackson.core</groupId>
-        <artifactId>jackson-databind</artifactId>
-        <version>${jackson.version}</version>
-      </dependency>
-      <!-- Converge jackson-annotations to one version across the reactor
-           (enforcer dependencyConvergence, §2). The Jackson 2 databind
-           (2.22.0) pulls annotations 2.22, while the Jackson 3 stack reached
-           transitively via json-schema-validator resolves annotations 2.21.
-           Pin the newer 2.x so both stacks share one version. -->
-      <dependency>
-        <groupId>com.fasterxml.jackson.core</groupId>
-        <artifactId>jackson-annotations</artifactId>
-        <version>${jackson-annotations.version}</version>
-      </dependency>
-      <dependency>
         <groupId>com.networknt</groupId>
         <artifactId>json-schema-validator</artifactId>
         <version>${json-schema-validator.version}</version>
       </dependency>
-      <!-- Force the patched Jackson 3 stack across the reactor.
-           json-schema-validator 3.0.5 (the latest release) pulls Jackson 3
-           jackson-databind 3.1.1 transitively, which is affected by
-           GHSA-j3rv-43j4-c7qm and GHSA-rmj7-2vxq-3g9f (both High); 3.1.4 fixes
-           them. Pin databind, core, and the yaml dataformat together so the
-           Jackson 3 line stays consistent. Distinct from the Jackson 2
-           (com.fasterxml.jackson.core) stack used elsewhere. -->
+      <!-- Jackson 3 (tools.jackson) is the project's sole Jackson stack. Pin
+           databind, core, and the yaml dataformat to one patched line.
+           json-schema-validator 3.0.5 (the latest release) pulls jackson-databind
+           3.1.1 transitively, which is affected by GHSA-j3rv-43j4-c7qm and
+           GHSA-rmj7-2vxq-3g9f (both High); 3.1.4 fixes them and is also the
+           version this project's own code compiles against. -->
       <dependency>
         <groupId>tools.jackson.core</groupId>
         <artifactId>jackson-databind</artifactId>
-        <version>${jackson3.version}</version>
+        <version>${jackson.version}</version>
       </dependency>
       <dependency>
         <groupId>tools.jackson.core</groupId>
         <artifactId>jackson-core</artifactId>
-        <version>${jackson3.version}</version>
+        <version>${jackson.version}</version>
       </dependency>
       <dependency>
         <groupId>tools.jackson.dataformat</groupId>
         <artifactId>jackson-dataformat-yaml</artifactId>
-        <version>${jackson3.version}</version>
+        <version>${jackson.version}</version>
       </dependency>
       <dependency>
         <groupId>info.picocli</groupId>

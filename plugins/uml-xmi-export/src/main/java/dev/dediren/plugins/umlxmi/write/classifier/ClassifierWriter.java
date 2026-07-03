@@ -2,10 +2,10 @@ package dev.dediren.plugins.umlxmi.write.classifier;
 
 import static dev.dediren.plugins.umlxmi.build.XmiHelpers.*;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import dev.dediren.contracts.source.SourceNode;
 import dev.dediren.plugins.umlxmi.build.IdentifierMap;
 import java.util.*;
+import tools.jackson.databind.JsonNode;
 
 public final class ClassifierWriter {
 

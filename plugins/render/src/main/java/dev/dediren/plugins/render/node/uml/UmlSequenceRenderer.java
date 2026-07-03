@@ -1,6 +1,5 @@
 package dev.dediren.plugins.render.node.uml;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import dev.dediren.contracts.layout.LaidOutEdge;
 import dev.dediren.contracts.layout.LaidOutNode;
 import dev.dediren.contracts.layout.LayoutResult;
@@ -24,6 +23,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import tools.jackson.databind.JsonNode;
 
 public final class UmlSequenceRenderer {
   private static final String DASH_PATTERN = "8 5";

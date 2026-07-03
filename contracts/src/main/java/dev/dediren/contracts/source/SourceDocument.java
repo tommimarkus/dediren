@@ -3,9 +3,9 @@ package dev.dediren.contracts.source;
 import static dev.dediren.contracts.util.ContractCollections.listOrEmpty;
 import static dev.dediren.contracts.util.ContractCollections.mapOrEmpty;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import java.util.List;
 import java.util.Map;
+import tools.jackson.databind.JsonNode;
 
 public record SourceDocument(
     String modelSchemaVersion,

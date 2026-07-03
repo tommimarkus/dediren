@@ -6,7 +6,6 @@ import static dev.dediren.plugins.render.svg.Svg.attr;
 import static dev.dediren.plugins.render.svg.Svg.styleNumber;
 import static dev.dediren.plugins.render.svg.Svg.text;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import dev.dediren.contracts.layout.LaidOutNode;
 import dev.dediren.contracts.render.RenderMetadataSelector;
 import dev.dediren.contracts.render.SvgNodeDecorator;
@@ -14,6 +13,7 @@ import dev.dediren.plugins.render.style.ResolvedNodeStyle;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import tools.jackson.databind.JsonNode;
 
 public final class UmlDecorators {
 

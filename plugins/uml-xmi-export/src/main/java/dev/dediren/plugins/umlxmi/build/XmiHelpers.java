@@ -1,6 +1,5 @@
 package dev.dediren.plugins.umlxmi.build;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import dev.dediren.contracts.export.ExportRequest;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.contracts.layout.LaidOutGroup;
@@ -10,6 +9,7 @@ import dev.dediren.contracts.source.SourceRelationship;
 import java.math.BigInteger;
 import java.util.List;
 import java.util.Map;
+import tools.jackson.databind.JsonNode;
 
 public final class XmiHelpers {
 

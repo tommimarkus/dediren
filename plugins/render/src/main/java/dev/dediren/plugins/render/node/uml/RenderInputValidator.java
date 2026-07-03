@@ -1,6 +1,5 @@
 package dev.dediren.plugins.render.node.uml;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import dev.dediren.archimate.Archimate;
 import dev.dediren.archimate.ArchimateTypeValidationException;
 import dev.dediren.contracts.layout.LaidOutEdge;
@@ -21,6 +20,7 @@ import dev.dediren.uml.UmlValidationException;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import tools.jackson.databind.JsonNode;
 
 public final class RenderInputValidator {
   private static final Set<String> UML_SEQUENCE_MESSAGE_SORTS =

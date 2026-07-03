@@ -4,7 +4,6 @@ import static dev.dediren.plugins.render.svg.SvgDocument.buildArtifacts;
 import static dev.dediren.plugins.render.svg.SvgDocument.interactiveMode;
 import static dev.dediren.plugins.render.svg.SvgDocument.renderSvg;
 
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import dev.dediren.archimate.ArchimateTypeValidationException;
 import dev.dediren.contracts.CommandEnvelope;
 import dev.dediren.contracts.ContractVersions;
@@ -26,6 +25,7 @@ import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import tools.jackson.databind.node.ObjectNode;
 
 public final class Main {
 

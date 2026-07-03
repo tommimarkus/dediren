@@ -1,6 +1,5 @@
 package dev.dediren.plugins.elklayout;
 
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import dev.dediren.contracts.ContractVersions;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.contracts.layout.LayoutRequest;
@@ -10,6 +9,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
+import tools.jackson.databind.node.ObjectNode;
 
 public final class Main {
   private Main() {}

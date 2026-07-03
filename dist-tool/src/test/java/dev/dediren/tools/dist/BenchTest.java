@@ -35,7 +35,7 @@ class BenchTest {
             java.util.List.of(
                 new Bench.Stat("cli --version", 3, 250L, 270L, 320L),
                 new Bench.Stat("elk-layout layout", 3, 1400L, 1500L, 1700L)));
-    com.fasterxml.jackson.databind.JsonNode node =
+    tools.jackson.databind.JsonNode node =
         dev.dediren.contracts.json.JsonSupport.objectMapper().readTree(json);
     assertThat(node.path("schema").asText()).isEqualTo("dediren-bench.v1");
     assertThat(node.path("results")).hasSize(2);

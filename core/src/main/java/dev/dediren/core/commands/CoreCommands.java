@@ -1,6 +1,5 @@
 package dev.dediren.core.commands;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import dev.dediren.contracts.CommandEnvelope;
 import dev.dediren.contracts.CommandExitCode;
 import dev.dediren.contracts.ContractVersions;
@@ -21,10 +20,10 @@ import dev.dediren.core.plugins.PluginRunner;
 import dev.dediren.core.quality.LayoutQuality;
 import dev.dediren.core.source.SourceValidator;
 import dev.dediren.core.source.ValidationResult;
-import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import tools.jackson.databind.JsonNode;
 
 public final class CoreCommands {
   private CoreCommands() {}
@@ -122,7 +121,7 @@ public final class CoreCommands {
           CommandExitCode.OK.code(),
           CommandEnvelope.ok(
               JsonSupport.objectMapper().valueToTree(LayoutQuality.validateLayout(result))));
-    } catch (RuntimeException | IOException error) {
+    } catch (RuntimeException error) {
       return commandInputValidationResult("validate-layout", error);
     }
   }
@@ -202,7 +201,7 @@ public final class CoreCommands {
       return new PluginRunOutcome(
           JsonSupport.objectMapper().writeValueAsString(CommandEnvelope.error(diagnostics)),
           CommandExitCode.INPUT_ERROR.code());
-    } catch (IOException error) {
+    } catch (RuntimeException error) {
       throw new IllegalStateException("error envelope should serialize", error);
     }
   }
@@ -211,7 +210,7 @@ public final class CoreCommands {
       throws PluginExecutionException {
     try {
       return JsonInput.parseCommandData(text, type);
-    } catch (RuntimeException | IOException error) {
+    } catch (RuntimeException error) {
       throw commandInputInvalid(command, error);
     }
   }
@@ -219,7 +218,7 @@ public final class CoreCommands {
   private static JsonNode parseJson(String command, String text) throws PluginExecutionException {
     try {
       return JsonSupport.objectMapper().readTree(text);
-    } catch (IOException error) {
+    } catch (RuntimeException error) {
       throw commandInputInvalid(command, error);
     }
   }
@@ -227,7 +226,7 @@ public final class CoreCommands {
   private static String toJson(String command, Object value) throws PluginExecutionException {
     try {
       return JsonSupport.objectMapper().writeValueAsString(value);
-    } catch (IOException error) {
+    } catch (RuntimeException error) {
       throw commandInputInvalid(command, error);
     }
   }

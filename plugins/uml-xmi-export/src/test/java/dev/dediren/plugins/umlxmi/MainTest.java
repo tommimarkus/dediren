@@ -3,8 +3,6 @@ package dev.dediren.plugins.umlxmi;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import dev.dediren.contracts.DiagnosticCode;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.plugins.umlxmi.schema.SchemaValidation;
@@ -18,6 +16,8 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.xml.sax.SAXParseException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.ObjectNode;
 
 class MainTest {
   @TempDir Path tempDir;
@@ -334,7 +334,7 @@ class MainTest {
         exportInput(
             fixtureJson("fixtures/source/valid-uml-sequence-fragments.json"),
             fixtureJson("fixtures/layout-result/uml-sequence-fragments.json"));
-    ((com.fasterxml.jackson.databind.node.ArrayNode) input.at("/source/relationships"))
+    ((tools.jackson.databind.node.ArrayNode) input.at("/source/relationships"))
         .add(
             JsonSupport.objectMapper()
                 .readTree(
@@ -354,7 +354,7 @@ class MainTest {
                   }
                 }
                 """));
-    ((com.fasterxml.jackson.databind.node.ArrayNode)
+    ((tools.jackson.databind.node.ArrayNode)
             input.at("/source/plugins/generic-graph/views/0/relationships"))
         .add("m-unlaid");
 
@@ -369,8 +369,7 @@ class MainTest {
         exportInput(
             fixtureJson("fixtures/source/valid-uml-sequence-fragments.json"),
             fixtureJson("fixtures/layout-result/uml-sequence-fragments.json"));
-    var relationships =
-        (com.fasterxml.jackson.databind.node.ArrayNode) input.at("/source/relationships");
+    var relationships = (tools.jackson.databind.node.ArrayNode) input.at("/source/relationships");
     for (int index = 4; index < relationships.size(); index++) {
       ObjectNode uml = (ObjectNode) relationships.get(index).get("properties").get("uml");
       uml.put("sequence", uml.get("sequence").intValue() + 1);
@@ -394,7 +393,7 @@ class MainTest {
                   }
                 }
                 """));
-    ((com.fasterxml.jackson.databind.node.ArrayNode) input.at("/layout_result/edges"))
+    ((tools.jackson.databind.node.ArrayNode) input.at("/layout_result/edges"))
         .add(
             JsonSupport.objectMapper()
                 .readTree(
@@ -428,8 +427,7 @@ class MainTest {
         exportInput(
             fixtureJson("fixtures/source/valid-uml-sequence-fragments.json"),
             fixtureJson("fixtures/layout-result/uml-sequence-fragments.json"));
-    ((com.fasterxml.jackson.databind.node.ArrayNode)
-            input.at("/source/nodes/7/properties/uml/fragments"))
+    ((tools.jackson.databind.node.ArrayNode) input.at("/source/nodes/7/properties/uml/fragments"))
         .add("cf-coupon");
 
     String xml = exportXml(input);
@@ -480,7 +478,7 @@ class MainTest {
   @Test
   void rejectsSelectedSequenceDeleteMessageToDestructionOccurrence() throws Exception {
     JsonNode input = exportSequenceInput();
-    ((com.fasterxml.jackson.databind.node.ArrayNode) input.at("/source/nodes"))
+    ((tools.jackson.databind.node.ArrayNode) input.at("/source/nodes"))
         .add(
             JsonSupport.objectMapper()
                 .readTree(
@@ -496,7 +494,7 @@ class MainTest {
                   }
                 }
                 """));
-    ((com.fasterxml.jackson.databind.node.ArrayNode) input.at("/source/relationships"))
+    ((tools.jackson.databind.node.ArrayNode) input.at("/source/relationships"))
         .add(
             JsonSupport.objectMapper()
                 .readTree(
@@ -587,7 +585,7 @@ class MainTest {
   @Test
   void rejectsSelectedUnsupportedSequenceNode() throws Exception {
     JsonNode input = exportSequenceInput();
-    ((com.fasterxml.jackson.databind.node.ArrayNode) input.at("/source/nodes"))
+    ((tools.jackson.databind.node.ArrayNode) input.at("/source/nodes"))
         .add(
             JsonSupport.objectMapper()
                 .readTree(
@@ -699,7 +697,7 @@ class MainTest {
   void deduplicatesCollidingGeneratedIds() throws Exception {
     JsonNode input = exportInput();
     ((ObjectNode) input.get("policy")).put("model_identifier", "id-class-order");
-    ((com.fasterxml.jackson.databind.node.ArrayNode) input.at("/source/nodes"))
+    ((tools.jackson.databind.node.ArrayNode) input.at("/source/nodes"))
         .add(
             JsonSupport.objectMapper()
                 .readTree(
@@ -718,7 +716,7 @@ class MainTest {
                   }
                 }
                 """));
-    ((com.fasterxml.jackson.databind.node.ArrayNode) input.at("/layout_result/nodes"))
+    ((tools.jackson.databind.node.ArrayNode) input.at("/layout_result/nodes"))
         .add(
             JsonSupport.objectMapper()
                 .readTree(

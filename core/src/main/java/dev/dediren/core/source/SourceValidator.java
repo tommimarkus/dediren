@@ -1,8 +1,5 @@
 package dev.dediren.core.source;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import dev.dediren.contracts.CommandEnvelope;
 import dev.dediren.contracts.CommandExitCode;
 import dev.dediren.contracts.Diagnostic;
@@ -22,6 +19,10 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.ArrayNode;
+import tools.jackson.databind.node.ObjectNode;
 
 public final class SourceValidator {
   private SourceValidator() {}
@@ -112,7 +113,7 @@ public final class SourceValidator {
     JsonNode value;
     try {
       value = JsonSupport.objectMapper().readTree(text);
-    } catch (IOException error) {
+    } catch (JacksonException error) {
       throw new SourceDiagnosticsException(List.of(schemaError(error.getMessage())));
     }
     var errors =
@@ -123,7 +124,7 @@ public final class SourceValidator {
     }
     try {
       return JsonSupport.objectMapper().treeToValue(value, SourceDocument.class);
-    } catch (IOException error) {
+    } catch (JacksonException error) {
       throw new SourceDiagnosticsException(List.of(schemaError(error.getMessage())));
     }
   }
@@ -219,7 +220,7 @@ public final class SourceValidator {
       throws SourceDiagnosticsException {
     if (target.isObject() && source.isObject()) {
       ObjectNode merged = ((ObjectNode) target.deepCopy());
-      var fields = source.fields();
+      var fields = source.properties().iterator();
       while (fields.hasNext()) {
         var field = fields.next();
         JsonNode existing = merged.get(field.getKey());

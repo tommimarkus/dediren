@@ -1,6 +1,5 @@
 package dev.dediren.plugins.render.node.uml;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import dev.dediren.contracts.layout.LaidOutEdge;
 import dev.dediren.contracts.layout.LaidOutNode;
 import dev.dediren.contracts.layout.LayoutResult;
@@ -10,6 +9,7 @@ import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import tools.jackson.databind.JsonNode;
 
 record UmlSequenceModel(
     List<UmlSequenceModel.SequenceNode> interactions,

@@ -2,9 +2,6 @@ package dev.dediren.uml;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.NullNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.contracts.source.GenericGraphPluginData;
 import dev.dediren.contracts.source.SourceDocument;
@@ -14,6 +11,9 @@ import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import tools.jackson.databind.node.ArrayNode;
+import tools.jackson.databind.node.NullNode;
+import tools.jackson.databind.node.ObjectNode;
 
 class UmlValidationTest {
   @Test
@@ -1551,7 +1551,7 @@ class UmlValidationTest {
   private static ObjectNode jsonObject(String content) {
     try {
       return (ObjectNode) JsonSupport.objectMapper().readTree(content);
-    } catch (java.io.IOException error) {
+    } catch (RuntimeException error) {
       throw new IllegalArgumentException(error);
     }
   }

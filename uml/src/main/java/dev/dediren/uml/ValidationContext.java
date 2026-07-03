@@ -1,7 +1,7 @@
 package dev.dediren.uml;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import java.util.Map;
+import tools.jackson.databind.JsonNode;
 
 record ValidationContext(
     Map<String, String> nodeTypes,

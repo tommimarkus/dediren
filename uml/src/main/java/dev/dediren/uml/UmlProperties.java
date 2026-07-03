@@ -1,10 +1,10 @@
 package dev.dediren.uml;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import java.math.BigInteger;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import tools.jackson.databind.JsonNode;
 
 /**
  * Generic JSON property-reader helpers shared by the UML validation surface. Behavior is

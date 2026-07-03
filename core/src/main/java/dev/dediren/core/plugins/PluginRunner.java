@@ -1,6 +1,5 @@
 package dev.dediren.core.plugins;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import dev.dediren.contracts.CommandExitCode;
 import dev.dediren.contracts.DiagnosticCode;
 import dev.dediren.contracts.EnvelopeStatus;
@@ -17,6 +16,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
 
 public final class PluginRunner {
   private PluginRunner() {}
@@ -156,7 +157,7 @@ public final class PluginRunner {
     JsonNode value;
     try {
       value = JsonSupport.objectMapper().readTree(output.stdout());
-    } catch (IOException error) {
+    } catch (JacksonException error) {
       throw PluginExecutionException.plugin(
           DiagnosticCode.PLUGIN_CAPABILITY_INVALID_JSON.code(),
           pluginId,
@@ -174,7 +175,7 @@ public final class PluginRunner {
     }
     try {
       return JsonSupport.objectMapper().treeToValue(value, RuntimeCapabilities.class);
-    } catch (IOException error) {
+    } catch (JacksonException error) {
       throw PluginExecutionException.plugin(
           DiagnosticCode.PLUGIN_CAPABILITY_SCHEMA_INVALID.code(), pluginId, error.getMessage());
     }
@@ -209,7 +210,7 @@ public final class PluginRunner {
     JsonNode value;
     try {
       value = JsonSupport.objectMapper().readTree(stdout);
-    } catch (IOException error) {
+    } catch (JacksonException error) {
       throw PluginExecutionException.plugin(
           DiagnosticCode.PLUGIN_OUTPUT_INVALID_JSON.code(),
           pluginId,

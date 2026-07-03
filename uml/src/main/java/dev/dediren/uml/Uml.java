@@ -8,7 +8,6 @@ import static dev.dediren.uml.UmlProperties.requireNodeType;
 import static dev.dediren.uml.UmlProperties.requiredTextArrayEntry;
 import static dev.dediren.uml.UmlProperties.requiredTextProperty;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import dev.dediren.contracts.source.GenericGraphPluginData;
 import dev.dediren.contracts.source.GenericGraphView;
 import dev.dediren.contracts.source.GenericGraphViewKind;
@@ -19,6 +18,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import tools.jackson.databind.JsonNode;
 
 public final class Uml {
   private static final List<String> STRUCTURAL_TYPES =

@@ -14,7 +14,6 @@ import static dev.dediren.plugins.umlxmi.schema.SchemaValidation.validateXmiToAv
 import static dev.dediren.plugins.umlxmi.write.interaction.InteractionWriter.validateExportableSequenceScope;
 import static dev.dediren.plugins.umlxmi.write.interaction.InteractionWriter.validateSelectedCombinedFragmentOperators;
 
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import dev.dediren.contracts.CommandEnvelope;
 import dev.dediren.contracts.ContractVersions;
 import dev.dediren.contracts.Diagnostic;
@@ -36,6 +35,7 @@ import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import tools.jackson.databind.node.ObjectNode;
 
 public final class Main {
 

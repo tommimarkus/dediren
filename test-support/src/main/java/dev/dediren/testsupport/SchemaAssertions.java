@@ -2,8 +2,6 @@ package dev.dediren.testsupport;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.networknt.schema.Error;
 import com.networknt.schema.InputFormat;
 import com.networknt.schema.Schema;
@@ -14,6 +12,8 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 public final class SchemaAssertions {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
@@ -36,7 +36,7 @@ public final class SchemaAssertions {
     try {
       JsonNode document = OBJECT_MAPPER.readTree(repositoryRoot.resolve(fixturePath).toFile());
       return validate(repositoryRoot, schemaPath, document);
-    } catch (IOException | RuntimeException error) {
+    } catch (RuntimeException error) {
       return List.of(error.getMessage());
     }
   }

@@ -187,12 +187,12 @@ class SchemaValidatorTest {
         .describedAs("policy omitted")
         .isNotEmpty();
 
-    List<com.fasterxml.jackson.databind.JsonNode> nonObjectPolicies =
+    List<tools.jackson.databind.JsonNode> nonObjectPolicies =
         List.of(
             mapper.getNodeFactory().textNode("not-an-object"),
             mapper.createArrayNode(),
             mapper.getNodeFactory().nullNode());
-    for (com.fasterxml.jackson.databind.JsonNode badPolicy : nonObjectPolicies) {
+    for (tools.jackson.databind.JsonNode badPolicy : nonObjectPolicies) {
       assertThat(
               SchemaAssertions.validate(
                   workspaceRoot(), "schemas/export-request.schema.json", exportRequest(badPolicy)))
@@ -201,8 +201,8 @@ class SchemaValidatorTest {
     }
   }
 
-  private static com.fasterxml.jackson.databind.JsonNode exportRequest(
-      com.fasterxml.jackson.databind.JsonNode policy) {
+  private static tools.jackson.databind.JsonNode exportRequest(
+      tools.jackson.databind.JsonNode policy) {
     var mapper = dev.dediren.contracts.json.JsonSupport.objectMapper();
     var request = mapper.createObjectNode();
     request.put("export_request_schema_version", "export-request.schema.v1");
@@ -214,18 +214,18 @@ class SchemaValidatorTest {
     return request;
   }
 
-  private static com.fasterxml.jackson.databind.JsonNode thirdPartyPolicy() {
+  private static tools.jackson.databind.JsonNode thirdPartyPolicy() {
     var policy = dev.dediren.contracts.json.JsonSupport.objectMapper().createObjectNode();
     policy.put("ticket_stats_policy", "v1");
     return policy;
   }
 
-  private static com.fasterxml.jackson.databind.JsonNode readJson(String path) throws Exception {
+  private static tools.jackson.databind.JsonNode readJson(String path) throws Exception {
     return dev.dediren.contracts.json.JsonSupport.objectMapper()
         .readTree(java.nio.file.Files.readString(workspaceRoot().resolve(path)));
   }
 
-  private static com.fasterxml.jackson.databind.JsonNode exportResult(String artifactKind) {
+  private static tools.jackson.databind.JsonNode exportResult(String artifactKind) {
     var document = dev.dediren.contracts.json.JsonSupport.objectMapper().createObjectNode();
     document.put("export_result_schema_version", "export-result.schema.v1");
     document.put("artifact_kind", artifactKind);

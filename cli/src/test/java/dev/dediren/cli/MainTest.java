@@ -2,7 +2,6 @@ package dev.dediren.cli;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import dev.dediren.contracts.json.JsonSupport;
 import java.io.File;
 import java.io.StringReader;
@@ -20,6 +19,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.xml.sax.InputSource;
+import tools.jackson.databind.JsonNode;
 
 class MainTest {
   @TempDir Path temp;

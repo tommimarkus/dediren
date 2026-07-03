@@ -1,6 +1,5 @@
 package dev.dediren.core.schema;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.networknt.schema.Error;
 import com.networknt.schema.InputFormat;
 import com.networknt.schema.Schema;
@@ -12,6 +11,7 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import tools.jackson.databind.JsonNode;
 
 public final class SchemaValidator {
   private final Path repositoryRoot;
@@ -40,7 +40,7 @@ public final class SchemaValidator {
       JsonNode document =
           JsonSupport.objectMapper().readTree(repositoryRoot.resolve(fixturePath).toFile());
       return validate(schemaPath, document);
-    } catch (IOException | RuntimeException error) {
+    } catch (RuntimeException error) {
       return List.of(error.getMessage());
     }
   }

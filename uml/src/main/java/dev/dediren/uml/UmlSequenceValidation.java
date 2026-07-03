@@ -11,7 +11,6 @@ import static dev.dediren.uml.UmlProperties.requiredTextArrayEntry;
 import static dev.dediren.uml.UmlProperties.requiredTextProperty;
 import static dev.dediren.uml.UmlProperties.textValueSet;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import dev.dediren.contracts.source.SourceNode;
 import dev.dediren.contracts.source.SourceRelationship;
 import java.math.BigInteger;
@@ -19,6 +18,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import tools.jackson.databind.JsonNode;
 
 /**
  * UML interaction/sequence validation: combined fragments, interaction operands, message

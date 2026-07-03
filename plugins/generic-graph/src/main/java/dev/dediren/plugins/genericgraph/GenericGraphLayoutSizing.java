@@ -1,12 +1,12 @@
 package dev.dediren.plugins.genericgraph;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import dev.dediren.archimate.Archimate;
 import dev.dediren.contracts.source.SourceNode;
 import dev.dediren.uml.Uml;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import tools.jackson.databind.JsonNode;
 
 final class GenericGraphLayoutSizing {
   private static final double UML_STRUCTURAL_MIN_WIDTH = 220.0;

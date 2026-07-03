@@ -2,12 +2,12 @@ package dev.dediren.plugins.genericgraph;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.testsupport.SchemaAssertions;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.JsonNode;
 
 class GenericGraphPluginTest {
   @Test
@@ -371,7 +371,7 @@ class GenericGraphPluginTest {
   void rejectsInvalidUmlRelationshipEndpoint() throws Exception {
     JsonNode source =
         JsonSupport.objectMapper().readTree(fixture("fixtures/source/valid-uml-basic.json"));
-    ((com.fasterxml.jackson.databind.node.ObjectNode) source.at("/relationships/2"))
+    ((tools.jackson.databind.node.ObjectNode) source.at("/relationships/2"))
         .put("type", "Composition");
 
     PluginResult result =
@@ -949,12 +949,12 @@ class GenericGraphPluginTest {
   @Test
   void projectsArchimateRenderMetadataWithoutOefExportPlugin() throws Exception {
     JsonNode source = archimateSource();
-    ((com.fasterxml.jackson.databind.node.ObjectNode) source)
+    ((tools.jackson.databind.node.ObjectNode) source)
         .putArray("required_plugins")
         .addObject()
         .put("id", "generic-graph")
         .put("version", "2026.07.0");
-    ((com.fasterxml.jackson.databind.node.ObjectNode) source.at("/plugins/generic-graph"))
+    ((tools.jackson.databind.node.ObjectNode) source.at("/plugins/generic-graph"))
         .put("semantic_profile", "archimate");
 
     PluginResult result =
@@ -1317,8 +1317,7 @@ class GenericGraphPluginTest {
   @Test
   void rejectsUnknownArchimateNodeTypeForRenderMetadata() throws Exception {
     JsonNode source = archimateSource();
-    ((com.fasterxml.jackson.databind.node.ObjectNode) source.at("/nodes/0"))
-        .put("type", "TechnologyNode");
+    ((tools.jackson.databind.node.ObjectNode) source.at("/nodes/0")).put("type", "TechnologyNode");
 
     PluginResult result =
         Main.executeForTesting(
@@ -1333,7 +1332,7 @@ class GenericGraphPluginTest {
   @Test
   void rejectsUnknownArchimateRelationshipTypeForRenderMetadata() throws Exception {
     JsonNode source = archimateSource();
-    ((com.fasterxml.jackson.databind.node.ObjectNode) source.at("/relationships/0"))
+    ((tools.jackson.databind.node.ObjectNode) source.at("/relationships/0"))
         .put("type", "ConnectsTo");
 
     PluginResult result =
@@ -1349,11 +1348,11 @@ class GenericGraphPluginTest {
   @Test
   void rejectsInvalidArchimateRelationshipEndpointForRenderMetadata() throws Exception {
     JsonNode source = archimateSource();
-    ((com.fasterxml.jackson.databind.node.ObjectNode) source.at("/nodes/0"))
+    ((tools.jackson.databind.node.ObjectNode) source.at("/nodes/0"))
         .put("type", "ApplicationService");
-    ((com.fasterxml.jackson.databind.node.ObjectNode) source.at("/nodes/1"))
+    ((tools.jackson.databind.node.ObjectNode) source.at("/nodes/1"))
         .put("type", "ApplicationComponent");
-    ((com.fasterxml.jackson.databind.node.ObjectNode) source.at("/relationships/0"))
+    ((tools.jackson.databind.node.ObjectNode) source.at("/relationships/0"))
         .put("type", "Realization");
 
     PluginResult result =
@@ -1370,11 +1369,11 @@ class GenericGraphPluginTest {
   @Test
   void rejectsInvalidArchimateRelationshipEndpointForSemanticValidation() throws Exception {
     JsonNode source = archimateSource();
-    ((com.fasterxml.jackson.databind.node.ObjectNode) source.at("/nodes/0"))
+    ((tools.jackson.databind.node.ObjectNode) source.at("/nodes/0"))
         .put("type", "ApplicationService");
-    ((com.fasterxml.jackson.databind.node.ObjectNode) source.at("/nodes/1"))
+    ((tools.jackson.databind.node.ObjectNode) source.at("/nodes/1"))
         .put("type", "ApplicationComponent");
-    ((com.fasterxml.jackson.databind.node.ObjectNode) source.at("/relationships/0"))
+    ((tools.jackson.databind.node.ObjectNode) source.at("/relationships/0"))
         .put("type", "Realization");
 
     PluginResult result =
@@ -1391,8 +1390,7 @@ class GenericGraphPluginTest {
   @Test
   void rejectsArchimateJunctionAsSourceNodeForSemanticValidation() throws Exception {
     JsonNode source = archimateSource();
-    ((com.fasterxml.jackson.databind.node.ObjectNode) source.at("/nodes/0"))
-        .put("type", "Junction");
+    ((tools.jackson.databind.node.ObjectNode) source.at("/nodes/0")).put("type", "Junction");
 
     PluginResult result =
         Main.executeForTesting(
@@ -1460,7 +1458,7 @@ class GenericGraphPluginTest {
 
   private static java.util.List<String> jsonFieldNames(JsonNode value) {
     var names = new java.util.ArrayList<String>();
-    value.fieldNames().forEachRemaining(names::add);
+    value.propertyNames().forEach(names::add);
     return names;
   }
 
@@ -1472,9 +1470,7 @@ class GenericGraphPluginTest {
     JsonNode source =
         JsonSupport.objectMapper()
             .readTree(fixture("fixtures/source/valid-uml-sequence-fragments.json"));
-    var view =
-        (com.fasterxml.jackson.databind.node.ObjectNode)
-            source.at("/plugins/generic-graph/views/0");
+    var view = (tools.jackson.databind.node.ObjectNode) source.at("/plugins/generic-graph/views/0");
     var groups = view.putArray("groups");
 
     var availabilityBand = groups.addObject();
@@ -1502,10 +1498,9 @@ class GenericGraphPluginTest {
     JsonNode source =
         JsonSupport.objectMapper()
             .readTree(fixture("fixtures/source/valid-uml-sequence-basic.json"));
-    var nodes = (com.fasterxml.jackson.databind.node.ArrayNode) source.get("nodes");
+    var nodes = (tools.jackson.databind.node.ArrayNode) source.get("nodes");
     var viewNodes =
-        (com.fasterxml.jackson.databind.node.ArrayNode)
-            source.at("/plugins/generic-graph/views/0/nodes");
+        (tools.jackson.databind.node.ArrayNode) source.at("/plugins/generic-graph/views/0/nodes");
 
     addSequenceNode(nodes, viewNodes, "service-execution", "ExecutionSpecification", "");
     addSequenceNode(nodes, viewNodes, "entry-gate", "Gate", "Entry");
@@ -1519,13 +1514,13 @@ class GenericGraphPluginTest {
     JsonNode source =
         JsonSupport.objectMapper()
             .readTree(fixture("fixtures/source/valid-uml-sequence-basic.json"));
-    var relationships = (com.fasterxml.jackson.databind.node.ArrayNode) source.get("relationships");
+    var relationships = (tools.jackson.databind.node.ArrayNode) source.get("relationships");
     JsonNode m1 = relationships.get(0).deepCopy();
     JsonNode m2 = relationships.get(1).deepCopy();
     JsonNode m3 = relationships.get(2).deepCopy();
 
-    ((com.fasterxml.jackson.databind.node.ObjectNode) m1.at("/properties/uml")).put("sequence", 2);
-    ((com.fasterxml.jackson.databind.node.ObjectNode) m2.at("/properties/uml")).put("sequence", 1);
+    ((tools.jackson.databind.node.ObjectNode) m1.at("/properties/uml")).put("sequence", 2);
+    ((tools.jackson.databind.node.ObjectNode) m2.at("/properties/uml")).put("sequence", 1);
     relationships.removeAll();
     relationships.add(m3);
     relationships.add(m2);
@@ -1538,19 +1533,19 @@ class GenericGraphPluginTest {
     JsonNode source =
         JsonSupport.objectMapper()
             .readTree(fixture("fixtures/source/valid-uml-sequence-basic.json"));
-    var relationships = (com.fasterxml.jackson.databind.node.ArrayNode) source.get("relationships");
+    var relationships = (tools.jackson.databind.node.ArrayNode) source.get("relationships");
     JsonNode m1 = relationships.get(0).deepCopy();
     JsonNode m2 = relationships.get(1).deepCopy();
     JsonNode m3 = relationships.get(2).deepCopy();
 
-    ((com.fasterxml.jackson.databind.node.ObjectNode) m1.at("/properties/uml"))
+    ((tools.jackson.databind.node.ObjectNode) m1.at("/properties/uml"))
         .set(
             "sequence",
             JsonSupport.objectMapper()
                 .getNodeFactory()
                 .numberNode(new java.math.BigInteger("9223372036854775808")));
-    ((com.fasterxml.jackson.databind.node.ObjectNode) m2.at("/properties/uml")).put("sequence", 2);
-    ((com.fasterxml.jackson.databind.node.ObjectNode) m3.at("/properties/uml")).put("sequence", 1);
+    ((tools.jackson.databind.node.ObjectNode) m2.at("/properties/uml")).put("sequence", 2);
+    ((tools.jackson.databind.node.ObjectNode) m3.at("/properties/uml")).put("sequence", 1);
     relationships.removeAll();
     relationships.add(m3);
     relationships.add(m2);
@@ -1560,8 +1555,8 @@ class GenericGraphPluginTest {
   }
 
   private static void addSequenceNode(
-      com.fasterxml.jackson.databind.node.ArrayNode nodes,
-      com.fasterxml.jackson.databind.node.ArrayNode viewNodes,
+      tools.jackson.databind.node.ArrayNode nodes,
+      tools.jackson.databind.node.ArrayNode viewNodes,
       String id,
       String type,
       String label) {

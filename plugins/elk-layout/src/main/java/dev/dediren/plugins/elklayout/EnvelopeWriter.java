@@ -1,6 +1,5 @@
 package dev.dediren.plugins.elklayout;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import dev.dediren.contracts.CommandEnvelope;
 import dev.dediren.contracts.Diagnostic;
 import dev.dediren.contracts.DiagnosticSeverity;
@@ -11,11 +10,11 @@ import java.util.List;
 final class EnvelopeWriter {
   private EnvelopeWriter() {}
 
-  static String ok(LayoutResult result) throws JsonProcessingException {
+  static String ok(LayoutResult result) {
     return JsonSupport.objectMapper().writeValueAsString(CommandEnvelope.ok(result));
   }
 
-  static String error(String code, String message) throws JsonProcessingException {
+  static String error(String code, String message) {
     Diagnostic diagnostic = new Diagnostic(code, DiagnosticSeverity.ERROR, message, null);
     return JsonSupport.objectMapper()
         .writeValueAsString(CommandEnvelope.error(List.of(diagnostic)));

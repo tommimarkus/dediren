@@ -1,6 +1,5 @@
 package dev.dediren.plugins.genericgraph;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import dev.dediren.archimate.Archimate;
 import dev.dediren.contracts.ContractVersions;
 import dev.dediren.contracts.layout.GroupProvenance;
@@ -27,6 +26,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import tools.jackson.databind.JsonNode;
 
 final class GenericGraphProjection {
   private GenericGraphProjection() {}

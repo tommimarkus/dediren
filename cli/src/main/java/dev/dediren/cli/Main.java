@@ -1,6 +1,5 @@
 package dev.dediren.cli;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import dev.dediren.contracts.CommandEnvelope;
 import dev.dediren.contracts.CommandExitCode;
 import dev.dediren.contracts.Diagnostic;
@@ -28,6 +27,7 @@ import picocli.CommandLine.Command;
 import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Spec;
+import tools.jackson.databind.JsonNode;
 
 @Command(
     name = "dediren",

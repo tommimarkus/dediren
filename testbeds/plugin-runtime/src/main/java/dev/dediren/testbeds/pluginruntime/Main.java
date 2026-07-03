@@ -1,6 +1,5 @@
 package dev.dediren.testbeds.pluginruntime;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import dev.dediren.contracts.CommandEnvelope;
 import dev.dediren.contracts.ContractVersions;
 import dev.dediren.contracts.Diagnostic;
@@ -14,6 +13,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
+import tools.jackson.databind.JsonNode;
 
 public final class Main {
   private Main() {}

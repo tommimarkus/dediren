@@ -2,8 +2,8 @@ package dev.dediren.testsupport;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Shared assertions for the plugin/CLI command-envelope contract. Lives in {@code test-support} so

@@ -1,6 +1,5 @@
 package dev.dediren.plugins.genericgraph;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import dev.dediren.archimate.Archimate;
 import dev.dediren.archimate.ArchimateJunctionValidationException;
 import dev.dediren.archimate.ArchimateTypeValidationException;
@@ -31,6 +30,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Objects;
+import tools.jackson.databind.JsonNode;
 
 public final class Main {
   private Main() {}

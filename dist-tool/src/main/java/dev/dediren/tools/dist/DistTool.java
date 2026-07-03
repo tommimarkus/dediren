@@ -1,7 +1,5 @@
 package dev.dediren.tools.dist;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import dev.dediren.contracts.json.JsonSupport;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -25,6 +23,8 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.ObjectNode;
 
 public final class DistTool {
   private static final String BUNDLE_METADATA_TARGET = "java";

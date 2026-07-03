@@ -2,9 +2,6 @@ package dev.dediren.plugins.render;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.testsupport.SchemaAssertions;
 import java.io.ByteArrayInputStream;
@@ -21,6 +18,9 @@ import org.junit.jupiter.api.Test;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.xml.sax.InputSource;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.ArrayNode;
+import tools.jackson.databind.node.ObjectNode;
 
 class MainTest {
   private static final String MINIMAL_LAYOUT =
@@ -1271,7 +1271,7 @@ class MainTest {
       ArrayNode nodes = JsonSupport.objectMapper().createArrayNode();
       ObjectNode metadataNodes = JsonSupport.objectMapper().createObjectNode();
       int index = 0;
-      for (var fields = nodeStyles.fields(); fields.hasNext(); ) {
+      for (var fields = nodeStyles.properties().iterator(); fields.hasNext(); ) {
         var field = fields.next();
         String nodeType = field.getKey();
         String id = "archimate-node-" + index;
@@ -1336,7 +1336,7 @@ class MainTest {
       Document document = svgDocument(content);
 
       index = 0;
-      for (var fields = nodeStyles.fields(); fields.hasNext(); ) {
+      for (var fields = nodeStyles.properties().iterator(); fields.hasNext(); ) {
         var field = fields.next();
         String id = "archimate-node-" + index;
         String decoratorKind = field.getValue().at("/decorator").asText(); // navigation only
@@ -1722,7 +1722,7 @@ class MainTest {
       ArrayNode nodes = JsonSupport.objectMapper().createArrayNode();
       ObjectNode metadataNodes = JsonSupport.objectMapper().createObjectNode();
       int index = 0;
-      for (var fields = nodeStyles.fields(); fields.hasNext(); ) {
+      for (var fields = nodeStyles.properties().iterator(); fields.hasNext(); ) {
         var field = fields.next();
         String nodeType = field.getKey();
         if (isSequenceNodeType(nodeType)) {
@@ -1774,7 +1774,7 @@ class MainTest {
       Document document = svgDocument(content);
 
       index = 0;
-      for (var fields = nodeStyles.fields(); fields.hasNext(); ) {
+      for (var fields = nodeStyles.properties().iterator(); fields.hasNext(); ) {
         var field = fields.next();
         String id = "uml-node-" + index;
         if (isSequenceNodeType(field.getKey())) {
@@ -3184,7 +3184,7 @@ class MainTest {
     ObjectNode metadata = (ObjectNode) object.at("/render_metadata");
     ObjectNode nodes = (ObjectNode) metadata.get("nodes");
     var entries = new java.util.ArrayList<Map.Entry<String, JsonNode>>();
-    nodes.fields().forEachRemaining(entries::add);
+    nodes.properties().iterator().forEachRemaining(entries::add);
     java.util.Collections.reverse(entries);
 
     ObjectNode reordered = JsonSupport.objectMapper().createObjectNode();
@@ -3298,7 +3298,7 @@ class MainTest {
     ArrayNode edges = JsonSupport.objectMapper().createArrayNode();
     ObjectNode metadataEdges = JsonSupport.objectMapper().createObjectNode();
     int index = 0;
-    for (var fields = edgeStyles.fields(); fields.hasNext(); ) {
+    for (var fields = edgeStyles.properties().iterator(); fields.hasNext(); ) {
       String relationshipType = fields.next().getKey();
       if (isSequenceRelationshipType(semanticProfile, relationshipType)) {
         continue;
@@ -3386,7 +3386,7 @@ class MainTest {
     Document document = svgDocument(content);
 
     index = 0;
-    for (var fields = edgeStyles.fields(); fields.hasNext(); ) {
+    for (var fields = edgeStyles.properties().iterator(); fields.hasNext(); ) {
       var field = fields.next();
       if (isSequenceRelationshipType(semanticProfile, field.getKey())) {
         continue;

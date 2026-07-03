@@ -5,7 +5,6 @@ import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.contracts.plugin.PluginManifest;
 import dev.dediren.core.DedirenPaths;
 import dev.dediren.core.schema.SchemaValidator;
-import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -14,6 +13,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import tools.jackson.core.JacksonException;
 
 public final class PluginRegistry {
   private final List<Path> manifestDirs;
@@ -118,7 +118,7 @@ public final class PluginRegistry {
               "manifest id '" + manifest.id() + "' did not match requested id");
         }
         return new LoadedPluginManifest(manifest, path, trustedDirs.contains(normalize(dir)));
-      } catch (IOException error) {
+      } catch (JacksonException error) {
         throw PluginExecutionException.plugin(
             DiagnosticCode.PLUGIN_MANIFEST_INVALID.code(),
             pluginId,

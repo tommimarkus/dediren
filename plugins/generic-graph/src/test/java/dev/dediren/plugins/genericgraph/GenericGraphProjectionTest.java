@@ -2,7 +2,6 @@ package dev.dediren.plugins.genericgraph;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.contracts.layout.LayoutRequest;
 import dev.dediren.contracts.render.RenderMetadata;
@@ -12,6 +11,7 @@ import dev.dediren.contracts.source.SourceDocument;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.JsonNode;
 
 class GenericGraphProjectionTest {
   @Test

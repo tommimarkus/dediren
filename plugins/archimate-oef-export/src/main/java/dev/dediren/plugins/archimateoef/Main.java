@@ -1,7 +1,5 @@
 package dev.dediren.plugins.archimateoef;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import dev.dediren.archimate.Archimate;
 import dev.dediren.archimate.ArchimateJunctionValidationException;
 import dev.dediren.archimate.ArchimateTypeValidationException;
@@ -38,6 +36,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.ObjectNode;
 
 public final class Main {
   private static final String OEF_NS = "http://www.opengroup.org/xsd/archimate/3.0/";

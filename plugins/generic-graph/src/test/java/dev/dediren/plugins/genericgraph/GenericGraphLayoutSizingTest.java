@@ -2,11 +2,11 @@ package dev.dediren.plugins.genericgraph;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.contracts.source.SourceNode;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.JsonNode;
 
 class GenericGraphLayoutSizingTest {
   @Test

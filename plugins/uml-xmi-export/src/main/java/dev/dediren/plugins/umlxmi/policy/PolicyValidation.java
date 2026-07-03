@@ -3,8 +3,8 @@ package dev.dediren.plugins.umlxmi.policy;
 import static dev.dediren.plugins.umlxmi.build.XmiHelpers.UML_VERSION;
 import static dev.dediren.plugins.umlxmi.build.XmiHelpers.XMI_VERSION;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import java.util.List;
+import tools.jackson.databind.JsonNode;
 
 public final class PolicyValidation {
 

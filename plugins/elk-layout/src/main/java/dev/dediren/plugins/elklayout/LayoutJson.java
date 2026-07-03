@@ -1,12 +1,12 @@
 package dev.dediren.plugins.elklayout;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.exc.MismatchedInputException;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.contracts.layout.LayoutRequest;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Set;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.exc.MismatchedInputException;
 
 final class LayoutJson {
   private LayoutJson() {}
