@@ -1747,11 +1747,13 @@ class MainTest {
 
       // Widest line clears the icon column (icon left edge = x + width - 28 = 202).
       double fontSize = Double.parseDouble(label.getAttribute("font-size"));
-      int widestChars = 0;
+      double widestHalf = 0.0;
       for (int i = 0; i < tspans.getLength(); i++) {
-        widestChars = Math.max(widestChars, tspans.item(i).getTextContent().length());
+        double lineWidth =
+            dev.dediren.plugins.render.svg.Svg.estimateTextWidth(
+                tspans.item(i).getTextContent(), fontSize);
+        widestHalf = Math.max(widestHalf, lineWidth / 2.0);
       }
-      double widestHalf = widestChars * fontSize * 0.62 / 2.0;
       assertThat(135.0 + widestHalf).isLessThanOrEqualTo(202.0);
     }
 
@@ -1835,11 +1837,11 @@ class MainTest {
         Element tspan = (Element) tspans.item(i);
         String content = tspan.getTextContent();
         // Each wrapped line pins its rendered width to the layout metric
-        // (chars x fontSize x 0.62) via textLength + lengthAdjust, so the displayed
-        // label size — and its clearance from the corner decorator — is independent
-        // of the viewer's installed font.
-        double metric = content.codePointCount(0, content.length()) * fontSize * 0.62;
-        assertThat(tspan.getAttribute("lengthAdjust")).isEqualTo("spacingAndGlyphs");
+        // (Svg.estimateTextWidth per-glyph advance table) via textLength +
+        // lengthAdjust, so the displayed label size — and its clearance from the
+        // corner decorator — is independent of the viewer's installed font.
+        double metric = dev.dediren.plugins.render.svg.Svg.estimateTextWidth(content, fontSize);
+        assertThat(tspan.getAttribute("lengthAdjust")).isEqualTo("spacing");
         assertThat(Double.parseDouble(tspan.getAttribute("textLength")))
             .isCloseTo(metric, org.assertj.core.data.Offset.offset(0.15));
       }
@@ -1870,10 +1872,64 @@ class MainTest {
       // Single-line labels emit no tspan; the metric pin lands on <text> itself.
       assertThat(label.getElementsByTagName("tspan").getLength()).isZero();
       double fontSize = Double.parseDouble(label.getAttribute("font-size"));
-      double metric = "Auth".codePointCount(0, "Auth".length()) * fontSize * 0.62;
-      assertThat(label.getAttribute("lengthAdjust")).isEqualTo("spacingAndGlyphs");
+      double metric = dev.dediren.plugins.render.svg.Svg.estimateTextWidth("Auth", fontSize);
+      assertThat(label.getAttribute("lengthAdjust")).isEqualTo("spacing");
       assertThat(Double.parseDouble(label.getAttribute("textLength")))
           .isCloseTo(metric, org.assertj.core.data.Offset.offset(0.15));
+    }
+
+    @Test
+    void narrowGlyphNodeLabelDoesNotOverstretchTextLength() throws Exception {
+      // Repro from issue #39: the #25 fix pinned every label to a flat
+      // 0.62em/char width with lengthAdjust="spacingAndGlyphs", so a narrow-glyph
+      // label like "Fulfillment Clerk" (17 chars incl. i/l/l/t) was forced to
+      // ~147.5 at 14px — ~47% wider than its natural Inter/Arial width — and the
+      // spacingAndGlyphs mode stretched the letterforms to fill it. The width
+      // metric must now approximate per-glyph advances (near natural width) and
+      // the pin must use lengthAdjust="spacing" so glyph SHAPES stay intact.
+      JsonNode input =
+          archimateRenderInput(
+              fixtureJson("fixtures/render-policy/archimate-svg.json"),
+              """
+                    [
+                      { "id": "appcomp", "source_id": "appcomp", "projection_id": "appcomp", "x": 40, "y": 40, "width": 250, "height": 80, "label": "Fulfillment Clerk" }
+                    ]
+                    """,
+              "[]",
+              """
+                    {
+                      "appcomp": { "type": "ApplicationComponent", "source_id": "appcomp" }
+                    }
+                    """,
+              "{}");
+
+      Document document = svgDocument(okContent(render(input)));
+      Element node = groupWithAttribute(document, "data-dediren-node-id", "appcomp");
+      Element label = (Element) node.getElementsByTagName("text").item(0);
+
+      // Wide box keeps the label on a single line at the full policy font size.
+      assertThat(label.getElementsByTagName("tspan").getLength()).isZero();
+      double fontSize = Double.parseDouble(label.getAttribute("font-size"));
+      double textLength = Double.parseDouble(label.getAttribute("textLength"));
+
+      // Glyph shapes are never distorted: only inter-glyph spacing is adjusted.
+      assertThat(label.getAttribute("lengthAdjust")).isEqualTo("spacing");
+
+      // The pin still equals the layout metric (so wrap/fit/box and the emitted
+      // width agree — the #25 determinism guarantee).
+      double metric =
+          dev.dediren.plugins.render.svg.Svg.estimateTextWidth("Fulfillment Clerk", fontSize);
+      assertThat(textLength).isCloseTo(metric, org.assertj.core.data.Offset.offset(0.15));
+
+      // Materially narrower than the old flat 0.62em/char metric that caused the
+      // stretch (17 * fontSize * 0.62 ≈ 147.5 at 14px).
+      double flatMetric = "Fulfillment Clerk".length() * fontSize * 0.62;
+      assertThat(textLength).isLessThan(flatMetric * 0.75);
+
+      // #25 clearance preserved: the centered label's half-width still clears the
+      // per-side corner-icon reserve (34 each side of a 250-wide node).
+      double halfWidth = textLength / 2.0;
+      assertThat(halfWidth).isLessThanOrEqualTo((250.0 - 2.0 * 34.0) / 2.0);
     }
 
     @Test
@@ -4096,7 +4152,7 @@ class MainTest {
   }
 
   private static double estimatedSvgTextWidth(String text, double fontSize) {
-    return text.codePointCount(0, text.length()) * fontSize * 0.62;
+    return dev.dediren.plugins.render.svg.Svg.estimateTextWidth(text, fontSize);
   }
 
   private static double svgFontSize(Element label) {

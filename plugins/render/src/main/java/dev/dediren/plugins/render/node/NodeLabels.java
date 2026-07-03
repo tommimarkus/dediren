@@ -76,12 +76,19 @@ public final class NodeLabels {
   // textLength + lengthAdjust, so the displayed width — and thus the label's
   // clearance from the corner decorator and node border — is independent of the
   // viewer's installed font rather than the layout's internal metric. See issue #25.
+  //
+  // lengthAdjust="spacing" adjusts only inter-glyph spacing to hit textLength, never
+  // the glyph shapes themselves. That is safe here because estimateTextWidth now
+  // approximates the natural per-glyph width (Svg per-glyph advance table), so the
+  // spacing correction is small — unlike the flat 0.62em/char metric it replaced,
+  // whose ~47% over-estimate on narrow-glyph labels forced spacingAndGlyphs to
+  // stretch the letterforms into visibly deformed type. See issue #39.
   public static String labelLengthAttributes(String line, double fontSize) {
     double width = estimateTextWidth(line, fontSize);
     if (width <= 0.0) {
       return "";
     }
-    return " textLength=\"" + labelNumber(width) + "\" lengthAdjust=\"spacingAndGlyphs\"";
+    return " textLength=\"" + labelNumber(width) + "\" lengthAdjust=\"spacing\"";
   }
 
   public static NodeLabelLines nodeLabelLinesAndSize(
