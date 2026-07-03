@@ -289,6 +289,66 @@ class ElkLayoutEngineTest {
   }
 
   @Test
+  void sequenceLifelinesEachGetADistinctColumnWhenElkCollapsesLayers() {
+    // Regression for #29: ELK's RIGHT-direction layered pass can assign two lifelines to the
+    // same layer, giving them an identical x. Every lifeline must still occupy its own column
+    // in declared order, and messages must span their two columns left-to-right.
+    List<String> order = List.of("user", "storefront", "orderservice", "payment", "inventory");
+    LayoutResult result = new ElkLayoutEngine().layout(fiveLifelineSequenceRequest(order));
+    ElkLayoutRenderArtifacts.write(result);
+
+    List<LaidOutNode> lifelines = order.stream().map(id -> nodeById(result, id)).toList();
+    double bandY = lifelines.getFirst().y();
+    for (int leftIndex = 0; leftIndex < lifelines.size(); leftIndex++) {
+      LaidOutNode left = lifelines.get(leftIndex);
+      assertEquals(
+          bandY,
+          left.y(),
+          PORT_SIDE_EPSILON,
+          "sequence lifeline heads should stay in one horizontal band, " + left);
+      for (int rightIndex = leftIndex + 1; rightIndex < lifelines.size(); rightIndex++) {
+        LaidOutNode right = lifelines.get(rightIndex);
+        assertTrue(
+            left.x() < right.x(),
+            "each sequence lifeline should occupy a distinct column in declared order, "
+                + order.get(leftIndex)
+                + "="
+                + left
+                + ", "
+                + order.get(rightIndex)
+                + "="
+                + right);
+        assertFalse(
+            rectanglesOverlap(
+                left.x(),
+                left.y(),
+                left.width(),
+                left.height(),
+                right.x(),
+                right.y(),
+                right.width(),
+                right.height()),
+            "sequence lifeline heads should not overlap, "
+                + order.get(leftIndex)
+                + "="
+                + left
+                + ", "
+                + order.get(rightIndex)
+                + "="
+                + right);
+      }
+    }
+
+    // m2 (storefront -> orderservice) was the message that degenerated into a backwards stub
+    // between the merged box's own edges; it must now read left-to-right.
+    LaidOutEdge m2 = edgeById(result, "m2");
+    assertEquals(2, m2.points().size(), "lifeline-to-lifeline message should be a direct segment");
+    assertTrue(
+        m2.points().getFirst().x() < m2.points().getLast().x(),
+        "forward sequence message should span its columns left-to-right, m2=" + m2.points());
+  }
+
+  @Test
   void packedLayoutPlacesDisconnectedNodesWithoutEdgesOrOverlaps() {
     LayoutRequest request =
         new LayoutRequest(
@@ -2376,6 +2436,49 @@ class ElkLayoutEngineTest {
               min, Math.hypot(x - (points.get(i).x() + t * dx), y - (points.get(i).y() + t * dy)));
     }
     return min;
+  }
+
+  private static LayoutRequest fiveLifelineSequenceRequest(List<String> order) {
+    List<LayoutNode> nodes =
+        List.of(
+            new LayoutNode("user", "User", "user", 140.0, 48.0, "lifeline"),
+            new LayoutNode("storefront", "Storefront", "storefront", 140.0, 48.0, "lifeline"),
+            new LayoutNode("interaction", "Place Order", "interaction", 600.0, 400.0),
+            new LayoutNode(
+                "orderservice", "Order Service", "orderservice", 140.0, 48.0, "lifeline"),
+            new LayoutNode("payment", "Payment", "payment", 140.0, 48.0, "lifeline"),
+            new LayoutNode("inventory", "Inventory", "inventory", 140.0, 48.0, "lifeline"));
+    List<LayoutEdge> edges =
+        List.of(
+            new LayoutEdge("m1", "user", "storefront", "browse", "m1", "Message"),
+            new LayoutEdge("m2", "storefront", "orderservice", "placeOrder", "m2", "Message"),
+            new LayoutEdge("m3", "orderservice", "payment", "charge", "m3", "Message"),
+            new LayoutEdge("m4", "payment", "orderservice", "charged", "m4", "Message"),
+            new LayoutEdge("m5", "orderservice", "inventory", "reserve", "m5", "Message"),
+            new LayoutEdge("m6", "inventory", "orderservice", "reserved", "m6", "Message"),
+            new LayoutEdge("m7", "orderservice", "storefront", "confirmed", "m7", "Message"),
+            new LayoutEdge("m8", "storefront", "user", "receipt", "m8", "Message"));
+    return new LayoutRequest(
+        "layout-request.schema.v1",
+        "sequence-view",
+        nodes,
+        edges,
+        List.of(),
+        List.of(
+            new LayoutConstraint(
+                "sequence-view.uml.sequence.lifeline-order", "uml.sequence.lifeline-order", order),
+            new LayoutConstraint(
+                "sequence-view.uml.sequence.message-order",
+                "uml.sequence.message-order",
+                List.of("m1", "m2", "m3", "m4", "m5", "m6", "m7", "m8"))),
+        new LayoutPreferences(
+            LayoutDirection.RIGHT,
+            LayoutDensity.READABLE,
+            null,
+            new LayoutRoutingPreferences(
+                LayoutRoutingStyle.ORTHOGONAL,
+                LayoutRoutingProfile.READABLE,
+                LayoutEndpointMerging.OFF)));
   }
 
   private static LayoutRequest sequenceLayoutRequest() {

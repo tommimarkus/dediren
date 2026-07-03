@@ -21,6 +21,7 @@ final class SequenceLayoutConstraints {
   private static final double MINIMUM_MESSAGE_Y_STEP = 1.0;
   private static final double MESSAGE_HEAD_GAP = 24.0;
   private static final double MESSAGE_Y_STEP = 24.0;
+  private static final double LIFELINE_COLUMN_GAP = 96.0;
 
   private final List<String> lifelineOrder;
   private final List<String> messageOrder;
@@ -122,7 +123,7 @@ final class SequenceLayoutConstraints {
       return nodes;
     }
 
-    List<Double> xSlots = orderedLifelines.stream().map(LaidOutNode::x).sorted().toList();
+    List<Double> xSlots = distinctColumnXSlots(orderedLifelines);
     double bandY = orderedLifelines.stream().mapToDouble(LaidOutNode::y).min().orElse(0.0);
     Map<String, Double> normalizedXById = new HashMap<>();
     for (int index = 0; index < orderedLifelines.size(); index++) {
@@ -149,6 +150,27 @@ final class SequenceLayoutConstraints {
               node.role()));
     }
     return normalized;
+  }
+
+  // ELK's RIGHT-direction layered pass can place two lifelines in the same layer, giving them
+  // an identical x. A sequence diagram requires one distinct column per participant in declared
+  // order, so return one x-slot per lifeline in ascending order. When ELK already produced a
+  // distinct column per lifeline, keep its exact (possibly uneven) spacing; only when it
+  // collapsed lifelines into fewer columns do we rebuild evenly spaced, non-overlapping columns
+  // anchored at the leftmost lifeline.
+  private static List<Double> distinctColumnXSlots(List<LaidOutNode> orderedLifelines) {
+    List<Double> sortedXs = orderedLifelines.stream().map(LaidOutNode::x).sorted().toList();
+    if (sortedXs.stream().distinct().count() == orderedLifelines.size()) {
+      return sortedXs;
+    }
+    double leftmostX = sortedXs.get(0);
+    double maxWidth = orderedLifelines.stream().mapToDouble(LaidOutNode::width).max().orElse(0.0);
+    double pitch = maxWidth + LIFELINE_COLUMN_GAP;
+    List<Double> columns = new ArrayList<>();
+    for (int index = 0; index < orderedLifelines.size(); index++) {
+      columns.add(leftmostX + (pitch * index));
+    }
+    return columns;
   }
 
   private List<LaidOutEdge> normalizedMessageEdges(
