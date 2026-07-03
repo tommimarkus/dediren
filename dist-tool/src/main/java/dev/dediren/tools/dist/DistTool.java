@@ -486,7 +486,11 @@ public final class DistTool {
             + "JAVA_OPTS=\"$JAVA_OPTS -XX:+AutoCreateSharedArchive"
             + " -XX:SharedArchiveFile=$DEDIREN_CDS_DIR/"
             + cdsName
-            + ".jsa\""
+            // -Xlog:cds=off silences the per-invocation CDS archive-dump warnings
+            // (e.g. "[warning][cds] Skipping ...: Old class has been linked" and the
+            // "Unsupported location" variants) without disabling the archive itself; the
+            // startup speedup is retained. Keeps launcher stderr/stdout clean (issue #38).
+            + ".jsa -Xlog:cds=off\""
             + nl
             + "export JAVA_OPTS"
             + nl;
@@ -621,6 +625,18 @@ public final class DistTool {
               + "\nstderr:\n"
               + stderr);
     }
+    // Issue #38: launcher invocations must not spew CDS archive-dump warnings. A single
+    // package pipeline is 15+ invocations, so any per-call CDS noise buries genuine
+    // diagnostics. The CDS log tag may land on stderr or stdout depending on the JDK
+    // build's default -Xlog target, so guard both streams.
+    if (stderr.contains("[cds]") || stdout.contains("[cds]")) {
+      throw new IllegalStateException(
+          "bundled command leaked CDS log output; -Xlog:cds=off suppression regressed"
+              + " (issue #38)\nstdout:\n"
+              + stdout
+              + "\nstderr:\n"
+              + stderr);
+    }
     return stdout;
   }
 
@@ -725,6 +741,13 @@ public final class DistTool {
           || !text.contains(launcher.sourceScript() + ".jsa")) {
         throw new IllegalStateException(
             "launcher " + launcher.bundleScript() + " is missing its CDS configuration");
+      }
+      if (!text.contains("-Xlog:cds=off")) {
+        throw new IllegalStateException(
+            "launcher "
+                + launcher.bundleScript()
+                + " is missing -Xlog:cds=off; CDS archive-dump warnings would leak to"
+                + " stderr/stdout (issue #38)");
       }
     }
   }

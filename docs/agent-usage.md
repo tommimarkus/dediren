@@ -609,7 +609,9 @@ is read-only, the launcher falls back to `${XDG_CACHE_HOME:-$HOME/.cache}/dedire
 Set `DEDIREN_CDS_DIR` to an explicit writable path to relocate all archives.
 The feature is based on `-XX:+AutoCreateSharedArchive` and degrades silently if
 the archive directory is unwritable — startup continues at normal speed without
-any error.
+any error. Launchers also pass `-Xlog:cds=off` so the JVM's per-invocation CDS
+archive-dump warnings never reach stdout/stderr; a healthy run stays quiet and
+stderr remains reserved for genuine diagnostics.
 
 Setting `DEDIREN_TRUST_MANIFEST_CAPABILITIES=1` (or `true`) makes dediren trust
 each plugin's static manifest capabilities and skip the per-call runtime

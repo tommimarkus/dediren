@@ -320,6 +320,8 @@ class DistModuleTest {
         .contains("DEDIREN_CDS_DIR=\"${DEDIREN_CDS_DIR:-$DEDIREN_BUNDLE_ROOT/cds}\"")
         .contains("-XX:+AutoCreateSharedArchive")
         .contains("-XX:SharedArchiveFile=$DEDIREN_CDS_DIR/elk-layout.jsa")
+        // issue #38: CDS archive-dump warnings are silenced without disabling CDS
+        .contains("-Xlog:cds=off")
         .contains("${XDG_CACHE_HOME:-$HOME/.cache}/dediren/cds");
     // exec line still present and after the injected block
     org.assertj.core.api.Assertions.assertThat(rewritten.indexOf("DEDIREN_CDS_DIR="))

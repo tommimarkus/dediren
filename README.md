@@ -107,7 +107,9 @@ Each `bin/dediren*` launcher auto-creates a Class-Data-Sharing archive
 subsequent calls. Archives are written to `cds/` inside the bundle directory
 (or `${XDG_CACHE_HOME:-$HOME/.cache}/dediren/cds` if the bundle dir is read-only). Set
 `DEDIREN_CDS_DIR` to relocate them. The feature degrades silently if the
-archive directory is unwritable.
+archive directory is unwritable. Launchers pass `-Xlog:cds=off`, so the
+archive-dump warnings the JVM would otherwise print on each invocation stay out
+of stdout/stderr; the startup speedup is unaffected.
 
 Set `DEDIREN_TRUST_MANIFEST_CAPABILITIES=1` (or `true`) to skip the per-call
 runtime capability probe, removing one JVM start per plugin operation. This
