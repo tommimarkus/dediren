@@ -456,3 +456,23 @@ guard were unreachable by the test — plus coverage gaps (single conflated
 test; no `export-request` policy negative). All were remediated in the same
 wave, and the CDS test was confirmed to fail when the exclude flags are
 removed.
+
+### Late finding — CDS warnings on stdout, first launch only (block-tier for the stdout contract)
+
+Independent verification of the remediation surfaced a genuine bug the review
+itself had masked. On the **first** launch of a freshly unpacked bundle,
+before `-XX:+AutoCreateSharedArchive` has seeded the CDS archive, the JVM
+prints ~150 `[warning][cds]` lines to **stdout**, interleaved with real output
+(e.g. `dediren 2026.07.0` followed by the warnings). This breaks the product's
+central promise — decide success from stdout JSON alone — for an agent whose
+very first command against a new bundle pipes stdout to `jq`. Every reviewer
+missed it because groundwork (Task 2) pre-seeded the CDS archives, so all four
+viewpoints ran against an already-warm bundle; the review's own warmup masked
+the finding. It is pre-existing (the launcher flag predates this work), not
+introduced by any remediation commit. Fixed by routing CDS logging to stderr
+(`-Xlog:cds=warning:stderr` in the launcher `JAVA_OPTS`), keeping the warnings
+for human debugging on the channel the product reserves for humans; enforced
+by a `DistTool` assertion and a first-launch stdout-purity regression test.
+Method note for future reviews: warm the bundle in a *separate* provisioning
+step from the cold-start reviewer, or give one reviewer an explicitly
+un-warmed bundle, so first-run behavior is not hidden.
