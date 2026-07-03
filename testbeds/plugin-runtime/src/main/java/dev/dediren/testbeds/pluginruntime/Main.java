@@ -163,7 +163,9 @@ public final class Main {
       case "export" -> {
         var data = mapper.createObjectNode();
         data.put("export_result_schema_version", ContractVersions.EXPORT_RESULT_SCHEMA_VERSION);
-        data.put("artifact_kind", "archimate-oef+xml");
+        data.put(
+            "artifact_kind",
+            envOrDefault("DEDIREN_TEST_PLUGIN_ARTIFACT_KIND", "archimate-oef+xml"));
         data.put("content", "<model></model>");
         yield data;
       }

@@ -60,7 +60,7 @@ public final class PluginRunner {
       ProcessOutput trusted =
           runExecutable(
               pluginId, executable, args, input, options.timeout(), allowedEnv, workingDirectory);
-      return normalizePluginOutput(pluginId, requiredCapability, args, trusted);
+      return normalizePluginOutput(pluginId, requiredCapability, args, trusted, loaded.trusted());
     }
     ProcessOutput capabilities =
         runExecutable(
@@ -95,7 +95,7 @@ public final class PluginRunner {
     ProcessOutput output =
         runExecutable(
             pluginId, executable, args, input, options.timeout(), allowedEnv, workingDirectory);
-    return normalizePluginOutput(pluginId, requiredCapability, args, output);
+    return normalizePluginOutput(pluginId, requiredCapability, args, output, loaded.trusted());
   }
 
   private static Map<String, String> allowedEnv(
@@ -181,7 +181,11 @@ public final class PluginRunner {
   }
 
   private static PluginRunOutcome normalizePluginOutput(
-      String pluginId, String requiredCapability, List<String> args, ProcessOutput output)
+      String pluginId,
+      String requiredCapability,
+      List<String> args,
+      ProcessOutput output,
+      boolean bundledFirstParty)
       throws PluginExecutionException {
     JsonNode envelope = commandEnvelope(pluginId, output.stdout());
     String status = envelope.path("status").asText(EnvelopeStatus.ERROR.wire());
@@ -191,7 +195,7 @@ public final class PluginRunner {
           output.exitCode() == 0 ? CommandExitCode.PLUGIN_ERROR.code() : output.exitCode());
     }
     if (output.exitCode() == 0) {
-      validateSuccessData(pluginId, requiredCapability, args, envelope);
+      validateSuccessData(pluginId, requiredCapability, args, envelope, bundledFirstParty);
       return new PluginRunOutcome(output.stdout(), CommandExitCode.OK.code());
     }
     throw PluginExecutionException.plugin(
@@ -225,9 +229,13 @@ public final class PluginRunner {
   }
 
   private static void validateSuccessData(
-      String pluginId, String requiredCapability, List<String> args, JsonNode envelope)
+      String pluginId,
+      String requiredCapability,
+      List<String> args,
+      JsonNode envelope,
+      boolean bundledFirstParty)
       throws PluginExecutionException {
-    String schema = capabilityResultSchema(requiredCapability, args);
+    String schema = capabilityResultSchema(requiredCapability, args, bundledFirstParty);
     if (schema == null) {
       return;
     }
@@ -255,11 +263,18 @@ public final class PluginRunner {
             + message);
   }
 
-  private static String capabilityResultSchema(String capability, List<String> args) {
+  private static String capabilityResultSchema(
+      String capability, List<String> args, boolean bundledFirstParty) {
     return switch (capability) {
       case "layout" -> "schemas/layout-result.schema.json";
       case "render" -> "schemas/render-result.schema.json";
-      case "export" -> "schemas/export-result.schema.json";
+      // Third-party export plugins own their artifact kinds: manifests outside the trusted
+      // bundled first-party directory are validated against the published relaxed base
+      // contract only. Bundled first-party manifests keep the exact artifact_kind enum.
+      case "export" ->
+          bundledFirstParty
+              ? "schemas/export-result.first-party.schema.json"
+              : "schemas/export-result.schema.json";
       case "semantic-validation" -> "schemas/semantic-validation-result.schema.json";
       case "projection" ->
           args.contains("--target")

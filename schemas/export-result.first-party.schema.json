@@ -1,12 +1,12 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://dediren.dev/schemas/export-result.schema.json",
+  "$id": "https://dediren.dev/schemas/export-result.first-party.schema.json",
   "type": "object",
   "additionalProperties": false,
   "required": ["export_result_schema_version", "artifact_kind", "content"],
   "properties": {
     "export_result_schema_version": { "const": "export-result.schema.v1" },
-    "artifact_kind": { "type": "string", "pattern": "^[a-z0-9][a-z0-9.-]*\\+(xml|json|text)$" },
+    "artifact_kind": { "enum": ["archimate-oef+xml", "uml-xmi+xml"] },
     "content": { "type": "string" }
   }
 }

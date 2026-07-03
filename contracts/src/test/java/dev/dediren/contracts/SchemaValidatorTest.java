@@ -20,6 +20,7 @@ class SchemaValidatorTest {
           "schemas/render-result.schema.json",
           "schemas/export-request.schema.json",
           "schemas/export-result.schema.json",
+          "schemas/export-result.first-party.schema.json",
           "schemas/oef-export-policy.schema.json",
           "schemas/uml-xmi-export-policy.schema.json",
           "schemas/plugin-manifest.schema.json",
@@ -71,6 +72,64 @@ class SchemaValidatorTest {
                 "fixtures/layout-result/basic.json"))
         .describedAs("role-less layout-result should still validate")
         .isEmpty();
+  }
+
+  @Test
+  void exportResultBaseSchemaAcceptsAnyHonestArtifactKind() {
+    // The published export-result contract is the base any export plugin can satisfy honestly:
+    // artifact_kind is a pattern, not the closed first-party enum.
+    assertThat(
+            SchemaAssertions.validate(
+                workspaceRoot(),
+                "schemas/export-result.schema.json",
+                exportResult("ticket-stats+json")))
+        .isEmpty();
+    assertThat(
+            SchemaAssertions.validate(
+                workspaceRoot(),
+                "schemas/export-result.schema.json",
+                exportResult("archimate-oef+xml")))
+        .isEmpty();
+    assertThat(
+            SchemaAssertions.validate(
+                workspaceRoot(), "schemas/export-result.schema.json", exportResult("uml-xmi+xml")))
+        .isEmpty();
+    assertThat(
+            SchemaAssertions.validate(
+                workspaceRoot(),
+                "schemas/export-result.schema.json",
+                exportResult("Not A Valid Kind")))
+        .isNotEmpty();
+  }
+
+  @Test
+  void exportResultFirstPartySchemaKeepsClosedArtifactKindEnum() {
+    assertThat(
+            SchemaAssertions.validate(
+                workspaceRoot(),
+                "schemas/export-result.first-party.schema.json",
+                exportResult("archimate-oef+xml")))
+        .isEmpty();
+    assertThat(
+            SchemaAssertions.validate(
+                workspaceRoot(),
+                "schemas/export-result.first-party.schema.json",
+                exportResult("uml-xmi+xml")))
+        .isEmpty();
+    assertThat(
+            SchemaAssertions.validate(
+                workspaceRoot(),
+                "schemas/export-result.first-party.schema.json",
+                exportResult("ticket-stats+json")))
+        .isNotEmpty();
+  }
+
+  private static com.fasterxml.jackson.databind.JsonNode exportResult(String artifactKind) {
+    var document = dev.dediren.contracts.json.JsonSupport.objectMapper().createObjectNode();
+    document.put("export_result_schema_version", "export-result.schema.v1");
+    document.put("artifact_kind", artifactKind);
+    document.put("content", "{}");
+    return document;
   }
 
   @Test

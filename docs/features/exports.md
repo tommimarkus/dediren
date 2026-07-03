@@ -31,6 +31,10 @@ Policy schemas:
 [`uml-xmi-export-policy.schema.json`](../../schemas/uml-xmi-export-policy.schema.json).
 Result schema:
 [`export-result.schema.json`](../../schemas/export-result.schema.json).
+Third-party export plugins declare their own `artifact_kind`
+(pattern `^[a-z0-9][a-z0-9.-]*\+(xml|json|text)$`); bundled first-party
+export output is additionally held to the closed first-party enum in
+[`export-result.first-party.schema.json`](../../schemas/export-result.first-party.schema.json).
 
 ## Standards Validation
 

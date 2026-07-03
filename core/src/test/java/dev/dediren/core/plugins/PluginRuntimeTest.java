@@ -113,6 +113,79 @@ class PluginRuntimeTest {
   }
 
   @Test
+  void thirdPartyExportArtifactKindIsAcceptedFromUntrustedManifest() throws Exception {
+    writeManifest(temp, "runtime-testbed", testbedExecutable().toString(), List.of("export"));
+    var options =
+        PluginRunOptions.defaults()
+            .withCandidateEnv(
+                Map.of(
+                    "DEDIREN_TEST_PLUGIN_CAPABILITIES", "export",
+                    "DEDIREN_TEST_PLUGIN_ARTIFACT_KIND", "ticket-stats+json"));
+
+    PluginRunOutcome outcome =
+        PluginRunner.runForCapabilityWithRegistry(
+            PluginRegistry.fromDirs(List.of(temp)),
+            "runtime-testbed",
+            "export",
+            List.of("export"),
+            "{}",
+            options);
+
+    assertThat(outcome.exitCode()).isZero();
+    assertThat(outcome.stdout()).contains("\"ticket-stats+json\"");
+  }
+
+  @Test
+  void bundledManifestExportOutputKeepsFirstPartyArtifactKindEnum() throws Exception {
+    // A manifest discovered in the trusted bundled first-party directory keeps the exact
+    // first-party artifact_kind enum, so a drifting first-party export is still caught.
+    writeManifest(temp, "runtime-testbed", testbedExecutable().toString(), List.of("export"));
+    var options =
+        PluginRunOptions.defaults()
+            .withCandidateEnv(
+                Map.of(
+                    "DEDIREN_TEST_PLUGIN_CAPABILITIES", "export",
+                    "DEDIREN_TEST_PLUGIN_ARTIFACT_KIND", "ticket-stats+json"));
+
+    assertThatThrownBy(
+            () ->
+                PluginRunner.runForCapabilityWithRegistry(
+                    PluginRegistry.fromDirs(List.of(temp), List.of(temp)),
+                    "runtime-testbed",
+                    "export",
+                    List.of("export"),
+                    "{}",
+                    options))
+        .isInstanceOf(PluginExecutionException.class)
+        .extracting(error -> ((PluginExecutionException) error).diagnostic().code())
+        .isEqualTo("DEDIREN_PLUGIN_OUTPUT_INVALID_DATA");
+  }
+
+  @Test
+  void thirdPartyExportArtifactKindMustStillMatchTheBasePattern() throws Exception {
+    writeManifest(temp, "runtime-testbed", testbedExecutable().toString(), List.of("export"));
+    var options =
+        PluginRunOptions.defaults()
+            .withCandidateEnv(
+                Map.of(
+                    "DEDIREN_TEST_PLUGIN_CAPABILITIES", "export",
+                    "DEDIREN_TEST_PLUGIN_ARTIFACT_KIND", "Not A Valid Kind"));
+
+    assertThatThrownBy(
+            () ->
+                PluginRunner.runForCapabilityWithRegistry(
+                    PluginRegistry.fromDirs(List.of(temp)),
+                    "runtime-testbed",
+                    "export",
+                    List.of("export"),
+                    "{}",
+                    options))
+        .isInstanceOf(PluginExecutionException.class)
+        .extracting(error -> ((PluginExecutionException) error).diagnostic().code())
+        .isEqualTo("DEDIREN_PLUGIN_OUTPUT_INVALID_DATA");
+  }
+
+  @Test
   void structuredPluginErrorEnvelopeIsPreservedAndReportedNonZero() throws Exception {
     writeManifest(temp, "runtime-testbed", testbedExecutable().toString(), List.of("render"));
 
@@ -521,6 +594,7 @@ class PluginRuntimeTest {
         executable,
         capabilities,
         List.of(
+            "DEDIREN_TEST_PLUGIN_ARTIFACT_KIND",
             "DEDIREN_TEST_PLUGIN_CAPABILITIES",
             "DEDIREN_TEST_PLUGIN_ID",
             "DEDIREN_TEST_PLUGIN_MODE"));
