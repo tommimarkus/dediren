@@ -21,13 +21,38 @@ Discovery is explicit, in this order; the first directory containing
 
 1. Bundled first-party plugins: `<bundle>/plugins/`.
 2. Project plugins: `.dediren/plugins/` under the directory the CLI is run
-   from (your project), then `.dediren/plugins/` under the bundle root.
+   from (your project) — **off by default, opt-in only** (see the trust note
+   below) — then `.dediren/plugins/` under the bundle root.
 3. `DEDIREN_PLUGIN_DIRS`: extra manifest directories, separated with the
    platform path separator.
 
 Plugins are never discovered from `PATH`. To register a plugin for one
-project, place the manifest and executable in `<project>/.dediren/plugins/`
-and run the CLI from the project directory — no environment variables needed.
+project, place the manifest and executable in `<project>/.dediren/plugins/`,
+set `DEDIREN_ALLOW_PROJECT_PLUGINS=1`, and run the CLI from the project
+directory.
+
+### Trust boundary and security
+
+A discovered manifest's `executable` is run **as a subprocess with the
+operator's own privileges** — unsandboxed, with no signature or checksum
+verification. Discovery identity, not the id a manifest claims, is the trust
+boundary. Read this before enabling or invoking any project-supplied plugin:
+
+- **A `.dediren/plugins` executable is arbitrary code with your privileges.**
+  Registering it and running a work command executes it. There is no sandbox
+  and no code-signing check; you are trusting whoever wrote the files.
+- **Caller-cwd project-plugin discovery is off by default.** The `.dediren/plugins`
+  directory under the CLI's working directory is consulted only when
+  `DEDIREN_ALLOW_PROJECT_PLUGINS` is set to `1` or `true`. An automated agent
+  MUST NOT enable this variable, or invoke a project-supplied plugin, for a
+  repository it did not author without explicit human confirmation — a cloned
+  repo's `.dediren/plugins` is untrusted input. (The bundle-root `.dediren/plugins`
+  lookup and `DEDIREN_PLUGIN_DIRS` are not gated by this flag; they are already
+  explicit operator choices.)
+- **`allowed_env` is not a security boundary against a malicious author.** It
+  limits accidental environment inheritance for an honest plugin; it does
+  nothing to contain a plugin whose author is hostile, because that author
+  controls the executable itself.
 
 ## Manifest
 
@@ -202,7 +227,9 @@ jq -r '.data.content' out.json > stats.json
    command (envelope on stdout, request on stdin).
 2. Write `<plugin-id>.manifest.json` next to it; list every environment
    variable you need in `allowed_env`.
-3. Register: drop both into `<project>/.dediren/plugins/`.
+3. Register: drop both into `<project>/.dediren/plugins/` and run the CLI from
+   that project with `DEDIREN_ALLOW_PROJECT_PLUGINS=1` (caller-cwd project-plugin
+   discovery is opt-in — see the trust note above).
 4. Verify: run your executable directly with `capabilities` and check the
    output against `schemas/runtime-capability.schema.json`, then run the real
    CLI command from the project directory and decide from stdout `.status`

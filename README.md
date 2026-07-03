@@ -97,8 +97,10 @@ First-party plugin manifests live under `plugins/`. Manifest executable names
 resolve to bundled launchers under `bin/`. Third-party plugins register
 explicitly, in discovery order: bundled plugins first, then the project plugin
 directory `.dediren/plugins` (resolved against the directory the CLI is run
-from), then `DEDIREN_PLUGIN_DIRS`. Plugins are not discovered implicitly from
-`PATH`. The full plugin-author contract lives in
+from, and discovered only when `DEDIREN_ALLOW_PROJECT_PLUGINS=1` — off by
+default, because such an executable runs unsandboxed with the caller's
+privileges), then `DEDIREN_PLUGIN_DIRS`. Plugins are not discovered implicitly
+from `PATH`. The full plugin-author contract lives in
 [`docs/plugin-authoring.md`](docs/plugin-authoring.md).
 
 Bundle launchers set `DEDIREN_BUNDLE_ROOT` from their installation root so
@@ -586,9 +588,14 @@ in their manifests. Important explicit variables:
   bundled plugin manifests, and bundled launchers. Packaged launchers set this
   automatically; override it only for custom launchers or tests.
 - `DEDIREN_PLUGIN_DIRS`: additional manifest directories, separated with the
-  platform path separator. Looked up after bundled plugins and the project
-  `.dediren/plugins` directory (resolved against the CLI's current working
-  directory).
+  platform path separator. Looked up after bundled plugins and the opt-in
+  project `.dediren/plugins` directory (resolved against the CLI's current
+  working directory).
+- `DEDIREN_ALLOW_PROJECT_PLUGINS`: opt-in (`1` or `true`); enables discovery of
+  the project `.dediren/plugins` directory under the CLI's current working
+  directory. Off by default: a project-supplied plugin runs unsandboxed and
+  unsigned with the caller's privileges, so a cloned repository's
+  `.dediren/plugins` is untrusted input.
 - `DEDIREN_PLUGIN_<PLUGIN_ID>`: per-plugin executable override, for example
   `DEDIREN_PLUGIN_RENDER`.
 - `DEDIREN_OEF_SCHEMA_DIR`: local directory containing official OEF schema

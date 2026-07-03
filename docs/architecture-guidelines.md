@@ -253,8 +253,13 @@ transport requires a `[runtime]` scenario these baselines fail.
 
 - **Discovery is explicit, never from `PATH`.** Order: bundled first-party
   plugins, then project plugin directories (`.dediren/plugins`), then
-  user-configured directories. Adding implicit `PATH` discovery is prohibited —
-  it would erase the trust boundary.
+  user-configured directories. The caller-cwd `.dediren/plugins` directory is
+  opt-in via `DEDIREN_ALLOW_PROJECT_PLUGINS` and off by default: running an
+  executable registered in an untrusted cloned repository is arbitrary code
+  execution with the caller's privileges, so that trust-boundary crossing must
+  be a deliberate operator choice (the bundle-root `.dediren/plugins` lookup and
+  `DEDIREN_PLUGIN_DIRS` remain ungated, being explicit choices already). Adding
+  implicit `PATH` discovery is prohibited — it would erase the trust boundary.
 - **Core normalizes the failures it can observe** into structured diagnostics:
   missing executable, timeout, invalid JSON, schema mismatch, unsupported
   capability, id mismatch, process failure. A valid plugin error envelope is
