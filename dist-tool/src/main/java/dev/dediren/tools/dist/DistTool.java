@@ -17,13 +17,26 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public final class DistTool {
   private static final String BUNDLE_METADATA_TARGET = "java";
+
+  /**
+   * Matches {@code "$REPO"/some-artifact-1.2.3.jar} segments of the CLASSPATH line that
+   * appassembler generates into each launcher script (flat repository layout). That line is the
+   * authoritative resolved runtime dependency set for the launcher, so the packaged {@code lib/} is
+   * verified against it (SEED-1 hermeticity guard).
+   */
+  private static final Pattern CLASSPATH_LIB_JAR = Pattern.compile("\\$REPO\"?/([^:/\"]+\\.jar)");
+
   private static final List<String> EXPECTED_LAUNCHER_FLAGS =
       List.of("-XX:TieredStopAtLevel=1", "-XX:+UseSerialGC");
   private static final List<Launcher> LAUNCHERS =
@@ -130,9 +143,11 @@ public final class DistTool {
     Files.createDirectories(bundle.resolve("plugins"));
     Files.createDirectories(bundle.resolve("docs"));
 
+    Set<String> declaredLibJars = new TreeSet<>();
     for (Launcher launcher : LAUNCHERS) {
-      installLauncher(root, bundle, launcher);
+      declaredLibJars.addAll(installLauncher(root, bundle, launcher));
     }
+    verifyPackagedLib(bundle.resolve("lib"), declaredLibJars);
     copyManifestFiles(root.resolve("fixtures/plugins"), bundle.resolve("plugins"));
     copyDirectory(root.resolve("schemas"), bundle.resolve("schemas"));
     copyFixtures(root.resolve("fixtures"), bundle.resolve("fixtures"));
@@ -150,6 +165,11 @@ public final class DistTool {
         root,
         List.of(
             "tar",
+            // Runtime-generated CDS content must never ship in the archive
+            // (SEED-1): launchers auto-create cds/*.jsa next to the bundle at
+            // first run, and stale copies must not ride into a rebuild.
+            "--exclude=cds",
+            "--exclude=*.jsa",
             "-C",
             dist.toString(),
             "-czf",
@@ -442,20 +462,107 @@ public final class DistTool {
     void run() throws Exception;
   }
 
-  private static void installLauncher(Path root, Path bundle, Launcher launcher)
+  private static Set<String> installLauncher(Path root, Path bundle, Launcher launcher)
       throws IOException {
     Path install = root.resolve(launcher.installDir());
     Path sourceBin = install.resolve("bin").resolve(launcher.sourceScript());
     if (!Files.isRegularFile(sourceBin)) {
       throw new IOException("missing installed launcher: " + sourceBin);
     }
+    String sourceScript = Files.readString(sourceBin, StandardCharsets.UTF_8);
+    Set<String> declaredJars = declaredClasspathJars(sourceScript);
+    verifyStagedLib(install.resolve("lib"), declaredJars, launcher);
     Path targetBin = bundle.resolve("bin").resolve(launcher.bundleScript());
-    Files.copy(sourceBin, targetBin, StandardCopyOption.REPLACE_EXISTING);
-    String script = withBundleRootExport(Files.readString(targetBin, StandardCharsets.UTF_8));
+    String script = withBundleRootExport(sourceScript);
     script = withCdsArchive(script, launcher.sourceScript());
     Files.writeString(targetBin, script, StandardCharsets.UTF_8);
     makeExecutable(targetBin);
-    copyDirectoryContents(install.resolve("lib"), bundle.resolve("lib"));
+    copyDeclaredJars(install.resolve("lib"), bundle.resolve("lib"), declaredJars);
+    return declaredJars;
+  }
+
+  /** Extracts the {@code lib/} jar file names declared on the launcher script CLASSPATH line. */
+  static Set<String> declaredClasspathJars(String script) {
+    Set<String> jars = new LinkedHashSet<>();
+    for (String line : script.split("\\R")) {
+      if (!line.startsWith("CLASSPATH=")) {
+        continue;
+      }
+      Matcher matcher = CLASSPATH_LIB_JAR.matcher(line);
+      while (matcher.find()) {
+        jars.add(matcher.group(1));
+      }
+    }
+    return jars;
+  }
+
+  /**
+   * Fails the build when the staged appassembler {@code lib/} diverges from the launcher's declared
+   * classpath: a stale jar (for example a prior product version left in {@code target/}) would
+   * otherwise silently ship, and a missing jar would ship a broken launcher.
+   */
+  private static void verifyStagedLib(Path lib, Set<String> declaredJars, Launcher launcher)
+      throws IOException {
+    Set<String> staged = new TreeSet<>();
+    if (Files.isDirectory(lib)) {
+      try (var entries = Files.list(lib)) {
+        entries
+            .filter(Files::isRegularFile)
+            .map(path -> path.getFileName().toString())
+            .filter(name -> name.endsWith(".jar"))
+            .forEach(staged::add);
+      }
+    }
+    Set<String> foreign = new TreeSet<>(staged);
+    foreign.removeAll(declaredJars);
+    if (!foreign.isEmpty()) {
+      throw new IllegalStateException(
+          "dist hermeticity check failed: "
+              + launcher.installDir()
+              + "/lib contains jars that are not on the "
+              + launcher.sourceScript()
+              + " launcher classpath: "
+              + foreign
+              + " (stale build output; rebuild so target/appassembler is regenerated)");
+    }
+    Set<String> missing = new TreeSet<>(declaredJars);
+    missing.removeAll(staged);
+    if (!missing.isEmpty()) {
+      throw new IllegalStateException(
+          "dist hermeticity check failed: "
+              + launcher.installDir()
+              + "/lib is missing jars declared on the "
+              + launcher.sourceScript()
+              + " launcher classpath: "
+              + missing);
+    }
+  }
+
+  private static void copyDeclaredJars(Path sourceLib, Path targetLib, Set<String> declaredJars)
+      throws IOException {
+    Files.createDirectories(targetLib);
+    for (String jar : declaredJars) {
+      Files.copy(
+          sourceLib.resolve(jar), targetLib.resolve(jar), StandardCopyOption.REPLACE_EXISTING);
+    }
+  }
+
+  /** Exact-match guard: the packaged {@code lib/} holds the declared jar set and nothing else. */
+  private static void verifyPackagedLib(Path lib, Set<String> declaredJars) throws IOException {
+    Set<String> packaged = new TreeSet<>();
+    try (var entries = Files.list(lib)) {
+      entries.map(path -> path.getFileName().toString()).forEach(packaged::add);
+    }
+    if (!packaged.equals(declaredJars)) {
+      Set<String> extra = new TreeSet<>(packaged);
+      extra.removeAll(declaredJars);
+      Set<String> missing = new TreeSet<>(declaredJars);
+      missing.removeAll(packaged);
+      throw new IllegalStateException(
+          "dist hermeticity check failed: packaged lib/ diverges from the launcher classpaths"
+              + (extra.isEmpty() ? "" : "; unexpected entries: " + extra)
+              + (missing.isEmpty() ? "" : "; missing jars: " + missing));
+    }
   }
 
   static String withCdsArchive(String script, String cdsName) {
@@ -920,20 +1027,6 @@ public final class DistTool {
             return FileVisitResult.CONTINUE;
           }
         });
-  }
-
-  private static void copyDirectoryContents(Path source, Path target) throws IOException {
-    Files.createDirectories(target);
-    try (var entries = Files.list(source)) {
-      for (Path path : entries.toList()) {
-        Path destination = target.resolve(path.getFileName());
-        if (Files.isDirectory(path)) {
-          copyDirectory(path, destination);
-        } else {
-          Files.copy(path, destination, StandardCopyOption.REPLACE_EXISTING);
-        }
-      }
-    }
   }
 
   private static void deleteIfExists(Path path) throws IOException {
