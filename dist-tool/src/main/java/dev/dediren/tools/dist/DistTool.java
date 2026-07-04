@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -74,6 +75,116 @@ public final class DistTool {
           "DEDIREN_PLUGIN_RENDER",
           "DEDIREN_PLUGIN_ARCHIMATE_OEF",
           "DEDIREN_PLUGIN_UML_XMI");
+
+  /** Licence attribution for one redistributed third-party artifact (jar name minus version). */
+  private record ThirdPartyAttribution(String project, List<String> licenseIds) {}
+
+  private static ThirdPartyAttribution attribution(String project, String... licenseIds) {
+    return new ThirdPartyAttribution(project, List.of(licenseIds));
+  }
+
+  private static final Set<String> FIRST_PARTY_ARTIFACTS =
+      Set.of(
+          "archimate",
+          "archimate-oef-export",
+          "cli",
+          "contracts",
+          "core",
+          "elk-layout",
+          "generic-graph",
+          "render",
+          "schema-cache",
+          "uml",
+          "uml-xmi-export");
+
+  private static final Map<String, ThirdPartyAttribution> THIRD_PARTY_ATTRIBUTIONS =
+      Map.ofEntries(
+          Map.entry("batik-anim", attribution("Apache Batik", "Apache-2.0")),
+          Map.entry("batik-awt-util", attribution("Apache Batik", "Apache-2.0")),
+          Map.entry("batik-bridge", attribution("Apache Batik", "Apache-2.0")),
+          Map.entry("batik-codec", attribution("Apache Batik", "Apache-2.0")),
+          Map.entry("batik-constants", attribution("Apache Batik", "Apache-2.0")),
+          Map.entry("batik-css", attribution("Apache Batik", "Apache-2.0")),
+          Map.entry("batik-dom", attribution("Apache Batik", "Apache-2.0")),
+          Map.entry("batik-ext", attribution("Apache Batik", "Apache-2.0")),
+          Map.entry("batik-gvt", attribution("Apache Batik", "Apache-2.0")),
+          Map.entry("batik-i18n", attribution("Apache Batik", "Apache-2.0")),
+          Map.entry("batik-parser", attribution("Apache Batik", "Apache-2.0")),
+          Map.entry("batik-script", attribution("Apache Batik", "Apache-2.0")),
+          Map.entry("batik-shared-resources", attribution("Apache Batik", "Apache-2.0")),
+          Map.entry("batik-svg-dom", attribution("Apache Batik", "Apache-2.0")),
+          Map.entry("batik-svggen", attribution("Apache Batik", "Apache-2.0")),
+          Map.entry("batik-transcoder", attribution("Apache Batik", "Apache-2.0")),
+          Map.entry("batik-util", attribution("Apache Batik", "Apache-2.0")),
+          Map.entry("batik-xml", attribution("Apache Batik", "Apache-2.0")),
+          Map.entry("commons-io", attribution("Apache Commons IO", "Apache-2.0")),
+          Map.entry("commons-logging", attribution("Apache Commons Logging", "Apache-2.0")),
+          Map.entry(
+              "error_prone_annotations",
+              attribution("Google Error Prone annotations", "Apache-2.0")),
+          Map.entry("failureaccess", attribution("Google Guava failureaccess", "Apache-2.0")),
+          Map.entry("guava", attribution("Google Guava", "Apache-2.0")),
+          Map.entry("itu", attribution("Ethlo Internet Time Utility", "Apache-2.0")),
+          Map.entry("j2objc-annotations", attribution("Google J2ObjC annotations", "Apache-2.0")),
+          Map.entry("jackson-annotations", attribution("FasterXML Jackson", "Apache-2.0")),
+          Map.entry("jackson-core", attribution("FasterXML Jackson", "Apache-2.0")),
+          Map.entry("jackson-databind", attribution("FasterXML Jackson", "Apache-2.0")),
+          Map.entry("jackson-dataformat-yaml", attribution("FasterXML Jackson", "Apache-2.0")),
+          Map.entry(
+              "json-schema-validator",
+              attribution("NetworkNT JSON Schema Validator", "Apache-2.0")),
+          Map.entry("jspecify", attribution("JSpecify", "Apache-2.0")),
+          Map.entry("listenablefuture", attribution("Google Guava listenablefuture", "Apache-2.0")),
+          Map.entry(
+              "org.eclipse.elk.alg.common", attribution("Eclipse Layout Kernel (ELK)", "EPL-2.0")),
+          Map.entry(
+              "org.eclipse.elk.alg.layered", attribution("Eclipse Layout Kernel (ELK)", "EPL-2.0")),
+          Map.entry(
+              "org.eclipse.elk.alg.rectpacking",
+              attribution("Eclipse Layout Kernel (ELK)", "EPL-2.0")),
+          Map.entry("org.eclipse.elk.core", attribution("Eclipse Layout Kernel (ELK)", "EPL-2.0")),
+          Map.entry("org.eclipse.elk.graph", attribution("Eclipse Layout Kernel (ELK)", "EPL-2.0")),
+          Map.entry(
+              "org.eclipse.emf.common", attribution("Eclipse Modeling Framework (EMF)", "EPL-1.0")),
+          Map.entry(
+              "org.eclipse.emf.ecore", attribution("Eclipse Modeling Framework (EMF)", "EPL-1.0")),
+          Map.entry(
+              "org.eclipse.emf.ecore.xmi",
+              attribution("Eclipse Modeling Framework (EMF)", "EPL-1.0")),
+          Map.entry("org.eclipse.xtext.xbase.lib", attribution("Eclipse Xtext", "EPL-2.0")),
+          Map.entry("picocli", attribution("picocli", "Apache-2.0")),
+          Map.entry("slf4j-api", attribution("SLF4J", "MIT (SLF4J)")),
+          Map.entry("snakeyaml-engine", attribution("SnakeYAML Engine", "Apache-2.0")),
+          Map.entry(
+              "xml-apis",
+              attribution(
+                  "Apache XML Commons xml-apis",
+                  "Apache-2.0",
+                  "SAX (public domain)",
+                  "W3C Software License")),
+          Map.entry(
+              "xml-apis-ext",
+              attribution(
+                  "Apache XML Commons xml-apis-ext",
+                  "Apache-2.0",
+                  "SAX (public domain)",
+                  "W3C Software License")),
+          Map.entry(
+              "xmlgraphics-commons", attribution("Apache XML Graphics Commons", "Apache-2.0")));
+
+  /**
+   * Bundled verbatim licence texts appended to the generated notices. Every licence id used in
+   * THIRD_PARTY_ATTRIBUTIONS must have a text here; a new dependency under a new licence must add
+   * its canonical text before it can ship.
+   */
+  private static final Map<String, String> LICENSE_TEXT_RESOURCES =
+      Map.of(
+          "Apache-2.0", "licenses/apache-2.0.txt",
+          "EPL-2.0", "licenses/epl-2.0.txt",
+          "EPL-1.0", "licenses/epl-1.0.txt",
+          "MIT (SLF4J)", "licenses/mit-slf4j.txt",
+          "SAX (public domain)", "licenses/sax.txt",
+          "W3C Software License", "licenses/w3c-software.txt");
 
   private DistTool() {}
 
@@ -215,17 +326,93 @@ public final class DistTool {
             .forEach(jars::add);
       }
     }
+    Set<String> firstParty = new TreeSet<>();
+    Map<String, ThirdPartyAttribution> thirdParty = new TreeMap<>();
+    List<String> unattributed = new ArrayList<>();
+    for (String jar : jars) {
+      String artifact = jarArtifactId(jar);
+      if (FIRST_PARTY_ARTIFACTS.contains(artifact)) {
+        firstParty.add(jar);
+      } else {
+        ThirdPartyAttribution attribution = THIRD_PARTY_ATTRIBUTIONS.get(artifact);
+        if (attribution == null) {
+          unattributed.add(jar);
+        } else {
+          thirdParty.put(jar, attribution);
+        }
+      }
+    }
+    if (!unattributed.isEmpty()) {
+      throw new IllegalStateException(
+          "redistributed jars without licence attribution: "
+              + unattributed
+              + "; add DistTool.THIRD_PARTY_ATTRIBUTIONS (or FIRST_PARTY_ARTIFACTS) entries");
+    }
     Files.createDirectories(output.getParent());
     StringBuilder notice = new StringBuilder();
     notice.append("# Third-Party Notices\n\n");
-    notice.append("Dediren's own source and launchers are covered by the root LICENSE file.\n");
-    notice.append(
-        "The Maven runtime dependency graph below covers redistributed Java libraries.\n\n");
-    notice.append("## Java Runtime Dependencies\n\n");
-    for (String jar : jars) {
+    notice.append("Dediren's own modules and launchers are covered by the bundle root\n");
+    notice.append("LICENSE file (MIT License).\n\n");
+    notice.append("## First-Party Jars\n\n");
+    for (String jar : firstParty) {
       notice.append("- ").append(jar).append('\n');
     }
+    notice.append('\n');
+    notice.append("## Redistributed Third-Party Libraries\n\n");
+    notice.append("Each launcher `lib/` directory redistributes the libraries below in\n");
+    notice.append("unmodified object form. Every library remains covered by its upstream\n");
+    notice.append("licence, identified per jar as `(project, licence)`. Licence and notice\n");
+    notice.append("files embedded inside the jars (`META-INF/LICENSE`, `META-INF/NOTICE`,\n");
+    notice.append("`about.html`) are redistributed unchanged and remain authoritative for\n");
+    notice.append("their jar.\n\n");
+    Set<String> licenseIds = new TreeSet<>();
+    for (Map.Entry<String, ThirdPartyAttribution> entry : thirdParty.entrySet()) {
+      ThirdPartyAttribution attribution = entry.getValue();
+      licenseIds.addAll(attribution.licenseIds());
+      notice
+          .append("- ")
+          .append(entry.getKey())
+          .append(" (")
+          .append(attribution.project())
+          .append(", ")
+          .append(String.join(" / ", attribution.licenseIds()))
+          .append(")\n");
+    }
+    notice.append('\n');
+    if (licenseIds.contains("EPL-2.0") || licenseIds.contains("EPL-1.0")) {
+      notice.append("## Source Code Availability\n\n");
+      notice.append("Source code for the Eclipse Public License libraries listed above is\n");
+      notice.append("available from their Eclipse Foundation project repositories\n");
+      notice.append("(https://projects.eclipse.org/) and as source artifacts on Maven\n");
+      notice.append("Central under the same coordinates as the redistributed jars.\n\n");
+    }
+    notice.append("## Licence Texts\n");
+    for (String licenseId : licenseIds) {
+      notice.append("\n### ").append(licenseId).append("\n\n");
+      String text = licenseText(licenseId);
+      notice.append(text);
+      if (!text.endsWith("\n")) {
+        notice.append('\n');
+      }
+    }
     Files.writeString(output, notice.toString(), StandardCharsets.UTF_8);
+  }
+
+  private static String jarArtifactId(String jarName) {
+    return jarName.replaceFirst("-\\d.*\\.jar$", "");
+  }
+
+  private static String licenseText(String licenseId) throws IOException {
+    String resource = LICENSE_TEXT_RESOURCES.get(licenseId);
+    if (resource == null) {
+      throw new IllegalStateException("no bundled licence text for " + licenseId);
+    }
+    try (var in = DistTool.class.getResourceAsStream(resource)) {
+      if (in == null) {
+        throw new IllegalStateException("missing licence text resource: " + resource);
+      }
+      return new String(in.readAllBytes(), StandardCharsets.UTF_8);
+    }
   }
 
   private static void smoke(Path root, Path archive, String version) throws Exception {

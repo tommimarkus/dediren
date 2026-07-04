@@ -101,6 +101,61 @@ class DistModuleTest {
   }
 
   @Test
+  void noticesIdentifyLicencesAndEmbedTexts(@TempDir Path root) throws Exception {
+    Path lib = root.resolve("cli/target/appassembler/lib");
+    Files.createDirectories(lib);
+    for (String jar :
+        java.util.List.of(
+            "cli-2026.07.1.jar",
+            "guava-33.6.0-jre.jar",
+            "org.eclipse.elk.core-0.11.0.jar",
+            "org.eclipse.emf.ecore-2.12.0.jar",
+            "slf4j-api-2.0.17.jar",
+            "xml-apis-1.4.01.jar")) {
+      Files.writeString(lib.resolve(jar), "");
+    }
+    Path output = root.resolve("THIRD-PARTY-NOTICES.md");
+
+    DistTool.run(
+        new String[] {"notices", "--root", root.toString(), "--output", output.toString()});
+
+    // Redistribution compliance: every third-party jar carries a licence identification,
+    // EPL source availability is stated, and the referenced licence texts ride in the file.
+    assertThat(Files.readString(output))
+        .contains("- cli-2026.07.1.jar")
+        .contains("- guava-33.6.0-jre.jar (Google Guava, Apache-2.0)")
+        .contains("- org.eclipse.elk.core-0.11.0.jar (Eclipse Layout Kernel (ELK), EPL-2.0)")
+        .contains("- org.eclipse.emf.ecore-2.12.0.jar (Eclipse Modeling Framework (EMF), EPL-1.0)")
+        .contains("- slf4j-api-2.0.17.jar (SLF4J, MIT (SLF4J))")
+        .contains(
+            "- xml-apis-1.4.01.jar (Apache XML Commons xml-apis, Apache-2.0 / SAX (public domain)"
+                + " / W3C Software License)")
+        .contains("## Source Code Availability")
+        .contains("Apache License")
+        .contains("Eclipse Public License - v 2.0")
+        .contains("Eclipse Public License - v 1.0")
+        .contains("W3C® SOFTWARE NOTICE AND LICENSE")
+        .contains("QOS.ch");
+  }
+
+  @Test
+  void noticesFailOnUnattributedThirdPartyJar(@TempDir Path root) throws Exception {
+    Path lib = root.resolve("cli/target/appassembler/lib");
+    Files.createDirectories(lib);
+    Files.writeString(lib.resolve("mystery-1.0.jar"), "");
+    Path output = root.resolve("THIRD-PARTY-NOTICES.md");
+
+    assertThatThrownBy(
+            () ->
+                DistTool.run(
+                    new String[] {
+                      "notices", "--root", root.toString(), "--output", output.toString()
+                    }))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("mystery-1.0.jar");
+  }
+
+  @Test
   void launcherScriptExportsBundleRootFromAppHome() {
     String script =
         """
