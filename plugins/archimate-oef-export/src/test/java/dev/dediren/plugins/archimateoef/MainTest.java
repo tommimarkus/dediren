@@ -75,6 +75,33 @@ class MainTest {
   }
 
   @Test
+  void schemaDownloadFailureNamesProxyAndOfflineRemediation() throws Exception {
+    // Issue #35: the OEF schema download runs curl in the plugin child. When it cannot fetch the
+    // schema (proxied/sandboxed environment), DEDIREN_OEF_SCHEMA_UNAVAILABLE must name both
+    // remediations agents can self-serve from stdout JSON alone: expose proxy env to the plugin,
+    // or pre-fetch the XSDs and point DEDIREN_OEF_SCHEMA_DIR at them. Force the download path
+    // (DEDIREN_OEF_SCHEMA_DIR unset) to fail deterministically without a network by pointing the
+    // cache dir under a regular file so the cache directory cannot be created.
+    Path blocker = tempDir.resolve("not-a-directory");
+    Files.writeString(blocker, "x", StandardCharsets.UTF_8);
+    Map<String, String> env =
+        Map.of("DEDIREN_SCHEMA_CACHE_DIR", blocker.resolve("cache").toString());
+
+    PluginResult result =
+        Main.executeForTesting(
+            new String[] {"export"},
+            exportInput(
+                fixtureJson("fixtures/source/valid-archimate-oef.json"),
+                fixtureJson("fixtures/layout-result/archimate-oef-basic.json")),
+            env);
+
+    JsonNode diagnostic = JsonSupport.objectMapper().readTree(result.stdout()).at("/diagnostics/0");
+    assertThat(diagnostic.at("/code").asText()).isEqualTo("DEDIREN_OEF_SCHEMA_UNAVAILABLE");
+    assertThat(diagnostic.at("/message").asText())
+        .contains("HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "DEDIREN_OEF_SCHEMA_DIR");
+  }
+
+  @Test
   void emitsSemanticGroupingViewNodeAndIgnoresLayoutOnlyGroup() throws Exception {
     JsonNode source = fixtureJson("fixtures/source/valid-archimate-oef.json");
     ((ArrayNode) source.get("nodes"))
@@ -430,6 +457,213 @@ class MainTest {
     assertThat(result.exitCode()).isEqualTo(3);
     assertErrorCode(result, "DEDIREN_OEF_SCHEMA_INVALID");
     assertThat(result.stdout()).contains("official OEF schema");
+  }
+
+  @Test
+  void declaresSchemaLocationAgainstDiagramSchemaNotModelSchema() throws Exception {
+    String xml =
+        exportXml(
+            fixtureJson("fixtures/source/valid-archimate-oef.json"),
+            fixtureJson("fixtures/layout-result/archimate-oef-basic.json"));
+
+    // The document carries <views>/<diagrams>, which archimate3_Model.xsd rejects; it must declare
+    // the diagram-bearing schema it actually validates against (issue #34, gap 3).
+    assertThat(xml)
+        .contains(
+            "xsi:schemaLocation=\"http://www.opengroup.org/xsd/archimate/3.0/"
+                + " http://www.opengroup.org/xsd/archimate/3.1/archimate3_Diagram.xsd\"");
+    assertThat(xml).doesNotContain("archimate3_Model.xsd");
+  }
+
+  @Test
+  void preservesNodeAndRelationshipPropertiesViaOefPropertyDefinitions() throws Exception {
+    JsonNode source = fixtureJson("fixtures/source/valid-archimate-oef.json");
+    ObjectNode componentProperties = (ObjectNode) source.at("/nodes/0/properties");
+    componentProperties.put("evidence-classification", "candidate-from-source");
+    componentProperties.put("confidence", 0.4);
+    ((ObjectNode) source.at("/relationships/0/properties")).put("source-path", "src/orders/mod.rs");
+
+    String xml = exportXml(source, fixtureJson("fixtures/layout-result/archimate-oef-basic.json"));
+
+    // Each distinct key becomes one model-level property definition (sorted for determinism).
+    assertThat(xml)
+        .contains(
+            "<propertyDefinitions>"
+                + "<propertyDefinition identifier=\"id-prop-confidence\" type=\"string\">"
+                + "<name xml:lang=\"en\">confidence</name></propertyDefinition>"
+                + "<propertyDefinition identifier=\"id-prop-evidence-classification\""
+                + " type=\"string\">"
+                + "<name xml:lang=\"en\">evidence-classification</name></propertyDefinition>"
+                + "<propertyDefinition identifier=\"id-prop-source-path\" type=\"string\">"
+                + "<name xml:lang=\"en\">source-path</name></propertyDefinition>"
+                + "</propertyDefinitions>");
+    // The element references its property definitions and carries the values (issue #34, gap 2).
+    assertThat(xml)
+        .contains(
+            "<element identifier=\"id-el-orders-component\" xsi:type=\"ApplicationComponent\">"
+                + "<name xml:lang=\"en\">Orders Component</name>"
+                + "<properties>"
+                + "<property propertyDefinitionRef=\"id-prop-confidence\">"
+                + "<value xml:lang=\"en\">0.4</value></property>"
+                + "<property propertyDefinitionRef=\"id-prop-evidence-classification\">"
+                + "<value xml:lang=\"en\">candidate-from-source</value></property>"
+                + "</properties></element>");
+    assertThat(xml)
+        .contains(
+            "<properties><property propertyDefinitionRef=\"id-prop-source-path\">"
+                + "<value xml:lang=\"en\">src/orders/mod.rs</value></property></properties>"
+                + "</relationship>");
+  }
+
+  @Test
+  void emitsNoPropertyDefinitionsWhenSourceHasNoProperties() throws Exception {
+    String xml =
+        exportXml(
+            fixtureJson("fixtures/source/valid-archimate-oef.json"),
+            fixtureJson("fixtures/layout-result/archimate-oef-basic.json"));
+
+    assertThat(xml).doesNotContain("<propertyDefinitions>", "<properties>");
+  }
+
+  @Test
+  void declaresOmittedViewsWithInfoDiagnosticWhileStatusStaysOk() throws Exception {
+    JsonNode source = fixtureJson("fixtures/source/valid-archimate-oef.json");
+    ArrayNode views = (ArrayNode) source.at("/plugins/generic-graph/views");
+    views
+        .addObject()
+        .put("id", "detail")
+        .put("label", "Detail")
+        .set("nodes", JsonSupport.objectMapper().createArrayNode().add("orders-service"));
+
+    PluginResult result =
+        Main.executeForTesting(
+            new String[] {"export"},
+            exportInput(source, fixtureJson("fixtures/layout-result/archimate-oef-basic.json")),
+            envWithOefSchemas());
+
+    JsonNode envelope = JsonSupport.objectMapper().readTree(result.stdout());
+    assertThat(result.exitCode()).isZero();
+    assertThat(envelope.at("/status").asText()).isEqualTo("ok");
+    assertThat(envelope.at("/data/content").asText()).contains("<view identifier=\"id-view-main\"");
+    JsonNode diagnostic = envelope.at("/diagnostics/0");
+    assertThat(diagnostic.at("/code").asText()).isEqualTo("DEDIREN_OEF_VIEWS_OMITTED");
+    assertThat(diagnostic.at("/severity").asText()).isEqualTo("info");
+    assertThat(diagnostic.at("/path").asText()).isEqualTo("source.plugins.generic-graph.views");
+    assertThat(diagnostic.at("/message").asText())
+        .contains("1 of 2 ArchiMate views", "omitted: detail", "single laid-out view 'main'");
+  }
+
+  @Test
+  void singleDeclaredViewEmitsNoViewCoverageDiagnostic() throws Exception {
+    PluginResult result =
+        Main.executeForTesting(
+            new String[] {"export"},
+            exportInput(
+                fixtureJson("fixtures/source/valid-archimate-oef.json"),
+                fixtureJson("fixtures/layout-result/archimate-oef-basic.json")),
+            envWithOefSchemas());
+
+    JsonNode envelope = JsonSupport.objectMapper().readTree(result.stdout());
+    assertThat(envelope.at("/status").asText()).isEqualTo("ok");
+    assertThat(envelope.at("/diagnostics")).isEmpty();
+  }
+
+  @Test
+  void declaresOmissionWhenTheSingleDeclaredViewIsNotTheExportedView() throws Exception {
+    // Exactly one declared view, but its id ('detail') is not the exported view ('main'): the
+    // exported diagram is not the declared one, so the loss must still be declared, not suppressed
+    // by a view-count short-circuit (issue #34).
+    JsonNode source = fixtureJson("fixtures/source/valid-archimate-oef.json");
+    ((ObjectNode) source.at("/plugins/generic-graph/views/0")).put("id", "detail");
+
+    PluginResult result =
+        Main.executeForTesting(
+            new String[] {"export"},
+            exportInput(source, fixtureJson("fixtures/layout-result/archimate-oef-basic.json")),
+            envWithOefSchemas());
+
+    JsonNode envelope = JsonSupport.objectMapper().readTree(result.stdout());
+    assertThat(envelope.at("/status").asText()).isEqualTo("ok");
+    assertThat(envelope.at("/diagnostics/0/code").asText()).isEqualTo("DEDIREN_OEF_VIEWS_OMITTED");
+    assertThat(envelope.at("/diagnostics/0/message").asText())
+        .contains("1 of 1 ArchiMate views", "omitted: detail", "single laid-out view 'main'");
+  }
+
+  @Test
+  void listsEveryOmittedViewSortedAndCountedWhenSeveralAreOmitted() throws Exception {
+    JsonNode source = fixtureJson("fixtures/source/valid-archimate-oef.json");
+    ArrayNode views = (ArrayNode) source.at("/plugins/generic-graph/views");
+    views.addObject().put("id", "detail").put("label", "Detail");
+    views.addObject().put("id", "alt").put("label", "Alt");
+
+    PluginResult result =
+        Main.executeForTesting(
+            new String[] {"export"},
+            exportInput(source, fixtureJson("fixtures/layout-result/archimate-oef-basic.json")),
+            envWithOefSchemas());
+
+    JsonNode envelope = JsonSupport.objectMapper().readTree(result.stdout());
+    assertThat(envelope.at("/diagnostics/0/code").asText()).isEqualTo("DEDIREN_OEF_VIEWS_OMITTED");
+    assertThat(envelope.at("/diagnostics/0/message").asText())
+        .contains("2 of 3 ArchiMate views", "omitted: alt, detail");
+  }
+
+  @Test
+  void toleratesMalformedGenericGraphPluginDataWithoutCrashingOrViewDiagnostic() throws Exception {
+    JsonNode source = fixtureJson("fixtures/source/valid-archimate-oef.json");
+    // 'views' as a string cannot deserialize into a view list; the export must degrade to no view
+    // diagnostic rather than crash the plugin process.
+    ((ObjectNode) source.at("/plugins/generic-graph")).put("views", "not-a-view-array");
+
+    PluginResult result =
+        Main.executeForTesting(
+            new String[] {"export"},
+            exportInput(source, fixtureJson("fixtures/layout-result/archimate-oef-basic.json")),
+            envWithOefSchemas());
+
+    JsonNode envelope = JsonSupport.objectMapper().readTree(result.stdout());
+    assertThat(result.exitCode()).isZero();
+    assertThat(envelope.at("/status").asText()).isEqualTo("ok");
+    assertThat(envelope.at("/diagnostics")).isEmpty();
+  }
+
+  @Test
+  void escapesXmlMetacharactersInPropertyKeysAndValues() throws Exception {
+    JsonNode source = fixtureJson("fixtures/source/valid-archimate-oef.json");
+    ((ObjectNode) source.at("/nodes/0/properties")).put("note<x", "a&b<c");
+
+    String xml = exportXml(source, fixtureJson("fixtures/layout-result/archimate-oef-basic.json"));
+
+    assertThat(xml)
+        .contains(
+            "<name xml:lang=\"en\">note&lt;x</name>",
+            "<value xml:lang=\"en\">a&amp;b&lt;c</value>");
+    assertThat(xml).doesNotContain("note<x", "a&b<c");
+  }
+
+  @Test
+  void emitsElementPropertiesInSortedKeyOrderIndependentOfSourceMapOrder() throws Exception {
+    JsonNode source = fixtureJson("fixtures/source/valid-archimate-oef.json");
+    ObjectNode properties = (ObjectNode) source.at("/nodes/0/properties");
+    properties.put("owner", "team-x");
+    properties.put("notes", "n");
+    properties.put("source-path", "p");
+    properties.put("confidence", "c");
+
+    String xml = exportXml(source, fixtureJson("fixtures/layout-result/archimate-oef-basic.json"));
+
+    assertThat(xml)
+        .contains(
+            "<properties>"
+                + "<property propertyDefinitionRef=\"id-prop-confidence\">"
+                + "<value xml:lang=\"en\">c</value></property>"
+                + "<property propertyDefinitionRef=\"id-prop-notes\">"
+                + "<value xml:lang=\"en\">n</value></property>"
+                + "<property propertyDefinitionRef=\"id-prop-owner\">"
+                + "<value xml:lang=\"en\">team-x</value></property>"
+                + "<property propertyDefinitionRef=\"id-prop-source-path\">"
+                + "<value xml:lang=\"en\">p</value></property>"
+                + "</properties>");
   }
 
   private String exportXml(JsonNode source, JsonNode layout) throws Exception {

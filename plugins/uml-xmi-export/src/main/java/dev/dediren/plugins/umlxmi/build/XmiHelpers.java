@@ -122,6 +122,27 @@ public final class XmiHelpers {
     return new String[] {value, value};
   }
 
+  /**
+   * Appends a multiplicity as UML 2.5.1 canonical owned {@code ValueSpecification} children: {@code
+   * lowerValue} as a {@code uml:LiteralInteger} and {@code upperValue} as a {@code
+   * uml:LiteralUnlimitedNatural} (with {@code *} denoting unlimited). Owner elements that carry a
+   * multiplicity ({@code ownedAttribute}, association {@code ownedEnd}) must be written as open
+   * elements so these children can nest inside them, rather than serializing bounds as XML
+   * attributes, which UML importers ignore or reject (issue #33 defect 2).
+   */
+  public static void writeMultiplicityValues(StringBuilder xml, String ownerId, String[] bounds) {
+    xml.append("<lowerValue xmi:type=\"uml:LiteralInteger\" xmi:id=\"")
+        .append(attr(ownerId + "-lower"))
+        .append("\" value=\"")
+        .append(attr(bounds[0]))
+        .append("\"/>");
+    xml.append("<upperValue xmi:type=\"uml:LiteralUnlimitedNatural\" xmi:id=\"")
+        .append(attr(ownerId + "-upper"))
+        .append("\" value=\"")
+        .append(attr(bounds[1]))
+        .append("\"/>");
+  }
+
   public static boolean isXmlId(String value) {
     if (value.isEmpty()) {
       return false;

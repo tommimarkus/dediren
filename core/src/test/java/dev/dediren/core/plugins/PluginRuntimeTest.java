@@ -282,6 +282,40 @@ class PluginRuntimeTest {
   }
 
   @Test
+  void manifestListedProxyEnvIsForwardedToChildProcess() throws Exception {
+    // Issue #35: export plugins run curl in the child to download schemas, so proxy configuration
+    // must cross the process boundary. Core forwards only manifest-listed vars, so a manifest that
+    // lists HTTPS_PROXY makes its value visible to the child. (The complementary guarantee — that a
+    // var absent from allowed_env stays stripped — is proven by
+    // explicitEnvWithoutManifestAllowlistIsNotPassedToPlugin.)
+    writeManifest(
+        temp,
+        "runtime-testbed",
+        testbedExecutable().toString(),
+        List.of("render"),
+        List.of("DEDIREN_TEST_PLUGIN_MODE", "DEDIREN_TEST_REPORT_ENV", "HTTPS_PROXY"));
+    var options =
+        PluginRunOptions.defaults()
+            .withCandidateEnv(
+                Map.of(
+                    "DEDIREN_TEST_PLUGIN_MODE", "report-env",
+                    "DEDIREN_TEST_REPORT_ENV", "HTTPS_PROXY",
+                    "HTTPS_PROXY", "http://proxy.example:3128"));
+
+    PluginRunOutcome outcome =
+        PluginRunner.runForCapabilityWithRegistry(
+            PluginRegistry.fromDirs(List.of(temp)),
+            "runtime-testbed",
+            "render",
+            List.of("render"),
+            "{}",
+            options);
+
+    // The child echoed the forwarded HTTPS_PROXY value, so the proxy variable crossed the boundary.
+    assertThat(outcome.stdout()).contains("http://proxy.example:3128");
+  }
+
+  @Test
   void explicitEnvWithoutManifestAllowlistIsNotPassedToPlugin() throws Exception {
     writeManifest(
         temp, "runtime-testbed", testbedExecutable().toString(), List.of("render"), List.of());

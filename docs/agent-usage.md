@@ -109,6 +109,17 @@ profile and use ArchiMate type names:
 }
 ```
 
+An `archimate-oef` export renders the single laid-out view it is handed and
+preserves node/relationship `properties` via OEF `<propertyDefinitions>` and
+per-element `<property>` values, so evidence-classification markers survive the
+export. When the source declares more views than the exported one, the omission
+is declared (rather than dropped silently) with the `info` diagnostic
+`DEDIREN_OEF_VIEWS_OMITTED`, which names the omitted view ids and counts; the
+envelope `status` stays `ok`. Because the document always carries a
+`<views>`/`<diagrams>` element it declares and validates against
+`archimate3_Diagram.xsd`, not the model-only `archimate3_Model.xsd`; point
+`DEDIREN_OEF_SCHEMA_DIR` at a directory holding all three ArchiMate 3.1 OEF XSDs.
+
 For UML SVG notation or XMI export, use `semantic_profile: "uml"` and the
 `uml-xmi` plugin. Supported UML view kinds are `uml-class`, `uml-data`,
 `uml-activity`, `uml-sequence`, `uml-state-machine`, `uml-use-case`, and
@@ -153,6 +164,34 @@ valid; the reversed directions are diagnosed).
 Continue with the Bundle Smoke Workflow commands, using
 `--policy "$BUNDLE/fixtures/render-policy/archimate-svg.json"` for ArchiMate
 SVG notation, and the OEF export under `## Export`.
+
+A `uml-xmi` export represents the single laid-out view it is handed, not the
+whole source model. In a `uml-class`/`uml-data` view it emits class
+relationships (`Association`, `Aggregation`, `Composition`, `Dependency`, and
+`Realization` between classifiers) as owned `packagedElement`s and nests
+classifiers under the `Package` they declare via `properties.uml.package`. When
+the source model contains elements or relationships outside the exported view,
+the export declares them (rather than dropping them silently) with `info`
+diagnostics `DEDIREN_XMI_ELEMENTS_OMITTED` and
+`DEDIREN_XMI_RELATIONSHIPS_OMITTED`, each listing the omitted count and a
+per-type breakdown; the envelope `status` stays `ok`. Read those diagnostics
+from `.diagnostics[]` to know exactly what a given XMI does and does not cover
+(for example, to disclose "classes only") and export the other views to
+represent their content.
+
+Class content is canonical UML 2.5.1: every attribute `type` resolves to an
+`xmi:id` in the document (an emitted classifier, or a self-contained
+`uml:PrimitiveType`/`uml:DataType` synthesized for standard primitives and
+domain types) rather than a dangling type-name string, and multiplicities are
+owned `lowerValue` (`uml:LiteralInteger`) / `upperValue`
+(`uml:LiteralUnlimitedNatural`, `*` for unbounded) value-specification children
+rather than XML attributes. To schema-check the emitted UML content, point
+`DEDIREN_XMI_SCHEMA_PATH` at a driver schema that imports the OMG `XMI.xsd` and
+a UML 2.5.1 XSD and run `xmllint --nonet --noout --schema <driver.xsd>
+<document>`; OMG does not publish an importable UML 2.5.1 XSD, so supply or
+generate one, or import the document into a UML tool. Without a UML schema only
+the XMI envelope is checked. The `capabilities` command reports this recipe
+under `runtime.schema_validation.uml_content_validation`.
 
 ## Command Handoff
 
@@ -506,10 +545,17 @@ from any current working directory.
 `validate-layout` quality fields: `overlap_count`, `connector_through_node_count`,
 `invalid_route_count`, `route_detour_count`, `route_close_parallel_count`,
 `group_boundary_issue_count`, `group_label_band_issue_count`,
-`label_space_issue_count`, `edge_crossing_count` (informational only), and
-`warning_count`. `status` is `ok` only when all non-informational counts and
-warnings are zero. ArchiMate junction nodes detached from an incident edge
-route fail with `DEDIREN_LAYOUT_JUNCTION_OFF_INCIDENT_ROUTE`.
+`label_space_issue_count`, `edge_label_dissociation_count`,
+`edge_crossing_count` (informational only), and
+`warning_count`. The payload `data.status` is `ok` only when all
+non-informational counts and warnings are zero; otherwise it is `warning`, and
+the command envelope now restates that verdict so consumers reading only
+`.status`/`.diagnostics[]` see it: envelope `status` becomes `warning` and one
+`DEDIREN_LAYOUT_QUALITY_WARNING` diagnostic (severity `warning`, `path` pointing
+at the offending `data.*` count) is emitted per nonzero non-informational count.
+A warning verdict is not a failure — the exit code stays `0`. ArchiMate junction
+nodes detached from an incident edge route fail with
+`DEDIREN_LAYOUT_JUNCTION_OFF_INCIDENT_ROUTE`.
 
 The `elk-layout` plugin uses official Eclipse ELK Java libraries and requires
 Java 21 or newer. It does not use external layout adapters. Use
@@ -576,6 +622,13 @@ reusable offline cache (subtrees `opengroup/archimate/3.1/` and
 paths as absolute: plugins run from the bundle's product root, so a relative
 value resolves against that root rather than your current directory.
 
+When schema downloads must go through a proxy, set `HTTP_PROXY`, `HTTPS_PROXY`,
+and `NO_PROXY` (or their lowercase forms) before invoking `dediren`; the export
+plugins forward them to `curl`. If a download still fails, the
+`DEDIREN_OEF_SCHEMA_UNAVAILABLE` / `DEDIREN_XMI_SCHEMA_UNAVAILABLE` diagnostic
+message names both the proxy variables and the offline schema-path fallback, so
+you can recover from stdout JSON alone.
+
 ## Repair Rules
 
 - `DEDIREN_SCHEMA_INVALID`: validate against `schemas/model.schema.json`. A
@@ -618,8 +671,11 @@ variables. Important explicit variables:
   explicit human confirmation.
 - `DEDIREN_PLUGIN_<PLUGIN_ID>`: per-plugin executable override.
 - `DEDIREN_OEF_SCHEMA_DIR`: local OEF schema directory.
-- `DEDIREN_XMI_SCHEMA_PATH`: local XMI schema file.
+- `DEDIREN_XMI_SCHEMA_PATH`: local XMI schema file, or a driver schema that
+  imports `XMI.xsd` plus a UML 2.5.1 XSD to also validate UML content.
 - `DEDIREN_SCHEMA_CACHE_DIR`: cache directory for schema downloads.
+- `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY` (and their lowercase forms): forwarded
+  to the export plugins so `curl` can download standards schemas through a proxy.
 - `DEDIREN_CDS_DIR`: directory for Class-Data-Sharing archives (see below).
 - `DEDIREN_TRUST_MANIFEST_CAPABILITIES`: opt-in; trusts each plugin's static
   manifest capabilities and skips the per-call runtime probe, removing one JVM
@@ -635,7 +691,9 @@ is read-only, the launcher falls back to `${XDG_CACHE_HOME:-$HOME/.cache}/dedire
 Set `DEDIREN_CDS_DIR` to an explicit writable path to relocate all archives.
 The feature is based on `-XX:+AutoCreateSharedArchive` and degrades silently if
 the archive directory is unwritable — startup continues at normal speed without
-any error.
+any error. Launchers also pass `-Xlog:cds=off` so the JVM's per-invocation CDS
+archive-dump warnings never reach stdout/stderr; a healthy run stays quiet and
+stderr remains reserved for genuine diagnostics.
 
 Each archive is seeded by that launcher's first invocation and is not
 regenerated while it stays valid, and its contents depend on what that first

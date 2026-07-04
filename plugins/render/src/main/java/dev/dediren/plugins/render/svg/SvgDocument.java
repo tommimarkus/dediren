@@ -159,6 +159,17 @@ public final class SvgDocument {
         svg.append(edgeLabel(label, edge.label(), style, base.backgroundFill(), edgeLabelFontSize));
         placedLabelBoxes.add(edgeLabelVisibleBox(label, style.labelPresentation()));
       }
+      RenderMetadataSelector edgeSelector =
+          metadata == null ? null : metadata.edges().get(edge.id());
+      List<EdgeEndAdornments.Adornment> endAdornments =
+          EdgeEndAdornments.adornments(edge, edgeSelector, base.fontSize());
+      if (!endAdornments.isEmpty()) {
+        svg.append(
+            EdgeEndAdornments.markup(endAdornments, style, base.backgroundFill(), base.fontSize()));
+        for (EdgeEndAdornments.Adornment adornment : endAdornments) {
+          placedLabelBoxes.add(EdgeEndAdornments.visibleBox(adornment, style));
+        }
+      }
       svg.append("</g>");
       renderedEdges.add(edge);
     }
@@ -183,7 +194,11 @@ public final class SvgDocument {
 
   public static String interactiveMode(RenderPolicy policy) {
     String mode = policy.interactive();
-    return mode == null ? "svg" : mode;
+    // The documented default is "none": omitting the field yields a static SVG with no
+    // interaction script. Interactivity is opt-in via an explicit "svg", "html", or "both".
+    // This rule is uniform across every view; the UML sequence renderer additionally never
+    // emits the highlight script even when interactivity is requested (nothing to highlight).
+    return mode == null ? "none" : mode;
   }
 
   private static String interactionStyleBlock(RenderPolicy policy) {

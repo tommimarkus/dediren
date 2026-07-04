@@ -78,6 +78,9 @@ subsequent calls (one `.jsa` per launcher). Archives are written to
 `${XDG_CACHE_HOME:-$HOME/.cache}/dediren/cds` if the bundle directory is
 read-only. Set `DEDIREN_CDS_DIR` to relocate them. The feature degrades silently
 if the archive directory is unwritable — startup continues at normal speed.
+Launchers pass `-Xlog:cds=off`, which suppresses the JVM's archive-dump warnings
+(`[warning][cds] ... Old class has been linked`, `... Unsupported location`) so
+each invocation stays quiet on stdout/stderr while keeping the CDS speedup.
 
 ## Release Artifacts & Verification
 

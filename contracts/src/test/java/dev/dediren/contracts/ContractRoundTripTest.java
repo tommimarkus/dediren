@@ -621,6 +621,24 @@ class ContractRoundTripTest {
     assertThat(capabilities.runtime().get("java").asText()).isEqualTo("21");
   }
 
+  @Test
+  void exportManifestsForwardProxyEnvForSchemaDownloads() throws Exception {
+    // Issue #35: OEF/XMI schema downloads run curl in the plugin child, which receives only
+    // manifest-listed env. The export manifests must list the standard proxy variables (upper- and
+    // lower-case) so proxy configuration reaches curl in proxied/sandboxed environments.
+    List<String> proxyEnv =
+        List.of("HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "http_proxy", "https_proxy", "no_proxy");
+    for (String fixture :
+        List.of(
+            "fixtures/plugins/archimate-oef.manifest.json",
+            "fixtures/plugins/uml-xmi.manifest.json")) {
+      PluginManifest manifest = readFixture(fixture, PluginManifest.class);
+      assertThat(manifest.allowedEnv())
+          .as("proxy env forwarded by %s", fixture)
+          .containsAll(proxyEnv);
+    }
+  }
+
   private static <T> T readFixture(String fixture, Class<T> type) throws Exception {
     return JsonSupport.readValue(Files.readString(workspaceRoot().resolve(fixture)), type);
   }

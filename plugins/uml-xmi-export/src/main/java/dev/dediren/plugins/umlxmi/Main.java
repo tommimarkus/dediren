@@ -18,11 +18,14 @@ import dev.dediren.contracts.CommandEnvelope;
 import dev.dediren.contracts.ContractVersions;
 import dev.dediren.contracts.Diagnostic;
 import dev.dediren.contracts.DiagnosticSeverity;
+import dev.dediren.contracts.EnvelopeStatus;
 import dev.dediren.contracts.export.ExportRequest;
 import dev.dediren.contracts.export.ExportResult;
 import dev.dediren.contracts.export.UmlXmiExportPolicy;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.contracts.source.GenericGraphPluginData;
+import dev.dediren.plugins.umlxmi.build.Coverage;
+import dev.dediren.plugins.umlxmi.build.ExportScope;
 import dev.dediren.plugins.umlxmi.build.XmiExportException;
 import dev.dediren.plugins.umlxmi.build.XmiValidationException;
 import dev.dediren.uml.Uml;
@@ -33,6 +36,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import tools.jackson.databind.node.ObjectNode;
@@ -105,6 +109,13 @@ public final class Main {
     schemaValidation.put("fetcher", SCHEMA_FETCHER);
     schemaValidation.put(
         "limitation", "UML 2.5.1 is published as an XMI metamodel, not an importable XML Schema");
+    schemaValidation.put(
+        "uml_content_validation",
+        "To schema-check the emitted uml:* content, point DEDIREN_XMI_SCHEMA_PATH at a driver schema"
+            + " that imports the OMG XMI.xsd and a UML 2.5.1 XSD, then run: xmllint --nonet --noout"
+            + " --schema <driver.xsd> <document>. OMG does not publish an importable UML 2.5.1 XSD,"
+            + " so supply or generate one (for example from the Eclipse UML2 metamodel) or import"
+            + " the document into a UML tool. Without a UML schema only the XMI envelope is checked.");
     return JsonSupport.objectMapper().writeValueAsString(root);
   }
 
@@ -144,13 +155,64 @@ public final class Main {
       return exitWithDiagnostic(stdout, error.code(), error.getMessage(), "content");
     }
 
-    stdout.println(
-        JsonSupport.objectMapper()
-            .writeValueAsString(
-                CommandEnvelope.ok(
-                    new ExportResult(
-                        ContractVersions.EXPORT_RESULT_SCHEMA_VERSION, "uml-xmi+xml", content))));
+    var result =
+        new ExportResult(ContractVersions.EXPORT_RESULT_SCHEMA_VERSION, "uml-xmi+xml", content);
+    Coverage coverage =
+        Coverage.compute(
+            request.source().nodes(),
+            request.source().relationships(),
+            ExportScope.fromRequest(request));
+    stdout.println(JsonSupport.objectMapper().writeValueAsString(exportEnvelope(result, coverage)));
     return 0;
+  }
+
+  private static CommandEnvelope<ExportResult> exportEnvelope(
+      ExportResult result, Coverage coverage) {
+    List<Diagnostic> diagnostics = coverageDiagnostics(coverage);
+    if (diagnostics.isEmpty()) {
+      return CommandEnvelope.ok(result);
+    }
+    // A view-scoped XMI is intentionally partial model interchange, so an omission is
+    // informational,
+    // not a failure: status stays "ok" while the diagnostics let a consumer see, from stdout JSON
+    // alone, exactly which source content this artifact does not represent (issue #32).
+    return new CommandEnvelope<>(
+        ContractVersions.ENVELOPE_SCHEMA_VERSION, EnvelopeStatus.OK, result, diagnostics);
+  }
+
+  private static List<Diagnostic> coverageDiagnostics(Coverage coverage) {
+    var diagnostics = new ArrayList<Diagnostic>();
+    if (coverage.omittedNodes() > 0) {
+      diagnostics.add(
+          new Diagnostic(
+              "DEDIREN_XMI_ELEMENTS_OMITTED",
+              DiagnosticSeverity.INFO,
+              coverage.omittedNodes()
+                  + " of "
+                  + (coverage.representedNodes() + coverage.omittedNodes())
+                  + " source elements are outside the exported view and are not represented in this"
+                  + " XMI (omitted by type: "
+                  + Coverage.describe(coverage.omittedNodeTypes())
+                  + "). This export covers a single laid-out view; export the other views to"
+                  + " represent them.",
+              "source.nodes"));
+    }
+    if (coverage.omittedRelationships() > 0) {
+      diagnostics.add(
+          new Diagnostic(
+              "DEDIREN_XMI_RELATIONSHIPS_OMITTED",
+              DiagnosticSeverity.INFO,
+              coverage.omittedRelationships()
+                  + " of "
+                  + (coverage.representedRelationships() + coverage.omittedRelationships())
+                  + " source relationships are outside the exported view and are not represented in"
+                  + " this XMI (omitted by type: "
+                  + Coverage.describe(coverage.omittedRelationshipTypes())
+                  + "). This export covers a single laid-out view; export the other views to"
+                  + " represent them.",
+              "source.relationships"));
+    }
+    return diagnostics;
   }
 
   // Defense in depth: this validator only ever parses Dediren's own generated

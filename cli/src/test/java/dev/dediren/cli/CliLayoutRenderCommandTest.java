@@ -33,9 +33,46 @@ class CliLayoutRenderCommandTest {
     assertThat(envelope.at("/data/overlap_count").asInt()).isZero();
     assertThat(envelope.at("/data/group_label_band_issue_count").asInt()).isZero();
     assertThat(envelope.at("/data/label_space_issue_count").asInt()).isZero();
+    assertThat(envelope.at("/data/edge_label_dissociation_count").asInt()).isZero();
     // Presence pin, not value pin: the fixture's crossing topology is ELK-determined, not
     // spec-derived.
     assertThat(envelope.at("/data/edge_crossing_count").isInt()).isTrue();
+  }
+
+  @Test
+  void validateLayoutSurfacesQualityWarningInEnvelopeStatusAndDiagnostics() throws Exception {
+    Path layout = temp.resolve("overlapping-layout.json");
+    Files.writeString(
+        layout,
+        """
+                {
+                  "layout_result_schema_version": "layout-result.schema.v1",
+                  "view_id": "main",
+                  "nodes": [
+                    { "id": "a", "source_id": "a", "projection_id": "a", "x": 0.0, "y": 0.0, "width": 100.0, "height": 80.0, "label": "A" },
+                    { "id": "b", "source_id": "b", "projection_id": "b", "x": 50.0, "y": 20.0, "width": 100.0, "height": 80.0, "label": "B" }
+                  ],
+                  "edges": [],
+                  "groups": [],
+                  "warnings": []
+                }
+                """);
+
+    CliResult result =
+        Main.executeForTesting(new String[] {"validate-layout", "--input", layout.toString()}, "");
+
+    JsonNode envelope = JsonSupport.objectMapper().readTree(result.stdout());
+
+    // A warning verdict is not a failure: exit stays 0, but the envelope status and diagnostics
+    // now carry the quality verdict so a consumer reading only .status/.diagnostics[] sees it.
+    assertThat(result.exitCode()).isZero();
+    assertThat(envelope.at("/status").asText()).isEqualTo("warning");
+    assertThat(envelope.at("/diagnostics/0/code").asText())
+        .isEqualTo("DEDIREN_LAYOUT_QUALITY_WARNING");
+    assertThat(envelope.at("/diagnostics/0/severity").asText()).isEqualTo("warning");
+    assertThat(envelope.at("/diagnostics/0/path").asText()).isEqualTo("$.data.overlap_count");
+    assertThat(envelope.at("/data/status").asText()).isEqualTo("warning");
+    assertThat(envelope.at("/data/overlap_count").asInt()).isEqualTo(1);
   }
 
   @Test
@@ -203,7 +240,12 @@ class CliLayoutRenderCommandTest {
             "<title>main</title>",
             "data-dediren-node-id=\"client\"",
             "data-dediren-edge-id=\"client-calls-api\"")
-        .doesNotContain("data-dediren-edge-label-background");
+        // The documented default is "none": a static SVG with no interaction script or hooks.
+        .doesNotContain(
+            "data-dediren-edge-label-background",
+            "<script",
+            "data-dediren-edge-source",
+            "dediren-edge-highlighted");
   }
 
   @Test

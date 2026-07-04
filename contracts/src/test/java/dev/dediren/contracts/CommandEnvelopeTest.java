@@ -66,6 +66,29 @@ class CommandEnvelopeTest {
   }
 
   @Test
+  void warningFactoryCarriesWarningStatusDataAndDiagnostics() {
+    var mapper = JsonSupport.objectMapper();
+    JsonNode data = mapper.createObjectNode().put("status", "warning");
+
+    var warning =
+        CommandEnvelope.warning(
+            data,
+            List.of(
+                new Diagnostic(
+                    "DEDIREN_LAYOUT_QUALITY_WARNING",
+                    DiagnosticSeverity.WARNING,
+                    "layout quality metric 'overlap_count' is 1",
+                    "$.data.overlap_count")));
+
+    assertThat(warning.envelopeSchemaVersion()).isEqualTo(ContractVersions.ENVELOPE_SCHEMA_VERSION);
+    assertThat(warning.status()).isEqualTo(EnvelopeStatus.WARNING);
+    assertThat(warning.data()).isEqualTo(data);
+    assertThat(warning.diagnostics())
+        .extracting(Diagnostic::severity)
+        .containsExactly(DiagnosticSeverity.WARNING);
+  }
+
+  @Test
   void unknownFieldsAreRejectedLikeSerdeDenyUnknownFields() {
     assertThatThrownBy(
             () ->

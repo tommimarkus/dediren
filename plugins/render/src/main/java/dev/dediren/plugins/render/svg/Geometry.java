@@ -13,6 +13,7 @@ import dev.dediren.contracts.layout.LaidOutNode;
 import dev.dediren.contracts.layout.LayoutResult;
 import dev.dediren.contracts.layout.Point;
 import dev.dediren.contracts.render.RenderMetadata;
+import dev.dediren.contracts.render.RenderMetadataSelector;
 import dev.dediren.contracts.render.RenderPolicy;
 import dev.dediren.plugins.render.style.ResolvedEdgeStyle;
 import dev.dediren.plugins.render.style.ResolvedNodeStyle;
@@ -52,19 +53,25 @@ public final class Geometry {
     List<LabelBox> placedLabelBoxes = new ArrayList<>();
     for (int edgeIndex = 0; edgeIndex < result.edges().size(); edgeIndex++) {
       LaidOutEdge edge = result.edges().get(edgeIndex);
-      if (edge.label() == null || edge.label().isEmpty()) {
-        continue;
-      }
       ResolvedEdgeStyle style = StyleResolver.edgeStyle(policy, metadata, edge.id(), base);
-      EdgeLabel label =
-          edgeLabel(
-              edge,
-              style,
-              labelObstacleBoxesForEdge(result, edgeIndex, placedLabelBoxes),
-              edgeLabelFontSize(base.fontSize()));
-      LabelBox labelBox = edgeLabelVisibleBox(label, style.labelPresentation());
-      bounds.includeRect(labelBox.minX(), labelBox.minY(), labelBox.width(), labelBox.height());
-      placedLabelBoxes.add(labelBox);
+      if (edge.label() != null && !edge.label().isEmpty()) {
+        EdgeLabel label =
+            edgeLabel(
+                edge,
+                style,
+                labelObstacleBoxesForEdge(result, edgeIndex, placedLabelBoxes),
+                edgeLabelFontSize(base.fontSize()));
+        LabelBox labelBox = edgeLabelVisibleBox(label, style.labelPresentation());
+        bounds.includeRect(labelBox.minX(), labelBox.minY(), labelBox.width(), labelBox.height());
+        placedLabelBoxes.add(labelBox);
+      }
+      RenderMetadataSelector selector = metadata == null ? null : metadata.edges().get(edge.id());
+      for (EdgeEndAdornments.Adornment adornment :
+          EdgeEndAdornments.adornments(edge, selector, base.fontSize())) {
+        LabelBox box = EdgeEndAdornments.visibleBox(adornment, style);
+        bounds.includeRect(box.minX(), box.minY(), box.width(), box.height());
+        placedLabelBoxes.add(box);
+      }
     }
     if (bounds.isEmpty()) {
       bounds.includeRect(0.0, 0.0, policy.page().width(), policy.page().height());

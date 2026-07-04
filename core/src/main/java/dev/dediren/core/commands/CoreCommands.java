@@ -18,6 +18,7 @@ import dev.dediren.core.plugins.PluginRunOptions;
 import dev.dediren.core.plugins.PluginRunOutcome;
 import dev.dediren.core.plugins.PluginRunner;
 import dev.dediren.core.quality.LayoutQuality;
+import dev.dediren.core.quality.LayoutQualityReport;
 import dev.dediren.core.source.SourceValidator;
 import dev.dediren.core.source.ValidationResult;
 import java.nio.file.Path;
@@ -117,10 +118,16 @@ public final class CoreCommands {
         return new ValidationResult(
             CommandExitCode.INPUT_ERROR.code(), CommandEnvelope.error(diagnostics));
       }
-      return new ValidationResult(
-          CommandExitCode.OK.code(),
-          CommandEnvelope.ok(
-              JsonSupport.objectMapper().valueToTree(LayoutQuality.validateLayout(result))));
+      LayoutQualityReport report = LayoutQuality.validateLayout(result);
+      JsonNode data = JsonSupport.objectMapper().valueToTree(report);
+      List<Diagnostic> qualityWarnings = LayoutQuality.layoutQualityWarnings(report);
+      // A warning verdict is not a failure, so the exit code stays OK; the envelope status and
+      // diagnostics carry the verdict for consumers that read the envelope, not just data.
+      CommandEnvelope<JsonNode> envelope =
+          qualityWarnings.isEmpty()
+              ? CommandEnvelope.ok(data)
+              : CommandEnvelope.warning(data, qualityWarnings);
+      return new ValidationResult(CommandExitCode.OK.code(), envelope);
     } catch (RuntimeException error) {
       return commandInputValidationResult("validate-layout", error);
     }

@@ -30,6 +30,9 @@ class LayoutQualityFixtureSweepTest {
     assertThat(report.groupLabelBandIssueCount())
         .as("group-label-band false positive in %s", fixture.getFileName())
         .isZero();
+    assertThat(report.edgeLabelDissociationCount())
+        .as("edge-label-dissociation false positive in %s", fixture.getFileName())
+        .isZero();
     assertThat(LayoutQuality.validateLayoutDiagnostics(result))
         .filteredOn(
             diagnostic -> diagnostic.code().equals("DEDIREN_LAYOUT_JUNCTION_OFF_INCIDENT_ROUTE"))

@@ -25,7 +25,10 @@ failure signaling), see `docs/plugin-authoring.md`; both ship in the bundle.
   export paths.
 - `curl` on `PATH` only when export validation needs to populate a standards
   schema cache. Offline runs can provide schema files with
-  `DEDIREN_OEF_SCHEMA_DIR` and `DEDIREN_XMI_SCHEMA_PATH`.
+  `DEDIREN_OEF_SCHEMA_DIR` and `DEDIREN_XMI_SCHEMA_PATH`. In a proxied
+  environment, set the standard proxy variables (`HTTP_PROXY`, `HTTPS_PROXY`,
+  `NO_PROXY`) so `curl` can reach the schema hosts; the export plugins forward
+  them to their child process.
 
 ## Build And Test
 
@@ -112,7 +115,9 @@ Each `bin/dediren*` launcher auto-creates a Class-Data-Sharing archive
 subsequent calls. Archives are written to `cds/` inside the bundle directory
 (or `${XDG_CACHE_HOME:-$HOME/.cache}/dediren/cds` if the bundle dir is read-only). Set
 `DEDIREN_CDS_DIR` to relocate them. The feature degrades silently if the
-archive directory is unwritable.
+archive directory is unwritable. Launchers pass `-Xlog:cds=off`, so the
+archive-dump warnings the JVM would otherwise print on each invocation stay out
+of stdout/stderr; the startup speedup is unaffected.
 
 Set `DEDIREN_TRUST_MANIFEST_CAPABILITIES=1` (or `true`) to skip the per-call
 runtime capability probe, removing one JVM start per plugin operation. This
@@ -175,11 +180,14 @@ jq -r '.data.artifacts[] | select(.artifact_kind=="png") | .content' render-resu
   | base64 -d > diagram.png
 ```
 
-The SVG render policy accepts an optional `interactive` mode: `none` (static),
-`svg` (default — a self-contained interactive SVG that highlights a node's
-edges on click), `html` (an HTML page wrapping the interactive SVG), or `both`
-(an `svg` and an `html` artifact). The render result returns an ordered
-`artifacts[]` list; select the artifact you want by `artifact_kind`. Optional
+The SVG render policy accepts an optional `interactive` mode: `none` (default —
+a static SVG with no embedded script), `svg` (a self-contained interactive SVG
+that highlights a node's edges on click), `html` (an HTML page wrapping the
+interactive SVG), or `both` (an `svg` and an `html` artifact). Interactivity is
+opt-in: omitting `interactive` produces a static SVG, and the interaction script
+is emitted only when you explicitly request a non-`none` mode. The render result
+returns an ordered `artifacts[]` list; select the artifact you want by
+`artifact_kind`. Optional
 `style.interaction.highlight_stroke` and `style.interaction.highlight_stroke_width`
 control the highlight appearance.
 
@@ -550,15 +558,53 @@ Commands:
 - `validate-layout` reports backend-neutral route and layout quality metrics.
   It additionally reports `group_label_band_issue_count` (members overlapping
   a labeled group's title band), `label_space_issue_count` (node labels that
-  clearly cannot fit their computed box; icon-sized nodes are exempt), and
+  clearly cannot fit their computed box; icon-sized nodes are exempt),
+  `edge_label_dissociation_count` (labeled edges trapped in a dense band of
+  parallel labeled edges, where a centered edge label cannot stay on its own
+  route and drifts toward a neighbour), and
   `edge_crossing_count` (informational; crossings can be unavoidable, so this
-  count never degrades `status`). Junction-role nodes (`AndJunction`/`OrJunction`
-  in ArchiMate views) must sit on the routes of their incident edges; a detached
-  junction is the error diagnostic `DEDIREN_LAYOUT_JUNCTION_OFF_INCIDENT_ROUTE`.
+  count never degrades `status`). When any non-informational count is nonzero the
+  command envelope surfaces the verdict: envelope `status` becomes `warning` and
+  one `DEDIREN_LAYOUT_QUALITY_WARNING` diagnostic is emitted per offending count
+  (exit code stays `0`, since a warning is not a failure). Junction-role nodes
+  (`AndJunction`/`OrJunction` in ArchiMate views) must sit on the routes of their
+  incident edges; a detached junction is the error diagnostic
+  `DEDIREN_LAYOUT_JUNCTION_OFF_INCIDENT_ROUTE`.
 - `render` asks `render` to generate SVG (and optionally PNG) in `.data.artifacts[]` (each
-  entry has `artifact_kind` and `content`; select the `svg`, `html`, or `png` entry).
+  entry has `artifact_kind` and `content`; select the `svg`, `html`, or `png` entry). UML
+  association end adornments carried in render metadata (the model's
+  `properties.uml.{source,target}_multiplicity` and `properties.uml.{source,target}_role`) are
+  drawn beside their own ends of the edge, each wrapped in a
+  `data-dediren-edge-adornment="<source|target>_<multiplicity|role>"` group so consumers can find
+  them; multiplicity sits at each end and role names at their ends per UML class-diagram notation.
 - `export` asks `archimate-oef` or `uml-xmi` to generate XML in
-  `.data.content`.
+  `.data.content`. A `uml-xmi` export covers the single laid-out view it is
+  handed; a `uml-class`/`uml-data` view now emits class relationships and nests
+  classifiers under their `Package`. Source content outside the exported view is
+  declared (not silently dropped) with `info` diagnostics
+  `DEDIREN_XMI_ELEMENTS_OMITTED` / `DEDIREN_XMI_RELATIONSHIPS_OMITTED` (status
+  stays `ok`); read `.diagnostics[]` to see what a given XMI omits.
+- An `archimate-oef` export likewise renders the single laid-out view it is
+  handed and preserves node/relationship `properties` through OEF
+  `<propertyDefinitions>`/`<property>` (so evidence-classification markers survive
+  the round trip). When the source declares more views than the exported one, the
+  omission is declared with the `info` diagnostic `DEDIREN_OEF_VIEWS_OMITTED`
+  (status stays `ok`). Because the document always carries `<views>`/`<diagrams>`,
+  it declares and validates against `archimate3_Diagram.xsd` (the model-only
+  `archimate3_Model.xsd` rejects a diagram-bearing OEF).
+- The `uml-xmi` class serialization is canonical UML 2.5.1: every attribute
+  `type` resolves to an `xmi:id` in the document (an emitted classifier, or a
+  self-contained `uml:PrimitiveType`/`uml:DataType` synthesized for standard
+  primitives and domain types), and multiplicities are owned `lowerValue`
+  (`uml:LiteralInteger`) / `upperValue` (`uml:LiteralUnlimitedNatural`, `*` for
+  unbounded) value-specification children rather than XML attributes. To
+  schema-check the emitted UML content, point `DEDIREN_XMI_SCHEMA_PATH` at a
+  driver schema that imports the OMG `XMI.xsd` and a UML 2.5.1 XSD and run
+  `xmllint --nonet --noout --schema <driver.xsd> <document>`; OMG does not
+  publish an importable UML 2.5.1 XSD, so supply or generate one (or import the
+  document into a UML tool). Without a UML schema only the XMI envelope is
+  checked. `dediren-plugin-uml-xmi-export capabilities` reports this recipe
+  under `runtime.schema_validation.uml_content_validation`.
 
 ## Source JSON Rules
 
@@ -600,8 +646,14 @@ in their manifests. Important explicit variables:
   `DEDIREN_PLUGIN_RENDER`.
 - `DEDIREN_OEF_SCHEMA_DIR`: local directory containing official OEF schema
   files.
-- `DEDIREN_XMI_SCHEMA_PATH`: local XMI schema file.
+- `DEDIREN_XMI_SCHEMA_PATH`: local XMI schema file, or a driver schema that
+  imports `XMI.xsd` plus a UML 2.5.1 XSD to also validate UML content.
 - `DEDIREN_SCHEMA_CACHE_DIR`: cache directory for schema downloads.
+- `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY` (and their lowercase forms): standard
+  proxy configuration. The export plugins declare them in their manifests, so
+  the core forwards them to the export child process when set — `curl` honors
+  them when downloading standards schemas from behind a proxy. No other plugin
+  receives them, and no other environment variables cross the boundary.
 
 Stderr is for human debugging only. Agents should make success or failure
 decisions from stdout JSON.

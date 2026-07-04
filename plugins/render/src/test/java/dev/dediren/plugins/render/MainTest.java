@@ -1,6 +1,7 @@
 package dev.dediren.plugins.render;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.testsupport.SchemaAssertions;
@@ -706,7 +707,7 @@ class MainTest {
     }
 
     @Test
-    void defaultModeEmitsInteractionLayerAndEdgeEndpoints() throws Exception {
+    void defaultModeIsStaticWithoutInteractionLayer() throws Exception {
       String content =
           okContent(
               render(
@@ -714,22 +715,27 @@ class MainTest {
                       "fixtures/layout-result/basic.json",
                       "fixtures/render-policy/default-svg.json")));
 
-      assertThat(content).contains("data-dediren-edge-source", "data-dediren-edge-target");
-      assertThat(content).contains("<style", "dediren-edge-highlighted");
-      assertThat(content).contains("<script", "data-dediren-node-id");
+      // The documented default is "none": a static SVG. No interaction script, no highlight
+      // <style>, and no edge source/target hooks that only make sense with the script.
+      assertThat(content).doesNotContain("<script");
+      assertThat(content).doesNotContain("dediren-edge-highlighted");
+      assertThat(content).doesNotContain("data-dediren-edge-source");
+      assertThat(content).doesNotContain("data-dediren-edge-target");
+      // Stable node ids remain; only the interaction layer is absent.
+      assertThat(content).contains("data-dediren-node-id");
 
       Document document = svgDocument(content);
       var edges = document.getElementsByTagName("g");
-      boolean anyEdgeHasSource = false;
+      boolean anyEdge = false;
       for (int i = 0; i < edges.getLength(); i++) {
         Element g = (Element) edges.item(i);
         if (!g.getAttribute("data-dediren-edge-id").isEmpty()) {
-          assertThat(g.getAttribute("data-dediren-edge-source")).isNotEmpty();
-          assertThat(g.getAttribute("data-dediren-edge-target")).isNotEmpty();
-          anyEdgeHasSource = true;
+          assertThat(g.getAttribute("data-dediren-edge-source")).isEmpty();
+          assertThat(g.getAttribute("data-dediren-edge-target")).isEmpty();
+          anyEdge = true;
         }
       }
-      assertThat(anyEdgeHasSource).isTrue();
+      assertThat(anyEdge).isTrue();
     }
 
     @Test
@@ -849,12 +855,15 @@ class MainTest {
 
     @Test
     void interactionStyleDefaultsWhenOmitted() throws Exception {
-      String svg =
-          okContent(
-              render(
-                  renderInput(
-                      "fixtures/layout-result/basic.json",
-                      "fixtures/render-policy/default-svg.json")));
+      // Interactivity is opt-in; with it enabled but style.interaction omitted, the highlight
+      // appearance falls back to the built-in defaults.
+      ObjectNode input =
+          (ObjectNode)
+              renderInput(
+                  "fixtures/layout-result/basic.json", "fixtures/render-policy/default-svg.json");
+      ((ObjectNode) input.at("/policy")).put("interactive", "svg");
+
+      String svg = okContent(render(input));
 
       assertThat(svg).contains("stroke:#1f6feb", "stroke-width:3");
     }
@@ -1084,6 +1093,204 @@ class MainTest {
 
       assertThat(path.getAttribute("marker-start")).isEqualTo("url(#marker-start-order-has-lines)");
       assertThat(content).contains("data-dediren-edge-marker-start=\"filled_diamond\"");
+    }
+
+    @Test
+    void rendersUmlAssociationEndAdornments() throws Exception {
+      // Issue #37: end multiplicities and role names reach render metadata (the model's
+      // properties.uml.*) but were never drawn, so the SVG was silently lossier than the model.
+      JsonNode policy = fixtureJson("fixtures/render-policy/uml-svg.json");
+      ArrayNode nodes = JsonSupport.objectMapper().createArrayNode();
+      nodes.add(
+          JsonSupport.objectMapper()
+              .readTree(
+                  """
+                  {
+                    "id": "class-customer", "source_id": "class-customer",
+                    "projection_id": "class-customer",
+                    "x": 40, "y": 60, "width": 160, "height": 80, "label": "Customer"
+                  }
+                  """));
+      nodes.add(
+          JsonSupport.objectMapper()
+              .readTree(
+                  """
+                  {
+                    "id": "class-order", "source_id": "class-order",
+                    "projection_id": "class-order",
+                    "x": 400, "y": 60, "width": 160, "height": 80, "label": "Order"
+                  }
+                  """));
+      ArrayNode edges = JsonSupport.objectMapper().createArrayNode();
+      edges.add(
+          JsonSupport.objectMapper()
+              .readTree(
+                  """
+                  {
+                    "id": "customer-places-order",
+                    "source": "class-customer", "target": "class-order",
+                    "source_id": "customer-places-order",
+                    "projection_id": "customer-places-order",
+                    "points": [{"x": 200, "y": 100}, {"x": 400, "y": 100}],
+                    "label": "places"
+                  }
+                  """));
+      ObjectNode metadataNodes = JsonSupport.objectMapper().createObjectNode();
+      metadataNodes.set(
+          "class-customer",
+          JsonSupport.objectMapper()
+              .readTree("{\"type\":\"Class\",\"source_id\":\"class-customer\"}"));
+      metadataNodes.set(
+          "class-order",
+          JsonSupport.objectMapper()
+              .readTree("{\"type\":\"Class\",\"source_id\":\"class-order\"}"));
+      ObjectNode metadataEdges = JsonSupport.objectMapper().createObjectNode();
+      metadataEdges.set(
+          "customer-places-order",
+          JsonSupport.objectMapper()
+              .readTree(
+                  """
+                  {
+                    "type": "Association", "source_id": "customer-places-order",
+                    "properties": {
+                      "source_multiplicity": "1", "target_multiplicity": "0..*",
+                      "source_role": "customer", "target_role": "orders"
+                    }
+                  }
+                  """));
+
+      String content =
+          okContent(
+              render(
+                  semanticRenderInput("uml", nodes, edges, metadataNodes, metadataEdges, policy)));
+      Document document = svgDocument(content);
+
+      // Every authored end adornment is now present as SVG text.
+      assertThat(content).contains(">0..*<", ">customer<", ">orders<");
+
+      Element edge = groupWithAttribute(document, "data-dediren-edge-id", "customer-places-order");
+      Element targetMultiplicity =
+          childGroupWithAttribute(edge, "data-dediren-edge-adornment", "target_multiplicity");
+      Element sourceMultiplicity =
+          childGroupWithAttribute(edge, "data-dediren-edge-adornment", "source_multiplicity");
+      Element targetRole =
+          childGroupWithAttribute(edge, "data-dediren-edge-adornment", "target_role");
+      Element sourceRole =
+          childGroupWithAttribute(edge, "data-dediren-edge-adornment", "source_role");
+
+      assertThat(targetMultiplicity.getAttribute("data-dediren-edge-adornment-end"))
+          .isEqualTo("target");
+      assertThat(firstChildElement(targetMultiplicity, "text").getTextContent()).isEqualTo("0..*");
+      assertThat(firstChildElement(sourceMultiplicity, "text").getTextContent()).isEqualTo("1");
+      assertThat(firstChildElement(targetRole, "text").getTextContent()).isEqualTo("orders");
+      assertThat(firstChildElement(sourceRole, "text").getTextContent()).isEqualTo("customer");
+
+      // Each adornment sits at its own end: the target multiplicity is nearer the target node
+      // (to the right) than the source multiplicity, per UML class-diagram notation.
+      double targetX =
+          Double.parseDouble(firstChildElement(targetMultiplicity, "text").getAttribute("x"));
+      double sourceX =
+          Double.parseDouble(firstChildElement(sourceMultiplicity, "text").getAttribute("x"));
+      assertThat(sourceX)
+          .as("source multiplicity sits at the source (left) end")
+          .isBetween(200.0, 300.0);
+      assertThat(targetX)
+          .as("target multiplicity sits at the target (right) end")
+          .isBetween(300.0, 400.0);
+      assertThat(targetX)
+          .as("target multiplicity is nearer the target node than the source multiplicity")
+          .isGreaterThan(sourceX);
+    }
+
+    @Test
+    void rendersPartialEndAdornmentOnVerticalEdge() throws Exception {
+      // Partition coverage for issue #37: a vertically routed edge carrying only ONE end
+      // adornment. Exercises the vertical-route anchor branch (text-anchor start/end) and the
+      // partial-property path (no role, no source multiplicity) that the horizontal test cannot.
+      JsonNode policy = fixtureJson("fixtures/render-policy/uml-svg.json");
+      ArrayNode nodes = JsonSupport.objectMapper().createArrayNode();
+      nodes.add(
+          JsonSupport.objectMapper()
+              .readTree(
+                  """
+                  {
+                    "id": "class-order", "source_id": "class-order",
+                    "projection_id": "class-order",
+                    "x": 420, "y": 40, "width": 180, "height": 90, "label": "Order"
+                  }
+                  """));
+      nodes.add(
+          JsonSupport.objectMapper()
+              .readTree(
+                  """
+                  {
+                    "id": "class-order-line", "source_id": "class-order-line",
+                    "projection_id": "class-order-line",
+                    "x": 420, "y": 320, "width": 180, "height": 90, "label": "OrderLine"
+                  }
+                  """));
+      ArrayNode edges = JsonSupport.objectMapper().createArrayNode();
+      edges.add(
+          JsonSupport.objectMapper()
+              .readTree(
+                  """
+                  {
+                    "id": "order-has-lines",
+                    "source": "class-order", "target": "class-order-line",
+                    "source_id": "order-has-lines", "projection_id": "order-has-lines",
+                    "points": [{"x": 510, "y": 130}, {"x": 510, "y": 320}],
+                    "label": "lines"
+                  }
+                  """));
+      ObjectNode metadataNodes = JsonSupport.objectMapper().createObjectNode();
+      metadataNodes.set(
+          "class-order",
+          JsonSupport.objectMapper()
+              .readTree("{\"type\":\"Class\",\"source_id\":\"class-order\"}"));
+      metadataNodes.set(
+          "class-order-line",
+          JsonSupport.objectMapper()
+              .readTree("{\"type\":\"Class\",\"source_id\":\"class-order-line\"}"));
+      ObjectNode metadataEdges = JsonSupport.objectMapper().createObjectNode();
+      metadataEdges.set(
+          "order-has-lines",
+          JsonSupport.objectMapper()
+              .readTree(
+                  """
+                  {
+                    "type": "Composition", "source_id": "order-has-lines",
+                    "properties": { "target_multiplicity": "1..*" }
+                  }
+                  """));
+
+      Document document =
+          svgDocument(
+              okContent(
+                  render(
+                      semanticRenderInput(
+                          "uml", nodes, edges, metadataNodes, metadataEdges, policy))));
+
+      Element edge = groupWithAttribute(document, "data-dediren-edge-id", "order-has-lines");
+      Element targetMultiplicity =
+          childGroupWithAttribute(edge, "data-dediren-edge-adornment", "target_multiplicity");
+      Element text = firstChildElement(targetMultiplicity, "text");
+      assertThat(text.getTextContent()).isEqualTo("1..*");
+      // Only the one authored adornment is drawn: no role and no source multiplicity are invented.
+      assertThatThrownBy(
+              () -> childGroupWithAttribute(edge, "data-dediren-edge-adornment", "target_role"))
+          .isInstanceOf(AssertionError.class);
+      assertThatThrownBy(
+              () ->
+                  childGroupWithAttribute(
+                      edge, "data-dediren-edge-adornment", "source_multiplicity"))
+          .isInstanceOf(AssertionError.class);
+      // Vertical route: the adornment is pushed off the line horizontally with a side anchor,
+      // and its baseline sits between the two stacked nodes rather than at an endpoint.
+      assertThat(text.getAttribute("text-anchor")).isIn("start", "end");
+      double baselineY = Double.parseDouble(text.getAttribute("y"));
+      assertThat(baselineY)
+          .as("adornment sits near the target (lower) end")
+          .isBetween(130.0, 320.0);
     }
 
     @Test
@@ -1548,11 +1755,13 @@ class MainTest {
 
       // Widest line clears the icon column (icon left edge = x + width - 28 = 202).
       double fontSize = Double.parseDouble(label.getAttribute("font-size"));
-      int widestChars = 0;
+      double widestHalf = 0.0;
       for (int i = 0; i < tspans.getLength(); i++) {
-        widestChars = Math.max(widestChars, tspans.item(i).getTextContent().length());
+        double lineWidth =
+            dev.dediren.plugins.render.svg.Svg.estimateTextWidth(
+                tspans.item(i).getTextContent(), fontSize);
+        widestHalf = Math.max(widestHalf, lineWidth / 2.0);
       }
-      double widestHalf = widestChars * fontSize * 0.62 / 2.0;
       assertThat(135.0 + widestHalf).isLessThanOrEqualTo(202.0);
     }
 
@@ -1636,11 +1845,11 @@ class MainTest {
         Element tspan = (Element) tspans.item(i);
         String content = tspan.getTextContent();
         // Each wrapped line pins its rendered width to the layout metric
-        // (chars x fontSize x 0.62) via textLength + lengthAdjust, so the displayed
-        // label size — and its clearance from the corner decorator — is independent
-        // of the viewer's installed font.
-        double metric = content.codePointCount(0, content.length()) * fontSize * 0.62;
-        assertThat(tspan.getAttribute("lengthAdjust")).isEqualTo("spacingAndGlyphs");
+        // (Svg.estimateTextWidth per-glyph advance table) via textLength +
+        // lengthAdjust, so the displayed label size — and its clearance from the
+        // corner decorator — is independent of the viewer's installed font.
+        double metric = dev.dediren.plugins.render.svg.Svg.estimateTextWidth(content, fontSize);
+        assertThat(tspan.getAttribute("lengthAdjust")).isEqualTo("spacing");
         assertThat(Double.parseDouble(tspan.getAttribute("textLength")))
             .isCloseTo(metric, org.assertj.core.data.Offset.offset(0.15));
       }
@@ -1671,10 +1880,64 @@ class MainTest {
       // Single-line labels emit no tspan; the metric pin lands on <text> itself.
       assertThat(label.getElementsByTagName("tspan").getLength()).isZero();
       double fontSize = Double.parseDouble(label.getAttribute("font-size"));
-      double metric = "Auth".codePointCount(0, "Auth".length()) * fontSize * 0.62;
-      assertThat(label.getAttribute("lengthAdjust")).isEqualTo("spacingAndGlyphs");
+      double metric = dev.dediren.plugins.render.svg.Svg.estimateTextWidth("Auth", fontSize);
+      assertThat(label.getAttribute("lengthAdjust")).isEqualTo("spacing");
       assertThat(Double.parseDouble(label.getAttribute("textLength")))
           .isCloseTo(metric, org.assertj.core.data.Offset.offset(0.15));
+    }
+
+    @Test
+    void narrowGlyphNodeLabelDoesNotOverstretchTextLength() throws Exception {
+      // Repro from issue #39: the #25 fix pinned every label to a flat
+      // 0.62em/char width with lengthAdjust="spacingAndGlyphs", so a narrow-glyph
+      // label like "Fulfillment Clerk" (17 chars incl. i/l/l/t) was forced to
+      // ~147.5 at 14px — ~47% wider than its natural Inter/Arial width — and the
+      // spacingAndGlyphs mode stretched the letterforms to fill it. The width
+      // metric must now approximate per-glyph advances (near natural width) and
+      // the pin must use lengthAdjust="spacing" so glyph SHAPES stay intact.
+      JsonNode input =
+          archimateRenderInput(
+              fixtureJson("fixtures/render-policy/archimate-svg.json"),
+              """
+                    [
+                      { "id": "appcomp", "source_id": "appcomp", "projection_id": "appcomp", "x": 40, "y": 40, "width": 250, "height": 80, "label": "Fulfillment Clerk" }
+                    ]
+                    """,
+              "[]",
+              """
+                    {
+                      "appcomp": { "type": "ApplicationComponent", "source_id": "appcomp" }
+                    }
+                    """,
+              "{}");
+
+      Document document = svgDocument(okContent(render(input)));
+      Element node = groupWithAttribute(document, "data-dediren-node-id", "appcomp");
+      Element label = (Element) node.getElementsByTagName("text").item(0);
+
+      // Wide box keeps the label on a single line at the full policy font size.
+      assertThat(label.getElementsByTagName("tspan").getLength()).isZero();
+      double fontSize = Double.parseDouble(label.getAttribute("font-size"));
+      double textLength = Double.parseDouble(label.getAttribute("textLength"));
+
+      // Glyph shapes are never distorted: only inter-glyph spacing is adjusted.
+      assertThat(label.getAttribute("lengthAdjust")).isEqualTo("spacing");
+
+      // The pin still equals the layout metric (so wrap/fit/box and the emitted
+      // width agree — the #25 determinism guarantee).
+      double metric =
+          dev.dediren.plugins.render.svg.Svg.estimateTextWidth("Fulfillment Clerk", fontSize);
+      assertThat(textLength).isCloseTo(metric, org.assertj.core.data.Offset.offset(0.15));
+
+      // Materially narrower than the old flat 0.62em/char metric that caused the
+      // stretch (17 * fontSize * 0.62 ≈ 147.5 at 14px).
+      double flatMetric = "Fulfillment Clerk".length() * fontSize * 0.62;
+      assertThat(textLength).isLessThan(flatMetric * 0.75);
+
+      // #25 clearance preserved: the centered label's half-width still clears the
+      // per-side corner-icon reserve (34 each side of a 250-wide node).
+      double halfWidth = textLength / 2.0;
+      assertThat(halfWidth).isLessThanOrEqualTo((250.0 - 2.0 * 34.0) / 2.0);
     }
 
     @Test
@@ -3897,7 +4160,7 @@ class MainTest {
   }
 
   private static double estimatedSvgTextWidth(String text, double fontSize) {
-    return text.codePointCount(0, text.length()) * fontSize * 0.62;
+    return dev.dediren.plugins.render.svg.Svg.estimateTextWidth(text, fontSize);
   }
 
   private static double svgFontSize(Element label) {

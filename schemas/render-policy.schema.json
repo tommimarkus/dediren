@@ -13,7 +13,8 @@
       "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
     },
     "interactive": {
-      "enum": ["none", "svg", "html", "both"]
+      "enum": ["none", "svg", "html", "both"],
+      "default": "none"
     },
     "page": {
       "type": "object",
