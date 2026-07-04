@@ -1,3 +1,4 @@
 Contact: https://github.com/tommimarkus/dediren/security/advisories/new
+Expires: 2027-07-01T00:00:00.000Z
 Policy: https://github.com/tommimarkus/dediren/blob/main/SECURITY.md
 Preferred-Languages: en
