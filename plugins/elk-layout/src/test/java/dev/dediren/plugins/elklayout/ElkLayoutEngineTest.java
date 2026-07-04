@@ -16,7 +16,9 @@ import org.eclipse.elk.alg.layered.options.LayeredOptions;
 import org.eclipse.elk.alg.layered.options.NodePlacementStrategy;
 import org.eclipse.elk.alg.layered.options.OrderingStrategy;
 import org.eclipse.elk.alg.layered.options.PortSortingStrategy;
+import org.eclipse.elk.core.options.CoreOptions;
 import org.eclipse.elk.core.options.Direction;
+import org.eclipse.elk.core.options.EdgeRouting;
 import org.eclipse.elk.core.options.PortSide;
 import org.eclipse.elk.graph.ElkNode;
 import org.junit.jupiter.api.Test;
@@ -25,8 +27,10 @@ class ElkLayoutEngineTest {
   private static final double GEOMETRY_EPSILON = 0.001;
   private static final double PORT_SIDE_EPSILON = 1.0;
 
-  // Tolerance for calling a route segment axis-aligned. The product only emits ORTHOGONAL routes
-  // (LayoutRoutingStyle has no other value), so every segment must move along exactly one axis. A
+  // Tolerance for calling a route segment axis-aligned. These fixtures use the default ORTHOGONAL
+  // routing style (polyline and spline exist but are not requested here), so every segment must
+  // move
+  // along exactly one axis. A
   // real diagonal jog is tens of pixels off both axes; this tolerance only absorbs sub-pixel float
   // drift and never lets a genuine diagonal through.
   private static final double ORTHOGONAL_TOLERANCE = 0.5;
@@ -3165,5 +3169,28 @@ class ElkLayoutEngineTest {
         && leftX + leftWidth > rightX
         && leftY < rightY + rightHeight
         && leftY + leftHeight > rightY;
+  }
+
+  @Test
+  void layeredRootMapsRoutingStyleToElkEdgeRouting() {
+    assertEquals(
+        EdgeRouting.ORTHOGONAL,
+        ElkLayeredOptions.configuredRoot(Direction.RIGHT, null)
+            .getProperty(CoreOptions.EDGE_ROUTING));
+    assertEquals(
+        EdgeRouting.POLYLINE,
+        ElkLayeredOptions.configuredRoot(
+                Direction.RIGHT, routingStylePreferences(LayoutRoutingStyle.POLYLINE))
+            .getProperty(CoreOptions.EDGE_ROUTING));
+    assertEquals(
+        EdgeRouting.SPLINES,
+        ElkLayeredOptions.configuredRoot(
+                Direction.RIGHT, routingStylePreferences(LayoutRoutingStyle.SPLINE))
+            .getProperty(CoreOptions.EDGE_ROUTING));
+  }
+
+  private static LayoutPreferences routingStylePreferences(LayoutRoutingStyle style) {
+    return new LayoutPreferences(
+        null, null, null, new LayoutRoutingPreferences(style, null, LayoutEndpointMerging.AUTO));
   }
 }

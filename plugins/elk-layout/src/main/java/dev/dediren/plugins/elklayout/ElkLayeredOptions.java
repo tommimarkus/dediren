@@ -4,6 +4,7 @@ import dev.dediren.contracts.layout.LayoutDensity;
 import dev.dediren.contracts.layout.LayoutEndpointMerging;
 import dev.dediren.contracts.layout.LayoutPreferences;
 import dev.dediren.contracts.layout.LayoutRoutingPreferences;
+import dev.dediren.contracts.layout.LayoutRoutingStyle;
 import dev.dediren.contracts.layout.LayoutWrapping;
 import org.eclipse.elk.alg.layered.options.EdgeStraighteningStrategy;
 import org.eclipse.elk.alg.layered.options.LayeredOptions;
@@ -73,7 +74,7 @@ final class ElkLayeredOptions {
 
     root.setProperty(CoreOptions.ALGORITHM, LAYERED_ALGORITHM);
     root.setProperty(CoreOptions.DIRECTION, direction);
-    root.setProperty(CoreOptions.EDGE_ROUTING, EdgeRouting.ORTHOGONAL);
+    root.setProperty(CoreOptions.EDGE_ROUTING, routingStyle(preferences));
     root.setProperty(CoreOptions.SPACING_NODE_NODE, nodeSpacing);
     root.setProperty(CoreOptions.SPACING_EDGE_NODE, edgeNodeSpacing);
     root.setProperty(CoreOptions.SPACING_EDGE_EDGE, edgeEdgeSpacing);
@@ -166,6 +167,19 @@ final class ElkLayeredOptions {
 
   private static boolean groupedWrappingEnabled(LayoutPreferences preferences) {
     return preferences != null && preferences.wrapping() == LayoutWrapping.MULTI_EDGE;
+  }
+
+  private static EdgeRouting routingStyle(LayoutPreferences preferences) {
+    LayoutRoutingPreferences routing = preferences == null ? null : preferences.routing();
+    LayoutRoutingStyle style = routing == null ? null : routing.style();
+    if (style == null) {
+      return EdgeRouting.ORTHOGONAL;
+    }
+    return switch (style) {
+      case ORTHOGONAL -> EdgeRouting.ORTHOGONAL;
+      case POLYLINE -> EdgeRouting.POLYLINE;
+      case SPLINE -> EdgeRouting.SPLINES;
+    };
   }
 
   private static LayoutEndpointMerging endpointMerging(LayoutPreferences preferences) {
