@@ -38,6 +38,7 @@
     <eclipse-elk.version>0.11.0</eclipse-elk.version>
     <guava.version>33.6.0-jre</guava.version>
     <jackson.version>3.1.4</jackson.version>
+    <jazzer.version>0.24.0</jazzer.version>
     <json-schema-validator.version>3.0.5</json-schema-validator.version>
     <junit.version>6.1.1</junit.version>
     <picocli.version>4.7.7</picocli.version>
@@ -161,6 +162,36 @@
         <groupId>org.xmlunit</groupId>
         <artifactId>xmlunit-core</artifactId>
         <version>${xmlunit.version}</version>
+      </dependency>
+      <!-- Fuzz-regression harness (audit finding F7), TEST scope only. jazzer-junit
+           0.24.0 is compiled against JUnit Jupiter 5.9 / Platform 1.9; this reactor
+           runs JUnit Jupiter 6. Exclude jazzer's transitive JUnit artifacts so the
+           dependencyConvergence enforcer sees a single JUnit version and the @FuzzTest
+           extension binds to the reactor's JUnit 6. Never reaches runtime scope, so it
+           stays out of the CycloneDX aggregate BOM (sbom profile: includeTestScope=false). -->
+      <dependency>
+        <groupId>com.code-intelligence</groupId>
+        <artifactId>jazzer-junit</artifactId>
+        <version>${jazzer.version}</version>
+        <scope>test</scope>
+        <exclusions>
+          <exclusion>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-api</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-params</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.junit.platform</groupId>
+            <artifactId>junit-platform-commons</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.junit.platform</groupId>
+            <artifactId>junit-platform-launcher</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
     </dependencies>
   </dependencyManagement>

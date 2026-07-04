@@ -61,7 +61,14 @@ public final class SchemaValidation {
     validateOmgXmiSchema(content, env);
   }
 
-  private static void validateXmiDocumentAndIds(String content) throws XmiValidationException {
+  /**
+   * Local DOM validation seam (package-private for tests): parses {@code content} with the hardened
+   * DOCTYPE-disallowing builder and checks the XMI root, forbidden {@code xmi:version}, and {@code
+   * xmi:id} shape/uniqueness without launching the external {@code xmllint} subprocess. The
+   * fuzz-regression target {@code SchemaValidationFuzzTest} (audit finding F7) exercises this path
+   * directly to prove the only Throwable that escapes is {@link XmiValidationException}.
+   */
+  static void validateXmiDocumentAndIds(String content) throws XmiValidationException {
     try {
       var factory = secureXmiDocumentBuilderFactory();
       var document =

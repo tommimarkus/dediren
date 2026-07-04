@@ -1,6 +1,7 @@
 **/target/
 /dist/
 /.cache/
+**/.cifuzz-corpus/
 /.worktrees/
 /.claude/worktrees/
 /.test-output/
