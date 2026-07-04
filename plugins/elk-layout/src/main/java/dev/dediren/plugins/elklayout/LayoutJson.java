@@ -37,6 +37,33 @@ final class LayoutJson {
     rejectNull(preferences.get("density"), "$.layout_preferences.density");
     rejectNull(preferences.get("wrapping"), "$.layout_preferences.wrapping");
 
+    rejectNull(preferences.get("cycle_breaking"), "$.layout_preferences.cycle_breaking");
+
+    JsonNode layering = preferences.get("layering");
+    if (layering != null) {
+      rejectNull(layering, "$.layout_preferences.layering");
+      if (layering.isObject()) {
+        rejectNull(layering.get("strategy"), "$.layout_preferences.layering.strategy");
+      }
+    }
+
+    JsonNode crossing = preferences.get("crossing");
+    if (crossing != null) {
+      rejectNull(crossing, "$.layout_preferences.crossing");
+      if (crossing.isObject()) {
+        rejectNull(crossing.get("strategy"), "$.layout_preferences.crossing.strategy");
+        rejectNull(crossing.get("greedy_switch"), "$.layout_preferences.crossing.greedy_switch");
+      }
+    }
+
+    JsonNode placement = preferences.get("placement");
+    if (placement != null) {
+      rejectNull(placement, "$.layout_preferences.placement");
+      if (placement.isObject()) {
+        rejectNull(placement.get("strategy"), "$.layout_preferences.placement.strategy");
+      }
+    }
+
     JsonNode routing = preferences.get("routing");
     if (routing == null) {
       return;
@@ -74,6 +101,46 @@ final class LayoutJson {
         preferences.get("wrapping"),
         "$.layout_preferences.wrapping",
         Set.of("auto", "off", "multi-edge"));
+
+    rejectUnsupportedText(
+        preferences.get("cycle_breaking"),
+        "$.layout_preferences.cycle_breaking",
+        Set.of("greedy", "depth-first", "model-order"));
+
+    JsonNode layering = preferences.get("layering");
+    if (layering != null && layering.isObject()) {
+      rejectUnsupportedText(
+          layering.get("strategy"),
+          "$.layout_preferences.layering.strategy",
+          Set.of(
+              "network-simplex",
+              "longest-path",
+              "coffman-graham",
+              "min-width",
+              "stretch-width",
+              "breadth-first",
+              "depth-first"));
+    }
+
+    JsonNode crossing = preferences.get("crossing");
+    if (crossing != null && crossing.isObject()) {
+      rejectUnsupportedText(
+          crossing.get("strategy"),
+          "$.layout_preferences.crossing.strategy",
+          Set.of("layer-sweep", "none"));
+      rejectUnsupportedText(
+          crossing.get("greedy_switch"),
+          "$.layout_preferences.crossing.greedy_switch",
+          Set.of("off", "one-sided", "two-sided"));
+    }
+
+    JsonNode placement = preferences.get("placement");
+    if (placement != null && placement.isObject()) {
+      rejectUnsupportedText(
+          placement.get("strategy"),
+          "$.layout_preferences.placement.strategy",
+          Set.of("brandes-koepf", "network-simplex", "linear-segments", "simple"));
+    }
 
     JsonNode routing = preferences.get("routing");
     if (routing == null || !routing.isObject()) {
