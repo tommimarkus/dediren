@@ -654,6 +654,18 @@ class MainTest {
     }
 
     @Test
+    void rejectsTypePolicyWithoutSemanticProfile() throws Exception {
+      ObjectNode input = (ObjectNode) archimateStyleInput();
+      ((ObjectNode) input.at("/policy")).remove("semantic_profile");
+
+      JsonNode envelope = error(render(input), "DEDIREN_RENDER_METADATA_PROFILE_REQUIRED");
+
+      assertThat(envelope.at("/diagnostics/0/path").asText()).isEqualTo("semantic_profile");
+      assertThat(envelope.at("/diagnostics/0/message").asText())
+          .contains("must declare semantic_profile");
+    }
+
+    @Test
     void rejectsUnsafePolicyColorBeforeRendering() throws Exception {
       JsonNode input =
           styledInlineInput(

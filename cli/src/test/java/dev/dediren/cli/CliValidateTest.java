@@ -229,6 +229,98 @@ class CliValidateTest {
   }
 
   @Test
+  void validateRejectsAbsoluteFragmentPath() throws Exception {
+    Files.writeString(
+        temp.resolve("model.json"),
+        """
+                {
+                  "model_schema_version": "model.schema.v1",
+                  "fragments": ["%s"],
+                  "nodes": [],
+                  "relationships": [],
+                  "plugins": { "generic-graph": { "views": [] } }
+                }
+                """
+            .formatted(temp.resolve("absolute-fragment.json")));
+
+    CliResult result =
+        Main.executeForTesting(
+            new String[] {"validate", "--input", temp.resolve("model.json").toString()}, "");
+
+    JsonNode envelope = JsonSupport.objectMapper().readTree(result.stdout());
+
+    assertThat(result.exitCode()).isEqualTo(2);
+    assertThat(envelope.at("/diagnostics/0/code").asText())
+        .isEqualTo("DEDIREN_FRAGMENT_PATH_UNSUPPORTED");
+    assertThat(envelope.at("/diagnostics/0/path").asText()).isEqualTo("$.fragments[0]");
+  }
+
+  @Test
+  void validateReportsUnreadableFragmentWithReadFailedEnvelope() throws Exception {
+    Files.writeString(
+        temp.resolve("model.json"),
+        """
+                {
+                  "model_schema_version": "model.schema.v1",
+                  "fragments": ["fragments/missing.json"],
+                  "nodes": [],
+                  "relationships": [],
+                  "plugins": { "generic-graph": { "views": [] } }
+                }
+                """);
+
+    CliResult result =
+        Main.executeForTesting(
+            new String[] {"validate", "--input", temp.resolve("model.json").toString()}, "");
+
+    JsonNode envelope = JsonSupport.objectMapper().readTree(result.stdout());
+
+    assertThat(result.exitCode()).isEqualTo(2);
+    assertThat(envelope.at("/diagnostics/0/code").asText())
+        .isEqualTo("DEDIREN_FRAGMENT_READ_FAILED");
+    assertThat(envelope.at("/diagnostics/0/path").asText()).isEqualTo("$.fragments[0]");
+  }
+
+  @Test
+  void validateRejectsFragmentDeclaringNestedFragments() throws Exception {
+    Path fragments = temp.resolve("fragments");
+    Files.createDirectories(fragments);
+    Files.writeString(
+        temp.resolve("model.json"),
+        """
+                {
+                  "model_schema_version": "model.schema.v1",
+                  "fragments": ["fragments/child.json"],
+                  "nodes": [],
+                  "relationships": [],
+                  "plugins": { "generic-graph": { "views": [] } }
+                }
+                """);
+    Files.writeString(
+        fragments.resolve("child.json"),
+        """
+                {
+                  "model_schema_version": "model.schema.v1",
+                  "fragments": ["grandchild.json"],
+                  "nodes": [],
+                  "relationships": [],
+                  "plugins": { "generic-graph": { "views": [] } }
+                }
+                """);
+
+    CliResult result =
+        Main.executeForTesting(
+            new String[] {"validate", "--input", temp.resolve("model.json").toString()}, "");
+
+    JsonNode envelope = JsonSupport.objectMapper().readTree(result.stdout());
+
+    assertThat(result.exitCode()).isEqualTo(2);
+    assertThat(envelope.at("/diagnostics/0/code").asText())
+        .isEqualTo("DEDIREN_FRAGMENT_NESTED_UNSUPPORTED");
+    assertThat(envelope.at("/diagnostics/0/path").asText()).isEqualTo("$.fragments[0]");
+  }
+
+  @Test
   void validateMissingInputFileReturnsJsonEnvelope() throws Exception {
     CliResult result =
         Main.executeForTesting(

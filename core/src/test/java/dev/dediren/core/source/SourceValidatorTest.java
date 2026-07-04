@@ -7,8 +7,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.api.parallel.Isolated;
 import tools.jackson.databind.JsonNode;
 
+// Mutates JVM-global state (user.dir / dediren.bundle.root system properties); must never run
+// concurrently with other test classes if parallel execution is ever enabled.
+@Isolated
 class SourceValidatorTest {
   @TempDir Path temp;
 

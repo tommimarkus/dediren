@@ -13,9 +13,13 @@ import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.api.parallel.Isolated;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
+// Mutates JVM-global state (user.dir / dediren.bundle.root system properties); must never run
+// concurrently with other test classes if parallel execution is ever enabled.
+@Isolated
 class PluginRuntimeTest {
   @TempDir Path temp;
 
@@ -28,6 +32,21 @@ class PluginRuntimeTest {
         .isInstanceOf(PluginExecutionException.class)
         .extracting(error -> ((PluginExecutionException) error).diagnostic().code())
         .isEqualTo("DEDIREN_PLUGIN_MISSING_EXECUTABLE");
+  }
+
+  @Test
+  void nonExecutableExecutableIsStructuredIoError() throws Exception {
+    // The missing-executable pre-check only tests existence, so a file without the executable bit
+    // passes it and fails at process start; core must normalize that launch failure into the
+    // typed I/O-error diagnostic instead of leaking a raw exception.
+    Path plainFile = temp.resolve("not-executable.sh");
+    Files.writeString(plainFile, "#!/bin/sh\nexit 0\n");
+    writeManifest(temp, "runtime-testbed", plainFile.toString(), List.of("render"));
+
+    assertThatThrownBy(() -> runWithMode("ok", "render", List.of("render")))
+        .isInstanceOf(PluginExecutionException.class)
+        .extracting(error -> ((PluginExecutionException) error).diagnostic().code())
+        .isEqualTo(DiagnosticCode.PLUGIN_IO_ERROR.code());
   }
 
   @Test

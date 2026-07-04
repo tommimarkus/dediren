@@ -54,6 +54,9 @@ class MainTest {
 
     assertThat(result.exitCode()).isZero();
     assertThat(data.at("/artifact_kind").asText()).isEqualTo("archimate-oef+xml");
+    // Regression backstop only; the spec-named assertions in the sibling tests are the primary
+    // oracle. Update this golden via a reviewed baseline refresh when the OEF contract changes
+    // intentionally.
     assertThat(data.at("/content").asText()).isEqualTo(fixture("fixtures/export/oef-basic.xml"));
   }
 

@@ -1041,6 +1041,245 @@ class UmlValidationTest {
   }
 
   @Test
+  void rejectsUnknownUmlRelationshipType() throws Exception {
+    Fixture fixture =
+        loadMutatedUmlFixture(
+            source -> relationshipById(source, "order-has-lines").put("type", "Wire"));
+
+    UmlValidationException error =
+        org.junit.jupiter.api.Assertions.assertThrows(
+            UmlValidationException.class,
+            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+
+    assertThat(error.code()).isEqualTo("DEDIREN_UML_RELATIONSHIP_TYPE_UNSUPPORTED");
+    assertThat(error.path()).isEqualTo("$.relationships[0].type");
+  }
+
+  @Test
+  void rejectsInvalidNodeAttributeMultiplicity() throws Exception {
+    Fixture fixture =
+        loadMutatedUmlFixture(
+            source ->
+                ((ObjectNode) nodeUmlProperties(source, "class-order").get("attributes").get(0))
+                    .put("multiplicity", "2..1"));
+
+    UmlValidationException error =
+        org.junit.jupiter.api.Assertions.assertThrows(
+            UmlValidationException.class,
+            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+
+    assertThat(error.code()).isEqualTo("DEDIREN_UML_MULTIPLICITY_INVALID");
+    assertThat(error.path()).isEqualTo("$.nodes[1].properties.uml.attributes[0].multiplicity");
+  }
+
+  @Test
+  void rejectsUseCaseViewAssociationEndpointOutsideView() throws Exception {
+    Fixture fixture =
+        loadMutatedUmlUseCaseFixture(source -> removeViewNode(source, "support-agent"));
+
+    UmlValidationException error =
+        org.junit.jupiter.api.Assertions.assertThrows(
+            UmlValidationException.class,
+            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+
+    assertThat(error.code()).isEqualTo("DEDIREN_UML_RELATIONSHIP_ENDPOINT_UNSUPPORTED");
+    assertThat(error.path()).isEqualTo("$.plugins.generic-graph.views[0].relationships[2]");
+  }
+
+  @Test
+  void rejectsUseCaseViewIncludeEndpointOutsideView() throws Exception {
+    Fixture fixture =
+        loadMutatedUmlUseCaseFixture(source -> removeViewNode(source, "authenticate-customer"));
+
+    UmlValidationException error =
+        org.junit.jupiter.api.Assertions.assertThrows(
+            UmlValidationException.class,
+            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+
+    assertThat(error.code()).isEqualTo("DEDIREN_UML_RELATIONSHIP_ENDPOINT_UNSUPPORTED");
+    assertThat(error.path()).isEqualTo("$.plugins.generic-graph.views[0].relationships[3]");
+  }
+
+  @Test
+  void rejectsUseCaseViewExtendEndpointOutsideView() throws Exception {
+    Fixture fixture =
+        loadMutatedUmlUseCaseFixture(source -> removeViewNode(source, "apply-discount"));
+
+    UmlValidationException error =
+        org.junit.jupiter.api.Assertions.assertThrows(
+            UmlValidationException.class,
+            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+
+    assertThat(error.code()).isEqualTo("DEDIREN_UML_RELATIONSHIP_ENDPOINT_UNSUPPORTED");
+    assertThat(error.path()).isEqualTo("$.plugins.generic-graph.views[0].relationships[4]");
+  }
+
+  @Test
+  void rejectsUseCaseAssociationBetweenTwoActors() throws Exception {
+    Fixture fixture =
+        loadMutatedUmlUseCaseFixture(
+            source ->
+                relationshipById(source, "customer-place-order").put("target", "support-agent"));
+
+    UmlValidationException error =
+        org.junit.jupiter.api.Assertions.assertThrows(
+            UmlValidationException.class,
+            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+
+    assertThat(error.code()).isEqualTo("DEDIREN_UML_RELATIONSHIP_ENDPOINT_UNSUPPORTED");
+    assertThat(error.value()).isEqualTo("Association: Actor -> Actor");
+  }
+
+  @Test
+  void rejectsExtensionPointUseCaseReferenceThatIsNotUseCase() throws Exception {
+    Fixture fixture =
+        loadMutatedUmlUseCaseFixture(
+            source -> nodeUmlProperties(source, "payment-extension").put("use_case", "customer"));
+
+    UmlValidationException error =
+        org.junit.jupiter.api.Assertions.assertThrows(
+            UmlValidationException.class,
+            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+
+    assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
+    assertThat(error.path()).isEqualTo("$.nodes[8].properties.uml.use_case");
+  }
+
+  @Test
+  void rejectsComponentViewStructuralRelationshipEndpointOutsideView() throws Exception {
+    Fixture fixture =
+        loadMutatedUmlComponentFixture(source -> removeViewNode(source, "class-order-controller"));
+
+    UmlValidationException error =
+        org.junit.jupiter.api.Assertions.assertThrows(
+            UmlValidationException.class,
+            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+
+    assertThat(error.code()).isEqualTo("DEDIREN_UML_RELATIONSHIP_ENDPOINT_UNSUPPORTED");
+    assertThat(error.path()).isEqualTo("$.plugins.generic-graph.views[0].relationships[3]");
+  }
+
+  @Test
+  void rejectsUsageWithInterfaceSourceEndpoint() throws Exception {
+    Fixture fixture =
+        loadMutatedUmlComponentFixture(
+            source ->
+                relationshipById(source, "order-api-uses-payment")
+                    .put("source", "interface-order-api"));
+
+    UmlValidationException error =
+        org.junit.jupiter.api.Assertions.assertThrows(
+            UmlValidationException.class,
+            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+
+    assertThat(error.code()).isEqualTo("DEDIREN_UML_RELATIONSHIP_ENDPOINT_UNSUPPORTED");
+    assertThat(error.value()).isEqualTo("Usage: Interface -> Interface");
+  }
+
+  @Test
+  void rejectsPortComponentReferenceThatIsNotComponent() throws Exception {
+    Fixture fixture =
+        loadMutatedUmlComponentFixture(
+            source ->
+                nodeUmlProperties(source, "port-rest-api").put("component", "interface-order-api"));
+
+    UmlValidationException error =
+        org.junit.jupiter.api.Assertions.assertThrows(
+            UmlValidationException.class,
+            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+
+    assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
+    assertThat(error.path()).isEqualTo("$.nodes[2].properties.uml.component");
+  }
+
+  @Test
+  void rejectsComponentViewWithDeploymentNode() throws Exception {
+    Fixture fixture =
+        loadMutatedUmlComponentFixture(
+            source -> {
+              ObjectNode device = ((ArrayNode) source.get("nodes")).addObject();
+              device.put("id", "device-host");
+              device.put("type", "Device");
+              device.put("label", "Device Host");
+              device.set("properties", JsonSupport.objectMapper().createObjectNode());
+              ((ArrayNode) source.at("/plugins/generic-graph/views/0/nodes")).add("device-host");
+            });
+
+    UmlValidationException error =
+        org.junit.jupiter.api.Assertions.assertThrows(
+            UmlValidationException.class,
+            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+
+    assertThat(error.code()).isEqualTo("DEDIREN_UML_VIEW_KIND_UNSUPPORTED_ELEMENT");
+    assertThat(error.path()).isEqualTo("$.plugins.generic-graph.views[0].nodes[7]");
+  }
+
+  @Test
+  void rejectsDeploymentViewWithUseCaseNode() throws Exception {
+    Fixture fixture =
+        loadMutatedUmlDeploymentFixture(
+            source -> {
+              ObjectNode actor = ((ArrayNode) source.get("nodes")).addObject();
+              actor.put("id", "field-operator");
+              actor.put("type", "Actor");
+              actor.put("label", "Field Operator");
+              actor.set("properties", JsonSupport.objectMapper().createObjectNode());
+              ((ArrayNode) source.at("/plugins/generic-graph/views/0/nodes")).add("field-operator");
+            });
+
+    UmlValidationException error =
+        org.junit.jupiter.api.Assertions.assertThrows(
+            UmlValidationException.class,
+            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+
+    assertThat(error.code()).isEqualTo("DEDIREN_UML_VIEW_KIND_UNSUPPORTED_ELEMENT");
+    assertThat(error.path()).isEqualTo("$.plugins.generic-graph.views[0].nodes[7]");
+  }
+
+  @Test
+  void rejectsDeploymentViewDeploymentRelationshipEndpointOutsideView() throws Exception {
+    Fixture fixture =
+        loadMutatedUmlDeploymentFixture(source -> removeViewNode(source, "deployment-spec-orders"));
+
+    UmlValidationException error =
+        org.junit.jupiter.api.Assertions.assertThrows(
+            UmlValidationException.class,
+            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+
+    assertThat(error.code()).isEqualTo("DEDIREN_UML_RELATIONSHIP_ENDPOINT_UNSUPPORTED");
+    assertThat(error.path()).isEqualTo("$.plugins.generic-graph.views[0].relationships[1]");
+  }
+
+  @Test
+  void rejectsDeploymentViewManifestationEndpointOutsideView() throws Exception {
+    Fixture fixture =
+        loadMutatedUmlDeploymentFixture(source -> removeViewNode(source, "component-order-api"));
+
+    UmlValidationException error =
+        org.junit.jupiter.api.Assertions.assertThrows(
+            UmlValidationException.class,
+            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+
+    assertThat(error.code()).isEqualTo("DEDIREN_UML_RELATIONSHIP_ENDPOINT_UNSUPPORTED");
+    assertThat(error.path()).isEqualTo("$.plugins.generic-graph.views[0].relationships[2]");
+  }
+
+  @Test
+  void rejectsRegionStateMachineReferenceThatIsNotStateMachine() throws Exception {
+    Fixture fixture =
+        loadMutatedUmlStateMachineFixture(
+            source -> nodeUmlProperties(source, "main-region").put("state_machine", "draft"));
+
+    UmlValidationException error =
+        org.junit.jupiter.api.Assertions.assertThrows(
+            UmlValidationException.class,
+            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+
+    assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
+    assertThat(error.path()).isEqualTo("$.nodes[1].properties.uml.state_machine");
+  }
+
+  @Test
   void rejectsUnknownUmlNodeType() throws Exception {
     Fixture fixture = loadUmlFixture();
     var nodes = new java.util.ArrayList<>(fixture.source().nodes());
@@ -1067,7 +1306,7 @@ class UmlValidationTest {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"", "abc", "-1", "1..", "2..1", "1..0"})
+  @ValueSource(strings = {"", "abc", "-1", "1..", "2..1", "1..0", "a..2", "10..9"})
   void rejectsInvalidMultiplicity(String multiplicity) {
     UmlValidationException error =
         org.junit.jupiter.api.Assertions.assertThrows(
@@ -1078,7 +1317,7 @@ class UmlValidationTest {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"1..*", "0..1", "1", "*"})
+  @ValueSource(strings = {"1..*", "0..1", "1", "*", "1..1", "9..10", "0"})
   void acceptsValidMultiplicities(String multiplicity) throws Exception {
     Uml.validateMultiplicity(multiplicity, "$.multiplicity");
   }
@@ -1348,6 +1587,17 @@ class UmlValidationTest {
         JsonSupport.objectMapper()
             .treeToValue(source.plugins().get("generic-graph"), GenericGraphPluginData.class);
     return new Fixture(source, data);
+  }
+
+  private static Fixture loadMutatedUmlFixture(Consumer<ObjectNode> mutate) throws Exception {
+    ObjectNode source =
+        (ObjectNode)
+            JsonSupport.objectMapper()
+                .readTree(
+                    Files.readString(
+                        workspaceRoot().resolve("fixtures/source/valid-uml-basic.json")));
+    mutate.accept(source);
+    return fixture(JsonSupport.objectMapper().writeValueAsString(source), "generic-graph");
   }
 
   private static Fixture loadUmlSequenceFixture() throws Exception {

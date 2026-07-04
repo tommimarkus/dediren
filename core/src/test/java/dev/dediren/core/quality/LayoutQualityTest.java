@@ -78,6 +78,20 @@ class LayoutQualityTest {
   }
 
   @Test
+  void routeDiagnosticsRejectSinglePointRoutes() {
+    var nodes = List.of(node("source", 0.0, 0.0), node("target", 300.0, 0.0));
+    var edges = List.of(edge("one-point", "source", "target", List.of(new Point(100.0, 40.0))));
+
+    var diagnostics =
+        LayoutQuality.validateLayoutDiagnostics(layoutResult(nodes, edges, List.of()));
+
+    assertThat(diagnostics)
+        .extracting(diagnostic -> diagnostic.code())
+        .containsExactly("DEDIREN_LAYOUT_ROUTE_POINTS_INSUFFICIENT");
+    assertThat(diagnostics.get(0).path()).isEqualTo("$.edges[0].points");
+  }
+
+  @Test
   void routeDiagnosticsReportEmptyRoutesAndEndpointMisses() {
     var nodes = new ArrayList<LaidOutNode>();
     nodes.add(node("source", 0.0, 0.0));

@@ -25,6 +25,31 @@ class GenericGraphPluginTest {
   }
 
   @Test
+  void validateWithoutProfileReturnsProfileRequiredEnvelope() throws Exception {
+    PluginResult result =
+        Main.executeForTesting(
+            new String[] {"validate"}, fixture("fixtures/source/valid-basic.json"));
+
+    assertThat(result.exitCode()).isEqualTo(3);
+    assertErrorCode(result, "DEDIREN_SEMANTIC_PROFILE_REQUIRED");
+  }
+
+  @Test
+  void validateRejectsUnsupportedProfile() throws Exception {
+    PluginResult result =
+        Main.executeForTesting(
+            new String[] {"validate", "--profile", "bpmn"},
+            fixture("fixtures/source/valid-basic.json"));
+
+    JsonNode envelope = JsonSupport.objectMapper().readTree(result.stdout());
+
+    assertThat(result.exitCode()).isEqualTo(3);
+    assertThat(envelope.at("/diagnostics/0/code").asText())
+        .isEqualTo("DEDIREN_SEMANTIC_PROFILE_UNSUPPORTED");
+    assertThat(envelope.at("/diagnostics/0/message").asText()).contains("bpmn");
+  }
+
+  @Test
   void projectsBasicViewToLayoutRequest() throws Exception {
     PluginResult result =
         Main.executeForTesting(

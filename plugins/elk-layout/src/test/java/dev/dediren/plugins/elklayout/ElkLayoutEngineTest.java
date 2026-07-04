@@ -390,6 +390,28 @@ class ElkLayoutEngineTest {
   }
 
   @Test
+  void groupWithNoLaidOutMembersYieldsEmptyGroupWarningAndNoGroupBounds() {
+    LayoutRequest request =
+        new LayoutRequest(
+            "layout-request.schema.v1",
+            "main",
+            List.of(new LayoutNode("api", "API", "api", 160.0, 80.0)),
+            List.of(),
+            List.of(
+                new LayoutGroup(
+                    "empty-group", "Empty", List.of(), GroupProvenance.visualOnlyGroup())),
+            List.of(),
+            null);
+
+    LayoutResult result = new ElkLayoutEngine().layout(request);
+
+    assertEquals(List.of(), result.groups());
+    assertEquals(1, result.warnings().size());
+    assertEquals("DEDIREN_ELK_EMPTY_GROUP", result.warnings().getFirst().code());
+    assertEquals("$.groups[0]", result.warnings().getFirst().path());
+  }
+
+  @Test
   void packedLayoutPlacesGroupedDisconnectedNodesInsidePackedGroupBounds() {
     LayoutRequest request =
         new LayoutRequest(
