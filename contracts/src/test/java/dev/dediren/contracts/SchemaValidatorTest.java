@@ -234,6 +234,37 @@ class SchemaValidatorTest {
   }
 
   @Test
+  void layoutRequestRoutingStyleAcceptsSplineAndRejectsUnknown() throws Exception {
+    var mapper = dev.dediren.contracts.json.JsonSupport.objectMapper();
+    String template =
+        """
+        {
+          "layout_request_schema_version": "layout-request.schema.v1",
+          "view_id": "main",
+          "nodes": [],
+          "edges": [],
+          "groups": [],
+          "constraints": [],
+          "layout_preferences": { "routing": { "style": "%s" } }
+        }
+        """;
+    assertThat(
+            SchemaAssertions.validate(
+                workspaceRoot(),
+                "schemas/layout-request.schema.json",
+                mapper.readTree(String.format(template, "spline"))))
+        .describedAs("spline style must validate")
+        .isEmpty();
+    assertThat(
+            SchemaAssertions.validate(
+                workspaceRoot(),
+                "schemas/layout-request.schema.json",
+                mapper.readTree(String.format(template, "curved"))))
+        .describedAs("unknown style must be rejected")
+        .isNotEmpty();
+  }
+
+  @Test
   void firstPartyPluginManifestsMatchSchema() {
     for (String manifest : PLUGIN_MANIFESTS) {
       assertThat(
