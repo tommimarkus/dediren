@@ -1,8 +1,8 @@
 # dediren
 
 `dediren` is a contract-first diagram pipeline for agentic tools. It turns
-semantic JSON into generated layout JSON, rendered SVG, ArchiMate 3.2 OEF XML,
-or UML 2.5.1 XMI XML through explicit CLI commands and process-boundary
+semantic JSON into generated layout JSON, rendered SVG, ArchiMate® 3.2 OEF
+XML, or UML® 2.5.1 XMI XML through explicit CLI commands and process-boundary
 plugins.
 
 The stable product surface is machine-readable:
@@ -551,7 +551,7 @@ Commands:
   or `--profile uml`, it also runs plugin-owned semantic validation.
 - `project` asks `generic-graph` to generate a layout request or render
   metadata for a named view.
-- `layout` asks the official Java ELK plugin to generate node geometry and
+- `layout` asks the first-party Java ELK plugin to generate node geometry and
   edge routes. `layout_preferences.mode` may be `flow` for ELK Layered
   flow diagrams or `packed` for edge-less node/group maps using ELK Rectangle
   Packing; omit it or use `auto` for the default flow behavior.

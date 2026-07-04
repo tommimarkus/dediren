@@ -91,7 +91,7 @@ diagrams should use a policy copy with a real title.
 
 ## Semantic Profiles
 
-For ArchiMate SVG notation or OEF export, set the generic graph semantic
+For ArchiMate® SVG notation or OEF export, set the generic graph semantic
 profile and use ArchiMate type names:
 
 ```json
@@ -120,7 +120,7 @@ envelope `status` stays `ok`. Because the document always carries a
 `archimate3_Diagram.xsd`, not the model-only `archimate3_Model.xsd`; point
 `DEDIREN_OEF_SCHEMA_DIR` at a directory holding all three ArchiMate 3.1 OEF XSDs.
 
-For UML SVG notation or XMI export, use `semantic_profile: "uml"` and the
+For UML® SVG notation or XMI export, use `semantic_profile: "uml"` and the
 `uml-xmi` plugin. Supported UML view kinds are `uml-class`, `uml-data`,
 `uml-activity`, `uml-sequence`, `uml-state-machine`, `uml-use-case`, and
 `uml-component`.

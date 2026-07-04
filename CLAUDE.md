@@ -180,7 +180,7 @@ enforcement authority for matching version, tag, and release actions.
 
 ## ELK Runtime
 
-- `plugins/elk-layout` is the first-party official Java ELK plugin.
+- `plugins/elk-layout` is the first-party Java ELK plugin.
 - It uses Eclipse ELK Java libraries and the Maven appassembler launcher.
 - Java 21 or newer is required.
 
