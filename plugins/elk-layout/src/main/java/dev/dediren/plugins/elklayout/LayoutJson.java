@@ -80,7 +80,9 @@ final class LayoutJson {
       return;
     }
     rejectUnsupportedText(
-        routing.get("style"), "$.layout_preferences.routing.style", Set.of("orthogonal"));
+        routing.get("style"),
+        "$.layout_preferences.routing.style",
+        Set.of("orthogonal", "polyline", "spline"));
     rejectUnsupportedText(
         routing.get("profile"),
         "$.layout_preferences.routing.profile",

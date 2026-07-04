@@ -43,4 +43,25 @@ class LayoutJsonTest {
     assertEquals(
         LayoutEndpointMerging.OFF, request.layoutPreferences().routing().endpointMerging());
   }
+
+  @Test
+  void readsSplineRoutingStyle() throws Exception {
+    String json =
+        """
+            {
+              "layout_request_schema_version": "layout-request.schema.v1",
+              "view_id": "main",
+              "nodes": [],
+              "edges": [],
+              "groups": [],
+              "constraints": [],
+              "layout_preferences": { "routing": { "style": "spline" } }
+            }
+            """;
+
+    LayoutRequest request =
+        LayoutJson.readLayoutRequest(new java.io.ByteArrayInputStream(json.getBytes()));
+
+    assertEquals(LayoutRoutingStyle.SPLINE, request.layoutPreferences().routing().style());
+  }
 }
