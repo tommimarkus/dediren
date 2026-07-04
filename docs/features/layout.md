@@ -55,6 +55,20 @@ is zero**.
 | `edge_crossing_count` | Edge crossings — **informational only**; crossings can be unavoidable, so this never degrades `status`. |
 | `warning_count` | Aggregate warning count. |
 
+### Routing styles
+
+`layout_preferences.routing.style` selects how ELK draws edges:
+
+| Value | Route shape |
+| --- | --- |
+| `orthogonal` (default) | Axis-aligned segments with right-angle bends. |
+| `polyline` | Straight point-to-point segments; diagonal bends allowed. |
+| `spline` | Smooth curved routes. |
+
+The style is Dediren-owned vocabulary; the `elk-layout` plugin maps it to the
+matching ELK edge-routing mode. `orthogonal` remains the default when the field
+is omitted.
+
 ### Junction routing
 
 In ArchiMate views, junction-role nodes (`AndJunction`/`OrJunction`) must sit on

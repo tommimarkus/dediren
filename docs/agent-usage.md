@@ -562,7 +562,7 @@ Java 21 or newer. It does not use external layout adapters. Use
 `layout_preferences.mode: "flow"` for directed diagrams that need ELK Layered
 placement and routing. Use `layout_preferences.mode: "packed"` only for
 edge-less node/group maps; this selects official ELK Rectangle Packing and
-returns no edge routes.
+returns no edge routes. The `routing.style` option accepts `orthogonal` (default), `polyline`, or `spline`.
 
 ## Export
 
