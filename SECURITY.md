@@ -33,6 +33,9 @@ GitHub release archives target SLSA Build Level 2 evidence:
   `main`, and weekly; high-severity alerts surface in the repository's code
   scanning view.
 
+See `docs/threat-model.md` for the full trust-boundary breakdown behind these
+controls.
+
 ## Branch Protection (deferred)
 
 While the project is pre-release and maintained by a single author, the default

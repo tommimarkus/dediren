@@ -14,6 +14,7 @@ agent tools should be pointed here from their own entrypoint files (for example,
   - Existing slice or planned task: matching file under `docs/superpowers/plans/`
   - User-facing command or workflow: `README.md`
   - Bundle-local agent authoring or runtime guidance: `docs/agent-usage.md`
+  - Trust-boundary or security-posture question: `docs/threat-model.md`
 - Treat `README.md` as the main user-facing document. Keep it current when
   commands, workflows, plugin/runtime behavior, public artifacts, or examples
   change.
@@ -101,6 +102,9 @@ agent tools should be pointed here from their own entrypoint files (for example,
 - UML/XMI export changes: update export schemas, policy fixtures,
   source/layout fixtures, `plugins/uml-xmi-export`, CLI export tests, and
   README examples together.
+- Plugin discovery/execution, schema-cache fetching, envelope validation, XML
+  parser hardening, or release workflow changes: update
+  `docs/threat-model.md` in the same change.
 
 ## Versioning
 
