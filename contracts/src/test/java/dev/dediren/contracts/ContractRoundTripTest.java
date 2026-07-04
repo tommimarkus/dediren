@@ -639,6 +639,16 @@ class ContractRoundTripTest {
     }
   }
 
+  @Test
+  void routingStyleAcceptsPolylineAndSpline() throws Exception {
+    var mapper = dev.dediren.contracts.json.JsonSupport.objectMapper();
+    assertThat(mapper.readValue("\"polyline\"", LayoutRoutingStyle.class))
+        .isEqualTo(LayoutRoutingStyle.POLYLINE);
+    assertThat(mapper.readValue("\"spline\"", LayoutRoutingStyle.class))
+        .isEqualTo(LayoutRoutingStyle.SPLINE);
+    assertThat(mapper.writeValueAsString(LayoutRoutingStyle.SPLINE)).isEqualTo("\"spline\"");
+  }
+
   private static <T> T readFixture(String fixture, Class<T> type) throws Exception {
     return JsonSupport.readValue(Files.readString(workspaceRoot().resolve(fixture)), type);
   }

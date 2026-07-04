@@ -4,5 +4,11 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 public enum LayoutRoutingStyle {
   @JsonProperty("orthogonal")
-  ORTHOGONAL
+  ORTHOGONAL,
+
+  @JsonProperty("polyline")
+  POLYLINE,
+
+  @JsonProperty("spline")
+  SPLINE
 }
