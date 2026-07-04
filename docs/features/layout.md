@@ -55,6 +55,22 @@ is zero**.
 | `edge_crossing_count` | Edge crossings — **informational only**; crossings can be unavoidable, so this never degrades `status`. |
 | `warning_count` | Aggregate warning count. |
 
+### Layered phase strategies
+
+`layout_preferences` exposes the ELK Layered pipeline stages as Dediren-owned
+options. All are optional; when omitted, Dediren keeps its defaults.
+
+| Option | Values | Controls |
+| --- | --- | --- |
+| `cycle_breaking` | `greedy` (default), `depth-first`, `model-order` | How edges in cycles are reversed for layering. |
+| `layering.strategy` | `network-simplex` (default), `longest-path`, `coffman-graham`, `min-width`, `stretch-width`, `breadth-first`, `depth-first` | How nodes are assigned to layers. |
+| `crossing.strategy` | `layer-sweep` (default), `none` | The crossing-minimization pass. |
+| `crossing.greedy_switch` | `off`, `one-sided`, `two-sided` | Greedy post-pass that swaps adjacent nodes to cut crossings. |
+| `placement.strategy` | `brandes-koepf` (default), `network-simplex`, `linear-segments`, `simple` | How nodes are positioned within their layers. |
+
+These map to ELK Layered options internally; Dediren validates the values and
+rejects unknown ones with a structured error envelope.
+
 ### Routing styles
 
 `layout_preferences.routing.style` selects how ELK draws edges:

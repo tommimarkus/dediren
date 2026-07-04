@@ -554,7 +554,7 @@ Commands:
 - `layout` asks the first-party Java ELK plugin to generate node geometry and
   edge routes. `layout_preferences.mode` may be `flow` for ELK Layered
   flow diagrams or `packed` for edge-less node/group maps using ELK Rectangle
-  Packing; omit it or use `auto` for the default flow behavior. The `routing.style` option accepts `orthogonal` (default), `polyline`, or `spline`.
+  Packing; omit it or use `auto` for the default flow behavior. The `routing.style` option accepts `orthogonal` (default), `polyline`, or `spline`. Layered phase strategies (`cycle_breaking`, `layering.strategy`, `crossing.strategy`, `crossing.greedy_switch`, `placement.strategy`) are configurable under `layout_preferences`; see the Layout feature page for values.
 - `validate-layout` reports backend-neutral route and layout quality metrics.
   It additionally reports `group_label_band_issue_count` (members overlapping
   a labeled group's title band), `label_space_issue_count` (node labels that
