@@ -3,10 +3,12 @@ package dev.dediren.schemacache;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledOnOs;
@@ -15,6 +17,13 @@ import org.junit.jupiter.api.io.TempDir;
 
 class SchemaCacheModuleTest {
   @TempDir Path tempDir;
+
+  private static final String SCHEMA_XML = "<schema/>";
+  // sha256sum of the literal bytes of SCHEMA_XML.
+  private static final String SCHEMA_SHA256 =
+      "65a8fcf0cf2a47e9dd2136cdbaee048f965cbb3830443622ff866637b7c8ed0d";
+  private static final String WRONG_SHA256 =
+      "0000000000000000000000000000000000000000000000000000000000000000";
 
   @Test
   void moduleLoads() {
@@ -128,17 +137,18 @@ class SchemaCacheModuleTest {
   @Test
   void skipsDownloadWhenCachedSchemaAlreadyExists() throws Exception {
     Path schema =
-        Files.writeString(tempDir.resolve("schema.xsd"), "<schema/>", StandardCharsets.UTF_8);
+        Files.writeString(tempDir.resolve("schema.xsd"), SCHEMA_XML, StandardCharsets.UTF_8);
 
     SchemaCacheModule.ensureCachedSchemaFile(
         schema,
         URI.create("https://example.test/schema.xsd"),
         "test schema",
+        SCHEMA_SHA256,
         (url, destination) -> {
-          throw new AssertionError("fetcher should not be called for a populated schema");
+          throw new AssertionError("fetcher should not be called for a matching cached schema");
         });
 
-    assertThat(schema).hasContent("<schema/>");
+    assertThat(schema).hasContent(SCHEMA_XML);
   }
 
   @Test
@@ -149,12 +159,84 @@ class SchemaCacheModuleTest {
         schema,
         URI.create("https://example.test/schema.xsd"),
         "test schema",
+        SCHEMA_SHA256,
         (url, destination) -> {
-          Files.writeString(destination, "<schema/>", StandardCharsets.UTF_8);
+          Files.writeString(destination, SCHEMA_XML, StandardCharsets.UTF_8);
           return SchemaFetchResult.success();
         });
 
-    assertThat(schema).hasContent("<schema/>");
+    assertThat(schema).hasContent(SCHEMA_XML);
+  }
+
+  @Test
+  void rejectsDownloadedSchemaWithMismatchingHash() throws Exception {
+    Path schema = tempDir.resolve("nested").resolve("schema.xsd");
+
+    assertThatThrownBy(
+            () ->
+                SchemaCacheModule.ensureCachedSchemaFile(
+                    schema,
+                    URI.create("https://example.test/schema.xsd"),
+                    "test schema",
+                    WRONG_SHA256,
+                    (url, destination) -> {
+                      Files.writeString(destination, SCHEMA_XML, StandardCharsets.UTF_8);
+                      return SchemaFetchResult.success();
+                    }))
+        .isInstanceOf(SchemaCacheException.class)
+        .hasMessageContaining("https://example.test/schema.xsd")
+        .hasMessageContaining(schema.toString())
+        .hasMessageContaining(WRONG_SHA256)
+        .hasMessageContaining(SCHEMA_SHA256);
+
+    assertThat(schema).doesNotExist();
+    assertThat(leftoverTempFiles(schema.getParent())).isEmpty();
+  }
+
+  @Test
+  void replacesCorruptCachedSchemaWhenReFetchMatches() throws Exception {
+    Path schema = tempDir.resolve("nested").resolve("schema.xsd");
+    Files.createDirectories(schema.getParent());
+    Files.writeString(schema, "<corrupt/>", StandardCharsets.UTF_8);
+
+    SchemaCacheModule.ensureCachedSchemaFile(
+        schema,
+        URI.create("https://example.test/schema.xsd"),
+        "test schema",
+        SCHEMA_SHA256,
+        (url, destination) -> {
+          Files.writeString(destination, SCHEMA_XML, StandardCharsets.UTF_8);
+          return SchemaFetchResult.success();
+        });
+
+    assertThat(schema).hasContent(SCHEMA_XML);
+    assertThat(leftoverTempFiles(schema.getParent())).isEmpty();
+  }
+
+  @Test
+  void rejectsCorruptCachedSchemaWhenReFetchStillMismatches() throws Exception {
+    Path schema = tempDir.resolve("nested").resolve("schema.xsd");
+    Files.createDirectories(schema.getParent());
+    Files.writeString(schema, "<corrupt/>", StandardCharsets.UTF_8);
+
+    assertThatThrownBy(
+            () ->
+                SchemaCacheModule.ensureCachedSchemaFile(
+                    schema,
+                    URI.create("https://example.test/schema.xsd"),
+                    "test schema",
+                    SCHEMA_SHA256,
+                    (url, destination) -> {
+                      Files.writeString(destination, "<stillbad/>", StandardCharsets.UTF_8);
+                      return SchemaFetchResult.success();
+                    }))
+        .isInstanceOf(SchemaCacheException.class)
+        .hasMessageContaining(SCHEMA_SHA256);
+
+    // The re-fetch never validated, so the corrupt cache file is not overwritten with the bad
+    // download and never treated as valid (the method throws). No temp file is left behind.
+    assertThat(schema).hasContent("<corrupt/>");
+    assertThat(leftoverTempFiles(schema.getParent())).isEmpty();
   }
 
   @Test
@@ -189,9 +271,10 @@ class SchemaCacheModuleTest {
         schema,
         URI.create("https://example.test/schema.xsd"),
         "test schema",
+        SCHEMA_SHA256,
         SchemaCacheModule.curlFetcher(fakeCurl.toString()));
 
-    assertThat(schema).hasContent("<schema/>");
+    assertThat(schema).hasContent(SCHEMA_XML);
     Path argsFile =
         Files.list(schema.getParent())
             .filter(path -> path.getFileName().toString().endsWith(".args"))
@@ -200,6 +283,8 @@ class SchemaCacheModuleTest {
     assertThat(argsFile)
         .content()
         .contains(
+            "--proto",
+            "=https",
             "--location",
             "--fail",
             "--silent",
@@ -218,6 +303,7 @@ class SchemaCacheModuleTest {
                     schema,
                     URI.create("https://example.test/schema.xsd"),
                     "test schema",
+                    SCHEMA_SHA256,
                     (url, destination) ->
                         new SchemaFetchResult(
                             false,
@@ -241,11 +327,23 @@ class SchemaCacheModuleTest {
                     schema,
                     URI.create("https://example.test/schema.xsd"),
                     "test schema",
+                    SCHEMA_SHA256,
                     (url, destination) -> {
                       return SchemaFetchResult.success();
                     }))
         .isInstanceOf(SchemaCacheException.class)
         .hasMessage("downloaded test schema from https://example.test/schema.xsd was empty");
+  }
+
+  private static List<Path> leftoverTempFiles(Path directory) throws IOException {
+    if (!Files.isDirectory(directory)) {
+      return List.of();
+    }
+    try (var entries = Files.list(directory)) {
+      return entries
+          .filter(path -> path.getFileName().toString().startsWith(".dediren-schema-"))
+          .toList();
+    }
   }
 
   @Test

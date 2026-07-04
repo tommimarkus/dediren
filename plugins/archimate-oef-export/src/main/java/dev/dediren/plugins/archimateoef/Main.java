@@ -63,6 +63,16 @@ public final class Main {
   private static final String SCHEMA_FETCHER = "curl";
   private static final List<String> OFFICIAL_OEF_SCHEMA_FILES =
       List.of("archimate3_Model.xsd", "archimate3_View.xsd", "archimate3_Diagram.xsd");
+  // Pinned SHA-256 checksums per OEF XSD, verified after every runtime download (audit finding F2).
+  // Source: https://www.opengroup.org/xsd/archimate/3.1/<file> — retrieved 2026-07-04.
+  private static final Map<String, String> OFFICIAL_OEF_SCHEMA_SHA256 =
+      Map.of(
+          "archimate3_Model.xsd",
+          "dd451abe3e3193f91dd9544b279af9bbbf17e75ff1ef86f65ad52b3f8cd29794",
+          "archimate3_View.xsd",
+          "d708ce176403034b1229b892712cfd69660aefe17da4cc54acea1ac35e4a9854",
+          "archimate3_Diagram.xsd",
+          "6419080f4c4bc43b4a7b8acf870146a7bae6c3487a3ce08d3c521c028ea6056e");
   // Names both self-serve remediations for a failed schema download (issue #35): expose proxy
   // configuration to the plugin child, or skip the download by supplying the XSDs offline. Appended
   // to DEDIREN_OEF_SCHEMA_UNAVAILABLE so an agent can recover from stdout JSON alone.
@@ -622,6 +632,7 @@ public final class Main {
             schemaDir.resolve(fileName),
             URI.create(OEF_SCHEMA_BASE_URL + "/" + fileName),
             "official OEF schema",
+            OFFICIAL_OEF_SCHEMA_SHA256.get(fileName),
             SchemaCacheModule.curlFetcher(SCHEMA_FETCHER));
       }
     } catch (SchemaCacheException error) {

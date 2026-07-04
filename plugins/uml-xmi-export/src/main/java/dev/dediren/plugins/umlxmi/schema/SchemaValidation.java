@@ -29,6 +29,10 @@ public final class SchemaValidation {
 
   public static final String XMI_SCHEMA_VALIDATOR = "xmllint";
   private static final String OMG_XMI_SCHEMA_URL = "https://www.omg.org/spec/XMI/20131001/XMI.xsd";
+  // Pinned SHA-256 of the OMG XMI schema, verified after every runtime download (audit finding F2).
+  // Source: https://www.omg.org/spec/XMI/20131001/XMI.xsd — retrieved 2026-07-04.
+  private static final String OMG_XMI_SCHEMA_SHA256 =
+      "7b228718d35a15a8e2fb99f078d36eee4b23b7a2cd405e7ac81b9d27bf2fab5d";
   public static final String XMI_SCHEMA_PATH_ENV = "DEDIREN_XMI_SCHEMA_PATH";
   public static final String SCHEMA_CACHE_DIR_ENV = "DEDIREN_SCHEMA_CACHE_DIR";
   public static final String SCHEMA_FETCHER = "curl";
@@ -184,6 +188,7 @@ public final class SchemaValidation {
           schemaPath,
           URI.create(OMG_XMI_SCHEMA_URL),
           "OMG XMI schema",
+          OMG_XMI_SCHEMA_SHA256,
           SchemaCacheModule.curlFetcher(SCHEMA_FETCHER));
     } catch (SchemaCacheException error) {
       throw new XmiValidationException(

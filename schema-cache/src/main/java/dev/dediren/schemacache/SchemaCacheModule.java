@@ -6,6 +6,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Map;
 import java.util.Optional;
 
@@ -64,9 +66,12 @@ public final class SchemaCacheModule {
   }
 
   public static void ensureCachedSchemaFile(
-      Path schemaPath, URI url, String description, SchemaFetcher fetcher)
+      Path schemaPath, URI url, String description, String expectedSha256, SchemaFetcher fetcher)
       throws SchemaCacheException {
-    if (isNonEmptyFile(schemaPath)) {
+    // A cached file is trusted only when its bytes still match the pinned SHA-256 (audit finding
+    // F2). A mismatch means the cache is corrupt, stale, or poisoned, so we re-fetch rather than
+    // serve it.
+    if (isNonEmptyFile(schemaPath) && fileMatchesSha256(schemaPath, expectedSha256)) {
       return;
     }
 
@@ -111,6 +116,20 @@ public final class SchemaCacheModule {
       if (!isNonEmptyFile(tempFile)) {
         throw new SchemaCacheException("downloaded " + description + " from " + url + " was empty");
       }
+      String actualSha256 = sha256Hex(tempFile);
+      if (!actualSha256.equalsIgnoreCase(expectedSha256)) {
+        throw new SchemaCacheException(
+            "downloaded "
+                + description
+                + " from "
+                + url
+                + " does not match the pinned sha-256 for "
+                + schemaPath
+                + ": expected "
+                + expectedSha256
+                + " but got "
+                + actualSha256);
+      }
       try {
         Files.move(
             tempFile,
@@ -139,6 +158,10 @@ public final class SchemaCacheModule {
       Process process =
           new ProcessBuilder(
                   command,
+                  // Forbid protocol downgrade when following redirects: only https is allowed for
+                  // the initial request and every redirect hop (audit finding F2).
+                  "--proto",
+                  "=https",
                   "--location",
                   "--fail",
                   "--silent",
@@ -152,6 +175,30 @@ public final class SchemaCacheModule {
       int exitCode = process.waitFor();
       return new SchemaFetchResult(exitCode == 0, command, exitCode, stdout, stderr);
     };
+  }
+
+  private static boolean fileMatchesSha256(Path path, String expectedSha256) {
+    try {
+      return sha256Hex(path).equalsIgnoreCase(expectedSha256);
+    } catch (IOException error) {
+      return false;
+    }
+  }
+
+  private static String sha256Hex(Path path) throws IOException {
+    MessageDigest digest;
+    try {
+      digest = MessageDigest.getInstance("SHA-256");
+    } catch (NoSuchAlgorithmException error) {
+      throw new IllegalStateException("SHA-256 message digest is required but unavailable", error);
+    }
+    byte[] hash = digest.digest(Files.readAllBytes(path));
+    StringBuilder hex = new StringBuilder(hash.length * 2);
+    for (byte b : hash) {
+      hex.append(Character.forDigit((b >> 4) & 0xF, 16));
+      hex.append(Character.forDigit(b & 0xF, 16));
+    }
+    return hex.toString();
   }
 
   public static String commandOutputDetails(
