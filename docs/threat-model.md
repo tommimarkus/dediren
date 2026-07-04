@@ -79,19 +79,17 @@ a documented accepted risk — see `SECURITY.md`.
 | --- | --- | --- |
 | Poison a release artifact | SHA-pinned Actions, blocking Grype/SBOM gate, attestation generated and verified before publish | Single-maintainer `main` has no required review (accepted risk, `SECURITY.md`) |
 | Tamper `main` or `v*` tags | `release.yml` cross-checks the tag version against `pom.xml`; attestation binds the published archive to its build | No branch protection on `main`; a bad commit is caught only by tests/scans, not review |
-| Malicious plugin on a user machine | Explicit discovery only (never `PATH`); project-plugin dirs opt-in via `DEDIREN_ALLOW_PROJECT_PLUGINS`; env allowlist + deterministic cwd in `PluginRunner` | A user who points `DEDIREN_ALLOW_PROJECT_PLUGINS`/`DEDIREN_PLUGIN_DIRS`/`DEDIREN_TRUST_MANIFEST_CAPABILITIES` at an untrusted directory opts back into arbitrary code execution |
+| Malicious plugin on a user machine | Explicit discovery only (never `PATH`); project-plugin dirs opt-in via `DEDIREN_ALLOW_PROJECT_PLUGINS`; env allowlist + deterministic cwd in `PluginRunner` | Enabling `DEDIREN_ALLOW_PROJECT_PLUGINS` or configuring `DEDIREN_PLUGIN_DIRS` is a user decision to execute plugins found there; the capabilities probe still runs for those manifests, but the probe itself launches the discovered executable, so discovery of a malicious directory is code execution by configuration |
 | Malicious schema substitution | HTTPS-only curl plus SHA-256 pin verified before use (`SchemaCacheModule`) | `DEDIREN_XMI_SCHEMA_PATH` / `DEDIREN_OEF_SCHEMA_DIR` offline overrides bypass the SHA-256 check by design |
 | Malicious envelope input | Jackson 3 parsing plus fuzz-regression targets pinning the only-`JacksonException`/`XmiValidationException` invariant; hardened DOM factory blocks DOCTYPE/XXE | Fuzz targets run in deterministic regression mode over a fixed seed corpus in CI, not continuous coverage-guided fuzzing |
-| Dependency compromise | Blocking Grype/SBOM gate on every push/PR/release plus weekly CodeQL scanning | Weekly OWASP Dependency-Check cross-check is intentionally non-blocking (`continue-on-error`), so a fresh compromise between scans is not gated |
+| Dependency compromise | Blocking Grype/SBOM gate on every push/PR/release (`ci.yml`, `release.yml`) plus weekly Dependabot updates (`.github/dependabot.yml`) | The weekly OWASP Dependency-Check cross-check (`dependency-audit.yml`) is intentionally non-blocking (`continue-on-error`), so advisories only it surfaces never gate a merge or release |
 
 ## Incident Response Runbook
 
 1. **Intake**: report through GitHub private vulnerability reporting — same
    URL as `SECURITY.md`.
-2. **Triage** against the SLAs already written in `SECURITY.md`
-   (acknowledge within 7 days; critical fixed or release-blocking exception
-   documented before the next release; high fixed within 30 days or
-   accepted with reachability analysis).
+2. **Triage** against the SLAs in `SECURITY.md`'s "Response Expectations"
+   section; do not re-derive them here.
 3. **Fix on `main`** — this repo takes direct commits to `main` per
    `git-workflow-policy` in `CLAUDE.md`; branches are optional.
 4. **Release** through the attested release workflow
