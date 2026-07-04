@@ -25,6 +25,12 @@ class ElkLayoutEngineTest {
   private static final double GEOMETRY_EPSILON = 0.001;
   private static final double PORT_SIDE_EPSILON = 1.0;
 
+  // Tolerance for calling a route segment axis-aligned. The product only emits ORTHOGONAL routes
+  // (LayoutRoutingStyle has no other value), so every segment must move along exactly one axis. A
+  // real diagonal jog is tens of pixels off both axes; this tolerance only absorbs sub-pixel float
+  // drift and never lets a genuine diagonal through.
+  private static final double ORTHOGONAL_TOLERANCE = 0.5;
+
   // Architectural fitness function for the ELK-first rule (CLAUDE.md): the helper must not
   // re-implement post-ELK route geometry. Intentionally a source-text guard, not behavioral —
   // accepted per the 2026-06-07 test-quality audit. The geometry-outcome tests in this class
@@ -2042,6 +2048,17 @@ class ElkLayoutEngineTest {
 
     assertRouteEndpointsOnNodePerimeters(result, "actor-ulosottolaitos-assigns-feedback");
     assertRouteEndpointsOnNodePerimeters(result, "proc-feedback-flow-applicant");
+    // Every edge in this cross-hierarchy feedback graph must render pristinely, not just the two
+    // feedback edges checked above: axis-aligned segments, no zero-length bends, and no route
+    // driven through an unrelated node.
+    for (LaidOutEdge edge : result.edges()) {
+      assertOrthogonalRoute(edge);
+      assertNoDegenerateRouteSegments(edge);
+    }
+    assertEquals(
+        0,
+        connectorThroughNodeCount(result),
+        "cross-hierarchy feedback routes should avoid unrelated nodes");
   }
 
   @Test
@@ -2322,9 +2339,15 @@ class ElkLayoutEngineTest {
     assertEquals(21, result.edges().size());
     for (LaidOutEdge edge : result.edges()) {
       assertRouteEndpointsOnNodePerimeters(result, edge.id());
+      assertOrthogonalRoute(edge);
+      assertNoDegenerateRouteSegments(edge);
       assertTrue(
           cornerCount(edge.points()) <= 8,
           edge.id() + " should keep a bounded corner count, points=" + edge.points());
+      assertEquals(
+          0,
+          endpointBoundaryOverlapCount(result, edge),
+          edge.id() + " must leave its endpoint nodes before turning, not hug a node border");
     }
     for (LaidOutGroup group : result.groups()) {
       assertGroupContainsMembers(result, group);
@@ -2980,6 +3003,54 @@ class ElkLayoutEngineTest {
       previous = current;
     }
     return corners;
+  }
+
+  // Pristine-routing invariant: every ELK-emitted segment must be axis-aligned. Kept independent of
+  // routeOrientation()/cornerCount(): those return null for a non-orthogonal or degenerate segment
+  // and then silently `continue` past it, so a stray diagonal would neither fail those checks nor
+  // raise the corner count. This asserts the very property those helpers quietly assume.
+  private static void assertOrthogonalRoute(LaidOutEdge edge) {
+    assertRouted(edge);
+    List<Point> points = edge.points();
+    for (int index = 0; index < points.size() - 1; index++) {
+      Point start = points.get(index);
+      Point end = points.get(index + 1);
+      boolean diagonal =
+          Math.abs(start.x() - end.x()) > ORTHOGONAL_TOLERANCE
+              && Math.abs(start.y() - end.y()) > ORTHOGONAL_TOLERANCE;
+      assertFalse(
+          diagonal,
+          "edge "
+              + edge.id()
+              + " must route with axis-aligned segments, but "
+              + start
+              + " -> "
+              + end
+              + " is diagonal; route="
+              + points);
+    }
+  }
+
+  // Pristine-routing invariant: a clean route has no consecutive coincident points, i.e. no
+  // zero-length segment. Such a point renders as an invisible no-op bend but signals sloppy route
+  // assembly (for example a section boundary duplicated when ELK edge sections are concatenated).
+  private static void assertNoDegenerateRouteSegments(LaidOutEdge edge) {
+    assertRouted(edge);
+    List<Point> points = edge.points();
+    for (int index = 0; index < points.size() - 1; index++) {
+      Point start = points.get(index);
+      Point end = points.get(index + 1);
+      assertFalse(
+          samePoint(start, end),
+          "edge "
+              + edge.id()
+              + " has a zero-length segment at index "
+              + index
+              + " ("
+              + start
+              + "); route="
+              + points);
+    }
   }
 
   private static boolean hasSharedInteriorRoutePoint(List<LaidOutEdge> edges) {
