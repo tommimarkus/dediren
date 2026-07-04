@@ -7,11 +7,17 @@ import dev.dediren.contracts.export.UmlXmiExportPolicy;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.contracts.layout.GroupProvenance;
 import dev.dediren.contracts.layout.LaidOutNode;
+import dev.dediren.contracts.layout.LayoutCrossingStrategy;
+import dev.dediren.contracts.layout.LayoutCycleBreaking;
 import dev.dediren.contracts.layout.LayoutDensity;
 import dev.dediren.contracts.layout.LayoutDirection;
 import dev.dediren.contracts.layout.LayoutEndpointMerging;
+import dev.dediren.contracts.layout.LayoutGreedySwitch;
+import dev.dediren.contracts.layout.LayoutLayeringStrategy;
 import dev.dediren.contracts.layout.LayoutMode;
 import dev.dediren.contracts.layout.LayoutNode;
+import dev.dediren.contracts.layout.LayoutPlacementStrategy;
+import dev.dediren.contracts.layout.LayoutPreferences;
 import dev.dediren.contracts.layout.LayoutRequest;
 import dev.dediren.contracts.layout.LayoutResult;
 import dev.dediren.contracts.layout.LayoutRoutingProfile;
@@ -647,6 +653,28 @@ class ContractRoundTripTest {
     assertThat(mapper.readValue("\"spline\"", LayoutRoutingStyle.class))
         .isEqualTo(LayoutRoutingStyle.SPLINE);
     assertThat(mapper.writeValueAsString(LayoutRoutingStyle.SPLINE)).isEqualTo("\"spline\"");
+  }
+
+  @Test
+  void layoutPreferencesRoundTripsPhaseStrategies() throws Exception {
+    var mapper = dev.dediren.contracts.json.JsonSupport.objectMapper();
+    String json =
+        """
+        {
+          "cycle_breaking": "model-order",
+          "layering": { "strategy": "coffman-graham" },
+          "crossing": { "strategy": "layer-sweep", "greedy_switch": "two-sided" },
+          "placement": { "strategy": "network-simplex" }
+        }
+        """;
+    LayoutPreferences prefs = mapper.readValue(json, LayoutPreferences.class);
+    assertThat(prefs.cycleBreaking()).isEqualTo(LayoutCycleBreaking.MODEL_ORDER);
+    assertThat(prefs.layering().strategy()).isEqualTo(LayoutLayeringStrategy.COFFMAN_GRAHAM);
+    assertThat(prefs.crossing().strategy()).isEqualTo(LayoutCrossingStrategy.LAYER_SWEEP);
+    assertThat(prefs.crossing().greedySwitch()).isEqualTo(LayoutGreedySwitch.TWO_SIDED);
+    assertThat(prefs.placement().strategy()).isEqualTo(LayoutPlacementStrategy.NETWORK_SIMPLEX);
+    assertThat(mapper.writeValueAsString(LayoutLayeringStrategy.NETWORK_SIMPLEX))
+        .isEqualTo("\"network-simplex\"");
   }
 
   private static <T> T readFixture(String fixture, Class<T> type) throws Exception {
