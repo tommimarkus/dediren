@@ -11,8 +11,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import org.eclipse.elk.alg.layered.options.CrossingMinimizationStrategy;
+import org.eclipse.elk.alg.layered.options.CycleBreakingStrategy;
 import org.eclipse.elk.alg.layered.options.EdgeStraighteningStrategy;
+import org.eclipse.elk.alg.layered.options.GreedySwitchType;
 import org.eclipse.elk.alg.layered.options.LayeredOptions;
+import org.eclipse.elk.alg.layered.options.LayeringStrategy;
 import org.eclipse.elk.alg.layered.options.NodePlacementStrategy;
 import org.eclipse.elk.alg.layered.options.OrderingStrategy;
 import org.eclipse.elk.alg.layered.options.PortSortingStrategy;
@@ -3192,5 +3196,43 @@ class ElkLayoutEngineTest {
   private static LayoutPreferences routingStylePreferences(LayoutRoutingStyle style) {
     return new LayoutPreferences(
         null, null, null, new LayoutRoutingPreferences(style, null, LayoutEndpointMerging.AUTO));
+  }
+
+  @Test
+  void layeredRootMapsPhaseStrategiesToElkOptions() {
+    LayoutPreferences prefs =
+        new LayoutPreferences(
+            null,
+            null,
+            null,
+            null,
+            null,
+            LayoutCycleBreaking.MODEL_ORDER,
+            new LayoutLayeringPreferences(LayoutLayeringStrategy.COFFMAN_GRAHAM),
+            new LayoutCrossingPreferences(
+                LayoutCrossingStrategy.NONE, LayoutGreedySwitch.ONE_SIDED),
+            new LayoutPlacementPreferences(LayoutPlacementStrategy.NETWORK_SIMPLEX));
+    ElkNode root = ElkLayeredOptions.configuredRoot(Direction.RIGHT, prefs);
+
+    assertEquals(
+        CycleBreakingStrategy.MODEL_ORDER,
+        root.getProperty(LayeredOptions.CYCLE_BREAKING_STRATEGY));
+    assertEquals(
+        LayeringStrategy.COFFMAN_GRAHAM, root.getProperty(LayeredOptions.LAYERING_STRATEGY));
+    assertEquals(
+        CrossingMinimizationStrategy.NONE,
+        root.getProperty(LayeredOptions.CROSSING_MINIMIZATION_STRATEGY));
+    assertEquals(
+        GreedySwitchType.ONE_SIDED,
+        root.getProperty(LayeredOptions.CROSSING_MINIMIZATION_GREEDY_SWITCH_TYPE));
+    assertEquals(
+        NodePlacementStrategy.NETWORK_SIMPLEX,
+        root.getProperty(LayeredOptions.NODE_PLACEMENT_STRATEGY));
+
+    // Absent phase-strategy fields preserve today's defaults.
+    ElkNode bare = ElkLayeredOptions.configuredRoot(Direction.RIGHT, null);
+    assertEquals(
+        NodePlacementStrategy.BRANDES_KOEPF,
+        bare.getProperty(LayeredOptions.NODE_PLACEMENT_STRATEGY));
   }
 }

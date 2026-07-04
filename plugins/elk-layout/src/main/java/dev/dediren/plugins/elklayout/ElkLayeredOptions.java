@@ -1,13 +1,20 @@
 package dev.dediren.plugins.elklayout;
 
+import dev.dediren.contracts.layout.LayoutCrossingPreferences;
 import dev.dediren.contracts.layout.LayoutDensity;
 import dev.dediren.contracts.layout.LayoutEndpointMerging;
+import dev.dediren.contracts.layout.LayoutLayeringPreferences;
+import dev.dediren.contracts.layout.LayoutPlacementPreferences;
 import dev.dediren.contracts.layout.LayoutPreferences;
 import dev.dediren.contracts.layout.LayoutRoutingPreferences;
 import dev.dediren.contracts.layout.LayoutRoutingStyle;
 import dev.dediren.contracts.layout.LayoutWrapping;
+import org.eclipse.elk.alg.layered.options.CrossingMinimizationStrategy;
+import org.eclipse.elk.alg.layered.options.CycleBreakingStrategy;
 import org.eclipse.elk.alg.layered.options.EdgeStraighteningStrategy;
+import org.eclipse.elk.alg.layered.options.GreedySwitchType;
 import org.eclipse.elk.alg.layered.options.LayeredOptions;
+import org.eclipse.elk.alg.layered.options.LayeringStrategy;
 import org.eclipse.elk.alg.layered.options.NodePlacementStrategy;
 import org.eclipse.elk.alg.layered.options.OrderingStrategy;
 import org.eclipse.elk.alg.layered.options.PortSortingStrategy;
@@ -94,7 +101,7 @@ final class ElkLayeredOptions {
       root.setProperty(LayeredOptions.CONSIDER_MODEL_ORDER_STRATEGY, OrderingStrategy.PREFER_EDGES);
       root.setProperty(LayeredOptions.CONSIDER_MODEL_ORDER_PORT_MODEL_ORDER, true);
     }
-    root.setProperty(LayeredOptions.NODE_PLACEMENT_STRATEGY, NodePlacementStrategy.BRANDES_KOEPF);
+    root.setProperty(LayeredOptions.NODE_PLACEMENT_STRATEGY, placementStrategy(preferences));
     root.setProperty(
         LayeredOptions.NODE_PLACEMENT_BK_EDGE_STRAIGHTENING,
         EdgeStraighteningStrategy.IMPROVE_STRAIGHTNESS);
@@ -102,6 +109,22 @@ final class ElkLayeredOptions {
     boolean mergeEdges = endpointMergingEnabled(preferences);
     root.setProperty(LayeredOptions.MERGE_EDGES, mergeEdges);
     root.setProperty(LayeredOptions.MERGE_HIERARCHY_EDGES, mergeEdges);
+    CycleBreakingStrategy cycleBreaking = cycleBreakingStrategy(preferences);
+    if (cycleBreaking != null) {
+      root.setProperty(LayeredOptions.CYCLE_BREAKING_STRATEGY, cycleBreaking);
+    }
+    LayeringStrategy layering = layeringStrategy(preferences);
+    if (layering != null) {
+      root.setProperty(LayeredOptions.LAYERING_STRATEGY, layering);
+    }
+    CrossingMinimizationStrategy crossing = crossingStrategy(preferences);
+    if (crossing != null) {
+      root.setProperty(LayeredOptions.CROSSING_MINIMIZATION_STRATEGY, crossing);
+    }
+    GreedySwitchType greedySwitch = greedySwitchType(preferences);
+    if (greedySwitch != null) {
+      root.setProperty(LayeredOptions.CROSSING_MINIMIZATION_GREEDY_SWITCH_TYPE, greedySwitch);
+    }
   }
 
   static void configureGroupedRoot(
@@ -188,5 +211,68 @@ final class ElkLayeredOptions {
       return LayoutEndpointMerging.AUTO;
     }
     return routing.endpointMerging();
+  }
+
+  private static NodePlacementStrategy placementStrategy(LayoutPreferences preferences) {
+    LayoutPlacementPreferences placement = preferences == null ? null : preferences.placement();
+    if (placement == null || placement.strategy() == null) {
+      return NodePlacementStrategy.BRANDES_KOEPF;
+    }
+    return switch (placement.strategy()) {
+      case BRANDES_KOEPF -> NodePlacementStrategy.BRANDES_KOEPF;
+      case NETWORK_SIMPLEX -> NodePlacementStrategy.NETWORK_SIMPLEX;
+      case LINEAR_SEGMENTS -> NodePlacementStrategy.LINEAR_SEGMENTS;
+      case SIMPLE -> NodePlacementStrategy.SIMPLE;
+    };
+  }
+
+  private static CycleBreakingStrategy cycleBreakingStrategy(LayoutPreferences preferences) {
+    if (preferences == null || preferences.cycleBreaking() == null) {
+      return null;
+    }
+    return switch (preferences.cycleBreaking()) {
+      case GREEDY -> CycleBreakingStrategy.GREEDY;
+      case DEPTH_FIRST -> CycleBreakingStrategy.DEPTH_FIRST;
+      case MODEL_ORDER -> CycleBreakingStrategy.MODEL_ORDER;
+    };
+  }
+
+  private static LayeringStrategy layeringStrategy(LayoutPreferences preferences) {
+    LayoutLayeringPreferences layering = preferences == null ? null : preferences.layering();
+    if (layering == null || layering.strategy() == null) {
+      return null;
+    }
+    return switch (layering.strategy()) {
+      case NETWORK_SIMPLEX -> LayeringStrategy.NETWORK_SIMPLEX;
+      case LONGEST_PATH -> LayeringStrategy.LONGEST_PATH;
+      case COFFMAN_GRAHAM -> LayeringStrategy.COFFMAN_GRAHAM;
+      case MIN_WIDTH -> LayeringStrategy.MIN_WIDTH;
+      case STRETCH_WIDTH -> LayeringStrategy.STRETCH_WIDTH;
+      case BREADTH_FIRST -> LayeringStrategy.BF_MODEL_ORDER;
+      case DEPTH_FIRST -> LayeringStrategy.DF_MODEL_ORDER;
+    };
+  }
+
+  private static CrossingMinimizationStrategy crossingStrategy(LayoutPreferences preferences) {
+    LayoutCrossingPreferences crossing = preferences == null ? null : preferences.crossing();
+    if (crossing == null || crossing.strategy() == null) {
+      return null;
+    }
+    return switch (crossing.strategy()) {
+      case LAYER_SWEEP -> CrossingMinimizationStrategy.LAYER_SWEEP;
+      case NONE -> CrossingMinimizationStrategy.NONE;
+    };
+  }
+
+  private static GreedySwitchType greedySwitchType(LayoutPreferences preferences) {
+    LayoutCrossingPreferences crossing = preferences == null ? null : preferences.crossing();
+    if (crossing == null || crossing.greedySwitch() == null) {
+      return null;
+    }
+    return switch (crossing.greedySwitch()) {
+      case OFF -> GreedySwitchType.OFF;
+      case ONE_SIDED -> GreedySwitchType.ONE_SIDED;
+      case TWO_SIDED -> GreedySwitchType.TWO_SIDED;
+    };
   }
 }
