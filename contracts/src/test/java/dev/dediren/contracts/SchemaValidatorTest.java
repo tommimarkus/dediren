@@ -265,6 +265,42 @@ class SchemaValidatorTest {
   }
 
   @Test
+  void layoutRequestAcceptsPhaseStrategiesAndRejectsUnknown() throws Exception {
+    var mapper = dev.dediren.contracts.json.JsonSupport.objectMapper();
+    String template =
+        """
+        {
+          "layout_request_schema_version": "layout-request.schema.v1",
+          "view_id": "main",
+          "nodes": [],
+          "edges": [],
+          "groups": [],
+          "constraints": [],
+          "layout_preferences": {
+            "cycle_breaking": "model-order",
+            "layering": { "strategy": "%s" },
+            "crossing": { "strategy": "layer-sweep", "greedy_switch": "two-sided" },
+            "placement": { "strategy": "network-simplex" }
+          }
+        }
+        """;
+    assertThat(
+            SchemaAssertions.validate(
+                workspaceRoot(),
+                "schemas/layout-request.schema.json",
+                mapper.readTree(String.format(template, "coffman-graham"))))
+        .describedAs("valid phase strategies must validate")
+        .isEmpty();
+    assertThat(
+            SchemaAssertions.validate(
+                workspaceRoot(),
+                "schemas/layout-request.schema.json",
+                mapper.readTree(String.format(template, "bogus-strategy"))))
+        .describedAs("unknown layering strategy must be rejected")
+        .isNotEmpty();
+  }
+
+  @Test
   void firstPartyPluginManifestsMatchSchema() {
     for (String manifest : PLUGIN_MANIFESTS) {
       assertThat(

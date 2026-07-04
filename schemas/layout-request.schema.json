@@ -95,7 +95,11 @@
         "direction": { "enum": ["right", "left", "down", "up"] },
         "density": { "enum": ["compact", "readable", "spacious"] },
         "wrapping": { "enum": ["auto", "off", "multi-edge"] },
-        "routing": { "$ref": "#/$defs/layoutRoutingPreferences" }
+        "routing": { "$ref": "#/$defs/layoutRoutingPreferences" },
+        "cycle_breaking": { "enum": ["greedy", "depth-first", "model-order"] },
+        "layering": { "$ref": "#/$defs/layoutLayeringPreferences" },
+        "crossing": { "$ref": "#/$defs/layoutCrossingPreferences" },
+        "placement": { "$ref": "#/$defs/layoutPlacementPreferences" }
       }
     },
     "layoutRoutingPreferences": {
@@ -105,6 +109,30 @@
         "style": { "enum": ["orthogonal", "polyline", "spline"] },
         "profile": { "enum": ["compact", "readable", "spacious"] },
         "endpoint_merging": { "enum": ["off", "local", "auto"] }
+      }
+    },
+    "layoutLayeringPreferences": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "strategy": {
+          "enum": ["network-simplex", "longest-path", "coffman-graham", "min-width", "stretch-width", "breadth-first", "depth-first"]
+        }
+      }
+    },
+    "layoutCrossingPreferences": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "strategy": { "enum": ["layer-sweep", "none"] },
+        "greedy_switch": { "enum": ["off", "one-sided", "two-sided"] }
+      }
+    },
+    "layoutPlacementPreferences": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "strategy": { "enum": ["brandes-koepf", "network-simplex", "linear-segments", "simple"] }
       }
     }
   }
