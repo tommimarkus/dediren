@@ -64,6 +64,19 @@ final class LayoutJson {
       }
     }
 
+    rejectNull(preferences.get("compaction"), "$.layout_preferences.compaction");
+    rejectNull(preferences.get("high_degree_nodes"), "$.layout_preferences.high_degree_nodes");
+    rejectNull(preferences.get("thoroughness"), "$.layout_preferences.thoroughness");
+
+    JsonNode components = preferences.get("components");
+    if (components != null) {
+      rejectNull(components, "$.layout_preferences.components");
+      if (components.isObject()) {
+        rejectNull(components.get("separate"), "$.layout_preferences.components.separate");
+        rejectNull(components.get("spacing"), "$.layout_preferences.components.spacing");
+      }
+    }
+
     JsonNode routing = preferences.get("routing");
     if (routing == null) {
       return;
@@ -140,6 +153,27 @@ final class LayoutJson {
           placement.get("strategy"),
           "$.layout_preferences.placement.strategy",
           Set.of("brandes-koepf", "network-simplex", "linear-segments", "simple"));
+    }
+
+    rejectUnsupportedText(
+        preferences.get("compaction"),
+        "$.layout_preferences.compaction",
+        Set.of("off", "left", "right", "balanced"));
+    rejectUnsupportedText(
+        preferences.get("high_degree_nodes"),
+        "$.layout_preferences.high_degree_nodes",
+        Set.of("off", "on"));
+    rejectUnsupportedText(
+        preferences.get("thoroughness"),
+        "$.layout_preferences.thoroughness",
+        Set.of("low", "normal", "high"));
+
+    JsonNode components = preferences.get("components");
+    if (components != null && components.isObject()) {
+      rejectUnsupportedText(
+          components.get("spacing"),
+          "$.layout_preferences.components.spacing",
+          Set.of("compact", "readable", "spacious"));
     }
 
     JsonNode routing = preferences.get("routing");

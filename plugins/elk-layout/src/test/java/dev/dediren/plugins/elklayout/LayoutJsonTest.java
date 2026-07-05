@@ -122,4 +122,59 @@ class LayoutJsonTest {
         ex.getMessage().contains("$.layout_preferences.cycle_breaking"),
         "error must name the offending path, was: " + ex.getMessage());
   }
+
+  @Test
+  void readsGraphTuningPreferences() throws Exception {
+    String json =
+        """
+            {
+              "layout_request_schema_version": "layout-request.schema.v1",
+              "view_id": "main",
+              "nodes": [],
+              "edges": [],
+              "groups": [],
+              "constraints": [],
+              "layout_preferences": {
+                "compaction": "left",
+                "components": { "separate": true, "spacing": "compact" },
+                "high_degree_nodes": "on",
+                "thoroughness": "low"
+              }
+            }
+            """;
+
+    LayoutRequest request =
+        LayoutJson.readLayoutRequest(new java.io.ByteArrayInputStream(json.getBytes()));
+
+    assertEquals(LayoutCompaction.LEFT, request.layoutPreferences().compaction());
+    assertEquals(Boolean.TRUE, request.layoutPreferences().components().separate());
+    assertEquals(
+        LayoutComponentsSpacing.COMPACT, request.layoutPreferences().components().spacing());
+    assertEquals(LayoutHighDegreeNodes.ON, request.layoutPreferences().highDegreeNodes());
+    assertEquals(LayoutThoroughness.LOW, request.layoutPreferences().thoroughness());
+  }
+
+  @Test
+  void rejectsUnknownThoroughnessWithStructuredError() {
+    String json =
+        """
+            {
+              "layout_request_schema_version": "layout-request.schema.v1",
+              "view_id": "main",
+              "nodes": [],
+              "edges": [],
+              "groups": [],
+              "constraints": [],
+              "layout_preferences": { "thoroughness": "extreme" }
+            }
+            """;
+
+    LayoutJson.LayoutPreferenceValidationException ex =
+        org.junit.jupiter.api.Assertions.assertThrows(
+            LayoutJson.LayoutPreferenceValidationException.class,
+            () -> LayoutJson.readLayoutRequest(new java.io.ByteArrayInputStream(json.getBytes())));
+    org.junit.jupiter.api.Assertions.assertTrue(
+        ex.getMessage().contains("$.layout_preferences.thoroughness"),
+        "error must name the offending path, was: " + ex.getMessage());
+  }
 }
