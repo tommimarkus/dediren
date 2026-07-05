@@ -2,14 +2,23 @@ package dev.dediren.plugins.elklayout;
 
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.contracts.layout.LayoutResult;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Locale;
+import java.util.concurrent.atomic.AtomicBoolean;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 
 final class ElkLayoutRenderArtifacts {
+  // Wipe the output directory once per JVM run so it holds only this run's renders, never a
+  // cumulative pile of artifacts from renamed or deleted tests.
+  private static final AtomicBoolean CLEANED = new AtomicBoolean();
+
   private ElkLayoutRenderArtifacts() {}
 
   static void write(LayoutResult result) {
@@ -50,12 +59,34 @@ final class ElkLayoutRenderArtifacts {
     }
 
     String content = envelope.path("data").path("content").asText();
-    Path output =
-        workspaceRoot()
-            .resolve(".test-output/renders/elk-layout")
-            .resolve(safeFileName(testName) + ".svg");
+    Path outputDir = workspaceRoot().resolve(".test-output/renders/elk-layout");
+    cleanOnce(outputDir);
+    Path output = outputDir.resolve(safeFileName(testName) + ".svg");
     Files.createDirectories(output.getParent());
     Files.writeString(output, content, StandardCharsets.UTF_8);
+  }
+
+  private static void cleanOnce(Path dir) throws IOException {
+    if (!CLEANED.compareAndSet(false, true) || !Files.isDirectory(dir)) {
+      return;
+    }
+    Files.walkFileTree(
+        dir,
+        new SimpleFileVisitor<Path>() {
+          @Override
+          public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
+              throws IOException {
+            Files.delete(file);
+            return FileVisitResult.CONTINUE;
+          }
+
+          @Override
+          public FileVisitResult postVisitDirectory(Path visited, IOException failure)
+              throws IOException {
+            Files.delete(visited);
+            return FileVisitResult.CONTINUE;
+          }
+        });
   }
 
   private static Path workspaceRoot() {

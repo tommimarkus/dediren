@@ -6,11 +6,16 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.testsupport.SchemaAssertions;
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.io.StringReader;
+import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Base64;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import javax.imageio.ImageIO;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -24,6 +29,8 @@ import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 class MainTest {
+  private static final AtomicBoolean RENDER_OUTPUT_CLEANED = new AtomicBoolean();
+
   private static final String MINIMAL_LAYOUT =
       """
             {"layout_result_schema_version":"layout-result.schema.v1","view_id":"t","nodes":[{"id":"n","source_id":"n","projection_id":"n","x":0,"y":0,"width":200,"height":100,"label":"Node"}],"edges":[],"groups":[],"warnings":[]}""";
@@ -4229,8 +4236,9 @@ class MainTest {
   }
 
   private static Path writeRenderArtifact(String testName, String content) throws Exception {
-    Path output =
-        workspaceRoot().resolve(".test-output/renders/render-plugin").resolve(testName + ".svg");
+    Path outputDir = workspaceRoot().resolve(".test-output/renders/render-plugin");
+    cleanRenderOutputOnce(outputDir);
+    Path output = outputDir.resolve(testName + ".svg");
     Files.createDirectories(output.getParent());
     Files.writeString(output, content);
     return output;
@@ -4238,13 +4246,37 @@ class MainTest {
 
   private static Path writeBinaryRenderArtifact(String testName, String extension, byte[] content)
       throws Exception {
-    Path output =
-        workspaceRoot()
-            .resolve(".test-output/renders/render-plugin")
-            .resolve(testName + "." + extension);
+    Path outputDir = workspaceRoot().resolve(".test-output/renders/render-plugin");
+    cleanRenderOutputOnce(outputDir);
+    Path output = outputDir.resolve(testName + "." + extension);
     Files.createDirectories(output.getParent());
     Files.write(output, content);
     return output;
+  }
+
+  // Wipe the output directory once per JVM run so it holds only this run's renders, never a
+  // cumulative pile of artifacts from renamed or deleted tests.
+  private static void cleanRenderOutputOnce(Path dir) throws Exception {
+    if (!RENDER_OUTPUT_CLEANED.compareAndSet(false, true) || !Files.isDirectory(dir)) {
+      return;
+    }
+    Files.walkFileTree(
+        dir,
+        new SimpleFileVisitor<Path>() {
+          @Override
+          public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
+              throws IOException {
+            Files.delete(file);
+            return FileVisitResult.CONTINUE;
+          }
+
+          @Override
+          public FileVisitResult postVisitDirectory(Path visited, IOException failure)
+              throws IOException {
+            Files.delete(visited);
+            return FileVisitResult.CONTINUE;
+          }
+        });
   }
 
   private static Path workspaceRoot() {
