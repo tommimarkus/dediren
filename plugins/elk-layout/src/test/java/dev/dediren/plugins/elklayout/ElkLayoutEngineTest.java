@@ -30,7 +30,17 @@ import org.eclipse.elk.core.options.PortSide;
 import org.eclipse.elk.graph.ElkNode;
 import org.eclipse.elk.graph.util.ElkGraphUtil;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
+// lean-audit:dup-intentional — the geometry-metric helpers below (connector-through-node,
+// excessive-detour, route-distance, boundary-overlap math) deliberately re-implement core's
+// LayoutQuality checks: plugins may depend only on `contracts` (§2; the sole test-scope
+// exception belongs to `cli`), and `test-support` cannot host contracts-typed helpers without
+// creating a reactor cycle (contracts test-depends on test-support). The independent copy
+// corroborates core's quality metrics against real ELK output. Tracked in
+// docs/architecture-guidelines.md §12 (LA-CODE-DUP-2).
 class ElkLayoutEngineTest {
   private static final double GEOMETRY_EPSILON = 0.001;
   private static final double PORT_SIDE_EPSILON = 1.0;
@@ -70,15 +80,7 @@ class ElkLayoutEngineTest {
 
   @Test
   void layeredRootDisablesElkMergeOptionsWhenEndpointMergingIsOff() {
-    LayoutPreferences preferences =
-        new LayoutPreferences(
-            null,
-            null,
-            null,
-            new LayoutRoutingPreferences(
-                LayoutRoutingStyle.ORTHOGONAL, null, LayoutEndpointMerging.OFF));
-
-    ElkNode root = ElkLayeredOptions.configuredRoot(Direction.RIGHT, preferences);
+    ElkNode root = ElkLayeredOptions.configuredRoot(Direction.RIGHT, noMergePreferences(null));
 
     assertEquals(false, root.getProperty(LayeredOptions.MERGE_EDGES));
     assertEquals(false, root.getProperty(LayeredOptions.MERGE_HIERARCHY_EDGES));
@@ -121,13 +123,8 @@ class ElkLayoutEngineTest {
     LayoutResult result = new ElkLayoutEngine().layout(request);
     ElkLayoutRenderArtifacts.write(result);
 
-    LaidOutNode client =
-        result.nodes().stream()
-            .filter(node -> node.id().equals("client"))
-            .findFirst()
-            .orElseThrow();
-    LaidOutNode api =
-        result.nodes().stream().filter(node -> node.id().equals("api")).findFirst().orElseThrow();
+    LaidOutNode client = nodeById(result, "client");
+    LaidOutNode api = nodeById(result, "api");
     LaidOutEdge edge = result.edges().get(0);
 
     assertEquals("layout-result.schema.v1", result.layoutResultSchemaVersion());
@@ -239,16 +236,12 @@ class ElkLayoutEngineTest {
     assertSequenceRouteEndpointOnLifelineSide(normalized, "m1", "service", false, PortSide.WEST);
   }
 
-  @Test
-  void ignoresSequenceConstraintsForNonSequenceGraphs() {
+  @ParameterizedTest
+  @MethodSource("partialSequenceConstraints")
+  void ignoresPartialSequenceConstraintsForNonSequenceGraphs(
+      LayoutConstraint constraint, String message) {
     LayoutRequest unconstrained = genericTwoNodeRequest(List.of());
-    LayoutRequest constrained =
-        genericTwoNodeRequest(
-            List.of(
-                new LayoutConstraint(
-                    "main.uml.sequence.lifeline-order",
-                    "uml.sequence.lifeline-order",
-                    List.of("service", "customer"))));
+    LayoutRequest constrained = genericTwoNodeRequest(List.of(constraint));
 
     LayoutResult baseline = new ElkLayoutEngine().layout(unconstrained);
     LayoutResult constrainedResult = new ElkLayoutEngine().layout(constrained);
@@ -258,39 +251,28 @@ class ElkLayoutEngineTest {
         nodeById(baseline, "customer").x(),
         nodeById(constrainedResult, "customer").x(),
         GEOMETRY_EPSILON,
-        "partial sequence constraints must not affect ordinary graph layout");
+        message);
     assertEquals(
         nodeById(baseline, "service").x(),
         nodeById(constrainedResult, "service").x(),
         GEOMETRY_EPSILON,
-        "partial sequence constraints must not affect ordinary graph layout");
+        message);
   }
 
-  @Test
-  void ignoresMessageOnlySequenceConstraintsForNonSequenceGraphs() {
-    LayoutRequest unconstrained = genericTwoNodeRequest(List.of());
-    LayoutRequest constrained =
-        genericTwoNodeRequest(
-            List.of(
-                new LayoutConstraint(
-                    "main.uml.sequence.message-order",
-                    "uml.sequence.message-order",
-                    List.of("customer-calls-service"))));
-
-    LayoutResult baseline = new ElkLayoutEngine().layout(unconstrained);
-    LayoutResult constrainedResult = new ElkLayoutEngine().layout(constrained);
-    ElkLayoutRenderArtifacts.write(constrainedResult);
-
-    assertEquals(
-        nodeById(baseline, "customer").x(),
-        nodeById(constrainedResult, "customer").x(),
-        GEOMETRY_EPSILON,
-        "message-only sequence constraints must not affect ordinary graph layout");
-    assertEquals(
-        nodeById(baseline, "service").x(),
-        nodeById(constrainedResult, "service").x(),
-        GEOMETRY_EPSILON,
-        "message-only sequence constraints must not affect ordinary graph layout");
+  private static List<Arguments> partialSequenceConstraints() {
+    return List.of(
+        Arguments.of(
+            new LayoutConstraint(
+                "main.uml.sequence.lifeline-order",
+                "uml.sequence.lifeline-order",
+                List.of("service", "customer")),
+            "partial sequence constraints must not affect ordinary graph layout"),
+        Arguments.of(
+            new LayoutConstraint(
+                "main.uml.sequence.message-order",
+                "uml.sequence.message-order",
+                List.of("customer-calls-service")),
+            "message-only sequence constraints must not affect ordinary graph layout"));
   }
 
   @Test
@@ -337,15 +319,7 @@ class ElkLayoutEngineTest {
                 + "="
                 + right);
         assertFalse(
-            rectanglesOverlap(
-                left.x(),
-                left.y(),
-                left.width(),
-                left.height(),
-                right.x(),
-                right.y(),
-                right.width(),
-                right.height()),
+            Rect.of(left).overlaps(Rect.of(right)),
             "sequence lifeline heads should not overlap, "
                 + order.get(leftIndex)
                 + "="
@@ -393,15 +367,7 @@ class ElkLayoutEngineTest {
       for (int rightIndex = leftIndex + 1; rightIndex < result.nodes().size(); rightIndex++) {
         LaidOutNode right = result.nodes().get(rightIndex);
         assertFalse(
-            rectanglesOverlap(
-                left.x(),
-                left.y(),
-                left.width(),
-                left.height(),
-                right.x(),
-                right.y(),
-                right.width(),
-                right.height()),
+            Rect.of(left).overlaps(Rect.of(right)),
             "packed layout should not overlap disconnected nodes");
       }
     }
@@ -469,15 +435,7 @@ class ElkLayoutEngineTest {
     assertGroupContainsNode(operations, nodeById(result, "warehouse"));
     assertGroupContainsNode(operations, nodeById(result, "portal"));
     assertFalse(
-        rectanglesOverlap(
-            customerSystems.x(),
-            customerSystems.y(),
-            customerSystems.width(),
-            customerSystems.height(),
-            operations.x(),
-            operations.y(),
-            operations.width(),
-            operations.height()),
+        Rect.of(customerSystems).overlaps(Rect.of(operations)),
         "packed layout should not overlap group bounds");
   }
 
@@ -707,31 +665,15 @@ class ElkLayoutEngineTest {
     ElkLayoutRenderArtifacts.write(result);
 
     assertEquals(2, result.groups().size());
-    LaidOutGroup application =
-        result.groups().stream()
-            .filter(group -> group.id().equals("application-services"))
-            .findFirst()
-            .orElseThrow();
-    LaidOutGroup external =
-        result.groups().stream()
-            .filter(group -> group.id().equals("external-dependencies"))
-            .findFirst()
-            .orElseThrow();
+    LaidOutGroup application = groupById(result, "application-services");
+    LaidOutGroup external = groupById(result, "external-dependencies");
 
     assertEquals(List.of("web-app", "orders-api", "worker"), application.members());
     assertEquals(List.of("payments", "database"), external.members());
     assertGroupContainsMembers(result, application);
     assertGroupContainsMembers(result, external);
-    assertTrue(
-        !rectanglesOverlap(
-            application.x(),
-            application.y(),
-            application.width(),
-            application.height(),
-            external.x(),
-            external.y(),
-            external.width(),
-            external.height()),
+    assertFalse(
+        Rect.of(application).overlaps(Rect.of(external)),
         "ELK-generated group bounds should not overlap");
   }
 
@@ -774,66 +716,7 @@ class ElkLayoutEngineTest {
 
   @Test
   void groupedPipelineKeepsReadableLeftToRightFlow() {
-    LayoutRequest request =
-        new LayoutRequest(
-            "layout-request.schema.v1",
-            "main",
-            List.of(
-                new LayoutNode("client", "Client", "client", 160.0, 80.0),
-                new LayoutNode("web-app", "Web App", "web-app", 160.0, 80.0),
-                new LayoutNode("orders-api", "Orders API", "orders-api", 160.0, 80.0),
-                new LayoutNode("worker", "Fulfillment Worker", "worker", 160.0, 80.0),
-                new LayoutNode(
-                    "payments", "Payment Authorization Service", "payments", 160.0, 80.0),
-                new LayoutNode("database", "PostgreSQL", "database", 160.0, 80.0)),
-            List.of(
-                new LayoutEdge(
-                    "client-submits-order",
-                    "client",
-                    "web-app",
-                    "submits order",
-                    "client-submits-order"),
-                new LayoutEdge(
-                    "web-app-calls-api", "web-app", "orders-api", "calls API", "web-app-calls-api"),
-                new LayoutEdge(
-                    "api-authorizes-payment",
-                    "orders-api",
-                    "payments",
-                    "requests payment authorization",
-                    "api-authorizes-payment"),
-                new LayoutEdge(
-                    "api-writes-database",
-                    "orders-api",
-                    "database",
-                    "writes orders",
-                    "api-writes-database"),
-                new LayoutEdge(
-                    "api-publishes-job",
-                    "orders-api",
-                    "worker",
-                    "publishes fulfillment",
-                    "api-publishes-job"),
-                new LayoutEdge(
-                    "worker-reads-database",
-                    "worker",
-                    "database",
-                    "loads order",
-                    "worker-reads-database")),
-            List.of(
-                new LayoutGroup(
-                    "application-services",
-                    "Application Services",
-                    List.of("web-app", "orders-api", "worker"),
-                    GroupProvenance.semanticBacked("application-services")),
-                new LayoutGroup(
-                    "external-dependencies",
-                    "External Dependencies",
-                    List.of("payments", "database"),
-                    GroupProvenance.semanticBacked("external-dependencies"))),
-            List.of(),
-            null);
-
-    LayoutResult result = new ElkLayoutEngine().layout(request);
+    LayoutResult result = new ElkLayoutEngine().layout(groupedPipelineRequest());
     ElkLayoutRenderArtifacts.write(result);
     LaidOutNode client = nodeById(result, "client");
     LaidOutNode webApp = nodeById(result, "web-app");
@@ -969,16 +852,8 @@ class ElkLayoutEngineTest {
 
     LayoutResult result = new ElkLayoutEngine().layout(request);
     ElkLayoutRenderArtifacts.write(result);
-    LaidOutEdge paymentEdge =
-        result.edges().stream()
-            .filter(edge -> edge.id().equals("api-authorizes-payment"))
-            .findFirst()
-            .orElseThrow();
-    LaidOutEdge databaseEdge =
-        result.edges().stream()
-            .filter(edge -> edge.id().equals("api-writes-database"))
-            .findFirst()
-            .orElseThrow();
+    LaidOutEdge paymentEdge = edgeById(result, "api-authorizes-payment");
+    LaidOutEdge databaseEdge = edgeById(result, "api-writes-database");
 
     assertRouted(paymentEdge);
     assertRouted(databaseEdge);
@@ -1021,71 +896,7 @@ class ElkLayoutEngineTest {
 
   @Test
   void groupedGatewayFanOutKeepsBoundedElkRoutes() {
-    LayoutRequest request =
-        new LayoutRequest(
-            "layout-request.schema.v1",
-            "main",
-            List.of(
-                new LayoutNode("web-frontend", "Web Frontend", "web-frontend", 160.0, 80.0),
-                new LayoutNode("api-gateway", "API Gateway", "api-gateway", 160.0, 112.0),
-                new LayoutNode(
-                    "identity-service", "Identity Service", "identity-service", 160.0, 80.0),
-                new LayoutNode(
-                    "pricing-service", "Pricing Service", "pricing-service", 160.0, 80.0),
-                new LayoutNode("order-service", "Order Service", "order-service", 160.0, 80.0),
-                new LayoutNode(
-                    "catalog-service", "Catalog Service", "catalog-service", 160.0, 80.0)),
-            List.of(
-                new LayoutEdge(
-                    "web-calls-gateway",
-                    "web-frontend",
-                    "api-gateway",
-                    "calls",
-                    "web-calls-gateway"),
-                new LayoutEdge(
-                    "gateway-authenticates",
-                    "api-gateway",
-                    "identity-service",
-                    "authenticates",
-                    "gateway-authenticates",
-                    "Serving"),
-                new LayoutEdge(
-                    "gateway-prices-cart",
-                    "api-gateway",
-                    "pricing-service",
-                    "prices cart",
-                    "gateway-prices-cart",
-                    "Serving"),
-                new LayoutEdge(
-                    "gateway-places-order",
-                    "api-gateway",
-                    "order-service",
-                    "places order",
-                    "gateway-places-order",
-                    "Serving"),
-                new LayoutEdge(
-                    "gateway-queries-catalog",
-                    "api-gateway",
-                    "catalog-service",
-                    "queries catalog",
-                    "gateway-queries-catalog",
-                    "Serving")),
-            List.of(
-                new LayoutGroup(
-                    "edge-platform",
-                    "Edge Platform",
-                    List.of("web-frontend", "api-gateway"),
-                    GroupProvenance.semanticBacked("edge-platform")),
-                new LayoutGroup(
-                    "core-services",
-                    "Core Services",
-                    List.of(
-                        "identity-service", "pricing-service", "order-service", "catalog-service"),
-                    GroupProvenance.semanticBacked("core-services"))),
-            List.of(),
-            null);
-
-    LayoutResult result = new ElkLayoutEngine().layout(request);
+    LayoutResult result = new ElkLayoutEngine().layout(gatewayFanOutRequest());
     ElkLayoutRenderArtifacts.write(result);
 
     assertEquals(
@@ -1113,71 +924,7 @@ class ElkLayoutEngineTest {
 
   @Test
   void groupedGatewayFanOutUsesMergedJunctionRoute() {
-    LayoutRequest request =
-        new LayoutRequest(
-            "layout-request.schema.v1",
-            "main",
-            List.of(
-                new LayoutNode("web-frontend", "Web Frontend", "web-frontend", 160.0, 80.0),
-                new LayoutNode("api-gateway", "API Gateway", "api-gateway", 160.0, 112.0),
-                new LayoutNode(
-                    "identity-service", "Identity Service", "identity-service", 160.0, 80.0),
-                new LayoutNode(
-                    "pricing-service", "Pricing Service", "pricing-service", 160.0, 80.0),
-                new LayoutNode("order-service", "Order Service", "order-service", 160.0, 80.0),
-                new LayoutNode(
-                    "catalog-service", "Catalog Service", "catalog-service", 160.0, 80.0)),
-            List.of(
-                new LayoutEdge(
-                    "web-calls-gateway",
-                    "web-frontend",
-                    "api-gateway",
-                    "calls",
-                    "web-calls-gateway"),
-                new LayoutEdge(
-                    "gateway-authenticates",
-                    "api-gateway",
-                    "identity-service",
-                    "authenticates",
-                    "gateway-authenticates",
-                    "Serving"),
-                new LayoutEdge(
-                    "gateway-prices-cart",
-                    "api-gateway",
-                    "pricing-service",
-                    "prices cart",
-                    "gateway-prices-cart",
-                    "Serving"),
-                new LayoutEdge(
-                    "gateway-places-order",
-                    "api-gateway",
-                    "order-service",
-                    "places order",
-                    "gateway-places-order",
-                    "Serving"),
-                new LayoutEdge(
-                    "gateway-queries-catalog",
-                    "api-gateway",
-                    "catalog-service",
-                    "queries catalog",
-                    "gateway-queries-catalog",
-                    "Serving")),
-            List.of(
-                new LayoutGroup(
-                    "edge-platform",
-                    "Edge Platform",
-                    List.of("web-frontend", "api-gateway"),
-                    GroupProvenance.semanticBacked("edge-platform")),
-                new LayoutGroup(
-                    "core-services",
-                    "Core Services",
-                    List.of(
-                        "identity-service", "pricing-service", "order-service", "catalog-service"),
-                    GroupProvenance.semanticBacked("core-services"))),
-            List.of(),
-            null);
-
-    LayoutResult result = new ElkLayoutEngine().layout(request);
+    LayoutResult result = new ElkLayoutEngine().layout(gatewayFanOutRequest());
     ElkLayoutRenderArtifacts.write(result);
     List<LaidOutEdge> fanOutEdges =
         List.of(
@@ -1215,12 +962,7 @@ class ElkLayoutEngineTest {
                     "edge-c", "source", "target-c", "realizes", "edge-c", "Realization")),
             List.of(),
             List.of(),
-            new LayoutPreferences(
-                null,
-                null,
-                null,
-                new LayoutRoutingPreferences(
-                    LayoutRoutingStyle.ORTHOGONAL, null, LayoutEndpointMerging.OFF)));
+            noMergePreferences(null));
 
     LayoutResult result = new ElkLayoutEngine().layout(request);
     ElkLayoutRenderArtifacts.write(result);
@@ -1257,12 +999,7 @@ class ElkLayoutEngineTest {
                 new LayoutEdge("edge-e", "source", "target-e", "calls", "edge-e")),
             List.of(),
             List.of(),
-            new LayoutPreferences(
-                null,
-                LayoutDensity.SPACIOUS,
-                null,
-                new LayoutRoutingPreferences(
-                    LayoutRoutingStyle.ORTHOGONAL, null, LayoutEndpointMerging.OFF)));
+            noMergePreferences(LayoutDensity.SPACIOUS));
 
     LayoutResult result = new ElkLayoutEngine().layout(request);
     ElkLayoutRenderArtifacts.write(result);
@@ -1650,16 +1387,8 @@ class ElkLayoutEngineTest {
 
     LayoutResult result = new ElkLayoutEngine().layout(request);
     ElkLayoutRenderArtifacts.write(result);
-    LaidOutEdge webEdge =
-        result.edges().stream()
-            .filter(edge -> edge.id().equals("web-calls-api"))
-            .findFirst()
-            .orElseThrow();
-    LaidOutEdge workerEdge =
-        result.edges().stream()
-            .filter(edge -> edge.id().equals("worker-updates-api"))
-            .findFirst()
-            .orElseThrow();
+    LaidOutEdge webEdge = edgeById(result, "web-calls-api");
+    LaidOutEdge workerEdge = edgeById(result, "worker-updates-api");
 
     assertRouted(webEdge);
     assertRouted(workerEdge);
@@ -1738,66 +1467,7 @@ class ElkLayoutEngineTest {
 
   @Test
   void groupedPipelineAvoidsExcessiveCrossGroupRouteDetours() {
-    LayoutRequest request =
-        new LayoutRequest(
-            "layout-request.schema.v1",
-            "main",
-            List.of(
-                new LayoutNode("client", "Client", "client", 160.0, 80.0),
-                new LayoutNode("web-app", "Web App", "web-app", 160.0, 80.0),
-                new LayoutNode("orders-api", "Orders API", "orders-api", 160.0, 80.0),
-                new LayoutNode("worker", "Fulfillment Worker", "worker", 160.0, 80.0),
-                new LayoutNode(
-                    "payments", "Payment Authorization Service", "payments", 160.0, 80.0),
-                new LayoutNode("database", "PostgreSQL", "database", 160.0, 80.0)),
-            List.of(
-                new LayoutEdge(
-                    "client-submits-order",
-                    "client",
-                    "web-app",
-                    "submits order",
-                    "client-submits-order"),
-                new LayoutEdge(
-                    "web-app-calls-api", "web-app", "orders-api", "calls API", "web-app-calls-api"),
-                new LayoutEdge(
-                    "api-authorizes-payment",
-                    "orders-api",
-                    "payments",
-                    "requests payment authorization",
-                    "api-authorizes-payment"),
-                new LayoutEdge(
-                    "api-writes-database",
-                    "orders-api",
-                    "database",
-                    "writes orders",
-                    "api-writes-database"),
-                new LayoutEdge(
-                    "api-publishes-job",
-                    "orders-api",
-                    "worker",
-                    "publishes fulfillment",
-                    "api-publishes-job"),
-                new LayoutEdge(
-                    "worker-reads-database",
-                    "worker",
-                    "database",
-                    "loads order",
-                    "worker-reads-database")),
-            List.of(
-                new LayoutGroup(
-                    "application-services",
-                    "Application Services",
-                    List.of("web-app", "orders-api", "worker"),
-                    GroupProvenance.semanticBacked("application-services")),
-                new LayoutGroup(
-                    "external-dependencies",
-                    "External Dependencies",
-                    List.of("payments", "database"),
-                    GroupProvenance.semanticBacked("external-dependencies"))),
-            List.of(),
-            null);
-
-    LayoutResult result = new ElkLayoutEngine().layout(request);
+    LayoutResult result = new ElkLayoutEngine().layout(groupedPipelineRequest());
     ElkLayoutRenderArtifacts.write(result);
 
     assertEquals(
@@ -2441,11 +2111,7 @@ class ElkLayoutEngineTest {
     LayoutResult result = new ElkLayoutEngine().layout(request);
     ElkLayoutRenderArtifacts.write(result);
 
-    LaidOutNode junction =
-        result.nodes().stream()
-            .filter(node -> node.id().equals("fulfillment-junction"))
-            .findFirst()
-            .orElseThrow();
+    LaidOutNode junction = nodeById(result, "fulfillment-junction");
     assertEquals("junction", junction.role(), "junction role must survive ELK layout");
 
     int incidentEdges = 0;
@@ -2535,14 +2201,7 @@ class ElkLayoutEngineTest {
                 "sequence-view.uml.sequence.message-order",
                 "uml.sequence.message-order",
                 List.of("m1", "m2", "m3", "m4", "m5", "m6", "m7", "m8"))),
-        new LayoutPreferences(
-            LayoutDirection.RIGHT,
-            LayoutDensity.READABLE,
-            null,
-            new LayoutRoutingPreferences(
-                LayoutRoutingStyle.ORTHOGONAL,
-                LayoutRoutingProfile.READABLE,
-                LayoutEndpointMerging.OFF)));
+        readableSequencePreferences());
   }
 
   private static LayoutRequest sequenceLayoutRequest() {
@@ -2568,14 +2227,7 @@ class ElkLayoutEngineTest {
                 "sequence-view.uml.sequence.message-order",
                 "uml.sequence.message-order",
                 List.of("m1", "m2", "m3"))),
-        new LayoutPreferences(
-            LayoutDirection.RIGHT,
-            LayoutDensity.READABLE,
-            null,
-            new LayoutRoutingPreferences(
-                LayoutRoutingStyle.ORTHOGONAL,
-                LayoutRoutingProfile.READABLE,
-                LayoutEndpointMerging.OFF)));
+        readableSequencePreferences());
   }
 
   private static LayoutRequest sequenceLayoutRequestWithDanglingMessage() {
@@ -2601,14 +2253,7 @@ class ElkLayoutEngineTest {
                 "sequence-view.uml.sequence.message-order",
                 "uml.sequence.message-order",
                 List.of("m1", "m2", "m3"))),
-        new LayoutPreferences(
-            LayoutDirection.RIGHT,
-            LayoutDensity.READABLE,
-            null,
-            new LayoutRoutingPreferences(
-                LayoutRoutingStyle.ORTHOGONAL,
-                LayoutRoutingProfile.READABLE,
-                LayoutEndpointMerging.OFF)));
+        readableSequencePreferences());
   }
 
   private static LayoutResult sequenceLayoutResultWithMessageBendPoints() {
@@ -2657,6 +2302,142 @@ class ElkLayoutEngineTest {
         null);
   }
 
+  private static LayoutPreferences noMergePreferences(LayoutDensity density) {
+    return new LayoutPreferences(
+        null,
+        density,
+        null,
+        new LayoutRoutingPreferences(
+            LayoutRoutingStyle.ORTHOGONAL, null, LayoutEndpointMerging.OFF));
+  }
+
+  private static LayoutPreferences readableSequencePreferences() {
+    return new LayoutPreferences(
+        LayoutDirection.RIGHT,
+        LayoutDensity.READABLE,
+        null,
+        new LayoutRoutingPreferences(
+            LayoutRoutingStyle.ORTHOGONAL,
+            LayoutRoutingProfile.READABLE,
+            LayoutEndpointMerging.OFF));
+  }
+
+  private static LayoutRequest gatewayFanOutRequest() {
+    return new LayoutRequest(
+        "layout-request.schema.v1",
+        "main",
+        List.of(
+            new LayoutNode("web-frontend", "Web Frontend", "web-frontend", 160.0, 80.0),
+            new LayoutNode("api-gateway", "API Gateway", "api-gateway", 160.0, 112.0),
+            new LayoutNode("identity-service", "Identity Service", "identity-service", 160.0, 80.0),
+            new LayoutNode("pricing-service", "Pricing Service", "pricing-service", 160.0, 80.0),
+            new LayoutNode("order-service", "Order Service", "order-service", 160.0, 80.0),
+            new LayoutNode("catalog-service", "Catalog Service", "catalog-service", 160.0, 80.0)),
+        List.of(
+            new LayoutEdge(
+                "web-calls-gateway", "web-frontend", "api-gateway", "calls", "web-calls-gateway"),
+            new LayoutEdge(
+                "gateway-authenticates",
+                "api-gateway",
+                "identity-service",
+                "authenticates",
+                "gateway-authenticates",
+                "Serving"),
+            new LayoutEdge(
+                "gateway-prices-cart",
+                "api-gateway",
+                "pricing-service",
+                "prices cart",
+                "gateway-prices-cart",
+                "Serving"),
+            new LayoutEdge(
+                "gateway-places-order",
+                "api-gateway",
+                "order-service",
+                "places order",
+                "gateway-places-order",
+                "Serving"),
+            new LayoutEdge(
+                "gateway-queries-catalog",
+                "api-gateway",
+                "catalog-service",
+                "queries catalog",
+                "gateway-queries-catalog",
+                "Serving")),
+        List.of(
+            new LayoutGroup(
+                "edge-platform",
+                "Edge Platform",
+                List.of("web-frontend", "api-gateway"),
+                GroupProvenance.semanticBacked("edge-platform")),
+            new LayoutGroup(
+                "core-services",
+                "Core Services",
+                List.of("identity-service", "pricing-service", "order-service", "catalog-service"),
+                GroupProvenance.semanticBacked("core-services"))),
+        List.of(),
+        null);
+  }
+
+  private static LayoutRequest groupedPipelineRequest() {
+    return new LayoutRequest(
+        "layout-request.schema.v1",
+        "main",
+        List.of(
+            new LayoutNode("client", "Client", "client", 160.0, 80.0),
+            new LayoutNode("web-app", "Web App", "web-app", 160.0, 80.0),
+            new LayoutNode("orders-api", "Orders API", "orders-api", 160.0, 80.0),
+            new LayoutNode("worker", "Fulfillment Worker", "worker", 160.0, 80.0),
+            new LayoutNode("payments", "Payment Authorization Service", "payments", 160.0, 80.0),
+            new LayoutNode("database", "PostgreSQL", "database", 160.0, 80.0)),
+        List.of(
+            new LayoutEdge(
+                "client-submits-order",
+                "client",
+                "web-app",
+                "submits order",
+                "client-submits-order"),
+            new LayoutEdge(
+                "web-app-calls-api", "web-app", "orders-api", "calls API", "web-app-calls-api"),
+            new LayoutEdge(
+                "api-authorizes-payment",
+                "orders-api",
+                "payments",
+                "requests payment authorization",
+                "api-authorizes-payment"),
+            new LayoutEdge(
+                "api-writes-database",
+                "orders-api",
+                "database",
+                "writes orders",
+                "api-writes-database"),
+            new LayoutEdge(
+                "api-publishes-job",
+                "orders-api",
+                "worker",
+                "publishes fulfillment",
+                "api-publishes-job"),
+            new LayoutEdge(
+                "worker-reads-database",
+                "worker",
+                "database",
+                "loads order",
+                "worker-reads-database")),
+        List.of(
+            new LayoutGroup(
+                "application-services",
+                "Application Services",
+                List.of("web-app", "orders-api", "worker"),
+                GroupProvenance.semanticBacked("application-services")),
+            new LayoutGroup(
+                "external-dependencies",
+                "External Dependencies",
+                List.of("payments", "database"),
+                GroupProvenance.semanticBacked("external-dependencies"))),
+        List.of(),
+        null);
+  }
+
   private static double firstSegmentY(LaidOutEdge edge) {
     assertRouted(edge);
     return edge.points().get(0).y();
@@ -2685,19 +2466,13 @@ class ElkLayoutEngineTest {
 
   private static void assertGroupContainsNode(LaidOutGroup group, LaidOutNode node) {
     assertTrue(
-        node.x() >= group.x() - GEOMETRY_EPSILON
-            && node.y() >= group.y() - GEOMETRY_EPSILON
-            && node.x() + node.width() <= group.x() + group.width() + GEOMETRY_EPSILON
-            && node.y() + node.height() <= group.y() + group.height() + GEOMETRY_EPSILON,
+        Rect.of(group).contains(Rect.of(node), GEOMETRY_EPSILON),
         "group " + group.id() + " should contain node " + node.id());
   }
 
   private static void assertGroupContainsGroup(LaidOutGroup outer, LaidOutGroup inner) {
     assertTrue(
-        inner.x() >= outer.x() - GEOMETRY_EPSILON
-            && inner.y() >= outer.y() - GEOMETRY_EPSILON
-            && inner.x() + inner.width() <= outer.x() + outer.width() + GEOMETRY_EPSILON
-            && inner.y() + inner.height() <= outer.y() + outer.height() + GEOMETRY_EPSILON,
+        Rect.of(outer).contains(Rect.of(inner), GEOMETRY_EPSILON),
         "group " + outer.id() + " should contain child group " + inner.id());
   }
 
@@ -2858,16 +2633,9 @@ class ElkLayoutEngineTest {
 
   private static void assertGroupContainsMembers(LayoutResult result, LaidOutGroup group) {
     for (String memberId : group.members()) {
-      LaidOutNode member =
-          result.nodes().stream()
-              .filter(node -> node.id().equals(memberId))
-              .findFirst()
-              .orElseThrow();
+      LaidOutNode member = nodeById(result, memberId);
       assertTrue(
-          member.x() >= group.x()
-              && member.y() >= group.y()
-              && member.x() + member.width() <= group.x() + group.width()
-              && member.y() + member.height() <= group.y() + group.height(),
+          Rect.of(group).contains(Rect.of(member), 0.0),
           "group " + group.id() + " should contain member " + memberId);
     }
   }
@@ -3160,30 +2928,34 @@ class ElkLayoutEngineTest {
     double maxX = Math.max(start.x(), end.x());
     double minY = Math.min(start.y(), end.y());
     double maxY = Math.max(start.y(), end.y());
-    return rectanglesOverlap(
-        minX,
-        minY,
-        Math.max(maxX - minX, 1.0),
-        Math.max(maxY - minY, 1.0),
-        node.x(),
-        node.y(),
-        node.width(),
-        node.height());
+    Rect segmentBounds =
+        new Rect(minX, minY, Math.max(maxX - minX, 1.0), Math.max(maxY - minY, 1.0));
+    return segmentBounds.overlaps(Rect.of(node));
   }
 
-  private static boolean rectanglesOverlap(
-      double leftX,
-      double leftY,
-      double leftWidth,
-      double leftHeight,
-      double rightX,
-      double rightY,
-      double rightWidth,
-      double rightHeight) {
-    return leftX < rightX + rightWidth
-        && leftX + leftWidth > rightX
-        && leftY < rightY + rightHeight
-        && leftY + leftHeight > rightY;
+  /** Axis-aligned bounds of a laid-out node or group, for overlap/containment assertions. */
+  private record Rect(double x, double y, double width, double height) {
+    static Rect of(LaidOutNode node) {
+      return new Rect(node.x(), node.y(), node.width(), node.height());
+    }
+
+    static Rect of(LaidOutGroup group) {
+      return new Rect(group.x(), group.y(), group.width(), group.height());
+    }
+
+    boolean overlaps(Rect other) {
+      return x < other.x + other.width
+          && x + width > other.x
+          && y < other.y + other.height
+          && y + height > other.y;
+    }
+
+    boolean contains(Rect inner, double tolerance) {
+      return inner.x >= x - tolerance
+          && inner.y >= y - tolerance
+          && inner.x + inner.width <= x + width + tolerance
+          && inner.y + inner.height <= y + height + tolerance;
+    }
   }
 
   @Test
