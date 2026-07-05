@@ -34,6 +34,12 @@ public final class EdgeRenderer {
   private static final int EDGE_LABEL_FONT_WEIGHT = 600;
   private static final double EDGE_LABEL_OUTLINE_WIDTH = 2.0;
 
+  // Perpendicular reach (px from the segment) within which a horizontal-side label still counts as
+  // "hugging" its own route. Offsets up to this are tried before falling back to an on-route
+  // vertical-segment placement; larger offsets — which can walk the label clear off the diagram —
+  // only run when no on-route placement is clear.
+  private static final double MAX_HUG_OFFSET = 56.0;
+
   public static String edgeMarker(LaidOutEdge edge, ResolvedEdgeStyle style, String side) {
     SvgEdgeMarkerEnd marker = side.equals("start") ? style.markerStart() : style.markerEnd();
     if (marker == SvgEdgeMarkerEnd.NONE) {
@@ -503,20 +509,31 @@ public final class EdgeRenderer {
             case AUTO -> autoHorizontalLabelOffset(edge, segment.index());
           };
       List<Double> xCandidates = orderedValues(preferredX, centerX, nearStartX, nearEndX);
-      List<Double> offsets = labelOffsetCandidates(baseOffset);
-      for (double offset : offsets) {
-        for (double x : xCandidates) {
-          EdgeLabel candidate =
-              edgeLabelCandidate(x, segment.start().y() + offset, "middle", edge.label(), fontSize);
-          LabelBox candidateBox = edgeLabelVisibleBox(candidate, style.labelPresentation());
-          if (occupiedBoxes.stream().noneMatch(candidateBox::overlaps)) {
-            return candidate;
-          }
-        }
+      List<Double> hugOffsets = new ArrayList<>();
+      List<Double> farOffsets = new ArrayList<>();
+      for (double offset : labelOffsetCandidates(baseOffset)) {
+        (Math.abs(offset) <= MAX_HUG_OFFSET ? hugOffsets : farOffsets).add(offset);
       }
+      // 1. Hug the segment: try only the beside-the-route offsets first.
+      Optional<EdgeLabel> besideRoute =
+          firstClearHorizontalLabel(
+              edge, style, occupiedBoxes, fontSize, segment, xCandidates, hugOffsets);
+      if (besideRoute.isPresent()) {
+        return besideRoute.get();
+      }
+      // 2. Prefer an on-route vertical-segment placement over displacing the label far from its own
+      // segment. Escalating the horizontal offset outward can walk the label clear off the diagram
+      // (the grouped fan-out regression), dissociating it from the relationship it names.
       Optional<EdgeLabel> vertical = firstClearVerticalLabel(edge, style, occupiedBoxes, fontSize);
       if (vertical.isPresent()) {
         return vertical.get();
+      }
+      // 3. Only with no clear on-route placement, escalate the horizontal offset outward.
+      Optional<EdgeLabel> displaced =
+          firstClearHorizontalLabel(
+              edge, style, occupiedBoxes, fontSize, segment, xCandidates, farOffsets);
+      if (displaced.isPresent()) {
+        return displaced.get();
       }
       return edgeLabelCandidate(
           preferredX, segment.start().y() + baseOffset, "middle", edge.label(), fontSize);
@@ -534,6 +551,27 @@ public final class EdgeRenderer {
     Point point =
         edge.points().isEmpty() ? new Point(0.0, 0.0) : edge.points().get(edge.points().size() / 2);
     return edgeLabelCandidate(point.x(), point.y() - 6.0, "middle", edge.label(), fontSize);
+  }
+
+  private static Optional<EdgeLabel> firstClearHorizontalLabel(
+      LaidOutEdge edge,
+      ResolvedEdgeStyle style,
+      List<LabelBox> occupiedBoxes,
+      double fontSize,
+      Segment segment,
+      List<Double> xCandidates,
+      List<Double> offsets) {
+    for (double offset : offsets) {
+      for (double x : xCandidates) {
+        EdgeLabel candidate =
+            edgeLabelCandidate(x, segment.start().y() + offset, "middle", edge.label(), fontSize);
+        LabelBox candidateBox = edgeLabelVisibleBox(candidate, style.labelPresentation());
+        if (occupiedBoxes.stream().noneMatch(candidateBox::overlaps)) {
+          return Optional.of(candidate);
+        }
+      }
+    }
+    return Optional.empty();
   }
 
   public static EdgeLabel edgeLabelCandidate(
