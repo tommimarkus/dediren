@@ -55,6 +55,20 @@ is zero**.
 | `edge_crossing_count` | Edge crossings — **informational only**; crossings can be unavoidable, so this never degrades `status`. |
 | `warning_count` | Aggregate warning count. |
 
+### Graph tuning
+
+Optional graph-level tuning under `layout_preferences`. Omitted options keep
+ELK's defaults. Numeric ELK options are exposed as symbolic tiers, never raw
+numbers.
+
+| Option | Values | Controls |
+| --- | --- | --- |
+| `compaction` | `off`, `left`, `right`, `balanced` | Post-layout horizontal compaction of the drawing. |
+| `components.separate` | `true`, `false` | Whether disconnected components are laid out separately. |
+| `components.spacing` | `compact`, `readable`, `spacious` | Gap between separated components. |
+| `high_degree_nodes` | `off`, `on` | Special treatment for nodes with many edges. |
+| `thoroughness` | `low`, `normal`, `high` | How hard ELK works to improve the layout (more thorough = slower). |
+
 ### Layered phase strategies
 
 `layout_preferences` exposes the ELK Layered pipeline stages as Dediren-owned
