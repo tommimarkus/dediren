@@ -109,7 +109,11 @@
         "cycle_breaking": { "enum": ["greedy", "depth-first", "model-order"] },
         "layering": { "$ref": "#/$defs/layoutLayeringPreferences" },
         "crossing": { "$ref": "#/$defs/layoutCrossingPreferences" },
-        "placement": { "$ref": "#/$defs/layoutPlacementPreferences" }
+        "placement": { "$ref": "#/$defs/layoutPlacementPreferences" },
+        "compaction": { "enum": ["off", "left", "right", "balanced"] },
+        "components": { "$ref": "#/$defs/layoutComponentsPreferences" },
+        "high_degree_nodes": { "enum": ["off", "on"] },
+        "thoroughness": { "enum": ["low", "normal", "high"] }
       }
     },
     "layoutRoutingPreferences": {
@@ -143,6 +147,14 @@
       "additionalProperties": false,
       "properties": {
         "strategy": { "enum": ["brandes-koepf", "network-simplex", "linear-segments", "simple"] }
+      }
+    },
+    "layoutComponentsPreferences": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "separate": { "type": "boolean" },
+        "spacing": { "enum": ["compact", "readable", "spacious"] }
       }
     }
   }

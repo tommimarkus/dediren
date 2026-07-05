@@ -301,6 +301,42 @@ class SchemaValidatorTest {
   }
 
   @Test
+  void layoutRequestAcceptsGraphTuningAndRejectsUnknown() throws Exception {
+    var mapper = dev.dediren.contracts.json.JsonSupport.objectMapper();
+    String template =
+        """
+        {
+          "layout_request_schema_version": "layout-request.schema.v1",
+          "view_id": "main",
+          "nodes": [],
+          "edges": [],
+          "groups": [],
+          "constraints": [],
+          "layout_preferences": {
+            "compaction": "%s",
+            "components": { "separate": false, "spacing": "spacious" },
+            "high_degree_nodes": "on",
+            "thoroughness": "high"
+          }
+        }
+        """;
+    assertThat(
+            SchemaAssertions.validate(
+                workspaceRoot(),
+                "schemas/layout-request.schema.json",
+                mapper.readTree(String.format(template, "balanced"))))
+        .describedAs("valid graph-tuning must validate")
+        .isEmpty();
+    assertThat(
+            SchemaAssertions.validate(
+                workspaceRoot(),
+                "schemas/layout-request.schema.json",
+                mapper.readTree(String.format(template, "squish"))))
+        .describedAs("unknown compaction must be rejected")
+        .isNotEmpty();
+  }
+
+  @Test
   void firstPartyPluginManifestsMatchSchema() {
     for (String manifest : PLUGIN_MANIFESTS) {
       assertThat(
