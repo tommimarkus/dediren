@@ -6,6 +6,7 @@ import dev.dediren.contracts.layout.GroupProvenance;
 import dev.dediren.contracts.layout.LaidOutEdge;
 import dev.dediren.contracts.layout.LaidOutGroup;
 import dev.dediren.contracts.layout.LaidOutNode;
+import dev.dediren.contracts.layout.LayoutAlgorithm;
 import dev.dediren.contracts.layout.LayoutConstraint;
 import dev.dediren.contracts.layout.LayoutEdge;
 import dev.dediren.contracts.layout.LayoutGroup;
@@ -1408,11 +1409,32 @@ final class ElkLayoutEngine {
       return;
     }
     validateRoutingPreferences(preferences.routing(), path + ".routing");
+    validateAlgorithmCompatibility(preferences, path);
   }
 
   private static void validateRoutingPreferences(LayoutRoutingPreferences routing, String path) {
     if (routing == null) {
       return;
+    }
+  }
+
+  private static void validateAlgorithmCompatibility(LayoutPreferences preferences, String path) {
+    LayoutAlgorithm algorithm = preferences.algorithm();
+    if (algorithm == null || algorithm == LayoutAlgorithm.LAYERED) {
+      return;
+    }
+    rejectLayeredOnly(preferences.cycleBreaking() != null, path + ".cycle_breaking");
+    rejectLayeredOnly(preferences.layering() != null, path + ".layering");
+    rejectLayeredOnly(preferences.crossing() != null, path + ".crossing");
+    rejectLayeredOnly(preferences.placement() != null, path + ".placement");
+    rejectLayeredOnly(preferences.compaction() != null, path + ".compaction");
+    rejectLayeredOnly(preferences.highDegreeNodes() != null, path + ".high_degree_nodes");
+    rejectLayeredOnly(preferences.thoroughness() != null, path + ".thoroughness");
+  }
+
+  private static void rejectLayeredOnly(boolean present, String path) {
+    if (present) {
+      throw new IllegalArgumentException(path + " is only supported for the 'layered' algorithm");
     }
   }
 

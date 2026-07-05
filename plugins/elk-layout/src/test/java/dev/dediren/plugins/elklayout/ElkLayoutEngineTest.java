@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import dev.dediren.contracts.layout.*;
+import dev.dediren.contracts.layout.LayoutAlgorithm;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -3263,5 +3264,34 @@ class ElkLayoutEngineTest {
     assertEquals(Double.valueOf(60.0), root.getProperty(CoreOptions.SPACING_COMPONENT_COMPONENT));
     assertEquals(Boolean.TRUE, root.getProperty(LayeredOptions.HIGH_DEGREE_NODES_TREATMENT));
     assertEquals(Integer.valueOf(21), root.getProperty(LayeredOptions.THOROUGHNESS));
+  }
+
+  @Test
+  void nonLayeredAlgorithmRejectsLayeredOnlyPreferences() {
+    LayoutPreferences prefs =
+        new LayoutPreferences(
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            new LayoutLayeringPreferences(LayoutLayeringStrategy.NETWORK_SIMPLEX),
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            LayoutAlgorithm.TREE);
+    LayoutRequest request =
+        new LayoutRequest("layout-request.schema.v1", "main", null, null, null, null, prefs);
+
+    IllegalArgumentException ex =
+        org.junit.jupiter.api.Assertions.assertThrows(
+            IllegalArgumentException.class, () -> new ElkLayoutEngine().layout(request));
+    org.junit.jupiter.api.Assertions.assertTrue(
+        ex.getMessage().contains("layered"),
+        "message should explain the layered-only restriction, was: " + ex.getMessage());
   }
 }
