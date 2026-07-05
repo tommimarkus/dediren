@@ -68,6 +68,8 @@ final class LayoutJson {
     rejectNull(preferences.get("high_degree_nodes"), "$.layout_preferences.high_degree_nodes");
     rejectNull(preferences.get("thoroughness"), "$.layout_preferences.thoroughness");
 
+    rejectNull(preferences.get("algorithm"), "$.layout_preferences.algorithm");
+
     JsonNode components = preferences.get("components");
     if (components != null) {
       rejectNull(components, "$.layout_preferences.components");
@@ -167,6 +169,9 @@ final class LayoutJson {
         preferences.get("thoroughness"),
         "$.layout_preferences.thoroughness",
         Set.of("low", "normal", "high"));
+
+    rejectUnsupportedText(
+        preferences.get("algorithm"), "$.layout_preferences.algorithm", Set.of("layered"));
 
     JsonNode components = preferences.get("components");
     if (components != null && components.isObject()) {

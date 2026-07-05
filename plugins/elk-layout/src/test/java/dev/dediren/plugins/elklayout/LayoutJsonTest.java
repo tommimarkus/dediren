@@ -177,4 +177,49 @@ class LayoutJsonTest {
         ex.getMessage().contains("$.layout_preferences.thoroughness"),
         "error must name the offending path, was: " + ex.getMessage());
   }
+
+  @Test
+  void readsLayeredAlgorithm() throws Exception {
+    String json =
+        """
+            {
+              "layout_request_schema_version": "layout-request.schema.v1",
+              "view_id": "main",
+              "nodes": [],
+              "edges": [],
+              "groups": [],
+              "constraints": [],
+              "layout_preferences": { "algorithm": "layered" }
+            }
+            """;
+
+    LayoutRequest request =
+        LayoutJson.readLayoutRequest(new java.io.ByteArrayInputStream(json.getBytes()));
+
+    assertEquals(LayoutAlgorithm.LAYERED, request.layoutPreferences().algorithm());
+  }
+
+  @Test
+  void rejectsUnsupportedAlgorithmWithStructuredError() {
+    String json =
+        """
+            {
+              "layout_request_schema_version": "layout-request.schema.v1",
+              "view_id": "main",
+              "nodes": [],
+              "edges": [],
+              "groups": [],
+              "constraints": [],
+              "layout_preferences": { "algorithm": "tree" }
+            }
+            """;
+
+    LayoutJson.LayoutPreferenceValidationException ex =
+        org.junit.jupiter.api.Assertions.assertThrows(
+            LayoutJson.LayoutPreferenceValidationException.class,
+            () -> LayoutJson.readLayoutRequest(new java.io.ByteArrayInputStream(json.getBytes())));
+    org.junit.jupiter.api.Assertions.assertTrue(
+        ex.getMessage().contains("$.layout_preferences.algorithm"),
+        "error must name the offending path, was: " + ex.getMessage());
+  }
 }
