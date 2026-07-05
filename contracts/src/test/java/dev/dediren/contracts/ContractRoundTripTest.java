@@ -7,6 +7,7 @@ import dev.dediren.contracts.export.UmlXmiExportPolicy;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.contracts.layout.GroupProvenance;
 import dev.dediren.contracts.layout.LaidOutNode;
+import dev.dediren.contracts.layout.LayoutAlgorithm;
 import dev.dediren.contracts.layout.LayoutCompaction;
 import dev.dediren.contracts.layout.LayoutComponentsSpacing;
 import dev.dediren.contracts.layout.LayoutCrossingStrategy;
@@ -700,6 +701,18 @@ class ContractRoundTripTest {
     assertThat(prefs.highDegreeNodes()).isEqualTo(LayoutHighDegreeNodes.ON);
     assertThat(prefs.thoroughness()).isEqualTo(LayoutThoroughness.HIGH);
     assertThat(mapper.writeValueAsString(LayoutThoroughness.NORMAL)).isEqualTo("\"normal\"");
+  }
+
+  @Test
+  void layoutPreferencesRoundTripsAlgorithm() throws Exception {
+    var mapper = dev.dediren.contracts.json.JsonSupport.objectMapper();
+    assertThat(mapper.readValue("{\"algorithm\":\"layered\"}", LayoutPreferences.class).algorithm())
+        .isEqualTo(LayoutAlgorithm.LAYERED);
+    // Forward-ready values deserialize at the contract layer (the public boundary still restricts
+    // to layered).
+    assertThat(mapper.readValue("{\"algorithm\":\"tree\"}", LayoutPreferences.class).algorithm())
+        .isEqualTo(LayoutAlgorithm.TREE);
+    assertThat(mapper.writeValueAsString(LayoutAlgorithm.LAYERED)).isEqualTo("\"layered\"");
   }
 
   private static <T> T readFixture(String fixture, Class<T> type) throws Exception {
