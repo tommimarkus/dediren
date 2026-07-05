@@ -55,6 +55,19 @@ is zero**.
 | `edge_crossing_count` | Edge crossings — **informational only**; crossings can be unavoidable, so this never degrades `status`. |
 | `warning_count` | Aggregate warning count. |
 
+### Algorithm
+
+`layout_preferences.algorithm` selects the layout algorithm.
+
+| Value | Algorithm |
+| --- | --- |
+| `layered` (default) | ELK Layered — the hierarchical, directed algorithm Dediren is built around. |
+
+`layered` is currently the only supported value. The layering, crossing,
+placement, compaction, high-degree-node, and thoroughness options apply only to
+the `layered` algorithm; requesting them under a different algorithm is rejected.
+Additional algorithms may be added in future releases.
+
 ### Graph tuning
 
 Optional graph-level tuning under `layout_preferences`. Omitted options keep
