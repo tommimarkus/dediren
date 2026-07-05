@@ -337,6 +337,37 @@ class SchemaValidatorTest {
   }
 
   @Test
+  void layoutRequestAcceptsLayeredAlgorithmAndRejectsOthers() throws Exception {
+    var mapper = dev.dediren.contracts.json.JsonSupport.objectMapper();
+    String template =
+        """
+        {
+          "layout_request_schema_version": "layout-request.schema.v1",
+          "view_id": "main",
+          "nodes": [],
+          "edges": [],
+          "groups": [],
+          "constraints": [],
+          "layout_preferences": { "algorithm": "%s" }
+        }
+        """;
+    assertThat(
+            SchemaAssertions.validate(
+                workspaceRoot(),
+                "schemas/layout-request.schema.json",
+                mapper.readTree(String.format(template, "layered"))))
+        .describedAs("layered algorithm must validate")
+        .isEmpty();
+    assertThat(
+            SchemaAssertions.validate(
+                workspaceRoot(),
+                "schemas/layout-request.schema.json",
+                mapper.readTree(String.format(template, "tree"))))
+        .describedAs("non-layered algorithm is not publicly exposed yet")
+        .isNotEmpty();
+  }
+
+  @Test
   void firstPartyPluginManifestsMatchSchema() {
     for (String manifest : PLUGIN_MANIFESTS) {
       assertThat(

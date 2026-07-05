@@ -101,6 +101,7 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "algorithm": { "enum": ["layered"] },
         "mode": { "enum": ["auto", "flow", "packed"] },
         "direction": { "enum": ["right", "left", "down", "up"] },
         "density": { "enum": ["compact", "readable", "spacious"] },
