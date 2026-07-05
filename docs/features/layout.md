@@ -114,6 +114,18 @@ options. All are optional; when omitted, Dediren keeps its defaults.
 These map to ELK Layered options internally; Dediren validates the values and
 rejects unknown ones with a structured error envelope.
 
+#### Straightening fan-out edges
+
+When one node fans out to several targets that live in a different group, the
+default `brandes-koepf` placement balances the source to its own center rather
+than aligning it with any target, so orthogonal edges can stair-step (several
+small bends) on their way across the group boundary. Setting
+`placement.strategy: network-simplex` on that view aligns the source with the
+central target — straightening the middle edge and cutting bends — while keeping
+orthogonal routing. It repositions nodes, so apply it per view where the fan-out
+matters rather than expecting it everywhere. The stair-stepping that remains
+comes from the group-boundary crossing itself, which placement cannot remove.
+
 ### Routing styles
 
 `layout_preferences.routing.style` selects how ELK draws edges:
