@@ -17,6 +17,7 @@ import org.eclipse.elk.alg.layered.options.CycleBreakingStrategy;
 import org.eclipse.elk.alg.layered.options.EdgeStraighteningStrategy;
 import org.eclipse.elk.alg.layered.options.GraphCompactionStrategy;
 import org.eclipse.elk.alg.layered.options.GreedySwitchType;
+import org.eclipse.elk.alg.layered.options.LayerConstraint;
 import org.eclipse.elk.alg.layered.options.LayeredOptions;
 import org.eclipse.elk.alg.layered.options.LayeringStrategy;
 import org.eclipse.elk.alg.layered.options.NodePlacementStrategy;
@@ -27,6 +28,7 @@ import org.eclipse.elk.core.options.Direction;
 import org.eclipse.elk.core.options.EdgeRouting;
 import org.eclipse.elk.core.options.PortSide;
 import org.eclipse.elk.graph.ElkNode;
+import org.eclipse.elk.graph.util.ElkGraphUtil;
 import org.junit.jupiter.api.Test;
 
 class ElkLayoutEngineTest {
@@ -3293,5 +3295,31 @@ class ElkLayoutEngineTest {
     org.junit.jupiter.api.Assertions.assertTrue(
         ex.getMessage().contains("layered"),
         "message should explain the layered-only restriction, was: " + ex.getMessage());
+  }
+
+  @Test
+  void applyNodeHintsSetsPartitionAndLayerConstraint() {
+    ElkNode root = ElkGraphUtil.createGraph();
+    ElkNode elkNode = ElkGraphUtil.createNode(root);
+    LayoutNode node =
+        new LayoutNode("n1", "N1", "n1", null, null, null, 2, LayoutLayerConstraint.FIRST);
+
+    ElkLayeredOptions.applyNodeHints(elkNode, node);
+
+    assertEquals(Integer.valueOf(2), elkNode.getProperty(LayeredOptions.PARTITIONING_PARTITION));
+    assertEquals(
+        LayerConstraint.FIRST, elkNode.getProperty(LayeredOptions.LAYERING_LAYER_CONSTRAINT));
+  }
+
+  @Test
+  void activatePartitioningWhenAnyNodeHasPartition() {
+    ElkNode root = ElkGraphUtil.createGraph();
+    ElkLayeredOptions.activatePartitioning(
+        root,
+        java.util.List.of(
+            new LayoutNode("a", "A", "a", null, null, null, null, null),
+            new LayoutNode("b", "B", "b", null, null, null, 5, null)));
+
+    assertEquals(Boolean.TRUE, root.getProperty(LayeredOptions.PARTITIONING_ACTIVATE));
   }
 }

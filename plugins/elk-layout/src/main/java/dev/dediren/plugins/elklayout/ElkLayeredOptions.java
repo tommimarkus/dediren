@@ -4,17 +4,21 @@ import dev.dediren.contracts.layout.LayoutComponentsPreferences;
 import dev.dediren.contracts.layout.LayoutCrossingPreferences;
 import dev.dediren.contracts.layout.LayoutDensity;
 import dev.dediren.contracts.layout.LayoutEndpointMerging;
+import dev.dediren.contracts.layout.LayoutLayerConstraint;
 import dev.dediren.contracts.layout.LayoutLayeringPreferences;
+import dev.dediren.contracts.layout.LayoutNode;
 import dev.dediren.contracts.layout.LayoutPlacementPreferences;
 import dev.dediren.contracts.layout.LayoutPreferences;
 import dev.dediren.contracts.layout.LayoutRoutingPreferences;
 import dev.dediren.contracts.layout.LayoutRoutingStyle;
 import dev.dediren.contracts.layout.LayoutWrapping;
+import java.util.List;
 import org.eclipse.elk.alg.layered.options.CrossingMinimizationStrategy;
 import org.eclipse.elk.alg.layered.options.CycleBreakingStrategy;
 import org.eclipse.elk.alg.layered.options.EdgeStraighteningStrategy;
 import org.eclipse.elk.alg.layered.options.GraphCompactionStrategy;
 import org.eclipse.elk.alg.layered.options.GreedySwitchType;
+import org.eclipse.elk.alg.layered.options.LayerConstraint;
 import org.eclipse.elk.alg.layered.options.LayeredOptions;
 import org.eclipse.elk.alg.layered.options.LayeringStrategy;
 import org.eclipse.elk.alg.layered.options.NodePlacementStrategy;
@@ -170,6 +174,36 @@ final class ElkLayeredOptions {
     ElkNode root = ElkGraphUtil.createGraph();
     configureRoot(root, direction, preferences);
     return root;
+  }
+
+  static void applyNodeHints(ElkNode elkNode, LayoutNode node) {
+    if (node.partition() != null) {
+      elkNode.setProperty(LayeredOptions.PARTITIONING_PARTITION, node.partition());
+    }
+    LayerConstraint layerConstraint = layerConstraint(node.layerConstraint());
+    if (layerConstraint != null) {
+      elkNode.setProperty(LayeredOptions.LAYERING_LAYER_CONSTRAINT, layerConstraint);
+    }
+  }
+
+  static void activatePartitioning(ElkNode root, List<LayoutNode> nodes) {
+    boolean anyPartition = nodes.stream().anyMatch(node -> node.partition() != null);
+    if (anyPartition) {
+      root.setProperty(LayeredOptions.PARTITIONING_ACTIVATE, true);
+    }
+  }
+
+  private static LayerConstraint layerConstraint(LayoutLayerConstraint constraint) {
+    if (constraint == null) {
+      return null;
+    }
+    return switch (constraint) {
+      case NONE -> LayerConstraint.NONE;
+      case FIRST -> LayerConstraint.FIRST;
+      case FIRST_SEPARATE -> LayerConstraint.FIRST_SEPARATE;
+      case LAST -> LayerConstraint.LAST;
+      case LAST_SEPARATE -> LayerConstraint.LAST_SEPARATE;
+    };
   }
 
   static double portPortSpacing(LayoutPreferences preferences) {

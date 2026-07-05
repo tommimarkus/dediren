@@ -95,8 +95,10 @@ final class ElkLayoutEngine {
       elkNode.setIdentifier(node.id());
       setGeneratedDimensions(elkNode, node, portCounts.get(node.id()), preferences);
       ElkGraphUtil.createLabel(elkNode).setText(node.label());
+      ElkLayeredOptions.applyNodeHints(elkNode, node);
       elkNodes.put(node.id(), elkNode);
     }
+    ElkLayeredOptions.activatePartitioning(root, list(request.nodes()));
 
     Map<String, ElkEdge> elkEdges = new HashMap<>();
     List<Diagnostic> warnings = new ArrayList<>();
@@ -223,8 +225,10 @@ final class ElkLayoutEngine {
       elkNode.setIdentifier(node.id());
       setGeneratedDimensions(elkNode, node, null, preferences);
       ElkGraphUtil.createLabel(elkNode).setText(node.label());
+      ElkLayeredOptions.applyNodeHints(elkNode, node);
       elkNodes.put(node.id(), elkNode);
     }
+    ElkLayeredOptions.activatePartitioning(root, list(request.nodes()));
 
     new RecursiveGraphLayoutEngine().layout(root, new BasicProgressMonitor());
 
@@ -315,8 +319,10 @@ final class ElkLayoutEngine {
       elkNode.setIdentifier(node.id());
       setGeneratedDimensions(elkNode, node, portCounts.get(node.id()), preferences);
       ElkGraphUtil.createLabel(elkNode).setText(node.label());
+      ElkLayeredOptions.applyNodeHints(elkNode, node);
       elkNodes.put(node.id(), elkNode);
     }
+    ElkLayeredOptions.activatePartitioning(root, list(request.nodes()));
 
     Map<String, ElkEdge> elkEdges = new HashMap<>();
     Map<String, EdgePortIndexes> edgePortIndexes =
