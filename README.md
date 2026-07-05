@@ -1,5 +1,7 @@
 # dediren
 
+![dediren: contract-first, built for agents, Java 21+, ArchiMate and UML, MIT licensed](docs/assets/badges.svg)
+
 `dediren` is a contract-first diagram pipeline **for agentic tools**. It turns
 semantic JSON into generated layout, rendered SVG/PNG, ArchiMate® 3.2 OEF XML,
 or UML® 2.5.1 XMI XML through explicit CLI commands and process-boundary

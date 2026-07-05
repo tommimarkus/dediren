@@ -28,3 +28,33 @@ BUNDLE=$(ls -d dist/dediren-agent-bundle-* | grep -v '\.tar\.gz$' | sort | tail 
 
 If `dist/` is empty, build a bundle first with
 `./mvnw -pl dist-tool -am verify -Pdist-build`.
+
+## Palette — Amber CRT
+
+The user-facing docs use one theme, **Amber CRT** — an amber monochrome
+terminal, emerald for the "second output" accent. This table is the single
+source of truth for doc color: the hero diagram carries it through
+[`pipeline.render-policy.json`](pipeline.render-policy.json) (source models stay
+colorless — presentation lives only in render policy), and
+[`badges.svg`](badges.svg) reuses the same values.
+
+| Role | Hex | Where it's used |
+| --- | --- | --- |
+| Ground | `#0C0A06` | diagram background, edge-label halos |
+| Panel | `#17110A` | node fills, badge chips |
+| Amber (primary) | `#F2A93B` | transform + SVG-output nodes, `project`/`layout`/`render` edge labels |
+| Emerald (accent) | `#54D98A` | XML-output node and `export` edge — the output split |
+| Text | `#ECDFC7` | node labels |
+| Muted line | `#4A3F2C` | source-node stroke |
+| Edge / muted | `#7A6B4E` | edge strokes and arrowheads |
+| Muted text | `#A2957A` | badge labels |
+
+In the pipeline diagram the colors carry meaning: inputs are muted, transforms
+are amber, and the two terminal outputs split by hue — **amber** for the
+`render` path to SVG/PNG, **emerald** for the `export` path to OEF/XMI XML.
+
+## `badges.svg` — the README badge strip
+
+`badges.svg` is a hand-authored, self-contained Amber CRT strip (no external
+badge service), embedded at the top of the README. It carries no version string,
+so it never needs a release-time bump.

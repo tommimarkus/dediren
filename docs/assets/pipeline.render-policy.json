@@ -2,6 +2,20 @@
   "render_policy_schema_version": "render-policy.schema.v1",
   "page": { "width": 1000, "height": 400 },
   "margin": { "top": 24, "right": 24, "bottom": 24, "left": 24 },
+  "style": {
+    "background": { "fill": "#0C0A06" },
+    "node": { "fill": "#17110A", "stroke": "#4A3F2C", "label_fill": "#ECDFC7" },
+    "edge": { "stroke": "#7A6B4E", "label_fill": "#F2A93B" },
+    "node_overrides": {
+      "req": { "stroke": "#F2A93B" },
+      "res": { "stroke": "#F2A93B" },
+      "svg": { "stroke": "#F2A93B", "label_fill": "#F2A93B" },
+      "xml": { "stroke": "#54D98A", "label_fill": "#54D98A" }
+    },
+    "edge_overrides": {
+      "e-export": { "label_fill": "#54D98A" }
+    }
+  },
   "accessibility": {
     "title": "Dediren pipeline",
     "description": "Source model through project, layout, and render or export to SVG/PNG or OEF/XMI XML"

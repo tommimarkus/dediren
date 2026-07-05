@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="536" height="24" viewBox="0 0 536 24" role="img" aria-label="dediren: contract-first, built for agents, Java 21+, ArchiMate and UML, MIT licensed">
+  <title>dediren badges</title>
+  <desc>contract-first, built for agents, Java 21+, ArchiMate and UML notations, MIT licensed</desc>
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" font-weight="500">
+    <!-- contract-first -->
+    <rect x="0.5" y="1" width="120" height="22" rx="6" fill="#17110A" stroke="#4A3618"/>
+    <text x="60" y="16" text-anchor="middle" fill="#F2A93B">contract-first</text>
+    <!-- built for agents -->
+    <rect x="129.5" y="1" width="134" height="22" rx="6" fill="#17110A" stroke="#4A3618"/>
+    <text x="196" y="16" text-anchor="middle" xml:space="preserve"><tspan fill="#A2957A">built for </tspan><tspan fill="#F2A93B">agents</tspan></text>
+    <!-- Java 21+ -->
+    <rect x="272.5" y="1" width="78" height="22" rx="6" fill="#17110A" stroke="#245043"/>
+    <text x="311" y="16" text-anchor="middle" xml:space="preserve"><tspan fill="#A2957A">Java </tspan><tspan fill="#54D98A">21+</tspan></text>
+    <!-- ArchiMate . UML -->
+    <rect x="358.5" y="1" width="128" height="22" rx="6" fill="#17110A" stroke="#4A3618"/>
+    <text x="422" y="16" text-anchor="middle" fill="#F2A93B">ArchiMate · UML</text>
+    <!-- MIT -->
+    <rect x="494.5" y="1" width="41" height="22" rx="6" fill="#17110A" stroke="#245043"/>
+    <text x="515" y="16" text-anchor="middle" fill="#54D98A">MIT</text>
+  </g>
+</svg>
