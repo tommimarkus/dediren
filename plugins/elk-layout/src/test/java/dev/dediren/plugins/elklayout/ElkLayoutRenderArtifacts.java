@@ -58,12 +58,29 @@ final class ElkLayoutRenderArtifacts {
               + renderResult.stderr());
     }
 
-    String content = envelope.path("data").path("content").asText();
+    String content = svgArtifactContent(envelope);
+    if (content.isBlank()) {
+      throw new AssertionError(
+          "SVG render produced no svg artifact content for "
+              + testName
+              + ", stdout="
+              + renderResult.stdout());
+    }
     Path outputDir = workspaceRoot().resolve(".test-output/renders/elk-layout");
     cleanOnce(outputDir);
     Path output = outputDir.resolve(safeFileName(testName) + ".svg");
     Files.createDirectories(output.getParent());
     Files.writeString(output, content, StandardCharsets.UTF_8);
+  }
+
+  // Render returns data.artifacts[] (svg, plus png when raster policy is set); pick the svg one.
+  private static String svgArtifactContent(JsonNode envelope) {
+    for (JsonNode artifact : envelope.path("data").path("artifacts")) {
+      if ("svg".equals(artifact.path("artifact_kind").asText())) {
+        return artifact.path("content").asText();
+      }
+    }
+    return "";
   }
 
   private static void cleanOnce(Path dir) throws IOException {
