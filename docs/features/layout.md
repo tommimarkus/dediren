@@ -55,6 +55,22 @@ is zero**.
 | `edge_crossing_count` | Edge crossings — **informational only**; crossings can be unavoidable, so this never degrades `status`. |
 | `warning_count` | Aggregate warning count. |
 
+### Node placement hints
+
+Per-node layout hints authored on source-model nodes (they also survive on
+layout-request nodes). Both are optional and layered-only.
+
+| Node hint | Values | Controls |
+| --- | --- | --- |
+| `layer_constraint` | `none`, `first`, `first-separate`, `last`, `last-separate` | Pin a node to the first or last layer of the drawing. |
+| `partition` | integer | Assign the node to an ordered partition band; lower numbers are placed earlier. |
+
+Partitioning activates automatically when any node carries a `partition`. For
+predictable results, give every node a partition when you use the feature —
+ELK places unpartitioned nodes without band ordering.
+
+These hints affect the layered algorithm only; they have no effect when `layout_preferences.mode` is `packed` (which uses rectangle packing).
+
 ### Algorithm
 
 `layout_preferences.algorithm` selects the layout algorithm.
