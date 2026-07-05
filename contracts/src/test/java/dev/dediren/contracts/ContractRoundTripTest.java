@@ -17,6 +17,7 @@ import dev.dediren.contracts.layout.LayoutDirection;
 import dev.dediren.contracts.layout.LayoutEndpointMerging;
 import dev.dediren.contracts.layout.LayoutGreedySwitch;
 import dev.dediren.contracts.layout.LayoutHighDegreeNodes;
+import dev.dediren.contracts.layout.LayoutLayerConstraint;
 import dev.dediren.contracts.layout.LayoutLayeringStrategy;
 import dev.dediren.contracts.layout.LayoutMode;
 import dev.dediren.contracts.layout.LayoutNode;
@@ -480,6 +481,47 @@ class ContractRoundTripTest {
 
     assertThat(reparsedOut).isEqualTo(lifeline);
     assertThat(reparsedIn).isEqualTo(input);
+  }
+
+  @Test
+  void layoutNodeRoundTripsPlacementHints() throws Exception {
+    var mapper = dev.dediren.contracts.json.JsonSupport.objectMapper();
+    String json =
+        """
+        {
+          "id": "n1",
+          "label": "N1",
+          "source_id": "n1",
+          "partition": 2,
+          "layer_constraint": "first-separate"
+        }
+        """;
+    dev.dediren.contracts.layout.LayoutNode node =
+        mapper.readValue(json, dev.dediren.contracts.layout.LayoutNode.class);
+    assertThat(node.partition()).isEqualTo(2);
+    assertThat(node.layerConstraint()).isEqualTo(LayoutLayerConstraint.FIRST_SEPARATE);
+    assertThat(mapper.writeValueAsString(LayoutLayerConstraint.LAST_SEPARATE))
+        .isEqualTo("\"last-separate\"");
+  }
+
+  @Test
+  void sourceNodeRoundTripsPlacementHints() throws Exception {
+    var mapper = dev.dediren.contracts.json.JsonSupport.objectMapper();
+    String json =
+        """
+        {
+          "id": "n1",
+          "type": "Component",
+          "label": "N1",
+          "properties": {},
+          "partition": 3,
+          "layer_constraint": "last"
+        }
+        """;
+    dev.dediren.contracts.source.SourceNode node =
+        mapper.readValue(json, dev.dediren.contracts.source.SourceNode.class);
+    assertThat(node.partition()).isEqualTo(3);
+    assertThat(node.layerConstraint()).isEqualTo(LayoutLayerConstraint.LAST);
   }
 
   @Test
