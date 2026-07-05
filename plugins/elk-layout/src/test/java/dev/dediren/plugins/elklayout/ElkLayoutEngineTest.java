@@ -14,6 +14,7 @@ import java.util.List;
 import org.eclipse.elk.alg.layered.options.CrossingMinimizationStrategy;
 import org.eclipse.elk.alg.layered.options.CycleBreakingStrategy;
 import org.eclipse.elk.alg.layered.options.EdgeStraighteningStrategy;
+import org.eclipse.elk.alg.layered.options.GraphCompactionStrategy;
 import org.eclipse.elk.alg.layered.options.GreedySwitchType;
 import org.eclipse.elk.alg.layered.options.LayeredOptions;
 import org.eclipse.elk.alg.layered.options.LayeringStrategy;
@@ -3234,5 +3235,33 @@ class ElkLayoutEngineTest {
     assertEquals(
         NodePlacementStrategy.BRANDES_KOEPF,
         bare.getProperty(LayeredOptions.NODE_PLACEMENT_STRATEGY));
+  }
+
+  @Test
+  void layeredRootMapsGraphTuningToElkOptions() {
+    LayoutPreferences prefs =
+        new LayoutPreferences(
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            LayoutCompaction.BALANCED,
+            new LayoutComponentsPreferences(Boolean.FALSE, LayoutComponentsSpacing.SPACIOUS),
+            LayoutHighDegreeNodes.ON,
+            LayoutThoroughness.HIGH);
+    ElkNode root = ElkLayeredOptions.configuredRoot(Direction.RIGHT, prefs);
+
+    assertEquals(
+        GraphCompactionStrategy.LEFT_RIGHT_CONSTRAINT_LOCKING,
+        root.getProperty(LayeredOptions.COMPACTION_POST_COMPACTION_STRATEGY));
+    assertEquals(Boolean.FALSE, root.getProperty(CoreOptions.SEPARATE_CONNECTED_COMPONENTS));
+    assertEquals(Double.valueOf(60.0), root.getProperty(CoreOptions.SPACING_COMPONENT_COMPONENT));
+    assertEquals(Boolean.TRUE, root.getProperty(LayeredOptions.HIGH_DEGREE_NODES_TREATMENT));
+    assertEquals(Integer.valueOf(21), root.getProperty(LayeredOptions.THOROUGHNESS));
   }
 }

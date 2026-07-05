@@ -1,5 +1,6 @@
 package dev.dediren.plugins.elklayout;
 
+import dev.dediren.contracts.layout.LayoutComponentsPreferences;
 import dev.dediren.contracts.layout.LayoutCrossingPreferences;
 import dev.dediren.contracts.layout.LayoutDensity;
 import dev.dediren.contracts.layout.LayoutEndpointMerging;
@@ -12,6 +13,7 @@ import dev.dediren.contracts.layout.LayoutWrapping;
 import org.eclipse.elk.alg.layered.options.CrossingMinimizationStrategy;
 import org.eclipse.elk.alg.layered.options.CycleBreakingStrategy;
 import org.eclipse.elk.alg.layered.options.EdgeStraighteningStrategy;
+import org.eclipse.elk.alg.layered.options.GraphCompactionStrategy;
 import org.eclipse.elk.alg.layered.options.GreedySwitchType;
 import org.eclipse.elk.alg.layered.options.LayeredOptions;
 import org.eclipse.elk.alg.layered.options.LayeringStrategy;
@@ -124,6 +126,26 @@ final class ElkLayeredOptions {
     GreedySwitchType greedySwitch = greedySwitchType(preferences);
     if (greedySwitch != null) {
       root.setProperty(LayeredOptions.CROSSING_MINIMIZATION_GREEDY_SWITCH_TYPE, greedySwitch);
+    }
+    GraphCompactionStrategy compaction = compactionStrategy(preferences);
+    if (compaction != null) {
+      root.setProperty(LayeredOptions.COMPACTION_POST_COMPACTION_STRATEGY, compaction);
+    }
+    Boolean separateComponents = componentsSeparate(preferences);
+    if (separateComponents != null) {
+      root.setProperty(CoreOptions.SEPARATE_CONNECTED_COMPONENTS, separateComponents);
+    }
+    Double componentSpacing = componentsSpacing(preferences);
+    if (componentSpacing != null) {
+      root.setProperty(CoreOptions.SPACING_COMPONENT_COMPONENT, componentSpacing);
+    }
+    Boolean highDegree = highDegreeNodes(preferences);
+    if (highDegree != null) {
+      root.setProperty(LayeredOptions.HIGH_DEGREE_NODES_TREATMENT, highDegree);
+    }
+    Integer thoroughness = thoroughness(preferences);
+    if (thoroughness != null) {
+      root.setProperty(LayeredOptions.THOROUGHNESS, thoroughness);
     }
   }
 
@@ -273,6 +295,56 @@ final class ElkLayeredOptions {
       case OFF -> GreedySwitchType.OFF;
       case ONE_SIDED -> GreedySwitchType.ONE_SIDED;
       case TWO_SIDED -> GreedySwitchType.TWO_SIDED;
+    };
+  }
+
+  private static GraphCompactionStrategy compactionStrategy(LayoutPreferences preferences) {
+    if (preferences == null || preferences.compaction() == null) {
+      return null;
+    }
+    return switch (preferences.compaction()) {
+      case OFF -> GraphCompactionStrategy.NONE;
+      case LEFT -> GraphCompactionStrategy.LEFT;
+      case RIGHT -> GraphCompactionStrategy.RIGHT;
+      case BALANCED -> GraphCompactionStrategy.LEFT_RIGHT_CONSTRAINT_LOCKING;
+    };
+  }
+
+  private static Boolean componentsSeparate(LayoutPreferences preferences) {
+    LayoutComponentsPreferences components = preferences == null ? null : preferences.components();
+    return components == null ? null : components.separate();
+  }
+
+  private static Double componentsSpacing(LayoutPreferences preferences) {
+    LayoutComponentsPreferences components = preferences == null ? null : preferences.components();
+    if (components == null || components.spacing() == null) {
+      return null;
+    }
+    return switch (components.spacing()) {
+      case COMPACT -> 20.0;
+      case READABLE -> 40.0;
+      case SPACIOUS -> 60.0;
+    };
+  }
+
+  private static Boolean highDegreeNodes(LayoutPreferences preferences) {
+    if (preferences == null || preferences.highDegreeNodes() == null) {
+      return null;
+    }
+    return switch (preferences.highDegreeNodes()) {
+      case OFF -> Boolean.FALSE;
+      case ON -> Boolean.TRUE;
+    };
+  }
+
+  private static Integer thoroughness(LayoutPreferences preferences) {
+    if (preferences == null || preferences.thoroughness() == null) {
+      return null;
+    }
+    return switch (preferences.thoroughness()) {
+      case LOW -> 3;
+      case NORMAL -> 7;
+      case HIGH -> 21;
     };
   }
 }
