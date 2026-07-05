@@ -46,7 +46,7 @@ guidance in that package.
 {
   "model_schema_version": "model.schema.v1",
   "required_plugins": [
-    { "id": "generic-graph", "version": "2026.07.1" }
+    { "id": "generic-graph", "version": "2026.07.2" }
   ],
   "nodes": [
     { "id": "client", "type": "generic.actor", "label": "Client", "properties": {} },
@@ -97,8 +97,8 @@ profile and use ArchiMate type names:
 ```json
 {
   "required_plugins": [
-    { "id": "generic-graph", "version": "2026.07.1" },
-    { "id": "archimate-oef", "version": "2026.07.1" }
+    { "id": "generic-graph", "version": "2026.07.2" },
+    { "id": "archimate-oef", "version": "2026.07.2" }
   ],
   "plugins": {
     "generic-graph": {
@@ -498,7 +498,7 @@ deployment slots, and UMLDI.
 ## Runtime Probes
 
 ```bash
-VERSION=2026.07.1
+VERSION=2026.07.2
 BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-${VERSION}
 
 "$BUNDLE/bin/dediren" --version
