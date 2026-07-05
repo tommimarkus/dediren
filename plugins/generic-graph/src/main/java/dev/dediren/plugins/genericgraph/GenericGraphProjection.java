@@ -108,7 +108,9 @@ final class GenericGraphProjection {
               sourceNode.id(),
               GenericGraphLayoutSizing.widthHint(semanticProfile, sourceNode),
               GenericGraphLayoutSizing.heightHint(semanticProfile, sourceNode),
-              layoutRole(semanticProfile, sourceNode.type())));
+              layoutRole(semanticProfile, sourceNode.type()),
+              sourceNode.partition(),
+              sourceNode.layerConstraint()));
     }
 
     var edges = new ArrayList<LayoutEdge>();

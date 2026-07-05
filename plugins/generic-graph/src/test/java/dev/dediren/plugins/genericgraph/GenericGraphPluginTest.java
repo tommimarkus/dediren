@@ -481,6 +481,48 @@ class GenericGraphPluginTest {
   }
 
   @Test
+  void projectsNodePlacementHintsOntoLayoutNodes() throws Exception {
+    PluginResult result =
+        Main.executeForTesting(
+            new String[] {"project", "--target", "layout-request", "--view", "main"},
+            """
+                {
+                  "model_schema_version": "model.schema.v1",
+                  "nodes": [
+                    {
+                      "id": "n1",
+                      "type": "ApplicationComponent",
+                      "label": "N1",
+                      "properties": {},
+                      "partition": 4,
+                      "layer_constraint": "last"
+                    }
+                  ],
+                  "relationships": [],
+                  "plugins": {
+                    "generic-graph": {
+                      "views": [
+                        {
+                          "id": "main",
+                          "label": "Main",
+                          "nodes": ["n1"],
+                          "relationships": []
+                        }
+                      ]
+                    }
+                  }
+                }
+                """);
+
+    JsonNode data = okData(result);
+    JsonNode projected = layoutRequestNode(data, "n1");
+
+    assertThat(projected.at("/partition").asInt()).isEqualTo(4);
+    assertThat(projected.at("/layer_constraint").asText()).isEqualTo("last");
+    assertSchemaValid("schemas/layout-request.schema.json", data);
+  }
+
+  @Test
   void projectsUmlStateMachineViewKind() throws Exception {
     PluginResult result =
         Main.executeForTesting(
