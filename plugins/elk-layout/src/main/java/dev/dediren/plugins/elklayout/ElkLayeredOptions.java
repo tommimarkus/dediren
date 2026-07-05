@@ -362,13 +362,16 @@ final class ElkLayeredOptions {
   }
 
   private static Boolean highDegreeNodes(LayoutPreferences preferences) {
-    if (preferences == null || preferences.highDegreeNodes() == null) {
-      return null;
-    }
-    return switch (preferences.highDegreeNodes()) {
-      case OFF -> Boolean.FALSE;
-      case ON -> Boolean.TRUE;
-    };
+    // Return the boxed value through a ternary rather than a bare `return null` so this Boolean
+    // mapper matches its siblings and stays clear of SpotBugs NP_BOOLEAN_RETURN_NULL. A null means
+    // "leave the ELK option unset"; the caller null-checks before applying it.
+    var value = preferences == null ? null : preferences.highDegreeNodes();
+    return value == null
+        ? null
+        : switch (value) {
+          case OFF -> Boolean.FALSE;
+          case ON -> Boolean.TRUE;
+        };
   }
 
   private static Integer thoroughness(LayoutPreferences preferences) {
