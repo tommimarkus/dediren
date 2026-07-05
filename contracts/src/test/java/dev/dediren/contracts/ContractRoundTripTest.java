@@ -7,12 +7,15 @@ import dev.dediren.contracts.export.UmlXmiExportPolicy;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.contracts.layout.GroupProvenance;
 import dev.dediren.contracts.layout.LaidOutNode;
+import dev.dediren.contracts.layout.LayoutCompaction;
+import dev.dediren.contracts.layout.LayoutComponentsSpacing;
 import dev.dediren.contracts.layout.LayoutCrossingStrategy;
 import dev.dediren.contracts.layout.LayoutCycleBreaking;
 import dev.dediren.contracts.layout.LayoutDensity;
 import dev.dediren.contracts.layout.LayoutDirection;
 import dev.dediren.contracts.layout.LayoutEndpointMerging;
 import dev.dediren.contracts.layout.LayoutGreedySwitch;
+import dev.dediren.contracts.layout.LayoutHighDegreeNodes;
 import dev.dediren.contracts.layout.LayoutLayeringStrategy;
 import dev.dediren.contracts.layout.LayoutMode;
 import dev.dediren.contracts.layout.LayoutNode;
@@ -22,6 +25,7 @@ import dev.dediren.contracts.layout.LayoutRequest;
 import dev.dediren.contracts.layout.LayoutResult;
 import dev.dediren.contracts.layout.LayoutRoutingProfile;
 import dev.dediren.contracts.layout.LayoutRoutingStyle;
+import dev.dediren.contracts.layout.LayoutThoroughness;
 import dev.dediren.contracts.layout.LayoutWrapping;
 import dev.dediren.contracts.plugin.PluginManifest;
 import dev.dediren.contracts.plugin.RuntimeCapabilities;
@@ -675,6 +679,27 @@ class ContractRoundTripTest {
     assertThat(prefs.placement().strategy()).isEqualTo(LayoutPlacementStrategy.NETWORK_SIMPLEX);
     assertThat(mapper.writeValueAsString(LayoutLayeringStrategy.NETWORK_SIMPLEX))
         .isEqualTo("\"network-simplex\"");
+  }
+
+  @Test
+  void layoutPreferencesRoundTripsGraphTuning() throws Exception {
+    var mapper = dev.dediren.contracts.json.JsonSupport.objectMapper();
+    String json =
+        """
+        {
+          "compaction": "balanced",
+          "components": { "separate": false, "spacing": "spacious" },
+          "high_degree_nodes": "on",
+          "thoroughness": "high"
+        }
+        """;
+    LayoutPreferences prefs = mapper.readValue(json, LayoutPreferences.class);
+    assertThat(prefs.compaction()).isEqualTo(LayoutCompaction.BALANCED);
+    assertThat(prefs.components().separate()).isEqualTo(Boolean.FALSE);
+    assertThat(prefs.components().spacing()).isEqualTo(LayoutComponentsSpacing.SPACIOUS);
+    assertThat(prefs.highDegreeNodes()).isEqualTo(LayoutHighDegreeNodes.ON);
+    assertThat(prefs.thoroughness()).isEqualTo(LayoutThoroughness.HIGH);
+    assertThat(mapper.writeValueAsString(LayoutThoroughness.NORMAL)).isEqualTo("\"normal\"");
   }
 
   private static <T> T readFixture(String fixture, Class<T> type) throws Exception {
