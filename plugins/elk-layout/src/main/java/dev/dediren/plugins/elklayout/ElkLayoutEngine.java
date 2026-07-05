@@ -18,6 +18,7 @@ import dev.dediren.contracts.layout.LayoutResult;
 import dev.dediren.contracts.layout.LayoutRoutingPreferences;
 import dev.dediren.contracts.layout.Point;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -325,6 +326,7 @@ final class ElkLayoutEngine {
     ElkLayeredOptions.activatePartitioning(root, list(request.nodes()));
 
     Map<String, ElkEdge> elkEdges = new HashMap<>();
+    Set<String> reversedBackEdges = new HashSet<>();
     Map<String, EdgePortIndexes> edgePortIndexes =
         groupedEdgePortIndexes(
             request, requestNodes, ownerByNode, groupDirectionById, groupOrderById, rootDirection);
@@ -346,20 +348,42 @@ final class ElkLayoutEngine {
               edge, requestNodes, ownerByNode, groupDirectionById, groupOrderById, rootDirection);
       EdgeEndpointMerge endpointMerge = endpointMerges.getOrDefault(edge.id(), NO_ENDPOINT_MERGE);
       EdgePortIndexes portIndexes = edgePortIndexes.get(edge.id());
-      ElkEdge elkEdge =
-          createRoutedEdge(
-              source,
-              target,
-              edge,
-              edgeDirection,
-              endpointMerge.sourceEndpoint()
-                  ? 0
-                  : portIndexes == null ? 0 : portIndexes.sourceIndex(),
-              endpointMerge.targetEndpoint()
-                  ? 0
-                  : portIndexes == null ? 0 : portIndexes.targetIndex(),
-              endpointMerge.sourceEndpoint(),
-              endpointMerge.targetEndpoint());
+      int sourceIndex =
+          endpointMerge.sourceEndpoint() ? 0 : portIndexes == null ? 0 : portIndexes.sourceIndex();
+      int targetIndex =
+          endpointMerge.targetEndpoint() ? 0 : portIndexes == null ? 0 : portIndexes.targetIndex();
+      ElkEdge elkEdge;
+      if (isCrossGroupBackEdge(edge, ownerByNode, groupOrderById)) {
+        // A cross-group back-edge points against the root flow. Presented to ELK as-is it is a
+        // feedback edge, which ELK routes the long way around the whole drawing. Handing ELK the
+        // reversed edge instead makes it an ordinary forward edge that routes straight through the
+        // return channel; we reverse its route points below so the rendered edge keeps its declared
+        // source-to-target orientation and port sides.
+        elkEdge =
+            createRoutedEdge(
+                target,
+                source,
+                edge,
+                sourcePortSide(rootDirection),
+                targetPortSide(rootDirection),
+                targetIndex,
+                sourceIndex,
+                endpointMerge.targetEndpoint(),
+                endpointMerge.sourceEndpoint());
+        reversedBackEdges.add(edge.id());
+      } else {
+        elkEdge =
+            createRoutedEdge(
+                source,
+                target,
+                edge,
+                sourcePortSide(edgeDirection),
+                targetPortSide(edgeDirection),
+                sourceIndex,
+                targetIndex,
+                endpointMerge.sourceEndpoint(),
+                endpointMerge.targetEndpoint());
+      }
       ElkGraphUtil.updateContainment(elkEdge);
       elkEdges.put(edge.id(), elkEdge);
     }
@@ -389,6 +413,12 @@ final class ElkLayoutEngine {
     for (LayoutEdge edge : list(request.edges())) {
       ElkEdge elkEdge = elkEdges.get(edge.id());
       if (elkEdge != null) {
+        List<Point> routePoints = points(elkEdge);
+        if (reversedBackEdges.contains(edge.id())) {
+          // The edge was handed to ELK reversed to avoid feedback routing; flip the geometry back
+          // so the route runs from the declared source to the declared target.
+          Collections.reverse(routePoints);
+        }
         edges.add(
             new LaidOutEdge(
                 edge.id(),
@@ -397,7 +427,7 @@ final class ElkLayoutEngine {
                 edge.sourceId(),
                 edge.id(),
                 routingHints(edge.id(), endpointMerges),
-                points(elkEdge),
+                routePoints,
                 edge.label()));
       }
     }
@@ -449,6 +479,17 @@ final class ElkLayoutEngine {
       }
     }
     return false;
+  }
+
+  private static boolean isCrossGroupBackEdge(
+      LayoutEdge edge, Map<String, String> ownerByNode, Map<String, Integer> groupOrderById) {
+    String sourceOwner = ownerByNode.get(edge.source());
+    String targetOwner = ownerByNode.get(edge.target());
+    return sourceOwner != null
+        && targetOwner != null
+        && !sourceOwner.equals(targetOwner)
+        && groupOrderById.getOrDefault(sourceOwner, 0)
+            > groupOrderById.getOrDefault(targetOwner, 0);
   }
 
   private static Direction edgeDirection(
@@ -577,27 +618,6 @@ final class ElkLayoutEngine {
           default -> new PortSide[] {primary};
         };
     return alternates[Math.min(index, alternates.length - 1)];
-  }
-
-  private static ElkEdge createRoutedEdge(
-      ElkNode source,
-      ElkNode target,
-      LayoutEdge edge,
-      Direction direction,
-      int sourcePortIndex,
-      int targetPortIndex,
-      boolean mergeSourceEndpoint,
-      boolean mergeTargetEndpoint) {
-    return createRoutedEdge(
-        source,
-        target,
-        edge,
-        sourcePortSide(direction),
-        targetPortSide(direction),
-        sourcePortIndex,
-        targetPortIndex,
-        mergeSourceEndpoint,
-        mergeTargetEndpoint);
   }
 
   private static ElkEdge createRoutedEdge(

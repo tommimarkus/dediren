@@ -1923,6 +1923,13 @@ class ElkLayoutEngineTest {
     assertRouteEndpointOnSide(result, "worker-to-workflow", "worker-return", true, PortSide.NORTH);
     assertRouteEndpointOnSide(
         result, "worker-to-workflow", "workflow-return", false, PortSide.SOUTH);
+
+    // The two edges form a group cycle. The reverse edge must route straight back through the
+    // return channel, not wrap the whole diagram as ELK feedback routing would otherwise do.
+    assertEquals(
+        List.of(),
+        excessiveRouteDetourIds(result),
+        "cyclic cross-group edges must route straight through, not detour around the diagram");
   }
 
   @Test
