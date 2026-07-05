@@ -1,0 +1,17 @@
+# lean-audit registry (souroldgeezer-audit:lean-audit).
+# Carve-outs declare intentional cross-file prose duplication: each pair below
+# deliberately states the same contract for two audiences and is kept in sync
+# by review, not by citation. Patterns use **/ so they also match shadow-
+# prefixed scans.
+
+# CLAUDE.md "Plugin Runtime Rules" <-> docs/features/plugin-runtime.md
+# "Plugin Protocol": agent work rules vs the product feature page.
+[[carve_out]]
+a = "**/CLAUDE.md"
+b = "**/docs/features/plugin-runtime.md"
+
+# docs/threat-model.md "Maintenance Rule" <-> CLAUDE.md "Files That Move
+# Together": reciprocal maintenance contract; each side states its own trigger.
+[[carve_out]]
+a = "**/docs/threat-model.md"
+b = "**/CLAUDE.md"

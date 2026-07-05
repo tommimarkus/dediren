@@ -41,6 +41,7 @@ import java.util.List;
 import java.util.Map;
 import tools.jackson.databind.node.ObjectNode;
 
+// lean-audit:dup-intentional: cross-plugin envelope boilerplate; see arch-guidelines.md §12
 public final class Main {
 
   private Main() {}

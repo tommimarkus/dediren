@@ -46,6 +46,7 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 
+// lean-audit:dup-intentional: cross-plugin envelope boilerplate; see arch-guidelines.md §12
 public final class Main {
   private static final String OEF_NS = "http://www.opengroup.org/xsd/archimate/3.0/";
   private static final String XSI_NS = "http://www.w3.org/2001/XMLSchema-instance";

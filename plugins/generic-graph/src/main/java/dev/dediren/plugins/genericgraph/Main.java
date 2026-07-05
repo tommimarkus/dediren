@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.Objects;
 import tools.jackson.databind.JsonNode;
 
+// lean-audit:dup-intentional: cross-plugin envelope boilerplate; see arch-guidelines.md §12
 public final class Main {
   private Main() {}
 

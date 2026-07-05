@@ -11,6 +11,7 @@ import dev.dediren.contracts.render.SvgNodeDecorator;
 import dev.dediren.plugins.render.style.ResolvedNodeStyle;
 import java.util.Locale;
 
+// lean-audit:dup-intentional per-icon SVG path builders are deliberately parallel declarative code
 public final class ArchimateIcons {
 
   private ArchimateIcons() {}
