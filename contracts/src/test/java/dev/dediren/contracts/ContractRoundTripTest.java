@@ -667,7 +667,7 @@ class ContractRoundTripTest {
             RuntimeCapabilities.class);
 
     assertThat(manifest.pluginManifestSchemaVersion()).isEqualTo("plugin-manifest.schema.v1");
-    assertThat(manifest.version()).isEqualTo("2026.07.2");
+    assertThat(manifest.version()).isEqualTo("2026.07.3");
     assertThat(manifest.allowedEnv()).containsExactly("JAVA_HOME", "PATH");
     assertThat(capabilities.pluginProtocolVersion())
         .isEqualTo(ContractVersions.PLUGIN_PROTOCOL_VERSION);

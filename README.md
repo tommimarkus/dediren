@@ -68,8 +68,8 @@ third-party notices with the `-Psbom` and `-Pthird-party-notices` profiles.
 jars, no bundled JRE — Java 21+ is required at runtime):
 
 ```text
-dist/dediren-agent-bundle-2026.07.2/
-dist/dediren-agent-bundle-2026.07.2.tar.gz
+dist/dediren-agent-bundle-2026.07.3/
+dist/dediren-agent-bundle-2026.07.3.tar.gz
 ```
 
 ## First Run
@@ -106,7 +106,7 @@ and failure-repair rules, follow
 ## Bundle Layout
 
 ```text
-dediren-agent-bundle-2026.07.2/
+dediren-agent-bundle-2026.07.3/
   bin/            dediren + one launcher per first-party plugin
   lib/            jars (no bundled JRE)
   plugins/        first-party plugin manifests
