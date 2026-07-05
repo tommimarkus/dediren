@@ -65,9 +65,7 @@ class ContractRoundTripTest {
         .isEqualTo("client");
     assertThat(source.fragments()).isEmpty();
 
-    SourceDocument reparsed =
-        JsonSupport.objectMapper()
-            .treeToValue(JsonSupport.objectMapper().valueToTree(source), SourceDocument.class);
+    SourceDocument reparsed = reparse(source);
 
     assertThat(reparsed).isEqualTo(source);
   }
@@ -75,16 +73,8 @@ class ContractRoundTripTest {
   @Test
   void umlSequenceSourceDocumentPreservesPublicSequenceSurface() throws Exception {
     String fixture = "fixtures/source/valid-uml-sequence-basic.json";
-
-    assertThat(
-            SchemaAssertions.validateFixture(workspaceRoot(), "schemas/model.schema.json", fixture))
-        .describedAs(fixture)
-        .isEmpty();
-
-    SourceDocument source = readFixture(fixture, SourceDocument.class);
-    GenericGraphPluginData genericGraph =
-        JsonSupport.objectMapper()
-            .treeToValue(source.plugins().get("generic-graph"), GenericGraphPluginData.class);
+    SourceDocument source = validatedFixtureSource(fixture);
+    GenericGraphPluginData genericGraph = genericGraphOf(source);
     var view = genericGraph.views().getFirst();
 
     assertThat(genericGraph.semanticProfile()).isEqualTo(GenericGraphSemanticProfile.UML);
@@ -96,9 +86,7 @@ class ContractRoundTripTest {
         .extracting(SourceRelationship::id)
         .containsExactly("m1", "m2", "m3");
 
-    SourceDocument reparsed =
-        JsonSupport.objectMapper()
-            .treeToValue(JsonSupport.objectMapper().valueToTree(source), SourceDocument.class);
+    SourceDocument reparsed = reparse(source);
 
     assertThat(reparsed.relationships())
         .extracting(SourceRelationship::id)
@@ -122,16 +110,8 @@ class ContractRoundTripTest {
   @Test
   void umlStateMachineSourceDocumentPreservesPublicStateMachineSurface() throws Exception {
     String fixture = "fixtures/source/valid-uml-state-machine-basic.json";
-
-    assertThat(
-            SchemaAssertions.validateFixture(workspaceRoot(), "schemas/model.schema.json", fixture))
-        .describedAs(fixture)
-        .isEmpty();
-
-    SourceDocument source = readFixture(fixture, SourceDocument.class);
-    GenericGraphPluginData genericGraph =
-        JsonSupport.objectMapper()
-            .treeToValue(source.plugins().get("generic-graph"), GenericGraphPluginData.class);
+    SourceDocument source = validatedFixtureSource(fixture);
+    GenericGraphPluginData genericGraph = genericGraphOf(source);
     var view = genericGraph.views().getFirst();
 
     assertThat(genericGraph.semanticProfile()).isEqualTo(GenericGraphSemanticProfile.UML);
@@ -149,9 +129,7 @@ class ContractRoundTripTest {
         .containsExactly(
             "t-create", "t-submit", "t-check-payment", "t-approve", "t-reject", "t-close");
 
-    SourceDocument reparsed =
-        JsonSupport.objectMapper()
-            .treeToValue(JsonSupport.objectMapper().valueToTree(source), SourceDocument.class);
+    SourceDocument reparsed = reparse(source);
 
     assertThat(reparsed.relationships())
         .extracting(relationship -> relationship.properties().get("uml").get("kind").textValue())
@@ -167,16 +145,8 @@ class ContractRoundTripTest {
   @Test
   void umlUseCaseSourceDocumentPreservesPublicUseCaseSurface() throws Exception {
     String fixture = "fixtures/source/valid-uml-use-case-basic.json";
-
-    assertThat(
-            SchemaAssertions.validateFixture(workspaceRoot(), "schemas/model.schema.json", fixture))
-        .describedAs(fixture)
-        .isEmpty();
-
-    SourceDocument source = readFixture(fixture, SourceDocument.class);
-    GenericGraphPluginData genericGraph =
-        JsonSupport.objectMapper()
-            .treeToValue(source.plugins().get("generic-graph"), GenericGraphPluginData.class);
+    SourceDocument source = validatedFixtureSource(fixture);
+    GenericGraphPluginData genericGraph = genericGraphOf(source);
     var view = genericGraph.views().getFirst();
 
     assertThat(genericGraph.semanticProfile()).isEqualTo(GenericGraphSemanticProfile.UML);
@@ -202,9 +172,7 @@ class ContractRoundTripTest {
             "extend-discount");
     assertThat(view.groups().getFirst().semanticSourceId()).isEqualTo("order-service");
 
-    SourceDocument reparsed =
-        JsonSupport.objectMapper()
-            .treeToValue(JsonSupport.objectMapper().valueToTree(source), SourceDocument.class);
+    SourceDocument reparsed = reparse(source);
 
     assertThat(reparsed.nodes())
         .extracting(node -> node.type())
@@ -223,16 +191,8 @@ class ContractRoundTripTest {
   @Test
   void umlComponentSourceDocumentPreservesPublicComponentSurface() throws Exception {
     String fixture = "fixtures/source/valid-uml-component-basic.json";
-
-    assertThat(
-            SchemaAssertions.validateFixture(workspaceRoot(), "schemas/model.schema.json", fixture))
-        .describedAs(fixture)
-        .isEmpty();
-
-    SourceDocument source = readFixture(fixture, SourceDocument.class);
-    GenericGraphPluginData genericGraph =
-        JsonSupport.objectMapper()
-            .treeToValue(source.plugins().get("generic-graph"), GenericGraphPluginData.class);
+    SourceDocument source = validatedFixtureSource(fixture);
+    GenericGraphPluginData genericGraph = genericGraphOf(source);
     var view = genericGraph.views().getFirst();
 
     assertThat(genericGraph.semanticProfile()).isEqualTo(GenericGraphSemanticProfile.UML);
@@ -257,9 +217,7 @@ class ContractRoundTripTest {
     assertThat(view.groups()).hasSize(3);
     assertThat(view.groups().getFirst().semanticSourceId()).isEqualTo("pkg-orders");
 
-    SourceDocument reparsed =
-        JsonSupport.objectMapper()
-            .treeToValue(JsonSupport.objectMapper().valueToTree(source), SourceDocument.class);
+    SourceDocument reparsed = reparse(source);
 
     assertThat(reparsed.nodes())
         .extracting(node -> node.type())
@@ -278,16 +236,8 @@ class ContractRoundTripTest {
   @Test
   void umlDeploymentSourceDocumentPreservesPublicDeploymentSurface() throws Exception {
     String fixture = "fixtures/source/valid-uml-deployment-basic.json";
-
-    assertThat(
-            SchemaAssertions.validateFixture(workspaceRoot(), "schemas/model.schema.json", fixture))
-        .describedAs(fixture)
-        .isEmpty();
-
-    SourceDocument source = readFixture(fixture, SourceDocument.class);
-    GenericGraphPluginData genericGraph =
-        JsonSupport.objectMapper()
-            .treeToValue(source.plugins().get("generic-graph"), GenericGraphPluginData.class);
+    SourceDocument source = validatedFixtureSource(fixture);
+    GenericGraphPluginData genericGraph = genericGraphOf(source);
     var view = genericGraph.views().getFirst();
 
     assertThat(genericGraph.semanticProfile()).isEqualTo(GenericGraphSemanticProfile.UML);
@@ -312,9 +262,7 @@ class ContractRoundTripTest {
     assertThat(view.groups()).hasSize(1);
     assertThat(view.groups().getFirst().semanticSourceId()).isEqualTo("device-prod-node");
 
-    SourceDocument reparsed =
-        JsonSupport.objectMapper()
-            .treeToValue(JsonSupport.objectMapper().valueToTree(source), SourceDocument.class);
+    SourceDocument reparsed = reparse(source);
 
     assertThat(reparsed.nodes())
         .extracting(node -> node.type())
@@ -343,9 +291,7 @@ class ContractRoundTripTest {
     assertUmlSequenceFragmentSurface(source);
 
     SourceDocument decoded = JsonSupport.objectMapper().treeToValue(source, SourceDocument.class);
-    SourceDocument roundTripped =
-        JsonSupport.objectMapper()
-            .treeToValue(JsonSupport.objectMapper().valueToTree(decoded), SourceDocument.class);
+    SourceDocument roundTripped = reparse(decoded);
     JsonNode encoded = JsonSupport.objectMapper().valueToTree(roundTripped);
 
     assertUmlSequenceFragmentSurface(encoded);
@@ -759,6 +705,25 @@ class ContractRoundTripTest {
 
   private static <T> T readFixture(String fixture, Class<T> type) throws Exception {
     return JsonSupport.readValue(Files.readString(workspaceRoot().resolve(fixture)), type);
+  }
+
+  /** Reads and validates a source-document fixture against the public model schema. */
+  private static SourceDocument validatedFixtureSource(String fixture) throws Exception {
+    assertThat(
+            SchemaAssertions.validateFixture(workspaceRoot(), "schemas/model.schema.json", fixture))
+        .describedAs(fixture)
+        .isEmpty();
+    return readFixture(fixture, SourceDocument.class);
+  }
+
+  private static GenericGraphPluginData genericGraphOf(SourceDocument source) throws Exception {
+    return JsonSupport.objectMapper()
+        .treeToValue(source.plugins().get("generic-graph"), GenericGraphPluginData.class);
+  }
+
+  private static SourceDocument reparse(SourceDocument source) throws Exception {
+    return JsonSupport.objectMapper()
+        .treeToValue(JsonSupport.objectMapper().valueToTree(source), SourceDocument.class);
   }
 
   private static String fixture(String fixture) throws Exception {

@@ -18,15 +18,9 @@ class CliLayoutRenderCommandTest {
   @Test
   void validateLayoutReportsQualityFromFile() throws Exception {
     CliResult result =
-        Main.executeForTesting(
-            new String[] {
-              "validate-layout",
-              "--input",
-              workspaceRoot().resolve("fixtures/layout-result/basic.json").toString()
-            },
-            "");
+        runValidateLayout(workspaceRoot().resolve("fixtures/layout-result/basic.json"));
 
-    JsonNode envelope = JsonSupport.objectMapper().readTree(result.stdout());
+    JsonNode envelope = envelope(result);
 
     assertThat(result.exitCode()).isZero();
     assertThat(envelope.at("/data/status").asText()).isEqualTo("ok");
@@ -58,10 +52,9 @@ class CliLayoutRenderCommandTest {
                 }
                 """);
 
-    CliResult result =
-        Main.executeForTesting(new String[] {"validate-layout", "--input", layout.toString()}, "");
+    CliResult result = runValidateLayout(layout);
 
-    JsonNode envelope = JsonSupport.objectMapper().readTree(result.stdout());
+    JsonNode envelope = envelope(result);
 
     // A warning verdict is not a failure: exit stays 0, but the envelope status and diagnostics
     // now carry the quality verdict so a consumer reading only .status/.diagnostics[] sees it.
@@ -79,10 +72,9 @@ class CliLayoutRenderCommandTest {
   void validateLayoutAcceptsSequenceLifelineMessageEndpoints() throws Exception {
     Path fixture = workspaceRoot().resolve("fixtures/layout-result/uml-sequence-validatable.json");
 
-    CliResult result =
-        Main.executeForTesting(new String[] {"validate-layout", "--input", fixture.toString()}, "");
+    CliResult result = runValidateLayout(fixture);
 
-    JsonNode envelope = JsonSupport.objectMapper().readTree(result.stdout());
+    JsonNode envelope = envelope(result);
 
     assertThat(result.exitCode()).isZero();
     assertThat(envelope.at("/data/status").asText()).isEqualTo("ok");
@@ -94,11 +86,9 @@ class CliLayoutRenderCommandTest {
     Path stripped = temp.resolve("sequence-without-role.json");
     Files.writeString(stripped, roleless);
 
-    CliResult control =
-        Main.executeForTesting(
-            new String[] {"validate-layout", "--input", stripped.toString()}, "");
+    CliResult control = runValidateLayout(stripped);
 
-    JsonNode controlEnvelope = JsonSupport.objectMapper().readTree(control.stdout());
+    JsonNode controlEnvelope = envelope(control);
 
     assertThat(control.exitCode()).isEqualTo(2);
     assertThat(controlEnvelope.at("/diagnostics/0/code").asText())
@@ -127,10 +117,9 @@ class CliLayoutRenderCommandTest {
                 }
                 """);
 
-    CliResult result =
-        Main.executeForTesting(new String[] {"validate-layout", "--input", layout.toString()}, "");
+    CliResult result = runValidateLayout(layout);
 
-    JsonNode envelope = JsonSupport.objectMapper().readTree(result.stdout());
+    JsonNode envelope = envelope(result);
 
     assertThat(result.exitCode()).isEqualTo(2);
     assertThat(envelope.at("/diagnostics/0/code").asText())
@@ -152,7 +141,7 @@ class CliLayoutRenderCommandTest {
             },
             "");
 
-    JsonNode envelope = JsonSupport.objectMapper().readTree(result.stdout());
+    JsonNode envelope = envelope(result);
 
     assertThat(result.exitCode()).isEqualTo(2);
     assertThat(envelope.at("/diagnostics/0/code").asText())
@@ -174,7 +163,7 @@ class CliLayoutRenderCommandTest {
             },
             "");
 
-    JsonNode envelope = JsonSupport.objectMapper().readTree(result.stdout());
+    JsonNode envelope = envelope(result);
 
     assertThat(result.exitCode()).isEqualTo(2);
     assertThat(envelope.at("/diagnostics/0/code").asText())
@@ -199,7 +188,7 @@ class CliLayoutRenderCommandTest {
             "",
             pluginEnv("generic-graph", "dev.dediren.plugins.genericgraph.Main"));
 
-    JsonNode envelope = JsonSupport.objectMapper().readTree(result.stdout());
+    JsonNode envelope = envelope(result);
 
     assertThat(result.exitCode()).isZero();
     assertThat(envelope.at("/status").asText()).isEqualTo("ok");
@@ -227,7 +216,7 @@ class CliLayoutRenderCommandTest {
             "",
             pluginEnv("render", "dev.dediren.plugins.render.Main"));
 
-    JsonNode envelope = JsonSupport.objectMapper().readTree(result.stdout());
+    JsonNode envelope = envelope(result);
 
     assertThat(result.exitCode()).isZero();
     assertThat(envelope.at("/status").asText()).isEqualTo("ok");
@@ -269,7 +258,7 @@ class CliLayoutRenderCommandTest {
             "",
             env);
 
-    JsonNode envelope = JsonSupport.objectMapper().readTree(result.stdout());
+    JsonNode envelope = envelope(result);
 
     assertThat(result.exitCode()).isZero();
     assertThat(envelope.at("/status").asText()).isEqualTo("ok");
@@ -302,13 +291,22 @@ class CliLayoutRenderCommandTest {
             "",
             env);
 
-    JsonNode envelope = JsonSupport.objectMapper().readTree(result.stdout());
+    JsonNode envelope = envelope(result);
 
     assertThat(result.exitCode()).isZero();
     assertThat(envelope.at("/status").asText()).isEqualTo("ok");
     assertThat(envelope.at("/data/artifact_kind").asText()).isEqualTo("uml-xmi+xml");
     assertThat(envelope.at("/data/content").asText())
         .contains("xmi:XMI", "<uml:Model", "xmi:type=\"uml:Class\"");
+  }
+
+  private CliResult runValidateLayout(Path input) {
+    return Main.executeForTesting(
+        new String[] {"validate-layout", "--input", input.toString()}, "");
+  }
+
+  private JsonNode envelope(CliResult result) throws Exception {
+    return JsonSupport.objectMapper().readTree(result.stdout());
   }
 
   private Map<String, String> pluginEnv(String pluginId, String mainClass) throws Exception {

@@ -1755,24 +1755,9 @@ class MainTest {
     @Test
     void archimateLabelStaysCenteredAndClearsCornerIcon() throws Exception {
       JsonNode input =
-          archimateRenderInput(
-              fixtureJson("fixtures/render-policy/archimate-svg.json"),
-              """
-                    [
-                      { "id": "appcomp", "source_id": "appcomp", "projection_id": "appcomp", "x": 40, "y": 40, "width": 190, "height": 80, "label": "Telecommunications Service" }
-                    ]
-                    """,
-              "[]",
-              """
-                    {
-                      "appcomp": { "type": "ApplicationComponent", "source_id": "appcomp" }
-                    }
-                    """,
-              "{}");
+          singleApplicationComponentInput(40, 40, 190, 80, "Telecommunications Service");
 
-      Document document = svgDocument(okContent(render(input)));
-      Element node = groupWithAttribute(document, "data-dediren-node-id", "appcomp");
-      Element label = (Element) node.getElementsByTagName("text").item(0);
+      Element label = singleApplicationComponentLabel(input);
 
       // Centered vertically in the box area BELOW the reserved corner-decorator band
       // (issue #27): middle baseline, with the first line clearing the band.
@@ -1806,24 +1791,9 @@ class MainTest {
       // BELOW the reserved decorator band (top inset 9 + icon size 22 = 31 from the box
       // top) — the vertical complement of the #25 horizontal textLength gutter.
       JsonNode input =
-          archimateRenderInput(
-              fixtureJson("fixtures/render-policy/archimate-svg.json"),
-              """
-                    [
-                      { "id": "appcomp", "source_id": "appcomp", "projection_id": "appcomp", "x": 40, "y": 40, "width": 160, "height": 100, "label": "Customer Identity Provider Service" }
-                    ]
-                    """,
-              "[]",
-              """
-                    {
-                      "appcomp": { "type": "ApplicationComponent", "source_id": "appcomp" }
-                    }
-                    """,
-              "{}");
+          singleApplicationComponentInput(40, 40, 160, 100, "Customer Identity Provider Service");
 
-      Document document = svgDocument(okContent(render(input)));
-      Element node = groupWithAttribute(document, "data-dediren-node-id", "appcomp");
-      Element label = (Element) node.getElementsByTagName("text").item(0);
+      Element label = singleApplicationComponentLabel(input);
 
       // Multi-line: dominant-baseline=middle and the first tspan has dy=0, so the
       // <text> y is the first line's vertical center.
@@ -1852,24 +1822,9 @@ class MainTest {
       // Box sized so each wrapped line keeps the full font (no width/height shrink),
       // so the rendered font-size is exactly the policy font-size.
       JsonNode input =
-          archimateRenderInput(
-              fixtureJson("fixtures/render-policy/archimate-svg.json"),
-              """
-                    [
-                      { "id": "appcomp", "source_id": "appcomp", "projection_id": "appcomp", "x": 40, "y": 40, "width": 190, "height": 110, "label": "Customer Identity Service" }
-                    ]
-                    """,
-              "[]",
-              """
-                    {
-                      "appcomp": { "type": "ApplicationComponent", "source_id": "appcomp" }
-                    }
-                    """,
-              "{}");
+          singleApplicationComponentInput(40, 40, 190, 110, "Customer Identity Service");
 
-      Document document = svgDocument(okContent(render(input)));
-      Element node = groupWithAttribute(document, "data-dediren-node-id", "appcomp");
-      Element label = (Element) node.getElementsByTagName("text").item(0);
+      Element label = singleApplicationComponentLabel(input);
       double fontSize = Double.parseDouble(label.getAttribute("font-size"));
 
       org.w3c.dom.NodeList tspans = label.getElementsByTagName("tspan");
@@ -1890,25 +1845,9 @@ class MainTest {
 
     @Test
     void singleLineNodeLabelPinsRenderedWidthToLayoutMetric() throws Exception {
-      JsonNode input =
-          archimateRenderInput(
-              fixtureJson("fixtures/render-policy/archimate-svg.json"),
-              """
-                    [
-                      { "id": "appcomp", "source_id": "appcomp", "projection_id": "appcomp", "x": 40, "y": 40, "width": 190, "height": 80, "label": "Auth" }
-                    ]
-                    """,
-              "[]",
-              """
-                    {
-                      "appcomp": { "type": "ApplicationComponent", "source_id": "appcomp" }
-                    }
-                    """,
-              "{}");
+      JsonNode input = singleApplicationComponentInput(40, 40, 190, 80, "Auth");
 
-      Document document = svgDocument(okContent(render(input)));
-      Element node = groupWithAttribute(document, "data-dediren-node-id", "appcomp");
-      Element label = (Element) node.getElementsByTagName("text").item(0);
+      Element label = singleApplicationComponentLabel(input);
 
       // Single-line labels emit no tspan; the metric pin lands on <text> itself.
       assertThat(label.getElementsByTagName("tspan").getLength()).isZero();
@@ -1928,25 +1867,9 @@ class MainTest {
       // spacingAndGlyphs mode stretched the letterforms to fill it. The width
       // metric must now approximate per-glyph advances (near natural width) and
       // the pin must use lengthAdjust="spacing" so glyph SHAPES stay intact.
-      JsonNode input =
-          archimateRenderInput(
-              fixtureJson("fixtures/render-policy/archimate-svg.json"),
-              """
-                    [
-                      { "id": "appcomp", "source_id": "appcomp", "projection_id": "appcomp", "x": 40, "y": 40, "width": 250, "height": 80, "label": "Fulfillment Clerk" }
-                    ]
-                    """,
-              "[]",
-              """
-                    {
-                      "appcomp": { "type": "ApplicationComponent", "source_id": "appcomp" }
-                    }
-                    """,
-              "{}");
+      JsonNode input = singleApplicationComponentInput(40, 40, 250, 80, "Fulfillment Clerk");
 
-      Document document = svgDocument(okContent(render(input)));
-      Element node = groupWithAttribute(document, "data-dediren-node-id", "appcomp");
-      Element label = (Element) node.getElementsByTagName("text").item(0);
+      Element label = singleApplicationComponentLabel(input);
 
       // Wide box keeps the label on a single line at the full policy font size.
       assertThat(label.getElementsByTagName("tspan").getLength()).isZero();
@@ -3556,6 +3479,34 @@ class MainTest {
     input.set("render_metadata", metadata);
     input.set("policy", policy);
     return input;
+  }
+
+  /**
+   * Builds a render input for a single ArchiMate {@code ApplicationComponent} node named "appcomp"
+   * at the given box, so label-layout tests only need to vary the geometry and text.
+   */
+  private static JsonNode singleApplicationComponentInput(
+      double x, double y, double width, double height, String label) throws Exception {
+    String nodes =
+        String.format(
+            "[ { \"id\": \"appcomp\", \"source_id\": \"appcomp\", \"projection_id\": \"appcomp\","
+                + " \"x\": %s, \"y\": %s, \"width\": %s, \"height\": %s, \"label\": \"%s\" } ]",
+            x, y, width, height, label);
+    String metadataNodes =
+        """
+              {
+                "appcomp": { "type": "ApplicationComponent", "source_id": "appcomp" }
+              }
+              """;
+    return archimateRenderInput(
+        fixtureJson("fixtures/render-policy/archimate-svg.json"), nodes, "[]", metadataNodes, "{}");
+  }
+
+  /** Renders {@code input} and returns the "appcomp" node's first {@code <text>} label. */
+  private static Element singleApplicationComponentLabel(JsonNode input) throws Exception {
+    Document document = svgDocument(okContent(render(input)));
+    Element node = groupWithAttribute(document, "data-dediren-node-id", "appcomp");
+    return (Element) node.getElementsByTagName("text").item(0);
   }
 
   private static JsonNode semanticRenderInput(

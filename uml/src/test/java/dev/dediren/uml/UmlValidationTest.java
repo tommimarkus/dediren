@@ -157,10 +157,7 @@ class UmlValidationTest {
                 nodeUmlProperties(source, "ee-orders-runtime")
                     .put("node", "artifact-orders-service"));
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class,
-            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+    UmlValidationException error = assertRejected(fixture);
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
     assertThat(error.path()).isEqualTo("$.nodes[1].properties.uml.node");
@@ -174,10 +171,7 @@ class UmlValidationTest {
                 relationshipById(source, "deploy-orders-service")
                     .put("source", "component-order-api"));
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class,
-            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+    UmlValidationException error = assertRejected(fixture);
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_RELATIONSHIP_ENDPOINT_UNSUPPORTED");
     assertThat(error.value()).isEqualTo("Deployment: Component -> ExecutionEnvironment");
@@ -191,10 +185,7 @@ class UmlValidationTest {
                 relationshipById(source, "artifact-manifests-order-api")
                     .put("source", "ee-orders-runtime"));
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class,
-            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+    UmlValidationException error = assertRejected(fixture);
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_RELATIONSHIP_ENDPOINT_UNSUPPORTED");
     assertThat(error.value()).isEqualTo("Manifestation: ExecutionEnvironment -> Component");
@@ -208,10 +199,7 @@ class UmlValidationTest {
                 relationshipById(source, "orders-runtime-payment-path")
                     .put("target", "artifact-orders-service"));
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class,
-            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+    UmlValidationException error = assertRejected(fixture);
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_RELATIONSHIP_ENDPOINT_UNSUPPORTED");
     assertThat(error.value()).isEqualTo("CommunicationPath: ExecutionEnvironment -> Artifact");
@@ -222,10 +210,7 @@ class UmlValidationTest {
     Fixture fixture =
         loadMutatedUmlDeploymentFixture(source -> removeViewNode(source, "node-payment-network"));
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class,
-            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+    UmlValidationException error = assertRejected(fixture);
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_RELATIONSHIP_ENDPOINT_UNSUPPORTED");
     assertThat(error.path()).isEqualTo("$.plugins.generic-graph.views[0].relationships[3]");
@@ -237,10 +222,7 @@ class UmlValidationTest {
         loadMutatedUmlComponentFixture(
             source -> nodeUmlProperties(source, "port-rest-api").remove("component"));
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class,
-            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+    UmlValidationException error = assertRejected(fixture);
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
     assertThat(error.path()).isEqualTo("$.nodes[2].properties.uml.component");
@@ -254,10 +236,7 @@ class UmlValidationTest {
                 replaceTextArray(
                     nodeUmlProperties(source, "port-rest-api"), "provided", "component-order-api"));
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class,
-            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+    UmlValidationException error = assertRejected(fixture);
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
     assertThat(error.path()).isEqualTo("$.nodes[2].properties.uml.provided[0]");
@@ -271,10 +250,7 @@ class UmlValidationTest {
                 relationshipById(source, "order-api-uses-payment")
                     .put("target", "port-payment-client"));
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class,
-            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+    UmlValidationException error = assertRejected(fixture);
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_RELATIONSHIP_ENDPOINT_UNSUPPORTED");
     assertThat(error.value()).isEqualTo("Usage: Component -> Port");
@@ -286,10 +262,7 @@ class UmlValidationTest {
         loadMutatedUmlComponentFixture(
             source -> removeViewNode(source, "interface-payment-gateway"));
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class,
-            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+    UmlValidationException error = assertRejected(fixture);
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_RELATIONSHIP_ENDPOINT_UNSUPPORTED");
     assertThat(error.path()).isEqualTo("$.plugins.generic-graph.views[0].relationships[1]");
@@ -301,10 +274,7 @@ class UmlValidationTest {
         loadMutatedUmlUseCaseFixture(
             source -> relationshipById(source, "include-authentication").put("source", "customer"));
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class,
-            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+    UmlValidationException error = assertRejected(fixture);
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_RELATIONSHIP_ENDPOINT_UNSUPPORTED");
     assertThat(error.value()).isEqualTo("Include: Actor -> UseCase");
@@ -318,10 +288,7 @@ class UmlValidationTest {
             source ->
                 nodeUmlProperties(source, "payment-extension").put("use_case", "track-order"));
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class,
-            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+    UmlValidationException error = assertRejected(fixture);
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_RELATIONSHIP_PROPERTY_INVALID");
     assertThat(error.path()).isEqualTo("$.relationships[4].properties.uml.extension_point");
@@ -333,10 +300,7 @@ class UmlValidationTest {
         loadMutatedUmlUseCaseFixture(
             source -> nodeUmlProperties(source, "payment-extension").remove("use_case"));
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class,
-            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+    UmlValidationException error = assertRejected(fixture);
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
     assertThat(error.path()).isEqualTo("$.nodes[8].properties.uml.use_case");
@@ -348,10 +312,7 @@ class UmlValidationTest {
         loadMutatedUmlUseCaseFixture(
             source -> nodeUmlProperties(source, "place-order").put("subject", "customer"));
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class,
-            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+    UmlValidationException error = assertRejected(fixture);
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
     assertThat(error.path()).isEqualTo("$.nodes[3].properties.uml.subject");
@@ -365,10 +326,7 @@ class UmlValidationTest {
                 ((ArrayNode) source.at("/plugins/generic-graph/views/0/nodes"))
                     .add("order-service"));
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class,
-            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+    UmlValidationException error = assertRejected(fixture);
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_VIEW_KIND_UNSUPPORTED_ELEMENT");
     assertThat(error.value()).isEqualTo("Class in uml-use-case");
@@ -380,10 +338,7 @@ class UmlValidationTest {
         loadMutatedUmlStateMachineFixture(
             source -> nodeUmlProperties(source, "initial").put("kind", "unknownKind"));
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class,
-            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+    UmlValidationException error = assertRejected(fixture);
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
     assertThat(error.path()).contains("properties.uml.kind");
@@ -412,10 +367,7 @@ class UmlValidationTest {
               nodeUmlProperties(source, "fulfilled").put("region", "other-region");
             });
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class,
-            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+    UmlValidationException error = assertRejected(fixture);
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_RELATIONSHIP_PROPERTY_INVALID");
     assertThat(error.path()).contains("properties.uml.region");
@@ -427,10 +379,7 @@ class UmlValidationTest {
         loadMutatedUmlStateMachineFixture(
             source -> nodeUmlProperties(source, "fulfilled").remove("region"));
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class,
-            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+    UmlValidationException error = assertRejected(fixture);
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
     assertThat(error.path()).isEqualTo("$.nodes[6].properties.uml.region");
@@ -464,10 +413,7 @@ class UmlValidationTest {
                   .add("t-reopen");
             });
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class,
-            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+    UmlValidationException error = assertRejected(fixture);
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_RELATIONSHIP_ENDPOINT_UNSUPPORTED");
     assertThat(error.path()).contains("$.relationships[6]");
@@ -500,10 +446,7 @@ class UmlValidationTest {
             source ->
                 nodeUmlProperties(source, "cf-availability").put("operator", "unknownOperator"));
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class,
-            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+    UmlValidationException error = assertRejected(fixture);
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
     assertThat(error.path()).contains("properties.uml.operator");
@@ -520,10 +463,7 @@ class UmlValidationTest {
                     "op-coupon",
                     "op-in-stock"));
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class,
-            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+    UmlValidationException error = assertRejected(fixture);
 
     assertThat(error.path()).contains("properties.uml.operands");
   }
@@ -643,10 +583,7 @@ class UmlValidationTest {
                     "op-in-stock",
                     "op-coupon"));
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class,
-            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+    UmlValidationException error = assertRejected(fixture);
 
     assertThat(error.path()).contains("properties.uml.operands[1]");
   }
@@ -661,10 +598,7 @@ class UmlValidationTest {
                   .put("interaction", "interaction-return-order");
             });
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class,
-            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+    UmlValidationException error = assertRejected(fixture);
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
     assertThat(error.path()).isEqualTo("$.nodes[9].properties.uml.fragments[0]");
@@ -675,10 +609,7 @@ class UmlValidationTest {
     Fixture fixture =
         loadMutatedUmlSequenceFragmentsFixture(source -> removeViewNode(source, "op-backorder"));
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class,
-            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+    UmlValidationException error = assertRejected(fixture);
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
     assertThat(error.path()).isEqualTo("$.nodes[5].properties.uml.operands[1]");
@@ -689,10 +620,7 @@ class UmlValidationTest {
     Fixture fixture =
         loadMutatedUmlSequenceFragmentsFixture(source -> removeViewRelationship(source, "m5"));
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class,
-            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+    UmlValidationException error = assertRejected(fixture);
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
     assertThat(error.path()).isEqualTo("$.nodes[9].properties.uml.fragments[0]");
@@ -703,10 +631,7 @@ class UmlValidationTest {
     Fixture fixture =
         loadMutatedUmlSequenceFragmentsFixture(source -> removeViewNode(source, "cf-availability"));
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class,
-            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+    UmlValidationException error = assertRejected(fixture);
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
     assertThat(error.path()).isEqualTo("$.nodes[6].properties.uml.combined_fragment");
@@ -717,10 +642,7 @@ class UmlValidationTest {
     Fixture fixture =
         loadMutatedUmlSequenceFragmentsFixture(source -> removeViewNode(source, "inventory"));
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class,
-            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+    UmlValidationException error = assertRejected(fixture);
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
     assertThat(error.path()).isEqualTo("$.nodes[5].properties.uml.covered[2]");
@@ -747,10 +669,7 @@ class UmlValidationTest {
                   "op-availability-extra");
             });
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class,
-            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+    UmlValidationException error = assertRejected(fixture);
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
     assertThat(error.path()).isEqualTo("$.nodes[6].properties.uml.combined_fragment");
@@ -772,10 +691,7 @@ class UmlValidationTest {
               removeViewNode(source, "op-availability-hidden");
             });
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class,
-            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+    UmlValidationException error = assertRejected(fixture);
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
     assertThat(error.path()).isEqualTo("$.nodes[15].properties.uml.combined_fragment");
@@ -791,10 +707,7 @@ class UmlValidationTest {
                   .put("interaction", "interaction-return-order");
             });
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class,
-            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+    UmlValidationException error = assertRejected(fixture);
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
     assertThat(error.path()).isEqualTo("$.nodes[5].properties.uml.operands[0]");
@@ -809,10 +722,7 @@ class UmlValidationTest {
               nodeUmlProperties(source, "inventory").put("interaction", "interaction-return-order");
             });
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class,
-            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+    UmlValidationException error = assertRejected(fixture);
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
     assertThat(error.path()).isEqualTo("$.nodes[5].properties.uml.covered[2]");
@@ -828,10 +738,7 @@ class UmlValidationTest {
               replaceTextArray(nodeUmlProperties(source, "op-in-stock"), "fragments", "cf-coupon");
             });
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class,
-            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+    UmlValidationException error = assertRejected(fixture);
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
     assertThat(error.path()).isEqualTo("$.nodes[6].properties.uml.fragments[0]");
@@ -845,10 +752,7 @@ class UmlValidationTest {
                 replaceTextArray(
                     nodeUmlProperties(source, "op-in-stock"), "fragments", "cf-availability"));
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class,
-            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+    UmlValidationException error = assertRejected(fixture);
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
     assertThat(error.path()).isEqualTo("$.nodes[6].properties.uml.fragments[0]");
@@ -870,10 +774,7 @@ class UmlValidationTest {
                   "inventory");
             });
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class,
-            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+    UmlValidationException error = assertRejected(fixture);
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
     assertThat(error.path()).isEqualTo("$.nodes[6].properties.uml.fragments[0]");
@@ -886,10 +787,7 @@ class UmlValidationTest {
             source ->
                 replaceTextArray(nodeUmlProperties(source, "cf-coupon"), "covered", "customer"));
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class,
-            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+    UmlValidationException error = assertRejected(fixture);
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
     assertThat(error.path()).isEqualTo("$.nodes[9].properties.uml.fragments[0]");
@@ -904,10 +802,7 @@ class UmlValidationTest {
               replaceTextArray(nodeUmlProperties(source, "cf-availability"), "covered", "customer");
             });
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class,
-            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+    UmlValidationException error = assertRejected(fixture);
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
     assertThat(error.path()).isEqualTo("$.nodes[6].properties.uml.fragments[0]");
@@ -921,10 +816,7 @@ class UmlValidationTest {
                 replaceTextArray(
                     nodeUmlProperties(source, "op-in-stock"), "fragments", "m1", "m1"));
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class,
-            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+    UmlValidationException error = assertRejected(fixture);
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
     assertThat(error.path()).isEqualTo("$.nodes[6].properties.uml.fragments[1]");
@@ -965,10 +857,7 @@ class UmlValidationTest {
             source ->
                 replaceTextArray(nodeUmlProperties(source, "op-backorder"), "fragments", "m1"));
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class,
-            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+    UmlValidationException error = assertRejected(fixture);
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
     assertThat(error.path()).isEqualTo("$.nodes[7].properties.uml.fragments[0]");
@@ -983,10 +872,7 @@ class UmlValidationTest {
               replaceTextArray(nodeUmlProperties(source, "op-backorder"), "fragments", "cf-coupon");
             });
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class,
-            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+    UmlValidationException error = assertRejected(fixture);
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
     assertThat(error.path()).isEqualTo("$.nodes[7].properties.uml.fragments[0]");
@@ -998,10 +884,7 @@ class UmlValidationTest {
         loadMutatedUmlSequenceFragmentsFixture(
             source -> nodeUmlProperties(source, "op-in-stock").put("order", 0));
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class,
-            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+    UmlValidationException error = assertRejected(fixture);
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
     assertThat(error.path()).isEqualTo("$.nodes[6].properties.uml.order");
@@ -1013,10 +896,7 @@ class UmlValidationTest {
         loadMutatedUmlSequenceFragmentsFixture(
             source -> nodeUmlProperties(source, "op-backorder").put("order", 1));
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class,
-            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+    UmlValidationException error = assertRejected(fixture);
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
     assertThat(error.path()).isEqualTo("$.nodes[5].properties.uml.operands[1]");
@@ -1031,10 +911,7 @@ class UmlValidationTest {
               nodeUmlProperties(source, "op-backorder").put("order", 1);
             });
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class,
-            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+    UmlValidationException error = assertRejected(fixture);
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
     assertThat(error.path()).isEqualTo("$.nodes[5].properties.uml.operands[0]");
@@ -1046,10 +923,7 @@ class UmlValidationTest {
         loadMutatedUmlFixture(
             source -> relationshipById(source, "order-has-lines").put("type", "Wire"));
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class,
-            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+    UmlValidationException error = assertRejected(fixture);
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_RELATIONSHIP_TYPE_UNSUPPORTED");
     assertThat(error.path()).isEqualTo("$.relationships[0].type");
@@ -1063,10 +937,7 @@ class UmlValidationTest {
                 ((ObjectNode) nodeUmlProperties(source, "class-order").get("attributes").get(0))
                     .put("multiplicity", "2..1"));
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class,
-            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+    UmlValidationException error = assertRejected(fixture);
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_MULTIPLICITY_INVALID");
     assertThat(error.path()).isEqualTo("$.nodes[1].properties.uml.attributes[0].multiplicity");
@@ -1077,10 +948,7 @@ class UmlValidationTest {
     Fixture fixture =
         loadMutatedUmlUseCaseFixture(source -> removeViewNode(source, "support-agent"));
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class,
-            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+    UmlValidationException error = assertRejected(fixture);
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_RELATIONSHIP_ENDPOINT_UNSUPPORTED");
     assertThat(error.path()).isEqualTo("$.plugins.generic-graph.views[0].relationships[2]");
@@ -1091,10 +959,7 @@ class UmlValidationTest {
     Fixture fixture =
         loadMutatedUmlUseCaseFixture(source -> removeViewNode(source, "authenticate-customer"));
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class,
-            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+    UmlValidationException error = assertRejected(fixture);
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_RELATIONSHIP_ENDPOINT_UNSUPPORTED");
     assertThat(error.path()).isEqualTo("$.plugins.generic-graph.views[0].relationships[3]");
@@ -1105,10 +970,7 @@ class UmlValidationTest {
     Fixture fixture =
         loadMutatedUmlUseCaseFixture(source -> removeViewNode(source, "apply-discount"));
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class,
-            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+    UmlValidationException error = assertRejected(fixture);
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_RELATIONSHIP_ENDPOINT_UNSUPPORTED");
     assertThat(error.path()).isEqualTo("$.plugins.generic-graph.views[0].relationships[4]");
@@ -1121,10 +983,7 @@ class UmlValidationTest {
             source ->
                 relationshipById(source, "customer-place-order").put("target", "support-agent"));
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class,
-            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+    UmlValidationException error = assertRejected(fixture);
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_RELATIONSHIP_ENDPOINT_UNSUPPORTED");
     assertThat(error.value()).isEqualTo("Association: Actor -> Actor");
@@ -1136,10 +995,7 @@ class UmlValidationTest {
         loadMutatedUmlUseCaseFixture(
             source -> nodeUmlProperties(source, "payment-extension").put("use_case", "customer"));
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class,
-            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+    UmlValidationException error = assertRejected(fixture);
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
     assertThat(error.path()).isEqualTo("$.nodes[8].properties.uml.use_case");
@@ -1150,10 +1006,7 @@ class UmlValidationTest {
     Fixture fixture =
         loadMutatedUmlComponentFixture(source -> removeViewNode(source, "class-order-controller"));
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class,
-            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+    UmlValidationException error = assertRejected(fixture);
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_RELATIONSHIP_ENDPOINT_UNSUPPORTED");
     assertThat(error.path()).isEqualTo("$.plugins.generic-graph.views[0].relationships[3]");
@@ -1167,10 +1020,7 @@ class UmlValidationTest {
                 relationshipById(source, "order-api-uses-payment")
                     .put("source", "interface-order-api"));
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class,
-            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+    UmlValidationException error = assertRejected(fixture);
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_RELATIONSHIP_ENDPOINT_UNSUPPORTED");
     assertThat(error.value()).isEqualTo("Usage: Interface -> Interface");
@@ -1183,10 +1033,7 @@ class UmlValidationTest {
             source ->
                 nodeUmlProperties(source, "port-rest-api").put("component", "interface-order-api"));
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class,
-            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+    UmlValidationException error = assertRejected(fixture);
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
     assertThat(error.path()).isEqualTo("$.nodes[2].properties.uml.component");
@@ -1205,10 +1052,7 @@ class UmlValidationTest {
               ((ArrayNode) source.at("/plugins/generic-graph/views/0/nodes")).add("device-host");
             });
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class,
-            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+    UmlValidationException error = assertRejected(fixture);
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_VIEW_KIND_UNSUPPORTED_ELEMENT");
     assertThat(error.path()).isEqualTo("$.plugins.generic-graph.views[0].nodes[7]");
@@ -1227,10 +1071,7 @@ class UmlValidationTest {
               ((ArrayNode) source.at("/plugins/generic-graph/views/0/nodes")).add("field-operator");
             });
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class,
-            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+    UmlValidationException error = assertRejected(fixture);
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_VIEW_KIND_UNSUPPORTED_ELEMENT");
     assertThat(error.path()).isEqualTo("$.plugins.generic-graph.views[0].nodes[7]");
@@ -1241,10 +1082,7 @@ class UmlValidationTest {
     Fixture fixture =
         loadMutatedUmlDeploymentFixture(source -> removeViewNode(source, "deployment-spec-orders"));
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class,
-            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+    UmlValidationException error = assertRejected(fixture);
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_RELATIONSHIP_ENDPOINT_UNSUPPORTED");
     assertThat(error.path()).isEqualTo("$.plugins.generic-graph.views[0].relationships[1]");
@@ -1255,10 +1093,7 @@ class UmlValidationTest {
     Fixture fixture =
         loadMutatedUmlDeploymentFixture(source -> removeViewNode(source, "component-order-api"));
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class,
-            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+    UmlValidationException error = assertRejected(fixture);
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_RELATIONSHIP_ENDPOINT_UNSUPPORTED");
     assertThat(error.path()).isEqualTo("$.plugins.generic-graph.views[0].relationships[2]");
@@ -1270,10 +1105,7 @@ class UmlValidationTest {
         loadMutatedUmlStateMachineFixture(
             source -> nodeUmlProperties(source, "main-region").put("state_machine", "draft"));
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class,
-            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+    UmlValidationException error = assertRejected(fixture);
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
     assertThat(error.path()).isEqualTo("$.nodes[1].properties.uml.state_machine");
@@ -1297,9 +1129,7 @@ class UmlValidationTest {
             fixture.source().relationships(),
             fixture.source().plugins());
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class, () -> Uml.validateSource(source, fixture.pluginData()));
+    UmlValidationException error = assertRejected(source, fixture.pluginData());
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_TYPE_UNSUPPORTED");
     assertThat(error.path()).isEqualTo("$.nodes[0].type");
@@ -1341,9 +1171,7 @@ class UmlValidationTest {
             view.groups()));
     var data = new GenericGraphPluginData(fixture.pluginData().semanticProfile(), views);
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class, () -> Uml.validateSource(fixture.source(), data));
+    UmlValidationException error = assertRejected(fixture.source(), data);
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_VIEW_KIND_UNSUPPORTED_ELEMENT");
   }
@@ -1365,9 +1193,7 @@ class UmlValidationTest {
             view.groups()));
     var data = new GenericGraphPluginData(fixture.pluginData().semanticProfile(), views);
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class, () -> Uml.validateSource(fixture.source(), data));
+    UmlValidationException error = assertRejected(fixture.source(), data);
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_VIEW_KIND_UNSUPPORTED_ELEMENT");
     assertThat(error.value()).isEqualTo("Package in uml-sequence");
@@ -1392,9 +1218,7 @@ class UmlValidationTest {
             fixture.source().relationships(),
             fixture.source().plugins());
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class, () -> Uml.validateSource(source, fixture.pluginData()));
+    UmlValidationException error = assertRejected(source, fixture.pluginData());
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_RELATIONSHIP_ENDPOINT_UNSUPPORTED");
     assertThat(error.value()).isEqualTo("Message: Lifeline -> Class");
@@ -1407,10 +1231,7 @@ class UmlValidationTest {
         loadMutatedUmlSequenceFixture(
             source -> firstMessageUmlProperties(source).remove("sequence"));
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class,
-            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+    UmlValidationException error = assertRejected(fixture);
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_RELATIONSHIP_PROPERTY_INVALID");
     assertThat(error.value()).isEqualTo("Message.sequence");
@@ -1423,10 +1244,7 @@ class UmlValidationTest {
         loadMutatedUmlSequenceFixture(
             source -> firstMessageProperties(source).put("uml", "not-an-object"));
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class,
-            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+    UmlValidationException error = assertRejected(fixture);
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_RELATIONSHIP_PROPERTY_INVALID");
     assertThat(error.value()).isEqualTo("Message.sequence");
@@ -1439,10 +1257,7 @@ class UmlValidationTest {
         loadMutatedUmlSequenceFixture(
             source -> firstMessageUmlProperties(source).put("sequence", 0));
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class,
-            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+    UmlValidationException error = assertRejected(fixture);
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_RELATIONSHIP_PROPERTY_INVALID");
     assertThat(error.value()).isEqualTo("0");
@@ -1455,10 +1270,7 @@ class UmlValidationTest {
         loadMutatedUmlSequenceFixture(
             source -> firstMessageUmlProperties(source).put("sequence", 1.5));
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class,
-            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+    UmlValidationException error = assertRejected(fixture);
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_RELATIONSHIP_PROPERTY_INVALID");
     assertThat(error.value()).isEqualTo("1.5");
@@ -1471,10 +1283,7 @@ class UmlValidationTest {
         loadMutatedUmlSequenceFixture(
             source -> firstMessageUmlProperties(source).set("sequence", NullNode.getInstance()));
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class,
-            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+    UmlValidationException error = assertRejected(fixture);
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_RELATIONSHIP_PROPERTY_INVALID");
     assertThat(error.value()).isEqualTo("null");
@@ -1487,10 +1296,7 @@ class UmlValidationTest {
         loadMutatedUmlSequenceFixture(
             source -> relationshipUmlProperties(source, "m2").put("sequence", 1));
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class,
-            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+    UmlValidationException error = assertRejected(fixture);
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_RELATIONSHIP_PROPERTY_INVALID");
     assertThat(error.value()).isEqualTo("Message.sequence");
@@ -1528,10 +1334,7 @@ class UmlValidationTest {
         loadMutatedUmlSequenceFixture(
             source -> firstMessageUmlProperties(source).put("message_sort", "lostMessage"));
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class,
-            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+    UmlValidationException error = assertRejected(fixture);
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_RELATIONSHIP_PROPERTY_INVALID");
     assertThat(error.value()).isEqualTo("lostMessage");
@@ -1544,10 +1347,7 @@ class UmlValidationTest {
         loadMutatedUmlSequenceFixture(
             source -> firstMessageUmlProperties(source).put("message_sort", 1));
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class,
-            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+    UmlValidationException error = assertRejected(fixture);
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_RELATIONSHIP_PROPERTY_INVALID");
     assertThat(error.value()).isEqualTo("1");
@@ -1747,13 +1547,20 @@ class UmlValidationTest {
       Consumer<ObjectNode> mutate, String expectedPath) throws Exception {
     Fixture fixture = loadMutatedUmlSequenceFragmentsFixture(mutate);
 
-    UmlValidationException error =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            UmlValidationException.class,
-            () -> Uml.validateSource(fixture.source(), fixture.pluginData()));
+    UmlValidationException error = assertRejected(fixture);
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
     assertThat(error.path()).isEqualTo(expectedPath);
+  }
+
+  private static UmlValidationException assertRejected(Fixture fixture) {
+    return assertRejected(fixture.source(), fixture.pluginData());
+  }
+
+  private static UmlValidationException assertRejected(
+      SourceDocument source, GenericGraphPluginData data) {
+    return org.junit.jupiter.api.Assertions.assertThrows(
+        UmlValidationException.class, () -> Uml.validateSource(source, data));
   }
 
   private static ObjectNode firstMessageUmlProperties(ObjectNode source) {

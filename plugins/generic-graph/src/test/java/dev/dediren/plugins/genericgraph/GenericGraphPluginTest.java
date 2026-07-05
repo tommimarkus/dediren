@@ -545,12 +545,9 @@ class GenericGraphPluginTest {
     assertThat(jsonTexts(layoutRequestGroup(data, "main-region-frame").get("members")))
         .containsExactly(
             "initial", "draft", "submitted", "payment-choice", "fulfilled", "closed", "rejected");
-    assertThat(layoutRequestNode(data, "draft").at("/width_hint").asDouble()).isEqualTo(150.0);
-    assertThat(layoutRequestNode(data, "draft").at("/height_hint").asDouble()).isEqualTo(72.0);
-    assertThat(layoutRequestNode(data, "initial").at("/width_hint").asDouble()).isEqualTo(36.0);
-    assertThat(layoutRequestNode(data, "initial").at("/height_hint").asDouble()).isEqualTo(36.0);
-    assertThat(layoutRequestNode(data, "closed").at("/width_hint").asDouble()).isEqualTo(36.0);
-    assertThat(layoutRequestNode(data, "closed").at("/height_hint").asDouble()).isEqualTo(36.0);
+    assertNodeSize(data, "draft", 150.0, 72.0);
+    assertNodeSize(data, "initial", 36.0, 36.0);
+    assertNodeSize(data, "closed", 36.0, 36.0);
     assertSchemaValid("schemas/layout-request.schema.json", data);
   }
 
@@ -610,16 +607,9 @@ class GenericGraphPluginTest {
             "apply-discount",
             "cancel-order",
             "payment-extension");
-    assertThat(layoutRequestNode(data, "customer").at("/width_hint").asDouble()).isEqualTo(80.0);
-    assertThat(layoutRequestNode(data, "customer").at("/height_hint").asDouble()).isEqualTo(120.0);
-    assertThat(layoutRequestNode(data, "place-order").at("/width_hint").asDouble())
-        .isEqualTo(160.0);
-    assertThat(layoutRequestNode(data, "place-order").at("/height_hint").asDouble())
-        .isEqualTo(72.0);
-    assertThat(layoutRequestNode(data, "payment-extension").at("/width_hint").asDouble())
-        .isEqualTo(140.0);
-    assertThat(layoutRequestNode(data, "payment-extension").at("/height_hint").asDouble())
-        .isEqualTo(40.0);
+    assertNodeSize(data, "customer", 80.0, 120.0);
+    assertNodeSize(data, "place-order", 160.0, 72.0);
+    assertNodeSize(data, "payment-extension", 140.0, 40.0);
     assertSchemaValid("schemas/layout-request.schema.json", data);
   }
 
@@ -685,14 +675,8 @@ class GenericGraphPluginTest {
             "class-order-controller");
     assertThat(jsonTexts(layoutRequestGroup(data, "order-api-boundary").get("members")))
         .containsExactly("component-order-api", "port-rest-api");
-    assertThat(layoutRequestNode(data, "component-order-api").at("/width_hint").asDouble())
-        .isEqualTo(180.0);
-    assertThat(layoutRequestNode(data, "component-order-api").at("/height_hint").asDouble())
-        .isEqualTo(96.0);
-    assertThat(layoutRequestNode(data, "port-rest-api").at("/width_hint").asDouble())
-        .isEqualTo(32.0);
-    assertThat(layoutRequestNode(data, "port-rest-api").at("/height_hint").asDouble())
-        .isEqualTo(32.0);
+    assertNodeSize(data, "component-order-api", 180.0, 96.0);
+    assertNodeSize(data, "port-rest-api", 32.0, 32.0);
     assertSchemaValid("schemas/layout-request.schema.json", data);
   }
 
@@ -754,22 +738,10 @@ class GenericGraphPluginTest {
             "artifact-orders-service",
             "artifact-migration-job",
             "deployment-spec-orders");
-    assertThat(layoutRequestNode(data, "device-prod-node").at("/width_hint").asDouble())
-        .isEqualTo(200.0);
-    assertThat(layoutRequestNode(data, "device-prod-node").at("/height_hint").asDouble())
-        .isEqualTo(120.0);
-    assertThat(layoutRequestNode(data, "ee-orders-runtime").at("/width_hint").asDouble())
-        .isEqualTo(180.0);
-    assertThat(layoutRequestNode(data, "ee-orders-runtime").at("/height_hint").asDouble())
-        .isEqualTo(96.0);
-    assertThat(layoutRequestNode(data, "artifact-orders-service").at("/width_hint").asDouble())
-        .isEqualTo(150.0);
-    assertThat(layoutRequestNode(data, "artifact-orders-service").at("/height_hint").asDouble())
-        .isEqualTo(70.0);
-    assertThat(layoutRequestNode(data, "deployment-spec-orders").at("/width_hint").asDouble())
-        .isEqualTo(190.0);
-    assertThat(layoutRequestNode(data, "deployment-spec-orders").at("/height_hint").asDouble())
-        .isEqualTo(70.0);
+    assertNodeSize(data, "device-prod-node", 200.0, 120.0);
+    assertNodeSize(data, "ee-orders-runtime", 180.0, 96.0);
+    assertNodeSize(data, "artifact-orders-service", 150.0, 70.0);
+    assertNodeSize(data, "deployment-spec-orders", 190.0, 70.0);
     assertSchemaValid("schemas/layout-request.schema.json", data);
   }
 
@@ -939,22 +911,11 @@ class GenericGraphPluginTest {
 
     JsonNode data = okData(result);
 
-    assertThat(layoutRequestNode(data, "interaction-place-order").at("/width_hint").asDouble())
-        .isEqualTo(360.0);
-    assertThat(layoutRequestNode(data, "interaction-place-order").at("/height_hint").asDouble())
-        .isEqualTo(260.0);
-    assertThat(layoutRequestNode(data, "customer").at("/width_hint").asDouble()).isEqualTo(140.0);
-    assertThat(layoutRequestNode(data, "customer").at("/height_hint").asDouble()).isEqualTo(48.0);
-    assertThat(layoutRequestNode(data, "service-execution").at("/width_hint").asDouble())
-        .isEqualTo(16.0);
-    assertThat(layoutRequestNode(data, "service-execution").at("/height_hint").asDouble())
-        .isEqualTo(72.0);
-    assertThat(layoutRequestNode(data, "entry-gate").at("/width_hint").asDouble()).isEqualTo(24.0);
-    assertThat(layoutRequestNode(data, "entry-gate").at("/height_hint").asDouble()).isEqualTo(24.0);
-    assertThat(layoutRequestNode(data, "service-destroyed").at("/width_hint").asDouble())
-        .isEqualTo(24.0);
-    assertThat(layoutRequestNode(data, "service-destroyed").at("/height_hint").asDouble())
-        .isEqualTo(24.0);
+    assertNodeSize(data, "interaction-place-order", 360.0, 260.0);
+    assertNodeSize(data, "customer", 140.0, 48.0);
+    assertNodeSize(data, "service-execution", 16.0, 72.0);
+    assertNodeSize(data, "entry-gate", 24.0, 24.0);
+    assertNodeSize(data, "service-destroyed", 24.0, 24.0);
     assertSchemaValid("schemas/layout-request.schema.json", data);
   }
 
@@ -966,10 +927,8 @@ class GenericGraphPluginTest {
             fixture("fixtures/source/valid-uml-basic.json"));
 
     JsonNode data = okData(result);
-    JsonNode initial = layoutRequestNode(data, "initial-submit");
 
-    assertThat(initial.at("/width_hint").asDouble()).isEqualTo(32.0);
-    assertThat(initial.at("/height_hint").asDouble()).isEqualTo(32.0);
+    assertNodeSize(data, "initial-submit", 32.0, 32.0);
     assertSchemaValid("schemas/layout-request.schema.json", data);
   }
 
@@ -982,16 +941,10 @@ class GenericGraphPluginTest {
 
     JsonNode data = okData(result);
 
-    assertThat(layoutRequestNode(data, "class-order").at("/width_hint").asDouble())
-        .isEqualTo(300.0);
-    assertThat(layoutRequestNode(data, "class-order").at("/height_hint").asDouble())
-        .isEqualTo(190.0);
+    assertNodeSize(data, "class-order", 300.0, 190.0);
     assertThat(layoutRequestNode(data, "class-shipment").at("/height_hint").asDouble())
         .isEqualTo(130.0);
-    assertThat(layoutRequestNode(data, "interface-payment-gateway").at("/width_hint").asDouble())
-        .isEqualTo(380.0);
-    assertThat(layoutRequestNode(data, "interface-payment-gateway").at("/height_hint").asDouble())
-        .isEqualTo(120.0);
+    assertNodeSize(data, "interface-payment-gateway", 380.0, 120.0);
   }
 
   @Test
@@ -1125,10 +1078,7 @@ class GenericGraphPluginTest {
                 }
                 """);
 
-    JsonNode junction = layoutRequestNode(okData(result), "flow-junction");
-
-    assertThat(junction.at("/width_hint").asDouble()).isEqualTo(28.0);
-    assertThat(junction.at("/height_hint").asDouble()).isEqualTo(28.0);
+    assertNodeSize(okData(result), "flow-junction", 28.0, 28.0);
   }
 
   @Test
@@ -1178,10 +1128,7 @@ class GenericGraphPluginTest {
     assertThat(shortWidth).isEqualTo(160.0);
     assertThat(shortHeight).isEqualTo(80.0);
     assertThat(longWidth).isGreaterThan(shortWidth);
-    assertThat(layoutRequestNode(data, "flow-junction").at("/width_hint").asDouble())
-        .isEqualTo(28.0);
-    assertThat(layoutRequestNode(data, "flow-junction").at("/height_hint").asDouble())
-        .isEqualTo(28.0);
+    assertNodeSize(data, "flow-junction", 28.0, 28.0);
     assertThat(longHeight).isGreaterThan(shortHeight);
     assertThat(longWidth).isEqualTo(190.0);
     assertThat(longHeight).isEqualTo(100.0);
@@ -1414,18 +1361,10 @@ class GenericGraphPluginTest {
 
   @Test
   void rejectsInvalidArchimateRelationshipEndpointForRenderMetadata() throws Exception {
-    JsonNode source = archimateSource();
-    ((tools.jackson.databind.node.ObjectNode) source.at("/nodes/0"))
-        .put("type", "ApplicationService");
-    ((tools.jackson.databind.node.ObjectNode) source.at("/nodes/1"))
-        .put("type", "ApplicationComponent");
-    ((tools.jackson.databind.node.ObjectNode) source.at("/relationships/0"))
-        .put("type", "Realization");
-
     PluginResult result =
         Main.executeForTesting(
             new String[] {"project", "--target", "render-metadata", "--view", "main"},
-            JsonSupport.objectMapper().writeValueAsString(source));
+            archimateMismatchedRelationshipEndpointSource());
 
     assertThat(result.exitCode()).isEqualTo(3);
     assertErrorCode(result, "DEDIREN_ARCHIMATE_RELATIONSHIP_ENDPOINT_UNSUPPORTED");
@@ -1435,18 +1374,10 @@ class GenericGraphPluginTest {
 
   @Test
   void rejectsInvalidArchimateRelationshipEndpointForSemanticValidation() throws Exception {
-    JsonNode source = archimateSource();
-    ((tools.jackson.databind.node.ObjectNode) source.at("/nodes/0"))
-        .put("type", "ApplicationService");
-    ((tools.jackson.databind.node.ObjectNode) source.at("/nodes/1"))
-        .put("type", "ApplicationComponent");
-    ((tools.jackson.databind.node.ObjectNode) source.at("/relationships/0"))
-        .put("type", "Realization");
-
     PluginResult result =
         Main.executeForTesting(
             new String[] {"validate", "--profile", "archimate"},
-            JsonSupport.objectMapper().writeValueAsString(source));
+            archimateMismatchedRelationshipEndpointSource());
 
     assertThat(result.exitCode()).isEqualTo(3);
     assertErrorCode(result, "DEDIREN_ARCHIMATE_RELATIONSHIP_ENDPOINT_UNSUPPORTED");
@@ -1482,6 +1413,12 @@ class GenericGraphPluginTest {
 
   private static void assertSchemaValid(String schemaPath, JsonNode data) {
     SchemaAssertions.assertSchemaValid(workspaceRoot(), schemaPath, data);
+  }
+
+  private static void assertNodeSize(JsonNode data, String nodeId, double width, double height) {
+    JsonNode node = layoutRequestNode(data, nodeId);
+    assertThat(node.at("/width_hint").asDouble()).isEqualTo(width);
+    assertThat(node.at("/height_hint").asDouble()).isEqualTo(height);
   }
 
   private static JsonNode layoutRequestNode(JsonNode data, String nodeId) {
@@ -1740,6 +1677,17 @@ class GenericGraphPluginTest {
                   }
                 }
                 """);
+  }
+
+  private static String archimateMismatchedRelationshipEndpointSource() throws Exception {
+    JsonNode source = archimateSource();
+    ((tools.jackson.databind.node.ObjectNode) source.at("/nodes/0"))
+        .put("type", "ApplicationService");
+    ((tools.jackson.databind.node.ObjectNode) source.at("/nodes/1"))
+        .put("type", "ApplicationComponent");
+    ((tools.jackson.databind.node.ObjectNode) source.at("/relationships/0"))
+        .put("type", "Realization");
+    return JsonSupport.objectMapper().writeValueAsString(source);
   }
 
   private static Path workspaceRoot() {

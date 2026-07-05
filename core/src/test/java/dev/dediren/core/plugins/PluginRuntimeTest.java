@@ -9,8 +9,10 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.api.parallel.Isolated;
@@ -28,10 +30,8 @@ class PluginRuntimeTest {
     writeManifest(
         temp, "runtime-testbed", temp.resolve("missing-binary").toString(), List.of("render"));
 
-    assertThatThrownBy(() -> runWithMode("ok", "render", List.of("render")))
-        .isInstanceOf(PluginExecutionException.class)
-        .extracting(error -> ((PluginExecutionException) error).diagnostic().code())
-        .isEqualTo("DEDIREN_PLUGIN_MISSING_EXECUTABLE");
+    assertPluginErrorCode(
+        () -> runWithMode("ok", "render", List.of("render")), "DEDIREN_PLUGIN_MISSING_EXECUTABLE");
   }
 
   @Test
@@ -43,30 +43,27 @@ class PluginRuntimeTest {
     Files.writeString(plainFile, "#!/bin/sh\nexit 0\n");
     writeManifest(temp, "runtime-testbed", plainFile.toString(), List.of("render"));
 
-    assertThatThrownBy(() -> runWithMode("ok", "render", List.of("render")))
-        .isInstanceOf(PluginExecutionException.class)
-        .extracting(error -> ((PluginExecutionException) error).diagnostic().code())
-        .isEqualTo(DiagnosticCode.PLUGIN_IO_ERROR.code());
+    assertPluginErrorCode(
+        () -> runWithMode("ok", "render", List.of("render")),
+        DiagnosticCode.PLUGIN_IO_ERROR.code());
   }
 
   @Test
   void unsupportedCapabilityIsRejectedBeforeCommandExecution() throws Exception {
     writeManifest(temp, "runtime-testbed", testbedExecutable().toString(), List.of("render"));
 
-    assertThatThrownBy(() -> runWithMode("ok", "layout", List.of("layout")))
-        .isInstanceOf(PluginExecutionException.class)
-        .extracting(error -> ((PluginExecutionException) error).diagnostic().code())
-        .isEqualTo("DEDIREN_PLUGIN_UNSUPPORTED_CAPABILITY");
+    assertPluginErrorCode(
+        () -> runWithMode("ok", "layout", List.of("layout")),
+        "DEDIREN_PLUGIN_UNSUPPORTED_CAPABILITY");
   }
 
   @Test
   void invalidRuntimeCapabilityJsonIsStructured() throws Exception {
     writeManifest(temp, "runtime-testbed", testbedExecutable().toString(), List.of("render"));
 
-    assertThatThrownBy(() -> runWithMode("capabilities-invalid-json", "render", List.of("render")))
-        .isInstanceOf(PluginExecutionException.class)
-        .extracting(error -> ((PluginExecutionException) error).diagnostic().code())
-        .isEqualTo("DEDIREN_PLUGIN_CAPABILITY_INVALID_JSON");
+    assertPluginErrorCode(
+        () -> runWithMode("capabilities-invalid-json", "render", List.of("render")),
+        "DEDIREN_PLUGIN_CAPABILITY_INVALID_JSON");
   }
 
   @Test
@@ -76,18 +73,16 @@ class PluginRuntimeTest {
         PluginRunOptions.defaults()
             .withCandidateEnv(Map.of("DEDIREN_TEST_PLUGIN_ID", "different-plugin"));
 
-    assertThatThrownBy(
-            () ->
-                PluginRunner.runForCapabilityWithRegistry(
-                    PluginRegistry.fromDirs(List.of(temp)),
-                    "runtime-testbed",
-                    "render",
-                    List.of("render"),
-                    "{}",
-                    options))
-        .isInstanceOf(PluginExecutionException.class)
-        .extracting(error -> ((PluginExecutionException) error).diagnostic().code())
-        .isEqualTo("DEDIREN_PLUGIN_ID_MISMATCH");
+    assertPluginErrorCode(
+        () ->
+            PluginRunner.runForCapabilityWithRegistry(
+                PluginRegistry.fromDirs(List.of(temp)),
+                "runtime-testbed",
+                "render",
+                List.of("render"),
+                "{}",
+                options),
+        "DEDIREN_PLUGIN_ID_MISMATCH");
   }
 
   @Test
@@ -97,40 +92,36 @@ class PluginRuntimeTest {
     // This is the path a missing runtime dependency (e.g. ELK without Java) takes.
     writeManifest(temp, "runtime-testbed", testbedExecutable().toString(), List.of("render"));
 
-    assertThatThrownBy(() -> runWithMode("capabilities-nonzero", "render", List.of("render")))
-        .isInstanceOf(PluginExecutionException.class)
-        .extracting(error -> ((PluginExecutionException) error).diagnostic().code())
-        .isEqualTo("DEDIREN_PLUGIN_CAPABILITY_PROBE_FAILED");
+    assertPluginErrorCode(
+        () -> runWithMode("capabilities-nonzero", "render", List.of("render")),
+        "DEDIREN_PLUGIN_CAPABILITY_PROBE_FAILED");
   }
 
   @Test
   void invalidSuccessOutputIsStructured() throws Exception {
     writeManifest(temp, "runtime-testbed", testbedExecutable().toString(), List.of("render"));
 
-    assertThatThrownBy(() -> runWithMode("invalid-json", "render", List.of("render")))
-        .isInstanceOf(PluginExecutionException.class)
-        .extracting(error -> ((PluginExecutionException) error).diagnostic().code())
-        .isEqualTo("DEDIREN_PLUGIN_OUTPUT_INVALID_JSON");
+    assertPluginErrorCode(
+        () -> runWithMode("invalid-json", "render", List.of("render")),
+        "DEDIREN_PLUGIN_OUTPUT_INVALID_JSON");
   }
 
   @Test
   void invalidSuccessEnvelopeIsStructured() throws Exception {
     writeManifest(temp, "runtime-testbed", testbedExecutable().toString(), List.of("render"));
 
-    assertThatThrownBy(() -> runWithMode("invalid-envelope", "render", List.of("render")))
-        .isInstanceOf(PluginExecutionException.class)
-        .extracting(error -> ((PluginExecutionException) error).diagnostic().code())
-        .isEqualTo("DEDIREN_PLUGIN_OUTPUT_INVALID_ENVELOPE");
+    assertPluginErrorCode(
+        () -> runWithMode("invalid-envelope", "render", List.of("render")),
+        "DEDIREN_PLUGIN_OUTPUT_INVALID_ENVELOPE");
   }
 
   @Test
   void successfulPluginDataMustMatchCapabilitySchema() throws Exception {
     writeManifest(temp, "runtime-testbed", testbedExecutable().toString(), List.of("render"));
 
-    assertThatThrownBy(() -> runWithMode("invalid-data", "render", List.of("render")))
-        .isInstanceOf(PluginExecutionException.class)
-        .extracting(error -> ((PluginExecutionException) error).diagnostic().code())
-        .isEqualTo("DEDIREN_PLUGIN_OUTPUT_INVALID_DATA");
+    assertPluginErrorCode(
+        () -> runWithMode("invalid-data", "render", List.of("render")),
+        "DEDIREN_PLUGIN_OUTPUT_INVALID_DATA");
   }
 
   @Test
@@ -168,18 +159,16 @@ class PluginRuntimeTest {
                     "DEDIREN_TEST_PLUGIN_CAPABILITIES", "export",
                     "DEDIREN_TEST_PLUGIN_ARTIFACT_KIND", "ticket-stats+json"));
 
-    assertThatThrownBy(
-            () ->
-                PluginRunner.runForCapabilityWithRegistry(
-                    PluginRegistry.fromDirs(List.of(temp), List.of(temp)),
-                    "runtime-testbed",
-                    "export",
-                    List.of("export"),
-                    "{}",
-                    options))
-        .isInstanceOf(PluginExecutionException.class)
-        .extracting(error -> ((PluginExecutionException) error).diagnostic().code())
-        .isEqualTo("DEDIREN_PLUGIN_OUTPUT_INVALID_DATA");
+    assertPluginErrorCode(
+        () ->
+            PluginRunner.runForCapabilityWithRegistry(
+                PluginRegistry.fromDirs(List.of(temp), List.of(temp)),
+                "runtime-testbed",
+                "export",
+                List.of("export"),
+                "{}",
+                options),
+        "DEDIREN_PLUGIN_OUTPUT_INVALID_DATA");
   }
 
   @ParameterizedTest
@@ -205,18 +194,16 @@ class PluginRuntimeTest {
                     "DEDIREN_TEST_PLUGIN_ARTIFACT_KIND",
                     artifactKind));
 
-    assertThatThrownBy(
-            () ->
-                PluginRunner.runForCapabilityWithRegistry(
-                    PluginRegistry.fromDirs(List.of(temp)),
-                    "runtime-testbed",
-                    "export",
-                    List.of("export"),
-                    "{}",
-                    options))
-        .isInstanceOf(PluginExecutionException.class)
-        .extracting(error -> ((PluginExecutionException) error).diagnostic().code())
-        .isEqualTo("DEDIREN_PLUGIN_OUTPUT_INVALID_DATA");
+    assertPluginErrorCode(
+        () ->
+            PluginRunner.runForCapabilityWithRegistry(
+                PluginRegistry.fromDirs(List.of(temp)),
+                "runtime-testbed",
+                "export",
+                List.of("export"),
+                "{}",
+                options),
+        "DEDIREN_PLUGIN_OUTPUT_INVALID_DATA");
   }
 
   @Test
@@ -365,16 +352,14 @@ class PluginRuntimeTest {
     writePermissiveSchemas(schemas, "model.schema.json", "plugin-manifest.schema.json");
     writeManifest(
         plugins, "runtime-testbed", testbedExecutable().toString(), List.of("render"), List.of());
-    String originalUserDir = System.getProperty("user.dir");
-    System.setProperty("user.dir", bundleRoot.toString());
-    try {
-      LoadedPluginManifest manifest = PluginRegistry.bundled().loadManifest("runtime-testbed");
+    withSystemProperties(
+        Map.of("user.dir", bundleRoot.toString()),
+        () -> {
+          LoadedPluginManifest manifest = PluginRegistry.bundled().loadManifest("runtime-testbed");
 
-      assertThat(manifest.manifest().id()).isEqualTo("runtime-testbed");
-      assertThat(manifest.path()).isEqualTo(plugins.resolve("runtime-testbed.manifest.json"));
-    } finally {
-      System.setProperty("user.dir", originalUserDir);
-    }
+          assertThat(manifest.manifest().id()).isEqualTo("runtime-testbed");
+          assertThat(manifest.path()).isEqualTo(plugins.resolve("runtime-testbed.manifest.json"));
+        });
   }
 
   @Test
@@ -393,18 +378,17 @@ class PluginRuntimeTest {
         testbedExecutable().toString(),
         List.of("render"),
         List.of());
-    String originalBundleRoot = System.getProperty("dediren.bundle.root");
-    System.setProperty("dediren.bundle.root", bundleRoot.toString());
-    try {
-      PluginRegistry registry =
-          PluginRegistry.bundled(Map.of("DEDIREN_PLUGIN_DIRS", configured.toString()));
-      LoadedPluginManifest manifest = registry.loadManifest("runtime-testbed");
+    withSystemProperties(
+        Map.of("dediren.bundle.root", bundleRoot.toString()),
+        () -> {
+          PluginRegistry registry =
+              PluginRegistry.bundled(Map.of("DEDIREN_PLUGIN_DIRS", configured.toString()));
+          LoadedPluginManifest manifest = registry.loadManifest("runtime-testbed");
 
-      assertThat(manifest.path()).isEqualTo(configured.resolve("runtime-testbed.manifest.json"));
-      assertThat(manifest.trusted()).isFalse();
-    } finally {
-      restoreProperty("dediren.bundle.root", originalBundleRoot);
-    }
+          assertThat(manifest.path())
+              .isEqualTo(configured.resolve("runtime-testbed.manifest.json"));
+          assertThat(manifest.trusted()).isFalse();
+        });
   }
 
   @Test
@@ -426,22 +410,17 @@ class PluginRuntimeTest {
         testbedExecutable().toString(),
         List.of("export"),
         List.of());
-    String originalUserDir = System.getProperty("user.dir");
-    String originalBundleRoot = System.getProperty("dediren.bundle.root");
-    System.setProperty("user.dir", project.toString());
-    System.setProperty("dediren.bundle.root", bundleRoot.toString());
-    try {
-      LoadedPluginManifest manifest =
-          PluginRegistry.bundled(Map.of("DEDIREN_ALLOW_PROJECT_PLUGINS", "1"))
-              .loadManifest("runtime-testbed");
+    withSystemProperties(
+        Map.of("user.dir", project.toString(), "dediren.bundle.root", bundleRoot.toString()),
+        () -> {
+          LoadedPluginManifest manifest =
+              PluginRegistry.bundled(Map.of("DEDIREN_ALLOW_PROJECT_PLUGINS", "1"))
+                  .loadManifest("runtime-testbed");
 
-      assertThat(manifest.path())
-          .isEqualTo(projectPlugins.resolve("runtime-testbed.manifest.json"));
-      assertThat(manifest.trusted()).isFalse();
-    } finally {
-      restoreProperty("user.dir", originalUserDir);
-      restoreProperty("dediren.bundle.root", originalBundleRoot);
-    }
+          assertThat(manifest.path())
+              .isEqualTo(projectPlugins.resolve("runtime-testbed.manifest.json"));
+          assertThat(manifest.trusted()).isFalse();
+        });
   }
 
   @Test
@@ -464,19 +443,12 @@ class PluginRuntimeTest {
         testbedExecutable().toString(),
         List.of("export"),
         List.of());
-    String originalUserDir = System.getProperty("user.dir");
-    String originalBundleRoot = System.getProperty("dediren.bundle.root");
-    System.setProperty("user.dir", project.toString());
-    System.setProperty("dediren.bundle.root", bundleRoot.toString());
-    try {
-      assertThatThrownBy(() -> PluginRegistry.bundled(Map.of()).loadManifest("runtime-testbed"))
-          .isInstanceOf(PluginExecutionException.class)
-          .extracting(error -> ((PluginExecutionException) error).diagnostic().code())
-          .isEqualTo(DiagnosticCode.PLUGIN_UNKNOWN.code());
-    } finally {
-      restoreProperty("user.dir", originalUserDir);
-      restoreProperty("dediren.bundle.root", originalBundleRoot);
-    }
+    withSystemProperties(
+        Map.of("user.dir", project.toString(), "dediren.bundle.root", bundleRoot.toString()),
+        () ->
+            assertPluginErrorCode(
+                () -> PluginRegistry.bundled(Map.of()).loadManifest("runtime-testbed"),
+                DiagnosticCode.PLUGIN_UNKNOWN.code()));
   }
 
   @Test
@@ -496,22 +468,17 @@ class PluginRuntimeTest {
         testbedExecutable().toString(),
         List.of("export"),
         List.of());
-    String originalUserDir = System.getProperty("user.dir");
-    String originalBundleRoot = System.getProperty("dediren.bundle.root");
-    System.setProperty("user.dir", project.toString());
-    System.setProperty("dediren.bundle.root", bundleRoot.toString());
-    try {
-      LoadedPluginManifest manifest =
-          PluginRegistry.bundled(Map.of("DEDIREN_ALLOW_PROJECT_PLUGINS", "true"))
-              .loadManifest("runtime-testbed");
+    withSystemProperties(
+        Map.of("user.dir", project.toString(), "dediren.bundle.root", bundleRoot.toString()),
+        () -> {
+          LoadedPluginManifest manifest =
+              PluginRegistry.bundled(Map.of("DEDIREN_ALLOW_PROJECT_PLUGINS", "true"))
+                  .loadManifest("runtime-testbed");
 
-      assertThat(manifest.path())
-          .isEqualTo(projectPlugins.resolve("runtime-testbed.manifest.json"));
-      assertThat(manifest.trusted()).isFalse();
-    } finally {
-      restoreProperty("user.dir", originalUserDir);
-      restoreProperty("dediren.bundle.root", originalBundleRoot);
-    }
+          assertThat(manifest.path())
+              .isEqualTo(projectPlugins.resolve("runtime-testbed.manifest.json"));
+          assertThat(manifest.trusted()).isFalse();
+        });
   }
 
   @Test
@@ -532,27 +499,22 @@ class PluginRuntimeTest {
     writeManifest(projectPlugins, "runtime-testbed", executable, List.of("export"), List.of());
     writeManifest(projectPlugins, "other-plugin", executable, List.of("export"), List.of());
     writeManifest(configured, "other-plugin", executable, List.of("export"), List.of());
-    String originalUserDir = System.getProperty("user.dir");
-    String originalBundleRoot = System.getProperty("dediren.bundle.root");
-    System.setProperty("user.dir", project.toString());
-    System.setProperty("dediren.bundle.root", bundleRoot.toString());
-    try {
-      PluginRegistry registry =
-          PluginRegistry.bundled(
-              Map.of(
-                  "DEDIREN_PLUGIN_DIRS",
-                  configured.toString(),
-                  "DEDIREN_ALLOW_PROJECT_PLUGINS",
-                  "1"));
+    withSystemProperties(
+        Map.of("user.dir", project.toString(), "dediren.bundle.root", bundleRoot.toString()),
+        () -> {
+          PluginRegistry registry =
+              PluginRegistry.bundled(
+                  Map.of(
+                      "DEDIREN_PLUGIN_DIRS",
+                      configured.toString(),
+                      "DEDIREN_ALLOW_PROJECT_PLUGINS",
+                      "1"));
 
-      assertThat(registry.loadManifest("runtime-testbed").path())
-          .isEqualTo(bundledPlugins.resolve("runtime-testbed.manifest.json"));
-      assertThat(registry.loadManifest("other-plugin").path())
-          .isEqualTo(projectPlugins.resolve("other-plugin.manifest.json"));
-    } finally {
-      restoreProperty("user.dir", originalUserDir);
-      restoreProperty("dediren.bundle.root", originalBundleRoot);
-    }
+          assertThat(registry.loadManifest("runtime-testbed").path())
+              .isEqualTo(bundledPlugins.resolve("runtime-testbed.manifest.json"));
+          assertThat(registry.loadManifest("other-plugin").path())
+              .isEqualTo(projectPlugins.resolve("other-plugin.manifest.json"));
+        });
   }
 
   @Test
@@ -574,27 +536,22 @@ class PluginRuntimeTest {
     writeManifest(bundledPlugins, "runtime-testbed", executable, List.of("export"), List.of());
     writeManifest(projectPlugins, "runtime-testbed", executable, List.of("export"), List.of());
     writeManifest(configured, "runtime-testbed", executable, List.of("export"), List.of());
-    String originalUserDir = System.getProperty("user.dir");
-    String originalBundleRoot = System.getProperty("dediren.bundle.root");
-    System.setProperty("user.dir", project.toString());
-    System.setProperty("dediren.bundle.root", bundleRoot.toString());
-    try {
-      PluginRegistry registry =
-          PluginRegistry.bundled(
-              Map.of(
-                  "DEDIREN_PLUGIN_DIRS",
-                  configured.toString(),
-                  "DEDIREN_ALLOW_PROJECT_PLUGINS",
-                  "1"));
-      LoadedPluginManifest manifest = registry.loadManifest("runtime-testbed");
+    withSystemProperties(
+        Map.of("user.dir", project.toString(), "dediren.bundle.root", bundleRoot.toString()),
+        () -> {
+          PluginRegistry registry =
+              PluginRegistry.bundled(
+                  Map.of(
+                      "DEDIREN_PLUGIN_DIRS",
+                      configured.toString(),
+                      "DEDIREN_ALLOW_PROJECT_PLUGINS",
+                      "1"));
+          LoadedPluginManifest manifest = registry.loadManifest("runtime-testbed");
 
-      assertThat(manifest.path())
-          .isEqualTo(bundledPlugins.resolve("runtime-testbed.manifest.json"));
-      assertThat(manifest.trusted()).isTrue();
-    } finally {
-      restoreProperty("user.dir", originalUserDir);
-      restoreProperty("dediren.bundle.root", originalBundleRoot);
-    }
+          assertThat(manifest.path())
+              .isEqualTo(bundledPlugins.resolve("runtime-testbed.manifest.json"));
+          assertThat(manifest.trusted()).isTrue();
+        });
   }
 
   @Test
@@ -617,26 +574,21 @@ class PluginRuntimeTest {
         "render-result.schema.json");
     writeTestbedExecutable(bin.resolve("runtime-testbed"));
     writeManifest(plugins, "runtime-testbed", "runtime-testbed", List.of("render"), List.of());
-    String originalUserDir = System.getProperty("user.dir");
-    String originalBundleRoot = System.getProperty("dediren.bundle.root");
-    System.setProperty("user.dir", outsideBundle.toString());
-    System.setProperty("dediren.bundle.root", bundleRoot.toString());
-    try {
-      PluginRunOutcome outcome =
-          PluginRunner.runForCapabilityWithRegistry(
-              PluginRegistry.bundled(),
-              "runtime-testbed",
-              "render",
-              List.of("render"),
-              "{}",
-              PluginRunOptions.defaults());
+    withSystemProperties(
+        Map.of("user.dir", outsideBundle.toString(), "dediren.bundle.root", bundleRoot.toString()),
+        () -> {
+          PluginRunOutcome outcome =
+              PluginRunner.runForCapabilityWithRegistry(
+                  PluginRegistry.bundled(),
+                  "runtime-testbed",
+                  "render",
+                  List.of("render"),
+                  "{}",
+                  PluginRunOptions.defaults());
 
-      assertThat(outcome.exitCode()).isZero();
-      assertThat(outcome.stdout()).contains("\"render_result_schema_version\"");
-    } finally {
-      restoreProperty("user.dir", originalUserDir);
-      restoreProperty("dediren.bundle.root", originalBundleRoot);
-    }
+          assertThat(outcome.exitCode()).isZero();
+          assertThat(outcome.stdout()).contains("\"render_result_schema_version\"");
+        });
   }
 
   @Test
@@ -657,23 +609,21 @@ class PluginRuntimeTest {
         "render-result.schema.json");
     writeTestbedExecutable(bin.resolve("runtime-testbed"));
     writeManifest(plugins, "runtime-testbed", "runtime-testbed", List.of("render"), List.of());
-    String originalUserDir = System.getProperty("user.dir");
-    System.setProperty("user.dir", bundleRoot.toString());
-    try {
-      PluginRunOutcome outcome =
-          PluginRunner.runForCapabilityWithRegistry(
-              PluginRegistry.bundled(),
-              "runtime-testbed",
-              "render",
-              List.of("render"),
-              "{}",
-              PluginRunOptions.defaults());
+    withSystemProperties(
+        Map.of("user.dir", bundleRoot.toString()),
+        () -> {
+          PluginRunOutcome outcome =
+              PluginRunner.runForCapabilityWithRegistry(
+                  PluginRegistry.bundled(),
+                  "runtime-testbed",
+                  "render",
+                  List.of("render"),
+                  "{}",
+                  PluginRunOptions.defaults());
 
-      assertThat(outcome.exitCode()).isZero();
-      assertThat(outcome.stdout()).contains("\"render_result_schema_version\"");
-    } finally {
-      System.setProperty("user.dir", originalUserDir);
-    }
+          assertThat(outcome.exitCode()).isZero();
+          assertThat(outcome.stdout()).contains("\"render_result_schema_version\"");
+        });
   }
 
   @Test
@@ -716,18 +666,16 @@ class PluginRuntimeTest {
 
     // A manifest from an untrusted directory cannot use trust mode to skip the probe, so the
     // runtime id mismatch is still caught even though trust is requested.
-    assertThatThrownBy(
-            () ->
-                PluginRunner.runForCapabilityWithRegistry(
-                    PluginRegistry.fromDirs(List.of(temp)),
-                    "runtime-testbed",
-                    "layout",
-                    List.of("layout"),
-                    "{}",
-                    options))
-        .isInstanceOf(PluginExecutionException.class)
-        .extracting(error -> ((PluginExecutionException) error).diagnostic().code())
-        .isEqualTo("DEDIREN_PLUGIN_ID_MISMATCH");
+    assertPluginErrorCode(
+        () ->
+            PluginRunner.runForCapabilityWithRegistry(
+                PluginRegistry.fromDirs(List.of(temp)),
+                "runtime-testbed",
+                "layout",
+                List.of("layout"),
+                "{}",
+                options),
+        "DEDIREN_PLUGIN_ID_MISMATCH");
   }
 
   @Test
@@ -741,18 +689,16 @@ class PluginRuntimeTest {
                     "DEDIREN_TEST_PLUGIN_CAPABILITIES", "layout",
                     "DEDIREN_TRUST_MANIFEST_CAPABILITIES", "true"));
 
-    assertThatThrownBy(
-            () ->
-                PluginRunner.runForCapabilityWithRegistry(
-                    PluginRegistry.fromDirs(List.of(temp), List.of(temp)),
-                    "runtime-testbed",
-                    "layout",
-                    List.of("layout"),
-                    "{}",
-                    options))
-        .isInstanceOf(PluginExecutionException.class)
-        .extracting(error -> ((PluginExecutionException) error).diagnostic().code())
-        .isEqualTo("DEDIREN_PLUGIN_OUTPUT_INVALID_DATA");
+    assertPluginErrorCode(
+        () ->
+            PluginRunner.runForCapabilityWithRegistry(
+                PluginRegistry.fromDirs(List.of(temp), List.of(temp)),
+                "runtime-testbed",
+                "layout",
+                List.of("layout"),
+                "{}",
+                options),
+        "DEDIREN_PLUGIN_OUTPUT_INVALID_DATA");
   }
 
   @Test
@@ -786,36 +732,32 @@ class PluginRuntimeTest {
             .withCandidateEnv(Map.of("DEDIREN_TEST_PLUGIN_MODE", "sleep"))
             .withTimeout(Duration.ofMillis(200));
 
-    assertThatThrownBy(
-            () ->
-                PluginRunner.runForCapabilityWithRegistry(
-                    PluginRegistry.fromDirs(List.of(temp)),
-                    "runtime-testbed",
-                    "render",
-                    List.of("render"),
-                    "{}",
-                    options))
-        .isInstanceOf(PluginExecutionException.class)
-        .extracting(error -> ((PluginExecutionException) error).diagnostic().code())
-        .isEqualTo(DiagnosticCode.PLUGIN_TIMEOUT.code());
+    assertPluginErrorCode(
+        () ->
+            PluginRunner.runForCapabilityWithRegistry(
+                PluginRegistry.fromDirs(List.of(temp)),
+                "runtime-testbed",
+                "render",
+                List.of("render"),
+                "{}",
+                options),
+        DiagnosticCode.PLUGIN_TIMEOUT.code());
   }
 
   @Test
   void okEnvelopeWithNonZeroExitIsStructuredProcessFailure() throws Exception {
     writeManifest(temp, "runtime-testbed", testbedExecutable().toString(), List.of("render"));
 
-    assertThatThrownBy(() -> runWithMode("ok-envelope-nonzero", "render", List.of("render")))
-        .isInstanceOf(PluginExecutionException.class)
-        .extracting(error -> ((PluginExecutionException) error).diagnostic().code())
-        .isEqualTo(DiagnosticCode.PLUGIN_PROCESS_FAILED.code());
+    assertPluginErrorCode(
+        () -> runWithMode("ok-envelope-nonzero", "render", List.of("render")),
+        DiagnosticCode.PLUGIN_PROCESS_FAILED.code());
   }
 
   @Test
   void unknownPluginIdIsStructured() throws Exception {
-    assertThatThrownBy(() -> PluginRegistry.fromDirs(List.of(temp)).loadManifest("does-not-exist"))
-        .isInstanceOf(PluginExecutionException.class)
-        .extracting(error -> ((PluginExecutionException) error).diagnostic().code())
-        .isEqualTo(DiagnosticCode.PLUGIN_UNKNOWN.code());
+    assertPluginErrorCode(
+        () -> PluginRegistry.fromDirs(List.of(temp)).loadManifest("does-not-exist"),
+        DiagnosticCode.PLUGIN_UNKNOWN.code());
   }
 
   @Test
@@ -826,10 +768,16 @@ class PluginRuntimeTest {
         temp.resolve("broken.manifest.json"),
         "{\"plugin_manifest_schema_version\":\"plugin-manifest.schema.v1\"}");
 
-    assertThatThrownBy(() -> PluginRegistry.fromDirs(List.of(temp)).loadManifest("broken"))
+    assertPluginErrorCode(
+        () -> PluginRegistry.fromDirs(List.of(temp)).loadManifest("broken"),
+        DiagnosticCode.PLUGIN_MANIFEST_INVALID.code());
+  }
+
+  private static void assertPluginErrorCode(ThrowingCallable callable, String expectedCode) {
+    assertThatThrownBy(callable)
         .isInstanceOf(PluginExecutionException.class)
         .extracting(error -> ((PluginExecutionException) error).diagnostic().code())
-        .isEqualTo(DiagnosticCode.PLUGIN_MANIFEST_INVALID.code());
+        .isEqualTo(expectedCode);
   }
 
   private static void restoreProperty(String name, String value) {
@@ -838,6 +786,27 @@ class PluginRuntimeTest {
     } else {
       System.setProperty(name, value);
     }
+  }
+
+  /**
+   * Sets the given system properties, runs {@code body}, then restores every property to its prior
+   * value (or clears it if it was previously unset) even if {@code body} throws.
+   */
+  private static void withSystemProperties(Map<String, String> properties, ThrowingRunnable body)
+      throws Exception {
+    var originals = new LinkedHashMap<String, String>();
+    properties.keySet().forEach(name -> originals.put(name, System.getProperty(name)));
+    properties.forEach(System::setProperty);
+    try {
+      body.run();
+    } finally {
+      originals.forEach(PluginRuntimeTest::restoreProperty);
+    }
+  }
+
+  @FunctionalInterface
+  private interface ThrowingRunnable {
+    void run() throws Exception;
   }
 
   private PluginRunOutcome runWithMode(String mode, String capability, List<String> args)

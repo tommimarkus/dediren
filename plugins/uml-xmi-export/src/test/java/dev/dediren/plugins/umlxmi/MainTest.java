@@ -410,15 +410,8 @@ class MainTest {
             fixtureJson("fixtures/layout-result/uml-state-machine-basic.json"));
     ((ObjectNode) input.at("/source/relationships/0/properties/uml")).remove("region");
 
-    PluginResult result =
-        Main.executeForTesting(
-            new String[] {"export"},
-            JsonSupport.objectMapper().writeValueAsString(input),
-            envWithXmiSchema());
-
-    assertThat(result.exitCode()).isEqualTo(3);
-    assertError(
-        result,
+    exportExpectingError(
+        input,
         "DEDIREN_UML_RELATIONSHIP_PROPERTY_INVALID",
         "$.relationships[0].properties.uml.region");
   }
@@ -465,15 +458,8 @@ class MainTest {
             fixtureJson("fixtures/layout-result/uml-use-case-basic.json"));
     ((ObjectNode) input.at("/source/nodes/8/properties/uml")).put("use_case", "track-order");
 
-    PluginResult result =
-        Main.executeForTesting(
-            new String[] {"export"},
-            JsonSupport.objectMapper().writeValueAsString(input),
-            envWithXmiSchema());
-
-    assertThat(result.exitCode()).isEqualTo(3);
-    assertError(
-        result,
+    exportExpectingError(
+        input,
         "DEDIREN_UML_RELATIONSHIP_PROPERTY_INVALID",
         "$.relationships[4].properties.uml.extension_point");
   }
@@ -508,15 +494,8 @@ class MainTest {
     ((ObjectNode) input.at("/source/nodes/2/properties/uml"))
         .put("component", "interface-order-api");
 
-    PluginResult result =
-        Main.executeForTesting(
-            new String[] {"export"},
-            JsonSupport.objectMapper().writeValueAsString(input),
-            envWithXmiSchema());
-
-    assertThat(result.exitCode()).isEqualTo(3);
-    assertError(
-        result, "DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED", "$.nodes[2].properties.uml.component");
+    exportExpectingError(
+        input, "DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED", "$.nodes[2].properties.uml.component");
   }
 
   @Test
@@ -553,14 +532,8 @@ class MainTest {
             fixtureJson("fixtures/layout-result/uml-deployment-basic.json"));
     ((ObjectNode) input.at("/source/relationships/0")).put("source", "component-order-api");
 
-    PluginResult result =
-        Main.executeForTesting(
-            new String[] {"export"},
-            JsonSupport.objectMapper().writeValueAsString(input),
-            envWithXmiSchema());
-
-    assertThat(result.exitCode()).isEqualTo(3);
-    assertError(result, "DEDIREN_UML_RELATIONSHIP_ENDPOINT_UNSUPPORTED", "$.relationships[0]");
+    exportExpectingError(
+        input, "DEDIREN_UML_RELATIONSHIP_ENDPOINT_UNSUPPORTED", "$.relationships[0]");
   }
 
   @Test
@@ -750,15 +723,8 @@ class MainTest {
                 }
                 """));
 
-    PluginResult result =
-        Main.executeForTesting(
-            new String[] {"export"},
-            JsonSupport.objectMapper().writeValueAsString(input),
-            envWithXmiSchema());
-
-    assertThat(result.exitCode()).isEqualTo(3);
-    assertError(
-        result, "DEDIREN_UML_XMI_SEQUENCE_MESSAGE_ENDPOINT_UNSUPPORTED", "$.relationships[3]");
+    exportExpectingError(
+        input, "DEDIREN_UML_XMI_SEQUENCE_MESSAGE_ENDPOINT_UNSUPPORTED", "$.relationships[3]");
   }
 
   @Test
@@ -766,15 +732,8 @@ class MainTest {
     JsonNode input = exportSequenceInput();
     ((ObjectNode) input.at("/source/relationships/0/properties/uml")).remove("interaction");
 
-    PluginResult result =
-        Main.executeForTesting(
-            new String[] {"export"},
-            JsonSupport.objectMapper().writeValueAsString(input),
-            envWithXmiSchema());
-
-    assertThat(result.exitCode()).isEqualTo(3);
-    assertError(
-        result,
+    exportExpectingError(
+        input,
         "DEDIREN_UML_XMI_SEQUENCE_MESSAGE_INTERACTION_MISSING",
         "$.relationships[0].properties.uml.interaction");
   }
@@ -785,15 +744,8 @@ class MainTest {
     ((ObjectNode) input.at("/source/relationships/0/properties/uml"))
         .put("interaction", "missing-interaction");
 
-    PluginResult result =
-        Main.executeForTesting(
-            new String[] {"export"},
-            JsonSupport.objectMapper().writeValueAsString(input),
-            envWithXmiSchema());
-
-    assertThat(result.exitCode()).isEqualTo(3);
-    assertError(
-        result,
+    exportExpectingError(
+        input,
         "DEDIREN_UML_XMI_SEQUENCE_MESSAGE_INTERACTION_UNSUPPORTED",
         "$.relationships[0].properties.uml.interaction");
   }
@@ -804,15 +756,8 @@ class MainTest {
     ((ObjectNode) input.at("/source/relationships/0/properties/uml"))
         .put("interaction", "customer");
 
-    PluginResult result =
-        Main.executeForTesting(
-            new String[] {"export"},
-            JsonSupport.objectMapper().writeValueAsString(input),
-            envWithXmiSchema());
-
-    assertThat(result.exitCode()).isEqualTo(3);
-    assertError(
-        result,
+    exportExpectingError(
+        input,
         "DEDIREN_UML_XMI_SEQUENCE_MESSAGE_INTERACTION_UNSUPPORTED",
         "$.relationships[0].properties.uml.interaction");
   }
@@ -837,14 +782,7 @@ class MainTest {
                 }
                 """));
 
-    PluginResult result =
-        Main.executeForTesting(
-            new String[] {"export"},
-            JsonSupport.objectMapper().writeValueAsString(input),
-            envWithXmiSchema());
-
-    assertThat(result.exitCode()).isEqualTo(3);
-    assertError(result, "DEDIREN_UML_XMI_SEQUENCE_NODE_UNSUPPORTED", "$.nodes[3]");
+    exportExpectingError(input, "DEDIREN_UML_XMI_SEQUENCE_NODE_UNSUPPORTED", "$.nodes[3]");
   }
 
   @Test
@@ -855,15 +793,8 @@ class MainTest {
             fixtureJson("fixtures/layout-result/uml-sequence-fragments.json"));
     ((ObjectNode) input.at("/source/nodes/5/properties/uml")).put("operator", "ignore");
 
-    PluginResult result =
-        Main.executeForTesting(
-            new String[] {"export"},
-            JsonSupport.objectMapper().writeValueAsString(input),
-            envWithXmiSchema());
-
-    assertThat(result.exitCode()).isEqualTo(3);
-    assertError(
-        result,
+    exportExpectingError(
+        input,
         "DEDIREN_UML_XMI_SEQUENCE_FRAGMENT_OPERATOR_UNSUPPORTED",
         "$.nodes[5].properties.uml.operator");
   }
@@ -873,14 +804,7 @@ class MainTest {
     JsonNode input = exportInput();
     ((ObjectNode) input.at("/source/relationships/0")).put("source", "initial-submit");
 
-    PluginResult result =
-        Main.executeForTesting(
-            new String[] {"export"},
-            JsonSupport.objectMapper().writeValueAsString(input),
-            envWithXmiSchema());
-
-    assertThat(result.exitCode()).isEqualTo(3);
-    assertErrorCode(result, "DEDIREN_UML_RELATIONSHIP_ENDPOINT_UNSUPPORTED");
+    exportExpectingError(input, "DEDIREN_UML_RELATIONSHIP_ENDPOINT_UNSUPPORTED");
   }
 
   @Test
@@ -888,14 +812,7 @@ class MainTest {
     JsonNode input = exportSequenceInput();
     ((ObjectNode) input.at("/source/nodes/2")).put("type", "Class");
 
-    PluginResult result =
-        Main.executeForTesting(
-            new String[] {"export"},
-            JsonSupport.objectMapper().writeValueAsString(input),
-            envWithXmiSchema());
-
-    assertThat(result.exitCode()).isEqualTo(3);
-    assertErrorCode(result, "DEDIREN_UML_RELATIONSHIP_ENDPOINT_UNSUPPORTED");
+    exportExpectingError(input, "DEDIREN_UML_RELATIONSHIP_ENDPOINT_UNSUPPORTED");
   }
 
   @Test
@@ -903,14 +820,7 @@ class MainTest {
     JsonNode input = exportInput();
     ((ObjectNode) input.get("policy")).put("xmi_version", "3.0");
 
-    PluginResult result =
-        Main.executeForTesting(
-            new String[] {"export"},
-            JsonSupport.objectMapper().writeValueAsString(input),
-            envWithXmiSchema());
-
-    assertThat(result.exitCode()).isEqualTo(3);
-    assertErrorCode(result, "DEDIREN_UML_XMI_POLICY_INVALID");
+    exportExpectingError(input, "DEDIREN_UML_XMI_POLICY_INVALID");
   }
 
   @Test
@@ -918,14 +828,7 @@ class MainTest {
     JsonNode input = exportInput();
     ((ObjectNode) input.get("policy")).put("model_identifier", "not a valid xml id");
 
-    PluginResult result =
-        Main.executeForTesting(
-            new String[] {"export"},
-            JsonSupport.objectMapper().writeValueAsString(input),
-            envWithXmiSchema());
-
-    assertThat(result.exitCode()).isEqualTo(3);
-    assertErrorCode(result, "DEDIREN_XMI_ID_INVALID");
+    exportExpectingError(input, "DEDIREN_XMI_ID_INVALID");
   }
 
   @Test
@@ -996,6 +899,29 @@ class MainTest {
             () -> builder.parse(new ByteArrayInputStream(hostile.getBytes(StandardCharsets.UTF_8))))
         .isInstanceOf(SAXParseException.class)
         .hasMessageContaining("DOCTYPE");
+  }
+
+  private PluginResult exportExpectingError(JsonNode input, String expectedCode) throws Exception {
+    PluginResult result =
+        Main.executeForTesting(
+            new String[] {"export"},
+            JsonSupport.objectMapper().writeValueAsString(input),
+            envWithXmiSchema());
+    assertThat(result.exitCode()).isEqualTo(3);
+    assertErrorCode(result, expectedCode);
+    return result;
+  }
+
+  private PluginResult exportExpectingError(
+      JsonNode input, String expectedCode, String expectedPath) throws Exception {
+    PluginResult result =
+        Main.executeForTesting(
+            new String[] {"export"},
+            JsonSupport.objectMapper().writeValueAsString(input),
+            envWithXmiSchema());
+    assertThat(result.exitCode()).isEqualTo(3);
+    assertError(result, expectedCode, expectedPath);
+    return result;
   }
 
   private String exportXml(JsonNode input) throws Exception {

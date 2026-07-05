@@ -336,10 +336,7 @@ class LayoutQualityTest {
             horizontalEdge("middle", 270.0),
             horizontalEdge("bottom", 340.0));
 
-    assertThat(
-            LayoutQuality.validateLayout(layoutResult(List.of(), edges, List.of()))
-                .edgeLabelDissociationCount())
-        .isZero();
+    assertThat(dissociationCount(edges)).isZero();
   }
 
   @Test
@@ -352,10 +349,7 @@ class LayoutQualityTest {
             horizontalEdge("middle", 252.0),
             horizontalEdge("bottom", 304.0));
 
-    assertThat(
-            LayoutQuality.validateLayout(layoutResult(List.of(), edges, List.of()))
-                .edgeLabelDissociationCount())
-        .isEqualTo(1);
+    assertThat(dissociationCount(edges)).isEqualTo(1);
   }
 
   @Test
@@ -368,10 +362,7 @@ class LayoutQualityTest {
             horizontalEdge("middle", 254.0),
             horizontalEdge("bottom", 308.0));
 
-    assertThat(
-            LayoutQuality.validateLayout(layoutResult(List.of(), edges, List.of()))
-                .edgeLabelDissociationCount())
-        .isZero();
+    assertThat(dissociationCount(edges)).isZero();
   }
 
   @Test
@@ -400,10 +391,7 @@ class LayoutQualityTest {
             unlabeledHorizontalEdge("middle", 244.0),
             unlabeledHorizontalEdge("bottom", 288.0));
 
-    assertThat(
-            LayoutQuality.validateLayout(layoutResult(List.of(), edges, List.of()))
-                .edgeLabelDissociationCount())
-        .isZero();
+    assertThat(dissociationCount(edges)).isZero();
   }
 
   @Test
@@ -416,10 +404,12 @@ class LayoutQualityTest {
             edge("b", "hub", "y", List.of(new Point(100.0, 244.0), new Point(500.0, 244.0))),
             edge("c", "hub", "z", List.of(new Point(100.0, 288.0), new Point(500.0, 288.0))));
 
-    assertThat(
-            LayoutQuality.validateLayout(layoutResult(List.of(), edges, List.of()))
-                .edgeLabelDissociationCount())
-        .isZero();
+    assertThat(dissociationCount(edges)).isZero();
+  }
+
+  private static int dissociationCount(List<LaidOutEdge> edges) {
+    return LayoutQuality.validateLayout(layoutResult(List.of(), edges, List.of()))
+        .edgeLabelDissociationCount();
   }
 
   private static LaidOutEdge horizontalEdge(String id, double y) {
@@ -544,10 +534,7 @@ class LayoutQualityTest {
             new LaidOutNode(
                 "edge-case", "edge-case", "edge-case", 0.0, 0.0, 60.0, 48.0, "x".repeat(24), null));
 
-    assertThat(
-            LayoutQuality.validateLayout(layoutResult(nodes, List.of(), List.of()))
-                .labelSpaceIssueCount())
-        .isZero();
+    assertThat(labelSpaceIssueCount(nodes)).isZero();
   }
 
   @Test
@@ -557,10 +544,7 @@ class LayoutQualityTest {
             new LaidOutNode(
                 "edge-case", "edge-case", "edge-case", 0.0, 0.0, 60.0, 48.0, "x".repeat(25), null));
 
-    assertThat(
-            LayoutQuality.validateLayout(layoutResult(nodes, List.of(), List.of()))
-                .labelSpaceIssueCount())
-        .isEqualTo(1);
+    assertThat(labelSpaceIssueCount(nodes)).isEqualTo(1);
   }
 
   @Test
@@ -573,10 +557,7 @@ class LayoutQualityTest {
             new LaidOutNode(
                 "at-floor", "at-floor", "at-floor", 0.0, 0.0, 40.0, 40.0, "overflow", null));
 
-    assertThat(
-            LayoutQuality.validateLayout(layoutResult(nodes, List.of(), List.of()))
-                .labelSpaceIssueCount())
-        .isEqualTo(1);
+    assertThat(labelSpaceIssueCount(nodes)).isEqualTo(1);
   }
 
   @Test
@@ -594,10 +575,7 @@ class LayoutQualityTest {
                 "overflow",
                 null));
 
-    assertThat(
-            LayoutQuality.validateLayout(layoutResult(nodes, List.of(), List.of()))
-                .labelSpaceIssueCount())
-        .isZero();
+    assertThat(labelSpaceIssueCount(nodes)).isZero();
   }
 
   @Test
@@ -640,10 +618,7 @@ class LayoutQualityTest {
     var nodes =
         List.of(new LaidOutNode("port", "port", "port", 0.0, 0.0, 32.0, 32.0, "client", null));
 
-    assertThat(
-            LayoutQuality.validateLayout(layoutResult(nodes, List.of(), List.of()))
-                .labelSpaceIssueCount())
-        .isZero();
+    assertThat(labelSpaceIssueCount(nodes)).isZero();
   }
 
   @Test
@@ -662,51 +637,35 @@ class LayoutQualityTest {
                 "a junction label rendered adjacent to the dot",
                 "junction"));
 
-    assertThat(
-            LayoutQuality.validateLayout(layoutResult(nodes, List.of(), List.of()))
-                .labelSpaceIssueCount())
-        .isZero();
+    assertThat(labelSpaceIssueCount(nodes)).isZero();
+  }
+
+  private static int labelSpaceIssueCount(List<LaidOutNode> nodes) {
+    return LayoutQuality.validateLayout(layoutResult(nodes, List.of(), List.of()))
+        .labelSpaceIssueCount();
   }
 
   @Test
   void memberTouchingLabelBandLowerEdgeIsAccepted() {
     // Band is group y 0..24 exclusive at the boundary: a member starting exactly at y 24 clears it.
     var nodes = List.of(node("member", 10.0, 24.0));
-    var groups =
-        List.of(
-            new LaidOutGroup(
-                "zone", "zone", "zone", null, 0.0, 0.0, 300.0, 200.0, List.of("member"), "Zone"));
 
-    assertThat(
-            LayoutQuality.validateLayout(layoutResult(nodes, List.of(), groups))
-                .groupLabelBandIssueCount())
-        .isZero();
+    assertThat(groupLabelBandIssueCount(nodes, singleZoneGroup("Zone"))).isZero();
   }
 
   @Test
   void memberOneUnitInsideLabelBandIsCounted() {
     var nodes = List.of(node("member", 10.0, 23.0));
-    var groups =
-        List.of(
-            new LaidOutGroup(
-                "zone", "zone", "zone", null, 0.0, 0.0, 300.0, 200.0, List.of("member"), "Zone"));
 
-    assertThat(
-            LayoutQuality.validateLayout(layoutResult(nodes, List.of(), groups))
-                .groupLabelBandIssueCount())
-        .isEqualTo(1);
+    assertThat(groupLabelBandIssueCount(nodes, singleZoneGroup("Zone"))).isEqualTo(1);
   }
 
   @Test
   void groupMembersInsideLabelBandAreCounted() {
     var nodes = List.of(node("member", 10.0, 10.0));
-    var groups =
-        List.of(
-            new LaidOutGroup(
-                "zone", "zone", "zone", null, 0.0, 0.0, 300.0, 200.0, List.of("member"), "Zone"));
 
     LayoutQualityReport report =
-        LayoutQuality.validateLayout(layoutResult(nodes, List.of(), groups));
+        LayoutQuality.validateLayout(layoutResult(nodes, List.of(), singleZoneGroup("Zone")));
 
     assertThat(report.groupLabelBandIssueCount()).isEqualTo(1);
     assertThat(report.status()).isEqualTo("warning");
@@ -715,13 +674,9 @@ class LayoutQualityTest {
   @Test
   void groupMembersBelowLabelBandAreAccepted() {
     var nodes = List.of(node("member", 10.0, 32.0));
-    var groups =
-        List.of(
-            new LaidOutGroup(
-                "zone", "zone", "zone", null, 0.0, 0.0, 300.0, 200.0, List.of("member"), "Zone"));
 
     LayoutQualityReport report =
-        LayoutQuality.validateLayout(layoutResult(nodes, List.of(), groups));
+        LayoutQuality.validateLayout(layoutResult(nodes, List.of(), singleZoneGroup("Zone")));
 
     assertThat(report.groupLabelBandIssueCount()).isZero();
     assertThat(report.status()).isEqualTo("ok");
@@ -730,72 +685,34 @@ class LayoutQualityTest {
   @Test
   void blankLabeledGroupHasNoLabelBandReservation() {
     var nodes = List.of(node("member", 10.0, 10.0));
-    var groups =
-        List.of(
-            new LaidOutGroup(
-                "zone", "zone", "zone", null, 0.0, 0.0, 300.0, 200.0, List.of("member"), "  "));
 
-    assertThat(
-            LayoutQuality.validateLayout(layoutResult(nodes, List.of(), groups))
-                .groupLabelBandIssueCount())
-        .isZero();
+    assertThat(groupLabelBandIssueCount(nodes, singleZoneGroup("  "))).isZero();
   }
 
   @Test
   void unlabeledGroupHasNoLabelBandReservation() {
     var nodes = List.of(node("member", 10.0, 10.0));
-    var groups =
-        List.of(
-            new LaidOutGroup(
-                "zone", "zone", "zone", null, 0.0, 0.0, 300.0, 200.0, List.of("member"), null));
 
-    assertThat(
-            LayoutQuality.validateLayout(layoutResult(nodes, List.of(), groups))
-                .groupLabelBandIssueCount())
-        .isZero();
+    assertThat(groupLabelBandIssueCount(nodes, singleZoneGroup(null))).isZero();
+  }
+
+  private static List<LaidOutGroup> singleZoneGroup(String label) {
+    return List.of(
+        new LaidOutGroup(
+            "zone", "zone", "zone", null, 0.0, 0.0, 300.0, 200.0, List.of("member"), label));
+  }
+
+  private static int groupLabelBandIssueCount(List<LaidOutNode> nodes, List<LaidOutGroup> groups) {
+    return LayoutQuality.validateLayout(layoutResult(nodes, List.of(), groups))
+        .groupLabelBandIssueCount();
   }
 
   @Test
   void threeLevelNestedContainmentValidatesCleanly() {
     var nodes = List.of(node("leaf", 60.0, 110.0));
-    var groups =
-        List.of(
-            new LaidOutGroup(
-                "outer",
-                "outer",
-                "outer",
-                null,
-                0.0,
-                0.0,
-                400.0,
-                320.0,
-                List.of("middle"),
-                "Outer"),
-            new LaidOutGroup(
-                "middle",
-                "middle",
-                "middle",
-                null,
-                30.0,
-                40.0,
-                320.0,
-                240.0,
-                List.of("inner"),
-                "Middle"),
-            new LaidOutGroup(
-                "inner",
-                "inner",
-                "inner",
-                null,
-                50.0,
-                80.0,
-                260.0,
-                160.0,
-                List.of("leaf"),
-                "Inner"));
 
     LayoutQualityReport report =
-        LayoutQuality.validateLayout(layoutResult(nodes, List.of(), groups));
+        LayoutQuality.validateLayout(layoutResult(nodes, List.of(), threeLevelNestedGroups()));
 
     assertThat(report.groupBoundaryIssueCount()).isZero();
     assertThat(report.groupLabelBandIssueCount()).isZero();
@@ -805,47 +722,31 @@ class LayoutQualityTest {
   @Test
   void memberEscapingDeepNestedGroupIsCounted() {
     var nodes = List.of(node("leaf", 290.0, 110.0));
-    var groups =
-        List.of(
-            new LaidOutGroup(
-                "outer",
-                "outer",
-                "outer",
-                null,
-                0.0,
-                0.0,
-                400.0,
-                320.0,
-                List.of("middle"),
-                "Outer"),
-            new LaidOutGroup(
-                "middle",
-                "middle",
-                "middle",
-                null,
-                30.0,
-                40.0,
-                320.0,
-                240.0,
-                List.of("inner"),
-                "Middle"),
-            new LaidOutGroup(
-                "inner",
-                "inner",
-                "inner",
-                null,
-                50.0,
-                80.0,
-                260.0,
-                160.0,
-                List.of("leaf"),
-                "Inner"));
 
     LayoutQualityReport report =
-        LayoutQuality.validateLayout(layoutResult(nodes, List.of(), groups));
+        LayoutQuality.validateLayout(layoutResult(nodes, List.of(), threeLevelNestedGroups()));
 
     assertThat(report.groupBoundaryIssueCount()).isEqualTo(1);
     assertThat(report.status()).isEqualTo("warning");
+  }
+
+  private static List<LaidOutGroup> threeLevelNestedGroups() {
+    return List.of(
+        new LaidOutGroup(
+            "outer", "outer", "outer", null, 0.0, 0.0, 400.0, 320.0, List.of("middle"), "Outer"),
+        new LaidOutGroup(
+            "middle",
+            "middle",
+            "middle",
+            null,
+            30.0,
+            40.0,
+            320.0,
+            240.0,
+            List.of("inner"),
+            "Middle"),
+        new LaidOutGroup(
+            "inner", "inner", "inner", null, 50.0, 80.0, 260.0, 160.0, List.of("leaf"), "Inner"));
   }
 
   @Test

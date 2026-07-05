@@ -43,40 +43,14 @@ class MainTest {
     Path root = workspaceRoot();
     Path source = root.resolve("fixtures/source/valid-uml-sequence-basic.json");
 
-    CliResult validate =
-        Main.executeForTesting(
-            new String[] {
-              "validate",
-              "--plugin",
-              "generic-graph",
-              "--profile",
-              "uml",
-              "--input",
-              source.toString()
-            },
-            "",
-            env);
+    CliResult validate = runValidate(env, source);
 
     JsonNode validateData = okData(validate);
     assertThat(validateData.at("/semantic_profile").asText()).isEqualTo("uml");
     assertThat(validateData.at("/node_count").asInt()).isEqualTo(3);
     assertThat(validateData.at("/relationship_count").asInt()).isEqualTo(3);
 
-    CliResult layoutRequest =
-        Main.executeForTesting(
-            new String[] {
-              "project",
-              "--plugin",
-              "generic-graph",
-              "--target",
-              "layout-request",
-              "--view",
-              "sequence-view",
-              "--input",
-              source.toString()
-            },
-            "",
-            env);
+    CliResult layoutRequest = runLayoutRequest(env, source, "sequence-view");
 
     JsonNode layoutRequestData = okData(layoutRequest);
     assertThat(layoutRequestData.at("/view_id").asText()).isEqualTo("sequence-view");
@@ -85,21 +59,7 @@ class MainTest {
         .containsExactly("uml.sequence.lifeline-order", "uml.sequence.message-order");
     Path layoutRequestFile = writeStdout("sequence-layout-request.json", layoutRequest);
 
-    CliResult renderMetadata =
-        Main.executeForTesting(
-            new String[] {
-              "project",
-              "--plugin",
-              "generic-graph",
-              "--target",
-              "render-metadata",
-              "--view",
-              "sequence-view",
-              "--input",
-              source.toString()
-            },
-            "",
-            env);
+    CliResult renderMetadata = runRenderMetadata(env, source, "sequence-view");
 
     JsonNode renderMetadataData = okData(renderMetadata);
     assertThat(renderMetadataData.at("/semantic_profile").asText()).isEqualTo("uml");
@@ -111,13 +71,7 @@ class MainTest {
         .isEqualTo("synchCall");
     Path renderMetadataFile = writeStdout("sequence-render-metadata.json", renderMetadata);
 
-    CliResult layout =
-        Main.executeForTesting(
-            new String[] {
-              "layout", "--plugin", "elk-layout", "--input", layoutRequestFile.toString()
-            },
-            "",
-            env);
+    CliResult layout = runLayout(env, layoutRequestFile);
 
     JsonNode layoutData = okData(layout);
     assertThat(layoutData.at("/view_id").asText()).isEqualTo("sequence-view");
@@ -126,21 +80,7 @@ class MainTest {
         .contains("interaction-place-order", "customer", "service");
     Path layoutFile = writeStdout("sequence-layout-result.json", layout);
 
-    CliResult render =
-        Main.executeForTesting(
-            new String[] {
-              "render",
-              "--plugin",
-              "render",
-              "--policy",
-              root.resolve("fixtures/render-policy/uml-svg.json").toString(),
-              "--metadata",
-              renderMetadataFile.toString(),
-              "--input",
-              layoutFile.toString()
-            },
-            "",
-            env);
+    CliResult render = runRender(env, root, renderMetadataFile, layoutFile);
 
     JsonNode renderData = okData(render);
     String svg = renderData.at("/artifacts/0/content").asText();
@@ -154,21 +94,7 @@ class MainTest {
             "placeOrder");
     assertSequenceSvgGeometry(svgDocument(svg));
 
-    CliResult export =
-        Main.executeForTesting(
-            new String[] {
-              "export",
-              "--plugin",
-              "uml-xmi",
-              "--policy",
-              root.resolve("fixtures/export-policy/default-uml-xmi.json").toString(),
-              "--source",
-              source.toString(),
-              "--layout",
-              layoutFile.toString()
-            },
-            "",
-            env);
+    CliResult export = runExport(env, root, source, layoutFile);
 
     JsonNode exportData = okData(export);
     String xmi = exportData.at("/content").asText();
@@ -184,39 +110,13 @@ class MainTest {
     Path root = workspaceRoot();
     Path source = root.resolve("fixtures/source/valid-uml-sequence-fragments.json");
 
-    CliResult validate =
-        Main.executeForTesting(
-            new String[] {
-              "validate",
-              "--plugin",
-              "generic-graph",
-              "--profile",
-              "uml",
-              "--input",
-              source.toString()
-            },
-            "",
-            env);
+    CliResult validate = runValidate(env, source);
 
     JsonNode validateData = okData(validate);
     assertThat(validateData.at("/semantic_profile").asText()).isEqualTo("uml");
     assertThat(validateData.at("/node_count").asInt()).isGreaterThan(0);
 
-    CliResult layoutRequest =
-        Main.executeForTesting(
-            new String[] {
-              "project",
-              "--plugin",
-              "generic-graph",
-              "--target",
-              "layout-request",
-              "--view",
-              "sequence-fragments-view",
-              "--input",
-              source.toString()
-            },
-            "",
-            env);
+    CliResult layoutRequest = runLayoutRequest(env, source, "sequence-fragments-view");
 
     JsonNode layoutRequestData = okData(layoutRequest);
     assertThat(layoutRequestData.at("/view_id").asText()).isEqualTo("sequence-fragments-view");
@@ -226,21 +126,7 @@ class MainTest {
         .doesNotContain("cf-availability");
     Path layoutRequestFile = writeStdout("sequence-fragments-layout-request.json", layoutRequest);
 
-    CliResult renderMetadata =
-        Main.executeForTesting(
-            new String[] {
-              "project",
-              "--plugin",
-              "generic-graph",
-              "--target",
-              "render-metadata",
-              "--view",
-              "sequence-fragments-view",
-              "--input",
-              source.toString()
-            },
-            "",
-            env);
+    CliResult renderMetadata = runRenderMetadata(env, source, "sequence-fragments-view");
 
     JsonNode renderMetadataData = okData(renderMetadata);
     assertThat(renderMetadataData.at("/nodes/cf-availability/type").asText())
@@ -250,54 +136,20 @@ class MainTest {
     Path renderMetadataFile =
         writeStdout("sequence-fragments-render-metadata.json", renderMetadata);
 
-    CliResult layout =
-        Main.executeForTesting(
-            new String[] {
-              "layout", "--plugin", "elk-layout", "--input", layoutRequestFile.toString()
-            },
-            "",
-            env);
+    CliResult layout = runLayout(env, layoutRequestFile);
 
     JsonNode layoutData = okData(layout);
     assertThat(layoutData.at("/view_id").asText()).isEqualTo("sequence-fragments-view");
     Path layoutFile = writeStdout("sequence-fragments-layout-result.json", layout);
 
-    CliResult render =
-        Main.executeForTesting(
-            new String[] {
-              "render",
-              "--plugin",
-              "render",
-              "--policy",
-              root.resolve("fixtures/render-policy/uml-svg.json").toString(),
-              "--metadata",
-              renderMetadataFile.toString(),
-              "--input",
-              layoutFile.toString()
-            },
-            "",
-            env);
+    CliResult render = runRender(env, root, renderMetadataFile, layoutFile);
 
     JsonNode renderData = okData(render);
     String svg = renderData.at("/artifacts/0/content").asText();
     assertThat(renderData.at("/artifacts/0/artifact_kind").asText()).isEqualTo("svg");
     assertThat(svg).contains("data-dediren-sequence-combined-fragment=\"cf-availability\"");
 
-    CliResult export =
-        Main.executeForTesting(
-            new String[] {
-              "export",
-              "--plugin",
-              "uml-xmi",
-              "--policy",
-              root.resolve("fixtures/export-policy/default-uml-xmi.json").toString(),
-              "--source",
-              source.toString(),
-              "--layout",
-              layoutFile.toString()
-            },
-            "",
-            env);
+    CliResult export = runExport(env, root, source, layoutFile);
 
     JsonNode exportData = okData(export);
     String xmi = exportData.at("/content").asText();
@@ -311,60 +163,20 @@ class MainTest {
     Path root = workspaceRoot();
     Path source = root.resolve("fixtures/source/valid-uml-state-machine-basic.json");
 
-    CliResult validate =
-        Main.executeForTesting(
-            new String[] {
-              "validate",
-              "--plugin",
-              "generic-graph",
-              "--profile",
-              "uml",
-              "--input",
-              source.toString()
-            },
-            "",
-            env);
+    CliResult validate = runValidate(env, source);
 
     JsonNode validateData = okData(validate);
     assertThat(validateData.at("/semantic_profile").asText()).isEqualTo("uml");
     assertThat(validateData.at("/node_count").asInt()).isEqualTo(9);
     assertThat(validateData.at("/relationship_count").asInt()).isEqualTo(6);
 
-    CliResult layoutRequest =
-        Main.executeForTesting(
-            new String[] {
-              "project",
-              "--plugin",
-              "generic-graph",
-              "--target",
-              "layout-request",
-              "--view",
-              "state-machine-view",
-              "--input",
-              source.toString()
-            },
-            "",
-            env);
+    CliResult layoutRequest = runLayoutRequest(env, source, "state-machine-view");
 
     JsonNode layoutRequestData = okData(layoutRequest);
     assertThat(layoutRequestData.at("/view_id").asText()).isEqualTo("state-machine-view");
     Path layoutRequestFile = writeStdout("state-machine-layout-request.json", layoutRequest);
 
-    CliResult renderMetadata =
-        Main.executeForTesting(
-            new String[] {
-              "project",
-              "--plugin",
-              "generic-graph",
-              "--target",
-              "render-metadata",
-              "--view",
-              "state-machine-view",
-              "--input",
-              source.toString()
-            },
-            "",
-            env);
+    CliResult renderMetadata = runRenderMetadata(env, source, "state-machine-view");
 
     JsonNode renderMetadataData = okData(renderMetadata);
     assertThat(renderMetadataData.at("/nodes/payment-choice/type").asText())
@@ -372,33 +184,13 @@ class MainTest {
     assertThat(renderMetadataData.at("/edges/t-approve/type").asText()).isEqualTo("Transition");
     Path renderMetadataFile = writeStdout("state-machine-render-metadata.json", renderMetadata);
 
-    CliResult layout =
-        Main.executeForTesting(
-            new String[] {
-              "layout", "--plugin", "elk-layout", "--input", layoutRequestFile.toString()
-            },
-            "",
-            env);
+    CliResult layout = runLayout(env, layoutRequestFile);
 
     JsonNode layoutData = okData(layout);
     assertThat(layoutData.at("/view_id").asText()).isEqualTo("state-machine-view");
     Path layoutFile = writeStdout("state-machine-layout-result.json", layout);
 
-    CliResult render =
-        Main.executeForTesting(
-            new String[] {
-              "render",
-              "--plugin",
-              "render",
-              "--policy",
-              root.resolve("fixtures/render-policy/uml-svg.json").toString(),
-              "--metadata",
-              renderMetadataFile.toString(),
-              "--input",
-              layoutFile.toString()
-            },
-            "",
-            env);
+    CliResult render = runRender(env, root, renderMetadataFile, layoutFile);
 
     JsonNode renderData = okData(render);
     String svg = renderData.at("/artifacts/0/content").asText();
@@ -410,21 +202,7 @@ class MainTest {
             "data-dediren-node-id=\"draft\"",
             "data-dediren-edge-id=\"t-submit\"");
 
-    CliResult export =
-        Main.executeForTesting(
-            new String[] {
-              "export",
-              "--plugin",
-              "uml-xmi",
-              "--policy",
-              root.resolve("fixtures/export-policy/default-uml-xmi.json").toString(),
-              "--source",
-              source.toString(),
-              "--layout",
-              layoutFile.toString()
-            },
-            "",
-            env);
+    CliResult export = runExport(env, root, source, layoutFile);
 
     JsonNode exportData = okData(export);
     String xmi = exportData.at("/content").asText();
@@ -438,40 +216,14 @@ class MainTest {
     Path root = workspaceRoot();
     Path source = root.resolve("fixtures/source/valid-uml-use-case-basic.json");
 
-    CliResult validate =
-        Main.executeForTesting(
-            new String[] {
-              "validate",
-              "--plugin",
-              "generic-graph",
-              "--profile",
-              "uml",
-              "--input",
-              source.toString()
-            },
-            "",
-            env);
+    CliResult validate = runValidate(env, source);
 
     JsonNode validateData = okData(validate);
     assertThat(validateData.at("/semantic_profile").asText()).isEqualTo("uml");
     assertThat(validateData.at("/node_count").asInt()).isEqualTo(9);
     assertThat(validateData.at("/relationship_count").asInt()).isEqualTo(5);
 
-    CliResult layoutRequest =
-        Main.executeForTesting(
-            new String[] {
-              "project",
-              "--plugin",
-              "generic-graph",
-              "--target",
-              "layout-request",
-              "--view",
-              "use-case-view",
-              "--input",
-              source.toString()
-            },
-            "",
-            env);
+    CliResult layoutRequest = runLayoutRequest(env, source, "use-case-view");
 
     JsonNode layoutRequestData = okData(layoutRequest);
     assertThat(layoutRequestData.at("/view_id").asText()).isEqualTo("use-case-view");
@@ -480,21 +232,7 @@ class MainTest {
         .contains("customer", "place-order", "payment-extension");
     Path layoutRequestFile = writeStdout("use-case-layout-request.json", layoutRequest);
 
-    CliResult renderMetadata =
-        Main.executeForTesting(
-            new String[] {
-              "project",
-              "--plugin",
-              "generic-graph",
-              "--target",
-              "render-metadata",
-              "--view",
-              "use-case-view",
-              "--input",
-              source.toString()
-            },
-            "",
-            env);
+    CliResult renderMetadata = runRenderMetadata(env, source, "use-case-view");
 
     JsonNode renderMetadataData = okData(renderMetadata);
     assertThat(renderMetadataData.at("/nodes/customer/type").asText()).isEqualTo("Actor");
@@ -507,13 +245,7 @@ class MainTest {
         .isEqualTo("payment-extension");
     Path renderMetadataFile = writeStdout("use-case-render-metadata.json", renderMetadata);
 
-    CliResult layout =
-        Main.executeForTesting(
-            new String[] {
-              "layout", "--plugin", "elk-layout", "--input", layoutRequestFile.toString()
-            },
-            "",
-            env);
+    CliResult layout = runLayout(env, layoutRequestFile);
 
     JsonNode layoutData = okData(layout);
     assertThat(layoutData.at("/view_id").asText()).isEqualTo("use-case-view");
@@ -522,21 +254,7 @@ class MainTest {
         .contains("customer", "place-order", "authenticate-customer");
     Path layoutFile = writeStdout("use-case-layout-result.json", layout);
 
-    CliResult render =
-        Main.executeForTesting(
-            new String[] {
-              "render",
-              "--plugin",
-              "render",
-              "--policy",
-              root.resolve("fixtures/render-policy/uml-svg.json").toString(),
-              "--metadata",
-              renderMetadataFile.toString(),
-              "--input",
-              layoutFile.toString()
-            },
-            "",
-            env);
+    CliResult render = runRender(env, root, renderMetadataFile, layoutFile);
 
     JsonNode renderData = okData(render);
     String svg = renderData.at("/artifacts/0/content").asText();
@@ -552,21 +270,7 @@ class MainTest {
             "data-dediren-edge-id=\"include-authentication\"",
             "data-dediren-edge-id=\"extend-discount\"");
 
-    CliResult export =
-        Main.executeForTesting(
-            new String[] {
-              "export",
-              "--plugin",
-              "uml-xmi",
-              "--policy",
-              root.resolve("fixtures/export-policy/default-uml-xmi.json").toString(),
-              "--source",
-              source.toString(),
-              "--layout",
-              layoutFile.toString()
-            },
-            "",
-            env);
+    CliResult export = runExport(env, root, source, layoutFile);
 
     JsonNode exportData = okData(export);
     String xmi = exportData.at("/content").asText();
@@ -587,40 +291,14 @@ class MainTest {
     Path root = workspaceRoot();
     Path source = root.resolve("fixtures/source/valid-uml-component-basic.json");
 
-    CliResult validate =
-        Main.executeForTesting(
-            new String[] {
-              "validate",
-              "--plugin",
-              "generic-graph",
-              "--profile",
-              "uml",
-              "--input",
-              source.toString()
-            },
-            "",
-            env);
+    CliResult validate = runValidate(env, source);
 
     JsonNode validateData = okData(validate);
     assertThat(validateData.at("/semantic_profile").asText()).isEqualTo("uml");
     assertThat(validateData.at("/node_count").asInt()).isEqualTo(8);
     assertThat(validateData.at("/relationship_count").asInt()).isEqualTo(4);
 
-    CliResult layoutRequest =
-        Main.executeForTesting(
-            new String[] {
-              "project",
-              "--plugin",
-              "generic-graph",
-              "--target",
-              "layout-request",
-              "--view",
-              "component-view",
-              "--input",
-              source.toString()
-            },
-            "",
-            env);
+    CliResult layoutRequest = runLayoutRequest(env, source, "component-view");
 
     JsonNode layoutRequestData = okData(layoutRequest);
     assertThat(layoutRequestData.at("/view_id").asText()).isEqualTo("component-view");
@@ -629,21 +307,7 @@ class MainTest {
         .contains("component-order-api", "port-rest-api", "interface-payment-gateway");
     Path layoutRequestFile = writeStdout("component-layout-request.json", layoutRequest);
 
-    CliResult renderMetadata =
-        Main.executeForTesting(
-            new String[] {
-              "project",
-              "--plugin",
-              "generic-graph",
-              "--target",
-              "render-metadata",
-              "--view",
-              "component-view",
-              "--input",
-              source.toString()
-            },
-            "",
-            env);
+    CliResult renderMetadata = runRenderMetadata(env, source, "component-view");
 
     JsonNode renderMetadataData = okData(renderMetadata);
     assertThat(renderMetadataData.at("/nodes/component-order-api/type").asText())
@@ -653,13 +317,7 @@ class MainTest {
         .isEqualTo("Usage");
     Path renderMetadataFile = writeStdout("component-render-metadata.json", renderMetadata);
 
-    CliResult layout =
-        Main.executeForTesting(
-            new String[] {
-              "layout", "--plugin", "elk-layout", "--input", layoutRequestFile.toString()
-            },
-            "",
-            env);
+    CliResult layout = runLayout(env, layoutRequestFile);
 
     JsonNode layoutData = okData(layout);
     assertThat(layoutData.at("/view_id").asText()).isEqualTo("component-view");
@@ -668,21 +326,7 @@ class MainTest {
         .contains("component-order-api", "port-rest-api", "component-payment-adapter");
     Path layoutFile = writeStdout("component-layout-result.json", layout);
 
-    CliResult render =
-        Main.executeForTesting(
-            new String[] {
-              "render",
-              "--plugin",
-              "render",
-              "--policy",
-              root.resolve("fixtures/render-policy/uml-svg.json").toString(),
-              "--metadata",
-              renderMetadataFile.toString(),
-              "--input",
-              layoutFile.toString()
-            },
-            "",
-            env);
+    CliResult render = runRender(env, root, renderMetadataFile, layoutFile);
 
     JsonNode renderData = okData(render);
     String svg = renderData.at("/artifacts/0/content").asText();
@@ -694,21 +338,7 @@ class MainTest {
             "data-dediren-edge-id=\"order-api-uses-payment\"",
             "PaymentGateway");
 
-    CliResult export =
-        Main.executeForTesting(
-            new String[] {
-              "export",
-              "--plugin",
-              "uml-xmi",
-              "--policy",
-              root.resolve("fixtures/export-policy/default-uml-xmi.json").toString(),
-              "--source",
-              source.toString(),
-              "--layout",
-              layoutFile.toString()
-            },
-            "",
-            env);
+    CliResult export = runExport(env, root, source, layoutFile);
 
     JsonNode exportData = okData(export);
     String xmi = exportData.at("/content").asText();
@@ -727,40 +357,14 @@ class MainTest {
     Path root = workspaceRoot();
     Path source = root.resolve("fixtures/source/valid-uml-deployment-basic.json");
 
-    CliResult validate =
-        Main.executeForTesting(
-            new String[] {
-              "validate",
-              "--plugin",
-              "generic-graph",
-              "--profile",
-              "uml",
-              "--input",
-              source.toString()
-            },
-            "",
-            env);
+    CliResult validate = runValidate(env, source);
 
     JsonNode validateData = okData(validate);
     assertThat(validateData.at("/semantic_profile").asText()).isEqualTo("uml");
     assertThat(validateData.at("/node_count").asInt()).isEqualTo(7);
     assertThat(validateData.at("/relationship_count").asInt()).isEqualTo(4);
 
-    CliResult layoutRequest =
-        Main.executeForTesting(
-            new String[] {
-              "project",
-              "--plugin",
-              "generic-graph",
-              "--target",
-              "layout-request",
-              "--view",
-              "deployment-view",
-              "--input",
-              source.toString()
-            },
-            "",
-            env);
+    CliResult layoutRequest = runLayoutRequest(env, source, "deployment-view");
 
     JsonNode layoutRequestData = okData(layoutRequest);
     assertThat(layoutRequestData.at("/view_id").asText()).isEqualTo("deployment-view");
@@ -769,21 +373,7 @@ class MainTest {
         .contains("device-prod-node", "ee-orders-runtime", "artifact-orders-service");
     Path layoutRequestFile = writeStdout("deployment-layout-request.json", layoutRequest);
 
-    CliResult renderMetadata =
-        Main.executeForTesting(
-            new String[] {
-              "project",
-              "--plugin",
-              "generic-graph",
-              "--target",
-              "render-metadata",
-              "--view",
-              "deployment-view",
-              "--input",
-              source.toString()
-            },
-            "",
-            env);
+    CliResult renderMetadata = runRenderMetadata(env, source, "deployment-view");
 
     JsonNode renderMetadataData = okData(renderMetadata);
     assertThat(renderMetadataData.at("/nodes/device-prod-node/type").asText()).isEqualTo("Device");
@@ -795,13 +385,7 @@ class MainTest {
         .isEqualTo("Manifestation");
     Path renderMetadataFile = writeStdout("deployment-render-metadata.json", renderMetadata);
 
-    CliResult layout =
-        Main.executeForTesting(
-            new String[] {
-              "layout", "--plugin", "elk-layout", "--input", layoutRequestFile.toString()
-            },
-            "",
-            env);
+    CliResult layout = runLayout(env, layoutRequestFile);
 
     JsonNode layoutData = okData(layout);
     assertThat(layoutData.at("/view_id").asText()).isEqualTo("deployment-view");
@@ -810,21 +394,7 @@ class MainTest {
         .contains("device-prod-node", "ee-orders-runtime", "deployment-spec-orders");
     Path layoutFile = writeStdout("deployment-layout-result.json", layout);
 
-    CliResult render =
-        Main.executeForTesting(
-            new String[] {
-              "render",
-              "--plugin",
-              "render",
-              "--policy",
-              root.resolve("fixtures/render-policy/uml-svg.json").toString(),
-              "--metadata",
-              renderMetadataFile.toString(),
-              "--input",
-              layoutFile.toString()
-            },
-            "",
-            env);
+    CliResult render = runRender(env, root, renderMetadataFile, layoutFile);
 
     JsonNode renderData = okData(render);
     String svg = renderData.at("/artifacts/0/content").asText();
@@ -836,21 +406,7 @@ class MainTest {
             "data-dediren-node-shape=\"uml_artifact\"",
             "data-dediren-edge-id=\"deploy-orders-service\"");
 
-    CliResult export =
-        Main.executeForTesting(
-            new String[] {
-              "export",
-              "--plugin",
-              "uml-xmi",
-              "--policy",
-              root.resolve("fixtures/export-policy/default-uml-xmi.json").toString(),
-              "--source",
-              source.toString(),
-              "--layout",
-              layoutFile.toString()
-            },
-            "",
-            env);
+    CliResult export = runExport(env, root, source, layoutFile);
 
     JsonNode exportData = okData(export);
     String xmi = exportData.at("/content").asText();
@@ -862,6 +418,95 @@ class MainTest {
             "xmi:type=\"uml:Deployment\"",
             "xmi:type=\"uml:Manifestation\"",
             "xmi:type=\"uml:CommunicationPath\"");
+  }
+
+  private CliResult runValidate(Map<String, String> env, Path source) throws Exception {
+    return Main.executeForTesting(
+        new String[] {
+          "validate", "--plugin", "generic-graph", "--profile", "uml", "--input", source.toString()
+        },
+        "",
+        env);
+  }
+
+  private CliResult runLayoutRequest(Map<String, String> env, Path source, String viewId)
+      throws Exception {
+    return Main.executeForTesting(
+        new String[] {
+          "project",
+          "--plugin",
+          "generic-graph",
+          "--target",
+          "layout-request",
+          "--view",
+          viewId,
+          "--input",
+          source.toString()
+        },
+        "",
+        env);
+  }
+
+  private CliResult runRenderMetadata(Map<String, String> env, Path source, String viewId)
+      throws Exception {
+    return Main.executeForTesting(
+        new String[] {
+          "project",
+          "--plugin",
+          "generic-graph",
+          "--target",
+          "render-metadata",
+          "--view",
+          viewId,
+          "--input",
+          source.toString()
+        },
+        "",
+        env);
+  }
+
+  private CliResult runLayout(Map<String, String> env, Path layoutRequestFile) throws Exception {
+    return Main.executeForTesting(
+        new String[] {"layout", "--plugin", "elk-layout", "--input", layoutRequestFile.toString()},
+        "",
+        env);
+  }
+
+  private CliResult runRender(
+      Map<String, String> env, Path root, Path renderMetadataFile, Path layoutFile)
+      throws Exception {
+    return Main.executeForTesting(
+        new String[] {
+          "render",
+          "--plugin",
+          "render",
+          "--policy",
+          root.resolve("fixtures/render-policy/uml-svg.json").toString(),
+          "--metadata",
+          renderMetadataFile.toString(),
+          "--input",
+          layoutFile.toString()
+        },
+        "",
+        env);
+  }
+
+  private CliResult runExport(Map<String, String> env, Path root, Path source, Path layoutFile)
+      throws Exception {
+    return Main.executeForTesting(
+        new String[] {
+          "export",
+          "--plugin",
+          "uml-xmi",
+          "--policy",
+          root.resolve("fixtures/export-policy/default-uml-xmi.json").toString(),
+          "--source",
+          source.toString(),
+          "--layout",
+          layoutFile.toString()
+        },
+        "",
+        env);
   }
 
   private Path writeStdout(String fileName, CliResult result) throws Exception {
