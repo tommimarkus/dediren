@@ -94,7 +94,7 @@ semantic rules apply:
 | --- | --- | --- | --- |
 | Generic | (unset) | `generic.*` | `generic` |
 | ArchiMate | `"archimate"` | ArchiMate 3.2 element/relationship names | `archimate` |
-| UML | `"uml"` | UML 2.5.1 metaclass names | `uml-class`, `uml-data`, `uml-activity`, `uml-sequence`, `uml-state-machine`, `uml-use-case`, `uml-component` |
+| UML | `"uml"` | UML 2.5.1 metaclass names | `uml-class`, `uml-data`, `uml-activity`, `uml-sequence`, `uml-state-machine`, `uml-use-case`, `uml-component`, `uml-deployment` |
 
 ```json
 {

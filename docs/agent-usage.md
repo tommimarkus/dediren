@@ -122,8 +122,8 @@ envelope `status` stays `ok`. Because the document always carries a
 
 For UML® SVG notation or XMI export, use `semantic_profile: "uml"` and the
 `uml-xmi` plugin. Supported UML view kinds are `uml-class`, `uml-data`,
-`uml-activity`, `uml-sequence`, `uml-state-machine`, `uml-use-case`, and
-`uml-component`.
+`uml-activity`, `uml-sequence`, `uml-state-machine`, `uml-use-case`,
+`uml-component`, and `uml-deployment`.
 
 ## ArchiMate Handoff
 
@@ -216,6 +216,26 @@ jq -r '.data.artifacts[] | select(.artifact_kind=="svg") | .content' render-resu
 ```
 
 The `render` plugin also emits a base64-encoded `png` artifact (`encoding: base64`) when the policy includes a `raster` block (e.g. `"raster": { "scale": 2 }`); decode it with `base64 -d > diagram.png`.
+
+## Render Policy Options
+
+The render policy owns SVG presentation. Beyond `accessibility` (above) and
+`raster` (PNG), these options shape output:
+
+- **Interactive SVG.** `interactive` is `none` (default — a static SVG with no
+  embedded script), `svg` (a self-contained SVG that highlights a node's edges
+  on click), `html` (an HTML page wrapping that SVG), or `both` (an `svg` and an
+  `html` artifact). The render result is an ordered `artifacts[]` list — select
+  the one you want by `artifact_kind`. `style.interaction.highlight_stroke` and
+  `style.interaction.highlight_stroke_width` tune the highlight.
+- **Edge label backing.** Edge labels default to outlined text; set
+  `style.edge.label_presentation` to `background` for a filled label backing.
+- **UML association-end adornments.** In UML class diagrams, multiplicity and
+  role carried in render metadata (`properties.uml.{source,target}_multiplicity`
+  and `properties.uml.{source,target}_role`) are drawn beside their own end of
+  the edge, each wrapped in a
+  `data-dediren-edge-adornment="<source|target>_<multiplicity|role>"` group so
+  consumers can find them.
 
 ## UML Sequence Handoff
 
@@ -562,7 +582,15 @@ Java 21 or newer. It does not use external layout adapters. Use
 `layout_preferences.mode: "flow"` for directed diagrams that need ELK Layered
 placement and routing. Use `layout_preferences.mode: "packed"` only for
 edge-less node/group maps; this selects official ELK Rectangle Packing and
-returns no edge routes. The `algorithm` option selects the layout algorithm; `layered` (the default) is currently the only supported value. The `routing.style` option accepts `orthogonal` (default), `polyline`, or `spline`. Layered phase strategies (`cycle_breaking`, `layering.strategy`, `crossing.strategy`, `crossing.greedy_switch`, `placement.strategy`) are configurable under `layout_preferences`; see the Layout feature page for values. Graph tuning (`compaction`, `components`, `high_degree_nodes`, `thoroughness`) is also configurable under `layout_preferences`; see the Layout feature page. Individual nodes accept placement hints (`layer_constraint`, `partition`); see the Layout feature page.
+returns no edge routes. The `algorithm` option selects the layout algorithm
+(`layered`, the default, is currently the only value). `routing.style` accepts
+`orthogonal` (default), `polyline`, or `spline`. Layered phase strategies
+(`cycle_breaking`, `layering.strategy`, `crossing.strategy`,
+`crossing.greedy_switch`, `placement.strategy`), graph tuning (`compaction`,
+`components`, `high_degree_nodes`, `thoroughness`), and per-node placement hints
+(`layer_constraint`, `partition`) are also configurable under
+`layout_preferences`; see `schemas/layout-request.schema.json` for the allowed
+values.
 
 ## Export
 

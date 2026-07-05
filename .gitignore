@@ -8,6 +8,7 @@
 .mvn/wrapper/maven-wrapper.jar
 .mvn/wrapper/MavenWrapperDownloader.class
 **/*.svg
+!/docs/assets/pipeline.svg
 .codex/rules/default.rules
 .codex/config.toml
 .mcp.json

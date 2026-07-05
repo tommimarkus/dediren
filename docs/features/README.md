@@ -60,7 +60,7 @@ validate -> project --target layout-request -> layout -> validate-layout -> expo
 | --- | --- | --- | --- | --- |
 | Generic graph | (default) | `generic` | — | SVG only |
 | ArchiMate | `archimate` | `archimate` | `archimate-oef` | OEF XML + SVG |
-| UML | `uml` | `uml-class`, `uml-data`, `uml-activity`, `uml-sequence`, `uml-state-machine`, `uml-use-case`, `uml-component` | `uml-xmi` | XMI XML + SVG |
+| UML | `uml` | `uml-class`, `uml-data`, `uml-activity`, `uml-sequence`, `uml-state-machine`, `uml-use-case`, `uml-component`, `uml-deployment` | `uml-xmi` | XMI XML + SVG |
 
 ## Keeping This Documentation Current
 

@@ -93,7 +93,8 @@ other views to represent them.
 
 Use `semantic_profile: "uml"` and the `uml-xmi` plugin. View kinds: `uml-class`,
 `uml-data`, `uml-activity`, `uml-sequence`, `uml-state-machine`, `uml-use-case`,
-`uml-component`. For SVG of the notation diagrams below, also generate render
+`uml-component`, `uml-deployment`. For SVG of the notation diagrams below, also
+generate render
 metadata (see [SVG Rendering](svg-render.md#notation-rendering--render-metadata)).
 
 The following sections summarize each UML notation's supported vocabulary and

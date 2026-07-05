@@ -1,0 +1,29 @@
+{
+  "model_schema_version": "model.schema.v1",
+  "nodes": [
+    { "id": "src", "type": "generic.component", "label": "Source model", "properties": {} },
+    { "id": "req", "type": "generic.component", "label": "Layout request", "properties": {} },
+    { "id": "res", "type": "generic.component", "label": "Layout result", "properties": {} },
+    { "id": "svg", "type": "generic.component", "label": "SVG / PNG", "properties": {} },
+    { "id": "xml", "type": "generic.component", "label": "OEF / XMI XML", "properties": {} }
+  ],
+  "relationships": [
+    { "id": "e-project", "type": "generic.calls", "source": "src", "target": "req", "label": "project", "properties": {} },
+    { "id": "e-layout", "type": "generic.calls", "source": "req", "target": "res", "label": "layout", "properties": {} },
+    { "id": "e-render", "type": "generic.calls", "source": "res", "target": "svg", "label": "render", "properties": {} },
+    { "id": "e-export", "type": "generic.calls", "source": "res", "target": "xml", "label": "export", "properties": {} }
+  ],
+  "plugins": {
+    "generic-graph": {
+      "views": [
+        {
+          "id": "pipeline",
+          "label": "Dediren pipeline",
+          "nodes": ["src", "req", "res", "svg", "xml"],
+          "relationships": ["e-project", "e-layout", "e-render", "e-export"],
+          "groups": []
+        }
+      ]
+    }
+  }
+}
