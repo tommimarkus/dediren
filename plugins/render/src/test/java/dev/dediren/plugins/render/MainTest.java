@@ -1100,6 +1100,11 @@ class MainTest {
       assertThat(marker.getAttribute("data-dediren-edge-marker-end")).isEqualTo("hollow_triangle");
       assertThat(markerPath.getAttribute("fill")).isEqualTo("#ffffff");
       assertThat(markerPath.getAttribute("stroke")).isEqualTo("#374151");
+      // The arrow geometry points to x=9; anchoring refX there keeps the whole arrowhead on the
+      // stroke side of the endpoint so the (later-painted, opaque) target node cannot clip its tip.
+      assertThat(marker.getAttribute("refX"))
+          .as("end marker anchors at the arrow tip so the target node border does not clip it")
+          .isEqualTo("9");
     }
 
     @Test
@@ -1112,6 +1117,15 @@ class MainTest {
 
       assertThat(path.getAttribute("marker-start")).isEqualTo("url(#marker-start-order-has-lines)");
       assertThat(content).contains("data-dediren-edge-marker-start=\"filled_diamond\"");
+
+      // A start marker's trailing extent is x=1; anchoring refX there keeps the whole marker on the
+      // stroke side of the endpoint so the (later-painted, opaque) source node cannot clip it.
+      Element marker =
+          marker(document, "marker-start-order-has-lines", "data-dediren-edge-marker-start");
+      assertThat(marker.getAttribute("refX"))
+          .as(
+              "start marker anchors at its trailing vertex so the source node border does not clip it")
+          .isEqualTo("1");
     }
 
     @Test

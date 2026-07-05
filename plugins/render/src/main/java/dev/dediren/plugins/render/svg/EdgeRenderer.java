@@ -75,13 +75,20 @@ public final class EdgeRenderer {
                   + stroke
                   + "\" stroke-width=\"1\"/>";
         };
+    // Anchor the marker at its endpoint-facing extent so the whole adornment stays on the
+    // stroke side of the endpoint. Endpoints sit on node borders, and nodes paint over edges,
+    // so a centred marker (refX=5) has its far half hidden by the node. End markers point
+    // forward (tip at x=9); start markers trail back (base at x=1).
+    String refX = "start".equals(side) ? "1" : "9";
     return "<marker id=\""
         + attr(id)
         + "\" "
         + attribute
         + "=\""
         + markerName
-        + "\" markerWidth=\"10\" markerHeight=\"10\" refX=\"5\" refY=\"5\" orient=\"auto\">"
+        + "\" markerWidth=\"10\" markerHeight=\"10\" refX=\""
+        + refX
+        + "\" refY=\"5\" orient=\"auto\">"
         + body
         + "</marker>";
   }
