@@ -368,6 +368,35 @@ class SchemaValidatorTest {
   }
 
   @Test
+  void nodePlacementHintsValidateAndRejectUnknown() throws Exception {
+    var mapper = dev.dediren.contracts.json.JsonSupport.objectMapper();
+    String sourceTemplate =
+        """
+        {
+          "model_schema_version": "model.schema.v1",
+          "nodes": [ { "id": "n1", "type": "Component", "label": "N1", "properties": {},
+                      "partition": 1, "layer_constraint": "%s" } ],
+          "relationships": [],
+          "plugins": {}
+        }
+        """;
+    assertThat(
+            SchemaAssertions.validate(
+                workspaceRoot(),
+                "schemas/model.schema.json",
+                mapper.readTree(String.format(sourceTemplate, "first"))))
+        .describedAs("valid node hints must validate")
+        .isEmpty();
+    assertThat(
+            SchemaAssertions.validate(
+                workspaceRoot(),
+                "schemas/model.schema.json",
+                mapper.readTree(String.format(sourceTemplate, "middle"))))
+        .describedAs("unknown layer_constraint must be rejected")
+        .isNotEmpty();
+  }
+
+  @Test
   void firstPartyPluginManifestsMatchSchema() {
     for (String manifest : PLUGIN_MANIFESTS) {
       assertThat(
