@@ -13,13 +13,15 @@ validate -> project --target layout-request -> layout -> validate-layout -> rend
 validate -> project --target layout-request -> layout -> validate-layout -> export
 ```
 
-For SVG of a UML notation view (sequence, state machine, use case, component,
-deployment), also generate **render metadata** so the renderer receives the
-notation semantics:
+UML notation views also need generated **render metadata** so the renderer
+receives the notation semantics:
 
 ```text
 project --target render-metadata --> (passed to render with --metadata)
 ```
+
+Which views, the commands, and the schema: [SVG Rendering → Notation Rendering
+& Render Metadata](svg-render.md).
 
 ## Command Handoff
 

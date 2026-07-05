@@ -70,7 +70,7 @@ codes (full repair guidance in
 - **CalVer version** (`YYYY.0M.MICRO`) encodes the release date, **not**
   compatibility. Backwards-incompatible changes are communicated through release
   notes and schema-id changes — never inferred from the version number. See
-  [Distribution & Runtime → Versioning](distribution-and-runtime.md#versioning).
+  [Distribution & Runtime → Version Compatibility Signal](distribution-and-runtime.md#version-compatibility-signal).
 
 ## Module Boundaries
 

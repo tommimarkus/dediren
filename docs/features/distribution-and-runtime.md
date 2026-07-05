@@ -72,15 +72,14 @@ Plugin child processes receive only the variables listed in their manifests.
 ## Startup Optimization (Class-Data-Sharing)
 
 Each `bin/dediren*` launcher auto-creates a Class-Data-Sharing archive
-(`-XX:+AutoCreateSharedArchive`) on first invocation to speed JVM startup on
-subsequent calls (one `.jsa` per launcher). Archives are written to
-`<bundle>/cds/` by default, falling back to
-`${XDG_CACHE_HOME:-$HOME/.cache}/dediren/cds` if the bundle directory is
-read-only. Set `DEDIREN_CDS_DIR` to relocate them. The feature degrades silently
-if the archive directory is unwritable — startup continues at normal speed.
-Launchers pass `-Xlog:cds=off`, which suppresses the JVM's archive-dump warnings
-(`[warning][cds] ... Old class has been linked`, `... Unsupported location`) so
-each invocation stays quiet on stdout/stderr while keeping the CDS speedup.
+(`-XX:+AutoCreateSharedArchive`, one `.jsa` per launcher) on first invocation to
+speed JVM startup on subsequent calls, and passes `-Xlog:cds=off`, which
+suppresses the JVM's archive-dump warnings (`[warning][cds] ... Old class has
+been linked`, `... Unsupported location`) so each invocation stays quiet on
+stdout/stderr while keeping the CDS speedup. Archive locations, the
+`DEDIREN_CDS_DIR` override, silent degradation when the archive directory is
+unwritable, and seeding guidance: [Agent Usage → Plugin
+Environment](../agent-usage.md#plugin-environment).
 
 ## Release Artifacts & Verification
 

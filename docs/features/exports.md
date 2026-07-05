@@ -123,30 +123,15 @@ Deferred: `InteractionUse`, `GeneralOrdering`, `ignore`, `consider`, and UMLDI.
 
 ### State machine — `valid-uml-state-machine-basic.json`
 
-Vocabulary: `StateMachine`, `Region`, `State`, `FinalState`, `Pseudostate`,
-`Transition`. `StateMachine` and `Region` are semantic-backed view groups
-(`semantic_source_id`); states are nodes and transitions are relationships.
-
-Pseudostate kinds: `initial`, `deepHistory`, `shallowHistory`, `join`, `fork`,
-`junction`, `choice`, `entryPoint`, `exitPoint`, `terminate`. Transition kinds:
-`internal`, `local`, `external`.
-
-Deferred: `ConnectionPointReference`, `ProtocolStateMachine`,
-`ProtocolTransition`, submachine states, orthogonal multi-region internals,
-trigger event metaclasses, effects as behavior nodes, and UMLDI.
+Vocabulary, semantic-backed groups, pseudostate/transition kinds, and deferred
+constructs: [Agent Usage → UML State Machine
+Handoff](../agent-usage.md#uml-state-machine-handoff).
 
 ### Use case — `valid-uml-use-case-basic.json`
 
-Vocabulary: `Actor`, `UseCase`, `ExtensionPoint` plus `Association`, `Include`,
-`Extend`. `Include`/`Extend` connect `UseCase -> UseCase`; `Association` may
-connect actors and use cases in either direction. The subject boundary is a
-semantic-backed group whose `semantic_source_id` points at a UML structural
-classifier. `UseCase.properties.uml.subject` references that classifier;
-`ExtensionPoint.properties.uml.use_case` references its owning use case;
-`Extend.properties.uml.extension_point`, when present, must reference an
-extension point owned by the extended target use case.
-
-Deferred: use-case generalization, collaboration use-case realizations, UMLDI.
+Vocabulary, authoring rules, and deferred constructs: [Agent Usage → UML Use
+Case Handoff](../agent-usage.md#uml-use-case-handoff). Additionally:
+`Association` may connect actors and use cases in either direction.
 
 ### Component — `valid-uml-component-basic.json`
 
@@ -162,16 +147,11 @@ Deferred: composite structure, connectors, collaborations, UMLDI.
 
 ### Deployment — `valid-uml-deployment-basic.json`
 
-Vocabulary: `Node`, `Device`, `ExecutionEnvironment`, `Artifact`,
-`DeploymentSpecification`, and manifested structural classifiers. Relationships:
-`Deployment`, `Manifestation`, `CommunicationPath`. Optional
-`ExecutionEnvironment.properties.uml.node` marks nested runtimes; deployment
-target boundaries are semantic-backed groups. `Deployment` connects an `Artifact`
-or `DeploymentSpecification` to a `Node`/`Device`/`ExecutionEnvironment`;
-`Manifestation` connects an artifact or deployment specification to a structural
-classifier; `CommunicationPath` connects deployment targets in either direction.
-
-Deferred: full nested part/property modeling, deployment slots, UMLDI.
+Vocabulary, authoring rules, and deferred constructs: [Agent Usage → UML
+Deployment Handoff](../agent-usage.md#uml-deployment-handoff). Additionally:
+`Deployment` connects an `Artifact` or `DeploymentSpecification` to a
+`Node`/`Device`/`ExecutionEnvironment`, and `CommunicationPath` connects
+deployment targets in either direction.
 
 ## Related Pages
 
