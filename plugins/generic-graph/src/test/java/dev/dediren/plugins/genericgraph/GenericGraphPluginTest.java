@@ -69,6 +69,52 @@ class GenericGraphPluginTest {
   }
 
   @Test
+  void projectsRelationshipPriorityOntoLayoutEdge() throws Exception {
+    PluginResult result =
+        Main.executeForTesting(
+            new String[] {"project", "--target", "layout-request", "--view", "main"},
+            """
+                {
+                  "model_schema_version": "model.schema.v1",
+                  "nodes": [
+                    { "id": "client", "type": "BusinessActor", "label": "Client", "properties": {} },
+                    { "id": "api", "type": "ApplicationComponent", "label": "API", "properties": {} }
+                  ],
+                  "relationships": [
+                    {
+                      "id": "e1",
+                      "type": "generic.calls",
+                      "source": "client",
+                      "target": "api",
+                      "label": "calls",
+                      "properties": {},
+                      "priority": { "keep_short": 7 }
+                    }
+                  ],
+                  "plugins": {
+                    "generic-graph": {
+                      "views": [
+                        {
+                          "id": "main",
+                          "label": "Main",
+                          "nodes": ["client", "api"],
+                          "relationships": ["e1"]
+                        }
+                      ]
+                    }
+                  }
+                }
+                """);
+
+    JsonNode data = okData(result);
+    JsonNode edge = data.get("edges").get(0);
+
+    assertThat(edge.at("/id").asText()).isEqualTo("e1");
+    assertThat(edge.at("/priority/keep_short").asInt()).isEqualTo(7);
+    assertSchemaValid("schemas/layout-request.schema.json", data);
+  }
+
+  @Test
   void rejectsDuplicateViewIds() throws Exception {
     PluginResult result =
         Main.executeForTesting(

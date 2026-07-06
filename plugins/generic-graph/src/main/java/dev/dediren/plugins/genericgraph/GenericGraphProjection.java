@@ -127,7 +127,8 @@ final class GenericGraphProjection {
               relationship.target(),
               relationship.label(),
               relationship.id(),
-              relationship.type()));
+              relationship.type(),
+              relationship.priority()));
     }
 
     var selectedNodeIds = new LinkedHashSet<>(selectedView.nodes());
