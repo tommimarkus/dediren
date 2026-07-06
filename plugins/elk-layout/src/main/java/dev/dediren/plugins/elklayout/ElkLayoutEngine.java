@@ -1510,6 +1510,12 @@ final class ElkLayoutEngine {
   private static boolean placementHonorsStraightness(LayoutPreferences preferences) {
     var placement = preferences == null ? null : preferences.placement();
     var strategy = placement == null ? null : placement.strategy();
+    // Deny-list: every placer except SimpleNodePlacer reads PRIORITY_STRAIGHTNESS in ELK 0.11.0, so
+    // only SIMPLE is rejected. Unlike the cycle-breaking/layering allow-lists (which fail safe),
+    // this
+    // fails OPEN if LayoutPlacementStrategy gains a future non-simple placer that ignores
+    // straightness — it would be silently accepted. placementEnumSizeTripwire flags that enum
+    // growth.
     return strategy != LayoutPlacementStrategy.SIMPLE;
   }
 

@@ -3233,4 +3233,13 @@ class ElkLayoutEngineTest {
         new ElkLayoutEngine().layout(edgePriorityRequest(new LayoutEdgePriority(5, 2, 8), null));
     org.junit.jupiter.api.Assertions.assertNotNull(result);
   }
+
+  @Test
+  void placementEnumSizeTripwire() {
+    // placementHonorsStraightness uses a deny-list (only SIMPLE rejected). If
+    // LayoutPlacementStrategy
+    // grows, re-check whether the new placer reads PRIORITY_STRAIGHTNESS; if it does not, add it to
+    // the deny-list so an unsupported keep_straight is rejected rather than silently ignored.
+    org.junit.jupiter.api.Assertions.assertEquals(4, LayoutPlacementStrategy.values().length);
+  }
 }
