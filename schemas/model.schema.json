@@ -55,7 +55,16 @@
         "source": { "type": "string" },
         "target": { "type": "string" },
         "label": { "type": "string" },
-        "properties": { "type": "object", "additionalProperties": true }
+        "properties": { "type": "object", "additionalProperties": true },
+        "priority": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "resist_reversal": { "type": "integer" },
+            "keep_short": { "type": "integer" },
+            "keep_straight": { "type": "integer" }
+          }
+        }
       }
     },
     "genericGraphPluginData": {

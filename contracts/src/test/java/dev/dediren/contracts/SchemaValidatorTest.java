@@ -407,6 +407,36 @@ class SchemaValidatorTest {
     }
   }
 
+  @Test
+  void edgePriorityHintsValidateAndRejectUnknownKey() throws Exception {
+    var mapper = dev.dediren.contracts.json.JsonSupport.objectMapper();
+    String sourceTemplate =
+        """
+        {
+          "model_schema_version": "model.schema.v1",
+          "nodes": [ { "id": "a", "type": "Component", "label": "A", "properties": {} },
+                     { "id": "b", "type": "Component", "label": "B", "properties": {} } ],
+          "relationships": [ { "id": "e1", "type": "flow", "source": "a", "target": "b",
+                               "label": "", "properties": {}, "priority": { %s } } ],
+          "plugins": {}
+        }
+        """;
+    assertThat(
+            SchemaAssertions.validate(
+                workspaceRoot(),
+                "schemas/model.schema.json",
+                mapper.readTree(String.format(sourceTemplate, "\"keep_short\": 2"))))
+        .describedAs("valid edge priority must validate")
+        .isEmpty();
+    assertThat(
+            SchemaAssertions.validate(
+                workspaceRoot(),
+                "schemas/model.schema.json",
+                mapper.readTree(String.format(sourceTemplate, "\"keep_medium\": 2"))))
+        .describedAs("unknown priority key must be rejected")
+        .isNotEmpty();
+  }
+
   private static Path workspaceRoot() {
     return dev.dediren.testsupport.TestSupport.workspaceRoot();
   }

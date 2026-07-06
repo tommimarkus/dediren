@@ -39,7 +39,16 @@
         "target": { "type": "string" },
         "label": { "type": "string" },
         "source_id": { "type": "string" },
-        "relationship_type": { "type": "string", "minLength": 1 }
+        "relationship_type": { "type": "string", "minLength": 1 },
+        "priority": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "resist_reversal": { "type": "integer" },
+            "keep_short": { "type": "integer" },
+            "keep_straight": { "type": "integer" }
+          }
+        }
       }
     },
     "group": {
