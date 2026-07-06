@@ -101,7 +101,12 @@ final class ElkLayeredOptions {
         LayeredOptions.SPACING_PORTS_SURROUNDING, new ElkMargin(PORT_SURROUNDING_SPACING));
     root.setProperty(LayeredOptions.SPACING_NODE_NODE_BETWEEN_LAYERS, nodeSpacing);
     root.setProperty(LayeredOptions.SPACING_EDGE_NODE_BETWEEN_LAYERS, edgeNodeSpacing);
-    root.setProperty(LayeredOptions.SPACING_EDGE_EDGE_BETWEEN_LAYERS, edgeEdgeSpacing);
+    // Between-layer parallel edge risers are pitched to the port pitch, not the (wider) in-layer
+    // edge pitch. When the riser pitch exceeds the port pitch, sibling edges leaving one node side
+    // jog outward after clearing their ports -> a staircase near the node. Clamping to portPort
+    // keeps those exits straight; the wider in-layer SPACING_EDGE_EDGE still spaces unrelated
+    // parallel edges within a layer.
+    root.setProperty(LayeredOptions.SPACING_EDGE_EDGE_BETWEEN_LAYERS, portPortSpacing);
     root.setProperty(LayeredOptions.PORT_SORTING_STRATEGY, PortSortingStrategy.INPUT_ORDER);
     if (preserveModelOrder) {
       root.setProperty(LayeredOptions.CONSIDER_MODEL_ORDER_STRATEGY, OrderingStrategy.PREFER_EDGES);

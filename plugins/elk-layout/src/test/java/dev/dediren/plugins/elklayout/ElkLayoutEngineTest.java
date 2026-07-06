@@ -105,6 +105,33 @@ class ElkLayoutEngineTest {
     assertEquals(true, root.getProperty(LayeredOptions.UNNECESSARY_BENDPOINTS));
   }
 
+  // Regression: sibling edges leaving one node side must not fan out past the port pitch. ELK
+  // spreads parallel risers in the between-layer gap to SPACING_EDGE_EDGE_BETWEEN_LAYERS; when that
+  // exceeds SPACING_PORT_PORT, each edge jogs outward after clearing its port, producing the
+  // staircase near the node. Clamp the between-layer edge pitch to the port pitch so exits stay
+  // straight; the wider in-layer SPACING_EDGE_EDGE still separates unrelated parallel edges.
+  @Test
+  void betweenLayerEdgeSpacingMatchesPortPitchToAvoidFanOutStaircase() {
+    ElkNode root = ElkLayeredOptions.configuredRoot(Direction.RIGHT, null);
+
+    double portPort = root.getProperty(LayeredOptions.SPACING_PORT_PORT);
+    double edgeEdgeBetweenLayers =
+        root.getProperty(LayeredOptions.SPACING_EDGE_EDGE_BETWEEN_LAYERS);
+    double edgeEdgeInLayer = root.getProperty(LayeredOptions.SPACING_EDGE_EDGE);
+
+    assertEquals(
+        portPort,
+        edgeEdgeBetweenLayers,
+        GEOMETRY_EPSILON,
+        "between-layer edge pitch must match the port pitch so fan-out edges leave straight");
+    assertTrue(
+        edgeEdgeBetweenLayers <= edgeEdgeInLayer,
+        "between-layer edge pitch must not exceed the in-layer edge pitch, betweenLayers="
+            + edgeEdgeBetweenLayers
+            + ", inLayer="
+            + edgeEdgeInLayer);
+  }
+
   @Test
   void layeredLayoutPlacesTargetToTheRightAndRoutesTheEdge() {
     LayoutRequest request =
