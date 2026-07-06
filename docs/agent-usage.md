@@ -587,8 +587,9 @@ returns no edge routes. The `algorithm` option selects the layout algorithm
 `orthogonal` (default), `polyline`, or `spline`. Layered phase strategies
 (`cycle_breaking`, `layering.strategy`, `crossing.strategy`,
 `crossing.greedy_switch`, `placement.strategy`), graph tuning (`compaction`,
-`components`, `high_degree_nodes`, `thoroughness`), and per-node placement hints
-(`layer_constraint`, `partition`) are also configurable under
+`components`, `high_degree_nodes`, `thoroughness`), per-node placement hints
+(`layer_constraint`, `partition`), and per-edge priority hints
+(`resist_reversal`, `keep_short`, `keep_straight`) are also configurable under
 `layout_preferences`; see `schemas/layout-request.schema.json` for the allowed
 values.
 

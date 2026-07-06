@@ -71,6 +71,25 @@ ELK places unpartitioned nodes without band ordering.
 
 These hints affect the layered algorithm only; they have no effect when `layout_preferences.mode` is `packed` (which uses rectangle packing).
 
+### Edge priority hints
+
+Per-edge layout hints authored on source-model relationships (they also survive
+on layout-request edges), grouped under an optional `priority` object. All three
+are optional integers and layered-only; higher numbers mean "try harder". They
+are relative weights, so what matters is the ordering between edges.
+
+| Edge hint | ELK phase | Honored only when |
+| --- | --- | --- |
+| `resist_reversal` | cycle-breaking (resist pointing against the flow) | `cycle_breaking` is `greedy` (the default) |
+| `keep_short` | layering (fewer layers spanned) | `layering.strategy` is `network-simplex` (the default) |
+| `keep_straight` | node placement (axis-aligned) | `placement.strategy` is anything except `simple` |
+
+A priority set against the default strategies is always honored. If you set a
+priority whose governing phase strategy cannot honor it (for example `keep_short`
+with a non-`network-simplex` layering strategy), the layout request is rejected
+with a `$.edges[i].priority.<field>` diagnostic rather than being silently
+ignored.
+
 ### Algorithm
 
 `layout_preferences.algorithm` selects the layout algorithm.
