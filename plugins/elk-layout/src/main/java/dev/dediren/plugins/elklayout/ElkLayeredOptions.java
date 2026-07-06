@@ -3,6 +3,8 @@ package dev.dediren.plugins.elklayout;
 import dev.dediren.contracts.layout.LayoutComponentsPreferences;
 import dev.dediren.contracts.layout.LayoutCrossingPreferences;
 import dev.dediren.contracts.layout.LayoutDensity;
+import dev.dediren.contracts.layout.LayoutEdge;
+import dev.dediren.contracts.layout.LayoutEdgePriority;
 import dev.dediren.contracts.layout.LayoutEndpointMerging;
 import dev.dediren.contracts.layout.LayoutLayerConstraint;
 import dev.dediren.contracts.layout.LayoutLayeringPreferences;
@@ -31,6 +33,7 @@ import org.eclipse.elk.core.options.CoreOptions;
 import org.eclipse.elk.core.options.Direction;
 import org.eclipse.elk.core.options.EdgeRouting;
 import org.eclipse.elk.core.options.HierarchyHandling;
+import org.eclipse.elk.graph.ElkEdge;
 import org.eclipse.elk.graph.ElkNode;
 import org.eclipse.elk.graph.util.ElkGraphUtil;
 
@@ -188,6 +191,22 @@ final class ElkLayeredOptions {
     LayerConstraint layerConstraint = layerConstraint(node.layerConstraint());
     if (layerConstraint != null) {
       elkNode.setProperty(LayeredOptions.LAYERING_LAYER_CONSTRAINT, layerConstraint);
+    }
+  }
+
+  static void applyEdgeHints(ElkEdge elkEdge, LayoutEdge edge) {
+    LayoutEdgePriority priority = edge.priority();
+    if (priority == null) {
+      return;
+    }
+    if (priority.resistReversal() != null) {
+      elkEdge.setProperty(LayeredOptions.PRIORITY_DIRECTION, priority.resistReversal());
+    }
+    if (priority.keepShort() != null) {
+      elkEdge.setProperty(LayeredOptions.PRIORITY_SHORTNESS, priority.keepShort());
+    }
+    if (priority.keepStraight() != null) {
+      elkEdge.setProperty(LayeredOptions.PRIORITY_STRAIGHTNESS, priority.keepStraight());
     }
   }
 

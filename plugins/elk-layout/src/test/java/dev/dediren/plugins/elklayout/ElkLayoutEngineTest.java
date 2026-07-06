@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import dev.dediren.contracts.layout.*;
 import dev.dediren.contracts.layout.LayoutAlgorithm;
+import dev.dediren.contracts.layout.LayoutEdgePriority;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -27,6 +28,7 @@ import org.eclipse.elk.core.options.CoreOptions;
 import org.eclipse.elk.core.options.Direction;
 import org.eclipse.elk.core.options.EdgeRouting;
 import org.eclipse.elk.core.options.PortSide;
+import org.eclipse.elk.graph.ElkEdge;
 import org.eclipse.elk.graph.ElkNode;
 import org.eclipse.elk.graph.util.ElkGraphUtil;
 import org.junit.jupiter.api.Test;
@@ -3127,5 +3129,21 @@ class ElkLayoutEngineTest {
             new LayoutNode("b", "B", "b", null, null, null, 5, null)));
 
     assertEquals(Boolean.TRUE, root.getProperty(LayeredOptions.PARTITIONING_ACTIVATE));
+  }
+
+  @Test
+  void applyEdgeHintsSetsThreePriorities() {
+    ElkNode root = ElkGraphUtil.createGraph();
+    ElkNode a = ElkGraphUtil.createNode(root);
+    ElkNode b = ElkGraphUtil.createNode(root);
+    ElkEdge elkEdge = ElkGraphUtil.createSimpleEdge(a, b);
+    LayoutEdge edge =
+        new LayoutEdge("e1", "a", "b", "", "e1", null, new LayoutEdgePriority(5, 2, 8));
+
+    ElkLayeredOptions.applyEdgeHints(elkEdge, edge);
+
+    assertEquals(Integer.valueOf(5), elkEdge.getProperty(LayeredOptions.PRIORITY_DIRECTION));
+    assertEquals(Integer.valueOf(2), elkEdge.getProperty(LayeredOptions.PRIORITY_SHORTNESS));
+    assertEquals(Integer.valueOf(8), elkEdge.getProperty(LayeredOptions.PRIORITY_STRAIGHTNESS));
   }
 }

@@ -136,6 +136,7 @@ final class ElkLayoutEngine {
               endpointMerge.sourceEndpoint(),
               endpointMerge.targetEndpoint());
       elkEdges.put(edge.id(), elkEdge);
+      ElkLayeredOptions.applyEdgeHints(elkEdge, edge);
     }
 
     new RecursiveGraphLayoutEngine().layout(root, new BasicProgressMonitor());
@@ -386,6 +387,7 @@ final class ElkLayoutEngine {
       }
       ElkGraphUtil.updateContainment(elkEdge);
       elkEdges.put(edge.id(), elkEdge);
+      ElkLayeredOptions.applyEdgeHints(elkEdge, edge);
     }
 
     new RecursiveGraphLayoutEngine().layout(root, new BasicProgressMonitor());
