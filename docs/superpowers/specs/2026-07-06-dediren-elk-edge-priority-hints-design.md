@@ -116,8 +116,11 @@ changes, and mirroring the node-hints pipeline
 - Tests: `ContractRoundTripTest`, schema valid/invalid tests, `LayoutJson` /
   helper mapping tests, engine rejection tests, and one ignored real-ELK render
   fixture.
-- Docs: `README.md`, `docs/agent-usage.md`, `docs/features/layout.md`, and
-  `docs/threat-model.md`.
+- Docs: `README.md`, `docs/agent-usage.md`, `docs/features/layout.md`.
+  `docs/threat-model.md` needs no change: the new rejection reuses the existing
+  `DEDIREN_ELK_LAYOUT_FAILED` envelope and adds no parser, trust boundary, or
+  envelope category — it is the same input-validation posture as the existing
+  layered-only gate.
 
 ## Conditional validity and validation policy
 
@@ -131,10 +134,21 @@ new algorithm-gate code is needed.
 
 ### New phase-coupling rejection
 
-New error code `DEDIREN_LAYOUT_EDGE_PRIORITY_UNSUPPORTED_FOR_STRATEGY`, with a
-JSON path to the offending edge, rejects a set priority whose governing phase
-strategy cannot honor it. **An absent strategy means the ELK default, which
-supports its priority** — so a priority set against defaults is always valid.
+The rejection mirrors the existing layered-only gate exactly. Today every hard
+layout rejection (`rejectLayeredOnly`, provenance, structural `requireNonNull`)
+throws `IllegalArgumentException` with a JSON-path message, and `Main` maps all
+of them to the single envelope `DEDIREN_ELK_LAYOUT_FAILED`. This slice follows
+that pattern rather than inventing a per-rejection code — a one-off code here
+would be inconsistent with every other layout gate. So: a set priority whose
+governing phase strategy cannot honor it throws `IllegalArgumentException` with
+a message of the form `$.edges[i].priority.<field> is only honored by the
+'<strategy>' <phase> strategy`, surfaced as `DEDIREN_ELK_LAYOUT_FAILED`. No new
+envelope code, no new envelope category, no threat-model category change. The
+rejection is still fully agent-decidable: the response is a non-ok envelope with
+the offending JSON path in its message.
+
+**An absent strategy means the ELK default, which supports its priority** — so a
+priority set against defaults is always valid.
 
 Matrix (verified against ELK 0.11.0 phase code):
 
@@ -162,13 +176,20 @@ fields, matching the `LayoutJson.rejectUnsupportedPreferenceValues` pattern.
   `LayoutEdge` / `SourceRelationship` carrying it.
 - **Helper mapping**: assert each sub-field sets the expected `LayeredOptions`
   property on the `ElkEdge`; assert absent sub-fields leave the property unset.
-- **Engine rejection**: assert each of the three incompatible combinations
-  produces `DEDIREN_LAYOUT_EDGE_PRIORITY_UNSUPPORTED_FOR_STRATEGY` with the
-  correct edge JSON path, and that priority-against-defaults is accepted.
-- **Real render**: one ignored real-ELK render fixture exercising edge priority
-  as geometry evidence (renders can be stale — regenerate before review).
-- **Distribution**: `AgentUsageDocConsistencyTest` stays green for the new
-  `DEDIREN_*` code.
+- **Engine rejection**: assert each of the three incompatible combinations makes
+  `ElkLayoutEngine.layout(request)` throw `IllegalArgumentException` whose message
+  contains the offending `$.edges[i].priority.<field>` path and the required
+  strategy (mirroring `nonLayeredAlgorithmRejectsLayeredOnlyPreferences`), and
+  that priority-against-defaults is accepted.
+- **Real render**: optional/deferred. Unlike node placement hints, edge
+  priorities are tie-breakers — they nudge geometry only when the layout is
+  otherwise ambiguous — so a small render fixture is weak visual evidence. The
+  node-placement-hints slice set the precedent of relying on the full elk-layout
+  suite for behavior preservation rather than a dedicated render fixture; this
+  slice follows it. Add an ignored render fixture later only if a concrete
+  readability case motivates one.
+- **Distribution**: no new `DEDIREN_*` code is introduced — the rejection reuses
+  `DEDIREN_ELK_LAYOUT_FAILED` — so `AgentUsageDocConsistencyTest` is unaffected.
 
 ## Version and schema id
 
