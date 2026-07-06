@@ -34,7 +34,7 @@ class MainTest {
     CliResult result = Main.executeForTesting(new String[] {"--version"}, "");
 
     assertThat(result.exitCode()).isZero();
-    assertThat(result.stdout()).contains("dediren 2026.07.4");
+    assertThat(result.stdout()).contains("dediren 2026.07.5");
   }
 
   @Test
