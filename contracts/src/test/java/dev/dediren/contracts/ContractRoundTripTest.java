@@ -703,6 +703,55 @@ class ContractRoundTripTest {
     assertThat(mapper.writeValueAsString(LayoutAlgorithm.LAYERED)).isEqualTo("\"layered\"");
   }
 
+  @Test
+  void layoutEdgeRoundTripsPriorityHints() throws Exception {
+    var mapper = dev.dediren.contracts.json.JsonSupport.objectMapper();
+    String json =
+        """
+        {
+          "id": "e1",
+          "source": "a",
+          "target": "b",
+          "label": "",
+          "source_id": "e1",
+          "relationship_type": "flow",
+          "priority": { "resist_reversal": 5, "keep_short": 2, "keep_straight": 8 }
+        }
+        """;
+    dev.dediren.contracts.layout.LayoutEdge edge =
+        mapper.readValue(json, dev.dediren.contracts.layout.LayoutEdge.class);
+    assertThat(edge.priority()).isNotNull();
+    assertThat(edge.priority().resistReversal()).isEqualTo(5);
+    assertThat(edge.priority().keepShort()).isEqualTo(2);
+    assertThat(edge.priority().keepStraight()).isEqualTo(8);
+    assertThat(
+            mapper.writeValueAsString(
+                new dev.dediren.contracts.layout.LayoutEdgePriority(null, 2, null)))
+        .isEqualTo("{\"keep_short\":2}");
+  }
+
+  @Test
+  void sourceRelationshipRoundTripsPriorityHints() throws Exception {
+    var mapper = dev.dediren.contracts.json.JsonSupport.objectMapper();
+    String json =
+        """
+        {
+          "id": "e1",
+          "type": "flow",
+          "source": "a",
+          "target": "b",
+          "label": "",
+          "properties": {},
+          "priority": { "keep_straight": 3 }
+        }
+        """;
+    dev.dediren.contracts.source.SourceRelationship rel =
+        mapper.readValue(json, dev.dediren.contracts.source.SourceRelationship.class);
+    assertThat(rel.priority()).isNotNull();
+    assertThat(rel.priority().keepStraight()).isEqualTo(3);
+    assertThat(rel.priority().resistReversal()).isNull();
+  }
+
   private static <T> T readFixture(String fixture, Class<T> type) throws Exception {
     return JsonSupport.readValue(Files.readString(workspaceRoot().resolve(fixture)), type);
   }
