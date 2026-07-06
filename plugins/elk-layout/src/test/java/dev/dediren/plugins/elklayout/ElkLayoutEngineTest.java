@@ -7,7 +7,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import dev.dediren.contracts.layout.*;
 import dev.dediren.contracts.layout.LayoutAlgorithm;
+import dev.dediren.contracts.layout.LayoutCycleBreaking;
 import dev.dediren.contracts.layout.LayoutEdgePriority;
+import dev.dediren.contracts.layout.LayoutLayeringPreferences;
+import dev.dediren.contracts.layout.LayoutLayeringStrategy;
+import dev.dediren.contracts.layout.LayoutPlacementPreferences;
+import dev.dediren.contracts.layout.LayoutPlacementStrategy;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -3145,5 +3150,87 @@ class ElkLayoutEngineTest {
     assertEquals(Integer.valueOf(5), elkEdge.getProperty(LayeredOptions.PRIORITY_DIRECTION));
     assertEquals(Integer.valueOf(2), elkEdge.getProperty(LayeredOptions.PRIORITY_SHORTNESS));
     assertEquals(Integer.valueOf(8), elkEdge.getProperty(LayeredOptions.PRIORITY_STRAIGHTNESS));
+  }
+
+  private static LayoutRequest edgePriorityRequest(
+      LayoutEdgePriority priority, LayoutPreferences prefs) {
+    LayoutNode a = new LayoutNode("a", "A", "a", null, null);
+    LayoutNode b = new LayoutNode("b", "B", "b", null, null);
+    LayoutEdge e = new LayoutEdge("e1", "a", "b", "", "e1", null, priority);
+    return new LayoutRequest(
+        "layout-request.schema.v1", "main", List.of(a, b), List.of(e), List.of(), List.of(), prefs);
+  }
+
+  @Test
+  void resistReversalRejectedUnderNonGreedyCycleBreaking() {
+    LayoutPreferences prefs =
+        new LayoutPreferences(
+            null, null, null, null, null, LayoutCycleBreaking.MODEL_ORDER, null, null, null);
+    IllegalArgumentException ex =
+        org.junit.jupiter.api.Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                new ElkLayoutEngine()
+                    .layout(edgePriorityRequest(new LayoutEdgePriority(5, null, null), prefs)));
+    org.junit.jupiter.api.Assertions.assertTrue(
+        ex.getMessage().contains("$.edges[0].priority.resist_reversal"),
+        "message should name the offending path, was: " + ex.getMessage());
+  }
+
+  @Test
+  void keepShortRejectedUnderNonNetworkSimplexLayering() {
+    LayoutPreferences prefs =
+        new LayoutPreferences(
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            new LayoutLayeringPreferences(LayoutLayeringStrategy.LONGEST_PATH),
+            null,
+            null);
+    IllegalArgumentException ex =
+        org.junit.jupiter.api.Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                new ElkLayoutEngine()
+                    .layout(edgePriorityRequest(new LayoutEdgePriority(null, 2, null), prefs)));
+    org.junit.jupiter.api.Assertions.assertTrue(
+        ex.getMessage().contains("$.edges[0].priority.keep_short"),
+        "message should name the offending path, was: " + ex.getMessage());
+  }
+
+  @Test
+  void keepStraightRejectedUnderSimplePlacement() {
+    LayoutPreferences prefs =
+        new LayoutPreferences(
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            new LayoutPlacementPreferences(LayoutPlacementStrategy.SIMPLE));
+    IllegalArgumentException ex =
+        org.junit.jupiter.api.Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                new ElkLayoutEngine()
+                    .layout(edgePriorityRequest(new LayoutEdgePriority(null, null, 8), prefs)));
+    org.junit.jupiter.api.Assertions.assertTrue(
+        ex.getMessage().contains("$.edges[0].priority.keep_straight"),
+        "message should name the offending path, was: " + ex.getMessage());
+  }
+
+  @Test
+  void edgePriorityAcceptedAgainstDefaultStrategies() {
+    // All strategies absent → ELK defaults (greedy / network-simplex / brandes-koepf) honor all
+    // three, so a fully-populated priority must NOT be rejected.
+    LayoutResult result =
+        new ElkLayoutEngine().layout(edgePriorityRequest(new LayoutEdgePriority(5, 2, 8), null));
+    org.junit.jupiter.api.Assertions.assertNotNull(result);
   }
 }

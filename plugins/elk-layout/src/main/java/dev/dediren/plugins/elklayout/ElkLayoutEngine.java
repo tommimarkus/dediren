@@ -8,10 +8,14 @@ import dev.dediren.contracts.layout.LaidOutGroup;
 import dev.dediren.contracts.layout.LaidOutNode;
 import dev.dediren.contracts.layout.LayoutAlgorithm;
 import dev.dediren.contracts.layout.LayoutConstraint;
+import dev.dediren.contracts.layout.LayoutCycleBreaking;
 import dev.dediren.contracts.layout.LayoutEdge;
+import dev.dediren.contracts.layout.LayoutEdgePriority;
 import dev.dediren.contracts.layout.LayoutGroup;
+import dev.dediren.contracts.layout.LayoutLayeringStrategy;
 import dev.dediren.contracts.layout.LayoutMode;
 import dev.dediren.contracts.layout.LayoutNode;
+import dev.dediren.contracts.layout.LayoutPlacementStrategy;
 import dev.dediren.contracts.layout.LayoutPreferences;
 import dev.dediren.contracts.layout.LayoutRequest;
 import dev.dediren.contracts.layout.LayoutResult;
@@ -1404,6 +1408,8 @@ final class ElkLayoutEngine {
       requireNonNull(edge.sourceId(), path + ".source_id");
     }
 
+    validateEdgePriorities(request.edges(), request.layoutPreferences());
+
     for (int index = 0; index < request.groups().size(); index++) {
       LayoutGroup group = request.groups().get(index);
       String path = "$.groups[" + index + "]";
@@ -1464,6 +1470,47 @@ final class ElkLayoutEngine {
     if (present) {
       throw new IllegalArgumentException(path + " is only supported for the 'layered' algorithm");
     }
+  }
+
+  private static void validateEdgePriorities(
+      List<LayoutEdge> edges, LayoutPreferences preferences) {
+    for (int index = 0; index < edges.size(); index++) {
+      LayoutEdge edge = edges.get(index);
+      LayoutEdgePriority priority = edge == null ? null : edge.priority();
+      if (priority == null) {
+        continue;
+      }
+      String path = "$.edges[" + index + "].priority";
+      if (priority.resistReversal() != null && !cycleBreakingHonorsDirection(preferences)) {
+        throw new IllegalArgumentException(
+            path + ".resist_reversal is only honored by the 'greedy' cycle_breaking strategy");
+      }
+      if (priority.keepShort() != null && !layeringHonorsShortness(preferences)) {
+        throw new IllegalArgumentException(
+            path + ".keep_short is only honored by the 'network-simplex' layering strategy");
+      }
+      if (priority.keepStraight() != null && !placementHonorsStraightness(preferences)) {
+        throw new IllegalArgumentException(
+            path + ".keep_straight is not honored by the 'simple' placement strategy");
+      }
+    }
+  }
+
+  private static boolean cycleBreakingHonorsDirection(LayoutPreferences preferences) {
+    var strategy = preferences == null ? null : preferences.cycleBreaking();
+    return strategy == null || strategy == LayoutCycleBreaking.GREEDY;
+  }
+
+  private static boolean layeringHonorsShortness(LayoutPreferences preferences) {
+    var layering = preferences == null ? null : preferences.layering();
+    var strategy = layering == null ? null : layering.strategy();
+    return strategy == null || strategy == LayoutLayeringStrategy.NETWORK_SIMPLEX;
+  }
+
+  private static boolean placementHonorsStraightness(LayoutPreferences preferences) {
+    var placement = preferences == null ? null : preferences.placement();
+    var strategy = placement == null ? null : placement.strategy();
+    return strategy != LayoutPlacementStrategy.SIMPLE;
   }
 
   private static void validateProvenance(GroupProvenance provenance, String path) {
