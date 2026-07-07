@@ -254,6 +254,52 @@ class LayoutQualityTest {
   }
 
   @Test
+  void degenerateSelfLoopHiddenInsideItsNodeIsReported() {
+    // A self-loop (source == target) whose route never leaves the node box renders as a dot or a
+    // line hidden behind the node — an invisible self-reference (taxonomy T10).
+    var nodes = List.of(node("a", 0.0, 0.0)); // 100 x 80 at the origin
+    var edges =
+        List.of(
+            edge(
+                "loop",
+                "a",
+                "a",
+                List.of(new Point(50.0, 0.0), new Point(60.0, 10.0), new Point(50.0, 0.0))));
+
+    var diagnostics =
+        LayoutQuality.validateLayoutDiagnostics(layoutResult(nodes, edges, List.of()));
+
+    assertThat(diagnostics)
+        .filteredOn(diagnostic -> diagnostic.code().equals("DEDIREN_LAYOUT_SELF_LOOP_DEGENERATE"))
+        .singleElement()
+        .satisfies(
+            diagnostic -> {
+              assertThat(diagnostic.severity()).isEqualTo(DiagnosticSeverity.ERROR);
+              assertThat(diagnostic.path()).isEqualTo("$.edges[0]");
+            });
+  }
+
+  @Test
+  void selfLoopExtendingOutsideItsNodeIsAccepted() {
+    var nodes = List.of(node("a", 0.0, 0.0)); // 100 x 80 at the origin
+    var edges =
+        List.of(
+            edge(
+                "loop",
+                "a",
+                "a",
+                List.of(
+                    new Point(100.0, 20.0),
+                    new Point(140.0, 20.0),
+                    new Point(140.0, 60.0),
+                    new Point(100.0, 60.0))));
+
+    assertThat(LayoutQuality.validateLayoutDiagnostics(layoutResult(nodes, edges, List.of())))
+        .extracting(diagnostic -> diagnostic.code())
+        .doesNotContain("DEDIREN_LAYOUT_SELF_LOOP_DEGENERATE");
+  }
+
+  @Test
   void routeAndBoundaryIssuesAreCounted() {
     var nodes = new ArrayList<LaidOutNode>();
     nodes.add(node("source", 0.0, 0.0));

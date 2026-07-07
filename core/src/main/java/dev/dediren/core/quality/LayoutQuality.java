@@ -35,6 +35,9 @@ public final class LayoutQuality {
   // not constrain the label.
   private static final double LABEL_SPACE_MIN_DIMENSION = 40.0;
   private static final double JUNCTION_ROUTE_TOLERANCE = 2.0;
+  // A self-loop must poke out beyond its node by at least this much to read as a visible loop;
+  // a route staying within the box renders hidden behind the (later-painted, opaque) node.
+  private static final double SELF_LOOP_MIN_ESCAPE = 4.0;
   // Edge-label dissociation band (issue #31). LABEL_BAND_GAP spans ELK Layered's compact/readable
   // edge-edge spacing (40-48px) so genuinely adjacent parallel labeled runs qualify, while spacious
   // spacing (64px) and roomy layouts stay clear. LABEL_BAND_MIN_OVERLAP is the parallel run length
@@ -242,11 +245,45 @@ public final class LayoutQuality {
         }
       }
     }
+    for (int edgeIndex = 0; edgeIndex < result.edges().size(); edgeIndex++) {
+      LaidOutEdge edge = result.edges().get(edgeIndex);
+      if (!edge.source().equals(edge.target()) || edge.points().size() < 2) {
+        continue;
+      }
+      LaidOutNode node = findNode(result, edge.source());
+      if (node != null && !selfLoopEscapesNode(edge.points(), node)) {
+        diagnostics.add(
+            routeError(
+                DiagnosticCode.LAYOUT_SELF_LOOP_DEGENERATE,
+                "self-loop '"
+                    + edge.id()
+                    + "' does not extend outside node '"
+                    + node.id()
+                    + "' and renders hidden behind it",
+                "$.edges[" + edgeIndex + "]"));
+      }
+    }
     return diagnostics;
   }
 
   private static Diagnostic routeError(DiagnosticCode code, String message, String path) {
     return new Diagnostic(code.code(), DiagnosticSeverity.ERROR, message, path);
+  }
+
+  private static boolean selfLoopEscapesNode(List<Point> points, LaidOutNode node) {
+    double left = node.x();
+    double right = node.x() + node.width();
+    double top = node.y();
+    double bottom = node.y() + node.height();
+    for (Point point : points) {
+      if (point.x() < left - SELF_LOOP_MIN_ESCAPE
+          || point.x() > right + SELF_LOOP_MIN_ESCAPE
+          || point.y() < top - SELF_LOOP_MIN_ESCAPE
+          || point.y() > bottom + SELF_LOOP_MIN_ESCAPE) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private static boolean allFinite(double... values) {

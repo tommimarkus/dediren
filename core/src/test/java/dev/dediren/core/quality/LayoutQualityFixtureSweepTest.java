@@ -42,6 +42,10 @@ class LayoutQualityFixtureSweepTest {
         .filteredOn(diagnostic -> diagnostic.code().equals("DEDIREN_LAYOUT_NON_FINITE_GEOMETRY"))
         .as("non-finite-geometry false positive in %s", fixture.getFileName())
         .isEmpty();
+    assertThat(LayoutQuality.validateLayoutDiagnostics(result))
+        .filteredOn(diagnostic -> diagnostic.code().equals("DEDIREN_LAYOUT_SELF_LOOP_DEGENERATE"))
+        .as("self-loop-degenerate false positive in %s", fixture.getFileName())
+        .isEmpty();
   }
 
   static Stream<Path> layoutResultFixtures() throws IOException {
