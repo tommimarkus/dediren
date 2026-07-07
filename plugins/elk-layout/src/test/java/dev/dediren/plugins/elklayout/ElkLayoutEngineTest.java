@@ -2271,6 +2271,60 @@ class ElkLayoutEngineTest {
         readableSequencePreferences());
   }
 
+  @Test
+  void reservesLeadingGapBeforeFragmentOpenMessages() {
+    LayoutResult result = new ElkLayoutEngine().layout(fragmentGapSequenceRequest());
+
+    double y1 = firstSegmentY(edgeById(result, "m1"));
+    double y2 = firstSegmentY(edgeById(result, "m2"));
+    double y3 = firstSegmentY(edgeById(result, "m3"));
+
+    double plainStep = y2 - y1;
+    double gappedStep = y3 - y2;
+    assertTrue(
+        gappedStep > plainStep + 20.0,
+        "fragment-open message m3 must reserve extra leading room (plain="
+            + plainStep
+            + ", gapped="
+            + gappedStep
+            + ")");
+  }
+
+  private static LayoutRequest fragmentGapSequenceRequest() {
+    return new LayoutRequest(
+        "layout-request.schema.v1",
+        "sequence-view",
+        List.of(
+            new LayoutNode("customer", "Customer", "customer", 140.0, 48.0, "lifeline"),
+            new LayoutNode(
+                "interaction-place-order",
+                "Place Order",
+                "interaction-place-order",
+                360.0,
+                260.0,
+                "interaction"),
+            new LayoutNode("service", "Order Service", "service", 140.0, 48.0, "lifeline")),
+        List.of(
+            new LayoutEdge("m1", "customer", "service", "a", "m1", "Message"),
+            new LayoutEdge("m2", "service", "customer", "b", "m2", "Message"),
+            new LayoutEdge("m3", "customer", "service", "c", "m3", "Message")),
+        List.of(),
+        List.of(
+            new LayoutConstraint(
+                "sequence-view.uml.sequence.lifeline-order",
+                "uml.sequence.lifeline-order",
+                List.of("customer", "service")),
+            new LayoutConstraint(
+                "sequence-view.uml.sequence.message-order",
+                "uml.sequence.message-order",
+                List.of("m1", "m2", "m3")),
+            new LayoutConstraint(
+                "sequence-view.uml.sequence.fragment-open",
+                "uml.sequence.fragment-open",
+                List.of("m3"))),
+        readableSequencePreferences());
+  }
+
   private static LayoutRequest sequenceLayoutRequest() {
     return new LayoutRequest(
         "layout-request.schema.v1",

@@ -13,39 +13,62 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.eclipse.elk.core.options.PortSide;
 
 final class SequenceLayoutConstraints {
   private static final String LIFELINE_ORDER_KIND = "uml.sequence.lifeline-order";
   private static final String MESSAGE_ORDER_KIND = "uml.sequence.message-order";
+  private static final String FRAGMENT_OPEN_KIND = "uml.sequence.fragment-open";
+  private static final String OPERAND_OPEN_KIND = "uml.sequence.operand-open";
   private static final double MINIMUM_MESSAGE_Y_STEP = 1.0;
   private static final double MESSAGE_HEAD_GAP = 24.0;
   private static final double MESSAGE_Y_STEP = 24.0;
   private static final double LIFELINE_COLUMN_GAP = 96.0;
+  // Extra vertical room reserved before a message that opens a combined fragment (header band +
+  // first-operand guard) or a non-first operand (separator line + guard). Coupled with the
+  // renderer's FRAGMENT_VERTICAL_PADDING; kept in sync so the render chrome clears message labels.
+  private static final double FRAGMENT_OPEN_GAP = 46.0;
+  private static final double OPERAND_OPEN_GAP = 52.0;
 
   private final List<String> lifelineOrder;
   private final List<String> messageOrder;
   private final Map<String, Integer> lifelineIndexById;
   private final Map<String, Integer> messageIndexById;
+  private final Set<String> fragmentOpenIds;
+  private final Set<String> operandOpenIds;
 
-  private SequenceLayoutConstraints(List<String> lifelineOrder, List<String> messageOrder) {
+  private SequenceLayoutConstraints(
+      List<String> lifelineOrder,
+      List<String> messageOrder,
+      List<String> fragmentOpenIds,
+      List<String> operandOpenIds) {
     this.lifelineOrder = List.copyOf(lifelineOrder);
     this.messageOrder = List.copyOf(messageOrder);
     this.lifelineIndexById = indexById(this.lifelineOrder);
     this.messageIndexById = indexById(this.messageOrder);
+    this.fragmentOpenIds = Set.copyOf(fragmentOpenIds);
+    this.operandOpenIds = Set.copyOf(operandOpenIds);
   }
 
   static SequenceLayoutConstraints from(LayoutRequest request) {
     List<String> lifelineOrder = List.of();
     List<String> messageOrder = List.of();
+    List<String> fragmentOpenIds = List.of();
+    List<String> operandOpenIds = List.of();
     for (LayoutConstraint constraint : request.constraints()) {
       if (LIFELINE_ORDER_KIND.equals(constraint.kind())) {
         lifelineOrder = constraint.subjects();
       } else if (MESSAGE_ORDER_KIND.equals(constraint.kind())) {
         messageOrder = constraint.subjects();
+      } else if (FRAGMENT_OPEN_KIND.equals(constraint.kind())) {
+        fragmentOpenIds = constraint.subjects();
+      } else if (OPERAND_OPEN_KIND.equals(constraint.kind())) {
+        operandOpenIds = constraint.subjects();
       }
     }
-    return new SequenceLayoutConstraints(lifelineOrder, messageOrder);
+    return new SequenceLayoutConstraints(
+        lifelineOrder, messageOrder, fragmentOpenIds, operandOpenIds);
   }
 
   boolean active() {
@@ -315,8 +338,18 @@ final class SequenceLayoutConstraints {
         lifelines.stream().mapToDouble(node -> node.y() + node.height()).max().orElse(Double.NaN);
     if (Double.isFinite(headBottom)) {
       List<Double> ySlots = new ArrayList<>();
+      double y = headBottom + MESSAGE_HEAD_GAP;
       for (int index = 0; index < orderedMessages.size(); index++) {
-        ySlots.add(headBottom + MESSAGE_HEAD_GAP + (MESSAGE_Y_STEP * index));
+        if (index > 0) {
+          y += MESSAGE_Y_STEP;
+        }
+        String id = orderedMessages.get(index).id();
+        if (fragmentOpenIds.contains(id)) {
+          y += FRAGMENT_OPEN_GAP;
+        } else if (operandOpenIds.contains(id)) {
+          y += OPERAND_OPEN_GAP;
+        }
+        ySlots.add(y);
       }
       return ySlots;
     }
