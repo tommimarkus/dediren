@@ -31,7 +31,7 @@ public final class UmlSequenceRenderer {
   private static final double INTERACTION_TOP_PADDING = 40.0;
   private static final double INTERACTION_BOTTOM_PADDING = 48.0;
   private static final double FRAGMENT_HORIZONTAL_PADDING = 20.0;
-  private static final double FRAGMENT_VERTICAL_PADDING = 18.0;
+  private static final double FRAGMENT_VERTICAL_PADDING = 42.0;
   private static final double FRAGMENT_HEADER_HEIGHT = 24.0;
 
   private final LayoutResult result;
