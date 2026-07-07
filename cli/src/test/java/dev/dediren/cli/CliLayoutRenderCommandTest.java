@@ -3,11 +3,20 @@ package dev.dediren.cli;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.dediren.contracts.json.JsonSupport;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import tools.jackson.databind.JsonNode;
@@ -238,6 +247,51 @@ class CliLayoutRenderCommandTest {
   }
 
   @Test
+  void emitsRealEngineSequenceDiagramToGallery() throws Exception {
+    // The sequence render's message geometry comes from the live ELK layout normalizer, so the
+    // gallery image is produced from the real engine end to end (project -> layout -> render), not
+    // a frozen layout fixture. This refreshes the git-ignored gallery with a styled sequence
+    // diagram and guards, at the render boundary, that every message arrow still terminates on its
+    // lifeline stem — the same invariant ElkLayoutEngineTest pins at the layout boundary.
+    Map<String, String> env = sequencePipelineEnv();
+    String source =
+        workspaceRoot().resolve("fixtures/source/valid-uml-sequence-basic.json").toString();
+    String[] projectView = {
+      "--plugin", "generic-graph", "--view", "sequence-view", "--input", source
+    };
+
+    JsonNode layoutRequest =
+        stageData(concat("project", "--target", "layout-request", projectView), env);
+    JsonNode renderMetadata =
+        stageData(concat("project", "--target", "render-metadata", projectView), env);
+    Path requestFile = writeStage("layout-request.json", layoutRequest);
+    JsonNode layoutResult =
+        stageData(
+            new String[] {"layout", "--plugin", "elk-layout", "--input", requestFile.toString()},
+            env);
+    Path layoutFile = writeStage("layout-result.json", layoutResult);
+    Path metadataFile = writeStage("render-metadata.json", renderMetadata);
+    JsonNode render =
+        stageData(
+            new String[] {
+              "render",
+              "--plugin",
+              "render",
+              "--policy",
+              workspaceRoot().resolve("fixtures/render-policy/uml-svg.json").toString(),
+              "--metadata",
+              metadataFile.toString(),
+              "--input",
+              layoutFile.toString()
+            },
+            env);
+
+    String svg = render.at("/artifacts/0/content").asText();
+    assertSequenceArrowsReachStems(svg);
+    writeGalleryArtifact("uml-sequence-real-engine", svg);
+  }
+
+  @Test
   void exportCommandRunsJavaArchimateOefPlugin() throws Exception {
     Map<String, String> env = pluginEnv("archimate-oef", "dev.dediren.plugins.archimateoef.Main");
     env.putAll(envWithOefSchemas());
@@ -303,6 +357,95 @@ class CliLayoutRenderCommandTest {
   private CliResult runValidateLayout(Path input) {
     return Main.executeForTesting(
         new String[] {"validate-layout", "--input", input.toString()}, "");
+  }
+
+  /** Runs one CLI pipeline stage and returns its ok-envelope {@code data} payload. */
+  private JsonNode stageData(String[] args, Map<String, String> env) throws Exception {
+    CliResult result = Main.executeForTesting(args, "", env);
+    JsonNode envelope = envelope(result);
+    assertThat(result.exitCode()).describedAs(result.stdout()).isZero();
+    assertThat(envelope.at("/status").asText()).describedAs(result.stdout()).isEqualTo("ok");
+    return envelope.at("/data");
+  }
+
+  private Path writeStage(String name, JsonNode data) throws Exception {
+    Path file = temp.resolve(name);
+    Files.writeString(
+        file, JsonSupport.objectMapper().writeValueAsString(data), StandardCharsets.UTF_8);
+    return file;
+  }
+
+  private Map<String, String> sequencePipelineEnv() throws Exception {
+    Map<String, String> env = new LinkedHashMap<>();
+    env.putAll(pluginEnv("generic-graph", "dev.dediren.plugins.genericgraph.Main"));
+    env.putAll(pluginEnv("elk-layout", "dev.dediren.plugins.elklayout.Main"));
+    env.putAll(pluginEnv("render", "dev.dediren.plugins.render.Main"));
+    return env;
+  }
+
+  private static String[] concat(String first, String second, String third, String[] rest) {
+    String[] all = new String[3 + rest.length];
+    all[0] = first;
+    all[1] = second;
+    all[2] = third;
+    System.arraycopy(rest, 0, all, 3, rest.length);
+    return all;
+  }
+
+  private static void assertSequenceArrowsReachStems(String svg) {
+    List<Double> stems = new ArrayList<>();
+    Matcher stem =
+        Pattern.compile("data-dediren-sequence-lifeline-stem=\"[^\"]*\"\\s+x1=\"([-\\d.]+)\"")
+            .matcher(svg);
+    while (stem.find()) {
+      stems.add(Double.parseDouble(stem.group(1)));
+    }
+    assertThat(stems).as("rendered sequence must draw lifeline stems").isNotEmpty();
+
+    // The message connector (not the arrowhead marker path) carries stroke-linecap="round".
+    Matcher message =
+        Pattern.compile(
+                "<path d=\"M ([-\\d.]+) [-\\d.]+ L ([-\\d.]+) [-\\d.]+\"[^>]*stroke-linecap=\"round\"")
+            .matcher(svg);
+    int messages = 0;
+    while (message.find()) {
+      messages++;
+      for (String endpoint : new String[] {message.group(1), message.group(2)}) {
+        double x = Double.parseDouble(endpoint);
+        double nearestStem =
+            stems.stream().mapToDouble(s -> Math.abs(s - x)).min().orElse(Double.MAX_VALUE);
+        assertThat(nearestStem)
+            .as("message arrow endpoint x=%.1f must reach a lifeline stem %s", x, stems)
+            .isLessThan(1.0);
+      }
+    }
+    assertThat(messages).as("rendered sequence must draw message arrows").isGreaterThan(0);
+  }
+
+  private static final AtomicBoolean GALLERY_CLEANED = new AtomicBoolean();
+
+  private static void writeGalleryArtifact(String name, String svg) throws IOException {
+    Path dir = workspaceRoot().resolve(".test-output/renders/sequence");
+    cleanGalleryOnce(dir);
+    Files.createDirectories(dir);
+    Files.writeString(dir.resolve(name + ".svg"), svg);
+  }
+
+  // Wipe once per JVM run so the sequence gallery holds only this run's render.
+  private static void cleanGalleryOnce(Path dir) throws IOException {
+    if (!GALLERY_CLEANED.compareAndSet(false, true) || !Files.isDirectory(dir)) {
+      return;
+    }
+    Files.walkFileTree(
+        dir,
+        new SimpleFileVisitor<Path>() {
+          @Override
+          public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
+              throws IOException {
+            Files.delete(file);
+            return FileVisitResult.CONTINUE;
+          }
+        });
   }
 
   private JsonNode envelope(CliResult result) throws Exception {
