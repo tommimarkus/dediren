@@ -18,6 +18,15 @@ import tools.jackson.databind.JsonNode;
 public final class Main {
   private Main() {}
 
+  /**
+   * Fixed non-ASCII sentinel echoed back by the {@code report-nonascii} mode: Finnish Latin-1
+   * letters (2-byte UTF-8) plus CJK ideographs (3-byte UTF-8). A plugin child JVM launched with a
+   * stripped environment mangles every one of these code points to {@code '?'} unless the launcher
+   * forces UTF-8 stream encoding (issue #47). Kept as a shared constant so the core round-trip test
+   * asserts against exactly what the child emits.
+   */
+  public static final String NON_ASCII_SENTINEL = "Sähkö öäå 测试";
+
   public static void main(String[] args) throws Exception {
     if (System.getenv("DEDIREN_TEST_PLUGIN_PIPE_LEAK_CHILD") != null) {
       Thread.sleep(2_000);
@@ -140,6 +149,22 @@ public final class Main {
                 DiagnosticSeverity.ERROR,
                 System.getProperty("user.dir"),
                 "$.cwd");
+        System.out.println(
+            JsonSupport.objectMapper()
+                .writeValueAsString(CommandEnvelope.error(List.of(diagnostic))));
+        return;
+      }
+      case "report-nonascii" -> {
+        // Echo a fixed non-ASCII sentinel back through System.out. When core launches this child
+        // with a stripped environment (no locale), the JVM derives stdout.encoding from
+        // native.encoding = US-ASCII and every non-ASCII code point is written as '?' (issue #47).
+        // The launcher must force UTF-8 stream encoding so the sentinel round-trips unchanged.
+        var diagnostic =
+            new Diagnostic(
+                "DEDIREN_TESTBED_NONASCII",
+                DiagnosticSeverity.ERROR,
+                NON_ASCII_SENTINEL,
+                "$.label");
         System.out.println(
             JsonSupport.objectMapper()
                 .writeValueAsString(CommandEnvelope.error(List.of(diagnostic))));

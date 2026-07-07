@@ -263,6 +263,24 @@ class PluginRuntimeTest {
   }
 
   @Test
+  void nonAsciiPluginStdoutSurvivesStrippedEnvironment() throws Exception {
+    // Issue #47: core launches plugin children with a stripped environment (only allowed_env is
+    // forwarded), so the child JVM derives stdout.encoding from native.encoding = US-ASCII and
+    // mangles every non-ASCII code point to '?'. The launcher must force UTF-8 stream encoding.
+    // The testbed launcher (writeTestbedExecutable) mirrors the production dediren.launcher.jvmArgs
+    // flags, so this exercises the fix end-to-end through a real stripped-env subprocess spawn.
+    writeManifest(temp, "runtime-testbed", testbedExecutable().toString(), List.of("render"));
+
+    PluginRunOutcome outcome = runWithMode("report-nonascii", "render", List.of("render"));
+
+    String reportedLabel =
+        JsonSupport.objectMapper().readTree(outcome.stdout()).at("/diagnostics/0/message").asText();
+    assertThat(reportedLabel)
+        .as("non-ASCII plugin stdout must round-trip without '?' corruption")
+        .isEqualTo(dev.dediren.testbeds.pluginruntime.Main.NON_ASCII_SENTINEL);
+  }
+
+  @Test
   void manifestAllowedEnvIsPassedToCapabilityProbeAndCommand() throws Exception {
     writeManifest(
         temp,
@@ -826,11 +844,14 @@ class PluginRuntimeTest {
   private static void writeTestbedExecutable(Path script) throws IOException {
     String java = Path.of(System.getProperty("java.home"), "bin", "java").toString();
     String classpath = System.getProperty("java.class.path");
+    // Mirror the production launcher's encoding flags (root pom dediren.launcher.jvmArgs) so this
+    // stripped-env spawn reproduces how bundled plugins are actually launched. Without them the
+    // child JVM writes non-ASCII System.out as US-ASCII '?' (issue #47).
     Files.writeString(
         script,
         """
                 #!/bin/sh
-                exec "%s" -cp "%s" dev.dediren.testbeds.pluginruntime.Main "$@"
+                exec "%s" -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8 -Dfile.encoding=UTF-8 -cp "%s" dev.dediren.testbeds.pluginruntime.Main "$@"
                 """
             .formatted(java, classpath));
     script.toFile().setExecutable(true);

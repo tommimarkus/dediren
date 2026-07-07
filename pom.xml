@@ -31,7 +31,10 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <maven.compiler.release>21</maven.compiler.release>
     <argLine>-Dfile.encoding=UTF-8 -Djava.awt.headless=true</argLine>
-    <dediren.launcher.jvmArgs>-XX:TieredStopAtLevel=1 -XX:+UseSerialGC -Djava.awt.headless=true</dediren.launcher.jvmArgs>
+    <!-- Force UTF-8 on every launched JVM's streams. Core spawns plugin children with a stripped
+         environment (JAVA_HOME + PATH only), so without this the child derives stdout.encoding
+         from native.encoding = US-ASCII and mangles all non-ASCII output to '?' (issue #47). -->
+    <dediren.launcher.jvmArgs>-XX:TieredStopAtLevel=1 -XX:+UseSerialGC -Djava.awt.headless=true -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8 -Dfile.encoding=UTF-8</dediren.launcher.jvmArgs>
     <archunit.version>1.4.2</archunit.version>
     <assertj.version>3.27.7</assertj.version>
     <commons-io.version>2.22.0</commons-io.version>

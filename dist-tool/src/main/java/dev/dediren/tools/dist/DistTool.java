@@ -39,7 +39,14 @@ public final class DistTool {
   private static final Pattern CLASSPATH_LIB_JAR = Pattern.compile("\\$REPO\"?/([^:/\"]+\\.jar)");
 
   private static final List<String> EXPECTED_LAUNCHER_FLAGS =
-      List.of("-XX:TieredStopAtLevel=1", "-XX:+UseSerialGC");
+      List.of(
+          "-XX:TieredStopAtLevel=1",
+          "-XX:+UseSerialGC",
+          // UTF-8 stream encoding: core spawns plugin children with a stripped environment, so the
+          // launcher itself must force UTF-8 or non-ASCII output is mangled to '?' (issue #47).
+          "-Dstdout.encoding=UTF-8",
+          "-Dstderr.encoding=UTF-8",
+          "-Dfile.encoding=UTF-8");
   private static final List<Launcher> LAUNCHERS =
       List.of(
           new Launcher("cli/target/appassembler", "cli", "dediren", null),
