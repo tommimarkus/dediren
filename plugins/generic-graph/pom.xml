@@ -7,7 +7,7 @@
   <parent>
     <groupId>dev.dediren</groupId>
     <artifactId>dediren</artifactId>
-    <version>2026.07.10</version>
+    <version>2026.07.11</version>
     <relativePath>../../pom.xml</relativePath>
   </parent>
 
