@@ -347,12 +347,25 @@ public final class LayoutQuality {
     return Math.abs(left - right) <= tolerance;
   }
 
+  private static boolean isSequenceContainer(LaidOutNode node) {
+    // A UML sequence interaction frame is a container that legitimately encloses its
+    // lifelines, executions, and messages; it must not be counted as an overlap or a
+    // route-through-node.
+    return "interaction".equals(node.role());
+  }
+
   private static int countOverlaps(LayoutResult result) {
     int count = 0;
     for (int i = 0; i < result.nodes().size(); i++) {
       LaidOutNode left = result.nodes().get(i);
+      if (isSequenceContainer(left)) {
+        continue;
+      }
       for (int j = i + 1; j < result.nodes().size(); j++) {
         LaidOutNode right = result.nodes().get(j);
+        if (isSequenceContainer(right)) {
+          continue;
+        }
         if (rectanglesOverlap(
             left.x(),
             left.y(),
@@ -376,6 +389,9 @@ public final class LayoutQuality {
         Point start = edge.points().get(i);
         Point end = edge.points().get(i + 1);
         for (LaidOutNode node : result.nodes()) {
+          if (isSequenceContainer(node)) {
+            continue;
+          }
           if (!node.id().equals(edge.source())
               && !node.id().equals(edge.target())
               && segmentIntersectsRect(

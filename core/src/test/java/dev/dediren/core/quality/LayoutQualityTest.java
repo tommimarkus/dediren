@@ -334,6 +334,29 @@ class LayoutQualityTest {
   }
 
   @Test
+  void sequenceInteractionContainerIsNotCountedAsOverlapOrConnectorThrough() {
+    var interaction =
+        new LaidOutNode("ix", "ix", "ix", 0.0, 0.0, 400.0, 300.0, "Interaction", "interaction");
+    var a = new LaidOutNode("a", "a", "a", 40.0, 20.0, 100.0, 48.0, "A", "lifeline");
+    var b = new LaidOutNode("b", "b", "b", 260.0, 20.0, 100.0, 48.0, "B", "lifeline");
+    var nodes = List.of(interaction, a, b);
+    // Endpoints sit on the lifeline axis (a's right edge x=140, b's left edge x=260), matching
+    // the onLifelineAxis convention already exercised by
+    // lifelineMessageEndpointsOnLifelineAxisAreAccepted.
+    var edges =
+        List.of(edge("m", "a", "b", List.of(new Point(140.0, 120.0), new Point(260.0, 120.0))));
+
+    LayoutQualityReport report =
+        LayoutQuality.validateLayout(layoutResult(nodes, edges, List.of()));
+
+    // The interaction frame legitimately encloses its lifelines and messages: it must not
+    // register as an overlap, and messages routed inside it are not "through-node" hits.
+    assertThat(report.overlapCount()).isEqualTo(0);
+    assertThat(report.connectorThroughNodeCount()).isEqualTo(0);
+    assertThat(report.status()).isEqualTo("ok");
+  }
+
+  @Test
   void nestedGroupMembersAreCountedAsGroupBoundaryMembers() {
     var nodes = List.of(node("source", 0.0, 30.0), node("target", 200.0, 30.0));
     var edges =
