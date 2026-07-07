@@ -4,7 +4,7 @@
     { "id": "src", "type": "generic.component", "label": "Source model", "properties": {} },
     { "id": "req", "type": "generic.component", "label": "Layout request", "properties": {} },
     { "id": "res", "type": "generic.component", "label": "Layout result", "properties": {} },
-    { "id": "svg", "type": "generic.component", "label": "SVG / PNG", "properties": {} },
+    { "id": "svg", "type": "generic.component", "label": "SVG", "properties": {} },
     { "id": "xml", "type": "generic.component", "label": "OEF / XMI XML", "properties": {} }
   ],
   "relationships": [

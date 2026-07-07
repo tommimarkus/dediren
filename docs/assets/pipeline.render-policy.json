@@ -18,6 +18,6 @@
   },
   "accessibility": {
     "title": "Dediren pipeline",
-    "description": "Source model through project, layout, and render or export to SVG/PNG or OEF/XMI XML"
+    "description": "Source model through project, layout, and render or export to SVG or OEF/XMI XML"
   }
 }

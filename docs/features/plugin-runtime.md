@@ -40,7 +40,7 @@ launcher `dediren-plugin-archimate-oef-export`).
 | --- | --- | --- |
 | `generic-graph` | `dediren-plugin-generic-graph` | Semantic vocabulary, semantic validation, view projection (layout request + render metadata). Owns the `generic`, `archimate`, and `uml` profiles. |
 | `elk-layout` | `dediren-plugin-elk-layout` | Layout geometry and edge routing via official Eclipse ELK Java libraries. See [Layout (ELK)](layout.md). |
-| `render` | `dediren-plugin-render` | SVG (and optional interactive HTML or PNG) rendering. See [SVG Rendering](svg-render.md). |
+| `render` | `dediren-plugin-render` | SVG (and optional interactive HTML) rendering. See [SVG Rendering](svg-render.md). |
 | `archimate-oef` | `dediren-plugin-archimate-oef-export` | ArchiMate 3.2 Open Exchange Format XML. See [Exports](exports.md). |
 | `uml-xmi` | `dediren-plugin-uml-xmi-export` | UML 2.5.1 XMI XML. See [Exports](exports.md). |
 

@@ -44,7 +44,7 @@ or the token-efficient authoring guide in
 | [Source Model & Views](source-model.md) | The semantic source graph, namespaced properties, views/projection, semantic profiles, and fragments |
 | [Plugin Runtime](plugin-runtime.md) | The plugin protocol, the five first-party plugins, discovery, capability probing, and runtime diagnostics |
 | [Layout (ELK)](layout.md) | The official Java ELK plugin, layout modes (`flow`/`packed`/`auto`), and `validate-layout` quality metrics |
-| [SVG Rendering](svg-render.md) | The render plugin, render policies, interactive modes, PNG rasterization, and the `artifacts[]` result shape |
+| [SVG Rendering](svg-render.md) | The render plugin, render policies, interactive modes, and the `artifacts[]` result shape |
 | [Exports (OEF & XMI)](exports.md) | ArchiMate 3.2 OEF and UML 2.5.1 XMI export, plus the supported UML notation coverage |
 | [Contracts & Schemas](contracts-and-schemas.md) | Public schemas, command envelopes, diagnostics, and version/compatibility signals |
 | [Distribution & Runtime](distribution-and-runtime.md) | The agent bundle, launchers, environment variables, Class-Data-Sharing, supply-chain artifacts, and versioning |
@@ -81,7 +81,7 @@ described in [`CLAUDE.md`](../../CLAUDE.md).
   update [Plugin Runtime](plugin-runtime.md).
 - **ELK layout behavior, a new layout mode, or a new `validate-layout` metric**
   → update [Layout (ELK)](layout.md).
-- **Render policy field, interaction mode, PNG rasterization, or styling behavior** → update
+- **Render policy field, interaction mode, or styling behavior** → update
   [SVG Rendering](svg-render.md) alongside `schemas/render-policy.schema.json`.
 - **OEF/XMI export semantics or expanded UML notation coverage** → update
   [Exports (OEF & XMI)](exports.md).

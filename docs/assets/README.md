@@ -51,7 +51,7 @@ colorless — presentation lives only in render policy), and
 
 In the pipeline diagram the colors carry meaning: inputs are muted, transforms
 are amber, and the two terminal outputs split by hue — **amber** for the
-`render` path to SVG/PNG, **emerald** for the `export` path to OEF/XMI XML.
+`render` path to SVG, **emerald** for the `export` path to OEF/XMI XML.
 
 ## `badges.svg` — the README badge strip
 

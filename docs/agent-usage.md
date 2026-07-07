@@ -215,12 +215,12 @@ or the previous command envelope:
 jq -r '.data.artifacts[] | select(.artifact_kind=="svg") | .content' render-result.json > diagram.svg
 ```
 
-The `render` plugin also emits a base64-encoded `png` artifact (`encoding: base64`) when the policy includes a `raster` block (e.g. `"raster": { "scale": 2 }`); decode it with `base64 -d > diagram.png`.
+The `render` plugin emits only `svg` (and, in interactive modes, `html`) artifacts; it does not produce PNG. To get a raster image, convert the emitted SVG with an external tool — for example `rsvg-convert diagram.svg -o diagram.png`, `resvg diagram.svg diagram.png`, ImageMagick (`magick convert diagram.svg diagram.png`), or Inkscape (`inkscape diagram.svg --export-type=png`).
 
 ## Render Policy Options
 
-The render policy owns SVG presentation. Beyond `accessibility` (above) and
-`raster` (PNG), these options shape output:
+The render policy owns SVG presentation. Beyond `accessibility` (above), these
+options shape output:
 
 - **Interactive SVG.** `interactive` is `none` (default — a static SVG with no
   embedded script), `svg` (a self-contained SVG that highlights a node's edges

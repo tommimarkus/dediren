@@ -1,8 +1,9 @@
 # SVG Rendering
 
 The `render` plugin turns a layout result into a deterministic SVG artifact
-(and, optionally, an interactive HTML page or a PNG raster image). All SVG
-styling lives in the render policy and the plugin — never in source JSON.
+(and, optionally, an interactive HTML page). All SVG styling lives in the render
+policy and the plugin — never in source JSON. dediren emits no PNG; convert the
+SVG with an external tool (`rsvg-convert`, `resvg`, ImageMagick, or Inkscape).
 
 [← Back to feature index](README.md)
 
@@ -13,7 +14,7 @@ Result schema: [`schemas/render-result.schema.json`](../../schemas/render-result
 ## Result Shape: `artifacts[]`
 
 `render` returns an ordered `.data.artifacts[]` list. Each entry has an
-`artifact_kind` (`svg`, `html`, or `png`) and `content`. Select the one you want:
+`artifact_kind` (`svg` or `html`) and `content`. Select the one you want:
 
 ```bash
 jq -r '.data.artifacts[] | select(.artifact_kind=="svg") | .content' \

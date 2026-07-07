@@ -3,7 +3,7 @@
 ![dediren: contract-first, built for agents, Java 21+, ArchiMate and UML, MIT licensed](docs/assets/badges.svg)
 
 `dediren` is a contract-first diagram pipeline **for agentic tools**. It turns
-semantic JSON into generated layout, rendered SVG/PNG, ArchiMate® 3.2 OEF XML,
+semantic JSON into generated layout, rendered SVG, ArchiMate® 3.2 OEF XML,
 or UML® 2.5.1 XMI XML through explicit CLI commands and process-boundary
 plugins. Every command prints a JSON envelope on stdout, so an agent decides
 success or failure without scraping stderr.
@@ -18,10 +18,10 @@ success or failure without scraping stderr.
 
 ## Pipeline
 
-![Dediren pipeline: a source model becomes a layout request via project, a layout result via layout, then either SVG/PNG via render or ArchiMate OEF / UML XMI XML via export](docs/assets/pipeline.svg)
+![Dediren pipeline: a source model becomes a layout request via project, a layout result via layout, then either SVG via render or ArchiMate OEF / UML XMI XML via export](docs/assets/pipeline.svg)
 
 ```text
-validate → project → layout → validate-layout → render   (SVG / PNG)
+validate → project → layout → validate-layout → render   (SVG)
 validate → project → layout → validate-layout → export   (ArchiMate OEF / UML XMI)
 ```
 
@@ -100,8 +100,11 @@ BUNDLE=$(ls -d dist/dediren-agent-bundle-* | grep -v '\.tar\.gz$' | sort | tail 
 jq -r '.data.artifacts[] | select(.artifact_kind=="svg") | .content' render-result.json > diagram.svg
 ```
 
+dediren emits SVG only; for a raster image, convert the SVG with an external
+tool such as `rsvg-convert`, `resvg`, ImageMagick, or Inkscape.
+
 Each `bin/dediren-plugin-* capabilities` probe reports what a plugin supports.
-For PNG output, ArchiMate/UML notations, exports, interactive SVG, accessibility,
+For ArchiMate/UML notations, exports, interactive SVG, accessibility,
 and failure-repair rules, follow
 [`docs/agent-usage.md`](docs/agent-usage.md).
 

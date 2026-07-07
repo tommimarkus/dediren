@@ -21,7 +21,7 @@ bundle. Shared protocol records and schema-version constants live in the
 | [`render-result.schema.json`](../../schemas/render-result.schema.json) | `render` envelope with `artifacts[]`. |
 | [`export-request.schema.json`](../../schemas/export-request.schema.json) / [`export-result.schema.json`](../../schemas/export-result.schema.json) | `export` request/result. The result base is open to any plugin: `artifact_kind` is a pattern, not a closed list. |
 | [`export-result.first-party.schema.json`](../../schemas/export-result.first-party.schema.json) | Stricter `export` result contract enforced for bundled first-party export plugins (closed `artifact_kind` enum). |
-| [`render-policy.schema.json`](../../schemas/render-policy.schema.json) | SVG/PNG presentation policy. |
+| [`render-policy.schema.json`](../../schemas/render-policy.schema.json) | SVG presentation policy. |
 | [`oef-export-policy.schema.json`](../../schemas/oef-export-policy.schema.json) / [`uml-xmi-export-policy.schema.json`](../../schemas/uml-xmi-export-policy.schema.json) | Export policies. |
 | [`semantic-validation-result.schema.json`](../../schemas/semantic-validation-result.schema.json) | Plugin semantic-validation result. |
 | [`plugin-manifest.schema.json`](../../schemas/plugin-manifest.schema.json) | First-party plugin manifest shape. |
