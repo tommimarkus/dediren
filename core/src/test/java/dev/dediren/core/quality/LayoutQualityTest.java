@@ -180,6 +180,80 @@ class LayoutQualityTest {
   }
 
   @Test
+  void nonFiniteNodeGeometryIsReported() {
+    // A layout plugin bug — or a JSON coordinate like 1e999 that Jackson deserializes to Infinity —
+    // reaches core as a non-finite coordinate that every downstream geometry check silently
+    // mis-handles (NaN comparisons are always false). Catch it at the source.
+    var nodes =
+        List.of(
+            new LaidOutNode(
+                "bad", "bad", "bad", Double.POSITIVE_INFINITY, 0.0, 100.0, 80.0, "bad"));
+
+    var diagnostics =
+        LayoutQuality.validateLayoutDiagnostics(layoutResult(nodes, List.of(), List.of()));
+
+    assertThat(diagnostics)
+        .filteredOn(diagnostic -> diagnostic.code().equals("DEDIREN_LAYOUT_NON_FINITE_GEOMETRY"))
+        .singleElement()
+        .satisfies(
+            diagnostic -> {
+              assertThat(diagnostic.severity()).isEqualTo(DiagnosticSeverity.ERROR);
+              assertThat(diagnostic.path()).isEqualTo("$.nodes[0]");
+            });
+  }
+
+  @Test
+  void nonFiniteRoutePointIsReported() {
+    var edges =
+        List.of(edge("e", "s", "t", List.of(new Point(Double.NaN, 0.0), new Point(100.0, 0.0))));
+
+    var diagnostics =
+        LayoutQuality.validateLayoutDiagnostics(layoutResult(List.of(), edges, List.of()));
+
+    assertThat(diagnostics)
+        .filteredOn(diagnostic -> diagnostic.code().equals("DEDIREN_LAYOUT_NON_FINITE_GEOMETRY"))
+        .singleElement()
+        .extracting(diagnostic -> diagnostic.path())
+        .isEqualTo("$.edges[0].points[0]");
+  }
+
+  @Test
+  void nonFiniteGroupGeometryIsReported() {
+    var groups =
+        List.of(
+            new LaidOutGroup(
+                "g", "g", "g", null, Double.NaN, 0.0, 100.0, 100.0, List.of(), "Group"));
+
+    var diagnostics =
+        LayoutQuality.validateLayoutDiagnostics(layoutResult(List.of(), List.of(), groups));
+
+    assertThat(diagnostics)
+        .filteredOn(diagnostic -> diagnostic.code().equals("DEDIREN_LAYOUT_NON_FINITE_GEOMETRY"))
+        .singleElement()
+        .extracting(diagnostic -> diagnostic.path())
+        .isEqualTo("$.groups[0]");
+  }
+
+  @Test
+  void finiteLayoutRaisesNoNonFiniteDiagnostic() {
+    var nodes = List.of(node("a", 0.0, 0.0), node("b", 300.0, 0.0));
+    var edges =
+        List.of(edge("a-b", "a", "b", List.of(new Point(100.0, 40.0), new Point(300.0, 40.0))));
+
+    assertThat(LayoutQuality.validateLayoutDiagnostics(layoutResult(nodes, edges, List.of())))
+        .extracting(diagnostic -> diagnostic.code())
+        .doesNotContain("DEDIREN_LAYOUT_NON_FINITE_GEOMETRY");
+  }
+
+  @Test
+  void emptyLayoutValidatesCleanly() {
+    LayoutResult empty = layoutResult(List.of(), List.of(), List.of());
+
+    assertThat(LayoutQuality.validateLayout(empty).status()).isEqualTo("ok");
+    assertThat(LayoutQuality.validateLayoutDiagnostics(empty)).isEmpty();
+  }
+
+  @Test
   void routeAndBoundaryIssuesAreCounted() {
     var nodes = new ArrayList<LaidOutNode>();
     nodes.add(node("source", 0.0, 0.0));

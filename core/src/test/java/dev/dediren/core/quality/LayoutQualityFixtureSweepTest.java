@@ -38,6 +38,10 @@ class LayoutQualityFixtureSweepTest {
             diagnostic -> diagnostic.code().equals("DEDIREN_LAYOUT_JUNCTION_OFF_INCIDENT_ROUTE"))
         .as("junction false positive in %s", fixture.getFileName())
         .isEmpty();
+    assertThat(LayoutQuality.validateLayoutDiagnostics(result))
+        .filteredOn(diagnostic -> diagnostic.code().equals("DEDIREN_LAYOUT_NON_FINITE_GEOMETRY"))
+        .as("non-finite-geometry false positive in %s", fixture.getFileName())
+        .isEmpty();
   }
 
   static Stream<Path> layoutResultFixtures() throws IOException {

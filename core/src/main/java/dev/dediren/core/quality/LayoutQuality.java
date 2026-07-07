@@ -131,6 +131,43 @@ public final class LayoutQuality {
 
   public static List<Diagnostic> validateLayoutDiagnostics(LayoutResult result) {
     var diagnostics = new ArrayList<Diagnostic>();
+    // Non-finite coordinates (a layout-plugin bug, or a JSON magnitude Jackson widens to Infinity)
+    // make every downstream geometry check silently wrong, since NaN comparisons are always false.
+    // Report them at the source before the route and junction checks consume the coordinates.
+    for (int nodeIndex = 0; nodeIndex < result.nodes().size(); nodeIndex++) {
+      LaidOutNode node = result.nodes().get(nodeIndex);
+      if (!allFinite(node.x(), node.y(), node.width(), node.height())) {
+        diagnostics.add(
+            routeError(
+                DiagnosticCode.LAYOUT_NON_FINITE_GEOMETRY,
+                "node '" + node.id() + "' has non-finite geometry",
+                "$.nodes[" + nodeIndex + "]"));
+      }
+    }
+    for (int edgeIndex = 0; edgeIndex < result.edges().size(); edgeIndex++) {
+      LaidOutEdge edge = result.edges().get(edgeIndex);
+      for (int pointIndex = 0; pointIndex < edge.points().size(); pointIndex++) {
+        Point point = edge.points().get(pointIndex);
+        if (!allFinite(point.x(), point.y())) {
+          diagnostics.add(
+              routeError(
+                  DiagnosticCode.LAYOUT_NON_FINITE_GEOMETRY,
+                  "edge '" + edge.id() + "' has a non-finite route point",
+                  "$.edges[" + edgeIndex + "].points[" + pointIndex + "]"));
+          break;
+        }
+      }
+    }
+    for (int groupIndex = 0; groupIndex < result.groups().size(); groupIndex++) {
+      LaidOutGroup group = result.groups().get(groupIndex);
+      if (!allFinite(group.x(), group.y(), group.width(), group.height())) {
+        diagnostics.add(
+            routeError(
+                DiagnosticCode.LAYOUT_NON_FINITE_GEOMETRY,
+                "group '" + group.id() + "' has non-finite geometry",
+                "$.groups[" + groupIndex + "]"));
+      }
+    }
     for (int edgeIndex = 0; edgeIndex < result.edges().size(); edgeIndex++) {
       LaidOutEdge edge = result.edges().get(edgeIndex);
       if (edge.points().isEmpty()) {
@@ -210,6 +247,15 @@ public final class LayoutQuality {
 
   private static Diagnostic routeError(DiagnosticCode code, String message, String path) {
     return new Diagnostic(code.code(), DiagnosticSeverity.ERROR, message, path);
+  }
+
+  private static boolean allFinite(double... values) {
+    for (double value : values) {
+      if (!Double.isFinite(value)) {
+        return false;
+      }
+    }
+    return true;
   }
 
   private static boolean routeHasIntegrityIssue(LaidOutEdge edge, LayoutResult result) {
