@@ -4,8 +4,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.dediren.plugins.render.svg.Svg;
 import java.awt.Font;
+import java.awt.FontFormatException;
 import java.awt.font.FontRenderContext;
+import java.io.IOException;
+import java.io.InputStream;
 import java.io.StringReader;
+import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -40,6 +44,31 @@ final class SvgAudit {
   private static final Pattern URL_REF = Pattern.compile("url\\(#([^)\\s]+)\\)");
   private static final FontRenderContext FONT_RENDER_CONTEXT =
       new FontRenderContext(null, true, true);
+
+  // The oracle for assertTextWidthPinsMatchRealFont: a bundled, Arial-metric-compatible font
+  // (Liberation Sans, SIL OFL 1.1) measured at a 1000-unit em. Bundling it — instead of asking the
+  // JVM for the logical Font.SANS_SERIF — is what makes this check hermetic: the logical font
+  // resolves to whatever physical sans-serif the host installs (DejaVu on one runner, something
+  // wider on another), so the same pin measured "close enough" on the author's box but 16-18% wide
+  // on a stock ubuntu CI runner. Liberation Sans is metric-compatible with Arial, the family the
+  // renderer's AFM advance table (Svg#estimateTextWidth) is built on, so the measured/pinned ratio
+  // now sits at ~1.0 on every machine and the tolerance can be tight.
+  private static final Font MEASURING_FONT = loadMeasuringFont();
+
+  private static Font loadMeasuringFont() {
+    try (InputStream ttf =
+        SvgAudit.class.getResourceAsStream("/fonts/LiberationSans-Regular.ttf")) {
+      if (ttf == null) {
+        throw new IllegalStateException(
+            "bundled measuring font /fonts/LiberationSans-Regular.ttf missing from test resources");
+      }
+      return Font.createFont(Font.TRUETYPE_FONT, ttf).deriveFont(1000f);
+    } catch (FontFormatException e) {
+      throw new IllegalStateException("bundled measuring font is not a valid TrueType font", e);
+    } catch (IOException e) {
+      throw new UncheckedIOException("cannot read bundled measuring font", e);
+    }
+  }
 
   // Attributes whose value is a single number and must therefore be finite.
   private static final Set<String> NUMERIC_ATTRS =
@@ -219,12 +248,15 @@ final class SvgAudit {
   /**
    * The pinned {@code textLength} must be close to what a real font engine measures for the same
    * string, or {@code lengthAdjust="spacing"} visibly squeezes or letterspaces the glyphs. Measured
-   * with Java2D's logical sans-serif; the tolerance absorbs the substitution gap between that and
-   * the AFM table the estimate is built on, while still catching gross mismatches (e.g. the
-   * non-ASCII 0.6em fallback under-measuring wide glyphs).
+   * with the bundled {@link #MEASURING_FONT} (Liberation Sans, Arial-metric-compatible), so the
+   * result is identical on every machine. Because that font shares the metric family the estimate's
+   * AFM table is built on, ASCII pins land within a fraction of a percent of {@code 1.0} and the
+   * band is snug — but it keeps teeth: a wide glyph the estimate scores at the 0.6em fallback but
+   * the font renders at a full em (e.g. an em dash or {@code ™}) still overshoots the ceiling, and
+   * a grossly over-reserved pin still undershoots the floor. The floor stays loose enough to
+   * tolerate that 0.6em approximation for narrow non-ASCII Latin the font can display.
    */
   static void assertTextWidthPinsMatchRealFont(Document document, double low, double high) {
-    Font sans = new Font(Font.SANS_SERIF, Font.PLAIN, 1000);
     List<String> off = new ArrayList<>();
     for (Element element : elements(document)) {
       String pinned = element.getAttribute("textLength");
@@ -236,15 +268,15 @@ final class SvgAudit {
       if (declared <= 0 || string.isBlank()) {
         continue;
       }
-      if (sans.canDisplayUpTo(string) != -1) {
-        // The measuring font lacks a glyph for this string (e.g. CJK on a JVM without CJK fonts):
+      if (MEASURING_FONT.canDisplayUpTo(string) != -1) {
+        // The measuring font lacks a glyph for this string (e.g. CJK — Liberation Sans is Latin):
         // its fallback advance is not the width a real viewer renders, so this oracle cannot judge
         // it. The full-em-square estimate for those code points is verified deterministically in
         // SvgTextWidthTest instead.
         continue;
       }
       double real =
-          sans.getStringBounds(string, FONT_RENDER_CONTEXT).getWidth()
+          MEASURING_FONT.getStringBounds(string, FONT_RENDER_CONTEXT).getWidth()
               / 1000.0
               * effectiveFontSize(element);
       double ratio = real / declared;

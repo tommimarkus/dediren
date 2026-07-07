@@ -73,6 +73,30 @@ class SvgAuditTest {
     SvgAudit.assertGeometryWithinViewBox(document, 1.0);
   }
 
+  @Test
+  void detectsPinNarrowerThanRealFontWidth() {
+    // A textLength pinned far below what the font actually renders squeezes the glyphs. The real
+    // Liberation-Sans width of "client" at 10px is ~24 units, ~2.4x this pin — well past the
+    // ceiling
+    // — so the oracle must fire. Guards that tightening the band did not cost it its teeth.
+    Document document =
+        SvgAudit.parse(
+            "<svg viewBox=\"0 0 100 100\"><text font-size=\"10\" textLength=\"10\">client</text></svg>");
+    assertThatThrownBy(() -> SvgAudit.assertTextWidthPinsMatchRealFont(document, 0.85, 1.06))
+        .isInstanceOf(AssertionError.class)
+        .hasMessageContaining("diverging from real font metrics");
+  }
+
+  @Test
+  void acceptsPinMatchingRealFontWidth() {
+    // The same label pinned at the width the estimate reserves (~24 units) must pass: the bundled
+    // measuring font agrees with the AFM estimate to within a fraction of a percent.
+    Document document =
+        SvgAudit.parse(
+            "<svg viewBox=\"0 0 100 100\"><text font-size=\"10\" textLength=\"24\">client</text></svg>");
+    SvgAudit.assertTextWidthPinsMatchRealFont(document, 0.85, 1.06);
+  }
+
   // --- Every real render passes the full structural audit. ---
 
   @ParameterizedTest(name = "{0}")
@@ -86,11 +110,13 @@ class SvgAuditTest {
   @MethodSource("dev.dediren.plugins.render.RenderScenarios#all")
   void everyPinnedLabelWidthMatchesRealFontMetrics(
       String name, String layout, String policy, String metadata) throws Exception {
-    // ASCII labels: the AFM-based estimate must track real sans-serif metrics closely. Non-ASCII
-    // strings the measuring font cannot display are skipped inside the check (their full-em width
-    // is
-    // verified deterministically in SvgTextWidthTest).
+    // Measured against the bundled Arial-metric-compatible font, ASCII pins sit at ~1.0 (observed
+    // 1.000-1.003 across every fixture), so the ceiling is snug at 1.06 — tight enough to catch a
+    // wide glyph under-reserved at the 0.6em fallback (ratio ~1.67) yet clear of rasterizer noise.
+    // The floor stays at 0.85 to tolerate that same 0.6em approximation for narrow non-ASCII Latin
+    // the font can display. Non-ASCII the font cannot display is skipped inside the check (its
+    // full-em width is verified deterministically in SvgTextWidthTest).
     SvgAudit.assertTextWidthPinsMatchRealFont(
-        SvgAudit.parse(RenderTestSupport.renderFixtures(layout, policy, metadata)), 0.85, 1.15);
+        SvgAudit.parse(RenderTestSupport.renderFixtures(layout, policy, metadata)), 0.85, 1.06);
   }
 }
