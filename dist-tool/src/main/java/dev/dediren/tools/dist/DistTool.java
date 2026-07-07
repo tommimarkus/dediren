@@ -12,7 +12,6 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.PosixFilePermission;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Base64;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -25,7 +24,6 @@ import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.node.ObjectNode;
 
 public final class DistTool {
   private static final String BUNDLE_METADATA_TARGET = "java";
@@ -106,26 +104,6 @@ public final class DistTool {
 
   private static final Map<String, ThirdPartyAttribution> THIRD_PARTY_ATTRIBUTIONS =
       Map.ofEntries(
-          Map.entry("batik-anim", attribution("Apache Batik", "Apache-2.0")),
-          Map.entry("batik-awt-util", attribution("Apache Batik", "Apache-2.0")),
-          Map.entry("batik-bridge", attribution("Apache Batik", "Apache-2.0")),
-          Map.entry("batik-codec", attribution("Apache Batik", "Apache-2.0")),
-          Map.entry("batik-constants", attribution("Apache Batik", "Apache-2.0")),
-          Map.entry("batik-css", attribution("Apache Batik", "Apache-2.0")),
-          Map.entry("batik-dom", attribution("Apache Batik", "Apache-2.0")),
-          Map.entry("batik-ext", attribution("Apache Batik", "Apache-2.0")),
-          Map.entry("batik-gvt", attribution("Apache Batik", "Apache-2.0")),
-          Map.entry("batik-i18n", attribution("Apache Batik", "Apache-2.0")),
-          Map.entry("batik-parser", attribution("Apache Batik", "Apache-2.0")),
-          Map.entry("batik-script", attribution("Apache Batik", "Apache-2.0")),
-          Map.entry("batik-shared-resources", attribution("Apache Batik", "Apache-2.0")),
-          Map.entry("batik-svg-dom", attribution("Apache Batik", "Apache-2.0")),
-          Map.entry("batik-svggen", attribution("Apache Batik", "Apache-2.0")),
-          Map.entry("batik-transcoder", attribution("Apache Batik", "Apache-2.0")),
-          Map.entry("batik-util", attribution("Apache Batik", "Apache-2.0")),
-          Map.entry("batik-xml", attribution("Apache Batik", "Apache-2.0")),
-          Map.entry("commons-io", attribution("Apache Commons IO", "Apache-2.0")),
-          Map.entry("commons-logging", attribution("Apache Commons Logging", "Apache-2.0")),
           Map.entry(
               "error_prone_annotations",
               attribution("Google Error Prone annotations", "Apache-2.0")),
@@ -168,16 +146,7 @@ public final class DistTool {
                   "Apache XML Commons xml-apis",
                   "Apache-2.0",
                   "SAX (public domain)",
-                  "W3C Software License")),
-          Map.entry(
-              "xml-apis-ext",
-              attribution(
-                  "Apache XML Commons xml-apis-ext",
-                  "Apache-2.0",
-                  "SAX (public domain)",
-                  "W3C Software License")),
-          Map.entry(
-              "xmlgraphics-commons", attribution("Apache XML Graphics Commons", "Apache-2.0")));
+                  "W3C Software License")));
 
   /**
    * Bundled verbatim licence texts appended to the generated notices. Every licence id used in
@@ -510,35 +479,6 @@ public final class DistTool {
               null);
       Files.writeString(render, renderOutput, StandardCharsets.UTF_8);
       assertSvgRenderOutput(renderOutput);
-
-      // Second render: raster-enabled policy (PNG / Batik path)
-      JsonNode svgPolicyJson =
-          JsonSupport.objectMapper()
-              .readTree(
-                  Files.readString(
-                      bundle.resolve("fixtures/render-policy/rich-svg.json"),
-                      StandardCharsets.UTF_8));
-      ObjectNode rasterPolicyJson = ((ObjectNode) svgPolicyJson).deepCopy();
-      rasterPolicyJson.putObject("raster").put("scale", 2);
-      Path rasterPolicyFile = temp.resolve("raster-policy.json");
-      Files.writeString(
-          rasterPolicyFile,
-          JsonSupport.objectMapper().writeValueAsString(rasterPolicyJson),
-          StandardCharsets.UTF_8);
-      String pngRenderOutput =
-          runBundleCommand(
-              dediren,
-              bundle,
-              List.of(
-                  "render",
-                  "--plugin",
-                  "render",
-                  "--policy",
-                  rasterPolicyFile.toString(),
-                  "--input",
-                  layout.toString()),
-              null);
-      assertPngRenderOutput(pngRenderOutput);
 
       Path oefSchemas = writeOefSchemas(temp.resolve("oef-schemas"));
       String oefOutput =
@@ -960,34 +900,6 @@ public final class DistTool {
     }
     if (!artifact.path("content").asText().contains("<svg")) {
       throw new IllegalStateException("render smoke output should contain SVG content");
-    }
-  }
-
-  private static void assertPngRenderOutput(String stdout) throws IOException {
-    JsonNode data = okData(stdout);
-    JsonNode artifacts = data.path("artifacts");
-    JsonNode pngArtifact = null;
-    for (JsonNode artifact : artifacts) {
-      if ("png".equals(artifact.path("artifact_kind").asText())) {
-        pngArtifact = artifact;
-        break;
-      }
-    }
-    if (pngArtifact == null) {
-      throw new IllegalStateException(
-          "raster render smoke output should contain a png artifact: " + stdout);
-    }
-    if (!"base64".equals(pngArtifact.path("encoding").asText())) {
-      throw new IllegalStateException("png artifact encoding should be base64: " + stdout);
-    }
-    byte[] pngBytes = Base64.getDecoder().decode(pngArtifact.path("content").asText());
-    // PNG magic: 0x89 'P' 'N' 'G'
-    if (pngBytes.length < 4
-        || (pngBytes[0] & 0xFF) != 0x89
-        || pngBytes[1] != 'P'
-        || pngBytes[2] != 'N'
-        || pngBytes[3] != 'G') {
-      throw new IllegalStateException("png artifact content does not start with PNG magic bytes");
     }
   }
 
