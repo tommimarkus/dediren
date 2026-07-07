@@ -70,8 +70,8 @@ third-party notices with the `-Psbom` and `-Pthird-party-notices` profiles.
 jars, no bundled JRE — Java 21+ is required at runtime):
 
 ```text
-dist/dediren-agent-bundle-2026.07.11/
-dist/dediren-agent-bundle-2026.07.11.tar.gz
+dist/dediren-agent-bundle-2026.07.12/
+dist/dediren-agent-bundle-2026.07.12.tar.gz
 ```
 
 ## First Run
@@ -108,7 +108,7 @@ and failure-repair rules, follow
 ## Bundle Layout
 
 ```text
-dediren-agent-bundle-2026.07.11/
+dediren-agent-bundle-2026.07.12/
   bin/            dediren + one launcher per first-party plugin
   lib/            jars (no bundled JRE)
   plugins/        first-party plugin manifests
@@ -158,7 +158,7 @@ release notes and through schema-id changes. The version source is root
 `pom.xml`; set it across all modules with:
 
 ```bash
-./mvnw versions:set -DnewVersion='2026.07.11' -DprocessAllModules=true -DgenerateBackupPoms=false
+./mvnw versions:set -DnewVersion='2026.07.12' -DprocessAllModules=true -DgenerateBackupPoms=false
 ```
 
 Then sync the checked-in version surfaces (first-party plugin manifests,
@@ -168,7 +168,7 @@ list lives in [`CLAUDE.md` §Versioning](CLAUDE.md). Commit the bump on its own,
 then tag the bump commit:
 
 ```bash
-git tag -a v2026.07.11 -m "Release 2026.07.11"
+git tag -a v2026.07.12 -m "Release 2026.07.12"
 ```
 
 `dist-build` is hermetic and self-verifying — it regenerates each module's
