@@ -2054,6 +2054,22 @@ class MainTest {
       Element deleteMarker =
           groupWithAttribute(document, "data-dediren-sequence-delete-marker", "service-destroyed");
       assertThat(childElements(deleteMarker, "line")).hasSize(2);
+
+      // Regression (Release 2026.07.10 exposed this): message endpoints now anchor on the lifeline
+      // stem center, so a centred marker (refX=5) drives the arrowhead's far half across the
+      // receiving lifeline. The arrow geometry points to x=9; anchoring refX there keeps the whole
+      // arrowhead on the stroke side with its tip on the stem, exactly as EdgeRenderer does for
+      // regular edges.
+      for (String messageId : new String[] {"m1", "m2", "m3", "m4"}) {
+        Element messageMarker =
+            marker(document, "marker-end-" + messageId, "data-dediren-edge-marker-end");
+        assertThat(messageMarker.getAttribute("refX"))
+            .as(
+                "sequence message %s end marker must anchor at the arrow tip so the arrowhead does"
+                    + " not overlap the receiving lifeline stem",
+                messageId)
+            .isEqualTo("9");
+      }
     }
 
     @Test

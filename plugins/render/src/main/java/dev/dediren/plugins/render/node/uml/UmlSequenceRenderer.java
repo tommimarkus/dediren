@@ -451,13 +451,21 @@ public final class UmlSequenceRenderer {
                 + "\" stroke=\""
                 + attr(stroke)
                 + "\" stroke-width=\"1\"/>";
+    // Message endpoints sit on the lifeline stem (the head-box center), so a centred marker
+    // (refX=5) would straddle the stem and drive the arrowhead's far half across the lifeline.
+    // Anchor the marker at its endpoint-facing extent instead: end markers point forward (tip at
+    // x=9), start markers trail back (base at x=1) -- the same convention EdgeRenderer applies so
+    // node/lifeline geometry cannot clip or be overlapped by the adornment.
+    String refX = "start".equals(side) ? "1" : "9";
     return "<marker id=\""
         + attr(id)
         + "\" "
         + attribute
         + "=\""
         + markerName
-        + "\" markerWidth=\"10\" markerHeight=\"10\" refX=\"5\" refY=\"5\" orient=\"auto\">"
+        + "\" markerWidth=\"10\" markerHeight=\"10\" refX=\""
+        + refX
+        + "\" refY=\"5\" orient=\"auto\">"
         + body
         + "</marker>";
   }
