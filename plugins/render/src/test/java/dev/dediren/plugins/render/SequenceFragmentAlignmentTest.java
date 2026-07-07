@@ -2,7 +2,9 @@ package dev.dediren.plugins.render;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.w3c.dom.Document;
@@ -25,6 +27,15 @@ class SequenceFragmentAlignmentTest {
   private static final String POLICY = "fixtures/render-policy/uml-svg.json";
   private static final String METADATA = "fixtures/render-metadata/uml-sequence-fragments.json";
   private static final double TOLERANCE = 1.0;
+
+  // A real (engine-produced, fragment-gap-spaced) layout of the same fragments source. The shared
+  // LAYOUT fixture above is hand-authored with idealised spacing that does not reflect the reserved
+  // fragment/operand gaps, so the chrome-collision invariant must be checked against real spacing.
+  private static final String CHROME_LAYOUT =
+      "fixtures/layout-result/uml-sequence-fragment-chrome.json";
+  // Message labels are one font-size tall; chrome (operator tab, operand separators, guards) must
+  // stay at least this far from every message label baseline to avoid overlapping the text.
+  private static final double MESSAGE_LABEL_CLEARANCE = 14.0;
 
   @Test
   void everyCombinedFragmentFrameSpansTheLifelinesItCovers() throws Exception {
@@ -84,6 +95,46 @@ class SequenceFragmentAlignmentTest {
         }
       }
     }
+  }
+
+  @Test
+  void combinedFragmentChromeClearsMessageLabels() throws Exception {
+    Document svg =
+        SvgAudit.parse(RenderTestSupport.renderFixtures(CHROME_LAYOUT, POLICY, METADATA));
+
+    List<Double> messageLabelYs =
+        elementYs(svg, "text", "y", "data-dediren-sequence-message-label");
+    assertThat(messageLabelYs).as("chrome fixture must render message labels").isNotEmpty();
+
+    List<Double> chromeYs = new ArrayList<>();
+    chromeYs.addAll(elementYs(svg, "line", "y1", "data-dediren-sequence-operand-separator"));
+    chromeYs.addAll(elementYs(svg, "text", "y", "data-dediren-sequence-operand-guard"));
+    chromeYs.addAll(elementYs(svg, "text", "y", "data-dediren-sequence-fragment-operator"));
+    assertThat(chromeYs).as("chrome fixture must render fragment chrome").isNotEmpty();
+
+    for (double chromeY : chromeYs) {
+      double nearest =
+          messageLabelYs.stream()
+              .mapToDouble(y -> Math.abs(y - chromeY))
+              .min()
+              .orElse(Double.MAX_VALUE);
+      assertThat(nearest)
+          .as("fragment chrome at y=%.1f must clear every message label", chromeY)
+          .isGreaterThanOrEqualTo(MESSAGE_LABEL_CLEARANCE);
+    }
+  }
+
+  private static List<Double> elementYs(
+      Document svg, String tag, String yAttribute, String markerAttribute) {
+    List<Double> ys = new ArrayList<>();
+    NodeList elements = svg.getElementsByTagName(tag);
+    for (int index = 0; index < elements.getLength(); index++) {
+      Element element = (Element) elements.item(index);
+      if (element.hasAttribute(markerAttribute)) {
+        ys.add(Double.parseDouble(element.getAttribute(yAttribute)));
+      }
+    }
+    return ys;
   }
 
   private static Iterable<Map.Entry<String, JsonNode>> nodes(JsonNode metadata) {

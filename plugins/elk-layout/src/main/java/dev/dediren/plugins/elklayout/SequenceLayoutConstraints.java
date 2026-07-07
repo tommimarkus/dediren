@@ -29,7 +29,7 @@ final class SequenceLayoutConstraints {
   // first-operand guard) or a non-first operand (separator line + guard). Coupled with the
   // renderer's FRAGMENT_VERTICAL_PADDING; kept in sync so the render chrome clears message labels.
   private static final double FRAGMENT_OPEN_GAP = 46.0;
-  private static final double OPERAND_OPEN_GAP = 52.0;
+  private static final double OPERAND_OPEN_GAP = 68.0;
 
   private final List<String> lifelineOrder;
   private final List<String> messageOrder;
