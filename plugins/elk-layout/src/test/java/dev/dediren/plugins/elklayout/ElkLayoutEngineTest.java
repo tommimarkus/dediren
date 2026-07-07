@@ -2272,21 +2272,43 @@ class ElkLayoutEngineTest {
   }
 
   @Test
-  void reservesLeadingGapBeforeFragmentOpenMessages() {
+  void reservesLeadingGapBeforeFragmentAndOperandOpenMessages() {
     LayoutResult result = new ElkLayoutEngine().layout(fragmentGapSequenceRequest());
 
     double y1 = firstSegmentY(edgeById(result, "m1"));
     double y2 = firstSegmentY(edgeById(result, "m2"));
     double y3 = firstSegmentY(edgeById(result, "m3"));
+    double y4 = firstSegmentY(edgeById(result, "m4"));
 
-    double plainStep = y2 - y1;
-    double gappedStep = y3 - y2;
+    double plainStep = y2 - y1; // m1 -> m2: neither marked, plain lattice step
+    double fragmentStep = y3 - y2; // m3 is fragment-open
+    double operandStep = y4 - y3; // m4 is operand-open
+
+    // Each marked message reserves clearly more than the plain step, and operand-open (separator +
+    // guard) reserves more than fragment-open (header + guard) — both gaps are individually
+    // guarded,
+    // so shrinking either constant fails here even though the render collision test uses a frozen
+    // fixture.
     assertTrue(
-        gappedStep > plainStep + 20.0,
-        "fragment-open message m3 must reserve extra leading room (plain="
+        fragmentStep > plainStep + 30.0,
+        "fragment-open m3 must reserve extra room (plain="
             + plainStep
-            + ", gapped="
-            + gappedStep
+            + ", frag="
+            + fragmentStep
+            + ")");
+    assertTrue(
+        operandStep > plainStep + 50.0,
+        "operand-open m4 must reserve extra room (plain="
+            + plainStep
+            + ", oper="
+            + operandStep
+            + ")");
+    assertTrue(
+        operandStep > fragmentStep,
+        "operand-open gap must exceed fragment-open gap (frag="
+            + fragmentStep
+            + ", oper="
+            + operandStep
             + ")");
   }
 
@@ -2307,7 +2329,8 @@ class ElkLayoutEngineTest {
         List.of(
             new LayoutEdge("m1", "customer", "service", "a", "m1", "Message"),
             new LayoutEdge("m2", "service", "customer", "b", "m2", "Message"),
-            new LayoutEdge("m3", "customer", "service", "c", "m3", "Message")),
+            new LayoutEdge("m3", "customer", "service", "c", "m3", "Message"),
+            new LayoutEdge("m4", "service", "customer", "d", "m4", "Message")),
         List.of(),
         List.of(
             new LayoutConstraint(
@@ -2317,11 +2340,15 @@ class ElkLayoutEngineTest {
             new LayoutConstraint(
                 "sequence-view.uml.sequence.message-order",
                 "uml.sequence.message-order",
-                List.of("m1", "m2", "m3")),
+                List.of("m1", "m2", "m3", "m4")),
             new LayoutConstraint(
                 "sequence-view.uml.sequence.fragment-open",
                 "uml.sequence.fragment-open",
-                List.of("m3"))),
+                List.of("m3")),
+            new LayoutConstraint(
+                "sequence-view.uml.sequence.operand-open",
+                "uml.sequence.operand-open",
+                List.of("m4"))),
         readableSequencePreferences());
   }
 

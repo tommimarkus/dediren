@@ -262,19 +262,21 @@ final class GenericGraphProjection {
             selectedView.id() + ".uml.sequence.message-order",
             "uml.sequence.message-order",
             messageIds));
+    // Dedupe: a nested fragment whose first member is another fragment resolves to the same first
+    // message via both the outer and inner iterations, so a message id can be collected twice.
     if (!fragmentOpenIds.isEmpty()) {
       constraints.add(
           new LayoutConstraint(
               selectedView.id() + ".uml.sequence.fragment-open",
               "uml.sequence.fragment-open",
-              fragmentOpenIds));
+              new ArrayList<>(new LinkedHashSet<>(fragmentOpenIds))));
     }
     if (!operandOpenIds.isEmpty()) {
       constraints.add(
           new LayoutConstraint(
               selectedView.id() + ".uml.sequence.operand-open",
               "uml.sequence.operand-open",
-              operandOpenIds));
+              new ArrayList<>(new LinkedHashSet<>(operandOpenIds))));
     }
     return constraints;
   }

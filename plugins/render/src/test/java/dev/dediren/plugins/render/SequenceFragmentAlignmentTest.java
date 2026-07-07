@@ -29,8 +29,13 @@ class SequenceFragmentAlignmentTest {
   private static final double TOLERANCE = 1.0;
 
   // A real (engine-produced, fragment-gap-spaced) layout of the same fragments source. The shared
-  // LAYOUT fixture above is hand-authored with idealised spacing that does not reflect the reserved
-  // fragment/operand gaps, so the chrome-collision invariant must be checked against real spacing.
+  // LAYOUT fixture above is hand-authored with idealised spacing that PREDATES the reserved
+  // fragment/operand gaps; under the current fragment padding it would render chrome that overlaps
+  // its message labels, so LAYOUT must never back a chrome/label collision or overlap assertion —
+  // the chrome-collision invariant is checked here against this realistically-spaced fixture. If a
+  // generic label-overlap invariant is ever added to the shared appearance suites, regenerate
+  // LAYOUT from the real engine first (it is consumed by several suites, hence not regenerated
+  // here).
   private static final String CHROME_LAYOUT =
       "fixtures/layout-result/uml-sequence-fragment-chrome.json";
   // Message labels are one font-size tall; chrome (operator tab, operand separators, guards) must
