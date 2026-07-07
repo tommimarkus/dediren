@@ -2,7 +2,6 @@ package dev.dediren.plugins.elklayout;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import dev.dediren.contracts.layout.*;
@@ -198,9 +197,36 @@ class ElkLayoutEngineTest {
 
     assertEquals("lifeline", nodeById(result, "customer").role(), "customer lifeline role");
     assertEquals("lifeline", nodeById(result, "service").role(), "service lifeline role");
-    assertNull(
+    assertEquals(
+        "interaction",
         nodeById(result, "interaction-place-order").role(),
-        "interaction frame should stay role-less");
+        "interaction frame keeps its interaction role");
+  }
+
+  @Test
+  void wrapsInteractionNodeAroundLifelineBand() {
+    LayoutResult result = new ElkLayoutEngine().layout(sequenceLayoutRequest());
+
+    LaidOutNode interaction = nodeById(result, "interaction-place-order");
+    LaidOutNode customer = nodeById(result, "customer");
+    LaidOutNode service = nodeById(result, "service");
+    double lifelineTop = Math.min(customer.y(), service.y());
+
+    // Interaction top hugs the lifeline heads instead of floating a band above them.
+    assertEquals(
+        lifelineTop, interaction.y(), 0.5, "interaction top should equal the lifeline band top");
+    // Interaction spans every lifeline horizontally.
+    assertTrue(
+        interaction.x() <= Math.min(customer.x(), service.x()) + 0.5,
+        "interaction left edge spans the lifelines");
+    assertTrue(
+        interaction.x() + interaction.width()
+            >= Math.max(customer.x() + customer.width(), service.x() + service.width()) - 0.5,
+        "interaction right edge spans the lifelines");
+    // Interaction reaches below the head band to enclose the message rows.
+    assertTrue(
+        interaction.y() + interaction.height() > lifelineTop + customer.height(),
+        "interaction encloses the message rows below the heads");
   }
 
   @Test
@@ -2245,7 +2271,12 @@ class ElkLayoutEngineTest {
         List.of(
             new LayoutNode("service", "Order Service", "service", 140.0, 48.0, "lifeline"),
             new LayoutNode(
-                "interaction-place-order", "Place Order", "interaction-place-order", 360.0, 260.0),
+                "interaction-place-order",
+                "Place Order",
+                "interaction-place-order",
+                360.0,
+                260.0,
+                "interaction"),
             new LayoutNode("customer", "Customer", "customer", 140.0, 48.0, "lifeline")),
         List.of(
             new LayoutEdge("m3", "service", "customer", "receiptReady", "m3", "Message"),

@@ -97,13 +97,63 @@ final class SequenceLayoutConstraints {
       return result;
     }
     List<LaidOutNode> normalizedNodes = normalizedLifelineNodes(result.nodes());
+    List<LaidOutEdge> normalizedEdges =
+        normalizedMessageEdges(result.edges(), nodesById(normalizedNodes));
+    List<LaidOutNode> wrappedNodes = normalizedInteractionNodes(normalizedNodes, normalizedEdges);
     return new LayoutResult(
         result.layoutResultSchemaVersion(),
         result.viewId(),
-        normalizedNodes,
-        normalizedMessageEdges(result.edges(), nodesById(normalizedNodes)),
+        wrappedNodes,
+        normalizedEdges,
         result.groups(),
         result.warnings());
+  }
+
+  private List<LaidOutNode> normalizedInteractionNodes(
+      List<LaidOutNode> nodes, List<LaidOutEdge> edges) {
+    Map<String, LaidOutNode> byId = nodesById(nodes);
+    List<LaidOutNode> lifelines = new ArrayList<>();
+    for (String id : lifelineOrder) {
+      LaidOutNode node = byId.get(id);
+      if (node != null) {
+        lifelines.add(node);
+      }
+    }
+    if (lifelines.isEmpty()) {
+      return nodes;
+    }
+
+    double top = lifelines.stream().mapToDouble(LaidOutNode::y).min().orElse(0.0);
+    double left = lifelines.stream().mapToDouble(LaidOutNode::x).min().orElse(0.0);
+    double right =
+        lifelines.stream().mapToDouble(node -> node.x() + node.width()).max().orElse(left);
+    double bottom =
+        lifelines.stream().mapToDouble(node -> node.y() + node.height()).max().orElse(top);
+    for (LaidOutEdge edge : edges) {
+      for (Point point : edge.points()) {
+        bottom = Math.max(bottom, point.y());
+      }
+    }
+
+    List<LaidOutNode> normalized = new ArrayList<>();
+    for (LaidOutNode node : nodes) {
+      if ("interaction".equals(node.role())) {
+        normalized.add(
+            new LaidOutNode(
+                node.id(),
+                node.sourceId(),
+                node.projectionId(),
+                left,
+                top,
+                right - left,
+                bottom - top,
+                node.label(),
+                node.role()));
+      } else {
+        normalized.add(node);
+      }
+    }
+    return normalized;
   }
 
   private List<LaidOutNode> normalizedLifelineNodes(List<LaidOutNode> nodes) {
