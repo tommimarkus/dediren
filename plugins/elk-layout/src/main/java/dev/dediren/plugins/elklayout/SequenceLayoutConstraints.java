@@ -305,23 +305,14 @@ final class SequenceLayoutConstraints {
       return pointsAtY(edge.points(), y);
     }
 
-    return List.of(
-        new Point(sourceEndpointX(source, sourceIndex, targetIndex), y),
-        new Point(targetEndpointX(target, sourceIndex, targetIndex), y));
+    return List.of(new Point(stemX(source), y), new Point(stemX(target), y));
   }
 
-  private static double sourceEndpointX(LaidOutNode source, int sourceIndex, int targetIndex) {
-    if (sourceIndex < targetIndex) {
-      return source.x() + source.width();
-    }
-    return source.x();
-  }
-
-  private static double targetEndpointX(LaidOutNode target, int sourceIndex, int targetIndex) {
-    if (sourceIndex < targetIndex) {
-      return target.x();
-    }
-    return target.x() + target.width();
+  // A message terminates on each participant's lifeline stem, which the renderer draws down the
+  // head-box center (node.x() + node.width()/2). Anchoring the endpoint to the box's left/right
+  // border instead leaves the arrow floating half a head-box width short of the stem.
+  private static double stemX(LaidOutNode lifeline) {
+    return lifeline.x() + lifeline.width() / 2.0;
   }
 
   private List<Double> normalizedMessageYSlots(

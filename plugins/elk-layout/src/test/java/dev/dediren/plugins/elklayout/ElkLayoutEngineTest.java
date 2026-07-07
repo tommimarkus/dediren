@@ -252,12 +252,12 @@ class ElkLayoutEngineTest {
             + edgeById(result, "m2").points()
             + ", m3="
             + edgeById(result, "m3").points());
-    assertSequenceRouteEndpointOnLifelineSide(result, "m1", "customer", true, PortSide.EAST);
-    assertSequenceRouteEndpointOnLifelineSide(result, "m1", "service", false, PortSide.WEST);
-    assertSequenceRouteEndpointOnLifelineSide(result, "m2", "service", true, PortSide.WEST);
-    assertSequenceRouteEndpointOnLifelineSide(result, "m2", "customer", false, PortSide.EAST);
-    assertSequenceRouteEndpointOnLifelineSide(result, "m3", "service", true, PortSide.WEST);
-    assertSequenceRouteEndpointOnLifelineSide(result, "m3", "customer", false, PortSide.EAST);
+    assertSequenceMessageEndpointAtStemCenter(result, "m1", "customer", true);
+    assertSequenceMessageEndpointAtStemCenter(result, "m1", "service", false);
+    assertSequenceMessageEndpointAtStemCenter(result, "m2", "service", true);
+    assertSequenceMessageEndpointAtStemCenter(result, "m2", "customer", false);
+    assertSequenceMessageEndpointAtStemCenter(result, "m3", "service", true);
+    assertSequenceMessageEndpointAtStemCenter(result, "m3", "customer", false);
   }
 
   @Test
@@ -293,14 +293,15 @@ class ElkLayoutEngineTest {
         2,
         edge.points().size(),
         "lifeline-to-lifeline sequence messages should render as direct horizontal segments");
-    assertEquals(240.0, edge.points().getFirst().x(), GEOMETRY_EPSILON);
-    assertEquals(520.0, edge.points().getLast().x(), GEOMETRY_EPSILON);
+    // customer stem center = 100 + 140/2 = 170; service stem center = 520 + 140/2 = 590.
+    assertEquals(170.0, edge.points().getFirst().x(), GEOMETRY_EPSILON);
+    assertEquals(590.0, edge.points().getLast().x(), GEOMETRY_EPSILON);
     for (Point point : edge.points()) {
       assertEquals(
           messageY, point.y(), GEOMETRY_EPSILON, "all message route points should share y");
     }
-    assertSequenceRouteEndpointOnLifelineSide(normalized, "m1", "customer", true, PortSide.EAST);
-    assertSequenceRouteEndpointOnLifelineSide(normalized, "m1", "service", false, PortSide.WEST);
+    assertSequenceMessageEndpointAtStemCenter(normalized, "m1", "customer", true);
+    assertSequenceMessageEndpointAtStemCenter(normalized, "m1", "service", false);
   }
 
   @ParameterizedTest
@@ -2638,23 +2639,20 @@ class ElkLayoutEngineTest {
     assertPointOnSide(point, node, side, edgeId + " endpoint for " + nodeId);
   }
 
-  private static void assertSequenceRouteEndpointOnLifelineSide(
-      LayoutResult result, String edgeId, String nodeId, boolean start, PortSide side) {
+  // A sequence message must terminate on the receiving/sending lifeline's stem, which the renderer
+  // draws down the head-box center (node.x() + node.width()/2). An endpoint parked on the box's
+  // left/right border instead leaves the arrow floating half a box width short of the stem.
+  private static void assertSequenceMessageEndpointAtStemCenter(
+      LayoutResult result, String edgeId, String nodeId, boolean start) {
     LaidOutEdge edge = edgeById(result, edgeId);
     LaidOutNode node = nodeById(result, nodeId);
     assertRouted(edge);
     Point point = start ? edge.points().get(0) : edge.points().get(edge.points().size() - 1);
-    switch (side) {
-      case WEST ->
-          assertEquals(node.x(), point.x(), PORT_SIDE_EPSILON, edgeId + " endpoint for " + nodeId);
-      case EAST ->
-          assertEquals(
-              node.x() + node.width(),
-              point.x(),
-              PORT_SIDE_EPSILON,
-              edgeId + " endpoint for " + nodeId);
-      default -> throw new IllegalArgumentException("unsupported sequence lifeline side " + side);
-    }
+    assertEquals(
+        node.x() + node.width() / 2.0,
+        point.x(),
+        PORT_SIDE_EPSILON,
+        edgeId + " endpoint for " + nodeId + " must reach the lifeline stem center");
     assertTrue(
         point.y() > node.y() + node.height(),
         edgeId + " endpoint should attach below lifeline head, point=" + point + ", node=" + node);
