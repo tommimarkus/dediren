@@ -3666,8 +3666,15 @@ class MainTest {
              "margin":{"top":0,"right":0,"bottom":0,"left":0}}""";
     String stdin = renderInputJson(MINIMAL_LAYOUT, null, policy);
     PluginResult result = Main.executeForTesting(new String[] {"render"}, stdin);
-    assertThat(result.exitCode()).isZero();
-    assertThat(result.stdout()).doesNotContain("\"artifact_kind\":\"png\"");
+    // Assert structurally, not by string search: every emitted artifact_kind must be svg/html, so
+    // a reintroduced png branch fails here regardless of how the envelope is serialized.
+    JsonNode data = okData(result);
+    int artifactCount = 0;
+    for (JsonNode artifact : data.path("artifacts")) {
+      assertThat(artifact.path("artifact_kind").asText()).isIn("svg", "html");
+      artifactCount++;
+    }
+    assertThat(artifactCount).isPositive();
   }
 
   private static String renderInputJson(String layoutJson, String metadataJson, String policyJson) {
