@@ -210,23 +210,30 @@ class ElkLayoutEngineTest {
     LaidOutNode interaction = nodeById(result, "interaction-place-order");
     LaidOutNode customer = nodeById(result, "customer");
     LaidOutNode service = nodeById(result, "service");
-    double lifelineTop = Math.min(customer.y(), service.y());
 
-    // Interaction top hugs the lifeline heads instead of floating a band above them.
+    double expectedLeft = Math.min(customer.x(), service.x());
+    double expectedTop = Math.min(customer.y(), service.y());
+    double expectedRight = Math.max(customer.x() + customer.width(), service.x() + service.width());
+    double expectedBottom =
+        Math.max(customer.y() + customer.height(), service.y() + service.height());
+    for (LaidOutEdge edge : result.edges()) {
+      for (Point point : edge.points()) {
+        expectedBottom = Math.max(expectedBottom, point.y());
+      }
+    }
+
+    // The interaction box exactly wraps the lifelines + message rows (not merely covers them):
+    // every edge is pinned in both directions, so a too-wide or too-tall regression fails.
+    assertEquals(expectedLeft, interaction.x(), 0.5, "interaction left edge");
+    assertEquals(expectedTop, interaction.y(), 0.5, "interaction top edge");
     assertEquals(
-        lifelineTop, interaction.y(), 0.5, "interaction top should equal the lifeline band top");
-    // Interaction spans every lifeline horizontally.
+        expectedRight, interaction.x() + interaction.width(), 0.5, "interaction right edge");
+    assertEquals(
+        expectedBottom, interaction.y() + interaction.height(), 0.5, "interaction bottom edge");
+    // Sanity: the band actually extends below the head row to enclose the messages.
     assertTrue(
-        interaction.x() <= Math.min(customer.x(), service.x()) + 0.5,
-        "interaction left edge spans the lifelines");
-    assertTrue(
-        interaction.x() + interaction.width()
-            >= Math.max(customer.x() + customer.width(), service.x() + service.width()) - 0.5,
-        "interaction right edge spans the lifelines");
-    // Interaction reaches below the head band to enclose the message rows.
-    assertTrue(
-        interaction.y() + interaction.height() > lifelineTop + customer.height(),
-        "interaction encloses the message rows below the heads");
+        expectedBottom > expectedTop + customer.height(),
+        "content band extends below the lifeline heads");
   }
 
   @Test

@@ -97,9 +97,10 @@ final class SequenceLayoutConstraints {
       return result;
     }
     List<LaidOutNode> normalizedNodes = normalizedLifelineNodes(result.nodes());
-    List<LaidOutEdge> normalizedEdges =
-        normalizedMessageEdges(result.edges(), nodesById(normalizedNodes));
-    List<LaidOutNode> wrappedNodes = normalizedInteractionNodes(normalizedNodes, normalizedEdges);
+    Map<String, LaidOutNode> normalizedById = nodesById(normalizedNodes);
+    List<LaidOutEdge> normalizedEdges = normalizedMessageEdges(result.edges(), normalizedById);
+    List<LaidOutNode> wrappedNodes =
+        normalizedInteractionNodes(normalizedNodes, normalizedById, normalizedEdges);
     return new LayoutResult(
         result.layoutResultSchemaVersion(),
         result.viewId(),
@@ -110,8 +111,7 @@ final class SequenceLayoutConstraints {
   }
 
   private List<LaidOutNode> normalizedInteractionNodes(
-      List<LaidOutNode> nodes, List<LaidOutEdge> edges) {
-    Map<String, LaidOutNode> byId = nodesById(nodes);
+      List<LaidOutNode> nodes, Map<String, LaidOutNode> byId, List<LaidOutEdge> edges) {
     List<LaidOutNode> lifelines = new ArrayList<>();
     for (String id : lifelineOrder) {
       LaidOutNode node = byId.get(id);
