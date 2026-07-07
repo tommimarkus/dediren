@@ -897,8 +897,31 @@ class GenericGraphPluginTest {
     assertThat(jsonTexts(data.get("edges"), "id"))
         .containsExactly("m1", "m2", "m3", "m4", "m5", "m6", "m7", "m8", "m9", "m10", "m11", "m12");
     assertThat(jsonTexts(data.get("constraints"), "kind"))
-        .containsExactly("uml.sequence.lifeline-order", "uml.sequence.message-order");
+        .containsExactly(
+            "uml.sequence.lifeline-order",
+            "uml.sequence.message-order",
+            "uml.sequence.fragment-open",
+            "uml.sequence.operand-open");
     assertSchemaValid("schemas/layout-request.schema.json", data);
+  }
+
+  @Test
+  void projectsFragmentAndOperandOpenConstraintsForSequenceFragments() throws Exception {
+    PluginResult result =
+        Main.executeForTesting(
+            new String[] {
+              "project", "--target", "layout-request", "--view", "sequence-fragments-view"
+            },
+            fixture("fixtures/source/valid-uml-sequence-fragments.json"));
+
+    JsonNode data = okData(result);
+
+    assertThat(
+            jsonTexts(layoutRequestConstraint(data, "uml.sequence.fragment-open").get("subjects")))
+        .containsExactlyInAnyOrder("m1", "m5", "m7", "m9");
+    assertThat(
+            jsonTexts(layoutRequestConstraint(data, "uml.sequence.operand-open").get("subjects")))
+        .containsExactlyInAnyOrder("m3", "m11");
   }
 
   @Test

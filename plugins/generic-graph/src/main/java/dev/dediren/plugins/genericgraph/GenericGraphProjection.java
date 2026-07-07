@@ -23,9 +23,12 @@ import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import tools.jackson.databind.JsonNode;
 
 final class GenericGraphProjection {
@@ -214,15 +217,116 @@ final class GenericGraphProjection {
             .map(SourceRelationship::id)
             .toList();
 
-    return List.of(
+    var messageIdSet = new HashSet<>(messageIds);
+    var nodesById =
+        source.nodes().stream()
+            .collect(java.util.stream.Collectors.toMap(SourceNode::id, node -> node, (a, b) -> a));
+    var fragmentOpenIds = new ArrayList<String>();
+    var operandOpenIds = new ArrayList<String>();
+    for (SourceNode node : source.nodes()) {
+      if (!selectedNodeIds.contains(node.id()) || !"CombinedFragment".equals(node.type())) {
+        continue;
+      }
+      JsonNode uml = node.properties().get("uml");
+      if (uml == null) {
+        continue;
+      }
+      var operandIds = new ArrayList<String>();
+      for (JsonNode operand : uml.path("operands")) {
+        operandIds.add(operand.asText());
+      }
+      operandIds.sort(Comparator.comparingInt(id -> operandOrder(nodesById.get(id))));
+      for (int index = 0; index < operandIds.size(); index++) {
+        String firstMessage =
+            firstMessageOfOperand(
+                nodesById.get(operandIds.get(index)), nodesById, messageIdSet, new HashSet<>());
+        if (firstMessage == null) {
+          continue;
+        }
+        if (index == 0) {
+          fragmentOpenIds.add(firstMessage);
+        } else {
+          operandOpenIds.add(firstMessage);
+        }
+      }
+    }
+
+    var constraints = new ArrayList<LayoutConstraint>();
+    constraints.add(
         new LayoutConstraint(
             selectedView.id() + ".uml.sequence.lifeline-order",
             "uml.sequence.lifeline-order",
-            lifelineIds),
+            lifelineIds));
+    constraints.add(
         new LayoutConstraint(
             selectedView.id() + ".uml.sequence.message-order",
             "uml.sequence.message-order",
             messageIds));
+    if (!fragmentOpenIds.isEmpty()) {
+      constraints.add(
+          new LayoutConstraint(
+              selectedView.id() + ".uml.sequence.fragment-open",
+              "uml.sequence.fragment-open",
+              fragmentOpenIds));
+    }
+    if (!operandOpenIds.isEmpty()) {
+      constraints.add(
+          new LayoutConstraint(
+              selectedView.id() + ".uml.sequence.operand-open",
+              "uml.sequence.operand-open",
+              operandOpenIds));
+    }
+    return constraints;
+  }
+
+  private static int operandOrder(SourceNode operand) {
+    if (operand == null) {
+      return Integer.MAX_VALUE;
+    }
+    JsonNode uml = operand.properties().get("uml");
+    JsonNode order = uml == null ? null : uml.get("order");
+    return order != null && order.isNumber() ? order.asInt() : Integer.MAX_VALUE;
+  }
+
+  private static String firstMessageOfOperand(
+      SourceNode operand,
+      Map<String, SourceNode> nodesById,
+      Set<String> messageIds,
+      Set<String> visiting) {
+    if (operand == null) {
+      return null;
+    }
+    JsonNode uml = operand.properties().get("uml");
+    if (uml == null) {
+      return null;
+    }
+    for (JsonNode member : uml.path("fragments")) {
+      String memberId = member.asText();
+      if (messageIds.contains(memberId)) {
+        return memberId;
+      }
+      SourceNode nested = nodesById.get(memberId);
+      if (nested != null && "CombinedFragment".equals(nested.type()) && visiting.add(memberId)) {
+        JsonNode nestedUml = nested.properties().get("uml");
+        if (nestedUml == null) {
+          continue;
+        }
+        var nestedOperands = new ArrayList<String>();
+        for (JsonNode operandRef : nestedUml.path("operands")) {
+          nestedOperands.add(operandRef.asText());
+        }
+        nestedOperands.sort(Comparator.comparingInt(id -> operandOrder(nodesById.get(id))));
+        for (String nestedOperandId : nestedOperands) {
+          String found =
+              firstMessageOfOperand(
+                  nodesById.get(nestedOperandId), nodesById, messageIds, visiting);
+          if (found != null) {
+            return found;
+          }
+        }
+      }
+    }
+    return null;
   }
 
   // Carry roles into the layout-request so backend-neutral layout-quality checks can apply
