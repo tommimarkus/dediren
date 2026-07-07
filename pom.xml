@@ -37,7 +37,6 @@
     <dediren.launcher.jvmArgs>-XX:TieredStopAtLevel=1 -XX:+UseSerialGC -Djava.awt.headless=true -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8 -Dfile.encoding=UTF-8</dediren.launcher.jvmArgs>
     <archunit.version>1.4.2</archunit.version>
     <assertj.version>3.27.7</assertj.version>
-    <commons-io.version>2.22.0</commons-io.version>
     <eclipse-elk.version>0.11.0</eclipse-elk.version>
     <guava.version>33.6.0-jre</guava.version>
     <jackson.version>3.2.0</jackson.version>
@@ -142,24 +141,6 @@
         <groupId>com.tngtech.archunit</groupId>
         <artifactId>archunit</artifactId>
         <version>${archunit.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.xmlgraphics</groupId>
-        <artifactId>batik-transcoder</artifactId>
-        <version>1.19</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.xmlgraphics</groupId>
-        <artifactId>batik-codec</artifactId>
-        <version>1.19</version>
-      </dependency>
-      <!-- Force the patched commons-io across the reactor. Batik 1.17 pulls
-           commons-io 2.11.0 transitively, which is affected by CVE-2024-47554
-           (GHSA-78wr-2p64-hpwj, CVSS 7.5); 2.14.0+ fixes it. -->
-      <dependency>
-        <groupId>commons-io</groupId>
-        <artifactId>commons-io</artifactId>
-        <version>${commons-io.version}</version>
       </dependency>
       <dependency>
         <groupId>org.xmlunit</groupId>
