@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.testsupport.SchemaAssertions;
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.StringReader;
 import java.nio.file.FileVisitResult;
@@ -13,11 +12,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.util.Base64;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
-import javax.imageio.ImageIO;
 import javax.xml.parsers.DocumentBuilderFactory;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -66,7 +63,7 @@ class MainTest {
       String content = data.at("/artifacts/0/content").asText();
 
       assertThat(data.at("/render_result_schema_version").asText())
-          .isEqualTo("render-result.schema.v3");
+          .isEqualTo("render-result.schema.v4");
       assertThat(data.at("/artifacts/0/artifact_kind").asText()).isEqualTo("svg");
       assertThat(content).contains("<svg", "Client", "API");
     }
@@ -829,36 +826,6 @@ class MainTest {
     }
 
     @Test
-    void rejectsRasterScaleAboveMax() throws Exception {
-      ObjectNode input =
-          (ObjectNode)
-              renderInput(
-                  "fixtures/layout-result/basic.json", "fixtures/render-policy/default-svg.json");
-      ((ObjectNode) input.at("/policy"))
-          .set("raster", JsonSupport.objectMapper().readTree("{\"scale\":99}"));
-
-      PluginResult result = render(input);
-      assertThat(result.exitCode()).isEqualTo(3);
-      assertThat(result.stdout()).contains("DEDIREN_SVG_POLICY_INVALID");
-      assertThat(result.stdout()).contains("raster.scale");
-    }
-
-    @Test
-    void rejectsInvalidRasterBackground() throws Exception {
-      ObjectNode input =
-          (ObjectNode)
-              renderInput(
-                  "fixtures/layout-result/basic.json", "fixtures/render-policy/default-svg.json");
-      ((ObjectNode) input.at("/policy"))
-          .set("raster", JsonSupport.objectMapper().readTree("{\"background\":\"red\"}"));
-
-      PluginResult result = render(input);
-      assertThat(result.exitCode()).isEqualTo(3);
-      assertThat(result.stdout()).contains("DEDIREN_SVG_POLICY_INVALID");
-      assertThat(result.stdout()).contains("raster.background");
-    }
-
-    @Test
     void interactionStyleOverridesAppearInCss() throws Exception {
       String svg =
           okData(
@@ -1402,7 +1369,7 @@ class MainTest {
               .readTree(
                   """
                     {
-                      "render_policy_schema_version": "render-policy.schema.v1",
+                      "render_policy_schema_version": "render-policy.schema.v2",
                       "semantic_profile": "archimate",
                       "page": { "width": 400, "height": 240 },
                       "margin": { "top": 24, "right": 24, "bottom": 24, "left": 24 },
@@ -1486,7 +1453,7 @@ class MainTest {
               .readTree(
                   """
                     {
-                      "render_policy_schema_version": "render-policy.schema.v1",
+                      "render_policy_schema_version": "render-policy.schema.v2",
                       "semantic_profile": "archimate",
                       "page": { "width": 400, "height": 240 },
                       "margin": { "top": 24, "right": 24, "bottom": 24, "left": 24 }
@@ -3689,49 +3656,12 @@ class MainTest {
   }
 
   @Test
-  void emitsPngArtifactWhenRasterRequested() throws Exception {
+  void neverEmitsPngArtifact() throws Exception {
+    // Permanent regression guard: PNG rasterization was removed with render-result.schema.v4.
+    // A normal render must only ever emit svg/html artifacts, never a png branch.
     String policy =
         """
-            {"render_policy_schema_version":"render-policy.schema.v1",
-             "page":{"width":800,"height":600},
-             "margin":{"top":0,"right":0,"bottom":0,"left":0},
-             "raster":{"scale":1}}""";
-    String stdin = renderInputJson(MINIMAL_LAYOUT, null, policy);
-    PluginResult result = Main.executeForTesting(new String[] {"render"}, stdin);
-    JsonNode data = okData(result);
-
-    JsonNode svgArtifact = artifact(data, "svg");
-    String svg = svgArtifact.at("/content").asText();
-    assertThat(svg).isNotBlank().startsWith("<svg").contains(">Node<");
-    Path svgOutput = writeRenderArtifact("emits_png_artifact_when_raster_requested", svg);
-    assertThat(svgOutput).isRegularFile();
-    assertThat(Files.size(svgOutput)).isGreaterThan(0L);
-
-    JsonNode pngArtifact = artifact(data, "png");
-    assertThat(pngArtifact.at("/encoding").asText()).isEqualTo("base64");
-    String encodedPng = pngArtifact.at("/content").asText();
-    assertThat(encodedPng).isNotBlank();
-    byte[] png = Base64.getDecoder().decode(encodedPng);
-    assertThat(png.length).isGreaterThan(0);
-    assertThat(png[0] & 0xFF).isEqualTo(0x89);
-    assertThat(new String(png, 1, 3, java.nio.charset.StandardCharsets.US_ASCII)).isEqualTo("PNG");
-
-    Path pngOutput =
-        writeBinaryRenderArtifact("emits_png_artifact_when_raster_requested", "png", png);
-    assertThat(pngOutput).isRegularFile();
-    assertThat(Files.size(pngOutput)).isGreaterThan(0L);
-
-    var image = ImageIO.read(new ByteArrayInputStream(png));
-    assertThat(image).isNotNull();
-    assertThat(image.getWidth()).isGreaterThan(0);
-    assertThat(image.getHeight()).isGreaterThan(0);
-  }
-
-  @Test
-  void omitsPngArtifactWithoutRaster() throws Exception {
-    String policy =
-        """
-            {"render_policy_schema_version":"render-policy.schema.v1",
+            {"render_policy_schema_version":"render-policy.schema.v2",
              "page":{"width":800,"height":600},
              "margin":{"top":0,"right":0,"bottom":0,"left":0}}""";
     String stdin = renderInputJson(MINIMAL_LAYOUT, null, policy);
@@ -3784,7 +3714,7 @@ class MainTest {
     layout.set("warnings", JsonSupport.objectMapper().createArrayNode());
 
     ObjectNode policy = JsonSupport.objectMapper().createObjectNode();
-    policy.put("render_policy_schema_version", "render-policy.schema.v1");
+    policy.put("render_policy_schema_version", "render-policy.schema.v2");
     ObjectNode page = policy.putObject("page");
     page.put("width", 640);
     page.put("height", 360);
@@ -4222,16 +4152,6 @@ class MainTest {
     Path output = outputDir.resolve(testName + ".svg");
     Files.createDirectories(output.getParent());
     Files.writeString(output, content);
-    return output;
-  }
-
-  private static Path writeBinaryRenderArtifact(String testName, String extension, byte[] content)
-      throws Exception {
-    Path outputDir = workspaceRoot().resolve(".test-output/renders/render-plugin");
-    cleanRenderOutputOnce(outputDir);
-    Path output = outputDir.resolve(testName + "." + extension);
-    Files.createDirectories(output.getParent());
-    Files.write(output, content);
     return output;
   }
 

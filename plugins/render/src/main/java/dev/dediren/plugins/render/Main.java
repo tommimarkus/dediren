@@ -23,7 +23,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.List;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -94,18 +93,7 @@ public final class Main {
     }
 
     String svg = renderSvg(input.layoutResult(), input.renderMetadata(), input.policy());
-    List<RenderArtifact> artifacts =
-        new ArrayList<>(buildArtifacts(interactiveMode(input.policy()), svg));
-    if (input.policy().raster() != null) {
-      try {
-        artifacts.add(
-            new RenderArtifact(
-                "png", SvgRasterizer.toPngBase64(svg, input.policy().raster()), "base64"));
-      } catch (SvgRasterizer.RasterizationException error) {
-        return exitWithDiagnostic(
-            stdout, "DEDIREN_SVG_RASTERIZE_FAILED", error.getMessage(), "raster");
-      }
-    }
+    List<RenderArtifact> artifacts = buildArtifacts(interactiveMode(input.policy()), svg);
     var result = new RenderResult(ContractVersions.RENDER_RESULT_SCHEMA_VERSION, artifacts);
     stdout.println(JsonSupport.objectMapper().writeValueAsString(CommandEnvelope.ok(result)));
     return 0;

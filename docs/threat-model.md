@@ -74,6 +74,15 @@ authored string; `SvgAudit` re-parses the emitted SVG and fails on any
 ill-formed markup. The interaction `<script>` layer is opt-in (`interactive`
 policy other than the default `none`) and never carries model text.
 
+The `render` plugin emits SVG as text and no longer bundles Apache Batik /
+XML Graphics. Earlier versions round-tripped the emitted SVG through a Batik
+SVG DOM and PNG transcoder to produce a `png` artifact, re-parsing the
+rendered markup (and its CSS/font references) a second time inside the plugin.
+That path is removed: the plugin never re-parses its own output and carries no
+Batik XML-parsing surface. PNG output is now produced out of process by a
+user-chosen external converter (`rsvg-convert`, `resvg`, ImageMagick, or
+Inkscape) that runs outside the dediren trust boundary.
+
 ### Build & release chain
 
 `.github/workflows/release.yml` and `ci.yml` pin every GitHub Action to a

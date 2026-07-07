@@ -112,7 +112,8 @@ class SvgAuditTest {
       String name, String layout, String policy, String metadata) throws Exception {
     // Measured against the bundled Arial-metric-compatible font, ASCII pins sit at ~1.0 (observed
     // 1.000-1.003 across every fixture), so the ceiling is snug at 1.06 — tight enough to catch a
-    // wide glyph under-reserved at the 0.6em fallback (ratio ~1.67) yet clear of rasterizer noise.
+    // wide glyph under-reserved at the 0.6em fallback (ratio ~1.67) yet loose enough to absorb
+    // sub-pixel metric noise.
     // The floor stays at 0.85 to tolerate that same 0.6em approximation for narrow non-ASCII Latin
     // the font can display. Non-ASCII the font cannot display is skipped inside the check (its
     // full-em width is verified deterministically in SvgTextWidthTest).
