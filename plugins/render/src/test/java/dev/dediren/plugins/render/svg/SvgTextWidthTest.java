@@ -70,10 +70,29 @@ class SvgTextWidthTest {
   }
 
   @Test
-  void nonAsciiCodePointsFallBackToTheDefaultAdvance() {
-    // Code points outside printable ASCII use DEFAULT_ADVANCE_EM (0.600 em) each. "é" (U+00E9)
-    // and "€" (U+20AC) are not in the table, so a two-glyph string is ~1.2 em wide.
+  void narrowNonAsciiCodePointsFallBackToTheDefaultAdvance() {
+    // Narrow non-ASCII (accented Latin, currency) is not full-width: each uses DEFAULT_ADVANCE_EM
+    // (0.600 em). "é" (U+00E9) and "€" (U+20AC) → a two-glyph string is ~1.2 em wide.
     assertThat(Svg.estimateTextWidth("é€", EM)).isCloseTo(1200.0, Offset.offset(0.5));
+  }
+
+  @Test
+  void fullWidthCjkGlyphsMeasureAtOneEm() {
+    // CJK ideographs occupy the full em square (~1.0 em advance), not the 0.6 em non-ASCII
+    // fallback,
+    // which under-measured them by ~40% and let textLength squeeze the rendered label. "注文管理"
+    // (four ideographs) is ~4.0 em wide, not 2.4.
+    assertThat(Svg.estimateTextWidth("注文管理", EM)).isCloseTo(4000.0, withinPercentage(1.0));
+  }
+
+  @Test
+  void kanaHangulAndFullWidthFormsMeasureAtOneEm() {
+    assertThat(Svg.estimateTextWidth("あ", EM)).isCloseTo(1000.0, withinPercentage(1.0)); // Hiragana
+    assertThat(Svg.estimateTextWidth("カ", EM)).isCloseTo(1000.0, withinPercentage(1.0)); // Katakana
+    assertThat(Svg.estimateTextWidth("한", EM)).isCloseTo(1000.0, withinPercentage(1.0)); // Hangul
+    assertThat(Svg.estimateTextWidth("Ａ", EM))
+        .as("fullwidth Latin A (U+FF21) is wide, unlike ASCII A")
+        .isCloseTo(1000.0, withinPercentage(1.0));
   }
 
   @Test

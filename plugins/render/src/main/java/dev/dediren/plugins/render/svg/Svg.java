@@ -20,8 +20,14 @@ public final class Svg {
   // and under-stated wide ones (m/w/W/M). The estimate stays deterministic and
   // font-installation independent (the #25 goal): it is identical wherever the SVG
   // is produced, which is what lets textLength safely pin the rendered width.
-  // Code points outside printable ASCII fall back to DEFAULT_ADVANCE_EM. See #39.
+  // Non-ASCII code points split two ways: East Asian Wide/Fullwidth glyphs (CJK, kana, Hangul,
+  // fullwidth forms, emoji) occupy the full em square and use FULLWIDTH_ADVANCE_EM; every other
+  // non-ASCII code point (accented Latin, currency, Greek, Cyrillic) is narrow and uses
+  // DEFAULT_ADVANCE_EM. The earlier flat 0.600 em fallback under-measured CJK by ~40%, so the
+  // emitted textLength then squeezed the rendered label — the #39 correction, extended to
+  // non-ASCII. See #39.
   private static final double DEFAULT_ADVANCE_EM = 0.600;
+  private static final double FULLWIDTH_ADVANCE_EM = 1.000;
   private static final double[] ASCII_ADVANCE_EM = buildAsciiAdvanceTable();
 
   /** Coordinate/length formatter: drops the decimal for whole numbers, otherwise full precision. */
@@ -80,7 +86,31 @@ public final class Svg {
     if (codePoint >= 32 && codePoint < 127) {
       return ASCII_ADVANCE_EM[codePoint - 32];
     }
+    if (isFullWidth(codePoint)) {
+      return FULLWIDTH_ADVANCE_EM;
+    }
     return DEFAULT_ADVANCE_EM;
+  }
+
+  // Approximates Unicode East Asian Width "Wide" or "Fullwidth": the ranges whose glyphs occupy a
+  // full em square in the fonts a viewer substitutes for them. Deterministic and font-installation
+  // independent (the #25 goal), so the emitted textLength is identical wherever the SVG is
+  // produced.
+  private static boolean isFullWidth(int codePoint) {
+    return (codePoint >= 0x1100 && codePoint <= 0x115F) // Hangul Jamo
+        || (codePoint >= 0x2E80 && codePoint <= 0x303E) // CJK radicals, Kangxi, CJK symbols/punct
+        || (codePoint >= 0x3041 && codePoint <= 0x33FF) // Hiragana, Katakana, CJK compatibility
+        || (codePoint >= 0x3400 && codePoint <= 0x4DBF) // CJK Unified Ideographs Extension A
+        || (codePoint >= 0x4E00 && codePoint <= 0x9FFF) // CJK Unified Ideographs
+        || (codePoint >= 0xA000 && codePoint <= 0xA4CF) // Yi Syllables/Radicals
+        || (codePoint >= 0xAC00 && codePoint <= 0xD7A3) // Hangul Syllables
+        || (codePoint >= 0xF900 && codePoint <= 0xFAFF) // CJK Compatibility Ideographs
+        || (codePoint >= 0xFE10 && codePoint <= 0xFE19) // Vertical forms
+        || (codePoint >= 0xFE30 && codePoint <= 0xFE6F) // CJK compatibility & small form variants
+        || (codePoint >= 0xFF00 && codePoint <= 0xFF60) // Fullwidth ASCII variants
+        || (codePoint >= 0xFFE0 && codePoint <= 0xFFE6) // Fullwidth signs
+        || (codePoint >= 0x1F300 && codePoint <= 0x1FAFF) // emoji & pictographs
+        || (codePoint >= 0x20000 && codePoint <= 0x3FFFD); // CJK Extension B+ (supplementary)
   }
 
   private static double[] buildAsciiAdvanceTable() {
