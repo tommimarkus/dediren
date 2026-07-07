@@ -8,8 +8,8 @@ public final class ContractVersions {
   public static final String LAYOUT_RESULT_SCHEMA_VERSION = "layout-result.schema.v1";
   public static final String SEMANTIC_VALIDATION_RESULT_SCHEMA_VERSION =
       "semantic-validation-result.schema.v1";
-  public static final String RENDER_RESULT_SCHEMA_VERSION = "render-result.schema.v3";
-  public static final String RENDER_POLICY_SCHEMA_VERSION = "render-policy.schema.v1";
+  public static final String RENDER_RESULT_SCHEMA_VERSION = "render-result.schema.v4";
+  public static final String RENDER_POLICY_SCHEMA_VERSION = "render-policy.schema.v2";
   public static final String RENDER_METADATA_SCHEMA_VERSION = "render-metadata.schema.v1";
   public static final String EXPORT_REQUEST_SCHEMA_VERSION = "export-request.schema.v1";
   public static final String EXPORT_RESULT_SCHEMA_VERSION = "export-result.schema.v1";

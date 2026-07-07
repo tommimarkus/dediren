@@ -5,7 +5,7 @@
   "additionalProperties": false,
   "required": ["render_policy_schema_version", "page", "margin"],
   "properties": {
-    "render_policy_schema_version": { "const": "render-policy.schema.v1" },
+    "render_policy_schema_version": { "const": "render-policy.schema.v2" },
     "semantic_profile": {
       "type": "string",
       "minLength": 1,
@@ -37,7 +37,6 @@
       }
     },
     "style": { "$ref": "#/$defs/style" },
-    "raster": { "$ref": "#/$defs/raster" },
     "accessibility": { "$ref": "#/$defs/accessibility" }
   },
   "$defs": {
@@ -312,14 +311,6 @@
       "properties": {
         "highlight_stroke": { "$ref": "#/$defs/color" },
         "highlight_stroke_width": { "type": "number", "minimum": 0, "maximum": 24 }
-      }
-    },
-    "raster": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "scale": { "type": "number", "exclusiveMinimum": 0, "maximum": 8 },
-        "background": { "$ref": "#/$defs/color" }
       }
     },
     "accessibility": {

@@ -495,7 +495,7 @@ class ContractRoundTripTest {
         JsonSupport.readValue(
             """
                 {
-                  "render_policy_schema_version": "render-policy.schema.v1",
+                  "render_policy_schema_version": "render-policy.schema.v2",
                   "semantic_profile": "archimate",
                   "page": { "width": 640, "height": 360 },
                   "margin": { "top": 24, "right": 24, "bottom": 24, "left": 24 },
@@ -533,13 +533,13 @@ class ContractRoundTripTest {
                 .valueToTree(result)
                 .at("/render_result_schema_version")
                 .asText())
-        .isEqualTo("render-result.schema.v3");
+        .isEqualTo("render-result.schema.v4");
 
     var interactivePolicy =
         JsonSupport.readValue(
             """
                 {
-                  "render_policy_schema_version": "render-policy.schema.v1",
+                  "render_policy_schema_version": "render-policy.schema.v2",
                   "interactive": "both",
                   "page": { "width": 640, "height": 360 },
                   "margin": { "top": 24, "right": 24, "bottom": 24, "left": 24 },

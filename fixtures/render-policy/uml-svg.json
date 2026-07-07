@@ -1,5 +1,5 @@
 {
-  "render_policy_schema_version": "render-policy.schema.v1",
+  "render_policy_schema_version": "render-policy.schema.v2",
   "semantic_profile": "uml",
   "page": {
     "width": 900,
