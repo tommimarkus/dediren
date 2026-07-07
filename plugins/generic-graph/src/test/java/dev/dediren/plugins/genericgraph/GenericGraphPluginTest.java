@@ -505,7 +505,8 @@ class GenericGraphPluginTest {
 
     assertThat(layoutRequestNode(data, "customer").at("/role").asText()).isEqualTo("lifeline");
     assertThat(layoutRequestNode(data, "service").at("/role").asText()).isEqualTo("lifeline");
-    assertThat(layoutRequestNode(data, "interaction-place-order").has("role")).isFalse();
+    assertThat(layoutRequestNode(data, "interaction-place-order").at("/role").asText())
+        .isEqualTo("interaction");
     assertSchemaValid("schemas/layout-request.schema.json", data);
   }
 

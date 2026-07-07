@@ -232,6 +232,9 @@ final class GenericGraphProjection {
     if ("Lifeline".equals(sourceType)) {
       return "lifeline";
     }
+    if ("Interaction".equals(sourceType)) {
+      return "interaction";
+    }
     if (semanticProfile.equals("archimate") && Archimate.isRelationshipConnectorType(sourceType)) {
       return "junction";
     }
