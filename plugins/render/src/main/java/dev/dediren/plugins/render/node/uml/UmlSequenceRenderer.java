@@ -474,7 +474,9 @@ public final class UmlSequenceRenderer {
         appearance.markerEnd() == SvgEdgeMarkerEnd.NONE
             ? ""
             : " marker-end=\"url(#marker-end-" + attr(edge.id()) + ")\"";
-    return "<path d=\""
+    return "<path data-dediren-sequence-message=\""
+        + attr(edge.id())
+        + "\" d=\""
         + attr(pathData(edge.points()))
         + "\" fill=\"none\" stroke=\""
         + attr(appearance.stroke())

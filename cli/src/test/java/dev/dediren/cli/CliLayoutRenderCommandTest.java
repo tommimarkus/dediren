@@ -247,7 +247,7 @@ class CliLayoutRenderCommandTest {
   }
 
   @Test
-  void emitsRealEngineSequenceDiagramToGallery() throws Exception {
+  void sequenceMessageArrowsReachLifelineStemsThroughRealEngine() throws Exception {
     // The sequence render's message geometry comes from the live ELK layout normalizer, so the
     // gallery image is produced from the real engine end to end (project -> layout -> render), not
     // a frozen layout fixture. This refreshes the git-ignored gallery with a styled sequence
@@ -402,10 +402,11 @@ class CliLayoutRenderCommandTest {
     }
     assertThat(stems).as("rendered sequence must draw lifeline stems").isNotEmpty();
 
-    // The message connector (not the arrowhead marker path) carries stroke-linecap="round".
+    // Locate message connectors by their stable data hook rather than a cosmetic stroke attribute,
+    // so a future style change cannot silently redraw what this oracle counts.
     Matcher message =
         Pattern.compile(
-                "<path d=\"M ([-\\d.]+) [-\\d.]+ L ([-\\d.]+) [-\\d.]+\"[^>]*stroke-linecap=\"round\"")
+                "<path data-dediren-sequence-message=\"[^\"]*\" d=\"M ([-\\d.]+) [-\\d.]+ L ([-\\d.]+) [-\\d.]+\"")
             .matcher(svg);
     int messages = 0;
     while (message.find()) {

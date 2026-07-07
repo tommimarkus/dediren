@@ -20,10 +20,12 @@ import org.junit.jupiter.params.provider.MethodSource;
  * diagram. Sequence is deliberately absent here: its message geometry depends on the live ELK
  * layout normalizer, so it is rendered from the real engine in the cli suite instead.
  *
- * <p>These are fixture-based renders. The assertion is a light "still produces an SVG" sanity gate;
- * the artifact itself is for visual review, not a geometry oracle. This class solely owns the
- * {@code scenarios/} gallery subdirectory (wiped once per JVM run) so it never races the sampler
- * writers in {@code MainTest}, which own {@code render-plugin/}.
+ * <p>These are fixture-based renders. The assertion is a light "produces an SVG that carries node
+ * content" smoke gate — it catches a total render/empty-frame regression but is not a geometry
+ * oracle; per-kind shape correctness lives in {@code MainTest}, and the artifact itself is for
+ * visual review. This class solely owns the {@code scenarios/} gallery subdirectory (wiped once per
+ * JVM run) so it never races the sampler writers in {@code MainTest}, which own {@code
+ * render-plugin/}.
  */
 class RenderGalleryTest {
   private static final AtomicBoolean CLEANED = new AtomicBoolean();
@@ -33,7 +35,12 @@ class RenderGalleryTest {
   void emitsGalleryRenderForEachScenario(String name, String layout, String policy, String metadata)
       throws Exception {
     String svg = RenderTestSupport.renderFixtures(layout, policy, metadata);
-    assertThat(svg).as("scenario %s must render an SVG", name).contains("<svg", "</svg>");
+    // Smoke gate, not a geometry oracle: assert a well-formed SVG that actually carries rendered
+    // graph content, so an empty-but-valid <svg> frame (a total node-render regression) fails here
+    // rather than sliding through. Per-kind shape correctness is pinned structurally in MainTest.
+    assertThat(svg)
+        .as("scenario %s must render an SVG with node content, not an empty frame", name)
+        .contains("<svg", "</svg>", "data-dediren-node-id=");
     writeGalleryArtifact(name + "__" + basename(policy), svg);
   }
 
