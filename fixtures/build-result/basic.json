@@ -1,0 +1,23 @@
+{
+  "build_result_schema_version": "build-result.schema.v1",
+  "status": "ok",
+  "views": [
+    {
+      "view_id": "overview",
+      "status": "ok",
+      "artifacts": [
+        { "artifact_kind": "svg", "path": "overview/diagram.svg" }
+      ],
+      "diagnostics": []
+    },
+    {
+      "view_id": "detail",
+      "status": "ok",
+      "artifacts": [
+        { "artifact_kind": "svg", "path": "detail/diagram.svg" },
+        { "artifact_kind": "archimate+xml", "path": "detail/oef.xml" }
+      ],
+      "diagnostics": []
+    }
+  ]
+}

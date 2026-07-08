@@ -2,6 +2,9 @@ package dev.dediren.contracts;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dev.dediren.contracts.build.BuildArtifact;
+import dev.dediren.contracts.build.BuildResult;
+import dev.dediren.contracts.build.BuildViewOutcome;
 import dev.dediren.contracts.export.ExportRequest;
 import dev.dediren.contracts.export.UmlXmiExportPolicy;
 import dev.dediren.contracts.json.JsonSupport;
@@ -750,6 +753,70 @@ class ContractRoundTripTest {
     assertThat(rel.priority()).isNotNull();
     assertThat(rel.priority().keepStraight()).isEqualTo(3);
     assertThat(rel.priority().resistReversal()).isNull();
+  }
+
+  @Test
+  void buildResultContractsRoundTripFromFixtures() throws Exception {
+    BuildResult basic = readFixture("fixtures/build-result/basic.json", BuildResult.class);
+    BuildResult error = readFixture("fixtures/build-result/error.json", BuildResult.class);
+
+    assertThat(
+            SchemaAssertions.validateFixture(
+                workspaceRoot(),
+                "schemas/build-result.schema.json",
+                "fixtures/build-result/basic.json"))
+        .describedAs("basic build-result fixture")
+        .isEmpty();
+    assertThat(
+            SchemaAssertions.validateFixture(
+                workspaceRoot(),
+                "schemas/build-result.schema.json",
+                "fixtures/build-result/error.json"))
+        .describedAs("error build-result fixture")
+        .isEmpty();
+
+    assertThat(basic.buildResultSchemaVersion())
+        .isEqualTo(ContractVersions.BUILD_RESULT_SCHEMA_VERSION);
+    assertThat(basic.status()).isEqualTo(EnvelopeStatus.OK);
+    assertThat(basic.diagnostics()).isEmpty();
+    assertThat(basic.views())
+        .extracting(BuildViewOutcome::viewId)
+        .containsExactly("overview", "detail");
+    assertThat(basic.views())
+        .allSatisfy(view -> assertThat(view.status()).isEqualTo(EnvelopeStatus.OK));
+    assertThat(basic.views().getFirst().artifacts())
+        .containsExactly(new BuildArtifact("svg", "overview/diagram.svg"));
+
+    assertThat(error.status()).isEqualTo(EnvelopeStatus.ERROR);
+    BuildViewOutcome warned = error.views().getFirst();
+    BuildViewOutcome failed = error.views().getLast();
+    assertThat(warned.status()).isEqualTo(EnvelopeStatus.WARNING);
+    assertThat(warned.diagnostics())
+        .first()
+        .extracting(Diagnostic::severity)
+        .isEqualTo(DiagnosticSeverity.WARNING);
+    assertThat(warned.artifacts()).hasSize(1);
+    assertThat(failed.status()).isEqualTo(EnvelopeStatus.ERROR);
+    assertThat(failed.artifacts()).isEmpty();
+    assertThat(failed.diagnostics())
+        .first()
+        .extracting(Diagnostic::severity)
+        .isEqualTo(DiagnosticSeverity.ERROR);
+
+    JsonNode encoded = JsonSupport.objectMapper().valueToTree(basic);
+    assertThat(encoded.at("/build_result_schema_version").asText())
+        .isEqualTo("build-result.schema.v1");
+    assertThat(encoded.at("/views/0/view_id").asText()).isEqualTo("overview");
+    assertThat(encoded.at("/views/0/artifacts/0/artifact_kind").asText()).isEqualTo("svg");
+    assertThat(encoded.has("diagnostics")).isFalse();
+
+    assertThat(reparse(basic)).isEqualTo(basic);
+    assertThat(reparse(error)).isEqualTo(error);
+  }
+
+  private static BuildResult reparse(BuildResult result) throws Exception {
+    return JsonSupport.objectMapper()
+        .treeToValue(JsonSupport.objectMapper().valueToTree(result), BuildResult.class);
   }
 
   private static <T> T readFixture(String fixture, Class<T> type) throws Exception {

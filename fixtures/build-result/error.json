@@ -1,0 +1,33 @@
+{
+  "build_result_schema_version": "build-result.schema.v1",
+  "status": "error",
+  "views": [
+    {
+      "view_id": "overview",
+      "status": "warning",
+      "artifacts": [
+        { "artifact_kind": "svg", "path": "overview/diagram.svg" }
+      ],
+      "diagnostics": [
+        {
+          "code": "DEDIREN_LAYOUT_QUALITY_WARNING",
+          "severity": "warning",
+          "message": "layout quality metric 'route_close_parallel_count' is 1",
+          "path": "$.data.route_close_parallel_count"
+        }
+      ]
+    },
+    {
+      "view_id": "detail",
+      "status": "error",
+      "artifacts": [],
+      "diagnostics": [
+        {
+          "code": "DEDIREN_ELK_INPUT_INVALID_JSON",
+          "severity": "error",
+          "message": "layout request is not a valid layout-request document"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dediren.dev/schemas/build-result.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["build_result_schema_version", "status", "views"],
+  "properties": {
+    "build_result_schema_version": { "const": "build-result.schema.v1" },
+    "status": { "enum": ["ok", "warning", "error"] },
+    "views": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/viewOutcome" }
+    },
+    "diagnostics": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/diagnostic" }
+    }
+  },
+  "$defs": {
+    "viewOutcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["view_id", "status", "artifacts", "diagnostics"],
+      "properties": {
+        "view_id": { "type": "string", "minLength": 1 },
+        "status": { "enum": ["ok", "warning", "error"] },
+        "artifacts": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/artifact" }
+        },
+        "diagnostics": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/diagnostic" }
+        }
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifact_kind", "path"],
+      "properties": {
+        "artifact_kind": { "type": "string", "minLength": 1 },
+        "path": { "type": "string", "minLength": 1 }
+      }
+    },
+    "diagnostic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "severity", "message"],
+      "properties": {
+        "code": { "type": "string", "minLength": 1 },
+        "severity": { "enum": ["info", "warning", "error"] },
+        "message": { "type": "string" },
+        "path": { "type": "string" }
+      }
+    }
+  }
+}
