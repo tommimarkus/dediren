@@ -2,6 +2,11 @@
 
 Date: 2026-05-08
 
+> **Amended 2026-07-08 by `2026-07-08-monolithic-compiler.md`:** the
+> external-executable plugin posture is revised to a monolithic single-JVM
+> compiler; the contract-first identity and pipeline scope stand. The historical
+> body below is preserved as the record of how the product began.
+
 ## Purpose
 
 `dediren` is a structured-data-first diagram rendering CLI for agentic tools.

@@ -1,5 +1,8 @@
 # Plugin Capability-Probe Result Cache Implementation Plan
 
+> **STATUS: DEAD (2026-07-08).** The capability probe it caches is deleted by
+> 2026-07-08-monolithic-runtime-radical.md. Do not execute.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` (recommended, same session) or `superpowers:executing-plans` (separate session with review checkpoints) to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. Do **not** batch tasks; land each behind its own commit with explicit-path staging.
 
 **Goal:** Pay the capability-probe JVM spawn (~50–80 ms/stage, measured) **once per plugin build instead of once per invocation** by memoizing the validated `RuntimeCapabilities` on disk, keyed to a fingerprint of everything the probe attests. A cache hit must yield *exactly* the same semantic checks a live probe yields (runtime-schema validation, id match, capability support), so the change is invisible to agents and preserves the current integrity posture with **no `DEDIREN_TRUST_MANIFEST_CAPABILITIES` opt-in required**. This is the only surviving standalone piece of review idea **I5** (the `dediren pipeline` one-shot subcommand is deliberately *not* built here — it arrives as the facade of the I9 hybrid-host plan).

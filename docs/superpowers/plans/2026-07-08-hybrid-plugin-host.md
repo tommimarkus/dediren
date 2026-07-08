@@ -1,5 +1,10 @@
 # Hybrid Single-JVM Plugin Host Implementation Plan
 
+> **STATUS: SUPERSEDED (2026-07-08).** The owner approved the monolithic
+> direction; this hybrid plan is not to be executed. Superseded by
+> 2026-07-08-monolithic-runtime-radical.md, which reuses its verified seam
+> facts.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use
 > superpowers:subagent-driven-development (recommended) or
 > superpowers:executing-plans to implement this plan task-by-task. Steps use

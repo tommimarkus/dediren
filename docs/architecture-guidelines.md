@@ -21,26 +21,34 @@ in [Sources](#sources).
 
 ## 1. Architectural style
 
-Dediren is a **contract-first modular monolith with a process-isolated plugin
-runtime**. Three properties define it, and every other rule serves them:
+Dediren is a **contract-first modular monolith**. Two properties define it, and
+every other rule serves them:
 
 1. **Contract-first.** The stable product is a set of machine-readable contracts
-   — JSON schemas, command envelopes, plugin manifests, runtime capability
-   probes, and structured diagnostics. Java types are an implementation of those
-   contracts, not the product. An agent must be able to decide success or
-   failure from stdout JSON alone, without reading Java.
+   — JSON schemas, command envelopes, and structured diagnostics. Java types are
+   an implementation of those contracts, not the product. An agent must be able
+   to decide success or failure from stdout JSON alone, without reading Java.
 2. **Modular monolith.** The system ships as one coordinated Maven reactor build
    of small modules with an explicit, acyclic dependency graph (*Maven reactor*;
    *Martin 2017*, ADP). It is not a distributed system: the modules build and
    version together.
-3. **Process-isolated plugins.** Layout, render, and export are *separate
-   executables* that core launches as OS subprocesses and talks to over JSON on
-   stdin/stdout (*microkernel pattern*, *Richards 2022*; *LSP*). This is a
-   deliberate microkernel/plug-in split: `core` is the kernel, plugins are
-   independently built feature modules behind a wire contract.
 
-The job of these guidelines is to keep those three properties true as the system
-grows.
+**Process boundary — reversed 2026-07-08 (transitional).** Dediren shipped with
+a third defining property: *process-isolated plugins* — layout, render, and
+export as separate executables core launched as OS subprocesses over JSON on
+stdin/stdout, a deliberate microkernel/plug-in split (*microkernel pattern*,
+*Richards 2022*; *LSP*). The 2026-07-08 runtime challenge measured that
+boundary's cost — roughly 1.9 s across 13–15 JVM spawns for the documented
+five-invocation agent flow, an order of process overhead the shipped startup
+tiers cannot recover — and the owner approved reversing it: the plugins become
+in-tree single-JVM library engines behind typed interfaces
+(spec `docs/superpowers/specs/2026-07-08-monolithic-compiler.md`; plan
+`2026-07-08-monolithic-runtime-radical.md`). That reversal lands task-by-task;
+until the cutover tasks land, the process boundary and every rule in §5 remain
+live and authoritative for the current code.
+
+The job of these guidelines is to keep the contract-first and modular-monolith
+properties true as the system grows.
 
 ---
 
@@ -91,6 +99,54 @@ Rules that fall out of this table and must be enforced, not just hoped for:
   never enter the default build or the shipped product graph. Nothing depends
   on it and `dist-tool` does not bundle it — it is not a compile-scope edge on
   the spine.
+
+### Target allowed-edge table (monolith)
+
+> **Target state — lands task-by-task via plan
+> `2026-07-08-monolithic-runtime-radical.md` (spec
+> `2026-07-08-monolithic-compiler.md`). The current table above remains
+> authoritative until the matching task lands.** This is where the spine points
+> once the plugin process protocol is deleted and the five plugins become
+> in-tree library engines behind a typed `engine-api` seam. The graph stays an
+> acyclic DAG rooted at `contracts`; only the plugin edges change shape.
+
+| Module | May compile-depend on | Stability tier |
+|---|---|---|
+| `contracts` | *(nothing internal)* | 0 — foundation |
+| `archimate` | *(nothing internal)* | 1 — notation core |
+| `uml` | `contracts` | 1 — notation core |
+| `schema-cache` | `contracts` | 1 — utility core |
+| `engine-api` | `contracts` | 1 — engine seam |
+| `core` | `contracts`, `engine-api` | 2 — orchestration + `build` driver |
+| `render` (engine) | `engine-api`, `contracts`, `archimate`, `uml` | 2 — leaf engine |
+| `generic-graph` (engine) | `engine-api`, `contracts`, `archimate`, `uml` | 2 — leaf engine |
+| `elk-layout` (engine) | `engine-api`, `contracts` | 2 — leaf engine |
+| `archimate-oef-export` (engine) | `engine-api`, `contracts`, `archimate`, `schema-cache` | 2 — leaf engine |
+| `uml-xmi-export` (engine) | `engine-api`, `contracts`, `uml`, `schema-cache` | 2 — leaf engine |
+| `cli` | `contracts`, `core`, `engine-api`; engine implementations **only in `EngineWiring`** | 3 — entrypoint + wiring |
+| `dist-tool` | `contracts` (compile); `cli` (runtime, for bundling) | 3 — assembly |
+| `coverage-report` | *(build-only, `coverage`-profile-scoped)* | 3 — build tooling |
+
+Rules that fall out of this target table:
+
+- **`engine-api` is a new tier-1 module** (directory `engine-api/`, package
+  `dev.dediren.engine`): interfaces only, depends on `contracts` alone.
+- **No engine depends on `core`.** The plugin→`core` prohibition survives the
+  reversal as an engine→`core` prohibition: engines depend on `engine-api`,
+  `contracts`, and the notation/utility cores they need, never on `core` and
+  never on each other. The SVG emitter must not import ELK; exporters must not
+  import the SVG emitter.
+- **`core` never compile-depends on an engine implementation.** `core` drives
+  engines only through the `engine-api` interfaces and the `contracts` records.
+- **`cli` confines the engine-implementation edge to one class.** `cli` depends
+  on `core`, `contracts`, and `engine-api` for orchestration, and on the five
+  engine implementations only inside `EngineWiring`, which constructs them
+  explicitly (no `ServiceLoader`, no `PATH`, no runtime discovery). ArchUnit
+  pins the edge to that single named class.
+- **The five engines move to `engines/<name>`** (directory move only), keeping
+  their Maven artifactIds and their `dev.dediren.plugins.*` packages; the
+  package rename is deferred debt. `testbeds/plugin-runtime` is deleted with the
+  process protocol.
 
 ### A noted exception to Stable Abstractions
 
@@ -231,23 +287,30 @@ design removes. Do not migrate a plugin in-process for performance without a
 measured latency requirement that justifies losing isolation (a `[runtime]`
 quality scenario, §9).
 
-**In-process transport initiative — considered and closed (2026-07).** A
-trust-tiered in-process transport for first-party plugins (typed SPI over
-`contracts` records, feature-flagged dispatch, ArchUnit replacing the OS wall)
-was designed on 2026-07-01 but the spec was never committed and the working
-file was lost. The initiative was formally closed after the 2026-07-03
-multi-viewpoint review measured the baseline this rule demands: roughly
-330 ms irreducible per-stage process overhead after all three shipped startup
-tiers, about 2.5 s for a six-stage 100-element pipeline, and only ~50 ms per
-operation recoverable via the manifest-trust flag
-(`docs/superpowers/reviews/2026-07-03-multi-viewpoint-product-review.md`,
-findings PF-1/PF-2 and the appendix). The maintainer-viewpoint analysis
-(MT-7) judged the added load — dual transports, a doubled failure taxonomy,
-per-plugin adapters, and converting the ArchUnit
-plugins-do-not-depend-on-core rule from structurally guaranteed into a
-load-bearing last defense — not worth that recovery. If startup cost
-resurfaces, execute Tier 4 (Leyden AOT, §13c) first; reopening in-process
-transport requires a `[runtime]` scenario these baselines fail.
+**In-process transport initiative — reopened and decided as the monolith
+(2026-07-08).** A trust-tiered in-process transport for first-party plugins
+(typed SPI over `contracts` records, feature-flagged dispatch, ArchUnit
+replacing the OS wall) was designed on 2026-07-01 (spec never committed, working
+file lost) and closed after the 2026-07-03 multi-viewpoint review — that closure
+rested on roughly 330 ms irreducible per-stage overhead after all three startup
+tiers and only ~50 ms/op recoverable via the manifest-trust flag, and judged a
+dual-transport hybrid not worth that recovery (MT-7). The `[runtime]` reopening
+bar this section set was then *met*: the 2026-07-08 runtime challenge re-examined
+the question without the architecture constraint and measured the boundary
+end-to-end — roughly 1.9 s across 13–15 JVM spawns for the documented
+five-invocation agent flow, an order of process overhead the shipped startup
+tiers cannot recover
+(`docs/superpowers/reviews/2026-07-08-runtime-size-speed-challenge.md`, I9
+dark-horse follow-up). On that evidence the owner approved not the interim
+in-process *hybrid* but the full **monolith**: the five plugins become in-tree
+single-JVM library engines and the plugin process protocol is deleted. This
+decision supersedes both the 2026-07 closure ruling above and the interim I9
+hybrid design (`2026-07-08-hybrid-plugin-host.md`, superseded;
+`2026-07-08-plugin-probe-cache.md`, dead). It is specified in
+`docs/superpowers/specs/2026-07-08-monolithic-compiler.md` and lands
+task-by-task via `2026-07-08-monolithic-runtime-radical.md`; this section's
+process-boundary rules retire when the cutover tasks (protocol deletion) land.
+Until then, the boundary rules below remain authoritative for the current code.
 
 ### Rules for the boundary
 
