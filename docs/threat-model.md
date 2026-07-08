@@ -21,7 +21,7 @@ Parsing goes through `contracts/src/main/java/dev/dediren/contracts/json/JsonSup
 Jackson 3 (`tools.jackson`) `ObjectMapper`: snake_case properties, fail on
 unknown properties, non-null-only output. Fuzz-regression targets pin the
 failure contract: `JsonSupportFuzzTest` (`contracts`) and
-`SchemaValidationFuzzTest` (`plugins/uml-xmi-export`) assert only
+`SchemaValidationFuzzTest` (`engines/uml-xmi-export`) assert only
 `JacksonException` / `XmiValidationException` may escape parsing, running in
 deterministic regression mode over checked-in seed corpora in CI.
 
@@ -48,8 +48,8 @@ Runtime schema fetches go through
 `curlFetcher`, which forces `--proto '=https'` (no protocol downgrade on
 redirect) and verifies the download's SHA-256 against a pinned value before
 trusting it: the single `OMG_XMI_SCHEMA_SHA256` constant
-(`plugins/uml-xmi-export/.../schema/SchemaValidation.java`) and the per-file
-`OFFICIAL_OEF_SCHEMA_SHA256` map (`plugins/archimate-oef-export/.../OefExportEngine.java`).
+(`engines/uml-xmi-export/.../schema/SchemaValidation.java`) and the per-file
+`OFFICIAL_OEF_SCHEMA_SHA256` map (`engines/archimate-oef-export/.../OefExportEngine.java`).
 The offline overrides `DEDIREN_XMI_SCHEMA_PATH` / `DEDIREN_OEF_SCHEMA_DIR`
 bypass the SHA-256 check by design — they only require the supplied file to
 be non-empty.
@@ -60,8 +60,8 @@ Generated UML/XMI XML is parsed with a hardened `DocumentBuilderFactory`
 (`SchemaValidation.secureXmiDocumentBuilderFactory()`): DOCTYPE declarations
 disallowed, `FEATURE_SECURE_PROCESSING` on, XInclude and entity-reference
 expansion off. The external `xmllint` schema validator runs with `--nonet`
-for both the OMG XMI schema (`plugins/uml-xmi-export`) and the OEF
-ArchiMate schemas (`plugins/archimate-oef-export`).
+for both the OMG XMI schema (`engines/uml-xmi-export`) and the OEF
+ArchiMate schemas (`engines/archimate-oef-export`).
 
 ### SVG output escaping
 
@@ -69,7 +69,7 @@ Untrusted model text (node/edge/group labels and ids) flows into the SVG
 render surface. Every value is XML-escaped at emission — `Svg.text()` for
 element content and `Svg.attr()` for attribute values — so a label such as
 `</text><script>alert(1)</script>` reaches the output only in escaped form and
-cannot break out of its host element. `LabelInjectionTest` (`plugins/render`)
+cannot break out of its host element. `LabelInjectionTest` (`engines/render`)
 drives a breakout payload through a full render and asserts both that the
 payload never appears unescaped and that the label round-trips back to the exact
 authored string; `SvgAudit` re-parses the emitted SVG and fails on any

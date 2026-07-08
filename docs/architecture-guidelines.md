@@ -97,9 +97,9 @@ Rules that fall out of this table and must be enforced, not just hoped for:
   engine implementations only inside `EngineWiring`, which constructs them
   explicitly (no `ServiceLoader`, no `PATH`, no runtime discovery). ArchUnit
   pins the edge to that single named class.
-- **The five engines still live under `plugins/<name>`** with their
-  `dev.dediren.plugins.*` packages; the `engines/<name>` directory move and
-  package rename are deferred debt from the monolith plan.
+- **The five engines now live under `engines/<name>`** (directory move landed
+  2026-07-08); their `dev.dediren.plugins.*` packages are retained debt — see
+  §12.
 - **`contracts` depends on nothing internal.** It is the most-depended-on module
   and must stay the most stable (*Martin 2017*, SDP).
 - **`coverage-report` is build-only.** It exists solely to host JaCoCo
@@ -413,9 +413,9 @@ erodes the engine boundary needs `[runtime]` evidence, not assertion.
 Small, boundary-preserving moves (*evolutionary design*). Playbooks for the
 common changes:
 
-- **Add an engine.** New Maven module under `plugins/` (target home
-  `engines/`), depends on `engine-api` and `contracts` (+ the notation/utility
-  cores it needs), never on `core`. Implement the matching `engine-api`
+- **Add an engine.** New Maven module under `engines/`, depends on
+  `engine-api` and `contracts` (+ the notation/utility cores it needs), never
+  on `core`. Implement the matching `engine-api`
   interface, surface failures as `EngineException` with published diagnostics,
   and bind the instance in `cli` `EngineWiring` (the only permitted
   implementation edge). Add the cli engine-envelope regression coverage named
@@ -514,7 +514,8 @@ speculatively):
 | SpotBugs `MS_EXPOSE_REP` suppressed in `JsonSupport.objectMapper()` | `spotbugs-exclude.xml` | §4 contract surface | by design: returns the shared `ObjectMapper` singleton, mutable in place (`.configure()`/`.registerModule()`), exposed as one canonical mapper; the reconfiguration risk is first-party-only: every consumer of the singleton is first-party code in the product JVM, and the mapper is configured once at class initialization |
 | SpotBugs `NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE` suppressed in `DistTool` (5 sites) | `spotbugs-exclude.xml` | §3 module charter | deferred: `Path.getFileName()`/`getParent()` on `Files.list(dir)` entries and real bundle/output paths; null branch infeasible; build/dist tool, not shipped runtime |
 | Cross-plugin envelope/dispatch boilerplate duplicated across first-party plugin Mains | `archimate-oef-export/Main.java`, `uml-xmi-export/Main.java`, `generic-graph/Main.java` | §5 engine boundary | `LA-CODE-DUP-1` (lean-audit 2026-07-06), accepted while the standalone Mains survive the launcher lane; retires with the packaging task that deletes them |
-| Layout-quality metric math re-implemented in the ELK plugin's e2e test | `plugins/elk-layout/.../ElkLayoutEngineTest.java` (geometry-metric helpers) vs `core/quality/LayoutQuality.java` | §2 no plugin→`core` edge | `LA-CODE-DUP-2` (lean-audit 2026-07-06), accepted: plugins may depend only on `contracts` (the sole test-scope exception belongs to `cli`), and `test-support` cannot host `contracts`-typed helpers without a reactor cycle (`contracts` test-depends on `test-support`); the independent copy deliberately corroborates core's quality metrics against real ELK output; marked `lean-audit:dup-intentional`; revisit if a contracts-aware test-support home is ever chartered |
+| Layout-quality metric math re-implemented in the ELK plugin's e2e test | `engines/elk-layout/.../ElkLayoutEngineTest.java` (geometry-metric helpers) vs `core/quality/LayoutQuality.java` | §2 no plugin→`core` edge | `LA-CODE-DUP-2` (lean-audit 2026-07-06), accepted: plugins may depend only on `contracts` (the sole test-scope exception belongs to `cli`), and `test-support` cannot host `contracts`-typed helpers without a reactor cycle (`contracts` test-depends on `test-support`); the independent copy deliberately corroborates core's quality metrics against real ELK output; marked `lean-audit:dup-intentional`; revisit if a contracts-aware test-support home is ever chartered |
+| `dev.dediren.plugins.*` package names retained on the five engines after the `plugins/` → `engines/` directory move | `engines/{generic-graph,elk-layout,render,archimate-oef-export,uml-xmi-export}/src/**/dev/dediren/plugins/**` | §2 module naming | mechanical directory/reactor move only (owner-ratified); the matching package rename is out-of-scope follow-on debt, not yet scheduled |
 
 None of these block the architecture; they are propagation-cost and clarity
 debts with a clear, local fix when their files are next worked.

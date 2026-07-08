@@ -79,7 +79,7 @@ codes (full repair guidance in
   quality checks.
 - `cli` — thin: parse args, assemble requests, call `core`, print envelopes;
   constructs the engines in its single `EngineWiring` class.
-- `plugins/*` (engines) — notation, layout, render, export (may depend on
+- `engines/*` — notation, layout, render, export (may depend on
   `engine-api` and `contracts`, never on `core`).
 
 ## Related Pages

@@ -92,16 +92,16 @@ agent tools should be pointed here from their own entrypoint files (for example,
   `AgentUsageDocConsistencyTest` (dist-tool) enforces that every `DEDIREN_*`
   token and CalVer version string in `docs/agent-usage.md` exists in source and
   matches the product version; keep it green when renaming codes or env vars.
-- ELK layout changes: update `plugins/elk-layout`, CLI/distribution
+- ELK layout changes: update `engines/elk-layout`, CLI/distribution
   smoke coverage, and README/agent runtime notes together.
 - Render policy changes: update `schemas/render-policy.schema.json`,
-  `contracts`, render fixtures, `plugins/render`, CLI render tests, and
+  `contracts`, render fixtures, `engines/render`, CLI render tests, and
   README examples together.
 - OEF export changes: update export schemas, policy fixtures, source/layout
-  fixtures, `plugins/archimate-oef-export`, CLI export tests, and README
+  fixtures, `engines/archimate-oef-export`, CLI export tests, and README
   examples together.
 - UML/XMI export changes: update export schemas, policy fixtures,
-  source/layout fixtures, `plugins/uml-xmi-export`, CLI export tests, and
+  source/layout fixtures, `engines/uml-xmi-export`, CLI export tests, and
   README examples together.
 - Engine runtime, schema-cache fetching, envelope validation, XML
   parser hardening, or release workflow changes: update
@@ -149,8 +149,8 @@ enforcement authority for matching version, tag, and release actions.
 - Known version assertion surfaces include
   `cli/src/test/java/dev/dediren/cli/MainTest.java`,
   `contracts/src/test/java/dev/dediren/contracts/ContractRoundTripTest.java`,
-  `plugins/archimate-oef-export/src/test/java/dev/dediren/plugins/archimateoef/MainTest.java`,
-  `plugins/generic-graph/src/test/java/dev/dediren/plugins/genericgraph/GenericGraphPluginTest.java`,
+  `engines/archimate-oef-export/src/test/java/dev/dediren/plugins/archimateoef/MainTest.java`,
+  `engines/generic-graph/src/test/java/dev/dediren/plugins/genericgraph/GenericGraphPluginTest.java`,
   and `dist-tool/src/test/java/dev/dediren/tools/dist/DistModuleTest.java`.
 - `.github/workflows/release.yml` validates tag `v<version>` against root
   `pom.xml`; update it only if the product version source changes.
@@ -181,7 +181,7 @@ enforcement authority for matching version, tag, and release actions.
 
 ## ELK Runtime
 
-- `plugins/elk-layout` is the first-party Java ELK engine module.
+- `engines/elk-layout` is the first-party Java ELK engine module.
 - It uses Eclipse ELK Java libraries; the single `bin/dediren` (cli) launcher
   hosts it in-process. There is no per-plugin appassembler launcher.
 - Java 21 or newer is required.
@@ -244,26 +244,26 @@ Plugin runtime changes:
 ELK changes:
 
 ```bash
-./mvnw -pl plugins/elk-layout -am test
+./mvnw -pl engines/elk-layout -am test
 ./mvnw -pl dist-tool -am verify -Pdist-smoke
 ```
 
 SVG render changes:
 
 ```bash
-./mvnw -pl plugins/render,cli -am test
+./mvnw -pl engines/render,cli -am test
 ```
 
 OEF export changes:
 
 ```bash
-./mvnw -pl plugins/archimate-oef-export,cli -am test
+./mvnw -pl engines/archimate-oef-export,cli -am test
 ```
 
 UML/XMI export changes:
 
 ```bash
-./mvnw -pl plugins/uml-xmi-export,cli -am test
+./mvnw -pl engines/uml-xmi-export,cli -am test
 ```
 
 Distribution/release changes:

@@ -17,11 +17,11 @@
     <module>core</module>
     <module>schema-cache</module>
     <module>uml</module>
-    <module>plugins/archimate-oef-export</module>
-    <module>plugins/elk-layout</module>
-    <module>plugins/generic-graph</module>
-    <module>plugins/render</module>
-    <module>plugins/uml-xmi-export</module>
+    <module>engines/archimate-oef-export</module>
+    <module>engines/elk-layout</module>
+    <module>engines/generic-graph</module>
+    <module>engines/render</module>
+    <module>engines/uml-xmi-export</module>
     <module>test-support</module>
     <module>dist-tool</module>
     <module>coverage-report</module>
