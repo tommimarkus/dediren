@@ -87,6 +87,20 @@ class GenericGraphEngineTest {
   }
 
   @Test
+  void validateWithoutProfileWinsOverMalformedStdin() throws Exception {
+    // Error precedence: the process form checks --profile before reading stdin, so a missing
+    // profile must produce the enveloped DEDIREN_SEMANTIC_PROFILE_REQUIRED + exit 3 even when the
+    // stdin bytes are unparseable — the raw parse failure must not win.
+    PluginResult result = Main.executeForTesting(new String[] {"validate"}, "not-json");
+
+    JsonNode envelope = JsonSupport.objectMapper().readTree(result.stdout());
+    assertThat(result.exitCode()).isEqualTo(3);
+    assertThat(envelope.at("/status").asText()).isEqualTo("error");
+    assertThat(envelope.at("/diagnostics/0/code").asText())
+        .isEqualTo("DEDIREN_SEMANTIC_PROFILE_REQUIRED");
+  }
+
+  @Test
   void parseSourceRejectsUnparseableInput() {
     // generic-graph publishes no parse-failure envelope: unparseable stdin surfaces as today's raw
     // (non-enveloped) failure, so the parse entry point throws rather than returning a diagnostic.

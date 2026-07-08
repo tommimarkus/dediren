@@ -59,12 +59,21 @@ public final class GenericGraphEngine implements SemanticsEngine {
     return JsonSupport.objectMapper().readValue(input, SourceDocument.class);
   }
 
+  /**
+   * The published missing-profile failure ({@code DEDIREN_SEMANTIC_PROFILE_REQUIRED} / exit 3).
+   * Shared with the thin {@code Main}, whose pre-parse precedence check must emit the identical
+   * envelope before stdin is parsed; {@link #validate} re-checks for the typed in-memory path.
+   */
+  static EngineException profileRequired() {
+    return failure(
+        "DEDIREN_SEMANTIC_PROFILE_REQUIRED", "semantic validation requires --profile", null);
+  }
+
   @Override
   public EngineResult<SemanticValidationResult> validate(SourceDocument source, String profile)
       throws EngineException {
     if (profile == null) {
-      throw failure(
-          "DEDIREN_SEMANTIC_PROFILE_REQUIRED", "semantic validation requires --profile", null);
+      throw profileRequired();
     }
     GenericGraphPluginData pluginData = pluginData(source);
     GenericGraphValidationError graphError = validateGenericGraphPluginData(source, pluginData);

@@ -80,6 +80,11 @@ public final class Main {
   private static int validateFromStdin(String[] args, InputStream stdin, PrintStream stdout)
       throws Exception {
     String profile = valueAfter(args, "--profile");
+    if (profile == null) {
+      // Error precedence: the profile check runs before stdin is parsed, so a missing profile wins
+      // over malformed stdin with the enveloped diagnostic (the engine re-checks for typed calls).
+      return printError(stdout, GenericGraphEngine.profileRequired());
+    }
     GenericGraphEngine engine = new GenericGraphEngine();
     SourceDocument source = engine.parseSource(stdin.readAllBytes());
     try {
