@@ -39,7 +39,7 @@ process path, so fault isolation and the threat-model trust boundary survive
 exactly where they matter.
 
 **Tech Stack:** Java 21, Maven Wrapper multi-module reactor, `ServiceLoader`
-SPI, picocli (CLI), Jackson 3 envelopes, JUnit 5 + AssertJ, appassembler
+SPI, picocli (CLI), Jackson 3 envelopes, JUnit 6 (Jupiter API) + AssertJ, appassembler
 launchers, dist-tool bundle assembly.
 
 ## Global Constraints

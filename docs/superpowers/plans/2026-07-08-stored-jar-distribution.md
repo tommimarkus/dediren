@@ -57,7 +57,7 @@ download size win is the whole case.
 Java 21 (Maven Wrapper build), `dist-tool` module (`DistTool`, exec-maven-plugin
 `dist-build`/`dist-smoke`/`dist-bench` profiles), `java.util.zip`
 (`ZipFile`/`ZipOutputStream`, method `STORED`), system `tar` + `xz` for
-archiving, GitHub Actions release workflow, JUnit 5 + AssertJ.
+archiving, GitHub Actions release workflow, JUnit 6 (Jupiter API) + AssertJ.
 
 ## Global Constraints
 

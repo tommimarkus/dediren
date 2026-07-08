@@ -38,7 +38,7 @@ artifact branch.
 
 ## Tech Stack
 
-Java 21+, Maven Wrapper (`./mvnw`), JUnit 5 + AssertJ, Jackson 3 (`tools.jackson`
+Java 21+, Maven Wrapper (`./mvnw`), JUnit 6 (Jupiter API) + AssertJ, Jackson 3 (`tools.jackson`
 databind; `com.fasterxml.jackson.annotation` annotations) / Jackson 3
 (`tools.jackson`, used in some render tests), JSON
 Schema (Draft 2020-12) under `schemas/`, appassembler-bundled render launcher,

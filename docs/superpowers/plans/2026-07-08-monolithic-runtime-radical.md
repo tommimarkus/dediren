@@ -37,8 +37,9 @@ the protocol is deleted in two coupled cutover tasks (8–9), then the tree and
 enforcement are finalized (10–12).
 
 **Tech Stack:** Java 21, Maven Wrapper multi-module reactor, picocli (CLI),
-Jackson 3 (`tools.jackson`) via `contracts` `JsonSupport`, Eclipse ELK, JUnit
-5 + AssertJ, ArchUnit (dist-tool `ArchitectureRulesTest`), appassembler
+Jackson 3 (`tools.jackson`) via `contracts` `JsonSupport`, Eclipse ELK,
+JUnit 6 (Jupiter API; root pom pins `junit.version` 6.1.1) + AssertJ,
+ArchUnit (dist-tool `ArchitectureRulesTest`), appassembler
 launcher (cli only, post-cutover), dist-tool bundle assembly.
 
 ---
