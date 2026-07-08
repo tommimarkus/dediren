@@ -19,6 +19,9 @@
        architecture-guidelines.md §12. -->
   <Match>
     <Or>
+      <Class name="dev.dediren.contracts.build.BuildArtifact"/>
+      <Class name="dev.dediren.contracts.build.BuildResult"/>
+      <Class name="dev.dediren.contracts.build.BuildViewOutcome"/>
       <Class name="dev.dediren.contracts.layout.LaidOutEdge"/>
       <Class name="dev.dediren.contracts.layout.LaidOutGroup"/>
       <Class name="dev.dediren.contracts.layout.LayoutConstraint"/>
