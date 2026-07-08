@@ -13,6 +13,7 @@
     <module>cli</module>
     <module>archimate</module>
     <module>contracts</module>
+    <module>engine-api</module>
     <module>core</module>
     <module>schema-cache</module>
     <module>uml</module>

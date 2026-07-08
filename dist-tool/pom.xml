@@ -19,6 +19,15 @@
       <artifactId>contracts</artifactId>
       <version>${project.version}</version>
     </dependency>
+    <!-- Nothing runtime-consumes engine-api yet (Task 2 of the monolith-restructure
+         plan); it is on the test classpath only so ArchitectureRulesTest can import
+         and assert its dependency edge. -->
+    <dependency>
+      <groupId>dev.dediren</groupId>
+      <artifactId>engine-api</artifactId>
+      <version>${project.version}</version>
+      <scope>test</scope>
+    </dependency>
     <dependency>
       <groupId>dev.dediren</groupId>
       <artifactId>cli</artifactId>

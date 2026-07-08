@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Test;
 class ArchitectureRulesTest {
 
   private static final String CONTRACTS = "dev.dediren.contracts..";
+  private static final String ENGINE_API = "dev.dediren.engine..";
   private static final String CORE = "dev.dediren.core..";
   private static final String CLI = "dev.dediren.cli..";
   private static final String PLUGINS = "dev.dediren.plugins..";
@@ -36,16 +37,20 @@ class ArchitectureRulesTest {
     // vacuously. Assert we actually loaded classes from the tiers under test.
     int coreClasses = 0;
     int pluginClasses = 0;
+    int engineApiClasses = 0;
     for (JavaClass javaClass : PRODUCTION_CLASSES) {
       String packageName = javaClass.getPackageName();
       if (packageName.startsWith("dev.dediren.core")) {
         coreClasses++;
       } else if (packageName.startsWith("dev.dediren.plugins")) {
         pluginClasses++;
+      } else if (packageName.startsWith("dev.dediren.engine")) {
+        engineApiClasses++;
       }
     }
     assertThat(coreClasses).as("core production classes on the classpath").isPositive();
     assertThat(pluginClasses).as("plugin production classes on the classpath").isPositive();
+    assertThat(engineApiClasses).as("engine-api production classes on the classpath").isPositive();
   }
 
   @Test
@@ -76,6 +81,27 @@ class ArchitectureRulesTest {
         .because(
             "contracts is the stable foundation and must not depend on any"
                 + " other internal module (§2)")
+        .check(PRODUCTION_CLASSES);
+  }
+
+  @Test
+  void engineApiDependsOnlyOnContracts() {
+    noClasses()
+        .that()
+        .resideInAPackage(ENGINE_API)
+        .should()
+        .dependOnClassesThat()
+        .resideInAnyPackage(
+            CORE,
+            CLI,
+            PLUGINS,
+            "dev.dediren.archimate..",
+            "dev.dediren.uml..",
+            "dev.dediren.schemacache..",
+            "dev.dediren.tools..")
+        .because(
+            "engine-api is the shared engine-facing interface surface and must depend"
+                + " only on contracts, never core or any plugin module (Task 2)")
         .check(PRODUCTION_CLASSES);
   }
 
