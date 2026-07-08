@@ -324,7 +324,10 @@ public final class BuildCommand {
       BuildRequest request, String view, String fileName, String content) {
     Path target = request.outDir().resolve(view).resolve(fileName);
     try {
-      Files.createDirectories(target.getParent());
+      Path parent = target.getParent();
+      if (parent != null) {
+        Files.createDirectories(parent);
+      }
       Files.writeString(target, content);
     } catch (IOException error) {
       throw new UncheckedIOException("failed to write build artifact " + target, error);
