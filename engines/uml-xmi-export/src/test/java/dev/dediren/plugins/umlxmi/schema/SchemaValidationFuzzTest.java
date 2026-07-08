@@ -23,7 +23,7 @@ import org.junit.jupiter.api.Test;
  * coverage-guided exploratory fuzzer locally (needs the Jazzer native agent; ~60s):
  *
  * <pre>{@code
- * JAZZER_FUZZ=1 ./mvnw -pl plugins/uml-xmi-export -am test \
+ * JAZZER_FUZZ=1 ./mvnw -pl engines/uml-xmi-export -am test \
  *     -Dtest=SchemaValidationFuzzTest -Dsurefire.failIfNoSpecifiedTests=false
  * }</pre>
  */
