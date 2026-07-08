@@ -388,6 +388,9 @@
                 <param>dev.dediren.uml.*</param>
                 <param>dev.dediren.archimate.*</param>
                 <param>dev.dediren.contracts.*</param>
+                <param>dev.dediren.core.*</param>
+                <param>dev.dediren.engine.*</param>
+                <param>dev.dediren.cli.*</param>
                 <param>dev.dediren.plugins.genericgraph.GenericGraphLayoutSizing</param>
                 <param>dev.dediren.plugins.elklayout.*</param>
                 <param>dev.dediren.plugins.render.*</param>
