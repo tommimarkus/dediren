@@ -11,6 +11,8 @@ import dev.dediren.contracts.layout.LayoutRequest;
 import dev.dediren.contracts.layout.LayoutResult;
 import dev.dediren.contracts.render.RenderMetadata;
 import dev.dediren.contracts.source.SourceDocument;
+import dev.dediren.core.DedirenPaths;
+import dev.dediren.core.engine.EngineDispatch;
 import dev.dediren.core.io.JsonInput;
 import dev.dediren.core.plugins.PluginExecutionException;
 import dev.dediren.core.plugins.PluginRegistry;
@@ -21,9 +23,17 @@ import dev.dediren.core.quality.LayoutQuality;
 import dev.dediren.core.quality.LayoutQualityReport;
 import dev.dediren.core.source.SourceValidator;
 import dev.dediren.core.source.ValidationResult;
+import dev.dediren.engine.Engines;
+import dev.dediren.engine.ExportEngine;
+import dev.dediren.engine.LayoutEngine;
+import dev.dediren.engine.RenderEngine;
+import dev.dediren.engine.SemanticsEngine;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import tools.jackson.databind.JsonNode;
 
 public final class CoreCommands {
@@ -201,6 +211,152 @@ public final class CoreCommands {
         List.of("export"),
         toJson("export", input),
         PluginRunOptions.defaults().withCandidateEnv(env));
+  }
+
+  // Registry-first in-memory dispatch overloads (Task 5 strangler seam). A bound first-party engine
+  // runs in-process through EngineDispatch; an unbound id falls back to the process path above, so
+  // third-party plugins and the unknown-id/unsupported-capability diagnostics are unchanged.
+
+  public static PluginRunOutcome layoutCommand(
+      String plugin, String inputText, Map<String, String> env, Engines engines)
+      throws PluginExecutionException {
+    Optional<LayoutEngine> engine = engines.layoutEngine(plugin);
+    if (engine.isEmpty()) {
+      return layoutCommand(plugin, inputText, env);
+    }
+    LayoutEngine layout = engine.get();
+    // Unwrap a piped stage envelope to its data (the chained-workflow convenience JsonInput gives
+    // the process path), then route the unwrapped bytes through the engine's parse entry point so a
+    // well-formed-but-invalid request reproduces the published DEDIREN_ELK_INPUT_INVALID_JSON
+    // envelope rather than core's generic input diagnostic.
+    byte[] bytes = layoutRequestBytes(inputText);
+    return EngineDispatch.dispatch(plugin, () -> layout.layout(layout.parseRequest(bytes)));
+  }
+
+  private static byte[] layoutRequestBytes(String inputText) throws PluginExecutionException {
+    JsonNode value;
+    try {
+      value = JsonSupport.objectMapper().readTree(inputText);
+    } catch (RuntimeException error) {
+      throw commandInputInvalid("layout", error);
+    }
+    JsonNode data = value.has("envelope_schema_version") ? value.get("data") : value;
+    if (data == null) {
+      throw commandInputInvalid(
+          "layout", new IllegalArgumentException("command envelope does not contain data"));
+    }
+    try {
+      return JsonSupport.objectMapper().writeValueAsBytes(data);
+    } catch (RuntimeException error) {
+      throw commandInputInvalid("layout", error);
+    }
+  }
+
+  public static PluginRunOutcome projectCommand(
+      String plugin,
+      String target,
+      String view,
+      String inputText,
+      Path baseDir,
+      Map<String, String> env,
+      Engines engines)
+      throws PluginExecutionException {
+    Optional<SemanticsEngine> engine = engines.semanticsEngine(plugin);
+    if (engine.isEmpty()) {
+      return projectCommand(plugin, target, view, inputText, baseDir, env);
+    }
+    SourceDocument source;
+    try {
+      source = SourceValidator.loadAndValidateSourceDocument(inputText, baseDir);
+    } catch (SourceValidator.SourceDiagnosticsException error) {
+      return errorOutcome(error.diagnostics());
+    }
+    SemanticsEngine semantics = engine.get();
+    if ("render-metadata".equals(target)) {
+      return EngineDispatch.dispatch(plugin, () -> semantics.projectRenderMetadata(source, view));
+    }
+    if ("layout-request".equals(target)) {
+      return EngineDispatch.dispatch(plugin, () -> semantics.projectLayoutRequest(source, view));
+    }
+    // Reproduce the plugin-native "unsupported target" observable: message to stderr, exit 2. The
+    // cli catches this UncheckedIOException and prints its cause, matching the process form.
+    throw new UncheckedIOException(new IOException("unsupported target: " + target));
+  }
+
+  public static PluginRunOutcome semanticValidateCommand(
+      String plugin,
+      String profile,
+      String inputText,
+      Path baseDir,
+      Map<String, String> env,
+      Engines engines)
+      throws PluginExecutionException {
+    Optional<SemanticsEngine> engine = engines.semanticsEngine(plugin);
+    if (engine.isEmpty()) {
+      return semanticValidateCommand(plugin, profile, inputText, baseDir, env);
+    }
+    SourceDocument source;
+    try {
+      source = SourceValidator.loadAndValidateSourceDocument(inputText, baseDir);
+    } catch (SourceValidator.SourceDiagnosticsException error) {
+      return errorOutcome(error.diagnostics());
+    }
+    SemanticsEngine semantics = engine.get();
+    return EngineDispatch.dispatch(plugin, () -> semantics.validate(source, profile));
+  }
+
+  public static PluginRunOutcome renderCommand(
+      String plugin,
+      String policyText,
+      String metadataText,
+      String layoutText,
+      Map<String, String> env,
+      Engines engines)
+      throws PluginExecutionException {
+    Optional<RenderEngine> engine = engines.renderEngine(plugin);
+    if (engine.isEmpty()) {
+      return renderCommand(plugin, policyText, metadataText, layoutText, env);
+    }
+    LayoutResult layoutResult = parseCommandData("render", layoutText, LayoutResult.class);
+    JsonNode policy = parseJson("render", policyText);
+    RenderMetadata metadata =
+        metadataText == null
+            ? null
+            : parseCommandData("render", metadataText, RenderMetadata.class);
+    RenderEngine renderEngine = engine.get();
+    return EngineDispatch.dispatch(
+        plugin, () -> renderEngine.render(layoutResult, policy, metadata));
+  }
+
+  public static PluginRunOutcome exportCommand(
+      String plugin,
+      String policyText,
+      String sourceText,
+      Path sourceBaseDir,
+      String layoutText,
+      Map<String, String> env,
+      Engines engines)
+      throws PluginExecutionException {
+    Optional<ExportEngine> engine = engines.exportEngine(plugin);
+    if (engine.isEmpty()) {
+      return exportCommand(plugin, policyText, sourceText, sourceBaseDir, layoutText, env);
+    }
+    SourceDocument source;
+    try {
+      source = SourceValidator.loadAndValidateSourceDocument(sourceText, sourceBaseDir);
+    } catch (SourceValidator.SourceDiagnosticsException error) {
+      return errorOutcome(error.diagnostics());
+    }
+    LayoutResult layoutResult = parseCommandData("export", layoutText, LayoutResult.class);
+    JsonNode policy = parseJson("export", policyText);
+    var request =
+        new ExportRequest(
+            ContractVersions.EXPORT_REQUEST_SCHEMA_VERSION, source, layoutResult, policy);
+    ExportEngine exportEngine = engine.get();
+    // Decision 9: a relative schema/cache env path resolves against the product root, not the JVM
+    // cwd, matching the process child (which ran with cwd = product root).
+    Path productRoot = DedirenPaths.productRoot();
+    return EngineDispatch.dispatch(plugin, () -> exportEngine.export(request, env, productRoot));
   }
 
   static PluginRunOutcome errorOutcome(List<Diagnostic> diagnostics) {

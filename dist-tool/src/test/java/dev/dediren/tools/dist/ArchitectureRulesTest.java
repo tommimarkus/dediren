@@ -134,16 +134,21 @@ class ArchitectureRulesTest {
   }
 
   @Test
-  void cliDoesNotDependOnPlugins() {
+  void onlyEngineWiringTouchesEngineImplementations() {
+    // Task 5 flips the five engine deps to compile scope so EngineWiring can construct them for the
+    // in-memory dispatch. That single named class is the only permitted cli to plugin edge; every
+    // other cli class must reach engines through the engine-api interfaces (decision 3, §2, §5).
     noClasses()
         .that()
         .resideInAPackage(CLI)
+        .and()
+        .doNotHaveFullyQualifiedName("dev.dediren.cli.EngineWiring")
         .should()
         .dependOnClassesThat()
         .resideInAPackage(PLUGINS)
         .because(
-            "cli depends on core and contracts only; its plugin dependencies are"
-                + " test-scope end-to-end coverage, never a compile edge (§2)")
+            "only EngineWiring wires the concrete first-party engines; the rest of cli knows them"
+                + " through engine-api, confining the cli to engine-implementation edge to one class")
         .check(PRODUCTION_CLASSES);
   }
 }

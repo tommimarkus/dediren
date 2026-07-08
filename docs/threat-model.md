@@ -39,6 +39,20 @@ to skip the runtime capabilities probe
 manifest-declared env allowlist and always runs the child from a
 deterministic working directory (the product root), not the caller's cwd.
 
+Transition (Task 5): the five bundled first-party ids
+(`generic-graph`, `elk-layout`, `render`, `archimate-oef`, `uml-xmi`) now
+execute in-process through `core`'s `EngineDispatch`
+(`core/.../engine/EngineDispatch.java`), wired in one named cli class
+(`cli/.../EngineWiring.java`), so no child process is spawned for them and the
+protocol's process-crash/timeout/output-validation controls no longer apply to
+those ids. The change is guarded by a stage-by-stage parity gate
+(`cli/.../InMemoryParityTest.java`) proving the in-memory envelopes and exit
+codes are byte-shape equal to the process leg. The `PluginRunner` process
+boundary above still governs every other (third-party/unbound) manifest as the
+registry-first fallback, keeping its discovery, trust, env-allowlist, and
+working-directory controls in force until the boundary is deleted in the
+cutover (Task 8).
+
 ### Schema cache + runtime download
 
 Runtime schema fetches go through

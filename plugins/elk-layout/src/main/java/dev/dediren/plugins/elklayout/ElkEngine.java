@@ -30,6 +30,7 @@ public final class ElkEngine implements LayoutEngine {
    * LayoutJson#readLayoutRequest} performs while reading), and any other parse failure maps to
    * {@code DEDIREN_ELK_INPUT_INVALID_JSON}.
    */
+  @Override
   public LayoutRequest parseRequest(byte[] input) throws EngineException {
     try {
       return LayoutJson.readLayoutRequest(new ByteArrayInputStream(input));

@@ -11,11 +11,13 @@ import dev.dediren.core.plugins.PluginExecutionException;
 import dev.dediren.core.plugins.PluginRunOutcome;
 import dev.dediren.core.source.SourceValidator;
 import dev.dediren.core.source.ValidationResult;
+import dev.dediren.engine.Engines;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintWriter;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -85,13 +87,14 @@ public final class Main {
 
   private static CommandLine commandLine(
       InputStream stdin, PrintWriter stdout, PrintWriter stderr, Map<String, String> env) {
+    Engines engines = EngineWiring.defaults();
     CommandLine commandLine = new CommandLine(new Main(stdin, env));
-    commandLine.addSubcommand("validate", new ValidateCommand(stdin, env));
-    commandLine.addSubcommand("project", new ProjectCommand(stdin, env));
-    commandLine.addSubcommand("layout", new LayoutCommand(stdin, env));
+    commandLine.addSubcommand("validate", new ValidateCommand(stdin, env, engines));
+    commandLine.addSubcommand("project", new ProjectCommand(stdin, env, engines));
+    commandLine.addSubcommand("layout", new LayoutCommand(stdin, env, engines));
     commandLine.addSubcommand("validate-layout", new ValidateLayoutCommand(stdin));
-    commandLine.addSubcommand("render", new RenderCommand(stdin, env));
-    commandLine.addSubcommand("export", new ExportCommand(env));
+    commandLine.addSubcommand("render", new RenderCommand(stdin, env, engines));
+    commandLine.addSubcommand("export", new ExportCommand(env, engines));
     commandLine.setOut(stdout);
     commandLine.setErr(stderr);
     return commandLine;
@@ -101,6 +104,7 @@ public final class Main {
   static final class ValidateCommand implements Callable<Integer> {
     private final InputStream stdin;
     private final Map<String, String> env;
+    private final Engines engines;
 
     @Option(names = "--plugin")
     private String plugin;
@@ -113,9 +117,10 @@ public final class Main {
 
     @Spec private CommandSpec spec;
 
-    ValidateCommand(InputStream stdin, Map<String, String> env) {
+    ValidateCommand(InputStream stdin, Map<String, String> env, Engines engines) {
       this.stdin = stdin;
       this.env = env;
+      this.engines = engines;
     }
 
     @Override
@@ -140,9 +145,11 @@ public final class Main {
         try {
           return printPluginOutcome(
               CoreCommands.semanticValidateCommand(
-                  plugin, profile, inputText.text(), inputText.baseDir(), env));
+                  plugin, profile, inputText.text(), inputText.baseDir(), env, engines));
         } catch (PluginExecutionException error) {
           return printPluginError(error);
+        } catch (UncheckedIOException error) {
+          return printStructuralFailure(spec, error);
         }
       }
       ValidationResult result =
@@ -171,6 +178,7 @@ public final class Main {
   static final class ProjectCommand implements Callable<Integer> {
     private final InputStream stdin;
     private final Map<String, String> env;
+    private final Engines engines;
 
     @Option(names = "--target", required = true)
     private String target;
@@ -186,9 +194,10 @@ public final class Main {
 
     @Spec private CommandSpec spec;
 
-    ProjectCommand(InputStream stdin, Map<String, String> env) {
+    ProjectCommand(InputStream stdin, Map<String, String> env, Engines engines) {
       this.stdin = stdin;
       this.env = env;
+      this.engines = engines;
     }
 
     @Override
@@ -201,9 +210,11 @@ public final class Main {
         return writePluginOutcome(
             spec,
             CoreCommands.projectCommand(
-                plugin, target, view, inputText.text(), inputText.baseDir(), env));
+                plugin, target, view, inputText.text(), inputText.baseDir(), env, engines));
       } catch (PluginExecutionException error) {
         return writePluginError(spec, error);
+      } catch (UncheckedIOException error) {
+        return printStructuralFailure(spec, error);
       }
     }
   }
@@ -212,6 +223,7 @@ public final class Main {
   static final class LayoutCommand implements Callable<Integer> {
     private final InputStream stdin;
     private final Map<String, String> env;
+    private final Engines engines;
 
     @Option(names = "--plugin", required = true)
     private String plugin;
@@ -221,9 +233,10 @@ public final class Main {
 
     @Spec private CommandSpec spec;
 
-    LayoutCommand(InputStream stdin, Map<String, String> env) {
+    LayoutCommand(InputStream stdin, Map<String, String> env, Engines engines) {
       this.stdin = stdin;
       this.env = env;
+      this.engines = engines;
     }
 
     @Override
@@ -233,7 +246,8 @@ public final class Main {
         return writeEnvelope(spec, inputText.error(), CommandExitCode.INPUT_ERROR);
       }
       try {
-        return writePluginOutcome(spec, CoreCommands.layoutCommand(plugin, inputText.text(), env));
+        return writePluginOutcome(
+            spec, CoreCommands.layoutCommand(plugin, inputText.text(), env, engines));
       } catch (PluginExecutionException error) {
         return writePluginError(spec, error);
       }
@@ -267,6 +281,7 @@ public final class Main {
   static final class RenderCommand implements Callable<Integer> {
     private final InputStream stdin;
     private final Map<String, String> env;
+    private final Engines engines;
 
     @Option(names = "--plugin", required = true)
     private String plugin;
@@ -282,9 +297,10 @@ public final class Main {
 
     @Spec private CommandSpec spec;
 
-    RenderCommand(InputStream stdin, Map<String, String> env) {
+    RenderCommand(InputStream stdin, Map<String, String> env, Engines engines) {
       this.stdin = stdin;
       this.env = env;
+      this.engines = engines;
     }
 
     @Override
@@ -309,7 +325,8 @@ public final class Main {
                 policyText.text(),
                 metadataText == null ? null : metadataText.text(),
                 layoutText.text(),
-                env));
+                env,
+                engines));
       } catch (PluginExecutionException error) {
         return writePluginError(spec, error);
       }
@@ -319,6 +336,7 @@ public final class Main {
   @Command(name = "export", description = "Run an export plugin")
   static final class ExportCommand implements Callable<Integer> {
     private final Map<String, String> env;
+    private final Engines engines;
 
     @Option(names = "--plugin", required = true)
     private String plugin;
@@ -334,8 +352,9 @@ public final class Main {
 
     @Spec private CommandSpec spec;
 
-    ExportCommand(Map<String, String> env) {
+    ExportCommand(Map<String, String> env, Engines engines) {
       this.env = env;
+      this.engines = engines;
     }
 
     @Override
@@ -361,7 +380,8 @@ public final class Main {
                 sourceText.text(),
                 sourceText.baseDir(),
                 layoutText.text(),
-                env));
+                env,
+                engines));
       } catch (PluginExecutionException error) {
         return writePluginError(spec, error);
       }
@@ -415,6 +435,18 @@ public final class Main {
       throws IOException {
     return writeEnvelope(
         spec, CommandEnvelope.error(List.of(error.diagnostic())), CommandExitCode.PLUGIN_ERROR);
+  }
+
+  /**
+   * Reproduces the plugin-native observable for a semantics structural failure (missing {@code
+   * plugins.generic-graph}, an unknown view, or an unsupported target): the engine surfaces it as
+   * an {@link UncheckedIOException}, and the process {@code Main} printed the cause message to
+   * stderr and exited {@code 2}. stdout stays empty; agents read this as a raw non-enveloped
+   * failure.
+   */
+  private static Integer printStructuralFailure(CommandSpec spec, UncheckedIOException error) {
+    spec.commandLine().getErr().println(error.getCause().getMessage());
+    return CommandExitCode.INPUT_ERROR.code();
   }
 
   private static CommandEnvelope<JsonNode> usageError(String code, String message) {

@@ -25,6 +25,10 @@ public enum DiagnosticCode {
   PLUGIN_OUTPUT_INVALID_ENVELOPE("DEDIREN_PLUGIN_OUTPUT_INVALID_ENVELOPE"),
   PLUGIN_OUTPUT_INVALID_DATA("DEDIREN_PLUGIN_OUTPUT_INVALID_DATA"),
 
+  // In-memory engine dispatch (core: EngineDispatch). Emitted only for an unexpected engine
+  // exception; the successor of the process-crash category once the process boundary is retired.
+  ENGINE_FAILED("DEDIREN_ENGINE_FAILED"),
+
   // Command input (core: CoreCommands; cli: Main).
   COMMAND_INPUT_INVALID("DEDIREN_COMMAND_INPUT_INVALID"),
   VALIDATE_PROFILE_REQUIRED("DEDIREN_VALIDATE_PROFILE_REQUIRED"),

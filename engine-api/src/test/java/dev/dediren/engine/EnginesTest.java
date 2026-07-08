@@ -44,6 +44,11 @@ class EnginesTest {
     }
 
     @Override
+    public LayoutRequest parseRequest(byte[] input) {
+      return new LayoutRequest("layout-request.schema.v1", "main", null, null, null, null, null);
+    }
+
+    @Override
     public EngineResult<LayoutResult> layout(LayoutRequest request) {
       return new EngineResult<>(
           new LayoutResult("layout-result.schema.v1", request.viewId(), null, null, null, null),

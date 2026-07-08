@@ -28,35 +28,33 @@
       <groupId>info.picocli</groupId>
       <artifactId>picocli</artifactId>
     </dependency>
+    <!-- The five bundled first-party engines are compile-scope: EngineWiring wires them into the
+         in-memory dispatch and the appassembler CLASSPATH carries them (pinned by Task 9's dist
+         assertions). Only dev.dediren.cli.EngineWiring may reference these implementations. -->
     <dependency>
       <groupId>dev.dediren</groupId>
       <artifactId>archimate-oef-export</artifactId>
       <version>${project.version}</version>
-      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>dev.dediren</groupId>
       <artifactId>generic-graph</artifactId>
       <version>${project.version}</version>
-      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>dev.dediren</groupId>
       <artifactId>elk-layout</artifactId>
       <version>${project.version}</version>
-      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>dev.dediren</groupId>
       <artifactId>render</artifactId>
       <version>${project.version}</version>
-      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>dev.dediren</groupId>
       <artifactId>uml-xmi-export</artifactId>
       <version>${project.version}</version>
-      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>dev.dediren</groupId>
