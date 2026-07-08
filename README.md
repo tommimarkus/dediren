@@ -120,18 +120,16 @@ jq -r '.data.artifacts[] | select(.artifact_kind=="svg") | .content' render-resu
 dediren emits SVG only; for a raster image, convert the SVG with an external
 tool such as `rsvg-convert`, `resvg`, ImageMagick, or Inkscape.
 
-Each `bin/dediren-plugin-* capabilities` probe reports what a plugin supports.
-For ArchiMate/UML notations, exports, interactive SVG, accessibility,
-and failure-repair rules, follow
-[`docs/agent-usage.md`](docs/agent-usage.md).
+`"$BUNDLE/bin/dediren" --version` confirms the bundle is runnable. For
+ArchiMate/UML notations, exports, interactive SVG, accessibility, and
+failure-repair rules, follow [`docs/agent-usage.md`](docs/agent-usage.md).
 
 ## Bundle Layout
 
 ```text
 dediren-agent-bundle-2026.07.13/
-  bin/            dediren + one launcher per first-party plugin
+  bin/dediren     the single launcher (hosts all five engines in-process)
   lib/            jars (no bundled JRE)
-  plugins/        first-party plugin manifests
   schemas/        public JSON schemas
   fixtures/       source, policy, layout, render, and export examples
   docs/agent-usage.md
@@ -139,10 +137,11 @@ dediren-agent-bundle-2026.07.13/
   cds/            generated at runtime — not a tracked artifact
 ```
 
-Bundle launchers set `DEDIREN_BUNDLE_ROOT` so commands resolve bundled
-`schemas/`, `plugins/`, and `bin/` from any working directory. The five
+The `dediren` launcher sets `DEDIREN_BUNDLE_ROOT` so commands resolve bundled
+`schemas/`, `fixtures/`, and `bin/` from any working directory. The five
 first-party engines are compiled into the CLI; there is no runtime plugin
-discovery of any kind.
+discovery of any kind — see [`docs/threat-model.md`](docs/threat-model.md) for
+the single-JVM trust boundary.
 
 For the full runtime-environment variables and the Class-Data-Sharing startup
 cache, see [`docs/agent-usage.md`](docs/agent-usage.md).

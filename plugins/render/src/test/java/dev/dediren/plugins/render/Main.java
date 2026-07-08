@@ -1,31 +1,26 @@
 package dev.dediren.plugins.render;
 
 import dev.dediren.contracts.CommandEnvelope;
-import dev.dediren.contracts.ContractVersions;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.contracts.render.RenderResult;
 import dev.dediren.engine.EngineException;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
-import tools.jackson.databind.node.ObjectNode;
 
+/**
+ * Envelope-shaped test harness for the SVG render engine: it parses stdin, delegates to {@link
+ * SvgRenderEngine}, and shapes the command envelope so the existing render suites can drive the
+ * engine without a process boundary.
+ */
 public final class Main {
 
   private Main() {}
 
   public static String moduleName() {
     return "render";
-  }
-
-  public static void main(String[] args) throws Exception {
-    int exitCode = execute(args, System.in, System.out, System.err);
-    if (exitCode != 0) {
-      System.exit(exitCode);
-    }
   }
 
   public static PluginResult executeForTesting(String[] args, String stdin) throws Exception {
@@ -43,24 +38,11 @@ public final class Main {
 
   private static int execute(
       String[] args, InputStream stdin, PrintStream stdout, PrintStream stderr) throws Exception {
-    if (args.length > 0 && args[0].equals("capabilities")) {
-      stdout.println(capabilitiesJson());
-      return 0;
-    }
     if (args.length > 0 && args[0].equals("render")) {
       return renderFromStdin(stdin, stdout);
     }
-    stderr.println("expected command: capabilities or render");
+    stderr.println("expected command: render");
     return 2;
-  }
-
-  private static String capabilitiesJson() throws IOException {
-    ObjectNode root = JsonSupport.objectMapper().createObjectNode();
-    root.put("plugin_protocol_version", ContractVersions.PLUGIN_PROTOCOL_VERSION);
-    root.put("id", "render");
-    root.set("capabilities", JsonSupport.objectMapper().createArrayNode().add("render"));
-    root.putObject("runtime").put("artifact_kind", "svg");
-    return JsonSupport.objectMapper().writeValueAsString(root);
   }
 
   private static int renderFromStdin(InputStream stdin, PrintStream stdout) throws Exception {

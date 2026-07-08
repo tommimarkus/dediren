@@ -29,14 +29,6 @@ class SchemaValidatorTest {
           "schemas/runtime-capability.schema.json",
           "schemas/bundle.schema.json");
 
-  private static final List<String> PLUGIN_MANIFESTS =
-      List.of(
-          "fixtures/plugins/archimate-oef.manifest.json",
-          "fixtures/plugins/elk-layout.manifest.json",
-          "fixtures/plugins/generic-graph.manifest.json",
-          "fixtures/plugins/render.manifest.json",
-          "fixtures/plugins/uml-xmi.manifest.json");
-
   @Test
   void allPublicSchemasCompile() {
     for (String schema : PUBLIC_SCHEMAS) {
@@ -394,17 +386,6 @@ class SchemaValidatorTest {
                 mapper.readTree(String.format(sourceTemplate, "middle"))))
         .describedAs("unknown layer_constraint must be rejected")
         .isNotEmpty();
-  }
-
-  @Test
-  void firstPartyPluginManifestsMatchSchema() {
-    for (String manifest : PLUGIN_MANIFESTS) {
-      assertThat(
-              SchemaAssertions.validateFixture(
-                  workspaceRoot(), "schemas/plugin-manifest.schema.json", manifest))
-          .describedAs(manifest)
-          .isEmpty();
-    }
   }
 
   @Test

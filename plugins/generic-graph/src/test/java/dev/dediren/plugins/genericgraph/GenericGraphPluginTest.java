@@ -11,20 +11,6 @@ import tools.jackson.databind.JsonNode;
 
 class GenericGraphPluginTest {
   @Test
-  void capabilitiesReportSemanticValidationAndProjection() throws Exception {
-    PluginResult result = Main.executeForTesting(new String[] {"capabilities"}, "");
-
-    JsonNode capabilities = JsonSupport.objectMapper().readTree(result.stdout());
-
-    assertThat(result.exitCode()).isZero();
-    assertThat(capabilities.get("id").asText()).isEqualTo("generic-graph");
-    assertThat(capabilities.get("capabilities"))
-        .extracting(JsonNode::toString)
-        .asString()
-        .contains("semantic-validation", "projection");
-  }
-
-  @Test
   void validateWithoutProfileReturnsProfileRequiredEnvelope() throws Exception {
     PluginResult result =
         Main.executeForTesting(

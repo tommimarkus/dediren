@@ -49,7 +49,7 @@ Runtime schema fetches go through
 redirect) and verifies the download's SHA-256 against a pinned value before
 trusting it: the single `OMG_XMI_SCHEMA_SHA256` constant
 (`plugins/uml-xmi-export/.../schema/SchemaValidation.java`) and the per-file
-`OFFICIAL_OEF_SCHEMA_SHA256` map (`plugins/archimate-oef-export/.../Main.java`).
+`OFFICIAL_OEF_SCHEMA_SHA256` map (`plugins/archimate-oef-export/.../OefExportEngine.java`).
 The offline overrides `DEDIREN_XMI_SCHEMA_PATH` / `DEDIREN_OEF_SCHEMA_DIR`
 bypass the SHA-256 check by design — they only require the supplied file to
 be non-empty.

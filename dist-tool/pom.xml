@@ -28,39 +28,13 @@
       <version>${project.version}</version>
       <scope>test</scope>
     </dependency>
+    <!-- The single cli launcher now carries the five first-party engines (cli's compile deps), so
+         dist-tool only needs cli at runtime; the engine jars arrive transitively. This also keeps
+         the reactor build order (engines -> cli -> dist-tool) that the dist verify phase relies on
+         to find the staged cli/target/appassembler launcher. -->
     <dependency>
       <groupId>dev.dediren</groupId>
       <artifactId>cli</artifactId>
-      <version>${project.version}</version>
-      <scope>runtime</scope>
-    </dependency>
-    <dependency>
-      <groupId>dev.dediren</groupId>
-      <artifactId>generic-graph</artifactId>
-      <version>${project.version}</version>
-      <scope>runtime</scope>
-    </dependency>
-    <dependency>
-      <groupId>dev.dediren</groupId>
-      <artifactId>elk-layout</artifactId>
-      <version>${project.version}</version>
-      <scope>runtime</scope>
-    </dependency>
-    <dependency>
-      <groupId>dev.dediren</groupId>
-      <artifactId>render</artifactId>
-      <version>${project.version}</version>
-      <scope>runtime</scope>
-    </dependency>
-    <dependency>
-      <groupId>dev.dediren</groupId>
-      <artifactId>archimate-oef-export</artifactId>
-      <version>${project.version}</version>
-      <scope>runtime</scope>
-    </dependency>
-    <dependency>
-      <groupId>dev.dediren</groupId>
-      <artifactId>uml-xmi-export</artifactId>
       <version>${project.version}</version>
       <scope>runtime</scope>
     </dependency>

@@ -90,12 +90,33 @@ class DistModuleTest {
     String archiveMetadata =
         readArchiveEntry(archive, "dediren-agent-bundle-2026.06.0/bundle.json");
     JsonNode metadata = JsonSupport.objectMapper().readTree(archiveMetadata);
+    assertThat(metadata.path("bundle_schema_version").asText())
+        .isEqualTo("dediren-bundle.schema.v2");
     assertThat(metadata.path("version").asText()).isEqualTo("2026.06.0");
     assertThat(metadata.path("target").asText()).isEqualTo("java");
+    // Single-launcher cutover: the descriptor no longer advertises a process-plugin surface.
+    assertThat(metadata.has("plugins"))
+        .describedAs("bundle.schema.v2 dropped the plugins[] array")
+        .isFalse();
+    assertThat(metadata.has("elk_helper"))
+        .describedAs("bundle.schema.v2 dropped the elk_helper launcher pointer")
+        .isFalse();
+
+    // No bundled plugin-manifest directory is staged any more.
+    assertThat(archiveEntries(archive))
+        .noneMatch(entry -> entry.startsWith("dediren-agent-bundle-2026.06.0/plugins/"));
 
     // The shipped agent-facing doc rides in the bundle.
     assertThat(readArchiveEntry(archive, "dediren-agent-bundle-2026.06.0/docs/agent-usage.md"))
         .contains("# Agent usage");
+  }
+
+  private static java.util.List<String> archiveEntries(Path archive) throws Exception {
+    Process process =
+        new ProcessBuilder("tar", "-tzf", archive.toString()).redirectErrorStream(true).start();
+    String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+    assertThat(process.waitFor()).as("tar -tzf %s%n%s", archive, output).isZero();
+    return output.lines().toList();
   }
 
   @Test
@@ -189,21 +210,10 @@ class DistModuleTest {
   }
 
   @Test
-  void bundledPluginIdsAreDerivedFromPluginLaunchers() {
-    assertThat(DistTool.bundledPluginIds())
-        .containsExactly("generic-graph", "elk-layout", "render", "archimate-oef", "uml-xmi");
-  }
-
-  @Test
-  void launcherInstallDirsUseMavenReactorModulePaths() {
-    assertThat(DistTool.launcherInstallDirs())
-        .containsExactly(
-            "cli/target/appassembler",
-            "plugins/generic-graph/target/appassembler",
-            "plugins/elk-layout/target/appassembler",
-            "plugins/render/target/appassembler",
-            "plugins/archimate-oef-export/target/appassembler",
-            "plugins/uml-xmi-export/target/appassembler");
+  void launcherInstallDirsCollapseToTheSingleCliLauncher() {
+    // Cutover B: the five per-plugin appassembler launchers are gone; only the cli launcher (which
+    // now carries the five engine jars on its classpath) is staged into the bundle.
+    assertThat(DistTool.launcherInstallDirs()).containsExactly("cli/target/appassembler");
   }
 
   @Test
@@ -343,12 +353,6 @@ class DistModuleTest {
 
   private static void writeMinimalDistributionRoot(Path root) throws Exception {
     writeLauncher(root, "cli/target/appassembler", "cli");
-    writeLauncher(root, "plugins/generic-graph/target/appassembler", "generic-graph");
-    writeLauncher(root, "plugins/elk-layout/target/appassembler", "elk-layout");
-    writeLauncher(root, "plugins/render/target/appassembler", "render");
-    writeLauncher(root, "plugins/archimate-oef-export/target/appassembler", "archimate-oef-export");
-    writeLauncher(root, "plugins/uml-xmi-export/target/appassembler", "uml-xmi-export");
-    Files.createDirectories(root.resolve("fixtures/plugins"));
     Files.createDirectories(root.resolve("schemas"));
     Files.createDirectories(root.resolve("fixtures/source"));
     Files.createDirectories(root.resolve("docs"));

@@ -601,8 +601,21 @@ class ContractRoundTripTest {
 
   @Test
   void pluginManifestAndRuntimeCapabilityRoundTrip() throws Exception {
+    // The plugin-manifest / runtime-capability records ship orphaned after the single-launcher
+    // cutover (their source fixtures were retired with the process-plugin surface); this exercises
+    // the still-shipping records from inline JSON so the deferred contract cleanup stays visible.
     PluginManifest manifest =
-        readFixture("fixtures/plugins/generic-graph.manifest.json", PluginManifest.class);
+        JsonSupport.readValue(
+            """
+                {
+                  "plugin_manifest_schema_version": "plugin-manifest.schema.v1",
+                  "id": "generic-graph",
+                  "version": "2026.07.13",
+                  "capabilities": ["semantic-validation", "projection"],
+                  "allowed_env": ["JAVA_HOME", "PATH"]
+                }
+                """,
+            PluginManifest.class);
     RuntimeCapabilities capabilities =
         JsonSupport.readValue(
             """
@@ -621,24 +634,6 @@ class ContractRoundTripTest {
     assertThat(capabilities.pluginProtocolVersion())
         .isEqualTo(ContractVersions.PLUGIN_PROTOCOL_VERSION);
     assertThat(capabilities.runtime().get("java").asText()).isEqualTo("21");
-  }
-
-  @Test
-  void exportManifestsForwardProxyEnvForSchemaDownloads() throws Exception {
-    // Issue #35: OEF/XMI schema downloads run curl in the plugin child, which receives only
-    // manifest-listed env. The export manifests must list the standard proxy variables (upper- and
-    // lower-case) so proxy configuration reaches curl in proxied/sandboxed environments.
-    List<String> proxyEnv =
-        List.of("HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "http_proxy", "https_proxy", "no_proxy");
-    for (String fixture :
-        List.of(
-            "fixtures/plugins/archimate-oef.manifest.json",
-            "fixtures/plugins/uml-xmi.manifest.json")) {
-      PluginManifest manifest = readFixture(fixture, PluginManifest.class);
-      assertThat(manifest.allowedEnv())
-          .as("proxy env forwarded by %s", fixture)
-          .containsAll(proxyEnv);
-    }
   }
 
   @Test

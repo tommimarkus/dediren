@@ -34,12 +34,12 @@ class DistHermeticityTest {
   @Test
   void buildFailsOnLauncherClasspathJarMissingFromStagedLib(@TempDir Path root) throws Exception {
     writeDistributionRoot(root);
-    Files.delete(root.resolve("plugins/render/target/appassembler/lib/dep-alpha-1.0.0.jar"));
+    Files.delete(root.resolve("cli/target/appassembler/lib/render-module-" + VERSION + ".jar"));
 
     assertThatThrownBy(() -> runBuild(root))
         .isInstanceOf(IllegalStateException.class)
-        .hasMessageContaining("dep-alpha-1.0.0.jar")
-        .hasMessageContaining("plugins/render/target/appassembler");
+        .hasMessageContaining("render-module-" + VERSION + ".jar")
+        .hasMessageContaining("cli/target/appassembler");
     assertThat(root.resolve("dist/dediren-agent-bundle-" + VERSION + ".tar.gz")).doesNotExist();
   }
 
@@ -62,7 +62,6 @@ class DistHermeticityTest {
           try {
             Files.createDirectories(bundle.resolve("cds"));
             Files.writeString(bundle.resolve("cds/cli.jsa"), "cds archive");
-            Files.writeString(bundle.resolve("cds/elk-layout.jsa"), "cds archive");
             Files.writeString(bundle.resolve("stray.jsa"), "cds archive");
           } catch (java.io.IOException error) {
             throw new java.io.UncheckedIOException(error);
@@ -107,13 +106,7 @@ class DistHermeticityTest {
   }
 
   private static void writeDistributionRoot(Path root) throws Exception {
-    writeLauncher(root, "cli/target/appassembler", "cli");
-    writeLauncher(root, "plugins/generic-graph/target/appassembler", "generic-graph");
-    writeLauncher(root, "plugins/elk-layout/target/appassembler", "elk-layout");
-    writeLauncher(root, "plugins/render/target/appassembler", "render");
-    writeLauncher(root, "plugins/archimate-oef-export/target/appassembler", "archimate-oef-export");
-    writeLauncher(root, "plugins/uml-xmi-export/target/appassembler", "uml-xmi-export");
-    Files.createDirectories(root.resolve("fixtures/plugins"));
+    writeCliLauncher(root);
     Files.createDirectories(root.resolve("schemas"));
     Files.createDirectories(root.resolve("fixtures/source"));
     Files.createDirectories(root.resolve("docs"));
@@ -122,28 +115,42 @@ class DistHermeticityTest {
     Files.writeString(root.resolve("THIRD-PARTY-NOTICES.md"), "# Notices\n");
   }
 
+  /** The engine module jars the collapsed cli launcher now carries on its classpath. */
+  private static final List<String> ENGINE_MODULE_JARS =
+      List.of("generic-graph", "elk-layout", "render", "archimate-oef-export", "uml-xmi-export");
+
   /**
-   * Writes an appassembler-shaped launcher whose CLASSPATH declares a module jar plus a shared
-   * dependency jar, and stages exactly those jars in {@code lib/}.
+   * Writes the single appassembler-shaped cli launcher whose CLASSPATH declares its own module jar,
+   * a shared dependency jar, and the five engine module jars (the collapsed per-plugin classpaths),
+   * and stages exactly those jars in {@code lib/}. The packaged {@code lib/} must equal this set.
    */
-  private static void writeLauncher(Path root, String installDir, String sourceScript)
-      throws Exception {
-    Path install = root.resolve(installDir);
+  private static void writeCliLauncher(Path root) throws Exception {
+    Path install = root.resolve("cli/target/appassembler");
     Files.createDirectories(install.resolve("bin"));
     Files.createDirectories(install.resolve("lib"));
-    String moduleJar = sourceScript + "-module-" + VERSION + ".jar";
+    List<String> moduleJars = new java.util.ArrayList<>();
+    moduleJars.add("cli-module-" + VERSION + ".jar");
+    for (String engine : ENGINE_MODULE_JARS) {
+      moduleJars.add(engine + "-module-" + VERSION + ".jar");
+    }
+    StringBuilder classpath = new StringBuilder("\"$BASEDIR\"/etc:\"$REPO\"/dep-alpha-1.0.0.jar");
+    for (String jar : moduleJars) {
+      classpath.append(":\"$REPO\"/").append(jar);
+    }
     Files.writeString(
-        install.resolve("bin").resolve(sourceScript),
+        install.resolve("bin/cli"),
         """
             #!/bin/sh
             BASEDIR=$(dirname "$0")/..
             REPO="$BASEDIR"/lib
-            CLASSPATH="$BASEDIR"/etc:"$REPO"/dep-alpha-1.0.0.jar:"$REPO"/%s
+            CLASSPATH=%s
             exec "$JAVACMD" -classpath "$CLASSPATH" "$@"
             """
-            .formatted(moduleJar));
+            .formatted(classpath));
     Files.writeString(install.resolve("lib/dep-alpha-1.0.0.jar"), "shared dependency jar");
-    Files.writeString(install.resolve("lib").resolve(moduleJar), "module jar");
+    for (String jar : moduleJars) {
+      Files.writeString(install.resolve("lib").resolve(jar), "module jar");
+    }
   }
 
   private static List<String> archiveEntries(Path archive) throws Exception {

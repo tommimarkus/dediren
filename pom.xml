@@ -31,9 +31,9 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <maven.compiler.release>21</maven.compiler.release>
     <argLine>-Dfile.encoding=UTF-8 -Djava.awt.headless=true</argLine>
-    <!-- Force UTF-8 on every launched JVM's streams. Core spawns plugin children with a stripped
-         environment (JAVA_HOME + PATH only), so without this the child derives stdout.encoding
-         from native.encoding = US-ASCII and mangles all non-ASCII output to '?' (issue #47). -->
+    <!-- Force UTF-8 on the single packaged dediren launcher's JVM streams. If the ambient locale
+         drives native.encoding to US-ASCII, an unset stdout.encoding would mangle all non-ASCII
+         output to '?' (issue #47), so the launcher pins UTF-8 for stdout/stderr and file I/O. -->
     <dediren.launcher.jvmArgs>-XX:TieredStopAtLevel=1 -XX:+UseSerialGC -Djava.awt.headless=true -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8 -Dfile.encoding=UTF-8</dediren.launcher.jvmArgs>
     <archunit.version>1.4.2</archunit.version>
     <assertj.version>3.27.7</assertj.version>

@@ -196,8 +196,7 @@ rather than XML attributes. To schema-check the emitted UML content, point
 a UML 2.5.1 XSD and run `xmllint --nonet --noout --schema <driver.xsd>
 <document>`; OMG does not publish an importable UML 2.5.1 XSD, so supply or
 generate one, or import the document into a UML tool. Without a UML schema only
-the XMI envelope is checked. The `capabilities` command reports this recipe
-under `runtime.schema_validation.uml_content_validation`.
+the XMI envelope is checked.
 
 ## Command Handoff
 
@@ -598,17 +597,19 @@ VERSION=2026.07.13
 BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-${VERSION}
 
 "$BUNDLE/bin/dediren" --version
-"$BUNDLE/bin/dediren-plugin-generic-graph" capabilities
-"$BUNDLE/bin/dediren-plugin-elk-layout" capabilities
-"$BUNDLE/bin/dediren-plugin-render" capabilities
-"$BUNDLE/bin/dediren-plugin-archimate-oef-export" capabilities
-"$BUNDLE/bin/dediren-plugin-uml-xmi-export" capabilities
+
+"$BUNDLE/bin/dediren" build \
+  --input "$BUNDLE/fixtures/source/valid-basic.json" \
+  --out /tmp/dediren-probe-out \
+  --render-policy "$BUNDLE/fixtures/render-policy/default-svg.json"
 ```
 
-Capability output is raw JSON using `schemas/runtime-capability.schema.json`.
+`--version` prints the product banner; a one-shot `build` against a bundled
+fixture exercises the whole in-process pipeline (project → layout →
+validate-layout → render) end to end and is the readiness probe for the bundle.
 Workflow commands return command envelopes using `schemas/envelope.schema.json`.
-Packaged launchers set `DEDIREN_BUNDLE_ROOT` automatically so commands can run
-from any current working directory.
+The single packaged `dediren` launcher sets `DEDIREN_BUNDLE_ROOT` automatically
+so commands can run from any current working directory.
 
 ## Bundle Smoke Workflow
 
@@ -760,7 +761,7 @@ CLI's environment explicitly for the schema-path variables below and read
 nothing else. Important explicit variables:
 
 - `DEDIREN_BUNDLE_ROOT`: explicit bundle or repository root for bundled
-  schemas, plugin manifests, and launchers. Packaged launchers set this
+  schemas, fixtures, and the launcher. The packaged `dediren` launcher sets this
   automatically.
 - `DEDIREN_OEF_SCHEMA_DIR`: local OEF schema directory.
 - `DEDIREN_XMI_SCHEMA_PATH`: local XMI schema file, or a driver schema that
@@ -770,25 +771,24 @@ nothing else. Important explicit variables:
   to `curl` so it can download standards schemas through a proxy.
 - `DEDIREN_CDS_DIR`: directory for Class-Data-Sharing archives (see below).
 
-Each `bin/dediren*` launcher auto-creates a Class-Data-Sharing archive on its
-first invocation to speed JVM startup on subsequent calls. Archives are written
-to `<bundle>/cds/` by default (one `.jsa` file per launcher). If that directory
-is read-only, the launcher falls back to `${XDG_CACHE_HOME:-$HOME/.cache}/dediren/cds`.
-Set `DEDIREN_CDS_DIR` to an explicit writable path to relocate all archives.
+The `bin/dediren` launcher auto-creates a single Class-Data-Sharing archive on
+its first invocation to speed JVM startup on subsequent calls. The archive is
+written to `<bundle>/cds/cli.jsa` by default. If that directory is read-only, the
+launcher falls back to `${XDG_CACHE_HOME:-$HOME/.cache}/dediren/cds`.
+Set `DEDIREN_CDS_DIR` to an explicit writable path to relocate the archive.
 The feature is based on `-XX:+AutoCreateSharedArchive` and degrades silently if
 the archive directory is unwritable — startup continues at normal speed without
-any error. Launchers also pass `-Xlog:cds=off` so the JVM's per-invocation CDS
-archive-dump warnings never reach stdout/stderr; a healthy run stays quiet and
-stderr remains reserved for genuine diagnostics.
+any error. The launcher also passes `-Xlog:cds=off` so the JVM's per-invocation
+CDS archive-dump warnings never reach stdout/stderr; a healthy run stays quiet
+and stderr remains reserved for genuine diagnostics.
 
-Each archive is seeded by that launcher's first invocation and is not
-regenerated while it stays valid, and its contents depend on what that first
-command loaded: an archive seeded by `--version` or a `capabilities` probe
-stays measurably slower (about 30% per call) than one seeded by real work.
-Seed each launcher with a representative workload command — running the
-Bundle Smoke Workflow once covers the whole pipeline — before or instead of
-trivial probes. To reseed, delete the `.jsa` files or point `DEDIREN_CDS_DIR`
-at a fresh directory.
+The archive is seeded by the launcher's first invocation and is not regenerated
+while it stays valid, and its contents depend on what that first command loaded:
+an archive seeded by a bare `--version` probe stays measurably slower (about 30%
+per call) than one seeded by real work. Seed it with one representative
+workload — a single `dediren build` covers the whole pipeline — before or
+instead of a trivial probe. To reseed, delete `cds/cli.jsa` or point
+`DEDIREN_CDS_DIR` at a fresh directory.
 
 Keep stderr for human debugging only. Agents should decide success or failure
 from stdout JSON.

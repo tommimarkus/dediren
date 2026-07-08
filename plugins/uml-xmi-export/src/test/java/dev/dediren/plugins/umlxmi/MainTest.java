@@ -28,24 +28,6 @@ class MainTest {
   }
 
   @Test
-  void reportsCapabilities() throws Exception {
-    PluginResult result =
-        Main.executeForTesting(new String[] {"capabilities"}, "", envWithXmiSchema());
-
-    JsonNode capabilities = JsonSupport.objectMapper().readTree(result.stdout());
-
-    assertThat(result.exitCode()).isZero();
-    assertThat(capabilities.at("/id").asText()).isEqualTo("uml-xmi");
-    assertThat(capabilities.at("/runtime/artifact_kind").asText()).isEqualTo("uml-xmi+xml");
-    assertThat(capabilities.at("/runtime/schema_validation/kind").asText())
-        .isEqualTo("omg-xmi-xsd-partial");
-    // The UML-content validation recipe is a published capability hint (issue #33 defect 3).
-    assertThat(capabilities.at("/runtime/schema_validation/uml_content_validation").asText())
-        .contains("DEDIREN_XMI_SCHEMA_PATH", "UML 2.5.1 XSD", "xmllint");
-    assertThat(capabilities.at("/capabilities").toString()).contains("export");
-  }
-
-  @Test
   void outputsXmi() throws Exception {
     String xml = exportXml(exportInput());
 

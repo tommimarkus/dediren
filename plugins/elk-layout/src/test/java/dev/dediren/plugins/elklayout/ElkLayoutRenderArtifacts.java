@@ -2,6 +2,9 @@ package dev.dediren.plugins.elklayout;
 
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.contracts.layout.LayoutResult;
+import dev.dediren.contracts.render.RenderArtifact;
+import dev.dediren.contracts.render.RenderResult;
+import dev.dediren.plugins.render.SvgRenderEngine;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileVisitResult;
@@ -12,7 +15,6 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Locale;
 import java.util.concurrent.atomic.AtomicBoolean;
 import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.node.ObjectNode;
 
 final class ElkLayoutRenderArtifacts {
   // Wipe the output directory once per JVM run so it holds only this run's renders, never a
@@ -37,50 +39,28 @@ final class ElkLayoutRenderArtifacts {
   }
 
   private static void writeSvg(String testName, LayoutResult result) throws Exception {
-    ObjectNode input = JsonSupport.objectMapper().createObjectNode();
-    input.set("layout_result", JsonSupport.objectMapper().valueToTree(result));
-    input.set(
-        "policy",
+    JsonNode policy =
         JsonSupport.objectMapper()
-            .readTree(workspaceRoot().resolve("fixtures/render-policy/default-svg.json").toFile()));
+            .readTree(workspaceRoot().resolve("fixtures/render-policy/default-svg.json").toFile());
+    // Render through the production SvgRenderEngine (render's compile surface), not the render
+    // module's test-only Main harness, so this debug artifact writer stays on the shipped engine
+    // API after the single-launcher cutover moved the harness into render's own test scope.
+    RenderResult rendered = new SvgRenderEngine().render(result, policy, null).value();
 
-    dev.dediren.plugins.render.PluginResult renderResult =
-        dev.dediren.plugins.render.Main.executeForTesting(
-            new String[] {"render"}, JsonSupport.objectMapper().writeValueAsString(input));
-    JsonNode envelope = JsonSupport.objectMapper().readTree(renderResult.stdout());
-    if (renderResult.exitCode() != 0 || !"ok".equals(envelope.path("status").asText())) {
-      throw new AssertionError(
-          "SVG render failed for "
-              + testName
-              + ", stdout="
-              + renderResult.stdout()
-              + ", stderr="
-              + renderResult.stderr());
-    }
-
-    String content = svgArtifactContent(envelope);
+    String content =
+        rendered.artifacts().stream()
+            .filter(artifact -> "svg".equals(artifact.artifactKind()))
+            .map(RenderArtifact::content)
+            .findFirst()
+            .orElse("");
     if (content.isBlank()) {
-      throw new AssertionError(
-          "SVG render produced no svg artifact content for "
-              + testName
-              + ", stdout="
-              + renderResult.stdout());
+      throw new AssertionError("SVG render produced no svg artifact content for " + testName);
     }
     Path outputDir = workspaceRoot().resolve(".test-output/renders/elk-layout");
     cleanOnce(outputDir);
     Path output = outputDir.resolve(safeFileName(testName) + ".svg");
     Files.createDirectories(output.getParent());
     Files.writeString(output, content, StandardCharsets.UTF_8);
-  }
-
-  // Render returns data.artifacts[] (svg, plus png when raster policy is set); pick the svg one.
-  private static String svgArtifactContent(JsonNode envelope) {
-    for (JsonNode artifact : envelope.path("data").path("artifacts")) {
-      if ("svg".equals(artifact.path("artifact_kind").asText())) {
-        return artifact.path("content").asText();
-      }
-    }
-    return "";
   }
 
   private static void cleanOnce(Path dir) throws IOException {

@@ -37,18 +37,6 @@ class MainTest {
     assertThat(Main.moduleName()).isEqualTo("render");
   }
 
-  @Test
-  void reportsCapabilities() throws Exception {
-    PluginResult result = Main.executeForTesting(new String[] {"capabilities"}, "");
-
-    JsonNode capabilities = JsonSupport.objectMapper().readTree(result.stdout());
-
-    assertThat(result.exitCode()).isZero();
-    assertThat(capabilities.at("/id").asText()).isEqualTo("render");
-    assertThat(capabilities.at("/runtime/artifact_kind").asText()).isEqualTo("svg");
-    assertThat(capabilities.at("/capabilities").toString()).contains("render");
-  }
-
   @Nested
   class RenderContracts {
     @Test

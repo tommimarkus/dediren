@@ -24,23 +24,6 @@ class MainTest {
   }
 
   @Test
-  void reportsCapabilities() throws Exception {
-    PluginResult result =
-        Main.executeForTesting(new String[] {"capabilities"}, "", envWithOefSchemas());
-
-    JsonNode capabilities = JsonSupport.objectMapper().readTree(result.stdout());
-
-    assertThat(result.exitCode()).isZero();
-    assertThat(capabilities.at("/id").asText()).isEqualTo("archimate-oef");
-    assertThat(capabilities.at("/runtime/artifact_kind").asText()).isEqualTo("archimate-oef+xml");
-    assertThat(capabilities.at("/runtime/schema_validation/kind").asText())
-        .isEqualTo("official-oef-xsd");
-    assertThat(capabilities.at("/runtime/schema_validation/validator").asText())
-        .isEqualTo("xmllint");
-    assertThat(capabilities.at("/capabilities").toString()).contains("export");
-  }
-
-  @Test
   void outputsModelValidOefXml() throws Exception {
     PluginResult result =
         Main.executeForTesting(

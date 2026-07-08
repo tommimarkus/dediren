@@ -1,9 +1,7 @@
 package dev.dediren.plugins.genericgraph;
 
 import dev.dediren.contracts.CommandEnvelope;
-import dev.dediren.contracts.ContractVersions;
 import dev.dediren.contracts.json.JsonSupport;
-import dev.dediren.contracts.plugin.RuntimeCapabilities;
 import dev.dediren.contracts.source.SourceDocument;
 import dev.dediren.engine.EngineException;
 import java.io.ByteArrayInputStream;
@@ -12,22 +10,19 @@ import java.io.InputStream;
 import java.io.PrintStream;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
-import java.util.List;
 import java.util.Objects;
 
+/**
+ * Envelope-shaped test harness for the generic-graph engine: it parses stdin, delegates to {@link
+ * GenericGraphEngine}, and shapes the command envelope so the existing suites can drive the engine
+ * without a process boundary.
+ */
 // lean-audit:dup-intentional: cross-plugin envelope boilerplate; see arch-guidelines.md §12
 public final class Main {
   private Main() {}
 
   public static String moduleName() {
     return "generic-graph";
-  }
-
-  public static void main(String[] args) throws Exception {
-    int exitCode = execute(args, System.in, System.out, System.err);
-    if (exitCode != 0) {
-      System.exit(exitCode);
-    }
   }
 
   public static PluginResult executeForTesting(String[] args, String stdin) throws Exception {
@@ -45,17 +40,6 @@ public final class Main {
 
   private static int execute(
       String[] args, InputStream stdin, PrintStream stdout, PrintStream stderr) throws Exception {
-    if (args.length > 0 && args[0].equals("capabilities")) {
-      stdout.println(
-          JsonSupport.objectMapper()
-              .writeValueAsString(
-                  new RuntimeCapabilities(
-                      ContractVersions.PLUGIN_PROTOCOL_VERSION,
-                      "generic-graph",
-                      List.of("semantic-validation", "projection"),
-                      null)));
-      return 0;
-    }
     if (args.length == 0) {
       stderr.println("expected command: validate or project");
       return 2;

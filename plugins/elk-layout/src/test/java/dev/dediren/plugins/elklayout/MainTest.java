@@ -1,7 +1,6 @@
 package dev.dediren.plugins.elklayout;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayInputStream;
@@ -13,29 +12,6 @@ import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 
 class MainTest {
-  @Test
-  void capabilitiesReportOfficialJavaElkRuntime() throws Exception {
-    PluginResult result = Main.executeForTesting(new String[] {"capabilities"}, "");
-
-    assertEquals(0, result.exitCode());
-    JsonNode capabilities = EnvelopeAssertions.parseJson(result.stdout());
-    assertEquals("plugin.protocol.v1", capabilities.path("plugin_protocol_version").asText());
-    assertEquals("elk-layout", capabilities.path("id").asText());
-    assertEquals("layout", capabilities.path("capabilities").get(0).asText());
-    assertEquals("official-java-elk", capabilities.path("runtime").path("kind").asText());
-    assertEquals(
-        "org.eclipse.elk.layered", capabilities.path("runtime").path("algorithms").get(0).asText());
-    assertEquals(
-        "org.eclipse.elk.rectpacking",
-        capabilities.path("runtime").path("algorithms").get(1).asText());
-    JsonNode algorithms = capabilities.path("runtime").path("algorithms");
-    for (JsonNode algorithm : algorithms) {
-      assertFalse(
-          algorithm.asText().contains("libavoid"),
-          "ELK runtime must not advertise a Libavoid backend algorithm");
-    }
-  }
-
   @Test
   void invalidJsonReturnsStructuredErrorEnvelope() throws Exception {
     ByteArrayInputStream stdin =

@@ -17,7 +17,6 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
@@ -45,31 +44,11 @@ public final class DistTool {
           "-Dstdout.encoding=UTF-8",
           "-Dstderr.encoding=UTF-8",
           "-Dfile.encoding=UTF-8");
+  // Single-launcher distribution (Cutover B): the five per-plugin appassembler launchers are gone.
+  // The cli launcher hosts the five first-party engines in-process, so its classpath carries the
+  // engine jars (+ transitives) and the packaged lib/ is verified against that one classpath.
   private static final List<Launcher> LAUNCHERS =
-      List.of(
-          new Launcher("cli/target/appassembler", "cli", "dediren", null),
-          new Launcher(
-              "plugins/generic-graph/target/appassembler",
-              "generic-graph",
-              "dediren-plugin-generic-graph",
-              "generic-graph"),
-          new Launcher(
-              "plugins/elk-layout/target/appassembler",
-              "elk-layout",
-              "dediren-plugin-elk-layout",
-              "elk-layout"),
-          new Launcher(
-              "plugins/render/target/appassembler", "render", "dediren-plugin-render", "render"),
-          new Launcher(
-              "plugins/archimate-oef-export/target/appassembler",
-              "archimate-oef-export",
-              "dediren-plugin-archimate-oef-export",
-              "archimate-oef"),
-          new Launcher(
-              "plugins/uml-xmi-export/target/appassembler",
-              "uml-xmi-export",
-              "dediren-plugin-uml-xmi-export",
-              "uml-xmi"));
+      List.of(new Launcher("cli/target/appassembler", "cli", "dediren"));
   // Hermeticity scrub for smoke/bench child processes: the CDS directory is the only remaining
   // dediren environment knob a caller's shell could leak into the packaged-bundle probes.
   private static final List<String> CLEAN_ENV = List.of("DEDIREN_CDS_DIR");
@@ -236,7 +215,6 @@ public final class DistTool {
     Files.deleteIfExists(archive);
     Files.createDirectories(bundle.resolve("bin"));
     Files.createDirectories(bundle.resolve("lib"));
-    Files.createDirectories(bundle.resolve("plugins"));
     Files.createDirectories(bundle.resolve("docs"));
 
     Set<String> declaredLibJars = new TreeSet<>();
@@ -244,7 +222,6 @@ public final class DistTool {
       declaredLibJars.addAll(installLauncher(root, bundle, launcher));
     }
     verifyPackagedLib(bundle.resolve("lib"), declaredLibJars);
-    copyManifestFiles(root.resolve("fixtures/plugins"), bundle.resolve("plugins"));
     copyDirectory(root.resolve("schemas"), bundle.resolve("schemas"));
     copyFixtures(root.resolve("fixtures"), bundle.resolve("fixtures"));
     Files.copy(
@@ -396,24 +373,20 @@ public final class DistTool {
       if (Files.exists(bundle.resolve("fixtures/plugins"))) {
         throw new IllegalStateException("archive must not include source fixture plugin manifests");
       }
+      if (Files.exists(bundle.resolve("plugins"))) {
+        throw new IllegalStateException(
+            "single-launcher bundle must not stage a plugins/ manifest directory");
+      }
       Path dediren = bundle.resolve("bin/dediren");
       runBundleCommand(dediren, bundle, List.of("--help"), null);
       assertContains(
           runBundleCommand(dediren, bundle, List.of("--version"), null),
           "dediren " + version,
           "version output");
-      for (Launcher launcher : LAUNCHERS) {
-        if (launcher.pluginId() == null) {
-          continue;
-        }
-        String capabilities =
-            runBundleCommand(
-                bundle.resolve("bin").resolve(launcher.bundleScript()),
-                bundle,
-                List.of("capabilities"),
-                null);
-        assertRuntimeCapabilities(capabilities, launcher.pluginId());
-      }
+
+      Path oefSchemas = writeOefSchemas(temp.resolve("oef-schemas"));
+      // Full one-shot pipeline through the packaged launcher: render + OEF export in one build.
+      assertBuildRendersAndExports(dediren, bundle, temp, oefSchemas);
 
       Path request = temp.resolve("request.json");
       Path layout = temp.resolve("layout.json");
@@ -442,7 +415,8 @@ public final class DistTool {
               List.of("layout", "--plugin", "elk-layout", "--input", request.toString()),
               null);
       Files.writeString(layout, layoutOutput, StandardCharsets.UTF_8);
-      assertCdsArchiveCreated(bundle, "elk-layout");
+      // One CDS archive per launcher: the single cli launcher seeds cds/cli.jsa.
+      assertCdsArchiveCreated(bundle, "cli");
       assertQualityOutput(
           runBundleCommand(
               dediren, bundle, List.of("validate-layout", "--input", layout.toString()), null));
@@ -463,7 +437,6 @@ public final class DistTool {
       Files.writeString(render, renderOutput, StandardCharsets.UTF_8);
       assertSvgRenderOutput(renderOutput);
 
-      Path oefSchemas = writeOefSchemas(temp.resolve("oef-schemas"));
       String oefOutput =
           runBundleCommand(
               dediren,
@@ -501,10 +474,165 @@ public final class DistTool {
               Map.of("DEDIREN_XMI_SCHEMA_PATH", xmiSchema.toString()),
               Map.of());
       assertArtifactKind(xmiOutput, "uml-xmi+xml");
+
+      // Issue #47 regression (rehomed from the retired plugin-runtime testbed): a non-ASCII model
+      // rendered through the packaged launcher under a C locale must round-trip intact, proving the
+      // launcher's -Dstdout.encoding/-Dfile.encoding=UTF-8 flags hold when the ambient locale would
+      // otherwise drive the JVM to US-ASCII and mangle the labels to '?'.
+      assertNonAsciiRoundTrip(dediren, bundle, temp, version);
+
       System.out.println("distribution smoke test passed: " + archive);
     } finally {
       deleteIfExists(temp);
     }
+  }
+
+  /**
+   * Full one-shot {@code dediren build} exercising a render lane and an OEF export lane in one call
+   * against bundle fixtures, writing both artifacts under {@code --out} and asserting the packaged
+   * build succeeds end to end.
+   */
+  private static void assertBuildRendersAndExports(
+      Path dediren, Path bundle, Path temp, Path oefSchemas) throws Exception {
+    Path buildOut = temp.resolve("build-out");
+    String stdout =
+        runBundleCommand(
+            dediren,
+            bundle,
+            List.of(
+                "build",
+                "--input",
+                bundle.resolve("fixtures/source/valid-archimate-oef.json").toString(),
+                "--out",
+                buildOut.toString(),
+                "--render-policy",
+                bundle.resolve("fixtures/render-policy/archimate-svg.json").toString(),
+                "--oef-policy",
+                bundle.resolve("fixtures/export-policy/default-oef.json").toString()),
+            null,
+            Map.of("DEDIREN_OEF_SCHEMA_DIR", oefSchemas.toString()),
+            Map.of());
+    JsonNode buildResult = JsonSupport.objectMapper().readTree(stdout);
+    if (!"ok".equals(buildResult.path("status").asText())) {
+      throw new IllegalStateException("dediren build did not succeed: " + stdout);
+    }
+    Path svg = buildOut.resolve("main/diagram.svg");
+    Path oef = buildOut.resolve("main/oef.xml");
+    if (!Files.isRegularFile(svg) || !Files.isRegularFile(oef)) {
+      throw new IllegalStateException(
+          "dediren build must write both the render and OEF artifacts: " + buildResult);
+    }
+  }
+
+  /**
+   * Renders a sentinel-labelled model through the packaged launcher under {@code LC_ALL=C} and
+   * asserts the non-ASCII label survives the stdout round-trip.
+   */
+  private static void assertNonAsciiRoundTrip(Path dediren, Path bundle, Path temp, String version)
+      throws Exception {
+    String sentinel = "Sähkö öäå 测试";
+    // Literal placeholder substitution (not String.format) so the multi-line JSON template does not
+    // trip the format-string-newline check and the sentinel is inserted verbatim.
+    String source =
+        """
+        {
+          "model_schema_version": "model.schema.v1",
+          "required_plugins": [ { "id": "generic-graph", "version": "__VERSION__" } ],
+          "nodes": [
+            { "id": "client", "type": "generic.actor", "label": "__SENTINEL__", "properties": {} },
+            { "id": "api", "type": "generic.component", "label": "API", "properties": {} }
+          ],
+          "relationships": [
+            { "id": "client-calls-api", "type": "generic.calls", "source": "client",
+              "target": "api", "label": "calls", "properties": {} }
+          ],
+          "plugins": {
+            "generic-graph": {
+              "views": [
+                { "id": "main", "label": "Main", "nodes": ["client", "api"],
+                  "relationships": ["client-calls-api"] }
+              ]
+            }
+          }
+        }
+        """
+            .replace("__VERSION__", version)
+            .replace("__SENTINEL__", sentinel);
+    Path sourceFile = temp.resolve("sentinel-source.json");
+    Files.writeString(sourceFile, source, StandardCharsets.UTF_8);
+    // Force a non-UTF-8 ambient locale so the launcher's own encoding flags are what keep stdout
+    // and
+    // the written files UTF-8 clean; without them the JVM would derive US-ASCII and emit '?'.
+    Map<String, String> asciiLocale = Map.of("LC_ALL", "C", "LANG", "C");
+
+    String requestOutput =
+        runBundleCommand(
+            dediren,
+            bundle,
+            List.of(
+                "project",
+                "--target",
+                "layout-request",
+                "--plugin",
+                "generic-graph",
+                "--view",
+                "main",
+                "--input",
+                sourceFile.toString()),
+            null,
+            Map.of(),
+            asciiLocale);
+    Path request = temp.resolve("sentinel-request.json");
+    Files.writeString(request, requestOutput, StandardCharsets.UTF_8);
+    // Verbatim stream-encoding check: the projected node label must survive the stdout round-trip
+    // byte-for-byte (a mangling launcher would have replaced the non-ASCII glyphs with '?'). Assert
+    // on the structured label rather than the rendered SVG, which may wrap the label across tspans.
+    JsonNode projectedLabel = clientNodeLabel(okData(requestOutput));
+    if (projectedLabel == null || !sentinel.equals(projectedLabel.asText())) {
+      throw new IllegalStateException(
+          "non-ASCII label was mangled through the packaged launcher (issue #47 regression); "
+              + "expected the projected node label to be \""
+              + sentinel
+              + "\" but got: "
+              + projectedLabel);
+    }
+
+    // The full pipeline must also run render clean (non-zero exit throws); this proves the
+    // non-ASCII payload survives layout and render through the packaged launcher end to end.
+    String layoutOutput =
+        runBundleCommand(
+            dediren,
+            bundle,
+            List.of("layout", "--plugin", "elk-layout", "--input", request.toString()),
+            null,
+            Map.of(),
+            asciiLocale);
+    Path layout = temp.resolve("sentinel-layout.json");
+    Files.writeString(layout, layoutOutput, StandardCharsets.UTF_8);
+    runBundleCommand(
+        dediren,
+        bundle,
+        List.of(
+            "render",
+            "--plugin",
+            "render",
+            "--policy",
+            bundle.resolve("fixtures/render-policy/default-svg.json").toString(),
+            "--input",
+            layout.toString()),
+        null,
+        Map.of(),
+        asciiLocale);
+  }
+
+  /** Returns the {@code label} node of the {@code client} node in a layout-request payload. */
+  private static JsonNode clientNodeLabel(JsonNode layoutRequestData) {
+    for (JsonNode node : layoutRequestData.path("nodes")) {
+      if ("client".equals(node.path("id").asText())) {
+        return node.path("label");
+      }
+    }
+    return null;
   }
 
   private static void bench(Path root, Path archive, int runs) throws Exception {
@@ -537,28 +665,21 @@ public final class DistTool {
       Path request = temp.resolve("request.json");
       Files.writeString(request, projectOutput, StandardCharsets.UTF_8);
 
+      Path buildOut = temp.resolve("bench-build-out");
       List<Bench.Stat> stats = new ArrayList<>();
+      // Surviving single-launcher surface (W1): the per-plugin capabilities launchers are gone, so
+      // bench the version banner, a per-stage layout, and a one-shot render build — all through the
+      // one packaged dediren launcher.
       stats.add(
           timeCommand(
-              "cli --version",
+              "dediren --version",
               runs,
               () -> {
                 runBundleCommand(dediren, bundle, List.of("--version"), null);
               }));
       stats.add(
           timeCommand(
-              "elk-layout capabilities",
-              runs,
-              () -> {
-                runBundleCommand(
-                    bundle.resolve("bin/dediren-plugin-elk-layout"),
-                    bundle,
-                    List.of("capabilities"),
-                    null);
-              }));
-      stats.add(
-          timeCommand(
-              "elk-layout layout (probe+work)",
+              "dediren layout (per-stage)",
               runs,
               () -> {
                 runBundleCommand(
@@ -569,13 +690,20 @@ public final class DistTool {
               }));
       stats.add(
           timeCommand(
-              "generic-graph capabilities",
+              "dediren build (render)",
               runs,
               () -> {
                 runBundleCommand(
-                    bundle.resolve("bin/dediren-plugin-generic-graph"),
+                    dediren,
                     bundle,
-                    List.of("capabilities"),
+                    List.of(
+                        "build",
+                        "--input",
+                        bundle.resolve("fixtures/source/valid-pipeline-rich.json").toString(),
+                        "--out",
+                        buildOut.toString(),
+                        "--render-policy",
+                        bundle.resolve("fixtures/render-policy/rich-svg.json").toString()),
                     null);
               }));
 
@@ -779,20 +907,11 @@ public final class DistTool {
         "launcher script does not contain a recognized application home assignment");
   }
 
-  private static void copyManifestFiles(Path source, Path target) throws IOException {
-    Files.createDirectories(target);
-    try (var entries = Files.list(source)) {
-      for (Path path :
-          entries.filter(p -> p.getFileName().toString().endsWith(".manifest.json")).toList()) {
-        Files.copy(path, target.resolve(path.getFileName()), StandardCopyOption.REPLACE_EXISTING);
-      }
-    }
-  }
-
   private static void copyFixtures(Path source, Path target) throws IOException {
     Files.createDirectories(target);
     try (var entries = Files.list(source)) {
       for (Path path : entries.toList()) {
+        // The retired source plugin-manifest fixtures never ship in the bundle.
         if (path.getFileName().toString().equals("plugins")) {
           continue;
         }
@@ -807,29 +926,21 @@ public final class DistTool {
   }
 
   private static void writeBundleMetadata(Path bundle, String version) throws IOException {
-    List<Map<String, String>> plugins = new ArrayList<>();
-    for (String plugin : bundledPluginIds()) {
-      plugins.add(Map.of("id", plugin, "version", version));
-    }
+    // dediren-bundle.schema.v2 (Cutover B): the plugins[] array and elk_helper pointer described a
+    // process-plugin surface that no longer exists; an honest descriptor drops them.
     Map<String, Object> metadata = new LinkedHashMap<>();
-    metadata.put("bundle_schema_version", "dediren-bundle.schema.v1");
+    metadata.put("bundle_schema_version", "dediren-bundle.schema.v2");
     metadata.put("product", "dediren");
     metadata.put("version", version);
     metadata.put("target", bundleMetadataTarget());
     metadata.put("built_at_utc", Instant.now().toString());
-    metadata.put("plugins", plugins);
     metadata.put("schemas_dir", "schemas");
     metadata.put("fixtures_dir", "fixtures");
     metadata.put("docs_dir", "docs");
-    metadata.put("elk_helper", "bin/dediren-plugin-elk-layout");
     Files.writeString(
         bundle.resolve("bundle.json"),
         JsonSupport.objectMapper().writerWithDefaultPrettyPrinter().writeValueAsString(metadata),
         StandardCharsets.UTF_8);
-  }
-
-  static List<String> bundledPluginIds() {
-    return LAUNCHERS.stream().map(Launcher::pluginId).filter(Objects::nonNull).toList();
   }
 
   static List<String> launcherInstallDirs() {
@@ -897,18 +1008,6 @@ public final class DistTool {
     JsonNode data = okData(stdout);
     if (!"ok".equals(data.path("status").asText())) {
       throw new IllegalStateException("validate-layout status should be ok: " + stdout);
-    }
-  }
-
-  private static void assertRuntimeCapabilities(String stdout, String expectedPluginId)
-      throws IOException {
-    JsonNode value = JsonSupport.objectMapper().readTree(stdout);
-    if (!expectedPluginId.equals(value.path("id").asText())) {
-      throw new IllegalStateException(
-          "capability id should be " + expectedPluginId + ": " + stdout);
-    }
-    if (!value.path("capabilities").isArray() || value.path("capabilities").isEmpty()) {
-      throw new IllegalStateException("capability output should list capabilities: " + stdout);
     }
   }
 
@@ -1287,6 +1386,5 @@ public final class DistTool {
 
   private record InsertionPoint(int index, String variable) {}
 
-  private record Launcher(
-      String installDir, String sourceScript, String bundleScript, String pluginId) {}
+  private record Launcher(String installDir, String sourceScript, String bundleScript) {}
 }

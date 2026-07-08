@@ -143,8 +143,7 @@ enforcement authority for matching version, tag, and release actions.
   already-integrated changes.
 - Every product/plugin version bump must create the matching annotated git tag
   `v<version>` on the version-bump commit before pushing.
-- First-party plugin manifests under `fixtures/plugins/*.manifest.json`,
-  source fixture `required_plugins[].version` entries, README bundle examples,
+- Source fixture `required_plugins[].version` entries, README bundle examples,
   `docs/agent-usage.md` examples, distribution metadata, and tests that assert
   version strings must match the product version.
 - Known version assertion surfaces include
@@ -159,8 +158,7 @@ enforcement authority for matching version, tag, and release actions.
   family intentionally changes. They are the durable compatibility signal,
   since CalVer does not encode compatibility.
 - After every product/plugin version bump, run a stale-version search over
-  `pom.xml`, `README.md`, `docs/agent-usage.md`, `fixtures/plugins`, and
-  `fixtures/source`.
+  `pom.xml`, `README.md`, `docs/agent-usage.md`, and `fixtures/source`.
 
 ## Engine Runtime Rules
 
@@ -183,8 +181,9 @@ enforcement authority for matching version, tag, and release actions.
 
 ## ELK Runtime
 
-- `plugins/elk-layout` is the first-party Java ELK plugin.
-- It uses Eclipse ELK Java libraries and the Maven appassembler launcher.
+- `plugins/elk-layout` is the first-party Java ELK engine module.
+- It uses Eclipse ELK Java libraries; the single `bin/dediren` (cli) launcher
+  hosts it in-process. There is no per-plugin appassembler launcher.
 - Java 21 or newer is required.
 
 ## Code Style
