@@ -4,11 +4,11 @@
 # by review, not by citation. Patterns use **/ so they also match shadow-
 # prefixed scans.
 
-# CLAUDE.md "Plugin Runtime Rules" <-> docs/features/plugin-runtime.md
-# "Plugin Protocol": agent work rules vs the product feature page.
+# CLAUDE.md "Engine Runtime Rules" <-> docs/features/engine-runtime.md
+# "Engine Contract": agent work rules vs the product feature page.
 [[carve_out]]
 a = "**/CLAUDE.md"
-b = "**/docs/features/plugin-runtime.md"
+b = "**/docs/features/engine-runtime.md"
 
 # docs/threat-model.md "Maintenance Rule" <-> CLAUDE.md "Files That Move
 # Together": reciprocal maintenance contract; each side states its own trigger.

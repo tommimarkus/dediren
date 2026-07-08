@@ -2,11 +2,11 @@
 
 ![dediren: contract-first, built for agents, Java 21+, ArchiMate and UML, MIT licensed](docs/assets/badges.svg)
 
-`dediren` is a contract-first diagram pipeline **for agentic tools**. It turns
-semantic JSON into generated layout, rendered SVG, ArchiMate® 3.2 OEF XML,
-or UML® 2.5.1 XMI XML through explicit CLI commands backed by in-process
-first-party engines. Every command prints a JSON envelope on stdout, so an
-agent decides success or failure without scraping stderr.
+`dediren` is a contract-first, single-JVM diagram compiler **for agentic
+tools**. It turns semantic JSON into generated layout, rendered SVG,
+ArchiMate® 3.2 OEF XML, or UML® 2.5.1 XMI XML through explicit CLI commands
+backed by in-process first-party engines. Every command prints a JSON envelope
+on stdout, so an agent decides success or failure without scraping stderr.
 
 > [!TIP]
 > The primary audience is agents. If you are authoring Dediren JSON or driving a
@@ -174,8 +174,8 @@ release notes and through schema-id changes. The version source is root
 ./mvnw versions:set -DnewVersion='2026.07.13' -DprocessAllModules=true -DgenerateBackupPoms=false
 ```
 
-Then sync the checked-in version surfaces (first-party plugin manifests,
-source-fixture `required_plugins[].version`, the bundle examples in this file and
+Then sync the checked-in version surfaces (source-fixture
+`required_plugins[].version` entries, the bundle examples in this file and
 `docs/agent-usage.md`, and the version-assertion tests) — the exhaustive surface
 list lives in [`CLAUDE.md` §Versioning](CLAUDE.md). Commit the bump on its own,
 then tag the bump commit:
