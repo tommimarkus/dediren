@@ -334,13 +334,13 @@ public final class LayoutQuality {
     return "lifeline".equals(node.role()) && onLifelineAxis(point, node, tolerance);
   }
 
-  // Sequence Message endpoints anchor to the lifeline axis: the participant head's vertical
-  // edge extended downward. ELK places them at the head's left/right edge x, below the head box.
+  // Sequence Message endpoints anchor to the lifeline axis: the participant head-box center,
+  // extended downward (the render engine's own convention — see UmlSequenceRenderer's stem/
+  // message-endpoint geometry, "the head-box center"). ELK places message endpoints at that
+  // center x, below the head box.
   private static boolean onLifelineAxis(Point point, LaidOutNode node, double tolerance) {
-    double left = node.x();
-    double right = node.x() + node.width();
-    return point.y() >= node.y() - tolerance
-        && (sameWithin(point.x(), left, tolerance) || sameWithin(point.x(), right, tolerance));
+    double centerX = node.x() + node.width() / 2.0;
+    return point.y() >= node.y() - tolerance && sameWithin(point.x(), centerX, tolerance);
   }
 
   private static boolean sameWithin(double left, double right, double tolerance) {

@@ -23,8 +23,13 @@ guidance in that package.
    each view.
 3. Reuse `fixtures/render-policy/default-svg.json` unless custom SVG style is
    required.
-4. Run `validate`, `project --target layout-request`, `layout`,
-   `validate-layout`, then `render` or `export`.
+4. Run `build --render-policy <policy> --out <dir>` (add `--oef-policy`
+   and/or `--xmi-policy` for export lanes). It chains `project` → `layout` →
+   `validate-layout` → `render`/`export` for every view and writes each
+   view's artifacts under `--out/<view-id>/` — see `## Build`. Fall back to
+   the decomposed form — `validate`, `project --target layout-request`,
+   `layout`, `validate-layout`, then `render` or `export` — to run a single
+   stage, inspect an intermediate result, or reuse a cached stage output.
 5. Inspect stdout JSON `.status` and `.diagnostics[]`; do not parse stderr.
 
 ## Artifact Map
@@ -39,6 +44,7 @@ guidance in that package.
 | Render metadata | Usually generated | `schemas/render-metadata.schema.json` | `fixtures/render-metadata/archimate-basic.json` |
 | Layout result | No | `schemas/layout-result.schema.json` | `fixtures/layout-result/basic.json` |
 | Render/export result | No | `schemas/render-result.schema.json`, `schemas/export-result.schema.json` | command stdout |
+| Build result | No | `schemas/build-result.schema.json` | command stdout (`build`) |
 
 ## Minimal Source JSON
 
@@ -216,6 +222,76 @@ jq -r '.data.artifacts[] | select(.artifact_kind=="svg") | .content' render-resu
 ```
 
 The `render` plugin emits only `svg` (and, in interactive modes, `html`) artifacts; it does not produce PNG. To get a raster image, convert the emitted SVG with an external tool — for example `rsvg-convert diagram.svg -o diagram.png`, `resvg diagram.svg diagram.png`, ImageMagick (`magick convert diagram.svg diagram.png`), or Inkscape (`inkscape diagram.svg --export-type=png`).
+
+## Build
+
+`dediren build` runs the whole per-view pipeline — `project` (layout-request,
+then render-metadata when `--render-policy` is set) → `layout` →
+`validate-layout` → one or more of `render`/`archimate-oef`/`uml-xmi` — as one
+process call, chaining the exact same stage paths the decomposed commands
+above use, and writes each view's artifacts under `--out`:
+
+```bash
+"$BUNDLE/bin/dediren" build \
+  --input "$BUNDLE/fixtures/source/valid-basic.json" \
+  --out out \
+  --render-policy "$BUNDLE/fixtures/render-policy/default-svg.json"
+```
+
+| Flag | Meaning |
+| --- | --- |
+| `--input <path>` | Source model JSON; default stdin. |
+| `--out <dir>` | Output directory (required). Each view writes under `<out>/<view-id>/`. |
+| `--views <id,id,...>` | Views to build, in the given order; default is every view in model order. |
+| `--render-policy <path>` | Enable the SVG render lane; writes `<view-id>/diagram.<svg\|html>`. |
+| `--oef-policy <path>` | Enable the ArchiMate OEF export lane; writes `<view-id>/oef.xml`. |
+| `--xmi-policy <path>` | Enable the UML/XMI export lane; writes `<view-id>/xmi.xml`. |
+| `--emit <kinds>` | Comma-separated subset of `layout-request,layout-result,render-metadata` stage command envelopes to also persist under `<view-id>/`; see below. |
+
+At least one of `--render-policy`/`--oef-policy`/`--xmi-policy` is required;
+zero lanes is a rejected input (`DEDIREN_COMMAND_INPUT_INVALID`, exit `2`).
+
+Build's own stdout **is** the build result document — unlike every other
+command, it is not wrapped in the generic envelope's `.data`. Read it
+directly:
+
+```bash
+jq -r '.status, (.views[] | .view_id, .status, (.artifacts[] | .artifact_kind + " " + .path))' build-result.json
+```
+
+- `.status` / `.views[].status` are `ok`, `warning`, or `error`, following the
+  same rollup vocabulary the per-stage envelopes use: a view is `error` if any
+  of its stages failed (it stops at that stage, so `.views[].artifacts[]` may
+  be partial for it), `warning` if a stage warned, else `ok`; the build's own
+  `.status` is the worst of its views'. One failing view never aborts the
+  others, so read every `.views[].status` rather than stopping at the first.
+- `.views[].artifacts[]` lists each written file as `{ "artifact_kind": ...,
+  "path": "<view-id>/<file>" }`, relative to `--out`.
+- A build-level failure (no lane selected, or the source itself fails
+  `validate`) never runs any view: `.views` is empty and the failure's
+  diagnostics sit on the top-level `.diagnostics[]` instead of nested under a
+  view.
+- A model that declares zero views (`plugins.generic-graph.views: []`, with no
+  explicit `--views`) is not an error: `.status` is `ok` and `.views` is
+  empty — there is simply nothing to build.
+
+`--emit` persists **stage command envelopes**, not the build result's own
+shape: each requested kind is the exact JSON a per-stage subcommand above
+would print — `{ "envelope_schema_version", "status", "data", "diagnostics" }`
+with the generated data nested under `.data` — written verbatim to
+`<out>/<view-id>/<kind>.json` (for example `<out>/main/layout-result.json`).
+Use it to debug a specific stage or hand an intermediate result to another
+tool without re-running the decomposed flow.
+
+The `archimate-oef` lane's OEF policy identity (`model_identifier`,
+`view_identifier`, `model_name`, `view_name`) is per-build, not per-view
+(Phase-1 limitation): building several views with `--oef-policy` writes one
+`oef.xml` per view, but every one carries the *same* policy identity fields,
+and each still declares the source's other views via the `info`
+`DEDIREN_OEF_VIEWS_OMITTED` diagnostic (see `## Semantic Profiles`). Scope
+`--views` to one view per `dediren build` invocation — with a matching
+per-view `--oef-policy` — to get a correctly identified OEF per view, or fall
+back to the decomposed `export` subcommand.
 
 ## Render Policy Options
 

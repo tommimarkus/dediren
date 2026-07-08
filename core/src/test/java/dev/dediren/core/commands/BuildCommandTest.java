@@ -187,6 +187,48 @@ class BuildCommandTest {
   }
 
   @Test
+  void unresolvableExplicitViewIsAPerViewErrorAndDoesNotAbortOthers() throws Exception {
+    // A real semantics engine (GenericGraphEngine) surfaces an unknown --views entry as an
+    // UncheckedIOException structural failure, not an EngineException; the fake reproduces that
+    // exact observable so the driver's catch (not a fake-only code path) is what's pinned here.
+    BuildRequest request =
+        new BuildRequest(
+            SOURCE,
+            null,
+            List.of("overview", "no-such-view"),
+            "{}",
+            null,
+            null,
+            Set.of(),
+            out,
+            Map.of());
+
+    PluginRunOutcome outcome = BuildCommand.run(request, engines());
+
+    assertThat(outcome.exitCode()).isEqualTo(2);
+    BuildResult result = buildResult(outcome);
+    assertSchemaValid(outcome);
+    assertThat(result.status()).isEqualTo(EnvelopeStatus.ERROR);
+
+    BuildViewOutcome overview = result.views().getFirst();
+    assertThat(overview.status()).isEqualTo(EnvelopeStatus.OK);
+    assertThat(overview.artifacts()).hasSize(1);
+    assertThat(Files.exists(out.resolve("overview/diagram.svg"))).isTrue();
+
+    BuildViewOutcome missing = result.views().getLast();
+    assertThat(missing.viewId()).isEqualTo("no-such-view");
+    assertThat(missing.status()).isEqualTo(EnvelopeStatus.ERROR);
+    assertThat(missing.artifacts()).isEmpty();
+    assertThat(missing.diagnostics())
+        .anySatisfy(
+            diagnostic -> {
+              assertThat(diagnostic.code()).isEqualTo("DEDIREN_COMMAND_INPUT_INVALID");
+              assertThat(diagnostic.severity()).isEqualTo(DiagnosticSeverity.ERROR);
+              assertThat(diagnostic.message()).contains("no-such-view");
+            });
+  }
+
+  @Test
   void emitWritesStageEnvelopesUnderView() throws Exception {
     BuildRequest request =
         new BuildRequest(
@@ -290,6 +332,7 @@ class BuildCommandTest {
 
     @Override
     public EngineResult<LayoutRequest> projectLayoutRequest(SourceDocument source, String view) {
+      requireKnownView(view);
       return new EngineResult<>(
           new LayoutRequest(
               ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION,
@@ -304,6 +347,7 @@ class BuildCommandTest {
 
     @Override
     public EngineResult<RenderMetadata> projectRenderMetadata(SourceDocument source, String view) {
+      requireKnownView(view);
       return new EngineResult<>(
           new RenderMetadata(
               ContractVersions.RENDER_METADATA_SCHEMA_VERSION,
@@ -312,6 +356,15 @@ class BuildCommandTest {
               Map.of(),
               Map.of()),
           List.of());
+    }
+
+    // Reproduces GenericGraphEngine's real observable for an unresolvable view: a raw
+    // UncheckedIOException structural failure, not an EngineException.
+    private static void requireKnownView(String view) {
+      if (!Set.of("overview", "detail").contains(view)) {
+        throw new java.io.UncheckedIOException(
+            new java.io.IOException("missing generic-graph view " + view));
+      }
     }
   }
 

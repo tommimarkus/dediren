@@ -33,8 +33,8 @@
       "source_id": "m1",
       "projection_id": "m1",
       "points": [
-        { "x": 240, "y": 180 },
-        { "x": 520, "y": 180 }
+        { "x": 170, "y": 180 },
+        { "x": 590, "y": 180 }
       ],
       "label": "placeOrder"
     },
@@ -45,8 +45,8 @@
       "source_id": "m2",
       "projection_id": "m2",
       "points": [
-        { "x": 520, "y": 220 },
-        { "x": 240, "y": 220 }
+        { "x": 590, "y": 220 },
+        { "x": 170, "y": 220 }
       ],
       "label": "accepted"
     },
@@ -57,8 +57,8 @@
       "source_id": "m3",
       "projection_id": "m3",
       "points": [
-        { "x": 520, "y": 260 },
-        { "x": 240, "y": 260 }
+        { "x": 590, "y": 260 },
+        { "x": 170, "y": 260 }
       ],
       "label": "receiptReady"
     }

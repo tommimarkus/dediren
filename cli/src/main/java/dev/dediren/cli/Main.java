@@ -6,6 +6,7 @@ import dev.dediren.contracts.Diagnostic;
 import dev.dediren.contracts.DiagnosticCode;
 import dev.dediren.contracts.DiagnosticSeverity;
 import dev.dediren.contracts.json.JsonSupport;
+import dev.dediren.core.commands.BuildRequest;
 import dev.dediren.core.commands.CoreCommands;
 import dev.dediren.core.plugins.PluginExecutionException;
 import dev.dediren.core.plugins.PluginRunOutcome;
@@ -23,6 +24,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
@@ -95,6 +97,7 @@ public final class Main {
     commandLine.addSubcommand("validate-layout", new ValidateLayoutCommand(stdin));
     commandLine.addSubcommand("render", new RenderCommand(stdin, env, engines));
     commandLine.addSubcommand("export", new ExportCommand(env, engines));
+    commandLine.addSubcommand("build", new BuildCommand(stdin, env, engines));
     commandLine.setOut(stdout);
     commandLine.setErr(stderr);
     return commandLine;
@@ -382,6 +385,103 @@ public final class Main {
                 layoutText.text(),
                 env,
                 engines));
+      } catch (PluginExecutionException error) {
+        return writePluginError(spec, error);
+      }
+    }
+  }
+
+  @Command(
+      name = "build",
+      description =
+          "Build one or more views end to end (project, layout, and one or more of render/OEF/XMI)"
+              + " into an output directory")
+  static final class BuildCommand implements Callable<Integer> {
+    // The subset of stage envelopes --emit can persist; kept in lockstep with the build driver's
+    // own emit vocabulary (dev.dediren.core.commands.BuildCommand), which is otherwise private to
+    // that class.
+    private static final Set<String> KNOWN_EMIT_KINDS =
+        Set.of("layout-request", "layout-result", "render-metadata");
+
+    private final InputStream stdin;
+    private final Map<String, String> env;
+    private final Engines engines;
+
+    @Option(names = "--input")
+    private Path input;
+
+    @Option(names = "--out", required = true)
+    private Path out;
+
+    @Option(names = "--views", split = ",")
+    private List<String> views = List.of();
+
+    @Option(names = "--render-policy")
+    private Path renderPolicy;
+
+    @Option(names = "--oef-policy")
+    private Path oefPolicy;
+
+    @Option(names = "--xmi-policy")
+    private Path xmiPolicy;
+
+    @Option(names = "--emit", split = ",")
+    private List<String> emit = List.of();
+
+    @Spec private CommandSpec spec;
+
+    BuildCommand(InputStream stdin, Map<String, String> env, Engines engines) {
+      this.stdin = stdin;
+      this.env = env;
+      this.engines = engines;
+    }
+
+    @Override
+    public Integer call() throws Exception {
+      for (String kind : emit) {
+        if (!KNOWN_EMIT_KINDS.contains(kind)) {
+          return writeEnvelope(
+              spec,
+              usageError(
+                  DiagnosticCode.COMMAND_INPUT_INVALID.code(),
+                  "build --emit has unknown kind '"
+                      + kind
+                      + "'; expected one of layout-request, layout-result, render-metadata"),
+              CommandExitCode.INPUT_ERROR);
+        }
+      }
+      JsonInputText inputText = readInput("input", input, stdin);
+      if (inputText.error() != null) {
+        return writeEnvelope(spec, inputText.error(), CommandExitCode.INPUT_ERROR);
+      }
+      JsonInputText renderPolicyText =
+          renderPolicy == null ? null : readFile("render-policy", renderPolicy);
+      if (renderPolicyText != null && renderPolicyText.error() != null) {
+        return writeEnvelope(spec, renderPolicyText.error(), CommandExitCode.INPUT_ERROR);
+      }
+      JsonInputText oefPolicyText = oefPolicy == null ? null : readFile("oef-policy", oefPolicy);
+      if (oefPolicyText != null && oefPolicyText.error() != null) {
+        return writeEnvelope(spec, oefPolicyText.error(), CommandExitCode.INPUT_ERROR);
+      }
+      JsonInputText xmiPolicyText = xmiPolicy == null ? null : readFile("xmi-policy", xmiPolicy);
+      if (xmiPolicyText != null && xmiPolicyText.error() != null) {
+        return writeEnvelope(spec, xmiPolicyText.error(), CommandExitCode.INPUT_ERROR);
+      }
+
+      BuildRequest request =
+          new BuildRequest(
+              inputText.text(),
+              inputText.baseDir(),
+              views,
+              renderPolicyText == null ? null : renderPolicyText.text(),
+              oefPolicyText == null ? null : oefPolicyText.text(),
+              xmiPolicyText == null ? null : xmiPolicyText.text(),
+              Set.copyOf(emit),
+              out,
+              env);
+      try {
+        return writePluginOutcome(
+            spec, dev.dediren.core.commands.BuildCommand.run(request, engines));
       } catch (PluginExecutionException error) {
         return writePluginError(spec, error);
       }

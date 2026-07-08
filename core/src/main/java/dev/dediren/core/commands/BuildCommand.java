@@ -266,6 +266,20 @@ public final class BuildCommand {
       // the others.
       diagnostics.add(error.diagnostic());
       return StageOutcome.crashed(CommandExitCode.PLUGIN_ERROR.code());
+    } catch (UncheckedIOException error) {
+      // A semantics-engine structural failure (missing plugins.generic-graph, an unknown view, or a
+      // projection reference outside the view) is, at the per-stage CLI boundary, a raw
+      // non-enveloped observable by design (EngineDispatch re-throws it unchanged). The build
+      // driver
+      // has no stderr/raw-exit channel per view, so it folds the same failure into a per-view
+      // diagnostic instead — an unresolvable --views entry must not abort the rest of the build.
+      diagnostics.add(
+          new Diagnostic(
+              DiagnosticCode.COMMAND_INPUT_INVALID.code(),
+              DiagnosticSeverity.ERROR,
+              error.getCause() != null ? error.getCause().getMessage() : error.getMessage(),
+              "command:build"));
+      return StageOutcome.crashed(CommandExitCode.INPUT_ERROR.code());
     }
     CommandEnvelope<JsonNode> envelope =
         JsonSupport.readValue(outcome.stdout(), CommandEnvelope.jsonNodeEnvelopeType());

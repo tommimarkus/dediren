@@ -25,6 +25,9 @@ validate → project → layout → validate-layout → render   (SVG)
 validate → project → layout → validate-layout → export   (ArchiMate OEF / UML XMI)
 ```
 
+`dediren build` runs the decomposed flow above as one command per view,
+writing each view's artifacts under `--out`; use the stage-by-stage form when
+you need to inspect, cache, or persist an intermediate stage envelope.
 `validate` guards the source model and `validate-layout` checks the generated
 geometry — both are quality gates that emit structured diagnostics. See
 [`docs/agent-usage.md`](docs/agent-usage.md) for every command, flag, and
@@ -77,7 +80,7 @@ dist/dediren-agent-bundle-2026.07.13.tar.gz
 ## First Run
 
 Point `BUNDLE` at an unpacked bundle (the newest local `dist/` build shown), then
-validate → layout → render the smallest fixture:
+validate and build the smallest fixture into SVG in one command:
 
 ```bash
 BUNDLE=$(ls -d dist/dediren-agent-bundle-* | grep -v '\.tar\.gz$' | sort | tail -1)
@@ -85,6 +88,22 @@ BUNDLE=$(ls -d dist/dediren-agent-bundle-* | grep -v '\.tar\.gz$' | sort | tail 
 "$BUNDLE/bin/dediren" validate \
   --input "$BUNDLE/fixtures/source/valid-basic.json"
 
+"$BUNDLE/bin/dediren" build \
+  --input "$BUNDLE/fixtures/source/valid-basic.json" \
+  --out out \
+  --render-policy "$BUNDLE/fixtures/render-policy/default-svg.json"
+
+cp out/main/diagram.svg diagram.svg
+```
+
+`build` chains `project` → `layout` → `validate-layout` → `render`/`export`
+for every requested view in one process call and writes each view's artifacts
+under `--out/<view-id>/`; read its stdout `.status` and `.views[]` (see
+[`docs/agent-usage.md`](docs/agent-usage.md) `## Build`). Run each stage
+individually — as below — to inspect, cache, or persist an intermediate stage
+envelope with `--emit`:
+
+```bash
 "$BUNDLE/bin/dediren" project --target layout-request --plugin generic-graph \
   --view main --input "$BUNDLE/fixtures/source/valid-basic.json" > layout-request.json
 

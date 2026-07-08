@@ -126,12 +126,15 @@ class LayoutQualityTest {
     nodes.add(lifelineNode("customer", 100.0, 100.0, 140.0, 48.0));
     nodes.add(lifelineNode("service", 520.0, 104.0, 140.0, 48.0));
     var edges = new ArrayList<LaidOutEdge>();
+    // Endpoints sit on the lifeline axis (each head box's horizontal center: customer
+    // 100 + 140/2 = 170, service 520 + 140/2 = 590), matching the render engine's own
+    // head-box-center stem convention.
     edges.add(
         edge(
             "m1",
             "customer",
             "service",
-            List.of(new Point(240.0, 180.0), new Point(520.0, 180.0))));
+            List.of(new Point(170.0, 180.0), new Point(590.0, 180.0))));
 
     LayoutResult result = layoutResult(nodes, edges, List.of());
 
@@ -145,12 +148,13 @@ class LayoutQualityTest {
     nodes.add(lifelineNode("customer", 100.0, 100.0, 140.0, 48.0));
     nodes.add(lifelineNode("service", 520.0, 104.0, 140.0, 48.0));
     var edges = new ArrayList<LaidOutEdge>();
+    // First point on customer's axis (170); last point misses service's axis (590).
     edges.add(
         edge(
             "m1",
             "customer",
             "service",
-            List.of(new Point(240.0, 180.0), new Point(400.0, 180.0))));
+            List.of(new Point(170.0, 180.0), new Point(400.0, 180.0))));
 
     var diagnostics =
         LayoutQuality.validateLayoutDiagnostics(layoutResult(nodes, edges, List.of()));
@@ -340,11 +344,11 @@ class LayoutQualityTest {
     var a = new LaidOutNode("a", "a", "a", 40.0, 20.0, 100.0, 48.0, "A", "lifeline");
     var b = new LaidOutNode("b", "b", "b", 260.0, 20.0, 100.0, 48.0, "B", "lifeline");
     var nodes = List.of(interaction, a, b);
-    // Endpoints sit on the lifeline axis (a's right edge x=140, b's left edge x=260), matching
-    // the onLifelineAxis convention already exercised by
+    // Endpoints sit on the lifeline axis (a's center x=40+100/2=90, b's center x=260+100/2=310),
+    // matching the onLifelineAxis convention already exercised by
     // lifelineMessageEndpointsOnLifelineAxisAreAccepted.
     var edges =
-        List.of(edge("m", "a", "b", List.of(new Point(140.0, 120.0), new Point(260.0, 120.0))));
+        List.of(edge("m", "a", "b", List.of(new Point(90.0, 120.0), new Point(310.0, 120.0))));
 
     LayoutQualityReport report =
         LayoutQuality.validateLayout(layoutResult(nodes, edges, List.of()));
