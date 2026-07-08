@@ -65,7 +65,8 @@ class MainTest {
     // Issue #35: the OEF schema download runs curl as a subprocess of this JVM. When it cannot
     // fetch the schema (proxied/sandboxed environment), DEDIREN_OEF_SCHEMA_UNAVAILABLE must name
     // both remediations agents can self-serve from stdout JSON alone: expose proxy env to this
-    // process, or pre-fetch the XSDs and point DEDIREN_OEF_SCHEMA_DIR at them. Force the download path
+    // process, or pre-fetch the XSDs and point DEDIREN_OEF_SCHEMA_DIR at them. Force the download
+    // path
     // (DEDIREN_OEF_SCHEMA_DIR unset) to fail deterministically without a network by pointing the
     // cache dir under a regular file so the cache directory cannot be created.
     Path blocker = tempDir.resolve("not-a-directory");
