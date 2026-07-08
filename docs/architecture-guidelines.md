@@ -477,8 +477,22 @@ Guidelines that are not checked become folklore. The enforceable core:
   3.6.x.)
 - **Contract stability:** schema id discipline and the schema/round-trip and
   version-assertion tests already in the suite back §4.
-- **Engine boundary + diagnostics:** `EngineDispatchTest` (core) and the cli
-  engine-envelope regression tests back §5.
+- **Engine boundary — ArchUnit replaces the OS wall:** the retired process
+  boundary (§5 "Historical note") was a runtime, subprocess-enforced wall; the
+  monolith cutover moved that enforcement to compile time.
+  `ArchitectureRulesTest` (`dist-tool`) is the enforcement: `enginesDoNotDependOnCore`
+  and `coreDoesNotDependOnEngineImplementations` pin the core↔engine edge,
+  `enginesDoNotDependOnEachOther` asserts the five engines are pairwise
+  independent, `svgEmitterDoesNotImportElk` and `exportersDoNotImportSvgEmitter`
+  pin the two named examples from §2 ("the SVG emitter must not import ELK;
+  exporters must not import the SVG emitter"), and
+  `onlyEngineWiringTouchesEngineImplementations` confines the
+  cli-to-engine-implementation edge to the single `EngineWiring` class. A
+  `reactorProductionClassesWereImported` guard keeps every rule non-vacuous by
+  asserting each constrained package (core, engine-api, and each of the five
+  engine packages individually) actually has classes on the test classpath.
+  `EngineDispatchTest` (core) and the cli engine-envelope regression tests back
+  the runtime dispatch and diagnostics side of §5.
 - **Audit gates:** the `CLAUDE.md` `## Audit Gates` table assigns
   `test-quality-audit` and `devsecops-audit` passes per work area; run the one
   the touched area names before calling work complete.
