@@ -1,46 +1,38 @@
 package dev.dediren.plugins.umlxmi;
 
-import static dev.dediren.plugins.umlxmi.build.XmiBuilder.buildXmi;
 import static dev.dediren.plugins.umlxmi.build.XmiHelpers.UML_VERSION;
 import static dev.dediren.plugins.umlxmi.build.XmiHelpers.XMI_VERSION;
-import static dev.dediren.plugins.umlxmi.build.XmiHelpers.genericGraphPluginData;
-import static dev.dediren.plugins.umlxmi.policy.PolicyValidation.validatePolicy;
 import static dev.dediren.plugins.umlxmi.schema.SchemaValidation.SCHEMA_CACHE_DIR_ENV;
 import static dev.dediren.plugins.umlxmi.schema.SchemaValidation.SCHEMA_FETCHER;
 import static dev.dediren.plugins.umlxmi.schema.SchemaValidation.XMI_SCHEMA_PATH_ENV;
 import static dev.dediren.plugins.umlxmi.schema.SchemaValidation.XMI_SCHEMA_VALIDATOR;
 import static dev.dediren.plugins.umlxmi.schema.SchemaValidation.commandAvailable;
-import static dev.dediren.plugins.umlxmi.schema.SchemaValidation.validateXmiToAvailableStandards;
-import static dev.dediren.plugins.umlxmi.write.interaction.InteractionWriter.validateExportableSequenceScope;
-import static dev.dediren.plugins.umlxmi.write.interaction.InteractionWriter.validateSelectedCombinedFragmentOperators;
 
 import dev.dediren.contracts.CommandEnvelope;
 import dev.dediren.contracts.ContractVersions;
 import dev.dediren.contracts.Diagnostic;
-import dev.dediren.contracts.DiagnosticSeverity;
 import dev.dediren.contracts.EnvelopeStatus;
 import dev.dediren.contracts.export.ExportRequest;
 import dev.dediren.contracts.export.ExportResult;
-import dev.dediren.contracts.export.UmlXmiExportPolicy;
 import dev.dediren.contracts.json.JsonSupport;
-import dev.dediren.contracts.source.GenericGraphPluginData;
-import dev.dediren.plugins.umlxmi.build.Coverage;
-import dev.dediren.plugins.umlxmi.build.ExportScope;
-import dev.dediren.plugins.umlxmi.build.XmiExportException;
-import dev.dediren.plugins.umlxmi.build.XmiValidationException;
-import dev.dediren.uml.Uml;
-import dev.dediren.uml.UmlValidationException;
+import dev.dediren.engine.EngineException;
+import dev.dediren.engine.EngineResult;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import tools.jackson.databind.node.ObjectNode;
 
+/**
+ * Thin process-boundary adapter for the UML/XMI export: it parses stdin, delegates to {@link
+ * XmiExportEngine}, and shapes the command envelope. All export orchestration and schema handling
+ * live in the engine.
+ */
 // lean-audit:dup-intentional: cross-plugin envelope boilerplate; see arch-guidelines.md §12
 public final class Main {
 
@@ -122,110 +114,34 @@ public final class Main {
 
   private static int exportFromStdin(InputStream stdin, PrintStream stdout, Map<String, String> env)
       throws Exception {
-    ExportRequest request =
-        JsonSupport.objectMapper().readValue(stdin.readAllBytes(), ExportRequest.class);
-    UmlXmiExportPolicy policy;
+    XmiExportEngine engine = new XmiExportEngine();
+    ExportRequest request = engine.parseRequest(stdin.readAllBytes());
     try {
-      validatePolicy(request.policy());
-      policy = JsonSupport.objectMapper().treeToValue(request.policy(), UmlXmiExportPolicy.class);
-    } catch (IllegalArgumentException error) {
-      return exitWithDiagnostic(
-          stdout, "DEDIREN_UML_XMI_POLICY_INVALID", error.getMessage(), "policy");
+      EngineResult<ExportResult> result = engine.export(request, env, Path.of("").toAbsolutePath());
+      stdout.println(
+          JsonSupport.objectMapper()
+              .writeValueAsString(exportEnvelope(result.value(), result.diagnostics())));
+      return 0;
+    } catch (EngineException error) {
+      stdout.println(
+          JsonSupport.objectMapper()
+              .writeValueAsString(CommandEnvelope.error(error.diagnostics())));
+      return error.exitCode();
     }
-
-    GenericGraphPluginData pluginData;
-    try {
-      pluginData = genericGraphPluginData(request);
-      validateSelectedCombinedFragmentOperators(request, pluginData);
-      Uml.validateSource(request.source(), pluginData);
-    } catch (UmlValidationException error) {
-      return exitWithDiagnostic(stdout, error.code(), error.message(), error.path());
-    } catch (XmiExportException error) {
-      return exitWithDiagnostic(stdout, error.code(), error.getMessage(), error.path());
-    }
-    try {
-      validateExportableSequenceScope(request);
-    } catch (XmiExportException error) {
-      return exitWithDiagnostic(stdout, error.code(), error.getMessage(), error.path());
-    }
-
-    String content = buildXmi(request, policy);
-    try {
-      validateXmiToAvailableStandards(content, env);
-    } catch (XmiValidationException error) {
-      return exitWithDiagnostic(stdout, error.code(), error.getMessage(), "content");
-    }
-
-    var result =
-        new ExportResult(ContractVersions.EXPORT_RESULT_SCHEMA_VERSION, "uml-xmi+xml", content);
-    Coverage coverage =
-        Coverage.compute(
-            request.source().nodes(),
-            request.source().relationships(),
-            ExportScope.fromRequest(request));
-    stdout.println(JsonSupport.objectMapper().writeValueAsString(exportEnvelope(result, coverage)));
-    return 0;
   }
 
+  /**
+   * Shapes the success envelope, preserving the process form: a fully-covered export emits {@link
+   * CommandEnvelope#ok} (no {@code diagnostics}), while info-level view-coverage diagnostics ride
+   * an {@code ok}-status envelope so a consumer sees which source content this artifact does not
+   * represent without descending into {@code data} (issue #32).
+   */
   private static CommandEnvelope<ExportResult> exportEnvelope(
-      ExportResult result, Coverage coverage) {
-    List<Diagnostic> diagnostics = coverageDiagnostics(coverage);
+      ExportResult result, List<Diagnostic> diagnostics) {
     if (diagnostics.isEmpty()) {
       return CommandEnvelope.ok(result);
     }
-    // A view-scoped XMI is intentionally partial model interchange, so an omission is
-    // informational,
-    // not a failure: status stays "ok" while the diagnostics let a consumer see, from stdout JSON
-    // alone, exactly which source content this artifact does not represent (issue #32).
     return new CommandEnvelope<>(
         ContractVersions.ENVELOPE_SCHEMA_VERSION, EnvelopeStatus.OK, result, diagnostics);
-  }
-
-  private static List<Diagnostic> coverageDiagnostics(Coverage coverage) {
-    var diagnostics = new ArrayList<Diagnostic>();
-    if (coverage.omittedNodes() > 0) {
-      diagnostics.add(
-          new Diagnostic(
-              "DEDIREN_XMI_ELEMENTS_OMITTED",
-              DiagnosticSeverity.INFO,
-              coverage.omittedNodes()
-                  + " of "
-                  + (coverage.representedNodes() + coverage.omittedNodes())
-                  + " source elements are outside the exported view and are not represented in this"
-                  + " XMI (omitted by type: "
-                  + Coverage.describe(coverage.omittedNodeTypes())
-                  + "). This export covers a single laid-out view; export the other views to"
-                  + " represent them.",
-              "source.nodes"));
-    }
-    if (coverage.omittedRelationships() > 0) {
-      diagnostics.add(
-          new Diagnostic(
-              "DEDIREN_XMI_RELATIONSHIPS_OMITTED",
-              DiagnosticSeverity.INFO,
-              coverage.omittedRelationships()
-                  + " of "
-                  + (coverage.representedRelationships() + coverage.omittedRelationships())
-                  + " source relationships are outside the exported view and are not represented in"
-                  + " this XMI (omitted by type: "
-                  + Coverage.describe(coverage.omittedRelationshipTypes())
-                  + "). This export covers a single laid-out view; export the other views to"
-                  + " represent them.",
-              "source.relationships"));
-    }
-    return diagnostics;
-  }
-
-  // Defense in depth: this validator only ever parses Dediren's own generated
-  // XMI, which never contains a DOCTYPE. Hardening the factory keeps XXE and
-  // entity-expansion classes off the table regardless of what the parser is
-  // ever pointed at. Package-private so the same-package test can exercise it.
-
-  private static int exitWithDiagnostic(
-      PrintStream stdout, String code, String message, String path) throws IOException {
-    var diagnostic = new Diagnostic(code, DiagnosticSeverity.ERROR, message, path);
-    stdout.println(
-        JsonSupport.objectMapper().writeValueAsString(CommandEnvelope.error(List.of(diagnostic))));
-    return 3;
   }
 }

@@ -15,6 +15,7 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -55,10 +56,20 @@ public final class SchemaValidation {
     }
   }
 
+  /**
+   * Legacy two-argument seam retained for the same-package validation tests; resolves schema/cache
+   * env paths against the JVM cwd. The engine path threads an explicit {@code productRoot} through
+   * the three-argument form instead.
+   */
   public static void validateXmiToAvailableStandards(String content, Map<String, String> env)
       throws XmiValidationException {
+    validateXmiToAvailableStandards(content, env, Path.of("").toAbsolutePath());
+  }
+
+  public static void validateXmiToAvailableStandards(
+      String content, Map<String, String> env, Path productRoot) throws XmiValidationException {
     validateXmiDocumentAndIds(content);
-    validateOmgXmiSchema(content, env);
+    validateOmgXmiSchema(content, env, productRoot);
   }
 
   /**
@@ -112,9 +123,9 @@ public final class SchemaValidation {
     }
   }
 
-  private static void validateOmgXmiSchema(String content, Map<String, String> env)
-      throws XmiValidationException {
-    Path schemaPath = resolveOmgXmiSchemaPath(env);
+  private static void validateOmgXmiSchema(
+      String content, Map<String, String> env, Path productRoot) throws XmiValidationException {
+    Path schemaPath = resolveOmgXmiSchemaPath(env, productRoot);
     String validator = xmiSchemaValidator(env);
     Process process;
     try {
@@ -168,9 +179,14 @@ public final class SchemaValidation {
     return configured == null || configured.isBlank() ? XMI_SCHEMA_VALIDATOR : configured;
   }
 
-  private static Path resolveOmgXmiSchemaPath(Map<String, String> env)
+  private static Path resolveOmgXmiSchemaPath(Map<String, String> env, Path productRoot)
       throws XmiValidationException {
-    Optional<Path> configured = SchemaCacheModule.nonEmptyEnvPath(env, XMI_SCHEMA_PATH_ENV);
+    // Decision 9: a relative schema/cache env path resolves against the product root, not the JVM
+    // cwd, so an in-memory build path can supply the product root explicitly. An absolute value is
+    // returned unchanged by Path.resolve, so the process path (product root == child cwd) is
+    // byte-identical.
+    Map<String, String> schemaEnv = productRootRelativeEnv(env, productRoot);
+    Optional<Path> configured = SchemaCacheModule.nonEmptyEnvPath(schemaEnv, XMI_SCHEMA_PATH_ENV);
     if (configured.isPresent()) {
       if (SchemaCacheModule.isNonEmptyFile(configured.get())) {
         return configured.get();
@@ -186,7 +202,7 @@ public final class SchemaValidation {
     Path schemaPath;
     try {
       schemaPath =
-          SchemaCacheModule.schemaCacheBaseDir(env, SCHEMA_CACHE_DIR_ENV, XMI_SCHEMA_PATH_ENV)
+          SchemaCacheModule.schemaCacheBaseDir(schemaEnv, SCHEMA_CACHE_DIR_ENV, XMI_SCHEMA_PATH_ENV)
               .resolve("omg")
               .resolve("xmi")
               .resolve("2.5.1")
@@ -203,6 +219,25 @@ public final class SchemaValidation {
           error.getMessage() + " " + XMI_SCHEMA_DOWNLOAD_REMEDIATION);
     }
     return schemaPath;
+  }
+
+  /**
+   * Decision 9 resolution site: rewrites the relative {@code DEDIREN_XMI_SCHEMA_PATH} / {@code
+   * DEDIREN_SCHEMA_CACHE_DIR} env values so they resolve against {@code productRoot} rather than
+   * the JVM cwd. {@link Path#resolve(Path)} returns an absolute value unchanged, so a caller that
+   * supplies the child cwd as the product root gets byte-identical behavior to the historical bare
+   * {@code Path.of(value)}.
+   */
+  public static Map<String, String> productRootRelativeEnv(
+      Map<String, String> env, Path productRoot) {
+    Map<String, String> resolved = new LinkedHashMap<>(env);
+    for (String name : new String[] {XMI_SCHEMA_PATH_ENV, SCHEMA_CACHE_DIR_ENV}) {
+      String value = env.get(name);
+      if (value != null && !value.isEmpty()) {
+        resolved.put(name, productRoot.resolve(value).toString());
+      }
+    }
+    return resolved;
   }
 
   private static boolean xmiSchemaErrorsAreOnlyUnavailableUmlSchema(String details) {

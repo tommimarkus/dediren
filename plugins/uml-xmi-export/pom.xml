@@ -21,6 +21,11 @@
     </dependency>
     <dependency>
       <groupId>dev.dediren</groupId>
+      <artifactId>engine-api</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>dev.dediren</groupId>
       <artifactId>schema-cache</artifactId>
       <version>${project.version}</version>
     </dependency>
