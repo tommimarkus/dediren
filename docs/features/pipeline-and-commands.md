@@ -20,6 +20,10 @@ receives the notation semantics:
 project --target render-metadata --> (passed to render with --metadata)
 ```
 
+`build` runs this whole flow as one command per view, writing each view's
+artifacts under `--out`; use the per-stage commands below when you need to
+inspect, cache, or persist an intermediate stage envelope.
+
 Which views, the commands, and the schema: [SVG Rendering → Notation Rendering
 & Render Metadata](svg-render.md).
 
@@ -30,6 +34,28 @@ command envelope **or** the raw `.data` artifact JSON from the previous step. So
 you can pipe envelopes straight through without unwrapping them.
 
 ## Commands
+
+### `build`
+
+Runs `project` (layout-request, then render-metadata when `--render-policy` is
+set) → `layout` → `validate-layout` → one or more of
+`render`/`archimate-oef`/`uml-xmi` for one or more views, in a single process
+call, writing each view's artifacts under `--out/<view-id>/`. At least one of
+`--render-policy`/`--oef-policy`/`--xmi-policy` is required.
+
+```bash
+dediren build --input fixtures/source/valid-basic.json --out out \
+  --render-policy fixtures/render-policy/default-svg.json
+```
+
+Unlike every other command, `build`'s stdout **is** the build result document
+directly (`schemas/build-result.schema.json`) — it is not wrapped in the
+generic envelope's `.data`. Full flag table, `--emit` (persisting intermediate
+stage envelopes), and status-rollup rules: [Agent Usage →
+`## Build`](../agent-usage.md#build).
+
+Fall back to the per-stage commands below to run a single stage, inspect an
+intermediate result, or reuse a cached stage output.
 
 ### `validate`
 
@@ -123,17 +149,6 @@ jq -r '.data.content' xmi-result.json > diagram.xmi
 
 See [Exports (OEF & XMI)](exports.md).
 
-### `capabilities` (per plugin)
-
-Each bundled engine launcher answers a `capabilities` probe with raw JSON
-conforming to `schemas/runtime-capability.schema.json`. It is a standalone
-probe of the launcher; the CLI itself dispatches engines in-process and never
-runs it.
-
-```bash
-dediren-plugin-elk-layout capabilities
-```
-
 ### `--version`
 
 ```bash
@@ -142,9 +157,11 @@ dediren --version
 
 ## Output & Exit Codes
 
-- Success and failure both produce a JSON command envelope on stdout
-  (`schemas/envelope.schema.json`), with `.status` and `.diagnostics[]`.
-- A valid plugin **error envelope** is preserved and the CLI exits non-zero.
+- Every command but `build` produces a JSON command envelope on stdout
+  (`schemas/envelope.schema.json`), with `.status` and `.diagnostics[]`;
+  `build`'s stdout is the build result document directly
+  (`schemas/build-result.schema.json`).
+- A valid engine **error envelope** is preserved and the CLI exits non-zero.
 - **stderr is for human debugging only.** Agents must decide success or failure
   from stdout JSON. See [Contracts & Schemas](contracts-and-schemas.md) for the
   envelope and diagnostic shape.
@@ -152,5 +169,5 @@ dediren --version
 ## Related Pages
 
 - [Source Model & Views](source-model.md) — what `validate`/`project` consume.
-- [Plugin Runtime](plugin-runtime.md) — how commands reach plugins.
+- [Engine Runtime](engine-runtime.md) — how commands reach engines.
 - [Contracts & Schemas](contracts-and-schemas.md) — envelope and diagnostic codes.

@@ -46,7 +46,8 @@ in-tree single-JVM library engines behind typed interfaces
 `2026-07-08-monolithic-runtime-radical.md`). The cutover has landed: core no
 longer discovers or executes plugin processes; §5 holds the engine-boundary
 rules and a historical note on the retired process boundary. The launcher and
-manifest packaging lane is retired by the follow-on packaging task.
+manifest packaging lane was retired by the follow-on packaging task (Cutover
+B, single-launcher distribution).
 
 The job of these guidelines is to keep the contract-first and modular-monolith
 properties true as the system grows.
@@ -77,7 +78,7 @@ Stable Dependencies Principle).
 | `archimate-oef-export` (engine) | `engine-api`, `contracts`, `archimate`, `schema-cache` | 2 — leaf engine |
 | `uml-xmi-export` (engine) | `engine-api`, `contracts`, `uml`, `schema-cache` | 2 — leaf engine |
 | `cli` | `contracts`, `core`, `engine-api`; engine implementations **only in `EngineWiring`** | 3 — entrypoint + wiring |
-| `dist-tool` | `contracts` (compile); `cli` + every engine launcher (runtime, for bundling — the launcher lane retires with the packaging task) | 3 — assembly |
+| `dist-tool` | `contracts` (compile); `cli` (runtime, for bundling — the five engines arrive transitively through `cli`'s compile deps, so the single-launcher distribution needs no separate engine-launcher dependency) | 3 — assembly |
 | `coverage-report` | *(nothing in the default build)*; every product module (runtime, **`coverage`-profile-scoped only**, for JaCoCo `report-aggregate`) | 3 — build tooling |
 
 Rules that fall out of this table and must be enforced, not just hoped for:
@@ -179,14 +180,16 @@ charter below is the contract for "what changes for this reason lives here."
   backend concern: SVG rendering, generic-graph source handling, ELK layout,
   ArchiMate OEF export, UML/XMI export. Each owns its backend-specific policy
   and *only* that. Styling lives in render; OEF semantics in the OEF engine;
-  XMI semantics in the XMI engine; layout geometry in ELK. (Their standalone
-  `Main` executables and launchers remain only until the packaging task
-  retires the launcher lane.)
+  XMI semantics in the XMI engine; layout geometry in ELK. (Their former
+  standalone `Main` executables and per-engine launchers were retired by the
+  single-launcher distribution cutover (Cutover B); each `Main` survives only
+  as an `src/test/java` envelope-shaped test harness — no `main()`, no
+  launcher script.)
 
-- **`dist-tool`** — assembly and distribution: bundles `cli` (and, until the
-  packaging task, the engine launchers) into a runnable distribution,
-  third-party-notice and SBOM generation, dist smoke. Top of the graph; nothing
-  depends on it.
+- **`dist-tool`** — assembly and distribution: bundles the single `cli`
+  launcher, which hosts the five engines in-process, into a runnable
+  distribution, third-party-notice and SBOM generation, dist smoke. Top of the
+  graph; nothing depends on it.
 
 - **`coverage-report`** — build-only JaCoCo aggregation: hosts `report-aggregate`
   over the product reactor under `-Pcoverage`. Ships nothing and nothing depends
@@ -207,9 +210,13 @@ protocol is the compatibility boundary). Treat these as the stable product:
 
 - public JSON schemas under `schemas/`;
 - command envelopes on stdout (success and error);
-- first-party plugin manifests and runtime capability probes;
 - structured diagnostics agents inspect without scraping stderr;
 - the documented fixtures under `fixtures/`.
+
+(`plugin-manifest.schema.json` and `runtime-capability.schema.json` are
+schemas from the retired process-plugin runtime that still ship but are
+orphaned — no live code path constructs a manifest or answers a capability
+probe; see §12.)
 
 Discipline:
 
@@ -527,9 +534,10 @@ speculatively):
 | SpotBugs `EI_EXPOSE_REP`/`EI_EXPOSE_REP2` suppressed on `render/node/NodeLabelLines` and `umlxmi/build/ExportScope` | `spotbugs-exclude.xml` | §8 thinness/cohesion | deferred: plugin-internal value records extracted from the former Main god-files; hold List/Set consumed read-only within the engine, not part of the public contract surface; suppressed rather than defensive-copied for consistency with the `contracts` records |
 | SpotBugs `MS_EXPOSE_REP` suppressed in `JsonSupport.objectMapper()` | `spotbugs-exclude.xml` | §4 contract surface | by design: returns the shared `ObjectMapper` singleton, mutable in place (`.configure()`/`.registerModule()`), exposed as one canonical mapper; the reconfiguration risk is first-party-only: every consumer of the singleton is first-party code in the product JVM, and the mapper is configured once at class initialization |
 | SpotBugs `NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE` suppressed in `DistTool` (5 sites) | `spotbugs-exclude.xml` | §3 module charter | deferred: `Path.getFileName()`/`getParent()` on `Files.list(dir)` entries and real bundle/output paths; null branch infeasible; build/dist tool, not shipped runtime |
-| Cross-plugin envelope/dispatch boilerplate duplicated across first-party plugin Mains | `archimate-oef-export/Main.java`, `uml-xmi-export/Main.java`, `generic-graph/Main.java` | §5 engine boundary | `LA-CODE-DUP-1` (lean-audit 2026-07-06), accepted while the standalone Mains survive the launcher lane; retires with the packaging task that deletes them |
+| Cross-plugin envelope/dispatch boilerplate duplicated across first-party plugin Mains | `engines/archimate-oef-export/src/test/.../Main.java`, `engines/uml-xmi-export/src/test/.../Main.java`, `engines/generic-graph/src/test/.../Main.java` (and the render/elk-layout equivalents) | §5 engine boundary | `LA-CODE-DUP-1` (lean-audit 2026-07-06); the packaging task (Cutover B) landed and retired the launcher lane, but demoted these `Main`s to `src/test/java` envelope-shaped test harnesses rather than deleting them (decision 13), so the duplication is retained debt with no scheduled retirement |
 | Layout-quality metric math re-implemented in the ELK plugin's e2e test | `engines/elk-layout/.../ElkLayoutEngineTest.java` (geometry-metric helpers) vs `core/quality/LayoutQuality.java` | §2 no plugin→`core` edge | `LA-CODE-DUP-2` (lean-audit 2026-07-06), accepted: plugins may depend only on `contracts` (the sole test-scope exception belongs to `cli`), and `test-support` cannot host `contracts`-typed helpers without a reactor cycle (`contracts` test-depends on `test-support`); the independent copy deliberately corroborates core's quality metrics against real ELK output; marked `lean-audit:dup-intentional`; revisit if a contracts-aware test-support home is ever chartered |
 | `dev.dediren.plugins.*` package names retained on the five engines after the `plugins/` → `engines/` directory move | `engines/{generic-graph,elk-layout,render,archimate-oef-export,uml-xmi-export}/src/**/dev/dediren/plugins/**` | §2 module naming | mechanical directory/reactor move only (owner-ratified); the matching package rename is out-of-scope follow-on debt, not yet scheduled |
+| `plugin-manifest.schema.json` / `runtime-capability.schema.json` still ship though no live code path constructs a manifest or answers a capability probe | `schemas/plugin-manifest.schema.json`, `schemas/runtime-capability.schema.json`, `contracts.PluginManifest`/`RuntimeCapabilities` | §4 contract surface | orphaned by the process-plugin runtime deletion (Cutover A/B); kept compile-checked and round-tripped from inline JSON (`ContractRoundTripTest`, `SchemaValidatorTest`) rather than deleted, since a future non-bundled engine could still want the same manifest/capability shape; retire or repurpose is out-of-scope follow-on debt, not yet scheduled |
 
 None of these block the architecture; they are propagation-cost and clarity
 debts with a clear, local fix when their files are next worked.
@@ -550,14 +558,13 @@ archaeology (promoted 2026-07-03 after the multi-viewpoint review, MT-5).
   Wrapper runs cleanly. Pre-Java contract rationale requires archaeology
   below `4933d79`; per `CLAUDE.md`, do not revive retired pre-Maven guidance.
 
-- **(b) Enforced launcher flags.** Every bundle launcher ships
-  `-XX:TieredStopAtLevel=1 -XX:+UseSerialGC`, asserted by `DistTool`
+- **(b) Enforced launcher flags.** The bundle's single `bin/dediren` launcher
+  ships `-XX:TieredStopAtLevel=1 -XX:+UseSerialGC`, asserted by `DistTool`
   (`EXPECTED_LAUNCHER_FLAGS`). Measured justification: elk-layout −102 ms
-  (−12.9%) wall per call (JVM tier-1 plan/results, 2026-06-10). Rollback
-  lever if C1-only ever regresses large ELK layouts: the separate
-  `dediren.layout.jvmArgs` property overrides flags for the layout launcher
-  alone. `-Xmx` is deliberately excluded — do not add heap caps to
-  launchers.
+  (−12.9%) wall per call (JVM tier-1 plan/results, 2026-06-10, measured when
+  layout still had its own per-plugin launcher pre-cutover — the flags carried
+  forward to the single launcher). `-Xmx` is deliberately excluded — do not
+  add heap caps to the launcher.
 
 - **(c) JVM startup tiers.** Startup cost is attacked in ordered tiers:
   Tier 1 launcher flags (shipped), Tier 2 AppCDS auto-created `.jsa`

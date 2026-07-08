@@ -4,9 +4,9 @@
 
 `dediren` is a contract-first diagram pipeline **for agentic tools**. It turns
 semantic JSON into generated layout, rendered SVG, ArchiMate® 3.2 OEF XML,
-or UML® 2.5.1 XMI XML through explicit CLI commands and process-boundary
-plugins. Every command prints a JSON envelope on stdout, so an agent decides
-success or failure without scraping stderr.
+or UML® 2.5.1 XMI XML through explicit CLI commands backed by in-process
+first-party engines. Every command prints a JSON envelope on stdout, so an
+agent decides success or failure without scraping stderr.
 
 > [!TIP]
 > The primary audience is agents. If you are authoring Dediren JSON or driving a

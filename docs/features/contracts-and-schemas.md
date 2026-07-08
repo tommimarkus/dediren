@@ -19,15 +19,15 @@ bundle. Shared protocol records and schema-version constants live in the
 | [`layout-result.schema.json`](../../schemas/layout-result.schema.json) | Generated geometry and routes (output of `layout`). |
 | [`render-metadata.schema.json`](../../schemas/render-metadata.schema.json) | Generated notation metadata (output of `project --target render-metadata`). |
 | [`render-result.schema.json`](../../schemas/render-result.schema.json) | `render` envelope with `artifacts[]`. |
-| [`export-request.schema.json`](../../schemas/export-request.schema.json) / [`export-result.schema.json`](../../schemas/export-result.schema.json) | `export` request/result. The result base is open to any plugin: `artifact_kind` is a pattern, not a closed list. |
-| [`export-result.first-party.schema.json`](../../schemas/export-result.first-party.schema.json) | Stricter `export` result contract enforced for bundled first-party export plugins (closed `artifact_kind` enum). |
+| [`export-request.schema.json`](../../schemas/export-request.schema.json) / [`export-result.schema.json`](../../schemas/export-result.schema.json) | `export` request/result. The result base keeps an open `artifact_kind` pattern (not a closed list) by design, for a future non-bundled export engine. |
+| [`export-result.first-party.schema.json`](../../schemas/export-result.first-party.schema.json) | Stricter `export` result contract enforced for the two bundled first-party export engines (closed `artifact_kind` enum). |
 | [`render-policy.schema.json`](../../schemas/render-policy.schema.json) | SVG presentation policy. |
 | [`oef-export-policy.schema.json`](../../schemas/oef-export-policy.schema.json) / [`uml-xmi-export-policy.schema.json`](../../schemas/uml-xmi-export-policy.schema.json) | Export policies. |
-| [`semantic-validation-result.schema.json`](../../schemas/semantic-validation-result.schema.json) | Plugin semantic-validation result. |
-| [`plugin-manifest.schema.json`](../../schemas/plugin-manifest.schema.json) | First-party plugin manifest shape. |
-| [`runtime-capability.schema.json`](../../schemas/runtime-capability.schema.json) | Plugin `capabilities` probe output. |
-| [`envelope.schema.json`](../../schemas/envelope.schema.json) | The command envelope wrapping every command's stdout. |
+| [`semantic-validation-result.schema.json`](../../schemas/semantic-validation-result.schema.json) | Engine semantic-validation result. |
+| [`build-result.schema.json`](../../schemas/build-result.schema.json) | `build` command result: `.status`, `.views[]` (each with `.artifacts[]`/`.diagnostics[]`). Unlike every other command, `build`'s stdout **is** this document directly — it is not wrapped in `envelope.schema.json`'s `.data`. |
+| [`envelope.schema.json`](../../schemas/envelope.schema.json) | The command envelope wrapping every other command's stdout. |
 | [`bundle.schema.json`](../../schemas/bundle.schema.json) | The bundle's `bundle.json` metadata. |
+| [`plugin-manifest.schema.json`](../../schemas/plugin-manifest.schema.json) / [`runtime-capability.schema.json`](../../schemas/runtime-capability.schema.json) | **Orphaned, pending contract cleanup.** Shipped from the retired process-plugin runtime (deleted; see [Engine Runtime](engine-runtime.md)); no live code path constructs, discovers, or reads a manifest or a capability probe today. Round-tripped from inline JSON, not a live fixture, to keep the deferred cleanup visible (`ContractRoundTripTest`). |
 
 ### Who authors what
 
@@ -36,7 +36,7 @@ bundle. Shared protocol records and schema-version constants live in the
 | Source model | Yes |
 | SVG / OEF / UML-XMI policies | Usually reuse a fixture |
 | Layout request, render metadata | Usually generated |
-| Layout result, render/export result | No (generated) |
+| Layout result, render/export result, build result | No (generated) |
 
 ## Command Envelope
 
@@ -60,7 +60,7 @@ codes (full repair guidance in
 | `DEDIREN_DUPLICATE_ID` | Non-unique node/relationship/view/group id. |
 | `DEDIREN_DANGLING_ENDPOINT` | Relationship `source`/`target` does not resolve. |
 | `DEDIREN_COMMAND_INPUT_INVALID` | CLI could not read/parse a command input file. |
-| `DEDIREN_PLUGIN_UNKNOWN` / `DEDIREN_PLUGIN_UNSUPPORTED_CAPABILITY` / `DEDIREN_ENGINE_FAILED` | Engine lookup/dispatch failures (see [Engine Runtime](plugin-runtime.md)). |
+| `DEDIREN_PLUGIN_UNKNOWN` / `DEDIREN_PLUGIN_UNSUPPORTED_CAPABILITY` / `DEDIREN_ENGINE_FAILED` | Engine lookup/dispatch failures (see [Engine Runtime](engine-runtime.md)). |
 | `DEDIREN_LAYOUT_JUNCTION_OFF_INCIDENT_ROUTE` | ArchiMate junction detached from its incident edge routes. |
 
 ## Compatibility Signals
@@ -85,5 +85,5 @@ codes (full repair guidance in
 ## Related Pages
 
 - [Source Model & Views](source-model.md) — the authored contract.
-- [Engine Runtime](plugin-runtime.md) — engine and capability contracts.
+- [Engine Runtime](engine-runtime.md) — engine and capability contracts.
 - [Pipeline & Commands](pipeline-and-commands.md) — which command emits which artifact.

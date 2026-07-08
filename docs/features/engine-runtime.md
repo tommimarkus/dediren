@@ -29,26 +29,23 @@ All five are compile-time library modules. They may depend on `engine-api`,
 `contracts`, and the notation cores they need, but must not depend on `core`;
 only the CLI's `EngineWiring` class constructs them. There is no engine
 discovery of any kind — no `PATH` lookup, no manifest directories, no
-executable overrides.
+executable overrides, and no per-engine launcher. The **engine id** is simply
+the value you pass to `--plugin`.
 
-The **engine id** is the value you pass to `--plugin`; it is not always the
-launcher name. For the export engines the two differ (id `archimate-oef` →
-launcher `dediren-plugin-archimate-oef-export`).
+| Engine id (`--plugin`) | Role |
+| --- | --- |
+| `generic-graph` | Semantic vocabulary, semantic validation, view projection (layout request + render metadata). Owns the `generic`, `archimate`, and `uml` profiles. |
+| `elk-layout` | Layout geometry and edge routing via official Eclipse ELK Java libraries. See [Layout (ELK)](layout.md). |
+| `render` | SVG (and optional interactive HTML) rendering. See [SVG Rendering](svg-render.md). |
+| `archimate-oef` | ArchiMate 3.2 Open Exchange Format XML. See [Exports](exports.md). |
+| `uml-xmi` | UML 2.5.1 XMI XML. See [Exports](exports.md). |
 
-| Engine id (`--plugin`) | Launcher | Role |
-| --- | --- | --- |
-| `generic-graph` | `dediren-plugin-generic-graph` | Semantic vocabulary, semantic validation, view projection (layout request + render metadata). Owns the `generic`, `archimate`, and `uml` profiles. |
-| `elk-layout` | `dediren-plugin-elk-layout` | Layout geometry and edge routing via official Eclipse ELK Java libraries. See [Layout (ELK)](layout.md). |
-| `render` | `dediren-plugin-render` | SVG (and optional interactive HTML) rendering. See [SVG Rendering](svg-render.md). |
-| `archimate-oef` | `dediren-plugin-archimate-oef-export` | ArchiMate 3.2 Open Exchange Format XML. See [Exports](exports.md). |
-| `uml-xmi` | `dediren-plugin-uml-xmi-export` | UML 2.5.1 XMI XML. See [Exports](exports.md). |
-
-The bundle still ships one standalone launcher per engine (each answers a
-`capabilities` probe with raw JSON conforming to
-[`schemas/runtime-capability.schema.json`](../../schemas/runtime-capability.schema.json)),
-alongside the manifests under `plugins/`
-([`schemas/plugin-manifest.schema.json`](../../schemas/plugin-manifest.schema.json)).
-The CLI itself never launches them.
+All five are hosted in-process by the single `bin/dediren` launcher; there is
+no per-engine launcher, standalone executable, or `capabilities` probe to run
+against. The `plugin-manifest.schema.json` and `runtime-capability.schema.json`
+schemas remain in `schemas/` from the retired process-plugin runtime; they are
+unused by any live code path and are pending contract cleanup — see
+[Contracts & Schemas](contracts-and-schemas.md#public-schemas).
 
 ## Runtime Diagnostics
 
@@ -65,5 +62,5 @@ Common engine diagnostics (full list and repair guidance in
 ## Related Pages
 
 - [Pipeline & Commands](pipeline-and-commands.md) — which command calls which engine.
-- [Distribution & Runtime](distribution-and-runtime.md) — launchers, env vars, CDS.
-- [Contracts & Schemas](contracts-and-schemas.md) — envelope and capability schemas.
+- [Distribution & Runtime](distribution-and-runtime.md) — the launcher, env vars, CDS.
+- [Contracts & Schemas](contracts-and-schemas.md) — envelope and diagnostic schemas.

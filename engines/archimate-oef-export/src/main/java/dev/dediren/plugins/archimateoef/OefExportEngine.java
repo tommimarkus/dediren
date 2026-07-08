@@ -81,7 +81,7 @@ public final class OefExportEngine implements ExportEngine {
           "archimate3_Diagram.xsd",
           "6419080f4c4bc43b4a7b8acf870146a7bae6c3487a3ce08d3c521c028ea6056e");
   // Names both self-serve remediations for a failed schema download (issue #35): expose proxy
-  // configuration to the plugin child, or skip the download by supplying the XSDs offline. Appended
+  // configuration to this process, or skip the download by supplying the XSDs offline. Appended
   // to DEDIREN_OEF_SCHEMA_UNAVAILABLE so an agent can recover from stdout JSON alone.
   private static final String OEF_SCHEMA_DOWNLOAD_REMEDIATION =
       "To download through an HTTP proxy, expose HTTP_PROXY, HTTPS_PROXY, and NO_PROXY (or their"

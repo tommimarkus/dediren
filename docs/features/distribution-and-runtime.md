@@ -1,8 +1,8 @@
 # Distribution & Runtime
 
-Dediren ships as a platform-neutral agent bundle of launch scripts, jars,
+Dediren ships as a platform-neutral agent bundle of one launch script, jars,
 schemas, fixtures, and docs — no embedded JRE. This page covers the bundle, its
-launchers, the runtime environment, startup optimization, release artifacts, and
+launcher, the runtime environment, startup optimization, release artifacts, and
 how versions signal compatibility.
 
 [← Back to feature index](README.md)
@@ -24,14 +24,8 @@ The `dist-build` profile produces an agent-ready archive under `dist/`:
 ```text
 dediren-agent-bundle-<version>/
   bin/
-    dediren
-    dediren-plugin-generic-graph
-    dediren-plugin-elk-layout
-    dediren-plugin-render
-    dediren-plugin-archimate-oef-export
-    dediren-plugin-uml-xmi-export
+    dediren       the single launcher (hosts all five engines in-process)
   lib/
-  plugins/        first-party plugin manifests
   schemas/
   fixtures/
   docs/agent-usage.md
@@ -44,13 +38,13 @@ dediren-agent-bundle-<version>/
 The Java archive is platform-neutral (not tied to CPU architecture) and contains
 launch scripts and jars, not a JRE.
 
-## Launchers
+## The Launcher
 
-Each `bin/dediren*` launcher sets `DEDIREN_BUNDLE_ROOT` from its installation
-root, so commands locate bundled `schemas/`, `plugins/`, and `bin/` regardless of
-the caller's working directory. The `dediren` CLI runs every engine in-process;
-the per-engine launchers remain as standalone entry points (for example the
-`capabilities` probe) and are never looked up from `PATH`.
+The single `bin/dediren` launcher sets `DEDIREN_BUNDLE_ROOT` from its
+installation root, so commands locate bundled `schemas/`, `fixtures/`, and
+`bin/` regardless of the caller's working directory. It runs every engine
+in-process; there is no per-engine launcher, standalone executable, or
+`capabilities` probe, and nothing is ever looked up from `PATH`.
 
 ## Environment Variables
 
@@ -60,7 +54,7 @@ else.
 
 | Variable | Purpose |
 | --- | --- |
-| `DEDIREN_BUNDLE_ROOT` | Bundle/repo root for schemas, manifests, launchers. Set automatically by packaged launchers; override only for custom launchers or tests. |
+| `DEDIREN_BUNDLE_ROOT` | Bundle/repo root for schemas and fixtures. Set automatically by the packaged launcher; override only for custom launch setups or tests. |
 | `DEDIREN_OEF_SCHEMA_DIR` | Local OEF schema directory (offline export validation). |
 | `DEDIREN_XMI_SCHEMA_PATH` | Local XMI schema file (offline export validation). |
 | `DEDIREN_SCHEMA_CACHE_DIR` | Cache directory for schema downloads. |
@@ -68,8 +62,8 @@ else.
 
 ## Startup Optimization (Class-Data-Sharing)
 
-Each `bin/dediren*` launcher auto-creates a Class-Data-Sharing archive
-(`-XX:+AutoCreateSharedArchive`, one `.jsa` per launcher) on first invocation to
+The `bin/dediren` launcher auto-creates a single Class-Data-Sharing archive
+(`-XX:+AutoCreateSharedArchive`, `cds/cli.jsa`) on first invocation to
 speed JVM startup on subsequent calls, and passes `-Xlog:cds=off`, which
 suppresses the JVM's archive-dump warnings (`[warning][cds] ... Old class has
 been linked`, `... Unsupported location`) so each invocation stays quiet on
@@ -107,6 +101,6 @@ stale-version search (see
 
 ## Related Pages
 
-- [Plugin Runtime](plugin-runtime.md) — discovery, manifests, capability probe.
+- [Engine Runtime](engine-runtime.md) — the engine contract and diagnostics.
 - [Contracts & Schemas](contracts-and-schemas.md) — `bundle.json` and schema ids.
 - [Exports (OEF & XMI)](exports.md) — schema cache/offline env vars.

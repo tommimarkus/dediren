@@ -755,7 +755,7 @@ you can recover from stdout JSON alone.
 
 ## Plugin Environment
 
-Bundle launchers use `DEDIREN_BUNDLE_ROOT` for product-root discovery. The
+The bundle launcher uses `DEDIREN_BUNDLE_ROOT` for product-root discovery. The
 bundled engines run inside the CLI process; the export engines receive the
 CLI's environment explicitly for the schema-path variables below and read
 nothing else. Important explicit variables:

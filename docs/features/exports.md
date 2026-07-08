@@ -31,9 +31,11 @@ Policy schemas:
 [`uml-xmi-export-policy.schema.json`](../../schemas/uml-xmi-export-policy.schema.json).
 Result schema:
 [`export-result.schema.json`](../../schemas/export-result.schema.json).
-Third-party export plugins declare their own `artifact_kind`
-(pattern `^[a-z0-9][a-z0-9.-]*\+(xml|json|text)$`); bundled first-party
-export output is additionally held to the closed first-party enum in
+The base schema keeps an open `artifact_kind` pattern
+(`^[a-z0-9][a-z0-9.-]*\+(xml|json|text)$`) rather than a closed list, by
+design, for a future non-bundled export engine; the two bundled first-party
+export engines (`archimate-oef`, `uml-xmi`) are additionally held to the
+closed first-party enum in
 [`export-result.first-party.schema.json`](../../schemas/export-result.first-party.schema.json).
 
 ## Standards Validation
@@ -43,9 +45,9 @@ using `xmllint` (required on `PATH`). Schema sources:
 
 - **Online:** `curl` fetches schemas into a cache; set
   `DEDIREN_SCHEMA_CACHE_DIR` for a stable cache location. Behind a proxy, set
-  `HTTP_PROXY`, `HTTPS_PROXY`, and `NO_PROXY` (or their lowercase forms): the
-  export plugins declare these in their manifests, so the core forwards them to
-  the plugin child and `curl` honors them.
+  `HTTP_PROXY`, `HTTPS_PROXY`, and `NO_PROXY` (or their lowercase forms) before
+  invoking `dediren`: `curl` runs as a subprocess of the CLI process and
+  inherits them directly, no plugin-specific forwarding involved.
 - **Offline:** provide local schema files with `DEDIREN_OEF_SCHEMA_DIR` (OEF
   directory) and `DEDIREN_XMI_SCHEMA_PATH` (XMI schema file).
 

@@ -39,8 +39,8 @@ public final class DistTool {
       List.of(
           "-XX:TieredStopAtLevel=1",
           "-XX:+UseSerialGC",
-          // UTF-8 stream encoding: core spawns plugin children with a stripped environment, so the
-          // launcher itself must force UTF-8 or non-ASCII output is mangled to '?' (issue #47).
+          // UTF-8 stream encoding: the launcher itself must force UTF-8 or non-ASCII output is
+          // mangled to '?' regardless of the invoking shell's locale (issue #47).
           "-Dstdout.encoding=UTF-8",
           "-Dstderr.encoding=UTF-8",
           "-Dfile.encoding=UTF-8");

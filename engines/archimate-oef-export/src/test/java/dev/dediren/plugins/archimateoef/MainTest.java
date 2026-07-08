@@ -62,10 +62,10 @@ class MainTest {
 
   @Test
   void schemaDownloadFailureNamesProxyAndOfflineRemediation() throws Exception {
-    // Issue #35: the OEF schema download runs curl in the plugin child. When it cannot fetch the
-    // schema (proxied/sandboxed environment), DEDIREN_OEF_SCHEMA_UNAVAILABLE must name both
-    // remediations agents can self-serve from stdout JSON alone: expose proxy env to the plugin,
-    // or pre-fetch the XSDs and point DEDIREN_OEF_SCHEMA_DIR at them. Force the download path
+    // Issue #35: the OEF schema download runs curl as a subprocess of this JVM. When it cannot
+    // fetch the schema (proxied/sandboxed environment), DEDIREN_OEF_SCHEMA_UNAVAILABLE must name
+    // both remediations agents can self-serve from stdout JSON alone: expose proxy env to this
+    // process, or pre-fetch the XSDs and point DEDIREN_OEF_SCHEMA_DIR at them. Force the download path
     // (DEDIREN_OEF_SCHEMA_DIR unset) to fail deterministically without a network by pointing the
     // cache dir under a regular file so the cache directory cannot be created.
     Path blocker = tempDir.resolve("not-a-directory");
@@ -548,7 +548,7 @@ class MainTest {
   void toleratesMalformedGenericGraphPluginDataWithoutCrashingOrViewDiagnostic() throws Exception {
     JsonNode source = fixtureJson("fixtures/source/valid-archimate-oef.json");
     // 'views' as a string cannot deserialize into a view list; the export must degrade to no view
-    // diagnostic rather than crash the plugin process.
+    // diagnostic rather than throw out of the engine call.
     ((ObjectNode) source.at("/plugins/generic-graph")).put("views", "not-a-view-array");
 
     JsonNode envelope = exportEnvelope(source);

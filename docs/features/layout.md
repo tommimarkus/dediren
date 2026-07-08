@@ -7,7 +7,7 @@ that ELK already provides.
 
 [← Back to feature index](README.md)
 
-Plugin: `elk-layout` (`dediren-plugin-elk-layout`) ·
+Plugin: `elk-layout` ·
 Request schema: [`schemas/layout-request.schema.json`](../../schemas/layout-request.schema.json) ·
 Result schema: [`schemas/layout-result.schema.json`](../../schemas/layout-result.schema.json)
 

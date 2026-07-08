@@ -57,8 +57,7 @@ agent tools should be pointed here from their own entrypoint files (for example,
   dependency-edge table, stability tiers, enforcement (ArchUnit/Enforcer), and
   the known-debt register live in `docs/architecture-guidelines.md`.
 - Keep `dediren` contract-first. Public JSON schemas, fixtures, command
-  envelopes, diagnostics, plugin manifests, and runtime capability output are
-  the stable product surface.
+  envelopes, and diagnostics are the stable product surface.
 - Keep `cli` thin. CLI code should parse arguments, assemble requests, call
   `core`, and print envelopes.
 - Keep orchestration, validation, engine dispatch, and backend-neutral quality
@@ -235,7 +234,7 @@ Contract/schema changes:
 ./mvnw -pl contracts -am test
 ```
 
-Plugin runtime changes:
+Engine dispatch changes (`core` dispatch, `cli` `EngineWiring`):
 
 ```bash
 ./mvnw -pl core,cli -am test
@@ -282,7 +281,7 @@ validation named by that plan before calling the work complete.
 | Work area | `test-quality-audit` | `devsecops-audit` |
 | --- | --- | --- |
 | Vertical slice or broad pipeline | Deep: Java tests/fixtures | Quick: dependencies, process boundaries, artifacts, docs |
-| Plugin runtime | Deep: runtime tests/fixtures | Quick: plugin process boundary and dependency posture |
+| Engine runtime (dispatch, `EngineWiring`) | Deep: runtime tests/fixtures | Quick: engine dependency boundary and posture |
 | ELK runtime | Deep: bounded ELK test suite | Quick: implementation diff |
 | SVG render | Quick: changed contract/plugin/CLI tests | Quick: schema, renderer, README, dependency posture |
 | OEF or UML/XMI export | Deep: export tests/fixtures | Quick: export boundary |

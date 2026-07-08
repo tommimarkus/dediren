@@ -147,10 +147,10 @@ class MainTest {
 
   @Test
   void schemaDownloadFailureNamesProxyAndOfflineRemediation() throws Exception {
-    // Issue #35: the XMI schema download runs curl in the plugin child. When it cannot fetch the
-    // schema (proxied/sandboxed environment), DEDIREN_XMI_SCHEMA_UNAVAILABLE must name both
-    // remediations agents can self-serve from stdout JSON alone: expose proxy env to the plugin,
-    // or pre-fetch XMI.xsd and point DEDIREN_XMI_SCHEMA_PATH at it. Force the download path
+    // Issue #35: the XMI schema download runs curl as a subprocess of this JVM. When it cannot
+    // fetch the schema (proxied/sandboxed environment), DEDIREN_XMI_SCHEMA_UNAVAILABLE must name
+    // both remediations agents can self-serve from stdout JSON alone: expose proxy env to this
+    // process, or pre-fetch XMI.xsd and point DEDIREN_XMI_SCHEMA_PATH at it. Force the download path
     // (DEDIREN_XMI_SCHEMA_PATH unset) to fail deterministically without a network by pointing the
     // cache dir under a regular file so the cache directory cannot be created.
     Path blocker = tempDir.resolve("not-a-directory");

@@ -40,14 +40,14 @@ or the token-efficient authoring guide in
 
 | Page | Covers |
 | --- | --- |
-| [Pipeline & Commands](pipeline-and-commands.md) | The end-to-end pipeline and every CLI command (`validate`, `project`, `layout`, `validate-layout`, `render`, `export`, `capabilities`, `--version`) |
+| [Pipeline & Commands](pipeline-and-commands.md) | The end-to-end pipeline and every CLI command (`build`, `validate`, `project`, `layout`, `validate-layout`, `render`, `export`, `--version`) |
 | [Source Model & Views](source-model.md) | The semantic source graph, namespaced properties, views/projection, semantic profiles, and fragments |
-| [Engine Runtime](plugin-runtime.md) | The engine contract, the five first-party engines, and runtime diagnostics |
+| [Engine Runtime](engine-runtime.md) | The engine contract, the five first-party engines, and runtime diagnostics |
 | [Layout (ELK)](layout.md) | The official Java ELK plugin, layout modes (`flow`/`packed`/`auto`), and `validate-layout` quality metrics |
 | [SVG Rendering](svg-render.md) | The render plugin, render policies, interactive modes, and the `artifacts[]` result shape |
 | [Exports (OEF & XMI)](exports.md) | ArchiMate 3.2 OEF and UML 2.5.1 XMI export, plus the supported UML notation coverage |
 | [Contracts & Schemas](contracts-and-schemas.md) | Public schemas, command envelopes, diagnostics, and version/compatibility signals |
-| [Distribution & Runtime](distribution-and-runtime.md) | The agent bundle, launchers, environment variables, Class-Data-Sharing, supply-chain artifacts, and versioning |
+| [Distribution & Runtime](distribution-and-runtime.md) | The agent bundle, its single launcher, environment variables, Class-Data-Sharing, supply-chain artifacts, and versioning |
 
 ## At a Glance
 
@@ -55,6 +55,9 @@ or the token-efficient authoring guide in
 validate -> project --target layout-request -> layout -> validate-layout -> render
 validate -> project --target layout-request -> layout -> validate-layout -> export
 ```
+
+`build` runs either flow above as one command per view; see [Pipeline &
+Commands](pipeline-and-commands.md).
 
 | Notation | Source profile | View kinds | Export plugin | Export format |
 | --- | --- | --- | --- | --- |
@@ -78,7 +81,7 @@ described in [`CLAUDE.md`](../../CLAUDE.md).
   [Contracts & Schemas](contracts-and-schemas.md) alongside `schemas/`,
   `contracts`, and fixtures.
 - **Engine contract or a first-party engine's capabilities** →
-  update [Engine Runtime](plugin-runtime.md).
+  update [Engine Runtime](engine-runtime.md).
 - **ELK layout behavior, a new layout mode, or a new `validate-layout` metric**
   → update [Layout (ELK)](layout.md).
 - **Render policy field, interaction mode, or styling behavior** → update
@@ -88,7 +91,7 @@ described in [`CLAUDE.md`](../../CLAUDE.md).
 - **Bundle layout, launcher behavior, environment variable, or release/version
   policy** → update [Distribution & Runtime](distribution-and-runtime.md).
 
-**Version strings.** Pages cite the current product version (`2026.06.7` at the
+**Version strings.** Pages cite the current product version (`2026.07.13` at the
 time of writing) only in illustrative bundle paths and `required_plugins`
 examples. When the product version bumps (see [Versioning in
 `CLAUDE.md`](../../CLAUDE.md) and the `release-policy`), include this directory

@@ -38,7 +38,7 @@ public final class SchemaValidation {
   public static final String SCHEMA_CACHE_DIR_ENV = "DEDIREN_SCHEMA_CACHE_DIR";
   public static final String SCHEMA_FETCHER = "curl";
   // Names both self-serve remediations for a failed schema download (issue #35): expose proxy
-  // configuration to the plugin child, or skip the download by supplying XMI.xsd offline. Appended
+  // configuration to this process, or skip the download by supplying XMI.xsd offline. Appended
   // to DEDIREN_XMI_SCHEMA_UNAVAILABLE so an agent can recover from stdout JSON alone.
   private static final String XMI_SCHEMA_DOWNLOAD_REMEDIATION =
       "To download through an HTTP proxy, expose HTTP_PROXY, HTTPS_PROXY, and NO_PROXY (or their"

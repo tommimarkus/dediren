@@ -7,7 +7,7 @@ SVG with an external tool (`rsvg-convert`, `resvg`, ImageMagick, or Inkscape).
 
 [← Back to feature index](README.md)
 
-Plugin: `render` (`dediren-plugin-render`) ·
+Plugin: `render` ·
 Policy schema: [`schemas/render-policy.schema.json`](../../schemas/render-policy.schema.json) ·
 Result schema: [`schemas/render-result.schema.json`](../../schemas/render-result.schema.json)
 
