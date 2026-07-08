@@ -343,8 +343,12 @@ public final class BuildCommand {
   }
 
   private static String exportExtension(String artifactKind) {
-    int plus = artifactKind.lastIndexOf('+');
-    String suffix = plus >= 0 ? artifactKind.substring(plus + 1) : artifactKind;
+    // Every export-result artifact_kind matches the export-result schema pattern
+    // "^[a-z0-9][a-z0-9.-]*\+(xml|json|text)$", so a '+' media suffix is always present; the text
+    // after the last '+' selects the file extension. There is no no-'+' fallback branch: it is
+    // unreachable for schema-valid input, and substring(lastIndexOf('+') + 1) already yields the
+    // whole string (== the former fallback) if a '+' were ever absent.
+    String suffix = artifactKind.substring(artifactKind.lastIndexOf('+') + 1);
     return switch (suffix) {
       case "json" -> "json";
       case "text" -> "txt";

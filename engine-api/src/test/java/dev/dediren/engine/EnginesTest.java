@@ -1,6 +1,7 @@
 package dev.dediren.engine;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import dev.dediren.contracts.Diagnostic;
 import dev.dediren.contracts.DiagnosticSeverity;
@@ -24,6 +25,21 @@ class EnginesTest {
     var engines = Engines.of(List.of(), List.of(new FakeLayoutEngine()), List.of(), List.of());
 
     assertThat(engines.layoutEngine("does-not-exist")).isEmpty();
+  }
+
+  @Test
+  void duplicateIdWithinCapabilityIsRejected() {
+    // Engines.of indexes each capability by id() and rejects a duplicate id within the same
+    // capability (documented in the Engines Javadoc), so two engines sharing "fake-layout" fail.
+    assertThatThrownBy(
+            () ->
+                Engines.of(
+                    List.of(),
+                    List.of(new FakeLayoutEngine(), new FakeLayoutEngine()),
+                    List.of(),
+                    List.of()))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("fake-layout");
   }
 
   @Test

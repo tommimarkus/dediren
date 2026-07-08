@@ -13,10 +13,15 @@ import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 
 /**
- * The typed {@link ElkEngine} seam must produce exactly what the process {@code Main} emits. Unlike
- * the other engines, elk-layout publishes a dedicated parse-failure envelope ({@code
- * DEDIREN_ELK_INPUT_INVALID_JSON} / exit 3), so the parse entry point maps failures to a structured
- * {@link EngineException} instead of surfacing a raw exit.
+ * Pins the {@link ElkEngine} seam's envelope serialization: {@code
+ * layoutEnvelopeRoundTripsThroughHarness} wraps the engine's result in a command envelope through
+ * the test-only {@link Main} harness and unwraps its {@code data}, asserting it JSON-equals the
+ * value the engine returned directly. Post-cutover that harness delegates to this same engine, so
+ * the guarantee is envelope wrap/unwrap round-trip stability, not the cross-process parity the
+ * retired plugin process boundary once provided. Unlike the other engines, elk-layout publishes a
+ * dedicated parse-failure envelope ({@code DEDIREN_ELK_INPUT_INVALID_JSON} / exit 3), so the parse
+ * entry point maps failures to a structured {@link EngineException} instead of surfacing a raw
+ * exit.
  */
 class ElkEngineTest {
   private static final String VALID_REQUEST =
@@ -44,7 +49,7 @@ class ElkEngineTest {
   }
 
   @Test
-  void layoutEqualsProcessData() throws Exception {
+  void layoutEnvelopeRoundTripsThroughHarness() throws Exception {
     LayoutRequest request = engine.parseRequest(VALID_REQUEST.getBytes(StandardCharsets.UTF_8));
 
     EngineResult<LayoutResult> result = engine.layout(request);

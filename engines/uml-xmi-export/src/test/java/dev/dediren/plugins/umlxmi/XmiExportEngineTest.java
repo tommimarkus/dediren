@@ -19,12 +19,15 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * The typed {@link XmiExportEngine} seam must produce exactly what the process {@code Main} emits:
- * the engine result JSON-equals the {@code data} of {@link Main#executeForTesting}, and the
- * published post-parse diagnostics throw {@link EngineException} with the same code and exit code.
- * The unparseable-input case reproduces today's raw (non-enveloped) parse failure through the
- * engine's parse entry point, and the product-root case pins that relative schema env paths resolve
- * against the supplied product root, not the JVM cwd.
+ * Pins the {@link XmiExportEngine} seam's envelope serialization: {@code
+ * exportEnvelopeRoundTripsThroughHarness} wraps the engine's result in a command envelope through
+ * the test-only {@link Main} harness and unwraps its {@code data}, asserting it JSON-equals the
+ * value the engine returned directly. Post-cutover that harness delegates to this same engine, so
+ * the guarantee is envelope wrap/unwrap round-trip stability, not the cross-process parity the
+ * retired plugin process boundary once provided. The remaining cases pin that published post-parse
+ * diagnostics throw {@link EngineException} with the same code and exit code, that unparseable
+ * input surfaces as a raw (non-enveloped) parse failure through the engine's parse entry point, and
+ * that relative schema env paths resolve against the supplied product root, not the JVM cwd.
  */
 class XmiExportEngineTest {
   @TempDir Path tempDir;
@@ -37,7 +40,7 @@ class XmiExportEngineTest {
   }
 
   @Test
-  void exportEqualsProcessData() throws Exception {
+  void exportEnvelopeRoundTripsThroughHarness() throws Exception {
     byte[] input = exportInput();
     Map<String, String> env = envWithXmiSchema();
 

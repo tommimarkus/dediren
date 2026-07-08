@@ -15,11 +15,14 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * The typed {@link SvgRenderEngine} seam must produce exactly what the process {@code Main} emits:
- * the engine result JSON-equals the {@code data} of {@link Main#executeForTesting}, and the
- * published render diagnostics throw {@link EngineException} with the same code and exit code. The
- * unparseable-input case reproduces today's raw (non-enveloped) parse failure through the engine's
- * parse entry point.
+ * Pins the {@link SvgRenderEngine} seam's envelope serialization: {@code
+ * renderEnvelopeRoundTripsThroughHarness} wraps the engine's result in a command envelope through
+ * the test-only {@link Main} harness and unwraps its {@code data}, asserting it JSON-equals the
+ * value the engine returned directly. Post-cutover that harness delegates to this same engine, so
+ * the guarantee is envelope wrap/unwrap round-trip stability, not the cross-process parity the
+ * retired plugin process boundary once provided. The remaining cases pin that published render
+ * diagnostics throw {@link EngineException} with the same code and exit code, and that unparseable
+ * input surfaces as a raw (non-enveloped) parse failure through the engine's parse entry point.
  */
 class SvgRenderEngineTest {
   private final SvgRenderEngine engine = new SvgRenderEngine();
@@ -30,7 +33,7 @@ class SvgRenderEngineTest {
   }
 
   @Test
-  void renderEqualsProcessData() throws Exception {
+  void renderEnvelopeRoundTripsThroughHarness() throws Exception {
     byte[] input =
         renderInput("fixtures/layout-result/basic.json", "fixtures/render-policy/default-svg.json");
 

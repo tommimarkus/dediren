@@ -15,11 +15,14 @@ import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 
 /**
- * The typed {@link GenericGraphEngine} seam must produce exactly what the process {@code Main}
- * emits: the engine result JSON-equals the {@code data} of {@link Main#executeForTesting}, and the
- * published diagnostic errors throw {@link EngineException} with the same code and exit code. The
- * unparseable-input case reproduces today's raw (non-enveloped) parse failure through the engine's
- * parse entry point.
+ * Pins the {@link GenericGraphEngine} seam's envelope serialization. Each {@code
+ * *RoundTripsThroughHarness} case wraps the engine's result in a command envelope through the
+ * test-only {@link Main} harness and unwraps its {@code data}, asserting it JSON-equals the value
+ * the engine returned directly. Post-cutover that harness delegates to this same engine, so the
+ * guarantee is envelope wrap/unwrap round-trip stability, not the cross-process parity the retired
+ * plugin process boundary once provided. The remaining cases pin that published diagnostics throw
+ * {@link EngineException} with the same code and exit code, and that unparseable input surfaces as
+ * a raw (non-enveloped) parse failure through the engine's parse entry point.
  */
 class GenericGraphEngineTest {
   private final GenericGraphEngine engine = new GenericGraphEngine();
@@ -30,7 +33,7 @@ class GenericGraphEngineTest {
   }
 
   @Test
-  void validateArchimateEqualsProcessData() throws Exception {
+  void validateArchimateEnvelopeRoundTripsThroughHarness() throws Exception {
     byte[] source = fixtureBytes("fixtures/source/valid-archimate-oef.json");
 
     EngineResult<?> result = engine.validate(engine.parseSource(source), "archimate");
@@ -40,7 +43,7 @@ class GenericGraphEngineTest {
   }
 
   @Test
-  void projectLayoutRequestEqualsProcessData() throws Exception {
+  void projectLayoutRequestEnvelopeRoundTripsThroughHarness() throws Exception {
     byte[] source = fixtureBytes("fixtures/source/valid-basic.json");
 
     EngineResult<?> result = engine.projectLayoutRequest(engine.parseSource(source), "main");
@@ -52,7 +55,7 @@ class GenericGraphEngineTest {
   }
 
   @Test
-  void projectRenderMetadataEqualsProcessData() throws Exception {
+  void projectRenderMetadataEnvelopeRoundTripsThroughHarness() throws Exception {
     byte[] source = fixtureBytes("fixtures/source/valid-archimate-oef.json");
 
     EngineResult<?> result = engine.projectRenderMetadata(engine.parseSource(source), "main");

@@ -10,6 +10,7 @@ import dev.dediren.contracts.build.BuildResult;
 import dev.dediren.contracts.build.BuildViewOutcome;
 import dev.dediren.contracts.export.ExportResult;
 import dev.dediren.contracts.json.JsonSupport;
+import dev.dediren.contracts.layout.LaidOutEdge;
 import dev.dediren.contracts.layout.LayoutRequest;
 import dev.dediren.contracts.layout.LayoutResult;
 import dev.dediren.contracts.render.RenderArtifact;
@@ -224,7 +225,11 @@ class BuildCommandTest {
             diagnostic -> {
               assertThat(diagnostic.code()).isEqualTo("DEDIREN_COMMAND_INPUT_INVALID");
               assertThat(diagnostic.severity()).isEqualTo(DiagnosticSeverity.ERROR);
-              assertThat(diagnostic.message()).contains("no-such-view");
+              // Exact equality (not contains) discriminates the getCause() != null ternary in
+              // runStage: the cleaned cause message, not the wrapped UncheckedIOException's
+              // "java.io.IOException: ..." message. A mutant that took error.getMessage() would
+              // fail this assertion because that message starts with the exception class name.
+              assertThat(diagnostic.message()).isEqualTo("missing generic-graph view no-such-view");
             });
   }
 
@@ -286,24 +291,343 @@ class BuildCommandTest {
     assertThat(result.diagnostics()).isNotEmpty();
   }
 
+  @Test
+  void qualityValidationFailureIsAPerViewErrorAndDoesNotAbortOthers() throws Exception {
+    // The layout stage succeeds but emits a route with no points, so the real LayoutQuality
+    // validation (still in the loop) fails the view at the layout-quality-validation stage.
+    Engines engines = new FakeEngines().qualityFailingViews(Set.of("detail")).build();
+
+    PluginRunOutcome outcome = BuildCommand.run(renderOnlyRequest(), engines);
+
+    assertFailingViewDidNotAbortHealthyOverview(
+        outcome, "svg", "DEDIREN_LAYOUT_ROUTE_POINTS_EMPTY");
+  }
+
+  @Test
+  void renderMetadataFailureIsAPerViewErrorAndDoesNotAbortOthers() throws Exception {
+    Engines engines = new FakeEngines().metadataFailingViews(Set.of("detail")).build();
+
+    PluginRunOutcome outcome = BuildCommand.run(renderOnlyRequest(), engines);
+
+    assertFailingViewDidNotAbortHealthyOverview(outcome, "svg", "DEDIREN_FAKE_METADATA_FAILED");
+  }
+
+  @Test
+  void renderFailureIsAPerViewErrorAndDoesNotAbortOthers() throws Exception {
+    Engines engines = new FakeEngines().renderFailingViews(Set.of("detail")).build();
+
+    PluginRunOutcome outcome = BuildCommand.run(renderOnlyRequest(), engines);
+
+    assertFailingViewDidNotAbortHealthyOverview(outcome, "svg", "DEDIREN_FAKE_RENDER_FAILED");
+  }
+
+  @Test
+  void oefExportFailureIsAPerViewErrorAndDoesNotAbortOthers() throws Exception {
+    Engines engines = new FakeEngines().oefFailingViews(Set.of("detail")).build();
+
+    PluginRunOutcome outcome = BuildCommand.run(oefOnlyRequest(), engines);
+
+    assertFailingViewDidNotAbortHealthyOverview(
+        outcome, "archimate+xml", "DEDIREN_FAKE_EXPORT_FAILED");
+  }
+
+  @Test
+  void xmiExportFailureIsAPerViewErrorAndDoesNotAbortOthers() throws Exception {
+    Engines engines = new FakeEngines().xmiFailingViews(Set.of("detail")).build();
+
+    PluginRunOutcome outcome = BuildCommand.run(xmiOnlyRequest(), engines);
+
+    assertFailingViewDidNotAbortHealthyOverview(outcome, "uml+xml", "DEDIREN_FAKE_EXPORT_FAILED");
+  }
+
+  @Test
+  void layoutRequestStageWarningDowngradesViewToWarning() throws Exception {
+    // Pins `warning |= layoutRequest.warning()`: the only warning enters at the layout-request
+    // stage, so a `|=` -> `&=` mutation would leave the view OK instead of WARNING.
+    Engines engines = new FakeEngines().layoutRequestWarningViews(Set.of("detail")).build();
+
+    PluginRunOutcome outcome = BuildCommand.run(renderOnlyRequest(), engines);
+
+    assertOnlyDetailWarned(outcome, "svg", "DEDIREN_FAKE_LAYOUT_REQUEST_WARNING");
+  }
+
+  @Test
+  void layoutStageWarningDowngradesViewToWarning() throws Exception {
+    // Pins `warning |= layout.warning()`: the only warning enters at the layout stage envelope.
+    Engines engines = new FakeEngines().layoutStageWarningViews(Set.of("detail")).build();
+
+    PluginRunOutcome outcome = BuildCommand.run(renderOnlyRequest(), engines);
+
+    assertOnlyDetailWarned(outcome, "svg", "DEDIREN_FAKE_LAYOUT_STAGE_WARNING");
+  }
+
+  @Test
+  void oefExportStageWarningDowngradesViewToWarning() throws Exception {
+    // Pins `warning |= oef.warning()`: the OEF lane runs and its stage is the sole warning source.
+    Engines engines = new FakeEngines().oefWarningViews(Set.of("detail")).build();
+
+    PluginRunOutcome outcome = BuildCommand.run(oefOnlyRequest(), engines);
+
+    assertOnlyDetailWarned(outcome, "archimate+xml", "DEDIREN_FAKE_EXPORT_WARNING");
+  }
+
+  @Test
+  void xmiExportStageWarningDowngradesViewToWarning() throws Exception {
+    // Pins `warning |= xmi.warning()`: the XMI lane runs and its stage is the sole warning source.
+    Engines engines = new FakeEngines().xmiWarningViews(Set.of("detail")).build();
+
+    PluginRunOutcome outcome = BuildCommand.run(xmiOnlyRequest(), engines);
+
+    assertOnlyDetailWarned(outcome, "uml+xml", "DEDIREN_FAKE_EXPORT_WARNING");
+  }
+
+  @Test
+  void sourceWithoutGenericGraphSectionBuildsNoViews() throws Exception {
+    // selectViews' empty-view path: no explicit --views and no plugins.generic-graph section, so
+    // the build has nothing to render and reports an OK, exit-0, empty-views result.
+    BuildRequest request =
+        new BuildRequest(
+            SOURCE_WITHOUT_VIEWS, null, List.of(), "{}", null, null, Set.of(), out, Map.of());
+
+    PluginRunOutcome outcome = BuildCommand.run(request, engines());
+
+    assertThat(outcome.exitCode()).isZero();
+    BuildResult result = buildResult(outcome);
+    assertSchemaValid(outcome);
+    assertThat(result.status()).isEqualTo(EnvelopeStatus.OK);
+    assertThat(result.views()).isEmpty();
+    assertThat(result.diagnostics()).isEmpty();
+  }
+
+  @Test
+  void exportMediaSuffixSelectsFileExtension() throws Exception {
+    // exportExtension keys the file extension off the media suffix after the last '+'. First-party
+    // engines only emit "+xml", so a third-party-style "<id>+json" pins the switch's "json" arm and
+    // the substring offset (a +1 -> -1 mutation would land on a different suffix and extension).
+    Engines engines =
+        Engines.of(
+            List.of(new FakeSemanticsEngine(Set.of(), Set.of())),
+            List.of(new FakeLayoutEngine(Set.of(), Set.of(), Set.of(), Set.of())),
+            List.of(new FakeRenderEngine(Set.of())),
+            List.of(
+                new FakeExportEngine("archimate-oef", "stats+json", "{}", Set.of(), Set.of()),
+                new FakeExportEngine("uml-xmi", "uml+xml", "<xmi/>", Set.of(), Set.of())));
+
+    PluginRunOutcome outcome = BuildCommand.run(oefOnlyRequest(), engines);
+
+    assertThat(outcome.exitCode()).isZero();
+    BuildResult result = buildResult(outcome);
+    assertSchemaValid(outcome);
+    BuildViewOutcome overview = result.views().getFirst();
+    assertThat(overview.artifacts().getFirst().artifactKind()).isEqualTo("stats+json");
+    assertThat(overview.artifacts().getFirst().path()).isEqualTo("overview/oef.json");
+    assertThat(Files.readString(out.resolve("overview/oef.json"))).isEqualTo("{}");
+  }
+
+  @Test
+  void structuredStageExceptionIsFoldedPerViewNotThrown() throws Exception {
+    // A stage that raises a structured PluginExecutionException (here the render engine id resolves
+    // to no engine) is folded into the view by runStage's catch rather than aborting the build, so
+    // the driver still returns a per-view error outcome.
+    Engines engines =
+        Engines.of(
+            List.of(new FakeSemanticsEngine(Set.of(), Set.of())),
+            List.of(new FakeLayoutEngine(Set.of(), Set.of(), Set.of(), Set.of())),
+            List.of(),
+            List.of());
+
+    PluginRunOutcome outcome = BuildCommand.run(renderOnlyRequest(), engines);
+
+    assertThat(outcome.exitCode()).isNotZero();
+    BuildResult result = buildResult(outcome);
+    assertSchemaValid(outcome);
+    assertThat(result.status()).isEqualTo(EnvelopeStatus.ERROR);
+    assertThat(result.views())
+        .allSatisfy(view -> assertThat(view.status()).isEqualTo(EnvelopeStatus.ERROR));
+    assertThat(result.views().getFirst().diagnostics())
+        .extracting(Diagnostic::code)
+        .contains("DEDIREN_PLUGIN_UNKNOWN");
+  }
+
   // --- helpers ---------------------------------------------------------------------------------
+
+  // A schema-valid source with no plugins.generic-graph section, so selectViews returns no views.
+  private static final String SOURCE_WITHOUT_VIEWS =
+      """
+      {
+        "model_schema_version": "model.schema.v1",
+        "nodes": [
+          { "id": "client", "type": "generic.actor", "label": "Client", "properties": {} }
+        ],
+        "relationships": [],
+        "plugins": {}
+      }
+      """;
 
   private BuildRequest renderOnlyRequest() {
     return new BuildRequest(SOURCE, null, List.of(), "{}", null, null, Set.of(), out, Map.of());
   }
 
+  private BuildRequest oefOnlyRequest() {
+    return new BuildRequest(SOURCE, null, List.of(), null, "{}", null, Set.of(), out, Map.of());
+  }
+
+  private BuildRequest xmiOnlyRequest() {
+    return new BuildRequest(SOURCE, null, List.of(), null, null, "{}", Set.of(), out, Map.of());
+  }
+
+  // Asserts a single failing view ("detail") did not abort the healthy first view ("overview"):
+  // the build errors and exits non-zero, overview still produces its lane artifact, and detail
+  // errors with no artifacts and the expected diagnostic code.
+  private void assertFailingViewDidNotAbortHealthyOverview(
+      PluginRunOutcome outcome, String overviewArtifactKind, String detailDiagnosticCode)
+      throws Exception {
+    assertThat(outcome.exitCode()).isNotZero();
+    BuildResult result = buildResult(outcome);
+    assertSchemaValid(outcome);
+    assertThat(result.status()).isEqualTo(EnvelopeStatus.ERROR);
+
+    BuildViewOutcome overview = result.views().getFirst();
+    assertThat(overview.status()).isEqualTo(EnvelopeStatus.OK);
+    assertThat(overview.artifacts()).hasSize(1);
+    assertThat(overview.artifacts().getFirst().artifactKind()).isEqualTo(overviewArtifactKind);
+
+    BuildViewOutcome detail = result.views().getLast();
+    assertThat(detail.viewId()).isEqualTo("detail");
+    assertThat(detail.status()).isEqualTo(EnvelopeStatus.ERROR);
+    assertThat(detail.artifacts()).isEmpty();
+    assertThat(detail.diagnostics()).extracting(Diagnostic::code).contains(detailDiagnosticCode);
+  }
+
+  // Asserts only "detail" warned (overview stays OK): the build rolls up to WARNING with exit 0,
+  // detail keeps its lane artifact, and carries the expected warning diagnostic. A `warning |=` ->
+  // `warning &=` mutation on the pinned stage would leave detail OK and fail this assertion.
+  private void assertOnlyDetailWarned(
+      PluginRunOutcome outcome, String detailArtifactKind, String detailDiagnosticCode)
+      throws Exception {
+    assertThat(outcome.exitCode()).isZero();
+    BuildResult result = buildResult(outcome);
+    assertSchemaValid(outcome);
+    assertThat(result.status()).isEqualTo(EnvelopeStatus.WARNING);
+    assertThat(result.views().getFirst().status()).isEqualTo(EnvelopeStatus.OK);
+
+    BuildViewOutcome detail = result.views().getLast();
+    assertThat(detail.viewId()).isEqualTo("detail");
+    assertThat(detail.status()).isEqualTo(EnvelopeStatus.WARNING);
+    assertThat(detail.artifacts()).hasSize(1);
+    assertThat(detail.artifacts().getFirst().artifactKind()).isEqualTo(detailArtifactKind);
+    assertThat(detail.diagnostics()).extracting(Diagnostic::code).contains(detailDiagnosticCode);
+  }
+
   private static Engines engines() {
-    return enginesWith(Set.of(), Set.of());
+    return new FakeEngines().build();
   }
 
   private static Engines enginesWith(Set<String> failingViews, Set<String> warningViews) {
-    return Engines.of(
-        List.of(new FakeSemanticsEngine()),
-        List.of(new FakeLayoutEngine(failingViews, warningViews)),
-        List.of(new FakeRenderEngine()),
-        List.of(
-            new FakeExportEngine("archimate-oef", "archimate+xml", "<oef/>"),
-            new FakeExportEngine("uml-xmi", "uml+xml", "<xmi/>")));
+    return new FakeEngines()
+        .layoutFailingViews(failingViews)
+        .qualityWarningViews(warningViews)
+        .build();
+  }
+
+  // Configures the fake engine registry: each knob names the views that fail or warn at a specific
+  // build stage, so a test can target one stage's error/warning aggregation in isolation.
+  private static final class FakeEngines {
+    private Set<String> layoutRequestWarningViews = Set.of();
+    private Set<String> metadataFailingViews = Set.of();
+    private Set<String> layoutFailingViews = Set.of();
+    private Set<String> layoutStageWarningViews = Set.of();
+    private Set<String> qualityWarningViews = Set.of();
+    private Set<String> qualityFailingViews = Set.of();
+    private Set<String> renderFailingViews = Set.of();
+    private Set<String> oefFailingViews = Set.of();
+    private Set<String> oefWarningViews = Set.of();
+    private Set<String> xmiFailingViews = Set.of();
+    private Set<String> xmiWarningViews = Set.of();
+
+    FakeEngines layoutRequestWarningViews(Set<String> views) {
+      this.layoutRequestWarningViews = views;
+      return this;
+    }
+
+    FakeEngines metadataFailingViews(Set<String> views) {
+      this.metadataFailingViews = views;
+      return this;
+    }
+
+    FakeEngines layoutFailingViews(Set<String> views) {
+      this.layoutFailingViews = views;
+      return this;
+    }
+
+    FakeEngines layoutStageWarningViews(Set<String> views) {
+      this.layoutStageWarningViews = views;
+      return this;
+    }
+
+    FakeEngines qualityWarningViews(Set<String> views) {
+      this.qualityWarningViews = views;
+      return this;
+    }
+
+    FakeEngines qualityFailingViews(Set<String> views) {
+      this.qualityFailingViews = views;
+      return this;
+    }
+
+    FakeEngines renderFailingViews(Set<String> views) {
+      this.renderFailingViews = views;
+      return this;
+    }
+
+    FakeEngines oefFailingViews(Set<String> views) {
+      this.oefFailingViews = views;
+      return this;
+    }
+
+    FakeEngines oefWarningViews(Set<String> views) {
+      this.oefWarningViews = views;
+      return this;
+    }
+
+    FakeEngines xmiFailingViews(Set<String> views) {
+      this.xmiFailingViews = views;
+      return this;
+    }
+
+    FakeEngines xmiWarningViews(Set<String> views) {
+      this.xmiWarningViews = views;
+      return this;
+    }
+
+    Engines build() {
+      return Engines.of(
+          List.of(new FakeSemanticsEngine(layoutRequestWarningViews, metadataFailingViews)),
+          List.of(
+              new FakeLayoutEngine(
+                  layoutFailingViews,
+                  qualityWarningViews,
+                  layoutStageWarningViews,
+                  qualityFailingViews)),
+          List.of(new FakeRenderEngine(renderFailingViews)),
+          List.of(
+              new FakeExportEngine(
+                  "archimate-oef", "archimate+xml", "<oef/>", oefFailingViews, oefWarningViews),
+              new FakeExportEngine(
+                  "uml-xmi", "uml+xml", "<xmi/>", xmiFailingViews, xmiWarningViews)));
+    }
+  }
+
+  private static EngineException fakeFailure(String code, String message) {
+    return new EngineException(
+        List.of(new Diagnostic(code, DiagnosticSeverity.ERROR, message, null)), 3);
+  }
+
+  private static List<Diagnostic> warningIf(
+      Set<String> views, String view, String code, String message) {
+    return views.contains(view)
+        ? List.of(new Diagnostic(code, DiagnosticSeverity.WARNING, message, null))
+        : List.of();
   }
 
   private static BuildResult buildResult(PluginRunOutcome outcome) {
@@ -318,7 +642,9 @@ class BuildCommandTest {
     assertThat(errors).describedAs("build-result schema validity: %s", outcome.stdout()).isEmpty();
   }
 
-  private static final class FakeSemanticsEngine implements SemanticsEngine {
+  private record FakeSemanticsEngine(
+      Set<String> layoutRequestWarningViews, Set<String> metadataFailingViews)
+      implements SemanticsEngine {
     @Override
     public String id() {
       return "generic-graph";
@@ -342,12 +668,20 @@ class BuildCommandTest {
               List.of(),
               List.of(),
               null),
-          List.of());
+          warningIf(
+              layoutRequestWarningViews,
+              view,
+              "DEDIREN_FAKE_LAYOUT_REQUEST_WARNING",
+              "layout-request warning"));
     }
 
     @Override
-    public EngineResult<RenderMetadata> projectRenderMetadata(SourceDocument source, String view) {
+    public EngineResult<RenderMetadata> projectRenderMetadata(SourceDocument source, String view)
+        throws EngineException {
       requireKnownView(view);
+      if (metadataFailingViews.contains(view)) {
+        throw fakeFailure("DEDIREN_FAKE_METADATA_FAILED", "render-metadata blew up");
+      }
       return new EngineResult<>(
           new RenderMetadata(
               ContractVersions.RENDER_METADATA_SCHEMA_VERSION,
@@ -368,7 +702,11 @@ class BuildCommandTest {
     }
   }
 
-  private record FakeLayoutEngine(Set<String> failingViews, Set<String> warningViews)
+  private record FakeLayoutEngine(
+      Set<String> failingViews,
+      Set<String> qualityWarningViews,
+      Set<String> layoutStageWarningViews,
+      Set<String> qualityFailingViews)
       implements LayoutEngine {
     @Override
     public String id() {
@@ -385,24 +723,31 @@ class BuildCommandTest {
     public EngineResult<LayoutResult> layout(LayoutRequest request) throws EngineException {
       String view = request.viewId();
       if (failingViews.contains(view)) {
-        throw new EngineException(
-            List.of(
-                new Diagnostic(
-                    "DEDIREN_FAKE_LAYOUT_FAILED",
-                    DiagnosticSeverity.ERROR,
-                    "layout blew up",
-                    null)),
-            3);
+        throw fakeFailure("DEDIREN_FAKE_LAYOUT_FAILED", "layout blew up");
       }
-      List<Diagnostic> warnings =
-          warningViews.contains(view)
-              ? List.of(
-                  new Diagnostic(
-                      "DEDIREN_FAKE_UPSTREAM",
-                      DiagnosticSeverity.WARNING,
-                      "upstream warning",
-                      null))
-              : List.of();
+      if (qualityFailingViews.contains(view)) {
+        // A layout that clears the layout stage but fails LayoutQuality.validateLayoutDiagnostics:
+        // an edge with no route points -> DEDIREN_LAYOUT_ROUTE_POINTS_EMPTY (ERROR).
+        return new EngineResult<>(
+            new LayoutResult(
+                ContractVersions.LAYOUT_RESULT_SCHEMA_VERSION,
+                view,
+                List.of(),
+                List.of(new LaidOutEdge("bad-edge", "client", "api", null, null, null, null, null)),
+                List.of(),
+                List.of()),
+            List.of());
+      }
+      // qualityWarningViews embeds an upstream warning in the LayoutResult so the real quality
+      // validation degrades to WARNING; layoutStageWarningViews warns on the layout stage envelope.
+      List<Diagnostic> embeddedWarnings =
+          warningIf(qualityWarningViews, view, "DEDIREN_FAKE_UPSTREAM", "upstream warning");
+      List<Diagnostic> stageWarnings =
+          warningIf(
+              layoutStageWarningViews,
+              view,
+              "DEDIREN_FAKE_LAYOUT_STAGE_WARNING",
+              "layout stage warning");
       return new EngineResult<>(
           new LayoutResult(
               ContractVersions.LAYOUT_RESULT_SCHEMA_VERSION,
@@ -410,12 +755,12 @@ class BuildCommandTest {
               List.of(),
               List.of(),
               List.of(),
-              warnings),
-          List.of());
+              embeddedWarnings),
+          stageWarnings);
     }
   }
 
-  private static final class FakeRenderEngine implements RenderEngine {
+  private record FakeRenderEngine(Set<String> failingViews) implements RenderEngine {
     @Override
     public String id() {
       return "render";
@@ -423,7 +768,11 @@ class BuildCommandTest {
 
     @Override
     public EngineResult<RenderResult> render(
-        LayoutResult layout, JsonNode policy, RenderMetadata metadataOrNull) {
+        LayoutResult layout, JsonNode policy, RenderMetadata metadataOrNull)
+        throws EngineException {
+      if (failingViews.contains(layout.viewId())) {
+        throw fakeFailure("DEDIREN_FAKE_RENDER_FAILED", "render blew up");
+      }
       return new EngineResult<>(
           new RenderResult(
               ContractVersions.RENDER_RESULT_SCHEMA_VERSION,
@@ -432,16 +781,26 @@ class BuildCommandTest {
     }
   }
 
-  private record FakeExportEngine(String id, String artifactKind, String content)
+  private record FakeExportEngine(
+      String id,
+      String artifactKind,
+      String content,
+      Set<String> failingViews,
+      Set<String> warningViews)
       implements ExportEngine {
     @Override
     public EngineResult<ExportResult> export(
         dev.dediren.contracts.export.ExportRequest request,
         Map<String, String> env,
-        Path productRoot) {
+        Path productRoot)
+        throws EngineException {
+      String view = request.layoutResult().viewId();
+      if (failingViews.contains(view)) {
+        throw fakeFailure("DEDIREN_FAKE_EXPORT_FAILED", "export blew up");
+      }
       return new EngineResult<>(
           new ExportResult(ContractVersions.EXPORT_RESULT_SCHEMA_VERSION, artifactKind, content),
-          List.of());
+          warningIf(warningViews, view, "DEDIREN_FAKE_EXPORT_WARNING", "export warning"));
     }
   }
 }
