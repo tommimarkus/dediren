@@ -44,6 +44,26 @@
     </Or>
   </Match>
 
+  <!-- EI_EXPOSE_REP / EI_EXPOSE_REP2: the engine-api value types follow the
+       same construction discipline as the contracts.* records above:
+       EngineResult and EngineException wrap their List<Diagnostic> component
+       via ContractCollections.listOrEmpty(...) (List.copyOf), and Engines
+       wraps its four capability maps via mapOrEmpty(...)/Map.copyOf, so the
+       shared reference is genuinely immutable. Suppressed rather than
+       defensive-copied for consistency with the contracts records. Tracked in
+       architecture-guidelines.md §12. -->
+  <Match>
+    <Or>
+      <Class name="dev.dediren.engine.EngineException"/>
+      <Class name="dev.dediren.engine.EngineResult"/>
+      <Class name="dev.dediren.engine.Engines"/>
+    </Or>
+    <Or>
+      <Bug pattern="EI_EXPOSE_REP"/>
+      <Bug pattern="EI_EXPOSE_REP2"/>
+    </Or>
+  </Match>
+
   <!-- MS_EXPOSE_REP: JsonSupport.objectMapper() intentionally returns the
        shared ObjectMapper singleton. It is mutable in place (.configure(),
        .registerModule()) and exposed by design (one canonical mapper). The
