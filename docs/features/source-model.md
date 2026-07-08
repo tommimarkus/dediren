@@ -103,9 +103,11 @@ semantic rules apply:
 ```
 
 Run profile-aware semantic validation with
-`validate --plugin generic-graph --profile <archimate|uml>`. The matching export
-plugin (`archimate-oef` or `uml-xmi`) must be declared in `required_plugins` to
-export.
+`validate --plugin generic-graph --profile <archimate|uml>`. `required_plugins`
+entries (for example `archimate-oef` or `uml-xmi`) are informational: they name
+the bundled engines a source model expects, but the registry does not enforce
+them against export, so export runs whether or not the matching entry is
+present.
 
 UML notation specifics (vocabulary, message sorts, pseudostate/transition kinds,
 deferred constructs) are documented in [Exports (OEF & XMI)](exports.md), since

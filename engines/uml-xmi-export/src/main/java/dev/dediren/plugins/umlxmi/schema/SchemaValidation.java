@@ -42,7 +42,7 @@ public final class SchemaValidation {
   // to DEDIREN_XMI_SCHEMA_UNAVAILABLE so an agent can recover from stdout JSON alone.
   private static final String XMI_SCHEMA_DOWNLOAD_REMEDIATION =
       "To download through an HTTP proxy, expose HTTP_PROXY, HTTPS_PROXY, and NO_PROXY (or their"
-          + " lowercase forms) to this plugin. To skip the download, pre-fetch the OMG XMI.xsd and"
+          + " lowercase forms) to this process. To skip the download, pre-fetch the OMG XMI.xsd and"
           + " set DEDIREN_XMI_SCHEMA_PATH to its absolute file path.";
 
   public static boolean commandAvailable(String command) {

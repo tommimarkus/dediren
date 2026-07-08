@@ -222,7 +222,7 @@ public final class Main {
     }
   }
 
-  @Command(name = "layout", description = "Run a layout plugin")
+  @Command(name = "layout", description = "Run a layout engine")
   static final class LayoutCommand implements Callable<Integer> {
     private final InputStream stdin;
     private final Map<String, String> env;
@@ -280,7 +280,7 @@ public final class Main {
     }
   }
 
-  @Command(name = "render", description = "Run a render plugin")
+  @Command(name = "render", description = "Run a render engine")
   static final class RenderCommand implements Callable<Integer> {
     private final InputStream stdin;
     private final Map<String, String> env;
@@ -336,7 +336,7 @@ public final class Main {
     }
   }
 
-  @Command(name = "export", description = "Run an export plugin")
+  @Command(name = "export", description = "Run an export engine")
   static final class ExportCommand implements Callable<Integer> {
     private final Map<String, String> env;
     private final Engines engines;

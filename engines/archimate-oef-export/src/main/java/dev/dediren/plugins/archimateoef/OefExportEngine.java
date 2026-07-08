@@ -85,7 +85,7 @@ public final class OefExportEngine implements ExportEngine {
   // to DEDIREN_OEF_SCHEMA_UNAVAILABLE so an agent can recover from stdout JSON alone.
   private static final String OEF_SCHEMA_DOWNLOAD_REMEDIATION =
       "To download through an HTTP proxy, expose HTTP_PROXY, HTTPS_PROXY, and NO_PROXY (or their"
-          + " lowercase forms) to this plugin. To skip the download, pre-fetch the ArchiMate 3.1"
+          + " lowercase forms) to this process. To skip the download, pre-fetch the ArchiMate 3.1"
           + " OEF XSD files and set DEDIREN_OEF_SCHEMA_DIR to their absolute directory.";
 
   @Override
