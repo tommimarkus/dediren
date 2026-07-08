@@ -8,33 +8,15 @@ import org.junit.jupiter.api.Test;
 
 class DiagnosticCodeTest {
   @Test
-  void eachConstantExposesItsCanonicalWireString() {
-    assertThat(DiagnosticCode.PLUGIN_TIMEOUT.code()).isEqualTo("DEDIREN_PLUGIN_TIMEOUT");
-    assertThat(DiagnosticCode.PLUGIN_PROCESS_FAILED.code())
-        .isEqualTo("DEDIREN_PLUGIN_PROCESS_FAILED");
-    assertThat(DiagnosticCode.OEF_SCHEMA_VALIDATOR_UNAVAILABLE.code())
-        .isEqualTo("DEDIREN_OEF_SCHEMA_VALIDATOR_UNAVAILABLE");
-  }
-
-  @Test
-  void pluginRuntimeFamilyExposesItsCanonicalWireStrings() {
-    assertThat(DiagnosticCode.PLUGIN_MISSING_EXECUTABLE.code())
-        .isEqualTo("DEDIREN_PLUGIN_MISSING_EXECUTABLE");
+  void engineRegistryFamilyExposesItsCanonicalWireStrings() {
+    // PLUGIN_UNKNOWN and PLUGIN_UNSUPPORTED_CAPABILITY keep the wire strings published by the
+    // retired process runtime; ENGINE_FAILED is the successor of the process-crash category.
+    assertThat(DiagnosticCode.PLUGIN_UNKNOWN.code()).isEqualTo("DEDIREN_PLUGIN_UNKNOWN");
     assertThat(DiagnosticCode.PLUGIN_UNSUPPORTED_CAPABILITY.code())
         .isEqualTo("DEDIREN_PLUGIN_UNSUPPORTED_CAPABILITY");
-    assertThat(DiagnosticCode.PLUGIN_ID_MISMATCH.code()).isEqualTo("DEDIREN_PLUGIN_ID_MISMATCH");
-    assertThat(DiagnosticCode.PLUGIN_CAPABILITY_PROBE_FAILED.code())
-        .isEqualTo("DEDIREN_PLUGIN_CAPABILITY_PROBE_FAILED");
-    assertThat(DiagnosticCode.PLUGIN_CAPABILITY_INVALID_JSON.code())
-        .isEqualTo("DEDIREN_PLUGIN_CAPABILITY_INVALID_JSON");
-    assertThat(DiagnosticCode.PLUGIN_CAPABILITY_SCHEMA_INVALID.code())
-        .isEqualTo("DEDIREN_PLUGIN_CAPABILITY_SCHEMA_INVALID");
-    assertThat(DiagnosticCode.PLUGIN_OUTPUT_INVALID_JSON.code())
-        .isEqualTo("DEDIREN_PLUGIN_OUTPUT_INVALID_JSON");
-    assertThat(DiagnosticCode.PLUGIN_OUTPUT_INVALID_ENVELOPE.code())
-        .isEqualTo("DEDIREN_PLUGIN_OUTPUT_INVALID_ENVELOPE");
-    assertThat(DiagnosticCode.PLUGIN_OUTPUT_INVALID_DATA.code())
-        .isEqualTo("DEDIREN_PLUGIN_OUTPUT_INVALID_DATA");
+    assertThat(DiagnosticCode.ENGINE_FAILED.code()).isEqualTo("DEDIREN_ENGINE_FAILED");
+    assertThat(DiagnosticCode.OEF_SCHEMA_VALIDATOR_UNAVAILABLE.code())
+        .isEqualTo("DEDIREN_OEF_SCHEMA_VALIDATOR_UNAVAILABLE");
   }
 
   @Test

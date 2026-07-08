@@ -11,10 +11,8 @@ success or failure without scraping stderr.
 > [!TIP]
 > The primary audience is agents. If you are authoring Dediren JSON or driving a
 > bundle, read [`docs/agent-usage.md`](docs/agent-usage.md) — the comprehensive,
-> token-efficient authoring and command reference, and
-> [`docs/plugin-authoring.md`](docs/plugin-authoring.md) for the plugin-author
-> contract. This README is the human front door: what Dediren is, how to build
-> it, and how to cut a release.
+> token-efficient authoring and command reference. This README is the human
+> front door: what Dediren is, how to build it, and how to cut a release.
 
 ## Pipeline
 
@@ -136,24 +134,18 @@ dediren-agent-bundle-2026.07.13/
   plugins/        first-party plugin manifests
   schemas/        public JSON schemas
   fixtures/       source, policy, layout, render, and export examples
-  docs/agent-usage.md · docs/plugin-authoring.md
+  docs/agent-usage.md
   LICENSE · THIRD-PARTY-NOTICES.md · bundle.json
   cds/            generated at runtime — not a tracked artifact
 ```
 
 Bundle launchers set `DEDIREN_BUNDLE_ROOT` so commands resolve bundled
-`schemas/`, `plugins/`, and `bin/` from any working directory. Plugin discovery
-is explicit and ordered: bundled plugins first, then the project
-`.dediren/plugins` directory, then `DEDIREN_PLUGIN_DIRS` — never `PATH`.
+`schemas/`, `plugins/`, and `bin/` from any working directory. The five
+first-party engines are compiled into the CLI; there is no runtime plugin
+discovery of any kind.
 
-> [!WARNING]
-> A project `.dediren/plugins` executable runs **unsandboxed with the caller's
-> privileges**, so discovery of it is off by default. Enable it with
-> `DEDIREN_ALLOW_PROJECT_PLUGINS=1` only for a repository you trust.
-
-For the full runtime-environment variables, the Class-Data-Sharing startup
-cache, and the manifest-trust fast path, see
-[`docs/agent-usage.md`](docs/agent-usage.md).
+For the full runtime-environment variables and the Class-Data-Sharing startup
+cache, see [`docs/agent-usage.md`](docs/agent-usage.md).
 
 ## Notations
 

@@ -17,16 +17,14 @@ import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 
 /**
- * Guards the shipped, agent-facing bundle docs ({@code docs/agent-usage.md} and {@code
- * docs/plugin-authoring.md}) against drift: every {@code DEDIREN_*} token they reference must exist
- * in the product source, and every CalVer version string in them must match the product version.
- * Converts the CLAUDE.md "Files That Move Together" prose discipline into an automated check, so a
- * renamed diagnostic code or a missed version bump fails CI instead of silently shipping a wrong
- * agent contract.
+ * Guards the shipped, agent-facing bundle doc ({@code docs/agent-usage.md}) against drift: every
+ * {@code DEDIREN_*} token it references must exist in the product source, and every CalVer version
+ * string in it must match the product version. Converts the CLAUDE.md "Files That Move Together"
+ * prose discipline into an automated check, so a renamed diagnostic code or a missed version bump
+ * fails CI instead of silently shipping a wrong agent contract.
  */
 class AgentUsageDocConsistencyTest {
-  private static final List<String> SHIPPED_DOCS =
-      List.of("docs/agent-usage.md", "docs/plugin-authoring.md");
+  private static final List<String> SHIPPED_DOCS = List.of("docs/agent-usage.md");
   private static final Pattern TOKEN = Pattern.compile("DEDIREN_[A-Z_]+");
   private static final Pattern CALVER = Pattern.compile("\\b\\d{4}\\.\\d{2}\\.\\d+\\b");
 
@@ -41,8 +39,8 @@ class AgentUsageDocConsistencyTest {
       Matcher matcher = TOKEN.matcher(doc);
       while (matcher.find()) {
         String token = matcher.group();
-        // A token ending in '_' is a documented prefix/wildcard (e.g. DEDIREN_PLUGIN_<PLUGIN_ID>,
-        // DEDIREN_PLUGIN_OUTPUT_INVALID_*); accept it when some real token starts with it.
+        // A token ending in '_' is a documented prefix/wildcard (e.g. a family reference such as
+        // DEDIREN_LAYOUT_*); accept it when some real token starts with it.
         boolean ok =
             token.endsWith("_")
                 ? universe.stream().anyMatch(known -> known.startsWith(token))

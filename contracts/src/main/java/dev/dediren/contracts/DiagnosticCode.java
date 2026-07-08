@@ -2,31 +2,23 @@ package dev.dediren.contracts;
 
 /**
  * Compile-time owner of the published {@code DEDIREN_*} diagnostic vocabulary. Covers every code
- * emitted by {@code core} and {@code cli}; export-plugin-internal codes (in the {@code archimate}
- * /{@code uml} and export-plugin modules) are the remaining family to migrate. This enum owns
+ * emitted by {@code core} and {@code cli}; export-engine-internal codes (in the {@code archimate}
+ * /{@code uml} and export-engine modules) are the remaining family to migrate. This enum owns
  * diagnostic codes only, not {@code DEDIREN_*} environment-variable names (for example {@code
- * DEDIREN_PLUGIN_DIRS}), which are a separate vocabulary. The {@link #code()} string is the wire
+ * DEDIREN_OEF_SCHEMA_DIR}), which are a separate vocabulary. The {@link #code()} string is the wire
  * contract and must never change for an existing constant.
  */
 public enum DiagnosticCode {
-  // Plugin runtime boundary (core: PluginRunner, PluginRegistry).
-  PLUGIN_TIMEOUT("DEDIREN_PLUGIN_TIMEOUT"),
-  PLUGIN_PROCESS_FAILED("DEDIREN_PLUGIN_PROCESS_FAILED"),
-  PLUGIN_IO_ERROR("DEDIREN_PLUGIN_IO_ERROR"),
+  // In-memory engine registry (core: EngineDispatch). The two PLUGIN_* constants keep the wire
+  // strings published by the retired process runtime: an engine id bound to no capability, and an
+  // id bound only under another capability. The twelve process-taxonomy codes (timeout, process
+  // failure, I/O error, manifest, executable, id-mismatch, capability-probe, output-validation)
+  // were retired with the plugin process boundary.
   PLUGIN_UNKNOWN("DEDIREN_PLUGIN_UNKNOWN"),
-  PLUGIN_MANIFEST_INVALID("DEDIREN_PLUGIN_MANIFEST_INVALID"),
-  PLUGIN_MISSING_EXECUTABLE("DEDIREN_PLUGIN_MISSING_EXECUTABLE"),
   PLUGIN_UNSUPPORTED_CAPABILITY("DEDIREN_PLUGIN_UNSUPPORTED_CAPABILITY"),
-  PLUGIN_ID_MISMATCH("DEDIREN_PLUGIN_ID_MISMATCH"),
-  PLUGIN_CAPABILITY_PROBE_FAILED("DEDIREN_PLUGIN_CAPABILITY_PROBE_FAILED"),
-  PLUGIN_CAPABILITY_INVALID_JSON("DEDIREN_PLUGIN_CAPABILITY_INVALID_JSON"),
-  PLUGIN_CAPABILITY_SCHEMA_INVALID("DEDIREN_PLUGIN_CAPABILITY_SCHEMA_INVALID"),
-  PLUGIN_OUTPUT_INVALID_JSON("DEDIREN_PLUGIN_OUTPUT_INVALID_JSON"),
-  PLUGIN_OUTPUT_INVALID_ENVELOPE("DEDIREN_PLUGIN_OUTPUT_INVALID_ENVELOPE"),
-  PLUGIN_OUTPUT_INVALID_DATA("DEDIREN_PLUGIN_OUTPUT_INVALID_DATA"),
 
-  // In-memory engine dispatch (core: EngineDispatch). Emitted only for an unexpected engine
-  // exception; the successor of the process-crash category once the process boundary is retired.
+  // Emitted only for an unexpected in-memory engine exception; the successor of the retired
+  // process-crash category.
   ENGINE_FAILED("DEDIREN_ENGINE_FAILED"),
 
   // Command input (core: CoreCommands; cli: Main).

@@ -2,8 +2,8 @@
 
 `dediren` is a contract-first diagram pipeline for agentic tools. It turns a
 semantic, plugin-typed JSON model into generated layout geometry, rendered SVG,
-ArchiMate 3.2 OEF XML, or UML 2.5.1 XMI XML through explicit CLI commands and
-process-boundary plugins.
+ArchiMate 3.2 OEF XML, or UML 2.5.1 XMI XML through explicit CLI commands
+backed by in-process first-party engines.
 
 This directory is **feature reference documentation**: a capability-by-capability
 description of what Dediren does, organized so a reader can find a feature
@@ -28,10 +28,10 @@ or the token-efficient authoring guide in
   plugin-typed. It must not contain absolute positions, sizes, colors, fonts, or
   SVG shape choices. Geometry is *generated* into derived layout result JSON;
   presentation lives in render policy.
-- **Pluggable at a process boundary.** Layout, rendering, semantic validation,
-  and export are performed by external executable plugins that communicate over
-  JSON stdin/stdout. The core owns orchestration, validation, diagnostics, and
-  plugin discovery — not notation or styling.
+- **Engines behind a typed seam.** Layout, rendering, semantic validation,
+  and export are performed by first-party library engines behind the
+  `engine-api` interfaces, dispatched in a single JVM. The core owns
+  orchestration, validation, and diagnostics — not notation or styling.
 - **Multi-notation, multi-format output.** One semantic model can drive several
   notations — generic graphs, ArchiMate 3.2, and UML 2.5.1 — and produce SVG
   (static or interactive), ArchiMate OEF XML, or UML XMI XML.
@@ -42,7 +42,7 @@ or the token-efficient authoring guide in
 | --- | --- |
 | [Pipeline & Commands](pipeline-and-commands.md) | The end-to-end pipeline and every CLI command (`validate`, `project`, `layout`, `validate-layout`, `render`, `export`, `capabilities`, `--version`) |
 | [Source Model & Views](source-model.md) | The semantic source graph, namespaced properties, views/projection, semantic profiles, and fragments |
-| [Plugin Runtime](plugin-runtime.md) | The plugin protocol, the five first-party plugins, discovery, capability probing, and runtime diagnostics |
+| [Engine Runtime](plugin-runtime.md) | The engine contract, the five first-party engines, and runtime diagnostics |
 | [Layout (ELK)](layout.md) | The official Java ELK plugin, layout modes (`flow`/`packed`/`auto`), and `validate-layout` quality metrics |
 | [SVG Rendering](svg-render.md) | The render plugin, render policies, interactive modes, and the `artifacts[]` result shape |
 | [Exports (OEF & XMI)](exports.md) | ArchiMate 3.2 OEF and UML 2.5.1 XMI export, plus the supported UML notation coverage |
@@ -77,8 +77,8 @@ described in [`CLAUDE.md`](../../CLAUDE.md).
   [Source Model & Views](source-model.md) and
   [Contracts & Schemas](contracts-and-schemas.md) alongside `schemas/`,
   `contracts`, and fixtures.
-- **Plugin protocol, discovery, or a first-party plugin's capabilities** →
-  update [Plugin Runtime](plugin-runtime.md).
+- **Engine contract or a first-party engine's capabilities** →
+  update [Engine Runtime](plugin-runtime.md).
 - **ELK layout behavior, a new layout mode, or a new `validate-layout` metric**
   → update [Layout (ELK)](layout.md).
 - **Render policy field, interaction mode, or styling behavior** → update

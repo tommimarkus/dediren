@@ -61,12 +61,13 @@ agent tools should be pointed here from their own entrypoint files (for example,
   the stable product surface.
 - Keep `cli` thin. CLI code should parse arguments, assemble requests, call
   `core`, and print envelopes.
-- Keep orchestration, validation, plugin discovery, plugin execution, and
-  backend-neutral quality checks in `core`.
+- Keep orchestration, validation, engine dispatch, and backend-neutral quality
+  checks in `core`.
 - Keep shared protocol records and schema-version constants in
   `contracts`. Do not put orchestration or plugin implementation logic there.
-- First-party plugins are executable process-boundary plugins. They may depend
-  on `contracts`; they must not depend on `core`.
+- First-party engines are library modules behind `engine-api`. Engines never
+  depend on `core`; `core` never depends on engine implementations; only the
+  `cli` `EngineWiring` class constructs them.
 - Do not duplicate layout or routing features already provided by ELK. Express
   layout intent through ELK graph structure, ports, hierarchy, and options,
   then let ELK compute geometry and routes.
@@ -79,9 +80,9 @@ agent tools should be pointed here from their own entrypoint files (for example,
 
 - Public JSON shape changes: update `schemas/`, `contracts`, fixtures, plugin
   mapping code, and schema/round-trip tests together.
-- Plugin protocol or runtime changes: update manifests, runtime capability
-  handling, plugin envelope validation, CLI behavior, README notes, and
-  compatibility tests together.
+- Engine contract or runtime changes: update `engine-api`, `core` dispatch,
+  `cli` `EngineWiring`, CLI behavior, README notes, and the engine envelope
+  regression tests together.
 - User-facing command, workflow, install, artifact-location, or
   agent-authoring changes: update `README.md` and `docs/agent-usage.md` in the
   same change.
@@ -102,7 +103,7 @@ agent tools should be pointed here from their own entrypoint files (for example,
 - UML/XMI export changes: update export schemas, policy fixtures,
   source/layout fixtures, `plugins/uml-xmi-export`, CLI export tests, and
   README examples together.
-- Plugin discovery/execution, schema-cache fetching, envelope validation, XML
+- Engine runtime, schema-cache fetching, envelope validation, XML
   parser hardening, or release workflow changes: update
   `docs/threat-model.md` in the same change.
 
@@ -161,25 +162,23 @@ enforcement authority for matching version, tag, and release actions.
   `pom.xml`, `README.md`, `docs/agent-usage.md`, `fixtures/plugins`, and
   `fixtures/source`.
 
-## Plugin Runtime Rules
+## Engine Runtime Rules
 
-- Plugins communicate with JSON stdin/stdout and command envelopes. Agents
-  should be able to decide success or failure from stdout JSON alone.
-- Preserve valid plugin error envelopes and return a non-zero CLI exit.
-- Normalize the runtime boundary failures core can observe into structured
-  diagnostics: missing executable, timeout, invalid JSON, schema mismatch,
-  unsupported capability, id mismatch, and process failure.
-- A missing runtime dependency is reported by the plugin that owns the
+- Command envelopes on stdout remain the agent contract. Agents should be able
+  to decide success or failure from stdout JSON alone.
+- Preserve valid engine error envelopes (an `EngineException` becomes the
+  published error envelope with its exit code) and return a non-zero CLI exit.
+- The registry resolves engine lookups in memory: an unknown engine id yields
+  `DEDIREN_PLUGIN_UNKNOWN`; an id bound only under another capability yields
+  `DEDIREN_PLUGIN_UNSUPPORTED_CAPABILITY`. An unexpected in-memory engine
+  failure is `DEDIREN_ENGINE_FAILED`.
+- A missing runtime dependency is reported by the engine that owns the
   dependency, as a structured error envelope core preserves (for example the
-  export plugins emit `DEDIREN_OEF_SCHEMA_VALIDATOR_UNAVAILABLE` /
-  `DEDIREN_XMI_SCHEMA_VALIDATOR_UNAVAILABLE` when `xmllint` is absent). Core
-  does not synthesize this category, because a launcher that fails to start its
-  runtime (for example the ELK launcher when `java` is missing) only yields a
-  raw non-zero exit, which core surfaces as a generic plugin failure (typically
-  `DEDIREN_PLUGIN_CAPABILITY_PROBE_FAILED` from the runtime probe).
-- Do not add implicit plugin discovery from `PATH`. Discovery is explicit:
-  bundled first-party plugins, project plugin directories such as
-  `.dediren/plugins`, then user-configured directories.
+  export engines emit `DEDIREN_OEF_SCHEMA_VALIDATOR_UNAVAILABLE` /
+  `DEDIREN_XMI_SCHEMA_VALIDATOR_UNAVAILABLE` when `xmllint` is absent).
+- There is no engine discovery of any kind: no `PATH` lookup, no manifest
+  directories, no executable overrides. The bundled set is constructed
+  explicitly in `cli` `EngineWiring`.
 - Keep stderr for human debugging only.
 
 ## ELK Runtime

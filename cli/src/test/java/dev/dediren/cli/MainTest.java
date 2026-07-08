@@ -3,7 +3,6 @@ package dev.dediren.cli;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.dediren.contracts.json.JsonSupport;
-import java.io.File;
 import java.io.StringReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -12,7 +11,6 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.StringJoiner;
 import javax.xml.parsers.DocumentBuilderFactory;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -524,53 +522,9 @@ class MainTest {
   }
 
   private Map<String, String> sequenceWorkflowEnv() throws Exception {
-    Map<String, String> env = new LinkedHashMap<>();
-    env.putAll(pluginEnv("generic-graph", "dev.dediren.plugins.genericgraph.Main"));
-    env.putAll(pluginEnv("elk-layout", "dev.dediren.plugins.elklayout.Main"));
-    env.putAll(pluginEnv("render", "dev.dediren.plugins.render.Main"));
-    env.putAll(pluginEnv("uml-xmi", "dev.dediren.plugins.umlxmi.Main"));
-    env.putAll(envWithXmiSchema());
-    return env;
-  }
-
-  private Map<String, String> pluginEnv(String pluginId, String mainClass) throws Exception {
-    Path script = temp.resolve(pluginId + ".sh");
-    String java = Path.of(System.getProperty("java.home"), "bin", "java").toString();
-    String classpath =
-        pluginId.equals("elk-layout")
-            ? elkLayoutPluginClasspath()
-            : System.getProperty("java.class.path");
-    Files.writeString(
-        script,
-        """
-                #!/bin/sh
-                exec "%s" -cp "%s" %s "$@"
-                """
-            .formatted(java, classpath, mainClass),
-        StandardCharsets.UTF_8);
-    script.toFile().setExecutable(true);
-    return Map.of(
-        "DEDIREN_PLUGIN_DIRS",
-        workspaceRoot().resolve("fixtures/plugins").toString(),
-        "DEDIREN_PLUGIN_" + pluginId.toUpperCase().replace('-', '_'),
-        script.toString());
-  }
-
-  private static String elkLayoutPluginClasspath() throws Exception {
-    Path root = workspaceRoot();
-    StringJoiner classpath = new StringJoiner(File.pathSeparator);
-    classpath.add(System.getProperty("java.class.path"));
-    classpath.add(root.resolve("plugins/elk-layout/target/classes").toString());
-    Path repository = root.resolve(".cache/maven/repository");
-    if (Files.exists(repository)) {
-      try (var paths = Files.walk(repository)) {
-        paths
-            .filter(path -> path.getFileName().toString().endsWith(".jar"))
-            .sorted()
-            .forEach(path -> classpath.add(path.toString()));
-      }
-    }
-    return classpath.toString();
+    // The engines run in-process; the only environment the workflow needs is the export lane's
+    // offline XMI schema path.
+    return new LinkedHashMap<>(envWithXmiSchema());
   }
 
   private Map<String, String> envWithXmiSchema() throws Exception {

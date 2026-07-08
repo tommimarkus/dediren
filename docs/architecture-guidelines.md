@@ -7,7 +7,7 @@ the code already has, and established software-architecture sources — so that
 each rule names a force, not just a preference.
 
 This document is the *rationale and enforcement* layer. The terse, agent-facing
-rules in `CLAUDE.md` (`## Architecture Rules`, `## Plugin Runtime Rules`,
+rules in `CLAUDE.md` (`## Architecture Rules`, `## Engine Runtime Rules`,
 `## ELK Runtime`, `## Files That Move Together`) are the quick reference; this
 file explains why they exist, what verifies them, and how to evolve the system
 without breaking them. Where this document and the live code disagree, the code
@@ -33,19 +33,20 @@ every other rule serves them:
    *Martin 2017*, ADP). It is not a distributed system: the modules build and
    version together.
 
-**Process boundary — reversed 2026-07-08 (transitional).** Dediren shipped with
-a third defining property: *process-isolated plugins* — layout, render, and
-export as separate executables core launched as OS subprocesses over JSON on
-stdin/stdout, a deliberate microkernel/plug-in split (*microkernel pattern*,
+**Process boundary — reversed 2026-07-08, cutover landed.** Dediren shipped
+with a third defining property: *process-isolated plugins* — layout, render,
+and export as separate executables core launched as OS subprocesses over JSON
+on stdin/stdout, a deliberate microkernel/plug-in split (*microkernel pattern*,
 *Richards 2022*; *LSP*). The 2026-07-08 runtime challenge measured that
 boundary's cost — roughly 1.9 s across 13–15 JVM spawns for the documented
 five-invocation agent flow, an order of process overhead the shipped startup
 tiers cannot recover — and the owner approved reversing it: the plugins become
 in-tree single-JVM library engines behind typed interfaces
 (spec `docs/superpowers/specs/2026-07-08-monolithic-compiler.md`; plan
-`2026-07-08-monolithic-runtime-radical.md`). That reversal lands task-by-task;
-until the cutover tasks land, the process boundary and every rule in §5 remain
-live and authoritative for the current code.
+`2026-07-08-monolithic-runtime-radical.md`). The cutover has landed: core no
+longer discovers or executes plugin processes; §5 holds the engine-boundary
+rules and a historical note on the retired process boundary. The launcher and
+manifest packaging lane is retired by the follow-on packaging task.
 
 The job of these guidelines is to keep the contract-first and modular-monolith
 properties true as the system grows.
@@ -68,54 +69,6 @@ Stable Dependencies Principle).
 | `archimate` | *(nothing internal)* | 1 — notation core |
 | `uml` | `contracts` | 1 — notation core |
 | `schema-cache` | `contracts` | 1 — utility core |
-| `core` | `contracts` | 2 — orchestration |
-| `cli` | `contracts`, `core` | 3 — entrypoint |
-| `render` (plugin) | `contracts`, `archimate`, `uml` | 2 — leaf plugin |
-| `generic-graph` (plugin) | `contracts`, `archimate`, `uml` | 2 — leaf plugin |
-| `elk-layout` (plugin) | `contracts` | 2 — leaf plugin |
-| `archimate-oef-export` (plugin) | `contracts`, `archimate`, `schema-cache` | 2 — leaf plugin |
-| `uml-xmi-export` (plugin) | `contracts`, `uml`, `schema-cache` | 2 — leaf plugin |
-| `dist-tool` | `contracts` (compile); `cli` + every plugin (runtime, for bundling) | 3 — assembly |
-| `coverage-report` | *(nothing in the default build)*; every product module (runtime, **`coverage`-profile-scoped only**, for JaCoCo `report-aggregate`) | 3 — build tooling |
-
-Rules that fall out of this table and must be enforced, not just hoped for:
-
-- **No cycles, ever.** A back-edge anywhere is a defect (*Martin 2017*, ADP).
-- **No plugin depends on `core`.** Plugins are reachable only across the process
-  boundary; a compile dependency from a plugin to `core` would collapse the
-  microkernel split. Plugins may depend on `contracts` (the wire types) and on
-  the notation/utility cores they need.
-- **`core` never compile-depends on a plugin.** `core` discovers and runs
-  plugins as subprocesses (`PluginRunner` via `ProcessBuilder`); it knows them
-  only through `contracts` (manifests, envelopes, capabilities).
-- **`cli` depends on `core` and `contracts` only.** The CLI assembles requests
-  and prints envelopes; it does not reach into plugins (its plugin dependencies
-  are `test`-scope, for end-to-end coverage, and must stay that way).
-- **`contracts` depends on nothing internal.** It is the most-depended-on module
-  and must stay the most stable (*Martin 2017*, SDP).
-- **`coverage-report` is build-only.** It exists solely to host JaCoCo
-  `report-aggregate` under `-Pcoverage`. Its dependencies on every product
-  module are runtime-scope and confined to the `coverage` profile, so they
-  never enter the default build or the shipped product graph. Nothing depends
-  on it and `dist-tool` does not bundle it — it is not a compile-scope edge on
-  the spine.
-
-### Target allowed-edge table (monolith)
-
-> **Target state — lands task-by-task via plan
-> `2026-07-08-monolithic-runtime-radical.md` (spec
-> `2026-07-08-monolithic-compiler.md`). The current table above remains
-> authoritative until the matching task lands.** This is where the spine points
-> once the plugin process protocol is deleted and the five plugins become
-> in-tree library engines behind a typed `engine-api` seam. The graph stays an
-> acyclic DAG rooted at `contracts`; only the plugin edges change shape.
-
-| Module | May compile-depend on | Stability tier |
-|---|---|---|
-| `contracts` | *(nothing internal)* | 0 — foundation |
-| `archimate` | *(nothing internal)* | 1 — notation core |
-| `uml` | `contracts` | 1 — notation core |
-| `schema-cache` | `contracts` | 1 — utility core |
 | `engine-api` | `contracts` | 1 — engine seam |
 | `core` | `contracts`, `engine-api` | 2 — orchestration + `build` driver |
 | `render` (engine) | `engine-api`, `contracts`, `archimate`, `uml` | 2 — leaf engine |
@@ -124,15 +77,16 @@ Rules that fall out of this table and must be enforced, not just hoped for:
 | `archimate-oef-export` (engine) | `engine-api`, `contracts`, `archimate`, `schema-cache` | 2 — leaf engine |
 | `uml-xmi-export` (engine) | `engine-api`, `contracts`, `uml`, `schema-cache` | 2 — leaf engine |
 | `cli` | `contracts`, `core`, `engine-api`; engine implementations **only in `EngineWiring`** | 3 — entrypoint + wiring |
-| `dist-tool` | `contracts` (compile); `cli` (runtime, for bundling) | 3 — assembly |
-| `coverage-report` | *(build-only, `coverage`-profile-scoped)* | 3 — build tooling |
+| `dist-tool` | `contracts` (compile); `cli` + every engine launcher (runtime, for bundling — the launcher lane retires with the packaging task) | 3 — assembly |
+| `coverage-report` | *(nothing in the default build)*; every product module (runtime, **`coverage`-profile-scoped only**, for JaCoCo `report-aggregate`) | 3 — build tooling |
 
-Rules that fall out of this target table:
+Rules that fall out of this table and must be enforced, not just hoped for:
 
-- **`engine-api` is a new tier-1 module** (directory `engine-api/`, package
+- **No cycles, ever.** A back-edge anywhere is a defect (*Martin 2017*, ADP).
+- **`engine-api` is a tier-1 module** (directory `engine-api/`, package
   `dev.dediren.engine`): interfaces only, depends on `contracts` alone.
-- **No engine depends on `core`.** The plugin→`core` prohibition survives the
-  reversal as an engine→`core` prohibition: engines depend on `engine-api`,
+- **No engine depends on `core`.** The old plugin→`core` prohibition survives
+  the reversal as an engine→`core` prohibition: engines depend on `engine-api`,
   `contracts`, and the notation/utility cores they need, never on `core` and
   never on each other. The SVG emitter must not import ELK; exporters must not
   import the SVG emitter.
@@ -143,10 +97,17 @@ Rules that fall out of this target table:
   engine implementations only inside `EngineWiring`, which constructs them
   explicitly (no `ServiceLoader`, no `PATH`, no runtime discovery). ArchUnit
   pins the edge to that single named class.
-- **The five engines move to `engines/<name>`** (directory move only), keeping
-  their Maven artifactIds and their `dev.dediren.plugins.*` packages; the
-  package rename is deferred debt. `testbeds/plugin-runtime` is deleted with the
-  process protocol.
+- **The five engines still live under `plugins/<name>`** with their
+  `dev.dediren.plugins.*` packages; the `engines/<name>` directory move and
+  package rename are deferred debt from the monolith plan.
+- **`contracts` depends on nothing internal.** It is the most-depended-on module
+  and must stay the most stable (*Martin 2017*, SDP).
+- **`coverage-report` is build-only.** It exists solely to host JaCoCo
+  `report-aggregate` under `-Pcoverage`. Its dependencies on every product
+  module are runtime-scope and confined to the `coverage` profile, so they
+  never enter the default build or the shipped product graph. Nothing depends
+  on it and `dist-tool` does not bundle it — it is not a compile-scope edge on
+  the spine.
 
 ### A noted exception to Stable Abstractions
 
@@ -190,12 +151,14 @@ charter below is the contract for "what changes for this reason lives here."
   execution, or notation semantics. This is the stable kernel of the system; it
   changes only when a contract intentionally changes.
 
-- **`core`** — orchestration and backend-neutral policy: command handlers
-  (`commands`), plugin discovery and subprocess execution (`plugins`), schema
-  validation (`schema`), source validation (`source`), and layout-quality checks
-  (`quality`). Owns *how a command is run* and *how runtime-boundary failures
-  become structured diagnostics*. Must **not** own SVG styling, OEF/XMI mapping,
-  ELK geometry, or notation type rules — those belong to plugins.
+- **`core`** — orchestration and backend-neutral policy: command handlers and
+  the `build` driver (`commands`), in-memory engine dispatch (`engine`), the
+  engine outcome types (`plugins`: `PluginRunOutcome`,
+  `PluginExecutionException`), schema validation (`schema`), source validation
+  (`source`), and layout-quality checks (`quality`). Owns *how a command is
+  run* and *how engine failures become structured diagnostics*. Must **not**
+  own SVG styling, OEF/XMI mapping, ELK geometry, or notation type rules —
+  those belong to engines.
 
 - **`cli`** — the thin entrypoint: parse arguments, assemble a request, call
   `core`, print the envelope. Must stay thin (see §8). No domain policy, no
@@ -211,24 +174,28 @@ charter below is the contract for "what changes for this reason lives here."
   — the model shared library *should* look like (*reuse-or-migrate*: "stable,
   boring, owned mechanics").
 
-- **Plugins** (`render`, `generic-graph`, `elk-layout`, `archimate-oef-export`,
-  `uml-xmi-export`) — leaf executables, each owning one backend concern: SVG/PNG
-  rendering, generic-graph source handling, ELK layout, ArchiMate OEF export,
-  UML/XMI export. Each owns its backend-specific policy and *only* that. Styling
-  lives in render; OEF semantics in the OEF plugin; XMI semantics in the XMI
-  plugin; layout geometry in ELK.
+- **Engines** (`render`, `generic-graph`, `elk-layout`, `archimate-oef-export`,
+  `uml-xmi-export`) — leaf library modules behind `engine-api`, each owning one
+  backend concern: SVG rendering, generic-graph source handling, ELK layout,
+  ArchiMate OEF export, UML/XMI export. Each owns its backend-specific policy
+  and *only* that. Styling lives in render; OEF semantics in the OEF engine;
+  XMI semantics in the XMI engine; layout geometry in ELK. (Their standalone
+  `Main` executables and launchers remain only until the packaging task
+  retires the launcher lane.)
 
-- **`dist-tool`** — assembly and distribution: bundles `cli` and the plugins
-  into a runnable distribution, third-party-notice and SBOM generation, dist
-  smoke. Top of the graph; nothing depends on it.
+- **`dist-tool`** — assembly and distribution: bundles `cli` (and, until the
+  packaging task, the engine launchers) into a runnable distribution,
+  third-party-notice and SBOM generation, dist smoke. Top of the graph; nothing
+  depends on it.
 
 - **`coverage-report`** — build-only JaCoCo aggregation: hosts `report-aggregate`
   over the product reactor under `-Pcoverage`. Ships nothing and nothing depends
   on it; its product-module dependencies stay confined to the `coverage`
   profile. See §2.
 
-- **`test-support`, `testbeds/plugin-runtime`** — test-only scaffolding;
-  `test`-scope only, never on a production compile path.
+- **`test-support`** — test-only scaffolding; `test`-scope only, never on a
+  production compile path. (`testbeds/plugin-runtime` was deleted with the
+  plugin process protocol.)
 
 ---
 
@@ -263,78 +230,62 @@ Discipline:
 
 ---
 
-## 5. The plugin process boundary
+## 5. The engine boundary
 
-Plugins are a hard boundary — a separate process, reached only through a JSON
-contract. This is the system's most important and most expensive seam, chosen
-deliberately.
+The five backends are in-tree single-JVM library engines behind the typed
+`engine-api` seam. The boundary is a compile-time module wall enforced by
+ArchUnit and the Maven dependency graph, not an OS process wall.
 
-### Why out-of-process (the tradeoff, made explicit)
+### Historical note: the retired process boundary
 
-Out-of-process plugins over JSON buy **fault isolation** (a plugin crash, hang,
-or OOM cannot take down core), a real **trust/security boundary**, **language
-independence**, and **decoupled versioning** — the wire envelope, not a shared
-Java classpath, is the compatibility surface, which sidesteps classpath/JAR
-conflicts (*microkernel*, *Richards 2022*; *LSP*). The cost is
-serialization/process overhead per call and a protocol that is hard to change
-once published. This trade is correct for a CLI that invokes a plugin once per
-command rather than in a hot loop. The standing obligation it creates: **treat
-the JSON envelope as a versioned public contract** (§4).
-
-The in-process alternative (`ServiceLoader`/classloader plugins) is faster and
-typed but reintroduces exactly the fault-coupling and version-coupling this
-design removes. Do not migrate a plugin in-process for performance without a
-measured latency requirement that justifies losing isolation (a `[runtime]`
-quality scenario, §9).
-
-**In-process transport initiative — reopened and decided as the monolith
-(2026-07-08).** A trust-tiered in-process transport for first-party plugins
-(typed SPI over `contracts` records, feature-flagged dispatch, ArchUnit
-replacing the OS wall) was designed on 2026-07-01 (spec never committed, working
-file lost) and closed after the 2026-07-03 multi-viewpoint review — that closure
-rested on roughly 330 ms irreducible per-stage overhead after all three startup
-tiers and only ~50 ms/op recoverable via the manifest-trust flag, and judged a
-dual-transport hybrid not worth that recovery (MT-7). The `[runtime]` reopening
-bar this section set was then *met*: the 2026-07-08 runtime challenge re-examined
-the question without the architecture constraint and measured the boundary
-end-to-end — roughly 1.9 s across 13–15 JVM spawns for the documented
-five-invocation agent flow, an order of process overhead the shipped startup
-tiers cannot recover
+Dediren originally ran every backend as a separate executable core launched as
+an OS subprocess over JSON stdin/stdout (*microkernel*, *Richards 2022*;
+*LSP*), buying fault isolation, a process trust boundary, language
+independence, and decoupled versioning at the cost of per-call JVM/process
+overhead. A trust-tiered in-process transport was designed on 2026-07-01 and
+closed after the 2026-07-03 multi-viewpoint review (MT-7). The `[runtime]`
+reopening bar that closure set was then *met*: the 2026-07-08 runtime challenge
+measured the boundary end-to-end — roughly 1.9 s across 13–15 JVM spawns for
+the documented five-invocation agent flow, an order of process overhead the
+shipped startup tiers could not recover
 (`docs/superpowers/reviews/2026-07-08-runtime-size-speed-challenge.md`, I9
-dark-horse follow-up). On that evidence the owner approved not the interim
-in-process *hybrid* but the full **monolith**: the five plugins become in-tree
-single-JVM library engines and the plugin process protocol is deleted. This
-decision supersedes both the 2026-07 closure ruling above and the interim I9
-hybrid design (`2026-07-08-hybrid-plugin-host.md`, superseded;
-`2026-07-08-plugin-probe-cache.md`, dead). It is specified in
-`docs/superpowers/specs/2026-07-08-monolithic-compiler.md` and lands
-task-by-task via `2026-07-08-monolithic-runtime-radical.md`; this section's
-process-boundary rules retire when the cutover tasks (protocol deletion) land.
-Until then, the boundary rules below remain authoritative for the current code.
+dark-horse follow-up). On that evidence the owner approved the full
+**monolith** (spec `docs/superpowers/specs/2026-07-08-monolithic-compiler.md`;
+plan `2026-07-08-monolithic-runtime-radical.md`), superseding the interim I9
+hybrid design (`2026-07-08-hybrid-plugin-host.md`) and the probe cache
+(`2026-07-08-plugin-probe-cache.md`). The cutover deleted the plugin process
+runtime: discovery (manifest directories, executable overrides, trust mode),
+subprocess execution, capability probing, and the twelve process-taxonomy
+diagnostic codes. `DEDIREN_PLUGIN_UNKNOWN` and
+`DEDIREN_PLUGIN_UNSUPPORTED_CAPABILITY` keep their wire strings, now answered
+from the in-memory registry; `DEDIREN_ENGINE_FAILED` succeeds the
+process-crash category.
 
 ### Rules for the boundary
 
-- **Discovery is explicit, never from `PATH`.** Order: bundled first-party
-  plugins, then project plugin directories (`.dediren/plugins`), then
-  user-configured directories. The caller-cwd `.dediren/plugins` directory is
-  opt-in via `DEDIREN_ALLOW_PROJECT_PLUGINS` and off by default: running an
-  executable registered in an untrusted cloned repository is arbitrary code
-  execution with the caller's privileges, so that trust-boundary crossing must
-  be a deliberate operator choice (the bundle-root `.dediren/plugins` lookup and
-  `DEDIREN_PLUGIN_DIRS` remain ungated, being explicit choices already). Adding
-  implicit `PATH` discovery is prohibited — it would erase the trust boundary.
-- **Core normalizes the failures it can observe** into structured diagnostics:
-  missing executable, timeout, invalid JSON, schema mismatch, unsupported
-  capability, id mismatch, process failure. A valid plugin error envelope is
-  preserved and surfaced with a non-zero CLI exit; core does not rewrite it.
-- **A dependency belongs to the plugin that needs it.** A plugin reports its own
-  missing runtime dependency as a structured error envelope (for example the
-  export plugins emit `DEDIREN_OEF_SCHEMA_VALIDATOR_UNAVAILABLE` /
-  `DEDIREN_XMI_SCHEMA_VALIDATOR_UNAVAILABLE` when `xmllint` is absent). Core does
-  not synthesize this category: a launcher that cannot even start its runtime
-  yields only a raw non-zero exit, which core surfaces generically (typically
-  `DEDIREN_PLUGIN_CAPABILITY_PROBE_FAILED`). Keep this ownership line crisp when
-  adding diagnostics.
+- **The JSON envelope stays the agent contract** (§4). Engines return typed
+  results; `core`'s `EngineDispatch` renders them into the exact published
+  stdout envelopes and exit codes, pinned by the cli engine-envelope
+  regression tests.
+- **No discovery of any kind.** No `PATH` lookup, no manifest directories, no
+  per-engine executable overrides, no trust flags. The bundled engine set is
+  constructed explicitly in the single `cli` `EngineWiring` class (ArchUnit
+  pins the edge). An unknown engine id / wrong capability is answered from the
+  in-memory registry (`DEDIREN_PLUGIN_UNKNOWN` /
+  `DEDIREN_PLUGIN_UNSUPPORTED_CAPABILITY`).
+- **Failure taxonomy is small and owned.** A structured engine failure
+  (`EngineException`) becomes the engine's published error envelope with its
+  exit code, preserved verbatim; a structural semantics failure keeps its
+  non-enveloped stderr/exit-2 observable; an unexpected engine exception is
+  normalized to `DEDIREN_ENGINE_FAILED`; Errors crash loudly.
+- **A dependency belongs to the engine that needs it.** An engine reports its
+  own missing runtime dependency as a structured error envelope (for example
+  the export engines emit `DEDIREN_OEF_SCHEMA_VALIDATOR_UNAVAILABLE` /
+  `DEDIREN_XMI_SCHEMA_VALIDATOR_UNAVAILABLE` when `xmllint` is absent). Keep
+  this ownership line crisp when adding diagnostics.
+- **Ambient environment stays out of engines.** The export engines receive the
+  CLI's env map explicitly for their schema-path variables and read nothing
+  else (no-`getenv` guard tests); no other engine reads the environment.
 
 ---
 
@@ -380,8 +331,7 @@ defect: the two copies drift, and a spec change must be made twice.
 `uml` is legitimately larger and more complex than `archimate` (more diagram
 types, ordering and nesting rules), and that asymmetry of *scope* is fine. What
 should be symmetric is their *architectural role and placement*: both are
-tier-1 notation cores consumed across the process boundary by the same plugin
-roles. Today they differ even in dependency (`uml` → `contracts`, `archimate`
+tier-1 notation cores consumed through the same engine roles. Today they differ even in dependency (`uml` → `contracts`, `archimate`
 standalone) and in how they model endpoint legality (`archimate` uses explicit
 curated/rejected triples; `uml` uses inline conditional logic). Prefer the
 explicit-data style for new endpoint rules — it is auditable — and let a core
@@ -447,14 +397,14 @@ requirement.
 | Force (25010 attribute) | Scenario shape | Owner |
 |---|---|---|
 | **Determinism / agent-consumability** (Interaction Capability, Functional Suitability) | Given the same source + policy, a command yields byte-stable envelopes and artifacts an agent can branch on. | `core` (envelopes), each plugin (artifacts) |
-| **Fault isolation** (Reliability) | A plugin crash/hang/OOM yields a structured diagnostic and non-zero exit; core stays up. | `core` plugin runner + process boundary (§5) |
+| **Failure legibility** (Reliability) | An engine failure yields a structured diagnostic (or the engine's published error envelope) and a non-zero exit an agent can branch on. | `core` engine dispatch + engine boundary (§5) |
 | **Offline capability** (Flexibility/Portability) | Export validation runs without network when schema files are supplied (`DEDIREN_OEF_SCHEMA_DIR`, `DEDIREN_XMI_SCHEMA_PATH`). | `schema-cache` + export plugins |
 | **Reproducible build** (Maintainability) | The reactor builds from the checked-in Maven Wrapper with repo-local cache, no ambient state. | root reactor / `dist-tool` |
 
 If a future change adds a *latency* or *throughput* requirement (for example,
 "render under N ms"), express it as a scenario with a number and an owner before
-it is allowed to override an isolation or contract guideline above. Performance
-work that erodes the process boundary needs `[runtime]` evidence, not assertion.
+it is allowed to override a contract guideline above. Performance work that
+erodes the engine boundary needs `[runtime]` evidence, not assertion.
 
 ---
 
@@ -463,12 +413,13 @@ work that erodes the process boundary needs `[runtime]` evidence, not assertion.
 Small, boundary-preserving moves (*evolutionary design*). Playbooks for the
 common changes:
 
-- **Add a plugin.** New Maven module under `plugins/`, depends on `contracts`
-  (+ the notation/utility cores it needs), never on `core`. Ship a manifest and
-  capability probe; communicate over the JSON envelope; report its own dependency
-  failures as structured diagnostics. Register it for discovery and bundling
-  (`dist-tool` runtime dep). Add the cli/dist smoke coverage named in the
-  matching `CLAUDE.md` "Files That Move Together" row.
+- **Add an engine.** New Maven module under `plugins/` (target home
+  `engines/`), depends on `engine-api` and `contracts` (+ the notation/utility
+  cores it needs), never on `core`. Implement the matching `engine-api`
+  interface, surface failures as `EngineException` with published diagnostics,
+  and bind the instance in `cli` `EngineWiring` (the only permitted
+  implementation edge). Add the cli engine-envelope regression coverage named
+  in the matching `CLAUDE.md` "Files That Move Together" row.
 
 - **Add or extend a notation.** Extend the owning notation core
   (`archimate`/`uml`) with vocabulary as the *exported* surface (§6); update
@@ -526,8 +477,8 @@ Guidelines that are not checked become folklore. The enforceable core:
   3.6.x.)
 - **Contract stability:** schema id discipline and the schema/round-trip and
   version-assertion tests already in the suite back §4.
-- **Process boundary + diagnostics:** the plugin-runtime tests and the
-  `plugin-runtime` testbed back §5.
+- **Engine boundary + diagnostics:** `EngineDispatchTest` (core) and the cli
+  engine-envelope regression tests back §5.
 - **Audit gates:** the `CLAUDE.md` `## Audit Gates` table assigns
   `test-quality-audit` and `devsecops-audit` passes per work area; run the one
   the touched area names before calling work complete.
@@ -537,7 +488,7 @@ For a Maven multi-module CLI with external dependencies, ArchUnit + Enforcer giv
 deterministic, dependency-friendly enforcement, while JPMS adoption across every
 module carries real cost (automatic-module friction with non-modular
 dependencies) for encapsulation this design already gets from module structure
-and the process boundary. (*JLS 21* §7.7; *JEP 261* — JPMS-for-libraries is a
+and the ArchUnit-pinned engine boundary. (*JLS 21* §7.7; *JEP 261* — JPMS-for-libraries is a
 genuinely contested area; this is a reasoned position, not settled consensus.)
 Adopting JPMS selectively on the runnable distribution for `jlink` is a separate,
 defensible option if minimal-runtime images become a goal.
@@ -559,11 +510,10 @@ speculatively):
 | SpotBugs `EI_EXPOSE_REP`/`EI_EXPOSE_REP2` suppressed across the contract DTO records (17 `contracts` value records + `schemacache.SchemaFetchResult`) | `spotbugs-exclude.xml` | §6 contract surface | deferred: two distinct cases — the `contracts` records wrap List/Map components via `ContractCollections.listOrEmpty`/`mapOrEmpty` (`List.copyOf`/`Map.copyOf`), so sharing the reference is genuinely immutable; `schemacache.SchemaFetchResult` is different — mutable `byte[] stdout`/`stderr` exposed by reference, never mutated after construction, and not part of the public `contracts` surface (short-lived internal schema-cache result). Defensive-copying either case is out of scope for the quality-gate wiring |
 | SpotBugs `EI_EXPOSE_REP`/`EI_EXPOSE_REP2` suppressed on the `contracts.build` record classes (`BuildArtifact`, `BuildResult`, `BuildViewOutcome`) | `spotbugs-exclude.xml` | §6 contract surface | deferred: same case as the other `contracts` records — wrap List/Map components via `ContractCollections.listOrEmpty`/`mapOrEmpty` (`List.copyOf`/`Map.copyOf`), so sharing the reference is genuinely immutable; suppressed rather than defensive-copied for consistency with the existing `contracts` records |
 | SpotBugs `EI_EXPOSE_REP`/`EI_EXPOSE_REP2` suppressed on the `engine-api` value types (`engine.EngineResult`, `engine.EngineException`, `engine.Engines`) | `spotbugs-exclude.xml` | §2 dependency spine | deferred: same case as the `contracts` records — `EngineResult`/`EngineException` wrap their `List<Diagnostic>` component via `ContractCollections.listOrEmpty` (`List.copyOf`) and `Engines` wraps its capability maps via `mapOrEmpty`/`Map.copyOf`, so sharing the reference is genuinely immutable; suppressed rather than defensive-copied for consistency with the `contracts` records |
-| SpotBugs `EI_EXPOSE_REP`/`EI_EXPOSE_REP2` suppressed on `render/node/NodeLabelLines` and `umlxmi/build/ExportScope` | `spotbugs-exclude.xml` | §8 thinness/cohesion | deferred: plugin-internal value records extracted from the former Main god-files; hold List/Set consumed read-only within the plugin, not part of the public contract surface, never cross the process boundary; suppressed rather than defensive-copied for consistency with the `contracts` records |
-| SpotBugs `MS_EXPOSE_REP` suppressed in `JsonSupport.objectMapper()` | `spotbugs-exclude.xml` | §4 contract surface | by design: returns the shared `ObjectMapper` singleton, mutable in place (`.configure()`/`.registerModule()`), exposed as one canonical mapper; the reconfiguration risk is first-party/same-JVM only because plugins communicate cross-process over stdin/stdout JSON, so the singleton never crosses a process/trust boundary |
+| SpotBugs `EI_EXPOSE_REP`/`EI_EXPOSE_REP2` suppressed on `render/node/NodeLabelLines` and `umlxmi/build/ExportScope` | `spotbugs-exclude.xml` | §8 thinness/cohesion | deferred: plugin-internal value records extracted from the former Main god-files; hold List/Set consumed read-only within the engine, not part of the public contract surface; suppressed rather than defensive-copied for consistency with the `contracts` records |
+| SpotBugs `MS_EXPOSE_REP` suppressed in `JsonSupport.objectMapper()` | `spotbugs-exclude.xml` | §4 contract surface | by design: returns the shared `ObjectMapper` singleton, mutable in place (`.configure()`/`.registerModule()`), exposed as one canonical mapper; the reconfiguration risk is first-party-only: every consumer of the singleton is first-party code in the product JVM, and the mapper is configured once at class initialization |
 | SpotBugs `NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE` suppressed in `DistTool` (5 sites) | `spotbugs-exclude.xml` | §3 module charter | deferred: `Path.getFileName()`/`getParent()` on `Files.list(dir)` entries and real bundle/output paths; null branch infeasible; build/dist tool, not shipped runtime |
-| SpotBugs `NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE` suppressed in `PluginRunner.executablePath` | `spotbugs-exclude.xml` | §5 process boundary | deferred: discovered manifest path always resolves under a plugins dir, so `getParent()` is non-null in practice; defining behavior for the infeasible null case is out of scope |
-| Cross-plugin envelope/dispatch boilerplate duplicated across first-party plugin Mains | `archimate-oef-export/Main.java`, `uml-xmi-export/Main.java`, `generic-graph/Main.java` | §5 process boundary | `LA-CODE-DUP-1` (lean-audit 2026-07-06), accepted while plugins may depend only on `contracts` and no shared plugin-support home exists; marked `lean-audit:dup-intentional`; revisit if a shared plugin runtime-support module is ever chartered |
+| Cross-plugin envelope/dispatch boilerplate duplicated across first-party plugin Mains | `archimate-oef-export/Main.java`, `uml-xmi-export/Main.java`, `generic-graph/Main.java` | §5 engine boundary | `LA-CODE-DUP-1` (lean-audit 2026-07-06), accepted while the standalone Mains survive the launcher lane; retires with the packaging task that deletes them |
 | Layout-quality metric math re-implemented in the ELK plugin's e2e test | `plugins/elk-layout/.../ElkLayoutEngineTest.java` (geometry-metric helpers) vs `core/quality/LayoutQuality.java` | §2 no plugin→`core` edge | `LA-CODE-DUP-2` (lean-audit 2026-07-06), accepted: plugins may depend only on `contracts` (the sole test-scope exception belongs to `cli`), and `test-support` cannot host `contracts`-typed helpers without a reactor cycle (`contracts` test-depends on `test-support`); the independent copy deliberately corroborates core's quality metrics against real ELK output; marked `lean-audit:dup-intentional`; revisit if a contracts-aware test-support home is ever chartered |
 
 None of these block the architecture; they are propagation-cost and clarity
@@ -599,11 +549,11 @@ archaeology (promoted 2026-07-03 after the multi-viewpoint review, MT-5).
   archives (shipped; seeding caveat — archives are seeded by the first
   invocation and a probe-seeded archive is ~30% slower per call than a
   workload-seeded one, see `docs/agent-usage.md`), Tier 3 manifest-trust
-  probe skip via `DEDIREN_TRUST_MANIFEST_CAPABILITIES` (shipped, first-party
-  manifests only, ~50 ms/op), Tier 4 Leyden AOT cache (planned successor;
-  gated on the pending Java 25 baseline decision). Tier 4 supersedes Tier 2
-  when adopted. The 2026-07-03 review appendix holds the measured baseline
-  for all of this.
+  probe skip (~50 ms/op; retired with the plugin process runtime — the
+  monolith removed the per-call probe entirely), Tier 4 Leyden AOT cache
+  (planned successor; gated on the pending Java 25 baseline decision). Tier 4
+  supersedes Tier 2 when adopted. The 2026-07-03 review appendix holds the
+  measured baseline for all of this.
 
 ---
 

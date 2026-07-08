@@ -35,7 +35,6 @@ dediren-agent-bundle-<version>/
   schemas/
   fixtures/
   docs/agent-usage.md
-  docs/plugin-authoring.md
   LICENSE
   THIRD-PARTY-NOTICES.md
   bundle.json
@@ -49,25 +48,23 @@ launch scripts and jars, not a JRE.
 
 Each `bin/dediren*` launcher sets `DEDIREN_BUNDLE_ROOT` from its installation
 root, so commands locate bundled `schemas/`, `plugins/`, and `bin/` regardless of
-the caller's working directory. Manifest executable names resolve to these
-bundled launchers. Project plugin directories and `DEDIREN_PLUGIN_DIRS` remain
-explicit later lookup sources; plugins are never discovered implicitly from
-`PATH`.
+the caller's working directory. The `dediren` CLI runs every engine in-process;
+the per-engine launchers remain as standalone entry points (for example the
+`capabilities` probe) and are never looked up from `PATH`.
 
 ## Environment Variables
 
-Plugin child processes receive only the variables listed in their manifests.
+The engines run inside the CLI process; the export engines receive the CLI's
+environment explicitly for the schema-path variables below and read nothing
+else.
 
 | Variable | Purpose |
 | --- | --- |
 | `DEDIREN_BUNDLE_ROOT` | Bundle/repo root for schemas, manifests, launchers. Set automatically by packaged launchers; override only for custom launchers or tests. |
-| `DEDIREN_PLUGIN_DIRS` | Additional manifest directories (platform path separator). |
-| `DEDIREN_PLUGIN_<PLUGIN_ID>` | Per-plugin executable override, e.g. `DEDIREN_PLUGIN_RENDER`. |
 | `DEDIREN_OEF_SCHEMA_DIR` | Local OEF schema directory (offline export validation). |
 | `DEDIREN_XMI_SCHEMA_PATH` | Local XMI schema file (offline export validation). |
 | `DEDIREN_SCHEMA_CACHE_DIR` | Cache directory for schema downloads. |
 | `DEDIREN_CDS_DIR` | Relocate Class-Data-Sharing archives (see below). |
-| `DEDIREN_TRUST_MANIFEST_CAPABILITIES` | Opt-in: trust static manifest capabilities, skip the per-call runtime probe (one fewer JVM start per op); bypasses the id-mismatch pre-check. Honored only for bundled first-party plugins; manifests in `.dediren/plugins` or `DEDIREN_PLUGIN_DIRS` always keep the probe. Default keeps the probe. |
 
 ## Startup Optimization (Class-Data-Sharing)
 

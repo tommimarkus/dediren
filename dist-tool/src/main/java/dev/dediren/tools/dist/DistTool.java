@@ -70,16 +70,9 @@ public final class DistTool {
               "uml-xmi-export",
               "dediren-plugin-uml-xmi-export",
               "uml-xmi"));
-  private static final List<String> CLEAN_ENV =
-      List.of(
-          "DEDIREN_CDS_DIR",
-          "DEDIREN_TRUST_MANIFEST_CAPABILITIES",
-          "DEDIREN_PLUGIN_DIRS",
-          "DEDIREN_PLUGIN_GENERIC_GRAPH",
-          "DEDIREN_PLUGIN_ELK_LAYOUT",
-          "DEDIREN_PLUGIN_RENDER",
-          "DEDIREN_PLUGIN_ARCHIMATE_OEF",
-          "DEDIREN_PLUGIN_UML_XMI");
+  // Hermeticity scrub for smoke/bench child processes: the CDS directory is the only remaining
+  // dediren environment knob a caller's shell could leak into the packaged-bundle probes.
+  private static final List<String> CLEAN_ENV = List.of("DEDIREN_CDS_DIR");
 
   /** Licence attribution for one redistributed third-party artifact (jar name minus version). */
   private record ThirdPartyAttribution(String project, List<String> licenseIds) {}
@@ -96,6 +89,7 @@ public final class DistTool {
           "contracts",
           "core",
           "elk-layout",
+          "engine-api",
           "generic-graph",
           "render",
           "schema-cache",
@@ -256,10 +250,6 @@ public final class DistTool {
     Files.copy(
         root.resolve("docs/agent-usage.md"),
         bundle.resolve("docs/agent-usage.md"),
-        StandardCopyOption.REPLACE_EXISTING);
-    Files.copy(
-        root.resolve("docs/plugin-authoring.md"),
-        bundle.resolve("docs/plugin-authoring.md"),
         StandardCopyOption.REPLACE_EXISTING);
     Files.copy(
         root.resolve("LICENSE"), bundle.resolve("LICENSE"), StandardCopyOption.REPLACE_EXISTING);
@@ -428,11 +418,6 @@ public final class DistTool {
       Path request = temp.resolve("request.json");
       Path layout = temp.resolve("layout.json");
       Path render = temp.resolve("render.json");
-      Map<String, String> dirtyPluginEnv =
-          Map.of(
-              "DEDIREN_PLUGIN_GENERIC_GRAPH", temp.resolve("missing-generic-graph").toString(),
-              "DEDIREN_PLUGIN_ELK_LAYOUT", temp.resolve("missing-elk-layout").toString(),
-              "DEDIREN_PLUGIN_RENDER", temp.resolve("missing-render").toString());
       String projectOutput =
           runBundleCommand(
               dediren,
@@ -447,9 +432,7 @@ public final class DistTool {
                   "main",
                   "--input",
                   bundle.resolve("fixtures/source/valid-pipeline-rich.json").toString()),
-              null,
-              Map.of(),
-              dirtyPluginEnv);
+              null);
       Files.writeString(request, projectOutput, StandardCharsets.UTF_8);
 
       String layoutOutput =

@@ -5,10 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.core.DedirenPaths;
 import dev.dediren.core.commands.CoreCommands;
-import dev.dediren.core.plugins.PluginRegistry;
-import dev.dediren.core.plugins.PluginRunOptions;
 import dev.dediren.core.plugins.PluginRunOutcome;
-import dev.dediren.core.plugins.PluginRunner;
 import dev.dediren.core.schema.SchemaValidator;
 import dev.dediren.engine.Engines;
 import dev.dediren.testsupport.TestSupport;
@@ -23,275 +20,243 @@ import org.junit.jupiter.api.io.TempDir;
 import tools.jackson.databind.JsonNode;
 
 /**
- * The strangler parity gate (Task 5): every stage command must produce a JSON-value-equal,
- * schema-valid stdout envelope with an identical exit code whether it runs through the new
- * in-memory engine dispatch ({@link CoreCommands} + {@link EngineWiring#defaults()}) or the process
- * boundary ({@link PluginRunner} against the bundled first-party plugin, driven with the
- * script-wrapper technique {@code CliLayoutRenderCommandTest} already uses). Success rows plus one
- * published error row per engine prove the two transports are observationally equivalent before
- * Task 8 deletes the process one.
+ * Envelope-contract regression gate, the successor of the Task-5 parity suite: every stage command,
+ * driven through the in-memory engine registry ({@link CoreCommands} + {@link
+ * EngineWiring#defaults()}), must keep producing a schema-valid stdout envelope with its published
+ * exit code — success rows plus one published error row per engine, and the registry's own
+ * unknown-id / unsupported-capability diagnostics.
  */
-class InMemoryParityTest {
-  private static final String GG_MAIN = "dev.dediren.plugins.genericgraph.Main";
-  private static final String ELK_MAIN = "dev.dediren.plugins.elklayout.Main";
-  private static final String RENDER_MAIN = "dev.dediren.plugins.render.Main";
-  private static final String OEF_MAIN = "dev.dediren.plugins.archimateoef.Main";
-  private static final String XMI_MAIN = "dev.dediren.plugins.umlxmi.Main";
+class EngineEnvelopeContractTest {
 
   @TempDir Path temp;
 
   // --- generic-graph: semantic validation ------------------------------------------------------
 
   @Test
-  void validateArchimateProfileParity() throws Exception {
+  void validateArchimateProfileEmitsOkEnvelope() throws Exception {
     String source = read("fixtures/source/valid-archimate-oef.json");
     Path base = path("fixtures/source");
 
-    PluginRunOutcome inMemory =
+    PluginRunOutcome outcome =
         CoreCommands.semanticValidateCommand(
             "generic-graph", "archimate", source, base, Map.of(), engines());
-    PluginRunOutcome process =
-        CoreCommands.semanticValidateCommand(
-            "generic-graph", "archimate", source, base, pluginEnv("generic-graph", GG_MAIN));
 
-    assertParity(inMemory, process);
-    assertOk(inMemory);
+    assertOk(outcome);
   }
 
   @Test
-  void validateUmlProfileParity() throws Exception {
+  void validateUmlProfileEmitsOkEnvelope() throws Exception {
     String source = read("fixtures/source/valid-uml-basic.json");
     Path base = path("fixtures/source");
 
-    PluginRunOutcome inMemory =
+    PluginRunOutcome outcome =
         CoreCommands.semanticValidateCommand(
             "generic-graph", "uml", source, base, Map.of(), engines());
-    PluginRunOutcome process =
-        CoreCommands.semanticValidateCommand(
-            "generic-graph", "uml", source, base, pluginEnv("generic-graph", GG_MAIN));
 
-    assertParity(inMemory, process);
-    assertOk(inMemory);
+    assertOk(outcome);
   }
 
   @Test
-  void validateMissingProfileParity() throws Exception {
+  void validateMissingProfileKeepsPublishedErrorRow() throws Exception {
     // Published error row: missing --profile wins with the enveloped
-    // DEDIREN_SEMANTIC_PROFILE_REQUIRED
-    // before stdin is parsed; the process leg feeds raw stdin to the plugin without a --profile
-    // arg.
+    // DEDIREN_SEMANTIC_PROFILE_REQUIRED before the engine does any work.
     String source = read("fixtures/source/valid-archimate-oef.json");
     Path base = path("fixtures/source");
 
-    PluginRunOutcome inMemory =
+    PluginRunOutcome outcome =
         CoreCommands.semanticValidateCommand(
             "generic-graph", null, source, base, Map.of(), engines());
-    PluginRunOutcome process =
-        directProcess(
-            "generic-graph", GG_MAIN, "semantic-validation", List.of("validate"), source, Map.of());
 
-    assertParity(inMemory, process);
-    assertDiagnostic(inMemory, 3, "DEDIREN_SEMANTIC_PROFILE_REQUIRED");
+    assertDiagnostic(outcome, 3, "DEDIREN_SEMANTIC_PROFILE_REQUIRED");
   }
 
   // --- generic-graph: projection ---------------------------------------------------------------
 
   @Test
-  void projectLayoutRequestParity() throws Exception {
+  void projectLayoutRequestEmitsOkEnvelope() throws Exception {
     String source = read("fixtures/source/valid-basic.json");
     Path base = path("fixtures/source");
 
-    PluginRunOutcome inMemory =
+    PluginRunOutcome outcome =
         CoreCommands.projectCommand(
             "generic-graph", "layout-request", "main", source, base, Map.of(), engines());
-    PluginRunOutcome process =
-        CoreCommands.projectCommand(
-            "generic-graph",
-            "layout-request",
-            "main",
-            source,
-            base,
-            pluginEnv("generic-graph", GG_MAIN));
 
-    assertParity(inMemory, process);
-    assertOk(inMemory);
+    assertOk(outcome);
   }
 
   @Test
-  void projectRenderMetadataParity() throws Exception {
+  void projectRenderMetadataEmitsOkEnvelope() throws Exception {
     String source = read("fixtures/source/valid-uml-basic.json");
     Path base = path("fixtures/source");
 
-    PluginRunOutcome inMemory =
+    PluginRunOutcome outcome =
         CoreCommands.projectCommand(
             "generic-graph", "render-metadata", "class-view", source, base, Map.of(), engines());
-    PluginRunOutcome process =
-        CoreCommands.projectCommand(
-            "generic-graph",
-            "render-metadata",
-            "class-view",
-            source,
-            base,
-            pluginEnv("generic-graph", GG_MAIN));
 
-    assertParity(inMemory, process);
-    assertOk(inMemory);
+    assertOk(outcome);
   }
 
   // --- elk-layout ------------------------------------------------------------------------------
 
   @Test
-  void layoutParity() throws Exception {
+  void layoutEmitsOkEnvelope() throws Exception {
     String request = read("fixtures/layout-request/basic.json");
 
-    PluginRunOutcome inMemory =
+    PluginRunOutcome outcome =
         CoreCommands.layoutCommand("elk-layout", request, Map.of(), engines());
-    PluginRunOutcome process =
-        directProcess("elk-layout", ELK_MAIN, "layout", List.of("layout"), request, Map.of());
 
-    assertParity(inMemory, process);
-    assertOk(inMemory);
+    assertOk(outcome);
   }
 
   @Test
-  void layoutInvalidJsonParity() throws Exception {
-    // Published parse row: a well-formed JSON that is not a valid layout request is routed through
-    // ElkEngine.parseRequest on both legs (the in-memory leg unwraps first, but this is not an
-    // envelope, so the same bytes reach the parser), yielding DEDIREN_ELK_INPUT_INVALID_JSON / 3.
+  void layoutInvalidJsonKeepsPublishedParseRow() throws Exception {
+    // Published parse row: well-formed JSON that is not a valid layout request is routed through
+    // ElkEngine.parseRequest, yielding DEDIREN_ELK_INPUT_INVALID_JSON / 3.
     String invalid = "{\"unexpected\":\"field\"}";
 
-    PluginRunOutcome inMemory =
+    PluginRunOutcome outcome =
         CoreCommands.layoutCommand("elk-layout", invalid, Map.of(), engines());
-    PluginRunOutcome process =
-        directProcess("elk-layout", ELK_MAIN, "layout", List.of("layout"), invalid, Map.of());
 
-    assertParity(inMemory, process);
-    assertDiagnostic(inMemory, 3, "DEDIREN_ELK_INPUT_INVALID_JSON");
+    assertDiagnostic(outcome, 3, "DEDIREN_ELK_INPUT_INVALID_JSON");
   }
 
   // --- render ----------------------------------------------------------------------------------
 
   @Test
-  void renderWithoutMetadataParity() throws Exception {
+  void renderWithoutMetadataEmitsOkEnvelope() throws Exception {
     String policy = read("fixtures/render-policy/default-svg.json");
     String layout = read("fixtures/layout-result/basic.json");
 
-    PluginRunOutcome inMemory =
+    PluginRunOutcome outcome =
         CoreCommands.renderCommand("render", policy, null, layout, Map.of(), engines());
-    PluginRunOutcome process =
-        CoreCommands.renderCommand(
-            "render", policy, null, layout, pluginEnv("render", RENDER_MAIN));
 
-    assertParity(inMemory, process);
-    assertOk(inMemory);
+    assertOk(outcome);
   }
 
   @Test
-  void renderWithMetadataParity() throws Exception {
+  void renderWithMetadataEmitsOkEnvelope() throws Exception {
     String policy = read("fixtures/render-policy/uml-svg.json");
     String layout = read("fixtures/layout-result/uml-basic.json");
     String metadata = read("fixtures/render-metadata/uml-basic.json");
 
-    PluginRunOutcome inMemory =
+    PluginRunOutcome outcome =
         CoreCommands.renderCommand("render", policy, metadata, layout, Map.of(), engines());
-    PluginRunOutcome process =
-        CoreCommands.renderCommand(
-            "render", policy, metadata, layout, pluginEnv("render", RENDER_MAIN));
 
-    assertParity(inMemory, process);
-    assertOk(inMemory);
+    assertOk(outcome);
   }
 
   @Test
-  void renderInvalidPolicyParity() throws Exception {
+  void renderInvalidPolicyKeepsPublishedErrorRow() throws Exception {
     String policy =
         "{\"render_policy_schema_version\":\"render-policy.schema.v2\",\"interactive\":\"bogus\"}";
     String layout = read("fixtures/layout-result/basic.json");
 
-    PluginRunOutcome inMemory =
+    PluginRunOutcome outcome =
         CoreCommands.renderCommand("render", policy, null, layout, Map.of(), engines());
-    PluginRunOutcome process =
-        CoreCommands.renderCommand(
-            "render", policy, null, layout, pluginEnv("render", RENDER_MAIN));
 
-    assertParity(inMemory, process);
-    assertDiagnostic(inMemory, 3, "DEDIREN_SVG_POLICY_INVALID");
+    assertDiagnostic(outcome, 3, "DEDIREN_SVG_POLICY_INVALID");
   }
 
   // --- archimate-oef export --------------------------------------------------------------------
 
   @Test
-  void exportArchimateOefParity() throws Exception {
+  void exportArchimateOefEmitsOkEnvelope() throws Exception {
     Map<String, String> schema = envWithOefSchemas();
     String policy = read("fixtures/export-policy/default-oef.json");
     String source = read("fixtures/source/valid-archimate-oef.json");
     Path base = path("fixtures/source");
     String layout = read("fixtures/layout-result/archimate-oef-basic.json");
 
-    PluginRunOutcome inMemory =
+    PluginRunOutcome outcome =
         CoreCommands.exportCommand(
             "archimate-oef", policy, source, base, layout, schema, engines());
-    Map<String, String> processEnv = pluginEnv("archimate-oef", OEF_MAIN);
-    processEnv.putAll(schema);
-    PluginRunOutcome process =
-        CoreCommands.exportCommand("archimate-oef", policy, source, base, layout, processEnv);
 
-    assertParity(inMemory, process);
-    assertOk(inMemory);
+    assertOk(outcome);
   }
 
   @Test
-  void exportOefInvalidPolicyParity() throws Exception {
+  void exportOefInvalidPolicyKeepsPublishedErrorRow() throws Exception {
     String source = read("fixtures/source/valid-archimate-oef.json");
     Path base = path("fixtures/source");
     String layout = read("fixtures/layout-result/archimate-oef-basic.json");
 
-    PluginRunOutcome inMemory =
+    PluginRunOutcome outcome =
         CoreCommands.exportCommand(
             "archimate-oef", "{}", source, base, layout, Map.of(), engines());
-    PluginRunOutcome process =
-        CoreCommands.exportCommand(
-            "archimate-oef", "{}", source, base, layout, pluginEnv("archimate-oef", OEF_MAIN));
 
-    assertParity(inMemory, process);
-    assertDiagnostic(inMemory, 3, "DEDIREN_OEF_POLICY_INVALID");
+    assertDiagnostic(outcome, 3, "DEDIREN_OEF_POLICY_INVALID");
   }
 
   // --- uml-xmi export --------------------------------------------------------------------------
 
   @Test
-  void exportUmlXmiParity() throws Exception {
+  void exportUmlXmiEmitsOkEnvelope() throws Exception {
     Map<String, String> schema = envWithXmiSchema();
     String policy = read("fixtures/export-policy/default-uml-xmi.json");
     String source = read("fixtures/source/valid-uml-basic.json");
     Path base = path("fixtures/source");
     String layout = read("fixtures/layout-result/uml-basic.json");
 
-    PluginRunOutcome inMemory =
+    PluginRunOutcome outcome =
         CoreCommands.exportCommand("uml-xmi", policy, source, base, layout, schema, engines());
-    Map<String, String> processEnv = pluginEnv("uml-xmi", XMI_MAIN);
-    processEnv.putAll(schema);
-    PluginRunOutcome process =
-        CoreCommands.exportCommand("uml-xmi", policy, source, base, layout, processEnv);
 
-    assertParity(inMemory, process);
-    assertOk(inMemory);
+    assertOk(outcome);
   }
 
   @Test
-  void exportUmlXmiInvalidPolicyParity() throws Exception {
+  void exportUmlXmiInvalidPolicyKeepsPublishedErrorRow() throws Exception {
     String source = read("fixtures/source/valid-uml-basic.json");
     Path base = path("fixtures/source");
     String layout = read("fixtures/layout-result/uml-basic.json");
 
-    PluginRunOutcome inMemory =
+    PluginRunOutcome outcome =
         CoreCommands.exportCommand("uml-xmi", "{}", source, base, layout, Map.of(), engines());
-    PluginRunOutcome process =
-        CoreCommands.exportCommand(
-            "uml-xmi", "{}", source, base, layout, pluginEnv("uml-xmi", XMI_MAIN));
 
-    assertParity(inMemory, process);
-    assertDiagnostic(inMemory, 3, "DEDIREN_UML_XMI_POLICY_INVALID");
+    assertDiagnostic(outcome, 3, "DEDIREN_UML_XMI_POLICY_INVALID");
+  }
+
+  // --- registry diagnostics through the CLI ----------------------------------------------------
+
+  @Test
+  void unknownEngineIdYieldsPublishedUnknownDiagnostic() throws Exception {
+    CliResult result =
+        Main.executeForTesting(
+            new String[] {
+              "layout",
+              "--plugin",
+              "no-such-engine",
+              "--input",
+              root().resolve("fixtures/layout-request/basic.json").toString()
+            },
+            "");
+
+    JsonNode envelope = JsonSupport.objectMapper().readTree(result.stdout());
+    assertThat(result.exitCode()).isEqualTo(3);
+    assertThat(envelope.at("/status").asText()).isEqualTo("error");
+    assertThat(envelope.at("/diagnostics/0/code").asText()).isEqualTo("DEDIREN_PLUGIN_UNKNOWN");
+    assertSchemaValid(envelope);
+  }
+
+  @Test
+  void wrongCapabilityYieldsPublishedUnsupportedCapabilityDiagnostic() throws Exception {
+    // "render" is a bound engine id, but it is not a layout engine.
+    CliResult result =
+        Main.executeForTesting(
+            new String[] {
+              "layout",
+              "--plugin",
+              "render",
+              "--input",
+              root().resolve("fixtures/layout-request/basic.json").toString()
+            },
+            "");
+
+    JsonNode envelope = JsonSupport.objectMapper().readTree(result.stdout());
+    assertThat(result.exitCode()).isEqualTo(3);
+    assertThat(envelope.at("/status").asText()).isEqualTo("error");
+    assertThat(envelope.at("/diagnostics/0/code").asText())
+        .isEqualTo("DEDIREN_PLUGIN_UNSUPPORTED_CAPABILITY");
+    assertSchemaValid(envelope);
   }
 
   // --- helpers ---------------------------------------------------------------------------------
@@ -300,21 +265,19 @@ class InMemoryParityTest {
     return EngineWiring.defaults();
   }
 
-  private void assertParity(PluginRunOutcome inMemory, PluginRunOutcome process) {
-    assertThat(inMemory.exitCode())
-        .describedAs(
-            "exit-code parity%n  in-memory(%s): %s%n  process(%s): %s",
-            inMemory.exitCode(), inMemory.stdout(), process.exitCode(), process.stdout())
-        .isEqualTo(process.exitCode());
-    JsonNode inMemoryEnvelope = JsonSupport.objectMapper().readTree(inMemory.stdout());
-    JsonNode processEnvelope = JsonSupport.objectMapper().readTree(process.stdout());
-    assertThat(inMemoryEnvelope)
-        .describedAs(
-            "stdout envelope JSON-value parity%n  in-memory: %s%n  process:   %s",
-            inMemory.stdout(), process.stdout())
-        .isEqualTo(processEnvelope);
-    assertSchemaValid(inMemoryEnvelope);
-    assertSchemaValid(processEnvelope);
+  private void assertOk(PluginRunOutcome outcome) {
+    assertThat(outcome.exitCode()).describedAs(outcome.stdout()).isZero();
+    JsonNode envelope = JsonSupport.objectMapper().readTree(outcome.stdout());
+    assertThat(envelope.get("status").asText()).isEqualTo("ok");
+    assertSchemaValid(envelope);
+  }
+
+  private void assertDiagnostic(PluginRunOutcome outcome, int exitCode, String code) {
+    assertThat(outcome.exitCode()).describedAs(outcome.stdout()).isEqualTo(exitCode);
+    JsonNode envelope = JsonSupport.objectMapper().readTree(outcome.stdout());
+    assertThat(envelope.get("status").asText()).isEqualTo("error");
+    assertThat(envelope.at("/diagnostics/0/code").asText()).isEqualTo(code);
+    assertSchemaValid(envelope);
   }
 
   private void assertSchemaValid(JsonNode envelope) {
@@ -322,59 +285,6 @@ class InMemoryParityTest {
         SchemaValidator.fromRepositoryRoot(DedirenPaths.productRoot())
             .validate("schemas/envelope.schema.json", envelope);
     assertThat(errors).describedAs("envelope schema validity: %s", envelope).isEmpty();
-  }
-
-  private void assertOk(PluginRunOutcome outcome) {
-    assertThat(outcome.exitCode()).isZero();
-    assertThat(JsonSupport.objectMapper().readTree(outcome.stdout()).get("status").asText())
-        .isEqualTo("ok");
-  }
-
-  private void assertDiagnostic(PluginRunOutcome outcome, int exitCode, String code) {
-    assertThat(outcome.exitCode()).isEqualTo(exitCode);
-    JsonNode envelope = JsonSupport.objectMapper().readTree(outcome.stdout());
-    assertThat(envelope.get("status").asText()).isEqualTo("error");
-    assertThat(envelope.at("/diagnostics/0/code").asText()).isEqualTo(code);
-  }
-
-  private PluginRunOutcome directProcess(
-      String pluginId,
-      String mainClass,
-      String capability,
-      List<String> args,
-      String stdin,
-      Map<String, String> extraEnv)
-      throws Exception {
-    Map<String, String> env = pluginEnv(pluginId, mainClass);
-    env.putAll(extraEnv);
-    return PluginRunner.runForCapabilityWithRegistry(
-        PluginRegistry.bundled(env),
-        pluginId,
-        capability,
-        args,
-        stdin,
-        PluginRunOptions.defaults().withCandidateEnv(env));
-  }
-
-  private Map<String, String> pluginEnv(String pluginId, String mainClass) throws Exception {
-    Path script = temp.resolve(pluginId + ".sh");
-    String java = Path.of(System.getProperty("java.home"), "bin", "java").toString();
-    String classpath = System.getProperty("java.class.path");
-    Files.writeString(
-        script,
-        """
-        #!/bin/sh
-        exec "%s" -cp "%s" %s "$@"
-        """
-            .formatted(java, classpath, mainClass),
-        StandardCharsets.UTF_8);
-    script.toFile().setExecutable(true);
-    return new LinkedHashMap<>(
-        Map.of(
-            "DEDIREN_PLUGIN_DIRS",
-            root().resolve("fixtures/plugins").toString(),
-            "DEDIREN_PLUGIN_" + pluginId.toUpperCase().replace('-', '_'),
-            script.toString()));
   }
 
   private Map<String, String> envWithOefSchemas() throws Exception {

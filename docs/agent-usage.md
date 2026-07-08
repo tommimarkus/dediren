@@ -743,51 +743,32 @@ you can recover from stdout JSON alone.
 - `DEDIREN_DUPLICATE_ID`: make node, relationship, view, and group ids unique.
 - `DEDIREN_DANGLING_ENDPOINT`: repair relationship source/target ids or include
   the missing node.
-- `DEDIREN_PLUGIN_UNKNOWN`: inspect `plugins/*.manifest.json` in the bundle,
-  `.dediren/plugins/*.manifest.json` under the directory you run the CLI from
-  (discovered only when `DEDIREN_ALLOW_PROJECT_PLUGINS=1`), or explicit
-  `DEDIREN_PLUGIN_DIRS`. Security: a project-supplied plugin runs as arbitrary
-  code with your privileges, so do not enable that flag or invoke such a plugin
-  for a repository you did not author without explicit human confirmation.
-- `DEDIREN_PLUGIN_MISSING_EXECUTABLE`: inspect the manifest executable and the
-  bundle `bin/` directory.
-- `DEDIREN_PLUGIN_OUTPUT_INVALID_*`: treat plugin stdout as invalid and do not
-  continue the pipeline.
+- `DEDIREN_PLUGIN_UNKNOWN`: unknown engine id — the bundled set is
+  `generic-graph`, `elk-layout`, `render`, `archimate-oef`, `uml-xmi`. Fix the
+  `--plugin` value.
+- `DEDIREN_ENGINE_FAILED`: an unexpected in-memory engine failure. Not an input
+  problem — the diagnostic message names the engine; report it with the failing
+  command and input rather than retrying with modified JSON.
 - `DEDIREN_COMMAND_INPUT_INVALID`: the CLI could not read or parse a command
   input file.
 
 ## Plugin Environment
 
-Bundle launchers use `DEDIREN_BUNDLE_ROOT` for product-root discovery. Plugin
-child processes launched by the core receive only manifest-listed environment
-variables. Important explicit variables:
+Bundle launchers use `DEDIREN_BUNDLE_ROOT` for product-root discovery. The
+bundled engines run inside the CLI process; the export engines receive the
+CLI's environment explicitly for the schema-path variables below and read
+nothing else. Important explicit variables:
 
 - `DEDIREN_BUNDLE_ROOT`: explicit bundle or repository root for bundled
   schemas, plugin manifests, and launchers. Packaged launchers set this
   automatically.
-- `DEDIREN_PLUGIN_DIRS`: additional manifest directories. Discovery order is
-  bundled plugins, then (opt-in) `.dediren/plugins` under the CLI's current
-  working directory, then these directories; never `PATH`.
-- `DEDIREN_ALLOW_PROJECT_PLUGINS`: opt-in; when `1` or `true`, enables discovery
-  of `.dediren/plugins` under the CLI's current working directory. Off by
-  default. Security: such a plugin executable runs unsandboxed with your
-  privileges and is unsigned, so treat a cloned repository's `.dediren/plugins`
-  as untrusted — do not enable this for a repository you did not author without
-  explicit human confirmation.
-- `DEDIREN_PLUGIN_<PLUGIN_ID>`: per-plugin executable override.
 - `DEDIREN_OEF_SCHEMA_DIR`: local OEF schema directory.
 - `DEDIREN_XMI_SCHEMA_PATH`: local XMI schema file, or a driver schema that
   imports `XMI.xsd` plus a UML 2.5.1 XSD to also validate UML content.
 - `DEDIREN_SCHEMA_CACHE_DIR`: cache directory for schema downloads.
 - `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY` (and their lowercase forms): forwarded
-  to the export plugins so `curl` can download standards schemas through a proxy.
+  to `curl` so it can download standards schemas through a proxy.
 - `DEDIREN_CDS_DIR`: directory for Class-Data-Sharing archives (see below).
-- `DEDIREN_TRUST_MANIFEST_CAPABILITIES`: opt-in; trusts each plugin's static
-  manifest capabilities and skips the per-call runtime probe, removing one JVM
-  start per plugin operation; bypasses the runtime id-mismatch pre-check. Honored
-  only for bundled first-party plugins; manifests in `.dediren/plugins` or
-  `DEDIREN_PLUGIN_DIRS` always keep the probe. Default (unset) keeps the probe
-  and all integrity checks.
 
 Each `bin/dediren*` launcher auto-creates a Class-Data-Sharing archive on its
 first invocation to speed JVM startup on subsequent calls. Archives are written
@@ -808,15 +789,6 @@ Seed each launcher with a representative workload command — running the
 Bundle Smoke Workflow once covers the whole pipeline — before or instead of
 trivial probes. To reseed, delete the `.jsa` files or point `DEDIREN_CDS_DIR`
 at a fresh directory.
-
-Setting `DEDIREN_TRUST_MANIFEST_CAPABILITIES=1` (or `true`) makes dediren trust
-each plugin's static manifest capabilities and skip the per-call runtime
-capability probe, removing one JVM start per plugin operation. The tradeoff is
-that the runtime `id`-mismatch pre-flight check is bypassed, so the flag is
-honored only for bundled first-party plugins (manifests in the bundle's
-`plugins/` directory). Manifests discovered in `.dediren/plugins` or a
-`DEDIREN_PLUGIN_DIRS` entry always keep the probe regardless of this flag.
-Default (unset) keeps the probe and all integrity checks.
 
 Keep stderr for human debugging only. Agents should decide success or failure
 from stdout JSON.

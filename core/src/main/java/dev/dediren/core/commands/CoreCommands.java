@@ -7,7 +7,6 @@ import dev.dediren.contracts.Diagnostic;
 import dev.dediren.contracts.DiagnosticCode;
 import dev.dediren.contracts.export.ExportRequest;
 import dev.dediren.contracts.json.JsonSupport;
-import dev.dediren.contracts.layout.LayoutRequest;
 import dev.dediren.contracts.layout.LayoutResult;
 import dev.dediren.contracts.render.RenderMetadata;
 import dev.dediren.contracts.source.SourceDocument;
@@ -15,10 +14,7 @@ import dev.dediren.core.DedirenPaths;
 import dev.dediren.core.engine.EngineDispatch;
 import dev.dediren.core.io.JsonInput;
 import dev.dediren.core.plugins.PluginExecutionException;
-import dev.dediren.core.plugins.PluginRegistry;
-import dev.dediren.core.plugins.PluginRunOptions;
 import dev.dediren.core.plugins.PluginRunOutcome;
-import dev.dediren.core.plugins.PluginRunner;
 import dev.dediren.core.quality.LayoutQuality;
 import dev.dediren.core.quality.LayoutQualityReport;
 import dev.dediren.core.source.SourceValidator;
@@ -33,48 +29,69 @@ import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import tools.jackson.databind.JsonNode;
 
+/**
+ * Stage command drivers over the in-memory engine registry. Every stage command requires an {@link
+ * Engines} registry; command inputs are parsed/validated first, then the engine is resolved
+ * (unknown id / unsupported capability via {@link EngineDispatch#requireEngine}), then the typed
+ * call is dispatched. The overloads without an explicit env map default to the ambient process
+ * environment — the export lane reads schema-path variables from it.
+ */
 public final class CoreCommands {
   private CoreCommands() {}
 
-  public static PluginRunOutcome layoutCommand(String plugin, String inputText)
+  public static PluginRunOutcome layoutCommand(String engineId, String inputText, Engines engines)
       throws PluginExecutionException {
-    return layoutCommand(plugin, inputText, System.getenv());
+    return layoutCommand(engineId, inputText, System.getenv(), engines);
   }
 
   public static PluginRunOutcome layoutCommand(
-      String plugin, String inputText, Map<String, String> env) throws PluginExecutionException {
-    return layoutCommand(
-        new LayoutCommandInput(plugin, inputText, PluginRegistry.bundled(env), env));
+      String engineId, String inputText, Map<String, String> env, Engines engines)
+      throws PluginExecutionException {
+    // Unwrap a piped stage envelope to its data (the chained-workflow convenience), then route the
+    // unwrapped bytes through the engine's parse entry point so a well-formed-but-invalid request
+    // reproduces the published DEDIREN_ELK_INPUT_INVALID_JSON envelope rather than core's generic
+    // input diagnostic.
+    byte[] bytes = layoutRequestBytes(inputText);
+    LayoutEngine layout =
+        EngineDispatch.requireEngine(engines, engineId, "layout", engines.layoutEngine(engineId));
+    return EngineDispatch.dispatch(engineId, () -> layout.layout(layout.parseRequest(bytes)));
   }
 
-  public static PluginRunOutcome layoutCommand(LayoutCommandInput input)
-      throws PluginExecutionException {
-    LayoutRequest request = parseCommandData("layout", input.inputText(), LayoutRequest.class);
-    return PluginRunner.runForCapabilityWithRegistry(
-        input.registry(),
-        input.plugin(),
-        "layout",
-        List.of("layout"),
-        toJson("layout", request),
-        PluginRunOptions.defaults().withCandidateEnv(input.env()));
+  private static byte[] layoutRequestBytes(String inputText) throws PluginExecutionException {
+    JsonNode value;
+    try {
+      value = JsonSupport.objectMapper().readTree(inputText);
+    } catch (RuntimeException error) {
+      throw commandInputInvalid("layout", error);
+    }
+    JsonNode data = value.has("envelope_schema_version") ? value.get("data") : value;
+    if (data == null) {
+      throw commandInputInvalid(
+          "layout", new IllegalArgumentException("command envelope does not contain data"));
+    }
+    try {
+      return JsonSupport.objectMapper().writeValueAsBytes(data);
+    } catch (RuntimeException error) {
+      throw commandInputInvalid("layout", error);
+    }
   }
 
   public static PluginRunOutcome projectCommand(
-      String plugin, String target, String view, String inputText, Path baseDir)
+      String engineId, String target, String view, String inputText, Path baseDir, Engines engines)
       throws PluginExecutionException {
-    return projectCommand(plugin, target, view, inputText, baseDir, System.getenv());
+    return projectCommand(engineId, target, view, inputText, baseDir, System.getenv(), engines);
   }
 
   public static PluginRunOutcome projectCommand(
-      String plugin,
+      String engineId,
       String target,
       String view,
       String inputText,
       Path baseDir,
-      Map<String, String> env)
+      Map<String, String> env,
+      Engines engines)
       throws PluginExecutionException {
     SourceDocument source;
     try {
@@ -82,28 +99,33 @@ public final class CoreCommands {
     } catch (SourceValidator.SourceDiagnosticsException error) {
       return errorOutcome(error.diagnostics());
     }
-    return PluginRunner.runForCapabilityWithRegistry(
-        PluginRegistry.bundled(env),
-        plugin,
-        "projection",
-        List.of("project", "--target", target, "--view", view),
-        toJson("project", source),
-        PluginRunOptions.defaults().withCandidateEnv(env));
+    SemanticsEngine semantics =
+        EngineDispatch.requireEngine(
+            engines, engineId, "projection", engines.semanticsEngine(engineId));
+    if ("render-metadata".equals(target)) {
+      return EngineDispatch.dispatch(engineId, () -> semantics.projectRenderMetadata(source, view));
+    }
+    if ("layout-request".equals(target)) {
+      return EngineDispatch.dispatch(engineId, () -> semantics.projectLayoutRequest(source, view));
+    }
+    // A structural failure's observable: message to stderr, exit 2. The cli catches this
+    // UncheckedIOException and prints its cause, keeping the published non-enveloped form.
+    throw new UncheckedIOException(new IOException("unsupported target: " + target));
   }
 
   public static PluginRunOutcome semanticValidateCommand(
-      String plugin, String profile, String inputText) throws PluginExecutionException {
-    return semanticValidateCommand(plugin, profile, inputText, null);
-  }
-
-  public static PluginRunOutcome semanticValidateCommand(
-      String plugin, String profile, String inputText, Path baseDir)
+      String engineId, String profile, String inputText, Path baseDir, Engines engines)
       throws PluginExecutionException {
-    return semanticValidateCommand(plugin, profile, inputText, baseDir, System.getenv());
+    return semanticValidateCommand(engineId, profile, inputText, baseDir, System.getenv(), engines);
   }
 
   public static PluginRunOutcome semanticValidateCommand(
-      String plugin, String profile, String inputText, Path baseDir, Map<String, String> env)
+      String engineId,
+      String profile,
+      String inputText,
+      Path baseDir,
+      Map<String, String> env,
+      Engines engines)
       throws PluginExecutionException {
     SourceDocument source;
     try {
@@ -111,13 +133,10 @@ public final class CoreCommands {
     } catch (SourceValidator.SourceDiagnosticsException error) {
       return errorOutcome(error.diagnostics());
     }
-    return PluginRunner.runForCapabilityWithRegistry(
-        PluginRegistry.bundled(env),
-        plugin,
-        "semantic-validation",
-        List.of("validate", "--profile", profile),
-        toJson("validate", source),
-        PluginRunOptions.defaults().withCandidateEnv(env));
+    SemanticsEngine semantics =
+        EngineDispatch.requireEngine(
+            engines, engineId, "semantic-validation", engines.semanticsEngine(engineId));
+    return EngineDispatch.dispatch(engineId, () -> semantics.validate(source, profile));
   }
 
   public static ValidationResult validateLayoutCommand(String inputText) {
@@ -144,17 +163,18 @@ public final class CoreCommands {
   }
 
   public static PluginRunOutcome renderCommand(
-      String plugin, String policyText, String metadataText, String layoutText)
+      String engineId, String policyText, String metadataText, String layoutText, Engines engines)
       throws PluginExecutionException {
-    return renderCommand(plugin, policyText, metadataText, layoutText, System.getenv());
+    return renderCommand(engineId, policyText, metadataText, layoutText, System.getenv(), engines);
   }
 
   public static PluginRunOutcome renderCommand(
-      String plugin,
+      String engineId,
       String policyText,
       String metadataText,
       String layoutText,
-      Map<String, String> env)
+      Map<String, String> env,
+      Engines engines)
       throws PluginExecutionException {
     LayoutResult layoutResult = parseCommandData("render", layoutText, LayoutResult.class);
     JsonNode policy = parseJson("render", policyText);
@@ -162,174 +182,26 @@ public final class CoreCommands {
         metadataText == null
             ? null
             : parseCommandData("render", metadataText, RenderMetadata.class);
-
-    var input = JsonSupport.objectMapper().createObjectNode();
-    input.set("layout_result", JsonSupport.objectMapper().valueToTree(layoutResult));
-    input.set("policy", policy);
-    if (metadata != null) {
-      input.set("render_metadata", JsonSupport.objectMapper().valueToTree(metadata));
-    }
-    return PluginRunner.runForCapabilityWithRegistry(
-        PluginRegistry.bundled(env),
-        plugin,
-        "render",
-        List.of("render"),
-        toJson("render", input),
-        PluginRunOptions.defaults().withCandidateEnv(env));
+    RenderEngine renderEngine =
+        EngineDispatch.requireEngine(engines, engineId, "render", engines.renderEngine(engineId));
+    return EngineDispatch.dispatch(
+        engineId, () -> renderEngine.render(layoutResult, policy, metadata));
   }
 
   public static PluginRunOutcome exportCommand(
-      String plugin, String policyText, String sourceText, Path sourceBaseDir, String layoutText)
+      String engineId,
+      String policyText,
+      String sourceText,
+      Path sourceBaseDir,
+      String layoutText,
+      Engines engines)
       throws PluginExecutionException {
     return exportCommand(
-        plugin, policyText, sourceText, sourceBaseDir, layoutText, System.getenv());
+        engineId, policyText, sourceText, sourceBaseDir, layoutText, System.getenv(), engines);
   }
 
   public static PluginRunOutcome exportCommand(
-      String plugin,
-      String policyText,
-      String sourceText,
-      Path sourceBaseDir,
-      String layoutText,
-      Map<String, String> env)
-      throws PluginExecutionException {
-    SourceDocument source;
-    try {
-      source = SourceValidator.loadAndValidateSourceDocument(sourceText, sourceBaseDir);
-    } catch (SourceValidator.SourceDiagnosticsException error) {
-      return errorOutcome(error.diagnostics());
-    }
-    LayoutResult layoutResult = parseCommandData("export", layoutText, LayoutResult.class);
-    JsonNode policy = parseJson("export", policyText);
-    var input =
-        new ExportRequest(
-            ContractVersions.EXPORT_REQUEST_SCHEMA_VERSION, source, layoutResult, policy);
-    return PluginRunner.runForCapabilityWithRegistry(
-        PluginRegistry.bundled(env),
-        plugin,
-        "export",
-        List.of("export"),
-        toJson("export", input),
-        PluginRunOptions.defaults().withCandidateEnv(env));
-  }
-
-  // Registry-first in-memory dispatch overloads (Task 5 strangler seam). A bound first-party engine
-  // runs in-process through EngineDispatch; an unbound id falls back to the process path above, so
-  // third-party plugins and the unknown-id/unsupported-capability diagnostics are unchanged.
-
-  public static PluginRunOutcome layoutCommand(
-      String plugin, String inputText, Map<String, String> env, Engines engines)
-      throws PluginExecutionException {
-    Optional<LayoutEngine> engine = engines.layoutEngine(plugin);
-    if (engine.isEmpty()) {
-      return layoutCommand(plugin, inputText, env);
-    }
-    LayoutEngine layout = engine.get();
-    // Unwrap a piped stage envelope to its data (the chained-workflow convenience JsonInput gives
-    // the process path), then route the unwrapped bytes through the engine's parse entry point so a
-    // well-formed-but-invalid request reproduces the published DEDIREN_ELK_INPUT_INVALID_JSON
-    // envelope rather than core's generic input diagnostic.
-    byte[] bytes = layoutRequestBytes(inputText);
-    return EngineDispatch.dispatch(plugin, () -> layout.layout(layout.parseRequest(bytes)));
-  }
-
-  private static byte[] layoutRequestBytes(String inputText) throws PluginExecutionException {
-    JsonNode value;
-    try {
-      value = JsonSupport.objectMapper().readTree(inputText);
-    } catch (RuntimeException error) {
-      throw commandInputInvalid("layout", error);
-    }
-    JsonNode data = value.has("envelope_schema_version") ? value.get("data") : value;
-    if (data == null) {
-      throw commandInputInvalid(
-          "layout", new IllegalArgumentException("command envelope does not contain data"));
-    }
-    try {
-      return JsonSupport.objectMapper().writeValueAsBytes(data);
-    } catch (RuntimeException error) {
-      throw commandInputInvalid("layout", error);
-    }
-  }
-
-  public static PluginRunOutcome projectCommand(
-      String plugin,
-      String target,
-      String view,
-      String inputText,
-      Path baseDir,
-      Map<String, String> env,
-      Engines engines)
-      throws PluginExecutionException {
-    Optional<SemanticsEngine> engine = engines.semanticsEngine(plugin);
-    if (engine.isEmpty()) {
-      return projectCommand(plugin, target, view, inputText, baseDir, env);
-    }
-    SourceDocument source;
-    try {
-      source = SourceValidator.loadAndValidateSourceDocument(inputText, baseDir);
-    } catch (SourceValidator.SourceDiagnosticsException error) {
-      return errorOutcome(error.diagnostics());
-    }
-    SemanticsEngine semantics = engine.get();
-    if ("render-metadata".equals(target)) {
-      return EngineDispatch.dispatch(plugin, () -> semantics.projectRenderMetadata(source, view));
-    }
-    if ("layout-request".equals(target)) {
-      return EngineDispatch.dispatch(plugin, () -> semantics.projectLayoutRequest(source, view));
-    }
-    // Reproduce the plugin-native "unsupported target" observable: message to stderr, exit 2. The
-    // cli catches this UncheckedIOException and prints its cause, matching the process form.
-    throw new UncheckedIOException(new IOException("unsupported target: " + target));
-  }
-
-  public static PluginRunOutcome semanticValidateCommand(
-      String plugin,
-      String profile,
-      String inputText,
-      Path baseDir,
-      Map<String, String> env,
-      Engines engines)
-      throws PluginExecutionException {
-    Optional<SemanticsEngine> engine = engines.semanticsEngine(plugin);
-    if (engine.isEmpty()) {
-      return semanticValidateCommand(plugin, profile, inputText, baseDir, env);
-    }
-    SourceDocument source;
-    try {
-      source = SourceValidator.loadAndValidateSourceDocument(inputText, baseDir);
-    } catch (SourceValidator.SourceDiagnosticsException error) {
-      return errorOutcome(error.diagnostics());
-    }
-    SemanticsEngine semantics = engine.get();
-    return EngineDispatch.dispatch(plugin, () -> semantics.validate(source, profile));
-  }
-
-  public static PluginRunOutcome renderCommand(
-      String plugin,
-      String policyText,
-      String metadataText,
-      String layoutText,
-      Map<String, String> env,
-      Engines engines)
-      throws PluginExecutionException {
-    Optional<RenderEngine> engine = engines.renderEngine(plugin);
-    if (engine.isEmpty()) {
-      return renderCommand(plugin, policyText, metadataText, layoutText, env);
-    }
-    LayoutResult layoutResult = parseCommandData("render", layoutText, LayoutResult.class);
-    JsonNode policy = parseJson("render", policyText);
-    RenderMetadata metadata =
-        metadataText == null
-            ? null
-            : parseCommandData("render", metadataText, RenderMetadata.class);
-    RenderEngine renderEngine = engine.get();
-    return EngineDispatch.dispatch(
-        plugin, () -> renderEngine.render(layoutResult, policy, metadata));
-  }
-
-  public static PluginRunOutcome exportCommand(
-      String plugin,
+      String engineId,
       String policyText,
       String sourceText,
       Path sourceBaseDir,
@@ -337,10 +209,6 @@ public final class CoreCommands {
       Map<String, String> env,
       Engines engines)
       throws PluginExecutionException {
-    Optional<ExportEngine> engine = engines.exportEngine(plugin);
-    if (engine.isEmpty()) {
-      return exportCommand(plugin, policyText, sourceText, sourceBaseDir, layoutText, env);
-    }
     SourceDocument source;
     try {
       source = SourceValidator.loadAndValidateSourceDocument(sourceText, sourceBaseDir);
@@ -352,11 +220,13 @@ public final class CoreCommands {
     var request =
         new ExportRequest(
             ContractVersions.EXPORT_REQUEST_SCHEMA_VERSION, source, layoutResult, policy);
-    ExportEngine exportEngine = engine.get();
-    // Decision 9: a relative schema/cache env path resolves against the product root, not the JVM
-    // cwd, matching the process child (which ran with cwd = product root).
+    ExportEngine exportEngine =
+        EngineDispatch.requireEngine(engines, engineId, "export", engines.exportEngine(engineId));
+    // The export engine receives the CLI's env map explicitly (schema-path variables) and reads
+    // nothing else. Decision 9: a relative schema/cache env path resolves against the product
+    // root, not the JVM cwd.
     Path productRoot = DedirenPaths.productRoot();
-    return EngineDispatch.dispatch(plugin, () -> exportEngine.export(request, env, productRoot));
+    return EngineDispatch.dispatch(engineId, () -> exportEngine.export(request, env, productRoot));
   }
 
   static PluginRunOutcome errorOutcome(List<Diagnostic> diagnostics) {
@@ -381,14 +251,6 @@ public final class CoreCommands {
   private static JsonNode parseJson(String command, String text) throws PluginExecutionException {
     try {
       return JsonSupport.objectMapper().readTree(text);
-    } catch (RuntimeException error) {
-      throw commandInputInvalid(command, error);
-    }
-  }
-
-  private static String toJson(String command, Object value) throws PluginExecutionException {
-    try {
-      return JsonSupport.objectMapper().writeValueAsString(value);
     } catch (RuntimeException error) {
       throw commandInputInvalid(command, error);
     }

@@ -7,24 +7,26 @@ import dev.dediren.contracts.Diagnostic;
 import dev.dediren.contracts.DiagnosticSeverity;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.contracts.layout.SemanticValidationResult;
+import dev.dediren.contracts.render.RenderResult;
 import dev.dediren.core.commands.CoreCommands;
 import dev.dediren.core.plugins.PluginExecutionException;
 import dev.dediren.core.plugins.PluginRunOutcome;
 import dev.dediren.engine.EngineException;
 import dev.dediren.engine.EngineResult;
 import dev.dediren.engine.Engines;
+import dev.dediren.engine.RenderEngine;
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.nio.file.Files;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 
 /**
- * Unit coverage for the five in-memory dispatch outcomes (Task 5), driven against fake engine
- * invocations so no plugin classpath is required. The envelope byte-shape parity against the real
- * process path is proven separately by the cli {@code InMemoryParityTest}.
+ * Unit coverage for the five in-memory dispatch outcomes, driven against fake engine invocations so
+ * no engine classpath is required. The registry is the only transport: the fifth outcome — an
+ * unknown engine id or a wrong capability — is resolved here too, without any filesystem manifest
+ * lookup.
  */
 class EngineDispatchTest {
 
@@ -133,6 +135,41 @@ class EngineDispatchTest {
   }
 
   @Test
+  void unexpectedCheckedExceptionBecomesEngineFailed() {
+    // The generic bucket is the only safety net now that the process fallback is gone: the catch
+    // is widened to Exception, so even a sneaky-thrown checked exception (invisible to the
+    // EngineInvocation signature) maps to the published DEDIREN_ENGINE_FAILED diagnostic.
+    assertThatThrownBy(
+            () ->
+                EngineDispatch.dispatch(
+                    "fake",
+                    () -> {
+                      sneakyThrow(new IOException("checked kaboom"));
+                      return null;
+                    }))
+        .isInstanceOf(PluginExecutionException.class)
+        .satisfies(
+            error ->
+                assertThat(((PluginExecutionException) error).diagnostic().code())
+                    .isEqualTo("DEDIREN_ENGINE_FAILED"));
+  }
+
+  @Test
+  void errorsPropagateInsteadOfBecomingEngineFailed() {
+    // Errors (OOM, assertion failures) must crash loudly, never be buried in an error envelope.
+    AssertionError boom = new AssertionError("engine invariant broken");
+
+    assertThatThrownBy(
+            () ->
+                EngineDispatch.dispatch(
+                    "fake",
+                    () -> {
+                      throw boom;
+                    }))
+        .isSameAs(boom);
+  }
+
+  @Test
   void uncheckedIoExceptionPropagatesInsteadOfBecomingEngineFailed() {
     // generic-graph structural failures ride UncheckedIOException so the cli can reproduce the
     // plugin-native observable (message to stderr, exit 2); the dispatch must not bury them.
@@ -150,21 +187,62 @@ class EngineDispatchTest {
   }
 
   @Test
-  void unknownEngineIdFallsBackToProcessUnknown() throws Exception {
-    // No engine is bound, so the overload falls back to the process registry, which reports the
-    // published unknown-id diagnostic (decision 7).
+  void unknownEngineIdIsRejectedWithoutAnyManifestLookup() {
+    // Outcome 5a: an id bound to no capability at all yields the published unknown-id diagnostic
+    // (kept wire string DEDIREN_PLUGIN_UNKNOWN) straight from the registry — no filesystem
+    // manifest is consulted.
     Engines empty = Engines.of(List.of(), List.of(), List.of(), List.of());
-    String layout =
-        Files.readString(
-            dev.dediren.testsupport.TestSupport.workspaceRoot()
-                .resolve("fixtures/layout-request/basic.json"));
 
-    assertThatThrownBy(() -> CoreCommands.layoutCommand("no-such-engine", layout, Map.of(), empty))
+    assertThatThrownBy(
+            () -> CoreCommands.layoutCommand("no-such-engine", LAYOUT_REQUEST, Map.of(), empty))
         .isInstanceOf(PluginExecutionException.class)
         .satisfies(
             error ->
                 assertThat(((PluginExecutionException) error).diagnostic().code())
                     .isEqualTo("DEDIREN_PLUGIN_UNKNOWN"));
+  }
+
+  @Test
+  void boundIdWithDifferentCapabilityIsUnsupportedCapability() {
+    // Outcome 5b: an id that exists in the registry, but under another capability, yields the kept
+    // DEDIREN_PLUGIN_UNSUPPORTED_CAPABILITY wire string rather than unknown-id.
+    Engines engines =
+        Engines.of(List.of(), List.of(), List.of(new FakeRenderEngine("fake-render")), List.of());
+
+    assertThatThrownBy(
+            () -> CoreCommands.layoutCommand("fake-render", LAYOUT_REQUEST, Map.of(), engines))
+        .isInstanceOf(PluginExecutionException.class)
+        .satisfies(
+            error ->
+                assertThat(((PluginExecutionException) error).diagnostic().code())
+                    .isEqualTo("DEDIREN_PLUGIN_UNSUPPORTED_CAPABILITY"));
+  }
+
+  private static final String LAYOUT_REQUEST =
+      """
+      {
+        "layout_request_schema_version": "layout-request.schema.v1",
+        "view_id": "main",
+        "nodes": [],
+        "edges": [],
+        "groups": [],
+        "constraints": []
+      }
+      """;
+
+  private record FakeRenderEngine(String id) implements RenderEngine {
+    @Override
+    public EngineResult<RenderResult> render(
+        dev.dediren.contracts.layout.LayoutResult layout,
+        JsonNode policy,
+        dev.dediren.contracts.render.RenderMetadata metadataOrNull) {
+      throw new UnsupportedOperationException("capability-mismatch fake must never be invoked");
+    }
+  }
+
+  @SuppressWarnings("unchecked")
+  private static <T extends Throwable> void sneakyThrow(Throwable error) throws T {
+    throw (T) error;
   }
 
   private static JsonNode envelope(PluginRunOutcome outcome) {

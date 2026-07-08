@@ -2,24 +2,26 @@ package dev.dediren.core.commands;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dev.dediren.contracts.ContractVersions;
 import dev.dediren.contracts.Diagnostic;
 import dev.dediren.contracts.EnvelopeStatus;
 import dev.dediren.contracts.json.JsonSupport;
-import dev.dediren.core.plugins.PluginRegistry;
+import dev.dediren.contracts.layout.LayoutRequest;
+import dev.dediren.contracts.layout.LayoutResult;
 import dev.dediren.core.plugins.PluginRunOutcome;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import dev.dediren.engine.EngineResult;
+import dev.dediren.engine.Engines;
+import dev.dediren.engine.LayoutEngine;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 
 class CoreCommandsTest {
-  @TempDir Path temp;
 
   @Test
-  void semanticValidateCommandRejectsInvalidSourceBeforePluginLookup() throws Exception {
+  void semanticValidateCommandRejectsInvalidSourceBeforeEngineLookup() throws Exception {
+    // Source validation runs before engine resolution, so an invalid source is reported as its own
+    // diagnostics even when the requested engine id does not exist in the registry.
     String input =
         """
                 {
@@ -42,7 +44,8 @@ class CoreCommandsTest {
                 """;
 
     PluginRunOutcome outcome =
-        CoreCommands.semanticValidateCommand("missing-plugin", "archimate", input);
+        CoreCommands.semanticValidateCommand(
+            "missing-engine", "archimate", input, null, Map.of(), emptyEngines());
 
     assertThat(outcome.exitCode()).isEqualTo(2);
     assertThat(outcome.stdout()).contains("DEDIREN_DANGLING_ENDPOINT");
@@ -100,13 +103,9 @@ class CoreCommandsTest {
   }
 
   @Test
-  void layoutCommandRunsThroughPluginRuntimeWithCandidateEnvironment() throws Exception {
-    writeManifest(
-        temp,
-        "runtime-testbed",
-        testbedExecutable().toString(),
-        List.of("layout"),
-        List.of("DEDIREN_TEST_PLUGIN_CAPABILITIES"));
+  void layoutCommandRunsThroughTheBoundEngine() throws Exception {
+    Engines engines =
+        Engines.of(List.of(), List.of(new FakeLayoutEngine("fake-layout")), List.of(), List.of());
     String request =
         """
                 {
@@ -120,46 +119,77 @@ class CoreCommandsTest {
                 """;
 
     PluginRunOutcome outcome =
-        CoreCommands.layoutCommand(
-            new LayoutCommandInput(
-                "runtime-testbed",
-                request,
-                PluginRegistry.fromDirs(List.of(temp)),
-                Map.of("DEDIREN_TEST_PLUGIN_CAPABILITIES", "layout")));
+        CoreCommands.layoutCommand("fake-layout", request, Map.of(), engines);
 
     assertThat(outcome.exitCode()).isZero();
     assertThat(outcome.stdout()).contains("\"layout_result_schema_version\"");
   }
 
-  private Path testbedExecutable() throws IOException {
-    Path script = temp.resolve("runtime-testbed.sh");
-    String java = Path.of(System.getProperty("java.home"), "bin", "java").toString();
-    String classpath = System.getProperty("java.class.path");
-    Files.writeString(
-        script,
+  @Test
+  void layoutCommandUnwrapsAPipedStageEnvelopeBeforeTheEngineParses() throws Exception {
+    // Chained-workflow convenience: the previous stage's command envelope is accepted directly;
+    // its .data payload is what reaches the engine's parse entry point.
+    FakeLayoutEngine engine = new FakeLayoutEngine("fake-layout");
+    Engines engines = Engines.of(List.of(), List.of(engine), List.of(), List.of());
+    String enveloped =
         """
-                #!/bin/sh
-                exec "%s" -cp "%s" dev.dediren.testbeds.pluginruntime.Main "$@"
-                """
-            .formatted(java, classpath));
-    script.toFile().setExecutable(true);
-    return script;
+                {
+                  "envelope_schema_version": "envelope.schema.v1",
+                  "status": "ok",
+                  "data": {
+                    "layout_request_schema_version": "layout-request.schema.v1",
+                    "view_id": "piped-view",
+                    "nodes": [],
+                    "edges": [],
+                    "groups": [],
+                    "constraints": []
+                  },
+                  "diagnostics": []
+                }
+                """;
+
+    PluginRunOutcome outcome =
+        CoreCommands.layoutCommand("fake-layout", enveloped, Map.of(), engines);
+
+    assertThat(outcome.exitCode()).isZero();
+    assertThat(engine.lastParsedViewId).isEqualTo("piped-view");
   }
 
-  private static void writeManifest(
-      Path dir, String id, String executable, List<String> capabilities, List<String> allowedEnv)
-      throws IOException {
-    var manifest = JsonSupport.objectMapper().createObjectNode();
-    manifest.put("plugin_manifest_schema_version", "plugin-manifest.schema.v1");
-    manifest.put("id", id);
-    manifest.put("version", "0.1.0");
-    manifest.put("executable", executable);
-    var capabilityArray = manifest.putArray("capabilities");
-    capabilities.forEach(capabilityArray::add);
-    var envArray = manifest.putArray("allowed_env");
-    allowedEnv.forEach(envArray::add);
-    Files.writeString(
-        dir.resolve(id + ".manifest.json"),
-        JsonSupport.objectMapper().writerWithDefaultPrettyPrinter().writeValueAsString(manifest));
+  private static Engines emptyEngines() {
+    return Engines.of(List.of(), List.of(), List.of(), List.of());
+  }
+
+  private static final class FakeLayoutEngine implements LayoutEngine {
+    private final String id;
+    private String lastParsedViewId;
+
+    FakeLayoutEngine(String id) {
+      this.id = id;
+    }
+
+    @Override
+    public String id() {
+      return id;
+    }
+
+    @Override
+    public LayoutRequest parseRequest(byte[] input) {
+      LayoutRequest request = JsonSupport.objectMapper().readValue(input, LayoutRequest.class);
+      lastParsedViewId = request.viewId();
+      return request;
+    }
+
+    @Override
+    public EngineResult<LayoutResult> layout(LayoutRequest request) {
+      return new EngineResult<>(
+          new LayoutResult(
+              ContractVersions.LAYOUT_RESULT_SCHEMA_VERSION,
+              request.viewId(),
+              List.of(),
+              List.of(),
+              List.of(),
+              List.of()),
+          List.of());
+    }
   }
 }

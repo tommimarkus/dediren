@@ -70,9 +70,10 @@
   <!-- MS_EXPOSE_REP: JsonSupport.objectMapper() intentionally returns the
        shared ObjectMapper singleton. It is mutable in place (.configure(),
        .registerModule()) and exposed by design (one canonical mapper). The
-       reconfiguration risk is first-party/same-JVM only: plugins communicate
-       cross-process over stdin/stdout JSON, so this singleton never crosses a
-       process/trust boundary. Tracked in architecture-guidelines.md §12. -->
+       reconfiguration risk is first-party-only: every consumer of the
+       singleton is first-party code in the product JVM, and the mapper is
+       configured once at class initialization. Tracked in
+       architecture-guidelines.md §12. -->
   <Match>
     <Class name="dev.dediren.contracts.json.JsonSupport"/>
     <Bug pattern="MS_EXPOSE_REP"/>
@@ -89,26 +90,13 @@
     <Bug pattern="NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"/>
   </Match>
 
-  <!-- NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE: PluginRunner.executablePath
-       dereferences loaded.path().getParent(); a discovered manifest path always
-       resolves under a plugins directory, so the parent is non-null in
-       practice. Defining error behavior for the infeasible null-parent case is
-       out of scope for the gate. Tracked in architecture-guidelines.md §12. -->
-  <Match>
-    <Class name="dev.dediren.core.plugins.PluginRunner"/>
-    <Method name="executablePath"/>
-    <Bug pattern="NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"/>
-  </Match>
-
-
   <!-- EI_EXPOSE_REP / EI_EXPOSE_REP2: NodeLabelLines (render) and ExportScope
        (uml-xmi) are plugin-internal value records extracted from the former
        Main god-files during the god-file split. They hold List/Set components
-       consumed read-only within their plugin; they are not part of the public
-       JSON contract surface and never cross the process boundary. As with the
-       contracts.* records above, EI_EXPOSE_REP/REP2 is suppressed rather than
-       defensive-copied (out of scope for the gate). Tracked in
-       architecture-guidelines.md §12. -->
+       consumed read-only within their engine; they are not part of the public
+       JSON contract surface. As with the contracts.* records above,
+       EI_EXPOSE_REP/REP2 is suppressed rather than defensive-copied (out of
+       scope for the gate). Tracked in architecture-guidelines.md §12. -->
   <Match>
     <Or>
       <Class name="dev.dediren.plugins.render.node.NodeLabelLines"/>

@@ -194,8 +194,7 @@ class CliLayoutRenderCommandTest {
               "--input",
               workspaceRoot().resolve("fixtures/source/valid-basic.json").toString()
             },
-            "",
-            pluginEnv("generic-graph", "dev.dediren.plugins.genericgraph.Main"));
+            "");
 
     JsonNode envelope = envelope(result);
 
@@ -222,8 +221,7 @@ class CliLayoutRenderCommandTest {
               "--input",
               workspaceRoot().resolve("fixtures/layout-result/basic.json").toString()
             },
-            "",
-            pluginEnv("render", "dev.dediren.plugins.render.Main"));
+            "");
 
     JsonNode envelope = envelope(result);
 
@@ -253,7 +251,7 @@ class CliLayoutRenderCommandTest {
     // a frozen layout fixture. This refreshes the git-ignored gallery with a styled sequence
     // diagram and guards, at the render boundary, that every message arrow still terminates on its
     // lifeline stem — the same invariant ElkLayoutEngineTest pins at the layout boundary.
-    Map<String, String> env = sequencePipelineEnv();
+    Map<String, String> env = Map.of();
     String source =
         workspaceRoot().resolve("fixtures/source/valid-uml-sequence-basic.json").toString();
     String[] projectView = {
@@ -293,8 +291,7 @@ class CliLayoutRenderCommandTest {
 
   @Test
   void exportCommandRunsJavaArchimateOefPlugin() throws Exception {
-    Map<String, String> env = pluginEnv("archimate-oef", "dev.dediren.plugins.archimateoef.Main");
-    env.putAll(envWithOefSchemas());
+    Map<String, String> env = new LinkedHashMap<>(envWithOefSchemas());
 
     CliResult result =
         Main.executeForTesting(
@@ -326,8 +323,7 @@ class CliLayoutRenderCommandTest {
 
   @Test
   void exportCommandRunsJavaUmlXmiPlugin() throws Exception {
-    Map<String, String> env = pluginEnv("uml-xmi", "dev.dediren.plugins.umlxmi.Main");
-    env.putAll(envWithXmiSchema());
+    Map<String, String> env = new LinkedHashMap<>(envWithXmiSchema());
 
     CliResult result =
         Main.executeForTesting(
@@ -373,14 +369,6 @@ class CliLayoutRenderCommandTest {
     Files.writeString(
         file, JsonSupport.objectMapper().writeValueAsString(data), StandardCharsets.UTF_8);
     return file;
-  }
-
-  private Map<String, String> sequencePipelineEnv() throws Exception {
-    Map<String, String> env = new LinkedHashMap<>();
-    env.putAll(pluginEnv("generic-graph", "dev.dediren.plugins.genericgraph.Main"));
-    env.putAll(pluginEnv("elk-layout", "dev.dediren.plugins.elklayout.Main"));
-    env.putAll(pluginEnv("render", "dev.dediren.plugins.render.Main"));
-    return env;
   }
 
   private static String[] concat(String first, String second, String third, String[] rest) {
@@ -451,27 +439,6 @@ class CliLayoutRenderCommandTest {
 
   private JsonNode envelope(CliResult result) throws Exception {
     return JsonSupport.objectMapper().readTree(result.stdout());
-  }
-
-  private Map<String, String> pluginEnv(String pluginId, String mainClass) throws Exception {
-    Path script = temp.resolve(pluginId + ".sh");
-    String java = Path.of(System.getProperty("java.home"), "bin", "java").toString();
-    String classpath = System.getProperty("java.class.path");
-    Files.writeString(
-        script,
-        """
-                #!/bin/sh
-                exec "%s" -cp "%s" %s "$@"
-                """
-            .formatted(java, classpath, mainClass),
-        StandardCharsets.UTF_8);
-    script.toFile().setExecutable(true);
-    return new LinkedHashMap<>(
-        Map.of(
-            "DEDIREN_PLUGIN_DIRS",
-            workspaceRoot().resolve("fixtures/plugins").toString(),
-            "DEDIREN_PLUGIN_" + pluginId.toUpperCase().replace('-', '_'),
-            script.toString()));
   }
 
   private Map<String, String> envWithOefSchemas() throws Exception {

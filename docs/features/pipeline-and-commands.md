@@ -125,10 +125,10 @@ See [Exports (OEF & XMI)](exports.md).
 
 ### `capabilities` (per plugin)
 
-Each plugin executable answers a `capabilities` probe with raw JSON conforming
-to `schemas/runtime-capability.schema.json`. The core uses this for a per-call
-id-mismatch pre-flight check (skippable with
-`DEDIREN_TRUST_MANIFEST_CAPABILITIES`).
+Each bundled engine launcher answers a `capabilities` probe with raw JSON
+conforming to `schemas/runtime-capability.schema.json`. It is a standalone
+probe of the launcher; the CLI itself dispatches engines in-process and never
+runs it.
 
 ```bash
 dediren-plugin-elk-layout capabilities

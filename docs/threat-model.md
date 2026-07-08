@@ -9,14 +9,13 @@ security-posture questions (audit finding F8).
 
 - Released agent-bundle archives (`dediren-agent-bundle-*.tar.gz`).
 - `main` branch and `v*` tag integrity.
-- The plugin execution boundary on user machines.
 - Schema cache content (downloaded OMG XMI / OEF ArchiMate schemas).
-- The envelope JSON contract surface (stdin/stdout between agents, CLI, and
-  plugins).
+- The envelope JSON contract surface (stdin/stdout between agents and the
+  CLI).
 
 ## Trust Boundaries
 
-### Envelope JSON stdin/stdout (agents -> CLI/plugins)
+### Envelope JSON stdin/stdout (agents -> CLI)
 
 Parsing goes through `contracts/src/main/java/dev/dediren/contracts/json/JsonSupport.java`'s
 Jackson 3 (`tools.jackson`) `ObjectMapper`: snake_case properties, fail on
@@ -26,32 +25,21 @@ failure contract: `JsonSupportFuzzTest` (`contracts`) and
 `JacksonException` / `XmiValidationException` may escape parsing, running in
 deterministic regression mode over checked-in seed corpora in CI.
 
-### Plugin process boundary
+### Single-JVM engine runtime (no plugin execution surface)
 
-Discovery is explicit only, never `PATH`
-(`core/src/main/java/dev/dediren/core/plugins/PluginRegistry.java`): bundled
-first-party plugins, then (opt-in via `DEDIREN_ALLOW_PROJECT_PLUGINS`) the
-caller's cwd `.dediren/plugins`, then the bundle-root `.dediren/plugins`,
-then `DEDIREN_PLUGIN_DIRS`. Only the bundled directory is trusted; a
-manifest found elsewhere can never claim `DEDIREN_TRUST_MANIFEST_CAPABILITIES`
-to skip the runtime capabilities probe
-(`core/.../plugins/PluginRunner.java`). `PluginRunner` also enforces a
-manifest-declared env allowlist and always runs the child from a
-deterministic working directory (the product root), not the caller's cwd.
-
-Transition (Task 5): the five bundled first-party ids
-(`generic-graph`, `elk-layout`, `render`, `archimate-oef`, `uml-xmi`) now
-execute in-process through `core`'s `EngineDispatch`
-(`core/.../engine/EngineDispatch.java`), wired in one named cli class
-(`cli/.../EngineWiring.java`), so no child process is spawned for them and the
-protocol's process-crash/timeout/output-validation controls no longer apply to
-those ids. The change is guarded by a stage-by-stage parity gate
-(`cli/.../InMemoryParityTest.java`) proving the in-memory envelopes and exit
-codes are byte-shape equal to the process leg. The `PluginRunner` process
-boundary above still governs every other (third-party/unbound) manifest as the
-registry-first fallback, keeping its discovery, trust, env-allowlist, and
-working-directory controls in force until the boundary is deleted in the
-cutover (Task 8).
+The runtime is a single JVM with no plugin discovery or execution surface:
+the five first-party engines (`generic-graph`, `elk-layout`, `render`,
+`archimate-oef`, `uml-xmi`) are compile-time library modules behind the
+`engine-api` interfaces, constructed explicitly in one named cli class
+(`cli/.../EngineWiring.java`) and dispatched in-process by `core`'s
+`EngineDispatch` (`core/.../engine/EngineDispatch.java`). Core never resolves
+an executable, spawns a child process, or reads a plugin path/trust
+environment variable; an unknown engine id is answered from the in-memory
+registry (`DEDIREN_PLUGIN_UNKNOWN`), not from any filesystem lookup. The
+former manifest env allowlist is gone because no child processes exist —
+the export engines receive the CLI's env map explicitly (schema-path
+variables) and read nothing else, pinned by the engines' no-`getenv` guard
+tests (Task 4).
 
 ### Schema cache + runtime download
 
@@ -115,7 +103,6 @@ a documented accepted risk — see `SECURITY.md`.
 | --- | --- | --- |
 | Poison a release artifact | SHA-pinned Actions, blocking Grype/SBOM gate, attestation generated and verified before publish | Single-maintainer `main` has no required review (accepted risk, `SECURITY.md`) |
 | Tamper `main` or `v*` tags | `release.yml` cross-checks the tag version against `pom.xml`; attestation binds the published archive to its build | No branch protection on `main`; a bad commit is caught only by tests/scans, not review |
-| Malicious plugin on a user machine | Explicit discovery only (never `PATH`); project-plugin dirs opt-in via `DEDIREN_ALLOW_PROJECT_PLUGINS`; env allowlist + deterministic cwd in `PluginRunner` | Enabling `DEDIREN_ALLOW_PROJECT_PLUGINS` or configuring `DEDIREN_PLUGIN_DIRS` is a user decision to execute plugins found there; the capabilities probe still runs for those manifests, but the probe itself launches the discovered executable, so discovery of a malicious directory is code execution by configuration |
 | Malicious schema substitution | HTTPS-only curl plus SHA-256 pin verified before use (`SchemaCacheModule`) | `DEDIREN_XMI_SCHEMA_PATH` / `DEDIREN_OEF_SCHEMA_DIR` offline overrides bypass the SHA-256 check by design |
 | Malicious envelope input | Jackson 3 parsing plus fuzz-regression targets pinning the only-`JacksonException`/`XmiValidationException` invariant; hardened DOM factory blocks DOCTYPE/XXE | Fuzz targets run in deterministic regression mode over a fixed seed corpus in CI, not continuous coverage-guided fuzzing |
 | Inject markup into a rendered SVG via model labels/ids | `Svg.text()`/`Svg.attr()` XML-escape all model text at emission; `LabelInjectionTest` proves an end-to-end breakout payload stays escaped and round-trips; `SvgAudit` rejects ill-formed output | The SVG is inert markup; a consumer that embeds it must still apply its own context's policy (e.g. CSP), and the opt-in interaction `<script>` runs in the viewer |
@@ -141,5 +128,5 @@ a documented accepted risk — see `SECURITY.md`.
 ## Maintenance Rule
 
 This page changes in the same commit/PR as any change to the trust
-boundaries it describes: plugin discovery/execution, schema-cache fetching,
-envelope validation, XML parser hardening, or release workflows.
+boundaries it describes: the single-JVM engine runtime, schema-cache
+fetching, envelope validation, XML parser hardening, or release workflows.

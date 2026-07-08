@@ -60,7 +60,7 @@ codes (full repair guidance in
 | `DEDIREN_DUPLICATE_ID` | Non-unique node/relationship/view/group id. |
 | `DEDIREN_DANGLING_ENDPOINT` | Relationship `source`/`target` does not resolve. |
 | `DEDIREN_COMMAND_INPUT_INVALID` | CLI could not read/parse a command input file. |
-| `DEDIREN_PLUGIN_UNKNOWN` / `DEDIREN_PLUGIN_MISSING_EXECUTABLE` / `DEDIREN_PLUGIN_OUTPUT_INVALID_*` | Plugin discovery/boundary failures (see [Plugin Runtime](plugin-runtime.md)). |
+| `DEDIREN_PLUGIN_UNKNOWN` / `DEDIREN_PLUGIN_UNSUPPORTED_CAPABILITY` / `DEDIREN_ENGINE_FAILED` | Engine lookup/dispatch failures (see [Engine Runtime](plugin-runtime.md)). |
 | `DEDIREN_LAYOUT_JUNCTION_OFF_INCIDENT_ROUTE` | ArchiMate junction detached from its incident edge routes. |
 
 ## Compatibility Signals
@@ -75,14 +75,15 @@ codes (full repair guidance in
 ## Module Boundaries
 
 - `contracts` — shared protocol records and schema-version constants only.
-- `core` — orchestration, validation, plugin discovery/execution,
-  backend-neutral quality checks.
-- `cli` — thin: parse args, assemble requests, call `core`, print envelopes.
-- `plugins/*` — notation, layout, render, export (may depend on `contracts`,
-  never on `core`).
+- `core` — orchestration, validation, engine dispatch, backend-neutral
+  quality checks.
+- `cli` — thin: parse args, assemble requests, call `core`, print envelopes;
+  constructs the engines in its single `EngineWiring` class.
+- `plugins/*` (engines) — notation, layout, render, export (may depend on
+  `engine-api` and `contracts`, never on `core`).
 
 ## Related Pages
 
 - [Source Model & Views](source-model.md) — the authored contract.
-- [Plugin Runtime](plugin-runtime.md) — manifest and capability contracts.
+- [Engine Runtime](plugin-runtime.md) — engine and capability contracts.
 - [Pipeline & Commands](pipeline-and-commands.md) — which command emits which artifact.
