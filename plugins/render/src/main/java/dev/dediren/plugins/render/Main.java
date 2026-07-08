@@ -1,29 +1,16 @@
 package dev.dediren.plugins.render;
 
-import static dev.dediren.plugins.render.svg.SvgDocument.buildArtifacts;
-import static dev.dediren.plugins.render.svg.SvgDocument.interactiveMode;
-import static dev.dediren.plugins.render.svg.SvgDocument.renderSvg;
-
-import dev.dediren.archimate.ArchimateTypeValidationException;
 import dev.dediren.contracts.CommandEnvelope;
 import dev.dediren.contracts.ContractVersions;
-import dev.dediren.contracts.Diagnostic;
-import dev.dediren.contracts.DiagnosticSeverity;
 import dev.dediren.contracts.json.JsonSupport;
-import dev.dediren.contracts.layout.LayoutResult;
-import dev.dediren.contracts.render.RenderArtifact;
-import dev.dediren.contracts.render.RenderMetadata;
-import dev.dediren.contracts.render.RenderPolicy;
 import dev.dediren.contracts.render.RenderResult;
-import dev.dediren.plugins.render.node.uml.RenderInputValidator;
-import dev.dediren.uml.UmlValidationException;
+import dev.dediren.engine.EngineException;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
-import java.util.List;
 import tools.jackson.databind.node.ObjectNode;
 
 public final class Main {
@@ -77,36 +64,18 @@ public final class Main {
   }
 
   private static int renderFromStdin(InputStream stdin, PrintStream stdout) throws Exception {
-    RenderInput input =
-        JsonSupport.objectMapper().readValue(stdin.readAllBytes(), RenderInput.class);
+    SvgRenderEngine engine = new SvgRenderEngine();
+    SvgRenderEngine.ParsedInput input = engine.parseInput(stdin.readAllBytes());
     try {
-      RenderInputValidator.validate(input.layoutResult(), input.renderMetadata(), input.policy());
-    } catch (RenderInputValidator.PolicyValidationException error) {
-      return exitWithDiagnostic(
-          stdout, "DEDIREN_SVG_POLICY_INVALID", error.getMessage(), error.path());
-    } catch (RenderInputValidator.RenderMetadataUsageException error) {
-      return exitWithDiagnostic(stdout, error.code(), error.getMessage(), error.path());
-    } catch (ArchimateTypeValidationException error) {
-      return exitWithDiagnostic(stdout, error.code(), error.message(), error.path());
-    } catch (UmlValidationException error) {
-      return exitWithDiagnostic(stdout, error.code(), error.message(), error.path());
+      RenderResult result =
+          engine.render(input.layoutResult(), input.policy(), input.renderMetadata()).value();
+      stdout.println(JsonSupport.objectMapper().writeValueAsString(CommandEnvelope.ok(result)));
+      return 0;
+    } catch (EngineException error) {
+      stdout.println(
+          JsonSupport.objectMapper()
+              .writeValueAsString(CommandEnvelope.error(error.diagnostics())));
+      return error.exitCode();
     }
-
-    String svg = renderSvg(input.layoutResult(), input.renderMetadata(), input.policy());
-    List<RenderArtifact> artifacts = buildArtifacts(interactiveMode(input.policy()), svg);
-    var result = new RenderResult(ContractVersions.RENDER_RESULT_SCHEMA_VERSION, artifacts);
-    stdout.println(JsonSupport.objectMapper().writeValueAsString(CommandEnvelope.ok(result)));
-    return 0;
   }
-
-  private static int exitWithDiagnostic(
-      PrintStream stdout, String code, String message, String path) throws IOException {
-    var diagnostic = new Diagnostic(code, DiagnosticSeverity.ERROR, message, path);
-    stdout.println(
-        JsonSupport.objectMapper().writeValueAsString(CommandEnvelope.error(List.of(diagnostic))));
-    return 3;
-  }
-
-  private record RenderInput(
-      LayoutResult layoutResult, RenderMetadata renderMetadata, RenderPolicy policy) {}
 }

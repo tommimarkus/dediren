@@ -19,4 +19,8 @@ final class EnvelopeWriter {
     return JsonSupport.objectMapper()
         .writeValueAsString(CommandEnvelope.error(List.of(diagnostic)));
   }
+
+  static String error(List<Diagnostic> diagnostics) {
+    return JsonSupport.objectMapper().writeValueAsString(CommandEnvelope.error(diagnostics));
+  }
 }

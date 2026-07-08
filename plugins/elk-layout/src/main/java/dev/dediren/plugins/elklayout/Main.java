@@ -4,6 +4,7 @@ import dev.dediren.contracts.ContractVersions;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.contracts.layout.LayoutRequest;
 import dev.dediren.contracts.layout.LayoutResult;
+import dev.dediren.engine.EngineException;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
@@ -67,31 +68,22 @@ public final class Main {
   }
 
   static int run(InputStream stdin, PrintStream stdout) throws Exception {
+    ElkEngine engine = new ElkEngine();
     LayoutRequest request;
     try {
-      request = LayoutJson.readLayoutRequest(stdin);
-    } catch (LayoutJson.LayoutPreferenceValidationException error) {
-      stdout.println(
-          EnvelopeWriter.error(
-              "DEDIREN_ELK_LAYOUT_FAILED", "ELK layout failed: " + error.getMessage()));
-      return 3;
-    } catch (Exception error) {
-      stdout.println(
-          EnvelopeWriter.error(
-              "DEDIREN_ELK_INPUT_INVALID_JSON",
-              "layout request JSON is invalid: " + error.getMessage()));
-      return 3;
+      request = engine.parseRequest(stdin.readAllBytes());
+    } catch (EngineException error) {
+      stdout.println(EnvelopeWriter.error(error.diagnostics()));
+      return error.exitCode();
     }
 
     try {
-      LayoutResult result = new ElkLayoutEngine().layout(request);
+      LayoutResult result = engine.layout(request).value();
       stdout.println(EnvelopeWriter.ok(result));
       return 0;
-    } catch (Exception error) {
-      stdout.println(
-          EnvelopeWriter.error(
-              "DEDIREN_ELK_LAYOUT_FAILED", "ELK layout failed: " + error.getMessage()));
-      return 3;
+    } catch (EngineException error) {
+      stdout.println(EnvelopeWriter.error(error.diagnostics()));
+      return error.exitCode();
     }
   }
 }
