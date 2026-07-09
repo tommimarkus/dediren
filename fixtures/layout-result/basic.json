@@ -1,5 +1,5 @@
 {
-  "layout_result_schema_version": "layout-result.schema.v1",
+  "layout_result_schema_version": "layout-result.schema.v2",
   "view_id": "main",
   "nodes": [
     {
@@ -10,7 +10,8 @@
       "y": 32,
       "width": 160,
       "height": 80,
-      "label": "Client"
+      "label": "Client",
+      "source_pointer": "/nodes/0"
     },
     {
       "id": "api",
@@ -20,7 +21,8 @@
       "y": 32,
       "width": 160,
       "height": 80,
-      "label": "API"
+      "label": "API",
+      "source_pointer": "/nodes/1"
     }
   ],
   "edges": [
@@ -40,7 +42,8 @@
           "y": 72
         }
       ],
-      "label": "calls"
+      "label": "calls",
+      "source_pointer": "/relationships/0"
     }
   ],
   "groups": [],
