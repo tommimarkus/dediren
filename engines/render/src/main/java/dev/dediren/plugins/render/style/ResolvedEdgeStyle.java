@@ -7,6 +7,8 @@ import dev.dediren.contracts.render.SvgEdgeLabelVerticalPosition;
 import dev.dediren.contracts.render.SvgEdgeLabelVerticalSide;
 import dev.dediren.contracts.render.SvgEdgeLineStyle;
 import dev.dediren.contracts.render.SvgEdgeMarkerEnd;
+import dev.dediren.contracts.util.ContractCollections;
+import java.util.List;
 
 public record ResolvedEdgeStyle(
     String stroke,
@@ -20,4 +22,9 @@ public record ResolvedEdgeStyle(
     SvgEdgeLabelVerticalPosition labelVerticalPosition,
     SvgEdgeLabelVerticalSide labelVerticalSide,
     SvgEdgeLabelPresentation labelPresentation,
-    Double strokeOpacity) {}
+    Double strokeOpacity,
+    List<Double> dashPattern) {
+  public ResolvedEdgeStyle {
+    dashPattern = ContractCollections.copyOrNull(dashPattern);
+  }
+}

@@ -56,6 +56,13 @@ reaches a CSS `<style>` block, so the validator (not escaping) keeps it safe.
 Set `fill_opacity` / `stroke_opacity` (0–1) on nodes and groups,
 `stroke_opacity` on edges, and `background.fill_opacity` for a translucent page.
 
+### Line style
+
+Edges and node/group borders take `line_style` (`solid`, `dashed`, `dotted`)
+and a custom `dash_pattern` — an array of 1–8 positive lengths (e.g. `[4, 2]`)
+that overrides the preset. The ArchiMate grouping border keeps its dashed
+default unless a `line_style` or `dash_pattern` is given.
+
 ### Edge label presentation
 
 Edge labels default to **outlined text**. Set

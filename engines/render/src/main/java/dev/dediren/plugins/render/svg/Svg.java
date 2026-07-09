@@ -1,6 +1,8 @@
 package dev.dediren.plugins.render.svg;
 
+import dev.dediren.contracts.render.SvgEdgeLineStyle;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Locale;
 
 /**
@@ -45,6 +47,40 @@ public final class Svg {
    */
   public static String opacityAttr(String name, Double value) {
     return value == null ? "" : " " + name + "=\"" + styleNumber(value) + "\"";
+  }
+
+  /**
+   * The {@code stroke-dasharray} VALUE for a resolved line style: an explicit {@code dashPattern}
+   * (space-joined) wins; otherwise the {@code dashedDefault} for {@code DASHED}, a fine dotted
+   * pattern for {@code DOTTED}, and the empty string (solid) otherwise. Callers that own their own
+   * dash default (e.g. the ArchiMate grouping border) use this raw value to reconcile.
+   */
+  public static String dashArrayValue(
+      SvgEdgeLineStyle lineStyle, List<Double> dashPattern, String dashedDefault) {
+    if (dashPattern != null && !dashPattern.isEmpty()) {
+      StringBuilder joined = new StringBuilder();
+      for (Double value : dashPattern) {
+        if (joined.length() > 0) {
+          joined.append(' ');
+        }
+        joined.append(styleNumber(value));
+      }
+      return joined.toString();
+    }
+    if (lineStyle == SvgEdgeLineStyle.DASHED) {
+      return dashedDefault;
+    }
+    if (lineStyle == SvgEdgeLineStyle.DOTTED) {
+      return "1 3";
+    }
+    return "";
+  }
+
+  /** The full {@code stroke-dasharray} attribute (with leading space), or empty for solid. */
+  public static String dashArrayAttr(
+      SvgEdgeLineStyle lineStyle, List<Double> dashPattern, String dashedDefault) {
+    String value = dashArrayValue(lineStyle, dashPattern, dashedDefault);
+    return value.isEmpty() ? "" : " stroke-dasharray=\"" + value + "\"";
   }
 
   /** Escapes a value for use inside an SVG/XML attribute (quotes included). */

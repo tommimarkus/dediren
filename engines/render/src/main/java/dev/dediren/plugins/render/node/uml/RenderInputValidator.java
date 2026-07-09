@@ -17,6 +17,7 @@ import dev.dediren.contracts.render.SvgStylePolicy;
 import dev.dediren.uml.Uml;
 import dev.dediren.uml.UmlValidationException;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -515,6 +516,7 @@ public final class RenderInputValidator {
     validateColor(style.labelFill(), path + ".label_fill");
     validateNumber(style.fillOpacity(), path + ".fill_opacity", Bound.MIN, 0.0, 1.0);
     validateNumber(style.strokeOpacity(), path + ".stroke_opacity", Bound.MIN, 0.0, 1.0);
+    validateDashPattern(style.dashPattern(), path + ".dash_pattern");
     if (style.shape() != null && style.decorator() != null) {
       throw new PolicyValidationException(
           path + ".shape", "SVG render policy " + path + " cannot set both shape and decorator");
@@ -530,6 +532,7 @@ public final class RenderInputValidator {
     validateNumber(style.strokeWidth(), path + ".stroke_width", Bound.MIN, 0.0, 24.0);
     validateColor(style.labelFill(), path + ".label_fill");
     validateNumber(style.strokeOpacity(), path + ".stroke_opacity", Bound.MIN, 0.0, 1.0);
+    validateDashPattern(style.dashPattern(), path + ".dash_pattern");
   }
 
   private static void validateGroupStyle(SvgGroupStyle style, String path)
@@ -545,6 +548,7 @@ public final class RenderInputValidator {
     validateNumber(style.labelSize(), path + ".label_size", Bound.EXCLUSIVE_MIN, 0.0, 96.0);
     validateNumber(style.fillOpacity(), path + ".fill_opacity", Bound.MIN, 0.0, 1.0);
     validateNumber(style.strokeOpacity(), path + ".stroke_opacity", Bound.MIN, 0.0, 1.0);
+    validateDashPattern(style.dashPattern(), path + ".dash_pattern");
   }
 
   // Broadened colour grammar: hex (#RGB/#RGBA/#RRGGBB/#RRGGBBAA), rgb()/rgba(), or a CSS colour
@@ -558,6 +562,23 @@ public final class RenderInputValidator {
               + "|rgba?\\(\\s*\\d{1,3}%?\\s*,\\s*\\d{1,3}%?\\s*,\\s*\\d{1,3}%?\\s*"
               + "(?:,\\s*(?:\\d*\\.?\\d+%?)\\s*)?\\)"
               + "|[A-Za-z]+");
+
+  private static void validateDashPattern(List<Double> pattern, String path)
+      throws PolicyValidationException {
+    if (pattern == null) {
+      return;
+    }
+    if (pattern.isEmpty() || pattern.size() > 8) {
+      throw new PolicyValidationException(
+          path, "SVG render policy " + path + " must have between 1 and 8 entries");
+    }
+    for (Double value : pattern) {
+      if (value == null || !Double.isFinite(value) || value <= 0.0 || value > 100.0) {
+        throw new PolicyValidationException(
+            path, "SVG render policy " + path + " entries must be positive numbers up to 100");
+      }
+    }
+  }
 
   private static void validateColor(String value, String path) throws PolicyValidationException {
     if (value == null) {

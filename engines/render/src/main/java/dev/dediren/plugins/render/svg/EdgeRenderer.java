@@ -2,6 +2,7 @@ package dev.dediren.plugins.render.svg;
 
 import static dev.dediren.plugins.render.svg.Geometry.labelBox;
 import static dev.dediren.plugins.render.svg.Svg.attr;
+import static dev.dediren.plugins.render.svg.Svg.dashArrayAttr;
 import static dev.dediren.plugins.render.svg.Svg.opacityAttr;
 import static dev.dediren.plugins.render.svg.Svg.styleNumber;
 import static dev.dediren.plugins.render.svg.Svg.text;
@@ -14,7 +15,6 @@ import dev.dediren.contracts.render.RenderMetadata;
 import dev.dediren.contracts.render.RenderPolicy;
 import dev.dediren.contracts.render.SvgEdgeLabelPresentation;
 import dev.dediren.contracts.render.SvgEdgeLabelVerticalSide;
-import dev.dediren.contracts.render.SvgEdgeLineStyle;
 import dev.dediren.contracts.render.SvgEdgeMarkerEnd;
 import dev.dediren.plugins.render.style.ResolvedEdgeStyle;
 import dev.dediren.plugins.render.style.ResolvedStyle;
@@ -152,7 +152,7 @@ public final class EdgeRenderer {
       return "";
     }
     String data = pathData(edge, lineJumps);
-    String dash = style.lineStyle() == SvgEdgeLineStyle.DASHED ? " stroke-dasharray=\"8 5\"" : "";
+    String dash = dashArrayAttr(style.lineStyle(), style.dashPattern(), "8 5");
     String markerStart =
         style.markerStart() == SvgEdgeMarkerEnd.NONE
             ? ""

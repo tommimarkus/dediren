@@ -54,6 +54,7 @@ class EdgeLabelPlacementTest {
           SvgEdgeLabelVerticalPosition.CENTER,
           SvgEdgeLabelVerticalSide.LEFT,
           SvgEdgeLabelPresentation.OUTLINE,
+          null,
           null);
 
   @Test

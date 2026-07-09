@@ -7,5 +7,8 @@ public enum SvgEdgeLineStyle {
   SOLID,
 
   @JsonProperty("dashed")
-  DASHED
+  DASHED,
+
+  @JsonProperty("dotted")
+  DOTTED
 }

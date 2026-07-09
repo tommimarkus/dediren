@@ -24,7 +24,8 @@ public final class StyleResolver {
   public static ResolvedStyle baseStyle(RenderPolicy policy) {
     SvgStylePolicy style = policy.style();
     var defaultNode =
-        new ResolvedNodeStyle("#f8fafc", "#334155", 1.5, 6.0, "#0f172a", null, null, null, null);
+        new ResolvedNodeStyle(
+            "#f8fafc", "#334155", 1.5, 6.0, "#0f172a", null, null, null, null, null, null);
     var defaultEdge =
         new ResolvedEdgeStyle(
             "#64748b",
@@ -38,9 +39,11 @@ public final class StyleResolver {
             SvgEdgeLabelVerticalPosition.CENTER,
             SvgEdgeLabelVerticalSide.LEFT,
             SvgEdgeLabelPresentation.OUTLINE,
+            null,
             null);
     var defaultGroup =
-        new ResolvedGroupStyle("#eff6ff", "#93c5fd", 1.0, 8.0, "#1e3a8a", 12.0, null, null, null);
+        new ResolvedGroupStyle(
+            "#eff6ff", "#93c5fd", 1.0, 8.0, "#1e3a8a", 12.0, null, null, null, null, null);
     return new ResolvedStyle(
         Optional.ofNullable(style)
             .map(SvgStylePolicy::background)
@@ -106,7 +109,9 @@ public final class StyleResolver {
         override.decorator() == null ? base.decorator() : override.decorator(),
         override.shape() == null ? base.shape() : override.shape(),
         override.fillOpacity() == null ? base.fillOpacity() : override.fillOpacity(),
-        override.strokeOpacity() == null ? base.strokeOpacity() : override.strokeOpacity());
+        override.strokeOpacity() == null ? base.strokeOpacity() : override.strokeOpacity(),
+        override.lineStyle() == null ? base.lineStyle() : override.lineStyle(),
+        override.dashPattern() == null ? base.dashPattern() : override.dashPattern());
   }
 
   static ResolvedEdgeStyle mergeEdgeStyle(ResolvedEdgeStyle base, SvgEdgeStyle override) {
@@ -135,7 +140,8 @@ public final class StyleResolver {
         override.labelPresentation() == null
             ? base.labelPresentation()
             : override.labelPresentation(),
-        override.strokeOpacity() == null ? base.strokeOpacity() : override.strokeOpacity());
+        override.strokeOpacity() == null ? base.strokeOpacity() : override.strokeOpacity(),
+        override.dashPattern() == null ? base.dashPattern() : override.dashPattern());
   }
 
   static ResolvedGroupStyle mergeGroupStyle(ResolvedGroupStyle base, SvgGroupStyle override) {
@@ -151,6 +157,8 @@ public final class StyleResolver {
         override.labelSize() == null ? base.labelSize() : override.labelSize(),
         override.decorator() == null ? base.decorator() : override.decorator(),
         override.fillOpacity() == null ? base.fillOpacity() : override.fillOpacity(),
-        override.strokeOpacity() == null ? base.strokeOpacity() : override.strokeOpacity());
+        override.strokeOpacity() == null ? base.strokeOpacity() : override.strokeOpacity(),
+        override.lineStyle() == null ? base.lineStyle() : override.lineStyle(),
+        override.dashPattern() == null ? base.dashPattern() : override.dashPattern());
   }
 }

@@ -22,6 +22,8 @@ import static dev.dediren.plugins.render.svg.EdgeRenderer.lineJumps;
 import static dev.dediren.plugins.render.svg.Geometry.labelObstacleBoxesForEdge;
 import static dev.dediren.plugins.render.svg.Geometry.svgBounds;
 import static dev.dediren.plugins.render.svg.Svg.attr;
+import static dev.dediren.plugins.render.svg.Svg.dashArrayAttr;
+import static dev.dediren.plugins.render.svg.Svg.dashArrayValue;
 import static dev.dediren.plugins.render.svg.Svg.opacityAttr;
 import static dev.dediren.plugins.render.svg.Svg.styleNumber;
 import static dev.dediren.plugins.render.svg.Svg.text;
@@ -103,10 +105,12 @@ public final class SvgDocument {
             .append("\"");
       }
       svg.append(">");
+      String groupDashValue = dashArrayValue(style.lineStyle(), style.dashPattern(), "6 4");
+      if (groupDashValue.isEmpty() && style.decorator() == SvgNodeDecorator.ARCHIMATE_GROUPING) {
+        groupDashValue = "3 2";
+      }
       String groupDashArray =
-          style.decorator() == SvgNodeDecorator.ARCHIMATE_GROUPING
-              ? " stroke-dasharray=\"3 2\""
-              : "";
+          groupDashValue.isEmpty() ? "" : " stroke-dasharray=\"" + groupDashValue + "\"";
       String groupExtra =
           groupDashArray
               + opacityAttr("fill-opacity", style.fillOpacity())
@@ -184,7 +188,7 @@ public final class SvgDocument {
       ResolvedNodeStyle style = StyleResolver.nodeStyle(policy, metadata, node.id(), base);
       RenderMetadataSelector selector = metadata == null ? null : metadata.nodes().get(node.id());
       svg.append("<g data-dediren-node-id=\"").append(attr(node.id())).append("\">");
-      svg.append(withNodeOpacity(nodeShape(node, style, selector), style));
+      svg.append(withNodeStrokeStyle(nodeShape(node, style, selector), style));
       svg.append(nodeDecorator(node, style, selector));
       if (shouldRenderPlainNodeLabel(node, style.decorator())) {
         svg.append(nodeLabel(node, style, base.fontSize()));
@@ -286,16 +290,17 @@ public final class SvgDocument {
         + "</g>";
   }
 
-  // Applies node fill/stroke opacity by wrapping the shape output in a group that carries the
-  // opacity attributes, so it reaches every notation's shape (generic, ArchiMate, UML, junction)
-  // without editing each shape builder. Emitted only when opacity is set, so shapeless renders stay
-  // byte-identical. The wrapper holds only the shape — the decorator and label keep their own
-  // fills.
-  private static String withNodeOpacity(String shape, ResolvedNodeStyle style) {
-    String opacity =
+  // Applies node fill/stroke opacity and dash by wrapping the shape output in a group that carries
+  // the attributes, so they reach every notation's shape (generic, ArchiMate, UML, junction) by
+  // inheritance without editing each shape builder. Emitted only when an attribute is set, so
+  // otherwise-styled renders stay byte-identical. The wrapper holds only the shape — the decorator
+  // and label keep their own fills; a shape's own inline dash (grouping "3 2") still wins.
+  private static String withNodeStrokeStyle(String shape, ResolvedNodeStyle style) {
+    String attrs =
         opacityAttr("fill-opacity", style.fillOpacity())
-            + opacityAttr("stroke-opacity", style.strokeOpacity());
-    return opacity.isEmpty() ? shape : "<g" + opacity + ">" + shape + "</g>";
+            + opacityAttr("stroke-opacity", style.strokeOpacity())
+            + dashArrayAttr(style.lineStyle(), style.dashPattern(), "6 4");
+    return attrs.isEmpty() ? shape : "<g" + attrs + ">" + shape + "</g>";
   }
 
   private static String nodeShape(

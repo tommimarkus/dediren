@@ -49,6 +49,16 @@
       "minimum": 0,
       "maximum": 1
     },
+    "lineStyle": {
+      "type": "string",
+      "enum": ["solid", "dashed", "dotted"]
+    },
+    "dashPattern": {
+      "type": "array",
+      "items": { "type": "number", "exclusiveMinimum": 0, "maximum": 100 },
+      "minItems": 1,
+      "maxItems": 8
+    },
     "font": {
       "type": "object",
       "additionalProperties": false,
@@ -207,7 +217,9 @@
           ]
         },
         "fill_opacity": { "$ref": "#/$defs/opacity" },
-        "stroke_opacity": { "$ref": "#/$defs/opacity" }
+        "stroke_opacity": { "$ref": "#/$defs/opacity" },
+        "line_style": { "$ref": "#/$defs/lineStyle" },
+        "dash_pattern": { "$ref": "#/$defs/dashPattern" }
       }
     },
     "edgeStyle": {
@@ -221,10 +233,8 @@
           "maximum": 24
         },
         "label_fill": { "$ref": "#/$defs/color" },
-        "line_style": {
-          "type": "string",
-          "enum": ["solid", "dashed"]
-        },
+        "line_style": { "$ref": "#/$defs/lineStyle" },
+        "dash_pattern": { "$ref": "#/$defs/dashPattern" },
         "marker_start": {
           "type": "string",
           "enum": [
@@ -298,7 +308,9 @@
         },
         "decorator": { "$ref": "#/$defs/nodeStyle/properties/decorator" },
         "fill_opacity": { "$ref": "#/$defs/opacity" },
-        "stroke_opacity": { "$ref": "#/$defs/opacity" }
+        "stroke_opacity": { "$ref": "#/$defs/opacity" },
+        "line_style": { "$ref": "#/$defs/lineStyle" },
+        "dash_pattern": { "$ref": "#/$defs/dashPattern" }
       }
     },
     "nodeOverrideMap": {

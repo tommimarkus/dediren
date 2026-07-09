@@ -315,6 +315,9 @@ options shape output:
   and CSS colour names. `fill_opacity`/`stroke_opacity` (0–1) fade node and group
   fills/strokes; edges take `stroke_opacity`; `background.fill_opacity` fades the
   page.
+- **Line style.** Edges and node/group borders take `line_style`
+  (`solid`/`dashed`/`dotted`) and a custom `dash_pattern` array of 1–8 positive
+  lengths (e.g. `[4, 2]`), the pattern winning over the preset.
 - **UML association-end adornments.** In UML class diagrams, multiplicity and
   role carried in render metadata (`properties.uml.{source,target}_multiplicity`
   and `properties.uml.{source,target}_role`) are drawn beside their own end of
