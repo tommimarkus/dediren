@@ -67,16 +67,17 @@ Stable Dependencies Principle).
 | Module | May compile-depend on | Stability tier |
 |---|---|---|
 | `contracts` | *(nothing internal)* | 0 — foundation |
+| `ir` | `contracts` | 0.5 — IR spine, between `contracts` and `engine-api` |
 | `archimate` | *(nothing internal)* | 1 — notation core |
 | `uml` | `contracts` | 1 — notation core |
 | `schema-cache` | `contracts` | 1 — utility core |
-| `engine-api` | `contracts` | 1 — engine seam |
-| `core` | `contracts`, `engine-api` | 2 — orchestration + `build` driver |
-| `render` (engine) | `engine-api`, `contracts`, `archimate`, `uml` | 2 — leaf engine |
+| `engine-api` | `contracts`, `ir` | 1 — engine seam |
+| `core` | `contracts`, `engine-api`, `ir` | 2 — orchestration + `build` driver |
+| `render` (engine) | `engine-api`, `contracts`, `archimate`, `uml`, `ir` | 2 — leaf engine |
 | `semantics-graph` (engine) | `engine-api`, `contracts`, `ir` | 2 — leaf engine |
 | `semantics-archimate` (engine) | `engine-api`, `contracts`, `archimate` | 2 — leaf engine |
 | `semantics-uml` (engine) | `engine-api`, `contracts`, `uml` | 2 — leaf engine |
-| `elk-layout` (engine) | `engine-api`, `contracts` | 2 — leaf engine |
+| `elk-layout` (engine) | `engine-api`, `contracts`, `ir` | 2 — leaf engine |
 | `archimate-oef-export` (engine) | `engine-api`, `contracts`, `archimate`, `schema-cache` | 2 — leaf engine |
 | `uml-xmi-export` (engine) | `engine-api`, `contracts`, `uml`, `schema-cache` | 2 — leaf engine |
 | `cli` | `contracts`, `core`, `engine-api`; engine implementations **only in `EngineWiring`** | 3 — entrypoint + wiring |
@@ -87,7 +88,22 @@ Rules that fall out of this table and must be enforced, not just hoped for:
 
 - **No cycles, ever.** A back-edge anywhere is a defect (*Martin 2017*, ADP).
 - **`engine-api` is a tier-1 module** (directory `engine-api/`, package
-  `dev.dediren.engine`): interfaces only, depends on `contracts` alone.
+  `dev.dediren.engine`): interfaces only, depends on `contracts` and `ir` (Plan
+  B P4 added the `ir` edge — see below).
+- **`engine-api` speaks `ir` types (Plan B P4 seam flip); export stays on
+  `contracts` records.** `SemanticsEngine.projectScene`, `LayoutEngine.layout`,
+  and `RenderEngine.render` now take/return the typed `ir` `SceneGraph` /
+  `LaidOutScene` instead of the `contracts` `LayoutRequest` / `LayoutResult`
+  records, adding the new `engine-api → ir` (and downstream `core → ir`,
+  `elk-layout → ir`, `render → ir`) compile edges recorded in the table above.
+  `ExportRequest` is the one boundary that did **not** flip: it is a wire
+  contract (`export-request.schema.v1`) built from `contracts.LayoutResult`,
+  and a `contracts → ir` edge is a cycle forbidden by ADP and the ArchUnit
+  `contractsDependsOnNothingInternal` rule, so export keeps consuming
+  `contracts` records. `build` still avoids re-serializing between stages for
+  this lane: it maps the in-memory `LaidOutScene` to a `LayoutResult` object
+  (`LaidOutSceneMapper.toResult`) to assemble the `ExportRequest`, rather than
+  writing and re-reading `layout-result.json`.
 - **No engine depends on `core`.** The old plugin→`core` prohibition survives
   the reversal as an engine→`core` prohibition: engines depend on `engine-api`,
   `contracts`, and the notation/utility cores they need, never on `core` and
