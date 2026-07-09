@@ -18,13 +18,13 @@ class LaidOutSceneMapperTest {
 
   private LayoutResult buildResult() {
     LaidOutNode node =
-        new LaidOutNode("n1", "n1", "p1", 10.0, 20.0, 30.0, 40.0, "N1", "lifeline", "/nodes/0");
+        new LaidOutNode("n1", "src-n1", "p1", 10.0, 20.0, 30.0, 40.0, "N1", "lifeline", "/nodes/0");
     LaidOutEdge edge =
         new LaidOutEdge(
             "e1",
             "n1",
             "n2",
-            "e1",
+            "src-e1",
             "p1",
             List.of("hint-1"),
             List.of(new Point(0, 0), new Point(10, 10)),
@@ -33,7 +33,7 @@ class LaidOutSceneMapperTest {
     LaidOutGroup group =
         new LaidOutGroup(
             "g1",
-            "g1",
+            "src-g1",
             "p1",
             GroupProvenance.semanticBacked("group-source-1"),
             1.0,
@@ -132,5 +132,29 @@ class LaidOutSceneMapperTest {
     LaidOutScene scene = LaidOutSceneMapper.toScene(result);
 
     assertThat(scene.nodes().get(0).origin()).isNull();
+  }
+
+  @Test
+  void toResultHandlesNullOrigin() {
+    PlacedNode node =
+        new PlacedNode("n1", "src-n1", "p1", 0.0, 0.0, 1.0, 1.0, "N1", "lifeline", null);
+    RoutedEdge edge =
+        new RoutedEdge(
+            "e1",
+            "n1",
+            "n2",
+            "src-e1",
+            "p1",
+            List.of("hint-1"),
+            List.of(new Point(0, 0)),
+            "E1",
+            null);
+    LaidOutScene scene =
+        new LaidOutScene("view-1", List.of(node), List.of(edge), List.of(), List.of());
+
+    LayoutResult result = LaidOutSceneMapper.toResult(scene);
+
+    assertThat(result.nodes().get(0).sourcePointer()).isNull();
+    assertThat(result.edges().get(0).sourcePointer()).isNull();
   }
 }
