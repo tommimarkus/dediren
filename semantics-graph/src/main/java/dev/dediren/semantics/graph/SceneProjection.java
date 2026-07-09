@@ -107,12 +107,13 @@ final class SceneProjection {
           new dev.dediren.ir.SceneNode(
               sourceNode.id(),
               sourceNode.label(),
-              dev.dediren.ir.SourcePointers.node(sourceIndex),
+              sourceNode.id(),
               notation.widthHint(sourceNode),
               notation.heightHint(sourceNode),
               notation.layoutRole(sourceNode.type()),
               sourceNode.partition(),
-              sourceNode.layerConstraint()));
+              sourceNode.layerConstraint(),
+              dev.dediren.ir.SourcePointers.node(sourceIndex)));
     }
 
     var sceneEdges = new ArrayList<dev.dediren.ir.SceneEdge>();
@@ -126,9 +127,10 @@ final class SceneProjection {
               relationship.source(),
               relationship.target(),
               relationship.label(),
-              dev.dediren.ir.SourcePointers.relationship(sourceIndex),
+              relationship.id(),
               relationship.type(),
-              relationship.priority()));
+              relationship.priority(),
+              dev.dediren.ir.SourcePointers.relationship(sourceIndex)));
     }
 
     LayoutRequest mapped =
@@ -137,6 +139,7 @@ final class SceneProjection {
                 selectedView.id(),
                 sceneNodes,
                 sceneEdges,
+                java.util.List.of(),
                 java.util.List.of(),
                 selectedView.layoutPreferences()));
     var nodes = mapped.nodes();

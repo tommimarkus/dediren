@@ -2,6 +2,7 @@ package dev.dediren.ir;
 
 import static dev.dediren.contracts.util.ContractCollections.listOrEmpty;
 
+import dev.dediren.contracts.layout.LayoutConstraint;
 import dev.dediren.contracts.layout.LayoutPreferences;
 import java.util.List;
 
@@ -11,10 +12,12 @@ public record SceneGraph(
     List<SceneNode> nodes,
     List<SceneEdge> edges,
     List<SceneGroup> groups,
+    List<LayoutConstraint> constraints,
     LayoutPreferences preferences) {
   public SceneGraph {
     nodes = listOrEmpty(nodes);
     edges = listOrEmpty(edges);
     groups = listOrEmpty(groups);
+    constraints = listOrEmpty(constraints);
   }
 }

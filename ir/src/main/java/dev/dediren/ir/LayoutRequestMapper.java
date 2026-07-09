@@ -7,7 +7,7 @@ import dev.dediren.contracts.layout.LayoutNode;
 import dev.dediren.contracts.layout.LayoutRequest;
 import java.util.List;
 
-/** Serializes a {@link SceneGraph} to the public {@code layout-request} record. */
+/** Bidirectionally maps a {@link SceneGraph} to the public {@code layout-request} record. */
 public final class LayoutRequestMapper {
   private LayoutRequestMapper() {}
 
@@ -19,7 +19,7 @@ public final class LayoutRequestMapper {
                     new LayoutNode(
                         n.id(),
                         n.label(),
-                        n.id(),
+                        n.sourceId(),
                         n.widthHint(),
                         n.heightHint(),
                         n.role(),
@@ -36,7 +36,7 @@ public final class LayoutRequestMapper {
                         e.source(),
                         e.target(),
                         e.label(),
-                        e.id(),
+                        e.sourceId(),
                         e.relationshipType(),
                         e.priority(),
                         pointerValue(e.origin())))
@@ -51,11 +51,53 @@ public final class LayoutRequestMapper {
         nodes,
         edges,
         groups,
-        List.of(),
+        graph.constraints(),
         graph.preferences());
+  }
+
+  public static SceneGraph toSceneGraph(LayoutRequest request) {
+    List<SceneNode> nodes =
+        request.nodes().stream()
+            .map(
+                n ->
+                    new SceneNode(
+                        n.id(),
+                        n.label(),
+                        n.sourceId(),
+                        n.widthHint(),
+                        n.heightHint(),
+                        n.role(),
+                        n.partition(),
+                        n.layerConstraint(),
+                        originOf(n.sourcePointer())))
+            .toList();
+    List<SceneEdge> edges =
+        request.edges().stream()
+            .map(
+                e ->
+                    new SceneEdge(
+                        e.id(),
+                        e.source(),
+                        e.target(),
+                        e.label(),
+                        e.sourceId(),
+                        e.relationshipType(),
+                        e.priority(),
+                        originOf(e.sourcePointer())))
+            .toList();
+    List<SceneGroup> groups =
+        request.groups().stream()
+            .map(g -> new SceneGroup(g.id(), g.label(), g.members(), g.provenance()))
+            .toList();
+    return new SceneGraph(
+        request.viewId(), nodes, edges, groups, request.constraints(), request.layoutPreferences());
   }
 
   private static String pointerValue(SourcePointer pointer) {
     return pointer == null ? null : pointer.value();
+  }
+
+  private static SourcePointer originOf(String sourcePointer) {
+    return sourcePointer == null ? null : new SourcePointer(sourcePointer);
   }
 }
