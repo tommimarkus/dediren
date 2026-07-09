@@ -17,6 +17,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import org.eclipse.elk.alg.layered.options.CrossingMinimizationStrategy;
 import org.eclipse.elk.alg.layered.options.CycleBreakingStrategy;
 import org.eclipse.elk.alg.layered.options.EdgeStraighteningStrategy;
@@ -284,7 +285,7 @@ class ElkLayoutEngineTest {
   @Test
   void normalizesSequenceMessagesToCleanHorizontalSegments() {
     LayoutResult normalized =
-        SequenceLayoutConstraints.from(sequenceLayoutRequest())
+        SequenceLayoutConstraints.from(sequenceLayoutRequest(), Map.of(), Map.of())
             .normalize(sequenceLayoutResultWithMessageBendPoints());
     LaidOutEdge edge = edgeById(normalized, "m1");
     double messageY = firstSegmentY(edge);

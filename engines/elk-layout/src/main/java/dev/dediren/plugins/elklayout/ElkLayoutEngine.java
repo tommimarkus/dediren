@@ -72,7 +72,10 @@ final class ElkLayoutEngine {
 
   private static LayoutResult layoutFlat(LayoutRequest request) {
     LayoutPreferences preferences = request.layoutPreferences();
-    SequenceLayoutConstraints sequenceConstraints = SequenceLayoutConstraints.from(request);
+    Map<String, String> nodePointers = nodeSourcePointers(request);
+    Map<String, String> edgePointers = edgeSourcePointers(request);
+    SequenceLayoutConstraints sequenceConstraints =
+        SequenceLayoutConstraints.from(request, nodePointers, edgePointers);
     Direction layoutDirection =
         sequenceConstraints.active()
             ? Direction.RIGHT
@@ -159,7 +162,8 @@ final class ElkLayoutEngine {
                 elkNode.getWidth(),
                 elkNode.getHeight(),
                 node.label(),
-                node.role()));
+                node.role(),
+                nodePointers.get(node.id())));
       }
     }
 
@@ -176,7 +180,8 @@ final class ElkLayoutEngine {
                 edge.id(),
                 routingHints(edge.id(), endpointMerges),
                 points(elkEdge),
-                edge.label()));
+                edge.label(),
+                edgePointers.get(edge.id())));
       }
     }
 
@@ -195,6 +200,7 @@ final class ElkLayoutEngine {
     }
 
     LayoutPreferences preferences = request.layoutPreferences();
+    Map<String, String> nodePointers = nodeSourcePointers(request);
     List<Diagnostic> warnings = new ArrayList<>();
     ElkNode root = ElkGraphUtil.createGraph();
     ElkPackedOptions.configureRoot(root, preferences);
@@ -252,7 +258,8 @@ final class ElkLayoutEngine {
                 elkNode.getWidth(),
                 elkNode.getHeight(),
                 node.label(),
-                node.role()));
+                node.role(),
+                nodePointers.get(node.id())));
       }
     }
 
@@ -263,6 +270,8 @@ final class ElkLayoutEngine {
 
   private static LayoutResult layoutGrouped(LayoutRequest request) {
     LayoutPreferences preferences = request.layoutPreferences();
+    Map<String, String> nodePointers = nodeSourcePointers(request);
+    Map<String, String> edgePointers = edgeSourcePointers(request);
     Direction rootDirection = ElkLayeredOptions.preferredDirection(preferences);
     List<Diagnostic> warnings = new ArrayList<>();
     Map<String, LayoutNode> requestNodes = requestNodesById(request);
@@ -410,7 +419,8 @@ final class ElkLayoutEngine {
                 elkNode.getWidth(),
                 elkNode.getHeight(),
                 node.label(),
-                node.role()));
+                node.role(),
+                nodePointers.get(node.id())));
       }
     }
 
@@ -434,7 +444,8 @@ final class ElkLayoutEngine {
                 edge.id(),
                 routingHints(edge.id(), endpointMerges),
                 routePoints,
-                edge.label()));
+                edge.label(),
+                edgePointers.get(edge.id())));
       }
     }
     // Route geometry belongs to ELK Layered. Keep route-quality concerns in
@@ -1095,6 +1106,26 @@ final class ElkLayoutEngine {
       byId.put(node.id(), node);
     }
     return byId;
+  }
+
+  // Provenance is a pure copy-through: the request's node/edge source pointer travels to the
+  // matching LaidOut* element by id. An ELK-synthesized element with no request counterpart gets
+  // no entry here, so the lookup yields null (the optional field's accepted "no provenance" value)
+  // rather than a synthesized pointer.
+  private static Map<String, String> nodeSourcePointers(LayoutRequest request) {
+    Map<String, String> pointers = new HashMap<>();
+    for (LayoutNode node : list(request.nodes())) {
+      pointers.put(node.id(), node.sourcePointer());
+    }
+    return pointers;
+  }
+
+  private static Map<String, String> edgeSourcePointers(LayoutRequest request) {
+    Map<String, String> pointers = new HashMap<>();
+    for (LayoutEdge edge : list(request.edges())) {
+      pointers.put(edge.id(), edge.sourcePointer());
+    }
+    return pointers;
   }
 
   private static Map<String, String> ownerByNode(
