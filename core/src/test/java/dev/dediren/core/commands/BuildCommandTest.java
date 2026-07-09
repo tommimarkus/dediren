@@ -11,7 +11,6 @@ import dev.dediren.contracts.build.BuildViewOutcome;
 import dev.dediren.contracts.export.ExportResult;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.contracts.layout.LayoutRequest;
-import dev.dediren.contracts.layout.LayoutResult;
 import dev.dediren.contracts.render.RenderArtifact;
 import dev.dediren.contracts.render.RenderMetadata;
 import dev.dediren.contracts.render.RenderResult;
@@ -769,9 +768,8 @@ class BuildCommandTest {
 
     @Override
     public EngineResult<RenderResult> render(
-        LayoutResult layout, JsonNode policy, RenderMetadata metadataOrNull)
-        throws EngineException {
-      if (failingViews.contains(layout.viewId())) {
+        LaidOutScene scene, JsonNode policy, RenderMetadata metadataOrNull) throws EngineException {
+      if (failingViews.contains(scene.viewId())) {
         throw fakeFailure("DEDIREN_FAKE_RENDER_FAILED", "render blew up");
       }
       return new EngineResult<>(

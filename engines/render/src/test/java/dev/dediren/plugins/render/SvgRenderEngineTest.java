@@ -1,12 +1,17 @@
 package dev.dediren.plugins.render;
 
+import static dev.dediren.plugins.render.svg.SvgDocument.renderSvg;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import dev.dediren.contracts.json.JsonSupport;
+import dev.dediren.contracts.render.RenderPolicy;
+import dev.dediren.contracts.render.RenderResult;
 import dev.dediren.engine.EngineException;
 import dev.dediren.engine.EngineResult;
+import dev.dediren.ir.LaidOutScene;
+import dev.dediren.ir.LaidOutSceneMapper;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -39,9 +44,31 @@ class SvgRenderEngineTest {
 
     SvgRenderEngine.ParsedInput parsed = engine.parseInput(input);
     EngineResult<?> result =
-        engine.render(parsed.layoutResult(), parsed.policy(), parsed.renderMetadata());
+        engine.render(
+            LaidOutSceneMapper.toScene(parsed.layoutResult()),
+            parsed.policy(),
+            parsed.renderMetadata());
 
     assertThat(engineTree(result.value())).isEqualTo(processData(input));
+  }
+
+  @Test
+  void rendersFromLaidOutSceneIdenticallyToRecord() throws Exception {
+    // Ground-truth oracle: SvgDocument.renderSvg is the untouched record-based internal the engine
+    // delegates to, so comparing against it directly (bypassing SvgRenderEngine's own render()
+    // entry point) pins that the LaidOutScene -> LayoutResult boundary adapter
+    // (LaidOutSceneMapper.toResult) is lossless and the renderer's output is unchanged.
+    byte[] input =
+        renderInput("fixtures/layout-result/basic.json", "fixtures/render-policy/default-svg.json");
+    SvgRenderEngine.ParsedInput parsed = engine.parseInput(input);
+    LaidOutScene scene = LaidOutSceneMapper.toScene(parsed.layoutResult());
+    RenderPolicy renderPolicy =
+        JsonSupport.objectMapper().treeToValue(parsed.policy(), RenderPolicy.class);
+    String expectedSvg = renderSvg(parsed.layoutResult(), parsed.renderMetadata(), renderPolicy);
+
+    RenderResult result = engine.render(scene, parsed.policy(), parsed.renderMetadata()).value();
+
+    assertThat(result.artifacts().get(0).content()).isEqualTo(expectedSvg);
   }
 
   @Test
@@ -54,7 +81,11 @@ class SvgRenderEngineTest {
     EngineException failure =
         assertThrows(
             EngineException.class,
-            () -> engine.render(parsed.layoutResult(), parsed.policy(), parsed.renderMetadata()));
+            () ->
+                engine.render(
+                    LaidOutSceneMapper.toScene(parsed.layoutResult()),
+                    parsed.policy(),
+                    parsed.renderMetadata()));
 
     assertThat(failure.exitCode()).isEqualTo(3);
     assertThat(failure.diagnostics().get(0).code()).isEqualTo("DEDIREN_SVG_POLICY_INVALID");

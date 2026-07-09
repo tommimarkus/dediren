@@ -4,6 +4,7 @@ import dev.dediren.contracts.CommandEnvelope;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.contracts.render.RenderResult;
 import dev.dediren.engine.EngineException;
+import dev.dediren.ir.LaidOutSceneMapper;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
@@ -50,7 +51,12 @@ public final class Main {
     SvgRenderEngine.ParsedInput input = engine.parseInput(stdin.readAllBytes());
     try {
       RenderResult result =
-          engine.render(input.layoutResult(), input.policy(), input.renderMetadata()).value();
+          engine
+              .render(
+                  LaidOutSceneMapper.toScene(input.layoutResult()),
+                  input.policy(),
+                  input.renderMetadata())
+              .value();
       stdout.println(JsonSupport.objectMapper().writeValueAsString(CommandEnvelope.ok(result)));
       return 0;
     } catch (EngineException error) {

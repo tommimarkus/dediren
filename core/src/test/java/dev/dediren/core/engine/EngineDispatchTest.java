@@ -233,7 +233,7 @@ class EngineDispatchTest {
   private record FakeRenderEngine(String id) implements RenderEngine {
     @Override
     public EngineResult<RenderResult> render(
-        dev.dediren.contracts.layout.LayoutResult layout,
+        dev.dediren.ir.LaidOutScene layout,
         JsonNode policy,
         dev.dediren.contracts.render.RenderMetadata metadataOrNull) {
       throw new UnsupportedOperationException("capability-mismatch fake must never be invoked");

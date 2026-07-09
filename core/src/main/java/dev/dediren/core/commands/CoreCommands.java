@@ -201,7 +201,8 @@ public final class CoreCommands {
     RenderEngine renderEngine =
         EngineDispatch.requireEngine(engines, engineId, "render", engines.renderEngine(engineId));
     return EngineDispatch.dispatch(
-        engineId, () -> renderEngine.render(layoutResult, policy, metadata));
+        engineId,
+        () -> renderEngine.render(LaidOutSceneMapper.toScene(layoutResult), policy, metadata));
   }
 
   public static PluginRunOutcome exportCommand(

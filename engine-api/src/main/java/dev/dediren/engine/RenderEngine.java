@@ -1,8 +1,8 @@
 package dev.dediren.engine;
 
-import dev.dediren.contracts.layout.LayoutResult;
 import dev.dediren.contracts.render.RenderMetadata;
 import dev.dediren.contracts.render.RenderResult;
+import dev.dediren.ir.LaidOutScene;
 import tools.jackson.databind.JsonNode;
 
 /**
@@ -15,5 +15,5 @@ public interface RenderEngine {
   String id();
 
   EngineResult<RenderResult> render(
-      LayoutResult layout, JsonNode policy, RenderMetadata metadataOrNull) throws EngineException;
+      LaidOutScene layout, JsonNode policy, RenderMetadata metadataOrNull) throws EngineException;
 }

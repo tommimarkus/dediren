@@ -17,6 +17,8 @@ import dev.dediren.contracts.render.RenderResult;
 import dev.dediren.engine.EngineException;
 import dev.dediren.engine.EngineResult;
 import dev.dediren.engine.RenderEngine;
+import dev.dediren.ir.LaidOutScene;
+import dev.dediren.ir.LaidOutSceneMapper;
 import dev.dediren.plugins.render.node.uml.RenderInputValidator;
 import dev.dediren.uml.UmlValidationException;
 import java.util.List;
@@ -47,7 +49,8 @@ public final class SvgRenderEngine implements RenderEngine {
 
   @Override
   public EngineResult<RenderResult> render(
-      LayoutResult layout, JsonNode policy, RenderMetadata metadataOrNull) throws EngineException {
+      LaidOutScene scene, JsonNode policy, RenderMetadata metadataOrNull) throws EngineException {
+    LayoutResult layout = LaidOutSceneMapper.toResult(scene);
     RenderPolicy renderPolicy = JsonSupport.objectMapper().treeToValue(policy, RenderPolicy.class);
     try {
       RenderInputValidator.validate(layout, metadataOrNull, renderPolicy);
