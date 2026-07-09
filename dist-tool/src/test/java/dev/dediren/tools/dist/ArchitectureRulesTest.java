@@ -273,6 +273,16 @@ class ArchitectureRulesTest {
         .check(PRODUCTION_CLASSES);
     noClasses()
         .that()
+        .resideInAPackage(SEMANTICS_GRAPH)
+        .should()
+        .dependOnClassesThat()
+        .resideInAnyPackage(SEMANTICS_ARCHIMATE, SEMANTICS_UML)
+        .because(
+            "the router/base projection depends on the notation front ends only through the"
+                + " NotationSemantics SPI, never a compile edge (§2)")
+        .check(PRODUCTION_CLASSES);
+    noClasses()
+        .that()
         .resideInAPackage(SEMANTICS)
         .should()
         .dependOnClassesThat()

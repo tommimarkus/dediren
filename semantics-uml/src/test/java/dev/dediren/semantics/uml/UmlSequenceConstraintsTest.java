@@ -35,6 +35,9 @@ class UmlSequenceConstraintsTest {
     LayoutConstraint lifelineOrder = constraintOf(constraints, "uml.sequence.lifeline-order");
     LayoutConstraint messageOrder = constraintOf(constraints, "uml.sequence.message-order");
 
+    assertThat(constraints)
+        .extracting(LayoutConstraint::kind)
+        .containsExactly("uml.sequence.lifeline-order", "uml.sequence.message-order");
     assertThat(lifelineOrder.id()).isEqualTo("sequence-view.uml.sequence.lifeline-order");
     assertThat(lifelineOrder.subjects()).containsExactly("customer", "service");
     assertThat(messageOrder.id()).isEqualTo("sequence-view.uml.sequence.message-order");

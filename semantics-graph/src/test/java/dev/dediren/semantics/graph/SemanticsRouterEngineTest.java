@@ -636,6 +636,105 @@ class SemanticsRouterEngineTest {
     assertThat(data.at("/groups/visual-column").isMissingNode()).isTrue();
   }
 
+  // --- schema-conformance net for routed notation projections (Finding 1, Plan B P3 audit)
+  // --------
+  // The base-profile cases above validate layout-request/render-metadata against the published
+  // schemas for the generic-graph profile; the pre-carve GenericGraphPluginTest did the same for
+  // every UML view kind and for ArchiMate (~27 assertSchemaValid calls). These cases restore a
+  // representative net for the notations routed through ArchimateNotationSemantics and
+  // UmlNotationSemantics, driven through the same RouterHarness (wired with all three notations).
+
+  @Test
+  void projectsArchimateMainViewToLayoutRequest() throws Exception {
+    RouterResult result =
+        RouterHarness.executeForTesting(
+            new String[] {"project", "--target", "layout-request", "--view", "main"},
+            fixture("fixtures/source/valid-archimate-oef.json"));
+
+    JsonNode data = okData(result);
+
+    assertThat(data.at("/layout_request_schema_version").asText())
+        .isEqualTo("layout-request.schema.v2");
+    assertThat(data.at("/view_id").asText()).isEqualTo("main");
+    assertThat(data.get("nodes")).hasSize(2);
+    assertSchemaValid("schemas/layout-request.schema.json", data);
+  }
+
+  @Test
+  void projectsArchimateMainViewToRenderMetadata() throws Exception {
+    RouterResult result =
+        RouterHarness.executeForTesting(
+            new String[] {"project", "--target", "render-metadata", "--view", "main"},
+            fixture("fixtures/source/valid-archimate-oef.json"));
+
+    JsonNode data = okData(result);
+
+    assertThat(data.at("/render_metadata_schema_version").asText())
+        .isEqualTo("render-metadata.schema.v1");
+    assertThat(data.at("/semantic_profile").asText()).isEqualTo("archimate");
+    assertSchemaValid("schemas/render-metadata.schema.json", data);
+  }
+
+  @Test
+  void projectsUmlSequenceViewToLayoutRequest() throws Exception {
+    RouterResult result =
+        RouterHarness.executeForTesting(
+            new String[] {"project", "--target", "layout-request", "--view", "sequence-view"},
+            fixture("fixtures/source/valid-uml-sequence-basic.json"));
+
+    JsonNode data = okData(result);
+
+    assertThat(data.at("/layout_request_schema_version").asText())
+        .isEqualTo("layout-request.schema.v2");
+    assertThat(data.at("/view_id").asText()).isEqualTo("sequence-view");
+    assertSchemaValid("schemas/layout-request.schema.json", data);
+  }
+
+  @Test
+  void projectsUmlSequenceViewToRenderMetadata() throws Exception {
+    RouterResult result =
+        RouterHarness.executeForTesting(
+            new String[] {"project", "--target", "render-metadata", "--view", "sequence-view"},
+            fixture("fixtures/source/valid-uml-sequence-basic.json"));
+
+    JsonNode data = okData(result);
+
+    assertThat(data.at("/render_metadata_schema_version").asText())
+        .isEqualTo("render-metadata.schema.v1");
+    assertThat(data.at("/semantic_profile").asText()).isEqualTo("uml");
+    assertSchemaValid("schemas/render-metadata.schema.json", data);
+  }
+
+  @Test
+  void projectsUmlStateMachineViewToLayoutRequest() throws Exception {
+    RouterResult result =
+        RouterHarness.executeForTesting(
+            new String[] {"project", "--target", "layout-request", "--view", "state-machine-view"},
+            fixture("fixtures/source/valid-uml-state-machine-basic.json"));
+
+    JsonNode data = okData(result);
+
+    assertThat(data.at("/layout_request_schema_version").asText())
+        .isEqualTo("layout-request.schema.v2");
+    assertThat(data.at("/view_id").asText()).isEqualTo("state-machine-view");
+    assertSchemaValid("schemas/layout-request.schema.json", data);
+  }
+
+  @Test
+  void projectsUmlStateMachineViewToRenderMetadata() throws Exception {
+    RouterResult result =
+        RouterHarness.executeForTesting(
+            new String[] {"project", "--target", "render-metadata", "--view", "state-machine-view"},
+            fixture("fixtures/source/valid-uml-state-machine-basic.json"));
+
+    JsonNode data = okData(result);
+
+    assertThat(data.at("/render_metadata_schema_version").asText())
+        .isEqualTo("render-metadata.schema.v1");
+    assertThat(data.at("/semantic_profile").asText()).isEqualTo("uml");
+    assertSchemaValid("schemas/render-metadata.schema.json", data);
+  }
+
   // --- helpers ----------------------------------------------------------------------------------
 
   private static JsonNode okData(RouterResult result) throws Exception {

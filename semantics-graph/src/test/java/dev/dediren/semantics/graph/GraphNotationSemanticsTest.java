@@ -11,7 +11,7 @@ class GraphNotationSemanticsTest {
   private final GraphNotationSemantics notation = new GraphNotationSemantics();
 
   @Test
-  void layoutRoleIsNullExceptForBaseLifelineAndInteraction() {
+  void layoutRoleIsNullForUnrelatedSourceTypes() {
     assertThat(notation.layoutRole("generic.actor")).isNull();
   }
 

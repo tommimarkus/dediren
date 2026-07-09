@@ -44,8 +44,9 @@ class ArchimateLabelReserveConsistencyTest {
         .isPresent();
     assertThat(render.get())
         .as(
-            "ARCHIMATE_LABEL_ICON_RESERVE must be identical in the generic-graph sizer and the "
-                + "render plugin; they reserve and consume the same per-side label/icon room")
+            "ARCHIMATE_LABEL_ICON_RESERVE must be identical in the semantics-archimate "
+                + "ArchimateLayoutSizing constant and the render plugin; they reserve and consume "
+                + "the same per-side label/icon room")
         .isEqualTo(sizing.get());
   }
 
