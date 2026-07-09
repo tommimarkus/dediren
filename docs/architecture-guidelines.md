@@ -80,7 +80,7 @@ Stable Dependencies Principle).
 | `elk-layout` (engine) | `engine-api`, `contracts`, `ir` | 2 — leaf engine |
 | `archimate-oef-export` (engine) | `engine-api`, `contracts`, `archimate`, `schema-cache` | 2 — leaf engine |
 | `uml-xmi-export` (engine) | `engine-api`, `contracts`, `uml`, `schema-cache` | 2 — leaf engine |
-| `cli` | `contracts`, `core`, `engine-api`; engine implementations **only in `EngineWiring`** | 3 — entrypoint + wiring |
+| `cli` | `contracts`, `core`, `engine-api`, `ir`; engine implementations **only in `EngineWiring`** | 3 — entrypoint + wiring |
 | `dist-tool` | `contracts` (compile); `cli` (runtime, for bundling — the bundled engine and semantics-front-end modules arrive transitively through `cli`'s compile deps, so the single-launcher distribution needs no separate engine-launcher dependency) | 3 — assembly |
 | `coverage-report` | *(nothing in the default build)*; every product module (runtime, **`coverage`-profile-scoped only**, for JaCoCo `report-aggregate`) | 3 — build tooling |
 
@@ -99,7 +99,7 @@ Rules that fall out of this table and must be enforced, not just hoped for:
   `ExportRequest` is the one boundary that did **not** flip: it is a wire
   contract (`export-request.schema.v1`) built from `contracts.LayoutResult`,
   and a `contracts → ir` edge is a cycle forbidden by ADP and the ArchUnit
-  `contractsDependsOnNothingInternal` rule, so export keeps consuming
+  `internalPackagesAreAcyclic` rule, so export keeps consuming
   `contracts` records. `build` still avoids re-serializing between stages for
   this lane: it maps the in-memory `LaidOutScene` to a `LayoutResult` object
   (`LaidOutSceneMapper.toResult`) to assemble the `ExportRequest`, rather than
