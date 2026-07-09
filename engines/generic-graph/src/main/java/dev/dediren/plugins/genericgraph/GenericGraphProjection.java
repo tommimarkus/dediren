@@ -4,7 +4,6 @@ import dev.dediren.archimate.Archimate;
 import dev.dediren.contracts.ContractVersions;
 import dev.dediren.contracts.layout.GroupProvenance;
 import dev.dediren.contracts.layout.LayoutConstraint;
-import dev.dediren.contracts.layout.LayoutEdge;
 import dev.dediren.contracts.layout.LayoutGroup;
 import dev.dediren.contracts.layout.LayoutNode;
 import dev.dediren.contracts.layout.LayoutRequest;
@@ -94,21 +93,19 @@ final class GenericGraphProjection {
   static LayoutRequest projectLayoutRequest(
       SourceDocument source, GenericGraphView selectedView, String semanticProfile)
       throws IOException {
-    var nodes = new ArrayList<LayoutNode>();
+    var sceneNodes = new ArrayList<dev.dediren.ir.SceneNode>();
+    var sourceNodeOrder = source.nodes();
     for (String id : selectedView.nodes()) {
-      SourceNode sourceNode =
-          source.nodes().stream()
-              .filter(node -> node.id().equals(id))
-              .findFirst()
-              .orElseThrow(() -> new IOException("view references missing node " + id));
+      int sourceIndex = indexOfNode(sourceNodeOrder, id);
+      SourceNode sourceNode = sourceNodeOrder.get(sourceIndex);
       if (isSourceOnlySequenceFragment(semanticProfile, selectedView, sourceNode)) {
         continue;
       }
-      nodes.add(
-          new LayoutNode(
+      sceneNodes.add(
+          new dev.dediren.ir.SceneNode(
               sourceNode.id(),
               sourceNode.label(),
-              sourceNode.id(),
+              dev.dediren.ir.SourcePointers.node(sourceIndex),
               GenericGraphLayoutSizing.widthHint(semanticProfile, sourceNode),
               GenericGraphLayoutSizing.heightHint(semanticProfile, sourceNode),
               layoutRole(semanticProfile, sourceNode.type()),
@@ -116,23 +113,32 @@ final class GenericGraphProjection {
               sourceNode.layerConstraint()));
     }
 
-    var edges = new ArrayList<LayoutEdge>();
+    var sceneEdges = new ArrayList<dev.dediren.ir.SceneEdge>();
+    var sourceRelationshipOrder = source.relationships();
     for (String id : selectedView.relationships()) {
-      SourceRelationship relationship =
-          source.relationships().stream()
-              .filter(candidate -> candidate.id().equals(id))
-              .findFirst()
-              .orElseThrow(() -> new IOException("view references missing relationship " + id));
-      edges.add(
-          new LayoutEdge(
+      int sourceIndex = indexOfRelationship(sourceRelationshipOrder, id);
+      SourceRelationship relationship = sourceRelationshipOrder.get(sourceIndex);
+      sceneEdges.add(
+          new dev.dediren.ir.SceneEdge(
               relationship.id(),
               relationship.source(),
               relationship.target(),
               relationship.label(),
-              relationship.id(),
+              dev.dediren.ir.SourcePointers.relationship(sourceIndex),
               relationship.type(),
               relationship.priority()));
     }
+
+    LayoutRequest mapped =
+        dev.dediren.ir.LayoutRequestMapper.toRequest(
+            new dev.dediren.ir.SceneGraph(
+                selectedView.id(),
+                sceneNodes,
+                sceneEdges,
+                java.util.List.of(),
+                selectedView.layoutPreferences()));
+    var nodes = mapped.nodes();
+    var edges = mapped.edges();
 
     var selectedNodeIds = new LinkedHashSet<>(selectedView.nodes());
     var selectedGroupIds =
@@ -361,5 +367,24 @@ final class GenericGraphProjection {
 
   static String sourceSemanticProfile(GenericGraphPluginData pluginData) {
     return GenericGraphSemanticProfiles.sourceSemanticProfile(pluginData);
+  }
+
+  private static int indexOfNode(List<SourceNode> nodes, String id) throws IOException {
+    for (int i = 0; i < nodes.size(); i++) {
+      if (nodes.get(i).id().equals(id)) {
+        return i;
+      }
+    }
+    throw new IOException("view references missing node " + id);
+  }
+
+  private static int indexOfRelationship(List<SourceRelationship> relationships, String id)
+      throws IOException {
+    for (int i = 0; i < relationships.size(); i++) {
+      if (relationships.get(i).id().equals(id)) {
+        return i;
+      }
+    }
+    throw new IOException("view references missing relationship " + id);
   }
 }
