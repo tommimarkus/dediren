@@ -122,7 +122,7 @@ class SvgRenderEngineTest {
     ObjectNode input = JsonSupport.objectMapper().createObjectNode();
     input.set("layout_result", fixtureJson(layoutPath));
     ObjectNode policy = (ObjectNode) fixtureJson(policyPath);
-    policy.put("interactive", "bogus");
+    policy.putObject("style").putObject("node").put("fill", "notacolor#");
     input.set("policy", policy);
     return JsonSupport.objectMapper().writeValueAsString(input).getBytes(StandardCharsets.UTF_8);
   }

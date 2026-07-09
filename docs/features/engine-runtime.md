@@ -36,7 +36,7 @@ the value you pass to `--plugin`.
 | --- | --- |
 | `generic-graph` | Semantic vocabulary, semantic validation, view projection (layout request + render metadata). Owns the `generic`, `archimate`, and `uml` profiles. |
 | `elk-layout` | Layout geometry and edge routing via official Eclipse ELK Java libraries. See [Layout (ELK)](layout.md). |
-| `render` | SVG (and optional interactive HTML) rendering. See [SVG Rendering](svg-render.md). |
+| `render` | SVG rendering. See [SVG Rendering](svg-render.md). |
 | `archimate-oef` | ArchiMate 3.2 Open Exchange Format XML. See [Exports](exports.md). |
 | `uml-xmi` | UML 2.5.1 XMI XML. See [Exports](exports.md). |
 

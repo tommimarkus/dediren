@@ -1,5 +1,5 @@
 {
-  "render_policy_schema_version": "render-policy.schema.v2",
+  "render_policy_schema_version": "render-policy.schema.v3",
   "page": { "width": 1000, "height": 400 },
   "margin": { "top": 24, "right": 24, "bottom": 24, "left": 24 },
   "style": {

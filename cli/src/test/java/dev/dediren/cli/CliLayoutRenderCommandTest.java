@@ -236,7 +236,7 @@ class CliLayoutRenderCommandTest {
             "<title>main</title>",
             "data-dediren-node-id=\"client\"",
             "data-dediren-edge-id=\"client-calls-api\"")
-        // The documented default is "none": a static SVG with no interaction script or hooks.
+        // Render output is always a static SVG with no interaction script or hooks.
         .doesNotContain(
             "data-dediren-edge-label-background",
             "<script",

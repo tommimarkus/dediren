@@ -34,14 +34,12 @@ import dev.dediren.contracts.layout.LaidOutEdge;
 import dev.dediren.contracts.layout.LaidOutGroup;
 import dev.dediren.contracts.layout.LaidOutNode;
 import dev.dediren.contracts.layout.LayoutResult;
-import dev.dediren.contracts.render.RenderArtifact;
 import dev.dediren.contracts.render.RenderMetadata;
 import dev.dediren.contracts.render.RenderMetadataSelector;
 import dev.dediren.contracts.render.RenderPolicy;
 import dev.dediren.contracts.render.SvgGradient;
 import dev.dediren.contracts.render.SvgGradientStop;
 import dev.dediren.contracts.render.SvgGradientType;
-import dev.dediren.contracts.render.SvgInteractionStyle;
 import dev.dediren.contracts.render.SvgLabelAlign;
 import dev.dediren.contracts.render.SvgNodeDecorator;
 import dev.dediren.plugins.render.node.uml.UmlSequenceRenderer;
@@ -58,15 +56,11 @@ public final class SvgDocument {
 
   private SvgDocument() {}
 
-  private static final String DEFAULT_HIGHLIGHT_STROKE = "#1f6feb";
-  private static final double DEFAULT_HIGHLIGHT_STROKE_WIDTH = 3.0;
-
   public static String renderSvg(
       LayoutResult result, RenderMetadata metadata, RenderPolicy policy) {
     if (UmlSequenceRenderer.isSequence(metadata)) {
       return new UmlSequenceRenderer(result, metadata, policy).render();
     }
-    boolean interactive = !"none".equals(interactiveMode(policy));
     ResolvedStyle base = StyleResolver.baseStyle(policy);
     SvgBounds bounds = svgBounds(result, metadata, policy, base);
     StringBuilder svg = new StringBuilder();
@@ -91,9 +85,6 @@ public final class SvgDocument {
             bounds.height(),
             attr(base.backgroundFill()),
             opacityAttr("fill-opacity", base.backgroundFillOpacity())));
-    if (interactive) {
-      svg.append(interactionStyleBlock(policy));
-    }
     svg.append("<g font-family=\"")
         .append(attr(base.fontFamily()))
         .append("\" font-size=\"")
@@ -178,13 +169,6 @@ public final class SvgDocument {
       ResolvedEdgeStyle style = StyleResolver.edgeStyle(policy, metadata, edge.id(), base);
       List<LineJump> lineJumps = lineJumps(edge, renderedEdges);
       svg.append("<g data-dediren-edge-id=\"").append(attr(edge.id())).append("\"");
-      if (interactive) {
-        svg.append(" data-dediren-edge-source=\"")
-            .append(attr(edge.source()))
-            .append("\" data-dediren-edge-target=\"")
-            .append(attr(edge.target()))
-            .append("\"");
-      }
       svg.append(">");
       svg.append(edgeMarker(edge, style, "start"));
       svg.append(edgeMarker(edge, style, "end"));
@@ -233,70 +217,8 @@ public final class SvgDocument {
       svg.append("</g>");
     }
     svg.append("</g>");
-    if (interactive) {
-      svg.append(interactionScriptBlock());
-    }
     svg.append("</svg>\n");
     return svg.toString();
-  }
-
-  public static String interactiveMode(RenderPolicy policy) {
-    String mode = policy.interactive();
-    // The documented default is "none": omitting the field yields a static SVG with no
-    // interaction script. Interactivity is opt-in via an explicit "svg", "html", or "both".
-    // This rule is uniform across every view; the UML sequence renderer additionally never
-    // emits the highlight script even when interactivity is requested (nothing to highlight).
-    return mode == null ? "none" : mode;
-  }
-
-  private static String interactionStyleBlock(RenderPolicy policy) {
-    String stroke = DEFAULT_HIGHLIGHT_STROKE;
-    double width = DEFAULT_HIGHLIGHT_STROKE_WIDTH;
-    SvgInteractionStyle interaction = policy.style() == null ? null : policy.style().interaction();
-    if (interaction != null) {
-      if (interaction.highlightStroke() != null) {
-        stroke = interaction.highlightStroke();
-      }
-      if (interaction.highlightStrokeWidth() != null) {
-        width = interaction.highlightStrokeWidth();
-      }
-    }
-    return "<style>g.dediren-edge-highlighted &gt; path{stroke:"
-        + attr(stroke)
-        + ";stroke-width:"
-        + styleNumber(width)
-        + ";}</style>";
-  }
-
-  private static String interactionScriptBlock() {
-    return "<script>//<![CDATA[\n"
-        + "(function(){\n"
-        + "var root=document.currentScript&&document.currentScript.closest?document.currentScript.closest('svg'):null;\n"
-        + "if(!root){root=document.querySelector('svg');}\n"
-        + "if(!root){return;}\n"
-        + "var selected=null;\n"
-        + "function clear(){var hl=root.querySelectorAll('.dediren-edge-highlighted');for(var i=0;i<hl.length;i++){hl[i].classList.remove('dediren-edge-highlighted');}selected=null;}\n"
-        + "function select(id){clear();var edges=root.querySelectorAll('[data-dediren-edge-source]');for(var i=0;i<edges.length;i++){var e=edges[i];if(e.getAttribute('data-dediren-edge-source')===id||e.getAttribute('data-dediren-edge-target')===id){e.classList.add('dediren-edge-highlighted');}}selected=id;}\n"
-        + "root.addEventListener('click',function(ev){var t=ev.target;var n=t.closest?t.closest('[data-dediren-node-id]'):null;if(n){var id=n.getAttribute('data-dediren-node-id');if(id===selected){clear();}else{select(id);}}else{clear();}});\n"
-        + "document.addEventListener('keydown',function(ev){if(ev.key==='Escape'){clear();}});\n"
-        + "})();\n"
-        + "//]]></script>";
-  }
-
-  public static List<RenderArtifact> buildArtifacts(String mode, String svg) {
-    return switch (mode) {
-      case "html" -> List.of(new RenderArtifact("html", htmlWrap(svg)));
-      case "both" ->
-          List.of(new RenderArtifact("svg", svg), new RenderArtifact("html", htmlWrap(svg)));
-      default -> List.of(new RenderArtifact("svg", svg));
-    };
-  }
-
-  private static String htmlWrap(String svg) {
-    return "<!DOCTYPE html>\n<html lang=\"en\">\n<head><meta charset=\"utf-8\">"
-        + "<title>dediren diagram</title></head>\n<body>\n"
-        + svg
-        + "</body>\n</html>\n";
   }
 
   private static String groupDecorator(LaidOutGroup group, ResolvedGroupStyle style) {

@@ -13,7 +13,6 @@ import dev.dediren.contracts.render.SvgFontStyle;
 import dev.dediren.contracts.render.SvgGradient;
 import dev.dediren.contracts.render.SvgGradientStop;
 import dev.dediren.contracts.render.SvgGroupStyle;
-import dev.dediren.contracts.render.SvgInteractionStyle;
 import dev.dediren.contracts.render.SvgNodeStyle;
 import dev.dediren.contracts.render.SvgStylePolicy;
 import dev.dediren.uml.Uml;
@@ -402,15 +401,6 @@ public final class RenderInputValidator {
   }
 
   private static void validateRenderPolicy(RenderPolicy policy) throws PolicyValidationException {
-    String interactive = policy.interactive();
-    if (interactive != null
-        && !interactive.equals("none")
-        && !interactive.equals("svg")
-        && !interactive.equals("html")
-        && !interactive.equals("both")) {
-      throw new PolicyValidationException(
-          "interactive", "SVG render policy interactive must be one of none, svg, html, both");
-    }
     SvgStylePolicy style = policy.style();
     if (style == null) {
       return;
@@ -420,7 +410,6 @@ public final class RenderInputValidator {
     validateNodeStyle(style.node(), "style.node");
     validateEdgeStyle(style.edge(), "style.edge");
     validateGroupStyle(style.group(), "style.group");
-    validateInteractionStyle(style.interaction(), "style.interaction");
     for (Map.Entry<String, SvgNodeStyle> entry : style.nodeTypeOverrides().entrySet()) {
       validateNodeStyle(entry.getValue(), "style.node_type_overrides." + entry.getKey());
     }
@@ -478,15 +467,6 @@ public final class RenderInputValidator {
     if (style != null) {
       validateColor(style.fill(), path + ".fill");
       validateNumber(style.fillOpacity(), path + ".fill_opacity", Bound.MIN, 0.0, 1.0);
-    }
-  }
-
-  private static void validateInteractionStyle(SvgInteractionStyle style, String path)
-      throws PolicyValidationException {
-    if (style != null) {
-      validateColor(style.highlightStroke(), path + ".highlight_stroke");
-      validateNumber(
-          style.highlightStrokeWidth(), path + ".highlight_stroke_width", Bound.MIN, 0.0, 24.0);
     }
   }
 
@@ -561,10 +541,10 @@ public final class RenderInputValidator {
   }
 
   // Broadened colour grammar: hex (#RGB/#RGBA/#RRGGBB/#RRGGBBAA), rgb()/rgba(), or a CSS colour
-  // keyword (letters, covering names plus none/transparent/currentColor). Deliberately admits no
-  // CSS
-  // metacharacters (; { } < > etc.): this validator — not XML escaping — is the security boundary,
-  // because style.interaction.highlight_stroke is emitted into a CSS <style> block. See #render.
+  // keyword (letters, covering names plus none/transparent/currentColor). Every colour now lands
+  // only in XML-escaped SVG attribute contexts (fill/stroke/label_fill/gradient stops), so escaping
+  // is the correctness boundary; admitting no CSS metacharacters (; { } < > etc.) is kept as
+  // defense-in-depth. (There is no longer a raw CSS <style> sink — interactive-svg was retired.)
   private static final Pattern COLOR =
       Pattern.compile(
           "#([0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})"

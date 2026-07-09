@@ -1,7 +1,5 @@
 package dev.dediren.plugins.render;
 
-import static dev.dediren.plugins.render.svg.SvgDocument.buildArtifacts;
-import static dev.dediren.plugins.render.svg.SvgDocument.interactiveMode;
 import static dev.dediren.plugins.render.svg.SvgDocument.renderSvg;
 
 import dev.dediren.archimate.ArchimateTypeValidationException;
@@ -65,7 +63,7 @@ public final class SvgRenderEngine implements RenderEngine {
     }
 
     String svg = renderSvg(layout, metadataOrNull, renderPolicy);
-    List<RenderArtifact> artifacts = buildArtifacts(interactiveMode(renderPolicy), svg);
+    List<RenderArtifact> artifacts = List.of(new RenderArtifact("svg", svg));
     return new EngineResult<>(
         new RenderResult(ContractVersions.RENDER_RESULT_SCHEMA_VERSION, artifacts), List.of());
   }

@@ -25,7 +25,7 @@ class SequenceStylingTest {
         RenderTestSupport.fixtureJson("fixtures/render-metadata/uml-sequence-basic.json"));
 
     ObjectNode policy = input.putObject("policy");
-    policy.put("render_policy_schema_version", "render-policy.schema.v2");
+    policy.put("render_policy_schema_version", "render-policy.schema.v3");
     policy.put("semantic_profile", "uml");
     policy.putObject("page").put("width", 1200).put("height", 800);
     policy.putObject("margin").put("top", 32).put("right", 32).put("bottom", 32).put("left", 32);

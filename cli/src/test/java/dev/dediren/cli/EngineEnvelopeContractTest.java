@@ -148,7 +148,10 @@ class EngineEnvelopeContractTest {
   @Test
   void renderInvalidPolicyKeepsPublishedErrorRow() throws Exception {
     String policy =
-        "{\"render_policy_schema_version\":\"render-policy.schema.v2\",\"interactive\":\"bogus\"}";
+        "{\"render_policy_schema_version\":\"render-policy.schema.v3\","
+            + "\"page\":{\"width\":100,\"height\":100},"
+            + "\"margin\":{\"top\":0,\"right\":0,\"bottom\":0,\"left\":0},"
+            + "\"style\":{\"node\":{\"fill\":\"notacolor#\"}}}";
     String layout = read("fixtures/layout-result/basic.json");
 
     PluginRunOutcome outcome =

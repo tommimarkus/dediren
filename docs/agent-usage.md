@@ -220,7 +220,7 @@ or the previous command envelope:
 jq -r '.data.artifacts[] | select(.artifact_kind=="svg") | .content' render-result.json > diagram.svg
 ```
 
-The `render` plugin emits only `svg` (and, in interactive modes, `html`) artifacts; it does not produce PNG. To get a raster image, convert the emitted SVG with an external tool — for example `rsvg-convert diagram.svg -o diagram.png`, `resvg diagram.svg diagram.png`, ImageMagick (`magick convert diagram.svg diagram.png`), or Inkscape (`inkscape diagram.svg --export-type=png`).
+The `render` plugin emits only an `svg` artifact; it does not produce PNG. To get a raster image, convert the emitted SVG with an external tool — for example `rsvg-convert diagram.svg -o diagram.png`, `resvg diagram.svg diagram.png`, ImageMagick (`magick convert diagram.svg diagram.png`), or Inkscape (`inkscape diagram.svg --export-type=png`).
 
 ## Build
 
@@ -297,12 +297,6 @@ back to the decomposed `export` subcommand.
 The render policy owns SVG presentation. Beyond `accessibility` (above), these
 options shape output:
 
-- **Interactive SVG.** `interactive` is `none` (default — a static SVG with no
-  embedded script), `svg` (a self-contained SVG that highlights a node's edges
-  on click), `html` (an HTML page wrapping that SVG), or `both` (an `svg` and an
-  `html` artifact). The render result is an ordered `artifacts[]` list — select
-  the one you want by `artifact_kind`. `style.interaction.highlight_stroke` and
-  `style.interaction.highlight_stroke_width` tune the highlight.
 - **Edge label backing.** Edge labels default to outlined text; set
   `style.edge.label_presentation` to `background` for a filled label backing.
 - **Generic node shapes.** For generic (non-notation) graphs, set `style.node.shape`

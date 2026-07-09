@@ -16,10 +16,9 @@ import tools.jackson.databind.node.ObjectNode;
 /**
  * The render policy's colour grammar is broadened beyond {@code #RRGGBB} to CSS colour keywords,
  * hex with alpha (3/4/6/8 digits), and {@code rgb()}/{@code rgba()} — but stays injection-safe.
- * This matters because {@code style.interaction.highlight_stroke} is emitted into a CSS {@code
- * <style>} block where XML escaping does nothing, so the validator (not escaping) is the security
- * boundary: a value carrying CSS metacharacters must be rejected as {@code
- * DEDIREN_SVG_POLICY_INVALID}.
+ * Every colour lands only in XML-escaped SVG attribute contexts, so escaping is the correctness
+ * boundary; the validator additionally admits no CSS metacharacters as defense-in-depth, so a value
+ * carrying them is rejected as {@code DEDIREN_SVG_POLICY_INVALID}.
  */
 class ColorGrammarTest {
 
@@ -51,21 +50,6 @@ class ColorGrammarTest {
           .describedAs("color %s", bad)
           .isEqualTo("DEDIREN_SVG_POLICY_INVALID");
     }
-  }
-
-  @Test
-  void rejectsCssInjectionThroughHighlightStroke() throws Exception {
-    ObjectNode input = baseInput();
-    ObjectNode policy = (ObjectNode) input.get("policy");
-    policy.put("interactive", "svg");
-    policy
-        .putObject("style")
-        .putObject("interaction")
-        .put("highlight_stroke", "red;}svg{display:none;");
-
-    EngineException failure = renderExpectingFailure(input);
-
-    assertThat(failure.diagnostics().get(0).code()).isEqualTo("DEDIREN_SVG_POLICY_INVALID");
   }
 
   private EngineException renderExpectingFailure(ObjectNode input) throws Exception {

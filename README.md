@@ -121,8 +121,8 @@ dediren emits SVG only; for a raster image, convert the SVG with an external
 tool such as `rsvg-convert`, `resvg`, ImageMagick, or Inkscape.
 
 `"$BUNDLE/bin/dediren" --version` confirms the bundle is runnable. For
-ArchiMate/UML notations, exports, interactive SVG, accessibility, and
-failure-repair rules, follow [`docs/agent-usage.md`](docs/agent-usage.md).
+ArchiMate/UML notations, exports, accessibility, and failure-repair rules,
+follow [`docs/agent-usage.md`](docs/agent-usage.md).
 
 ## Bundle Layout
 
