@@ -32,7 +32,9 @@ internal-representation change plus one deliberate, additive contract change
 
 - **Scope: full Plan B, phased in one spec** — the typed IR, JSON-Pointer
   provenance, the `semantics-*` notation-front-end split, and typed-IR piping,
-  as four sequenced phases (P1–P4 below).
+  as five sequenced phases (P1–P5 below). (Originally four phases; the P3/P4 line
+  was re-sliced into P3/P4/P5 to keep the typed `LayoutIntent` vocabulary with
+  its `elk-layout` consumer instead of one phase ahead of it.)
 - **Spanning IR.** The typed IR is the single in-memory truth across
   project → layout → render/export. The public `layout-request` /
   `layout-result` records become *serialization DTOs* of the IR.
@@ -247,14 +249,41 @@ green throughout.
   `LaidOutScene` and retire the matching `LayoutQuality` checks; jqwik
   generators; regenerate characterization `layout-result` fixtures; delete the
   idealized-oracle assertions.
-- **P3 — carve `generic-graph` → `semantics-archimate/uml/graph`.** Move
-  projection + the `SequenceConstraint` family + notation invariants +
-  UML→`LayoutIntent` lowering into the new modules; delete
-  `engines/generic-graph`; extend ArchUnit.
-- **P4 — typed-IR piping.** Flip `engine-api` to speak IR end-to-end;
-  `BuildCommand` passes IR in memory (no stage re-serialization); remove the
-  `SequenceLayoutConstraints` UML re-derivation from `elk-layout` (now driven by
-  neutral `LayoutIntent` + the normalization pass).
+- **P3 — carve `generic-graph` → `semantics-graph/archimate/uml` (structural,
+  byte-stable).** A pure code-relocation slice: the base/plain projection + the
+  profile router move to `semantics-graph`, the ArchiMate legality/projection/
+  sizing to `semantics-archimate`, and the UML legality/projection/sizing + the
+  four stringly `uml.sequence.*` constraint producers to `semantics-uml`. One
+  `SemanticsEngine` (engine id **unchanged**: `generic-graph`) routes by a typed
+  profile to a `NotationSemantics` SPI (owned by `engine-api`) that the three
+  notation modules satisfy, so the router depends on an abstraction and the two
+  notation modules stay independent siblings. Delete `engines/generic-graph`;
+  extend ArchUnit (three package constants, sibling-independence, only
+  `semantics-*` import the notation cores). **The wire is unchanged** — same
+  `contracts` records, same stringly `uml.sequence.*` constraints (relocated, not
+  retyped), no schema bump; only the Java package moves
+  (`dev.dediren.plugins.genericgraph` → `dev.dediren.semantics.*`), discharging
+  that slice of the §12 package-rename debt. The typed `LayoutIntent` /
+  `SequenceConstraint` vocabulary is **not** introduced here — it lands in P5
+  with its consumer. `elk-layout` / `render` / `export` are untouched.
+- **P4 — IR seam flip (plumbing, behavior-preserving).** Flip `engine-api` to
+  speak IR end-to-end (`SemanticsEngine` → `SceneGraph`; `LayoutEngine`
+  `SceneGraph` → `LaidOutScene`; render/export consume `LaidOutScene`) via
+  Parallel Change so `main` stays green per step; `BuildCommand` passes IR in
+  memory (no stage re-serialization). `SceneGraph` grows to carry the layout
+  constraints so the IR is the full pre-layout truth. Geometry is unchanged: the
+  stringly `uml.sequence.*` constraints still ride inside the IR and `elk-layout`
+  still consumes them via `SequenceLayoutConstraints`.
+- **P5 — typed sequence intent + remove the `elk-layout` re-derivation
+  (semantic).** Introduce the typed `LayoutIntent` + `SequenceConstraint` vocab
+  (the piece moved out of P3), the notation invariants, and the neutral-invariant
+  / `NormalizationPass` SPIs; `semantics-uml` lowers UML sequence rules into
+  neutral `LayoutIntent` on the `SceneGraph`; `elk-layout` consumes `LayoutIntent`
+  (+ the `NormalizationPass` escape hatch) and the hand-rolled
+  `SequenceLayoutConstraints` UML re-derivation is deleted. This is the
+  geometry-affecting change, gated by the P2 real-engine invariants + jqwik
+  property tests. The typed vocab now lands with its consumer, so nothing is
+  dead-weight.
 
 ## Costs And Reversals
 
@@ -262,8 +291,9 @@ green throughout.
   engines + `core` dispatch + `cli` wiring. The schema v1 → v2 bump (P1) touches
   the move-together set. The fixture replace (P2) touches ~14 test files.
 - **Reversibility.** P1–P2 are largely additive (mappers bridge old and new);
-  P3–P4 are structural and harder to revert. Parallel change keeps `main`
-  releasable at every phase boundary.
+  P3 is a byte-stable structural carve (a reversible module move with no wire
+  change); P4–P5 are structural seam/geometry changes and harder to revert.
+  Parallel change keeps `main` releasable at every phase boundary.
 - **Release/versioning.** The P1 schema-id bump is the compatibility signal
   (CalVer does not encode it): breaking-change release notes + a separate
   version-bump commit + an annotated `v<version>` tag per `release-policy`,
@@ -272,7 +302,7 @@ green throughout.
 ## Risks
 
 - **R1 — neutral `LayoutIntent` may not express every sequence normalization.**
-  Validate in P3 by porting one sequence rule first; the `NormalizationPass` SPI
+  Validate in P5 by porting one sequence rule first; the `NormalizationPass` SPI
   is the named, evidence-gated escape hatch (ELK-first preserved).
 - **R2 — characterization-fixture determinism** across CI and local runs. Gated
   on bundled Liberation Sans + pinned ELK; verified in CI.

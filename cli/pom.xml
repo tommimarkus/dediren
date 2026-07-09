@@ -38,7 +38,17 @@
     </dependency>
     <dependency>
       <groupId>dev.dediren</groupId>
-      <artifactId>generic-graph</artifactId>
+      <artifactId>semantics-graph</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>dev.dediren</groupId>
+      <artifactId>semantics-archimate</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>dev.dediren</groupId>
+      <artifactId>semantics-uml</artifactId>
       <version>${project.version}</version>
     </dependency>
     <dependency>
@@ -66,7 +76,6 @@
       <groupId>dev.dediren</groupId>
       <artifactId>ir</artifactId>
       <version>${project.version}</version>
-      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.assertj</groupId>

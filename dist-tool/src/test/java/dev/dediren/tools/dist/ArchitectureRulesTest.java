@@ -29,13 +29,21 @@ class ArchitectureRulesTest {
   private static final String PLUGINS = "dev.dediren.plugins..";
   private static final String IR = "dev.dediren.ir..";
 
-  // The five first-party engines, keyed by their retained dev.dediren.plugins.* package names
-  // (§12 debt: the package rename did not follow the engines/ directory move).
+  // The four remaining first-party plugins.* engines, keyed by their retained
+  // dev.dediren.plugins.* package names (§12 debt: the package rename did not follow the
+  // engines/ directory move). The fifth former engine, generic-graph, was carved into the
+  // three dev.dediren.semantics.* modules below (Plan B P3).
   private static final String RENDER = "dev.dediren.plugins.render..";
   private static final String ELK_LAYOUT = "dev.dediren.plugins.elklayout..";
-  private static final String GENERIC_GRAPH = "dev.dediren.plugins.genericgraph..";
   private static final String ARCHIMATE_OEF = "dev.dediren.plugins.archimateoef..";
   private static final String UML_XMI = "dev.dediren.plugins.umlxmi..";
+
+  // The three semantics-carve modules (Plan B P3): semantics-graph hosts the base projection
+  // and profile router; semantics-archimate and semantics-uml are the notation front ends.
+  private static final String SEMANTICS = "dev.dediren.semantics..";
+  private static final String SEMANTICS_GRAPH = "dev.dediren.semantics.graph..";
+  private static final String SEMANTICS_ARCHIMATE = "dev.dediren.semantics.archimate..";
+  private static final String SEMANTICS_UML = "dev.dediren.semantics.uml..";
 
   private static final String ELK = "org.eclipse.elk..";
 
@@ -55,10 +63,12 @@ class ArchitectureRulesTest {
     int engineApiClasses = 0;
     int renderClasses = 0;
     int elkLayoutClasses = 0;
-    int genericGraphClasses = 0;
     int archimateOefClasses = 0;
     int umlXmiClasses = 0;
     int irClasses = 0;
+    int semanticsGraphClasses = 0;
+    int semanticsArchimateClasses = 0;
+    int semanticsUmlClasses = 0;
     for (JavaClass javaClass : PRODUCTION_CLASSES) {
       String packageName = javaClass.getPackageName();
       if (packageName.startsWith("dev.dediren.core")) {
@@ -69,14 +79,18 @@ class ArchitectureRulesTest {
         renderClasses++;
       } else if (packageName.startsWith("dev.dediren.plugins.elklayout")) {
         elkLayoutClasses++;
-      } else if (packageName.startsWith("dev.dediren.plugins.genericgraph")) {
-        genericGraphClasses++;
       } else if (packageName.startsWith("dev.dediren.plugins.archimateoef")) {
         archimateOefClasses++;
       } else if (packageName.startsWith("dev.dediren.plugins.umlxmi")) {
         umlXmiClasses++;
       } else if (packageName.startsWith("dev.dediren.ir")) {
         irClasses++;
+      } else if (packageName.startsWith("dev.dediren.semantics.graph")) {
+        semanticsGraphClasses++;
+      } else if (packageName.startsWith("dev.dediren.semantics.archimate")) {
+        semanticsArchimateClasses++;
+      } else if (packageName.startsWith("dev.dediren.semantics.uml")) {
+        semanticsUmlClasses++;
       }
     }
     assertThat(coreClasses).as("core production classes on the classpath").isPositive();
@@ -85,9 +99,6 @@ class ArchitectureRulesTest {
     assertThat(elkLayoutClasses)
         .as("elk-layout engine production classes on the classpath")
         .isPositive();
-    assertThat(genericGraphClasses)
-        .as("generic-graph engine production classes on the classpath")
-        .isPositive();
     assertThat(archimateOefClasses)
         .as("archimate-oef-export engine production classes on the classpath")
         .isPositive();
@@ -95,6 +106,15 @@ class ArchitectureRulesTest {
         .as("uml-xmi-export engine production classes on the classpath")
         .isPositive();
     assertThat(irClasses).as("ir production classes on the classpath").isPositive();
+    assertThat(semanticsGraphClasses)
+        .as("semantics-graph production classes on the classpath")
+        .isPositive();
+    assertThat(semanticsArchimateClasses)
+        .as("semantics-archimate production classes on the classpath")
+        .isPositive();
+    assertThat(semanticsUmlClasses)
+        .as("semantics-uml production classes on the classpath")
+        .isPositive();
   }
 
   @Test
@@ -118,6 +138,7 @@ class ArchitectureRulesTest {
             CORE,
             CLI,
             PLUGINS,
+            SEMANTICS,
             "dev.dediren.archimate..",
             "dev.dediren.uml..",
             "dev.dediren.schemacache..",
@@ -139,6 +160,7 @@ class ArchitectureRulesTest {
             CORE,
             CLI,
             PLUGINS,
+            SEMANTICS,
             "dev.dediren.archimate..",
             "dev.dediren.uml..",
             "dev.dediren.schemacache..",
@@ -186,25 +208,26 @@ class ArchitectureRulesTest {
         .resideInAPackage(CORE)
         .should()
         .dependOnClassesThat()
-        .resideInAPackage(PLUGINS)
+        .resideInAnyPackage(PLUGINS, SEMANTICS)
         .because(
             "core dispatches engines only through the engine-api interfaces and contracts"
-                + " records; it must never compile-depend on a concrete engine implementation"
-                + " (§2, §5)")
+                + " records; it must never compile-depend on a concrete engine implementation,"
+                + " including the semantics-* engines (§2, §5)")
         .check(PRODUCTION_CLASSES);
   }
 
   @Test
   void enginesDoNotDependOnEachOther() {
-    // The five engines are independent leaf libraries behind engine-api (§2, §5); shared code
-    // between them flows only through contracts, engine-api, archimate, uml, or schema-cache —
-    // never a direct engine-to-engine edge. Checked pairwise: for each engine, no class in its
-    // package may depend on any of the other four engine packages.
+    // The four remaining plugins.* engines are independent leaf libraries behind engine-api
+    // (§2, §5); shared code between them flows only through contracts, engine-api, archimate,
+    // uml, or schema-cache — never a direct engine-to-engine edge. Checked pairwise: for each
+    // engine, no class in its package may depend on any of the other three engine packages.
+    // The former fifth engine, generic-graph, was carved into the semantics-* modules, whose own
+    // independence is asserted separately by semanticsModulesAreIndependentAndLeaf.
     Map<String, String> enginePackages =
         Map.of(
             "render", RENDER,
             "elk-layout", ELK_LAYOUT,
-            "generic-graph", GENERIC_GRAPH,
             "archimate-oef-export", ARCHIMATE_OEF,
             "uml-xmi-export", UML_XMI);
     for (Map.Entry<String, String> engine : enginePackages.entrySet()) {
@@ -225,6 +248,63 @@ class ArchitectureRulesTest {
                   + " archimate, uml, or schema-cache, never another engine (§2, §5)")
           .check(PRODUCTION_CLASSES);
     }
+  }
+
+  @Test
+  void semanticsModulesAreIndependentAndLeaf() {
+    // semantics-uml and semantics-archimate never depend on each other; neither depends on
+    // semantics-graph in production; and none depends on core/cli or another engine (they reach
+    // shared code only through contracts, ir, engine-api, and their own notation core).
+    noClasses()
+        .that()
+        .resideInAPackage(SEMANTICS_ARCHIMATE)
+        .should()
+        .dependOnClassesThat()
+        .resideInAnyPackage(SEMANTICS_UML, SEMANTICS_GRAPH)
+        .because("the ArchiMate front end must not depend on the UML front end or the router (§2)")
+        .check(PRODUCTION_CLASSES);
+    noClasses()
+        .that()
+        .resideInAPackage(SEMANTICS_UML)
+        .should()
+        .dependOnClassesThat()
+        .resideInAnyPackage(SEMANTICS_ARCHIMATE, SEMANTICS_GRAPH)
+        .because("the UML front end must not depend on the ArchiMate front end or the router (§2)")
+        .check(PRODUCTION_CLASSES);
+    noClasses()
+        .that()
+        .resideInAPackage(SEMANTICS_GRAPH)
+        .should()
+        .dependOnClassesThat()
+        .resideInAnyPackage(SEMANTICS_ARCHIMATE, SEMANTICS_UML)
+        .because(
+            "the router/base projection depends on the notation front ends only through the"
+                + " NotationSemantics SPI, never a compile edge (§2)")
+        .check(PRODUCTION_CLASSES);
+    noClasses()
+        .that()
+        .resideInAPackage(SEMANTICS)
+        .should()
+        .dependOnClassesThat()
+        .resideInAnyPackage(CORE, CLI, PLUGINS)
+        .because(
+            "the semantics front ends are leaf libraries behind engine-api; they must not"
+                + " depend on core, cli, or another engine implementation (§2, §5)")
+        .check(PRODUCTION_CLASSES);
+  }
+
+  @Test
+  void elkLayoutDoesNotImportSemantics() {
+    noClasses()
+        .that()
+        .resideInAPackage(ELK_LAYOUT)
+        .should()
+        .dependOnClassesThat()
+        .resideInAnyPackage(SEMANTICS)
+        .because(
+            "elk-layout consumes only stringly LayoutConstraints over contracts; a compile"
+                + " edge to a semantics front end would recreate the notation coupling P3 removed (§2)")
+        .check(PRODUCTION_CLASSES);
   }
 
   @Test
@@ -259,10 +339,10 @@ class ArchitectureRulesTest {
 
   @Test
   void onlyEngineWiringTouchesEngineImplementations() {
-    // The five engine deps are compile scope so EngineWiring can construct them for the
-    // in-memory dispatch. That single named class is the only permitted cli-to-engine-
-    // implementation edge; every other cli class must reach engines through the engine-api
-    // interfaces (decision 3, §2, §5).
+    // The engine deps (four plugins.* engines plus the three semantics-* modules) are compile
+    // scope so EngineWiring can construct them for the in-memory dispatch. That single named
+    // class is the only permitted cli-to-engine-implementation edge; every other cli class must
+    // reach engines through the engine-api interfaces (decision 3, §2, §5).
     noClasses()
         .that()
         .resideInAPackage(CLI)
@@ -270,7 +350,7 @@ class ArchitectureRulesTest {
         .doNotHaveFullyQualifiedName("dev.dediren.cli.EngineWiring")
         .should()
         .dependOnClassesThat()
-        .resideInAPackage(PLUGINS)
+        .resideInAnyPackage(PLUGINS, SEMANTICS)
         .because(
             "only EngineWiring wires the concrete first-party engines; the rest of cli knows"
                 + " them through engine-api, confining the cli-to-engine-implementation edge to"
