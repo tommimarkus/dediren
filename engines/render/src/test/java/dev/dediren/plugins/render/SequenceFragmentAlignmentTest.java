@@ -28,16 +28,14 @@ class SequenceFragmentAlignmentTest {
   private static final String METADATA = "fixtures/render-metadata/uml-sequence-fragments.json";
   private static final double TOLERANCE = 1.0;
 
-  // A real (engine-produced, fragment-gap-spaced) layout of the same fragments source. The shared
-  // LAYOUT fixture above is hand-authored with idealised spacing that PREDATES the reserved
-  // fragment/operand gaps; under the current fragment padding it would render chrome that overlaps
-  // its message labels, so LAYOUT must never back a chrome/label collision or overlap assertion —
-  // the chrome-collision invariant is checked here against this realistically-spaced fixture. If a
-  // generic label-overlap invariant is ever added to the shared appearance suites, regenerate
-  // LAYOUT from the real engine first (it is consumed by several suites, hence not regenerated
-  // here).
-  private static final String CHROME_LAYOUT =
-      "fixtures/layout-result/uml-sequence-fragment-chrome.json";
+  // fixtures/layout-result/uml-sequence-fragments.json and
+  // fixtures/layout-result/uml-sequence-fragment-chrome.json are real generic-graph + elk-layout
+  // engine output from the same (source, view) pair (Plan B P2, Task 10/11 fixture regeneration)
+  // and are therefore byte-identical; both files are kept because other suites still reference
+  // each by name (see LayoutFixtureRegenerator's Javadoc), but this test only needs one, so all
+  // three cases below share LAYOUT, including the chrome/label-clearance check that previously
+  // needed a separately-spaced real fixture while LAYOUT was still hand-authored/idealised.
+  private static final String CHROME_LAYOUT = LAYOUT;
   // Message labels are one font-size tall; chrome (operator tab, operand separators, guards) must
   // stay at least this far from every message label baseline to avoid overlapping the text.
   private static final double MESSAGE_LABEL_CLEARANCE = 14.0;

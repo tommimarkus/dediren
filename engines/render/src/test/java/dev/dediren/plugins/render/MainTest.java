@@ -1968,7 +1968,7 @@ class MainTest {
 
     @Test
     void rendersUmlSequenceDiagramLayers() throws Exception {
-      String content = okContent(render(umlSequenceStyleInput()));
+      String content = okContent(render(umlSequenceCreateAndDestroyStyleInput()));
       Document document = svgDocument(content);
 
       assertThat(content).contains(">Place Order<", ">Customer<", ">Order Service<", ">Receipt<");
@@ -2089,7 +2089,7 @@ class MainTest {
 
     @Test
     void ordersUmlSequenceMessagesWithLargeIntegralSequence() throws Exception {
-      JsonNode input = umlSequenceStyleInput();
+      JsonNode input = umlSequenceCreateAndDestroyStyleInput();
       ((ObjectNode) input.at("/render_metadata/edges/m1/properties"))
           .set(
               "sequence",
@@ -3356,6 +3356,226 @@ class MainTest {
     ObjectNode input = JsonSupport.objectMapper().createObjectNode();
     input.set("layout_result", fixtureJson("fixtures/layout-result/uml-sequence-basic.json"));
     input.set("render_metadata", fixtureJson("fixtures/render-metadata/uml-sequence-basic.json"));
+    input.set("policy", fixtureJson("fixtures/render-policy/uml-svg.json"));
+    return input;
+  }
+
+  // Inline (not fixture-backed): create-message, destroy-occurrence, and execution-specification
+  // rendering has no real generic-graph/ELK pipeline coverage yet (Plan B P2, Task 10/11 fixture
+  // sweep) — fixtures/source/valid-uml-sequence-basic.json only declares the 3-lifeline/3-message
+  // "placeOrder" exchange, so the real engine cannot produce a "receipt" lifeline, an
+  // ExecutionSpecification activation bar, or a DestructionOccurrenceSpecification from it.
+  // Wiring those UML sequence node kinds through generic-graph's real layout-request projection and
+  // verifying ELK's resulting geometry is unexplored, untested territory and out of scope for a
+  // fixture-regeneration pass. This geometry is therefore kept as hand-authored synthetic
+  // render-layer input (previously the layout-result/render-metadata fixture pair before they were
+  // regenerated from the real engine) so the create/destroy/execution-bar SVG decorator coverage
+  // below is not lost.
+  private static JsonNode umlSequenceCreateAndDestroyStyleInput() throws Exception {
+    ObjectNode input = JsonSupport.objectMapper().createObjectNode();
+    input.set(
+        "layout_result",
+        JsonSupport.objectMapper()
+            .readTree(
+                """
+                {
+                  "layout_result_schema_version": "layout-result.schema.v2",
+                  "view_id": "sequence-view",
+                  "nodes": [
+                    {
+                      "id": "interaction-place-order",
+                      "source_id": "interaction-place-order",
+                      "projection_id": "interaction-place-order",
+                      "x": 40, "y": 32, "width": 760, "height": 360,
+                      "label": "Place Order"
+                    },
+                    {
+                      "id": "customer",
+                      "source_id": "customer",
+                      "projection_id": "customer",
+                      "x": 96, "y": 72, "width": 140, "height": 48,
+                      "label": "Customer",
+                      "role": "lifeline"
+                    },
+                    {
+                      "id": "service",
+                      "source_id": "service",
+                      "projection_id": "service",
+                      "x": 364, "y": 72, "width": 140, "height": 48,
+                      "label": "Order Service",
+                      "role": "lifeline"
+                    },
+                    {
+                      "id": "receipt",
+                      "source_id": "receipt",
+                      "projection_id": "receipt",
+                      "x": 600, "y": 72, "width": 140, "height": 48,
+                      "label": "Receipt",
+                      "role": "lifeline"
+                    },
+                    {
+                      "id": "service-execution",
+                      "source_id": "service-execution",
+                      "projection_id": "service-execution",
+                      "x": 434, "y": 146, "width": 16, "height": 78,
+                      "label": ""
+                    },
+                    {
+                      "id": "service-destroyed",
+                      "source_id": "service-destroyed",
+                      "projection_id": "service-destroyed",
+                      "x": 424, "y": 280, "width": 36, "height": 36,
+                      "label": ""
+                    }
+                  ],
+                  "edges": [
+                    {
+                      "id": "m5",
+                      "source": "customer",
+                      "target": "service-destroyed",
+                      "source_id": "m5",
+                      "projection_id": "m5",
+                      "points": [ { "x": 166, "y": 298 }, { "x": 442, "y": 298 } ],
+                      "label": "cancelOrder"
+                    },
+                    {
+                      "id": "m4",
+                      "source": "service",
+                      "target": "receipt",
+                      "source_id": "m4",
+                      "projection_id": "m4",
+                      "points": [
+                        { "x": 442, "y": 262 }, { "x": 570, "y": 262 }, { "x": 600, "y": 96 }
+                      ],
+                      "label": "createReceipt"
+                    },
+                    {
+                      "id": "m2",
+                      "source": "service",
+                      "target": "customer",
+                      "source_id": "m2",
+                      "projection_id": "m2",
+                      "points": [ { "x": 442, "y": 190 }, { "x": 166, "y": 190 } ],
+                      "label": "accepted"
+                    },
+                    {
+                      "id": "m1",
+                      "source": "customer",
+                      "target": "service",
+                      "source_id": "m1",
+                      "projection_id": "m1",
+                      "points": [ { "x": 166, "y": 146 }, { "x": 442, "y": 146 } ],
+                      "label": "placeOrder"
+                    },
+                    {
+                      "id": "m3",
+                      "source": "service",
+                      "target": "customer",
+                      "source_id": "m3",
+                      "projection_id": "m3",
+                      "points": [ { "x": 442, "y": 238 }, { "x": 166, "y": 238 } ],
+                      "label": "receiptReady"
+                    }
+                  ],
+                  "groups": [],
+                  "warnings": []
+                }
+                """));
+    input.set(
+        "render_metadata",
+        JsonSupport.objectMapper()
+            .readTree(
+                """
+                {
+                  "render_metadata_schema_version": "render-metadata.schema.v1",
+                  "semantic_profile": "uml",
+                  "nodes": {
+                    "interaction-place-order": {
+                      "type": "Interaction",
+                      "source_id": "interaction-place-order"
+                    },
+                    "customer": {
+                      "type": "Lifeline",
+                      "source_id": "customer",
+                      "properties": { "interaction": "interaction-place-order" }
+                    },
+                    "service": {
+                      "type": "Lifeline",
+                      "source_id": "service",
+                      "properties": { "interaction": "interaction-place-order" }
+                    },
+                    "receipt": {
+                      "type": "Lifeline",
+                      "source_id": "receipt",
+                      "properties": { "interaction": "interaction-place-order" }
+                    },
+                    "service-execution": {
+                      "type": "ExecutionSpecification",
+                      "source_id": "service-execution",
+                      "properties": {
+                        "interaction": "interaction-place-order",
+                        "lifeline": "service"
+                      }
+                    },
+                    "service-destroyed": {
+                      "type": "DestructionOccurrenceSpecification",
+                      "source_id": "service-destroyed",
+                      "properties": {
+                        "interaction": "interaction-place-order",
+                        "lifeline": "service"
+                      }
+                    }
+                  },
+                  "edges": {
+                    "m1": {
+                      "type": "Message",
+                      "source_id": "m1",
+                      "properties": {
+                        "interaction": "interaction-place-order",
+                        "sequence": 1,
+                        "message_sort": "synchCall"
+                      }
+                    },
+                    "m2": {
+                      "type": "Message",
+                      "source_id": "m2",
+                      "properties": {
+                        "interaction": "interaction-place-order",
+                        "sequence": 2,
+                        "message_sort": "reply"
+                      }
+                    },
+                    "m3": {
+                      "type": "Message",
+                      "source_id": "m3",
+                      "properties": {
+                        "interaction": "interaction-place-order",
+                        "sequence": 3,
+                        "message_sort": "asynchSignal"
+                      }
+                    },
+                    "m4": {
+                      "type": "Message",
+                      "source_id": "m4",
+                      "properties": {
+                        "interaction": "interaction-place-order",
+                        "sequence": 4,
+                        "message_sort": "createMessage"
+                      }
+                    },
+                    "m5": {
+                      "type": "Message",
+                      "source_id": "m5",
+                      "properties": {
+                        "interaction": "interaction-place-order",
+                        "sequence": 5,
+                        "message_sort": "deleteMessage"
+                      }
+                    }
+                  },
+                  "groups": {}
+                }
+                """));
     input.set("policy", fixtureJson("fixtures/render-policy/uml-svg.json"));
     return input;
   }
