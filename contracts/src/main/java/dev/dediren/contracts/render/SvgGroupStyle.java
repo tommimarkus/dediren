@@ -7,4 +7,6 @@ public record SvgGroupStyle(
     Double rx,
     String labelFill,
     Double labelSize,
-    SvgNodeDecorator decorator) {}
+    SvgNodeDecorator decorator,
+    Double fillOpacity,
+    Double strokeOpacity) {}

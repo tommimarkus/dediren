@@ -53,7 +53,8 @@ class EdgeLabelPlacementTest {
           SvgEdgeLabelHorizontalSide.AUTO,
           SvgEdgeLabelVerticalPosition.CENTER,
           SvgEdgeLabelVerticalSide.LEFT,
-          SvgEdgeLabelPresentation.OUTLINE);
+          SvgEdgeLabelPresentation.OUTLINE,
+          null);
 
   @Test
   void fanOutEdgeLabelsStayAttachedToTheirRoutes() {

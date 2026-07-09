@@ -311,6 +311,10 @@ options shape output:
   `stadium`, `cylinder`, or `triangle`. A `shape` is rejected under the
   `archimate`/`uml` profiles or alongside a notation `decorator` — those notations
   fix their own geometry.
+- **Colour & opacity.** Colours accept hex (`#RGB`…`#RRGGBBAA`), `rgb()`/`rgba()`,
+  and CSS colour names. `fill_opacity`/`stroke_opacity` (0–1) fade node and group
+  fills/strokes; edges take `stroke_opacity`; `background.fill_opacity` fades the
+  page.
 - **UML association-end adornments.** In UML class diagrams, multiplicity and
   role carried in render metadata (`properties.uml.{source,target}_multiplicity`
   and `properties.uml.{source,target}_role`) are drawn beside their own end of

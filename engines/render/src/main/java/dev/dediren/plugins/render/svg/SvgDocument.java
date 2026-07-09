@@ -22,6 +22,7 @@ import static dev.dediren.plugins.render.svg.EdgeRenderer.lineJumps;
 import static dev.dediren.plugins.render.svg.Geometry.labelObstacleBoxesForEdge;
 import static dev.dediren.plugins.render.svg.Geometry.svgBounds;
 import static dev.dediren.plugins.render.svg.Svg.attr;
+import static dev.dediren.plugins.render.svg.Svg.opacityAttr;
 import static dev.dediren.plugins.render.svg.Svg.styleNumber;
 import static dev.dediren.plugins.render.svg.Svg.text;
 
@@ -75,12 +76,13 @@ public final class SvgDocument {
     svg.append(
         String.format(
             Locale.ROOT,
-            "<rect x=\"%.1f\" y=\"%.1f\" width=\"%.1f\" height=\"%.1f\" fill=\"%s\"/>",
+            "<rect x=\"%.1f\" y=\"%.1f\" width=\"%.1f\" height=\"%.1f\" fill=\"%s\"%s/>",
             bounds.minX(),
             bounds.minY(),
             bounds.width(),
             bounds.height(),
-            attr(base.backgroundFill())));
+            attr(base.backgroundFill()),
+            opacityAttr("fill-opacity", base.backgroundFillOpacity())));
     if (interactive) {
       svg.append(interactionStyleBlock(policy));
     }
@@ -105,6 +107,10 @@ public final class SvgDocument {
           style.decorator() == SvgNodeDecorator.ARCHIMATE_GROUPING
               ? " stroke-dasharray=\"3 2\""
               : "";
+      String groupExtra =
+          groupDashArray
+              + opacityAttr("fill-opacity", style.fillOpacity())
+              + opacityAttr("stroke-opacity", style.strokeOpacity());
       svg.append(
           String.format(
               Locale.ROOT,
@@ -117,7 +123,7 @@ public final class SvgDocument {
               attr(style.fill()),
               attr(style.stroke()),
               styleNumber(style.strokeWidth()),
-              groupDashArray));
+              groupExtra));
       svg.append(groupDecorator(group, style));
       svg.append(
           String.format(
@@ -178,7 +184,7 @@ public final class SvgDocument {
       ResolvedNodeStyle style = StyleResolver.nodeStyle(policy, metadata, node.id(), base);
       RenderMetadataSelector selector = metadata == null ? null : metadata.nodes().get(node.id());
       svg.append("<g data-dediren-node-id=\"").append(attr(node.id())).append("\">");
-      svg.append(nodeShape(node, style, selector));
+      svg.append(withNodeOpacity(nodeShape(node, style, selector), style));
       svg.append(nodeDecorator(node, style, selector));
       if (shouldRenderPlainNodeLabel(node, style.decorator())) {
         svg.append(nodeLabel(node, style, base.fontSize()));
@@ -278,6 +284,18 @@ public final class SvgDocument {
         + " data-dediren-icon-size=\"22\">"
         + body
         + "</g>";
+  }
+
+  // Applies node fill/stroke opacity by wrapping the shape output in a group that carries the
+  // opacity attributes, so it reaches every notation's shape (generic, ArchiMate, UML, junction)
+  // without editing each shape builder. Emitted only when opacity is set, so shapeless renders stay
+  // byte-identical. The wrapper holds only the shape — the decorator and label keep their own
+  // fills.
+  private static String withNodeOpacity(String shape, ResolvedNodeStyle style) {
+    String opacity =
+        opacityAttr("fill-opacity", style.fillOpacity())
+            + opacityAttr("stroke-opacity", style.strokeOpacity());
+    return opacity.isEmpty() ? shape : "<g" + opacity + ">" + shape + "</g>";
   }
 
   private static String nodeShape(

@@ -7,4 +7,6 @@ public record SvgNodeStyle(
     Double rx,
     String labelFill,
     SvgNodeDecorator decorator,
-    SvgNodeShape shape) {}
+    SvgNodeShape shape,
+    Double fillOpacity,
+    Double strokeOpacity) {}

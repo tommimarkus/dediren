@@ -2,6 +2,7 @@ package dev.dediren.plugins.render.svg;
 
 import static dev.dediren.plugins.render.svg.Geometry.labelBox;
 import static dev.dediren.plugins.render.svg.Svg.attr;
+import static dev.dediren.plugins.render.svg.Svg.opacityAttr;
 import static dev.dediren.plugins.render.svg.Svg.styleNumber;
 import static dev.dediren.plugins.render.svg.Svg.text;
 
@@ -168,6 +169,7 @@ public final class EdgeRenderer {
         + styleNumber(style.strokeWidth())
         + "\""
         + " stroke-linecap=\"round\" stroke-linejoin=\"round\""
+        + opacityAttr("stroke-opacity", style.strokeOpacity())
         + dash
         + markerStart
         + markerEnd

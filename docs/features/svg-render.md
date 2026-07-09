@@ -46,6 +46,16 @@ notations that do not fix geometry, so a `shape` is rejected
 under the `archimate` / `uml` semantic profiles — those keep their
 specification-mandated shapes and icons.
 
+### Colour & opacity
+
+Every colour value (`fill`, `stroke`, `label_fill`, `background.fill`,
+`interaction.highlight_stroke`) accepts `#RGB` / `#RGBA` / `#RRGGBB` /
+`#RRGGBBAA` hex, `rgb()` / `rgba()`, or a CSS colour keyword (including `none`
+and `transparent`). The grammar admits no CSS metacharacters — `highlight_stroke`
+reaches a CSS `<style>` block, so the validator (not escaping) keeps it safe.
+Set `fill_opacity` / `stroke_opacity` (0–1) on nodes and groups,
+`stroke_opacity` on edges, and `background.fill_opacity` for a translucent page.
+
 ### Edge label presentation
 
 Edge labels default to **outlined text**. Set

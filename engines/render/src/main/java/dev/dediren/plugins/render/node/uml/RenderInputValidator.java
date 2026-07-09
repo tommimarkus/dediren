@@ -474,6 +474,7 @@ public final class RenderInputValidator {
       throws PolicyValidationException {
     if (style != null) {
       validateColor(style.fill(), path + ".fill");
+      validateNumber(style.fillOpacity(), path + ".fill_opacity", Bound.MIN, 0.0, 1.0);
     }
   }
 
@@ -512,6 +513,8 @@ public final class RenderInputValidator {
     validateNumber(style.strokeWidth(), path + ".stroke_width", Bound.MIN, 0.0, 24.0);
     validateNumber(style.rx(), path + ".rx", Bound.MIN, 0.0, 80.0);
     validateColor(style.labelFill(), path + ".label_fill");
+    validateNumber(style.fillOpacity(), path + ".fill_opacity", Bound.MIN, 0.0, 1.0);
+    validateNumber(style.strokeOpacity(), path + ".stroke_opacity", Bound.MIN, 0.0, 1.0);
     if (style.shape() != null && style.decorator() != null) {
       throw new PolicyValidationException(
           path + ".shape", "SVG render policy " + path + " cannot set both shape and decorator");
@@ -526,6 +529,7 @@ public final class RenderInputValidator {
     validateColor(style.stroke(), path + ".stroke");
     validateNumber(style.strokeWidth(), path + ".stroke_width", Bound.MIN, 0.0, 24.0);
     validateColor(style.labelFill(), path + ".label_fill");
+    validateNumber(style.strokeOpacity(), path + ".stroke_opacity", Bound.MIN, 0.0, 1.0);
   }
 
   private static void validateGroupStyle(SvgGroupStyle style, String path)
@@ -539,6 +543,8 @@ public final class RenderInputValidator {
     validateNumber(style.rx(), path + ".rx", Bound.MIN, 0.0, 80.0);
     validateColor(style.labelFill(), path + ".label_fill");
     validateNumber(style.labelSize(), path + ".label_size", Bound.EXCLUSIVE_MIN, 0.0, 96.0);
+    validateNumber(style.fillOpacity(), path + ".fill_opacity", Bound.MIN, 0.0, 1.0);
+    validateNumber(style.strokeOpacity(), path + ".stroke_opacity", Bound.MIN, 0.0, 1.0);
   }
 
   // Broadened colour grammar: hex (#RGB/#RGBA/#RRGGBB/#RRGGBBAA), rgb()/rgba(), or a CSS colour

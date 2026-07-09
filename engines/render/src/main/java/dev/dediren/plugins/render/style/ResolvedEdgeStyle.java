@@ -19,4 +19,5 @@ public record ResolvedEdgeStyle(
     SvgEdgeLabelHorizontalSide labelHorizontalSide,
     SvgEdgeLabelVerticalPosition labelVerticalPosition,
     SvgEdgeLabelVerticalSide labelVerticalSide,
-    SvgEdgeLabelPresentation labelPresentation) {}
+    SvgEdgeLabelPresentation labelPresentation,
+    Double strokeOpacity) {}

@@ -38,6 +38,15 @@ public final class Svg {
     return Double.toString(value);
   }
 
+  /**
+   * A single optional presentation attribute (e.g. {@code fill-opacity}). Returns the empty string
+   * when {@code value} is null so callers can unconditionally append it before an element's {@code
+   * />}. The value is a validated number, so no escaping is needed.
+   */
+  public static String opacityAttr(String name, Double value) {
+    return value == null ? "" : " " + name + "=\"" + styleNumber(value) + "\"";
+  }
+
   /** Escapes a value for use inside an SVG/XML attribute (quotes included). */
   public static String attr(String value) {
     return (value == null ? "" : value)

@@ -44,6 +44,11 @@
       "type": "string",
       "pattern": "^(#([0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})|rgba?\\([0-9%.,\\s]*\\)|[A-Za-z]+)$"
     },
+    "opacity": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
     "font": {
       "type": "object",
       "additionalProperties": false,
@@ -64,7 +69,8 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "fill": { "$ref": "#/$defs/color" }
+        "fill": { "$ref": "#/$defs/color" },
+        "fill_opacity": { "$ref": "#/$defs/opacity" }
       }
     },
     "nodeStyle": {
@@ -199,7 +205,9 @@
             "cylinder",
             "triangle"
           ]
-        }
+        },
+        "fill_opacity": { "$ref": "#/$defs/opacity" },
+        "stroke_opacity": { "$ref": "#/$defs/opacity" }
       }
     },
     "edgeStyle": {
@@ -262,7 +270,8 @@
         "label_presentation": {
           "type": "string",
           "enum": ["outline", "background"]
-        }
+        },
+        "stroke_opacity": { "$ref": "#/$defs/opacity" }
       }
     },
     "groupStyle": {
@@ -287,7 +296,9 @@
           "exclusiveMinimum": 0,
           "maximum": 96
         },
-        "decorator": { "$ref": "#/$defs/nodeStyle/properties/decorator" }
+        "decorator": { "$ref": "#/$defs/nodeStyle/properties/decorator" },
+        "fill_opacity": { "$ref": "#/$defs/opacity" },
+        "stroke_opacity": { "$ref": "#/$defs/opacity" }
       }
     },
     "nodeOverrideMap": {

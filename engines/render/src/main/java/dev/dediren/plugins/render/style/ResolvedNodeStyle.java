@@ -10,4 +10,6 @@ public record ResolvedNodeStyle(
     double rx,
     String labelFill,
     SvgNodeDecorator decorator,
-    SvgNodeShape shape) {}
+    SvgNodeShape shape,
+    Double fillOpacity,
+    Double strokeOpacity) {}

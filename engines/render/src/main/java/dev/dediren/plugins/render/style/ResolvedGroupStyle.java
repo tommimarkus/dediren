@@ -9,4 +9,6 @@ public record ResolvedGroupStyle(
     double rx,
     String labelFill,
     double labelSize,
-    SvgNodeDecorator decorator) {}
+    SvgNodeDecorator decorator,
+    Double fillOpacity,
+    Double strokeOpacity) {}
