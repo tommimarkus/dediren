@@ -1,101 +1,107 @@
 {
-  "layout_result_schema_version": "layout-result.schema.v2",
-  "view_id": "class-view",
-  "nodes": [
-    {
-      "id": "class-order",
-      "source_id": "class-order",
-      "projection_id": "class-order",
-      "x": 80,
-      "y": 96,
-      "width": 180,
-      "height": 120,
-      "label": "Order"
+  "layout_result_schema_version" : "layout-result.schema.v2",
+  "view_id" : "class-view",
+  "nodes" : [ {
+    "id" : "pkg-orders",
+    "source_id" : "pkg-orders",
+    "projection_id" : "pkg-orders",
+    "x" : 256.0,
+    "y" : 703.0,
+    "width" : 160.0,
+    "height" : 80.0,
+    "label" : "Orders",
+    "source_pointer" : "/nodes/0"
+  }, {
+    "id" : "class-order",
+    "source_id" : "class-order",
+    "projection_id" : "class-order",
+    "x" : 44.0,
+    "y" : 44.0,
+    "width" : 220.0,
+    "height" : 120.0,
+    "label" : "Order",
+    "source_pointer" : "/nodes/1"
+  }, {
+    "id" : "class-order-line",
+    "source_id" : "class-order-line",
+    "projection_id" : "class-order-line",
+    "x" : 408.0,
+    "y" : 262.0,
+    "width" : 220.0,
+    "height" : 120.0,
+    "label" : "OrderLine",
+    "source_pointer" : "/nodes/3"
+  }, {
+    "id" : "enum-order-status",
+    "source_id" : "enum-order-status",
+    "projection_id" : "enum-order-status",
+    "x" : 408.0,
+    "y" : 479.0,
+    "width" : 220.0,
+    "height" : 120.0,
+    "label" : "OrderStatus",
+    "source_pointer" : "/nodes/2"
+  } ],
+  "edges" : [ {
+    "id" : "order-has-lines",
+    "source" : "class-order",
+    "target" : "class-order-line",
+    "source_id" : "order-has-lines",
+    "projection_id" : "order-has-lines",
+    "routing_hints" : [ ],
+    "points" : [ {
+      "x" : 185.5,
+      "y" : 165.0
+    }, {
+      "x" : 185.5,
+      "y" : 213.0
+    }, {
+      "x" : 518.0,
+      "y" : 213.0
+    }, {
+      "x" : 518.0,
+      "y" : 261.0
+    } ],
+    "label" : "lines",
+    "source_pointer" : "/relationships/0"
+  }, {
+    "id" : "order-status-dependency",
+    "source" : "class-order",
+    "target" : "enum-order-status",
+    "source_id" : "order-status-dependency",
+    "projection_id" : "order-status-dependency",
+    "routing_hints" : [ ],
+    "points" : [ {
+      "x" : 122.5,
+      "y" : 165.0
+    }, {
+      "x" : 122.5,
+      "y" : 430.0
+    }, {
+      "x" : 518.0,
+      "y" : 430.0
+    }, {
+      "x" : 518.0,
+      "y" : 478.0
+    } ],
+    "label" : "uses",
+    "source_pointer" : "/relationships/1"
+  } ],
+  "groups" : [ {
+    "id" : "orders-package-boundary",
+    "source_id" : "pkg-orders",
+    "projection_id" : "orders-package-boundary",
+    "provenance" : {
+      "semantic_backed" : {
+        "source_id" : "pkg-orders"
+      }
     },
-    {
-      "id": "class-order-line",
-      "source_id": "class-order-line",
-      "projection_id": "class-order-line",
-      "x": 360,
-      "y": 72,
-      "width": 180,
-      "height": 104,
-      "label": "OrderLine"
-    },
-    {
-      "id": "enum-order-status",
-      "source_id": "enum-order-status",
-      "projection_id": "enum-order-status",
-      "x": 360,
-      "y": 232,
-      "width": 180,
-      "height": 96,
-      "label": "OrderStatus"
-    }
-  ],
-  "edges": [
-    {
-      "id": "order-has-lines",
-      "source": "class-order",
-      "target": "class-order-line",
-      "source_id": "order-has-lines",
-      "projection_id": "order-has-lines",
-      "points": [
-        {
-          "x": 260,
-          "y": 132
-        },
-        {
-          "x": 360,
-          "y": 132
-        }
-      ],
-      "label": "lines"
-    },
-    {
-      "id": "order-status-dependency",
-      "source": "class-order",
-      "target": "enum-order-status",
-      "source_id": "order-status-dependency",
-      "projection_id": "order-status-dependency",
-      "points": [
-        {
-          "x": 260,
-          "y": 176
-        },
-        {
-          "x": 310,
-          "y": 176
-        },
-        {
-          "x": 310,
-          "y": 280
-        },
-        {
-          "x": 360,
-          "y": 280
-        }
-      ],
-      "label": "uses"
-    }
-  ],
-  "groups": [
-    {
-      "id": "orders-package-boundary",
-      "source_id": "pkg-orders",
-      "projection_id": "orders-package-boundary",
-      "provenance": {
-        "semantic_backed": {
-          "source_id": "pkg-orders"
-        }
-      },
-      "x": 40,
-      "y": 40,
-      "width": 540,
-      "height": 328,
-      "members": ["class-order", "class-order-line", "enum-order-status"],
-      "label": "Orders"
-    }
-  ],
-  "warnings": []
+    "x" : 12.0,
+    "y" : 12.0,
+    "width" : 648.0,
+    "height" : 619.0,
+    "members" : [ "class-order", "class-order-line", "enum-order-status" ],
+    "label" : "Orders"
+  } ],
+  "warnings" : [ ]
 }

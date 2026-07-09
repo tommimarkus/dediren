@@ -1,172 +1,216 @@
 {
-  "layout_result_schema_version": "layout-result.schema.v2",
-  "view_id": "use-case-view",
-  "nodes": [
-    {
-      "id": "customer",
-      "source_id": "customer",
-      "projection_id": "customer",
-      "x": 36.0,
-      "y": 104.0,
-      "width": 80.0,
-      "height": 120.0,
-      "label": "Customer"
+  "layout_result_schema_version" : "layout-result.schema.v2",
+  "view_id" : "use-case-view",
+  "nodes" : [ {
+    "id" : "customer",
+    "source_id" : "customer",
+    "projection_id" : "customer",
+    "x" : 12.0,
+    "y" : 205.16666666666666,
+    "width" : 80.0,
+    "height" : 120.0,
+    "label" : "Customer",
+    "source_pointer" : "/nodes/1"
+  }, {
+    "id" : "support-agent",
+    "source_id" : "support-agent",
+    "projection_id" : "support-agent",
+    "x" : 12.0,
+    "y" : 531.0,
+    "width" : 80.0,
+    "height" : 120.0,
+    "label" : "Support Agent",
+    "source_pointer" : "/nodes/2"
+  }, {
+    "id" : "place-order",
+    "source_id" : "place-order",
+    "projection_id" : "place-order",
+    "x" : 551.0,
+    "y" : 214.0,
+    "width" : 160.0,
+    "height" : 72.0,
+    "label" : "Place Order",
+    "source_pointer" : "/nodes/3"
+  }, {
+    "id" : "track-order",
+    "source_id" : "track-order",
+    "projection_id" : "track-order",
+    "x" : 246.0,
+    "y" : 299.0,
+    "width" : 160.0,
+    "height" : 72.0,
+    "label" : "Track Order",
+    "source_pointer" : "/nodes/4"
+  }, {
+    "id" : "authenticate-customer",
+    "source_id" : "authenticate-customer",
+    "projection_id" : "authenticate-customer",
+    "x" : 855.0,
+    "y" : 384.0,
+    "width" : 160.0,
+    "height" : 72.0,
+    "label" : "Authenticate Customer",
+    "source_pointer" : "/nodes/5"
+  }, {
+    "id" : "apply-discount",
+    "source_id" : "apply-discount",
+    "projection_id" : "apply-discount",
+    "x" : 245.5,
+    "y" : 44.0,
+    "width" : 160.0,
+    "height" : 72.0,
+    "label" : "Apply Discount",
+    "source_pointer" : "/nodes/6"
+  }, {
+    "id" : "cancel-order",
+    "source_id" : "cancel-order",
+    "projection_id" : "cancel-order",
+    "x" : 246.0,
+    "y" : 555.0,
+    "width" : 160.0,
+    "height" : 72.0,
+    "label" : "Cancel Order",
+    "source_pointer" : "/nodes/7"
+  }, {
+    "id" : "payment-extension",
+    "source_id" : "payment-extension",
+    "projection_id" : "payment-extension",
+    "x" : 255.5,
+    "y" : 443.0,
+    "width" : 140.0,
+    "height" : 40.0,
+    "label" : "payment authorized",
+    "source_pointer" : "/nodes/8"
+  } ],
+  "edges" : [ {
+    "id" : "customer-place-order",
+    "source" : "customer",
+    "target" : "place-order",
+    "source_id" : "customer-place-order",
+    "projection_id" : "customer-place-order",
+    "routing_hints" : [ ],
+    "points" : [ {
+      "x" : 93.0,
+      "y" : 250.0
+    }, {
+      "x" : 189.0,
+      "y" : 250.0
+    }, {
+      "x" : 325.5,
+      "y" : 250.0
+    }, {
+      "x" : 478.0,
+      "y" : 250.0
+    }, {
+      "x" : 550.0,
+      "y" : 250.0
+    } ],
+    "label" : "",
+    "source_pointer" : "/relationships/0"
+  }, {
+    "id" : "customer-track-order",
+    "source" : "customer",
+    "target" : "track-order",
+    "source_id" : "customer-track-order",
+    "projection_id" : "customer-track-order",
+    "routing_hints" : [ ],
+    "points" : [ {
+      "x" : 93.0,
+      "y" : 280.3333333333333
+    }, {
+      "x" : 141.0,
+      "y" : 280.3333333333333
+    }, {
+      "x" : 141.0,
+      "y" : 335.0
+    }, {
+      "x" : 189.0,
+      "y" : 335.0
+    }, {
+      "x" : 245.0,
+      "y" : 335.0
+    } ],
+    "label" : "",
+    "source_pointer" : "/relationships/1"
+  }, {
+    "id" : "support-cancel-order",
+    "source" : "support-agent",
+    "target" : "cancel-order",
+    "source_id" : "support-cancel-order",
+    "projection_id" : "support-cancel-order",
+    "routing_hints" : [ ],
+    "points" : [ {
+      "x" : 93.0,
+      "y" : 591.0
+    }, {
+      "x" : 189.0,
+      "y" : 591.0
+    }, {
+      "x" : 245.0,
+      "y" : 591.0
+    } ],
+    "label" : "",
+    "source_pointer" : "/relationships/2"
+  }, {
+    "id" : "include-authentication",
+    "source" : "place-order",
+    "target" : "authenticate-customer",
+    "source_id" : "include-authentication",
+    "projection_id" : "include-authentication",
+    "routing_hints" : [ ],
+    "points" : [ {
+      "x" : 631.0,
+      "y" : 287.0
+    }, {
+      "x" : 631.0,
+      "y" : 335.0
+    }, {
+      "x" : 935.0,
+      "y" : 335.0
+    }, {
+      "x" : 935.0,
+      "y" : 383.0
+    } ],
+    "label" : "include",
+    "source_pointer" : "/relationships/3"
+  }, {
+    "id" : "extend-discount",
+    "source" : "apply-discount",
+    "target" : "place-order",
+    "source_id" : "extend-discount",
+    "projection_id" : "extend-discount",
+    "routing_hints" : [ ],
+    "points" : [ {
+      "x" : 325.5,
+      "y" : 117.0
+    }, {
+      "x" : 325.5,
+      "y" : 165.0
+    }, {
+      "x" : 631.0,
+      "y" : 165.0
+    }, {
+      "x" : 631.0,
+      "y" : 213.0
+    } ],
+    "label" : "extend",
+    "source_pointer" : "/relationships/4"
+  } ],
+  "groups" : [ {
+    "id" : "order-service-boundary",
+    "source_id" : "order-service",
+    "projection_id" : "order-service-boundary",
+    "provenance" : {
+      "semantic_backed" : {
+        "source_id" : "order-service"
+      }
     },
-    {
-      "id": "support-agent",
-      "source_id": "support-agent",
-      "projection_id": "support-agent",
-      "x": 36.0,
-      "y": 312.0,
-      "width": 80.0,
-      "height": 120.0,
-      "label": "Support Agent"
-    },
-    {
-      "id": "place-order",
-      "source_id": "place-order",
-      "projection_id": "place-order",
-      "x": 276.0,
-      "y": 84.0,
-      "width": 160.0,
-      "height": 72.0,
-      "label": "Place Order"
-    },
-    {
-      "id": "track-order",
-      "source_id": "track-order",
-      "projection_id": "track-order",
-      "x": 276.0,
-      "y": 184.0,
-      "width": 160.0,
-      "height": 72.0,
-      "label": "Track Order"
-    },
-    {
-      "id": "authenticate-customer",
-      "source_id": "authenticate-customer",
-      "projection_id": "authenticate-customer",
-      "x": 560.0,
-      "y": 84.0,
-      "width": 180.0,
-      "height": 72.0,
-      "label": "Authenticate Customer"
-    },
-    {
-      "id": "apply-discount",
-      "source_id": "apply-discount",
-      "projection_id": "apply-discount",
-      "x": 560.0,
-      "y": 204.0,
-      "width": 160.0,
-      "height": 72.0,
-      "label": "Apply Discount"
-    },
-    {
-      "id": "cancel-order",
-      "source_id": "cancel-order",
-      "projection_id": "cancel-order",
-      "x": 276.0,
-      "y": 340.0,
-      "width": 160.0,
-      "height": 72.0,
-      "label": "Cancel Order"
-    },
-    {
-      "id": "payment-extension",
-      "source_id": "payment-extension",
-      "projection_id": "payment-extension",
-      "x": 560.0,
-      "y": 320.0,
-      "width": 140.0,
-      "height": 40.0,
-      "label": "payment authorized"
-    }
-  ],
-  "edges": [
-    {
-      "id": "customer-place-order",
-      "source": "customer",
-      "target": "place-order",
-      "source_id": "customer-place-order",
-      "projection_id": "customer-place-order",
-      "routing_hints": [],
-      "points": [
-        { "x": 116.0, "y": 164.0 },
-        { "x": 276.0, "y": 120.0 }
-      ],
-      "label": ""
-    },
-    {
-      "id": "customer-track-order",
-      "source": "customer",
-      "target": "track-order",
-      "source_id": "customer-track-order",
-      "projection_id": "customer-track-order",
-      "routing_hints": [],
-      "points": [
-        { "x": 116.0, "y": 184.0 },
-        { "x": 276.0, "y": 220.0 }
-      ],
-      "label": ""
-    },
-    {
-      "id": "support-cancel-order",
-      "source": "support-agent",
-      "target": "cancel-order",
-      "source_id": "support-cancel-order",
-      "projection_id": "support-cancel-order",
-      "routing_hints": [],
-      "points": [
-        { "x": 116.0, "y": 372.0 },
-        { "x": 276.0, "y": 376.0 }
-      ],
-      "label": ""
-    },
-    {
-      "id": "include-authentication",
-      "source": "place-order",
-      "target": "authenticate-customer",
-      "source_id": "include-authentication",
-      "projection_id": "include-authentication",
-      "routing_hints": [],
-      "points": [
-        { "x": 436.0, "y": 120.0 },
-        { "x": 560.0, "y": 120.0 }
-      ],
-      "label": "<<include>>"
-    },
-    {
-      "id": "extend-discount",
-      "source": "apply-discount",
-      "target": "place-order",
-      "source_id": "extend-discount",
-      "projection_id": "extend-discount",
-      "routing_hints": [],
-      "points": [
-        { "x": 560.0, "y": 240.0 },
-        { "x": 498.0, "y": 240.0 },
-        { "x": 498.0, "y": 120.0 },
-        { "x": 436.0, "y": 120.0 }
-      ],
-      "label": "<<extend>>"
-    }
-  ],
-  "groups": [
-    {
-      "id": "order-service-boundary",
-      "source_id": "order-service",
-      "projection_id": "order-service-boundary",
-      "provenance": {
-        "semantic_backed": {
-          "source_id": "order-service"
-        }
-      },
-      "x": 236.0,
-      "y": 36.0,
-      "width": 544.0,
-      "height": 420.0,
-      "label": "Order Service"
-    }
-  ]
+    "x" : 213.0,
+    "y" : 12.0,
+    "width" : 834.0,
+    "height" : 647.0,
+    "members" : [ "place-order", "track-order", "authenticate-customer", "apply-discount", "cancel-order", "payment-extension" ],
+    "label" : "Order Service"
+  } ],
+  "warnings" : [ ]
 }

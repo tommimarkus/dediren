@@ -1,224 +1,269 @@
 {
-  "layout_result_schema_version": "layout-result.schema.v2",
-  "view_id": "main",
-  "nodes": [
-    {
-      "id": "client",
-      "source_id": "client",
-      "projection_id": "client",
-      "x": 40,
-      "y": 160,
-      "width": 160,
-      "height": 80,
-      "label": "Client"
+  "layout_result_schema_version" : "layout-result.schema.v2",
+  "view_id" : "main",
+  "nodes" : [ {
+    "id" : "client",
+    "source_id" : "client",
+    "projection_id" : "client",
+    "x" : 12.0,
+    "y" : 36.0,
+    "width" : 160.0,
+    "height" : 80.0,
+    "label" : "Client",
+    "source_pointer" : "/nodes/0"
+  }, {
+    "id" : "web-app",
+    "source_id" : "web-app",
+    "projection_id" : "web-app",
+    "x" : 338.0,
+    "y" : 36.0,
+    "width" : 160.0,
+    "height" : 80.0,
+    "label" : "Web App",
+    "source_pointer" : "/nodes/1"
+  }, {
+    "id" : "orders-api",
+    "source_id" : "orders-api",
+    "projection_id" : "orders-api",
+    "x" : 618.0,
+    "y" : 182.0,
+    "width" : 160.0,
+    "height" : 80.0,
+    "label" : "Orders API",
+    "source_pointer" : "/nodes/2"
+  }, {
+    "id" : "database",
+    "source_id" : "database",
+    "projection_id" : "database",
+    "x" : 1345.0,
+    "y" : 318.5,
+    "width" : 160.0,
+    "height" : 80.0,
+    "label" : "PostgreSQL",
+    "source_pointer" : "/nodes/3"
+  }, {
+    "id" : "worker",
+    "source_id" : "worker",
+    "projection_id" : "worker",
+    "x" : 903.0,
+    "y" : 328.0,
+    "width" : 160.0,
+    "height" : 80.0,
+    "label" : "Fulfillment Worker",
+    "source_pointer" : "/nodes/4"
+  }, {
+    "id" : "payments",
+    "source_id" : "payments",
+    "projection_id" : "payments",
+    "x" : 1345.0,
+    "y" : 178.5,
+    "width" : 160.0,
+    "height" : 80.0,
+    "label" : "Payment Authorization Service",
+    "source_pointer" : "/nodes/5"
+  } ],
+  "edges" : [ {
+    "id" : "client-submits-order",
+    "source" : "client",
+    "target" : "web-app",
+    "source_id" : "client-submits-order",
+    "projection_id" : "client-submits-order",
+    "routing_hints" : [ ],
+    "points" : [ {
+      "x" : 173.0,
+      "y" : 76.0
+    }, {
+      "x" : 293.0,
+      "y" : 76.0
+    }, {
+      "x" : 337.0,
+      "y" : 76.0
+    } ],
+    "label" : "submits order",
+    "source_pointer" : "/relationships/0"
+  }, {
+    "id" : "web-app-calls-api",
+    "source" : "web-app",
+    "target" : "orders-api",
+    "source_id" : "web-app-calls-api",
+    "projection_id" : "web-app-calls-api",
+    "routing_hints" : [ ],
+    "points" : [ {
+      "x" : 418.0,
+      "y" : 117.0
+    }, {
+      "x" : 418.0,
+      "y" : 149.0
+    }, {
+      "x" : 698.0,
+      "y" : 149.0
+    }, {
+      "x" : 698.0,
+      "y" : 181.0
+    } ],
+    "label" : "calls API",
+    "source_pointer" : "/relationships/1"
+  }, {
+    "id" : "api-writes-database",
+    "source" : "orders-api",
+    "target" : "database",
+    "source_id" : "api-writes-database",
+    "projection_id" : "api-writes-database",
+    "routing_hints" : [ ],
+    "points" : [ {
+      "x" : 779.0,
+      "y" : 213.5
+    }, {
+      "x" : 811.0,
+      "y" : 213.5
+    }, {
+      "x" : 811.0,
+      "y" : 189.5
+    }, {
+      "x" : 843.0,
+      "y" : 189.5
+    }, {
+      "x" : 983.5,
+      "y" : 189.5
+    }, {
+      "x" : 1108.0,
+      "y" : 189.5
+    }, {
+      "x" : 1140.0,
+      "y" : 189.5
+    }, {
+      "x" : 1140.0,
+      "y" : 186.5
+    }, {
+      "x" : 1236.0,
+      "y" : 186.5
+    }, {
+      "x" : 1312.0,
+      "y" : 186.5
+    }, {
+      "x" : 1312.0,
+      "y" : 350.0
+    }, {
+      "x" : 1344.0,
+      "y" : 350.0
+    } ],
+    "label" : "writes orders",
+    "source_pointer" : "/relationships/2"
+  }, {
+    "id" : "api-authorizes-payment",
+    "source" : "orders-api",
+    "target" : "payments",
+    "source_id" : "api-authorizes-payment",
+    "projection_id" : "api-authorizes-payment",
+    "routing_hints" : [ ],
+    "points" : [ {
+      "x" : 779.0,
+      "y" : 230.5
+    }, {
+      "x" : 843.0,
+      "y" : 230.5
+    }, {
+      "x" : 983.5,
+      "y" : 230.5
+    }, {
+      "x" : 1108.0,
+      "y" : 230.5
+    }, {
+      "x" : 1204.0,
+      "y" : 230.5
+    }, {
+      "x" : 1204.0,
+      "y" : 218.5
+    }, {
+      "x" : 1236.0,
+      "y" : 218.5
+    }, {
+      "x" : 1344.0,
+      "y" : 218.5
+    } ],
+    "label" : "requests payment authorization",
+    "source_pointer" : "/relationships/3"
+  }, {
+    "id" : "api-publishes-job",
+    "source" : "orders-api",
+    "target" : "worker",
+    "source_id" : "api-publishes-job",
+    "projection_id" : "api-publishes-job",
+    "routing_hints" : [ ],
+    "points" : [ {
+      "x" : 698.0,
+      "y" : 263.0
+    }, {
+      "x" : 698.0,
+      "y" : 295.0
+    }, {
+      "x" : 983.0,
+      "y" : 295.0
+    }, {
+      "x" : 983.0,
+      "y" : 327.0
+    } ],
+    "label" : "publishes fulfillment",
+    "source_pointer" : "/relationships/4"
+  }, {
+    "id" : "worker-reads-database",
+    "source" : "worker",
+    "target" : "database",
+    "source_id" : "worker-reads-database",
+    "projection_id" : "worker-reads-database",
+    "routing_hints" : [ ],
+    "points" : [ {
+      "x" : 1064.0,
+      "y" : 368.0
+    }, {
+      "x" : 1108.0,
+      "y" : 368.0
+    }, {
+      "x" : 1140.0,
+      "y" : 368.0
+    }, {
+      "x" : 1140.0,
+      "y" : 367.0
+    }, {
+      "x" : 1236.0,
+      "y" : 367.0
+    }, {
+      "x" : 1344.0,
+      "y" : 367.0
+    } ],
+    "label" : "loads order",
+    "source_pointer" : "/relationships/5"
+  } ],
+  "groups" : [ {
+    "id" : "application-services",
+    "source_id" : "application-services",
+    "projection_id" : "application-services",
+    "provenance" : {
+      "semantic_backed" : {
+        "source_id" : "application-services"
+      }
     },
-    {
-      "id": "web-app",
-      "source_id": "web-app",
-      "projection_id": "web-app",
-      "x": 310,
-      "y": 160,
-      "width": 170,
-      "height": 80,
-      "label": "Web App"
+    "x" : 313.0,
+    "y" : 12.0,
+    "width" : 775.0,
+    "height" : 420.0,
+    "members" : [ "web-app", "orders-api", "worker" ],
+    "label" : "Application Services"
+  }, {
+    "id" : "external-dependencies",
+    "source_id" : "external-dependencies",
+    "projection_id" : "external-dependencies",
+    "provenance" : {
+      "semantic_backed" : {
+        "source_id" : "external-dependencies"
+      }
     },
-    {
-      "id": "orders-api",
-      "source_id": "orders-api",
-      "projection_id": "orders-api",
-      "x": 590,
-      "y": 160,
-      "width": 180,
-      "height": 80,
-      "label": "Orders API"
-    },
-    {
-      "id": "database",
-      "source_id": "database",
-      "projection_id": "database",
-      "x": 940,
-      "y": 350,
-      "width": 180,
-      "height": 80,
-      "label": "PostgreSQL"
-    },
-    {
-      "id": "worker",
-      "source_id": "worker",
-      "projection_id": "worker",
-      "x": 590,
-      "y": 350,
-      "width": 180,
-      "height": 80,
-      "label": "Fulfillment Worker"
-    },
-    {
-      "id": "payments",
-      "source_id": "payments",
-      "projection_id": "payments",
-      "x": 940,
-      "y": 160,
-      "width": 180,
-      "height": 80,
-      "label": "Payment Authorization Service"
-    }
-  ],
-  "edges": [
-    {
-      "id": "client-submits-order",
-      "source": "client",
-      "target": "web-app",
-      "source_id": "client-submits-order",
-      "projection_id": "client-submits-order",
-      "points": [
-        {
-          "x": 200,
-          "y": 200
-        },
-        {
-          "x": 310,
-          "y": 200
-        }
-      ],
-      "label": "submits order"
-    },
-    {
-      "id": "web-app-calls-api",
-      "source": "web-app",
-      "target": "orders-api",
-      "source_id": "web-app-calls-api",
-      "projection_id": "web-app-calls-api",
-      "points": [
-        {
-          "x": 480,
-          "y": 200
-        },
-        {
-          "x": 590,
-          "y": 200
-        }
-      ],
-      "label": "calls API"
-    },
-    {
-      "id": "api-writes-database",
-      "source": "orders-api",
-      "target": "database",
-      "source_id": "api-writes-database",
-      "projection_id": "api-writes-database",
-      "points": [
-        {
-          "x": 770,
-          "y": 230
-        },
-        {
-          "x": 900,
-          "y": 230
-        },
-        {
-          "x": 900,
-          "y": 390
-        },
-        {
-          "x": 940,
-          "y": 390
-        }
-      ],
-      "label": "writes orders"
-    },
-    {
-      "id": "api-authorizes-payment",
-      "source": "orders-api",
-      "target": "payments",
-      "source_id": "api-authorizes-payment",
-      "projection_id": "api-authorizes-payment",
-      "points": [
-        {
-          "x": 770,
-          "y": 200
-        },
-        {
-          "x": 940,
-          "y": 200
-        }
-      ],
-      "label": "requests payment authorization"
-    },
-    {
-      "id": "api-publishes-job",
-      "source": "orders-api",
-      "target": "worker",
-      "source_id": "api-publishes-job",
-      "projection_id": "api-publishes-job",
-      "points": [
-        {
-          "x": 680,
-          "y": 240
-        },
-        {
-          "x": 680,
-          "y": 350
-        }
-      ],
-      "label": "publishes fulfillment"
-    },
-    {
-      "id": "worker-reads-database",
-      "source": "worker",
-      "target": "database",
-      "source_id": "worker-reads-database",
-      "projection_id": "worker-reads-database",
-      "points": [
-        {
-          "x": 770,
-          "y": 390
-        },
-        {
-          "x": 940,
-          "y": 390
-        }
-      ],
-      "label": "loads order"
-    }
-  ],
-  "groups": [
-    {
-      "id": "application-services",
-      "source_id": "application-services",
-      "projection_id": "application-services",
-      "provenance": { "semantic_backed": { "source_id": "application-services" } },
-      "x": 250,
-      "y": 70,
-      "width": 590,
-      "height": 450,
-      "members": [
-        "web-app",
-        "orders-api",
-        "worker"
-      ],
-      "label": "Application Services"
-    },
-    {
-      "id": "external-dependencies",
-      "source_id": "external-dependencies",
-      "projection_id": "external-dependencies",
-      "provenance": { "semantic_backed": { "source_id": "external-dependencies" } },
-      "x": 910,
-      "y": 80,
-      "width": 240,
-      "height": 420,
-      "members": [
-        "database",
-        "payments"
-      ],
-      "label": "External Dependencies"
-    }
-  ],
-  "warnings": [
-    {
-      "code": "DEDIREN_LAYOUT_FIXTURE",
-      "severity": "info",
-      "message": "Fixture layout exercises routed edges, groups, and external dependencies."
-    }
-  ]
+    "x" : 1256.0,
+    "y" : 146.5,
+    "width" : 273.0,
+    "height" : 276.0,
+    "members" : [ "payments", "database" ],
+    "label" : "External Dependencies"
+  } ],
+  "warnings" : [ ]
 }
