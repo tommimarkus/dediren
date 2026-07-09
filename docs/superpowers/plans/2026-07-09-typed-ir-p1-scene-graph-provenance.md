@@ -699,8 +699,10 @@ class LayoutRequestMapperTest {
         .isEqualTo(ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION);
     assertThat(request.viewId()).isEqualTo("view-1");
     assertThat(request.nodes().get(0).sourcePointer()).isEqualTo("/nodes/2");
+    assertThat(request.nodes().get(0).sourceId()).isEqualTo("n1");
     assertThat(request.nodes().get(0).role()).isEqualTo("lifeline");
     assertThat(request.edges().get(0).sourcePointer()).isEqualTo("/relationships/0");
+    assertThat(request.edges().get(0).sourceId()).isEqualTo("e1");
   }
 }
 ```
@@ -735,7 +737,7 @@ public final class LayoutRequestMapper {
                     new LayoutNode(
                         n.id(),
                         n.label(),
-                        pointerValue(n.origin()),
+                        n.id(),
                         n.widthHint(),
                         n.heightHint(),
                         n.role(),
@@ -752,7 +754,7 @@ public final class LayoutRequestMapper {
                         e.source(),
                         e.target(),
                         e.label(),
-                        pointerValue(e.origin()),
+                        e.id(),
                         e.relationshipType(),
                         e.priority(),
                         pointerValue(e.origin())))
