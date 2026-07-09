@@ -5,7 +5,7 @@
   "additionalProperties": false,
   "required": ["layout_request_schema_version", "view_id", "nodes", "edges", "groups", "constraints"],
   "properties": {
-    "layout_request_schema_version": { "const": "layout-request.schema.v1" },
+    "layout_request_schema_version": { "const": "layout-request.schema.v2" },
     "view_id": { "type": "string" },
     "nodes": { "type": "array", "items": { "$ref": "#/$defs/node" } },
     "edges": { "type": "array", "items": { "$ref": "#/$defs/edge" } },
@@ -26,7 +26,8 @@
         "height_hint": { "type": "number", "exclusiveMinimum": 0 },
         "role": { "type": "string" },
         "partition": { "type": "integer" },
-        "layer_constraint": { "enum": ["none", "first", "first-separate", "last", "last-separate"] }
+        "layer_constraint": { "enum": ["none", "first", "first-separate", "last", "last-separate"] },
+        "source_pointer": { "type": "string", "pattern": "^/" }
       }
     },
     "edge": {
@@ -48,7 +49,8 @@
             "keep_short": { "type": "integer" },
             "keep_straight": { "type": "integer" }
           }
-        }
+        },
+        "source_pointer": { "type": "string", "pattern": "^/" }
       }
     },
     "group": {
