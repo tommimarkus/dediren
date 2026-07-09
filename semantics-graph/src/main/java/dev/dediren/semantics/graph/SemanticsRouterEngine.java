@@ -4,7 +4,6 @@ import dev.dediren.contracts.ContractVersions;
 import dev.dediren.contracts.Diagnostic;
 import dev.dediren.contracts.DiagnosticSeverity;
 import dev.dediren.contracts.json.JsonSupport;
-import dev.dediren.contracts.layout.LayoutRequest;
 import dev.dediren.contracts.layout.SemanticValidationResult;
 import dev.dediren.contracts.render.RenderMetadata;
 import dev.dediren.contracts.source.GenericGraphPluginData;
@@ -17,6 +16,7 @@ import dev.dediren.engine.EngineException;
 import dev.dediren.engine.EngineResult;
 import dev.dediren.engine.NotationSemantics;
 import dev.dediren.engine.SemanticsEngine;
+import dev.dediren.ir.SceneGraph;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.List;
@@ -103,12 +103,12 @@ public final class SemanticsRouterEngine implements SemanticsEngine {
   }
 
   @Override
-  public EngineResult<LayoutRequest> projectLayoutRequest(SourceDocument source, String view)
+  public EngineResult<SceneGraph> projectScene(SourceDocument source, String view)
       throws EngineException {
     Projection projection = prepareProjection(source, view);
     try {
       return new EngineResult<>(
-          SceneProjection.projectLayoutRequest(source, projection.view(), projection.notation()),
+          SceneProjection.projectScene(source, projection.view(), projection.notation()),
           List.of());
     } catch (IOException error) {
       throw new UncheckedIOException(error);

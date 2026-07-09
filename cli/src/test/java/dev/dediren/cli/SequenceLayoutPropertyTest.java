@@ -9,7 +9,9 @@ import dev.dediren.contracts.source.GenericGraphSemanticProfile;
 import dev.dediren.contracts.source.SourceDocument;
 import dev.dediren.ir.LaidOutScene;
 import dev.dediren.ir.LaidOutSceneMapper;
+import dev.dediren.ir.LayoutRequestMapper;
 import dev.dediren.ir.PlacedNode;
+import dev.dediren.ir.SceneGraph;
 import dev.dediren.ir.quality.SequenceInvariants;
 import dev.dediren.plugins.elklayout.ElkEngine;
 import dev.dediren.semantics.archimate.ArchimateNotationSemantics;
@@ -35,7 +37,7 @@ import net.jqwik.api.Provide;
  *
  * <p>{@code SceneProjection} and {@code ElkLayoutEngine} named in the task are package-private to
  * their own plugin packages, so this test drives their public wrappers instead — {@link
- * SemanticsRouterEngine#projectLayoutRequest} and {@link ElkEngine#layout} — which run identical
+ * SemanticsRouterEngine#projectScene} and {@link ElkEngine#layout} — which run identical
  * validation/projection/layout logic and are the exact instances {@code EngineWiring} wires into
  * the CLI's in-memory dispatch.
  *
@@ -57,14 +59,15 @@ class SequenceLayoutPropertyTest {
     SourceDocument source =
         JsonSupport.objectMapper().readValue(buildSourceJson(model), SourceDocument.class);
 
-    LayoutRequest request =
+    SceneGraph sceneGraph =
         new SemanticsRouterEngine(
                 Map.of(
                     GenericGraphSemanticProfile.GENERIC_GRAPH, new GraphNotationSemantics(),
                     GenericGraphSemanticProfile.ARCHIMATE, new ArchimateNotationSemantics(),
                     GenericGraphSemanticProfile.UML, new UmlNotationSemantics()))
-            .projectLayoutRequest(source, "sequence-view")
+            .projectScene(source, "sequence-view")
             .value();
+    LayoutRequest request = LayoutRequestMapper.toRequest(sceneGraph);
     LayoutResult result = new ElkEngine().layout(request).value();
     LaidOutScene scene = LaidOutSceneMapper.toScene(result);
 

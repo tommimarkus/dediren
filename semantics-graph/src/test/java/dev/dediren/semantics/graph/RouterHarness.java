@@ -5,6 +5,7 @@ import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.contracts.source.GenericGraphSemanticProfile;
 import dev.dediren.contracts.source.SourceDocument;
 import dev.dediren.engine.EngineException;
+import dev.dediren.ir.LayoutRequestMapper;
 import dev.dediren.semantics.archimate.ArchimateNotationSemantics;
 import dev.dediren.semantics.uml.UmlNotationSemantics;
 import java.io.ByteArrayInputStream;
@@ -117,9 +118,11 @@ final class RouterHarness {
         stdout.println(
             JsonSupport.objectMapper().writeValueAsString(CommandEnvelope.ok(result.value())));
       } else {
-        var result = engine.projectLayoutRequest(source, view);
+        var result = engine.projectScene(source, view);
         stdout.println(
-            JsonSupport.objectMapper().writeValueAsString(CommandEnvelope.ok(result.value())));
+            JsonSupport.objectMapper()
+                .writeValueAsString(
+                    CommandEnvelope.ok(LayoutRequestMapper.toRequest(result.value()))));
       }
       return 0;
     } catch (EngineException error) {

@@ -27,6 +27,8 @@ import dev.dediren.engine.ExportEngine;
 import dev.dediren.engine.LayoutEngine;
 import dev.dediren.engine.RenderEngine;
 import dev.dediren.engine.SemanticsEngine;
+import dev.dediren.ir.LayoutRequestMapper;
+import dev.dediren.ir.SceneGraph;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -657,9 +659,9 @@ class BuildCommandTest {
     }
 
     @Override
-    public EngineResult<LayoutRequest> projectLayoutRequest(SourceDocument source, String view) {
+    public EngineResult<SceneGraph> projectScene(SourceDocument source, String view) {
       requireKnownView(view);
-      return new EngineResult<>(
+      LayoutRequest layoutRequest =
           new LayoutRequest(
               ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION,
               view,
@@ -667,7 +669,9 @@ class BuildCommandTest {
               List.of(),
               List.of(),
               List.of(),
-              null),
+              null);
+      return new EngineResult<>(
+          LayoutRequestMapper.toSceneGraph(layoutRequest),
           warningIf(
               layoutRequestWarningViews,
               view,

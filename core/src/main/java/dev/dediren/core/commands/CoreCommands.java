@@ -19,11 +19,14 @@ import dev.dediren.core.quality.LayoutQuality;
 import dev.dediren.core.quality.LayoutQualityReport;
 import dev.dediren.core.source.SourceValidator;
 import dev.dediren.core.source.ValidationResult;
+import dev.dediren.engine.EngineResult;
 import dev.dediren.engine.Engines;
 import dev.dediren.engine.ExportEngine;
 import dev.dediren.engine.LayoutEngine;
 import dev.dediren.engine.RenderEngine;
 import dev.dediren.engine.SemanticsEngine;
+import dev.dediren.ir.LayoutRequestMapper;
+import dev.dediren.ir.SceneGraph;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
@@ -106,7 +109,13 @@ public final class CoreCommands {
       return EngineDispatch.dispatch(engineId, () -> semantics.projectRenderMetadata(source, view));
     }
     if ("layout-request".equals(target)) {
-      return EngineDispatch.dispatch(engineId, () -> semantics.projectLayoutRequest(source, view));
+      return EngineDispatch.dispatch(
+          engineId,
+          () -> {
+            EngineResult<SceneGraph> projected = semantics.projectScene(source, view);
+            return new EngineResult<>(
+                LayoutRequestMapper.toRequest(projected.value()), projected.diagnostics());
+          });
     }
     // A structural failure's observable: message to stderr, exit 2. The cli catches this
     // UncheckedIOException and prints its cause, keeping the published non-enveloped form.

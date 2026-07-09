@@ -12,6 +12,7 @@ import dev.dediren.contracts.source.GenericGraphViewKind;
 import dev.dediren.contracts.source.SourceDocument;
 import dev.dediren.contracts.source.SourceNode;
 import dev.dediren.contracts.source.SourceRelationship;
+import dev.dediren.ir.LayoutRequestMapper;
 import dev.dediren.semantics.uml.UmlNotationSemantics;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -44,7 +45,8 @@ class SceneProjectionProvenanceTest {
 
     // valid-basic.json declares the default (generic-graph) profile, so the base notation applies.
     LayoutRequest request =
-        SceneProjection.projectLayoutRequest(source, view, new GraphNotationSemantics());
+        LayoutRequestMapper.toRequest(
+            SceneProjection.projectScene(source, view, new GraphNotationSemantics()));
 
     // Every projected node/edge carries a JSON-Pointer into the source arrays.
     assertThat(request.nodes())
@@ -96,7 +98,8 @@ class SceneProjectionProvenanceTest {
             List.of());
 
     LayoutRequest request =
-        SceneProjection.projectLayoutRequest(source, view, new GraphNotationSemantics());
+        LayoutRequestMapper.toRequest(
+            SceneProjection.projectScene(source, view, new GraphNotationSemantics()));
 
     assertThat(request.nodes()).hasSize(2);
     assertThat(request.edges()).hasSize(2);
@@ -154,7 +157,8 @@ class SceneProjectionProvenanceTest {
             List.of());
 
     LayoutRequest request =
-        SceneProjection.projectLayoutRequest(source, view, new UmlNotationSemantics());
+        LayoutRequestMapper.toRequest(
+            SceneProjection.projectScene(source, view, new UmlNotationSemantics()));
 
     // The CombinedFragment/InteractionOperand nodes never become scene nodes.
     assertThat(request.nodes())

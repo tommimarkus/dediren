@@ -3,9 +3,6 @@ package dev.dediren.semantics.graph;
 import dev.dediren.contracts.ContractVersions;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.contracts.layout.GroupProvenance;
-import dev.dediren.contracts.layout.LayoutGroup;
-import dev.dediren.contracts.layout.LayoutNode;
-import dev.dediren.contracts.layout.LayoutRequest;
 import dev.dediren.contracts.render.RenderMetadata;
 import dev.dediren.contracts.render.RenderMetadataSelector;
 import dev.dediren.contracts.source.GenericGraphPluginData;
@@ -16,6 +13,8 @@ import dev.dediren.contracts.source.SourceDocument;
 import dev.dediren.contracts.source.SourceNode;
 import dev.dediren.contracts.source.SourceRelationship;
 import dev.dediren.engine.NotationSemantics;
+import dev.dediren.ir.SceneGraph;
+import dev.dediren.ir.SceneGroup;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
@@ -26,11 +25,10 @@ import tools.jackson.databind.JsonNode;
 
 /**
  * The shared, backend-neutral projection loop: it turns a selected {@link GenericGraphView} into a
- * layout-request or render-metadata input, delegating every notation-specific decision to a {@link
- * NotationSemantics}. Relocated verbatim from the old single generic-graph projection; the only
- * change is that the stringly {@code semanticProfile} parameter became a {@code notation} hook, so
- * the base structure (node/edge/group iteration, {@code SceneGraph} construction, {@code
- * LayoutRequestMapper} mapping, group provenance, constraint injection) is unchanged.
+ * pre-layout {@link SceneGraph} or a render-metadata input, delegating every notation-specific
+ * decision to a {@link NotationSemantics}. The projection owns the whole {@code SceneGraph} (nodes,
+ * edges, groups, constraints, preferences) directly; mapping to the {@code layout-request} wire
+ * record happens at the caller's edge (Plan B P4), not here.
  */
 final class SceneProjection {
   private SceneProjection() {}
@@ -92,7 +90,14 @@ final class SceneProjection {
         groups);
   }
 
-  static LayoutRequest projectLayoutRequest(
+  /**
+   * Builds the complete pre-layout {@link SceneGraph} for the selected view: nodes, edges, groups,
+   * constraints (the single injection point is {@link NotationSemantics#layoutConstraints}), and
+   * preferences. The projection owns the whole {@code SceneGraph} directly; callers map it to a
+   * {@code layout-request} at their own edge via {@code LayoutRequestMapper.toRequest} (the CLI
+   * standalone {@code project} command does this so the wire stays byte-identical).
+   */
+  static SceneGraph projectScene(
       SourceDocument source, GenericGraphView selectedView, NotationSemantics notation)
       throws IOException {
     var sceneNodes = new ArrayList<dev.dediren.ir.SceneNode>();
@@ -133,18 +138,6 @@ final class SceneProjection {
               dev.dediren.ir.SourcePointers.relationship(sourceIndex)));
     }
 
-    LayoutRequest mapped =
-        dev.dediren.ir.LayoutRequestMapper.toRequest(
-            new dev.dediren.ir.SceneGraph(
-                selectedView.id(),
-                sceneNodes,
-                sceneEdges,
-                java.util.List.of(),
-                java.util.List.of(),
-                selectedView.layoutPreferences()));
-    var nodes = mapped.nodes();
-    var edges = mapped.edges();
-
     var selectedNodeIds = new LinkedHashSet<>(selectedView.nodes());
     var selectedGroupIds =
         selectedView.groups().stream()
@@ -152,11 +145,11 @@ final class SceneProjection {
             .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
     var sourceNodeIds =
         source.nodes().stream().map(SourceNode::id).collect(java.util.stream.Collectors.toSet());
-    var emittedLayoutNodeIds =
-        nodes.stream()
-            .map(LayoutNode::id)
+    var emittedSceneNodeIds =
+        sceneNodes.stream()
+            .map(dev.dediren.ir.SceneNode::id)
             .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
-    var groups = new ArrayList<LayoutGroup>();
+    var sceneGroups = new ArrayList<SceneGroup>();
     for (GenericGraphViewGroup group : selectedView.groups()) {
       for (String member : group.members()) {
         if (!selectedNodeIds.contains(member) && !selectedGroupIds.contains(member)) {
@@ -179,20 +172,19 @@ final class SceneProjection {
           group.members().stream()
               .filter(
                   member ->
-                      emittedLayoutNodeIds.contains(member) || selectedGroupIds.contains(member))
+                      emittedSceneNodeIds.contains(member) || selectedGroupIds.contains(member))
               .toList();
       if (members.isEmpty()) {
         continue;
       }
-      groups.add(new LayoutGroup(group.id(), group.label(), members, provenance));
+      sceneGroups.add(new SceneGroup(group.id(), group.label(), members, provenance));
     }
 
-    return new LayoutRequest(
-        ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION,
+    return new SceneGraph(
         selectedView.id(),
-        nodes,
-        edges,
-        groups,
+        sceneNodes,
+        sceneEdges,
+        sceneGroups,
         notation.layoutConstraints(source, selectedView),
         selectedView.layoutPreferences());
   }
