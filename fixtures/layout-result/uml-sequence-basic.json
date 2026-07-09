@@ -1,167 +1,89 @@
 {
-  "layout_result_schema_version": "layout-result.schema.v2",
-  "view_id": "sequence-view",
-  "nodes": [
-    {
-      "id": "interaction-place-order",
-      "source_id": "interaction-place-order",
-      "projection_id": "interaction-place-order",
-      "x": 40,
-      "y": 32,
-      "width": 760,
-      "height": 360,
-      "label": "Place Order"
-    },
-    {
-      "id": "customer",
-      "source_id": "customer",
-      "projection_id": "customer",
-      "x": 96,
-      "y": 72,
-      "width": 140,
-      "height": 48,
-      "label": "Customer",
-      "role": "lifeline"
-    },
-    {
-      "id": "service",
-      "source_id": "service",
-      "projection_id": "service",
-      "x": 364,
-      "y": 72,
-      "width": 140,
-      "height": 48,
-      "label": "Order Service",
-      "role": "lifeline"
-    },
-    {
-      "id": "receipt",
-      "source_id": "receipt",
-      "projection_id": "receipt",
-      "x": 600,
-      "y": 72,
-      "width": 140,
-      "height": 48,
-      "label": "Receipt",
-      "role": "lifeline"
-    },
-    {
-      "id": "service-execution",
-      "source_id": "service-execution",
-      "projection_id": "service-execution",
-      "x": 434,
-      "y": 146,
-      "width": 16,
-      "height": 78,
-      "label": ""
-    },
-    {
-      "id": "service-destroyed",
-      "source_id": "service-destroyed",
-      "projection_id": "service-destroyed",
-      "x": 424,
-      "y": 280,
-      "width": 36,
-      "height": 36,
-      "label": ""
-    }
-  ],
-  "edges": [
-    {
-      "id": "m5",
-      "source": "customer",
-      "target": "service-destroyed",
-      "source_id": "m5",
-      "projection_id": "m5",
-      "points": [
-        {
-          "x": 166,
-          "y": 298
-        },
-        {
-          "x": 442,
-          "y": 298
-        }
-      ],
-      "label": "cancelOrder"
-    },
-    {
-      "id": "m4",
-      "source": "service",
-      "target": "receipt",
-      "source_id": "m4",
-      "projection_id": "m4",
-      "points": [
-        {
-          "x": 442,
-          "y": 262
-        },
-        {
-          "x": 570,
-          "y": 262
-        },
-        {
-          "x": 600,
-          "y": 96
-        }
-      ],
-      "label": "createReceipt"
-    },
-    {
-      "id": "m2",
-      "source": "service",
-      "target": "customer",
-      "source_id": "m2",
-      "projection_id": "m2",
-      "points": [
-        {
-          "x": 442,
-          "y": 190
-        },
-        {
-          "x": 166,
-          "y": 190
-        }
-      ],
-      "label": "accepted"
-    },
-    {
-      "id": "m1",
-      "source": "customer",
-      "target": "service",
-      "source_id": "m1",
-      "projection_id": "m1",
-      "points": [
-        {
-          "x": 166,
-          "y": 146
-        },
-        {
-          "x": 442,
-          "y": 146
-        }
-      ],
-      "label": "placeOrder"
-    },
-    {
-      "id": "m3",
-      "source": "service",
-      "target": "customer",
-      "source_id": "m3",
-      "projection_id": "m3",
-      "points": [
-        {
-          "x": 442,
-          "y": 238
-        },
-        {
-          "x": 166,
-          "y": 238
-        }
-      ],
-      "label": "receiptReady"
-    }
-  ],
-  "groups": [],
-  "warnings": []
+  "layout_result_schema_version" : "layout-result.schema.v2",
+  "view_id" : "sequence-view",
+  "nodes" : [ {
+    "id" : "interaction-place-order",
+    "source_id" : "interaction-place-order",
+    "projection_id" : "interaction-place-order",
+    "x" : 141.0,
+    "y" : 292.0,
+    "width" : 424.0,
+    "height" : 120.0,
+    "label" : "Place Order",
+    "role" : "interaction",
+    "source_pointer" : "/nodes/0"
+  }, {
+    "id" : "customer",
+    "source_id" : "customer",
+    "projection_id" : "customer",
+    "x" : 141.0,
+    "y" : 292.0,
+    "width" : 140.0,
+    "height" : 48.0,
+    "label" : "Customer",
+    "role" : "lifeline",
+    "source_pointer" : "/nodes/1"
+  }, {
+    "id" : "service",
+    "source_id" : "service",
+    "projection_id" : "service",
+    "x" : 425.0,
+    "y" : 292.0,
+    "width" : 140.0,
+    "height" : 48.0,
+    "label" : "Order Service",
+    "role" : "lifeline",
+    "source_pointer" : "/nodes/2"
+  } ],
+  "edges" : [ {
+    "id" : "m1",
+    "source" : "customer",
+    "target" : "service",
+    "source_id" : "m1",
+    "projection_id" : "m1",
+    "routing_hints" : [ ],
+    "points" : [ {
+      "x" : 211.0,
+      "y" : 364.0
+    }, {
+      "x" : 495.0,
+      "y" : 364.0
+    } ],
+    "label" : "placeOrder",
+    "source_pointer" : "/relationships/0"
+  }, {
+    "id" : "m2",
+    "source" : "service",
+    "target" : "customer",
+    "source_id" : "m2",
+    "projection_id" : "m2",
+    "routing_hints" : [ ],
+    "points" : [ {
+      "x" : 495.0,
+      "y" : 388.0
+    }, {
+      "x" : 211.0,
+      "y" : 388.0
+    } ],
+    "label" : "accepted",
+    "source_pointer" : "/relationships/1"
+  }, {
+    "id" : "m3",
+    "source" : "service",
+    "target" : "customer",
+    "source_id" : "m3",
+    "projection_id" : "m3",
+    "routing_hints" : [ ],
+    "points" : [ {
+      "x" : 495.0,
+      "y" : 412.0
+    }, {
+      "x" : 211.0,
+      "y" : 412.0
+    } ],
+    "label" : "receiptReady",
+    "source_pointer" : "/relationships/2"
+  } ],
+  "groups" : [ ],
+  "warnings" : [ ]
 }

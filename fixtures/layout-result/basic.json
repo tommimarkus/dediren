@@ -1,51 +1,44 @@
 {
-  "layout_result_schema_version": "layout-result.schema.v2",
-  "view_id": "main",
-  "nodes": [
-    {
-      "id": "client",
-      "source_id": "client",
-      "projection_id": "client",
-      "x": 32,
-      "y": 32,
-      "width": 160,
-      "height": 80,
-      "label": "Client",
-      "source_pointer": "/nodes/0"
-    },
-    {
-      "id": "api",
-      "source_id": "api",
-      "projection_id": "api",
-      "x": 272,
-      "y": 32,
-      "width": 160,
-      "height": 80,
-      "label": "API",
-      "source_pointer": "/nodes/1"
-    }
-  ],
-  "edges": [
-    {
-      "id": "client-calls-api",
-      "source": "client",
-      "target": "api",
-      "source_id": "client-calls-api",
-      "projection_id": "client-calls-api",
-      "points": [
-        {
-          "x": 192,
-          "y": 72
-        },
-        {
-          "x": 272,
-          "y": 72
-        }
-      ],
-      "label": "calls",
-      "source_pointer": "/relationships/0"
-    }
-  ],
-  "groups": [],
-  "warnings": []
+  "layout_result_schema_version" : "layout-result.schema.v2",
+  "view_id" : "main",
+  "nodes" : [ {
+    "id" : "client",
+    "source_id" : "client",
+    "projection_id" : "client",
+    "x" : 12.0,
+    "y" : 12.0,
+    "width" : 160.0,
+    "height" : 80.0,
+    "label" : "Client",
+    "source_pointer" : "/nodes/0"
+  }, {
+    "id" : "api",
+    "source_id" : "api",
+    "projection_id" : "api",
+    "x" : 294.0,
+    "y" : 12.0,
+    "width" : 160.0,
+    "height" : 80.0,
+    "label" : "API",
+    "source_pointer" : "/nodes/1"
+  } ],
+  "edges" : [ {
+    "id" : "client-calls-api",
+    "source" : "client",
+    "target" : "api",
+    "source_id" : "client-calls-api",
+    "projection_id" : "client-calls-api",
+    "routing_hints" : [ ],
+    "points" : [ {
+      "x" : 173.0,
+      "y" : 52.0
+    }, {
+      "x" : 293.0,
+      "y" : 52.0
+    } ],
+    "label" : "calls",
+    "source_pointer" : "/relationships/0"
+  } ],
+  "groups" : [ ],
+  "warnings" : [ ]
 }

@@ -7,9 +7,9 @@
 
   <!-- EI_EXPOSE_REP / EI_EXPOSE_REP2: two distinct cases, enumerated per class
        (not a blanket pattern-wide suppression) because their justification
-       differs. The contracts.* records (and the ir.* SceneGraph/SceneGroup
-       records, which follow the identical construction discipline) wrap
-       their List/Map components via
+       differs. The contracts.* records (and the ir.* SceneGraph/SceneGroup/
+       LaidOutScene/PlacedGroup/RoutedEdge records, which follow the identical
+       construction discipline) wrap their List/Map components via
        ContractCollections.listOrEmpty(...)/mapOrEmpty(...) (List.copyOf/
        Map.copyOf), so the shared reference is genuinely immutable.
        schemacache.SchemaFetchResult is different: it holds mutable byte[]
@@ -44,6 +44,9 @@
       <Class name="dev.dediren.schemacache.SchemaFetchResult"/>
       <Class name="dev.dediren.ir.SceneGraph"/>
       <Class name="dev.dediren.ir.SceneGroup"/>
+      <Class name="dev.dediren.ir.LaidOutScene"/>
+      <Class name="dev.dediren.ir.PlacedGroup"/>
+      <Class name="dev.dediren.ir.RoutedEdge"/>
     </Or>
     <Or>
       <Bug pattern="EI_EXPOSE_REP"/>

@@ -111,7 +111,8 @@
         "code": { "type": "string" },
         "severity": { "enum": ["info", "warning", "error"] },
         "message": { "type": "string" },
-        "path": { "type": "string" }
+        "path": { "type": "string" },
+        "source_pointer": { "type": "string", "pattern": "^/" }
       }
     }
   }

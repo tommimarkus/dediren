@@ -1,293 +1,255 @@
 {
-  "layout_result_schema_version": "layout-result.schema.v2",
-  "view_id": "sequence-fragments-view",
-  "nodes": [
-    {
-      "id": "interaction-place-order",
-      "source_id": "interaction-place-order",
-      "projection_id": "interaction-place-order",
-      "x": 521.0,
-      "y": 12.0,
-      "width": 1103.0,
-      "height": 856.0,
-      "label": "Place Order",
-      "role": "interaction"
-    },
-    {
-      "id": "customer",
-      "source_id": "customer",
-      "projection_id": "customer",
-      "x": 521.0,
-      "y": 12.0,
-      "width": 140.0,
-      "height": 88.0,
-      "label": "Customer",
-      "role": "lifeline"
-    },
-    {
-      "id": "service",
-      "source_id": "service",
-      "projection_id": "service",
-      "x": 870.0,
-      "y": 12.0,
-      "width": 140.0,
-      "height": 248.0,
-      "label": "Order Service",
-      "role": "lifeline"
-    },
-    {
-      "id": "inventory",
-      "source_id": "inventory",
-      "projection_id": "inventory",
-      "x": 1483.0,
-      "y": 12.0,
-      "width": 140.0,
-      "height": 88.0,
-      "label": "Inventory",
-      "role": "lifeline"
-    },
-    {
-      "id": "payment",
-      "source_id": "payment",
-      "projection_id": "payment",
-      "x": 1484.0,
-      "y": 12.0,
-      "width": 140.0,
-      "height": 88.0,
-      "label": "Payment",
-      "role": "lifeline"
-    }
-  ],
-  "edges": [
-    {
-      "id": "m1",
-      "source": "service",
-      "target": "inventory",
-      "source_id": "m1",
-      "projection_id": "m1",
-      "routing_hints": [],
-      "points": [
-        {
-          "x": 1010.0,
-          "y": 330.0
-        },
-        {
-          "x": 1483.0,
-          "y": 330.0
-        }
-      ],
-      "label": "checkAvailability"
-    },
-    {
-      "id": "m2",
-      "source": "inventory",
-      "target": "service",
-      "source_id": "m2",
-      "projection_id": "m2",
-      "routing_hints": [],
-      "points": [
-        {
-          "x": 1483.0,
-          "y": 354.0
-        },
-        {
-          "x": 1010.0,
-          "y": 354.0
-        }
-      ],
-      "label": "inStock"
-    },
-    {
-      "id": "m3",
-      "source": "service",
-      "target": "inventory",
-      "source_id": "m3",
-      "projection_id": "m3",
-      "routing_hints": [],
-      "points": [
-        {
-          "x": 1010.0,
-          "y": 446.0
-        },
-        {
-          "x": 1483.0,
-          "y": 446.0
-        }
-      ],
-      "label": "requestBackorder"
-    },
-    {
-      "id": "m4",
-      "source": "inventory",
-      "target": "service",
-      "source_id": "m4",
-      "projection_id": "m4",
-      "routing_hints": [],
-      "points": [
-        {
-          "x": 1483.0,
-          "y": 470.0
-        },
-        {
-          "x": 1010.0,
-          "y": 470.0
-        }
-      ],
-      "label": "backorderAccepted"
-    },
-    {
-      "id": "m5",
-      "source": "customer",
-      "target": "service",
-      "source_id": "m5",
-      "projection_id": "m5",
-      "routing_hints": [],
-      "points": [
-        {
-          "x": 661.0,
-          "y": 540.0
-        },
-        {
-          "x": 870.0,
-          "y": 540.0
-        }
-      ],
-      "label": "applyCoupon"
-    },
-    {
-      "id": "m6",
-      "source": "service",
-      "target": "customer",
-      "source_id": "m6",
-      "projection_id": "m6",
-      "routing_hints": [],
-      "points": [
-        {
-          "x": 870.0,
-          "y": 564.0
-        },
-        {
-          "x": 661.0,
-          "y": 564.0
-        }
-      ],
-      "label": "couponAccepted"
-    },
-    {
-      "id": "m7",
-      "source": "service",
-      "target": "payment",
-      "source_id": "m7",
-      "projection_id": "m7",
-      "routing_hints": [],
-      "points": [
-        {
-          "x": 1010.0,
-          "y": 634.0
-        },
-        {
-          "x": 1484.0,
-          "y": 634.0
-        }
-      ],
-      "label": "authorizePayment"
-    },
-    {
-      "id": "m8",
-      "source": "payment",
-      "target": "service",
-      "source_id": "m8",
-      "projection_id": "m8",
-      "routing_hints": [],
-      "points": [
-        {
-          "x": 1484.0,
-          "y": 658.0
-        },
-        {
-          "x": 1010.0,
-          "y": 658.0
-        }
-      ],
-      "label": "retryNeeded"
-    },
-    {
-      "id": "m9",
-      "source": "service",
-      "target": "payment",
-      "source_id": "m9",
-      "projection_id": "m9",
-      "routing_hints": [],
-      "points": [
-        {
-          "x": 1010.0,
-          "y": 728.0
-        },
-        {
-          "x": 1484.0,
-          "y": 728.0
-        }
-      ],
-      "label": "capturePayment"
-    },
-    {
-      "id": "m10",
-      "source": "payment",
-      "target": "service",
-      "source_id": "m10",
-      "projection_id": "m10",
-      "routing_hints": [],
-      "points": [
-        {
-          "x": 1484.0,
-          "y": 752.0
-        },
-        {
-          "x": 1010.0,
-          "y": 752.0
-        }
-      ],
-      "label": "charged"
-    },
-    {
-      "id": "m11",
-      "source": "service",
-      "target": "customer",
-      "source_id": "m11",
-      "projection_id": "m11",
-      "routing_hints": [],
-      "points": [
-        {
-          "x": 870.0,
-          "y": 844.0
-        },
-        {
-          "x": 661.0,
-          "y": 844.0
-        }
-      ],
-      "label": "sendConfirmation"
-    },
-    {
-      "id": "m12",
-      "source": "customer",
-      "target": "service",
-      "source_id": "m12",
-      "projection_id": "m12",
-      "routing_hints": [],
-      "points": [
-        {
-          "x": 661.0,
-          "y": 868.0
-        },
-        {
-          "x": 870.0,
-          "y": 868.0
-        }
-      ],
-      "label": "confirmReceipt"
-    }
-  ],
-  "groups": [],
-  "warnings": []
+  "layout_result_schema_version" : "layout-result.schema.v2",
+  "view_id" : "sequence-fragments-view",
+  "nodes" : [ {
+    "id" : "interaction-place-order",
+    "source_id" : "interaction-place-order",
+    "projection_id" : "interaction-place-order",
+    "x" : 521.0,
+    "y" : 12.0,
+    "width" : 848.0,
+    "height" : 856.0,
+    "label" : "Place Order",
+    "role" : "interaction",
+    "source_pointer" : "/nodes/0"
+  }, {
+    "id" : "customer",
+    "source_id" : "customer",
+    "projection_id" : "customer",
+    "x" : 521.0,
+    "y" : 12.0,
+    "width" : 140.0,
+    "height" : 88.0,
+    "label" : "Customer",
+    "role" : "lifeline",
+    "source_pointer" : "/nodes/1"
+  }, {
+    "id" : "service",
+    "source_id" : "service",
+    "projection_id" : "service",
+    "x" : 757.0,
+    "y" : 12.0,
+    "width" : 140.0,
+    "height" : 248.0,
+    "label" : "Order Service",
+    "role" : "lifeline",
+    "source_pointer" : "/nodes/2"
+  }, {
+    "id" : "inventory",
+    "source_id" : "inventory",
+    "projection_id" : "inventory",
+    "x" : 993.0,
+    "y" : 12.0,
+    "width" : 140.0,
+    "height" : 88.0,
+    "label" : "Inventory",
+    "role" : "lifeline",
+    "source_pointer" : "/nodes/3"
+  }, {
+    "id" : "payment",
+    "source_id" : "payment",
+    "projection_id" : "payment",
+    "x" : 1229.0,
+    "y" : 12.0,
+    "width" : 140.0,
+    "height" : 88.0,
+    "label" : "Payment",
+    "role" : "lifeline",
+    "source_pointer" : "/nodes/4"
+  } ],
+  "edges" : [ {
+    "id" : "m1",
+    "source" : "service",
+    "target" : "inventory",
+    "source_id" : "m1",
+    "projection_id" : "m1",
+    "routing_hints" : [ ],
+    "points" : [ {
+      "x" : 827.0,
+      "y" : 330.0
+    }, {
+      "x" : 1063.0,
+      "y" : 330.0
+    } ],
+    "label" : "checkAvailability",
+    "source_pointer" : "/relationships/0"
+  }, {
+    "id" : "m2",
+    "source" : "inventory",
+    "target" : "service",
+    "source_id" : "m2",
+    "projection_id" : "m2",
+    "routing_hints" : [ ],
+    "points" : [ {
+      "x" : 1063.0,
+      "y" : 354.0
+    }, {
+      "x" : 827.0,
+      "y" : 354.0
+    } ],
+    "label" : "inStock",
+    "source_pointer" : "/relationships/1"
+  }, {
+    "id" : "m3",
+    "source" : "service",
+    "target" : "inventory",
+    "source_id" : "m3",
+    "projection_id" : "m3",
+    "routing_hints" : [ ],
+    "points" : [ {
+      "x" : 827.0,
+      "y" : 446.0
+    }, {
+      "x" : 1063.0,
+      "y" : 446.0
+    } ],
+    "label" : "requestBackorder",
+    "source_pointer" : "/relationships/2"
+  }, {
+    "id" : "m4",
+    "source" : "inventory",
+    "target" : "service",
+    "source_id" : "m4",
+    "projection_id" : "m4",
+    "routing_hints" : [ ],
+    "points" : [ {
+      "x" : 1063.0,
+      "y" : 470.0
+    }, {
+      "x" : 827.0,
+      "y" : 470.0
+    } ],
+    "label" : "backorderAccepted",
+    "source_pointer" : "/relationships/3"
+  }, {
+    "id" : "m5",
+    "source" : "customer",
+    "target" : "service",
+    "source_id" : "m5",
+    "projection_id" : "m5",
+    "routing_hints" : [ ],
+    "points" : [ {
+      "x" : 591.0,
+      "y" : 540.0
+    }, {
+      "x" : 827.0,
+      "y" : 540.0
+    } ],
+    "label" : "applyCoupon",
+    "source_pointer" : "/relationships/4"
+  }, {
+    "id" : "m6",
+    "source" : "service",
+    "target" : "customer",
+    "source_id" : "m6",
+    "projection_id" : "m6",
+    "routing_hints" : [ ],
+    "points" : [ {
+      "x" : 827.0,
+      "y" : 564.0
+    }, {
+      "x" : 591.0,
+      "y" : 564.0
+    } ],
+    "label" : "couponAccepted",
+    "source_pointer" : "/relationships/5"
+  }, {
+    "id" : "m7",
+    "source" : "service",
+    "target" : "payment",
+    "source_id" : "m7",
+    "projection_id" : "m7",
+    "routing_hints" : [ ],
+    "points" : [ {
+      "x" : 827.0,
+      "y" : 634.0
+    }, {
+      "x" : 1299.0,
+      "y" : 634.0
+    } ],
+    "label" : "authorizePayment",
+    "source_pointer" : "/relationships/6"
+  }, {
+    "id" : "m8",
+    "source" : "payment",
+    "target" : "service",
+    "source_id" : "m8",
+    "projection_id" : "m8",
+    "routing_hints" : [ ],
+    "points" : [ {
+      "x" : 1299.0,
+      "y" : 658.0
+    }, {
+      "x" : 827.0,
+      "y" : 658.0
+    } ],
+    "label" : "retryNeeded",
+    "source_pointer" : "/relationships/7"
+  }, {
+    "id" : "m9",
+    "source" : "service",
+    "target" : "payment",
+    "source_id" : "m9",
+    "projection_id" : "m9",
+    "routing_hints" : [ ],
+    "points" : [ {
+      "x" : 827.0,
+      "y" : 728.0
+    }, {
+      "x" : 1299.0,
+      "y" : 728.0
+    } ],
+    "label" : "capturePayment",
+    "source_pointer" : "/relationships/8"
+  }, {
+    "id" : "m10",
+    "source" : "payment",
+    "target" : "service",
+    "source_id" : "m10",
+    "projection_id" : "m10",
+    "routing_hints" : [ ],
+    "points" : [ {
+      "x" : 1299.0,
+      "y" : 752.0
+    }, {
+      "x" : 827.0,
+      "y" : 752.0
+    } ],
+    "label" : "charged",
+    "source_pointer" : "/relationships/9"
+  }, {
+    "id" : "m11",
+    "source" : "service",
+    "target" : "customer",
+    "source_id" : "m11",
+    "projection_id" : "m11",
+    "routing_hints" : [ ],
+    "points" : [ {
+      "x" : 827.0,
+      "y" : 844.0
+    }, {
+      "x" : 591.0,
+      "y" : 844.0
+    } ],
+    "label" : "sendConfirmation",
+    "source_pointer" : "/relationships/10"
+  }, {
+    "id" : "m12",
+    "source" : "customer",
+    "target" : "service",
+    "source_id" : "m12",
+    "projection_id" : "m12",
+    "routing_hints" : [ ],
+    "points" : [ {
+      "x" : 591.0,
+      "y" : 868.0
+    }, {
+      "x" : 827.0,
+      "y" : 868.0
+    } ],
+    "label" : "confirmReceipt",
+    "source_pointer" : "/relationships/11"
+  } ],
+  "groups" : [ ],
+  "warnings" : [ ]
 }

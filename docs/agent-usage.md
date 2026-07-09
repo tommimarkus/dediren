@@ -654,6 +654,11 @@ A warning verdict is not a failure — the exit code stays `0`. ArchiMate juncti
 nodes detached from an incident edge route fail with
 `DEDIREN_LAYOUT_JUNCTION_OFF_INCIDENT_ROUTE`.
 
+Hard-error layout diagnostics (severity `error`) additionally carry an optional
+`source_pointer` — a JSON-Pointer into the source model (for example `/nodes/3`
+or `/relationships/2`) naming the element to repair. Use it to jump straight
+from a layout-quality failure to the source node or relationship that caused it.
+
 The `elk-layout` plugin uses official Eclipse ELK Java libraries and requires
 Java 21 or newer. It does not use external layout adapters. Use
 `layout_preferences.mode: "flow"` for directed diagrams that need ELK Layered

@@ -236,15 +236,17 @@ final class SequenceLayoutConstraints {
     return normalized;
   }
 
-  // ELK's RIGHT-direction layered pass can place two lifelines in the same layer, giving them
-  // an identical x. A sequence diagram requires one distinct column per participant in declared
-  // order, so return one x-slot per lifeline in ascending order. When ELK already produced a
-  // distinct column per lifeline, keep its exact (possibly uneven) spacing; only when it
-  // collapsed lifelines into fewer columns do we rebuild evenly spaced, non-overlapping columns
-  // anchored at the leftmost lifeline.
+  // ELK's RIGHT-direction layered pass can place two lifelines in the same layer, giving them an
+  // identical x, or in adjacent layers closer than their head-box width. A sequence diagram
+  // requires one distinct, non-overlapping column per participant in declared order, so return one
+  // x-slot per lifeline in ascending order. Keep ELK's exact (possibly uneven) spacing only when it
+  // already produced distinct AND non-overlapping columns; when it collapsed lifelines into fewer
+  // columns OR packed them closer than a head box is wide, rebuild evenly spaced, non-overlapping
+  // columns anchored at the leftmost lifeline.
   private static List<Double> distinctColumnXSlots(List<LaidOutNode> orderedLifelines) {
     List<Double> sortedXs = orderedLifelines.stream().map(LaidOutNode::x).sorted().toList();
-    if (sortedXs.stream().distinct().count() == orderedLifelines.size()) {
+    if (sortedXs.stream().distinct().count() == orderedLifelines.size()
+        && columnsAreNonOverlapping(orderedLifelines, sortedXs)) {
       return sortedXs;
     }
     double leftmostX = sortedXs.get(0);
@@ -255,6 +257,21 @@ final class SequenceLayoutConstraints {
       columns.add(leftmostX + (pitch * index));
     }
     return columns;
+  }
+
+  // Given lifelines assigned to ascending x-slots (declared lifeline i -> ascendingXs[i]), each
+  // head box occupies [x, x + width]. Boxes must not overlap: the next column starts at or after
+  // the current box's right edge. Touching edges are allowed, matching core LayoutQuality's strict
+  // rectanglesOverlap predicate (overlap iff x[i] + width[i] > x[i+1]).
+  private static boolean columnsAreNonOverlapping(
+      List<LaidOutNode> orderedLifelines, List<Double> ascendingXs) {
+    for (int index = 0; index < orderedLifelines.size() - 1; index++) {
+      double rightEdge = ascendingXs.get(index) + orderedLifelines.get(index).width();
+      if (rightEdge > ascendingXs.get(index + 1)) {
+        return false;
+      }
+    }
+    return true;
   }
 
   private List<LaidOutEdge> normalizedMessageEdges(

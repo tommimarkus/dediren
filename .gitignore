@@ -2,6 +2,7 @@
 /dist/
 /.cache/
 **/.cifuzz-corpus/
+**/.jqwik-database
 /.worktrees/
 /.claude/worktrees/
 /.test-output/

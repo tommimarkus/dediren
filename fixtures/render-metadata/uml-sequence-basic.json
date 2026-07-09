@@ -19,29 +19,6 @@
       "properties": {
         "interaction": "interaction-place-order"
       }
-    },
-    "receipt": {
-      "type": "Lifeline",
-      "source_id": "receipt",
-      "properties": {
-        "interaction": "interaction-place-order"
-      }
-    },
-    "service-execution": {
-      "type": "ExecutionSpecification",
-      "source_id": "service-execution",
-      "properties": {
-        "interaction": "interaction-place-order",
-        "lifeline": "service"
-      }
-    },
-    "service-destroyed": {
-      "type": "DestructionOccurrenceSpecification",
-      "source_id": "service-destroyed",
-      "properties": {
-        "interaction": "interaction-place-order",
-        "lifeline": "service"
-      }
     }
   },
   "edges": {
@@ -70,24 +47,6 @@
         "interaction": "interaction-place-order",
         "sequence": 3,
         "message_sort": "asynchSignal"
-      }
-    },
-    "m4": {
-      "type": "Message",
-      "source_id": "m4",
-      "properties": {
-        "interaction": "interaction-place-order",
-        "sequence": 4,
-        "message_sort": "createMessage"
-      }
-    },
-    "m5": {
-      "type": "Message",
-      "source_id": "m5",
-      "properties": {
-        "interaction": "interaction-place-order",
-        "sequence": 5,
-        "message_sort": "deleteMessage"
       }
     }
   },

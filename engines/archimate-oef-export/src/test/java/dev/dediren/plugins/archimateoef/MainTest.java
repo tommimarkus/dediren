@@ -124,6 +124,12 @@ class MainTest {
     ((ObjectNode) points.get(0)).put("x", 220.2);
     ((ObjectNode) points.get(0)).put("y", 80.8);
     points.insertObject(1).put("x", 260.6).put("y", 80.4);
+    // Override the target point too (like the source point above), so the target-attachment
+    // assertion below is a test-controlled value rather than an incidental real-ELK float from
+    // the regenerated fixture, unrelated to the source/target-vs-bendpoint tag-selection logic
+    // under test.
+    ((ObjectNode) points.get(points.size() - 1)).put("x", 300.2);
+    ((ObjectNode) points.get(points.size() - 1)).put("y", 50.8);
     layoutWithGroups(layout, 10.6, 11.5, 520.4, 180.6);
 
     String xml = exportXml(source, layout);
@@ -133,9 +139,9 @@ class MainTest {
     assertThat(xml)
         .contains(
             "<sourceAttachment x=\"220\" y=\"81\"/><bendpoint x=\"261\" y=\"80\"/>"
-                + "<targetAttachment x=\"300\" y=\"80\"/>");
+                + "<targetAttachment x=\"300\" y=\"51\"/>");
     assertThat(xml)
-        .doesNotContain("<bendpoint x=\"220\" y=\"81\"/>", "<bendpoint x=\"300\" y=\"80\"/>");
+        .doesNotContain("<bendpoint x=\"220\" y=\"81\"/>", "<bendpoint x=\"300\" y=\"51\"/>");
   }
 
   @Test

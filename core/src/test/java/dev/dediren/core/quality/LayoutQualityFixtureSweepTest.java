@@ -7,45 +7,68 @@ import dev.dediren.contracts.layout.LayoutResult;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Map;
 import java.util.stream.Stream;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
-// False-positive gate for the new quality checks: every checked-in layout-result fixture is a
-// known-good layout of some diagram kind, so the label-space, label-band, and junction checks
-// must stay silent on all of them (issue #13 regression class).
+// Real-engine quality gate (Plan B P2, Task 10/11): every checked-in layout-result fixture is
+// either real generic-graph + elk-layout engine output (regenerated via
+// scripts/regen-layout-fixtures.sh) or the one hand-authored quality oracle
+// (uml-sequence-validatable.json) that is itself constructed to be known-good. Neither kind may
+// carry a HARD-error diagnostic (malformed geometry, a route detached from its node, a junction
+// off its incident route, a degenerate self-loop) and every warning-eligible structural quality
+// metric must stay at its known-accepted value — zero everywhere the real engine currently
+// produces zero. edge_crossing_count is the one metric that is informational only (crossings can
+// be unavoidable in non-planar graphs, see LayoutQuality#validateLayout) and is pinned per fixture
+// below instead of forced to zero, so a fixture that legitimately has crossings stays honest
+// rather than silently passing or masking a regression elsewhere.
 class LayoutQualityFixtureSweepTest {
+
+  // Every fixture defaults to zero crossings; only fixtures with a real, expected nonzero count
+  // are listed here. A fixture regeneration that shifts this count is a legitimate layout change
+  // to review and re-pin, not a silent pass.
+  private static final Map<String, Integer> EXPECTED_EDGE_CROSSING_COUNTS =
+      Map.of("uml-complex-class.json", 2);
 
   @ParameterizedTest
   @MethodSource("layoutResultFixtures")
-  void newQualityChecksStaySilentOnKnownGoodLayouts(Path fixture) throws IOException {
+  void realEngineFixturesHaveNoHardErrorsAndKnownQuality(Path fixture) throws IOException {
+    String fixtureName = fixture.getFileName().toString();
     LayoutResult result =
         JsonSupport.objectMapper().readValue(Files.readString(fixture), LayoutResult.class);
 
-    LayoutQualityReport report = LayoutQuality.validateLayout(result);
+    assertThat(LayoutQuality.validateLayoutDiagnostics(result))
+        .as("hard-error diagnostic in %s", fixtureName)
+        .isEmpty();
 
-    assertThat(report.labelSpaceIssueCount())
-        .as("label-space false positive in %s", fixture.getFileName())
+    LayoutQualityReport report = LayoutQuality.validateLayout(result);
+    assertThat(report.status()).as("quality status for %s", fixtureName).isEqualTo("ok");
+    assertThat(report.overlapCount()).as("overlap count in %s", fixtureName).isZero();
+    assertThat(report.connectorThroughNodeCount())
+        .as("connector-through-node count in %s", fixtureName)
+        .isZero();
+    assertThat(report.invalidRouteCount()).as("invalid route count in %s", fixtureName).isZero();
+    assertThat(report.routeDetourCount()).as("route detour count in %s", fixtureName).isZero();
+    assertThat(report.routeCloseParallelCount())
+        .as("close-parallel route count in %s", fixtureName)
+        .isZero();
+    assertThat(report.groupBoundaryIssueCount())
+        .as("group boundary issue count in %s", fixtureName)
         .isZero();
     assertThat(report.groupLabelBandIssueCount())
-        .as("group-label-band false positive in %s", fixture.getFileName())
+        .as("group-label-band issue count in %s", fixtureName)
+        .isZero();
+    assertThat(report.labelSpaceIssueCount())
+        .as("label-space issue count in %s", fixtureName)
         .isZero();
     assertThat(report.edgeLabelDissociationCount())
-        .as("edge-label-dissociation false positive in %s", fixture.getFileName())
+        .as("edge-label-dissociation count in %s", fixtureName)
         .isZero();
-    assertThat(LayoutQuality.validateLayoutDiagnostics(result))
-        .filteredOn(
-            diagnostic -> diagnostic.code().equals("DEDIREN_LAYOUT_JUNCTION_OFF_INCIDENT_ROUTE"))
-        .as("junction false positive in %s", fixture.getFileName())
-        .isEmpty();
-    assertThat(LayoutQuality.validateLayoutDiagnostics(result))
-        .filteredOn(diagnostic -> diagnostic.code().equals("DEDIREN_LAYOUT_NON_FINITE_GEOMETRY"))
-        .as("non-finite-geometry false positive in %s", fixture.getFileName())
-        .isEmpty();
-    assertThat(LayoutQuality.validateLayoutDiagnostics(result))
-        .filteredOn(diagnostic -> diagnostic.code().equals("DEDIREN_LAYOUT_SELF_LOOP_DEGENERATE"))
-        .as("self-loop-degenerate false positive in %s", fixture.getFileName())
-        .isEmpty();
+    assertThat(report.warningCount()).as("warning count in %s", fixtureName).isZero();
+    assertThat(report.edgeCrossingCount())
+        .as("edge crossing count in %s", fixtureName)
+        .isEqualTo(EXPECTED_EDGE_CROSSING_COUNTS.getOrDefault(fixtureName, 0));
   }
 
   static Stream<Path> layoutResultFixtures() throws IOException {
