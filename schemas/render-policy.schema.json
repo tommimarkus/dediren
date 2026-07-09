@@ -184,6 +184,21 @@
             "uml_artifact",
             "uml_deployment_specification"
           ]
+        },
+        "shape": {
+          "type": "string",
+          "enum": [
+            "rectangle",
+            "rounded_rectangle",
+            "ellipse",
+            "circle",
+            "diamond",
+            "hexagon",
+            "parallelogram",
+            "stadium",
+            "cylinder",
+            "triangle"
+          ]
         }
       }
     },

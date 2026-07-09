@@ -1,0 +1,12 @@
+{
+  "render_policy_schema_version": "render-policy.schema.v2",
+  "page": { "width": 1200, "height": 800 },
+  "margin": { "top": 32, "right": 32, "bottom": 32, "left": 32 },
+  "style": {
+    "node": { "fill": "#eef2ff", "stroke": "#4338ca", "shape": "rounded_rectangle" },
+    "node_overrides": {
+      "client": { "shape": "ellipse", "fill": "#ecfeff", "stroke": "#0891b2" },
+      "api": { "shape": "hexagon", "fill": "#fef9c3", "stroke": "#ca8a04" }
+    }
+  }
+}

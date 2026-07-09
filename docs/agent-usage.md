@@ -305,6 +305,12 @@ options shape output:
   `style.interaction.highlight_stroke_width` tune the highlight.
 - **Edge label backing.** Edge labels default to outlined text; set
   `style.edge.label_presentation` to `background` for a filled label backing.
+- **Generic node shapes.** For generic (non-notation) graphs, set `style.node.shape`
+  or a per-node/type `shape` override to `rectangle`, `rounded_rectangle`
+  (default), `ellipse`, `circle`, `diamond`, `hexagon`, `parallelogram`,
+  `stadium`, `cylinder`, or `triangle`. A `shape` is rejected under the
+  `archimate`/`uml` profiles or alongside a notation `decorator` — those notations
+  fix their own geometry.
 - **UML association-end adornments.** In UML class diagrams, multiplicity and
   role carried in render metadata (`properties.uml.{source,target}_multiplicity`
   and `properties.uml.{source,target}_role`) are drawn beside their own end of

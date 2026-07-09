@@ -9,6 +9,7 @@ import static dev.dediren.plugins.render.node.NodeShapeSupport.isUmlDecorator;
 import static dev.dediren.plugins.render.node.NodeShapeSupport.shouldRenderPlainNodeLabel;
 import static dev.dediren.plugins.render.node.archimate.ArchimateIcons.archimateNodeDecorator;
 import static dev.dediren.plugins.render.node.archimate.ArchimateShapes.archimateCutCornerShape;
+import static dev.dediren.plugins.render.node.generic.GenericShapes.genericNodeShape;
 import static dev.dediren.plugins.render.node.uml.UmlDecorators.umlNodeDecorator;
 import static dev.dediren.plugins.render.node.uml.UmlShapes.umlNodeShape;
 import static dev.dediren.plugins.render.svg.EdgeRenderer.edgeLabel;
@@ -300,6 +301,9 @@ public final class SvgDocument {
     }
     if (decorator != null && isUmlDecorator(decorator)) {
       return umlNodeShape(node, style, decorator, selector);
+    }
+    if (decorator == null && style.shape() != null) {
+      return genericNodeShape(node, style);
     }
     String shapeName = "archimate_rectangle";
     double rx = 0.0;

@@ -33,6 +33,18 @@ needed:
 | [`fixtures/render-policy/uml-svg.json`](../../fixtures/render-policy/uml-svg.json) | UML notation styling. |
 | [`fixtures/render-policy/rich-svg.json`](../../fixtures/render-policy/rich-svg.json) | Richer styling example. |
 | [`fixtures/render-policy/interactive-svg.json`](../../fixtures/render-policy/interactive-svg.json) | Interactive-mode example. |
+| [`fixtures/render-policy/generic-shapes-svg.json`](../../fixtures/render-policy/generic-shapes-svg.json) | Generic node shapes example. |
+
+### Node shapes (generic graphs)
+
+Generic (non-notation) nodes can pick a shape with `style.node.shape` or a
+per-node / per-type `shape` override. Supported values: `rectangle`,
+`rounded_rectangle` (the historical default), `ellipse`, `circle`, `diamond`,
+`hexagon`, `parallelogram`, `stadium`, `cylinder`, `triangle`. Shapes exist for
+notations that do not fix geometry, so a `shape` is rejected
+(`DEDIREN_SVG_POLICY_INVALID`) when it sits alongside a notation `decorator`, or
+under the `archimate` / `uml` semantic profiles — those keep their
+specification-mandated shapes and icons.
 
 ### Edge label presentation
 

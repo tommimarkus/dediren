@@ -51,6 +51,42 @@ class SchemaValidatorTest {
   }
 
   @Test
+  void renderPolicyAcceptsGenericNodeShapeAndRejectsUnknownShape() throws Exception {
+    assertThat(
+            SchemaAssertions.validateFixture(
+                workspaceRoot(),
+                "schemas/render-policy.schema.json",
+                "fixtures/render-policy/generic-shapes-svg.json"))
+        .describedAs("generic node shapes fixture must validate")
+        .isEmpty();
+
+    var mapper = dev.dediren.contracts.json.JsonSupport.objectMapper();
+    String template =
+        """
+        {
+          "render_policy_schema_version": "render-policy.schema.v2",
+          "page": { "width": 100, "height": 100 },
+          "margin": { "top": 0, "right": 0, "bottom": 0, "left": 0 },
+          "style": { "node": { "shape": "%s" } }
+        }
+        """;
+    assertThat(
+            SchemaAssertions.validate(
+                workspaceRoot(),
+                "schemas/render-policy.schema.json",
+                mapper.readTree(String.format(template, "ellipse"))))
+        .describedAs("known node shape must validate")
+        .isEmpty();
+    assertThat(
+            SchemaAssertions.validate(
+                workspaceRoot(),
+                "schemas/render-policy.schema.json",
+                mapper.readTree(String.format(template, "blob"))))
+        .describedAs("unknown node shape must be rejected by the schema")
+        .isNotEmpty();
+  }
+
+  @Test
   void layoutResultNodeRoleFieldIsOptional() {
     assertThat(
             SchemaAssertions.validateFixture(

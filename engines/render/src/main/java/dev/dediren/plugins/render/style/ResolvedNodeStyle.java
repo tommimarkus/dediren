@@ -1,6 +1,7 @@
 package dev.dediren.plugins.render.style;
 
 import dev.dediren.contracts.render.SvgNodeDecorator;
+import dev.dediren.contracts.render.SvgNodeShape;
 
 public record ResolvedNodeStyle(
     String fill,
@@ -8,4 +9,5 @@ public record ResolvedNodeStyle(
     double strokeWidth,
     double rx,
     String labelFill,
-    SvgNodeDecorator decorator) {}
+    SvgNodeDecorator decorator,
+    SvgNodeShape shape) {}

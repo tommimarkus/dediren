@@ -23,7 +23,7 @@ public final class StyleResolver {
 
   public static ResolvedStyle baseStyle(RenderPolicy policy) {
     SvgStylePolicy style = policy.style();
-    var defaultNode = new ResolvedNodeStyle("#f8fafc", "#334155", 1.5, 6.0, "#0f172a", null);
+    var defaultNode = new ResolvedNodeStyle("#f8fafc", "#334155", 1.5, 6.0, "#0f172a", null, null);
     var defaultEdge =
         new ResolvedEdgeStyle(
             "#64748b",
@@ -97,7 +97,8 @@ public final class StyleResolver {
         override.strokeWidth() == null ? base.strokeWidth() : override.strokeWidth(),
         override.rx() == null ? base.rx() : override.rx(),
         override.labelFill() == null ? base.labelFill() : override.labelFill(),
-        override.decorator() == null ? base.decorator() : override.decorator());
+        override.decorator() == null ? base.decorator() : override.decorator(),
+        override.shape() == null ? base.shape() : override.shape());
   }
 
   static ResolvedEdgeStyle mergeEdgeStyle(ResolvedEdgeStyle base, SvgEdgeStyle override) {

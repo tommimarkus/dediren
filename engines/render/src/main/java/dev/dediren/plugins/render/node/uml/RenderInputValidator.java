@@ -35,6 +35,7 @@ public final class RenderInputValidator {
           ArchimateTypeValidationException,
           UmlValidationException {
     validateRenderPolicy(policy);
+    validateGenericShapePolicy(policy);
     validateRenderMetadataUsage(policy, metadata);
     validateArchimatePolicyTypes(policy);
     validateArchimateRenderMetadata(layout, metadata);
@@ -436,6 +437,38 @@ public final class RenderInputValidator {
     }
   }
 
+  private static void validateGenericShapePolicy(RenderPolicy policy)
+      throws PolicyValidationException {
+    String profile = policy.semanticProfile();
+    if (!"archimate".equals(profile) && !"uml".equals(profile)) {
+      return;
+    }
+    SvgStylePolicy style = policy.style();
+    if (style == null) {
+      return;
+    }
+    rejectShape(style.node(), "style.node", profile);
+    for (Map.Entry<String, SvgNodeStyle> entry : style.nodeTypeOverrides().entrySet()) {
+      rejectShape(entry.getValue(), "style.node_type_overrides." + entry.getKey(), profile);
+    }
+    for (Map.Entry<String, SvgNodeStyle> entry : style.nodeOverrides().entrySet()) {
+      rejectShape(entry.getValue(), "style.node_overrides." + entry.getKey(), profile);
+    }
+  }
+
+  private static void rejectShape(SvgNodeStyle style, String path, String profile)
+      throws PolicyValidationException {
+    if (style != null && style.shape() != null) {
+      throw new PolicyValidationException(
+          path + ".shape",
+          "SVG render policy "
+              + path
+              + " shape is not allowed under the "
+              + profile
+              + " profile; node shapes are for generic graphs");
+    }
+  }
+
   private static void validateBackgroundStyle(SvgBackgroundStyle style, String path)
       throws PolicyValidationException {
     if (style != null) {
@@ -478,6 +511,10 @@ public final class RenderInputValidator {
     validateNumber(style.strokeWidth(), path + ".stroke_width", Bound.MIN, 0.0, 24.0);
     validateNumber(style.rx(), path + ".rx", Bound.MIN, 0.0, 80.0);
     validateColor(style.labelFill(), path + ".label_fill");
+    if (style.shape() != null && style.decorator() != null) {
+      throw new PolicyValidationException(
+          path + ".shape", "SVG render policy " + path + " cannot set both shape and decorator");
+    }
   }
 
   private static void validateEdgeStyle(SvgEdgeStyle style, String path)

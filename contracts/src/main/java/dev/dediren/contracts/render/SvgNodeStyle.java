@@ -6,4 +6,5 @@ public record SvgNodeStyle(
     Double strokeWidth,
     Double rx,
     String labelFill,
-    SvgNodeDecorator decorator) {}
+    SvgNodeDecorator decorator,
+    SvgNodeShape shape) {}
