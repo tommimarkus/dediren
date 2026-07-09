@@ -201,13 +201,14 @@ public final class EdgeRenderer {
       output.append(
           String.format(
               Locale.ROOT,
-              "<text x=\"%.1f\" y=\"%.1f\" text-anchor=\"%s\" fill=\"%s\" font-size=\"%s\" font-weight=\"%d\">%s</text>",
+              "<text x=\"%.1f\" y=\"%.1f\" text-anchor=\"%s\" fill=\"%s\" font-size=\"%s\" font-weight=\"%d\"%s>%s</text>",
               label.x(),
               label.y(),
               attr(label.anchor()),
               attr(style.labelFill()),
               styleNumber(fontSize),
               EDGE_LABEL_FONT_WEIGHT,
+              opacityAttr("fill-opacity", style.labelOpacity()),
               text(text)));
       return output.toString();
     }
@@ -226,13 +227,14 @@ public final class EdgeRenderer {
     output.append(
         String.format(
             Locale.ROOT,
-            "<text x=\"%.1f\" y=\"%.1f\" text-anchor=\"%s\" fill=\"%s\" font-size=\"%s\" font-weight=\"%d\">%s</text>",
+            "<text x=\"%.1f\" y=\"%.1f\" text-anchor=\"%s\" fill=\"%s\" font-size=\"%s\" font-weight=\"%d\"%s>%s</text>",
             label.x(),
             label.y(),
             attr(label.anchor()),
             attr(style.labelFill()),
             styleNumber(fontSize),
             EDGE_LABEL_FONT_WEIGHT,
+            opacityAttr("fill-opacity", style.labelOpacity()),
             text(text)));
     return output.toString();
   }

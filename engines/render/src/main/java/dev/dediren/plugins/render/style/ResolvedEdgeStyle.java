@@ -23,7 +23,8 @@ public record ResolvedEdgeStyle(
     SvgEdgeLabelVerticalSide labelVerticalSide,
     SvgEdgeLabelPresentation labelPresentation,
     Double strokeOpacity,
-    List<Double> dashPattern) {
+    List<Double> dashPattern,
+    Double labelOpacity) {
   public ResolvedEdgeStyle {
     dashPattern = ContractCollections.copyOrNull(dashPattern);
   }

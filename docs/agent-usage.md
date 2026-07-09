@@ -318,6 +318,9 @@ options shape output:
 - **Line style.** Edges and node/group borders take `line_style`
   (`solid`/`dashed`/`dotted`) and a custom `dash_pattern` array of 1–8 positive
   lengths (e.g. `[4, 2]`), the pattern winning over the preset.
+- **Typography.** Global `font.weight`/`font.style` (bold/italic); per-element
+  `font_weight`, `font_style`, `font_family`, `label_align` (node/group labels),
+  and `label_opacity` on node/group/edge labels.
 - **UML association-end adornments.** In UML class diagrams, multiplicity and
   role carried in render metadata (`properties.uml.{source,target}_multiplicity`
   and `properties.uml.{source,target}_role`) are drawn beside their own end of

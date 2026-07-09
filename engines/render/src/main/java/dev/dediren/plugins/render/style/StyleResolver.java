@@ -25,7 +25,8 @@ public final class StyleResolver {
     SvgStylePolicy style = policy.style();
     var defaultNode =
         new ResolvedNodeStyle(
-            "#f8fafc", "#334155", 1.5, 6.0, "#0f172a", null, null, null, null, null, null);
+            "#f8fafc", "#334155", 1.5, 6.0, "#0f172a", null, null, null, null, null, null, null,
+            null, null, null, null);
     var defaultEdge =
         new ResolvedEdgeStyle(
             "#64748b",
@@ -40,10 +41,12 @@ public final class StyleResolver {
             SvgEdgeLabelVerticalSide.LEFT,
             SvgEdgeLabelPresentation.OUTLINE,
             null,
+            null,
             null);
     var defaultGroup =
         new ResolvedGroupStyle(
-            "#eff6ff", "#93c5fd", 1.0, 8.0, "#1e3a8a", 12.0, null, null, null, null, null);
+            "#eff6ff", "#93c5fd", 1.0, 8.0, "#1e3a8a", 12.0, null, null, null, null, null, null,
+            null, null, null, null);
     return new ResolvedStyle(
         Optional.ofNullable(style)
             .map(SvgStylePolicy::background)
@@ -58,6 +61,8 @@ public final class StyleResolver {
             .map(SvgFontStyle::family)
             .orElse("Inter, Arial, sans-serif"),
         Optional.ofNullable(style).map(SvgStylePolicy::font).map(SvgFontStyle::size).orElse(14.0),
+        Optional.ofNullable(style).map(SvgStylePolicy::font).map(SvgFontStyle::weight).orElse(null),
+        Optional.ofNullable(style).map(SvgStylePolicy::font).map(SvgFontStyle::style).orElse(null),
         mergeNodeStyle(defaultNode, style == null ? null : style.node()),
         mergeEdgeStyle(defaultEdge, style == null ? null : style.edge()),
         mergeGroupStyle(defaultGroup, style == null ? null : style.group()));
@@ -111,7 +116,12 @@ public final class StyleResolver {
         override.fillOpacity() == null ? base.fillOpacity() : override.fillOpacity(),
         override.strokeOpacity() == null ? base.strokeOpacity() : override.strokeOpacity(),
         override.lineStyle() == null ? base.lineStyle() : override.lineStyle(),
-        override.dashPattern() == null ? base.dashPattern() : override.dashPattern());
+        override.dashPattern() == null ? base.dashPattern() : override.dashPattern(),
+        override.fontWeight() == null ? base.fontWeight() : override.fontWeight(),
+        override.fontStyle() == null ? base.fontStyle() : override.fontStyle(),
+        override.fontFamily() == null ? base.fontFamily() : override.fontFamily(),
+        override.labelAlign() == null ? base.labelAlign() : override.labelAlign(),
+        override.labelOpacity() == null ? base.labelOpacity() : override.labelOpacity());
   }
 
   static ResolvedEdgeStyle mergeEdgeStyle(ResolvedEdgeStyle base, SvgEdgeStyle override) {
@@ -141,7 +151,8 @@ public final class StyleResolver {
             ? base.labelPresentation()
             : override.labelPresentation(),
         override.strokeOpacity() == null ? base.strokeOpacity() : override.strokeOpacity(),
-        override.dashPattern() == null ? base.dashPattern() : override.dashPattern());
+        override.dashPattern() == null ? base.dashPattern() : override.dashPattern(),
+        override.labelOpacity() == null ? base.labelOpacity() : override.labelOpacity());
   }
 
   static ResolvedGroupStyle mergeGroupStyle(ResolvedGroupStyle base, SvgGroupStyle override) {
@@ -159,6 +170,11 @@ public final class StyleResolver {
         override.fillOpacity() == null ? base.fillOpacity() : override.fillOpacity(),
         override.strokeOpacity() == null ? base.strokeOpacity() : override.strokeOpacity(),
         override.lineStyle() == null ? base.lineStyle() : override.lineStyle(),
-        override.dashPattern() == null ? base.dashPattern() : override.dashPattern());
+        override.dashPattern() == null ? base.dashPattern() : override.dashPattern(),
+        override.fontWeight() == null ? base.fontWeight() : override.fontWeight(),
+        override.fontStyle() == null ? base.fontStyle() : override.fontStyle(),
+        override.fontFamily() == null ? base.fontFamily() : override.fontFamily(),
+        override.labelAlign() == null ? base.labelAlign() : override.labelAlign(),
+        override.labelOpacity() == null ? base.labelOpacity() : override.labelOpacity());
   }
 }

@@ -517,6 +517,8 @@ public final class RenderInputValidator {
     validateNumber(style.fillOpacity(), path + ".fill_opacity", Bound.MIN, 0.0, 1.0);
     validateNumber(style.strokeOpacity(), path + ".stroke_opacity", Bound.MIN, 0.0, 1.0);
     validateDashPattern(style.dashPattern(), path + ".dash_pattern");
+    validateFontFamily(style.fontFamily(), path + ".font_family");
+    validateNumber(style.labelOpacity(), path + ".label_opacity", Bound.MIN, 0.0, 1.0);
     if (style.shape() != null && style.decorator() != null) {
       throw new PolicyValidationException(
           path + ".shape", "SVG render policy " + path + " cannot set both shape and decorator");
@@ -533,6 +535,7 @@ public final class RenderInputValidator {
     validateColor(style.labelFill(), path + ".label_fill");
     validateNumber(style.strokeOpacity(), path + ".stroke_opacity", Bound.MIN, 0.0, 1.0);
     validateDashPattern(style.dashPattern(), path + ".dash_pattern");
+    validateNumber(style.labelOpacity(), path + ".label_opacity", Bound.MIN, 0.0, 1.0);
   }
 
   private static void validateGroupStyle(SvgGroupStyle style, String path)
@@ -549,6 +552,8 @@ public final class RenderInputValidator {
     validateNumber(style.fillOpacity(), path + ".fill_opacity", Bound.MIN, 0.0, 1.0);
     validateNumber(style.strokeOpacity(), path + ".stroke_opacity", Bound.MIN, 0.0, 1.0);
     validateDashPattern(style.dashPattern(), path + ".dash_pattern");
+    validateFontFamily(style.fontFamily(), path + ".font_family");
+    validateNumber(style.labelOpacity(), path + ".label_opacity", Bound.MIN, 0.0, 1.0);
   }
 
   // Broadened colour grammar: hex (#RGB/#RGBA/#RRGGBB/#RRGGBBAA), rgb()/rgba(), or a CSS colour
@@ -562,6 +567,18 @@ public final class RenderInputValidator {
               + "|rgba?\\(\\s*\\d{1,3}%?\\s*,\\s*\\d{1,3}%?\\s*,\\s*\\d{1,3}%?\\s*"
               + "(?:,\\s*(?:\\d*\\.?\\d+%?)\\s*)?\\)"
               + "|[A-Za-z]+");
+
+  private static void validateFontFamily(String family, String path)
+      throws PolicyValidationException {
+    if (family == null) {
+      return;
+    }
+    int length = family.codePointCount(0, family.length());
+    if (length < 1 || length > 120) {
+      throw new PolicyValidationException(
+          path, "SVG render policy " + path + " length is outside the allowed range");
+    }
+  }
 
   private static void validateDashPattern(List<Double> pattern, String path)
       throws PolicyValidationException {

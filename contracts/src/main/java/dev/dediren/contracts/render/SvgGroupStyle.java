@@ -14,7 +14,12 @@ public record SvgGroupStyle(
     Double fillOpacity,
     Double strokeOpacity,
     SvgEdgeLineStyle lineStyle,
-    List<Double> dashPattern) {
+    List<Double> dashPattern,
+    SvgFontWeight fontWeight,
+    SvgFontSlant fontStyle,
+    String fontFamily,
+    SvgLabelAlign labelAlign,
+    Double labelOpacity) {
   public SvgGroupStyle {
     dashPattern = ContractCollections.copyOrNull(dashPattern);
   }

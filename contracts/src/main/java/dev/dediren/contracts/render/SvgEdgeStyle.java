@@ -16,7 +16,8 @@ public record SvgEdgeStyle(
     SvgEdgeLabelVerticalSide labelVerticalSide,
     SvgEdgeLabelPresentation labelPresentation,
     Double strokeOpacity,
-    List<Double> dashPattern) {
+    List<Double> dashPattern,
+    Double labelOpacity) {
   public SvgEdgeStyle {
     dashPattern = ContractCollections.copyOrNull(dashPattern);
   }

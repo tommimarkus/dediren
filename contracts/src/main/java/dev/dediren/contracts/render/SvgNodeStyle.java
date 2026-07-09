@@ -14,7 +14,12 @@ public record SvgNodeStyle(
     Double fillOpacity,
     Double strokeOpacity,
     SvgEdgeLineStyle lineStyle,
-    List<Double> dashPattern) {
+    List<Double> dashPattern,
+    SvgFontWeight fontWeight,
+    SvgFontSlant fontStyle,
+    String fontFamily,
+    SvgLabelAlign labelAlign,
+    Double labelOpacity) {
   public SvgNodeStyle {
     dashPattern = ContractCollections.copyOrNull(dashPattern);
   }

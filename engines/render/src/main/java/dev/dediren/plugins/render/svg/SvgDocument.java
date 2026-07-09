@@ -24,7 +24,9 @@ import static dev.dediren.plugins.render.svg.Geometry.svgBounds;
 import static dev.dediren.plugins.render.svg.Svg.attr;
 import static dev.dediren.plugins.render.svg.Svg.dashArrayAttr;
 import static dev.dediren.plugins.render.svg.Svg.dashArrayValue;
+import static dev.dediren.plugins.render.svg.Svg.enumAttr;
 import static dev.dediren.plugins.render.svg.Svg.opacityAttr;
+import static dev.dediren.plugins.render.svg.Svg.stringAttr;
 import static dev.dediren.plugins.render.svg.Svg.styleNumber;
 import static dev.dediren.plugins.render.svg.Svg.text;
 
@@ -37,6 +39,7 @@ import dev.dediren.contracts.render.RenderMetadata;
 import dev.dediren.contracts.render.RenderMetadataSelector;
 import dev.dediren.contracts.render.RenderPolicy;
 import dev.dediren.contracts.render.SvgInteractionStyle;
+import dev.dediren.contracts.render.SvgLabelAlign;
 import dev.dediren.contracts.render.SvgNodeDecorator;
 import dev.dediren.plugins.render.node.uml.UmlSequenceRenderer;
 import dev.dediren.plugins.render.style.ResolvedEdgeStyle;
@@ -92,7 +95,10 @@ public final class SvgDocument {
         .append(attr(base.fontFamily()))
         .append("\" font-size=\"")
         .append(styleNumber(base.fontSize()))
-        .append("\">");
+        .append("\"")
+        .append(enumAttr("font-weight", base.fontWeight()))
+        .append(enumAttr("font-style", base.fontStyle()))
+        .append(">");
     for (LaidOutGroup group : result.groups()) {
       ResolvedGroupStyle style = StyleResolver.groupStyle(policy, metadata, group.id(), base);
       svg.append("<g data-dediren-group-id=\"").append(attr(group.id())).append("\"");
@@ -129,14 +135,30 @@ public final class SvgDocument {
               styleNumber(style.strokeWidth()),
               groupExtra));
       svg.append(groupDecorator(group, style));
+      double groupLabelX = group.x() + 8.0;
+      String groupLabelAnchor = "";
+      if (style.labelAlign() == SvgLabelAlign.MIDDLE) {
+        groupLabelX = group.x() + group.width() / 2.0;
+        groupLabelAnchor = " text-anchor=\"middle\"";
+      } else if (style.labelAlign() == SvgLabelAlign.END) {
+        groupLabelX = group.x() + group.width() - 8.0;
+        groupLabelAnchor = " text-anchor=\"end\"";
+      }
+      String groupLabelFont =
+          stringAttr("font-family", style.fontFamily())
+              + enumAttr("font-weight", style.fontWeight())
+              + enumAttr("font-style", style.fontStyle())
+              + opacityAttr("fill-opacity", style.labelOpacity());
       svg.append(
           String.format(
               Locale.ROOT,
-              "<text x=\"%.1f\" y=\"%.1f\" fill=\"%s\" font-size=\"%s\">%s</text>",
-              group.x() + 8.0,
+              "<text x=\"%.1f\" y=\"%.1f\"%s fill=\"%s\" font-size=\"%s\"%s>%s</text>",
+              groupLabelX,
               group.y() + style.labelSize() + 4.0,
+              groupLabelAnchor,
               attr(style.labelFill()),
               styleNumber(style.labelSize()),
+              groupLabelFont,
               text(group.label())));
       svg.append("</g>");
     }

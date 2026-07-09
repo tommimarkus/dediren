@@ -59,6 +59,23 @@
       "minItems": 1,
       "maxItems": 8
     },
+    "fontWeight": {
+      "type": "string",
+      "enum": ["normal", "bold"]
+    },
+    "fontSlant": {
+      "type": "string",
+      "enum": ["normal", "italic"]
+    },
+    "labelAlign": {
+      "type": "string",
+      "enum": ["start", "middle", "end"]
+    },
+    "fontFamily": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120
+    },
     "font": {
       "type": "object",
       "additionalProperties": false,
@@ -72,7 +89,9 @@
           "type": "number",
           "exclusiveMinimum": 0,
           "maximum": 96
-        }
+        },
+        "weight": { "$ref": "#/$defs/fontWeight" },
+        "style": { "$ref": "#/$defs/fontSlant" }
       }
     },
     "background": {
@@ -219,7 +238,12 @@
         "fill_opacity": { "$ref": "#/$defs/opacity" },
         "stroke_opacity": { "$ref": "#/$defs/opacity" },
         "line_style": { "$ref": "#/$defs/lineStyle" },
-        "dash_pattern": { "$ref": "#/$defs/dashPattern" }
+        "dash_pattern": { "$ref": "#/$defs/dashPattern" },
+        "font_weight": { "$ref": "#/$defs/fontWeight" },
+        "font_style": { "$ref": "#/$defs/fontSlant" },
+        "font_family": { "$ref": "#/$defs/fontFamily" },
+        "label_align": { "$ref": "#/$defs/labelAlign" },
+        "label_opacity": { "$ref": "#/$defs/opacity" }
       }
     },
     "edgeStyle": {
@@ -281,7 +305,8 @@
           "type": "string",
           "enum": ["outline", "background"]
         },
-        "stroke_opacity": { "$ref": "#/$defs/opacity" }
+        "stroke_opacity": { "$ref": "#/$defs/opacity" },
+        "label_opacity": { "$ref": "#/$defs/opacity" }
       }
     },
     "groupStyle": {
@@ -310,7 +335,12 @@
         "fill_opacity": { "$ref": "#/$defs/opacity" },
         "stroke_opacity": { "$ref": "#/$defs/opacity" },
         "line_style": { "$ref": "#/$defs/lineStyle" },
-        "dash_pattern": { "$ref": "#/$defs/dashPattern" }
+        "dash_pattern": { "$ref": "#/$defs/dashPattern" },
+        "font_weight": { "$ref": "#/$defs/fontWeight" },
+        "font_style": { "$ref": "#/$defs/fontSlant" },
+        "font_family": { "$ref": "#/$defs/fontFamily" },
+        "label_align": { "$ref": "#/$defs/labelAlign" },
+        "label_opacity": { "$ref": "#/$defs/opacity" }
       }
     },
     "nodeOverrideMap": {

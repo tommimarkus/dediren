@@ -50,6 +50,22 @@ public final class Svg {
   }
 
   /**
+   * An optional attribute whose value is a single-word enum constant (e.g. {@code font-weight},
+   * {@code font-style}). The constant name lowercased is the SVG/CSS keyword for every enum used
+   * here (NORMAL→normal, BOLD→bold, ITALIC→italic, START/MIDDLE/END). Empty for null.
+   */
+  public static String enumAttr(String name, Enum<?> value) {
+    return value == null ? "" : " " + name + "=\"" + value.name().toLowerCase(Locale.ROOT) + "\"";
+  }
+
+  /**
+   * An optional string-valued attribute (e.g. {@code font-family}), XML-escaped. Empty for null.
+   */
+  public static String stringAttr(String name, String value) {
+    return value == null ? "" : " " + name + "=\"" + attr(value) + "\"";
+  }
+
+  /**
    * The {@code stroke-dasharray} VALUE for a resolved line style: an explicit {@code dashPattern}
    * (space-joined) wins; otherwise the {@code dashedDefault} for {@code DASHED}, a fine dotted
    * pattern for {@code DOTTED}, and the empty string (solid) otherwise. Callers that own their own

@@ -63,6 +63,15 @@ and a custom `dash_pattern` — an array of 1–8 positive lengths (e.g. `[4, 2]
 that overrides the preset. The ArchiMate grouping border keeps its dashed
 default unless a `line_style` or `dash_pattern` is given.
 
+### Typography
+
+The global `font` gains `weight` (`normal`/`bold`) and `style` (`normal`/
+`italic`). Node and group labels take per-element `font_weight`, `font_style`,
+`font_family`, `label_align` (`start`/`middle`/`end`), and `label_opacity`; edge
+labels take `label_opacity`. The deterministic label-width pin is unchanged, so
+bold/italic labels stay reproducible (a real browser may render bold slightly
+tighter than the pinned width).
+
 ### Edge label presentation
 
 Edge labels default to **outlined text**. Set

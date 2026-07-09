@@ -7,11 +7,15 @@ import static dev.dediren.plugins.render.node.NodeShapeSupport.archimateJunction
 import static dev.dediren.plugins.render.node.NodeShapeSupport.hasArchimateCornerIcon;
 import static dev.dediren.plugins.render.node.NodeShapeSupport.umlCompactControlNodeLabelOutside;
 import static dev.dediren.plugins.render.svg.Svg.attr;
+import static dev.dediren.plugins.render.svg.Svg.enumAttr;
 import static dev.dediren.plugins.render.svg.Svg.estimateTextWidth;
 import static dev.dediren.plugins.render.svg.Svg.labelNumber;
+import static dev.dediren.plugins.render.svg.Svg.opacityAttr;
+import static dev.dediren.plugins.render.svg.Svg.stringAttr;
 import static dev.dediren.plugins.render.svg.Svg.text;
 
 import dev.dediren.contracts.layout.LaidOutNode;
+import dev.dediren.contracts.render.SvgLabelAlign;
 import dev.dediren.plugins.render.style.ResolvedNodeStyle;
 import dev.dediren.plugins.render.svg.LabelBox;
 import java.util.ArrayList;
@@ -28,21 +32,43 @@ public final class NodeLabels {
   private static final double ARCHIMATE_LABEL_ICON_RESERVE = 34.0;
   private static final double NODE_LABEL_VERTICAL_PADDING = 8.0;
   private static final double NODE_LABEL_MIN_FONT_SIZE = 9.0;
+  private static final double LABEL_ALIGN_INSET = 8.0;
 
   public static String nodeLabel(LaidOutNode node, ResolvedNodeStyle style, double fontSize) {
     NodeLabelLines label = nodeLabelLinesAndSize(node, style, fontSize);
     NodeLabelPosition position =
         nodeLabelPosition(node, style, label.fontSize(), label.lines().size());
     String baselineAttribute = position.centerBaseline() ? " dominant-baseline=\"middle\"" : "";
+    // label_align only applies to plain centered labels; junction and UML compact-control labels
+    // sit at their own outside position and keep their middle anchor.
+    boolean plainCentered =
+        !archimateJunctionLabelOutside(style.decorator())
+            && !umlCompactControlNodeLabelOutside(style.decorator());
+    double textX = position.x();
+    String anchor = "middle";
+    if (plainCentered && style.labelAlign() == SvgLabelAlign.START) {
+      anchor = "start";
+      textX = node.x() + LABEL_ALIGN_INSET;
+    } else if (plainCentered && style.labelAlign() == SvgLabelAlign.END) {
+      anchor = "end";
+      textX = node.x() + node.width() - LABEL_ALIGN_INSET;
+    }
+    String fontAttributes =
+        stringAttr("font-family", style.fontFamily())
+            + enumAttr("font-weight", style.fontWeight())
+            + enumAttr("font-style", style.fontStyle())
+            + opacityAttr("fill-opacity", style.labelOpacity());
     if (label.lines().size() == 1) {
       return String.format(
           Locale.ROOT,
-          "<text x=\"%.1f\" y=\"%.1f\" text-anchor=\"middle\"%s fill=\"%s\" font-size=\"%s\"%s>%s</text>",
-          position.x(),
+          "<text x=\"%.1f\" y=\"%.1f\" text-anchor=\"%s\"%s fill=\"%s\" font-size=\"%s\"%s%s>%s</text>",
+          textX,
           position.y(),
+          anchor,
           baselineAttribute,
           attr(style.labelFill()),
           labelNumber(label.fontSize()),
+          fontAttributes,
           labelLengthAttributes(label.lines().get(0), label.fontSize()),
           text(label.lines().get(0)));
     }
@@ -51,19 +77,21 @@ public final class NodeLabels {
         new StringBuilder(
             String.format(
                 Locale.ROOT,
-                "<text x=\"%.1f\" y=\"%.1f\" text-anchor=\"middle\"%s fill=\"%s\" font-size=\"%s\">",
-                position.x(),
+                "<text x=\"%.1f\" y=\"%.1f\" text-anchor=\"%s\"%s fill=\"%s\" font-size=\"%s\"%s>",
+                textX,
                 position.y(),
+                anchor,
                 baselineAttribute,
                 attr(style.labelFill()),
-                labelNumber(label.fontSize())));
+                labelNumber(label.fontSize()),
+                fontAttributes));
     for (int index = 0; index < label.lines().size(); index++) {
       String dy = index == 0 ? "0" : labelNumber(nodeLabelLineHeight(label.fontSize()));
       svg.append(
           String.format(
               Locale.ROOT,
               "<tspan x=\"%.1f\" dy=\"%s\"%s>%s</tspan>",
-              position.x(),
+              textX,
               dy,
               labelLengthAttributes(label.lines().get(index), label.fontSize()),
               text(label.lines().get(index))));
