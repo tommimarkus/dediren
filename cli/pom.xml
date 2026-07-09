@@ -38,11 +38,6 @@
     </dependency>
     <dependency>
       <groupId>dev.dediren</groupId>
-      <artifactId>generic-graph</artifactId>
-      <version>${project.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>dev.dediren</groupId>
       <artifactId>semantics-graph</artifactId>
       <version>${project.version}</version>
     </dependency>

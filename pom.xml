@@ -20,7 +20,6 @@
     <module>uml</module>
     <module>engines/archimate-oef-export</module>
     <module>engines/elk-layout</module>
-    <module>engines/generic-graph</module>
     <module>engines/render</module>
     <module>engines/uml-xmi-export</module>
     <module>semantics-graph</module>

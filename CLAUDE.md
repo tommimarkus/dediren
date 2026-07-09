@@ -149,7 +149,6 @@ enforcement authority for matching version, tag, and release actions.
   `cli/src/test/java/dev/dediren/cli/MainTest.java`,
   `contracts/src/test/java/dev/dediren/contracts/ContractRoundTripTest.java`,
   `engines/archimate-oef-export/src/test/java/dev/dediren/plugins/archimateoef/MainTest.java`,
-  `engines/generic-graph/src/test/java/dev/dediren/plugins/genericgraph/GenericGraphPluginTest.java`,
   and `dist-tool/src/test/java/dev/dediren/tools/dist/DistModuleTest.java`.
 - `.github/workflows/release.yml` validates tag `v<version>` against root
   `pom.xml`; update it only if the product version source changes.
