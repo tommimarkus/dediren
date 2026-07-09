@@ -19,6 +19,7 @@ import dev.dediren.uml.UmlValidationException;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 import tools.jackson.databind.JsonNode;
 
 public final class RenderInputValidator {
@@ -540,20 +541,28 @@ public final class RenderInputValidator {
     validateNumber(style.labelSize(), path + ".label_size", Bound.EXCLUSIVE_MIN, 0.0, 96.0);
   }
 
+  // Broadened colour grammar: hex (#RGB/#RGBA/#RRGGBB/#RRGGBBAA), rgb()/rgba(), or a CSS colour
+  // keyword (letters, covering names plus none/transparent/currentColor). Deliberately admits no
+  // CSS
+  // metacharacters (; { } < > etc.): this validator — not XML escaping — is the security boundary,
+  // because style.interaction.highlight_stroke is emitted into a CSS <style> block. See #render.
+  private static final Pattern COLOR =
+      Pattern.compile(
+          "#([0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})"
+              + "|rgba?\\(\\s*\\d{1,3}%?\\s*,\\s*\\d{1,3}%?\\s*,\\s*\\d{1,3}%?\\s*"
+              + "(?:,\\s*(?:\\d*\\.?\\d+%?)\\s*)?\\)"
+              + "|[A-Za-z]+");
+
   private static void validateColor(String value, String path) throws PolicyValidationException {
     if (value == null) {
       return;
     }
-    boolean valid =
-        value.length() == 7
-            && value.charAt(0) == '#'
-            && value
-                .substring(1)
-                .chars()
-                .allMatch(character -> Character.digit(character, 16) >= 0);
-    if (!valid) {
+    if (!COLOR.matcher(value).matches()) {
       throw new PolicyValidationException(
-          path, "SVG render policy " + path + " must be a #RRGGBB hex color");
+          path,
+          "SVG render policy "
+              + path
+              + " must be a hex (#RGB/#RGBA/#RRGGBB/#RRGGBBAA), rgb()/rgba(), or CSS color-name value");
     }
   }
 

@@ -42,7 +42,7 @@
   "$defs": {
     "color": {
       "type": "string",
-      "pattern": "^#[0-9a-fA-F]{6}$"
+      "pattern": "^(#([0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})|rgba?\\([0-9%.,\\s]*\\)|[A-Za-z]+)$"
     },
     "font": {
       "type": "object",
