@@ -76,6 +76,15 @@ labels take `label_opacity`. The deterministic label-width pin is unchanged, so
 bold/italic labels stay reproducible (a real browser may render bold slightly
 tighter than the pinned width).
 
+### UML sequence diagrams
+
+The sequence renderer is a separate pipeline, so it honours a focused subset: box
+**fill/stroke opacity** and a box **`line_style`** preset (lifelines, activations,
+combined fragments, interaction frame, gate), plus **opacity** on messages and
+labels. A message's line style stays notation-driven (reply → dashed); custom
+`dash_pattern`, per-element label fonts, and gradients are not applied on
+sequence views.
+
 ### Edge label presentation
 
 Edge labels default to **outlined text**. Set

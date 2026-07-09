@@ -1,5 +1,8 @@
 package dev.dediren.plugins.render.node.uml;
 
+import static dev.dediren.plugins.render.svg.Svg.dashArrayAttr;
+import static dev.dediren.plugins.render.svg.Svg.opacityAttr;
+
 import dev.dediren.contracts.layout.LaidOutEdge;
 import dev.dediren.contracts.layout.LaidOutNode;
 import dev.dediren.contracts.layout.LayoutResult;
@@ -128,7 +131,7 @@ public final class UmlSequenceRenderer {
       svg.append(
           String.format(
               Locale.ROOT,
-              "<rect data-dediren-node-shape=\"uml_interaction\" x=\"%.1f\" y=\"%.1f\" width=\"%.1f\" height=\"%.1f\" rx=\"%s\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%s\"/>",
+              "<rect data-dediren-node-shape=\"uml_interaction\" x=\"%.1f\" y=\"%.1f\" width=\"%.1f\" height=\"%.1f\" rx=\"%s\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%s\"%s/>",
               frame.x(),
               frame.y(),
               frame.width(),
@@ -136,11 +139,12 @@ public final class UmlSequenceRenderer {
               styleNumber(paint.rx()),
               attr(paint.fill()),
               attr(paint.stroke()),
-              styleNumber(paint.strokeWidth())));
+              styleNumber(paint.strokeWidth()),
+              paint.boxAttrs()));
       svg.append(
           String.format(
               Locale.ROOT,
-              "<path data-dediren-sequence-interaction-title=\"true\" d=\"M %.1f %.1f H %.1f L %.1f %.1f V %.1f H %.1f Z\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%s\"/>",
+              "<path data-dediren-sequence-interaction-title=\"true\" d=\"M %.1f %.1f H %.1f L %.1f %.1f V %.1f H %.1f Z\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%s\"%s/>",
               frame.x(),
               frame.y(),
               frame.x() + titleWidth,
@@ -150,14 +154,16 @@ public final class UmlSequenceRenderer {
               frame.x(),
               attr(paint.fill()),
               attr(paint.stroke()),
-              styleNumber(paint.strokeWidth())));
+              styleNumber(paint.strokeWidth()),
+              paint.boxAttrs()));
       svg.append(
           String.format(
               Locale.ROOT,
-              "<text x=\"%.1f\" y=\"%.1f\" fill=\"%s\">%s</text>",
+              "<text x=\"%.1f\" y=\"%.1f\" fill=\"%s\"%s>%s</text>",
               frame.x() + 10.0,
               frame.y() + titleHeight - 8.0,
               attr(paint.labelFill()),
+              paint.labelOpacityAttr(),
               text(node.label())));
       svg.append("</g>");
     }
@@ -191,7 +197,7 @@ public final class UmlSequenceRenderer {
       svg.append(
           String.format(
               Locale.ROOT,
-              "<rect data-dediren-node-shape=\"uml_combined_fragment\" x=\"%.1f\" y=\"%.1f\" width=\"%.1f\" height=\"%.1f\" rx=\"%s\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%s\"/>",
+              "<rect data-dediren-node-shape=\"uml_combined_fragment\" x=\"%.1f\" y=\"%.1f\" width=\"%.1f\" height=\"%.1f\" rx=\"%s\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%s\"%s/>",
               frame.x(),
               frame.y(),
               frame.width(),
@@ -199,11 +205,12 @@ public final class UmlSequenceRenderer {
               styleNumber(paint.rx()),
               attr(paint.fill()),
               attr(paint.stroke()),
-              styleNumber(paint.strokeWidth())));
+              styleNumber(paint.strokeWidth()),
+              paint.boxAttrs()));
       svg.append(
           String.format(
               Locale.ROOT,
-              "<path data-dediren-sequence-fragment-operator-tab=\"true\" d=\"M %.1f %.1f H %.1f L %.1f %.1f V %.1f H %.1f Z\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%s\"/>",
+              "<path data-dediren-sequence-fragment-operator-tab=\"true\" d=\"M %.1f %.1f H %.1f L %.1f %.1f V %.1f H %.1f Z\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%s\"%s/>",
               frame.x(),
               frame.y(),
               frame.x() + tabWidth,
@@ -213,15 +220,17 @@ public final class UmlSequenceRenderer {
               frame.x(),
               attr(paint.fill()),
               attr(paint.stroke()),
-              styleNumber(paint.strokeWidth())));
+              styleNumber(paint.strokeWidth()),
+              paint.boxAttrs()));
       svg.append(
           String.format(
               Locale.ROOT,
-              "<text data-dediren-sequence-fragment-operator=\"%s\" x=\"%.1f\" y=\"%.1f\" fill=\"%s\" font-weight=\"600\">%s</text>",
+              "<text data-dediren-sequence-fragment-operator=\"%s\" x=\"%.1f\" y=\"%.1f\" fill=\"%s\" font-weight=\"600\"%s>%s</text>",
               attr(fragment.id()),
               frame.x() + 10.0,
               frame.y() + FRAGMENT_HEADER_HEIGHT - 7.0,
               attr(paint.labelFill()),
+              paint.labelOpacityAttr(),
               text(fragment.operator())));
       renderOperandSeparatorsAndGuards(svg, fragment, frame, paint);
       svg.append("</g>");
@@ -239,7 +248,7 @@ public final class UmlSequenceRenderer {
       svg.append(
           String.format(
               Locale.ROOT,
-              "<rect data-dediren-node-shape=\"uml_lifeline\" x=\"%.1f\" y=\"%.1f\" width=\"%.1f\" height=\"%.1f\" rx=\"%s\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%s\"/>",
+              "<rect data-dediren-node-shape=\"uml_lifeline\" x=\"%.1f\" y=\"%.1f\" width=\"%.1f\" height=\"%.1f\" rx=\"%s\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%s\"%s/>",
               node.x(),
               node.y(),
               node.width(),
@@ -247,15 +256,17 @@ public final class UmlSequenceRenderer {
               styleNumber(Math.max(paint.rx(), 2.0)),
               attr(paint.fill()),
               attr(paint.stroke()),
-              styleNumber(paint.strokeWidth())));
+              styleNumber(paint.strokeWidth()),
+              paint.boxAttrs()));
       svg.append("<g data-dediren-node-decorator=\"uml_lifeline\"></g>");
       svg.append(
           String.format(
               Locale.ROOT,
-              "<text x=\"%.1f\" y=\"%.1f\" text-anchor=\"middle\" fill=\"%s\">%s</text>",
+              "<text x=\"%.1f\" y=\"%.1f\" text-anchor=\"middle\" fill=\"%s\"%s>%s</text>",
               node.x() + node.width() / 2.0,
               node.y() + node.height() / 2.0 + base.fontSize() / 3.0,
               attr(paint.labelFill()),
+              paint.labelOpacityAttr(),
               text(node.label())));
       svg.append("</g>");
     }
@@ -292,7 +303,7 @@ public final class UmlSequenceRenderer {
       svg.append(
           String.format(
               Locale.ROOT,
-              "<rect data-dediren-node-shape=\"uml_execution_specification\" x=\"%.1f\" y=\"%.1f\" width=\"%.1f\" height=\"%.1f\" rx=\"%s\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%s\"/>",
+              "<rect data-dediren-node-shape=\"uml_execution_specification\" x=\"%.1f\" y=\"%.1f\" width=\"%.1f\" height=\"%.1f\" rx=\"%s\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%s\"%s/>",
               node.x(),
               node.y(),
               node.width(),
@@ -300,7 +311,8 @@ public final class UmlSequenceRenderer {
               styleNumber(Math.max(0.0, paint.rx())),
               attr(paint.fill()),
               attr(paint.stroke()),
-              styleNumber(paint.strokeWidth())));
+              styleNumber(paint.strokeWidth()),
+              paint.boxAttrs()));
       svg.append("<g data-dediren-node-decorator=\"uml_execution_specification\"></g></g>");
     }
   }
@@ -316,13 +328,14 @@ public final class UmlSequenceRenderer {
       svg.append(
           String.format(
               Locale.ROOT,
-              "<circle data-dediren-node-shape=\"uml_gate\" cx=\"%.1f\" cy=\"%.1f\" r=\"%.1f\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%s\"/>",
+              "<circle data-dediren-node-shape=\"uml_gate\" cx=\"%.1f\" cy=\"%.1f\" r=\"%.1f\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%s\"%s/>",
               node.x() + node.width() / 2.0,
               node.y() + node.height() / 2.0,
               radius,
               attr(paint.fill()),
               attr(paint.stroke()),
-              styleNumber(paint.strokeWidth())));
+              styleNumber(paint.strokeWidth()),
+              paint.boxAttrs()));
       svg.append("<g data-dediren-node-decorator=\"uml_gate\"></g></g>");
     }
   }
@@ -492,6 +505,7 @@ public final class UmlSequenceRenderer {
         + styleNumber(appearance.strokeWidth())
         + "\""
         + " stroke-linecap=\"round\" stroke-linejoin=\"round\""
+        + opacityAttr("stroke-opacity", appearance.strokeOpacity())
         + dash
         + markerEnd
         + "/>";
@@ -501,12 +515,13 @@ public final class UmlSequenceRenderer {
     LabelPoint point = labelPoint(edge);
     return String.format(
         Locale.ROOT,
-        "<text data-dediren-sequence-message-label=\"%s\" x=\"%.1f\" y=\"%.1f\" text-anchor=\"middle\" fill=\"%s\" font-size=\"%s\" font-weight=\"600\">%s</text>",
+        "<text data-dediren-sequence-message-label=\"%s\" x=\"%.1f\" y=\"%.1f\" text-anchor=\"middle\" fill=\"%s\" font-size=\"%s\" font-weight=\"600\"%s>%s</text>",
         attr(edge.id()),
         point.x(),
         point.y(),
         attr(appearance.labelFill()),
         styleNumber(base.fontSize()),
+        opacityAttr("fill-opacity", appearance.labelOpacity()),
         text(edge.label()));
   }
 
@@ -866,7 +881,8 @@ public final class UmlSequenceRenderer {
 
   private NodePaint nodePaint(String nodeId, String type) {
     SvgStylePolicy style = policy.style();
-    NodePaint paint = new NodePaint("#ffffff", "#000000", 1.25, 0.0, "#000000");
+    NodePaint paint =
+        new NodePaint("#ffffff", "#000000", 1.25, 0.0, "#000000", null, null, null, null);
     paint = paint.merge(style == null ? null : style.node());
     paint = paint.merge(style == null ? null : style.nodeTypeOverrides().get(type));
     paint = paint.merge(style == null ? null : style.nodeOverrides().get(nodeId));
@@ -875,7 +891,7 @@ public final class UmlSequenceRenderer {
 
   private EdgePaint edgePaint(String edgeId, String type) {
     SvgStylePolicy style = policy.style();
-    EdgePaint paint = new EdgePaint("#000000", 1.25, "#000000");
+    EdgePaint paint = new EdgePaint("#000000", 1.25, "#000000", null, null);
     paint = paint.merge(style == null ? null : style.edge());
     paint = paint.merge(style == null ? null : style.edgeTypeOverrides().get(type));
     paint = paint.merge(style == null ? null : style.edgeOverrides().get(edgeId));
@@ -971,7 +987,15 @@ public final class UmlSequenceRenderer {
   }
 
   private record NodePaint(
-      String fill, String stroke, double strokeWidth, double rx, String labelFill) {
+      String fill,
+      String stroke,
+      double strokeWidth,
+      double rx,
+      String labelFill,
+      Double fillOpacity,
+      Double strokeOpacity,
+      SvgEdgeLineStyle lineStyle,
+      Double labelOpacity) {
     NodePaint merge(SvgNodeStyle override) {
       if (override == null) {
         return this;
@@ -981,11 +1005,36 @@ public final class UmlSequenceRenderer {
           override.stroke() == null ? stroke : override.stroke(),
           override.strokeWidth() == null ? strokeWidth : override.strokeWidth(),
           override.rx() == null ? rx : override.rx(),
-          override.labelFill() == null ? labelFill : override.labelFill());
+          override.labelFill() == null ? labelFill : override.labelFill(),
+          override.fillOpacity() == null ? fillOpacity : override.fillOpacity(),
+          override.strokeOpacity() == null ? strokeOpacity : override.strokeOpacity(),
+          override.lineStyle() == null ? lineStyle : override.lineStyle(),
+          override.labelOpacity() == null ? labelOpacity : override.labelOpacity());
+    }
+
+    /** fill/stroke opacity and dash for a box shape; empty unless set (line_style preset only). */
+    String boxAttrs() {
+      return opacityAttr("fill-opacity", fillOpacity)
+          + opacityAttr("stroke-opacity", strokeOpacity)
+          + dashArrayAttr(lineStyle, null, "6 4");
+    }
+
+    /** stroke opacity and dash for a bare line (lifeline stem). */
+    String lineAttrs() {
+      return opacityAttr("stroke-opacity", strokeOpacity) + dashArrayAttr(lineStyle, null, "6 4");
+    }
+
+    String labelOpacityAttr() {
+      return opacityAttr("fill-opacity", labelOpacity);
     }
   }
 
-  private record EdgePaint(String stroke, double strokeWidth, String labelFill) {
+  private record EdgePaint(
+      String stroke,
+      double strokeWidth,
+      String labelFill,
+      Double strokeOpacity,
+      Double labelOpacity) {
     EdgePaint merge(SvgEdgeStyle override) {
       if (override == null) {
         return this;
@@ -993,7 +1042,9 @@ public final class UmlSequenceRenderer {
       return new EdgePaint(
           override.stroke() == null ? stroke : override.stroke(),
           override.strokeWidth() == null ? strokeWidth : override.strokeWidth(),
-          override.labelFill() == null ? labelFill : override.labelFill());
+          override.labelFill() == null ? labelFill : override.labelFill(),
+          override.strokeOpacity() == null ? strokeOpacity : override.strokeOpacity(),
+          override.labelOpacity() == null ? labelOpacity : override.labelOpacity());
     }
   }
 
@@ -1002,7 +1053,9 @@ public final class UmlSequenceRenderer {
       double strokeWidth,
       String labelFill,
       SvgEdgeLineStyle lineStyle,
-      SvgEdgeMarkerEnd markerEnd) {
+      SvgEdgeMarkerEnd markerEnd,
+      Double strokeOpacity,
+      Double labelOpacity) {
     static MessageAppearance from(String messageSort, EdgePaint paint) {
       SvgEdgeLineStyle lineStyle =
           "reply".equals(messageSort) ? SvgEdgeLineStyle.DASHED : SvgEdgeLineStyle.SOLID;
@@ -1014,7 +1067,13 @@ public final class UmlSequenceRenderer {
             default -> SvgEdgeMarkerEnd.FILLED_ARROW;
           };
       return new MessageAppearance(
-          paint.stroke(), paint.strokeWidth(), paint.labelFill(), lineStyle, markerEnd);
+          paint.stroke(),
+          paint.strokeWidth(),
+          paint.labelFill(),
+          lineStyle,
+          markerEnd,
+          paint.strokeOpacity(),
+          paint.labelOpacity());
     }
   }
 
