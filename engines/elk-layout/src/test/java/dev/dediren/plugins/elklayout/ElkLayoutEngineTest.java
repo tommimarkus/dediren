@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import dev.dediren.contracts.ContractVersions;
 import dev.dediren.contracts.layout.*;
 import dev.dediren.contracts.layout.LayoutAlgorithm;
 import dev.dediren.contracts.layout.LayoutCycleBreaking;
@@ -143,7 +144,7 @@ class ElkLayoutEngineTest {
   void layeredLayoutPlacesTargetToTheRightAndRoutesTheEdge() {
     LayoutRequest request =
         new LayoutRequest(
-            "layout-request.schema.v1",
+            ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION,
             "main",
             List.of(
                 new LayoutNode("client", "Client", "client", 160.0, 80.0),
@@ -161,7 +162,7 @@ class ElkLayoutEngineTest {
     LaidOutNode api = nodeById(result, "api");
     LaidOutEdge edge = result.edges().get(0);
 
-    assertEquals("layout-result.schema.v1", result.layoutResultSchemaVersion());
+    assertEquals(ContractVersions.LAYOUT_RESULT_SCHEMA_VERSION, result.layoutResultSchemaVersion());
     assertEquals("main", result.viewId());
     assertEquals("client", client.sourceId());
     assertEquals("api", api.projectionId());
@@ -413,7 +414,7 @@ class ElkLayoutEngineTest {
   void packedLayoutPlacesDisconnectedNodesWithoutEdgesOrOverlaps() {
     LayoutRequest request =
         new LayoutRequest(
-            "layout-request.schema.v1",
+            ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION,
             "map",
             List.of(
                 new LayoutNode("crm", "CRM", "crm", 160.0, 80.0),
@@ -446,7 +447,7 @@ class ElkLayoutEngineTest {
   void groupWithNoLaidOutMembersYieldsEmptyGroupWarningAndNoGroupBounds() {
     LayoutRequest request =
         new LayoutRequest(
-            "layout-request.schema.v1",
+            ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION,
             "main",
             List.of(new LayoutNode("api", "API", "api", 160.0, 80.0)),
             List.of(),
@@ -468,7 +469,7 @@ class ElkLayoutEngineTest {
   void packedLayoutPlacesGroupedDisconnectedNodesInsidePackedGroupBounds() {
     LayoutRequest request =
         new LayoutRequest(
-            "layout-request.schema.v1",
+            ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION,
             "map",
             List.of(
                 new LayoutNode("crm", "CRM", "crm", 160.0, 80.0),
@@ -512,7 +513,7 @@ class ElkLayoutEngineTest {
   void packedLayoutSupportsNestedGroupMembers() {
     LayoutRequest request =
         new LayoutRequest(
-            "layout-request.schema.v1",
+            ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION,
             "map",
             List.of(
                 new LayoutNode("initial", "", "initial", 36.0, 36.0),
@@ -550,7 +551,7 @@ class ElkLayoutEngineTest {
   void directionUpUsesNorthToSouthPorts() {
     LayoutRequest request =
         new LayoutRequest(
-            "layout-request.schema.v1",
+            ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION,
             "main",
             List.of(
                 new LayoutNode("worker", "Worker", "worker", 160.0, 80.0),
@@ -573,7 +574,7 @@ class ElkLayoutEngineTest {
   void compactDecisionFanOutUsesSeparateSourceCorners() {
     LayoutRequest request =
         new LayoutRequest(
-            "layout-request.schema.v1",
+            ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION,
             "activity",
             List.of(
                 new LayoutNode("check-cache", "Cached?", "check-cache", 32.0, 32.0),
@@ -621,7 +622,7 @@ class ElkLayoutEngineTest {
   void partialGroupUsesLaidOutMembersAndSemanticSourceId() {
     LayoutRequest request =
         new LayoutRequest(
-            "layout-request.schema.v1",
+            ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION,
             "main",
             List.of(new LayoutNode("client", "Client", "client", 160.0, 80.0)),
             List.of(),
@@ -653,7 +654,7 @@ class ElkLayoutEngineTest {
   void layoutPreservesVisualOnlyGroupProvenance() {
     LayoutRequest request =
         new LayoutRequest(
-            "layout-request.schema.v1",
+            ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION,
             "main",
             List.of(new LayoutNode("client", "Client", "client", 160.0, 80.0)),
             List.of(),
@@ -680,7 +681,7 @@ class ElkLayoutEngineTest {
   void groupedMembersProduceGroupBoundsAroundGeneratedNodeGeometry() {
     LayoutRequest request =
         new LayoutRequest(
-            "layout-request.schema.v1",
+            ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION,
             "main",
             List.of(
                 new LayoutNode("web-app", "Web App", "web-app", 160.0, 80.0),
@@ -750,7 +751,7 @@ class ElkLayoutEngineTest {
   void groupedLayoutSupportsNestedGroupMembers() {
     LayoutRequest request =
         new LayoutRequest(
-            "layout-request.schema.v1",
+            ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION,
             "state-machine",
             List.of(
                 new LayoutNode("initial", "", "initial", 36.0, 36.0),
@@ -819,7 +820,7 @@ class ElkLayoutEngineTest {
   void groupedInternalFanOutUsesRightwardServiceFlow() {
     LayoutRequest request =
         new LayoutRequest(
-            "layout-request.schema.v1",
+            ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION,
             "main",
             List.of(
                 new LayoutNode("order-service", "Order Service", "order-service", 160.0, 80.0),
@@ -885,7 +886,7 @@ class ElkLayoutEngineTest {
   void groupedPipelineProducesValidRoutesForMultipleOutgoingEdges() {
     LayoutRequest request =
         new LayoutRequest(
-            "layout-request.schema.v1",
+            ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION,
             "main",
             List.of(
                 new LayoutNode("orders-api", "Orders API", "orders-api", 160.0, 80.0),
@@ -936,7 +937,7 @@ class ElkLayoutEngineTest {
   void threeShortSidePortsKeepTheDefaultNodeSize() {
     LayoutRequest request =
         new LayoutRequest(
-            "layout-request.schema.v1",
+            ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION,
             "main",
             List.of(
                 new LayoutNode("gateway", "API Gateway", "gateway", 160.0, 80.0),
@@ -1017,7 +1018,7 @@ class ElkLayoutEngineTest {
   void endpointMergingOffSuppressesSharedSourceHints() {
     LayoutRequest request =
         new LayoutRequest(
-            "layout-request.schema.v1",
+            ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION,
             "main",
             List.of(
                 new LayoutNode("source", "Source", "source", 160.0, 80.0),
@@ -1051,7 +1052,7 @@ class ElkLayoutEngineTest {
   void spaciousDensityExpandsGeneratedNodeForExtraPorts() {
     LayoutRequest request =
         new LayoutRequest(
-            "layout-request.schema.v1",
+            ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION,
             "main",
             List.of(
                 new LayoutNode("source", "Source", "source", 160.0, 80.0),
@@ -1084,7 +1085,7 @@ class ElkLayoutEngineTest {
   void groupedFanOutDoesNotMergeDifferentRelationshipTypes() {
     LayoutRequest request =
         new LayoutRequest(
-            "layout-request.schema.v1",
+            ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION,
             "main",
             List.of(
                 new LayoutNode("api-gateway", "API Gateway", "api-gateway", 160.0, 112.0),
@@ -1146,7 +1147,7 @@ class ElkLayoutEngineTest {
   void sameGroupInternalEdgesDoNotUseSharedEndpointMerge() {
     LayoutRequest request =
         new LayoutRequest(
-            "layout-request.schema.v1",
+            ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION,
             "main",
             List.of(
                 new LayoutNode("api-gateway", "API Gateway", "api-gateway", 160.0, 112.0),
@@ -1203,7 +1204,7 @@ class ElkLayoutEngineTest {
   void groupedSourcePortsFollowDivergingRouteChannelOrder() {
     LayoutRequest request =
         new LayoutRequest(
-            "layout-request.schema.v1",
+            ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION,
             "main",
             List.of(
                 new LayoutNode(
@@ -1268,7 +1269,7 @@ class ElkLayoutEngineTest {
   void groupedSameSourceDataRoutesDoNotCrossNearTheSource() {
     LayoutRequest request =
         new LayoutRequest(
-            "layout-request.schema.v1",
+            ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION,
             "main",
             List.of(
                 new LayoutNode(
@@ -1327,7 +1328,7 @@ class ElkLayoutEngineTest {
   void groupedTargetPortsFollowIncomingSourceOrder() {
     LayoutRequest request =
         new LayoutRequest(
-            "layout-request.schema.v1",
+            ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION,
             "main",
             List.of(
                 new LayoutNode("customer-mobile", "Mobile App", "customer-mobile", 160.0, 80.0),
@@ -1425,7 +1426,7 @@ class ElkLayoutEngineTest {
   void groupedPipelineProducesValidRoutesForMultipleIncomingEdges() {
     LayoutRequest request =
         new LayoutRequest(
-            "layout-request.schema.v1",
+            ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION,
             "main",
             List.of(
                 new LayoutNode("web-app", "Web App", "web-app", 160.0, 80.0),
@@ -1471,7 +1472,7 @@ class ElkLayoutEngineTest {
   void groupedFanInUsesMergedJunctionRoute() {
     LayoutRequest request =
         new LayoutRequest(
-            "layout-request.schema.v1",
+            ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION,
             "main",
             List.of(
                 new LayoutNode("web-app", "Web App", "web-app", 160.0, 80.0),
@@ -1549,7 +1550,7 @@ class ElkLayoutEngineTest {
   void groupedReverseCrossGroupEdgeKeepsBoundedElkDetour() {
     LayoutRequest request =
         new LayoutRequest(
-            "layout-request.schema.v1",
+            ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION,
             "main",
             List.of(
                 new LayoutNode("orders-api", "Orders API", "orders-api", 160.0, 80.0),
@@ -1619,7 +1620,7 @@ class ElkLayoutEngineTest {
   void groupedCrossGroupEdgesFollowPreferredRootDirection() {
     LayoutRequest request =
         new LayoutRequest(
-            "layout-request.schema.v1",
+            ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION,
             "main",
             List.of(
                 new LayoutNode("workflow-entry", "Workflow Entry", "workflow-entry", 160.0, 80.0),
@@ -1675,7 +1676,7 @@ class ElkLayoutEngineTest {
   void businessProcessCooperationRoutesCrossHierarchyFeedbackEdgesToDeclaredTargets() {
     LayoutRequest request =
         new LayoutRequest(
-            "layout-request.schema.v1",
+            ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION,
             "business-process-cooperation",
             List.of(
                 new LayoutNode(
@@ -1823,7 +1824,7 @@ class ElkLayoutEngineTest {
   void groupedConnectorEdgesKeepHorizontalFlowInsideVerticalGroups() {
     LayoutRequest request =
         new LayoutRequest(
-            "layout-request.schema.v1",
+            ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION,
             "main",
             List.of(
                 new LayoutNode("event-bus", "Event Bus", "event-bus", 160.0, 80.0),
@@ -1880,7 +1881,7 @@ class ElkLayoutEngineTest {
   void complexGroupedServiceMeshKeepsRoutesValidAndBounded() {
     LayoutRequest request =
         new LayoutRequest(
-            "layout-request.schema.v1",
+            ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION,
             "service-mesh",
             List.of(
                 new LayoutNode("customer-mobile", "Mobile App", "customer-mobile", 160.0, 80.0),
@@ -2143,7 +2144,7 @@ class ElkLayoutEngineTest {
   void junctionRoleSurvivesLayoutAndPassesQualityGeometry() {
     var request =
         new LayoutRequest(
-            "layout-request.schema.v1",
+            ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION,
             "main",
             List.of(
                 new LayoutNode("order-intake", "Order Intake", "order-intake", 160.0, 80.0, null),
@@ -2258,7 +2259,7 @@ class ElkLayoutEngineTest {
             new LayoutEdge("m7", "orderservice", "storefront", "confirmed", "m7", "Message"),
             new LayoutEdge("m8", "storefront", "user", "receipt", "m8", "Message"));
     return new LayoutRequest(
-        "layout-request.schema.v1",
+        ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION,
         "sequence-view",
         nodes,
         edges,
@@ -2316,7 +2317,7 @@ class ElkLayoutEngineTest {
 
   private static LayoutRequest fragmentGapSequenceRequest() {
     return new LayoutRequest(
-        "layout-request.schema.v1",
+        ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION,
         "sequence-view",
         List.of(
             new LayoutNode("customer", "Customer", "customer", 140.0, 48.0, "lifeline"),
@@ -2356,7 +2357,7 @@ class ElkLayoutEngineTest {
 
   private static LayoutRequest sequenceLayoutRequest() {
     return new LayoutRequest(
-        "layout-request.schema.v1",
+        ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION,
         "sequence-view",
         List.of(
             new LayoutNode("service", "Order Service", "service", 140.0, 48.0, "lifeline"),
@@ -2387,7 +2388,7 @@ class ElkLayoutEngineTest {
 
   private static LayoutRequest sequenceLayoutRequestWithDanglingMessage() {
     return new LayoutRequest(
-        "layout-request.schema.v1",
+        ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION,
         "sequence-view",
         List.of(
             new LayoutNode("service", "Order Service", "service", 140.0, 48.0),
@@ -2413,7 +2414,7 @@ class ElkLayoutEngineTest {
 
   private static LayoutResult sequenceLayoutResultWithMessageBendPoints() {
     return new LayoutResult(
-        "layout-result.schema.v1",
+        ContractVersions.LAYOUT_RESULT_SCHEMA_VERSION,
         "sequence-view",
         List.of(
             new LaidOutNode(
@@ -2440,7 +2441,7 @@ class ElkLayoutEngineTest {
 
   private static LayoutRequest genericTwoNodeRequest(List<LayoutConstraint> constraints) {
     return new LayoutRequest(
-        "layout-request.schema.v1",
+        ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION,
         "main",
         List.of(
             new LayoutNode("customer", "Customer", "customer", 160.0, 80.0),
@@ -2479,7 +2480,7 @@ class ElkLayoutEngineTest {
 
   private static LayoutRequest gatewayFanOutRequest() {
     return new LayoutRequest(
-        "layout-request.schema.v1",
+        ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION,
         "main",
         List.of(
             new LayoutNode("web-frontend", "Web Frontend", "web-frontend", 160.0, 80.0),
@@ -2536,7 +2537,7 @@ class ElkLayoutEngineTest {
 
   private static LayoutRequest groupedPipelineRequest() {
     return new LayoutRequest(
-        "layout-request.schema.v1",
+        ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION,
         "main",
         List.of(
             new LayoutNode("client", "Client", "client", 160.0, 80.0),
@@ -2796,7 +2797,7 @@ class ElkLayoutEngineTest {
   void groupedCrossGroupEdgeDoesNotRouteThroughUnrelatedGroupMember() {
     LayoutRequest request =
         new LayoutRequest(
-            "layout-request.schema.v1",
+            ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION,
             "main",
             List.of(
                 new LayoutNode("a", "A", "a", 160.0, 80.0),
@@ -3218,7 +3219,8 @@ class ElkLayoutEngineTest {
             null,
             LayoutAlgorithm.TREE);
     LayoutRequest request =
-        new LayoutRequest("layout-request.schema.v1", "main", null, null, null, null, prefs);
+        new LayoutRequest(
+            ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION, "main", null, null, null, null, prefs);
 
     IllegalArgumentException ex =
         org.junit.jupiter.api.Assertions.assertThrows(
@@ -3276,7 +3278,13 @@ class ElkLayoutEngineTest {
     LayoutNode b = new LayoutNode("b", "B", "b", null, null);
     LayoutEdge e = new LayoutEdge("e1", "a", "b", "", "e1", null, priority);
     return new LayoutRequest(
-        "layout-request.schema.v1", "main", List.of(a, b), List.of(e), List.of(), List.of(), prefs);
+        ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION,
+        "main",
+        List.of(a, b),
+        List.of(e),
+        List.of(),
+        List.of(),
+        prefs);
   }
 
   @Test

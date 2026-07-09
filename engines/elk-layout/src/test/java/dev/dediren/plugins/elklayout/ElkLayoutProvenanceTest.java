@@ -2,6 +2,7 @@ package dev.dediren.plugins.elklayout;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dev.dediren.contracts.ContractVersions;
 import dev.dediren.contracts.layout.LayoutEdge;
 import dev.dediren.contracts.layout.LayoutNode;
 import dev.dediren.contracts.layout.LayoutRequest;
@@ -14,7 +15,7 @@ class ElkLayoutProvenanceTest {
   void layoutCarriesSourcePointerFromRequestToResult() {
     LayoutRequest request =
         new LayoutRequest(
-            "layout-request.schema.v1",
+            ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION,
             "view-1",
             List.of(
                 new LayoutNode("a", "A", "a", 40.0, 30.0, null, null, null, "/nodes/0"),

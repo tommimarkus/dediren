@@ -3,6 +3,7 @@ package dev.dediren.plugins.elklayout;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import dev.dediren.contracts.ContractVersions;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.contracts.layout.LayoutRequest;
 import dev.dediren.contracts.layout.LayoutResult;
@@ -27,7 +28,7 @@ class ElkEngineTest {
   private static final String VALID_REQUEST =
       """
           {
-            "layout_request_schema_version": "layout-request.schema.v1",
+            "layout_request_schema_version": "%s",
             "view_id": "main",
             "nodes": [
               {"id": "client", "label": "Client", "source_id": "client", "width_hint": 160, "height_hint": 80},
@@ -39,7 +40,8 @@ class ElkEngineTest {
             "groups": [],
             "constraints": []
           }
-          """;
+          """
+          .formatted(ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION);
 
   private final ElkEngine engine = new ElkEngine();
 
@@ -73,7 +75,7 @@ class ElkEngineTest {
     String request =
         """
             {
-              "layout_request_schema_version": "layout-request.schema.v1",
+              "layout_request_schema_version": "%s",
               "view_id": "main",
               "nodes": [],
               "edges": [],
@@ -81,7 +83,8 @@ class ElkEngineTest {
               "constraints": [],
               "layout_preferences": { "direction": "diagonal" }
             }
-            """;
+            """
+            .formatted(ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION);
 
     EngineException failure =
         assertThrows(
@@ -97,7 +100,7 @@ class ElkEngineTest {
     String request =
         """
             {
-              "layout_request_schema_version": "layout-request.schema.v1",
+              "layout_request_schema_version": "%s",
               "view_id": "main",
               "nodes": [
                 {"id": "client", "source_id": "client", "width_hint": 160, "height_hint": 80}
@@ -106,7 +109,8 @@ class ElkEngineTest {
               "groups": [],
               "constraints": []
             }
-            """;
+            """
+            .formatted(ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION);
     LayoutRequest parsed = engine.parseRequest(request.getBytes(StandardCharsets.UTF_8));
 
     EngineException failure = assertThrows(EngineException.class, () -> engine.layout(parsed));

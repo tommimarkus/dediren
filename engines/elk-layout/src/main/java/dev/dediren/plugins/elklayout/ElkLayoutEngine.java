@@ -1,5 +1,6 @@
 package dev.dediren.plugins.elklayout;
 
+import dev.dediren.contracts.ContractVersions;
 import dev.dediren.contracts.Diagnostic;
 import dev.dediren.contracts.DiagnosticSeverity;
 import dev.dediren.contracts.layout.GroupProvenance;
@@ -189,7 +190,12 @@ final class ElkLayoutEngine {
 
     LayoutResult result =
         new LayoutResult(
-            "layout-result.schema.v1", request.viewId(), nodes, edges, groups, warnings);
+            ContractVersions.LAYOUT_RESULT_SCHEMA_VERSION,
+            request.viewId(),
+            nodes,
+            edges,
+            groups,
+            warnings);
     return sequenceConstraints.normalize(result);
   }
 
@@ -265,7 +271,12 @@ final class ElkLayoutEngine {
 
     List<LaidOutGroup> groups = groupedBounds(request, elkGroups, elkNodes, warnings);
     return new LayoutResult(
-        "layout-result.schema.v1", request.viewId(), nodes, List.of(), groups, warnings);
+        ContractVersions.LAYOUT_RESULT_SCHEMA_VERSION,
+        request.viewId(),
+        nodes,
+        List.of(),
+        groups,
+        warnings);
   }
 
   private static LayoutResult layoutGrouped(LayoutRequest request) {
@@ -452,7 +463,12 @@ final class ElkLayoutEngine {
     // ELK graph construction, ELK options, and validation diagnostics.
 
     return new LayoutResult(
-        "layout-result.schema.v1", request.viewId(), nodes, edges, groups, warnings);
+        ContractVersions.LAYOUT_RESULT_SCHEMA_VERSION,
+        request.viewId(),
+        nodes,
+        edges,
+        groups,
+        warnings);
   }
 
   private static Map<String, EdgeEndpointMerge> emptyEndpointMerges(List<LayoutEdge> edges) {
@@ -1406,9 +1422,12 @@ final class ElkLayoutEngine {
   private static void validate(LayoutRequest request) {
     requireNonNull(request, "$");
     requireNonNull(request.layoutRequestSchemaVersion(), "$.layout_request_schema_version");
-    if (!request.layoutRequestSchemaVersion().equals("layout-request.schema.v1")) {
+    if (!request
+        .layoutRequestSchemaVersion()
+        .equals(ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION)) {
       throw new IllegalArgumentException(
-          "$.layout_request_schema_version must be layout-request.schema.v1");
+          "$.layout_request_schema_version must be "
+              + ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION);
     }
     requireNonNull(request.viewId(), "$.view_id");
     requireNonNull(request.nodes(), "$.nodes");
