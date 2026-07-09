@@ -42,6 +42,7 @@
     <guava.version>33.6.0-jre</guava.version>
     <jackson.version>3.2.0</jackson.version>
     <jazzer.version>0.30.0</jazzer.version>
+    <jqwik.version>1.9.3</jqwik.version>
     <json-schema-validator.version>3.0.5</json-schema-validator.version>
     <junit.version>6.1.1</junit.version>
     <picocli.version>4.7.7</picocli.version>
@@ -134,6 +135,19 @@
         <groupId>org.junit.jupiter</groupId>
         <artifactId>junit-jupiter</artifactId>
         <version>${junit.version}</version>
+      </dependency>
+      <!-- Property-based testing (Plan B P2 IR invariants). jqwik implements its
+           own JUnit Platform TestEngine; 1.9.3 declares JUnit Platform 1.11/1.12
+           while this reactor runs JUnit Platform 6.1.1 (Jupiter 6). Verified via
+           core's JqwikSmokeTest that jqwik still discovers and runs correctly
+           here: Maven resolves its transitive junit-platform-* deps up to this
+           reactor's converged version and the dependencyConvergence enforcer
+           passes, so no version pin/exclusion is needed. Test-scope only. -->
+      <dependency>
+        <groupId>net.jqwik</groupId>
+        <artifactId>jqwik</artifactId>
+        <version>${jqwik.version}</version>
+        <scope>test</scope>
       </dependency>
       <!-- Core ArchUnit only (no archunit-junit5 engine): the dependency-rule
            test runs as a plain JUnit Jupiter test via rule.check(...), which
