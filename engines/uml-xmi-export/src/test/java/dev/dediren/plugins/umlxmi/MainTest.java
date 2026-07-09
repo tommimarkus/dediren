@@ -705,6 +705,38 @@ class MainTest {
                   }
                 }
                 """));
+    // A relationship/node is only "selected" for export when its id also appears in
+    // layout_result (ExportScope.fromRequest reads selection off layout node/edge source_ids);
+    // add matching layout entries so the newly appended message and destruction occurrence are
+    // actually in scope and this test still exercises the endpoint-type rejection it names.
+    ((tools.jackson.databind.node.ArrayNode) input.at("/layout_result/nodes"))
+        .add(
+            JsonSupport.objectMapper()
+                .readTree(
+                    """
+                {
+                  "id": "service-destroyed",
+                  "source_id": "service-destroyed",
+                  "projection_id": "service-destroyed",
+                  "x": 424, "y": 280, "width": 36, "height": 36,
+                  "label": ""
+                }
+                """));
+    ((tools.jackson.databind.node.ArrayNode) input.at("/layout_result/edges"))
+        .add(
+            JsonSupport.objectMapper()
+                .readTree(
+                    """
+                {
+                  "id": "m5",
+                  "source": "customer",
+                  "target": "service-destroyed",
+                  "source_id": "m5",
+                  "projection_id": "m5",
+                  "points": [ { "x": 166, "y": 298 }, { "x": 442, "y": 298 } ],
+                  "label": "cancelOrder"
+                }
+                """));
 
     exportExpectingError(
         input, "DEDIREN_UML_XMI_SEQUENCE_MESSAGE_ENDPOINT_UNSUPPORTED", "$.relationships[3]");
@@ -762,6 +794,22 @@ class MainTest {
                       "interaction": "interaction-place-order"
                     }
                   }
+                }
+                """));
+    // Selection is driven off layout_result node source_ids (see ExportScope.fromRequest); add a
+    // matching laid-out node so this appended ExecutionSpecification is actually in scope and the
+    // test still exercises the unsupported-sequence-node-type rejection it names.
+    ((tools.jackson.databind.node.ArrayNode) input.at("/layout_result/nodes"))
+        .add(
+            JsonSupport.objectMapper()
+                .readTree(
+                    """
+                {
+                  "id": "service-execution",
+                  "source_id": "service-execution",
+                  "projection_id": "service-execution",
+                  "x": 434, "y": 146, "width": 16, "height": 78,
+                  "label": ""
                 }
                 """));
 
