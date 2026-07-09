@@ -133,9 +133,9 @@ class MainTest {
     assertThat(xml)
         .contains(
             "<sourceAttachment x=\"220\" y=\"81\"/><bendpoint x=\"261\" y=\"80\"/>"
-                + "<targetAttachment x=\"300\" y=\"80\"/>");
+                + "<targetAttachment x=\"293\" y=\"52\"/>");
     assertThat(xml)
-        .doesNotContain("<bendpoint x=\"220\" y=\"81\"/>", "<bendpoint x=\"300\" y=\"80\"/>");
+        .doesNotContain("<bendpoint x=\"220\" y=\"81\"/>", "<bendpoint x=\"293\" y=\"52\"/>");
   }
 
   @Test
