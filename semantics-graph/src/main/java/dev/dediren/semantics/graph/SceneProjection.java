@@ -17,10 +17,12 @@ import dev.dediren.contracts.source.SourceNode;
 import dev.dediren.contracts.source.SourceRelationship;
 import dev.dediren.engine.NotationSemantics;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import tools.jackson.databind.JsonNode;
 
 /**
  * The shared, backend-neutral projection loop: it turns a selected {@link GenericGraphView} into a
@@ -193,8 +195,11 @@ final class SceneProjection {
   }
 
   private static GenericGraphPluginData pluginData(SourceDocument source) {
-    return JsonSupport.objectMapper()
-        .treeToValue(source.plugins().get("generic-graph"), GenericGraphPluginData.class);
+    JsonNode pluginValue = source.plugins().get("generic-graph");
+    if (pluginValue == null) {
+      throw new UncheckedIOException(new IOException("missing plugins.generic-graph"));
+    }
+    return JsonSupport.objectMapper().treeToValue(pluginValue, GenericGraphPluginData.class);
   }
 
   private static int indexOfNode(List<SourceNode> nodes, String id) throws IOException {

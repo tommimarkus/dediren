@@ -11,10 +11,15 @@ class GraphNotationSemanticsTest {
   private final GraphNotationSemantics notation = new GraphNotationSemantics();
 
   @Test
-  void layoutRoleIsAlwaysNull() {
-    assertThat(notation.layoutRole("Lifeline")).isNull();
-    assertThat(notation.layoutRole("Interaction")).isNull();
+  void layoutRoleIsNullExceptForBaseLifelineAndInteraction() {
     assertThat(notation.layoutRole("generic.actor")).isNull();
+  }
+
+  @Test
+  void layoutRolePreservesProfileIndependentLifelineAndInteraction() {
+    assertThat(notation.layoutRole("Lifeline")).isEqualTo("lifeline");
+    assertThat(notation.layoutRole("Interaction")).isEqualTo("interaction");
+    assertThat(notation.layoutRole("Plain")).isNull();
   }
 
   @Test

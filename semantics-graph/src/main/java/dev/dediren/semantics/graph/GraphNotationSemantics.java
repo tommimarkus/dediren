@@ -24,8 +24,19 @@ public final class GraphNotationSemantics implements NotationSemantics {
     // The plain graph profile imposes no notation legality rules.
   }
 
+  // Preserves the old generic-graph base loop's profile-independent lifeline/interaction role
+  // for byte-stability: GenericGraphProjection.layoutRole returned "lifeline"/"interaction" for
+  // these two source types regardless of semantic profile. The "junction" role stays
+  // archimate-owned (see ArchimateNotationSemantics); UML sources get lifeline/interaction via
+  // UmlNotationSemantics.
   @Override
   public String layoutRole(String sourceType) {
+    if ("Lifeline".equals(sourceType)) {
+      return "lifeline";
+    }
+    if ("Interaction".equals(sourceType)) {
+      return "interaction";
+    }
     return null;
   }
 
