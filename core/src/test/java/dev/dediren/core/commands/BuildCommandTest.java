@@ -10,7 +10,6 @@ import dev.dediren.contracts.build.BuildResult;
 import dev.dediren.contracts.build.BuildViewOutcome;
 import dev.dediren.contracts.export.ExportResult;
 import dev.dediren.contracts.json.JsonSupport;
-import dev.dediren.contracts.layout.LaidOutEdge;
 import dev.dediren.contracts.layout.LayoutRequest;
 import dev.dediren.contracts.layout.LayoutResult;
 import dev.dediren.contracts.render.RenderArtifact;
@@ -27,7 +26,9 @@ import dev.dediren.engine.ExportEngine;
 import dev.dediren.engine.LayoutEngine;
 import dev.dediren.engine.RenderEngine;
 import dev.dediren.engine.SemanticsEngine;
+import dev.dediren.ir.LaidOutScene;
 import dev.dediren.ir.LayoutRequestMapper;
+import dev.dediren.ir.RoutedEdge;
 import dev.dediren.ir.SceneGraph;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -718,14 +719,16 @@ class BuildCommandTest {
     }
 
     @Override
-    public LayoutRequest parseRequest(byte[] input) {
-      return JsonSupport.objectMapper()
-          .treeToValue(JsonSupport.objectMapper().readTree(input), LayoutRequest.class);
+    public SceneGraph parseRequest(byte[] input) {
+      LayoutRequest request =
+          JsonSupport.objectMapper()
+              .treeToValue(JsonSupport.objectMapper().readTree(input), LayoutRequest.class);
+      return LayoutRequestMapper.toSceneGraph(request);
     }
 
     @Override
-    public EngineResult<LayoutResult> layout(LayoutRequest request) throws EngineException {
-      String view = request.viewId();
+    public EngineResult<LaidOutScene> layout(SceneGraph scene) throws EngineException {
+      String view = scene.viewId();
       if (failingViews.contains(view)) {
         throw fakeFailure("DEDIREN_FAKE_LAYOUT_FAILED", "layout blew up");
       }
@@ -733,16 +736,17 @@ class BuildCommandTest {
         // A layout that clears the layout stage but fails LayoutQuality.validateLayoutDiagnostics:
         // an edge with no route points -> DEDIREN_LAYOUT_ROUTE_POINTS_EMPTY (ERROR).
         return new EngineResult<>(
-            new LayoutResult(
-                ContractVersions.LAYOUT_RESULT_SCHEMA_VERSION,
+            new LaidOutScene(
                 view,
                 List.of(),
-                List.of(new LaidOutEdge("bad-edge", "client", "api", null, null, null, null, null)),
+                List.of(
+                    new RoutedEdge(
+                        "bad-edge", "client", "api", null, null, null, null, null, null)),
                 List.of(),
                 List.of()),
             List.of());
       }
-      // qualityWarningViews embeds an upstream warning in the LayoutResult so the real quality
+      // qualityWarningViews embeds an upstream warning in the LaidOutScene so the real quality
       // validation degrades to WARNING; layoutStageWarningViews warns on the layout stage envelope.
       List<Diagnostic> embeddedWarnings =
           warningIf(qualityWarningViews, view, "DEDIREN_FAKE_UPSTREAM", "upstream warning");
@@ -753,14 +757,7 @@ class BuildCommandTest {
               "DEDIREN_FAKE_LAYOUT_STAGE_WARNING",
               "layout stage warning");
       return new EngineResult<>(
-          new LayoutResult(
-              ContractVersions.LAYOUT_RESULT_SCHEMA_VERSION,
-              view,
-              List.of(),
-              List.of(),
-              List.of(),
-              embeddedWarnings),
-          stageWarnings);
+          new LaidOutScene(view, List.of(), List.of(), List.of(), embeddedWarnings), stageWarnings);
     }
   }
 

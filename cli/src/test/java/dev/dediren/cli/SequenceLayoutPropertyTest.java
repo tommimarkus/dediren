@@ -3,13 +3,9 @@ package dev.dediren.cli;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.dediren.contracts.json.JsonSupport;
-import dev.dediren.contracts.layout.LayoutRequest;
-import dev.dediren.contracts.layout.LayoutResult;
 import dev.dediren.contracts.source.GenericGraphSemanticProfile;
 import dev.dediren.contracts.source.SourceDocument;
 import dev.dediren.ir.LaidOutScene;
-import dev.dediren.ir.LaidOutSceneMapper;
-import dev.dediren.ir.LayoutRequestMapper;
 import dev.dediren.ir.PlacedNode;
 import dev.dediren.ir.SceneGraph;
 import dev.dediren.ir.quality.SequenceInvariants;
@@ -67,9 +63,7 @@ class SequenceLayoutPropertyTest {
                     GenericGraphSemanticProfile.UML, new UmlNotationSemantics()))
             .projectScene(source, "sequence-view")
             .value();
-    LayoutRequest request = LayoutRequestMapper.toRequest(sceneGraph);
-    LayoutResult result = new ElkEngine().layout(request).value();
-    LaidOutScene scene = LaidOutSceneMapper.toScene(result);
+    LaidOutScene scene = new ElkEngine().layout(sceneGraph).value();
 
     assertThat(SequenceInvariants.messageEndpointsOnLifelineAxis(scene))
         .describedAs("messageEndpointsOnLifelineAxis for %s", model)

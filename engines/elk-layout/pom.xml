@@ -25,6 +25,11 @@
       <version>${project.version}</version>
     </dependency>
     <dependency>
+      <groupId>dev.dediren</groupId>
+      <artifactId>ir</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
       <groupId>org.eclipse.elk</groupId>
       <artifactId>org.eclipse.elk.core</artifactId>
     </dependency>

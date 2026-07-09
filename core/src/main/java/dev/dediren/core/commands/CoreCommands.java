@@ -25,6 +25,8 @@ import dev.dediren.engine.ExportEngine;
 import dev.dediren.engine.LayoutEngine;
 import dev.dediren.engine.RenderEngine;
 import dev.dediren.engine.SemanticsEngine;
+import dev.dediren.ir.LaidOutScene;
+import dev.dediren.ir.LaidOutSceneMapper;
 import dev.dediren.ir.LayoutRequestMapper;
 import dev.dediren.ir.SceneGraph;
 import java.io.IOException;
@@ -59,7 +61,12 @@ public final class CoreCommands {
     byte[] bytes = layoutRequestBytes(inputText);
     LayoutEngine layout =
         EngineDispatch.requireEngine(engines, engineId, "layout", engines.layoutEngine(engineId));
-    return EngineDispatch.dispatch(engineId, () -> layout.layout(layout.parseRequest(bytes)));
+    return EngineDispatch.dispatch(
+        engineId,
+        () -> {
+          EngineResult<LaidOutScene> laid = layout.layout(layout.parseRequest(bytes));
+          return new EngineResult<>(LaidOutSceneMapper.toResult(laid.value()), laid.diagnostics());
+        });
   }
 
   private static byte[] layoutRequestBytes(String inputText) throws PluginExecutionException {
