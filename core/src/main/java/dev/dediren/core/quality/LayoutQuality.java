@@ -144,7 +144,8 @@ public final class LayoutQuality {
             routeError(
                 DiagnosticCode.LAYOUT_NON_FINITE_GEOMETRY,
                 "node '" + node.id() + "' has non-finite geometry",
-                "$.nodes[" + nodeIndex + "]"));
+                "$.nodes[" + nodeIndex + "]",
+                node.sourcePointer()));
       }
     }
     for (int edgeIndex = 0; edgeIndex < result.edges().size(); edgeIndex++) {
@@ -156,7 +157,8 @@ public final class LayoutQuality {
               routeError(
                   DiagnosticCode.LAYOUT_NON_FINITE_GEOMETRY,
                   "edge '" + edge.id() + "' has a non-finite route point",
-                  "$.edges[" + edgeIndex + "].points[" + pointIndex + "]"));
+                  "$.edges[" + edgeIndex + "].points[" + pointIndex + "]",
+                  edge.sourcePointer()));
           break;
         }
       }
@@ -178,7 +180,8 @@ public final class LayoutQuality {
             routeError(
                 DiagnosticCode.LAYOUT_ROUTE_POINTS_EMPTY,
                 "edge '" + edge.id() + "' has no route points",
-                "$.edges[" + edgeIndex + "].points"));
+                "$.edges[" + edgeIndex + "].points",
+                edge.sourcePointer()));
         continue;
       }
       if (edge.points().size() < 2) {
@@ -186,7 +189,8 @@ public final class LayoutQuality {
             routeError(
                 DiagnosticCode.LAYOUT_ROUTE_POINTS_INSUFFICIENT,
                 "edge '" + edge.id() + "' must have at least start and end route points",
-                "$.edges[" + edgeIndex + "].points"));
+                "$.edges[" + edgeIndex + "].points",
+                edge.sourcePointer()));
         continue;
       }
       LaidOutNode source = findNode(result, edge.source());
@@ -203,7 +207,8 @@ public final class LayoutQuality {
                     + "' first route point is not on source node '"
                     + edge.source()
                     + "' perimeter",
-                "$.edges[" + edgeIndex + "].points[0]"));
+                "$.edges[" + edgeIndex + "].points[0]",
+                edge.sourcePointer()));
       }
       if (!endpointAccepted(edge.points().getLast(), target, ROUTE_ENDPOINT_TOLERANCE)) {
         diagnostics.add(
@@ -214,7 +219,8 @@ public final class LayoutQuality {
                     + "' last route point is not on target node '"
                     + edge.target()
                     + "' perimeter",
-                "$.edges[" + edgeIndex + "].points[-1]"));
+                "$.edges[" + edgeIndex + "].points[-1]",
+                edge.sourcePointer()));
       }
     }
     for (int nodeIndex = 0; nodeIndex < result.nodes().size(); nodeIndex++) {
@@ -241,7 +247,8 @@ public final class LayoutQuality {
                       + "' is not on the route of incident edge '"
                       + edge.id()
                       + "'",
-                  "$.nodes[" + nodeIndex + "]"));
+                  "$.nodes[" + nodeIndex + "]",
+                  node.sourcePointer()));
         }
       }
     }
@@ -260,7 +267,8 @@ public final class LayoutQuality {
                     + "' does not extend outside node '"
                     + node.id()
                     + "' and renders hidden behind it",
-                "$.edges[" + edgeIndex + "]"));
+                "$.edges[" + edgeIndex + "]",
+                node.sourcePointer()));
       }
     }
     return diagnostics;
@@ -268,6 +276,11 @@ public final class LayoutQuality {
 
   private static Diagnostic routeError(DiagnosticCode code, String message, String path) {
     return new Diagnostic(code.code(), DiagnosticSeverity.ERROR, message, path);
+  }
+
+  private static Diagnostic routeError(
+      DiagnosticCode code, String message, String path, String sourcePointer) {
+    return new Diagnostic(code.code(), DiagnosticSeverity.ERROR, message, path, sourcePointer);
   }
 
   private static boolean selfLoopEscapesNode(List<Point> points, LaidOutNode node) {
