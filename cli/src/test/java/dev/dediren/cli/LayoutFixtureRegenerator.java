@@ -3,14 +3,19 @@ package dev.dediren.cli;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.contracts.layout.LayoutRequest;
 import dev.dediren.contracts.layout.LayoutResult;
+import dev.dediren.contracts.source.GenericGraphSemanticProfile;
 import dev.dediren.contracts.source.SourceDocument;
 import dev.dediren.plugins.elklayout.ElkEngine;
-import dev.dediren.plugins.genericgraph.GenericGraphEngine;
+import dev.dediren.semantics.archimate.ArchimateNotationSemantics;
+import dev.dediren.semantics.graph.GraphNotationSemantics;
+import dev.dediren.semantics.graph.SemanticsRouterEngine;
+import dev.dediren.semantics.uml.UmlNotationSemantics;
 import dev.dediren.testsupport.TestSupport;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 
@@ -93,7 +98,12 @@ class LayoutFixtureRegenerator {
     Path sourceDir = workspaceRoot.resolve("fixtures/source");
     Path layoutResultDir = workspaceRoot.resolve("fixtures/layout-result");
 
-    GenericGraphEngine genericGraph = new GenericGraphEngine();
+    SemanticsRouterEngine genericGraph =
+        new SemanticsRouterEngine(
+            Map.of(
+                GenericGraphSemanticProfile.GENERIC_GRAPH, new GraphNotationSemantics(),
+                GenericGraphSemanticProfile.ARCHIMATE, new ArchimateNotationSemantics(),
+                GenericGraphSemanticProfile.UML, new UmlNotationSemantics()));
     ElkEngine elk = new ElkEngine();
 
     for (FixtureMapping mapping : MAPPINGS) {

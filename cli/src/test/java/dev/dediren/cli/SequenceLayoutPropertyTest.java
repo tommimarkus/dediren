@@ -5,15 +5,20 @@ import static org.assertj.core.api.Assertions.assertThat;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.contracts.layout.LayoutRequest;
 import dev.dediren.contracts.layout.LayoutResult;
+import dev.dediren.contracts.source.GenericGraphSemanticProfile;
 import dev.dediren.contracts.source.SourceDocument;
 import dev.dediren.ir.LaidOutScene;
 import dev.dediren.ir.LaidOutSceneMapper;
 import dev.dediren.ir.PlacedNode;
 import dev.dediren.ir.quality.SequenceInvariants;
 import dev.dediren.plugins.elklayout.ElkEngine;
-import dev.dediren.plugins.genericgraph.GenericGraphEngine;
+import dev.dediren.semantics.archimate.ArchimateNotationSemantics;
+import dev.dediren.semantics.graph.GraphNotationSemantics;
+import dev.dediren.semantics.graph.SemanticsRouterEngine;
+import dev.dediren.semantics.uml.UmlNotationSemantics;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import net.jqwik.api.Arbitraries;
 import net.jqwik.api.Arbitrary;
 import net.jqwik.api.Combinators;
@@ -23,16 +28,16 @@ import net.jqwik.api.Provide;
 
 /**
  * Property test for Plan B P2 task 8: generated, engine-valid UML-sequence models are pushed
- * through the real project&#8594;layout path (the same {@link GenericGraphEngine} / {@link
+ * through the real project&#8594;layout path (the same {@link SemanticsRouterEngine} / {@link
  * ElkEngine} objects {@code EngineWiring} constructs for the CLI) and the P2-T7 sequence invariants
  * ({@link SequenceInvariants}) must hold on every generated model, not just the hand-written oracle
  * fixtures.
  *
- * <p>{@code GenericGraphProjection} and {@code ElkLayoutEngine} named in the task are
- * package-private to their own plugin packages, so this test drives their public wrappers instead —
- * {@link GenericGraphEngine#projectLayoutRequest} and {@link ElkEngine#layout} — which run
- * identical validation/projection/layout logic and are the exact instances {@code EngineWiring}
- * wires into the CLI's in-memory dispatch.
+ * <p>{@code SceneProjection} and {@code ElkLayoutEngine} named in the task are package-private to
+ * their own plugin packages, so this test drives their public wrappers instead — {@link
+ * SemanticsRouterEngine#projectLayoutRequest} and {@link ElkEngine#layout} — which run identical
+ * validation/projection/layout logic and are the exact instances {@code EngineWiring} wires into
+ * the CLI's in-memory dispatch.
  *
  * <p>The generator is intentionally minimal (Plan B P2 task 8 scope): an {@code Interaction}, 2-5
  * {@code Lifeline} nodes, and 1-10 {@code Message} relationships with unique strictly-increasing
@@ -53,7 +58,13 @@ class SequenceLayoutPropertyTest {
         JsonSupport.objectMapper().readValue(buildSourceJson(model), SourceDocument.class);
 
     LayoutRequest request =
-        new GenericGraphEngine().projectLayoutRequest(source, "sequence-view").value();
+        new SemanticsRouterEngine(
+                Map.of(
+                    GenericGraphSemanticProfile.GENERIC_GRAPH, new GraphNotationSemantics(),
+                    GenericGraphSemanticProfile.ARCHIMATE, new ArchimateNotationSemantics(),
+                    GenericGraphSemanticProfile.UML, new UmlNotationSemantics()))
+            .projectLayoutRequest(source, "sequence-view")
+            .value();
     LayoutResult result = new ElkEngine().layout(request).value();
     LaidOutScene scene = LaidOutSceneMapper.toScene(result);
 
