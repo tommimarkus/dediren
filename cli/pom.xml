@@ -76,7 +76,6 @@
       <groupId>dev.dediren</groupId>
       <artifactId>ir</artifactId>
       <version>${project.version}</version>
-      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.assertj</groupId>
