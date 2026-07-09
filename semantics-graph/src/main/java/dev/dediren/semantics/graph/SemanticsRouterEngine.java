@@ -35,8 +35,9 @@ import tools.jackson.databind.JsonNode;
  * publishes no envelope for structural projection failures (missing {@code plugins.generic-graph}
  * or an unknown view id): those surface as today's raw non-enveloped exit, reproduced here by
  * throwing {@link UncheckedIOException}, which the interface's {@code throws EngineException}
- * clause cannot carry as a checked {@link IOException}; the thin {@code Main} routes them to
- * today's exit codes.
+ * clause cannot carry as a checked {@link IOException}; the cli's {@code Main} (hosting this engine
+ * in-process via {@code EngineWiring}) routes them to today's exit codes — there is no separate
+ * semantics {@code Main} in this module.
  */
 public final class SemanticsRouterEngine implements SemanticsEngine {
 
@@ -62,8 +63,9 @@ public final class SemanticsRouterEngine implements SemanticsEngine {
 
   /**
    * The published missing-profile failure ({@code DEDIREN_SEMANTIC_PROFILE_REQUIRED} / exit 3).
-   * Shared with the thin {@code Main}, whose pre-parse precedence check must emit the identical
-   * envelope before stdin is parsed; {@link #validate} re-checks for the typed in-memory path.
+   * Package-visible so the {@code src/test/java} router harness can reproduce the identical
+   * envelope; {@link #validate} is the only production caller — this module has no separate
+   * semantics {@code Main}, the router is hosted in-process by the cli via {@code EngineWiring}.
    */
   static EngineException profileRequired() {
     return failure(

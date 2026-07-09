@@ -73,12 +73,14 @@ Stable Dependencies Principle).
 | `engine-api` | `contracts` | 1 — engine seam |
 | `core` | `contracts`, `engine-api` | 2 — orchestration + `build` driver |
 | `render` (engine) | `engine-api`, `contracts`, `archimate`, `uml` | 2 — leaf engine |
-| `generic-graph` (engine) | `engine-api`, `contracts`, `archimate`, `uml` | 2 — leaf engine |
+| `semantics-graph` (engine) | `engine-api`, `contracts`, `ir` | 2 — leaf engine |
+| `semantics-archimate` (engine) | `engine-api`, `contracts`, `archimate` | 2 — leaf engine |
+| `semantics-uml` (engine) | `engine-api`, `contracts`, `uml` | 2 — leaf engine |
 | `elk-layout` (engine) | `engine-api`, `contracts` | 2 — leaf engine |
 | `archimate-oef-export` (engine) | `engine-api`, `contracts`, `archimate`, `schema-cache` | 2 — leaf engine |
 | `uml-xmi-export` (engine) | `engine-api`, `contracts`, `uml`, `schema-cache` | 2 — leaf engine |
 | `cli` | `contracts`, `core`, `engine-api`; engine implementations **only in `EngineWiring`** | 3 — entrypoint + wiring |
-| `dist-tool` | `contracts` (compile); `cli` (runtime, for bundling — the five engines arrive transitively through `cli`'s compile deps, so the single-launcher distribution needs no separate engine-launcher dependency) | 3 — assembly |
+| `dist-tool` | `contracts` (compile); `cli` (runtime, for bundling — the bundled engine and semantics-front-end modules arrive transitively through `cli`'s compile deps, so the single-launcher distribution needs no separate engine-launcher dependency) | 3 — assembly |
 | `coverage-report` | *(nothing in the default build)*; every product module (runtime, **`coverage`-profile-scoped only**, for JaCoCo `report-aggregate`) | 3 — build tooling |
 
 Rules that fall out of this table and must be enforced, not just hoped for:
@@ -94,13 +96,19 @@ Rules that fall out of this table and must be enforced, not just hoped for:
 - **`core` never compile-depends on an engine implementation.** `core` drives
   engines only through the `engine-api` interfaces and the `contracts` records.
 - **`cli` confines the engine-implementation edge to one class.** `cli` depends
-  on `core`, `contracts`, and `engine-api` for orchestration, and on the five
-  engine implementations only inside `EngineWiring`, which constructs them
-  explicitly (no `ServiceLoader`, no `PATH`, no runtime discovery). ArchUnit
-  pins the edge to that single named class.
-- **The five engines now live under `engines/<name>`** (directory move landed
-  2026-07-08); their `dev.dediren.plugins.*` packages are retained debt — see
-  §12.
+  on `core`, `contracts`, and `engine-api` for orchestration, and on the
+  engine implementations — the four remaining `dev.dediren.plugins.*` engines
+  plus the three `semantics-*` carve modules (Plan B P3) — only inside
+  `EngineWiring`, which constructs them explicitly (no `ServiceLoader`, no
+  `PATH`, no runtime discovery). ArchUnit pins the edge to that single named
+  class.
+- **The four remaining `dev.dediren.plugins.*` engines live under
+  `engines/<name>`** (directory move landed 2026-07-08); their packages are
+  retained debt — see §12. The former fifth engine, `generic-graph`, was
+  carved (Plan B P3) into three top-level modules — `semantics-graph` (the
+  profile-routing engine, wire id still `generic-graph`), `semantics-archimate`,
+  and `semantics-uml` (its notation front ends) — each with a clean
+  `dev.dediren.semantics.*` package, discharging that debt for its slice.
 - **`contracts` depends on nothing internal.** It is the most-depended-on module
   and must stay the most stable (*Martin 2017*, SDP).
 - **`coverage-report` is build-only.** It exists solely to host JaCoCo
@@ -175,19 +183,28 @@ charter below is the contract for "what changes for this reason lives here."
   — the model shared library *should* look like (*reuse-or-migrate*: "stable,
   boring, owned mechanics").
 
-- **Engines** (`render`, `generic-graph`, `elk-layout`, `archimate-oef-export`,
+- **Engines** (`render`, `elk-layout`, `archimate-oef-export`,
   `uml-xmi-export`) — leaf library modules behind `engine-api`, each owning one
-  backend concern: SVG rendering, generic-graph source handling, ELK layout,
-  ArchiMate OEF export, UML/XMI export. Each owns its backend-specific policy
-  and *only* that. Styling lives in render; OEF semantics in the OEF engine;
-  XMI semantics in the XMI engine; layout geometry in ELK. (Their former
-  standalone `Main` executables and per-engine launchers were retired by the
-  single-launcher distribution cutover (Cutover B); each `Main` survives only
-  as an `src/test/java` envelope-shaped test harness — no `main()`, no
-  launcher script.)
+  backend concern: SVG rendering, ELK layout, ArchiMate OEF export, UML/XMI
+  export. Each owns its backend-specific policy and *only* that. Styling lives
+  in render; OEF semantics in the OEF engine; XMI semantics in the XMI engine;
+  layout geometry in ELK. (Their former standalone `Main` executables and
+  per-engine launchers were retired by the single-launcher distribution
+  cutover (Cutover B); each `Main` survives only as an `src/test/java`
+  envelope-shaped test harness — no `main()`, no launcher script.)
+
+- **`semantics-graph` / `semantics-archimate` / `semantics-uml`** — the former
+  `generic-graph` engine, carved (Plan B P3) into a profile-routing engine
+  (`semantics-graph`, still published under wire id `generic-graph`) plus two
+  notation front ends. `semantics-graph` owns generic-graph source handling
+  and base scene projection and depends only on `engine-api`, `contracts`, and
+  `ir`; `semantics-archimate` and `semantics-uml` own the per-notation legality
+  checks the router dispatches to, each depending on its own notation core
+  (`archimate` or `uml`) and nothing else notation-specific. No single module
+  in this trio depends on both `archimate` and `uml`.
 
 - **`dist-tool`** — assembly and distribution: bundles the single `cli`
-  launcher, which hosts the five engines in-process, into a runnable
+  launcher, which hosts the bundled engines in-process, into a runnable
   distribution, third-party-notice and SBOM generation, dist smoke. Top of the
   graph; nothing depends on it.
 
@@ -301,7 +318,8 @@ process-crash category.
 This is the system's most load-bearing design tension, so it gets its own rules.
 `archimate` and `uml` are **shared kernels** (*Evans 2003*): notation vocabulary
 and validation co-owned by every plugin that reads that notation (`render`,
-`generic-graph`, and the matching export plugin). A shared kernel trades
+the matching `semantics-*` notation front end, and the matching export
+plugin). A shared kernel trades
 duplication for tight, governed coupling, so it is justified only for *stable,
 genuinely common* concepts and must be kept small.
 
@@ -430,9 +448,10 @@ common changes:
 
 - **Add or extend a notation.** Extend the owning notation core
   (`archimate`/`uml`) with vocabulary as the *exported* surface (§6); update
-  consumers (`render`, `generic-graph`, the export plugin) to read it from
-  there. Do not re-declare vocabulary in a consumer. If the change is a public
-  schema change, move the schema/contracts/fixtures/mapping/tests together (§4).
+  consumers (`render`, the matching `semantics-*` notation front end, the
+  export plugin) to read it from there. Do not re-declare vocabulary in a
+  consumer. If the change is a public schema change, move the
+  schema/contracts/fixtures/mapping/tests together (§4).
 
 - **Add a contract surface.** Add records/enums to `contracts` and the schema to
   `schemas/`; bump the schema id only if compatibility actually breaks; update
@@ -489,15 +508,18 @@ Guidelines that are not checked become folklore. The enforceable core:
   monolith cutover moved that enforcement to compile time.
   `ArchitectureRulesTest` (`dist-tool`) is the enforcement: `enginesDoNotDependOnCore`
   and `coreDoesNotDependOnEngineImplementations` pin the core↔engine edge,
-  `enginesDoNotDependOnEachOther` asserts the five engines are pairwise
-  independent, `svgEmitterDoesNotImportElk` and `exportersDoNotImportSvgEmitter`
-  pin the two named examples from §2 ("the SVG emitter must not import ELK;
-  exporters must not import the SVG emitter"), and
-  `onlyEngineWiringTouchesEngineImplementations` confines the
+  `enginesDoNotDependOnEachOther` asserts the four remaining
+  `dev.dediren.plugins.*` engines are pairwise independent and
+  `semanticsModulesAreIndependentAndLeaf` asserts the same for the three
+  `semantics-*` carve modules, `svgEmitterDoesNotImportElk` and
+  `exportersDoNotImportSvgEmitter` pin the two named examples from §2 ("the
+  SVG emitter must not import ELK; exporters must not import the SVG
+  emitter"), and `onlyEngineWiringTouchesEngineImplementations` confines the
   cli-to-engine-implementation edge to the single `EngineWiring` class. A
   `reactorProductionClassesWereImported` guard keeps every rule non-vacuous by
-  asserting each constrained package (core, engine-api, and each of the five
-  engine packages individually) actually has classes on the test classpath.
+  asserting each constrained package (core, engine-api, each of the four
+  `plugins.*` engine packages, and each of the three `semantics-*` packages
+  individually) actually has classes on the test classpath.
   `EngineDispatchTest` (core) and the cli engine-envelope regression tests back
   the runtime dispatch and diagnostics side of §5.
 - **Audit gates:** the `CLAUDE.md` `## Audit Gates` table assigns
@@ -535,9 +557,9 @@ speculatively):
 | SpotBugs `EI_EXPOSE_REP`/`EI_EXPOSE_REP2` suppressed on `render/node/NodeLabelLines` and `umlxmi/build/ExportScope` | `spotbugs-exclude.xml` | §8 thinness/cohesion | deferred: plugin-internal value records extracted from the former Main god-files; hold List/Set consumed read-only within the engine, not part of the public contract surface; suppressed rather than defensive-copied for consistency with the `contracts` records |
 | SpotBugs `MS_EXPOSE_REP` suppressed in `JsonSupport.objectMapper()` | `spotbugs-exclude.xml` | §4 contract surface | by design: returns the shared `ObjectMapper` singleton, mutable in place (`.configure()`/`.registerModule()`), exposed as one canonical mapper; the reconfiguration risk is first-party-only: every consumer of the singleton is first-party code in the product JVM, and the mapper is configured once at class initialization |
 | SpotBugs `NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE` suppressed in `DistTool` (5 sites) | `spotbugs-exclude.xml` | §3 module charter | deferred: `Path.getFileName()`/`getParent()` on `Files.list(dir)` entries and real bundle/output paths; null branch infeasible; build/dist tool, not shipped runtime |
-| Cross-plugin envelope/dispatch boilerplate duplicated across first-party plugin Mains | `engines/archimate-oef-export/src/test/.../Main.java`, `engines/uml-xmi-export/src/test/.../Main.java`, `engines/generic-graph/src/test/.../Main.java` (and the render/elk-layout equivalents) | §5 engine boundary | `LA-CODE-DUP-1` (lean-audit 2026-07-06); the packaging task (Cutover B) landed and retired the launcher lane, but demoted these `Main`s to `src/test/java` envelope-shaped test harnesses rather than deleting them (decision 13), so the duplication is retained debt with no scheduled retirement |
+| Cross-plugin envelope/dispatch boilerplate duplicated across first-party plugin Mains | `engines/archimate-oef-export/src/test/.../Main.java`, `engines/uml-xmi-export/src/test/.../Main.java` (and the render/elk-layout equivalents) | §5 engine boundary | `LA-CODE-DUP-1` (lean-audit 2026-07-06); the packaging task (Cutover B) landed and retired the launcher lane, but demoted these `Main`s to `src/test/java` envelope-shaped test harnesses rather than deleting them (decision 13), so the duplication is retained debt with no scheduled retirement — the former `generic-graph` engine's copy was discharged by the Plan B P3 semantics carve, which introduced no replacement `Main` |
 | Layout-quality metric math re-implemented in the ELK plugin's e2e test | `engines/elk-layout/.../ElkLayoutEngineTest.java` (geometry-metric helpers) vs `core/quality/LayoutQuality.java` | §2 no plugin→`core` edge | `LA-CODE-DUP-2` (lean-audit 2026-07-06), accepted: plugins may depend only on `contracts` (the sole test-scope exception belongs to `cli`), and `test-support` cannot host `contracts`-typed helpers without a reactor cycle (`contracts` test-depends on `test-support`); the independent copy deliberately corroborates core's quality metrics against real ELK output; marked `lean-audit:dup-intentional`; revisit if a contracts-aware test-support home is ever chartered |
-| `dev.dediren.plugins.*` package names retained on the five engines after the `plugins/` → `engines/` directory move | `engines/{generic-graph,elk-layout,render,archimate-oef-export,uml-xmi-export}/src/**/dev/dediren/plugins/**` | §2 module naming | mechanical directory/reactor move only (owner-ratified); the matching package rename is out-of-scope follow-on debt, not yet scheduled |
+| `dev.dediren.plugins.*` package names retained on the four remaining engines after the `plugins/` → `engines/` directory move | `engines/{elk-layout,render,archimate-oef-export,uml-xmi-export}/src/**/dev/dediren/plugins/**` | §2 module naming | mechanical directory/reactor move only (owner-ratified); the matching package rename is out-of-scope follow-on debt for these four, not yet scheduled; the former fifth engine, `generic-graph`, discharged this debt for its slice when the Plan B P3 semantics carve replaced it with the clean `dev.dediren.semantics.*` packages in `semantics-graph`/`semantics-archimate`/`semantics-uml` |
 | `plugin-manifest.schema.json` / `runtime-capability.schema.json` still ship though no live code path constructs a manifest or answers a capability probe | `schemas/plugin-manifest.schema.json`, `schemas/runtime-capability.schema.json`, `contracts.PluginManifest`/`RuntimeCapabilities` | §4 contract surface | orphaned by the process-plugin runtime deletion (Cutover A/B); kept compile-checked and round-tripped from inline JSON (`ContractRoundTripTest`, `SchemaValidatorTest`) rather than deleted, since a future non-bundled engine could still want the same manifest/capability shape; retire or repurpose is out-of-scope follow-on debt, not yet scheduled |
 
 None of these block the architecture; they are propagation-cost and clarity
