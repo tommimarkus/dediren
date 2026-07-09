@@ -69,10 +69,12 @@ public final class DistTool {
           "core",
           "elk-layout",
           "engine-api",
-          "generic-graph",
           "ir",
           "render",
           "schema-cache",
+          "semantics-archimate",
+          "semantics-graph",
+          "semantics-uml",
           "uml",
           "uml-xmi-export");
 
