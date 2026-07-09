@@ -126,8 +126,11 @@ class ElkEngineTest {
 
   @Test
   void parseRequestThenLayoutMatchesDirectRecordLayout() throws Exception {
-    // sourceId != id on the node pins that the boundary adapters (LayoutRequestMapper.toRequest /
-    // toSceneGraph) don't conflate the graph id and the provenance sourceId when round-tripping.
+    // Both `laid` and `viaRecord` derive from the identical toRequest(toSceneGraph(parsedRequest)),
+    // so any pre-layout id/sourceId conflation in the boundary adapters would cancel out on both
+    // sides (that guard lives in LayoutRequestMapperTest, not here). What this test actually pins
+    // is toResult(toScene(...)) == identity on a real ELK-produced LayoutResult carrying populated
+    // geometry/routes, not just the pre-layout request shape.
     String request =
         """
             {

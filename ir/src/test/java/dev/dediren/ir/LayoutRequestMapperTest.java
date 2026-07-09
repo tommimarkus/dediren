@@ -109,4 +109,49 @@ class LayoutRequestMapperTest {
     assertThat(LayoutRequestMapper.toRequest(LayoutRequestMapper.toSceneGraph(request)))
         .isEqualTo(request);
   }
+
+  // sourcePointer is OPTIONAL on layout-request.schema.json, so a null origin is reachable on the
+  // real wire. LayoutRequestMapper's originOf/pointerValue helpers have explicit null branches
+  // that toSceneGraphThenToRequestIsIdentity never exercises (it only uses non-null pointers) — a
+  // regression that turned a null origin into "" or a wrapped null would silently change output
+  // bytes without failing that test. This pins the null-origin partition for both a node and an
+  // edge, round-tripping through toSceneGraph/toRequest.
+  @Test
+  void toSceneGraphThenToRequestIsIdentityWithNullOrigins() {
+    LayoutRequest request =
+        new LayoutRequest(
+            ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION,
+            "v1",
+            List.of(
+                new LayoutNode(
+                    "n1",
+                    "N1",
+                    "src-n1",
+                    160.0,
+                    80.0,
+                    "lifeline",
+                    2,
+                    LayoutLayerConstraint.FIRST,
+                    null)),
+            List.of(
+                new LayoutEdge(
+                    "e1",
+                    "n1",
+                    "n1",
+                    "E1",
+                    "src-e1",
+                    "Message",
+                    new LayoutEdgePriority(5, 2, 8),
+                    null)),
+            List.of(new LayoutGroup("g1", "G1", List.of("n1"), GroupProvenance.visualOnlyGroup())),
+            List.of(new LayoutConstraint("c1", "uml.sequence.lifeline-order", List.of("n1"))),
+            new LayoutPreferences(LayoutDirection.DOWN, null, null, null));
+
+    LayoutRequest roundTripped =
+        LayoutRequestMapper.toRequest(LayoutRequestMapper.toSceneGraph(request));
+
+    assertThat(roundTripped).isEqualTo(request);
+    assertThat(roundTripped.nodes().get(0).sourcePointer()).isNull();
+    assertThat(roundTripped.edges().get(0).sourcePointer()).isNull();
+  }
 }
