@@ -132,9 +132,10 @@ class LayoutQualityProvenanceTest {
   }
 
   @Test
-  void degenerateSelfLoopDiagnosticCarriesTheNodesSourcePointerNotTheEdges() {
+  void degenerateSelfLoopDiagnosticCarriesTheEdgesSourcePointer() {
     // source == target: the node and the edge are distinct source-model elements, so this pins
-    // down which one's pointer the diagnostic must carry (the node's, per the tightened scope).
+    // down which one's pointer the diagnostic must carry (the edge's, since the diagnostic's
+    // path targets $.edges[...] — the degenerate route belongs to the edge, not the node).
     var node = node("a", 0.0, 0.0, "/nodes/9"); // 100 x 80 at the origin
     var edge =
         new LaidOutEdge(
@@ -155,7 +156,7 @@ class LayoutQualityProvenanceTest {
         .filteredOn(diagnostic -> diagnostic.code().equals("DEDIREN_LAYOUT_SELF_LOOP_DEGENERATE"))
         .singleElement()
         .extracting(diagnostic -> diagnostic.sourcePointer())
-        .isEqualTo("/nodes/9");
+        .isEqualTo("/edges/3");
   }
 
   @Test

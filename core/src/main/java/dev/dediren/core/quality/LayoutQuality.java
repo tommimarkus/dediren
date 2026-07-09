@@ -268,7 +268,7 @@ public final class LayoutQuality {
                     + node.id()
                     + "' and renders hidden behind it",
                 "$.edges[" + edgeIndex + "]",
-                node.sourcePointer()));
+                edge.sourcePointer()));
       }
     }
     return diagnostics;
