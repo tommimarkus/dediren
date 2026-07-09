@@ -49,7 +49,7 @@ class CliLayoutRenderCommandTest {
         layout,
         """
                 {
-                  "layout_result_schema_version": "layout-result.schema.v1",
+                  "layout_result_schema_version": "layout-result.schema.v2",
                   "view_id": "main",
                   "nodes": [
                     { "id": "a", "source_id": "a", "projection_id": "a", "x": 0.0, "y": 0.0, "width": 100.0, "height": 80.0, "label": "A" },
@@ -111,7 +111,7 @@ class CliLayoutRenderCommandTest {
         layout,
         """
                 {
-                  "layout_result_schema_version": "layout-result.schema.v1",
+                  "layout_result_schema_version": "layout-result.schema.v2",
                   "view_id": "main",
                   "nodes": [
                     { "id": "source", "source_id": "source", "projection_id": "source", "x": 0.0, "y": 0.0, "width": 100.0, "height": 80.0, "label": "Source" },
@@ -201,7 +201,7 @@ class CliLayoutRenderCommandTest {
     assertThat(result.exitCode()).isZero();
     assertThat(envelope.at("/status").asText()).isEqualTo("ok");
     assertThat(envelope.at("/data/layout_request_schema_version").asText())
-        .isEqualTo("layout-request.schema.v1");
+        .isEqualTo("layout-request.schema.v2");
     assertThat(envelope.at("/data/view_id").asText()).isEqualTo("main");
     assertThat(envelope.at("/data/nodes")).hasSize(2);
     assertThat(envelope.at("/data/edges")).hasSize(1);

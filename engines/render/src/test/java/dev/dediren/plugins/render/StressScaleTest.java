@@ -33,7 +33,7 @@ class StressScaleTest {
   private static ObjectNode largeGraph() throws Exception {
     ObjectNode input = JsonSupport.objectMapper().createObjectNode();
     ObjectNode layout = input.putObject("layout_result");
-    layout.put("layout_result_schema_version", "layout-result.schema.v1");
+    layout.put("layout_result_schema_version", "layout-result.schema.v2");
     layout.put("view_id", "scale");
 
     ArrayNode nodes = layout.putArray("nodes");

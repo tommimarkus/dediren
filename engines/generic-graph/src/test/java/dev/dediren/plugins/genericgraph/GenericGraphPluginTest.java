@@ -46,7 +46,7 @@ class GenericGraphPluginTest {
 
     assertThat(result.exitCode()).isZero();
     assertThat(data.at("/layout_request_schema_version").asText())
-        .isEqualTo("layout-request.schema.v1");
+        .isEqualTo("layout-request.schema.v2");
     assertThat(data.at("/view_id").asText()).isEqualTo("main");
     assertThat(data.get("nodes")).hasSize(2);
     assertThat(data.get("edges")).hasSize(1);

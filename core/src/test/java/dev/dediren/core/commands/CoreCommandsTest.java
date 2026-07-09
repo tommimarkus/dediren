@@ -56,7 +56,7 @@ class CoreCommandsTest {
     String layout =
         """
                 {
-                  "layout_result_schema_version": "layout-result.schema.v1",
+                  "layout_result_schema_version": "layout-result.schema.v2",
                   "view_id": "main",
                   "nodes": [
                     { "id": "a", "source_id": "a", "projection_id": "a", "x": 0.0, "y": 0.0, "width": 100.0, "height": 80.0, "label": "A" },
@@ -84,7 +84,7 @@ class CoreCommandsTest {
     String layout =
         """
                 {
-                  "layout_result_schema_version": "layout-result.schema.v1",
+                  "layout_result_schema_version": "layout-result.schema.v2",
                   "view_id": "main",
                   "nodes": [
                     { "id": "a", "source_id": "a", "projection_id": "a", "x": 0.0, "y": 0.0, "width": 100.0, "height": 80.0, "label": "A" }
@@ -109,7 +109,7 @@ class CoreCommandsTest {
     String request =
         """
                 {
-                  "layout_request_schema_version": "layout-request.schema.v1",
+                  "layout_request_schema_version": "layout-request.schema.v2",
                   "view_id": "main",
                   "nodes": [],
                   "edges": [],
@@ -137,7 +137,7 @@ class CoreCommandsTest {
                   "envelope_schema_version": "envelope.schema.v1",
                   "status": "ok",
                   "data": {
-                    "layout_request_schema_version": "layout-request.schema.v1",
+                    "layout_request_schema_version": "layout-request.schema.v2",
                     "view_id": "piped-view",
                     "nodes": [],
                     "edges": [],

@@ -45,7 +45,7 @@ class DegenerateRenderTest {
   private static ObjectNode layout(int nodeCount) throws Exception {
     ObjectNode input = JsonSupport.objectMapper().createObjectNode();
     ObjectNode layout = input.putObject("layout_result");
-    layout.put("layout_result_schema_version", "layout-result.schema.v1");
+    layout.put("layout_result_schema_version", "layout-result.schema.v2");
     layout.put("view_id", "degenerate");
     ArrayNode nodes = layout.putArray("nodes");
     for (int index = 0; index < nodeCount; index++) {

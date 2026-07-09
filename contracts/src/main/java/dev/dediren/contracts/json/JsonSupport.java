@@ -38,4 +38,8 @@ public final class JsonSupport {
   public static <T> T readValue(String json, TypeReference<T> type) {
     return OBJECT_MAPPER.readValue(json, type);
   }
+
+  public static String writeValueAsString(Object value) {
+    return OBJECT_MAPPER.writeValueAsString(value);
+  }
 }

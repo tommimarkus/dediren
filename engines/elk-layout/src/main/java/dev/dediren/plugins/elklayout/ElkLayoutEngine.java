@@ -1,5 +1,6 @@
 package dev.dediren.plugins.elklayout;
 
+import dev.dediren.contracts.ContractVersions;
 import dev.dediren.contracts.Diagnostic;
 import dev.dediren.contracts.DiagnosticSeverity;
 import dev.dediren.contracts.layout.GroupProvenance;
@@ -72,7 +73,10 @@ final class ElkLayoutEngine {
 
   private static LayoutResult layoutFlat(LayoutRequest request) {
     LayoutPreferences preferences = request.layoutPreferences();
-    SequenceLayoutConstraints sequenceConstraints = SequenceLayoutConstraints.from(request);
+    Map<String, String> nodePointers = nodeSourcePointers(request);
+    Map<String, String> edgePointers = edgeSourcePointers(request);
+    SequenceLayoutConstraints sequenceConstraints =
+        SequenceLayoutConstraints.from(request, nodePointers, edgePointers);
     Direction layoutDirection =
         sequenceConstraints.active()
             ? Direction.RIGHT
@@ -159,7 +163,8 @@ final class ElkLayoutEngine {
                 elkNode.getWidth(),
                 elkNode.getHeight(),
                 node.label(),
-                node.role()));
+                node.role(),
+                nodePointers.get(node.id())));
       }
     }
 
@@ -176,7 +181,8 @@ final class ElkLayoutEngine {
                 edge.id(),
                 routingHints(edge.id(), endpointMerges),
                 points(elkEdge),
-                edge.label()));
+                edge.label(),
+                edgePointers.get(edge.id())));
       }
     }
 
@@ -184,7 +190,12 @@ final class ElkLayoutEngine {
 
     LayoutResult result =
         new LayoutResult(
-            "layout-result.schema.v1", request.viewId(), nodes, edges, groups, warnings);
+            ContractVersions.LAYOUT_RESULT_SCHEMA_VERSION,
+            request.viewId(),
+            nodes,
+            edges,
+            groups,
+            warnings);
     return sequenceConstraints.normalize(result);
   }
 
@@ -195,6 +206,7 @@ final class ElkLayoutEngine {
     }
 
     LayoutPreferences preferences = request.layoutPreferences();
+    Map<String, String> nodePointers = nodeSourcePointers(request);
     List<Diagnostic> warnings = new ArrayList<>();
     ElkNode root = ElkGraphUtil.createGraph();
     ElkPackedOptions.configureRoot(root, preferences);
@@ -252,17 +264,25 @@ final class ElkLayoutEngine {
                 elkNode.getWidth(),
                 elkNode.getHeight(),
                 node.label(),
-                node.role()));
+                node.role(),
+                nodePointers.get(node.id())));
       }
     }
 
     List<LaidOutGroup> groups = groupedBounds(request, elkGroups, elkNodes, warnings);
     return new LayoutResult(
-        "layout-result.schema.v1", request.viewId(), nodes, List.of(), groups, warnings);
+        ContractVersions.LAYOUT_RESULT_SCHEMA_VERSION,
+        request.viewId(),
+        nodes,
+        List.of(),
+        groups,
+        warnings);
   }
 
   private static LayoutResult layoutGrouped(LayoutRequest request) {
     LayoutPreferences preferences = request.layoutPreferences();
+    Map<String, String> nodePointers = nodeSourcePointers(request);
+    Map<String, String> edgePointers = edgeSourcePointers(request);
     Direction rootDirection = ElkLayeredOptions.preferredDirection(preferences);
     List<Diagnostic> warnings = new ArrayList<>();
     Map<String, LayoutNode> requestNodes = requestNodesById(request);
@@ -410,7 +430,8 @@ final class ElkLayoutEngine {
                 elkNode.getWidth(),
                 elkNode.getHeight(),
                 node.label(),
-                node.role()));
+                node.role(),
+                nodePointers.get(node.id())));
       }
     }
 
@@ -434,14 +455,20 @@ final class ElkLayoutEngine {
                 edge.id(),
                 routingHints(edge.id(), endpointMerges),
                 routePoints,
-                edge.label()));
+                edge.label(),
+                edgePointers.get(edge.id())));
       }
     }
     // Route geometry belongs to ELK Layered. Keep route-quality concerns in
     // ELK graph construction, ELK options, and validation diagnostics.
 
     return new LayoutResult(
-        "layout-result.schema.v1", request.viewId(), nodes, edges, groups, warnings);
+        ContractVersions.LAYOUT_RESULT_SCHEMA_VERSION,
+        request.viewId(),
+        nodes,
+        edges,
+        groups,
+        warnings);
   }
 
   private static Map<String, EdgeEndpointMerge> emptyEndpointMerges(List<LayoutEdge> edges) {
@@ -1097,6 +1124,26 @@ final class ElkLayoutEngine {
     return byId;
   }
 
+  // Provenance is a pure copy-through: the request's node/edge source pointer travels to the
+  // matching LaidOut* element by id. An ELK-synthesized element with no request counterpart gets
+  // no entry here, so the lookup yields null (the optional field's accepted "no provenance" value)
+  // rather than a synthesized pointer.
+  private static Map<String, String> nodeSourcePointers(LayoutRequest request) {
+    Map<String, String> pointers = new HashMap<>();
+    for (LayoutNode node : list(request.nodes())) {
+      pointers.put(node.id(), node.sourcePointer());
+    }
+    return pointers;
+  }
+
+  private static Map<String, String> edgeSourcePointers(LayoutRequest request) {
+    Map<String, String> pointers = new HashMap<>();
+    for (LayoutEdge edge : list(request.edges())) {
+      pointers.put(edge.id(), edge.sourcePointer());
+    }
+    return pointers;
+  }
+
   private static Map<String, String> ownerByNode(
       LayoutRequest request, Map<String, LayoutNode> requestNodes) {
     Map<String, String> ownerByNode = new HashMap<>();
@@ -1375,9 +1422,12 @@ final class ElkLayoutEngine {
   private static void validate(LayoutRequest request) {
     requireNonNull(request, "$");
     requireNonNull(request.layoutRequestSchemaVersion(), "$.layout_request_schema_version");
-    if (!request.layoutRequestSchemaVersion().equals("layout-request.schema.v1")) {
+    if (!request
+        .layoutRequestSchemaVersion()
+        .equals(ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION)) {
       throw new IllegalArgumentException(
-          "$.layout_request_schema_version must be layout-request.schema.v1");
+          "$.layout_request_schema_version must be "
+              + ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION);
     }
     requireNonNull(request.viewId(), "$.view_id");
     requireNonNull(request.nodes(), "$.nodes");

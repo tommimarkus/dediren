@@ -3,6 +3,7 @@ package dev.dediren.plugins.elklayout;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import dev.dediren.contracts.ContractVersions;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
@@ -30,7 +31,7 @@ class MainTest {
     String request =
         """
             {
-              "layout_request_schema_version": "layout-request.schema.v1",
+              "layout_request_schema_version": "%s",
               "view_id": "main",
               "nodes": [
                 {"id": "client", "label": "Client", "source_id": "client", "width_hint": 160, "height_hint": 80},
@@ -42,7 +43,8 @@ class MainTest {
               "groups": [],
               "constraints": []
             }
-            """;
+            """
+            .formatted(ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION);
     ByteArrayInputStream stdin = new ByteArrayInputStream(request.getBytes(StandardCharsets.UTF_8));
     ByteArrayOutputStream stdout = new ByteArrayOutputStream();
 
@@ -52,7 +54,9 @@ class MainTest {
     assertEquals(0, exitCode);
     JsonNode data = EnvelopeAssertions.okData(text);
     ElkLayoutRenderArtifacts.write(data);
-    assertEquals("layout-result.schema.v1", data.path("layout_result_schema_version").asText());
+    assertEquals(
+        ContractVersions.LAYOUT_RESULT_SCHEMA_VERSION,
+        data.path("layout_result_schema_version").asText());
     assertEquals("client-calls-api", data.path("edges").get(0).path("id").asText());
   }
 
@@ -61,7 +65,7 @@ class MainTest {
     String request =
         """
             {
-              "layout_request_schema_version": "layout-request.schema.v1",
+              "layout_request_schema_version": "%s",
               "view_id": "main",
               "nodes": [
                 {"id": "client", "source_id": "client", "width_hint": 160, "height_hint": 80}
@@ -70,7 +74,8 @@ class MainTest {
               "groups": [],
               "constraints": []
             }
-            """;
+            """
+            .formatted(ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION);
     ByteArrayInputStream stdin = new ByteArrayInputStream(request.getBytes(StandardCharsets.UTF_8));
     ByteArrayOutputStream stdout = new ByteArrayOutputStream();
 
@@ -86,7 +91,7 @@ class MainTest {
     String request =
         """
             {
-              "layout_request_schema_version": "layout-request.schema.v1",
+              "layout_request_schema_version": "%s",
               "view_id": "main",
               "nodes": [],
               "edges": [],
@@ -96,7 +101,8 @@ class MainTest {
                 "direction": "diagonal"
               }
             }
-            """;
+            """
+            .formatted(ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION);
     ByteArrayInputStream stdin = new ByteArrayInputStream(request.getBytes(StandardCharsets.UTF_8));
     ByteArrayOutputStream stdout = new ByteArrayOutputStream();
 
@@ -113,7 +119,7 @@ class MainTest {
     String request =
         """
             {
-              "layout_request_schema_version": "layout-request.schema.v1",
+              "layout_request_schema_version": "%s",
               "view_id": "main",
               "nodes": [],
               "edges": [],
@@ -121,7 +127,8 @@ class MainTest {
               "constraints": [],
               "layout_preferences": null
             }
-            """;
+            """
+            .formatted(ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION);
     ByteArrayInputStream stdin = new ByteArrayInputStream(request.getBytes(StandardCharsets.UTF_8));
     ByteArrayOutputStream stdout = new ByteArrayOutputStream();
 
@@ -137,7 +144,7 @@ class MainTest {
     String request =
         """
             {
-              "layout_request_schema_version": "layout-request.schema.v1",
+              "layout_request_schema_version": "%s",
               "view_id": "main",
               "nodes": [],
               "edges": [],
@@ -149,7 +156,8 @@ class MainTest {
                 }
               }
             }
-            """;
+            """
+            .formatted(ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION);
     ByteArrayInputStream stdin = new ByteArrayInputStream(request.getBytes(StandardCharsets.UTF_8));
     ByteArrayOutputStream stdout = new ByteArrayOutputStream();
 
@@ -165,7 +173,7 @@ class MainTest {
     String request =
         """
             {
-              "layout_request_schema_version": "layout-request.schema.v1",
+              "layout_request_schema_version": "%s",
               "view_id": "main",
               "nodes": [
                 {"id": "client", "label": "Client", "source_id": "client", "width_hint": 160, "height_hint": 80}
@@ -176,7 +184,8 @@ class MainTest {
               ],
               "constraints": []
             }
-            """;
+            """
+            .formatted(ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION);
     ByteArrayInputStream stdin = new ByteArrayInputStream(request.getBytes(StandardCharsets.UTF_8));
     ByteArrayOutputStream stdout = new ByteArrayOutputStream();
 
@@ -192,7 +201,7 @@ class MainTest {
     String request =
         """
             {
-              "layout_request_schema_version": "layout-request.schema.v1",
+              "layout_request_schema_version": "%s",
               "view_id": "main",
               "nodes": [
                 {"id": "client", "label": "Client", "source_id": "client", "width_hint": 160, "height_hint": 80}
@@ -203,7 +212,8 @@ class MainTest {
               ],
               "constraints": []
             }
-            """;
+            """
+            .formatted(ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION);
     ByteArrayInputStream stdin = new ByteArrayInputStream(request.getBytes(StandardCharsets.UTF_8));
     ByteArrayOutputStream stdout = new ByteArrayOutputStream();
 
@@ -219,7 +229,7 @@ class MainTest {
     String request =
         """
             {
-              "layout_request_schema_version": "layout-request.schema.v1",
+              "layout_request_schema_version": "%s",
               "view_id": "main",
               "nodes": [
                 {"id": "client", "label": "Client", "source_id": "client", "width_hint": 160, "height_hint": 80}
@@ -238,7 +248,8 @@ class MainTest {
               ],
               "constraints": []
             }
-            """;
+            """
+            .formatted(ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION);
     ByteArrayInputStream stdin = new ByteArrayInputStream(request.getBytes(StandardCharsets.UTF_8));
     ByteArrayOutputStream stdout = new ByteArrayOutputStream();
 
@@ -254,7 +265,7 @@ class MainTest {
     String request =
         """
             {
-              "layout_request_schema_version": "layout-request.schema.v1",
+              "layout_request_schema_version": "%s",
               "view_id": "main",
               "nodes": [
                 {"id": "client", "label": "Client", "source_id": "client", "width_hint": 1e309, "height_hint": 80}
@@ -263,7 +274,8 @@ class MainTest {
               "groups": [],
               "constraints": []
             }
-            """;
+            """
+            .formatted(ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION);
     ByteArrayInputStream stdin = new ByteArrayInputStream(request.getBytes(StandardCharsets.UTF_8));
     ByteArrayOutputStream stdout = new ByteArrayOutputStream();
 

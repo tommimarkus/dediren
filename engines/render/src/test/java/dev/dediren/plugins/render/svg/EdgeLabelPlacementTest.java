@@ -163,7 +163,7 @@ class EdgeLabelPlacementTest {
                 List.of(
                     "order-service", "catalog-service", "payment-service", "fulfillment-service"),
                 "Core Services"));
-    return new LayoutResult("layout-result.schema.v1", "main", nodes, edges, groups, List.of());
+    return new LayoutResult("layout-result.schema.v2", "main", nodes, edges, groups, List.of());
   }
 
   private static LaidOutEdge edge(String id, String target, List<Point> points, String label) {

@@ -2,6 +2,7 @@ package dev.dediren.plugins.elklayout;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import dev.dediren.contracts.ContractVersions;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.contracts.layout.*;
 import org.junit.jupiter.api.Test;
@@ -12,7 +13,7 @@ class LayoutJsonTest {
     String json =
         """
             {
-              "layout_request_schema_version": "layout-request.schema.v1",
+              "layout_request_schema_version": "%s",
               "view_id": "main",
               "nodes": [],
               "edges": [],
@@ -30,7 +31,8 @@ class LayoutJsonTest {
                 }
               }
             }
-            """;
+            """
+            .formatted(ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION);
 
     LayoutRequest request = JsonSupport.objectMapper().readValue(json, LayoutRequest.class);
 
@@ -49,7 +51,7 @@ class LayoutJsonTest {
     String json =
         """
             {
-              "layout_request_schema_version": "layout-request.schema.v1",
+              "layout_request_schema_version": "%s",
               "view_id": "main",
               "nodes": [],
               "edges": [],
@@ -57,7 +59,8 @@ class LayoutJsonTest {
               "constraints": [],
               "layout_preferences": { "routing": { "style": "spline" } }
             }
-            """;
+            """
+            .formatted(ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION);
 
     LayoutRequest request =
         LayoutJson.readLayoutRequest(new java.io.ByteArrayInputStream(json.getBytes()));
@@ -70,7 +73,7 @@ class LayoutJsonTest {
     String json =
         """
             {
-              "layout_request_schema_version": "layout-request.schema.v1",
+              "layout_request_schema_version": "%s",
               "view_id": "main",
               "nodes": [],
               "edges": [],
@@ -83,7 +86,8 @@ class LayoutJsonTest {
                 "placement": { "strategy": "linear-segments" }
               }
             }
-            """;
+            """
+            .formatted(ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION);
 
     LayoutRequest request =
         LayoutJson.readLayoutRequest(new java.io.ByteArrayInputStream(json.getBytes()));
@@ -104,7 +108,7 @@ class LayoutJsonTest {
     String json =
         """
             {
-              "layout_request_schema_version": "layout-request.schema.v1",
+              "layout_request_schema_version": "%s",
               "view_id": "main",
               "nodes": [],
               "edges": [],
@@ -112,7 +116,8 @@ class LayoutJsonTest {
               "constraints": [],
               "layout_preferences": { "cycle_breaking": "bogus" }
             }
-            """;
+            """
+            .formatted(ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION);
 
     LayoutJson.LayoutPreferenceValidationException ex =
         org.junit.jupiter.api.Assertions.assertThrows(
@@ -128,7 +133,7 @@ class LayoutJsonTest {
     String json =
         """
             {
-              "layout_request_schema_version": "layout-request.schema.v1",
+              "layout_request_schema_version": "%s",
               "view_id": "main",
               "nodes": [],
               "edges": [],
@@ -141,7 +146,8 @@ class LayoutJsonTest {
                 "thoroughness": "low"
               }
             }
-            """;
+            """
+            .formatted(ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION);
 
     LayoutRequest request =
         LayoutJson.readLayoutRequest(new java.io.ByteArrayInputStream(json.getBytes()));
@@ -159,7 +165,7 @@ class LayoutJsonTest {
     String json =
         """
             {
-              "layout_request_schema_version": "layout-request.schema.v1",
+              "layout_request_schema_version": "%s",
               "view_id": "main",
               "nodes": [],
               "edges": [],
@@ -167,7 +173,8 @@ class LayoutJsonTest {
               "constraints": [],
               "layout_preferences": { "thoroughness": "extreme" }
             }
-            """;
+            """
+            .formatted(ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION);
 
     LayoutJson.LayoutPreferenceValidationException ex =
         org.junit.jupiter.api.Assertions.assertThrows(
@@ -183,7 +190,7 @@ class LayoutJsonTest {
     String json =
         """
             {
-              "layout_request_schema_version": "layout-request.schema.v1",
+              "layout_request_schema_version": "%s",
               "view_id": "main",
               "nodes": [],
               "edges": [],
@@ -191,7 +198,8 @@ class LayoutJsonTest {
               "constraints": [],
               "layout_preferences": { "algorithm": "layered" }
             }
-            """;
+            """
+            .formatted(ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION);
 
     LayoutRequest request =
         LayoutJson.readLayoutRequest(new java.io.ByteArrayInputStream(json.getBytes()));
@@ -204,7 +212,7 @@ class LayoutJsonTest {
     String json =
         """
             {
-              "layout_request_schema_version": "layout-request.schema.v1",
+              "layout_request_schema_version": "%s",
               "view_id": "main",
               "nodes": [],
               "edges": [],
@@ -212,7 +220,8 @@ class LayoutJsonTest {
               "constraints": [],
               "layout_preferences": { "algorithm": "tree" }
             }
-            """;
+            """
+            .formatted(ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION);
 
     LayoutJson.LayoutPreferenceValidationException ex =
         org.junit.jupiter.api.Assertions.assertThrows(

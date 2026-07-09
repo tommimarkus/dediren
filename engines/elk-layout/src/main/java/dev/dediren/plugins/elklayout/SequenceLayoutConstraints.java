@@ -37,21 +37,30 @@ final class SequenceLayoutConstraints {
   private final Map<String, Integer> messageIndexById;
   private final Set<String> fragmentOpenIds;
   private final Set<String> operandOpenIds;
+  private final Map<String, String> nodePointers;
+  private final Map<String, String> edgePointers;
 
   private SequenceLayoutConstraints(
       List<String> lifelineOrder,
       List<String> messageOrder,
       List<String> fragmentOpenIds,
-      List<String> operandOpenIds) {
+      List<String> operandOpenIds,
+      Map<String, String> nodePointers,
+      Map<String, String> edgePointers) {
     this.lifelineOrder = List.copyOf(lifelineOrder);
     this.messageOrder = List.copyOf(messageOrder);
     this.lifelineIndexById = indexById(this.lifelineOrder);
     this.messageIndexById = indexById(this.messageOrder);
     this.fragmentOpenIds = Set.copyOf(fragmentOpenIds);
     this.operandOpenIds = Set.copyOf(operandOpenIds);
+    // Map.copyOf rejects null values; a missing/optional source pointer is a legitimate value
+    // here (pure copy-through), so keep a plain defensive copy instead.
+    this.nodePointers = new HashMap<>(nodePointers);
+    this.edgePointers = new HashMap<>(edgePointers);
   }
 
-  static SequenceLayoutConstraints from(LayoutRequest request) {
+  static SequenceLayoutConstraints from(
+      LayoutRequest request, Map<String, String> nodePointers, Map<String, String> edgePointers) {
     List<String> lifelineOrder = List.of();
     List<String> messageOrder = List.of();
     List<String> fragmentOpenIds = List.of();
@@ -68,7 +77,7 @@ final class SequenceLayoutConstraints {
       }
     }
     return new SequenceLayoutConstraints(
-        lifelineOrder, messageOrder, fragmentOpenIds, operandOpenIds);
+        lifelineOrder, messageOrder, fragmentOpenIds, operandOpenIds, nodePointers, edgePointers);
   }
 
   boolean active() {
@@ -171,7 +180,8 @@ final class SequenceLayoutConstraints {
                 right - left,
                 bottom - top,
                 node.label(),
-                node.role()));
+                node.role(),
+                nodePointers.get(node.id())));
       } else {
         normalized.add(node);
       }
@@ -220,7 +230,8 @@ final class SequenceLayoutConstraints {
               node.width(),
               node.height(),
               node.label(),
-              node.role()));
+              node.role(),
+              nodePointers.get(node.id())));
     }
     return normalized;
   }
@@ -286,7 +297,8 @@ final class SequenceLayoutConstraints {
               edge.projectionId(),
               edge.routingHints(),
               normalizedMessagePoints(edge, normalizedNodesById, y),
-              edge.label()));
+              edge.label(),
+              edgePointers.get(edge.id())));
     }
     return normalized;
   }

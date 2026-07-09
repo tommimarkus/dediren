@@ -27,6 +27,7 @@ class ArchitectureRulesTest {
   private static final String CORE = "dev.dediren.core..";
   private static final String CLI = "dev.dediren.cli..";
   private static final String PLUGINS = "dev.dediren.plugins..";
+  private static final String IR = "dev.dediren.ir..";
 
   // The five first-party engines, keyed by their retained dev.dediren.plugins.* package names
   // (§12 debt: the package rename did not follow the engines/ directory move).
@@ -57,6 +58,7 @@ class ArchitectureRulesTest {
     int genericGraphClasses = 0;
     int archimateOefClasses = 0;
     int umlXmiClasses = 0;
+    int irClasses = 0;
     for (JavaClass javaClass : PRODUCTION_CLASSES) {
       String packageName = javaClass.getPackageName();
       if (packageName.startsWith("dev.dediren.core")) {
@@ -73,6 +75,8 @@ class ArchitectureRulesTest {
         archimateOefClasses++;
       } else if (packageName.startsWith("dev.dediren.plugins.umlxmi")) {
         umlXmiClasses++;
+      } else if (packageName.startsWith("dev.dediren.ir")) {
+        irClasses++;
       }
     }
     assertThat(coreClasses).as("core production classes on the classpath").isPositive();
@@ -90,6 +94,7 @@ class ArchitectureRulesTest {
     assertThat(umlXmiClasses)
         .as("uml-xmi-export engine production classes on the classpath")
         .isPositive();
+    assertThat(irClasses).as("ir production classes on the classpath").isPositive();
   }
 
   @Test
@@ -141,6 +146,21 @@ class ArchitectureRulesTest {
         .because(
             "engine-api is the shared engine-facing interface surface and must depend"
                 + " only on contracts, never core or any engine implementation (Task 2)")
+        .check(PRODUCTION_CLASSES);
+  }
+
+  @Test
+  void irDependsOnlyOnContracts() {
+    noClasses()
+        .that()
+        .resideInAPackage(IR)
+        .should()
+        .dependOnClassesThat()
+        .resideInAnyPackage(CORE, CLI, PLUGINS, ENGINE_API)
+        .because(
+            "ir is the pre-layout typed scene graph library (Plan B P1); it depends only on"
+                + " contracts and must never compile-depend on core, cli, engine-api, or a"
+                + " concrete engine implementation")
         .check(PRODUCTION_CLASSES);
   }
 

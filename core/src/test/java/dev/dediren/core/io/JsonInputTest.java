@@ -14,7 +14,7 @@ class JsonInputTest {
         JsonInput.parseCommandData(
             """
                 {
-                  "layout_request_schema_version": "layout-request.schema.v1",
+                  "layout_request_schema_version": "layout-request.schema.v2",
                   "view_id": "main",
                   "nodes": [],
                   "edges": [],
@@ -38,7 +38,7 @@ class JsonInputTest {
                   "envelope_schema_version": "envelope.schema.v1",
                   "status": "ok",
                   "data": {
-                    "layout_request_schema_version": "layout-request.schema.v1",
+                    "layout_request_schema_version": "layout-request.schema.v2",
                     "view_id": "main",
                     "nodes": [],
                     "edges": [],

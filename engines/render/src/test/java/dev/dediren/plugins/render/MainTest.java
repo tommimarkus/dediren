@@ -30,7 +30,7 @@ class MainTest {
 
   private static final String MINIMAL_LAYOUT =
       """
-            {"layout_result_schema_version":"layout-result.schema.v1","view_id":"t","nodes":[{"id":"n","source_id":"n","projection_id":"n","x":0,"y":0,"width":200,"height":100,"label":"Node"}],"edges":[],"groups":[],"warnings":[]}""";
+            {"layout_result_schema_version":"layout-result.schema.v2","view_id":"t","nodes":[{"id":"n","source_id":"n","projection_id":"n","x":0,"y":0,"width":200,"height":100,"label":"Node"}],"edges":[],"groups":[],"warnings":[]}""";
 
   @Test
   void moduleLoads() {
@@ -1308,7 +1308,7 @@ class MainTest {
     @Test
     void archimateGroupingMetadataRendersGroupDecorator() throws Exception {
       ObjectNode layout = JsonSupport.objectMapper().createObjectNode();
-      layout.put("layout_result_schema_version", "layout-result.schema.v1");
+      layout.put("layout_result_schema_version", "layout-result.schema.v2");
       layout.put("view_id", "main");
       layout.set("nodes", JsonSupport.objectMapper().createArrayNode());
       layout.set("edges", JsonSupport.objectMapper().createArrayNode());
@@ -1391,7 +1391,7 @@ class MainTest {
     @Test
     void nonGroupingGroupContainerRendersSolidBorder() throws Exception {
       ObjectNode layout = JsonSupport.objectMapper().createObjectNode();
-      layout.put("layout_result_schema_version", "layout-result.schema.v1");
+      layout.put("layout_result_schema_version", "layout-result.schema.v2");
       layout.put("view_id", "main");
       layout.set("nodes", JsonSupport.objectMapper().createArrayNode());
       layout.set("edges", JsonSupport.objectMapper().createArrayNode());
@@ -3432,7 +3432,7 @@ class MainTest {
       JsonNode policy, String nodes, String edges, String metadataNodes, String metadataEdges)
       throws Exception {
     ObjectNode layout = JsonSupport.objectMapper().createObjectNode();
-    layout.put("layout_result_schema_version", "layout-result.schema.v1");
+    layout.put("layout_result_schema_version", "layout-result.schema.v2");
     layout.put("view_id", "archimate-coverage");
     layout.set("nodes", JsonSupport.objectMapper().readTree(nodes));
     layout.set("edges", JsonSupport.objectMapper().readTree(edges));
@@ -3488,7 +3488,7 @@ class MainTest {
       ObjectNode metadataEdges,
       JsonNode policy) {
     ObjectNode layout = JsonSupport.objectMapper().createObjectNode();
-    layout.put("layout_result_schema_version", "layout-result.schema.v1");
+    layout.put("layout_result_schema_version", "layout-result.schema.v2");
     layout.put("view_id", semanticProfile + "-coverage");
     layout.set("nodes", nodes);
     layout.set("edges", edges);
@@ -3701,7 +3701,7 @@ class MainTest {
   private static JsonNode styledInlineInput(String groups, String nodes, String edges, String style)
       throws Exception {
     ObjectNode layout = JsonSupport.objectMapper().createObjectNode();
-    layout.put("layout_result_schema_version", "layout-result.schema.v1");
+    layout.put("layout_result_schema_version", "layout-result.schema.v2");
     layout.put("view_id", "inline-test");
     layout.set("groups", JsonSupport.objectMapper().readTree(groups));
     layout.set("nodes", JsonSupport.objectMapper().readTree(nodes));

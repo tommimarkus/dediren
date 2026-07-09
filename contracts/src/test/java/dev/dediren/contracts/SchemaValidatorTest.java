@@ -172,7 +172,7 @@ class SchemaValidatorTest {
     noPolicy.putObject("source").put("model_schema_version", "model.schema.v1");
     noPolicy
         .putObject("layout_result")
-        .put("layout_result_schema_version", "layout-result.schema.v1");
+        .put("layout_result_schema_version", "layout-result.schema.v2");
     assertThat(
             SchemaAssertions.validate(
                 workspaceRoot(), "schemas/export-request.schema.json", noPolicy))
@@ -201,7 +201,7 @@ class SchemaValidatorTest {
     request.putObject("source").put("model_schema_version", "model.schema.v1");
     request
         .putObject("layout_result")
-        .put("layout_result_schema_version", "layout-result.schema.v1");
+        .put("layout_result_schema_version", "layout-result.schema.v2");
     request.set("policy", policy);
     return request;
   }
@@ -231,7 +231,7 @@ class SchemaValidatorTest {
     String template =
         """
         {
-          "layout_request_schema_version": "layout-request.schema.v1",
+          "layout_request_schema_version": "layout-request.schema.v2",
           "view_id": "main",
           "nodes": [],
           "edges": [],
@@ -262,7 +262,7 @@ class SchemaValidatorTest {
     String template =
         """
         {
-          "layout_request_schema_version": "layout-request.schema.v1",
+          "layout_request_schema_version": "layout-request.schema.v2",
           "view_id": "main",
           "nodes": [],
           "edges": [],
@@ -298,7 +298,7 @@ class SchemaValidatorTest {
     String template =
         """
         {
-          "layout_request_schema_version": "layout-request.schema.v1",
+          "layout_request_schema_version": "layout-request.schema.v2",
           "view_id": "main",
           "nodes": [],
           "edges": [],
@@ -334,7 +334,7 @@ class SchemaValidatorTest {
     String template =
         """
         {
-          "layout_request_schema_version": "layout-request.schema.v1",
+          "layout_request_schema_version": "layout-request.schema.v2",
           "view_id": "main",
           "nodes": [],
           "edges": [],

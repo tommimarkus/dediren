@@ -1,5 +1,5 @@
 {
-  "layout_request_schema_version": "layout-request.schema.v1",
+  "layout_request_schema_version": "layout-request.schema.v2",
   "view_id": "main",
   "nodes": [
     {
@@ -7,14 +7,16 @@
       "label": "Client",
       "source_id": "client",
       "width_hint": 160,
-      "height_hint": 80
+      "height_hint": 80,
+      "source_pointer": "/nodes/0"
     },
     {
       "id": "api",
       "label": "API",
       "source_id": "api",
       "width_hint": 160,
-      "height_hint": 80
+      "height_hint": 80,
+      "source_pointer": "/nodes/1"
     }
   ],
   "edges": [
@@ -23,7 +25,8 @@
       "source": "client",
       "target": "api",
       "label": "calls",
-      "source_id": "client-calls-api"
+      "source_id": "client-calls-api",
+      "source_pointer": "/relationships/0"
     }
   ],
   "groups": [],

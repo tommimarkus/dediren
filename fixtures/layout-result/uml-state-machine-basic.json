@@ -1,5 +1,5 @@
 {
-  "layout_result_schema_version": "layout-result.schema.v1",
+  "layout_result_schema_version": "layout-result.schema.v2",
   "view_id": "state-machine-view",
   "nodes": [
     {
