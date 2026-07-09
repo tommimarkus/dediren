@@ -43,6 +43,21 @@
     </dependency>
     <dependency>
       <groupId>dev.dediren</groupId>
+      <artifactId>semantics-graph</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>dev.dediren</groupId>
+      <artifactId>semantics-archimate</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>dev.dediren</groupId>
+      <artifactId>semantics-uml</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>dev.dediren</groupId>
       <artifactId>elk-layout</artifactId>
       <version>${project.version}</version>
     </dependency>
