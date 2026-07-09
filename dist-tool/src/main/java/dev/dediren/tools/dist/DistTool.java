@@ -70,6 +70,7 @@ public final class DistTool {
           "elk-layout",
           "engine-api",
           "generic-graph",
+          "ir",
           "render",
           "schema-cache",
           "uml",
