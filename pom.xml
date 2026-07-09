@@ -23,6 +23,9 @@
     <module>engines/generic-graph</module>
     <module>engines/render</module>
     <module>engines/uml-xmi-export</module>
+    <module>semantics-graph</module>
+    <module>semantics-archimate</module>
+    <module>semantics-uml</module>
     <module>test-support</module>
     <module>dist-tool</module>
     <module>coverage-report</module>
