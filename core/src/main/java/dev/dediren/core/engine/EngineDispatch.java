@@ -8,6 +8,7 @@ import dev.dediren.contracts.DiagnosticCode;
 import dev.dediren.contracts.DiagnosticSeverity;
 import dev.dediren.contracts.EnvelopeStatus;
 import dev.dediren.contracts.json.JsonSupport;
+import dev.dediren.contracts.util.ContractCollections;
 import dev.dediren.core.plugins.PluginExecutionException;
 import dev.dediren.core.plugins.PluginRunOutcome;
 import dev.dediren.engine.EngineException;
@@ -52,6 +53,27 @@ public final class EngineDispatch {
   }
 
   /**
+   * In-memory dispatch outcome: either the engine's typed {@link EngineResult}, or a published
+   * error envelope's diagnostics plus exit code (an {@link EngineException}). An unexpected failure
+   * is not an outcome here — {@link #dispatchInMemory} still throws {@link
+   * PluginExecutionException} ({@link DiagnosticCode#ENGINE_FAILED}); an {@link
+   * UncheckedIOException} still propagates unchanged. It lets the in-memory build pipe an engine's
+   * typed value straight into the next stage while the serializing {@link #dispatch} reuses the
+   * same branches to render an envelope.
+   */
+  public sealed interface InMemoryOutcome<T> {
+    record Value<T>(EngineResult<T> result) implements InMemoryOutcome<T> {}
+
+    record Failure<T>(List<Diagnostic> diagnostics, int exitCode) implements InMemoryOutcome<T> {
+      public Failure {
+        // Normalize the diagnostics defensively, matching EngineResult, so the record never exposes
+        // a caller-held mutable list (SpotBugs EI_EXPOSE_REP) without a suppression.
+        diagnostics = ContractCollections.listOrEmpty(diagnostics);
+      }
+    }
+  }
+
+  /**
    * Resolves outcome 5: returns the bound engine, or throws the published unknown-id /
    * unsupported-capability diagnostic. An id bound under any other capability in {@code engines} is
    * a capability mismatch, not an unknown id.
@@ -72,14 +94,20 @@ public final class EngineDispatch {
         DiagnosticCode.PLUGIN_UNKNOWN.code(), engineId, "unknown engine id: " + engineId);
   }
 
-  public static <T> PluginRunOutcome dispatch(String engineId, EngineInvocation<T> invocation)
-      throws PluginExecutionException {
-    EngineResult<T> result;
+  /**
+   * Invokes the engine and folds its two published failure shapes into a typed {@link
+   * InMemoryOutcome} instead of a serialized envelope: a {@link EngineException} becomes {@link
+   * InMemoryOutcome.Failure} (its diagnostics + exit code), while an unexpected exception still
+   * maps to a {@link DiagnosticCode#ENGINE_FAILED} {@link PluginExecutionException} and an {@link
+   * UncheckedIOException} still propagates unchanged. This is the transport the in-memory build
+   * consumes; {@link #dispatch} is this method plus serialization.
+   */
+  public static <T> InMemoryOutcome<T> dispatchInMemory(
+      String engineId, EngineInvocation<T> invocation) throws PluginExecutionException {
     try {
-      result = invocation.invoke();
+      return new InMemoryOutcome.Value<>(invocation.invoke());
     } catch (EngineException error) {
-      return new PluginRunOutcome(
-          serialize(CommandEnvelope.error(error.diagnostics())), error.exitCode());
+      return new InMemoryOutcome.Failure<>(error.diagnostics(), error.exitCode());
     } catch (UncheckedIOException error) {
       throw error;
     } catch (Exception error) {
@@ -92,9 +120,29 @@ public final class EngineDispatch {
           engineId,
           "engine " + engineId + " failed: " + error.getMessage());
     }
-    return new PluginRunOutcome(
-        serialize(successEnvelope(result.value(), result.diagnostics())),
-        CommandExitCode.OK.code());
+  }
+
+  public static <T> PluginRunOutcome dispatch(String engineId, EngineInvocation<T> invocation)
+      throws PluginExecutionException {
+    return switch (dispatchInMemory(engineId, invocation)) {
+      case InMemoryOutcome.Value<T> value ->
+          new PluginRunOutcome(
+              envelope(value.result().value(), value.result().diagnostics()),
+              CommandExitCode.OK.code());
+      case InMemoryOutcome.Failure<T> failure ->
+          new PluginRunOutcome(
+              serialize(CommandEnvelope.error(failure.diagnostics())), failure.exitCode());
+    };
+  }
+
+  /**
+   * Serializes a successful stage envelope for {@code data} carrying {@code diagnostics}, applying
+   * the same ok/warning/info-ride-ok policy as the standalone command path. The in-memory build
+   * reuses this so an {@code --emit} stage file is byte-identical to what the standalone command
+   * prints to stdout.
+   */
+  public static String envelope(Object data, List<Diagnostic> diagnostics) {
+    return serialize(successEnvelope(data, diagnostics));
   }
 
   private static boolean isBoundToAnyCapability(Engines engines, String engineId) {

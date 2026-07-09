@@ -1,6 +1,5 @@
 package dev.dediren.core.commands;
 
-import dev.dediren.contracts.CommandEnvelope;
 import dev.dediren.contracts.CommandExitCode;
 import dev.dediren.contracts.ContractVersions;
 import dev.dediren.contracts.Diagnostic;
@@ -10,18 +9,31 @@ import dev.dediren.contracts.EnvelopeStatus;
 import dev.dediren.contracts.build.BuildArtifact;
 import dev.dediren.contracts.build.BuildResult;
 import dev.dediren.contracts.build.BuildViewOutcome;
+import dev.dediren.contracts.export.ExportRequest;
 import dev.dediren.contracts.export.ExportResult;
 import dev.dediren.contracts.json.JsonSupport;
+import dev.dediren.contracts.layout.LayoutResult;
 import dev.dediren.contracts.render.RenderArtifact;
+import dev.dediren.contracts.render.RenderMetadata;
 import dev.dediren.contracts.render.RenderResult;
 import dev.dediren.contracts.source.GenericGraphPluginData;
 import dev.dediren.contracts.source.GenericGraphView;
 import dev.dediren.contracts.source.SourceDocument;
+import dev.dediren.core.DedirenPaths;
+import dev.dediren.core.engine.EngineDispatch;
 import dev.dediren.core.plugins.PluginExecutionException;
 import dev.dediren.core.plugins.PluginRunOutcome;
 import dev.dediren.core.source.SourceValidator;
 import dev.dediren.core.source.ValidationResult;
 import dev.dediren.engine.Engines;
+import dev.dediren.engine.ExportEngine;
+import dev.dediren.engine.LayoutEngine;
+import dev.dediren.engine.RenderEngine;
+import dev.dediren.engine.SemanticsEngine;
+import dev.dediren.ir.LaidOutScene;
+import dev.dediren.ir.LaidOutSceneMapper;
+import dev.dediren.ir.LayoutRequestMapper;
+import dev.dediren.ir.SceneGraph;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -32,14 +44,17 @@ import tools.jackson.databind.JsonNode;
 
 /**
  * The in-memory {@code build} driver (decision 14): it validates a source document once, then for
- * every selected view chains the same proven stage paths the Task 5 parity gate blessed — {@link
- * CoreCommands#projectCommand project layout-request} → {@link CoreCommands#layoutCommand layout} →
- * {@link CoreCommands#validateLayoutCommand layout-quality validation} → an optional render lane
- * ({@code project render-metadata} + {@code render}) and/or export lanes ({@code archimate-oef},
- * {@code uml-xmi}) — writing each lane's artifact under {@code outDir}. It never re-implements
- * stage logic; it pipes each stage's command envelope into the next exactly as the process CLI did,
- * so {@code --emit} can persist a stage envelope verbatim and every stage's diagnostics surface in
- * the build result unchanged.
+ * every selected view pipes the typed IR straight through the stages with no per-stage JSON
+ * round-trip — {@link SemanticsEngine#projectScene projectScene} → {@link LayoutEngine#layout
+ * layout} → {@link CoreCommands#validateLayout layout-quality validation} → an optional render lane
+ * ({@link SemanticsEngine#projectRenderMetadata render-metadata} + {@link RenderEngine#render
+ * render}) and/or export lanes ({@code archimate-oef}, {@code uml-xmi}) — writing each lane's
+ * artifact under {@code outDir}. The export lanes are record-based, so build maps its in-memory
+ * {@link LaidOutScene} to a {@link LayoutResult} via {@link LaidOutSceneMapper#toResult} to
+ * assemble the {@link ExportRequest}. Only the {@code --emit} seam serializes a stage: it reuses
+ * the same envelope serialization the standalone commands use ({@link EngineDispatch#envelope}), so
+ * an emitted stage file is byte-identical to what {@code dediren project}/{@code dediren layout}
+ * print.
  *
  * <p>Aggregation follows the envelope vocabulary: a view is {@code error} if any of its stages
  * failed (it stops at that stage, so its artifacts may be partial), {@code warning} if a stage
@@ -91,7 +106,7 @@ public final class BuildCommand {
     boolean anyWarning = false;
     int failureExit = CommandExitCode.OK.code();
     for (String view : views) {
-      ViewBuild built = buildView(request, engines, view);
+      ViewBuild built = buildView(request, engines, source, view);
       outcomes.add(built.outcome());
       EnvelopeStatus viewStatus = built.outcome().status();
       if (viewStatus == EnvelopeStatus.ERROR) {
@@ -131,124 +146,152 @@ public final class BuildCommand {
     }
   }
 
-  private static ViewBuild buildView(BuildRequest request, Engines engines, String view) {
+  private static ViewBuild buildView(
+      BuildRequest request, Engines engines, SourceDocument source, String view) {
     List<Diagnostic> diagnostics = new ArrayList<>();
     List<BuildArtifact> artifacts = new ArrayList<>();
     boolean warning = false;
 
-    StageOutcome layoutRequest =
+    // Stage 1: semantics projection -> SceneGraph, piped in memory into layout with no
+    // re-serialize.
+    InMemoryStage<SceneGraph> projection =
         runStage(
             diagnostics,
-            () ->
-                CoreCommands.projectCommand(
-                    SEMANTICS_ENGINE,
-                    "layout-request",
-                    view,
-                    request.sourceText(),
-                    request.sourceBaseDir(),
-                    request.env(),
-                    engines));
-    if (layoutRequest.failed()) {
-      return failedView(view, artifacts, diagnostics, layoutRequest.exitCode());
+            () -> {
+              SemanticsEngine engine =
+                  EngineDispatch.requireEngine(
+                      engines,
+                      SEMANTICS_ENGINE,
+                      "projection",
+                      engines.semanticsEngine(SEMANTICS_ENGINE));
+              return EngineDispatch.dispatchInMemory(
+                  SEMANTICS_ENGINE, () -> engine.projectScene(source, view));
+            });
+    if (projection.failed()) {
+      return failedView(view, artifacts, diagnostics, projection.exitCode());
     }
-    emit(request, view, EMIT_LAYOUT_REQUEST, "layout-request.json", layoutRequest.outcome());
-    warning |= layoutRequest.warning();
+    SceneGraph scene = projection.value();
+    emitEnvelope(
+        request,
+        view,
+        EMIT_LAYOUT_REQUEST,
+        "layout-request.json",
+        LayoutRequestMapper.toRequest(scene),
+        projection.stageDiagnostics());
+    warning |= projection.warning();
 
-    StageOutcome layout =
+    // Stage 2: layout -> LaidOutScene.
+    InMemoryStage<LaidOutScene> layout =
         runStage(
             diagnostics,
-            () ->
-                CoreCommands.layoutCommand(
-                    LAYOUT_ENGINE, layoutRequest.outcome().stdout(), request.env(), engines));
+            () -> {
+              LayoutEngine engine =
+                  EngineDispatch.requireEngine(
+                      engines, LAYOUT_ENGINE, "layout", engines.layoutEngine(LAYOUT_ENGINE));
+              return EngineDispatch.dispatchInMemory(LAYOUT_ENGINE, () -> engine.layout(scene));
+            });
     if (layout.failed()) {
       return failedView(view, artifacts, diagnostics, layout.exitCode());
     }
-    emit(request, view, EMIT_LAYOUT_RESULT, "layout-result.json", layout.outcome());
+    LaidOutScene laid = layout.value();
+    LayoutResult layoutRecord = LaidOutSceneMapper.toResult(laid);
+    emitEnvelope(
+        request,
+        view,
+        EMIT_LAYOUT_RESULT,
+        "layout-result.json",
+        layoutRecord,
+        layout.stageDiagnostics());
     warning |= layout.warning();
-    String layoutEnvelope = layout.outcome().stdout();
 
-    ValidationResult quality = CoreCommands.validateLayoutCommand(layoutEnvelope);
+    // Stage 3: layout-quality validation over the mapped record (unchanged verdict semantics).
+    ValidationResult quality = CoreCommands.validateLayout(layoutRecord);
     diagnostics.addAll(quality.envelope().diagnostics());
     if (quality.envelope().status() == EnvelopeStatus.ERROR) {
       return failedView(view, artifacts, diagnostics, quality.exitCode());
     }
     warning |= quality.envelope().status() == EnvelopeStatus.WARNING;
 
+    // Stage 4: render lane.
     if (request.renderPolicyText() != null) {
-      StageOutcome renderMetadata =
+      InMemoryStage<RenderMetadata> metadata =
           runStage(
               diagnostics,
-              () ->
-                  CoreCommands.projectCommand(
-                      SEMANTICS_ENGINE,
-                      "render-metadata",
-                      view,
-                      request.sourceText(),
-                      request.sourceBaseDir(),
-                      request.env(),
-                      engines));
-      if (renderMetadata.failed()) {
-        return failedView(view, artifacts, diagnostics, renderMetadata.exitCode());
+              () -> {
+                SemanticsEngine engine =
+                    EngineDispatch.requireEngine(
+                        engines,
+                        SEMANTICS_ENGINE,
+                        "projection",
+                        engines.semanticsEngine(SEMANTICS_ENGINE));
+                return EngineDispatch.dispatchInMemory(
+                    SEMANTICS_ENGINE, () -> engine.projectRenderMetadata(source, view));
+              });
+      if (metadata.failed()) {
+        return failedView(view, artifacts, diagnostics, metadata.exitCode());
       }
-      emit(request, view, EMIT_RENDER_METADATA, "render-metadata.json", renderMetadata.outcome());
-      warning |= renderMetadata.warning();
+      RenderMetadata renderMetadata = metadata.value();
+      emitEnvelope(
+          request,
+          view,
+          EMIT_RENDER_METADATA,
+          "render-metadata.json",
+          renderMetadata,
+          metadata.stageDiagnostics());
+      warning |= metadata.warning();
 
-      StageOutcome render =
+      InMemoryStage<RenderResult> render =
           runStage(
               diagnostics,
-              () ->
-                  CoreCommands.renderCommand(
-                      RENDER_ENGINE,
-                      request.renderPolicyText(),
-                      renderMetadata.outcome().stdout(),
-                      layoutEnvelope,
-                      request.env(),
-                      engines));
+              () -> {
+                JsonNode policy = CoreCommands.parseJson("render", request.renderPolicyText());
+                RenderEngine engine =
+                    EngineDispatch.requireEngine(
+                        engines, RENDER_ENGINE, "render", engines.renderEngine(RENDER_ENGINE));
+                return EngineDispatch.dispatchInMemory(
+                    RENDER_ENGINE, () -> engine.render(laid, policy, renderMetadata));
+              });
       if (render.failed()) {
         return failedView(view, artifacts, diagnostics, render.exitCode());
       }
       warning |= render.warning();
-      writeRenderArtifacts(request, view, render.data(), artifacts);
+      writeRenderArtifacts(request, view, render.value(), artifacts);
     }
 
+    // Stage 5: ArchiMate/OEF export lane (map laid -> LayoutResult for the record ExportRequest).
     if (request.oefPolicyText() != null) {
-      StageOutcome oef =
-          runStage(
-              diagnostics,
-              () ->
-                  CoreCommands.exportCommand(
-                      OEF_ENGINE,
-                      request.oefPolicyText(),
-                      request.sourceText(),
-                      request.sourceBaseDir(),
-                      layoutEnvelope,
-                      request.env(),
-                      engines));
+      InMemoryStage<ExportResult> oef =
+          runExportStage(
+              request,
+              engines,
+              source,
+              layoutRecord,
+              OEF_ENGINE,
+              request.oefPolicyText(),
+              diagnostics);
       if (oef.failed()) {
         return failedView(view, artifacts, diagnostics, oef.exitCode());
       }
       warning |= oef.warning();
-      writeExportArtifact(request, view, "oef", oef.data(), artifacts);
+      writeExportArtifact(request, view, "oef", oef.value(), artifacts);
     }
 
+    // Stage 6: UML/XMI export lane.
     if (request.xmiPolicyText() != null) {
-      StageOutcome xmi =
-          runStage(
-              diagnostics,
-              () ->
-                  CoreCommands.exportCommand(
-                      XMI_ENGINE,
-                      request.xmiPolicyText(),
-                      request.sourceText(),
-                      request.sourceBaseDir(),
-                      layoutEnvelope,
-                      request.env(),
-                      engines));
+      InMemoryStage<ExportResult> xmi =
+          runExportStage(
+              request,
+              engines,
+              source,
+              layoutRecord,
+              XMI_ENGINE,
+              request.xmiPolicyText(),
+              diagnostics);
       if (xmi.failed()) {
         return failedView(view, artifacts, diagnostics, xmi.exitCode());
       }
       warning |= xmi.warning();
-      writeExportArtifact(request, view, "xmi", xmi.data(), artifacts);
+      writeExportArtifact(request, view, "xmi", xmi.value(), artifacts);
     }
 
     EnvelopeStatus status = warning ? EnvelopeStatus.WARNING : EnvelopeStatus.OK;
@@ -256,51 +299,88 @@ public final class BuildCommand {
         new BuildViewOutcome(view, status, artifacts, diagnostics), CommandExitCode.OK.code());
   }
 
-  private static StageOutcome runStage(List<Diagnostic> diagnostics, StageCall call) {
-    PluginRunOutcome outcome;
+  private static InMemoryStage<ExportResult> runExportStage(
+      BuildRequest request,
+      Engines engines,
+      SourceDocument source,
+      LayoutResult layoutRecord,
+      String engineId,
+      String policyText,
+      List<Diagnostic> diagnostics) {
+    return runStage(
+        diagnostics,
+        () -> {
+          JsonNode policy = CoreCommands.parseJson("export", policyText);
+          ExportEngine engine =
+              EngineDispatch.requireEngine(
+                  engines, engineId, "export", engines.exportEngine(engineId));
+          // Decision 9: a relative schema/cache env path resolves against the product root, not the
+          // JVM cwd. Resolving it here (outside the dispatch invocation) mirrors the standalone
+          // export command, so a lookup failure surfaces the same way rather than as ENGINE_FAILED.
+          Path productRoot = DedirenPaths.productRoot();
+          ExportRequest exportRequest =
+              new ExportRequest(
+                  ContractVersions.EXPORT_REQUEST_SCHEMA_VERSION, source, layoutRecord, policy);
+          return EngineDispatch.dispatchInMemory(
+              engineId, () -> engine.export(exportRequest, request.env(), productRoot));
+        });
+  }
+
+  /**
+   * Runs one in-memory stage, folding the two published stage failures into the per-view
+   * diagnostics exactly as the process CLI did: a structured {@link PluginExecutionException}
+   * (unknown engine, unsupported capability, invalid policy JSON, or an unexpected engine failure)
+   * folds with a {@code PLUGIN_ERROR} exit; a raw {@link UncheckedIOException} structural failure
+   * (an unresolvable {@code --views} entry) folds with an {@code INPUT_ERROR} exit so it never
+   * aborts the other views. On success the stage's own diagnostics are appended and its warning bit
+   * is the same the success envelope would carry (any non-info diagnostic).
+   */
+  private static <T> InMemoryStage<T> runStage(List<Diagnostic> diagnostics, InMemoryCall<T> call) {
+    EngineDispatch.InMemoryOutcome<T> outcome;
     try {
       outcome = call.run();
     } catch (PluginExecutionException error) {
-      // In-memory dispatch surfaces an unexpected engine failure or invalid command input as a
-      // structured exception; fold its diagnostic into the view so one failing view never aborts
-      // the others.
       diagnostics.add(error.diagnostic());
-      return StageOutcome.crashed(CommandExitCode.PLUGIN_ERROR.code());
+      return InMemoryStage.crashed(CommandExitCode.PLUGIN_ERROR.code());
     } catch (UncheckedIOException error) {
-      // A semantics-engine structural failure (missing plugins.generic-graph, an unknown view, or a
-      // projection reference outside the view) is, at the per-stage CLI boundary, a raw
-      // non-enveloped observable by design (EngineDispatch re-throws it unchanged). The build
-      // driver
-      // has no stderr/raw-exit channel per view, so it folds the same failure into a per-view
-      // diagnostic instead — an unresolvable --views entry must not abort the rest of the build.
       diagnostics.add(
           new Diagnostic(
               DiagnosticCode.COMMAND_INPUT_INVALID.code(),
               DiagnosticSeverity.ERROR,
               error.getCause() != null ? error.getCause().getMessage() : error.getMessage(),
               "command:build"));
-      return StageOutcome.crashed(CommandExitCode.INPUT_ERROR.code());
+      return InMemoryStage.crashed(CommandExitCode.INPUT_ERROR.code());
     }
-    CommandEnvelope<JsonNode> envelope =
-        JsonSupport.readValue(outcome.stdout(), CommandEnvelope.jsonNodeEnvelopeType());
-    diagnostics.addAll(envelope.diagnostics());
-    boolean failed =
-        outcome.exitCode() != CommandExitCode.OK.code()
-            || envelope.status() == EnvelopeStatus.ERROR;
-    boolean warning = envelope.status() == EnvelopeStatus.WARNING;
-    return new StageOutcome(outcome, envelope.data(), failed, warning, outcome.exitCode());
+    return switch (outcome) {
+      case EngineDispatch.InMemoryOutcome.Value<T> value -> {
+        List<Diagnostic> stageDiagnostics = value.result().diagnostics();
+        diagnostics.addAll(stageDiagnostics);
+        boolean warned =
+            stageDiagnostics.stream().anyMatch(d -> d.severity() != DiagnosticSeverity.INFO);
+        yield new InMemoryStage<>(
+            value.result().value(), stageDiagnostics, false, warned, CommandExitCode.OK.code());
+      }
+      case EngineDispatch.InMemoryOutcome.Failure<T> failure -> {
+        diagnostics.addAll(failure.diagnostics());
+        yield new InMemoryStage<>(null, List.of(), true, false, failure.exitCode());
+      }
+    };
   }
 
-  private static void emit(
-      BuildRequest request, String view, String key, String fileName, PluginRunOutcome stage) {
+  private static void emitEnvelope(
+      BuildRequest request,
+      String view,
+      String key,
+      String fileName,
+      Object data,
+      List<Diagnostic> stageDiagnostics) {
     if (request.emit().contains(key)) {
-      writeFile(request, view, fileName, stage.stdout());
+      writeFile(request, view, fileName, EngineDispatch.envelope(data, stageDiagnostics));
     }
   }
 
   private static void writeRenderArtifacts(
-      BuildRequest request, String view, JsonNode renderData, List<BuildArtifact> artifacts) {
-    RenderResult result = JsonSupport.objectMapper().treeToValue(renderData, RenderResult.class);
+      BuildRequest request, String view, RenderResult result, List<BuildArtifact> artifacts) {
     for (RenderArtifact artifact : result.artifacts()) {
       String fileName = "diagram." + renderExtension(artifact.artifactKind());
       writeFile(request, view, fileName, artifact.content());
@@ -312,9 +392,8 @@ public final class BuildCommand {
       BuildRequest request,
       String view,
       String baseName,
-      JsonNode exportData,
+      ExportResult result,
       List<BuildArtifact> artifacts) {
-    ExportResult result = JsonSupport.objectMapper().treeToValue(exportData, ExportResult.class);
     String fileName = baseName + "." + exportExtension(result.artifactKind());
     writeFile(request, view, fileName, result.content());
     artifacts.add(new BuildArtifact(result.artifactKind(), view + "/" + fileName));
@@ -385,14 +464,14 @@ public final class BuildCommand {
   }
 
   @FunctionalInterface
-  private interface StageCall {
-    PluginRunOutcome run() throws PluginExecutionException;
+  private interface InMemoryCall<T> {
+    EngineDispatch.InMemoryOutcome<T> run() throws PluginExecutionException;
   }
 
-  private record StageOutcome(
-      PluginRunOutcome outcome, JsonNode data, boolean failed, boolean warning, int exitCode) {
-    static StageOutcome crashed(int exitCode) {
-      return new StageOutcome(null, null, true, false, exitCode);
+  private record InMemoryStage<T>(
+      T value, List<Diagnostic> stageDiagnostics, boolean failed, boolean warning, int exitCode) {
+    static <T> InMemoryStage<T> crashed(int exitCode) {
+      return new InMemoryStage<>(null, List.of(), true, false, exitCode);
     }
   }
 

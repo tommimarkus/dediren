@@ -261,6 +261,45 @@ class BuildCommandTest {
   }
 
   @Test
+  void emitStageEnvelopesAreByteIdenticalToStandaloneCommands() throws Exception {
+    // The --emit seam must persist the exact bytes each standalone stage command prints, so a
+    // consumer cannot tell the in-memory build apart from `dediren project`/`dediren layout`.
+    Engines engines = engines();
+    BuildRequest request =
+        new BuildRequest(
+            SOURCE,
+            null,
+            List.of("overview"),
+            "{}",
+            null,
+            null,
+            Set.of("layout-request", "layout-result", "render-metadata"),
+            out,
+            Map.of());
+
+    BuildCommand.run(request, engines);
+
+    String layoutRequest =
+        CoreCommands.projectCommand(
+                "generic-graph", "layout-request", "overview", SOURCE, null, Map.of(), engines)
+            .stdout();
+    assertThat(Files.readString(out.resolve("overview/layout-request.json")))
+        .isEqualTo(layoutRequest);
+
+    String layoutResult =
+        CoreCommands.layoutCommand("elk-layout", layoutRequest, Map.of(), engines).stdout();
+    assertThat(Files.readString(out.resolve("overview/layout-result.json")))
+        .isEqualTo(layoutResult);
+
+    String renderMetadata =
+        CoreCommands.projectCommand(
+                "generic-graph", "render-metadata", "overview", SOURCE, null, Map.of(), engines)
+            .stdout();
+    assertThat(Files.readString(out.resolve("overview/render-metadata.json")))
+        .isEqualTo(renderMetadata);
+  }
+
+  @Test
   void missingLaneIsARejectedInputError() throws Exception {
     BuildRequest request =
         new BuildRequest(SOURCE, null, List.of(), null, null, null, Set.of(), out, Map.of());

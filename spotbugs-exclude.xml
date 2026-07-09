@@ -74,6 +74,22 @@
     </Or>
   </Match>
 
+  <!-- EI_EXPOSE_REP / EI_EXPOSE_REP2: EngineDispatch.InMemoryOutcome.Failure is
+       the core in-memory dispatch failure outcome (Plan B P4). It follows the
+       identical construction discipline as the engine-api value types above:
+       its List<Diagnostic> component is wrapped via
+       ContractCollections.listOrEmpty(...) (List.copyOf) in the compact
+       constructor, so the shared reference is genuinely immutable. Suppressed
+       rather than defensive-copied for consistency with the contracts.* /
+       engine-api records. Tracked in architecture-guidelines.md §12. -->
+  <Match>
+    <Class name="dev.dediren.core.engine.EngineDispatch$InMemoryOutcome$Failure"/>
+    <Or>
+      <Bug pattern="EI_EXPOSE_REP"/>
+      <Bug pattern="EI_EXPOSE_REP2"/>
+    </Or>
+  </Match>
+
   <!-- MS_EXPOSE_REP: JsonSupport.objectMapper() intentionally returns the
        shared ObjectMapper singleton. It is mutable in place (.configure(),
        .registerModule()) and exposed by design (one canonical mapper). The
