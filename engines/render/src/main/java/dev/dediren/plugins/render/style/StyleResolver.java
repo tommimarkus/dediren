@@ -26,7 +26,7 @@ public final class StyleResolver {
     var defaultNode =
         new ResolvedNodeStyle(
             "#f8fafc", "#334155", 1.5, 6.0, "#0f172a", null, null, null, null, null, null, null,
-            null, null, null, null);
+            null, null, null, null, null);
     var defaultEdge =
         new ResolvedEdgeStyle(
             "#64748b",
@@ -46,7 +46,7 @@ public final class StyleResolver {
     var defaultGroup =
         new ResolvedGroupStyle(
             "#eff6ff", "#93c5fd", 1.0, 8.0, "#1e3a8a", 12.0, null, null, null, null, null, null,
-            null, null, null, null);
+            null, null, null, null, null);
     return new ResolvedStyle(
         Optional.ofNullable(style)
             .map(SvgStylePolicy::background)
@@ -121,7 +121,8 @@ public final class StyleResolver {
         override.fontStyle() == null ? base.fontStyle() : override.fontStyle(),
         override.fontFamily() == null ? base.fontFamily() : override.fontFamily(),
         override.labelAlign() == null ? base.labelAlign() : override.labelAlign(),
-        override.labelOpacity() == null ? base.labelOpacity() : override.labelOpacity());
+        override.labelOpacity() == null ? base.labelOpacity() : override.labelOpacity(),
+        override.fillGradient() == null ? base.fillGradient() : override.fillGradient());
   }
 
   static ResolvedEdgeStyle mergeEdgeStyle(ResolvedEdgeStyle base, SvgEdgeStyle override) {
@@ -175,6 +176,7 @@ public final class StyleResolver {
         override.fontStyle() == null ? base.fontStyle() : override.fontStyle(),
         override.fontFamily() == null ? base.fontFamily() : override.fontFamily(),
         override.labelAlign() == null ? base.labelAlign() : override.labelAlign(),
-        override.labelOpacity() == null ? base.labelOpacity() : override.labelOpacity());
+        override.labelOpacity() == null ? base.labelOpacity() : override.labelOpacity(),
+        override.fillGradient() == null ? base.fillGradient() : override.fillGradient());
   }
 }

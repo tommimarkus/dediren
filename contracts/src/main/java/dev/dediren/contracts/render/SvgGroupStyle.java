@@ -19,7 +19,8 @@ public record SvgGroupStyle(
     SvgFontSlant fontStyle,
     String fontFamily,
     SvgLabelAlign labelAlign,
-    Double labelOpacity) {
+    Double labelOpacity,
+    SvgGradient fillGradient) {
   public SvgGroupStyle {
     dashPattern = ContractCollections.copyOrNull(dashPattern);
   }

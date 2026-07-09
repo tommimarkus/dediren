@@ -10,6 +10,8 @@ import dev.dediren.contracts.render.RenderPolicy;
 import dev.dediren.contracts.render.SvgBackgroundStyle;
 import dev.dediren.contracts.render.SvgEdgeStyle;
 import dev.dediren.contracts.render.SvgFontStyle;
+import dev.dediren.contracts.render.SvgGradient;
+import dev.dediren.contracts.render.SvgGradientStop;
 import dev.dediren.contracts.render.SvgGroupStyle;
 import dev.dediren.contracts.render.SvgInteractionStyle;
 import dev.dediren.contracts.render.SvgNodeStyle;
@@ -519,6 +521,7 @@ public final class RenderInputValidator {
     validateDashPattern(style.dashPattern(), path + ".dash_pattern");
     validateFontFamily(style.fontFamily(), path + ".font_family");
     validateNumber(style.labelOpacity(), path + ".label_opacity", Bound.MIN, 0.0, 1.0);
+    validateGradient(style.fillGradient(), path + ".fill_gradient");
     if (style.shape() != null && style.decorator() != null) {
       throw new PolicyValidationException(
           path + ".shape", "SVG render policy " + path + " cannot set both shape and decorator");
@@ -554,6 +557,7 @@ public final class RenderInputValidator {
     validateDashPattern(style.dashPattern(), path + ".dash_pattern");
     validateFontFamily(style.fontFamily(), path + ".font_family");
     validateNumber(style.labelOpacity(), path + ".label_opacity", Bound.MIN, 0.0, 1.0);
+    validateGradient(style.fillGradient(), path + ".fill_gradient");
   }
 
   // Broadened colour grammar: hex (#RGB/#RGBA/#RRGGBB/#RRGGBBAA), rgb()/rgba(), or a CSS colour
@@ -567,6 +571,38 @@ public final class RenderInputValidator {
               + "|rgba?\\(\\s*\\d{1,3}%?\\s*,\\s*\\d{1,3}%?\\s*,\\s*\\d{1,3}%?\\s*"
               + "(?:,\\s*(?:\\d*\\.?\\d+%?)\\s*)?\\)"
               + "|[A-Za-z]+");
+
+  private static void validateGradient(SvgGradient gradient, String path)
+      throws PolicyValidationException {
+    if (gradient == null) {
+      return;
+    }
+    if (gradient.type() == null) {
+      throw new PolicyValidationException(
+          path + ".type", "SVG render policy " + path + ".type is required");
+    }
+    List<SvgGradientStop> stops = gradient.stops();
+    if (stops == null || stops.isEmpty() || stops.size() > 16) {
+      throw new PolicyValidationException(
+          path + ".stops",
+          "SVG render policy " + path + ".stops must have between 1 and 16 entries");
+    }
+    for (int index = 0; index < stops.size(); index++) {
+      SvgGradientStop stop = stops.get(index);
+      String stopPath = path + ".stops[" + index + "]";
+      if (!Double.isFinite(stop.offset()) || stop.offset() < 0.0 || stop.offset() > 1.0) {
+        throw new PolicyValidationException(
+            stopPath + ".offset",
+            "SVG render policy " + stopPath + ".offset must be between 0 and 1");
+      }
+      if (stop.color() == null) {
+        throw new PolicyValidationException(
+            stopPath + ".color", "SVG render policy " + stopPath + ".color is required");
+      }
+      validateColor(stop.color(), stopPath + ".color");
+      validateNumber(stop.opacity(), stopPath + ".opacity", Bound.MIN, 0.0, 1.0);
+    }
+  }
 
   private static void validateFontFamily(String family, String path)
       throws PolicyValidationException {

@@ -19,7 +19,8 @@ public record SvgNodeStyle(
     SvgFontSlant fontStyle,
     String fontFamily,
     SvgLabelAlign labelAlign,
-    Double labelOpacity) {
+    Double labelOpacity,
+    SvgGradient fillGradient) {
   public SvgNodeStyle {
     dashPattern = ContractCollections.copyOrNull(dashPattern);
   }

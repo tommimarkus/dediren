@@ -38,6 +38,9 @@ import dev.dediren.contracts.render.RenderArtifact;
 import dev.dediren.contracts.render.RenderMetadata;
 import dev.dediren.contracts.render.RenderMetadataSelector;
 import dev.dediren.contracts.render.RenderPolicy;
+import dev.dediren.contracts.render.SvgGradient;
+import dev.dediren.contracts.render.SvgGradientStop;
+import dev.dediren.contracts.render.SvgGradientType;
 import dev.dediren.contracts.render.SvgInteractionStyle;
 import dev.dediren.contracts.render.SvgLabelAlign;
 import dev.dediren.contracts.render.SvgNodeDecorator;
@@ -111,6 +114,12 @@ public final class SvgDocument {
             .append("\"");
       }
       svg.append(">");
+      ResolvedGroupStyle rectStyle = style;
+      if (style.fillGradient() != null) {
+        String gradientId = attr("group-fill-" + group.id());
+        svg.append(gradientElement(gradientId, style.fillGradient()));
+        rectStyle = style.withFill("url(#" + gradientId + ")");
+      }
       String groupDashValue = dashArrayValue(style.lineStyle(), style.dashPattern(), "6 4");
       if (groupDashValue.isEmpty() && style.decorator() == SvgNodeDecorator.ARCHIMATE_GROUPING) {
         groupDashValue = "3 2";
@@ -130,7 +139,7 @@ public final class SvgDocument {
               group.width(),
               group.height(),
               styleNumber(style.rx()),
-              attr(style.fill()),
+              attr(rectStyle.fill()),
               attr(style.stroke()),
               styleNumber(style.strokeWidth()),
               groupExtra));
@@ -210,7 +219,13 @@ public final class SvgDocument {
       ResolvedNodeStyle style = StyleResolver.nodeStyle(policy, metadata, node.id(), base);
       RenderMetadataSelector selector = metadata == null ? null : metadata.nodes().get(node.id());
       svg.append("<g data-dediren-node-id=\"").append(attr(node.id())).append("\">");
-      svg.append(withNodeStrokeStyle(nodeShape(node, style, selector), style));
+      ResolvedNodeStyle shapeStyle = style;
+      if (style.fillGradient() != null) {
+        String gradientId = attr("node-fill-" + node.id());
+        svg.append(gradientElement(gradientId, style.fillGradient()));
+        shapeStyle = style.withFill("url(#" + gradientId + ")");
+      }
+      svg.append(withNodeStrokeStyle(nodeShape(node, shapeStyle, selector), shapeStyle));
       svg.append(nodeDecorator(node, style, selector));
       if (shouldRenderPlainNodeLabel(node, style.decorator())) {
         svg.append(nodeLabel(node, style, base.fontSize()));
@@ -323,6 +338,43 @@ public final class SvgDocument {
             + opacityAttr("stroke-opacity", style.strokeOpacity())
             + dashArrayAttr(style.lineStyle(), style.dashPattern(), "6 4");
     return attrs.isEmpty() ? shape : "<g" + attrs + ">" + shape + "</g>";
+  }
+
+  // Inline gradient definition, referenced by fill="url(#id)". SVG gradient ids are
+  // document-global,
+  // so this can live inside the element's group. Linear coordinates run over the shape's bounding
+  // box (objectBoundingBox), derived deterministically from the angle (0 = left→right, 90 = top→
+  // bottom). Reuses the inline-id precedent from edge markers rather than a shared <defs>.
+  private static String gradientElement(String id, SvgGradient gradient) {
+    StringBuilder markup = new StringBuilder();
+    if (gradient.type() == SvgGradientType.RADIAL) {
+      markup.append("<radialGradient id=\"").append(id).append("\">");
+    } else {
+      double radians = Math.toRadians(gradient.angle() == null ? 0.0 : gradient.angle());
+      double cos = Math.cos(radians);
+      double sin = Math.sin(radians);
+      markup.append(
+          String.format(
+              Locale.ROOT,
+              "<linearGradient id=\"%s\" x1=\"%.4f\" y1=\"%.4f\" x2=\"%.4f\" y2=\"%.4f\">",
+              id,
+              0.5 - 0.5 * cos,
+              0.5 - 0.5 * sin,
+              0.5 + 0.5 * cos,
+              0.5 + 0.5 * sin));
+    }
+    for (SvgGradientStop stop : gradient.stops()) {
+      markup.append(
+          String.format(
+              Locale.ROOT,
+              "<stop offset=\"%s\" stop-color=\"%s\"%s/>",
+              styleNumber(stop.offset()),
+              attr(stop.color()),
+              opacityAttr("stop-opacity", stop.opacity())));
+    }
+    markup.append(
+        gradient.type() == SvgGradientType.RADIAL ? "</radialGradient>" : "</linearGradient>");
+    return markup.toString();
   }
 
   private static String nodeShape(

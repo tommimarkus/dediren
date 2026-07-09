@@ -76,6 +76,31 @@
       "minLength": 1,
       "maxLength": 120
     },
+    "gradientStop": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["offset", "color"],
+      "properties": {
+        "offset": { "type": "number", "minimum": 0, "maximum": 1 },
+        "color": { "$ref": "#/$defs/color" },
+        "opacity": { "$ref": "#/$defs/opacity" }
+      }
+    },
+    "gradient": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "stops"],
+      "properties": {
+        "type": { "type": "string", "enum": ["linear", "radial"] },
+        "angle": { "type": "number" },
+        "stops": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/gradientStop" },
+          "minItems": 1,
+          "maxItems": 16
+        }
+      }
+    },
     "font": {
       "type": "object",
       "additionalProperties": false,
@@ -243,7 +268,8 @@
         "font_style": { "$ref": "#/$defs/fontSlant" },
         "font_family": { "$ref": "#/$defs/fontFamily" },
         "label_align": { "$ref": "#/$defs/labelAlign" },
-        "label_opacity": { "$ref": "#/$defs/opacity" }
+        "label_opacity": { "$ref": "#/$defs/opacity" },
+        "fill_gradient": { "$ref": "#/$defs/gradient" }
       }
     },
     "edgeStyle": {
@@ -340,7 +366,8 @@
         "font_style": { "$ref": "#/$defs/fontSlant" },
         "font_family": { "$ref": "#/$defs/fontFamily" },
         "label_align": { "$ref": "#/$defs/labelAlign" },
-        "label_opacity": { "$ref": "#/$defs/opacity" }
+        "label_opacity": { "$ref": "#/$defs/opacity" },
+        "fill_gradient": { "$ref": "#/$defs/gradient" }
       }
     },
     "nodeOverrideMap": {

@@ -55,6 +55,10 @@ and `transparent`). The grammar admits no CSS metacharacters — `highlight_stro
 reaches a CSS `<style>` block, so the validator (not escaping) keeps it safe.
 Set `fill_opacity` / `stroke_opacity` (0–1) on nodes and groups,
 `stroke_opacity` on edges, and `background.fill_opacity` for a translucent page.
+Node and group fills can also be gradients via `fill_gradient` — `{ "type":
+"linear" | "radial", "angle": <deg>, "stops": [ { "offset": 0–1, "color": …,
+"opacity": 0–1 } ] }` — rendered as an inline `<linearGradient>` /
+`<radialGradient>` referenced by a deterministic id.
 
 ### Line style
 
