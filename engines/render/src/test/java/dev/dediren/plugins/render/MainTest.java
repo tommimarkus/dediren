@@ -3362,7 +3362,7 @@ class MainTest {
 
   // Inline (not fixture-backed): create-message, destroy-occurrence, and execution-specification
   // rendering has no real generic-graph/ELK pipeline coverage yet (Plan B P2, Task 10/11 fixture
-  // sweep) — fixtures/source/valid-uml-sequence-basic.json only declares the 3-lifeline/3-message
+  // sweep) — fixtures/source/valid-uml-sequence-basic.json only declares the 2-lifeline/3-message
   // "placeOrder" exchange, so the real engine cannot produce a "receipt" lifeline, an
   // ExecutionSpecification activation bar, or a DestructionOccurrenceSpecification from it.
   // Wiring those UML sequence node kinds through generic-graph's real layout-request projection and

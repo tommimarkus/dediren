@@ -94,6 +94,85 @@ class LayoutQualityProvenanceTest {
   }
 
   @Test
+  void routeEndpointOffPerimeterOnSourceSideDiagnosticCarriesTheEdgesSourcePointer() {
+    // Mirrors routeEndpointOffPerimeterDiagnosticCarriesTheEdgesSourcePointer, but on the SOURCE
+    // side: the first route point is interior to the source node (not on its perimeter) while the
+    // last point sits on the target node's perimeter, so only the source-side branch of
+    // LAYOUT_ROUTE_ENDPOINT_OFF_NODE_PERIMETER fires.
+    var source = node("source", 0.0, 0.0, null);
+    var target = node("target", 300.0, 0.0, null);
+    var edge =
+        new LaidOutEdge(
+            "misses-source",
+            "source",
+            "target",
+            "misses-source",
+            "misses-source",
+            List.of(),
+            List.of(new Point(55.0, 45.0), new Point(300.0, 40.0)),
+            "misses-source",
+            "/edges/11");
+
+    var diagnostics =
+        LayoutQuality.validateLayoutDiagnostics(
+            layoutResult(List.of(source, target), List.of(edge)));
+
+    assertThat(diagnostics)
+        .extracting(diagnostic -> diagnostic.code())
+        .containsExactly("DEDIREN_LAYOUT_ROUTE_ENDPOINT_OFF_NODE_PERIMETER");
+    assertThat(diagnostics.get(0).sourcePointer()).isEqualTo("/edges/11");
+  }
+
+  @Test
+  void routePointsEmptyDiagnosticCarriesTheEdgesSourcePointer() {
+    var edge =
+        new LaidOutEdge(
+            "empty-route",
+            "source",
+            "target",
+            "empty-route",
+            "empty-route",
+            List.of(),
+            List.of(),
+            "empty-route",
+            "/edges/12");
+
+    var diagnostics =
+        LayoutQuality.validateLayoutDiagnostics(layoutResult(List.of(), List.of(edge)));
+
+    assertThat(diagnostics)
+        .filteredOn(diagnostic -> diagnostic.code().equals("DEDIREN_LAYOUT_ROUTE_POINTS_EMPTY"))
+        .singleElement()
+        .extracting(diagnostic -> diagnostic.sourcePointer())
+        .isEqualTo("/edges/12");
+  }
+
+  @Test
+  void routePointsInsufficientDiagnosticCarriesTheEdgesSourcePointer() {
+    var edge =
+        new LaidOutEdge(
+            "one-point-route",
+            "source",
+            "target",
+            "one-point-route",
+            "one-point-route",
+            List.of(),
+            List.of(new Point(50.0, 40.0)),
+            "one-point-route",
+            "/edges/13");
+
+    var diagnostics =
+        LayoutQuality.validateLayoutDiagnostics(layoutResult(List.of(), List.of(edge)));
+
+    assertThat(diagnostics)
+        .filteredOn(
+            diagnostic -> diagnostic.code().equals("DEDIREN_LAYOUT_ROUTE_POINTS_INSUFFICIENT"))
+        .singleElement()
+        .extracting(diagnostic -> diagnostic.sourcePointer())
+        .isEqualTo("/edges/13");
+  }
+
+  @Test
   void junctionOffIncidentRouteDiagnosticCarriesTheJunctionNodesSourcePointer() {
     var upstream = node("upstream", 0.0, 0.0, null);
     var junction =

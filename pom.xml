@@ -139,15 +139,32 @@
       <!-- Property-based testing (Plan B P2 IR invariants). jqwik implements its
            own JUnit Platform TestEngine; 1.9.3 declares JUnit Platform 1.11/1.12
            while this reactor runs JUnit Platform 6.1.1 (Jupiter 6). Verified via
-           core's JqwikSmokeTest that jqwik still discovers and runs correctly
-           here: Maven resolves its transitive junit-platform-* deps up to this
-           reactor's converged version and the dependencyConvergence enforcer
-           passes, so no version pin/exclusion is needed. Test-scope only. -->
+           core's JqwikSmokeTest that jqwik still discovers and runs correctly here.
+           The managed junit-platform-commons/junit-platform-engine entries below
+           pin jqwik's transitive JUnit Platform requests to this reactor's
+           converged version explicitly, so the dependencyConvergence enforcer
+           passing does not rely on Maven's nearest-wins declaration order.
+           Test-scope only. -->
       <dependency>
         <groupId>net.jqwik</groupId>
         <artifactId>jqwik</artifactId>
         <version>${jqwik.version}</version>
         <scope>test</scope>
+      </dependency>
+      <!-- jqwik's transitive junit-platform-commons/junit-platform-engine requests (1.13.1)
+           currently converge to this reactor's junit.version only via Maven's nearest-wins
+           dependency-mediation order. Pin them explicitly so convergence is order-independent
+           rather than an incidental side effect of declaration order, mirroring how the
+           jazzer-junit platform-version mismatch above is handled. -->
+      <dependency>
+        <groupId>org.junit.platform</groupId>
+        <artifactId>junit-platform-commons</artifactId>
+        <version>${junit.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.junit.platform</groupId>
+        <artifactId>junit-platform-engine</artifactId>
+        <version>${junit.version}</version>
       </dependency>
       <!-- Core ArchUnit only (no archunit-junit5 engine): the dependency-rule
            test runs as a plain JUnit Jupiter test via rule.check(...), which

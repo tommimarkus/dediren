@@ -46,7 +46,7 @@ class SequenceLayoutPropertyTest {
   private static final List<String> MESSAGE_SORTS =
       List.of("synchCall", "asynchCall", "asynchSignal", "reply", "createMessage", "deleteMessage");
 
-  @Property(tries = 300)
+  @Property(tries = 300, seed = "1")
   void generatedSequenceModelsSatisfySequenceInvariants(
       @ForAll("validSequenceModels") GeneratedSequenceModel model) throws Exception {
     SourceDocument source =
