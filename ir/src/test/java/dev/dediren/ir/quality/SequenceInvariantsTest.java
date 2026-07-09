@@ -56,6 +56,77 @@ class SequenceInvariantsTest {
   }
 
   @Test
+  void messageEndpointsOnLifelineAxis_violatesWhenOnlyTargetEndpointOffLifelineCenter() {
+    // lifelineA center-x = 10, lifelineB center-x = 110
+    PlacedNode lifelineA = lifeline("lifelineA", 0, 20, new SourcePointer("/nodes/0"));
+    PlacedNode lifelineB = lifeline("lifelineB", 100, 20, new SourcePointer("/nodes/1"));
+    SourcePointer edgeOrigin = new SourcePointer("/edges/0");
+    // first point x=10 sits exactly on lifelineA's center-x=10 (source endpoint is correct);
+    // last point x=150 is 40 units off lifelineB's center-x=110 (target endpoint is off-axis).
+    RoutedEdge targetOffAxisMessage =
+        message(
+            "m1",
+            "lifelineA",
+            "lifelineB",
+            List.of(new Point(10, 50), new Point(150, 50)),
+            edgeOrigin);
+    LaidOutScene scene =
+        new LaidOutScene(
+            "view1",
+            List.of(lifelineA, lifelineB),
+            List.of(targetOffAxisMessage),
+            List.of(),
+            List.of());
+
+    List<InvariantViolation> violations = SequenceInvariants.messageEndpointsOnLifelineAxis(scene);
+
+    assertThat(violations).hasSize(1);
+    InvariantViolation violation = violations.get(0);
+    assertThat(violation.invariant()).isEqualTo("message_endpoints_on_lifeline_axis");
+    assertThat(violation.elementId()).isEqualTo("m1");
+    assertThat(violation.origin()).isEqualTo(edgeOrigin);
+    assertThat(violation.detail()).contains("last route point");
+  }
+
+  @Test
+  void messageEndpointsOnLifelineAxis_violatesTwiceWhenBothEndpointsOffLifelineCenter() {
+    PlacedNode lifelineA = lifeline("lifelineA", 0, 20, new SourcePointer("/nodes/0"));
+    PlacedNode lifelineB = lifeline("lifelineB", 100, 20, new SourcePointer("/nodes/1"));
+    SourcePointer edgeOrigin = new SourcePointer("/edges/0");
+    // first point x=15 is off lifelineA's center-x=10, and last point x=150 is off lifelineB's
+    // center-x=110: the production check tests each endpoint independently with two separate
+    // `if` blocks (not else-if), so a both-off edge yields TWO violations sharing the same edge
+    // id/origin, one per offending endpoint.
+    RoutedEdge bothOffAxisMessage =
+        message(
+            "m1",
+            "lifelineA",
+            "lifelineB",
+            List.of(new Point(15, 50), new Point(150, 50)),
+            edgeOrigin);
+    LaidOutScene scene =
+        new LaidOutScene(
+            "view1",
+            List.of(lifelineA, lifelineB),
+            List.of(bothOffAxisMessage),
+            List.of(),
+            List.of());
+
+    List<InvariantViolation> violations = SequenceInvariants.messageEndpointsOnLifelineAxis(scene);
+
+    assertThat(violations).hasSize(2);
+    assertThat(violations)
+        .allSatisfy(
+            violation -> {
+              assertThat(violation.invariant()).isEqualTo("message_endpoints_on_lifeline_axis");
+              assertThat(violation.elementId()).isEqualTo("m1");
+              assertThat(violation.origin()).isEqualTo(edgeOrigin);
+            });
+    assertThat(violations).anySatisfy(v -> assertThat(v.detail()).contains("first route point"));
+    assertThat(violations).anySatisfy(v -> assertThat(v.detail()).contains("last route point"));
+  }
+
+  @Test
   void messageEndpointsOnLifelineAxis_holdsWhenEndpointsMatchLifelineCenters() {
     PlacedNode lifelineA = lifeline("lifelineA", 0, 20, new SourcePointer("/nodes/0"));
     PlacedNode lifelineB = lifeline("lifelineB", 100, 20, new SourcePointer("/nodes/1"));
@@ -113,6 +184,40 @@ class SequenceInvariantsTest {
     assertThat(violation.invariant()).isEqualTo("message_y_strictly_increasing");
     assertThat(violation.elementId()).isEqualTo("m3");
     assertThat(violation.origin()).isEqualTo(m3Origin);
+  }
+
+  @Test
+  void messageYStrictlyIncreasing_violatesWhenConsecutiveMessagesShareTheSameY() {
+    PlacedNode lifelineA = lifeline("lifelineA", 0, 20, new SourcePointer("/nodes/0"));
+    PlacedNode lifelineB = lifeline("lifelineB", 100, 20, new SourcePointer("/nodes/1"));
+    RoutedEdge m1 =
+        message(
+            "m1",
+            "lifelineA",
+            "lifelineB",
+            List.of(new Point(10, 50), new Point(110, 50)),
+            new SourcePointer("/edges/0"));
+    // m2's y=50 exactly equals m1's y=50 (not less): guards the `<=` vs `<` boundary at
+    // SequenceInvariants.java:97, distinct from the existing strictly-decreasing-y case above.
+    SourcePointer m2Origin = new SourcePointer("/edges/1");
+    RoutedEdge m2 =
+        message(
+            "m2",
+            "lifelineB",
+            "lifelineA",
+            List.of(new Point(110, 50), new Point(10, 50)),
+            m2Origin);
+    LaidOutScene scene =
+        new LaidOutScene(
+            "view1", List.of(lifelineA, lifelineB), List.of(m1, m2), List.of(), List.of());
+
+    List<InvariantViolation> violations = SequenceInvariants.messageYStrictlyIncreasing(scene);
+
+    assertThat(violations).hasSize(1);
+    InvariantViolation violation = violations.get(0);
+    assertThat(violation.invariant()).isEqualTo("message_y_strictly_increasing");
+    assertThat(violation.elementId()).isEqualTo("m2");
+    assertThat(violation.origin()).isEqualTo(m2Origin);
   }
 
   @Test
@@ -177,6 +282,38 @@ class SequenceInvariantsTest {
               assertThat(violation.elementId()).isEqualTo("lifelineB");
               assertThat(violation.origin()).isEqualTo(lifelineBOrigin);
             });
+  }
+
+  @Test
+  void
+      interactionFrameEnclosesLifelines_violatesWhenMessagePointIsOutsideFrameButLifelinesAreEnclosed() {
+    PlacedNode frame = interactionFrame("frame1", 0, 0, 200, 300, new SourcePointer("/nodes/0"));
+    PlacedNode lifelineA = lifeline("lifelineA", 10, 20, new SourcePointer("/nodes/1"));
+    PlacedNode lifelineB = lifeline("lifelineB", 150, 20, new SourcePointer("/nodes/2"));
+    // both lifelines are fully inside the frame (frame right edge x=200; lifelineB spans
+    // x=150..170), but the message's last route point at x=250 escapes past the frame's right
+    // edge, exercising the edge-point loop (SequenceInvariants.java:166-190) on its own, with no
+    // lifeline-outside-frame violation to also trigger.
+    SourcePointer edgeOrigin = new SourcePointer("/edges/0");
+    RoutedEdge m1 =
+        message(
+            "m1",
+            "lifelineA",
+            "lifelineB",
+            List.of(new Point(20, 50), new Point(250, 50)),
+            edgeOrigin);
+    LaidOutScene scene =
+        new LaidOutScene(
+            "view1", List.of(frame, lifelineA, lifelineB), List.of(m1), List.of(), List.of());
+
+    List<InvariantViolation> violations =
+        SequenceInvariants.interactionFrameEnclosesLifelines(scene);
+
+    assertThat(violations).hasSize(1);
+    InvariantViolation violation = violations.get(0);
+    assertThat(violation.invariant()).isEqualTo("interaction_frame_encloses_lifelines");
+    assertThat(violation.elementId()).isEqualTo("m1");
+    assertThat(violation.origin()).isEqualTo(edgeOrigin);
   }
 
   @Test
