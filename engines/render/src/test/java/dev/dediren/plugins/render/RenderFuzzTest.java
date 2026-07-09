@@ -51,7 +51,7 @@ class RenderFuzzTest {
   private ObjectNode randomLayoutInput(Random random) throws Exception {
     ObjectNode input = JsonSupport.objectMapper().createObjectNode();
     ObjectNode layout = input.putObject("layout_result");
-    layout.put("layout_result_schema_version", "layout-result.schema.v1");
+    layout.put("layout_result_schema_version", "layout-result.schema.v2");
     layout.put("view_id", "fuzz");
 
     int nodeCount = random.nextInt(9); // 0..8

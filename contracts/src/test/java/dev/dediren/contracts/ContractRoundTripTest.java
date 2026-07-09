@@ -378,7 +378,7 @@ class ContractRoundTripTest {
     var semanticGroupJson =
         """
                 {
-                  "layout_request_schema_version": "layout-request.schema.v1",
+                  "layout_request_schema_version": "layout-request.schema.v2",
                   "view_id": "main",
                   "nodes": [],
                   "edges": [],
@@ -577,7 +577,7 @@ class ContractRoundTripTest {
                     "plugins": {}
                   },
                   "layout_result": {
-                    "layout_result_schema_version": "layout-result.schema.v1",
+                    "layout_result_schema_version": "layout-result.schema.v2",
                     "view_id": "class-view",
                     "nodes": [],
                     "edges": [],

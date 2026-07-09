@@ -3,6 +3,7 @@ package dev.dediren.engine;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import dev.dediren.contracts.ContractVersions;
 import dev.dediren.contracts.Diagnostic;
 import dev.dediren.contracts.DiagnosticSeverity;
 import dev.dediren.contracts.layout.LayoutRequest;
@@ -61,13 +62,20 @@ class EnginesTest {
 
     @Override
     public LayoutRequest parseRequest(byte[] input) {
-      return new LayoutRequest("layout-request.schema.v1", "main", null, null, null, null, null);
+      return new LayoutRequest(
+          ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION, "main", null, null, null, null, null);
     }
 
     @Override
     public EngineResult<LayoutResult> layout(LayoutRequest request) {
       return new EngineResult<>(
-          new LayoutResult("layout-result.schema.v1", request.viewId(), null, null, null, null),
+          new LayoutResult(
+              ContractVersions.LAYOUT_RESULT_SCHEMA_VERSION,
+              request.viewId(),
+              null,
+              null,
+              null,
+              null),
           List.of());
     }
   }

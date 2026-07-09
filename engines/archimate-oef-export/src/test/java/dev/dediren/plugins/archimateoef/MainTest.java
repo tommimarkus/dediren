@@ -273,7 +273,7 @@ class MainTest {
                 .readTree(
                     """
                 {
-                  "layout_result_schema_version": "layout-result.schema.v1",
+                  "layout_result_schema_version": "layout-result.schema.v2",
                   "view_id": "main",
                   "nodes": [
                     { "id": "api", "source_id": "api", "projection_id": "api", "x": 20.0, "y": 80.0, "width": 160.0, "height": 80.0, "label": "API" },
@@ -332,7 +332,7 @@ class MainTest {
                 .readTree(
                     """
                 {
-                  "layout_result_schema_version": "layout-result.schema.v1",
+                  "layout_result_schema_version": "layout-result.schema.v2",
                   "view_id": "main",
                   "nodes": [
                     { "id": "group", "source_id": "group", "projection_id": "group", "x": 0.0, "y": 0.0, "width": 440.0, "height": 180.0, "label": "Group" },

@@ -221,7 +221,7 @@ class EngineDispatchTest {
   private static final String LAYOUT_REQUEST =
       """
       {
-        "layout_request_schema_version": "layout-request.schema.v1",
+        "layout_request_schema_version": "layout-request.schema.v2",
         "view_id": "main",
         "nodes": [],
         "edges": [],

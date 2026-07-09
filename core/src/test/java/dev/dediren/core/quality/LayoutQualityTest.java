@@ -2,6 +2,7 @@ package dev.dediren.core.quality;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dev.dediren.contracts.ContractVersions;
 import dev.dediren.contracts.DiagnosticSeverity;
 import dev.dediren.contracts.layout.LaidOutEdge;
 import dev.dediren.contracts.layout.LaidOutGroup;
@@ -964,7 +965,8 @@ class LayoutQualityTest {
 
   private static LayoutResult layoutResult(
       List<LaidOutNode> nodes, List<LaidOutEdge> edges, List<LaidOutGroup> groups) {
-    return new LayoutResult("layout-result.schema.v1", "main", nodes, edges, groups, List.of());
+    return new LayoutResult(
+        ContractVersions.LAYOUT_RESULT_SCHEMA_VERSION, "main", nodes, edges, groups, List.of());
   }
 
   private static LaidOutNode node(String id, double x, double y) {
