@@ -12,18 +12,19 @@ import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 
 /**
- * Guards the ArchiMate label/icon reserve against cross-plugin drift. The generic-graph sizing
- * engine and the render engine are two of the five first-party engines that ArchUnit ({@code
- * enginesDoNotDependOnEachOther}) forbids from depending on each other, yet both must reserve the
- * same {@code ARCHIMATE_LABEL_ICON_RESERVE} so a centered node label clears the upper-right type
- * icon: the sizer budgets the space, the renderer places the label inside it. They were previously
- * kept equal only by a comment. This converts that prose into an enforced invariant, so a change to
- * one constant without the other fails CI instead of silently clipping labels.
+ * Guards the ArchiMate label/icon reserve against cross-plugin drift. The semantics-archimate
+ * sizing module and the render engine are independent leaf libraries behind engine-api (ArchUnit's
+ * {@code semanticsModulesAreIndependentAndLeaf} and {@code enginesDoNotDependOnEachOther} forbid a
+ * compile edge between them), yet both must reserve the same {@code ARCHIMATE_LABEL_ICON_RESERVE}
+ * so a centered node label clears the upper-right type icon: the sizer budgets the space, the
+ * renderer places the label inside it. They were previously kept equal only by a comment. This
+ * converts that prose into an enforced invariant, so a change to one constant without the other
+ * fails CI instead of silently clipping labels.
  */
 class ArchimateLabelReserveConsistencyTest {
   private static final Path SIZING =
       Path.of(
-          "engines/generic-graph/src/main/java/dev/dediren/plugins/genericgraph/GenericGraphLayoutSizing.java");
+          "semantics-archimate/src/main/java/dev/dediren/semantics/archimate/ArchimateLayoutSizing.java");
   private static final Path RENDER =
       Path.of("engines/render/src/main/java/dev/dediren/plugins/render/node/NodeLabels.java");
   private static final Pattern RESERVE =

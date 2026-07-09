@@ -425,7 +425,9 @@
                 <param>dev.dediren.core.*</param>
                 <param>dev.dediren.engine.*</param>
                 <param>dev.dediren.cli.*</param>
-                <param>dev.dediren.plugins.genericgraph.GenericGraphLayoutSizing</param>
+                <param>dev.dediren.semantics.archimate.ArchimateLayoutSizing</param>
+                <param>dev.dediren.semantics.uml.UmlLayoutSizing</param>
+                <param>dev.dediren.semantics.graph.*</param>
                 <param>dev.dediren.plugins.elklayout.*</param>
                 <param>dev.dediren.plugins.render.*</param>
                 <param>dev.dediren.plugins.umlxmi.*</param>
