@@ -285,6 +285,87 @@ green throughout.
   property tests. The typed vocab now lands with its consumer, so nothing is
   dead-weight.
 
+### P5 design resolution (2026-07-10)
+
+Scouting the four seams (elk `SequenceLayoutConstraints`, the `semantics-uml`
+producer, the `ir`/`engine-api` type surface, the invariant/property-test gates)
+surfaced the Risk-R1 fork the P5 bullet left open: the four `uml.sequence.*`
+constraints carry **only ordering + markers, no coordinates** — every number
+(column pitch 96, y-lattice steps 24/46/68, stem = head-box center, head band =
+min-y, interaction frame = bbox of lifelines + message points) is invented inside
+elk. So "delete the re-derivation and consume a neutral `LayoutIntent`" is not a
+mechanical retype. Resolved decisions:
+
+- **Geometry ownership.** The post-ELK geometry mechanics are *neutral* ("order
+  along an axis", "share a band") and stay in `elk-layout`, now driven by typed
+  `LayoutIntent` instead of the four magic strings. What is deleted is the
+  **notation coupling** — elk stops knowing `uml.sequence.*`; the
+  `SequenceLayoutConstraints` class is replaced by a neutral `LayoutIntent`
+  normalizer. ELK-first is preserved (no new custom geometry, only retyped
+  inputs).
+- **Neutral `LayoutIntent` vocab (in `ir`, sealed), YAGNI-pruned to what is
+  emitted.** `OrderedBand(Axis, List<BandMember> members)` where
+  `BandMember(String id, double leadingGap)` — lifelines along X (columns +
+  non-overlap rebuild, `leadingGap` 0) and messages along Y (strictly-increasing
+  rows, `leadingGap` carrying the fragment/operand spacing); `AlignmentAxis` —
+  lifeline heads share one top band. **`PortSideHint` dropped** (elk re-derives
+  source/target port side from the lifeline `OrderedBand(X)`); **`Encloses`
+  dropped** (interaction-frame enclosure is driven by the neutral scene
+  `role=="interaction"`, not by a constraint). A future notation that needs either
+  re-adds it to the sealed family then.
+- **Sealed `SequenceConstraint` (in `semantics-uml`).** `LifelineOrder` /
+  `MessageOrder` / `FragmentOpen` / `OperandOpen` — the typed form of today's four
+  producers. Lowering: `LifelineOrder → OrderedBand(X) + AlignmentAxis`;
+  `MessageOrder` + `FragmentOpen` + `OperandOpen` fold into one
+  `OrderedBand(Y)` whose per-member `leadingGap` is 0 / 46 / 68. `semantics-uml`
+  owns those numbers (they are render-fragment-chrome-coupled — a shared constant
+  with the render engine, guarded by the existing sequence-fragment alignment
+  test); elk stays value-agnostic.
+- **Fragment/operand gaps → declarative data on `LayoutIntent`, NOT a
+  `NormalizationPass`.** Every sequence geometry input (columns, head band,
+  message rows, gaps, port sides, enclosure) is expressible as declarative data,
+  so R1's escape-hatch risk does not materialize on the actual port. The decisive
+  force is **wire self-sufficiency**: the `layout-request` is a serialization DTO
+  consumed by a standalone `layout` command that runs *no notation*
+  (README documents `project --target layout-request | layout` as a first-class
+  equivalent of `build`, with a worked example). A `NormalizationPass` is
+  *behavior* the producer holds — it cannot serialize, and the standalone path
+  could never reconstruct it, so `project | layout` would silently lose the
+  fragment gaps `build` keeps (a regression on a documented invariant). Keeping
+  the gaps as data on the `OrderedBand` keeps the wire complete, keeps
+  `build ≡ project|layout`, and makes **both elk and the wire notation-free**
+  (elk consumes typed `LayoutIntent`; the notation-free codec that serializes
+  `LayoutIntent ↔ stringly LayoutConstraint` lives in `ir`'s `LayoutRequestMapper`
+  and knows only its own neutral encoding). **No `NormalizationPass` SPI in P5** —
+  with everything declarative it would have no consumer (speculative generality,
+  the exact smell the P3→P5 re-slice avoided); it is deferred until a genuine
+  non-serializable normalization need appears. **No schema-id bump** — the wire
+  `constraint` shape (`{id, kind, subjects:[string]}`, free-form `kind`) is
+  preserved; the neutral kinds + gap encoding sit inside it. `LayoutEngine.layout`
+  keeps its P4 `SceneGraph → LaidOutScene` signature (no pass parameter); all
+  post-ELK geometry mechanics stay co-located in `elk-layout`, now driven by the
+  typed intent.
+- **Invariants → `validate-layout`** (absorbs the P2-deferred item). The three
+  `SequenceInvariants` wire into `CoreCommands.validateLayoutResult` (the single
+  funnel for CLI validate + in-memory build), bridging `LayoutResult →
+  LaidOutScene` via `LaidOutSceneMapper`. **`core` gains an `ir` dependency** — a
+  deliberate new edge (P2 avoided it) recorded in the dep-table + guidelines.
+- **Test scope.** Extend the jqwik generator to `CombinedFragment` /
+  `InteractionOperand` (closes W3, since P5 changes fragment geometry); **W1**
+  (ExecutionSpecification / Destruction / create-delete — zero constraints today,
+  untouched by P5) stays a tracked follow-up guarded by the characterization
+  fixtures. Regenerate the 3 real `uml-sequence-*` fixtures; port the 2
+  direct-construction elk tests; the jqwik property test stays the primary
+  geometry gate.
+- **Move-together surfaces.** `semantics-uml/pom.xml` + `core/pom.xml` gain `ir`;
+  the §2 dep-table rows, the §12 debt register, `spotbugs-exclude.xml` (the new
+  `ir` `LayoutIntent`/`OrderedBand` records join the existing `ir` EI_EXPOSE_REP
+  suppressions), the render/`semantics-uml` shared fragment-gap constant + its
+  alignment test, and the `elkLayoutDoesNotImportSemantics` `because`-string
+  update together. No ArchUnit *rule* has to loosen — `semantics-uml → ir` and
+  `core → ir` are already permitted by the forbidden lists; no wire schema-id
+  bump (the `constraint` shape is unchanged).
+
 ## Costs And Reversals
 
 - **Blast radius.** The `engine-api` signature change (P4) touches all five
