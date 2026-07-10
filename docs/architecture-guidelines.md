@@ -67,19 +67,20 @@ Stable Dependencies Principle).
 | Module | May compile-depend on | Stability tier |
 |---|---|---|
 | `contracts` | *(nothing internal)* | 0 — foundation |
+| `ir` | `contracts` | 0.5 — IR spine, between `contracts` and `engine-api` |
 | `archimate` | *(nothing internal)* | 1 — notation core |
 | `uml` | `contracts` | 1 — notation core |
 | `schema-cache` | `contracts` | 1 — utility core |
-| `engine-api` | `contracts` | 1 — engine seam |
-| `core` | `contracts`, `engine-api` | 2 — orchestration + `build` driver |
-| `render` (engine) | `engine-api`, `contracts`, `archimate`, `uml` | 2 — leaf engine |
+| `engine-api` | `contracts`, `ir` | 1 — engine seam |
+| `core` | `contracts`, `engine-api`, `ir` | 2 — orchestration + `build` driver |
+| `render` (engine) | `engine-api`, `contracts`, `archimate`, `uml`, `ir` | 2 — leaf engine |
 | `semantics-graph` (engine) | `engine-api`, `contracts`, `ir` | 2 — leaf engine |
 | `semantics-archimate` (engine) | `engine-api`, `contracts`, `archimate` | 2 — leaf engine |
 | `semantics-uml` (engine) | `engine-api`, `contracts`, `uml` | 2 — leaf engine |
-| `elk-layout` (engine) | `engine-api`, `contracts` | 2 — leaf engine |
+| `elk-layout` (engine) | `engine-api`, `contracts`, `ir` | 2 — leaf engine |
 | `archimate-oef-export` (engine) | `engine-api`, `contracts`, `archimate`, `schema-cache` | 2 — leaf engine |
 | `uml-xmi-export` (engine) | `engine-api`, `contracts`, `uml`, `schema-cache` | 2 — leaf engine |
-| `cli` | `contracts`, `core`, `engine-api`; engine implementations **only in `EngineWiring`** | 3 — entrypoint + wiring |
+| `cli` | `contracts`, `core`, `engine-api`, `ir`; engine implementations **only in `EngineWiring`** | 3 — entrypoint + wiring |
 | `dist-tool` | `contracts` (compile); `cli` (runtime, for bundling — the bundled engine and semantics-front-end modules arrive transitively through `cli`'s compile deps, so the single-launcher distribution needs no separate engine-launcher dependency) | 3 — assembly |
 | `coverage-report` | *(nothing in the default build)*; every product module (runtime, **`coverage`-profile-scoped only**, for JaCoCo `report-aggregate`) | 3 — build tooling |
 
@@ -87,7 +88,22 @@ Rules that fall out of this table and must be enforced, not just hoped for:
 
 - **No cycles, ever.** A back-edge anywhere is a defect (*Martin 2017*, ADP).
 - **`engine-api` is a tier-1 module** (directory `engine-api/`, package
-  `dev.dediren.engine`): interfaces only, depends on `contracts` alone.
+  `dev.dediren.engine`): interfaces only, depends on `contracts` and `ir` (Plan
+  B P4 added the `ir` edge — see below).
+- **`engine-api` speaks `ir` types (Plan B P4 seam flip); export stays on
+  `contracts` records.** `SemanticsEngine.projectScene`, `LayoutEngine.layout`,
+  and `RenderEngine.render` now take/return the typed `ir` `SceneGraph` /
+  `LaidOutScene` instead of the `contracts` `LayoutRequest` / `LayoutResult`
+  records, adding the new `engine-api → ir` (and downstream `core → ir`,
+  `elk-layout → ir`, `render → ir`) compile edges recorded in the table above.
+  `ExportRequest` is the one boundary that did **not** flip: it is a wire
+  contract (`export-request.schema.v1`) built from `contracts.LayoutResult`,
+  and a `contracts → ir` edge is a cycle forbidden by ADP and the ArchUnit
+  `internalPackagesAreAcyclic` rule, so export keeps consuming
+  `contracts` records. `build` still avoids re-serializing between stages for
+  this lane: it maps the in-memory `LaidOutScene` to a `LayoutResult` object
+  (`LaidOutSceneMapper.toResult`) to assemble the `ExportRequest`, rather than
+  writing and re-reading `layout-result.json`.
 - **No engine depends on `core`.** The old plugin→`core` prohibition survives
   the reversal as an engine→`core` prohibition: engines depend on `engine-api`,
   `contracts`, and the notation/utility cores they need, never on `core` and
@@ -554,6 +570,7 @@ speculatively):
 | SpotBugs `EI_EXPOSE_REP`/`EI_EXPOSE_REP2` suppressed on the `ir` pre-layout and post-layout scene records (`ir.SceneGraph`, `ir.SceneGroup`, `ir.LaidOutScene`, `ir.PlacedGroup`, `ir.RoutedEdge`) | `spotbugs-exclude.xml` | §6 contract surface | deferred: same case as the other `contracts`-style records — wrap their List components via `ContractCollections.listOrEmpty` (`List.copyOf`), so sharing the reference is genuinely immutable; suppressed rather than defensive-copied for consistency with the existing `contracts` records (`ir.SceneGraph`/`ir.SceneGroup` from Plan B P1; `ir.LaidOutScene`/`ir.PlacedGroup`/`ir.RoutedEdge` from Plan B P2) |
 | SpotBugs `EI_EXPOSE_REP`/`EI_EXPOSE_REP2` suppressed on the `contracts.build` record classes (`BuildArtifact`, `BuildResult`, `BuildViewOutcome`) | `spotbugs-exclude.xml` | §6 contract surface | deferred: same case as the other `contracts` records — wrap List/Map components via `ContractCollections.listOrEmpty`/`mapOrEmpty` (`List.copyOf`/`Map.copyOf`), so sharing the reference is genuinely immutable; suppressed rather than defensive-copied for consistency with the existing `contracts` records |
 | SpotBugs `EI_EXPOSE_REP`/`EI_EXPOSE_REP2` suppressed on the `engine-api` value types (`engine.EngineResult`, `engine.EngineException`, `engine.Engines`) | `spotbugs-exclude.xml` | §2 dependency spine | deferred: same case as the `contracts` records — `EngineResult`/`EngineException` wrap their `List<Diagnostic>` component via `ContractCollections.listOrEmpty` (`List.copyOf`) and `Engines` wraps its capability maps via `mapOrEmpty`/`Map.copyOf`, so sharing the reference is genuinely immutable; suppressed rather than defensive-copied for consistency with the `contracts` records |
+| SpotBugs `EI_EXPOSE_REP`/`EI_EXPOSE_REP2` suppressed on `core.engine.EngineDispatch$InMemoryOutcome$Failure` | `spotbugs-exclude.xml` | §2 dependency spine | deferred: same case as the `engine-api`/`contracts` records — the in-memory dispatch failure outcome (Plan B P4) wraps its `List<Diagnostic>` component via `ContractCollections.listOrEmpty` (`List.copyOf`), so sharing the reference is genuinely immutable; suppressed rather than defensive-copied for consistency with the `contracts`/`engine-api` records |
 | SpotBugs `EI_EXPOSE_REP`/`EI_EXPOSE_REP2` suppressed on `render/node/NodeLabelLines` and `umlxmi/build/ExportScope` | `spotbugs-exclude.xml` | §8 thinness/cohesion | deferred: plugin-internal value records extracted from the former Main god-files; hold List/Set consumed read-only within the engine, not part of the public contract surface; suppressed rather than defensive-copied for consistency with the `contracts` records |
 | SpotBugs `MS_EXPOSE_REP` suppressed in `JsonSupport.objectMapper()` | `spotbugs-exclude.xml` | §4 contract surface | by design: returns the shared `ObjectMapper` singleton, mutable in place (`.configure()`/`.registerModule()`), exposed as one canonical mapper; the reconfiguration risk is first-party-only: every consumer of the singleton is first-party code in the product JVM, and the mapper is configured once at class initialization |
 | SpotBugs `NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE` suppressed in `DistTool` (5 sites) | `spotbugs-exclude.xml` | §3 module charter | deferred: `Path.getFileName()`/`getParent()` on `Files.list(dir)` entries and real bundle/output paths; null branch infeasible; build/dist tool, not shipped runtime |

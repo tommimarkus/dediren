@@ -166,8 +166,9 @@ class ArchitectureRulesTest {
             "dev.dediren.schemacache..",
             "dev.dediren.tools..")
         .because(
-            "engine-api is the shared engine-facing interface surface and must depend"
-                + " only on contracts, never core or any engine implementation (Task 2)")
+            "engine-api is the shared engine-facing interface surface and depends only on contracts"
+                + " and ir (the typed scene IR it now speaks), never core or any engine"
+                + " implementation")
         .check(PRODUCTION_CLASSES);
   }
 

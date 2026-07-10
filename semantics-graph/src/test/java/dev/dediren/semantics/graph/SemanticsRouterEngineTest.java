@@ -10,6 +10,8 @@ import dev.dediren.contracts.source.GenericGraphSemanticProfile;
 import dev.dediren.contracts.source.SourceDocument;
 import dev.dediren.engine.EngineException;
 import dev.dediren.engine.EngineResult;
+import dev.dediren.ir.LayoutRequestMapper;
+import dev.dediren.ir.SceneGraph;
 import dev.dediren.semantics.archimate.ArchimateNotationSemantics;
 import dev.dediren.semantics.uml.UmlNotationSemantics;
 import dev.dediren.testsupport.SchemaAssertions;
@@ -84,12 +86,13 @@ class SemanticsRouterEngineTest {
   void projectsBaseProfileLayoutAndRenderMetadata() throws Exception {
     SourceDocument source = source("fixtures/source/valid-basic.json");
 
-    EngineResult<LayoutRequest> layout = engine.projectLayoutRequest(source, "main");
+    EngineResult<SceneGraph> scene = engine.projectScene(source, "main");
     EngineResult<RenderMetadata> metadata = engine.projectRenderMetadata(source, "main");
+    LayoutRequest layout = LayoutRequestMapper.toRequest(scene.value());
 
-    assertThat(layout.value().viewId()).isEqualTo("main");
-    assertThat(layout.value().nodes()).hasSize(2);
-    assertThat(layout.value().edges()).hasSize(1);
+    assertThat(layout.viewId()).isEqualTo("main");
+    assertThat(layout.nodes()).hasSize(2);
+    assertThat(layout.edges()).hasSize(1);
     assertThat(metadata.value().semanticProfile()).isEqualTo("generic-graph");
     assertThat(metadata.value().nodes()).containsKeys("client", "api");
   }
@@ -116,10 +119,10 @@ class SemanticsRouterEngineTest {
   void projectLayoutRequestEnvelopeRoundTripsThroughHarness() throws Exception {
     byte[] source = fixtureBytes("fixtures/source/valid-basic.json");
 
-    EngineResult<?> result =
-        fullEngine.projectLayoutRequest(fullEngine.parseSource(source), "main");
+    EngineResult<SceneGraph> result =
+        fullEngine.projectScene(fullEngine.parseSource(source), "main");
 
-    assertThat(engineTree(result.value()))
+    assertThat(engineTree(LayoutRequestMapper.toRequest(result.value())))
         .isEqualTo(
             processData(
                 new String[] {"project", "--target", "layout-request", "--view", "main"}, source));

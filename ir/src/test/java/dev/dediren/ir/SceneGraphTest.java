@@ -8,15 +8,16 @@ class SceneGraphTest {
   @Test
   void sceneNodeCarriesOrigin() {
     SceneNode node =
-        new SceneNode("n1", "N1", SourcePointers.node(0), 10.0, 10.0, "lifeline", null, null);
+        new SceneNode("n1", "N1", "n1", 10.0, 10.0, "lifeline", null, null, SourcePointers.node(0));
     assertThat(node.origin().value()).isEqualTo("/nodes/0");
   }
 
   @Test
   void sceneGraphDefaultsEmptyCollections() {
-    SceneGraph graph = new SceneGraph("view-1", null, null, null, null);
+    SceneGraph graph = new SceneGraph("view-1", null, null, null, null, null);
     assertThat(graph.nodes()).isEmpty();
     assertThat(graph.edges()).isEmpty();
     assertThat(graph.groups()).isEmpty();
+    assertThat(graph.constraints()).isEmpty();
   }
 }

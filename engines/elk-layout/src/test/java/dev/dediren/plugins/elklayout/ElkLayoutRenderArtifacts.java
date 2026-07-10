@@ -4,6 +4,7 @@ import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.contracts.layout.LayoutResult;
 import dev.dediren.contracts.render.RenderArtifact;
 import dev.dediren.contracts.render.RenderResult;
+import dev.dediren.ir.LaidOutSceneMapper;
 import dev.dediren.plugins.render.SvgRenderEngine;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -45,7 +46,8 @@ final class ElkLayoutRenderArtifacts {
     // Render through the production SvgRenderEngine (render's compile surface), not the render
     // module's test-only Main harness, so this debug artifact writer stays on the shipped engine
     // API after the single-launcher cutover moved the harness into render's own test scope.
-    RenderResult rendered = new SvgRenderEngine().render(result, policy, null).value();
+    RenderResult rendered =
+        new SvgRenderEngine().render(LaidOutSceneMapper.toScene(result), policy, null).value();
 
     String content =
         rendered.artifacts().stream()

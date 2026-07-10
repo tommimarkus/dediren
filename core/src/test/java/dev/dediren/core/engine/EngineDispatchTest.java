@@ -76,6 +76,75 @@ class EngineDispatchTest {
   }
 
   @Test
+  void dispatchInMemoryReturnsValueOnSuccess() throws Exception {
+    EngineResult<SemanticValidationResult> result = new EngineResult<>(VALUE, List.of());
+
+    EngineDispatch.InMemoryOutcome<SemanticValidationResult> outcome =
+        EngineDispatch.dispatchInMemory("fake", () -> result);
+
+    assertThat(outcome).isInstanceOf(EngineDispatch.InMemoryOutcome.Value.class);
+    var value = (EngineDispatch.InMemoryOutcome.Value<SemanticValidationResult>) outcome;
+    assertThat(value.result().value()).isEqualTo(VALUE);
+    assertThat(value.result().diagnostics()).isEmpty();
+  }
+
+  @Test
+  void dispatchInMemoryReturnsFailureCarryingDiagnosticsAndExitCode() throws Exception {
+    List<Diagnostic> diagnostics =
+        List.of(
+            new Diagnostic("DEDIREN_ELK_LAYOUT_FAILED", DiagnosticSeverity.ERROR, "boom", null));
+
+    EngineDispatch.InMemoryOutcome<SemanticValidationResult> outcome =
+        EngineDispatch.dispatchInMemory(
+            "fake",
+            () -> {
+              throw new EngineException(diagnostics, 3);
+            });
+
+    assertThat(outcome).isInstanceOf(EngineDispatch.InMemoryOutcome.Failure.class);
+    var failure = (EngineDispatch.InMemoryOutcome.Failure<SemanticValidationResult>) outcome;
+    assertThat(failure.exitCode()).isEqualTo(3);
+    assertThat(failure.diagnostics())
+        .extracting(Diagnostic::code)
+        .containsExactly("DEDIREN_ELK_LAYOUT_FAILED");
+  }
+
+  @Test
+  void dispatchInMemoryThrowsEngineFailedOnUnexpectedException() {
+    // The third branch: an unexpected failure is not folded into a Failure outcome but thrown as a
+    // structured PluginExecutionException, exactly as the serializing dispatch does.
+    assertThatThrownBy(
+            () ->
+                EngineDispatch.dispatchInMemory(
+                    "fake",
+                    () -> {
+                      throw new IllegalStateException("kaboom");
+                    }))
+        .isInstanceOf(PluginExecutionException.class)
+        .satisfies(
+            error ->
+                assertThat(((PluginExecutionException) error).diagnostic().code())
+                    .isEqualTo("DEDIREN_ENGINE_FAILED"));
+  }
+
+  @Test
+  void dispatchInMemoryPropagatesUncheckedIoExceptionUnchanged() {
+    // A structural failure must ride the raw UncheckedIOException so the cli can reproduce its
+    // observable; dispatchInMemory must not bury it as a Failure or ENGINE_FAILED.
+    UncheckedIOException boom =
+        new UncheckedIOException(new IOException("missing generic-graph view"));
+
+    assertThatThrownBy(
+            () ->
+                EngineDispatch.dispatchInMemory(
+                    "fake",
+                    () -> {
+                      throw boom;
+                    }))
+        .isSameAs(boom);
+  }
+
+  @Test
   void engineExceptionProducesErrorEnvelopeWithExitCode() throws Exception {
     List<Diagnostic> diagnostics =
         List.of(
@@ -233,7 +302,7 @@ class EngineDispatchTest {
   private record FakeRenderEngine(String id) implements RenderEngine {
     @Override
     public EngineResult<RenderResult> render(
-        dev.dediren.contracts.layout.LayoutResult layout,
+        dev.dediren.ir.LaidOutScene layout,
         JsonNode policy,
         dev.dediren.contracts.render.RenderMetadata metadataOrNull) {
       throw new UnsupportedOperationException("capability-mismatch fake must never be invoked");

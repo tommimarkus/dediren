@@ -1,10 +1,12 @@
 package dev.dediren.cli;
 
 import dev.dediren.contracts.json.JsonSupport;
-import dev.dediren.contracts.layout.LayoutRequest;
 import dev.dediren.contracts.layout.LayoutResult;
 import dev.dediren.contracts.source.GenericGraphSemanticProfile;
 import dev.dediren.contracts.source.SourceDocument;
+import dev.dediren.ir.LaidOutScene;
+import dev.dediren.ir.LaidOutSceneMapper;
+import dev.dediren.ir.SceneGraph;
 import dev.dediren.plugins.elklayout.ElkEngine;
 import dev.dediren.semantics.archimate.ArchimateNotationSemantics;
 import dev.dediren.semantics.graph.GraphNotationSemantics;
@@ -109,8 +111,9 @@ class LayoutFixtureRegenerator {
     for (FixtureMapping mapping : MAPPINGS) {
       byte[] sourceBytes = Files.readAllBytes(sourceDir.resolve(mapping.sourceFileName()));
       SourceDocument source = genericGraph.parseSource(sourceBytes);
-      LayoutRequest request = genericGraph.projectLayoutRequest(source, mapping.viewId()).value();
-      LayoutResult result = elk.layout(request).value();
+      SceneGraph scene = genericGraph.projectScene(source, mapping.viewId()).value();
+      LaidOutScene laid = elk.layout(scene).value();
+      LayoutResult result = LaidOutSceneMapper.toResult(laid);
 
       String json =
           JsonSupport.objectMapper().writerWithDefaultPrettyPrinter().writeValueAsString(result)

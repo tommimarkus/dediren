@@ -1,8 +1,9 @@
 package dev.dediren.plugins.elklayout;
 
-import dev.dediren.contracts.layout.LayoutRequest;
 import dev.dediren.contracts.layout.LayoutResult;
 import dev.dediren.engine.EngineException;
+import dev.dediren.ir.LaidOutSceneMapper;
+import dev.dediren.ir.SceneGraph;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
@@ -44,16 +45,16 @@ public final class Main {
 
   static int run(InputStream stdin, PrintStream stdout) throws Exception {
     ElkEngine engine = new ElkEngine();
-    LayoutRequest request;
+    SceneGraph scene;
     try {
-      request = engine.parseRequest(stdin.readAllBytes());
+      scene = engine.parseRequest(stdin.readAllBytes());
     } catch (EngineException error) {
       stdout.println(EnvelopeWriter.error(error.diagnostics()));
       return error.exitCode();
     }
 
     try {
-      LayoutResult result = engine.layout(request).value();
+      LayoutResult result = LaidOutSceneMapper.toResult(engine.layout(scene).value());
       stdout.println(EnvelopeWriter.ok(result));
       return 0;
     } catch (EngineException error) {

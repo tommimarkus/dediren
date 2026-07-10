@@ -10,9 +10,7 @@ import dev.dediren.contracts.build.BuildResult;
 import dev.dediren.contracts.build.BuildViewOutcome;
 import dev.dediren.contracts.export.ExportResult;
 import dev.dediren.contracts.json.JsonSupport;
-import dev.dediren.contracts.layout.LaidOutEdge;
 import dev.dediren.contracts.layout.LayoutRequest;
-import dev.dediren.contracts.layout.LayoutResult;
 import dev.dediren.contracts.render.RenderArtifact;
 import dev.dediren.contracts.render.RenderMetadata;
 import dev.dediren.contracts.render.RenderResult;
@@ -27,6 +25,10 @@ import dev.dediren.engine.ExportEngine;
 import dev.dediren.engine.LayoutEngine;
 import dev.dediren.engine.RenderEngine;
 import dev.dediren.engine.SemanticsEngine;
+import dev.dediren.ir.LaidOutScene;
+import dev.dediren.ir.LayoutRequestMapper;
+import dev.dediren.ir.RoutedEdge;
+import dev.dediren.ir.SceneGraph;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -256,6 +258,45 @@ class BuildCommandTest {
       assertThat(envelope.get("status").asText()).isEqualTo("ok");
       assertThat(envelope.has("data")).isTrue();
     }
+  }
+
+  @Test
+  void emitStageEnvelopesAreByteIdenticalToStandaloneCommands() throws Exception {
+    // The --emit seam must persist the exact bytes each standalone stage command prints, so a
+    // consumer cannot tell the in-memory build apart from `dediren project`/`dediren layout`.
+    Engines engines = engines();
+    BuildRequest request =
+        new BuildRequest(
+            SOURCE,
+            null,
+            List.of("overview"),
+            "{}",
+            null,
+            null,
+            Set.of("layout-request", "layout-result", "render-metadata"),
+            out,
+            Map.of());
+
+    BuildCommand.run(request, engines);
+
+    String layoutRequest =
+        CoreCommands.projectCommand(
+                "generic-graph", "layout-request", "overview", SOURCE, null, Map.of(), engines)
+            .stdout();
+    assertThat(Files.readString(out.resolve("overview/layout-request.json")))
+        .isEqualTo(layoutRequest);
+
+    String layoutResult =
+        CoreCommands.layoutCommand("elk-layout", layoutRequest, Map.of(), engines).stdout();
+    assertThat(Files.readString(out.resolve("overview/layout-result.json")))
+        .isEqualTo(layoutResult);
+
+    String renderMetadata =
+        CoreCommands.projectCommand(
+                "generic-graph", "render-metadata", "overview", SOURCE, null, Map.of(), engines)
+            .stdout();
+    assertThat(Files.readString(out.resolve("overview/render-metadata.json")))
+        .isEqualTo(renderMetadata);
   }
 
   @Test
@@ -657,9 +698,9 @@ class BuildCommandTest {
     }
 
     @Override
-    public EngineResult<LayoutRequest> projectLayoutRequest(SourceDocument source, String view) {
+    public EngineResult<SceneGraph> projectScene(SourceDocument source, String view) {
       requireKnownView(view);
-      return new EngineResult<>(
+      LayoutRequest layoutRequest =
           new LayoutRequest(
               ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION,
               view,
@@ -667,7 +708,9 @@ class BuildCommandTest {
               List.of(),
               List.of(),
               List.of(),
-              null),
+              null);
+      return new EngineResult<>(
+          LayoutRequestMapper.toSceneGraph(layoutRequest),
           warningIf(
               layoutRequestWarningViews,
               view,
@@ -714,14 +757,16 @@ class BuildCommandTest {
     }
 
     @Override
-    public LayoutRequest parseRequest(byte[] input) {
-      return JsonSupport.objectMapper()
-          .treeToValue(JsonSupport.objectMapper().readTree(input), LayoutRequest.class);
+    public SceneGraph parseRequest(byte[] input) {
+      LayoutRequest request =
+          JsonSupport.objectMapper()
+              .treeToValue(JsonSupport.objectMapper().readTree(input), LayoutRequest.class);
+      return LayoutRequestMapper.toSceneGraph(request);
     }
 
     @Override
-    public EngineResult<LayoutResult> layout(LayoutRequest request) throws EngineException {
-      String view = request.viewId();
+    public EngineResult<LaidOutScene> layout(SceneGraph scene) throws EngineException {
+      String view = scene.viewId();
       if (failingViews.contains(view)) {
         throw fakeFailure("DEDIREN_FAKE_LAYOUT_FAILED", "layout blew up");
       }
@@ -729,16 +774,17 @@ class BuildCommandTest {
         // A layout that clears the layout stage but fails LayoutQuality.validateLayoutDiagnostics:
         // an edge with no route points -> DEDIREN_LAYOUT_ROUTE_POINTS_EMPTY (ERROR).
         return new EngineResult<>(
-            new LayoutResult(
-                ContractVersions.LAYOUT_RESULT_SCHEMA_VERSION,
+            new LaidOutScene(
                 view,
                 List.of(),
-                List.of(new LaidOutEdge("bad-edge", "client", "api", null, null, null, null, null)),
+                List.of(
+                    new RoutedEdge(
+                        "bad-edge", "client", "api", null, null, null, null, null, null)),
                 List.of(),
                 List.of()),
             List.of());
       }
-      // qualityWarningViews embeds an upstream warning in the LayoutResult so the real quality
+      // qualityWarningViews embeds an upstream warning in the LaidOutScene so the real quality
       // validation degrades to WARNING; layoutStageWarningViews warns on the layout stage envelope.
       List<Diagnostic> embeddedWarnings =
           warningIf(qualityWarningViews, view, "DEDIREN_FAKE_UPSTREAM", "upstream warning");
@@ -749,14 +795,7 @@ class BuildCommandTest {
               "DEDIREN_FAKE_LAYOUT_STAGE_WARNING",
               "layout stage warning");
       return new EngineResult<>(
-          new LayoutResult(
-              ContractVersions.LAYOUT_RESULT_SCHEMA_VERSION,
-              view,
-              List.of(),
-              List.of(),
-              List.of(),
-              embeddedWarnings),
-          stageWarnings);
+          new LaidOutScene(view, List.of(), List.of(), List.of(), embeddedWarnings), stageWarnings);
     }
   }
 
@@ -768,9 +807,8 @@ class BuildCommandTest {
 
     @Override
     public EngineResult<RenderResult> render(
-        LayoutResult layout, JsonNode policy, RenderMetadata metadataOrNull)
-        throws EngineException {
-      if (failingViews.contains(layout.viewId())) {
+        LaidOutScene scene, JsonNode policy, RenderMetadata metadataOrNull) throws EngineException {
+      if (failingViews.contains(scene.viewId())) {
         throw fakeFailure("DEDIREN_FAKE_RENDER_FAILED", "render blew up");
       }
       return new EngineResult<>(

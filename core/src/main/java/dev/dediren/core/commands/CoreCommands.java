@@ -19,11 +19,16 @@ import dev.dediren.core.quality.LayoutQuality;
 import dev.dediren.core.quality.LayoutQualityReport;
 import dev.dediren.core.source.SourceValidator;
 import dev.dediren.core.source.ValidationResult;
+import dev.dediren.engine.EngineResult;
 import dev.dediren.engine.Engines;
 import dev.dediren.engine.ExportEngine;
 import dev.dediren.engine.LayoutEngine;
 import dev.dediren.engine.RenderEngine;
 import dev.dediren.engine.SemanticsEngine;
+import dev.dediren.ir.LaidOutScene;
+import dev.dediren.ir.LaidOutSceneMapper;
+import dev.dediren.ir.LayoutRequestMapper;
+import dev.dediren.ir.SceneGraph;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
@@ -56,7 +61,12 @@ public final class CoreCommands {
     byte[] bytes = layoutRequestBytes(inputText);
     LayoutEngine layout =
         EngineDispatch.requireEngine(engines, engineId, "layout", engines.layoutEngine(engineId));
-    return EngineDispatch.dispatch(engineId, () -> layout.layout(layout.parseRequest(bytes)));
+    return EngineDispatch.dispatch(
+        engineId,
+        () -> {
+          EngineResult<LaidOutScene> laid = layout.layout(layout.parseRequest(bytes));
+          return new EngineResult<>(LaidOutSceneMapper.toResult(laid.value()), laid.diagnostics());
+        });
   }
 
   private static byte[] layoutRequestBytes(String inputText) throws PluginExecutionException {
@@ -106,7 +116,13 @@ public final class CoreCommands {
       return EngineDispatch.dispatch(engineId, () -> semantics.projectRenderMetadata(source, view));
     }
     if ("layout-request".equals(target)) {
-      return EngineDispatch.dispatch(engineId, () -> semantics.projectLayoutRequest(source, view));
+      return EngineDispatch.dispatch(
+          engineId,
+          () -> {
+            EngineResult<SceneGraph> projected = semantics.projectScene(source, view);
+            return new EngineResult<>(
+                LayoutRequestMapper.toRequest(projected.value()), projected.diagnostics());
+          });
     }
     // A structural failure's observable: message to stderr, exit 2. The cli catches this
     // UncheckedIOException and prints its cause, keeping the published non-enveloped form.
@@ -141,25 +157,43 @@ public final class CoreCommands {
 
   public static ValidationResult validateLayoutCommand(String inputText) {
     try {
-      LayoutResult result = JsonInput.parseCommandData(inputText, LayoutResult.class);
-      List<Diagnostic> diagnostics = LayoutQuality.validateLayoutDiagnostics(result);
-      if (!diagnostics.isEmpty()) {
-        return new ValidationResult(
-            CommandExitCode.INPUT_ERROR.code(), CommandEnvelope.error(diagnostics));
-      }
-      LayoutQualityReport report = LayoutQuality.validateLayout(result);
-      JsonNode data = JsonSupport.objectMapper().valueToTree(report);
-      List<Diagnostic> qualityWarnings = LayoutQuality.layoutQualityWarnings(report);
-      // A warning verdict is not a failure, so the exit code stays OK; the envelope status and
-      // diagnostics carry the verdict for consumers that read the envelope, not just data.
-      CommandEnvelope<JsonNode> envelope =
-          qualityWarnings.isEmpty()
-              ? CommandEnvelope.ok(data)
-              : CommandEnvelope.warning(data, qualityWarnings);
-      return new ValidationResult(CommandExitCode.OK.code(), envelope);
+      return validateLayoutResult(JsonInput.parseCommandData(inputText, LayoutResult.class));
     } catch (RuntimeException error) {
       return commandInputValidationResult("validate-layout", error);
     }
+  }
+
+  /**
+   * The quality stage over an already-typed {@link LayoutResult}: the in-memory build passes {@code
+   * LaidOutSceneMapper.toResult(laid)} straight in with no JSON round-trip, and gets the same
+   * verdict the standalone {@code validate-layout} command would produce for the equivalent bytes.
+   * A quality {@link RuntimeException} is folded into a {@code DEDIREN_COMMAND_INPUT_INVALID} error
+   * result exactly as the string entry point does.
+   */
+  public static ValidationResult validateLayout(LayoutResult result) {
+    try {
+      return validateLayoutResult(result);
+    } catch (RuntimeException error) {
+      return commandInputValidationResult("validate-layout", error);
+    }
+  }
+
+  private static ValidationResult validateLayoutResult(LayoutResult result) {
+    List<Diagnostic> diagnostics = LayoutQuality.validateLayoutDiagnostics(result);
+    if (!diagnostics.isEmpty()) {
+      return new ValidationResult(
+          CommandExitCode.INPUT_ERROR.code(), CommandEnvelope.error(diagnostics));
+    }
+    LayoutQualityReport report = LayoutQuality.validateLayout(result);
+    JsonNode data = JsonSupport.objectMapper().valueToTree(report);
+    List<Diagnostic> qualityWarnings = LayoutQuality.layoutQualityWarnings(report);
+    // A warning verdict is not a failure, so the exit code stays OK; the envelope status and
+    // diagnostics carry the verdict for consumers that read the envelope, not just data.
+    CommandEnvelope<JsonNode> envelope =
+        qualityWarnings.isEmpty()
+            ? CommandEnvelope.ok(data)
+            : CommandEnvelope.warning(data, qualityWarnings);
+    return new ValidationResult(CommandExitCode.OK.code(), envelope);
   }
 
   public static PluginRunOutcome renderCommand(
@@ -185,7 +219,8 @@ public final class CoreCommands {
     RenderEngine renderEngine =
         EngineDispatch.requireEngine(engines, engineId, "render", engines.renderEngine(engineId));
     return EngineDispatch.dispatch(
-        engineId, () -> renderEngine.render(layoutResult, policy, metadata));
+        engineId,
+        () -> renderEngine.render(LaidOutSceneMapper.toScene(layoutResult), policy, metadata));
   }
 
   public static PluginRunOutcome exportCommand(
@@ -248,7 +283,7 @@ public final class CoreCommands {
     }
   }
 
-  private static JsonNode parseJson(String command, String text) throws PluginExecutionException {
+  static JsonNode parseJson(String command, String text) throws PluginExecutionException {
     try {
       return JsonSupport.objectMapper().readTree(text);
     } catch (RuntimeException error) {

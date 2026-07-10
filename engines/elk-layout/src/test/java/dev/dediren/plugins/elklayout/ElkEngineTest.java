@@ -1,14 +1,18 @@
 package dev.dediren.plugins.elklayout;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import dev.dediren.contracts.ContractVersions;
 import dev.dediren.contracts.json.JsonSupport;
-import dev.dediren.contracts.layout.LayoutRequest;
 import dev.dediren.contracts.layout.LayoutResult;
 import dev.dediren.engine.EngineException;
 import dev.dediren.engine.EngineResult;
+import dev.dediren.ir.LaidOutScene;
+import dev.dediren.ir.LaidOutSceneMapper;
+import dev.dediren.ir.LayoutRequestMapper;
+import dev.dediren.ir.SceneGraph;
 import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
@@ -52,11 +56,12 @@ class ElkEngineTest {
 
   @Test
   void layoutEnvelopeRoundTripsThroughHarness() throws Exception {
-    LayoutRequest request = engine.parseRequest(VALID_REQUEST.getBytes(StandardCharsets.UTF_8));
+    SceneGraph scene = engine.parseRequest(VALID_REQUEST.getBytes(StandardCharsets.UTF_8));
 
-    EngineResult<LayoutResult> result = engine.layout(request);
+    EngineResult<LaidOutScene> result = engine.layout(scene);
 
-    assertEquals(processData(VALID_REQUEST), engineTree(result.value()));
+    assertEquals(
+        processData(VALID_REQUEST), engineTree(LaidOutSceneMapper.toResult(result.value())));
   }
 
   @Test
@@ -111,12 +116,46 @@ class ElkEngineTest {
             }
             """
             .formatted(ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION);
-    LayoutRequest parsed = engine.parseRequest(request.getBytes(StandardCharsets.UTF_8));
+    SceneGraph parsed = engine.parseRequest(request.getBytes(StandardCharsets.UTF_8));
 
     EngineException failure = assertThrows(EngineException.class, () -> engine.layout(parsed));
 
     assertEquals(3, failure.exitCode());
     assertEquals("DEDIREN_ELK_LAYOUT_FAILED", failure.diagnostics().get(0).code());
+  }
+
+  @Test
+  void parseRequestThenLayoutMatchesDirectRecordLayout() throws Exception {
+    // Both `laid` and `viaRecord` derive from the identical toRequest(toSceneGraph(parsedRequest)),
+    // so any pre-layout id/sourceId conflation in the boundary adapters would cancel out on both
+    // sides (that guard lives in LayoutRequestMapperTest, not here). What this test actually pins
+    // is toResult(toScene(...)) == identity on a real ELK-produced LayoutResult carrying populated
+    // geometry/routes, not just the pre-layout request shape.
+    String request =
+        """
+            {
+              "layout_request_schema_version": "%s",
+              "view_id": "main",
+              "nodes": [
+                {"id": "client-1", "label": "Client", "source_id": "client", "width_hint": 160, "height_hint": 80},
+                {"id": "api-1", "label": "API", "source_id": "api", "width_hint": 160, "height_hint": 80}
+              ],
+              "edges": [
+                {"id": "client-calls-api", "source": "client-1", "target": "api-1", "label": "calls", "source_id": "client-calls-api"}
+              ],
+              "groups": [],
+              "constraints": []
+            }
+            """
+            .formatted(ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION);
+    byte[] bytes = request.getBytes(StandardCharsets.UTF_8);
+    ElkEngine engine = new ElkEngine();
+
+    SceneGraph scene = engine.parseRequest(bytes);
+    LaidOutScene laid = engine.layout(scene).value();
+    LayoutResult viaRecord = new ElkLayoutEngine().layout(LayoutRequestMapper.toRequest(scene));
+
+    assertThat(LaidOutSceneMapper.toResult(laid)).isEqualTo(viaRecord);
   }
 
   private static JsonNode engineTree(Object value) {

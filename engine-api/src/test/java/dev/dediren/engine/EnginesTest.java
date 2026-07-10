@@ -3,11 +3,10 @@ package dev.dediren.engine;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import dev.dediren.contracts.ContractVersions;
 import dev.dediren.contracts.Diagnostic;
 import dev.dediren.contracts.DiagnosticSeverity;
-import dev.dediren.contracts.layout.LayoutRequest;
-import dev.dediren.contracts.layout.LayoutResult;
+import dev.dediren.ir.LaidOutScene;
+import dev.dediren.ir.SceneGraph;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -61,22 +60,14 @@ class EnginesTest {
     }
 
     @Override
-    public LayoutRequest parseRequest(byte[] input) {
-      return new LayoutRequest(
-          ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION, "main", null, null, null, null, null);
+    public SceneGraph parseRequest(byte[] input) {
+      return new SceneGraph("main", null, null, null, null, null);
     }
 
     @Override
-    public EngineResult<LayoutResult> layout(LayoutRequest request) {
+    public EngineResult<LaidOutScene> layout(SceneGraph scene) {
       return new EngineResult<>(
-          new LayoutResult(
-              ContractVersions.LAYOUT_RESULT_SCHEMA_VERSION,
-              request.viewId(),
-              null,
-              null,
-              null,
-              null),
-          List.of());
+          new LaidOutScene(scene.viewId(), null, null, null, null), List.of());
     }
   }
 }

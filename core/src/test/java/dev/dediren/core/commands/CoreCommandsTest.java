@@ -2,16 +2,17 @@ package dev.dediren.core.commands;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import dev.dediren.contracts.ContractVersions;
 import dev.dediren.contracts.Diagnostic;
 import dev.dediren.contracts.EnvelopeStatus;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.contracts.layout.LayoutRequest;
-import dev.dediren.contracts.layout.LayoutResult;
 import dev.dediren.core.plugins.PluginRunOutcome;
 import dev.dediren.engine.EngineResult;
 import dev.dediren.engine.Engines;
 import dev.dediren.engine.LayoutEngine;
+import dev.dediren.ir.LaidOutScene;
+import dev.dediren.ir.LayoutRequestMapper;
+import dev.dediren.ir.SceneGraph;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -173,23 +174,17 @@ class CoreCommandsTest {
     }
 
     @Override
-    public LayoutRequest parseRequest(byte[] input) {
+    public SceneGraph parseRequest(byte[] input) {
       LayoutRequest request = JsonSupport.objectMapper().readValue(input, LayoutRequest.class);
-      lastParsedViewId = request.viewId();
-      return request;
+      SceneGraph scene = LayoutRequestMapper.toSceneGraph(request);
+      lastParsedViewId = scene.viewId();
+      return scene;
     }
 
     @Override
-    public EngineResult<LayoutResult> layout(LayoutRequest request) {
+    public EngineResult<LaidOutScene> layout(SceneGraph scene) {
       return new EngineResult<>(
-          new LayoutResult(
-              ContractVersions.LAYOUT_RESULT_SCHEMA_VERSION,
-              request.viewId(),
-              List.of(),
-              List.of(),
-              List.of(),
-              List.of()),
-          List.of());
+          new LaidOutScene(scene.viewId(), List.of(), List.of(), List.of(), List.of()), List.of());
     }
   }
 }
