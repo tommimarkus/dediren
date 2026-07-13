@@ -8,7 +8,9 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -169,23 +171,31 @@ public final class SchemaCacheModule {
     }
   }
 
+  static List<String> curlArgs(URI url, Path destination) {
+    return List.of(
+        // Forbid protocol downgrade when following redirects: only https is allowed for
+        // the initial request and every redirect hop (audit finding F2).
+        "--proto",
+        "=https",
+        "--location",
+        "--fail",
+        "--silent",
+        "--show-error",
+        // Bound the whole transfer like XmlSchemaValidator bounds its subprocess: a stalled
+        // download must degrade to a structured fetch failure, not hang the export lane.
+        "--max-time",
+        "60",
+        url.toString(),
+        "--output",
+        destination.toString());
+  }
+
   public static SchemaFetcher curlFetcher(String command) {
     return (url, destination) -> {
-      Process process =
-          new ProcessBuilder(
-                  command,
-                  // Forbid protocol downgrade when following redirects: only https is allowed for
-                  // the initial request and every redirect hop (audit finding F2).
-                  "--proto",
-                  "=https",
-                  "--location",
-                  "--fail",
-                  "--silent",
-                  "--show-error",
-                  url.toString(),
-                  "--output",
-                  destination.toString())
-              .start();
+      List<String> command_ = new ArrayList<>();
+      command_.add(command);
+      command_.addAll(curlArgs(url, destination));
+      Process process = new ProcessBuilder(command_).start();
       // Both pipes are drained concurrently: a verbose fetch failure that fills the ~64 KiB stderr
       // pipe would otherwise block the child in write(2) forever while this thread waited on a
       // stdout EOF that can never arrive.

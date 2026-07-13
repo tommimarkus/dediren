@@ -311,6 +311,14 @@ class SchemaCacheModuleTest {
   }
 
   @Test
+  void curlArgsBoundTransferTimeAndForbidProtocolDowngrade() {
+    List<String> args =
+        SchemaCacheModule.curlArgs(URI.create("https://example.org/x.xsd"), Path.of("/tmp/x"));
+    assertThat(args).containsSequence("--proto", "=https");
+    assertThat(args).containsSequence("--max-time", "60");
+  }
+
+  @Test
   @EnabledOnOs({OS.LINUX, OS.MAC})
   void curlFetcherUsesExpectedDownloadArguments() throws Exception {
     Path fakeCurl = tempDir.resolve("fake-curl.sh");
