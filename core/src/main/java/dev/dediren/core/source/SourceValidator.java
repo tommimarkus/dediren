@@ -120,7 +120,8 @@ public final class SourceValidator {
         SchemaValidator.fromRepositoryRoot(DedirenPaths.productRoot())
             .validate("schemas/model.schema.json", value);
     if (!errors.isEmpty()) {
-      throw new SourceDiagnosticsException(List.of(schemaError(errors.getFirst())));
+      throw new SourceDiagnosticsException(
+          errors.stream().map(SourceValidator::schemaError).toList());
     }
     try {
       return JsonSupport.objectMapper().treeToValue(value, SourceDocument.class);

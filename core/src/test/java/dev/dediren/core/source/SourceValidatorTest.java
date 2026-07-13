@@ -83,6 +83,38 @@ class SourceValidatorTest {
     }
   }
 
+  @Test
+  void validateSourceReportsEverySchemaViolationNotJustTheFirst() {
+    // Two independent schema violations: node "n1" is missing required "label" and
+    // node "n2" is missing required "properties". SchemaValidator must surface both,
+    // not just the alphabetically-first violation message.
+    ValidationResult result =
+        SourceValidator.validateSourceJson(
+            """
+                {
+                  "model_schema_version": "model.schema.v1",
+                  "nodes": [
+                    { "id": "n1", "type": "Type", "properties": {} },
+                    { "id": "n2", "type": "Type", "label": "Two" }
+                  ],
+                  "relationships": [],
+                  "plugins": { "generic-graph": { "views": [] } }
+                }
+                """,
+            null);
+
+    assertThat(result.exitCode()).isEqualTo(2);
+    var diagnostics = result.envelope().diagnostics();
+    assertThat(diagnostics.size()).isGreaterThanOrEqualTo(2);
+    assertThat(diagnostics)
+        .allSatisfy(d -> assertThat(d.code()).isEqualTo("DEDIREN_SCHEMA_INVALID"));
+    // The two violation messages must be distinct: this proves they are independent
+    // sibling violations, not the same violation reported twice.
+    assertThat(
+            diagnostics.stream().map(dev.dediren.contracts.Diagnostic::message).distinct().count())
+        .isGreaterThanOrEqualTo(2);
+  }
+
   private static void restoreProperty(String name, String value) {
     if (value == null) {
       System.clearProperty(name);
