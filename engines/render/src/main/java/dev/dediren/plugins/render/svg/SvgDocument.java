@@ -21,14 +21,8 @@ import static dev.dediren.plugins.render.svg.EdgeRenderer.lineJumpMasks;
 import static dev.dediren.plugins.render.svg.EdgeRenderer.lineJumps;
 import static dev.dediren.plugins.render.svg.Geometry.labelObstacleBoxesForEdge;
 import static dev.dediren.plugins.render.svg.Geometry.svgBounds;
-import static dev.dediren.plugins.render.svg.Svg.attr;
-import static dev.dediren.plugins.render.svg.Svg.dashArrayAttr;
 import static dev.dediren.plugins.render.svg.Svg.dashArrayValue;
-import static dev.dediren.plugins.render.svg.Svg.enumAttr;
-import static dev.dediren.plugins.render.svg.Svg.opacityAttr;
-import static dev.dediren.plugins.render.svg.Svg.stringAttr;
 import static dev.dediren.plugins.render.svg.Svg.styleNumber;
-import static dev.dediren.plugins.render.svg.Svg.text;
 
 import dev.dediren.contracts.layout.LaidOutEdge;
 import dev.dediren.contracts.layout.LaidOutGroup;
@@ -63,104 +57,87 @@ public final class SvgDocument {
     }
     ResolvedStyle base = StyleResolver.baseStyle(policy);
     SvgBounds bounds = svgBounds(result, metadata, policy, base);
-    StringBuilder svg = new StringBuilder();
-    svg.append(
-        String.format(
-            Locale.ROOT,
-            "<svg xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" width=\"%.0f\" height=\"%.0f\" viewBox=\"%.1f %.1f %.1f %.1f\">",
-            bounds.width(),
-            bounds.height(),
-            bounds.minX(),
-            bounds.minY(),
-            bounds.width(),
-            bounds.height()));
-    svg.append(SvgAccessibleName.markup(policy, result.viewId()));
-    svg.append(
-        String.format(
-            Locale.ROOT,
-            "<rect x=\"%.1f\" y=\"%.1f\" width=\"%.1f\" height=\"%.1f\" fill=\"%s\"%s/>",
-            bounds.minX(),
-            bounds.minY(),
-            bounds.width(),
-            bounds.height(),
-            attr(base.backgroundFill()),
-            opacityAttr("fill-opacity", base.backgroundFillOpacity())));
-    svg.append("<g font-family=\"")
-        .append(attr(base.fontFamily()))
-        .append("\" font-size=\"")
-        .append(styleNumber(base.fontSize()))
-        .append("\"")
-        .append(enumAttr("font-weight", base.fontWeight()))
-        .append(enumAttr("font-style", base.fontStyle()))
-        .append(">");
+    SvgWriter w = new SvgWriter();
+    w.start("svg")
+        .attr("xmlns", "http://www.w3.org/2000/svg")
+        .attr("role", "img")
+        .attr("width", String.format(Locale.ROOT, "%.0f", bounds.width()))
+        .attr("height", String.format(Locale.ROOT, "%.0f", bounds.height()))
+        .attr(
+            "viewBox",
+            String.format(
+                Locale.ROOT,
+                "%.1f %.1f %.1f %.1f",
+                bounds.minX(),
+                bounds.minY(),
+                bounds.width(),
+                bounds.height()));
+    w.raw(SvgAccessibleName.markup(policy, result.viewId()));
+    w.empty("rect")
+        .attr("x", f1(bounds.minX()))
+        .attr("y", f1(bounds.minY()))
+        .attr("width", f1(bounds.width()))
+        .attr("height", f1(bounds.height()))
+        .attr("fill", base.backgroundFill())
+        .attrIf("fill-opacity", opacity(base.backgroundFillOpacity()));
+    w.start("g")
+        .attr("font-family", base.fontFamily())
+        .attr("font-size", styleNumber(base.fontSize()))
+        .attrIf("font-weight", enumValue(base.fontWeight()))
+        .attrIf("font-style", enumValue(base.fontStyle()));
     for (LaidOutGroup group : result.groups()) {
       ResolvedGroupStyle style = StyleResolver.groupStyle(policy, metadata, group.id(), base);
-      svg.append("<g data-dediren-group-id=\"").append(attr(group.id())).append("\"");
+      w.start("g").attr("data-dediren-group-id", group.id());
       RenderMetadataSelector selector = metadata == null ? null : metadata.groups().get(group.id());
       if (selector != null) {
-        svg.append(" data-dediren-group-type=\"")
-            .append(attr(selector.type()))
-            .append("\" data-dediren-group-source-id=\"")
-            .append(attr(selector.sourceId()))
-            .append("\"");
+        w.attr("data-dediren-group-type", selector.type())
+            .attr("data-dediren-group-source-id", selector.sourceId());
       }
-      svg.append(">");
       ResolvedGroupStyle rectStyle = style;
       if (style.fillGradient() != null) {
-        String gradientId = attr("group-fill-" + group.id());
-        svg.append(gradientElement(gradientId, style.fillGradient()));
+        String gradientId = "group-fill-" + group.id();
+        gradientElement(w, gradientId, style.fillGradient());
         rectStyle = style.withFill("url(#" + gradientId + ")");
       }
       String groupDashValue = dashArrayValue(style.lineStyle(), style.dashPattern(), "6 4");
       if (groupDashValue.isEmpty() && style.decorator() == SvgNodeDecorator.ARCHIMATE_GROUPING) {
         groupDashValue = "3 2";
       }
-      String groupDashArray =
-          groupDashValue.isEmpty() ? "" : " stroke-dasharray=\"" + groupDashValue + "\"";
-      String groupExtra =
-          groupDashArray
-              + opacityAttr("fill-opacity", style.fillOpacity())
-              + opacityAttr("stroke-opacity", style.strokeOpacity());
-      svg.append(
-          String.format(
-              Locale.ROOT,
-              "<rect x=\"%.1f\" y=\"%.1f\" width=\"%.1f\" height=\"%.1f\" rx=\"%s\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%s\"%s/>",
-              group.x(),
-              group.y(),
-              group.width(),
-              group.height(),
-              styleNumber(style.rx()),
-              attr(rectStyle.fill()),
-              attr(style.stroke()),
-              styleNumber(style.strokeWidth()),
-              groupExtra));
-      svg.append(groupDecorator(group, style));
+      w.empty("rect")
+          .attr("x", f1(group.x()))
+          .attr("y", f1(group.y()))
+          .attr("width", f1(group.width()))
+          .attr("height", f1(group.height()))
+          .attr("rx", styleNumber(style.rx()))
+          .attr("fill", rectStyle.fill())
+          .attr("stroke", style.stroke())
+          .attr("stroke-width", styleNumber(style.strokeWidth()))
+          .attrIf("stroke-dasharray", groupDashValue.isEmpty() ? null : groupDashValue)
+          .attrIf("fill-opacity", opacity(style.fillOpacity()))
+          .attrIf("stroke-opacity", opacity(style.strokeOpacity()));
+      groupDecorator(w, group, style);
       double groupLabelX = group.x() + 8.0;
-      String groupLabelAnchor = "";
+      String groupLabelAnchor = null;
       if (style.labelAlign() == SvgLabelAlign.MIDDLE) {
         groupLabelX = group.x() + group.width() / 2.0;
-        groupLabelAnchor = " text-anchor=\"middle\"";
+        groupLabelAnchor = "middle";
       } else if (style.labelAlign() == SvgLabelAlign.END) {
         groupLabelX = group.x() + group.width() - 8.0;
-        groupLabelAnchor = " text-anchor=\"end\"";
+        groupLabelAnchor = "end";
       }
-      String groupLabelFont =
-          stringAttr("font-family", style.fontFamily())
-              + enumAttr("font-weight", style.fontWeight())
-              + enumAttr("font-style", style.fontStyle())
-              + opacityAttr("fill-opacity", style.labelOpacity());
-      svg.append(
-          String.format(
-              Locale.ROOT,
-              "<text x=\"%.1f\" y=\"%.1f\"%s fill=\"%s\" font-size=\"%s\"%s>%s</text>",
-              groupLabelX,
-              group.y() + style.labelSize() + 4.0,
-              groupLabelAnchor,
-              attr(style.labelFill()),
-              styleNumber(style.labelSize()),
-              groupLabelFont,
-              text(group.label())));
-      svg.append("</g>");
+      w.start("text")
+          .attr("x", f1(groupLabelX))
+          .attr("y", f1(group.y() + style.labelSize() + 4.0))
+          .attrIf("text-anchor", groupLabelAnchor)
+          .attr("fill", style.labelFill())
+          .attr("font-size", styleNumber(style.labelSize()))
+          .attrIf("font-family", style.fontFamily())
+          .attrIf("font-weight", enumValue(style.fontWeight()))
+          .attrIf("font-style", enumValue(style.fontStyle()))
+          .attrIf("fill-opacity", opacity(style.labelOpacity()))
+          .text(group.label())
+          .end();
+      w.end();
     }
     List<LaidOutEdge> renderedEdges = new ArrayList<>();
     List<LabelBox> placedLabelBoxes = new ArrayList<>();
@@ -168,12 +145,11 @@ public final class SvgDocument {
       LaidOutEdge edge = result.edges().get(edgeIndex);
       ResolvedEdgeStyle style = StyleResolver.edgeStyle(policy, metadata, edge.id(), base);
       List<LineJump> lineJumps = lineJumps(edge, renderedEdges);
-      svg.append("<g data-dediren-edge-id=\"").append(attr(edge.id())).append("\"");
-      svg.append(">");
-      svg.append(edgeMarker(edge, style, "start"));
-      svg.append(edgeMarker(edge, style, "end"));
-      svg.append(lineJumpMasks(edge, lineJumps, result, metadata, policy, base));
-      svg.append(edgePath(edge, style, lineJumps));
+      w.start("g").attr("data-dediren-edge-id", edge.id());
+      w.raw(edgeMarker(edge, style, "start"));
+      w.raw(edgeMarker(edge, style, "end"));
+      w.raw(lineJumpMasks(edge, lineJumps, result, metadata, policy, base));
+      w.raw(edgePath(edge, style, lineJumps));
       if (edge.label() != null && !edge.label().isEmpty()) {
         double edgeLabelFontSize = edgeLabelFontSize(base.fontSize());
         EdgeLabel label =
@@ -182,7 +158,7 @@ public final class SvgDocument {
                 style,
                 labelObstacleBoxesForEdge(result, edgeIndex, placedLabelBoxes),
                 edgeLabelFontSize);
-        svg.append(edgeLabel(label, edge.label(), style, base.backgroundFill(), edgeLabelFontSize));
+        w.raw(edgeLabel(label, edge.label(), style, base.backgroundFill(), edgeLabelFontSize));
         placedLabelBoxes.add(edgeLabelVisibleBox(label, style.labelPresentation()));
       }
       RenderMetadataSelector edgeSelector =
@@ -190,76 +166,81 @@ public final class SvgDocument {
       List<EdgeEndAdornments.Adornment> endAdornments =
           EdgeEndAdornments.adornments(edge, edgeSelector, base.fontSize());
       if (!endAdornments.isEmpty()) {
-        svg.append(
+        w.raw(
             EdgeEndAdornments.markup(endAdornments, style, base.backgroundFill(), base.fontSize()));
         for (EdgeEndAdornments.Adornment adornment : endAdornments) {
           placedLabelBoxes.add(EdgeEndAdornments.visibleBox(adornment, style));
         }
       }
-      svg.append("</g>");
+      w.end();
       renderedEdges.add(edge);
     }
     for (LaidOutNode node : result.nodes()) {
       ResolvedNodeStyle style = StyleResolver.nodeStyle(policy, metadata, node.id(), base);
       RenderMetadataSelector selector = metadata == null ? null : metadata.nodes().get(node.id());
-      svg.append("<g data-dediren-node-id=\"").append(attr(node.id())).append("\">");
+      w.start("g").attr("data-dediren-node-id", node.id());
       ResolvedNodeStyle shapeStyle = style;
       if (style.fillGradient() != null) {
-        String gradientId = attr("node-fill-" + node.id());
-        svg.append(gradientElement(gradientId, style.fillGradient()));
+        String gradientId = "node-fill-" + node.id();
+        gradientElement(w, gradientId, style.fillGradient());
         shapeStyle = style.withFill("url(#" + gradientId + ")");
       }
-      svg.append(withNodeStrokeStyle(nodeShape(node, shapeStyle, selector), shapeStyle));
-      svg.append(nodeDecorator(node, style, selector));
-      if (shouldRenderPlainNodeLabel(node, style.decorator())) {
-        svg.append(nodeLabel(node, style, base.fontSize()));
+      String wrapDash = dashArrayValue(shapeStyle.lineStyle(), shapeStyle.dashPattern(), "6 4");
+      boolean wrap =
+          shapeStyle.fillOpacity() != null
+              || shapeStyle.strokeOpacity() != null
+              || !wrapDash.isEmpty();
+      if (wrap) {
+        w.start("g")
+            .attrIf("fill-opacity", opacity(shapeStyle.fillOpacity()))
+            .attrIf("stroke-opacity", opacity(shapeStyle.strokeOpacity()))
+            .attrIf("stroke-dasharray", wrapDash.isEmpty() ? null : wrapDash);
       }
-      svg.append("</g>");
+      nodeShape(w, node, shapeStyle, selector);
+      if (wrap) {
+        w.end();
+      }
+      nodeDecorator(w, node, style, selector);
+      if (shouldRenderPlainNodeLabel(node, style.decorator())) {
+        w.raw(nodeLabel(node, style, base.fontSize()));
+      }
+      w.end();
     }
-    svg.append("</g>");
-    svg.append("</svg>\n");
-    return svg.toString();
+    w.end();
+    w.end();
+    return w.finish() + "\n";
   }
 
-  private static String groupDecorator(LaidOutGroup group, ResolvedGroupStyle style) {
+  private static void groupDecorator(SvgWriter w, LaidOutGroup group, ResolvedGroupStyle style) {
     if (style.decorator() != SvgNodeDecorator.ARCHIMATE_GROUPING) {
-      return "";
+      return;
     }
     double size = 22.0;
     double x = group.x() + group.width() - size - 6.0;
     double y = group.y() + 9.0;
-    String body =
-        String.format(
-            Locale.ROOT,
-            "<path data-dediren-icon-part=\"grouping\" d=\"M %.1f %.1f L %.1f %.1f L %.1f %.1f L %.1f %.1f Z\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%s\"/>",
-            x,
-            y,
-            x + size,
-            y,
-            x + size,
-            y + size * 0.72,
-            x,
-            y + size * 0.72,
-            attr(style.fill()),
-            attr(style.stroke()),
-            styleNumber(style.strokeWidth()));
-    return "<g data-dediren-group-decorator=\"archimate_grouping\" data-dediren-icon-kind=\"grouping\""
-        + " data-dediren-icon-size=\"22\">"
-        + body
-        + "</g>";
-  }
-
-  // Applies node fill/stroke opacity and dash by wrapping the shape output in a group that carries
-  // the attributes, so they reach every notation's shape (generic, ArchiMate, UML, junction) by
-  // inheritance without editing each shape builder. Emitted only when an attribute is set, so
-  // otherwise-styled renders stay byte-identical. The wrapper holds only the shape — the decorator
-  // and label keep their own fills; a shape's own inline dash (grouping "3 2") still wins.
-  private static String withNodeStrokeStyle(String shape, ResolvedNodeStyle style) {
-    String attrs =
-        opacityAttr("fill-opacity", style.fillOpacity())
-            + opacityAttr("stroke-opacity", style.strokeOpacity())
-            + dashArrayAttr(style.lineStyle(), style.dashPattern(), "6 4");
-    return attrs.isEmpty() ? shape : "<g" + attrs + ">" + shape + "</g>";
+    w.start("g")
+        .attr("data-dediren-group-decorator", "archimate_grouping")
+        .attr("data-dediren-icon-kind", "grouping")
+        .attr("data-dediren-icon-size", "22");
+    w.empty("path")
+        .attr("data-dediren-icon-part", "grouping")
+        .attr(
+            "d",
+            String.format(
+                Locale.ROOT,
+                "M %.1f %.1f L %.1f %.1f L %.1f %.1f L %.1f %.1f Z",
+                x,
+                y,
+                x + size,
+                y,
+                x + size,
+                y + size * 0.72,
+                x,
+                y + size * 0.72))
+        .attr("fill", style.fill())
+        .attr("stroke", style.stroke())
+        .attr("stroke-width", styleNumber(style.strokeWidth()));
+    w.end();
   }
 
   // Inline gradient definition, referenced by fill="url(#id)". SVG gradient ids are
@@ -267,102 +248,106 @@ public final class SvgDocument {
   // so this can live inside the element's group. Linear coordinates run over the shape's bounding
   // box (objectBoundingBox), derived deterministically from the angle (0 = left→right, 90 = top→
   // bottom). Reuses the inline-id precedent from edge markers rather than a shared <defs>.
-  private static String gradientElement(String id, SvgGradient gradient) {
-    StringBuilder markup = new StringBuilder();
+  private static void gradientElement(SvgWriter w, String id, SvgGradient gradient) {
     if (gradient.type() == SvgGradientType.RADIAL) {
-      markup.append("<radialGradient id=\"").append(id).append("\">");
+      w.start("radialGradient").attr("id", id);
     } else {
       double radians = Math.toRadians(gradient.angle() == null ? 0.0 : gradient.angle());
       double cos = Math.cos(radians);
       double sin = Math.sin(radians);
-      markup.append(
-          String.format(
-              Locale.ROOT,
-              "<linearGradient id=\"%s\" x1=\"%.4f\" y1=\"%.4f\" x2=\"%.4f\" y2=\"%.4f\">",
-              id,
-              0.5 - 0.5 * cos,
-              0.5 - 0.5 * sin,
-              0.5 + 0.5 * cos,
-              0.5 + 0.5 * sin));
+      w.start("linearGradient")
+          .attr("id", id)
+          .attr("x1", String.format(Locale.ROOT, "%.4f", 0.5 - 0.5 * cos))
+          .attr("y1", String.format(Locale.ROOT, "%.4f", 0.5 - 0.5 * sin))
+          .attr("x2", String.format(Locale.ROOT, "%.4f", 0.5 + 0.5 * cos))
+          .attr("y2", String.format(Locale.ROOT, "%.4f", 0.5 + 0.5 * sin));
     }
     for (SvgGradientStop stop : gradient.stops()) {
-      markup.append(
-          String.format(
-              Locale.ROOT,
-              "<stop offset=\"%s\" stop-color=\"%s\"%s/>",
-              styleNumber(stop.offset()),
-              attr(stop.color()),
-              opacityAttr("stop-opacity", stop.opacity())));
+      w.empty("stop")
+          .attr("offset", styleNumber(stop.offset()))
+          .attr("stop-color", stop.color())
+          .attrIf("stop-opacity", opacity(stop.opacity()));
     }
-    markup.append(
-        gradient.type() == SvgGradientType.RADIAL ? "</radialGradient>" : "</linearGradient>");
-    return markup.toString();
+    w.end();
   }
 
-  private static String nodeShape(
-      LaidOutNode node, ResolvedNodeStyle style, RenderMetadataSelector selector) {
+  private static void nodeShape(
+      SvgWriter w, LaidOutNode node, ResolvedNodeStyle style, RenderMetadataSelector selector) {
     SvgNodeDecorator decorator = style.decorator();
     if (decorator == SvgNodeDecorator.ARCHIMATE_AND_JUNCTION
         || decorator == SvgNodeDecorator.ARCHIMATE_OR_JUNCTION) {
       double radius = archimateJunctionRadius(node, style);
       String fill =
           decorator == SvgNodeDecorator.ARCHIMATE_AND_JUNCTION ? style.stroke() : style.fill();
-      return String.format(
-          Locale.ROOT,
-          "<circle data-dediren-node-shape=\"%s\" cx=\"%.1f\" cy=\"%.1f\" r=\"%.1f\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%s\"/>",
-          decoratorName(decorator),
-          node.x() + node.width() / 2.0,
-          node.y() + node.height() / 2.0,
-          radius,
-          attr(fill),
-          attr(style.stroke()),
-          styleNumber(style.strokeWidth()));
+      w.empty("circle")
+          .attr("data-dediren-node-shape", decoratorName(decorator))
+          .attr("cx", f1(node.x() + node.width() / 2.0))
+          .attr("cy", f1(node.y() + node.height() / 2.0))
+          .attr("r", f1(radius))
+          .attr("fill", fill)
+          .attr("stroke", style.stroke())
+          .attr("stroke-width", styleNumber(style.strokeWidth()));
+      return;
     }
     if (decorator != null && isUmlDecorator(decorator)) {
-      return umlNodeShape(node, style, decorator, selector);
+      w.raw(umlNodeShape(node, style, decorator, selector));
+      return;
     }
     if (decorator == null && style.shape() != null) {
-      return genericNodeShape(node, style);
+      w.raw(genericNodeShape(node, style));
+      return;
     }
     String shapeName = "archimate_rectangle";
     double rx = 0.0;
-    String dashArray = "";
+    String dashArray = null;
     if (decorator == null) {
       rx = style.rx();
     } else if (isArchimateCutCornerRectangle(decorator)) {
-      return archimateCutCornerShape(node, style);
+      w.raw(archimateCutCornerShape(node, style));
+      return;
     } else if (isArchimateRoundedRectangle(decorator)) {
       rx = Math.max(1.0, style.rx());
       shapeName = "archimate_rounded_rectangle";
     } else if (decorator == SvgNodeDecorator.ARCHIMATE_GROUPING) {
-      dashArray = " stroke-dasharray=\"3 2\"";
+      dashArray = "3 2";
     }
-    return String.format(
-        Locale.ROOT,
-        "<rect data-dediren-node-shape=\"%s\" x=\"%.1f\" y=\"%.1f\" width=\"%.1f\" height=\"%.1f\" rx=\"%s\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%s\"%s/>",
-        shapeName,
-        node.x(),
-        node.y(),
-        node.width(),
-        node.height(),
-        styleNumber(rx),
-        attr(style.fill()),
-        attr(style.stroke()),
-        styleNumber(style.strokeWidth()),
-        dashArray);
+    w.empty("rect")
+        .attr("data-dediren-node-shape", shapeName)
+        .attr("x", f1(node.x()))
+        .attr("y", f1(node.y()))
+        .attr("width", f1(node.width()))
+        .attr("height", f1(node.height()))
+        .attr("rx", styleNumber(rx))
+        .attr("fill", style.fill())
+        .attr("stroke", style.stroke())
+        .attr("stroke-width", styleNumber(style.strokeWidth()))
+        .attrIf("stroke-dasharray", dashArray);
   }
 
-  private static String nodeDecorator(
-      LaidOutNode node, ResolvedNodeStyle style, RenderMetadataSelector selector) {
+  private static void nodeDecorator(
+      SvgWriter w, LaidOutNode node, ResolvedNodeStyle style, RenderMetadataSelector selector) {
     SvgNodeDecorator decorator = style.decorator();
     if (decorator == null
         || decorator == SvgNodeDecorator.ARCHIMATE_AND_JUNCTION
         || decorator == SvgNodeDecorator.ARCHIMATE_OR_JUNCTION) {
-      return "";
+      return;
     }
     if (isUmlDecorator(decorator)) {
-      return umlNodeDecorator(node, style, decorator, selector);
+      w.raw(umlNodeDecorator(node, style, decorator, selector));
+      return;
     }
-    return archimateNodeDecorator(node, style, decorator);
+    w.raw(archimateNodeDecorator(node, style, decorator));
+  }
+
+  private static String f1(double value) {
+    return String.format(Locale.ROOT, "%.1f", value);
+  }
+
+  private static String opacity(Double value) {
+    return value == null ? null : styleNumber(value);
+  }
+
+  private static String enumValue(Enum<?> value) {
+    return value == null ? null : value.name().toLowerCase(Locale.ROOT);
   }
 }
