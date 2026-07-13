@@ -40,14 +40,6 @@ import org.junit.jupiter.api.Test;
  *   <li>{@code uml-sequence-validatable.json} — a hand-authored schema/quality oracle (minimal
  *       2-lifeline fixture asserting {@code role: lifeline} acceptance) that does not correspond to
  *       any declared view's node set. Reworked separately (Plan B P2 Task 10).
- *   <li>{@code uml-sequence-fragment-chrome.json} is NOT an orphan — it maps to the same (source,
- *       view) pair as {@code uml-sequence-fragments.json} ({@code
- *       valid-uml-sequence-fragments.json} / {@code sequence-fragments-view}). It was already
- *       captured from the real engine by an earlier fix and is deliberately kept separate from the
- *       (currently idealized, hand-authored) {@code uml-sequence-fragments.json} because several
- *       other suites still consume the idealized geometry. Regenerating both from this table is
- *       expected to make them converge once {@code uml-sequence-fragments.json} itself is
- *       regenerated (Plan B P2 Task 11 decides whether to then consolidate the duplicate).
  * </ul>
  *
  * <p>Determinism precondition: reproducible geometry requires the bundled Liberation Sans font and
@@ -80,10 +72,6 @@ class LayoutFixtureRegenerator {
               "sequence-view"),
           new FixtureMapping(
               "uml-sequence-fragments.json",
-              "valid-uml-sequence-fragments.json",
-              "sequence-fragments-view"),
-          new FixtureMapping(
-              "uml-sequence-fragment-chrome.json",
               "valid-uml-sequence-fragments.json",
               "sequence-fragments-view"),
           new FixtureMapping(
