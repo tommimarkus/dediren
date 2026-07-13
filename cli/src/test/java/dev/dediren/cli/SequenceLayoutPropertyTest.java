@@ -39,19 +39,24 @@ import net.jqwik.api.statistics.Statistics;
  * the CLI's in-memory dispatch.
  *
  * <p>The generator (Plan B P2 task 8 baseline) emits an {@code Interaction} and 2-5 {@code
- * Lifeline} nodes, 1-10 {@code Message} relationships with unique strictly-increasing {@code
- * uml.sequence} integers between two distinct lifelines, and — Plan B P5 task 7 (closing the W3
- * gap) — on a minority of trials a single {@code CombinedFragment} node wrapping a contiguous span
- * of those messages, split across one or two {@code InteractionOperand} children ({@code opt} /
- * {@code loop} for one operand, {@code alt} / {@code par} for two). The fragment's operand(s)
- * always own a contiguous, non-overlapping block of the generated messages (no interior gaps and no
- * shared messages) so {@code Uml.validateSource} accepts every generated model, and so the
- * fragment-open (first operand) / operand-open (later operands) leading-gap constraints {@code
- * UmlSequenceConstraints} derives are non-empty and actually move message Y-positions when a
- * fragment is present. No self-messages (same lifeline as source and target), nested fragments, or
- * fragment {@code covered} lifeline sets — none are needed to exercise the leading-gap path. {@code
- * ExecutionSpecification} / {@code DestructionOccurrenceSpecification} / create-delete messages
- * (W1) remain out of scope and are a tracked follow-up.
+ * Lifeline} nodes and 1-10 {@code Message} relationships with unique strictly-increasing {@code
+ * uml.sequence} integers between two lifelines — on roughly a {@code 1 / lifelineCount} share of
+ * generated messages the source and target lifeline are the same one (a self-message), and
+ * otherwise they are distinct — and — Plan B P5 task 7 (closing the W3 gap) — on a minority of
+ * trials a single {@code CombinedFragment} node wrapping a contiguous span of those messages, split
+ * across one or two {@code InteractionOperand} children ({@code opt} / {@code loop} for one
+ * operand, {@code alt} / {@code par} for two). The fragment's operand(s) always own a contiguous,
+ * non-overlapping block of the generated messages (no interior gaps and no shared messages) so
+ * {@code Uml.validateSource} accepts every generated model, and so the fragment-open (first
+ * operand) / operand-open (later operands) leading-gap constraints {@code UmlSequenceConstraints}
+ * derives are non-empty and actually move message Y-positions when a fragment is present.
+ * Self-messages (this bugfix's own regression class — see {@code SequenceLayoutPropertyTest}'s
+ * sibling fixture {@code valid-uml-sequence-self-message.json}) are now generated and exercised end
+ * to end through the real project&#8594;layout path, closing the coverage gap that let a self-call
+ * hard-fail {@code build} ship unnoticed. Nested fragments and fragment {@code covered} lifeline
+ * sets are not needed to exercise the leading-gap path and remain out of scope, as do {@code
+ * ExecutionSpecification} / {@code DestructionOccurrenceSpecification} / create-delete-message
+ * geometry (the rest of the W1 gap) — tracked follow-ups.
  */
 class SequenceLayoutPropertyTest {
 
@@ -62,6 +67,7 @@ class SequenceLayoutPropertyTest {
   void generatedSequenceModelsSatisfySequenceInvariants(
       @ForAll("validSequenceModels") GeneratedSequenceModel model) throws Exception {
     Statistics.collect(fragmentShapeLabel(model.fragment()));
+    Statistics.label("self-message").collect(selfMessageLabel(model));
     SourceDocument source =
         JsonSupport.objectMapper().readValue(buildSourceJson(model), SourceDocument.class);
 
@@ -172,12 +178,31 @@ class SequenceLayoutPropertyTest {
         : "fragment: 2 operands (fragment-open + operand-open)";
   }
 
+  /**
+   * Whether {@code model} contains at least one self-message (a {@code Message} whose source and
+   * target lifeline are the same), for {@link Statistics} observability of the self-message share
+   * this task adds. A self-message never adds a scene node of its own — it is still exactly one
+   * {@code Lifeline} pair like every other message — so it needs no counterpart in {@link
+   * #assertNoNodeRectsOverlap}.
+   */
+  private static String selfMessageLabel(GeneratedSequenceModel model) {
+    boolean hasSelfMessage =
+        model.messages().stream()
+            .anyMatch(message -> message.sourceLifelineIndex() == message.targetLifelineIndex());
+    return hasSelfMessage ? "self-message: present" : "self-message: absent";
+  }
+
   private static Arbitrary<List<GeneratedMessage>> generatedMessages(int lifelineCount) {
     Arbitrary<Integer> sourceIndex = Arbitraries.integers().between(0, lifelineCount - 1);
-    // A shift in [1, lifelineCount - 1] applied mod lifelineCount guarantees target != source
-    // without relying on a filter (and its discard-ratio risk) to keep every generated message a
-    // valid Lifeline -> Lifeline connection between two distinct participants.
-    Arbitrary<Integer> targetShift = Arbitraries.integers().between(1, lifelineCount - 1);
+    // A shift in [0, lifelineCount - 1] applied mod lifelineCount lands back on the source
+    // lifeline itself when shift == 0 -- a self-message, source == target -- and on some other
+    // distinct participant for every nonzero shift. Both outcomes are valid Lifeline -> Lifeline
+    // Message connections (Uml.validateSource never compares source/target identity for Message
+    // endpoints -- see Uml#isMessageEndpoint), so widening the range to include 0 needs no filter
+    // (and its discard-ratio risk) to stay deterministic. This gives each generated message a
+    // 1 / lifelineCount chance of being a self-message: a non-trivial share across the 300 trials
+    // (lifelineCount ranges 2-5) without dominating the plain distinct-endpoint case.
+    Arbitrary<Integer> targetShift = Arbitraries.integers().between(0, lifelineCount - 1);
     Arbitrary<String> messageSort = Arbitraries.of(MESSAGE_SORTS).injectNull(0.3);
     Arbitrary<GeneratedEndpoints> endpoints =
         Combinators.combine(sourceIndex, targetShift)
