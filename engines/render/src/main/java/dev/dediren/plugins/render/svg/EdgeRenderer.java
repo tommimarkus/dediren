@@ -1,11 +1,8 @@
 package dev.dediren.plugins.render.svg;
 
 import static dev.dediren.plugins.render.svg.Geometry.labelBox;
-import static dev.dediren.plugins.render.svg.Svg.attr;
-import static dev.dediren.plugins.render.svg.Svg.dashArrayAttr;
-import static dev.dediren.plugins.render.svg.Svg.opacityAttr;
+import static dev.dediren.plugins.render.svg.Svg.dashArrayValue;
 import static dev.dediren.plugins.render.svg.Svg.styleNumber;
-import static dev.dediren.plugins.render.svg.Svg.text;
 
 import dev.dediren.contracts.layout.LaidOutEdge;
 import dev.dediren.contracts.layout.LaidOutGroup;
@@ -41,66 +38,69 @@ public final class EdgeRenderer {
   // only run when no on-route placement is clear.
   private static final double MAX_HUG_OFFSET = 56.0;
 
-  public static String edgeMarker(LaidOutEdge edge, ResolvedEdgeStyle style, String side) {
+  public static void edgeMarker(
+      SvgWriter w, LaidOutEdge edge, ResolvedEdgeStyle style, String side) {
     SvgEdgeMarkerEnd marker = side.equals("start") ? style.markerStart() : style.markerEnd();
     if (marker == SvgEdgeMarkerEnd.NONE) {
-      return "";
+      return;
     }
     String markerName = markerName(marker);
     String id = "marker-" + side + "-" + edge.id();
     String attribute = "data-dediren-edge-marker-" + side;
     String fill = markerFill(marker, style);
     String stroke = markerStroke(marker, style);
-    String body =
-        switch (marker) {
-          case FILLED_DIAMOND, HOLLOW_DIAMOND ->
-              "<path d=\"M 1 5 L 5 1 L 9 5 L 5 9 Z\" fill=\""
-                  + fill
-                  + "\" stroke=\""
-                  + stroke
-                  + "\" stroke-width=\"1\"/>";
-          case HOLLOW_TRIANGLE ->
-              "<path d=\"M 1 1 L 9 5 L 1 9 Z\" fill=\""
-                  + fill
-                  + "\" stroke=\""
-                  + stroke
-                  + "\" stroke-width=\"1\"/>";
-          case OPEN_ARROW ->
-              "<path d=\"M 1 1 L 9 5 L 1 9\" fill=\"none\" stroke=\""
-                  + stroke
-                  + "\" stroke-width=\"1.5\"/>";
-          case FILLED_CIRCLE, HOLLOW_CIRCLE ->
-              "<circle cx=\"5\" cy=\"5\" r=\"3.5\" fill=\""
-                  + fill
-                  + "\" stroke=\""
-                  + stroke
-                  + "\" stroke-width=\"1\"/>";
-          default ->
-              "<path d=\"M 1 1 L 9 5 L 1 9 Z\" fill=\""
-                  + fill
-                  + "\" stroke=\""
-                  + stroke
-                  + "\" stroke-width=\"1\"/>";
-        };
     // Anchor the marker at its endpoint-facing extent so the whole adornment stays on the
     // stroke side of the endpoint. Endpoints sit on node borders, and nodes paint over edges,
     // so a centred marker (refX=5) has its far half hidden by the node. End markers point
     // forward (tip at x=9); start markers trail back (base at x=1).
     String refX = "start".equals(side) ? "1" : "9";
-    return "<marker id=\""
-        + attr(id)
-        + "\" "
-        + attribute
-        + "=\""
-        + markerName
-        + "\" markerWidth=\"10\" markerHeight=\"10\" refX=\""
-        + refX
-        + "\" refY=\"5\" orient=\"auto\">"
-        + body
-        + "</marker>";
+    w.start("marker")
+        .attr("id", id)
+        .attr(attribute, markerName)
+        .attr("markerWidth", "10")
+        .attr("markerHeight", "10")
+        .attr("refX", refX)
+        .attr("refY", "5")
+        .attr("orient", "auto");
+    switch (marker) {
+      case FILLED_DIAMOND, HOLLOW_DIAMOND ->
+          w.empty("path")
+              .attr("d", "M 1 5 L 5 1 L 9 5 L 5 9 Z")
+              .attr("fill", fill)
+              .attr("stroke", stroke)
+              .attr("stroke-width", "1");
+      case HOLLOW_TRIANGLE ->
+          w.empty("path")
+              .attr("d", "M 1 1 L 9 5 L 1 9 Z")
+              .attr("fill", fill)
+              .attr("stroke", stroke)
+              .attr("stroke-width", "1");
+      case OPEN_ARROW ->
+          w.empty("path")
+              .attr("d", "M 1 1 L 9 5 L 1 9")
+              .attr("fill", "none")
+              .attr("stroke", stroke)
+              .attr("stroke-width", "1.5");
+      case FILLED_CIRCLE, HOLLOW_CIRCLE ->
+          w.empty("circle")
+              .attr("cx", "5")
+              .attr("cy", "5")
+              .attr("r", "3.5")
+              .attr("fill", fill)
+              .attr("stroke", stroke)
+              .attr("stroke-width", "1");
+      default ->
+          w.empty("path")
+              .attr("d", "M 1 1 L 9 5 L 1 9 Z")
+              .attr("fill", fill)
+              .attr("stroke", stroke)
+              .attr("stroke-width", "1");
+    }
+    w.end();
   }
 
-  public static String lineJumpMasks(
+  public static void lineJumpMasks(
+      SvgWriter w,
       LaidOutEdge edge,
       List<LineJump> lineJumps,
       LayoutResult result,
@@ -108,21 +108,18 @@ public final class EdgeRenderer {
       RenderPolicy policy,
       ResolvedStyle base) {
     if (lineJumps.isEmpty()) {
-      return "";
+      return;
     }
-    StringBuilder masks = new StringBuilder();
-    masks.append("<g data-dediren-line-jump-masks=\"").append(attr(edge.id())).append("\">");
+    w.start("g").attr("data-dediren-line-jump-masks", edge.id());
     for (LineJump jump : lineJumps) {
       String maskFill = backdropFillAt(jump.x(), jump.y(), result, metadata, policy, base);
-      masks
-          .append("<path d=\"")
-          .append(attr(jump.maskPath()))
-          .append("\" fill=\"none\" stroke=\"")
-          .append(attr(maskFill))
-          .append("\" stroke-width=\"6\"/>");
+      w.empty("path")
+          .attr("d", jump.maskPath())
+          .attr("fill", "none")
+          .attr("stroke", maskFill)
+          .attr("stroke-width", "6");
     }
-    masks.append("</g>");
-    return masks.toString();
+    w.end();
   }
 
   public static String backdropFillAt(
@@ -146,97 +143,88 @@ public final class EdgeRenderer {
     return x >= rectX && x <= rectX + width && y >= rectY && y <= rectY + height;
   }
 
-  public static String edgePath(
-      LaidOutEdge edge, ResolvedEdgeStyle style, List<LineJump> lineJumps) {
+  public static void edgePath(
+      SvgWriter w, LaidOutEdge edge, ResolvedEdgeStyle style, List<LineJump> lineJumps) {
     if (edge.points().isEmpty()) {
-      return "";
+      return;
     }
     String data = pathData(edge, lineJumps);
-    String dash = dashArrayAttr(style.lineStyle(), style.dashPattern(), "8 5");
-    String markerStart =
-        style.markerStart() == SvgEdgeMarkerEnd.NONE
-            ? ""
-            : " marker-start=\"url(#marker-start-" + attr(edge.id()) + ")\"";
-    String markerEnd =
-        style.markerEnd() == SvgEdgeMarkerEnd.NONE
-            ? ""
-            : " marker-end=\"url(#marker-end-" + attr(edge.id()) + ")\"";
-    return "<path d=\""
-        + data
-        + "\" fill=\"none\" stroke=\""
-        + attr(style.stroke())
-        + "\" stroke-width=\""
-        + styleNumber(style.strokeWidth())
-        + "\""
-        + " stroke-linecap=\"round\" stroke-linejoin=\"round\""
-        + opacityAttr("stroke-opacity", style.strokeOpacity())
-        + dash
-        + markerStart
-        + markerEnd
-        + "/>";
+    String dash = dashArrayValue(style.lineStyle(), style.dashPattern(), "8 5");
+    w.empty("path")
+        .attr("d", data)
+        .attr("fill", "none")
+        .attr("stroke", style.stroke())
+        .attr("stroke-width", styleNumber(style.strokeWidth()))
+        .attr("stroke-linecap", "round")
+        .attr("stroke-linejoin", "round")
+        .attrIf("stroke-opacity", opacity(style.strokeOpacity()))
+        .attrIf("stroke-dasharray", dash.isEmpty() ? null : dash)
+        .attrIf(
+            "marker-start",
+            style.markerStart() == SvgEdgeMarkerEnd.NONE
+                ? null
+                : "url(#marker-start-" + edge.id() + ")")
+        .attrIf(
+            "marker-end",
+            style.markerEnd() == SvgEdgeMarkerEnd.NONE
+                ? null
+                : "url(#marker-end-" + edge.id() + ")");
   }
 
-  public static String edgeLabelBackground(EdgeLabel label, String backgroundFill) {
+  private static void emitEdgeLabelBackground(SvgWriter w, EdgeLabel label, String backgroundFill) {
     LabelBox bounds = edgeLabelBackgroundBox(label);
-    return String.format(
-        Locale.ROOT,
-        "<rect data-dediren-edge-label-background=\"true\" x=\"%.1f\" y=\"%.1f\" width=\"%.1f\" height=\"%.1f\" rx=\"%s\" fill=\"%s\"/>",
-        bounds.minX(),
-        bounds.minY(),
-        bounds.width(),
-        bounds.height(),
-        styleNumber(EDGE_LABEL_BACKGROUND_RX),
-        attr(backgroundFill));
+    w.empty("rect")
+        .attr("data-dediren-edge-label-background", "true")
+        .attr("x", f1(bounds.minX()))
+        .attr("y", f1(bounds.minY()))
+        .attr("width", f1(bounds.width()))
+        .attr("height", f1(bounds.height()))
+        .attr("rx", styleNumber(EDGE_LABEL_BACKGROUND_RX))
+        .attr("fill", backgroundFill);
   }
 
-  public static String edgeLabel(
+  public static void edgeLabel(
+      SvgWriter w,
       EdgeLabel label,
       String text,
       ResolvedEdgeStyle style,
       String backgroundFill,
       double fontSize) {
-    StringBuilder output = new StringBuilder();
     if (style.labelPresentation() == SvgEdgeLabelPresentation.BACKGROUND) {
-      output.append(edgeLabelBackground(label, backgroundFill));
-      output.append(
-          String.format(
-              Locale.ROOT,
-              "<text x=\"%.1f\" y=\"%.1f\" text-anchor=\"%s\" fill=\"%s\" font-size=\"%s\" font-weight=\"%d\"%s>%s</text>",
-              label.x(),
-              label.y(),
-              attr(label.anchor()),
-              attr(style.labelFill()),
-              styleNumber(fontSize),
-              EDGE_LABEL_FONT_WEIGHT,
-              opacityAttr("fill-opacity", style.labelOpacity()),
-              text(text)));
-      return output.toString();
+      emitEdgeLabelBackground(w, label, backgroundFill);
+      w.start("text")
+          .attr("x", f1(label.x()))
+          .attr("y", f1(label.y()))
+          .attr("text-anchor", label.anchor())
+          .attr("fill", style.labelFill())
+          .attr("font-size", styleNumber(fontSize))
+          .attr("font-weight", Integer.toString(EDGE_LABEL_FONT_WEIGHT))
+          .attrIf("fill-opacity", opacity(style.labelOpacity()))
+          .text(text)
+          .end();
+      return;
     }
-    output.append(
-        String.format(
-            Locale.ROOT,
-            "<text x=\"%.1f\" y=\"%.1f\" text-anchor=\"%s\" fill=\"none\" font-size=\"%s\" font-weight=\"%d\" stroke=\"%s\" stroke-width=\"%s\">%s</text>",
-            label.x(),
-            label.y(),
-            attr(label.anchor()),
-            styleNumber(fontSize),
-            EDGE_LABEL_FONT_WEIGHT,
-            attr(backgroundFill),
-            styleNumber(EDGE_LABEL_OUTLINE_WIDTH),
-            text(text)));
-    output.append(
-        String.format(
-            Locale.ROOT,
-            "<text x=\"%.1f\" y=\"%.1f\" text-anchor=\"%s\" fill=\"%s\" font-size=\"%s\" font-weight=\"%d\"%s>%s</text>",
-            label.x(),
-            label.y(),
-            attr(label.anchor()),
-            attr(style.labelFill()),
-            styleNumber(fontSize),
-            EDGE_LABEL_FONT_WEIGHT,
-            opacityAttr("fill-opacity", style.labelOpacity()),
-            text(text)));
-    return output.toString();
+    w.start("text")
+        .attr("x", f1(label.x()))
+        .attr("y", f1(label.y()))
+        .attr("text-anchor", label.anchor())
+        .attr("fill", "none")
+        .attr("font-size", styleNumber(fontSize))
+        .attr("font-weight", Integer.toString(EDGE_LABEL_FONT_WEIGHT))
+        .attr("stroke", backgroundFill)
+        .attr("stroke-width", styleNumber(EDGE_LABEL_OUTLINE_WIDTH))
+        .text(text)
+        .end();
+    w.start("text")
+        .attr("x", f1(label.x()))
+        .attr("y", f1(label.y()))
+        .attr("text-anchor", label.anchor())
+        .attr("fill", style.labelFill())
+        .attr("font-size", styleNumber(fontSize))
+        .attr("font-weight", Integer.toString(EDGE_LABEL_FONT_WEIGHT))
+        .attrIf("fill-opacity", opacity(style.labelOpacity()))
+        .text(text)
+        .end();
   }
 
   public static LabelBox edgeLabelBackgroundBox(EdgeLabel label) {
@@ -265,14 +253,14 @@ public final class EdgeRenderer {
     return switch (marker) {
       case HOLLOW_TRIANGLE, HOLLOW_DIAMOND, HOLLOW_CIRCLE -> "#ffffff";
       case OPEN_ARROW -> "none";
-      default -> attr(style.stroke());
+      default -> style.stroke();
     };
   }
 
   public static String markerStroke(SvgEdgeMarkerEnd marker, ResolvedEdgeStyle style) {
     return switch (marker) {
-      case FILLED_ARROW, FILLED_DIAMOND, FILLED_CIRCLE -> attr(style.stroke());
-      default -> attr(style.stroke());
+      case FILLED_ARROW, FILLED_DIAMOND, FILLED_CIRCLE -> style.stroke();
+      default -> style.stroke();
     };
   }
 
@@ -706,5 +694,13 @@ public final class EdgeRenderer {
       }
     }
     return segments;
+  }
+
+  private static String f1(double value) {
+    return String.format(Locale.ROOT, "%.1f", value);
+  }
+
+  private static String opacity(Double value) {
+    return value == null ? null : styleNumber(value);
   }
 }

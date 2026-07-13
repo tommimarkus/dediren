@@ -146,10 +146,10 @@ public final class SvgDocument {
       ResolvedEdgeStyle style = StyleResolver.edgeStyle(policy, metadata, edge.id(), base);
       List<LineJump> lineJumps = lineJumps(edge, renderedEdges);
       w.start("g").attr("data-dediren-edge-id", edge.id());
-      w.raw(edgeMarker(edge, style, "start"));
-      w.raw(edgeMarker(edge, style, "end"));
-      w.raw(lineJumpMasks(edge, lineJumps, result, metadata, policy, base));
-      w.raw(edgePath(edge, style, lineJumps));
+      edgeMarker(w, edge, style, "start");
+      edgeMarker(w, edge, style, "end");
+      lineJumpMasks(w, edge, lineJumps, result, metadata, policy, base);
+      edgePath(w, edge, style, lineJumps);
       if (edge.label() != null && !edge.label().isEmpty()) {
         double edgeLabelFontSize = edgeLabelFontSize(base.fontSize());
         EdgeLabel label =
@@ -158,7 +158,7 @@ public final class SvgDocument {
                 style,
                 labelObstacleBoxesForEdge(result, edgeIndex, placedLabelBoxes),
                 edgeLabelFontSize);
-        w.raw(edgeLabel(label, edge.label(), style, base.backgroundFill(), edgeLabelFontSize));
+        edgeLabel(w, label, edge.label(), style, base.backgroundFill(), edgeLabelFontSize);
         placedLabelBoxes.add(edgeLabelVisibleBox(label, style.labelPresentation()));
       }
       RenderMetadataSelector edgeSelector =

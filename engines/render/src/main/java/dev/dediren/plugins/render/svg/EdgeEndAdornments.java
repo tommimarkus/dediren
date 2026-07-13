@@ -90,7 +90,7 @@ public final class EdgeEndAdornments {
       w.start("g")
           .attr("data-dediren-edge-adornment", adornment.kind())
           .attr("data-dediren-edge-adornment-end", adornment.end());
-      w.raw(edgeLabel(adornment.label(), adornment.text(), style, backgroundFill, fontSize));
+      edgeLabel(w, adornment.label(), adornment.text(), style, backgroundFill, fontSize);
       w.end();
     }
   }
