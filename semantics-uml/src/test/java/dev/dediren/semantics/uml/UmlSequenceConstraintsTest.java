@@ -9,7 +9,6 @@ import dev.dediren.contracts.source.GenericGraphView;
 import dev.dediren.contracts.source.SourceDocument;
 import dev.dediren.ir.Axis;
 import dev.dediren.ir.BandMember;
-import dev.dediren.ir.LayoutIntent.AlignmentAxis;
 import dev.dediren.ir.LayoutIntent.OrderedBand;
 import dev.dediren.semantics.uml.SequenceConstraint.FragmentOpen;
 import dev.dediren.semantics.uml.SequenceConstraint.LifelineOrder;
@@ -130,7 +129,6 @@ class UmlSequenceConstraintsTest {
         .containsExactly(
             new OrderedBand(
                 Axis.X, List.of(new BandMember("customer", 0.0), new BandMember("service", 0.0))),
-            new AlignmentAxis(Axis.Y, List.of("customer", "service")),
             new OrderedBand(
                 Axis.Y,
                 List.of(

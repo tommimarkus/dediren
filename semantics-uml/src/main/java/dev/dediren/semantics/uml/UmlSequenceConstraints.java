@@ -9,7 +9,6 @@ import dev.dediren.contracts.source.SourceRelationship;
 import dev.dediren.ir.Axis;
 import dev.dediren.ir.BandMember;
 import dev.dediren.ir.LayoutIntent;
-import dev.dediren.ir.LayoutIntent.AlignmentAxis;
 import dev.dediren.ir.LayoutIntent.OrderedBand;
 import dev.dediren.semantics.uml.SequenceConstraint.FragmentOpen;
 import dev.dediren.semantics.uml.SequenceConstraint.LifelineOrder;
@@ -114,13 +113,14 @@ public final class UmlSequenceConstraints {
 
   /**
    * Lowers typed {@link SequenceConstraint}s to the neutral {@link LayoutIntent} vocabulary: {@code
-   * LifelineOrder(ids)} becomes an X-axis {@link OrderedBand} of the lifeline columns plus a Y-axis
-   * {@link AlignmentAxis} so every lifeline head shares one top band, and {@code MessageOrder}
-   * becomes a single Y-axis {@link OrderedBand} whose members reserve {@link #FRAGMENT_OPEN_GAP} or
-   * {@link #OPERAND_OPEN_GAP} before a message that opens a fragment or a non-first operand. A
-   * message present in both sets reserves {@link #FRAGMENT_OPEN_GAP} — fragment-open takes
-   * precedence over operand-open, matching elk's {@code
-   * SequenceLayoutConstraints#normalizedMessageYSlots}, which checks the fragment-open set first.
+   * LifelineOrder(ids)} becomes a single X-axis {@link OrderedBand} of the lifeline columns — elk's
+   * {@code LayoutIntentNormalizer} derives the shared lifeline head band from that same X band, so
+   * no separate alignment vocabulary is emitted — and {@code MessageOrder} becomes a single Y-axis
+   * {@link OrderedBand} whose members reserve {@link #FRAGMENT_OPEN_GAP} or {@link
+   * #OPERAND_OPEN_GAP} before a message that opens a fragment or a non-first operand. A message
+   * present in both sets reserves {@link #FRAGMENT_OPEN_GAP} — fragment-open takes precedence over
+   * operand-open, matching elk's {@code SequenceLayoutConstraints#normalizedMessageYSlots}, which
+   * checks the fragment-open set first.
    */
   static List<LayoutIntent> lower(List<SequenceConstraint> constraints) {
     List<String> lifelineIds = null;
@@ -141,7 +141,6 @@ public final class UmlSequenceConstraints {
       intents.add(
           new OrderedBand(
               Axis.X, lifelineIds.stream().map(id -> new BandMember(id, 0.0)).toList()));
-      intents.add(new AlignmentAxis(Axis.Y, lifelineIds));
     }
     if (messageIds != null) {
       Set<String> fragmentOpenSet = new HashSet<>(fragmentOpenIds);

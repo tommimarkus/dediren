@@ -10,7 +10,6 @@ import dev.dediren.contracts.layout.Point;
 import dev.dediren.ir.Axis;
 import dev.dediren.ir.BandMember;
 import dev.dediren.ir.LayoutIntent;
-import dev.dediren.ir.LayoutIntent.AlignmentAxis;
 import dev.dediren.ir.LayoutIntent.OrderedBand;
 import java.util.List;
 import java.util.Map;
@@ -26,13 +25,13 @@ class LayoutIntentNormalizerTest {
 
   @Test
   void rebuildsColumnsWhenElkPacksLifelinesCloserThanTheirWidth() {
-    // mirror SequenceLifelineColumnOverlapTest fixtures: two lifelines at x=12,x=101 width=140
+    // mirror SequenceLifelineColumnOverlapTest fixtures: two lifelines at x=12,x=101 width=140,
+    // plus its non-empty message-order (message "m1") so active() is genuinely exercised as true.
     LayoutResult result = overlappingTwoLifelineResult();
     List<LayoutIntent> intents =
         List.of(
             new OrderedBand(Axis.X, List.of(new BandMember("a", 0.0), new BandMember("b", 0.0))),
-            new AlignmentAxis(Axis.Y, List.of("a", "b")),
-            new OrderedBand(Axis.Y, List.of()));
+            new OrderedBand(Axis.Y, List.of(new BandMember("m1", 0.0))));
 
     LayoutResult normalized =
         LayoutIntentNormalizer.from(intents, Map.of(), Map.of()).normalize(result);
@@ -117,7 +116,6 @@ class LayoutIntentNormalizerTest {
     return List.of(
         new OrderedBand(
             Axis.X, List.of(new BandMember("customer", 0.0), new BandMember("service", 0.0))),
-        new AlignmentAxis(Axis.Y, List.of("customer", "service")),
         new OrderedBand(Axis.Y, List.of(new BandMember(messageId, 0.0))));
   }
 

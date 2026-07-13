@@ -34,16 +34,12 @@ final class LayoutIntentNormalizer {
   private final Map<String, Integer> lifelineIndexById;
   private final Map<String, Integer> messageIndexById;
   private final Map<String, Double> messageLeadingGapById;
-  private final boolean hasLifelineBand;
-  private final boolean hasMessageBand;
   private final Map<String, String> nodePointers;
   private final Map<String, String> edgePointers;
 
   private LayoutIntentNormalizer(
       List<BandMember> lifelineMembers,
       List<BandMember> messageMembers,
-      boolean hasLifelineBand,
-      boolean hasMessageBand,
       Map<String, String> nodePointers,
       Map<String, String> edgePointers) {
     this.lifelineOrder = memberIds(lifelineMembers);
@@ -51,8 +47,6 @@ final class LayoutIntentNormalizer {
     this.lifelineIndexById = indexById(this.lifelineOrder);
     this.messageIndexById = indexById(this.messageOrder);
     this.messageLeadingGapById = leadingGapById(messageMembers);
-    this.hasLifelineBand = hasLifelineBand;
-    this.hasMessageBand = hasMessageBand;
     // Map.copyOf rejects null values; a missing/optional source pointer is a legitimate value
     // here (pure copy-through), so keep a plain defensive copy instead.
     this.nodePointers = new HashMap<>(nodePointers);
@@ -65,33 +59,23 @@ final class LayoutIntentNormalizer {
       Map<String, String> edgePointers) {
     List<BandMember> lifelineMembers = List.of();
     List<BandMember> messageMembers = List.of();
-    boolean hasLifelineBand = false;
-    boolean hasMessageBand = false;
     for (LayoutIntent intent : intents) {
       if (intent instanceof OrderedBand orderedBand) {
         switch (orderedBand.axis()) {
-          case X -> {
-            lifelineMembers = orderedBand.members();
-            hasLifelineBand = true;
-          }
-          case Y -> {
-            messageMembers = orderedBand.members();
-            hasMessageBand = true;
-          }
+          case X -> lifelineMembers = orderedBand.members();
+          case Y -> messageMembers = orderedBand.members();
         }
       }
     }
-    return new LayoutIntentNormalizer(
-        lifelineMembers,
-        messageMembers,
-        hasLifelineBand,
-        hasMessageBand,
-        nodePointers,
-        edgePointers);
+    return new LayoutIntentNormalizer(lifelineMembers, messageMembers, nodePointers, edgePointers);
   }
 
+  // Mirrors the old SequenceLayoutConstraints#active(): the parsed lifeline-order AND
+  // message-order lists must both be non-empty, not merely "a band was present". The lowering can
+  // emit an OrderedBand(Axis.Y, []) for a sequence view with lifelines but zero messages, which
+  // must stay inactive exactly like the old stringly constraints did.
   boolean active() {
-    return hasLifelineBand && hasMessageBand;
+    return !lifelineOrder.isEmpty() && !messageOrder.isEmpty();
   }
 
   List<LayoutNode> orderedNodes(List<LayoutNode> nodes) {

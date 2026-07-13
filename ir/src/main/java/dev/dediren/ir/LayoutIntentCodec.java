@@ -1,21 +1,18 @@
 package dev.dediren.ir;
 
 import dev.dediren.contracts.layout.LayoutConstraint;
-import dev.dediren.ir.LayoutIntent.AlignmentAxis;
 import dev.dediren.ir.LayoutIntent.OrderedBand;
 import java.util.ArrayList;
 import java.util.List;
 
 /**
  * Notation-free wire codec between neutral {@link LayoutIntent} and the record-based {@link
- * LayoutConstraint} carried on {@code SceneGraph}. Knows only the neutral {@code ordered-band:} and
- * {@code alignment-axis:} kinds and the {@code @}-gap subject encoding; no notation-specific
- * vocabulary or values live here.
+ * LayoutConstraint} carried on {@code SceneGraph}. Knows only the neutral {@code ordered-band:}
+ * kind and the {@code @}-gap subject encoding; no notation-specific vocabulary or values live here.
  */
 public final class LayoutIntentCodec {
 
   private static final String ORDERED_BAND_PREFIX = "ordered-band:";
-  private static final String ALIGNMENT_AXIS_PREFIX = "alignment-axis:";
 
   private LayoutIntentCodec() {}
 
@@ -35,13 +32,6 @@ public final class LayoutIntentCodec {
             orderedBand.members().stream().map(LayoutIntentCodec::encodeMember).toList();
         yield new LayoutConstraint(
             viewId + ".ordered-band." + axisTag, ORDERED_BAND_PREFIX + axisTag, subjects);
-      }
-      case AlignmentAxis alignmentAxis -> {
-        String axisTag = axisTag(alignmentAxis.axis());
-        yield new LayoutConstraint(
-            viewId + ".alignment-axis." + axisTag,
-            ALIGNMENT_AXIS_PREFIX + axisTag,
-            alignmentAxis.nodeIds());
       }
     };
   }
@@ -71,10 +61,6 @@ public final class LayoutIntentCodec {
       List<BandMember> members =
           constraint.subjects().stream().map(LayoutIntentCodec::decodeMember).toList();
       return new OrderedBand(axis, members);
-    }
-    if (kind.startsWith(ALIGNMENT_AXIS_PREFIX)) {
-      Axis axis = parseAxis(kind.substring(ALIGNMENT_AXIS_PREFIX.length()));
-      return new AlignmentAxis(axis, constraint.subjects());
     }
     throw new IllegalArgumentException("Unrecognized layout constraint kind: " + kind);
   }
