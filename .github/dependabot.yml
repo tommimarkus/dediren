@@ -19,3 +19,10 @@ updates:
       day: "monday"
       time: "05:30"
       timezone: "Europe/Helsinki"
+    # Actions that share a job must move in lockstep: codeql-action/init and
+    # codeql-action/analyze fail with a configuration error when their versions
+    # diverge, which is what happens when each lands in its own pull request.
+    groups:
+      github-actions:
+        patterns:
+          - "*"
