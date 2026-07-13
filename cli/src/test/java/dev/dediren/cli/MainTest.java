@@ -441,17 +441,102 @@ class MainTest {
   }
 
   @Test
-  void misconfiguredBundleRootEmitsErrorEnvelope(@TempDir Path tempDir) throws Exception {
+  void misconfiguredBundleRootEmitsErrorEnvelopeOnPluginValidate(@TempDir Path tempDir)
+      throws Exception {
+    CliResult result =
+        withBundleRootProperty(
+            tempDir.resolve("missing"),
+            () ->
+                runValidate(
+                    sequenceWorkflowEnv(),
+                    workspaceRoot().resolve("fixtures/source/valid-basic.json")));
+
+    assertProductRootUnresolved(result);
+  }
+
+  @Test
+  void misconfiguredBundleRootEmitsErrorEnvelopeOnPlainValidate(@TempDir Path tempDir)
+      throws Exception {
+    CliResult result =
+        withBundleRootProperty(
+            tempDir.resolve("missing"),
+            () ->
+                Main.executeForTesting(
+                    new String[] {
+                      "validate",
+                      "--input",
+                      workspaceRoot().resolve("fixtures/source/valid-basic.json").toString()
+                    },
+                    "",
+                    Map.of()));
+
+    assertProductRootUnresolved(result);
+  }
+
+  @Test
+  void misconfiguredBundleRootEmitsErrorEnvelopeOnProject(@TempDir Path tempDir) throws Exception {
+    CliResult result =
+        withBundleRootProperty(
+            tempDir.resolve("missing"),
+            () ->
+                runLayoutRequest(
+                    Map.of(), workspaceRoot().resolve("fixtures/source/valid-basic.json"), "main"));
+
+    assertProductRootUnresolved(result);
+  }
+
+  @Test
+  void misconfiguredBundleRootEmitsErrorEnvelopeOnExport(@TempDir Path tempDir) throws Exception {
+    // The layout argument only needs to be a readable file: the export lane validates the source
+    // document (which resolves the product root) before it ever parses the layout bytes.
+    Path layoutStub = Files.writeString(tempDir.resolve("layout.json"), "{}");
+
+    CliResult result =
+        withBundleRootProperty(
+            tempDir.resolve("missing"),
+            () ->
+                runExport(
+                    Map.of(),
+                    workspaceRoot(),
+                    workspaceRoot().resolve("fixtures/source/valid-basic.json"),
+                    layoutStub));
+
+    assertProductRootUnresolved(result);
+  }
+
+  @Test
+  void misconfiguredBundleRootEmitsErrorEnvelopeOnBuild(@TempDir Path tempDir) throws Exception {
+    CliResult result =
+        withBundleRootProperty(
+            tempDir.resolve("missing"),
+            () ->
+                Main.executeForTesting(
+                    new String[] {
+                      "build",
+                      "--input",
+                      workspaceRoot().resolve("fixtures/source/valid-basic.json").toString(),
+                      "--out",
+                      tempDir.resolve("out").toString(),
+                      "--render-policy",
+                      workspaceRoot().resolve("fixtures/render-policy/default-svg.json").toString()
+                    },
+                    "",
+                    Map.of()));
+
+    assertProductRootUnresolved(result);
+  }
+
+  /**
+   * Runs a CLI invocation with {@code dediren.bundle.root} pointed at {@code bundleRoot}, restoring
+   * the previous property value (or clearing it) in a finally block. The property override is read
+   * from JVM globals by DedirenPaths, so the env map the tests inject does not reach it.
+   */
+  private static CliResult withBundleRootProperty(Path bundleRoot, CliInvocation invocation)
+      throws Exception {
     String previous = System.getProperty(DedirenPaths.BUNDLE_ROOT_PROPERTY);
-    System.setProperty(DedirenPaths.BUNDLE_ROOT_PROPERTY, tempDir.resolve("missing").toString());
+    System.setProperty(DedirenPaths.BUNDLE_ROOT_PROPERTY, bundleRoot.toString());
     try {
-      CliResult result =
-          runValidate(
-              sequenceWorkflowEnv(), workspaceRoot().resolve("fixtures/source/valid-basic.json"));
-      assertThat(result.exitCode()).isEqualTo(2);
-      JsonNode envelope = JsonSupport.objectMapper().readTree(result.stdout());
-      assertThat(envelope.at("/diagnostics/0/code").asText())
-          .isEqualTo("DEDIREN_PRODUCT_ROOT_UNRESOLVED");
+      return invocation.run();
     } finally {
       if (previous == null) {
         System.clearProperty(DedirenPaths.BUNDLE_ROOT_PROPERTY);
@@ -459,6 +544,18 @@ class MainTest {
         System.setProperty(DedirenPaths.BUNDLE_ROOT_PROPERTY, previous);
       }
     }
+  }
+
+  @FunctionalInterface
+  private interface CliInvocation {
+    CliResult run() throws Exception;
+  }
+
+  private static void assertProductRootUnresolved(CliResult result) {
+    assertThat(result.exitCode()).describedAs(result.stdout()).isEqualTo(2);
+    JsonNode envelope = JsonSupport.objectMapper().readTree(result.stdout());
+    assertThat(envelope.at("/diagnostics/0/code").asText())
+        .isEqualTo("DEDIREN_PRODUCT_ROOT_UNRESOLVED");
   }
 
   private CliResult runValidate(Map<String, String> env, Path source) throws Exception {
