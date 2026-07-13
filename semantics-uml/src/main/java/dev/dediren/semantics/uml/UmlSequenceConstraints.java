@@ -6,6 +6,15 @@ import dev.dediren.contracts.source.GenericGraphViewKind;
 import dev.dediren.contracts.source.SourceDocument;
 import dev.dediren.contracts.source.SourceNode;
 import dev.dediren.contracts.source.SourceRelationship;
+import dev.dediren.ir.Axis;
+import dev.dediren.ir.BandMember;
+import dev.dediren.ir.LayoutIntent;
+import dev.dediren.ir.LayoutIntent.AlignmentAxis;
+import dev.dediren.ir.LayoutIntent.OrderedBand;
+import dev.dediren.semantics.uml.SequenceConstraint.FragmentOpen;
+import dev.dediren.semantics.uml.SequenceConstraint.LifelineOrder;
+import dev.dediren.semantics.uml.SequenceConstraint.MessageOrder;
+import dev.dediren.semantics.uml.SequenceConstraint.OperandOpen;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -26,15 +35,139 @@ import tools.jackson.databind.JsonNode;
  * {@code operandOrder} / {@code firstMessageOfOperand} / {@code umlMessageSequence} helpers) for
  * Plan B P3; gated on {@link GenericGraphViewKind#UML_SEQUENCE} since every other UML view kind
  * contributes no layout constraints.
+ *
+ * <p>{@link #of} is the stringly {@code uml.sequence.*} {@link LayoutConstraint} wire producer and
+ * stays the live source elk's {@code SequenceLayoutConstraints} reads until the Plan B P5 Task 5
+ * cutover; its output is unchanged by this class also exposing a typed producer. {@link
+ * #sequenceConstraints} is the typed form of the same four source scans, and {@link #lower} maps
+ * typed constraints to the neutral {@code dev.dediren.ir.LayoutIntent} vocabulary; both are
+ * additive and unused until Task 5.
  */
 public final class UmlSequenceConstraints {
+
+  // Extra vertical room reserved before a message that opens a combined fragment (header band +
+  // first-operand guard) or a non-first operand (separator line + guard). Kept in sync with
+  // engines/render FRAGMENT_VERTICAL_PADDING; guarded by render SequenceFragmentAlignmentTest.
+  static final double FRAGMENT_OPEN_GAP = 46.0;
+  static final double OPERAND_OPEN_GAP = 68.0;
+
   private UmlSequenceConstraints() {}
 
   static List<LayoutConstraint> of(SourceDocument source, GenericGraphView selectedView) {
     if (selectedView.kind() != GenericGraphViewKind.UML_SEQUENCE) {
       return List.of();
     }
+    Scan scan = scan(source, selectedView);
 
+    var constraints = new ArrayList<LayoutConstraint>();
+    constraints.add(
+        new LayoutConstraint(
+            selectedView.id() + ".uml.sequence.lifeline-order",
+            "uml.sequence.lifeline-order",
+            scan.lifelineIds()));
+    constraints.add(
+        new LayoutConstraint(
+            selectedView.id() + ".uml.sequence.message-order",
+            "uml.sequence.message-order",
+            scan.messageIds()));
+    if (!scan.fragmentOpenIds().isEmpty()) {
+      constraints.add(
+          new LayoutConstraint(
+              selectedView.id() + ".uml.sequence.fragment-open",
+              "uml.sequence.fragment-open",
+              scan.fragmentOpenIds()));
+    }
+    if (!scan.operandOpenIds().isEmpty()) {
+      constraints.add(
+          new LayoutConstraint(
+              selectedView.id() + ".uml.sequence.operand-open",
+              "uml.sequence.operand-open",
+              scan.operandOpenIds()));
+    }
+    return constraints;
+  }
+
+  /**
+   * Typed form of {@link #of}'s four source scans: empty for non-{@link
+   * GenericGraphViewKind#UML_SEQUENCE} views, otherwise {@link SequenceConstraint.LifelineOrder}
+   * and {@link SequenceConstraint.MessageOrder} always, {@link SequenceConstraint.FragmentOpen} and
+   * {@link SequenceConstraint.OperandOpen} only when the view has combined fragments.
+   */
+  static List<SequenceConstraint> sequenceConstraints(
+      SourceDocument source, GenericGraphView selectedView) {
+    if (selectedView.kind() != GenericGraphViewKind.UML_SEQUENCE) {
+      return List.of();
+    }
+    Scan scan = scan(source, selectedView);
+
+    var constraints = new ArrayList<SequenceConstraint>();
+    constraints.add(new LifelineOrder(scan.lifelineIds()));
+    constraints.add(new MessageOrder(scan.messageIds()));
+    if (!scan.fragmentOpenIds().isEmpty()) {
+      constraints.add(new FragmentOpen(scan.fragmentOpenIds()));
+    }
+    if (!scan.operandOpenIds().isEmpty()) {
+      constraints.add(new OperandOpen(scan.operandOpenIds()));
+    }
+    return List.copyOf(constraints);
+  }
+
+  /**
+   * Lowers typed {@link SequenceConstraint}s to the neutral {@link LayoutIntent} vocabulary: {@code
+   * LifelineOrder(ids)} becomes an X-axis {@link OrderedBand} of the lifeline columns plus a Y-axis
+   * {@link AlignmentAxis} so every lifeline head shares one top band, and {@code MessageOrder}
+   * becomes a single Y-axis {@link OrderedBand} whose members reserve {@link #FRAGMENT_OPEN_GAP} or
+   * {@link #OPERAND_OPEN_GAP} before a message that opens a fragment or a non-first operand. A
+   * message present in both sets reserves {@link #FRAGMENT_OPEN_GAP} — fragment-open takes
+   * precedence over operand-open, matching elk's {@code
+   * SequenceLayoutConstraints#normalizedMessageYSlots}, which checks the fragment-open set first.
+   */
+  static List<LayoutIntent> lower(List<SequenceConstraint> constraints) {
+    List<String> lifelineIds = null;
+    List<String> messageIds = null;
+    List<String> fragmentOpenIds = List.of();
+    List<String> operandOpenIds = List.of();
+    for (SequenceConstraint constraint : constraints) {
+      switch (constraint) {
+        case LifelineOrder lifelineOrder -> lifelineIds = lifelineOrder.lifelineIds();
+        case MessageOrder messageOrder -> messageIds = messageOrder.messageIds();
+        case FragmentOpen fragmentOpen -> fragmentOpenIds = fragmentOpen.messageIds();
+        case OperandOpen operandOpen -> operandOpenIds = operandOpen.messageIds();
+      }
+    }
+
+    var intents = new ArrayList<LayoutIntent>();
+    if (lifelineIds != null) {
+      intents.add(
+          new OrderedBand(
+              Axis.X, lifelineIds.stream().map(id -> new BandMember(id, 0.0)).toList()));
+      intents.add(new AlignmentAxis(Axis.Y, lifelineIds));
+    }
+    if (messageIds != null) {
+      Set<String> fragmentOpenSet = new HashSet<>(fragmentOpenIds);
+      Set<String> operandOpenSet = new HashSet<>(operandOpenIds);
+      intents.add(
+          new OrderedBand(
+              Axis.Y,
+              messageIds.stream()
+                  .map(id -> new BandMember(id, leadingGapFor(id, fragmentOpenSet, operandOpenSet)))
+                  .toList()));
+    }
+    return List.copyOf(intents);
+  }
+
+  private static double leadingGapFor(
+      String messageId, Set<String> fragmentOpenIds, Set<String> operandOpenIds) {
+    if (fragmentOpenIds.contains(messageId)) {
+      return FRAGMENT_OPEN_GAP;
+    }
+    if (operandOpenIds.contains(messageId)) {
+      return OPERAND_OPEN_GAP;
+    }
+    return 0.0;
+  }
+
+  private static Scan scan(SourceDocument source, GenericGraphView selectedView) {
     var selectedNodeIds = new LinkedHashSet<>(selectedView.nodes());
     var lifelineIds =
         source.nodes().stream()
@@ -93,35 +226,20 @@ public final class UmlSequenceConstraints {
       }
     }
 
-    var constraints = new ArrayList<LayoutConstraint>();
-    constraints.add(
-        new LayoutConstraint(
-            selectedView.id() + ".uml.sequence.lifeline-order",
-            "uml.sequence.lifeline-order",
-            lifelineIds));
-    constraints.add(
-        new LayoutConstraint(
-            selectedView.id() + ".uml.sequence.message-order",
-            "uml.sequence.message-order",
-            messageIds));
     // Dedupe: a nested fragment whose first member is another fragment resolves to the same first
     // message via both the outer and inner iterations, so a message id can be collected twice.
-    if (!fragmentOpenIds.isEmpty()) {
-      constraints.add(
-          new LayoutConstraint(
-              selectedView.id() + ".uml.sequence.fragment-open",
-              "uml.sequence.fragment-open",
-              new ArrayList<>(new LinkedHashSet<>(fragmentOpenIds))));
-    }
-    if (!operandOpenIds.isEmpty()) {
-      constraints.add(
-          new LayoutConstraint(
-              selectedView.id() + ".uml.sequence.operand-open",
-              "uml.sequence.operand-open",
-              new ArrayList<>(new LinkedHashSet<>(operandOpenIds))));
-    }
-    return constraints;
+    return new Scan(
+        lifelineIds,
+        messageIds,
+        List.copyOf(new LinkedHashSet<>(fragmentOpenIds)),
+        List.copyOf(new LinkedHashSet<>(operandOpenIds)));
   }
+
+  private record Scan(
+      List<String> lifelineIds,
+      List<String> messageIds,
+      List<String> fragmentOpenIds,
+      List<String> operandOpenIds) {}
 
   private static int operandOrder(SourceNode operand) {
     if (operand == null) {

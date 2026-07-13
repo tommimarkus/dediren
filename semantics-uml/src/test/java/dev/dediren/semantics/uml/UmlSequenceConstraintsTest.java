@@ -7,6 +7,14 @@ import dev.dediren.contracts.layout.LayoutConstraint;
 import dev.dediren.contracts.source.GenericGraphPluginData;
 import dev.dediren.contracts.source.GenericGraphView;
 import dev.dediren.contracts.source.SourceDocument;
+import dev.dediren.ir.Axis;
+import dev.dediren.ir.BandMember;
+import dev.dediren.ir.LayoutIntent.AlignmentAxis;
+import dev.dediren.ir.LayoutIntent.OrderedBand;
+import dev.dediren.semantics.uml.SequenceConstraint.FragmentOpen;
+import dev.dediren.semantics.uml.SequenceConstraint.LifelineOrder;
+import dev.dediren.semantics.uml.SequenceConstraint.MessageOrder;
+import dev.dediren.semantics.uml.SequenceConstraint.OperandOpen;
 import java.math.BigInteger;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -73,6 +81,78 @@ class UmlSequenceConstraintsTest {
         .containsExactlyInAnyOrder("m1", "m5", "m7", "m9");
     assertThat(constraintOf(constraints, "uml.sequence.operand-open").subjects())
         .containsExactlyInAnyOrder("m3", "m11");
+  }
+
+  @Test
+  void sequenceConstraintsReturnsEmptyForNonSequenceViewKinds() throws Exception {
+    SourceDocument source = fixture("fixtures/source/valid-uml-basic.json");
+    GenericGraphView view = viewOf(source, "class-view");
+
+    assertThat(UmlSequenceConstraints.sequenceConstraints(source, view)).isEmpty();
+  }
+
+  @Test
+  void buildsTypedLifelineAndMessageOrderConstraints() throws Exception {
+    SourceDocument source = sequenceFixtureWithReorderedMessagesForConstraints();
+    GenericGraphView view = viewOf(source, "sequence-view");
+
+    assertThat(UmlSequenceConstraints.sequenceConstraints(source, view))
+        .containsExactly(
+            new LifelineOrder(List.of("customer", "service")),
+            new MessageOrder(List.of("m2", "m1", "m3")));
+  }
+
+  @Test
+  void buildsTypedFragmentAndOperandOpenConstraints() throws Exception {
+    SourceDocument source = fixture("fixtures/source/valid-uml-sequence-fragments.json");
+    GenericGraphView view = viewOf(source, "sequence-fragments-view");
+
+    assertThat(UmlSequenceConstraints.sequenceConstraints(source, view))
+        .containsExactly(
+            new LifelineOrder(List.of("customer", "service", "inventory", "payment")),
+            new MessageOrder(
+                List.of("m1", "m2", "m3", "m4", "m5", "m6", "m7", "m8", "m9", "m10", "m11", "m12")),
+            new FragmentOpen(List.of("m1", "m5", "m7", "m9")),
+            new OperandOpen(List.of("m3", "m11")));
+  }
+
+  @Test
+  void loweringPlacesLifelineColumnsHeadBandAndMessageGaps() {
+    var intents =
+        UmlSequenceConstraints.lower(
+            List.of(
+                new LifelineOrder(List.of("customer", "service")),
+                new MessageOrder(List.of("m1", "m2", "m3")),
+                new FragmentOpen(List.of("m2")),
+                new OperandOpen(List.of("m3"))));
+
+    assertThat(intents)
+        .containsExactly(
+            new OrderedBand(
+                Axis.X, List.of(new BandMember("customer", 0.0), new BandMember("service", 0.0))),
+            new AlignmentAxis(Axis.Y, List.of("customer", "service")),
+            new OrderedBand(
+                Axis.Y,
+                List.of(
+                    new BandMember("m1", 0.0),
+                    new BandMember("m2", 46.0),
+                    new BandMember("m3", 68.0))));
+  }
+
+  @Test
+  void loweringPrefersFragmentOpenGapWhenMessageIsInBothSets() {
+    // Pins the precedence observed in elk's SequenceLayoutConstraints#normalizedMessageYSlots
+    // (checks fragmentOpenIds before operandOpenIds): fragment-open wins when a message id is in
+    // both sets.
+    var intents =
+        UmlSequenceConstraints.lower(
+            List.of(
+                new MessageOrder(List.of("m1")),
+                new FragmentOpen(List.of("m1")),
+                new OperandOpen(List.of("m1"))));
+
+    assertThat(intents)
+        .containsExactly(new OrderedBand(Axis.Y, List.of(new BandMember("m1", 46.0))));
   }
 
   private static LayoutConstraint constraintOf(List<LayoutConstraint> constraints, String kind) {
