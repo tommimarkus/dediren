@@ -153,7 +153,7 @@ public final class Geometry {
   }
 
   public static LabelBox labelBox(double x, double y, String anchor, String text, double fontSize) {
-    double width = (text == null ? 0 : text.length()) * fontSize * 0.56;
+    double width = Svg.estimateTextWidth(text, fontSize);
     double minX =
         switch (anchor) {
           case "end" -> x - width;

@@ -1,6 +1,7 @@
 package dev.dediren.plugins.render.node.uml;
 
 import static dev.dediren.plugins.render.svg.Svg.dashArrayValue;
+import static dev.dediren.plugins.render.svg.Svg.styleNumber;
 
 import dev.dediren.contracts.layout.LaidOutEdge;
 import dev.dediren.contracts.layout.LaidOutNode;
@@ -16,6 +17,7 @@ import dev.dediren.contracts.render.SvgFontStyle;
 import dev.dediren.contracts.render.SvgNodeStyle;
 import dev.dediren.contracts.render.SvgStylePolicy;
 import dev.dediren.plugins.render.svg.EdgeMarkers;
+import dev.dediren.plugins.render.svg.Svg;
 import dev.dediren.plugins.render.svg.SvgAccessibleName;
 import dev.dediren.plugins.render.svg.SvgWriter;
 import java.util.ArrayList;
@@ -906,14 +908,7 @@ public final class UmlSequenceRenderer {
   }
 
   private static double labelWidth(String label, double fontSize) {
-    return (label == null ? 0 : label.length()) * fontSize * 0.56;
-  }
-
-  private static String styleNumber(double value) {
-    if (Math.rint(value) == value) {
-      return Long.toString(Math.round(value));
-    }
-    return Double.toString(value);
+    return Svg.estimateTextWidth(label, fontSize);
   }
 
   private record SequenceStyle(String backgroundFill, String fontFamily, double fontSize) {
