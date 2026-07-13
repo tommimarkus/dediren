@@ -22,9 +22,13 @@ class UmlNotationSemanticsTest {
   private final UmlNotationSemantics notation = new UmlNotationSemantics();
 
   @Test
-  void layoutRoleIsLifelineOrInteractionForSequenceTypesOnly() {
+  void layoutRoleCoversLifelineInteractionExecutionAndDestructionButLeavesGateNull() {
     assertThat(notation.layoutRole("Lifeline")).isEqualTo("lifeline");
     assertThat(notation.layoutRole("Interaction")).isEqualTo("interaction");
+    assertThat(notation.layoutRole("ExecutionSpecification")).isEqualTo("execution");
+    assertThat(notation.layoutRole("DestructionOccurrenceSpecification")).isEqualTo("destruction");
+    // Gate stays deliberately out of scope for this slice; see design doc non-goals.
+    assertThat(notation.layoutRole("Gate")).isNull();
     assertThat(notation.layoutRole("Class")).isNull();
   }
 

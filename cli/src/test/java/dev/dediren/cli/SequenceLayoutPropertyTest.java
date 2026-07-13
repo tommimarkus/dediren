@@ -1,6 +1,7 @@
 package dev.dediren.cli;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.contracts.source.GenericGraphSemanticProfile;
@@ -15,6 +16,7 @@ import dev.dediren.semantics.graph.GraphNotationSemantics;
 import dev.dediren.semantics.graph.SemanticsRouterEngine;
 import dev.dediren.semantics.uml.UmlNotationSemantics;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import net.jqwik.api.Arbitraries;
@@ -54,9 +56,19 @@ import net.jqwik.api.statistics.Statistics;
  * sibling fixture {@code valid-uml-sequence-self-message.json}) are now generated and exercised end
  * to end through the real project&#8594;layout path, closing the coverage gap that let a self-call
  * hard-fail {@code build} ship unnoticed. Nested fragments and fragment {@code covered} lifeline
- * sets are not needed to exercise the leading-gap path and remain out of scope, as do {@code
- * ExecutionSpecification} / {@code DestructionOccurrenceSpecification} / create-delete-message
- * geometry (the rest of the W1 gap) — tracked follow-ups.
+ * sets are not needed to exercise the leading-gap path and remain out of scope.
+ *
+ * <p>Task 8 closes the rest of the W1 coverage hole — the one that let an activation bar land at
+ * the canvas origin and a delete-message hard-fail {@code build} (exit 2) ship unnoticed. A
+ * minority of trials now also carry an {@code ExecutionSpecification} (valid {@code covered}/{@code
+ * start}/{@code finish}, resolving to a selected lifeline and two selected messages) and,
+ * independently, a {@code DestructionOccurrenceSpecification} (valid {@code covered}) targeted by
+ * exactly one generated {@code deleteMessage}. Neither {@link SequenceInvariants} nor {@link
+ * #assertNoNodeRectsOverlap} treats a delete-message's endpoints as a "message" — its target's
+ * {@code role} is {@code "destruction"}, not {@code "lifeline"} — so {@link
+ * #assertDeleteMessageGeometry} asserts its geometry directly instead: the destruction marker
+ * centred on its covered lifeline's stem, and the delete-message's last route point landing exactly
+ * on the marker's near edge.
  */
 class SequenceLayoutPropertyTest {
 
@@ -68,6 +80,8 @@ class SequenceLayoutPropertyTest {
       @ForAll("validSequenceModels") GeneratedSequenceModel model) throws Exception {
     Statistics.collect(fragmentShapeLabel(model.fragment()));
     Statistics.label("self-message").collect(selfMessageLabel(model));
+    Statistics.label("execution").collect(executionLabel(model));
+    Statistics.label("destruction").collect(destructionLabel(model));
     SourceDocument source =
         JsonSupport.objectMapper().readValue(buildSourceJson(model), SourceDocument.class);
 
@@ -91,6 +105,7 @@ class SequenceLayoutPropertyTest {
         .describedAs("interactionFrameEnclosesLifelines for %s", model)
         .isEmpty();
     assertNoNodeRectsOverlap(scene, model);
+    assertDeleteMessageGeometry(scene, model);
   }
 
   // --- generator --------------------------------------------------------------------------------
@@ -99,6 +114,13 @@ class SequenceLayoutPropertyTest {
   // message-ordering path (the P2 task 8 baseline) still dominates the 300 trials, while a solid
   // minority of trials exercise the W3 fragment/operand-open leading-gap path added for P5 task 7.
   private static final double NO_FRAGMENT_PROBABILITY = 0.55;
+
+  // Probability a generated model has NO ExecutionSpecification / NO destruction, independent of
+  // NO_FRAGMENT_PROBABILITY and of each other: kept > 0.5 so most trials stay free of either, while
+  // a solid, independent minority of the 300 trials exercise each -- this is the Task 8 coverage
+  // this class exists to add (see the class javadoc).
+  private static final double NO_EXECUTION_PROBABILITY = 0.55;
+  private static final double NO_DESTRUCTION_PROBABILITY = 0.55;
 
   @Provide
   Arbitrary<GeneratedSequenceModel> validSequenceModels() {
@@ -110,10 +132,20 @@ class SequenceLayoutPropertyTest {
                     .flatMap(
                         messages ->
                             generatedFragment(messages.size())
-                                .map(
+                                .flatMap(
                                     fragment ->
-                                        new GeneratedSequenceModel(
-                                            lifelineCount, messages, fragment))));
+                                        generatedExecution(lifelineCount, messages.size())
+                                            .flatMap(
+                                                execution ->
+                                                    generatedDestruction(lifelineCount)
+                                                        .map(
+                                                            destruction ->
+                                                                new GeneratedSequenceModel(
+                                                                    lifelineCount,
+                                                                    messages,
+                                                                    fragment,
+                                                                    execution,
+                                                                    destruction))))));
   }
 
   /**
@@ -176,6 +208,67 @@ class SequenceLayoutPropertyTest {
     return fragment.operands().size() == 1
         ? "fragment: 1 operand (fragment-open only)"
         : "fragment: 2 operands (fragment-open + operand-open)";
+  }
+
+  /**
+   * An optional {@link GeneratedExecution}: an {@code ExecutionSpecification} covering a random
+   * lifeline, anchored to two of the generated messages in chronological order ({@code
+   * startMessageIndex} strictly before {@code finishMessageIndex}, both 0-based positions into the
+   * enclosing model's messages list). Needs at least two generated messages to pick a distinct
+   * start/finish pair, so trials with a single message never carry one. Injecting {@code null} at
+   * {@link #NO_EXECUTION_PROBABILITY} keeps most trials free of an activation bar while still
+   * generating plenty across 300 tries -- this closes the coverage gap that let a malformed
+   * ExecutionSpecification (a {@code covered}/{@code start}/{@code finish} absent, or present but
+   * not resolving to a selected lifeline/message) slip past {@code Uml.validateSource} and
+   * hard-fail layout unnoticed (see {@code
+   * UmlSequenceValidation#validateSelectedExecutionSpecificationProperties}).
+   */
+  private static Arbitrary<GeneratedExecution> generatedExecution(
+      int lifelineCount, int messageCount) {
+    if (messageCount < 2) {
+      Arbitrary<GeneratedExecution> none =
+          Arbitraries.integers().between(0, 0).map(ignored -> null);
+      return none;
+    }
+    Arbitrary<GeneratedExecution> execution =
+        Arbitraries.integers()
+            .between(0, messageCount - 2)
+            .flatMap(
+                startIndex ->
+                    Combinators.combine(
+                            Arbitraries.integers().between(0, lifelineCount - 1),
+                            Arbitraries.integers().between(startIndex + 1, messageCount - 1))
+                        .as(
+                            (covered, finishIndex) ->
+                                new GeneratedExecution(covered, startIndex, finishIndex)));
+    return execution.injectNull(NO_EXECUTION_PROBABILITY);
+  }
+
+  /**
+   * An optional {@link GeneratedDestruction}: a {@code DestructionOccurrenceSpecification} covering
+   * a random lifeline, targeted by exactly one generated {@code deleteMessage} from a (possibly the
+   * same) random lifeline. {@code Uml.validateSource} allows at most one Message to target a given
+   * destruction ({@code UmlSequenceValidation#validateSelectedDestructionMessageUniqueness}), and
+   * {@link #appendDestructionJson} only ever emits the single delete-message this record describes,
+   * so every generated model stays valid. Injecting {@code null} at {@link
+   * #NO_DESTRUCTION_PROBABILITY} keeps most trials free of a destruction marker while still
+   * generating plenty across 300 tries.
+   */
+  private static Arbitrary<GeneratedDestruction> generatedDestruction(int lifelineCount) {
+    Arbitrary<GeneratedDestruction> destruction =
+        Combinators.combine(
+                Arbitraries.integers().between(0, lifelineCount - 1),
+                Arbitraries.integers().between(0, lifelineCount - 1))
+            .as((covered, source) -> new GeneratedDestruction(covered, source));
+    return destruction.injectNull(NO_DESTRUCTION_PROBABILITY);
+  }
+
+  private static String executionLabel(GeneratedSequenceModel model) {
+    return model.execution() == null ? "execution: absent" : "execution: present";
+  }
+
+  private static String destructionLabel(GeneratedSequenceModel model) {
+    return model.destruction() == null ? "destruction: absent" : "destruction: present";
   }
 
   /**
@@ -248,8 +341,26 @@ class SequenceLayoutPropertyTest {
 
   private record GeneratedFragment(String operator, List<GeneratedOperand> operands) {}
 
+  // coveredLifelineIndex is the ExecutionSpecification's uml.covered lifeline; startMessageIndex/
+  // finishMessageIndex are 0-based positions into the enclosing model's messages list (same id
+  // convention as GeneratedOperand), always startMessageIndex < finishMessageIndex so the bar spans
+  // forward in time.
+  private record GeneratedExecution(
+      int coveredLifelineIndex, int startMessageIndex, int finishMessageIndex) {}
+
+  // coveredLifelineIndex is the DestructionOccurrenceSpecification's uml.covered lifeline;
+  // deleteSourceLifelineIndex is the source lifeline of the single generated deleteMessage that
+  // targets it -- it may equal coveredLifelineIndex (a lifeline destroying itself is valid UML and
+  // exercises the "source declared at or left of the destroyed lifeline" branch of the near-edge
+  // routing rule just like a distinct, lower-indexed source would).
+  private record GeneratedDestruction(int coveredLifelineIndex, int deleteSourceLifelineIndex) {}
+
   private record GeneratedSequenceModel(
-      int lifelineCount, List<GeneratedMessage> messages, GeneratedFragment fragment) {}
+      int lifelineCount,
+      List<GeneratedMessage> messages,
+      GeneratedFragment fragment,
+      GeneratedExecution execution,
+      GeneratedDestruction destruction) {}
 
   // --- source-document JSON assembly -------------------------------------------------------------
 
@@ -297,6 +408,14 @@ class SequenceLayoutPropertyTest {
     }
 
     appendFragmentJson(model.fragment(), nodesJson, nodeIdsJson);
+    appendExecutionJson(model.execution(), nodesJson, nodeIdsJson);
+    appendDestructionJson(
+        model.destruction(),
+        nodesJson,
+        nodeIdsJson,
+        relationshipsJson,
+        relationshipIdsJson,
+        messages.size());
 
     return """
         {
@@ -385,14 +504,89 @@ class SequenceLayoutPropertyTest {
     }
   }
 
+  /**
+   * Appends the {@code ExecutionSpecification} node (id {@code execution-0}) to both the source
+   * {@code nodes} array and the view's selected-node id list, when {@code execution} is non-null.
+   * {@code uml.covered}/{@code uml.start}/{@code uml.finish} always resolve to a selected
+   * lifeline/message, so {@code Uml.validateSource}'s occurrence-selection rules ({@code
+   * UmlSequenceValidation#validateSelectedExecutionSpecificationProperties}) accept every generated
+   * model. Unlike {@code CombinedFragment}/{@code InteractionOperand}, an ExecutionSpecification
+   * DOES become a {@code role=="execution"} scene node ({@link
+   * dev.dediren.semantics.uml.UmlNotationSemantics#layoutRole}) -- the activation bar -- which is
+   * why {@link #assertNoNodeRectsOverlap} below now exempts that role instead of skipping it.
+   */
+  private static void appendExecutionJson(
+      GeneratedExecution execution, StringBuilder nodesJson, StringBuilder nodeIdsJson) {
+    if (execution == null) {
+      return;
+    }
+    nodesJson
+        .append(",")
+        .append(
+            ("{\"id\":\"execution-0\",\"type\":\"ExecutionSpecification\",\"label\":\"Execution\","
+                    + "\"properties\":{\"uml\":{\"covered\":\"lifeline-%d\","
+                    + "\"start\":\"m-%d\",\"finish\":\"m-%d\"}}}")
+                .formatted(
+                    execution.coveredLifelineIndex(),
+                    execution.startMessageIndex(),
+                    execution.finishMessageIndex()));
+    nodeIdsJson.append(",\"execution-0\"");
+  }
+
+  /**
+   * Appends the {@code DestructionOccurrenceSpecification} node (id {@code destruction-0}) and the
+   * single {@code deleteMessage} relationship (id {@code m-delete}) that targets it, to the source
+   * {@code nodes}/{@code relationships} arrays and the view's selected-id lists, when {@code
+   * destruction} is non-null. The delete-message's {@code uml.sequence} is {@code messageCount + 1}
+   * -- strictly greater than every generated message's sequence, so it is always unique (see {@code
+   * UmlSequenceValidation#validateMessageSequenceUniqueness}) and always sorts last, outside any
+   * combined-fragment operand span. Exactly one Message targets {@code destruction-0}, satisfying
+   * {@code UmlSequenceValidation#validateSelectedDestructionMessageUniqueness}.
+   */
+  private static void appendDestructionJson(
+      GeneratedDestruction destruction,
+      StringBuilder nodesJson,
+      StringBuilder nodeIdsJson,
+      StringBuilder relationshipsJson,
+      StringBuilder relationshipIdsJson,
+      int messageCount) {
+    if (destruction == null) {
+      return;
+    }
+    nodesJson
+        .append(",")
+        .append(
+            ("{\"id\":\"destruction-0\",\"type\":\"DestructionOccurrenceSpecification\","
+                    + "\"label\":\"Destruction\",\"properties\":{\"uml\":{\"covered\":\"lifeline-%d\"}}}")
+                .formatted(destruction.coveredLifelineIndex()));
+    nodeIdsJson.append(",\"destruction-0\"");
+
+    relationshipsJson
+        .append(",")
+        .append(
+            ("{\"id\":\"m-delete\",\"type\":\"Message\",\"source\":\"lifeline-%d\","
+                    + "\"target\":\"destruction-0\",\"label\":\"m-delete\","
+                    + "\"properties\":{\"uml\":{\"interaction\":\"interaction\",\"sequence\":%d,"
+                    + "\"message_sort\":\"deleteMessage\"}}}")
+                .formatted(destruction.deleteSourceLifelineIndex(), messageCount + 1));
+    relationshipIdsJson.append(",\"m-delete\"");
+  }
+
   // --- extra geometry invariant: no sibling node rects overlap -----------------------------------
 
   /**
    * Beyond the three named {@link SequenceInvariants}, pins that no two non-nesting {@link
    * PlacedNode} rects overlap. The interaction frame is expected to enclose every lifeline (that
    * containment is what {@link SequenceInvariants#interactionFrameEnclosesLifelines} checks
-   * separately), so frame-vs-lifeline pairs are excluded here; every other pair — in this
-   * generator's minimal node set, every lifeline-vs-lifeline pair — must not overlap.
+   * separately), so frame-vs-lifeline pairs are excluded here. An activation bar ({@code
+   * role=="execution"}) and a destruction marker ({@code role=="destruction"}) are ALSO excluded
+   * from every pair they appear in: both are anchored to sit ON their covered lifeline's stem by
+   * construction (see {@code LayoutIntentNormalizer#placeStemSpanNodes}), not laid out
+   * independently, so a rect "overlap" with the lifeline (or with each other, when they share a
+   * covered lifeline) is sequence chrome, not a layout defect -- this mirrors {@code
+   * LayoutQuality#isSequenceChrome}, the equivalent exemption on the {@code core} quality-check
+   * path. Every remaining pair — lifeline-vs-lifeline in this generator's node set — must not
+   * overlap.
    */
   private static void assertNoNodeRectsOverlap(LaidOutScene scene, GeneratedSequenceModel model) {
     List<PlacedNode> nodes = scene.nodes();
@@ -400,7 +594,7 @@ class SequenceLayoutPropertyTest {
       for (int j = i + 1; j < nodes.size(); j++) {
         PlacedNode a = nodes.get(i);
         PlacedNode b = nodes.get(j);
-        if ("interaction".equals(a.role()) || "interaction".equals(b.role())) {
+        if (isSequenceChromeRole(a.role()) || isSequenceChromeRole(b.role())) {
           continue;
         }
         assertThat(rectsOverlap(a, b))
@@ -422,10 +616,75 @@ class SequenceLayoutPropertyTest {
     }
   }
 
+  private static boolean isSequenceChromeRole(String role) {
+    return "interaction".equals(role) || "execution".equals(role) || "destruction".equals(role);
+  }
+
   private static boolean rectsOverlap(PlacedNode a, PlacedNode b) {
     return a.x() < b.x() + b.width()
         && b.x() < a.x() + a.width()
         && a.y() < b.y() + b.height()
         && b.y() < a.y() + a.height();
+  }
+
+  // --- extra geometry invariant: delete-message reaches its destruction marker -------------------
+
+  /**
+   * A delete-message's endpoints are NOT covered by {@link SequenceInvariants}: its private {@code
+   * isMessage} helper requires BOTH endpoints to be {@code role=="lifeline"}, and a destruction
+   * marker's role is {@code "destruction"} -- so a regression in delete-message geometry would sail
+   * through every invariant assertion above undetected. Pins the two facts {@code
+   * LayoutIntentNormalizer#placeStemSpanNodes}/{@code #normalizedMessagePoints} guarantee directly
+   * instead: the destruction marker is centred (x-axis) on its covered lifeline's stem, and the
+   * delete-message's last route point lands exactly on the marker's near edge (left if the
+   * delete-message's source lifeline is declared at or before the destroyed lifeline, right
+   * otherwise) at the marker's vertical centre. A no-op when the trial carries no destruction.
+   */
+  private static void assertDeleteMessageGeometry(
+      LaidOutScene scene, GeneratedSequenceModel model) {
+    GeneratedDestruction destruction = model.destruction();
+    if (destruction == null) {
+      return;
+    }
+    Map<String, PlacedNode> nodesById = new HashMap<>();
+    for (PlacedNode node : scene.nodes()) {
+      nodesById.put(node.id(), node);
+    }
+    PlacedNode destructionNode = nodesById.get("destruction-0");
+    PlacedNode coveredLifeline = nodesById.get("lifeline-" + destruction.coveredLifelineIndex());
+    assertThat(destructionNode).describedAs("destruction-0 scene node for %s", model).isNotNull();
+    assertThat(coveredLifeline)
+        .describedAs("covered lifeline scene node for %s", model)
+        .isNotNull();
+
+    double destructionCenterX = destructionNode.x() + destructionNode.width() / 2.0;
+    double lifelineCenterX = coveredLifeline.x() + coveredLifeline.width() / 2.0;
+    assertThat(destructionCenterX)
+        .describedAs("destruction-0 must be centred on its covered lifeline's stem for %s", model)
+        .isCloseTo(lifelineCenterX, within(1e-6));
+
+    var deleteMessage =
+        scene.edges().stream()
+            .filter(edge -> "m-delete".equals(edge.id()))
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("no m-delete edge in scene for " + model));
+    var lastPoint = deleteMessage.points().getLast();
+
+    boolean sourceDeclaredRightOfCovered =
+        destruction.deleteSourceLifelineIndex() > destruction.coveredLifelineIndex();
+    double expectedEndX =
+        sourceDeclaredRightOfCovered
+            ? destructionNode.x() + destructionNode.width()
+            : destructionNode.x();
+    assertThat(lastPoint.x())
+        .describedAs(
+            "m-delete must terminate on destruction-0's near edge (not short of it) for %s", model)
+        .isCloseTo(expectedEndX, within(1e-6));
+
+    double destructionCenterY = destructionNode.y() + destructionNode.height() / 2.0;
+    assertThat(lastPoint.y())
+        .describedAs(
+            "m-delete's endpoint must land on destruction-0's vertical centre for %s", model)
+        .isCloseTo(destructionCenterY, within(1e-6));
   }
 }

@@ -17,15 +17,17 @@ import java.util.List;
 import tools.jackson.databind.JsonNode;
 
 /**
- * The UML notation: element/relationship/view legality against {@link Uml}, lifeline/interaction
- * layout role, sequence-diagram/state-machine/use-case/component/deployment/structural sizing via
- * {@link UmlLayoutSizing}, sequence-fragment chrome filtering ({@code CombinedFragment} / {@code
- * InteractionOperand} are notation-only nodes in a {@code uml-sequence} view), the four {@code
- * uml.sequence.*} layout constraints via {@link UmlSequenceConstraints}, and the {@code uml}
- * render-metadata selector subtree. Relocated verbatim from the old single generic-graph {@code
- * GenericGraphEngine}'s UML branch (Plan B P3): {@code validate} runs the exact same {@code
- * Uml.validateSource} the old engine ran identically from both its {@code validate()} command and
- * its projection path, so a single hook here covers both call sites without behavior drift.
+ * The UML notation: element/relationship/view legality against {@link Uml}, layout role for
+ * lifelines/interactions/execution-specifications/destruction-occurrences (a {@code Gate} stays
+ * role-less; out of scope for this slice), sequence-diagram/state-machine/use-case/component/
+ * deployment/structural sizing via {@link UmlLayoutSizing}, sequence-fragment chrome filtering
+ * ({@code CombinedFragment} / {@code InteractionOperand} are notation-only nodes in a {@code
+ * uml-sequence} view), the four {@code uml.sequence.*} layout constraints via {@link
+ * UmlSequenceConstraints}, and the {@code uml} render-metadata selector subtree. Relocated verbatim
+ * from the old single generic-graph {@code GenericGraphEngine}'s UML branch (Plan B P3): {@code
+ * validate} runs the exact same {@code Uml.validateSource} the old engine ran identically from both
+ * its {@code validate()} command and its projection path, so a single hook here covers both call
+ * sites without behavior drift.
  */
 public final class UmlNotationSemantics implements NotationSemantics {
 
@@ -40,7 +42,9 @@ public final class UmlNotationSemantics implements NotationSemantics {
   }
 
   // Carry roles into the layout-request so backend-neutral layout-quality checks can apply
-  // role-aware geometry rules (lifeline message anchors). Other source types stay role-less.
+  // role-aware geometry rules (lifeline message anchors, activation-bar/destruction-mark
+  // placement). Gate stays role-less/out of scope for this slice; other source types stay
+  // role-less too.
   @Override
   public String layoutRole(String sourceType) {
     if ("Lifeline".equals(sourceType)) {
@@ -48,6 +52,12 @@ public final class UmlNotationSemantics implements NotationSemantics {
     }
     if ("Interaction".equals(sourceType)) {
       return "interaction";
+    }
+    if ("ExecutionSpecification".equals(sourceType)) {
+      return "execution";
+    }
+    if ("DestructionOccurrenceSpecification".equals(sourceType)) {
+      return "destruction";
     }
     return null;
   }

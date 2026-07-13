@@ -64,6 +64,38 @@ class LayoutIntentCodecTest {
   }
 
   @Test
+  void roundTripsStemSpan() {
+    List<LayoutIntent> intents =
+        List.of(
+            new OrderedBand(
+                Axis.X, List.of(new BandMember("customer", 0.0), new BandMember("service", 0.0))),
+            new LayoutIntent.StemSpan("exec-1", "service", "m1", "m4"),
+            new LayoutIntent.StemSpan(
+                "destroy-1", "worker", "m3", "m3")); // degenerate: a destruction
+
+    List<LayoutConstraint> wire = LayoutIntentCodec.encode("v1", intents);
+
+    assertThat(wire)
+        .extracting(LayoutConstraint::kind)
+        .containsExactly("ordered-band:x", "stem-span", "stem-span");
+    assertThat(wire.get(1).subjects()).containsExactly("exec-1", "service", "m1", "m4");
+    assertThat(LayoutIntentCodec.decode(wire)).isEqualTo(intents);
+  }
+
+  @Test
+  void decodeRejectsAMalformedStemSpan() {
+    assertThatThrownBy(
+            () ->
+                LayoutIntentCodec.decode(
+                    List.of(
+                        new LayoutConstraint(
+                            "v1.stem-span.exec-1",
+                            "stem-span",
+                            List.of("exec-1", "service", "m1")))))
+        .isInstanceOf(IllegalArgumentException.class);
+  }
+
+  @Test
   void decodeRejectsAMalformedGapValue() {
     assertThatThrownBy(
             () ->
