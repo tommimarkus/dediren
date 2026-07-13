@@ -3,7 +3,6 @@ package dev.dediren.semantics.uml;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.dediren.contracts.json.JsonSupport;
-import dev.dediren.contracts.layout.LayoutConstraint;
 import dev.dediren.contracts.source.GenericGraphPluginData;
 import dev.dediren.contracts.source.GenericGraphView;
 import dev.dediren.contracts.source.SourceDocument;
@@ -26,63 +25,6 @@ import tools.jackson.databind.node.ObjectNode;
 class UmlSequenceConstraintsTest {
 
   @Test
-  void returnsEmptyForNonSequenceViewKinds() throws Exception {
-    SourceDocument source = fixture("fixtures/source/valid-uml-basic.json");
-    GenericGraphView view = viewOf(source, "class-view");
-
-    assertThat(UmlSequenceConstraints.of(source, view)).isEmpty();
-  }
-
-  @Test
-  void projectsLifelineAndMessageOrderConstraints() throws Exception {
-    SourceDocument source = sequenceFixtureWithReorderedMessagesForConstraints();
-    GenericGraphView view = viewOf(source, "sequence-view");
-
-    List<LayoutConstraint> constraints = UmlSequenceConstraints.of(source, view);
-    LayoutConstraint lifelineOrder = constraintOf(constraints, "uml.sequence.lifeline-order");
-    LayoutConstraint messageOrder = constraintOf(constraints, "uml.sequence.message-order");
-
-    assertThat(constraints)
-        .extracting(LayoutConstraint::kind)
-        .containsExactly("uml.sequence.lifeline-order", "uml.sequence.message-order");
-    assertThat(lifelineOrder.id()).isEqualTo("sequence-view.uml.sequence.lifeline-order");
-    assertThat(lifelineOrder.subjects()).containsExactly("customer", "service");
-    assertThat(messageOrder.id()).isEqualTo("sequence-view.uml.sequence.message-order");
-    assertThat(messageOrder.subjects()).containsExactly("m2", "m1", "m3");
-  }
-
-  @Test
-  void projectsMessageOrderWithLargeIntegralSequenceValues() throws Exception {
-    SourceDocument source = sequenceFixtureWithLargeSequenceForConstraints();
-    GenericGraphView view = viewOf(source, "sequence-view");
-
-    List<LayoutConstraint> constraints = UmlSequenceConstraints.of(source, view);
-
-    assertThat(constraintOf(constraints, "uml.sequence.message-order").subjects())
-        .containsExactly("m3", "m2", "m1");
-  }
-
-  @Test
-  void projectsFragmentAndOperandOpenConstraintsForSequenceFragments() throws Exception {
-    SourceDocument source = fixture("fixtures/source/valid-uml-sequence-fragments.json");
-    GenericGraphView view = viewOf(source, "sequence-fragments-view");
-
-    List<LayoutConstraint> constraints = UmlSequenceConstraints.of(source, view);
-
-    assertThat(constraints)
-        .extracting(LayoutConstraint::kind)
-        .containsExactly(
-            "uml.sequence.lifeline-order",
-            "uml.sequence.message-order",
-            "uml.sequence.fragment-open",
-            "uml.sequence.operand-open");
-    assertThat(constraintOf(constraints, "uml.sequence.fragment-open").subjects())
-        .containsExactlyInAnyOrder("m1", "m5", "m7", "m9");
-    assertThat(constraintOf(constraints, "uml.sequence.operand-open").subjects())
-        .containsExactlyInAnyOrder("m3", "m11");
-  }
-
-  @Test
   void sequenceConstraintsReturnsEmptyForNonSequenceViewKinds() throws Exception {
     SourceDocument source = fixture("fixtures/source/valid-uml-basic.json");
     GenericGraphView view = viewOf(source, "class-view");
@@ -99,6 +41,19 @@ class UmlSequenceConstraintsTest {
         .containsExactly(
             new LifelineOrder(List.of("customer", "service")),
             new MessageOrder(List.of("m2", "m1", "m3")));
+  }
+
+  // Message ordering keys on the declared uml.sequence value as a BigInteger, so a value beyond
+  // Long.MAX_VALUE must still sort last rather than overflow.
+  @Test
+  void buildsTypedMessageOrderWithLargeIntegralSequenceValues() throws Exception {
+    SourceDocument source = sequenceFixtureWithLargeSequenceForConstraints();
+    GenericGraphView view = viewOf(source, "sequence-view");
+
+    assertThat(UmlSequenceConstraints.sequenceConstraints(source, view))
+        .containsExactly(
+            new LifelineOrder(List.of("customer", "service")),
+            new MessageOrder(List.of("m3", "m2", "m1")));
   }
 
   @Test
@@ -151,13 +106,6 @@ class UmlSequenceConstraintsTest {
 
     assertThat(intents)
         .containsExactly(new OrderedBand(Axis.Y, List.of(new BandMember("m1", 46.0))));
-  }
-
-  private static LayoutConstraint constraintOf(List<LayoutConstraint> constraints, String kind) {
-    return constraints.stream()
-        .filter(constraint -> constraint.kind().equals(kind))
-        .findFirst()
-        .orElseThrow(() -> new AssertionError("expected layout constraint " + kind));
   }
 
   private static GenericGraphView viewOf(SourceDocument source, String viewId) {

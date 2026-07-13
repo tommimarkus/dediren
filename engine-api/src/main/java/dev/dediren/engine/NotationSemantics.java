@@ -1,6 +1,5 @@
 package dev.dediren.engine;
 
-import dev.dediren.contracts.layout.LayoutConstraint;
 import dev.dediren.contracts.source.GenericGraphPluginData;
 import dev.dediren.contracts.source.GenericGraphView;
 import dev.dediren.contracts.source.SourceDocument;
@@ -15,9 +14,8 @@ import tools.jackson.databind.JsonNode;
  * shared base projection in {@code semantics-graph} delegates. The profile router holds one
  * instance per {@link dev.dediren.contracts.source.GenericGraphSemanticProfile} and never switches
  * on a string. Introduced by Plan B P3 to replace the stringly {@code semanticProfile} threaded
- * through the old single {@code generic-graph} projection. In P3 layout constraints stay the
- * stringly {@link LayoutConstraint} DTO on the wire; P5 retypes them to a typed {@code
- * LayoutIntent}.
+ * through the old single {@code generic-graph} projection. Plan B P5 retyped layout constraints to
+ * the neutral typed {@link LayoutIntent} vocabulary exposed by {@link #layoutIntents}.
  */
 public interface NotationSemantics {
 
@@ -46,14 +44,10 @@ public interface NotationSemantics {
   boolean isSourceOnlyNode(GenericGraphView view, SourceNode node);
 
   /**
-   * Notation layout constraints for the view (the four stringly {@code uml.sequence.*}), or empty.
-   */
-  List<LayoutConstraint> layoutConstraints(SourceDocument source, GenericGraphView view);
-
-  /**
-   * Notation layout intents for the view, in the neutral {@link LayoutIntent} vocabulary. The P5
-   * typed successor to {@link #layoutConstraints}, which is removed at the cutover once this
-   * becomes the live producer.
+   * Notation layout intents for the view, in the neutral {@link LayoutIntent} vocabulary, or empty.
+   * The single live layout-constraint producer since the Plan B P5 cutover retyped {@code
+   * SceneGraph.constraints} and wired elk onto the {@code LayoutIntentCodec}/{@code
+   * LayoutIntentNormalizer} seam.
    */
   List<LayoutIntent> layoutIntents(SourceDocument source, GenericGraphView view);
 

@@ -7,7 +7,6 @@ import dev.dediren.archimate.JunctionValidationNode;
 import dev.dediren.archimate.JunctionValidationRelationship;
 import dev.dediren.contracts.Diagnostic;
 import dev.dediren.contracts.DiagnosticSeverity;
-import dev.dediren.contracts.layout.LayoutConstraint;
 import dev.dediren.contracts.source.GenericGraphPluginData;
 import dev.dediren.contracts.source.GenericGraphView;
 import dev.dediren.contracts.source.SourceDocument;
@@ -64,11 +63,6 @@ public final class ArchimateNotationSemantics implements NotationSemantics {
   @Override
   public boolean isSourceOnlyNode(GenericGraphView view, SourceNode node) {
     return false;
-  }
-
-  @Override
-  public List<LayoutConstraint> layoutConstraints(SourceDocument source, GenericGraphView view) {
-    return List.of();
   }
 
   @Override

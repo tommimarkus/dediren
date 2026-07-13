@@ -13,12 +13,15 @@ import dev.dediren.contracts.layout.LayoutLayeringPreferences;
 import dev.dediren.contracts.layout.LayoutLayeringStrategy;
 import dev.dediren.contracts.layout.LayoutPlacementPreferences;
 import dev.dediren.contracts.layout.LayoutPlacementStrategy;
+import dev.dediren.ir.Axis;
+import dev.dediren.ir.BandMember;
+import dev.dediren.ir.LayoutIntent.OrderedBand;
+import dev.dediren.ir.LayoutIntentCodec;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import org.eclipse.elk.alg.layered.options.CrossingMinimizationStrategy;
 import org.eclipse.elk.alg.layered.options.CycleBreakingStrategy;
 import org.eclipse.elk.alg.layered.options.EdgeStraighteningStrategy;
@@ -283,29 +286,6 @@ class ElkLayoutEngineTest {
     }
   }
 
-  @Test
-  void normalizesSequenceMessagesToCleanHorizontalSegments() {
-    LayoutResult normalized =
-        SequenceLayoutConstraints.from(sequenceLayoutRequest(), Map.of(), Map.of())
-            .normalize(sequenceLayoutResultWithMessageBendPoints());
-    LaidOutEdge edge = edgeById(normalized, "m1");
-    double messageY = firstSegmentY(edge);
-
-    assertEquals(
-        2,
-        edge.points().size(),
-        "lifeline-to-lifeline sequence messages should render as direct horizontal segments");
-    // customer stem center = 100 + 140/2 = 170; service stem center = 520 + 140/2 = 590.
-    assertEquals(170.0, edge.points().getFirst().x(), GEOMETRY_EPSILON);
-    assertEquals(590.0, edge.points().getLast().x(), GEOMETRY_EPSILON);
-    for (Point point : edge.points()) {
-      assertEquals(
-          messageY, point.y(), GEOMETRY_EPSILON, "all message route points should share y");
-    }
-    assertSequenceMessageEndpointAtStemCenter(normalized, "m1", "customer", true);
-    assertSequenceMessageEndpointAtStemCenter(normalized, "m1", "service", false);
-  }
-
   @ParameterizedTest
   @MethodSource("partialSequenceConstraints")
   void ignoresPartialSequenceConstraintsForNonSequenceGraphs(
@@ -329,20 +309,29 @@ class ElkLayoutEngineTest {
         message);
   }
 
+  // A single ordered band decodes to one LayoutIntent, so LayoutIntentNormalizer#active() (which
+  // needs BOTH an x and a y band non-empty) stays false and the normalizer never touches ordinary
+  // graph layout. Each case carries exactly one neutral ordered-band wire constraint.
   private static List<Arguments> partialSequenceConstraints() {
     return List.of(
         Arguments.of(
-            new LayoutConstraint(
-                "main.uml.sequence.lifeline-order",
-                "uml.sequence.lifeline-order",
-                List.of("service", "customer")),
-            "partial sequence constraints must not affect ordinary graph layout"),
+            LayoutIntentCodec.encode(
+                    "main",
+                    List.of(
+                        new OrderedBand(
+                            Axis.X,
+                            List.of(
+                                new BandMember("service", 0.0), new BandMember("customer", 0.0)))))
+                .get(0),
+            "a lone lifeline-order band must not affect ordinary graph layout"),
         Arguments.of(
-            new LayoutConstraint(
-                "main.uml.sequence.message-order",
-                "uml.sequence.message-order",
-                List.of("customer-calls-service")),
-            "message-only sequence constraints must not affect ordinary graph layout"));
+            LayoutIntentCodec.encode(
+                    "main",
+                    List.of(
+                        new OrderedBand(
+                            Axis.Y, List.of(new BandMember("customer-calls-service", 0.0)))))
+                .get(0),
+            "a lone message-order band must not affect ordinary graph layout"));
   }
 
   @Test
@@ -2238,6 +2227,23 @@ class ElkLayoutEngineTest {
     return min;
   }
 
+  // Encodes a sequence layout-request's neutral ordered-band wire the way the production
+  // ir.LayoutRequestMapper does: the lifeline order as an X band and the messages as a Y band, so
+  // ElkLayoutEngine decodes them straight back into a LayoutIntentNormalizer.
+  private static List<LayoutConstraint> sequenceWire(
+      String viewId, List<String> lifelineOrder, List<BandMember> messageBand) {
+    return LayoutIntentCodec.encode(
+        viewId,
+        List.of(
+            new OrderedBand(
+                Axis.X, lifelineOrder.stream().map(id -> new BandMember(id, 0.0)).toList()),
+            new OrderedBand(Axis.Y, messageBand)));
+  }
+
+  private static List<BandMember> plainMessages(List<String> ids) {
+    return ids.stream().map(id -> new BandMember(id, 0.0)).toList();
+  }
+
   private static LayoutRequest fiveLifelineSequenceRequest(List<String> order) {
     List<LayoutNode> nodes =
         List.of(
@@ -2264,13 +2270,10 @@ class ElkLayoutEngineTest {
         nodes,
         edges,
         List.of(),
-        List.of(
-            new LayoutConstraint(
-                "sequence-view.uml.sequence.lifeline-order", "uml.sequence.lifeline-order", order),
-            new LayoutConstraint(
-                "sequence-view.uml.sequence.message-order",
-                "uml.sequence.message-order",
-                List.of("m1", "m2", "m3", "m4", "m5", "m6", "m7", "m8"))),
+        sequenceWire(
+            "sequence-view",
+            order,
+            plainMessages(List.of("m1", "m2", "m3", "m4", "m5", "m6", "m7", "m8"))),
         readableSequencePreferences());
   }
 
@@ -2335,23 +2338,16 @@ class ElkLayoutEngineTest {
             new LayoutEdge("m3", "customer", "service", "c", "m3", "Message"),
             new LayoutEdge("m4", "service", "customer", "d", "m4", "Message")),
         List.of(),
-        List.of(
-            new LayoutConstraint(
-                "sequence-view.uml.sequence.lifeline-order",
-                "uml.sequence.lifeline-order",
-                List.of("customer", "service")),
-            new LayoutConstraint(
-                "sequence-view.uml.sequence.message-order",
-                "uml.sequence.message-order",
-                List.of("m1", "m2", "m3", "m4")),
-            new LayoutConstraint(
-                "sequence-view.uml.sequence.fragment-open",
-                "uml.sequence.fragment-open",
-                List.of("m3")),
-            new LayoutConstraint(
-                "sequence-view.uml.sequence.operand-open",
-                "uml.sequence.operand-open",
-                List.of("m4"))),
+        // m3 carries the fragment-open leading gap (46.0), m4 the operand-open gap (68.0), matching
+        // UmlSequenceConstraints.FRAGMENT_OPEN_GAP / OPERAND_OPEN_GAP baked into the wire.
+        sequenceWire(
+            "sequence-view",
+            List.of("customer", "service"),
+            List.of(
+                new BandMember("m1", 0.0),
+                new BandMember("m2", 0.0),
+                new BandMember("m3", 46.0),
+                new BandMember("m4", 68.0))),
         readableSequencePreferences());
   }
 
@@ -2374,15 +2370,10 @@ class ElkLayoutEngineTest {
             new LayoutEdge("m2", "service", "customer", "accepted", "m2", "Message"),
             new LayoutEdge("m1", "customer", "service", "placeOrder", "m1", "Message")),
         List.of(),
-        List.of(
-            new LayoutConstraint(
-                "sequence-view.uml.sequence.lifeline-order",
-                "uml.sequence.lifeline-order",
-                List.of("customer", "service")),
-            new LayoutConstraint(
-                "sequence-view.uml.sequence.message-order",
-                "uml.sequence.message-order",
-                List.of("m1", "m2", "m3"))),
+        sequenceWire(
+            "sequence-view",
+            List.of("customer", "service"),
+            plainMessages(List.of("m1", "m2", "m3"))),
         readableSequencePreferences());
   }
 
@@ -2400,43 +2391,11 @@ class ElkLayoutEngineTest {
             new LayoutEdge("m3", "service", "missing-customer", "receiptReady", "m3", "Message"),
             new LayoutEdge("m1", "customer", "service", "placeOrder", "m1", "Message")),
         List.of(),
-        List.of(
-            new LayoutConstraint(
-                "sequence-view.uml.sequence.lifeline-order",
-                "uml.sequence.lifeline-order",
-                List.of("customer", "service")),
-            new LayoutConstraint(
-                "sequence-view.uml.sequence.message-order",
-                "uml.sequence.message-order",
-                List.of("m1", "m2", "m3"))),
+        sequenceWire(
+            "sequence-view",
+            List.of("customer", "service"),
+            plainMessages(List.of("m1", "m2", "m3"))),
         readableSequencePreferences());
-  }
-
-  private static LayoutResult sequenceLayoutResultWithMessageBendPoints() {
-    return new LayoutResult(
-        ContractVersions.LAYOUT_RESULT_SCHEMA_VERSION,
-        "sequence-view",
-        List.of(
-            new LaidOutNode(
-                "service", "service", "service", 520.0, 104.0, 140.0, 48.0, "Order Service"),
-            new LaidOutNode(
-                "customer", "customer", "customer", 100.0, 100.0, 140.0, 48.0, "Customer")),
-        List.of(
-            new LaidOutEdge(
-                "m1",
-                "customer",
-                "service",
-                "m1",
-                "m1",
-                List.of(),
-                List.of(
-                    new Point(999.0, 10.0),
-                    new Point(700.0, 20.0),
-                    new Point(300.0, 30.0),
-                    new Point(-50.0, 40.0)),
-                "placeOrder")),
-        List.of(),
-        List.of());
   }
 
   private static LayoutRequest genericTwoNodeRequest(List<LayoutConstraint> constraints) {

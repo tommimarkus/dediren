@@ -2,7 +2,6 @@ package dev.dediren.semantics.uml;
 
 import dev.dediren.contracts.Diagnostic;
 import dev.dediren.contracts.DiagnosticSeverity;
-import dev.dediren.contracts.layout.LayoutConstraint;
 import dev.dediren.contracts.source.GenericGraphPluginData;
 import dev.dediren.contracts.source.GenericGraphView;
 import dev.dediren.contracts.source.GenericGraphViewKind;
@@ -67,11 +66,6 @@ public final class UmlNotationSemantics implements NotationSemantics {
   public boolean isSourceOnlyNode(GenericGraphView view, SourceNode node) {
     return view.kind() == GenericGraphViewKind.UML_SEQUENCE
         && (node.type().equals("CombinedFragment") || node.type().equals("InteractionOperand"));
-  }
-
-  @Override
-  public List<LayoutConstraint> layoutConstraints(SourceDocument source, GenericGraphView view) {
-    return UmlSequenceConstraints.of(source, view);
   }
 
   @Override

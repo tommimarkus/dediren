@@ -92,7 +92,7 @@ final class SceneProjection {
 
   /**
    * Builds the complete pre-layout {@link SceneGraph} for the selected view: nodes, edges, groups,
-   * constraints (the single injection point is {@link NotationSemantics#layoutConstraints}), and
+   * constraints (the single injection point is {@link NotationSemantics#layoutIntents}), and
    * preferences. The projection owns the whole {@code SceneGraph} directly; callers map it to a
    * {@code layout-request} at their own edge via {@code LayoutRequestMapper.toRequest} (the CLI
    * standalone {@code project} command does this so the wire stays byte-identical).
@@ -185,7 +185,7 @@ final class SceneProjection {
         sceneNodes,
         sceneEdges,
         sceneGroups,
-        notation.layoutConstraints(source, selectedView),
+        notation.layoutIntents(source, selectedView),
         selectedView.layoutPreferences());
   }
 

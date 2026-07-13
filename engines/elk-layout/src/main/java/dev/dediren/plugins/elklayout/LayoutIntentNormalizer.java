@@ -17,11 +17,12 @@ import java.util.Map;
 import org.eclipse.elk.core.options.PortSide;
 
 /**
- * Port of {@link SequenceLayoutConstraints} onto the neutral typed {@link LayoutIntent} seam: same
- * sequence-diagram geometry (column placement, non-overlap rebuild, message Y lattice, stem
- * anchoring, message straightening, interaction enclosure, provenance re-threading), but read from
- * {@code List<LayoutIntent>} instead of the stringly {@code uml.sequence.*} {@code LayoutRequest}
- * constraints. Built and unit-tested standalone; {@link ElkLayoutEngine} still wires the old class.
+ * The sequence-diagram geometry normalizer read from the neutral typed {@link LayoutIntent} seam:
+ * column placement, non-overlap rebuild, message Y lattice, stem anchoring, message straightening,
+ * interaction enclosure, and provenance re-threading, driven by {@code List<LayoutIntent>} decoded
+ * from the {@code LayoutRequest} constraints rather than the former stringly {@code uml.sequence.*}
+ * DTOs. Since the Plan B P5 cutover {@link ElkLayoutEngine} wires this class and the former {@code
+ * SequenceLayoutConstraints} re-derivation is deleted.
  */
 final class LayoutIntentNormalizer {
   private static final double MINIMUM_MESSAGE_Y_STEP = 1.0;

@@ -103,7 +103,7 @@ class LayoutRequestMapperTest {
                     new LayoutEdgePriority(5, 2, 8),
                     "/relationships/0")),
             List.of(new LayoutGroup("g1", "G1", List.of("n1"), GroupProvenance.visualOnlyGroup())),
-            List.of(new LayoutConstraint("c1", "uml.sequence.lifeline-order", List.of("n1"))),
+            List.of(new LayoutConstraint("v1.ordered-band.x", "ordered-band:x", List.of("n1"))),
             new LayoutPreferences(LayoutDirection.DOWN, null, null, null));
 
     assertThat(LayoutRequestMapper.toRequest(LayoutRequestMapper.toSceneGraph(request)))
@@ -144,7 +144,7 @@ class LayoutRequestMapperTest {
                     new LayoutEdgePriority(5, 2, 8),
                     null)),
             List.of(new LayoutGroup("g1", "G1", List.of("n1"), GroupProvenance.visualOnlyGroup())),
-            List.of(new LayoutConstraint("c1", "uml.sequence.lifeline-order", List.of("n1"))),
+            List.of(new LayoutConstraint("v1.ordered-band.x", "ordered-band:x", List.of("n1"))),
             new LayoutPreferences(LayoutDirection.DOWN, null, null, null));
 
     LayoutRequest roundTripped =

@@ -63,19 +63,6 @@ class UmlNotationSemanticsTest {
   }
 
   @Test
-  void layoutConstraintsDelegatesToUmlSequenceConstraints() throws Exception {
-    SourceDocument sequence = fixture("fixtures/source/valid-uml-sequence-basic.json");
-    GenericGraphView sequenceView = viewOf(sequence, "sequence-view");
-
-    assertThat(notation.layoutConstraints(sequence, sequenceView))
-        .isEqualTo(UmlSequenceConstraints.of(sequence, sequenceView));
-
-    SourceDocument classModel = fixture("fixtures/source/valid-uml-basic.json");
-    GenericGraphView classView = viewOf(classModel, "class-view");
-    assertThat(notation.layoutConstraints(classModel, classView)).isEmpty();
-  }
-
-  @Test
   void layoutIntentsDelegatesToLowering() throws Exception {
     SourceDocument sequence = fixture("fixtures/source/valid-uml-sequence-basic.json");
     GenericGraphView sequenceView = viewOf(sequence, "sequence-view");

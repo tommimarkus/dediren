@@ -3,12 +3,14 @@ package dev.dediren.semantics.graph;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.dediren.contracts.json.JsonSupport;
-import dev.dediren.contracts.layout.LayoutConstraint;
 import dev.dediren.contracts.layout.LayoutRequest;
 import dev.dediren.contracts.render.RenderMetadata;
 import dev.dediren.contracts.source.GenericGraphPluginData;
 import dev.dediren.contracts.source.GenericGraphView;
 import dev.dediren.contracts.source.SourceDocument;
+import dev.dediren.ir.Axis;
+import dev.dediren.ir.LayoutIntent.OrderedBand;
+import dev.dediren.ir.LayoutIntentCodec;
 import dev.dediren.ir.LayoutRequestMapper;
 import dev.dediren.ir.SceneGraph;
 import dev.dediren.semantics.uml.UmlNotationSemantics;
@@ -58,18 +60,19 @@ class SceneProjectionTest {
         .containsExactly("m1", "m2", "m3");
     assertThat(scene.groups()).isEmpty();
     assertThat(scene.constraints())
-        .extracting(LayoutConstraint::kind)
-        .contains("uml.sequence.lifeline-order", "uml.sequence.message-order");
+        .extracting(intent -> ((OrderedBand) intent).axis())
+        .containsExactly(Axis.X, Axis.Y);
     assertThat(scene.preferences()).isEqualTo(umlSequenceView.layoutPreferences());
 
-    // The projection owns the whole SceneGraph directly now: mapping it to a LayoutRequest must
-    // carry the exact same nodes/edges/constraints/preferences (the CLI-edge byte-stability oracle
-    // for `dediren project --target layout-request`).
+    // The projection owns the whole SceneGraph directly now: mapping it to a LayoutRequest encodes
+    // the typed intents to the neutral ordered-band wire, and decoding that wire must round-trip
+    // back to the exact same intents (the CLI-edge byte-stability oracle for `dediren project
+    // --target layout-request`).
     LayoutRequest mapped = LayoutRequestMapper.toRequest(scene);
     assertThat(mapped.viewId()).isEqualTo(scene.viewId());
     assertThat(mapped.nodes()).hasSameSizeAs(scene.nodes());
     assertThat(mapped.edges()).hasSameSizeAs(scene.edges());
-    assertThat(mapped.constraints()).isEqualTo(scene.constraints());
+    assertThat(LayoutIntentCodec.decode(mapped.constraints())).isEqualTo(scene.constraints());
     assertThat(mapped.layoutPreferences()).isEqualTo(scene.preferences());
   }
 

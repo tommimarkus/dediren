@@ -1,6 +1,5 @@
 package dev.dediren.semantics.uml;
 
-import dev.dediren.contracts.layout.LayoutConstraint;
 import dev.dediren.contracts.source.GenericGraphView;
 import dev.dediren.contracts.source.GenericGraphViewKind;
 import dev.dediren.contracts.source.SourceDocument;
@@ -35,12 +34,11 @@ import tools.jackson.databind.JsonNode;
  * Plan B P3; gated on {@link GenericGraphViewKind#UML_SEQUENCE} since every other UML view kind
  * contributes no layout constraints.
  *
- * <p>{@link #of} is the stringly {@code uml.sequence.*} {@link LayoutConstraint} wire producer and
- * stays the live source elk's {@code SequenceLayoutConstraints} reads until the Plan B P5 Task 5
- * cutover; its output is unchanged by this class also exposing a typed producer. {@link
- * #sequenceConstraints} is the typed form of the same four source scans, and {@link #lower} maps
- * typed constraints to the neutral {@code dev.dediren.ir.LayoutIntent} vocabulary; both are
- * additive and unused until Task 5.
+ * <p>{@link #sequenceConstraints} scans those four source facets into typed {@link
+ * SequenceConstraint}s, and {@link #lower} maps them to the neutral {@code
+ * dev.dediren.ir.LayoutIntent} vocabulary elk's {@code LayoutIntentNormalizer} consumes. The Plan B
+ * P5 cutover made this the single live layout-constraint path and deleted the former stringly
+ * {@code uml.sequence.*} {@code LayoutConstraint} producer.
  */
 public final class UmlSequenceConstraints {
 
@@ -52,42 +50,8 @@ public final class UmlSequenceConstraints {
 
   private UmlSequenceConstraints() {}
 
-  static List<LayoutConstraint> of(SourceDocument source, GenericGraphView selectedView) {
-    if (selectedView.kind() != GenericGraphViewKind.UML_SEQUENCE) {
-      return List.of();
-    }
-    Scan scan = scan(source, selectedView);
-
-    var constraints = new ArrayList<LayoutConstraint>();
-    constraints.add(
-        new LayoutConstraint(
-            selectedView.id() + ".uml.sequence.lifeline-order",
-            "uml.sequence.lifeline-order",
-            scan.lifelineIds()));
-    constraints.add(
-        new LayoutConstraint(
-            selectedView.id() + ".uml.sequence.message-order",
-            "uml.sequence.message-order",
-            scan.messageIds()));
-    if (!scan.fragmentOpenIds().isEmpty()) {
-      constraints.add(
-          new LayoutConstraint(
-              selectedView.id() + ".uml.sequence.fragment-open",
-              "uml.sequence.fragment-open",
-              scan.fragmentOpenIds()));
-    }
-    if (!scan.operandOpenIds().isEmpty()) {
-      constraints.add(
-          new LayoutConstraint(
-              selectedView.id() + ".uml.sequence.operand-open",
-              "uml.sequence.operand-open",
-              scan.operandOpenIds()));
-    }
-    return constraints;
-  }
-
   /**
-   * Typed form of {@link #of}'s four source scans: empty for non-{@link
+   * The four source scans as typed {@link SequenceConstraint}s: empty for non-{@link
    * GenericGraphViewKind#UML_SEQUENCE} views, otherwise {@link SequenceConstraint.LifelineOrder}
    * and {@link SequenceConstraint.MessageOrder} always, {@link SequenceConstraint.FragmentOpen} and
    * {@link SequenceConstraint.OperandOpen} only when the view has combined fragments.
@@ -119,8 +83,9 @@ public final class UmlSequenceConstraints {
    * {@link OrderedBand} whose members reserve {@link #FRAGMENT_OPEN_GAP} or {@link
    * #OPERAND_OPEN_GAP} before a message that opens a fragment or a non-first operand. A message
    * present in both sets reserves {@link #FRAGMENT_OPEN_GAP} — fragment-open takes precedence over
-   * operand-open, matching elk's {@code SequenceLayoutConstraints#normalizedMessageYSlots}, which
-   * checks the fragment-open set first.
+   * operand-open, the precedence the former elk {@code
+   * SequenceLayoutConstraints#normalizedMessageYSlots} applied by checking the fragment-open set
+   * first; it now lives here, baked into each band member's leading gap.
    */
   static List<LayoutIntent> lower(List<SequenceConstraint> constraints) {
     List<String> lifelineIds = null;
