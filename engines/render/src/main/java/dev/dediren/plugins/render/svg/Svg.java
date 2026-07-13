@@ -6,9 +6,10 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Pure SVG text/number formatting primitives shared by the render entry point and the per-notation
- * decorators. No state and no rendering policy: just XML escaping, coordinate/number formatting,
- * and a cheap text-width estimate. Consumers static-import these so call sites stay unqualified.
+ * Pure SVG number/geometry formatting primitives shared by the render entry point and the
+ * per-notation decorators. No state and no rendering policy: coordinate/number formatting,
+ * stroke-dasharray assembly, and a cheap text-width estimate. XML escaping is {@link SvgWriter}'s
+ * job. Consumers static-import these so call sites stay unqualified.
  */
 public final class Svg {
   private Svg() {}
@@ -41,31 +42,6 @@ public final class Svg {
   }
 
   /**
-   * A single optional presentation attribute (e.g. {@code fill-opacity}). Returns the empty string
-   * when {@code value} is null so callers can unconditionally append it before an element's {@code
-   * />}. The value is a validated number, so no escaping is needed.
-   */
-  public static String opacityAttr(String name, Double value) {
-    return value == null ? "" : " " + name + "=\"" + styleNumber(value) + "\"";
-  }
-
-  /**
-   * An optional attribute whose value is a single-word enum constant (e.g. {@code font-weight},
-   * {@code font-style}). The constant name lowercased is the SVG/CSS keyword for every enum used
-   * here (NORMAL→normal, BOLD→bold, ITALIC→italic, START/MIDDLE/END). Empty for null.
-   */
-  public static String enumAttr(String name, Enum<?> value) {
-    return value == null ? "" : " " + name + "=\"" + value.name().toLowerCase(Locale.ROOT) + "\"";
-  }
-
-  /**
-   * An optional string-valued attribute (e.g. {@code font-family}), XML-escaped. Empty for null.
-   */
-  public static String stringAttr(String name, String value) {
-    return value == null ? "" : " " + name + "=\"" + attr(value) + "\"";
-  }
-
-  /**
    * The {@code stroke-dasharray} VALUE for a resolved line style: an explicit {@code dashPattern}
    * (space-joined) wins; otherwise the {@code dashedDefault} for {@code DASHED}, a fine dotted
    * pattern for {@code DOTTED}, and the empty string (solid) otherwise. Callers that own their own
@@ -90,30 +66,6 @@ public final class Svg {
       return "1 3";
     }
     return "";
-  }
-
-  /** The full {@code stroke-dasharray} attribute (with leading space), or empty for solid. */
-  public static String dashArrayAttr(
-      SvgEdgeLineStyle lineStyle, List<Double> dashPattern, String dashedDefault) {
-    String value = dashArrayValue(lineStyle, dashPattern, dashedDefault);
-    return value.isEmpty() ? "" : " stroke-dasharray=\"" + value + "\"";
-  }
-
-  /** Escapes a value for use inside an SVG/XML attribute (quotes included). */
-  public static String attr(String value) {
-    return (value == null ? "" : value)
-        .replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
-        .replace("\"", "&quot;");
-  }
-
-  /** Escapes a value for use as SVG/XML text content. */
-  public static String text(String value) {
-    return (value == null ? "" : value)
-        .replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;");
   }
 
   /** Floors to one decimal place and formats with a fixed locale (stable across environments). */

@@ -12,11 +12,11 @@ import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * Hostile-label escaping, exercised end to end. The renderer's {@code Svg.attr}/{@code Svg.text}
- * escaping is unit-testable, but nothing drove an XML/SVG-breakout payload through a full render
- * and checked that (a) it cannot break out of its element and (b) it round-trips back to the exact
- * authored string. A label containing {@code </text><script>…</script>} must reach the SVG only in
- * escaped form. See {@code docs/threat-model.md} (untrusted model text reaching the SVG surface).
+ * Hostile-label escaping, exercised end to end. The renderer's {@code SvgWriter} escaping is
+ * structural, but nothing drove an XML/SVG-breakout payload through a full render and checked that
+ * (a) it cannot break out of its element and (b) it round-trips back to the exact authored string.
+ * A label containing {@code </text><script>…</script>} must reach the SVG only in escaped form. See
+ * {@code docs/threat-model.md} (untrusted model text reaching the SVG surface).
  */
 class LabelInjectionTest {
 

@@ -13,10 +13,10 @@ import javax.xml.stream.XMLStreamWriter;
  * and attributes are emitted in call order — both required to keep output byte-identical to the
  * previous string emitter.
  *
- * <p>The JDK writer escapes exactly as the retired {@code Svg.attr}/{@code Svg.text} helpers did
- * ({@code & < > "} in attribute values; {@code & < >} in text, leaving {@code "} raw), emits
- * self-closing empty elements with no space before {@code />}, and writes no XML prolog — verified
- * against the render golden fixtures.
+ * <p>The JDK writer escapes exactly as the previous hand-rolled string emitter did ({@code & < > "}
+ * in attribute values; {@code & < >} in text, leaving {@code "} raw), emits self-closing empty
+ * elements with no space before {@code />}, and writes no XML prolog — verified against the render
+ * golden fixtures.
  *
  * <p>Numeric formatting stays the caller's job: pass already-formatted strings (via {@link
  * Svg#styleNumber} or an explicit {@code %.1f}) to {@link #attr}, exactly matching the prior format
