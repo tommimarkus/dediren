@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.engine.EngineException;
+import dev.dediren.ir.LaidOutSceneMapper;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -50,7 +51,11 @@ class GenericShapePolicyTest {
     SvgRenderEngine.ParsedInput parsed = engine.parseInput(input);
     return assertThrows(
         EngineException.class,
-        () -> engine.render(parsed.layoutResult(), parsed.policy(), parsed.renderMetadata()));
+        () ->
+            engine.render(
+                LaidOutSceneMapper.toScene(parsed.layoutResult()),
+                parsed.policy(),
+                parsed.renderMetadata()));
   }
 
   private static byte[] policyWithClientOverride(String profile, ObjectNode clientOverride)

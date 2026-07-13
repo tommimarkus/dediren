@@ -76,8 +76,13 @@ ArchiMate schemas (`engines/archimate-oef-export`).
 ### SVG output escaping
 
 Untrusted model text (node/edge/group labels and ids) flows into the SVG
-render surface. Every value is XML-escaped at emission — `Svg.text()` for
-element content and `Svg.attr()` for attribute values — so a label such as
+render surface. Every value is XML-escaped at emission by `SvgWriter`
+(`engines/render/.../svg/SvgWriter.java`), the engine's StAX-backed emitter:
+element content goes through `text()` and attribute values through
+`attr()`/`attrIf()`, which escape structurally. Escaping is therefore a
+property of the writer, not a call-site invariant a caller can forget — the
+hand-rolled string emitter and its `Svg.attr`/`Svg.text` helpers are gone, and
+there is no verbatim-injection path. So a label such as
 `</text><script>alert(1)</script>` reaches the output only in escaped form and
 cannot break out of its host element. `LabelInjectionTest` (`engines/render`)
 drives a breakout payload through a full render and asserts both that the
@@ -116,7 +121,7 @@ a documented accepted risk — see `SECURITY.md`.
 | Tamper `main` or `v*` tags | `release.yml` cross-checks the tag version against `pom.xml`; attestation binds the published archive to its build | No branch protection on `main`; a bad commit is caught only by tests/scans, not review |
 | Malicious schema substitution | HTTPS-only curl plus SHA-256 pin verified before use (`SchemaCacheModule`) | `DEDIREN_XMI_SCHEMA_PATH` / `DEDIREN_OEF_SCHEMA_DIR` offline overrides bypass the SHA-256 check by design |
 | Malicious envelope input | Jackson 3 parsing plus fuzz-regression targets pinning the only-`JacksonException`/`XmiValidationException` invariant; hardened DOM factory blocks DOCTYPE/XXE | Fuzz targets run in deterministic regression mode over a fixed seed corpus in CI, not continuous coverage-guided fuzzing |
-| Inject markup into a rendered SVG via model labels/ids | `Svg.text()`/`Svg.attr()` XML-escape all model text at emission; `LabelInjectionTest` proves an end-to-end breakout payload stays escaped and round-trips; `SvgAudit` rejects ill-formed output | The SVG is inert markup with no embedded script; a consumer that embeds it must still apply its own context's policy (e.g. CSP) |
+| Inject markup into a rendered SVG via model labels/ids | `SvgWriter` (StAX) structurally escapes every attribute value and text node at emission, with no verbatim-injection path; `LabelInjectionTest` proves an end-to-end breakout payload stays escaped and round-trips; `SvgAudit` rejects ill-formed output | The SVG is inert markup with no embedded script; a consumer that embeds it must still apply its own context's policy (e.g. CSP) |
 | Dependency compromise | Blocking Grype/SBOM gate on every push/PR/release (`ci.yml`, `release.yml`) plus weekly Dependabot updates (`.github/dependabot.yml`) | The weekly OWASP Dependency-Check cross-check (`dependency-audit.yml`) is intentionally non-blocking (`continue-on-error`), so advisories only it surfaces never gate a merge or release |
 
 ## Incident Response Runbook

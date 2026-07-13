@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.engine.EngineException;
+import dev.dediren.ir.LaidOutSceneMapper;
 import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.node.ArrayNode;
@@ -92,7 +93,11 @@ class GradientTest {
     EngineException failure =
         assertThrows(
             EngineException.class,
-            () -> engine.render(parsed.layoutResult(), parsed.policy(), parsed.renderMetadata()));
+            () ->
+                engine.render(
+                    LaidOutSceneMapper.toScene(parsed.layoutResult()),
+                    parsed.policy(),
+                    parsed.renderMetadata()));
 
     assertThat(failure.diagnostics().get(0).code()).isEqualTo("DEDIREN_SVG_POLICY_INVALID");
   }
