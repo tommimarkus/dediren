@@ -2,7 +2,6 @@ package dev.dediren.plugins.render.node.uml;
 
 import static dev.dediren.plugins.render.node.NodeShapeSupport.decoratorName;
 import static dev.dediren.plugins.render.node.NodeShapeSupport.umlDecoratorSuppliesNodeLabel;
-import static dev.dediren.plugins.render.svg.Svg.attr;
 import static dev.dediren.plugins.render.svg.Svg.styleNumber;
 import static dev.dediren.plugins.render.svg.Svg.text;
 
@@ -10,6 +9,7 @@ import dev.dediren.contracts.layout.LaidOutNode;
 import dev.dediren.contracts.render.RenderMetadataSelector;
 import dev.dediren.contracts.render.SvgNodeDecorator;
 import dev.dediren.plugins.render.style.ResolvedNodeStyle;
+import dev.dediren.plugins.render.svg.SvgWriter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -19,48 +19,47 @@ public final class UmlDecorators {
 
   private UmlDecorators() {}
 
-  public static String umlNodeDecorator(
+  public static void umlNodeDecorator(
+      SvgWriter w,
       LaidOutNode node,
       ResolvedNodeStyle style,
       SvgNodeDecorator decorator,
       RenderMetadataSelector selector) {
-    String name = decoratorName(decorator);
-    String body = "";
+    w.start("g").attr("data-dediren-node-decorator", decoratorName(decorator));
     // Actor is in umlDecoratorSuppliesNodeLabel (so the generic plain label is
     // suppressed) but supplies its own label below the figure, not classifier
     // notation — so it is excluded from this classifier branch and handled below.
     if (umlDecoratorSuppliesNodeLabel(decorator) && decorator != SvgNodeDecorator.UML_ACTOR) {
-      body = umlClassifierNotation(node, style, decorator, selector);
+      umlClassifierNotation(w, node, style, decorator, selector);
     } else if (decorator == SvgNodeDecorator.UML_PACKAGE) {
-      body =
-          String.format(
-              Locale.ROOT,
-              "<text x=\"%.1f\" y=\"%.1f\" fill=\"%s\" font-size=\"12\">%s</text>",
-              node.x() + 8.0,
-              node.y() + 16.0,
-              attr(style.labelFill()),
-              text(node.label()));
+      w.start("text")
+          .attr("x", f1(node.x() + 8.0))
+          .attr("y", f1(node.y() + 16.0))
+          .attr("fill", style.labelFill())
+          .attr("font-size", "12")
+          .text(node.label())
+          .end();
     } else if (decorator == SvgNodeDecorator.UML_ACTOR) {
-      body =
-          String.format(
-              Locale.ROOT,
-              "<text x=\"%.1f\" y=\"%.1f\" text-anchor=\"middle\" fill=\"%s\" font-size=\"12\">%s</text>",
-              node.x() + node.width() / 2.0,
-              node.y() + node.height() - 8.0,
-              attr(style.labelFill()),
-              text(node.label()));
+      w.start("text")
+          .attr("x", f1(node.x() + node.width() / 2.0))
+          .attr("y", f1(node.y() + node.height() - 8.0))
+          .attr("text-anchor", "middle")
+          .attr("fill", style.labelFill())
+          .attr("font-size", "12")
+          .text(node.label())
+          .end();
     } else if (decorator == SvgNodeDecorator.UML_COMPONENT) {
-      body = umlComponentGlyph(node, style);
+      umlComponentGlyph(w, node, style);
     } else if (decorator == SvgNodeDecorator.UML_DEVICE
         || decorator == SvgNodeDecorator.UML_EXECUTION_ENVIRONMENT
         || decorator == SvgNodeDecorator.UML_DEPLOYMENT_SPECIFICATION) {
-      body = umlStereotypeLabel(node, style, decorator);
+      umlStereotypeLabel(w, node, style, decorator);
     }
-    return "<g data-dediren-node-decorator=\"" + attr(name) + "\">" + body + "</g>";
+    w.end();
   }
 
-  public static String umlStereotypeLabel(
-      LaidOutNode node, ResolvedNodeStyle style, SvgNodeDecorator decorator) {
+  public static void umlStereotypeLabel(
+      SvgWriter w, LaidOutNode node, ResolvedNodeStyle style, SvgNodeDecorator decorator) {
     String stereotype =
         switch (decorator) {
           case UML_DEVICE -> "&#171;device&#187;";
@@ -68,54 +67,42 @@ public final class UmlDecorators {
           case UML_DEPLOYMENT_SPECIFICATION -> "&#171;deployment spec&#187;";
           default -> "";
         };
-    return String.format(
-        Locale.ROOT,
-        "<text x=\"%.1f\" y=\"%.1f\" text-anchor=\"middle\" fill=\"%s\" font-size=\"11\">%s</text>",
-        node.x() + node.width() / 2.0,
-        node.y() + 17.0,
-        attr(style.labelFill()),
-        stereotype);
+    w.start("text")
+        .attr("x", f1(node.x() + node.width() / 2.0))
+        .attr("y", f1(node.y() + 17.0))
+        .attr("text-anchor", "middle")
+        .attr("fill", style.labelFill())
+        .attr("font-size", "11")
+        .raw(stereotype)
+        .end();
   }
 
-  public static String umlComponentGlyph(LaidOutNode node, ResolvedNodeStyle style) {
+  public static void umlComponentGlyph(SvgWriter w, LaidOutNode node, ResolvedNodeStyle style) {
     double glyphWidth = Math.min(28.0, Math.max(18.0, node.width() * 0.18));
     double glyphHeight = Math.min(24.0, Math.max(16.0, node.height() * 0.22));
     double x = node.x() + node.width() - glyphWidth - 10.0;
     double y = node.y() + 10.0;
     double tabWidth = glyphWidth * 0.32;
     double tabHeight = glyphHeight * 0.28;
-    String fill = attr(style.fill());
-    String stroke = attr(style.stroke());
-    String width = styleNumber(style.strokeWidth());
-    return String.format(
-        Locale.ROOT,
-        "<rect x=\"%.1f\" y=\"%.1f\" width=\"%.1f\" height=\"%.1f\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%s\"/>"
-            + "<rect x=\"%.1f\" y=\"%.1f\" width=\"%.1f\" height=\"%.1f\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%s\"/>"
-            + "<rect x=\"%.1f\" y=\"%.1f\" width=\"%.1f\" height=\"%.1f\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%s\"/>",
-        x,
-        y,
-        glyphWidth,
-        glyphHeight,
-        fill,
-        stroke,
-        width,
-        x - tabWidth * 0.45,
-        y + glyphHeight * 0.22,
-        tabWidth,
-        tabHeight,
-        fill,
-        stroke,
-        width,
-        x - tabWidth * 0.45,
-        y + glyphHeight * 0.58,
-        tabWidth,
-        tabHeight,
-        fill,
-        stroke,
-        width);
+    componentRect(w, x, y, glyphWidth, glyphHeight, style);
+    componentRect(w, x - tabWidth * 0.45, y + glyphHeight * 0.22, tabWidth, tabHeight, style);
+    componentRect(w, x - tabWidth * 0.45, y + glyphHeight * 0.58, tabWidth, tabHeight, style);
   }
 
-  public static String umlClassifierNotation(
+  private static void componentRect(
+      SvgWriter w, double x, double y, double width, double height, ResolvedNodeStyle style) {
+    w.empty("rect")
+        .attr("x", f1(x))
+        .attr("y", f1(y))
+        .attr("width", f1(width))
+        .attr("height", f1(height))
+        .attr("fill", style.fill())
+        .attr("stroke", style.stroke())
+        .attr("stroke-width", styleNumber(style.strokeWidth()));
+  }
+
+  public static void umlClassifierNotation(
+      SvgWriter w,
       LaidOutNode node,
       ResolvedNodeStyle style,
       SvgNodeDecorator decorator,
@@ -142,68 +129,57 @@ public final class UmlDecorators {
     double firstSeparatorY = node.y() + titleHeight;
     double secondSeparatorY = firstSeparatorY + attributeHeight;
 
-    StringBuilder svg = new StringBuilder();
     if (!attributeLines.isEmpty() || !operationLines.isEmpty()) {
-      svg.append(
-          String.format(
-              Locale.ROOT,
-              "<line x1=\"%.1f\" y1=\"%.1f\" x2=\"%.1f\" y2=\"%.1f\" stroke=\"%s\" stroke-width=\"%s\"/>",
-              node.x(),
-              firstSeparatorY,
-              node.x() + node.width(),
-              firstSeparatorY,
-              attr(style.stroke()),
-              styleNumber(style.strokeWidth())));
+      separatorLine(w, node, firstSeparatorY, style);
     }
     if (!operationLines.isEmpty()) {
-      svg.append(
-          String.format(
-              Locale.ROOT,
-              "<line x1=\"%.1f\" y1=\"%.1f\" x2=\"%.1f\" y2=\"%.1f\" stroke=\"%s\" stroke-width=\"%s\"/>",
-              node.x(),
-              secondSeparatorY,
-              node.x() + node.width(),
-              secondSeparatorY,
-              attr(style.stroke()),
-              styleNumber(style.strokeWidth())));
+      separatorLine(w, node, secondSeparatorY, style);
     }
     double y = node.y() + 15.0;
     for (String line : titleLines) {
-      svg.append(
-          String.format(
-              Locale.ROOT,
-              "<text x=\"%.1f\" y=\"%.1f\" text-anchor=\"middle\" fill=\"%s\" font-size=\"12\">%s</text>",
-              node.x() + node.width() / 2.0,
-              y,
-              attr(style.labelFill()),
-              line));
+      w.start("text")
+          .attr("x", f1(node.x() + node.width() / 2.0))
+          .attr("y", f1(y))
+          .attr("text-anchor", "middle")
+          .attr("fill", style.labelFill())
+          .attr("font-size", "12")
+          .raw(line)
+          .end();
       y += 15.0;
     }
     y = firstSeparatorY + 15.0;
     for (String line : attributeLines) {
-      svg.append(
-          String.format(
-              Locale.ROOT,
-              "<text x=\"%.1f\" y=\"%.1f\" fill=\"%s\" font-size=\"12\">%s</text>",
-              node.x() + 8.0,
-              y,
-              attr(style.labelFill()),
-              text(line)));
+      w.start("text")
+          .attr("x", f1(node.x() + 8.0))
+          .attr("y", f1(y))
+          .attr("fill", style.labelFill())
+          .attr("font-size", "12")
+          .text(line)
+          .end();
       y += 14.0;
     }
     y = secondSeparatorY + 15.0;
     for (String line : operationLines) {
-      svg.append(
-          String.format(
-              Locale.ROOT,
-              "<text x=\"%.1f\" y=\"%.1f\" fill=\"%s\" font-size=\"12\">%s</text>",
-              node.x() + 8.0,
-              y,
-              attr(style.labelFill()),
-              text(line)));
+      w.start("text")
+          .attr("x", f1(node.x() + 8.0))
+          .attr("y", f1(y))
+          .attr("fill", style.labelFill())
+          .attr("font-size", "12")
+          .text(line)
+          .end();
       y += 14.0;
     }
-    return svg.toString();
+  }
+
+  private static void separatorLine(
+      SvgWriter w, LaidOutNode node, double lineY, ResolvedNodeStyle style) {
+    w.empty("line")
+        .attr("x1", f1(node.x()))
+        .attr("y1", f1(lineY))
+        .attr("x2", f1(node.x() + node.width()))
+        .attr("y2", f1(lineY))
+        .attr("stroke", style.stroke())
+        .attr("stroke-width", styleNumber(style.strokeWidth()));
   }
 
   public static List<String> umlAttributeLines(JsonNode properties) {
@@ -278,5 +254,9 @@ public final class UmlDecorators {
   public static String textField(JsonNode value, String field, String fallback) {
     JsonNode fieldValue = value == null ? null : value.get(field);
     return fieldValue != null && fieldValue.isTextual() ? fieldValue.asText() : fallback;
+  }
+
+  private static String f1(double value) {
+    return String.format(Locale.ROOT, "%.1f", value);
   }
 }

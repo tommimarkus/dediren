@@ -201,7 +201,7 @@ public final class SvgDocument {
       }
       nodeDecorator(w, node, style, selector);
       if (shouldRenderPlainNodeLabel(node, style.decorator())) {
-        w.raw(nodeLabel(node, style, base.fontSize()));
+        nodeLabel(w, node, style, base.fontSize());
       }
       w.end();
     }
@@ -332,7 +332,7 @@ public final class SvgDocument {
       return;
     }
     if (isUmlDecorator(decorator)) {
-      w.raw(umlNodeDecorator(node, style, decorator, selector));
+      umlNodeDecorator(w, node, style, decorator, selector);
       return;
     }
     w.raw(archimateNodeDecorator(node, style, decorator));
