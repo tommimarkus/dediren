@@ -11,6 +11,7 @@ import dev.dediren.ir.Axis;
 import dev.dediren.ir.BandMember;
 import dev.dediren.ir.LayoutIntent;
 import dev.dediren.ir.LayoutIntent.OrderedBand;
+import dev.dediren.ir.LayoutIntent.StemSpan;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -307,6 +308,184 @@ class LayoutIntentNormalizerTest {
                 "m3")),
         List.of(),
         List.of());
+  }
+
+  @Test
+  void executionSpecificationSitsOnItsLifelineStemSpanningItsRows() {
+    LayoutResult out =
+        LayoutIntentNormalizer.from(lifecycleIntents(), Map.of(), Map.of())
+            .normalize(lifecycleResult());
+
+    LaidOutNode exec = node(out, "exec-b");
+    assertThat(exec.x()).isEqualTo(306.0 - 16.0 / 2); // centred on b's stem (306)
+    assertThat(exec.y()).isEqualTo(72.0); // m1's row
+    assertThat(exec.height()).isEqualTo(24.0); // m2(96) - m1(72)
+  }
+
+  @Test
+  void destructionSitsCentredOnItsLifelineStemAtTheDeleteMessageRow() {
+    LayoutResult out =
+        LayoutIntentNormalizer.from(lifecycleIntents(), Map.of(), Map.of())
+            .normalize(lifecycleResult());
+
+    LaidOutNode x = node(out, "destroy-b");
+    assertThat(x.x()).isEqualTo(306.0 - 24.0 / 2); // centred on b's stem
+    assertThat(x.y()).isEqualTo(120.0 - 24.0 / 2); // centred on m3's row
+  }
+
+  @Test
+  void deleteMessageRunsFromTheSourceStemToTheDestructionsLeftEdge() {
+    LayoutResult out =
+        LayoutIntentNormalizer.from(lifecycleIntents(), Map.of(), Map.of())
+            .normalize(lifecycleResult());
+
+    List<Point> pts = edge(out, "m3").points();
+    assertThat(pts)
+        .containsExactly(
+            new Point(70.0, 120.0), // a's stem
+            new Point(306.0 - 24.0 / 2, 120.0)); // the destruction's LEFT EDGE (perimeter)
+  }
+
+  @Test
+  void stemSpanNodesKeepTheirSourcePointerProvenance() {
+    // The placement pass rebuilds the node record; the source pointer must survive it exactly as
+    // normalizedLifelineNodes re-threads it.
+    LayoutResult out =
+        LayoutIntentNormalizer.from(
+                lifecycleIntents(),
+                Map.of("exec-b", "$.nodes[2]", "destroy-b", "$.nodes[3]"),
+                Map.of())
+            .normalize(lifecycleResult());
+
+    assertThat(node(out, "exec-b").sourcePointer()).isEqualTo("$.nodes[2]");
+    assertThat(node(out, "destroy-b").sourcePointer()).isEqualTo("$.nodes[3]");
+  }
+
+  @Test
+  void interactionFrameEnclosesThePlacedExecutionAndDestruction() {
+    LayoutResult out =
+        LayoutIntentNormalizer.from(lifecycleIntentsWithFrame(), Map.of(), Map.of())
+            .normalize(lifecycleResultWithFrame());
+
+    LaidOutNode frame = node(out, "frame");
+    LaidOutNode exec = node(out, "exec-b");
+    LaidOutNode destruction = node(out, "destroy-b");
+    for (LaidOutNode chrome : List.of(exec, destruction)) {
+      assertThat(chrome.x()).isGreaterThanOrEqualTo(frame.x());
+      assertThat(chrome.y()).isGreaterThanOrEqualTo(frame.y());
+      assertThat(chrome.x() + chrome.width()).isLessThanOrEqualTo(frame.x() + frame.width());
+      assertThat(chrome.y() + chrome.height()).isLessThanOrEqualTo(frame.y() + frame.height());
+    }
+    // the destruction (bottom 132) sits below the last message row (120), so it must have pushed
+    // the frame's bottom edge down past the route-derived bound
+    assertThat(frame.y() + frame.height()).isEqualTo(132.0);
+  }
+
+  @Test
+  void orphanDestructionSitsOneStepBelowTheLastMessageRow() {
+    // The empty from/to convention: no message targets the destruction, so it anchors one
+    // MESSAGE_Y_STEP (24) below the last message row (m2 = 96) -> centred on y=120.
+    LayoutResult out =
+        LayoutIntentNormalizer.from(orphanDestructionIntents(), Map.of(), Map.of())
+            .normalize(orphanDestructionResult());
+
+    LaidOutNode x = node(out, "destroy-b");
+    assertThat(x.x()).isEqualTo(306.0 - 24.0 / 2);
+    assertThat(x.y()).isEqualTo(96.0 + 24.0 - 24.0 / 2);
+  }
+
+  private static List<LayoutIntent> lifecycleIntents() {
+    // lifelines a (x=0,w=140 -> stem 70) and b (x=236,w=140 -> stem 306); messages m1 (a->b),
+    // m2 (a->b), m3 (a->destroy-b, the delete-message). exec-b spans m1..m2 on b; destroy-b is
+    // point-anchored on b at m3's row.
+    return List.of(
+        new OrderedBand(Axis.X, List.of(new BandMember("a", 0.0), new BandMember("b", 0.0))),
+        new OrderedBand(
+            Axis.Y,
+            List.of(
+                new BandMember("m1", 0.0), new BandMember("m2", 0.0), new BandMember("m3", 0.0))),
+        new StemSpan("exec-b", "b", "m1", "m2"),
+        new StemSpan("destroy-b", "b", "m3", "m3"));
+  }
+
+  private static LayoutResult lifecycleResult() {
+    // ELK leaves the two chrome nodes disconnected at the canvas origin (12,12) -- exactly the
+    // defect this normalizer fixes.
+    return new LayoutResult(
+        ContractVersions.LAYOUT_RESULT_SCHEMA_VERSION,
+        "sequence-view",
+        List.of(
+            new LaidOutNode("a", "a", "a", 0.0, 0.0, 140.0, 48.0, "A", "lifeline"),
+            new LaidOutNode("b", "b", "b", 236.0, 0.0, 140.0, 48.0, "B", "lifeline"),
+            new LaidOutNode(
+                "exec-b", "exec-b", "exec-b", 12.0, 12.0, 16.0, 72.0, null, "execution"),
+            new LaidOutNode(
+                "destroy-b",
+                "destroy-b",
+                "destroy-b",
+                12.0,
+                12.0,
+                24.0,
+                24.0,
+                null,
+                "destruction")),
+        List.of(
+            message("m1", "a", "b", new Point(70.0, 60.0), new Point(306.0, 60.0)),
+            message("m2", "a", "b", new Point(70.0, 90.0), new Point(306.0, 90.0)),
+            message("m3", "a", "destroy-b", new Point(70.0, 120.0), new Point(411.0, 120.0))),
+        List.of(),
+        List.of());
+  }
+
+  private static List<LayoutIntent> lifecycleIntentsWithFrame() {
+    return lifecycleIntents();
+  }
+
+  private static LayoutResult lifecycleResultWithFrame() {
+    List<LaidOutNode> nodes = new java.util.ArrayList<>(lifecycleResult().nodes());
+    nodes.add(new LaidOutNode("frame", "frame", "frame", 0.0, 0.0, 1.0, 1.0, "sd", "interaction"));
+    return new LayoutResult(
+        ContractVersions.LAYOUT_RESULT_SCHEMA_VERSION,
+        "sequence-view",
+        List.copyOf(nodes),
+        lifecycleResult().edges(),
+        List.of(),
+        List.of());
+  }
+
+  private static List<LayoutIntent> orphanDestructionIntents() {
+    return List.of(
+        new OrderedBand(Axis.X, List.of(new BandMember("a", 0.0), new BandMember("b", 0.0))),
+        new OrderedBand(Axis.Y, List.of(new BandMember("m1", 0.0), new BandMember("m2", 0.0))),
+        new StemSpan("destroy-b", "b", "", ""));
+  }
+
+  private static LayoutResult orphanDestructionResult() {
+    return new LayoutResult(
+        ContractVersions.LAYOUT_RESULT_SCHEMA_VERSION,
+        "sequence-view",
+        List.of(
+            new LaidOutNode("a", "a", "a", 0.0, 0.0, 140.0, 48.0, "A", "lifeline"),
+            new LaidOutNode("b", "b", "b", 236.0, 0.0, 140.0, 48.0, "B", "lifeline"),
+            new LaidOutNode(
+                "destroy-b",
+                "destroy-b",
+                "destroy-b",
+                12.0,
+                12.0,
+                24.0,
+                24.0,
+                null,
+                "destruction")),
+        List.of(
+            message("m1", "a", "b", new Point(70.0, 60.0), new Point(306.0, 60.0)),
+            message("m2", "a", "b", new Point(70.0, 90.0), new Point(306.0, 90.0))),
+        List.of(),
+        List.of());
+  }
+
+  private static LaidOutEdge message(String id, String source, String target, Point... points) {
+    return new LaidOutEdge(id, source, target, id, id, List.of(), List.of(points), id);
   }
 
   private static LayoutResult twoLifelineMessageWithBendPoints() {
