@@ -162,6 +162,52 @@ class LayoutIntentNormalizerTest {
     assertThat(m3Y).isGreaterThanOrEqualTo(m2Top + 24.0);
   }
 
+  @Test
+  void consecutiveSelfMessagesEachGetOwnYLatticeClearance() {
+    // m1 (b->b) and m2 (b->b) are both self-messages, back to back, then m3 (b->a) is a plain
+    // cross-lifeline message. The running accumulator in normalizedMessageYSlots must clear EACH
+    // self-message's hook, not just the first: this pins the compounding effect the review flagged
+    // as hand-traced-only.
+    LayoutResult normalized =
+        LayoutIntentNormalizer.from(consecutiveSelfMessagesIntents(), Map.of(), Map.of())
+            .normalize(consecutiveSelfMessagesResult());
+
+    // headBottom = max(node.y() + node.height()) = 48.0; Y0 = headBottom + MESSAGE_HEAD_GAP(24)
+    double y0 = 72.0;
+    List<Point> m1Hook = edge(normalized, "m1").points();
+    List<Point> m2Hook = edge(normalized, "m2").points();
+    List<Point> m3Points = edge(normalized, "m3").points();
+
+    double m1SlotY = m1Hook.get(0).y();
+    double m2SlotY = m2Hook.get(0).y();
+    double m3SlotY = m3Points.get(0).y();
+
+    assertThat(m1SlotY).isEqualTo(y0);
+    // m2 must clear m1's hook: Y0 + MESSAGE_Y_STEP(24) + SELF_MESSAGE_LOOP_HEIGHT(24) = Y0 + 48
+    assertThat(m2SlotY).isEqualTo(y0 + 48.0);
+    // m3 must clear m2's hook too: Y0 + 48 + MESSAGE_Y_STEP(24) + SELF_MESSAGE_LOOP_HEIGHT(24)
+    assertThat(m3SlotY).isEqualTo(y0 + 96.0);
+
+    // Non-collision: each self-message's hook lower leg (slotY + 24) sits strictly above the next
+    // message's slot y, so the compounding reservation genuinely keeps the geometry apart.
+    assertThat(m1SlotY + 24.0).isLessThan(m2SlotY);
+    assertThat(m2SlotY + 24.0).isLessThan(m3SlotY);
+
+    assertThat(m1Hook)
+        .containsExactly(
+            new Point(306.0, y0),
+            new Point(346.0, y0),
+            new Point(346.0, y0 + 24.0),
+            new Point(306.0, y0 + 24.0));
+    assertThat(m2Hook)
+        .containsExactly(
+            new Point(306.0, y0 + 48.0),
+            new Point(346.0, y0 + 48.0),
+            new Point(346.0, y0 + 72.0),
+            new Point(306.0, y0 + 72.0));
+    assertThat(m3Points).containsExactly(new Point(306.0, y0 + 96.0), new Point(70.0, y0 + 96.0));
+  }
+
   private static List<LayoutIntent> selfMessageIntents() {
     // two lifelines a (x=0,width=140 -> stemX=70) and b (x=236,width=140 -> stemX=306), three
     // ordered messages m1 (a->b), m2 (b->b, self), m3 (b->a).
@@ -189,6 +235,57 @@ class LayoutIntentNormalizerTest {
                 "m1",
                 List.of(),
                 List.of(new Point(70.0, 60.0), new Point(306.0, 60.0)),
+                "m1"),
+            new LaidOutEdge(
+                "m2",
+                "b",
+                "b",
+                "m2",
+                "m2",
+                List.of(),
+                List.of(new Point(306.0, 90.0), new Point(306.0, 90.0)),
+                "m2"),
+            new LaidOutEdge(
+                "m3",
+                "b",
+                "a",
+                "m3",
+                "m3",
+                List.of(),
+                List.of(new Point(306.0, 120.0), new Point(70.0, 120.0)),
+                "m3")),
+        List.of(),
+        List.of());
+  }
+
+  private static List<LayoutIntent> consecutiveSelfMessagesIntents() {
+    // same two lifelines a (stemX=70) and b (stemX=306) as selfMessageIntents(), but now the
+    // FIRST TWO ordered messages are both self-messages on b (m1 b->b, m2 b->b) before the
+    // trailing cross-lifeline m3 (b->a).
+    return List.of(
+        new OrderedBand(Axis.X, List.of(new BandMember("a", 0.0), new BandMember("b", 0.0))),
+        new OrderedBand(
+            Axis.Y,
+            List.of(
+                new BandMember("m1", 0.0), new BandMember("m2", 0.0), new BandMember("m3", 0.0))));
+  }
+
+  private static LayoutResult consecutiveSelfMessagesResult() {
+    return new LayoutResult(
+        ContractVersions.LAYOUT_RESULT_SCHEMA_VERSION,
+        "sequence-view",
+        List.of(
+            new LaidOutNode("a", "a", "a", 0.0, 0.0, 140.0, 48.0, "A", "lifeline"),
+            new LaidOutNode("b", "b", "b", 236.0, 0.0, 140.0, 48.0, "B", "lifeline")),
+        List.of(
+            new LaidOutEdge(
+                "m1",
+                "b",
+                "b",
+                "m1",
+                "m1",
+                List.of(),
+                List.of(new Point(306.0, 60.0), new Point(306.0, 60.0)),
                 "m1"),
             new LaidOutEdge(
                 "m2",
