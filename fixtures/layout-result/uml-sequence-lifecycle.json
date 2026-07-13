@@ -1,0 +1,138 @@
+{
+  "layout_result_schema_version" : "layout-result.schema.v2",
+  "view_id" : "sequence-view",
+  "nodes" : [ {
+    "id" : "interaction-lifecycle",
+    "source_id" : "interaction-lifecycle",
+    "projection_id" : "interaction-lifecycle",
+    "x" : 101.0,
+    "y" : 292.0,
+    "width" : 612.0,
+    "height" : 144.0,
+    "label" : "Worker Lifecycle",
+    "role" : "interaction",
+    "source_pointer" : "/nodes/0"
+  }, {
+    "id" : "customer",
+    "source_id" : "customer",
+    "projection_id" : "customer",
+    "x" : 101.0,
+    "y" : 292.0,
+    "width" : 140.0,
+    "height" : 48.0,
+    "label" : "Customer",
+    "role" : "lifeline",
+    "source_pointer" : "/nodes/1"
+  }, {
+    "id" : "service",
+    "source_id" : "service",
+    "projection_id" : "service",
+    "x" : 337.0,
+    "y" : 292.0,
+    "width" : 140.0,
+    "height" : 48.0,
+    "label" : "Order Service",
+    "role" : "lifeline",
+    "source_pointer" : "/nodes/2"
+  }, {
+    "id" : "worker",
+    "source_id" : "worker",
+    "projection_id" : "worker",
+    "x" : 573.0,
+    "y" : 292.0,
+    "width" : 140.0,
+    "height" : 48.0,
+    "label" : "Worker",
+    "role" : "lifeline",
+    "source_pointer" : "/nodes/3"
+  }, {
+    "id" : "exec-service",
+    "source_id" : "exec-service",
+    "projection_id" : "exec-service",
+    "x" : 399.0,
+    "y" : 364.0,
+    "width" : 16.0,
+    "height" : 72.0,
+    "label" : "Order Service Activation",
+    "role" : "execution",
+    "source_pointer" : "/nodes/4"
+  }, {
+    "id" : "worker-destroyed",
+    "source_id" : "worker-destroyed",
+    "projection_id" : "worker-destroyed",
+    "x" : 631.0,
+    "y" : 400.0,
+    "width" : 24.0,
+    "height" : 24.0,
+    "label" : "Worker Destroyed",
+    "role" : "destruction",
+    "source_pointer" : "/nodes/5"
+  } ],
+  "edges" : [ {
+    "id" : "m1",
+    "source" : "customer",
+    "target" : "service",
+    "source_id" : "m1",
+    "projection_id" : "m1",
+    "routing_hints" : [ ],
+    "points" : [ {
+      "x" : 171.0,
+      "y" : 364.0
+    }, {
+      "x" : 407.0,
+      "y" : 364.0
+    } ],
+    "label" : "placeOrder",
+    "source_pointer" : "/relationships/0"
+  }, {
+    "id" : "m2",
+    "source" : "service",
+    "target" : "worker",
+    "source_id" : "m2",
+    "projection_id" : "m2",
+    "routing_hints" : [ ],
+    "points" : [ {
+      "x" : 407.0,
+      "y" : 388.0
+    }, {
+      "x" : 643.0,
+      "y" : 388.0
+    } ],
+    "label" : "createWorker",
+    "source_pointer" : "/relationships/1"
+  }, {
+    "id" : "m3",
+    "source" : "service",
+    "target" : "worker-destroyed",
+    "source_id" : "m3",
+    "projection_id" : "m3",
+    "routing_hints" : [ ],
+    "points" : [ {
+      "x" : 407.0,
+      "y" : 412.0
+    }, {
+      "x" : 631.0,
+      "y" : 412.0
+    } ],
+    "label" : "destroyWorker",
+    "source_pointer" : "/relationships/2"
+  }, {
+    "id" : "m4",
+    "source" : "service",
+    "target" : "customer",
+    "source_id" : "m4",
+    "projection_id" : "m4",
+    "routing_hints" : [ ],
+    "points" : [ {
+      "x" : 407.0,
+      "y" : 436.0
+    }, {
+      "x" : 171.0,
+      "y" : 436.0
+    } ],
+    "label" : "orderComplete",
+    "source_pointer" : "/relationships/3"
+  } ],
+  "groups" : [ ],
+  "warnings" : [ ]
+}

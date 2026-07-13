@@ -174,6 +174,42 @@ class CliBuildCommandTest {
   }
 
   @Test
+  void buildsASequenceViewWithAnExecutionSpecificationAndADestruction() throws Exception {
+    // Regression: an execution bar used to be dumped at the canvas origin (12,12) and a
+    // delete-message hard-failed the build (exit 2) with ROUTE_ENDPOINT_OFF_NODE_PERIMETER,
+    // because neither the bar nor the destruction was ever anchored to its lifeline.
+    Path root = workspaceRoot();
+    Path source = root.resolve("fixtures/source/valid-uml-sequence-lifecycle.json");
+    Path renderPolicy = root.resolve("fixtures/render-policy/uml-svg.json");
+    Path out = temp.resolve("lifecycle-out");
+
+    CliResult result =
+        Main.executeForTesting(
+            new String[] {
+              "build",
+              "--input",
+              source.toString(),
+              "--out",
+              out.toString(),
+              "--views",
+              "sequence-view",
+              "--render-policy",
+              renderPolicy.toString()
+            },
+            "");
+
+    assertThat(result.exitCode()).describedAs(result.stdout()).isZero();
+    JsonNode buildResult = assertBuildResultSchemaValid(result.stdout());
+    assertThat(buildResult.at("/status").asText()).isEqualTo("ok");
+    assertThat(buildResult.at("/diagnostics")).isEmpty();
+    assertThat(buildResult.at("/views/0/status").asText()).isEqualTo("ok");
+    assertThat(buildResult.at("/views/0/diagnostics")).isEmpty();
+    assertThat(buildResult.at("/views/0/artifacts/0/path").asText())
+        .isEqualTo("sequence-view/diagram.svg");
+    assertThat(Files.exists(out.resolve("sequence-view/diagram.svg"))).isTrue();
+  }
+
+  @Test
   void oefLaneWritesArchimateArtifactWithOfflineSchemaEnv() throws Exception {
     Path root = workspaceRoot();
     Path out = temp.resolve("oef-out");
