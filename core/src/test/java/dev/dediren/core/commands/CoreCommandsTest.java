@@ -2,11 +2,17 @@ package dev.dediren.core.commands;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dev.dediren.contracts.ContractVersions;
 import dev.dediren.contracts.Diagnostic;
 import dev.dediren.contracts.EnvelopeStatus;
 import dev.dediren.contracts.json.JsonSupport;
+import dev.dediren.contracts.layout.LaidOutEdge;
+import dev.dediren.contracts.layout.LaidOutNode;
 import dev.dediren.contracts.layout.LayoutRequest;
+import dev.dediren.contracts.layout.LayoutResult;
+import dev.dediren.contracts.layout.Point;
 import dev.dediren.core.plugins.PluginRunOutcome;
+import dev.dediren.core.source.ValidationResult;
 import dev.dediren.engine.EngineResult;
 import dev.dediren.engine.Engines;
 import dev.dediren.engine.LayoutEngine;
@@ -101,6 +107,97 @@ class CoreCommandsTest {
     assertThat(result.exitCode()).isZero();
     assertThat(result.envelope().status()).isEqualTo(EnvelopeStatus.OK);
     assertThat(result.envelope().diagnostics()).isEmpty();
+  }
+
+  @Test
+  void validateLayoutAcceptsAValidSequenceLayoutsInvariants() {
+    // Regression guard (Plan B P5, Task 6): a geometrically valid UML-sequence layout — two
+    // lifelines, three messages whose route-point endpoints sit exactly on the lifeline center-x
+    // axes and whose y strictly increases, no interaction frame — must still yield the "ok"
+    // verdict once SequenceInvariants is wired into the hard-error lane. Mirrors
+    // fixtures/layout-result/uml-sequence-validatable.json (also exercised end-to-end by
+    // CliLayoutRenderCommandTest#validateLayoutAcceptsSequenceLifelineMessageEndpoints).
+    var customer = lifeline("customer", 100.0, 100.0); // center-x = 170
+    var service = lifeline("service", 520.0, 104.0); // center-x = 590
+    var m1 = message("m1", "customer", "service", 170.0, 180.0, 590.0, 180.0);
+    var m2 = message("m2", "service", "customer", 590.0, 220.0, 170.0, 220.0);
+    var m3 = message("m3", "service", "customer", 590.0, 260.0, 170.0, 260.0);
+    LayoutResult result = layoutResult(List.of(customer, service), List.of(m1, m2, m3));
+
+    ValidationResult validation = CoreCommands.validateLayout(result);
+
+    assertThat(validation.exitCode()).isZero();
+    assertThat(validation.envelope().status()).isEqualTo(EnvelopeStatus.OK);
+    assertThat(validation.envelope().diagnostics()).isEmpty();
+  }
+
+  @Test
+  void validateLayoutRejectsAMessageEndpointOffTheLifelineAxis() {
+    // Negative case (Plan B P5, Task 6): the message's first route point sits on the SOURCE
+    // lifeline's box perimeter (left edge, y inside the box) rather than its center-x axis. The
+    // pre-existing LayoutQuality hard-error lane accepts this endpoint outright (on-perimeter is
+    // its own acceptance branch, independent of the lifeline-axis branch), so this specifically
+    // proves the new SequenceInvariants wiring catches a violation the old lane does not: without
+    // it, this layout would wrongly validate as "ok".
+    var customer = lifeline("customer", 100.0, 100.0); // box: x[100,240] y[100,148], center-x 170
+    var service = lifeline("service", 520.0, 100.0); // center-x = 590
+    var offAxisMessage =
+        new LaidOutEdge(
+            "m1",
+            "customer",
+            "service",
+            "m1",
+            "m1",
+            List.of(),
+            List.of(new Point(100.0, 120.0), new Point(590.0, 120.0)),
+            "placeOrder",
+            "/edges/0");
+    LayoutResult result = layoutResult(List.of(customer, service), List.of(offAxisMessage));
+
+    ValidationResult validation = CoreCommands.validateLayout(result);
+
+    assertThat(validation.exitCode()).isEqualTo(2);
+    assertThat(validation.envelope().status()).isEqualTo(EnvelopeStatus.ERROR);
+    assertThat(validation.envelope().diagnostics())
+        .extracting(Diagnostic::code)
+        .containsExactly("DEDIREN_LAYOUT_SEQUENCE_INVARIANT_VIOLATED");
+    Diagnostic diagnostic = validation.envelope().diagnostics().get(0);
+    assertThat(diagnostic.message()).contains("message_endpoints_on_lifeline_axis").contains("m1");
+    assertThat(diagnostic.path()).isEqualTo("$.edges[0]");
+    assertThat(diagnostic.sourcePointer()).isEqualTo("/edges/0");
+  }
+
+  private static LaidOutNode lifeline(String id, double x, double y) {
+    return new LaidOutNode(id, id, id, x, y, 140.0, 48.0, id, "lifeline");
+  }
+
+  private static LaidOutEdge message(
+      String id,
+      String source,
+      String target,
+      double firstX,
+      double firstY,
+      double lastX,
+      double lastY) {
+    return new LaidOutEdge(
+        id,
+        source,
+        target,
+        id,
+        id,
+        List.of(),
+        List.of(new Point(firstX, firstY), new Point(lastX, lastY)),
+        id);
+  }
+
+  private static LayoutResult layoutResult(List<LaidOutNode> nodes, List<LaidOutEdge> edges) {
+    return new LayoutResult(
+        ContractVersions.LAYOUT_RESULT_SCHEMA_VERSION,
+        "sequence-view",
+        nodes,
+        edges,
+        List.of(),
+        List.of());
   }
 
   @Test
