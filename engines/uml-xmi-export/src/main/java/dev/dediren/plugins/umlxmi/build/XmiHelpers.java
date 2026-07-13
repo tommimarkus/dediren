@@ -3,6 +3,7 @@ package dev.dediren.plugins.umlxmi.build;
 import dev.dediren.contracts.export.ExportRequest;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.contracts.layout.LaidOutGroup;
+import dev.dediren.contracts.layout.LaidOutGroups;
 import dev.dediren.contracts.source.GenericGraphPluginData;
 import dev.dediren.contracts.source.SourceNode;
 import dev.dediren.contracts.source.SourceRelationship;
@@ -163,14 +164,7 @@ public final class XmiHelpers {
   }
 
   public static String semanticGroupSourceId(LaidOutGroup group) {
-    if (group.provenance() == null) {
-      return group.sourceId();
-    }
-    if (group.provenance().visualOnly()) {
-      return null;
-    }
-    String sourceId = group.provenance().semanticSourceId();
-    return sourceId == null ? group.sourceId() : sourceId;
+    return LaidOutGroups.semanticSourceId(group);
   }
 
   public static String attr(String value) {

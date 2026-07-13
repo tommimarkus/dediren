@@ -31,6 +31,47 @@ class SchemaCacheModuleTest {
   }
 
   @Test
+  void aRelativeSchemaPathResolvesAgainstTheProductRootNotTheJvmCwd() {
+    // Decision 9: both export engines resolve a relative schema/cache env path against the product
+    // root so an in-memory build can supply it explicitly. The rule is shared, so it lives here
+    // once rather than in a copy per engine.
+    Path productRoot = Path.of("/x/y");
+
+    Map<String, String> resolved =
+        SchemaCacheModule.productRootRelativeEnv(
+            Map.of("DEDIREN_OEF_SCHEMA_DIR", "schemas-oef"), productRoot, "DEDIREN_OEF_SCHEMA_DIR");
+
+    assertThat(resolved.get("DEDIREN_OEF_SCHEMA_DIR"))
+        .isEqualTo(productRoot.resolve("schemas-oef").toString());
+  }
+
+  @Test
+  void anAbsoluteSchemaPathIsUnchangedByProductRootResolution() {
+    Path productRoot = Path.of("/x/y");
+    String absolute = tempDir.resolve("oef-schemas").toString();
+
+    Map<String, String> resolved =
+        SchemaCacheModule.productRootRelativeEnv(
+            Map.of("DEDIREN_OEF_SCHEMA_DIR", absolute), productRoot, "DEDIREN_OEF_SCHEMA_DIR");
+
+    assertThat(resolved.get("DEDIREN_OEF_SCHEMA_DIR")).isEqualTo(absolute);
+  }
+
+  @Test
+  void aConfiguredValidatorOverridesTheDefaultCommandUnlessItIsBlank() {
+    assertThat(SchemaCacheModule.configuredValidator(Map.of(), "DEDIREN_X_VALIDATOR", "xmllint"))
+        .isEqualTo("xmllint");
+    assertThat(
+            SchemaCacheModule.configuredValidator(
+                Map.of("DEDIREN_X_VALIDATOR", "  "), "DEDIREN_X_VALIDATOR", "xmllint"))
+        .isEqualTo("xmllint");
+    assertThat(
+            SchemaCacheModule.configuredValidator(
+                Map.of("DEDIREN_X_VALIDATOR", "/opt/xmllint"), "DEDIREN_X_VALIDATOR", "xmllint"))
+        .isEqualTo("/opt/xmllint");
+  }
+
+  @Test
   void ignoresEmptyEnvironmentValuesWhenResolvingPaths() {
     assertThat(SchemaCacheModule.nonEmptyEnvPath(Map.of("TEST_PATH", ""), "TEST_PATH")).isEmpty();
     assertThat(

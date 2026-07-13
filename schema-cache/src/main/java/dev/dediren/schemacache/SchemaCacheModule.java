@@ -8,6 +8,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 
@@ -28,6 +29,34 @@ public final class SchemaCacheModule {
       return Optional.empty();
     }
     return Optional.of(Path.of(value));
+  }
+
+  /**
+   * Decision 9 resolution site: rewrites the named relative schema/cache env values so they resolve
+   * against {@code productRoot} rather than the JVM cwd. {@link Path#resolve(Path)} returns an
+   * absolute value unchanged, so a caller that supplies the child cwd as the product root gets
+   * byte-identical behavior to a bare {@code Path.of(value)}.
+   *
+   * <p>Shared by both export engines. Engines may not depend on each other, so this lives in the
+   * schema-cache seam they both already depend on rather than in a copy apiece.
+   */
+  public static Map<String, String> productRootRelativeEnv(
+      Map<String, String> env, Path productRoot, String... pathEnvNames) {
+    Map<String, String> resolved = new LinkedHashMap<>(env);
+    for (String name : pathEnvNames) {
+      String value = env.get(name);
+      if (value != null && !value.isEmpty()) {
+        resolved.put(name, productRoot.resolve(value).toString());
+      }
+    }
+    return resolved;
+  }
+
+  /** Returns the validator command an env override names, or {@code defaultCommand} if unset. */
+  public static String configuredValidator(
+      Map<String, String> env, String validatorEnvName, String defaultCommand) {
+    String configured = env.get(validatorEnvName);
+    return configured == null || configured.isBlank() ? defaultCommand : configured;
   }
 
   public static boolean isNonEmptyFile(Path path) {

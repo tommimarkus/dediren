@@ -14,6 +14,7 @@ import dev.dediren.contracts.export.ExportResult;
 import dev.dediren.contracts.export.OefExportPolicy;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.contracts.layout.LaidOutGroup;
+import dev.dediren.contracts.layout.LaidOutGroups;
 import dev.dediren.contracts.layout.Point;
 import dev.dediren.contracts.source.GenericGraphPluginData;
 import dev.dediren.contracts.source.GenericGraphView;
@@ -24,10 +25,8 @@ import dev.dediren.engine.EngineResult;
 import dev.dediren.engine.ExportEngine;
 import dev.dediren.schemacache.SchemaCacheException;
 import dev.dediren.schemacache.SchemaCacheModule;
-import java.io.IOException;
-import java.io.OutputStream;
+import dev.dediren.schemacache.XmlSchemaValidator;
 import java.net.URI;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -64,6 +63,7 @@ public final class OefExportEngine implements ExportEngine {
   private static final String OEF_SCHEMA =
       "http://www.opengroup.org/xsd/archimate/3.1/archimate3_Diagram.xsd";
   static final String OEF_SCHEMA_VALIDATOR = "xmllint";
+  static final String OEF_SCHEMA_VALIDATOR_ENV = "DEDIREN_OEF_SCHEMA_VALIDATOR";
   private static final String OEF_SCHEMA_BASE_URL = "https://www.opengroup.org/xsd/archimate/3.1";
   static final String OEF_SCHEMA_DIR_ENV = "DEDIREN_OEF_SCHEMA_DIR";
   static final String SCHEMA_CACHE_DIR_ENV = "DEDIREN_SCHEMA_CACHE_DIR";
@@ -500,54 +500,22 @@ public final class OefExportEngine implements ExportEngine {
       throws OefSchemaValidationException {
     Path schemaDir = resolveOfficialOefSchemaDir(env, productRoot);
     Path schemaPath = schemaDir.resolve("archimate3_Diagram.xsd");
-    String validator = oefSchemaValidator(env);
-    Process process;
+    String validator =
+        SchemaCacheModule.configuredValidator(env, OEF_SCHEMA_VALIDATOR_ENV, OEF_SCHEMA_VALIDATOR);
+    XmlSchemaValidator.Outcome outcome;
     try {
-      process =
-          new ProcessBuilder(
-                  validator, "--nonet", "--noout", "--schema", schemaPath.toString(), "-")
-              .start();
-    } catch (IOException error) {
+      outcome = XmlSchemaValidator.validate(validator, schemaPath, content);
+    } catch (SchemaCacheException error) {
       throw new OefSchemaValidationException(
-          DiagnosticCode.OEF_SCHEMA_VALIDATOR_UNAVAILABLE.code(),
-          "failed to run official OEF schema validator " + validator + ": " + error.getMessage());
+          DiagnosticCode.OEF_SCHEMA_VALIDATOR_UNAVAILABLE.code(), error.getMessage());
     }
-    try (OutputStream stdin = process.getOutputStream()) {
-      stdin.write(content.getBytes(StandardCharsets.UTF_8));
-    } catch (IOException error) {
-      throw new OefSchemaValidationException(
-          DiagnosticCode.OEF_SCHEMA_VALIDATOR_UNAVAILABLE.code(),
-          "failed to write OEF XML to official OEF schema validator "
-              + validator
-              + ": "
-              + error.getMessage());
+    if (outcome.valid()) {
+      return;
     }
-    try {
-      byte[] stdout = process.getInputStream().readAllBytes();
-      byte[] stderr = process.getErrorStream().readAllBytes();
-      int exitCode = process.waitFor();
-      if (exitCode == 0) {
-        return;
-      }
-      throw new OefSchemaValidationException(
-          "DEDIREN_OEF_SCHEMA_INVALID",
-          "generated OEF XML does not validate against the official OEF schema: "
-              + SchemaCacheModule.commandOutputDetails(validator, exitCode, stdout, stderr));
-    } catch (IOException error) {
-      throw new OefSchemaValidationException(
-          DiagnosticCode.OEF_SCHEMA_VALIDATOR_UNAVAILABLE.code(),
-          "failed to read official OEF schema validator output: " + error.getMessage());
-    } catch (InterruptedException error) {
-      Thread.currentThread().interrupt();
-      throw new OefSchemaValidationException(
-          DiagnosticCode.OEF_SCHEMA_VALIDATOR_UNAVAILABLE.code(),
-          "official OEF schema validator interrupted");
-    }
-  }
-
-  private static String oefSchemaValidator(Map<String, String> env) {
-    String configured = env.get("DEDIREN_OEF_SCHEMA_VALIDATOR");
-    return configured == null || configured.isBlank() ? OEF_SCHEMA_VALIDATOR : configured;
+    throw new OefSchemaValidationException(
+        "DEDIREN_OEF_SCHEMA_INVALID",
+        "generated OEF XML does not validate against the official OEF schema: "
+            + outcome.details());
   }
 
   private static Path resolveOfficialOefSchemaDir(Map<String, String> env, Path productRoot)
@@ -586,22 +554,10 @@ public final class OefExportEngine implements ExportEngine {
     return schemaDir;
   }
 
-  /**
-   * Decision 9 resolution site: rewrites the named relative schema/cache env values so they resolve
-   * against {@code productRoot} rather than the JVM cwd. {@link Path#resolve(Path)} returns an
-   * absolute value unchanged, so a caller that supplies the child cwd as the product root gets
-   * byte-identical behavior to the historical bare {@code Path.of(value)}.
-   */
+  /** Resolves this engine's schema/cache env paths against the product root (Decision 9). */
   static Map<String, String> productRootRelativeEnv(
       Map<String, String> env, Path productRoot, String... pathEnvNames) {
-    Map<String, String> resolved = new LinkedHashMap<>(env);
-    for (String name : pathEnvNames) {
-      String value = env.get(name);
-      if (value != null && !value.isEmpty()) {
-        resolved.put(name, productRoot.resolve(value).toString());
-      }
-    }
-    return resolved;
+    return SchemaCacheModule.productRootRelativeEnv(env, productRoot, pathEnvNames);
   }
 
   private static void ensureOefSchemaFilesExist(Path schemaDir)
@@ -702,14 +658,7 @@ public final class OefExportEngine implements ExportEngine {
   }
 
   private static String semanticGroupSourceId(LaidOutGroup group) {
-    if (group.provenance() == null) {
-      return group.sourceId();
-    }
-    if (group.provenance().visualOnly()) {
-      return null;
-    }
-    String sourceId = group.provenance().semanticSourceId();
-    return sourceId == null ? group.sourceId() : sourceId;
+    return LaidOutGroups.semanticSourceId(group);
   }
 
   private static String formatNumber(double value) {
