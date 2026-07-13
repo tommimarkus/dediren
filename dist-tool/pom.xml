@@ -64,6 +64,18 @@
     </dependency>
   </dependencies>
 
+  <properties>
+    <!-- The four dist executions are declared once below and skipped by default; each profile just
+         flips its own switch on. They used to be copy-pasted per profile (the notices execution
+         appeared verbatim four times, dist-build three), so a change to an argument had to be made
+         in every copy or the profiles silently diverged. The documented command lines
+         (-Pdist-build, -Pdist-smoke, -Pdist-bench, -Pthird-party-notices) are unchanged. -->
+    <dist.notices.skip>true</dist.notices.skip>
+    <dist.build.skip>true</dist.build.skip>
+    <dist.smoke.skip>true</dist.smoke.skip>
+    <dist.bench.skip>true</dist.bench.skip>
+  </properties>
+
   <build>
     <plugins>
       <plugin>
@@ -73,6 +85,80 @@
           <mainClass>dev.dediren.tools.dist.DistTool</mainClass>
           <classpathScope>runtime</classpathScope>
         </configuration>
+        <executions>
+          <execution>
+            <id>third-party-notices</id>
+            <phase>verify</phase>
+            <goals>
+              <goal>java</goal>
+            </goals>
+            <configuration>
+              <skip>${dist.notices.skip}</skip>
+              <arguments>
+                <argument>notices</argument>
+                <argument>--root</argument>
+                <argument>${maven.multiModuleProjectDirectory}</argument>
+                <argument>--output</argument>
+                <argument>${project.build.directory}/reports/third-party/THIRD-PARTY-NOTICES.md</argument>
+              </arguments>
+            </configuration>
+          </execution>
+          <execution>
+            <id>dist-build</id>
+            <phase>verify</phase>
+            <goals>
+              <goal>java</goal>
+            </goals>
+            <configuration>
+              <skip>${dist.build.skip}</skip>
+              <arguments>
+                <argument>build</argument>
+                <argument>--root</argument>
+                <argument>${maven.multiModuleProjectDirectory}</argument>
+                <argument>--version</argument>
+                <argument>${project.version}</argument>
+                <argument>--notices</argument>
+                <argument>${project.build.directory}/reports/third-party/THIRD-PARTY-NOTICES.md</argument>
+              </arguments>
+            </configuration>
+          </execution>
+          <execution>
+            <id>dist-smoke</id>
+            <phase>verify</phase>
+            <goals>
+              <goal>java</goal>
+            </goals>
+            <configuration>
+              <skip>${dist.smoke.skip}</skip>
+              <arguments>
+                <argument>smoke</argument>
+                <argument>--root</argument>
+                <argument>${maven.multiModuleProjectDirectory}</argument>
+                <argument>--version</argument>
+                <argument>${project.version}</argument>
+              </arguments>
+            </configuration>
+          </execution>
+          <execution>
+            <id>dist-bench</id>
+            <phase>verify</phase>
+            <goals>
+              <goal>java</goal>
+            </goals>
+            <configuration>
+              <skip>${dist.bench.skip}</skip>
+              <arguments>
+                <argument>bench</argument>
+                <argument>--root</argument>
+                <argument>${maven.multiModuleProjectDirectory}</argument>
+                <argument>--version</argument>
+                <argument>${project.version}</argument>
+                <argument>--runs</argument>
+                <argument>5</argument>
+              </arguments>
+            </configuration>
+          </execution>
+        </executions>
       </plugin>
     </plugins>
   </build>
@@ -80,207 +166,32 @@
   <profiles>
     <profile>
       <id>third-party-notices</id>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>org.codehaus.mojo</groupId>
-            <artifactId>exec-maven-plugin</artifactId>
-            <executions>
-              <execution>
-                <id>third-party-notices</id>
-                <phase>verify</phase>
-                <goals>
-                  <goal>java</goal>
-                </goals>
-                <configuration>
-                  <arguments>
-                    <argument>notices</argument>
-                    <argument>--root</argument>
-                    <argument>${maven.multiModuleProjectDirectory}</argument>
-                    <argument>--output</argument>
-                    <argument>${project.build.directory}/reports/third-party/THIRD-PARTY-NOTICES.md</argument>
-                  </arguments>
-                </configuration>
-              </execution>
-            </executions>
-          </plugin>
-        </plugins>
-      </build>
+      <properties>
+        <dist.notices.skip>false</dist.notices.skip>
+      </properties>
     </profile>
     <profile>
       <id>dist-build</id>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>org.codehaus.mojo</groupId>
-            <artifactId>exec-maven-plugin</artifactId>
-            <executions>
-              <execution>
-                <id>third-party-notices</id>
-                <phase>verify</phase>
-                <goals>
-                  <goal>java</goal>
-                </goals>
-                <configuration>
-                  <arguments>
-                    <argument>notices</argument>
-                    <argument>--root</argument>
-                    <argument>${maven.multiModuleProjectDirectory}</argument>
-                    <argument>--output</argument>
-                    <argument>${project.build.directory}/reports/third-party/THIRD-PARTY-NOTICES.md</argument>
-                  </arguments>
-                </configuration>
-              </execution>
-              <execution>
-                <id>dist-build</id>
-                <phase>verify</phase>
-                <goals>
-                  <goal>java</goal>
-                </goals>
-                <configuration>
-                  <arguments>
-                    <argument>build</argument>
-                    <argument>--root</argument>
-                    <argument>${maven.multiModuleProjectDirectory}</argument>
-                    <argument>--version</argument>
-                    <argument>${project.version}</argument>
-                    <argument>--notices</argument>
-                    <argument>${project.build.directory}/reports/third-party/THIRD-PARTY-NOTICES.md</argument>
-                  </arguments>
-                </configuration>
-              </execution>
-            </executions>
-          </plugin>
-        </plugins>
-      </build>
+      <properties>
+        <dist.notices.skip>false</dist.notices.skip>
+        <dist.build.skip>false</dist.build.skip>
+      </properties>
     </profile>
     <profile>
       <id>dist-smoke</id>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>org.codehaus.mojo</groupId>
-            <artifactId>exec-maven-plugin</artifactId>
-            <executions>
-              <execution>
-                <id>third-party-notices</id>
-                <phase>verify</phase>
-                <goals>
-                  <goal>java</goal>
-                </goals>
-                <configuration>
-                  <arguments>
-                    <argument>notices</argument>
-                    <argument>--root</argument>
-                    <argument>${maven.multiModuleProjectDirectory}</argument>
-                    <argument>--output</argument>
-                    <argument>${project.build.directory}/reports/third-party/THIRD-PARTY-NOTICES.md</argument>
-                  </arguments>
-                </configuration>
-              </execution>
-              <execution>
-                <id>dist-build</id>
-                <phase>verify</phase>
-                <goals>
-                  <goal>java</goal>
-                </goals>
-                <configuration>
-                  <arguments>
-                    <argument>build</argument>
-                    <argument>--root</argument>
-                    <argument>${maven.multiModuleProjectDirectory}</argument>
-                    <argument>--version</argument>
-                    <argument>${project.version}</argument>
-                    <argument>--notices</argument>
-                    <argument>${project.build.directory}/reports/third-party/THIRD-PARTY-NOTICES.md</argument>
-                  </arguments>
-                </configuration>
-              </execution>
-              <execution>
-                <id>dist-smoke</id>
-                <phase>verify</phase>
-                <goals>
-                  <goal>java</goal>
-                </goals>
-                <configuration>
-                  <arguments>
-                    <argument>smoke</argument>
-                    <argument>--root</argument>
-                    <argument>${maven.multiModuleProjectDirectory}</argument>
-                    <argument>--version</argument>
-                    <argument>${project.version}</argument>
-                  </arguments>
-                </configuration>
-              </execution>
-            </executions>
-          </plugin>
-        </plugins>
-      </build>
+      <properties>
+        <dist.notices.skip>false</dist.notices.skip>
+        <dist.build.skip>false</dist.build.skip>
+        <dist.smoke.skip>false</dist.smoke.skip>
+      </properties>
     </profile>
     <profile>
       <id>dist-bench</id>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>org.codehaus.mojo</groupId>
-            <artifactId>exec-maven-plugin</artifactId>
-            <executions>
-              <execution>
-                <id>third-party-notices</id>
-                <phase>verify</phase>
-                <goals>
-                  <goal>java</goal>
-                </goals>
-                <configuration>
-                  <arguments>
-                    <argument>notices</argument>
-                    <argument>--root</argument>
-                    <argument>${maven.multiModuleProjectDirectory}</argument>
-                    <argument>--output</argument>
-                    <argument>${project.build.directory}/reports/third-party/THIRD-PARTY-NOTICES.md</argument>
-                  </arguments>
-                </configuration>
-              </execution>
-              <execution>
-                <id>dist-build</id>
-                <phase>verify</phase>
-                <goals>
-                  <goal>java</goal>
-                </goals>
-                <configuration>
-                  <arguments>
-                    <argument>build</argument>
-                    <argument>--root</argument>
-                    <argument>${maven.multiModuleProjectDirectory}</argument>
-                    <argument>--version</argument>
-                    <argument>${project.version}</argument>
-                    <argument>--notices</argument>
-                    <argument>${project.build.directory}/reports/third-party/THIRD-PARTY-NOTICES.md</argument>
-                  </arguments>
-                </configuration>
-              </execution>
-              <execution>
-                <id>dist-bench</id>
-                <phase>verify</phase>
-                <goals>
-                  <goal>java</goal>
-                </goals>
-                <configuration>
-                  <arguments>
-                    <argument>bench</argument>
-                    <argument>--root</argument>
-                    <argument>${maven.multiModuleProjectDirectory}</argument>
-                    <argument>--version</argument>
-                    <argument>${project.version}</argument>
-                    <argument>--runs</argument>
-                    <argument>5</argument>
-                  </arguments>
-                </configuration>
-              </execution>
-            </executions>
-          </plugin>
-        </plugins>
-      </build>
+      <properties>
+        <dist.notices.skip>false</dist.notices.skip>
+        <dist.build.skip>false</dist.build.skip>
+        <dist.bench.skip>false</dist.bench.skip>
+      </properties>
     </profile>
     <profile>
       <id>coverage</id>
