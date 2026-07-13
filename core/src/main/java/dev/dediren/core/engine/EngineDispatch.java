@@ -118,10 +118,13 @@ public final class EngineDispatch {
       // gone: catch Exception — wider than RuntimeException so even a sneaky-thrown checked
       // exception maps to the published diagnostic — but never Throwable, because Errors (OOM,
       // assertion failures) must crash loudly instead of being buried in an error envelope.
+      String detail =
+          error.getMessage() == null ? error.getClass().getSimpleName() : error.getMessage();
       throw EngineExecutionException.plugin(
           DiagnosticCode.ENGINE_FAILED.code(),
           engineId,
-          "engine " + engineId + " failed: " + error.getMessage());
+          "engine " + engineId + " failed: " + detail,
+          error);
     }
   }
 

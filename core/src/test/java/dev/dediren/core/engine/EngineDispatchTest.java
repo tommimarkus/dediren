@@ -240,6 +240,26 @@ class EngineDispatchTest {
   }
 
   @Test
+  void unexpectedEngineFailureKeepsTheCause() {
+    RuntimeException boom = new RuntimeException("boom");
+
+    assertThatThrownBy(
+            () ->
+                EngineDispatch.dispatchInMemory(
+                    "elk",
+                    () -> {
+                      throw boom;
+                    }))
+        .isInstanceOf(EngineExecutionException.class)
+        .satisfies(
+            error -> {
+              assertThat(error.getCause()).isSameAs(boom);
+              assertThat(((EngineExecutionException) error).diagnostic().code())
+                  .isEqualTo("DEDIREN_ENGINE_FAILED");
+            });
+  }
+
+  @Test
   void errorsPropagateInsteadOfBecomingEngineFailed() {
     // Errors (OOM, assertion failures) must crash loudly, never be buried in an error envelope.
     AssertionError boom = new AssertionError("engine invariant broken");

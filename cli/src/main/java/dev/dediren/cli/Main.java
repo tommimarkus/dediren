@@ -544,6 +544,9 @@ public final class Main {
 
   private static Integer writePluginError(CommandSpec spec, EngineExecutionException error)
       throws IOException {
+    if (error.getCause() != null) {
+      error.getCause().printStackTrace(spec.commandLine().getErr());
+    }
     return writeEnvelope(
         spec, CommandEnvelope.error(List.of(error.diagnostic())), CommandExitCode.PLUGIN_ERROR);
   }
