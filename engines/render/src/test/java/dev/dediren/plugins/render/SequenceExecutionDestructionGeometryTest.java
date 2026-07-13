@@ -32,81 +32,7 @@ class SequenceExecutionDestructionGeometryTest {
   // covering "worker", and four Messages -- m3 (destroyWorker) is the deleteMessage that must reach
   // the worker's destruction marker. No render-metadata fixture exists for this layout fixture yet
   // (same situation SequenceSelfMessageHookTest was in for uml-sequence-self-message.json), so this
-  // builds the metadata inline rather than inventing a new fixture file.
-  private static final String RENDER_METADATA =
-      """
-      {
-        "render_metadata_schema_version": "render-metadata.schema.v1",
-        "semantic_profile": "uml",
-        "nodes": {
-          "interaction-lifecycle": { "type": "Interaction", "source_id": "interaction-lifecycle" },
-          "customer": {
-            "type": "Lifeline",
-            "source_id": "customer",
-            "properties": { "interaction": "interaction-lifecycle" }
-          },
-          "service": {
-            "type": "Lifeline",
-            "source_id": "service",
-            "properties": { "interaction": "interaction-lifecycle" }
-          },
-          "worker": {
-            "type": "Lifeline",
-            "source_id": "worker",
-            "properties": { "interaction": "interaction-lifecycle" }
-          },
-          "exec-service": {
-            "type": "ExecutionSpecification",
-            "source_id": "exec-service",
-            "properties": { "interaction": "interaction-lifecycle", "covered": "service" }
-          },
-          "worker-destroyed": {
-            "type": "DestructionOccurrenceSpecification",
-            "source_id": "worker-destroyed",
-            "properties": { "interaction": "interaction-lifecycle", "covered": "worker" }
-          }
-        },
-        "edges": {
-          "m1": {
-            "type": "Message",
-            "source_id": "m1",
-            "properties": {
-              "interaction": "interaction-lifecycle",
-              "sequence": 1,
-              "message_sort": "synchCall"
-            }
-          },
-          "m2": {
-            "type": "Message",
-            "source_id": "m2",
-            "properties": {
-              "interaction": "interaction-lifecycle",
-              "sequence": 2,
-              "message_sort": "createMessage"
-            }
-          },
-          "m3": {
-            "type": "Message",
-            "source_id": "m3",
-            "properties": {
-              "interaction": "interaction-lifecycle",
-              "sequence": 3,
-              "message_sort": "deleteMessage"
-            }
-          },
-          "m4": {
-            "type": "Message",
-            "source_id": "m4",
-            "properties": {
-              "interaction": "interaction-lifecycle",
-              "sequence": 4,
-              "message_sort": "reply"
-            }
-          }
-        },
-        "groups": {}
-      }
-      """;
+  private static final String METADATA = "fixtures/render-metadata/uml-sequence-lifecycle.json";
 
   @Test
   void executionBarIsCentredOnItsLifelineStem() throws Exception {
@@ -177,7 +103,7 @@ class SequenceExecutionDestructionGeometryTest {
   private static Document render() throws Exception {
     ObjectNode input = JsonSupport.objectMapper().createObjectNode();
     input.set("layout_result", RenderTestSupport.fixtureJson(LAYOUT));
-    input.set("render_metadata", JsonSupport.objectMapper().readTree(RENDER_METADATA));
+    input.set("render_metadata", RenderTestSupport.fixtureJson(METADATA));
     input.set("policy", RenderTestSupport.fixtureJson(POLICY));
     return SvgAudit.parse(RenderTestSupport.render(input));
   }
