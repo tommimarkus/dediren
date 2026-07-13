@@ -8,14 +8,12 @@ import dev.dediren.contracts.DiagnosticCode;
 import dev.dediren.plugins.umlxmi.build.XmiValidationException;
 import dev.dediren.schemacache.SchemaCacheException;
 import dev.dediren.schemacache.SchemaCacheModule;
+import dev.dediren.schemacache.XmlSchemaValidator;
 import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.io.OutputStream;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -29,6 +27,7 @@ public final class SchemaValidation {
   private SchemaValidation() {}
 
   public static final String XMI_SCHEMA_VALIDATOR = "xmllint";
+  public static final String XMI_SCHEMA_VALIDATOR_ENV = "DEDIREN_XMI_SCHEMA_VALIDATOR";
   private static final String OMG_XMI_SCHEMA_URL = "https://www.omg.org/spec/XMI/20131001/XMI.xsd";
   // Pinned SHA-256 of the OMG XMI schema, verified after every runtime download (audit finding F2).
   // Source: https://www.omg.org/spec/XMI/20131001/XMI.xsd — retrieved 2026-07-04.
@@ -44,17 +43,6 @@ public final class SchemaValidation {
       "To download through an HTTP proxy, expose HTTP_PROXY, HTTPS_PROXY, and NO_PROXY (or their"
           + " lowercase forms) to this process. To skip the download, pre-fetch the OMG XMI.xsd and"
           + " set DEDIREN_XMI_SCHEMA_PATH to its absolute file path.";
-
-  public static boolean commandAvailable(String command) {
-    try {
-      return new ProcessBuilder(command, "--version").start().waitFor() == 0;
-    } catch (IOException | InterruptedException error) {
-      if (error instanceof InterruptedException) {
-        Thread.currentThread().interrupt();
-      }
-      return false;
-    }
-  }
 
   /**
    * Legacy two-argument seam retained for the same-package validation tests; resolves schema/cache
@@ -89,12 +77,12 @@ public final class SchemaValidation {
       Element root = document.getDocumentElement();
       if (!XMI_NS.equals(root.getNamespaceURI()) || !"XMI".equals(root.getLocalName())) {
         throw new XmiValidationException(
-            "DEDIREN_XMI_SCHEMA_INVALID",
+            DiagnosticCode.XMI_SCHEMA_INVALID.code(),
             "generated UML/XMI XML root must be xmi:XMI in the OMG XMI namespace");
       }
       if (root.hasAttributeNS(XMI_NS, "version")) {
         throw new XmiValidationException(
-            "DEDIREN_XMI_SCHEMA_INVALID",
+            DiagnosticCode.XMI_SCHEMA_INVALID.code(),
             "generated UML/XMI XML uses xmi:version, which OMG XMI.xsd does not allow");
       }
       Set<String> ids = new HashSet<>();
@@ -107,18 +95,20 @@ public final class SchemaValidation {
         }
         if (!isXmlId(id)) {
           throw new XmiValidationException(
-              "DEDIREN_XMI_ID_INVALID", "generated UML/XMI XML contains invalid xmi:id " + id);
+              DiagnosticCode.XMI_ID_INVALID.code(),
+              "generated UML/XMI XML contains invalid xmi:id " + id);
         }
         if (!ids.add(id)) {
           throw new XmiValidationException(
-              "DEDIREN_XMI_ID_INVALID", "generated UML/XMI XML contains duplicate xmi:id " + id);
+              DiagnosticCode.XMI_ID_INVALID.code(),
+              "generated UML/XMI XML contains duplicate xmi:id " + id);
         }
       }
     } catch (XmiValidationException error) {
       throw error;
     } catch (Exception error) {
       throw new XmiValidationException(
-          "DEDIREN_XMI_XML_INVALID",
+          DiagnosticCode.XMI_XML_INVALID.code(),
           "generated UML/XMI XML is not well-formed: " + error.getMessage());
     }
   }
@@ -126,57 +116,21 @@ public final class SchemaValidation {
   private static void validateOmgXmiSchema(
       String content, Map<String, String> env, Path productRoot) throws XmiValidationException {
     Path schemaPath = resolveOmgXmiSchemaPath(env, productRoot);
-    String validator = xmiSchemaValidator(env);
-    Process process;
+    String validator =
+        SchemaCacheModule.configuredValidator(env, XMI_SCHEMA_VALIDATOR_ENV, XMI_SCHEMA_VALIDATOR);
+    XmlSchemaValidator.Outcome outcome;
     try {
-      process =
-          new ProcessBuilder(
-                  validator, "--nonet", "--noout", "--schema", schemaPath.toString(), "-")
-              .start();
-    } catch (IOException error) {
+      outcome = XmlSchemaValidator.validate(validator, schemaPath, content);
+    } catch (SchemaCacheException error) {
       throw new XmiValidationException(
-          DiagnosticCode.XMI_SCHEMA_VALIDATOR_UNAVAILABLE.code(),
-          "failed to run OMG XMI schema validator " + validator + ": " + error.getMessage());
+          DiagnosticCode.XMI_SCHEMA_VALIDATOR_UNAVAILABLE.code(), error.getMessage());
     }
-    try (OutputStream stdin = process.getOutputStream()) {
-      stdin.write(content.getBytes(StandardCharsets.UTF_8));
-    } catch (IOException error) {
-      throw new XmiValidationException(
-          DiagnosticCode.XMI_SCHEMA_VALIDATOR_UNAVAILABLE.code(),
-          "failed to write UML/XMI XML to OMG XMI schema validator "
-              + validator
-              + ": "
-              + error.getMessage());
+    if (outcome.valid() || xmiSchemaErrorsAreOnlyUnavailableUmlSchema(outcome.details())) {
+      return;
     }
-    try {
-      byte[] stdout = process.getInputStream().readAllBytes();
-      byte[] stderr = process.getErrorStream().readAllBytes();
-      int exitCode = process.waitFor();
-      if (exitCode == 0) {
-        return;
-      }
-      String details = SchemaCacheModule.commandOutputDetails(validator, exitCode, stdout, stderr);
-      if (xmiSchemaErrorsAreOnlyUnavailableUmlSchema(details)) {
-        return;
-      }
-      throw new XmiValidationException(
-          "DEDIREN_XMI_SCHEMA_INVALID",
-          "generated UML/XMI XML does not validate against OMG XMI.xsd: " + details);
-    } catch (IOException error) {
-      throw new XmiValidationException(
-          DiagnosticCode.XMI_SCHEMA_VALIDATOR_UNAVAILABLE.code(),
-          "failed to read OMG XMI schema validator output: " + error.getMessage());
-    } catch (InterruptedException error) {
-      Thread.currentThread().interrupt();
-      throw new XmiValidationException(
-          DiagnosticCode.XMI_SCHEMA_VALIDATOR_UNAVAILABLE.code(),
-          "OMG XMI schema validator interrupted");
-    }
-  }
-
-  private static String xmiSchemaValidator(Map<String, String> env) {
-    String configured = env.get("DEDIREN_XMI_SCHEMA_VALIDATOR");
-    return configured == null || configured.isBlank() ? XMI_SCHEMA_VALIDATOR : configured;
+    throw new XmiValidationException(
+        DiagnosticCode.XMI_SCHEMA_INVALID.code(),
+        "generated UML/XMI XML does not validate against OMG XMI.xsd: " + outcome.details());
   }
 
   private static Path resolveOmgXmiSchemaPath(Map<String, String> env, Path productRoot)
@@ -192,7 +146,7 @@ public final class SchemaValidation {
         return configured.get();
       }
       throw new XmiValidationException(
-          "DEDIREN_XMI_SCHEMA_UNAVAILABLE",
+          DiagnosticCode.XMI_SCHEMA_UNAVAILABLE.code(),
           "OMG XMI schema file "
               + configured.get()
               + " is missing or empty; provide the official XMI.xsd or unset "
@@ -215,29 +169,17 @@ public final class SchemaValidation {
           SchemaCacheModule.curlFetcher(SCHEMA_FETCHER));
     } catch (SchemaCacheException error) {
       throw new XmiValidationException(
-          "DEDIREN_XMI_SCHEMA_UNAVAILABLE",
+          DiagnosticCode.XMI_SCHEMA_UNAVAILABLE.code(),
           error.getMessage() + " " + XMI_SCHEMA_DOWNLOAD_REMEDIATION);
     }
     return schemaPath;
   }
 
-  /**
-   * Decision 9 resolution site: rewrites the relative {@code DEDIREN_XMI_SCHEMA_PATH} / {@code
-   * DEDIREN_SCHEMA_CACHE_DIR} env values so they resolve against {@code productRoot} rather than
-   * the JVM cwd. {@link Path#resolve(Path)} returns an absolute value unchanged, so a caller that
-   * supplies the child cwd as the product root gets byte-identical behavior to the historical bare
-   * {@code Path.of(value)}.
-   */
+  /** Resolves this engine's schema/cache env paths against the product root (Decision 9). */
   public static Map<String, String> productRootRelativeEnv(
       Map<String, String> env, Path productRoot) {
-    Map<String, String> resolved = new LinkedHashMap<>(env);
-    for (String name : new String[] {XMI_SCHEMA_PATH_ENV, SCHEMA_CACHE_DIR_ENV}) {
-      String value = env.get(name);
-      if (value != null && !value.isEmpty()) {
-        resolved.put(name, productRoot.resolve(value).toString());
-      }
-    }
-    return resolved;
+    return SchemaCacheModule.productRootRelativeEnv(
+        env, productRoot, XMI_SCHEMA_PATH_ENV, SCHEMA_CACHE_DIR_ENV);
   }
 
   private static boolean xmiSchemaErrorsAreOnlyUnavailableUmlSchema(String details) {

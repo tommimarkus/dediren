@@ -259,6 +259,29 @@ Discipline:
   (`YYYY.0M.MICRO`) encodes the release *date*, not compatibility — never
   communicate a breaking contract change through the version number. (See
   `CLAUDE.md` `## Versioning`.)
+- **When to bump a schema id — the rule, decided 2026-07-13.** The version
+  string is a schema `const` (`"model_schema_version": {"const":
+  "model.schema.v1"}`) and is `required`. So bumping an id does not merely
+  *signal* incompatibility — it *creates* it: every existing document of that
+  family instantly fails validation and must be rewritten, including the
+  documents that never touched whatever changed. A bump is therefore a
+  **big-bang migration for all consumers**, and is warranted only when *working*
+  documents must change.
+
+  It follows that a narrowing which can only invalidate documents whose content
+  had **no semantics** — an inert field nothing read, or a value that was
+  silently ignored — forces no working document to change and does **not**
+  warrant a bump. Such changes are communicated in the release notes instead.
+  Three narrowings landed under this rule on 2026-07-13 with the ids untouched:
+  retiring `routing.profile` (a knob no code read); constraining node `role` to
+  its enum (an unrecognised role was silently ignored, so only already-broken
+  documents fail); and aligning layout-request id charsets with `model.schema`
+  (ids that came from a model already complied). All 52 fixtures still validate,
+  which is the check that the narrowing hit only dead surface.
+
+  If you are ever unsure, the question to ask is not "did the schema change?"
+  but "**does a document that worked yesterday have to change today?**" If yes,
+  bump. If no, release-note it.
 - **Contract changes move together.** A change to a public JSON shape updates
   `schemas/`, `contracts`, fixtures, the mapping code in the owning plugin, and
   the schema/round-trip tests *in the same change* (*Martin 2017*, Common
@@ -373,10 +396,21 @@ defect: the two copies drift, and a spec change must be made twice.
 types, ordering and nesting rules), and that asymmetry of *scope* is fine. What
 should be symmetric is their *architectural role and placement*: both are
 tier-1 notation cores consumed through the same engine roles. Today they differ even in dependency (`uml` → `contracts`, `archimate`
-standalone) and in how they model endpoint legality (`archimate` uses explicit
-curated/rejected triples; `uml` uses inline conditional logic). Prefer the
-explicit-data style for new endpoint rules — it is auditable — and let a core
-depend on `contracts` only when it genuinely consumes contract types. When a
+standalone) and in how they model endpoint legality.
+
+The endpoint-legality difference is one of **polarity**, and this document used to
+overstate it. `archimate` enforces a **deny list**: five explicitly rejected
+(source, relationship, target) triples, and everything else passes. `uml` defaults
+the other way, rejecting endpoint combinations it does not recognise. Neither is a
+curated allow list. (A 16-triple `CURATED_RELATIONSHIP_ENDPOINT_TRIPLES` table did
+live in `archimate` and read like one, but it never took part in validation and had
+no production caller; it was demoted to test data on 2026-07-13. Do not describe
+ArchiMate endpoint legality as curated — for agents, that is false validation
+confidence.)
+
+Prefer explicit data over inline conditionals for new endpoint rules — it is
+auditable — and let a core depend on `contracts` only when it genuinely consumes
+contract types. When a
 notation core keeps growing and pulling unrelated consumers along, that is the
 signal (*Evans 2003*) to split the shared part or accept deliberate duplication,
 not to keep enlarging the kernel.
@@ -494,17 +528,23 @@ common changes:
   consumer base makes big-bang untenable, design a dual-read window as its
   own spec first — do not improvise one mid-bump.
 
-- **Bump or migrate Jackson.** The product JSON stack is Jackson 2
-  (`com.fasterxml.jackson`, 60 main-source files, `contracts` alone 30);
-  Jackson 3 (`tools.jackson`) is already on the classpath transitively via
-  networknt `json-schema-validator`, which is hand-pinned for two High CVEs
-  (GHSA-j3rv-43j4-c7qm, GHSA-rmj7-2vxq-3g9f) with `jackson-annotations`
-  pinned separately to keep Enforcer `dependencyConvergence` green across
-  both stacks. Routine bumps must move both stacks together and re-verify
-  convergence. The 2→3 migration is a repo-wide package-rename sweep with no
-  incremental path; its trigger conditions are Jackson 2 EOL, networknt
-  dropping the Jackson-2-compatible line, or an unfixed 2.x CVE — when one
-  fires, plan the sweep as a dedicated slice, contracts module first.
+- **Bump Jackson.** The 2→3 migration this section used to plan for has
+  **already happened**: Jackson 3 (`tools.jackson`, `jackson.version` 3.2.0 in
+  the root pom) is the product's sole JSON stack. 42 main-source files import
+  `tools.jackson`; **no** main-source file imports a `com.fasterxml.jackson`
+  runtime package. There is no dual-stack bump procedure to follow and no
+  migration left to schedule.
+
+  The one `com.fasterxml` surface that remains is deliberate and is not a
+  leftover: **annotations**. Jackson 3 keeps its annotation package at
+  `com.fasterxml.jackson.annotation` by design, so the 40 main-source files
+  carrying `@JsonProperty` / `@JsonInclude` are correct as they are — do not
+  "finish the migration" by rewriting them.
+
+  Routine bumps therefore move one stack. Keep Enforcer
+  `dependencyConvergence` green: networknt `json-schema-validator` is the other
+  consumer of Jackson on the classpath, so a bump that changes the databind
+  version must re-verify convergence against it.
 
 ---
 
@@ -562,7 +602,7 @@ speculatively):
 
 | Debt | Location | Guideline | Smell |
 |---|---|---|---|
-| Notation vocabulary duplicated because the source copy is `private` | `uml/UmlSequenceValidation.java` (private) vs `render/node/uml/RenderInputValidator.java` (re-declared) | §6 single source of truth | `java.SD-S` / `SD-C` |
+| Notation vocabulary duplicated because the source copy is `private` — **resolved 2026-07-13** | was: `uml/UmlSequenceValidation.java` (package-private) vs `render/node/uml/RenderInputValidator.java` and `uml-xmi-export/write/interaction/InteractionWriter.java` (each re-declaring the message sorts / fragment operators verbatim) | §6 single source of truth | (resolved) `UmlSequenceValidation` is now public and exports `messageSorts()` / `combinedFragmentOperators()`; both engines consume them, and the three copies are gone. The never-consumed `Uml.structuralTypes()` / `Uml.activityTypes()` accessors were deleted in the same change — the §6 export surface had been inverted relative to demand: what consumers needed was private, and what was exported nothing wanted |
 | Plugin `Main.java` god-files — **resolved**: split into per-notation packages (`render` → `.style`/`.svg`/`.node.{archimate,uml}`; `uml-xmi-export` → `.build`/`.policy`/`.schema`/`.write.*`) | `render/Main.java` 3,851→317 LOC, `uml-xmi-export/Main.java` 1,734→292 LOC | §8 thinness/cohesion | (resolved) |
 | Notation-core asymmetry (dependency + endpoint-rule modeling) | `archimate` (standalone, explicit triples) vs `uml` (→`contracts`, inline conditionals) | §6 symmetric role | `SD-S` (low) |
 | `CLAUDE.md` "semantics belong in export plugin" reads as contradicting shared cores | wording vs `archimate`/`uml` consumers | §6 validation-vs-mapping distinction | doc/code drift |
@@ -579,6 +619,8 @@ speculatively):
 | Cross-plugin envelope/dispatch boilerplate duplicated across first-party plugin Mains | `engines/archimate-oef-export/src/test/.../Main.java`, `engines/uml-xmi-export/src/test/.../Main.java` (and the render/elk-layout equivalents) | §5 engine boundary | `LA-CODE-DUP-1` (lean-audit 2026-07-06); the packaging task (Cutover B) landed and retired the launcher lane, but demoted these `Main`s to `src/test/java` envelope-shaped test harnesses rather than deleting them (decision 13), so the duplication is retained debt with no scheduled retirement — the former `generic-graph` engine's copy was discharged by the Plan B P3 semantics carve, which introduced no replacement `Main` |
 | Layout-quality metric math re-implemented in the ELK plugin's e2e test | `engines/elk-layout/.../ElkLayoutEngineTest.java` (geometry-metric helpers) vs `core/quality/LayoutQuality.java` | §2 no plugin→`core` edge | `LA-CODE-DUP-2` (lean-audit 2026-07-06), accepted: plugins may depend only on `contracts` (the sole test-scope exception belongs to `cli`), and `test-support` cannot host `contracts`-typed helpers without a reactor cycle (`contracts` test-depends on `test-support`); the independent copy deliberately corroborates core's quality metrics against real ELK output; marked `lean-audit:dup-intentional`; revisit if a contracts-aware test-support home is ever chartered |
 | `dev.dediren.plugins.*` package names retained on the four remaining engines after the `plugins/` → `engines/` directory move | `engines/{elk-layout,render,archimate-oef-export,uml-xmi-export}/src/**/dev/dediren/plugins/**` | §2 module naming | mechanical directory/reactor move only (owner-ratified); the matching package rename is out-of-scope follow-on debt for these four, not yet scheduled; the former fifth engine, `generic-graph`, discharged this debt for its slice when the Plan B P3 semantics carve replaced it with the clean `dev.dediren.semantics.*` packages in `semantics-graph`/`semantics-archimate`/`semantics-uml` |
+| Port-count node sizing in `elk-layout` looks like it duplicates an ELK capability, but does not — **trialled and rejected 2026-07-13** | `ElkLayoutEngine.setGeneratedDimensions` / `requiredPortSideLength` / `flatPortCounts` / `groupedPortCounts` (~117 LOC) | §7 ELK-first | **keep, with evidence.** §7 says try the official ELK option before hand-rolling, so it was tried: `CoreOptions.NODE_SIZE_CONSTRAINTS = minimumSizeWithPorts()` + `NODE_SIZE_MINIMUM`, with the custom growth removed. It is **not** equivalent. ELK's constraint enforces port fit at *every* port count, so it inflated a typical 80px node to **161px** to seat three ports; the custom math deliberately leaves nodes at their hinted size until a side exceeds `DEFAULT_SHORT_SIDE_PORT_CAPACITY` (3) and only then grows it. That divergence is a product decision, and it is already pinned by `ElkLayoutEngineTest.threeShortSidePortsKeepTheDefaultNodeSize`, which the trial failed with exactly that 80→161 delta. The code is size *intent* ELK's option cannot express, not a re-implementation of it. Do not "simplify" it to the ELK option without re-litigating that test |
+| Typed-IR double representation: `ir` scene types and their `contracts` record twins are maintained in parallel, with 1:1 mappers between them | `ir/LaidOutSceneMapper.java`, `ir/LayoutRequestMapper.java` (~237 LOC of field-for-field copying); type pairs `PlacedGroup`↔`LaidOutGroup`, `PlacedNode`↔`LaidOutNode`, `RoutedEdge`↔`LaidOutEdge`, `SceneNode`↔`LayoutNode`, `SceneEdge`↔`LayoutEdge`, `SceneGroup`↔`LayoutGroup` | §2 dependency spine (Plan B P4 seam flip) | **accepted, with a trigger.** This is the deliberate P4 "adapt at boundary" decision: heavy engine internals stayed record-based and were adapted at a thin boundary so byte-stability was provable (`toResult ∘ toScene = identity`). That payoff has now been *collected* — the migration landed — but the tax is permanent: every concept has two names, and one new scene field touches the schema, the contracts record, the ir record, the mapper constructors, fixtures and tests (~7 surfaces). Registered here so it is a choice rather than an accident. **Trigger:** when `elk-layout` or `render` internals are next substantively reworked, move that engine's internals onto the `ir` types so its mapper calls collapse; the mappers should end up serving only the two real wire edges (`LayoutEngine.parseRequest` and artifact emission). Two conversions have already been removed this way (2026-07-13): `build` now hands the scene it already holds to `CoreCommands.validateLayout`, and the shared route-endpoint tolerance moved to `ir.quality.LayoutTolerances` |
 | `plugin-manifest.schema.json` / `runtime-capability.schema.json` still ship though no live code path constructs a manifest or answers a capability probe | `schemas/plugin-manifest.schema.json`, `schemas/runtime-capability.schema.json`, `contracts.PluginManifest`/`RuntimeCapabilities` | §4 contract surface | orphaned by the process-plugin runtime deletion (Cutover A/B); kept compile-checked and round-tripped from inline JSON (`ContractRoundTripTest`, `SchemaValidatorTest`) rather than deleted, since a future non-bundled engine could still want the same manifest/capability shape; retire or repurpose is out-of-scope follow-on debt, not yet scheduled |
 
 None of these block the architecture; they are propagation-cost and clarity

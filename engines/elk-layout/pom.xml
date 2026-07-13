@@ -44,14 +44,16 @@
     <dependency>
       <groupId>org.eclipse.elk</groupId>
       <artifactId>org.eclipse.elk.alg.rectpacking</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.google.guava</groupId>
-      <artifactId>guava</artifactId>
+      <!-- RUNTIME-ONLY, and dependency:analyze reports it as an unused declared dependency.
+           Do not remove. ELK resolves the packing algorithm reflectively from the id string
+           "org.eclipse.elk.rectpacking" (ElkPackedOptions), so no bytecode reference exists for
+           the analyzer to see. Removing it compiles fine and breaks mode=packed at runtime. -->
     </dependency>
     <dependency>
       <groupId>org.eclipse.xtext</groupId>
       <artifactId>org.eclipse.xtext.xbase.lib</artifactId>
+      <!-- RUNTIME-ONLY, same trap as rectpacking above: dependency:analyze calls it unused, but
+           ELK's Xtend-generated code needs the Xbase runtime on the classpath. Do not remove. -->
     </dependency>
     <dependency>
       <groupId>dev.dediren</groupId>
@@ -74,6 +76,18 @@
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter</artifactId>
       <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>tools.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>tools.jackson.core</groupId>
+      <artifactId>jackson-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.eclipse.emf</groupId>
+      <artifactId>org.eclipse.emf.common</artifactId>
     </dependency>
   </dependencies>
 </project>

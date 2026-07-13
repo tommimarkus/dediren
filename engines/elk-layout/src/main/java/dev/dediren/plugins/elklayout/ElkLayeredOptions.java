@@ -97,11 +97,10 @@ final class ElkLayeredOptions {
     root.setProperty(CoreOptions.SPACING_PORT_PORT, portPortSpacing);
     root.setProperty(
         CoreOptions.SPACING_PORTS_SURROUNDING, new ElkMargin(PORT_SURROUNDING_SPACING));
-    root.setProperty(LayeredOptions.SPACING_EDGE_EDGE, edgeEdgeSpacing);
-    root.setProperty(LayeredOptions.SPACING_EDGE_NODE, edgeNodeSpacing);
-    root.setProperty(LayeredOptions.SPACING_PORT_PORT, portPortSpacing);
-    root.setProperty(
-        LayeredOptions.SPACING_PORTS_SURROUNDING, new ElkMargin(PORT_SURROUNDING_SPACING));
+    // LayeredOptions.SPACING_{EDGE_EDGE,EDGE_NODE,PORT_PORT,PORTS_SURROUNDING} are literal aliases
+    // of the CoreOptions fields set just above — the same IProperty key, written twice with the
+    // same
+    // value — so they were no-ops that only obscured the genuinely layered-only writes below.
     root.setProperty(LayeredOptions.SPACING_NODE_NODE_BETWEEN_LAYERS, nodeSpacing);
     root.setProperty(LayeredOptions.SPACING_EDGE_NODE_BETWEEN_LAYERS, edgeNodeSpacing);
     // Between-layer parallel edge risers are pitched to the port pitch, not the (wider) in-layer

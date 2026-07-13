@@ -21,32 +21,76 @@ public final class StyleResolver {
 
   private StyleResolver() {}
 
+  /** The product's house palette: every diagram except UML sequence starts here. */
+  private static final ResolvedNodeStyle DEFAULT_NODE =
+      new ResolvedNodeStyle(
+          "#f8fafc", "#334155", 1.5, 6.0, "#0f172a", null, null, null, null, null, null, null, null,
+          null, null, null, null);
+
+  private static final ResolvedEdgeStyle DEFAULT_EDGE =
+      new ResolvedEdgeStyle(
+          "#64748b",
+          1.5,
+          "#374151",
+          SvgEdgeLineStyle.SOLID,
+          SvgEdgeMarkerEnd.NONE,
+          SvgEdgeMarkerEnd.FILLED_ARROW,
+          SvgEdgeLabelHorizontalPosition.NEAR_START,
+          SvgEdgeLabelHorizontalSide.AUTO,
+          SvgEdgeLabelVerticalPosition.CENTER,
+          SvgEdgeLabelVerticalSide.LEFT,
+          SvgEdgeLabelPresentation.OUTLINE,
+          null,
+          null,
+          null);
+
+  private static final ResolvedGroupStyle DEFAULT_GROUP =
+      new ResolvedGroupStyle(
+          "#eff6ff", "#93c5fd", 1.0, 8.0, "#1e3a8a", 12.0, null, null, null, null, null, null, null,
+          null, null, null, null);
+
+  // UML sequence diagrams start from a plain black-on-white base rather than the house palette:
+  // square corners (rx 0), black strokes, 1.25px. This divergence is deliberate — square lifeline
+  // heads and execution bars are what the notation draws — but it used to be spelled out inside
+  // UmlSequenceRenderer's own private merge chain, so the two palettes could drift without anyone
+  // noticing they were different things. Stated here, once, beside the palette it diverges from.
+  private static final ResolvedNodeStyle SEQUENCE_DEFAULT_NODE =
+      new ResolvedNodeStyle(
+          "#ffffff", "#000000", 1.25, 0.0, "#000000", null, null, null, null, null, null, null,
+          null, null, null, null, null);
+
+  private static final ResolvedEdgeStyle SEQUENCE_DEFAULT_EDGE =
+      new ResolvedEdgeStyle(
+          "#000000",
+          1.25,
+          "#000000",
+          SvgEdgeLineStyle.SOLID,
+          SvgEdgeMarkerEnd.NONE,
+          SvgEdgeMarkerEnd.FILLED_ARROW,
+          SvgEdgeLabelHorizontalPosition.NEAR_START,
+          SvgEdgeLabelHorizontalSide.AUTO,
+          SvgEdgeLabelVerticalPosition.CENTER,
+          SvgEdgeLabelVerticalSide.LEFT,
+          SvgEdgeLabelPresentation.OUTLINE,
+          null,
+          null,
+          null);
+
   public static ResolvedStyle baseStyle(RenderPolicy policy) {
+    return baseStyle(policy, DEFAULT_NODE, DEFAULT_EDGE, DEFAULT_GROUP);
+  }
+
+  /** The base a UML sequence render resolves against. See {@link #SEQUENCE_DEFAULT_NODE}. */
+  public static ResolvedStyle sequenceBaseStyle(RenderPolicy policy) {
+    return baseStyle(policy, SEQUENCE_DEFAULT_NODE, SEQUENCE_DEFAULT_EDGE, DEFAULT_GROUP);
+  }
+
+  private static ResolvedStyle baseStyle(
+      RenderPolicy policy,
+      ResolvedNodeStyle defaultNode,
+      ResolvedEdgeStyle defaultEdge,
+      ResolvedGroupStyle defaultGroup) {
     SvgStylePolicy style = policy.style();
-    var defaultNode =
-        new ResolvedNodeStyle(
-            "#f8fafc", "#334155", 1.5, 6.0, "#0f172a", null, null, null, null, null, null, null,
-            null, null, null, null, null);
-    var defaultEdge =
-        new ResolvedEdgeStyle(
-            "#64748b",
-            1.5,
-            "#374151",
-            SvgEdgeLineStyle.SOLID,
-            SvgEdgeMarkerEnd.NONE,
-            SvgEdgeMarkerEnd.FILLED_ARROW,
-            SvgEdgeLabelHorizontalPosition.NEAR_START,
-            SvgEdgeLabelHorizontalSide.AUTO,
-            SvgEdgeLabelVerticalPosition.CENTER,
-            SvgEdgeLabelVerticalSide.LEFT,
-            SvgEdgeLabelPresentation.OUTLINE,
-            null,
-            null,
-            null);
-    var defaultGroup =
-        new ResolvedGroupStyle(
-            "#eff6ff", "#93c5fd", 1.0, 8.0, "#1e3a8a", 12.0, null, null, null, null, null, null,
-            null, null, null, null, null);
     return new ResolvedStyle(
         Optional.ofNullable(style)
             .map(SvgStylePolicy::background)

@@ -73,6 +73,31 @@ expansion off. The external `xmllint` schema validator runs with `--nonet`
 for both the OMG XMI schema (`engines/uml-xmi-export`) and the OEF
 ArchiMate schemas (`engines/archimate-oef-export`).
 
+Both engines invoke that validator through one shared runner,
+`schemacache.XmlSchemaValidator` — engines may not depend on each other, so
+before it each kept its own copy of the subprocess block and every hardening
+fix had to be applied twice. The runner owns two availability properties the
+copies did not have:
+
+- **No drain deadlock.** stdout and stderr are drained concurrently. The
+  previous code read stdout to EOF *before* stderr, with an unbounded
+  `waitFor()` after: a validator that fills the ~64 KiB stderr pipe blocks in
+  `write(2)`, so it never exits, so stdout never reaches EOF. A schema-invalid
+  document with a systematic per-element violation reaches that volume easily —
+  the export hung precisely when it should have reported the schema error, and
+  a hang is invisible to an agent that decides from stdout JSON.
+- **Bounded wall clock.** A run that exceeds `XmlSchemaValidator.DEFAULT_TIMEOUT`
+  (60s) is force-killed and reported as
+  `DEDIREN_OEF_SCHEMA_VALIDATOR_UNAVAILABLE` /
+  `DEDIREN_XMI_SCHEMA_VALIDATOR_UNAVAILABLE`, so a wedged or malicious validator
+  binary degrades to a structured non-zero envelope rather than an indefinite
+  stall.
+
+The runner returns a code-free outcome; each engine maps it onto its own
+published diagnostic codes, so `schema-cache` stays notation-neutral.
+`XmlSchemaValidatorTest` pins both properties, including a stderr-flooding
+validator as an explicit deadlock regression.
+
 ### SVG output escaping
 
 Untrusted model text (node/edge/group labels and ids) flows into the SVG

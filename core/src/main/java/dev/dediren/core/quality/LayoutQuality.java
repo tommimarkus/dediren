@@ -6,6 +6,7 @@ import dev.dediren.contracts.DiagnosticSeverity;
 import dev.dediren.contracts.layout.LaidOutEdge;
 import dev.dediren.contracts.layout.LaidOutGroup;
 import dev.dediren.contracts.layout.LaidOutNode;
+import dev.dediren.contracts.layout.LayoutNodeRole;
 import dev.dediren.contracts.layout.LayoutResult;
 import dev.dediren.contracts.layout.Point;
 import java.util.ArrayList;
@@ -19,7 +20,8 @@ public final class LayoutQuality {
   private static final double ROUTE_CLOSE_PARALLEL_DISTANCE = 20.0;
   private static final double ROUTE_CLOSE_PARALLEL_MIN_OVERLAP = 40.0;
   private static final double GEOMETRY_EPSILON = 0.001;
-  private static final double ROUTE_ENDPOINT_TOLERANCE = 1.5;
+  private static final double ROUTE_ENDPOINT_TOLERANCE =
+      dev.dediren.ir.quality.LayoutTolerances.ROUTE_ENDPOINT_TOLERANCE;
   // Layout units reserved for the group title row; render draws the group label inside the
   // top of the group rect, so members inside this band collide with the label visually.
   private static final double GROUP_LABEL_BAND_HEIGHT = 24.0;
@@ -225,7 +227,7 @@ public final class LayoutQuality {
     }
     for (int nodeIndex = 0; nodeIndex < result.nodes().size(); nodeIndex++) {
       LaidOutNode node = result.nodes().get(nodeIndex);
-      if (!"junction".equals(node.role())) {
+      if (!LayoutNodeRole.isJunction(node.role())) {
         continue;
       }
       double centerX = node.x() + node.width() / 2.0;
@@ -344,7 +346,7 @@ public final class LayoutQuality {
     if (pointOnNodePerimeter(point, node, tolerance)) {
       return true;
     }
-    return "lifeline".equals(node.role()) && onLifelineAxis(point, node, tolerance);
+    return LayoutNodeRole.isLifeline(node.role()) && onLifelineAxis(point, node, tolerance);
   }
 
   // Sequence Message endpoints anchor to the lifeline axis: the participant head-box center,
@@ -365,9 +367,9 @@ public final class LayoutQuality {
     // messages; and an execution bar / destruction marker legitimately sits ON the lifeline stem a
     // message terminates on. None of these are overlaps or route-through-node defects. The
     // hard-error lane (validateLayoutDiagnostics) still guards them.
-    return "interaction".equals(node.role())
-        || "execution".equals(node.role())
-        || "destruction".equals(node.role());
+    return LayoutNodeRole.isInteraction(node.role())
+        || LayoutNodeRole.isExecution(node.role())
+        || LayoutNodeRole.isDestruction(node.role());
   }
 
   private static int countOverlaps(LayoutResult result) {
@@ -522,7 +524,7 @@ public final class LayoutQuality {
     for (LaidOutNode node : result.nodes()) {
       if (node.label() == null
           || node.label().isBlank()
-          || "junction".equals(node.role())
+          || LayoutNodeRole.isJunction(node.role())
           || Math.min(node.width(), node.height()) < LABEL_SPACE_MIN_DIMENSION) {
         continue;
       }

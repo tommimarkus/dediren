@@ -100,14 +100,6 @@ public final class Uml {
 
   private Uml() {}
 
-  public static List<String> structuralTypes() {
-    return STRUCTURAL_TYPES;
-  }
-
-  public static List<String> activityTypes() {
-    return ACTIVITY_TYPES;
-  }
-
   public static List<String> relationshipTypes() {
     return RELATIONSHIP_TYPES;
   }

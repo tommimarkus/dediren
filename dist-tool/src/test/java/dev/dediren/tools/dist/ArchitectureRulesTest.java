@@ -150,6 +150,27 @@ class ArchitectureRulesTest {
   }
 
   @Test
+  void cliDependsOnNoNotationOrUtilityCore() {
+    // §2 allows cli only contracts, core, engine-api and ir (plus the engine implementations,
+    // confined to EngineWiring by the rule below). The notation cores were the one forbidden cli
+    // edge nothing pinned, and Maven leaves it compile-reachable: cli depends on render and the
+    // export engines, which pull uml/archimate/schema-cache onto its compile classpath. A
+    // dev.dediren.uml import in cli — notation logic leaking into the entrypoint, against the §3
+    // thin-cli charter — would have compiled and passed every gate.
+    noClasses()
+        .that()
+        .resideInAPackage(CLI)
+        .should()
+        .dependOnClassesThat()
+        .resideInAnyPackage(
+            "dev.dediren.uml..", "dev.dediren.archimate..", "dev.dediren.schemacache..")
+        .because(
+            "cli parses arguments, assembles requests, calls core and prints envelopes; notation"
+                + " and schema-cache semantics belong to the engines that own them (§2, §3)")
+        .check(PRODUCTION_CLASSES);
+  }
+
+  @Test
   void engineApiDependsOnlyOnContracts() {
     noClasses()
         .that()

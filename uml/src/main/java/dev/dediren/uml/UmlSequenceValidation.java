@@ -26,7 +26,7 @@ import tools.jackson.databind.JsonNode;
  * sequencing, and fragment coverage/nesting/ownership. Extracted verbatim from {@link Uml} to keep
  * the facade small; behavior, diagnostic codes, and JSON paths are unchanged.
  */
-final class UmlSequenceValidation {
+public final class UmlSequenceValidation {
 
   private static final Set<String> MESSAGE_SORTS =
       Set.of("synchCall", "asynchCall", "asynchSignal", "reply", "createMessage", "deleteMessage");
@@ -34,6 +34,22 @@ final class UmlSequenceValidation {
       Set.of("alt", "opt", "loop", "par");
 
   private UmlSequenceValidation() {}
+
+  /**
+   * The UML message sorts this product recognises. Exported because the render engine and the
+   * UML/XMI exporter both need to know them, and each used to re-declare the set verbatim —
+   * "re-declaring a notation's vocabulary in a consumer is a defect" (architecture-guidelines §6),
+   * and it was one: adding a message sort meant hand-syncing string literals across three modules,
+   * with a typo failing silently (a filter just stops matching).
+   */
+  public static Set<String> messageSorts() {
+    return MESSAGE_SORTS;
+  }
+
+  /** The UML combined-fragment operators this product recognises. See {@link #messageSorts()}. */
+  public static Set<String> combinedFragmentOperators() {
+    return COMBINED_FRAGMENT_OPERATORS;
+  }
 
   static void validateSelectedCombinedFragmentProperties(
       JsonNode umlProperties, String path, Set<String> selectedNodeIds)

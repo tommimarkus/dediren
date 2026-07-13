@@ -1,5 +1,6 @@
 package dev.dediren.plugins.umlxmi.schema;
 
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import dev.dediren.plugins.umlxmi.build.XmiValidationException;
@@ -18,6 +19,7 @@ import org.junit.jupiter.api.io.TempDir;
  */
 class SchemaValidationTest {
   private static final String XMI_NS = "http://www.omg.org/spec/XMI/20131001";
+  private static final String UML_NS = "http://www.omg.org/spec/UML/20161101";
 
   @TempDir Path tempDir;
 
@@ -50,6 +52,49 @@ class SchemaValidationTest {
         .hasMessageContaining("xmi:version")
         .extracting(error -> ((XmiValidationException) error).code())
         .isEqualTo("DEDIREN_XMI_SCHEMA_INVALID");
+  }
+
+  @Test
+  void aDocumentWhoseOnlyErrorsAreTheUnavailableUmlSchemaIsAccepted() throws Exception {
+    // The success path of every real UML/XMI export. OMG publishes no UML XSD, so validating
+    // against XMI.xsd alone can never resolve the uml:* children: xmllint exits non-zero and the
+    // export is rescued only by recognising that every reported error is the missing-UML-schema
+    // gap. That recognition matches xmllint's literal wording, so it is pinned here — if a libxml2
+    // message change silently broke it, every UML export would flip to a false
+    // DEDIREN_XMI_SCHEMA_INVALID. A stand-in XMI.xsd with a strict wildcard reproduces the exact
+    // condition offline, without downloading the real OMG schema.
+    Path schemaPath = tempDir.resolve("XMI.xsd");
+    Files.writeString(
+        schemaPath,
+        """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+                            targetNamespace="http://www.omg.org/spec/XMI/20131001"
+                            xmlns="http://www.omg.org/spec/XMI/20131001"
+                            elementFormDefault="qualified">
+                  <xsd:element name="XMI">
+                    <xsd:complexType>
+                      <xsd:sequence>
+                        <xsd:any namespace="##other" processContents="strict"
+                                 minOccurs="0" maxOccurs="unbounded"/>
+                      </xsd:sequence>
+                    </xsd:complexType>
+                  </xsd:element>
+                </xsd:schema>
+                """,
+        StandardCharsets.UTF_8);
+    String content =
+        "<xmi:XMI xmlns:xmi=\""
+            + XMI_NS
+            + "\"><uml:Model xmlns:uml=\""
+            + UML_NS
+            + "\" xmi:id=\"m1\"/></xmi:XMI>";
+
+    assertThatCode(
+            () ->
+                SchemaValidation.validateXmiToAvailableStandards(
+                    content, Map.of("DEDIREN_XMI_SCHEMA_PATH", schemaPath.toString())))
+        .doesNotThrowAnyException();
   }
 
   @Test

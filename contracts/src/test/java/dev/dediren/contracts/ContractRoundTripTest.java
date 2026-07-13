@@ -28,7 +28,6 @@ import dev.dediren.contracts.layout.LayoutPlacementStrategy;
 import dev.dediren.contracts.layout.LayoutPreferences;
 import dev.dediren.contracts.layout.LayoutRequest;
 import dev.dediren.contracts.layout.LayoutResult;
-import dev.dediren.contracts.layout.LayoutRoutingProfile;
 import dev.dediren.contracts.layout.LayoutRoutingStyle;
 import dev.dediren.contracts.layout.LayoutThoroughness;
 import dev.dediren.contracts.layout.LayoutWrapping;
@@ -321,7 +320,6 @@ class ContractRoundTripTest {
                         "wrapping": "off",
                         "routing": {
                           "style": "orthogonal",
-                          "profile": "spacious",
                           "endpoint_merging": "local"
                         }
                       },
@@ -350,7 +348,6 @@ class ContractRoundTripTest {
     assertThat(preferences.density()).isEqualTo(LayoutDensity.READABLE);
     assertThat(preferences.wrapping()).isEqualTo(LayoutWrapping.OFF);
     assertThat(routing.style()).isEqualTo(LayoutRoutingStyle.ORTHOGONAL);
-    assertThat(routing.profile()).isEqualTo(LayoutRoutingProfile.SPACIOUS);
     assertThat(routing.endpointMerging()).isEqualTo(LayoutEndpointMerging.LOCAL);
     assertThat(view.groups().getFirst().role())
         .isEqualTo(GenericGraphViewGroupRole.SEMANTIC_BOUNDARY);

@@ -24,20 +24,19 @@ class UmlValidationTest {
   }
 
   @Test
+  void exposesTheSequenceVocabularyItsConsumersDependOn() {
+    // The render engine and the UML/XMI exporter read these instead of re-declaring them
+    // (architecture-guidelines §6). Pinning them here means a change to the notation's vocabulary
+    // is a change to this spec, not a silent three-module hand-sync.
+    assertThat(UmlSequenceValidation.messageSorts())
+        .containsExactlyInAnyOrder(
+            "synchCall", "asynchCall", "asynchSignal", "reply", "createMessage", "deleteMessage");
+    assertThat(UmlSequenceValidation.combinedFragmentOperators())
+        .containsExactlyInAnyOrder("alt", "opt", "loop", "par");
+  }
+
+  @Test
   void exposesPublicUmlVocabulary() {
-    assertThat(Uml.structuralTypes())
-        .containsExactly("Package", "Class", "Interface", "DataType", "Enumeration", "Component");
-    assertThat(Uml.activityTypes())
-        .containsExactly(
-            "Activity",
-            "Action",
-            "InitialNode",
-            "ActivityFinalNode",
-            "DecisionNode",
-            "MergeNode",
-            "ForkNode",
-            "JoinNode",
-            "ObjectNode");
     assertThat(Uml.relationshipTypes())
         .containsExactly(
             "Association",

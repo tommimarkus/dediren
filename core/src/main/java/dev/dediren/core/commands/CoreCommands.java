@@ -15,9 +15,9 @@ import dev.dediren.contracts.render.RenderMetadata;
 import dev.dediren.contracts.source.SourceDocument;
 import dev.dediren.core.DedirenPaths;
 import dev.dediren.core.engine.EngineDispatch;
+import dev.dediren.core.engine.EngineExecutionException;
+import dev.dediren.core.engine.EngineRunOutcome;
 import dev.dediren.core.io.JsonInput;
-import dev.dediren.core.plugins.PluginExecutionException;
-import dev.dediren.core.plugins.PluginRunOutcome;
 import dev.dediren.core.quality.LayoutQuality;
 import dev.dediren.core.quality.LayoutQualityReport;
 import dev.dediren.core.source.SourceValidator;
@@ -52,14 +52,9 @@ import tools.jackson.databind.JsonNode;
 public final class CoreCommands {
   private CoreCommands() {}
 
-  public static PluginRunOutcome layoutCommand(String engineId, String inputText, Engines engines)
-      throws PluginExecutionException {
-    return layoutCommand(engineId, inputText, System.getenv(), engines);
-  }
-
-  public static PluginRunOutcome layoutCommand(
+  public static EngineRunOutcome layoutCommand(
       String engineId, String inputText, Map<String, String> env, Engines engines)
-      throws PluginExecutionException {
+      throws EngineExecutionException {
     // Unwrap a piped stage envelope to its data (the chained-workflow convenience), then route the
     // unwrapped bytes through the engine's parse entry point so a well-formed-but-invalid request
     // reproduces the published DEDIREN_ELK_INPUT_INVALID_JSON envelope rather than core's generic
@@ -75,7 +70,7 @@ public final class CoreCommands {
         });
   }
 
-  private static byte[] layoutRequestBytes(String inputText) throws PluginExecutionException {
+  private static byte[] layoutRequestBytes(String inputText) throws EngineExecutionException {
     JsonNode value;
     try {
       value = JsonSupport.objectMapper().readTree(inputText);
@@ -94,13 +89,7 @@ public final class CoreCommands {
     }
   }
 
-  public static PluginRunOutcome projectCommand(
-      String engineId, String target, String view, String inputText, Path baseDir, Engines engines)
-      throws PluginExecutionException {
-    return projectCommand(engineId, target, view, inputText, baseDir, System.getenv(), engines);
-  }
-
-  public static PluginRunOutcome projectCommand(
+  public static EngineRunOutcome projectCommand(
       String engineId,
       String target,
       String view,
@@ -108,7 +97,7 @@ public final class CoreCommands {
       Path baseDir,
       Map<String, String> env,
       Engines engines)
-      throws PluginExecutionException {
+      throws EngineExecutionException {
     SourceDocument source;
     try {
       source = SourceValidator.loadAndValidateSourceDocument(inputText, baseDir);
@@ -135,20 +124,14 @@ public final class CoreCommands {
     throw new UncheckedIOException(new IOException("unsupported target: " + target));
   }
 
-  public static PluginRunOutcome semanticValidateCommand(
-      String engineId, String profile, String inputText, Path baseDir, Engines engines)
-      throws PluginExecutionException {
-    return semanticValidateCommand(engineId, profile, inputText, baseDir, System.getenv(), engines);
-  }
-
-  public static PluginRunOutcome semanticValidateCommand(
+  public static EngineRunOutcome semanticValidateCommand(
       String engineId,
       String profile,
       String inputText,
       Path baseDir,
       Map<String, String> env,
       Engines engines)
-      throws PluginExecutionException {
+      throws EngineExecutionException {
     SourceDocument source;
     try {
       source = SourceValidator.loadAndValidateSourceDocument(inputText, baseDir);
@@ -163,7 +146,8 @@ public final class CoreCommands {
 
   public static ValidationResult validateLayoutCommand(String inputText) {
     try {
-      return validateLayoutResult(JsonInput.parseCommandData(inputText, LayoutResult.class));
+      LayoutResult result = JsonInput.parseCommandData(inputText, LayoutResult.class);
+      return validateLayoutResult(LaidOutSceneMapper.toScene(result), result);
     } catch (RuntimeException error) {
       return commandInputValidationResult("validate-layout", error);
     }
@@ -177,16 +161,27 @@ public final class CoreCommands {
    * result exactly as the string entry point does.
    */
   public static ValidationResult validateLayout(LayoutResult result) {
+    return validateLayout(LaidOutSceneMapper.toScene(result), result);
+  }
+
+  /**
+   * The quality stage for a caller that already holds the typed scene. The in-memory build does: it
+   * receives a {@link LaidOutScene} from the layout engine and maps it to a record for the emit and
+   * export lanes, so re-deriving the scene here (scene -> record -> scene, a whole-graph conversion
+   * per built view) was pure tax. The standalone validate-layout command, which starts from JSON
+   * bytes, still maps once through the overload above.
+   */
+  public static ValidationResult validateLayout(LaidOutScene scene, LayoutResult result) {
     try {
-      return validateLayoutResult(result);
+      return validateLayoutResult(scene, result);
     } catch (RuntimeException error) {
       return commandInputValidationResult("validate-layout", error);
     }
   }
 
-  private static ValidationResult validateLayoutResult(LayoutResult result) {
+  private static ValidationResult validateLayoutResult(LaidOutScene scene, LayoutResult result) {
     List<Diagnostic> diagnostics = new ArrayList<>(LayoutQuality.validateLayoutDiagnostics(result));
-    diagnostics.addAll(sequenceInvariantDiagnostics(result));
+    diagnostics.addAll(sequenceInvariantDiagnostics(scene, result));
     if (!diagnostics.isEmpty()) {
       return new ValidationResult(
           CommandExitCode.INPUT_ERROR.code(), CommandEnvelope.error(diagnostics));
@@ -210,8 +205,8 @@ public final class CoreCommands {
    * lane's {@code INPUT_ERROR} verdict. Non-sequence layouts carry no lifeline/interaction
    * geometry, so every {@link SequenceInvariants} check returns empty and this contributes nothing.
    */
-  private static List<Diagnostic> sequenceInvariantDiagnostics(LayoutResult result) {
-    LaidOutScene scene = LaidOutSceneMapper.toScene(result);
+  private static List<Diagnostic> sequenceInvariantDiagnostics(
+      LaidOutScene scene, LayoutResult result) {
     List<InvariantViolation> violations = new ArrayList<>();
     violations.addAll(SequenceInvariants.messageEndpointsOnLifelineAxis(scene));
     violations.addAll(SequenceInvariants.messageYStrictlyIncreasing(scene));
@@ -252,20 +247,14 @@ public final class CoreCommands {
     return "$";
   }
 
-  public static PluginRunOutcome renderCommand(
-      String engineId, String policyText, String metadataText, String layoutText, Engines engines)
-      throws PluginExecutionException {
-    return renderCommand(engineId, policyText, metadataText, layoutText, System.getenv(), engines);
-  }
-
-  public static PluginRunOutcome renderCommand(
+  public static EngineRunOutcome renderCommand(
       String engineId,
       String policyText,
       String metadataText,
       String layoutText,
       Map<String, String> env,
       Engines engines)
-      throws PluginExecutionException {
+      throws EngineExecutionException {
     LayoutResult layoutResult = parseCommandData("render", layoutText, LayoutResult.class);
     JsonNode policy = parseJson("render", policyText);
     RenderMetadata metadata =
@@ -279,19 +268,7 @@ public final class CoreCommands {
         () -> renderEngine.render(LaidOutSceneMapper.toScene(layoutResult), policy, metadata));
   }
 
-  public static PluginRunOutcome exportCommand(
-      String engineId,
-      String policyText,
-      String sourceText,
-      Path sourceBaseDir,
-      String layoutText,
-      Engines engines)
-      throws PluginExecutionException {
-    return exportCommand(
-        engineId, policyText, sourceText, sourceBaseDir, layoutText, System.getenv(), engines);
-  }
-
-  public static PluginRunOutcome exportCommand(
+  public static EngineRunOutcome exportCommand(
       String engineId,
       String policyText,
       String sourceText,
@@ -299,7 +276,7 @@ public final class CoreCommands {
       String layoutText,
       Map<String, String> env,
       Engines engines)
-      throws PluginExecutionException {
+      throws EngineExecutionException {
     SourceDocument source;
     try {
       source = SourceValidator.loadAndValidateSourceDocument(sourceText, sourceBaseDir);
@@ -320,9 +297,9 @@ public final class CoreCommands {
     return EngineDispatch.dispatch(engineId, () -> exportEngine.export(request, env, productRoot));
   }
 
-  static PluginRunOutcome errorOutcome(List<Diagnostic> diagnostics) {
+  static EngineRunOutcome errorOutcome(List<Diagnostic> diagnostics) {
     try {
-      return new PluginRunOutcome(
+      return new EngineRunOutcome(
           JsonSupport.objectMapper().writeValueAsString(CommandEnvelope.error(diagnostics)),
           CommandExitCode.INPUT_ERROR.code());
     } catch (RuntimeException error) {
@@ -331,7 +308,7 @@ public final class CoreCommands {
   }
 
   private static <T> T parseCommandData(String command, String text, Class<T> type)
-      throws PluginExecutionException {
+      throws EngineExecutionException {
     try {
       return JsonInput.parseCommandData(text, type);
     } catch (RuntimeException error) {
@@ -339,7 +316,7 @@ public final class CoreCommands {
     }
   }
 
-  static JsonNode parseJson(String command, String text) throws PluginExecutionException {
+  static JsonNode parseJson(String command, String text) throws EngineExecutionException {
     try {
       return JsonSupport.objectMapper().readTree(text);
     } catch (RuntimeException error) {
@@ -347,14 +324,14 @@ public final class CoreCommands {
     }
   }
 
-  private static PluginExecutionException commandInputInvalid(String command, Exception error) {
-    return PluginExecutionException.command(
+  private static EngineExecutionException commandInputInvalid(String command, Exception error) {
+    return EngineExecutionException.command(
         DiagnosticCode.COMMAND_INPUT_INVALID.code(), command, error.getMessage());
   }
 
   private static ValidationResult commandInputValidationResult(String command, Exception error) {
     var diagnostic =
-        PluginExecutionException.command(
+        EngineExecutionException.command(
                 DiagnosticCode.COMMAND_INPUT_INVALID.code(), command, error.getMessage())
             .diagnostic();
     return new ValidationResult(

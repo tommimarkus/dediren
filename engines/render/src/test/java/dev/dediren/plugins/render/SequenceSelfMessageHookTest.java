@@ -29,63 +29,13 @@ class SequenceSelfMessageHookTest {
   // Mirrors fixtures/render-metadata/uml-sequence-basic.json's shape for the self-message source
   // (fixtures/source/valid-uml-sequence-self-message.json): Interaction + two Lifelines, three
   // Messages, with m2 (the self-call) carrying message_sort "synchCall" so it resolves to a
-  // filled-arrow marker-end, not "none".
-  private static final String RENDER_METADATA =
-      """
-      {
-        "render_metadata_schema_version": "render-metadata.schema.v1",
-        "semantic_profile": "uml",
-        "nodes": {
-          "interaction-self-message": { "type": "Interaction", "source_id": "interaction-self-message" },
-          "customer": {
-            "type": "Lifeline",
-            "source_id": "customer",
-            "properties": { "interaction": "interaction-self-message" }
-          },
-          "service": {
-            "type": "Lifeline",
-            "source_id": "service",
-            "properties": { "interaction": "interaction-self-message" }
-          }
-        },
-        "edges": {
-          "m1": {
-            "type": "Message",
-            "source_id": "m1",
-            "properties": {
-              "interaction": "interaction-self-message",
-              "sequence": 1,
-              "message_sort": "synchCall"
-            }
-          },
-          "m2": {
-            "type": "Message",
-            "source_id": "m2",
-            "properties": {
-              "interaction": "interaction-self-message",
-              "sequence": 2,
-              "message_sort": "synchCall"
-            }
-          },
-          "m3": {
-            "type": "Message",
-            "source_id": "m3",
-            "properties": {
-              "interaction": "interaction-self-message",
-              "sequence": 3,
-              "message_sort": "reply"
-            }
-          }
-        },
-        "groups": {}
-      }
-      """;
+  private static final String METADATA = "fixtures/render-metadata/uml-sequence-self-message.json";
 
   @Test
   void selfMessageHookPathReturnsToTheStemWithAnArrowhead() throws Exception {
     ObjectNode input = JsonSupport.objectMapper().createObjectNode();
     input.set("layout_result", RenderTestSupport.fixtureJson(LAYOUT));
-    input.set("render_metadata", JsonSupport.objectMapper().readTree(RENDER_METADATA));
+    input.set("render_metadata", RenderTestSupport.fixtureJson(METADATA));
     input.set("policy", RenderTestSupport.fixtureJson(POLICY));
 
     Document svg = SvgAudit.parse(RenderTestSupport.render(input));

@@ -2,6 +2,7 @@ package dev.dediren.plugins.umlxmi.write.interaction;
 
 import static dev.dediren.plugins.umlxmi.build.XmiHelpers.*;
 
+import dev.dediren.contracts.DiagnosticCode;
 import dev.dediren.contracts.export.ExportRequest;
 import dev.dediren.contracts.source.GenericGraphPluginData;
 import dev.dediren.contracts.source.SourceNode;
@@ -9,6 +10,7 @@ import dev.dediren.contracts.source.SourceRelationship;
 import dev.dediren.plugins.umlxmi.build.ExportScope;
 import dev.dediren.plugins.umlxmi.build.IdentifierMap;
 import dev.dediren.plugins.umlxmi.build.XmiExportException;
+import dev.dediren.uml.UmlSequenceValidation;
 import java.math.BigInteger;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -18,17 +20,17 @@ public final class InteractionWriter {
   private InteractionWriter() {}
 
   private static final String UNSUPPORTED_SEQUENCE_MESSAGE_ENDPOINT =
-      "DEDIREN_UML_XMI_SEQUENCE_MESSAGE_ENDPOINT_UNSUPPORTED";
+      DiagnosticCode.UML_XMI_SEQUENCE_MESSAGE_ENDPOINT_UNSUPPORTED.code();
   private static final String UNSUPPORTED_SEQUENCE_FRAGMENT_OPERATOR =
-      "DEDIREN_UML_XMI_SEQUENCE_FRAGMENT_OPERATOR_UNSUPPORTED";
+      DiagnosticCode.UML_XMI_SEQUENCE_FRAGMENT_OPERATOR_UNSUPPORTED.code();
   private static final String MISSING_SEQUENCE_MESSAGE_INTERACTION =
-      "DEDIREN_UML_XMI_SEQUENCE_MESSAGE_INTERACTION_MISSING";
+      DiagnosticCode.UML_XMI_SEQUENCE_MESSAGE_INTERACTION_MISSING.code();
   private static final String UNSUPPORTED_SEQUENCE_MESSAGE_INTERACTION =
-      "DEDIREN_UML_XMI_SEQUENCE_MESSAGE_INTERACTION_UNSUPPORTED";
+      DiagnosticCode.UML_XMI_SEQUENCE_MESSAGE_INTERACTION_UNSUPPORTED.code();
   private static final String UNSUPPORTED_SEQUENCE_NODE =
-      "DEDIREN_UML_XMI_SEQUENCE_NODE_UNSUPPORTED";
+      DiagnosticCode.UML_XMI_SEQUENCE_NODE_UNSUPPORTED.code();
   private static final Set<String> SUPPORTED_SEQUENCE_FRAGMENT_OPERATORS =
-      Set.of("alt", "opt", "loop", "par");
+      UmlSequenceValidation.combinedFragmentOperators();
 
   public static void writeInteraction(
       StringBuilder xml,

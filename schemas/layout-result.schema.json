@@ -26,7 +26,7 @@
         "width": { "type": "number", "exclusiveMinimum": 0 },
         "height": { "type": "number", "exclusiveMinimum": 0 },
         "label": { "type": "string" },
-        "role": { "type": "string" },
+        "role": { "enum": ["lifeline", "interaction", "junction", "execution", "destruction"] },
         "source_pointer": { "type": "string", "pattern": "^/" }
       }
     },

@@ -4,6 +4,7 @@ import dev.dediren.contracts.layout.LaidOutEdge;
 import dev.dediren.contracts.layout.LaidOutNode;
 import dev.dediren.contracts.layout.LayoutEdge;
 import dev.dediren.contracts.layout.LayoutNode;
+import dev.dediren.contracts.layout.LayoutNodeRole;
 import dev.dediren.contracts.layout.LayoutResult;
 import dev.dediren.contracts.layout.Point;
 import dev.dediren.ir.BandMember;
@@ -239,7 +240,7 @@ final class LayoutIntentNormalizer {
 
     List<LaidOutNode> normalized = new ArrayList<>();
     for (LaidOutNode node : nodes) {
-      if ("interaction".equals(node.role())) {
+      if (LayoutNodeRole.isInteraction(node.role())) {
         normalized.add(
             new LaidOutNode(
                 node.id(),

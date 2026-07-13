@@ -8,19 +8,12 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 
 public final class SchemaCacheModule {
   private SchemaCacheModule() {}
-
-  public static String moduleName() {
-    return "schema-cache";
-  }
-
-  public static Optional<Path> nonEmptyEnvPath(String name) {
-    return nonEmptyEnvPath(System.getenv(), name);
-  }
 
   public static Optional<Path> nonEmptyEnvPath(Map<String, String> env, String name) {
     String value = env.get(name);
@@ -30,17 +23,40 @@ public final class SchemaCacheModule {
     return Optional.of(Path.of(value));
   }
 
+  /**
+   * Decision 9 resolution site: rewrites the named relative schema/cache env values so they resolve
+   * against {@code productRoot} rather than the JVM cwd. {@link Path#resolve(Path)} returns an
+   * absolute value unchanged, so a caller that supplies the child cwd as the product root gets
+   * byte-identical behavior to a bare {@code Path.of(value)}.
+   *
+   * <p>Shared by both export engines. Engines may not depend on each other, so this lives in the
+   * schema-cache seam they both already depend on rather than in a copy apiece.
+   */
+  public static Map<String, String> productRootRelativeEnv(
+      Map<String, String> env, Path productRoot, String... pathEnvNames) {
+    Map<String, String> resolved = new LinkedHashMap<>(env);
+    for (String name : pathEnvNames) {
+      String value = env.get(name);
+      if (value != null && !value.isEmpty()) {
+        resolved.put(name, productRoot.resolve(value).toString());
+      }
+    }
+    return resolved;
+  }
+
+  /** Returns the validator command an env override names, or {@code defaultCommand} if unset. */
+  public static String configuredValidator(
+      Map<String, String> env, String validatorEnvName, String defaultCommand) {
+    String configured = env.get(validatorEnvName);
+    return configured == null || configured.isBlank() ? defaultCommand : configured;
+  }
+
   public static boolean isNonEmptyFile(Path path) {
     try {
       return Files.isRegularFile(path) && Files.size(path) > 0;
     } catch (IOException error) {
       return false;
     }
-  }
-
-  public static Path schemaCacheBaseDir(String cacheDirEnv, String fallbackEnv)
-      throws SchemaCacheException {
-    return schemaCacheBaseDir(System.getenv(), cacheDirEnv, fallbackEnv);
   }
 
   public static Path schemaCacheBaseDir(
@@ -170,10 +186,14 @@ public final class SchemaCacheModule {
                   "--output",
                   destination.toString())
               .start();
-      byte[] stdout = process.getInputStream().readAllBytes();
-      byte[] stderr = process.getErrorStream().readAllBytes();
+      // Both pipes are drained concurrently: a verbose fetch failure that fills the ~64 KiB stderr
+      // pipe would otherwise block the child in write(2) forever while this thread waited on a
+      // stdout EOF that can never arrive.
+      StreamDrain stdout = StreamDrain.start(process.getInputStream());
+      StreamDrain stderr = StreamDrain.start(process.getErrorStream());
       int exitCode = process.waitFor();
-      return new SchemaFetchResult(exitCode == 0, command, exitCode, stdout, stderr);
+      return new SchemaFetchResult(
+          exitCode == 0, command, exitCode, stdout.await(), stderr.await());
     };
   }
 

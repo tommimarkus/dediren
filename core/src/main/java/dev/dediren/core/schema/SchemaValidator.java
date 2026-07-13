@@ -26,25 +26,6 @@ public final class SchemaValidator {
     return new SchemaValidator(repositoryRoot.toAbsolutePath().normalize());
   }
 
-  public List<String> compile(String schemaPath) {
-    try {
-      loadSchema(schemaPath);
-      return List.of();
-    } catch (IOException | RuntimeException error) {
-      return List.of(error.getMessage());
-    }
-  }
-
-  public List<String> validateFixture(String schemaPath, String fixturePath) {
-    try {
-      JsonNode document =
-          JsonSupport.objectMapper().readTree(repositoryRoot.resolve(fixturePath).toFile());
-      return validate(schemaPath, document);
-    } catch (RuntimeException error) {
-      return List.of(error.getMessage());
-    }
-  }
-
   public List<String> validate(String schemaPath, JsonNode document) {
     try {
       Schema schema = loadSchema(schemaPath);

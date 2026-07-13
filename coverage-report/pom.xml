@@ -25,13 +25,30 @@
     <profile>
       <id>coverage</id>
       <dependencies>
-        <!-- Aggregate coverage set: the 13 gated product modules. Keep this in
+        <!-- Aggregate coverage set: the 15 gated product modules. Keep this in
              sync with the product modules — a new product module must be added
              here to appear in the reactor aggregate report (it is gated by the
-             root profile automatically unless skipped). -->
+             root profile automatically unless skipped).
+
+             ir and engine-api were missing until 2026-07-13: both are shipped
+             product modules (DistTool.FIRST_PARTY_ARTIFACTS lists them), so the
+             aggregate silently under-reported the reactor by ~1,034 main LOC and
+             anyone reading it believed those modules were counted. -->
         <dependency>
           <groupId>dev.dediren</groupId>
           <artifactId>contracts</artifactId>
+          <version>${project.version}</version>
+          <scope>runtime</scope>
+        </dependency>
+        <dependency>
+          <groupId>dev.dediren</groupId>
+          <artifactId>ir</artifactId>
+          <version>${project.version}</version>
+          <scope>runtime</scope>
+        </dependency>
+        <dependency>
+          <groupId>dev.dediren</groupId>
+          <artifactId>engine-api</artifactId>
           <version>${project.version}</version>
           <scope>runtime</scope>
         </dependency>

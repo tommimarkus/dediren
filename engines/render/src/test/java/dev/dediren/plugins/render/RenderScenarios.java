@@ -32,7 +32,9 @@ final class RenderScenarios {
   static Stream<Arguments> sequence() {
     return Stream.of(
         scenario("uml-sequence-basic", "uml-svg", "uml-sequence-basic"),
-        scenario("uml-sequence-fragments", "uml-svg", "uml-sequence-fragments"));
+        scenario("uml-sequence-fragments", "uml-svg", "uml-sequence-fragments"),
+        scenario("uml-sequence-self-message", "uml-svg", "uml-sequence-self-message"),
+        scenario("uml-sequence-lifecycle", "uml-svg", "uml-sequence-lifecycle"));
   }
 
   static Stream<Arguments> all() {

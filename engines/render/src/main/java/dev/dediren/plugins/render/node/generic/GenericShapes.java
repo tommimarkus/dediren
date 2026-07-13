@@ -1,5 +1,6 @@
 package dev.dediren.plugins.render.node.generic;
 
+import static dev.dediren.plugins.render.svg.Svg.f1;
 import static dev.dediren.plugins.render.svg.Svg.styleNumber;
 
 import dev.dediren.contracts.layout.LaidOutNode;
@@ -200,9 +201,5 @@ public final class GenericShapes {
         .attr("fill", style.fill())
         .attr("stroke", style.stroke())
         .attr("stroke-width", styleNumber(style.strokeWidth()));
-  }
-
-  private static String f1(double value) {
-    return String.format(Locale.ROOT, "%.1f", value);
   }
 }

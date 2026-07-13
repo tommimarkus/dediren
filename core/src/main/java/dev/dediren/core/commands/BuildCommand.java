@@ -21,8 +21,8 @@ import dev.dediren.contracts.source.GenericGraphView;
 import dev.dediren.contracts.source.SourceDocument;
 import dev.dediren.core.DedirenPaths;
 import dev.dediren.core.engine.EngineDispatch;
-import dev.dediren.core.plugins.PluginExecutionException;
-import dev.dediren.core.plugins.PluginRunOutcome;
+import dev.dediren.core.engine.EngineExecutionException;
+import dev.dediren.core.engine.EngineRunOutcome;
 import dev.dediren.core.source.SourceValidator;
 import dev.dediren.core.source.ValidationResult;
 import dev.dediren.engine.Engines;
@@ -77,8 +77,8 @@ public final class BuildCommand {
 
   private BuildCommand() {}
 
-  public static PluginRunOutcome run(BuildRequest request, Engines engines)
-      throws PluginExecutionException {
+  public static EngineRunOutcome run(BuildRequest request, Engines engines)
+      throws EngineExecutionException {
     if (request.renderPolicyText() == null
         && request.oefPolicyText() == null
         && request.xmiPolicyText() == null) {
@@ -126,7 +126,7 @@ public final class BuildCommand {
   }
 
   private static List<String> selectViews(BuildRequest request, SourceDocument source)
-      throws PluginExecutionException {
+      throws EngineExecutionException {
     if (!request.views().isEmpty()) {
       return request.views();
     }
@@ -139,7 +139,7 @@ public final class BuildCommand {
           JsonSupport.objectMapper().treeToValue(genericGraph, GenericGraphPluginData.class);
       return data.views().stream().map(GenericGraphView::id).toList();
     } catch (RuntimeException error) {
-      throw PluginExecutionException.command(
+      throw EngineExecutionException.command(
           DiagnosticCode.COMMAND_INPUT_INVALID.code(),
           "build",
           "generic-graph view list is unreadable: " + error.getMessage());
@@ -204,8 +204,10 @@ public final class BuildCommand {
         layout.stageDiagnostics());
     warning |= layout.warning();
 
-    // Stage 3: layout-quality validation over the mapped record (unchanged verdict semantics).
-    ValidationResult quality = CoreCommands.validateLayout(layoutRecord);
+    // Stage 3: layout-quality validation. The scene is passed alongside the record it was mapped
+    // from, so the sequence invariants reuse it instead of re-deriving it (record -> scene) — one
+    // whole-graph conversion per built view that bought nothing. Verdict semantics unchanged.
+    ValidationResult quality = CoreCommands.validateLayout(laid, layoutRecord);
     diagnostics.addAll(quality.envelope().diagnostics());
     if (quality.envelope().status() == EnvelopeStatus.ERROR) {
       return failedView(view, artifacts, diagnostics, quality.exitCode());
@@ -328,7 +330,7 @@ public final class BuildCommand {
 
   /**
    * Runs one in-memory stage, folding the two published stage failures into the per-view
-   * diagnostics exactly as the process CLI did: a structured {@link PluginExecutionException}
+   * diagnostics exactly as the process CLI did: a structured {@link EngineExecutionException}
    * (unknown engine, unsupported capability, invalid policy JSON, or an unexpected engine failure)
    * folds with a {@code PLUGIN_ERROR} exit; a raw {@link UncheckedIOException} structural failure
    * (an unresolvable {@code --views} entry) folds with an {@code INPUT_ERROR} exit so it never
@@ -339,7 +341,7 @@ public final class BuildCommand {
     EngineDispatch.InMemoryOutcome<T> outcome;
     try {
       outcome = call.run();
-    } catch (PluginExecutionException error) {
+    } catch (EngineExecutionException error) {
       diagnostics.add(error.diagnostic());
       return InMemoryStage.crashed(CommandExitCode.PLUGIN_ERROR.code());
     } catch (UncheckedIOException error) {
@@ -441,11 +443,11 @@ public final class BuildCommand {
         new BuildViewOutcome(view, EnvelopeStatus.ERROR, artifacts, diagnostics), exitCode);
   }
 
-  private static PluginRunOutcome buildLevelError(Diagnostic diagnostic) {
+  private static EngineRunOutcome buildLevelError(Diagnostic diagnostic) {
     return buildLevelError(List.of(diagnostic));
   }
 
-  private static PluginRunOutcome buildLevelError(List<Diagnostic> diagnostics) {
+  private static EngineRunOutcome buildLevelError(List<Diagnostic> diagnostics) {
     return outcome(
         new BuildResult(
             ContractVersions.BUILD_RESULT_SCHEMA_VERSION,
@@ -455,9 +457,9 @@ public final class BuildCommand {
         CommandExitCode.INPUT_ERROR.code());
   }
 
-  private static PluginRunOutcome outcome(BuildResult result, int exitCode) {
+  private static EngineRunOutcome outcome(BuildResult result, int exitCode) {
     try {
-      return new PluginRunOutcome(JsonSupport.objectMapper().writeValueAsString(result), exitCode);
+      return new EngineRunOutcome(JsonSupport.objectMapper().writeValueAsString(result), exitCode);
     } catch (RuntimeException error) {
       throw new IllegalStateException("build result should serialize", error);
     }
@@ -465,7 +467,7 @@ public final class BuildCommand {
 
   @FunctionalInterface
   private interface InMemoryCall<T> {
-    EngineDispatch.InMemoryOutcome<T> run() throws PluginExecutionException;
+    EngineDispatch.InMemoryOutcome<T> run() throws EngineExecutionException;
   }
 
   private record InMemoryStage<T>(

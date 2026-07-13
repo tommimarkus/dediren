@@ -3,6 +3,7 @@ package dev.dediren.plugins.render.node.archimate;
 import static dev.dediren.plugins.render.node.NodeShapeSupport.ARCHIMATE_ICON_SIZE;
 import static dev.dediren.plugins.render.node.NodeShapeSupport.ARCHIMATE_ICON_TOP_INSET;
 import static dev.dediren.plugins.render.node.NodeShapeSupport.decoratorName;
+import static dev.dediren.plugins.render.svg.Svg.f1;
 import static dev.dediren.plugins.render.svg.Svg.styleNumber;
 
 import dev.dediren.contracts.layout.LaidOutNode;
@@ -1608,9 +1609,5 @@ public final class ArchimateIcons {
       case ARCHIMATE_PATH -> ArchimateIconKind.PATH;
       default -> throw new IllegalArgumentException("not an ArchiMate decorator: " + decorator);
     };
-  }
-
-  private static String f1(double value) {
-    return String.format(Locale.ROOT, "%.1f", value);
   }
 }

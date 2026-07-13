@@ -1,5 +1,7 @@
 package dev.dediren.uml;
 
+import dev.dediren.contracts.DiagnosticCode;
+
 public final class UmlValidationException extends Exception {
   private final UmlTypeKind kind;
   private final String value;
@@ -14,13 +16,13 @@ public final class UmlValidationException extends Exception {
 
   public String code() {
     return switch (kind) {
-      case ELEMENT -> "DEDIREN_UML_ELEMENT_TYPE_UNSUPPORTED";
-      case ELEMENT_PROPERTY -> "DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED";
-      case RELATIONSHIP -> "DEDIREN_UML_RELATIONSHIP_TYPE_UNSUPPORTED";
-      case RELATIONSHIP_PROPERTY -> "DEDIREN_UML_RELATIONSHIP_PROPERTY_INVALID";
-      case RELATIONSHIP_ENDPOINT -> "DEDIREN_UML_RELATIONSHIP_ENDPOINT_UNSUPPORTED";
-      case MULTIPLICITY -> "DEDIREN_UML_MULTIPLICITY_INVALID";
-      case VIEW_KIND -> "DEDIREN_UML_VIEW_KIND_UNSUPPORTED_ELEMENT";
+      case ELEMENT -> DiagnosticCode.UML_ELEMENT_TYPE_UNSUPPORTED.code();
+      case ELEMENT_PROPERTY -> DiagnosticCode.UML_ELEMENT_PROPERTY_UNSUPPORTED.code();
+      case RELATIONSHIP -> DiagnosticCode.UML_RELATIONSHIP_TYPE_UNSUPPORTED.code();
+      case RELATIONSHIP_PROPERTY -> DiagnosticCode.UML_RELATIONSHIP_PROPERTY_INVALID.code();
+      case RELATIONSHIP_ENDPOINT -> DiagnosticCode.UML_RELATIONSHIP_ENDPOINT_UNSUPPORTED.code();
+      case MULTIPLICITY -> DiagnosticCode.UML_MULTIPLICITY_INVALID.code();
+      case VIEW_KIND -> DiagnosticCode.UML_VIEW_KIND_UNSUPPORTED_ELEMENT.code();
     };
   }
 

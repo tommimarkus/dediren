@@ -9,8 +9,6 @@ import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.contracts.layout.SemanticValidationResult;
 import dev.dediren.contracts.render.RenderResult;
 import dev.dediren.core.commands.CoreCommands;
-import dev.dediren.core.plugins.PluginExecutionException;
-import dev.dediren.core.plugins.PluginRunOutcome;
 import dev.dediren.engine.EngineException;
 import dev.dediren.engine.EngineResult;
 import dev.dediren.engine.Engines;
@@ -35,7 +33,7 @@ class EngineDispatchTest {
 
   @Test
   void successWithoutDiagnosticsProducesOkEnvelope() throws Exception {
-    PluginRunOutcome outcome =
+    EngineRunOutcome outcome =
         EngineDispatch.dispatch("fake", () -> new EngineResult<>(VALUE, List.of()));
 
     assertThat(outcome.exitCode()).isZero();
@@ -51,7 +49,7 @@ class EngineDispatchTest {
         new Diagnostic(
             "DEDIREN_OEF_VIEWS_OMITTED", DiagnosticSeverity.INFO, "one view omitted", "p");
 
-    PluginRunOutcome outcome =
+    EngineRunOutcome outcome =
         EngineDispatch.dispatch("fake", () -> new EngineResult<>(VALUE, List.of(info)));
 
     assertThat(outcome.exitCode()).isZero();
@@ -66,7 +64,7 @@ class EngineDispatchTest {
     Diagnostic warning =
         new Diagnostic("DEDIREN_TEST_WARNING", DiagnosticSeverity.WARNING, "watch out", null);
 
-    PluginRunOutcome outcome =
+    EngineRunOutcome outcome =
         EngineDispatch.dispatch("fake", () -> new EngineResult<>(VALUE, List.of(warning)));
 
     assertThat(outcome.exitCode()).isZero();
@@ -112,7 +110,7 @@ class EngineDispatchTest {
   @Test
   void dispatchInMemoryThrowsEngineFailedOnUnexpectedException() {
     // The third branch: an unexpected failure is not folded into a Failure outcome but thrown as a
-    // structured PluginExecutionException, exactly as the serializing dispatch does.
+    // structured EngineExecutionException, exactly as the serializing dispatch does.
     assertThatThrownBy(
             () ->
                 EngineDispatch.dispatchInMemory(
@@ -120,10 +118,10 @@ class EngineDispatchTest {
                     () -> {
                       throw new IllegalStateException("kaboom");
                     }))
-        .isInstanceOf(PluginExecutionException.class)
+        .isInstanceOf(EngineExecutionException.class)
         .satisfies(
             error ->
-                assertThat(((PluginExecutionException) error).diagnostic().code())
+                assertThat(((EngineExecutionException) error).diagnostic().code())
                     .isEqualTo("DEDIREN_ENGINE_FAILED"));
   }
 
@@ -150,7 +148,7 @@ class EngineDispatchTest {
         List.of(
             new Diagnostic("DEDIREN_ELK_LAYOUT_FAILED", DiagnosticSeverity.ERROR, "boom", null));
 
-    PluginRunOutcome outcome =
+    EngineRunOutcome outcome =
         EngineDispatch.dispatch(
             "fake",
             () -> {
@@ -175,7 +173,7 @@ class EngineDispatchTest {
                 "layout request JSON is invalid",
                 null));
 
-    PluginRunOutcome outcome =
+    EngineRunOutcome outcome =
         EngineDispatch.dispatch(
             "fake",
             () -> {
@@ -196,10 +194,10 @@ class EngineDispatchTest {
                     () -> {
                       throw new IllegalStateException("kaboom");
                     }))
-        .isInstanceOf(PluginExecutionException.class)
+        .isInstanceOf(EngineExecutionException.class)
         .satisfies(
             error ->
-                assertThat(((PluginExecutionException) error).diagnostic().code())
+                assertThat(((EngineExecutionException) error).diagnostic().code())
                     .isEqualTo("DEDIREN_ENGINE_FAILED"));
   }
 
@@ -216,10 +214,10 @@ class EngineDispatchTest {
                       sneakyThrow(new IOException("checked kaboom"));
                       return null;
                     }))
-        .isInstanceOf(PluginExecutionException.class)
+        .isInstanceOf(EngineExecutionException.class)
         .satisfies(
             error ->
-                assertThat(((PluginExecutionException) error).diagnostic().code())
+                assertThat(((EngineExecutionException) error).diagnostic().code())
                     .isEqualTo("DEDIREN_ENGINE_FAILED"));
   }
 
@@ -264,10 +262,10 @@ class EngineDispatchTest {
 
     assertThatThrownBy(
             () -> CoreCommands.layoutCommand("no-such-engine", LAYOUT_REQUEST, Map.of(), empty))
-        .isInstanceOf(PluginExecutionException.class)
+        .isInstanceOf(EngineExecutionException.class)
         .satisfies(
             error ->
-                assertThat(((PluginExecutionException) error).diagnostic().code())
+                assertThat(((EngineExecutionException) error).diagnostic().code())
                     .isEqualTo("DEDIREN_PLUGIN_UNKNOWN"));
   }
 
@@ -280,10 +278,10 @@ class EngineDispatchTest {
 
     assertThatThrownBy(
             () -> CoreCommands.layoutCommand("fake-render", LAYOUT_REQUEST, Map.of(), engines))
-        .isInstanceOf(PluginExecutionException.class)
+        .isInstanceOf(EngineExecutionException.class)
         .satisfies(
             error ->
-                assertThat(((PluginExecutionException) error).diagnostic().code())
+                assertThat(((EngineExecutionException) error).diagnostic().code())
                     .isEqualTo("DEDIREN_PLUGIN_UNSUPPORTED_CAPABILITY"));
   }
 
@@ -314,7 +312,7 @@ class EngineDispatchTest {
     throw (T) error;
   }
 
-  private static JsonNode envelope(PluginRunOutcome outcome) {
+  private static JsonNode envelope(EngineRunOutcome outcome) {
     return JsonSupport.objectMapper().readTree(outcome.stdout());
   }
 }

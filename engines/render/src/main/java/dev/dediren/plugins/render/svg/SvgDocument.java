@@ -22,6 +22,8 @@ import static dev.dediren.plugins.render.svg.EdgeRenderer.lineJumps;
 import static dev.dediren.plugins.render.svg.Geometry.labelObstacleBoxesForEdge;
 import static dev.dediren.plugins.render.svg.Geometry.svgBounds;
 import static dev.dediren.plugins.render.svg.Svg.dashArrayValue;
+import static dev.dediren.plugins.render.svg.Svg.f1;
+import static dev.dediren.plugins.render.svg.Svg.opacity;
 import static dev.dediren.plugins.render.svg.Svg.styleNumber;
 
 import dev.dediren.contracts.layout.LaidOutEdge;
@@ -336,14 +338,6 @@ public final class SvgDocument {
       return;
     }
     archimateNodeDecorator(w, node, style, decorator);
-  }
-
-  private static String f1(double value) {
-    return String.format(Locale.ROOT, "%.1f", value);
-  }
-
-  private static String opacity(Double value) {
-    return value == null ? null : styleNumber(value);
   }
 
   private static String enumValue(Enum<?> value) {

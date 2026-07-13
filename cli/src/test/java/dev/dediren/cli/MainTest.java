@@ -23,11 +23,6 @@ class MainTest {
   @TempDir Path temp;
 
   @Test
-  void moduleLoads() {
-    assertThat(Main.moduleName()).isEqualTo("cli");
-  }
-
-  @Test
   void versionCommandReportsProductVersion() {
     CliResult result = Main.executeForTesting(new String[] {"--version"}, "");
 

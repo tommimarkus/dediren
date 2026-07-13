@@ -1,5 +1,6 @@
 package dev.dediren.ir.quality;
 
+import dev.dediren.contracts.layout.LayoutNodeRole;
 import dev.dediren.contracts.layout.Point;
 import dev.dediren.ir.LaidOutScene;
 import dev.dediren.ir.PlacedNode;
@@ -20,11 +21,10 @@ import java.util.Map;
  */
 public final class SequenceInvariants {
 
-  // Mirrors core's LayoutQuality#ROUTE_ENDPOINT_TOLERANCE / #onLifelineAxis: sequence message
-  // endpoints anchor to the lifeline axis (the participant head-box center-x, per the render
-  // engine's own stem/message-endpoint convention), so the same tolerance that accepts a message
-  // endpoint there is reused here to keep the two checks consistent.
-  private static final double LIFELINE_AXIS_TOLERANCE = 1.5;
+  // Sequence message endpoints anchor to the lifeline axis (the participant head-box centre-x, per
+  // the render engine's stem/message-endpoint convention). core's perimeter check accepts the same
+  // slack, so the value is declared once in LayoutTolerances and consumed by both.
+  private static final double LIFELINE_AXIS_TOLERANCE = LayoutTolerances.ROUTE_ENDPOINT_TOLERANCE;
 
   private SequenceInvariants() {}
 
@@ -121,7 +121,7 @@ public final class SequenceInvariants {
   public static List<InvariantViolation> interactionFrameEnclosesLifelines(LaidOutScene scene) {
     PlacedNode frame =
         scene.nodes().stream()
-            .filter(node -> "interaction".equals(node.role()))
+            .filter(node -> LayoutNodeRole.isInteraction(node.role()))
             .findFirst()
             .orElse(null);
     if (frame == null) {
@@ -200,7 +200,7 @@ public final class SequenceInvariants {
   }
 
   private static boolean isLifeline(PlacedNode node) {
-    return node != null && "lifeline".equals(node.role());
+    return node != null && LayoutNodeRole.isLifeline(node.role());
   }
 
   private static boolean isMessage(RoutedEdge edge, Map<String, PlacedNode> nodesById) {

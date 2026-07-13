@@ -11,6 +11,8 @@
 **/*.svg
 !/docs/assets/pipeline.svg
 !/docs/assets/badges.svg
+# Render goldens are the geometry oracle (RenderGoldenTest) and are checked in on purpose.
+!/engines/render/src/test/resources/golden/*.svg
 .codex/rules/default.rules
 .codex/config.toml
 .mcp.json

@@ -9,6 +9,7 @@ import static dev.dediren.plugins.umlxmi.write.interaction.InteractionWriter.val
 
 import dev.dediren.contracts.ContractVersions;
 import dev.dediren.contracts.Diagnostic;
+import dev.dediren.contracts.DiagnosticCode;
 import dev.dediren.contracts.DiagnosticSeverity;
 import dev.dediren.contracts.export.ExportRequest;
 import dev.dediren.contracts.export.ExportResult;
@@ -65,7 +66,7 @@ public final class XmiExportEngine implements ExportEngine {
       validatePolicy(request.policy());
       policy = JsonSupport.objectMapper().treeToValue(request.policy(), UmlXmiExportPolicy.class);
     } catch (IllegalArgumentException error) {
-      throw failure("DEDIREN_UML_XMI_POLICY_INVALID", error.getMessage(), "policy");
+      throw failure(DiagnosticCode.UML_XMI_POLICY_INVALID.code(), error.getMessage(), "policy");
     }
 
     try {
@@ -116,7 +117,7 @@ public final class XmiExportEngine implements ExportEngine {
     if (coverage.omittedNodes() > 0) {
       diagnostics.add(
           new Diagnostic(
-              "DEDIREN_XMI_ELEMENTS_OMITTED",
+              DiagnosticCode.XMI_ELEMENTS_OMITTED.code(),
               DiagnosticSeverity.INFO,
               coverage.omittedNodes()
                   + " of "
@@ -131,7 +132,7 @@ public final class XmiExportEngine implements ExportEngine {
     if (coverage.omittedRelationships() > 0) {
       diagnostics.add(
           new Diagnostic(
-              "DEDIREN_XMI_RELATIONSHIPS_OMITTED",
+              DiagnosticCode.XMI_RELATIONSHIPS_OMITTED.code(),
               DiagnosticSeverity.INFO,
               coverage.omittedRelationships()
                   + " of "

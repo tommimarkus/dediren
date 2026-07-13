@@ -133,7 +133,6 @@
       "additionalProperties": false,
       "properties": {
         "style": { "enum": ["orthogonal", "polyline", "spline"] },
-        "profile": { "enum": ["compact", "readable", "spacious"] },
         "endpoint_merging": { "enum": ["off", "local", "auto"] }
       }
     },

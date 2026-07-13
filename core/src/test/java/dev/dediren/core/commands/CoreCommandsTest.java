@@ -11,7 +11,7 @@ import dev.dediren.contracts.layout.LaidOutNode;
 import dev.dediren.contracts.layout.LayoutRequest;
 import dev.dediren.contracts.layout.LayoutResult;
 import dev.dediren.contracts.layout.Point;
-import dev.dediren.core.plugins.PluginRunOutcome;
+import dev.dediren.core.engine.EngineRunOutcome;
 import dev.dediren.core.source.ValidationResult;
 import dev.dediren.engine.EngineResult;
 import dev.dediren.engine.Engines;
@@ -50,7 +50,7 @@ class CoreCommandsTest {
                 }
                 """;
 
-    PluginRunOutcome outcome =
+    EngineRunOutcome outcome =
         CoreCommands.semanticValidateCommand(
             "missing-engine", "archimate", input, null, Map.of(), emptyEngines());
 
@@ -267,7 +267,7 @@ class CoreCommandsTest {
                 }
                 """;
 
-    PluginRunOutcome outcome =
+    EngineRunOutcome outcome =
         CoreCommands.layoutCommand("fake-layout", request, Map.of(), engines);
 
     assertThat(outcome.exitCode()).isZero();
@@ -297,7 +297,7 @@ class CoreCommandsTest {
                 }
                 """;
 
-    PluginRunOutcome outcome =
+    EngineRunOutcome outcome =
         CoreCommands.layoutCommand("fake-layout", enveloped, Map.of(), engines);
 
     assertThat(outcome.exitCode()).isZero();

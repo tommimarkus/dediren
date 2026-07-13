@@ -28,13 +28,9 @@ class SequenceFragmentAlignmentTest {
   private static final String METADATA = "fixtures/render-metadata/uml-sequence-fragments.json";
   private static final double TOLERANCE = 1.0;
 
-  // fixtures/layout-result/uml-sequence-fragments.json and
-  // fixtures/layout-result/uml-sequence-fragment-chrome.json are real generic-graph + elk-layout
-  // engine output from the same (source, view) pair (Plan B P2, Task 10/11 fixture regeneration)
-  // and are therefore byte-identical; both files are kept because other suites still reference
-  // each by name (see LayoutFixtureRegenerator's Javadoc), but this test only needs one, so all
-  // three cases below share LAYOUT, including the chrome/label-clearance check that previously
-  // needed a separately-spaced real fixture while LAYOUT was still hand-authored/idealised.
+  // fixtures/layout-result/uml-sequence-fragments.json is real generic-graph + elk-layout engine
+  // output. uml-sequence-fragment-chrome.json used to be a byte-identical second copy of it and
+  // was consolidated away; CHROME_LAYOUT stays as a name for the chrome/label-clearance case.
   private static final String CHROME_LAYOUT = LAYOUT;
   // Message labels are one font-size tall; chrome (operator tab, operand separators, guards) must
   // stay at least this far from every message label baseline to avoid overlapping the text.
