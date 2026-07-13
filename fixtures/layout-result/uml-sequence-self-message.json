@@ -1,0 +1,95 @@
+{
+  "layout_result_schema_version" : "layout-result.schema.v2",
+  "view_id" : "sequence-view",
+  "nodes" : [ {
+    "id" : "interaction-self-message",
+    "source_id" : "interaction-self-message",
+    "projection_id" : "interaction-self-message",
+    "x" : 111.0,
+    "y" : 304.0,
+    "width" : 435.0,
+    "height" : 144.0,
+    "label" : "Validate Order",
+    "role" : "interaction",
+    "source_pointer" : "/nodes/0"
+  }, {
+    "id" : "customer",
+    "source_id" : "customer",
+    "projection_id" : "customer",
+    "x" : 111.0,
+    "y" : 304.0,
+    "width" : 140.0,
+    "height" : 48.0,
+    "label" : "Customer",
+    "role" : "lifeline",
+    "source_pointer" : "/nodes/1"
+  }, {
+    "id" : "service",
+    "source_id" : "service",
+    "projection_id" : "service",
+    "x" : 406.0,
+    "y" : 304.0,
+    "width" : 140.0,
+    "height" : 48.0,
+    "label" : "Order Service",
+    "role" : "lifeline",
+    "source_pointer" : "/nodes/2"
+  } ],
+  "edges" : [ {
+    "id" : "m1",
+    "source" : "customer",
+    "target" : "service",
+    "source_id" : "m1",
+    "projection_id" : "m1",
+    "routing_hints" : [ ],
+    "points" : [ {
+      "x" : 181.0,
+      "y" : 376.0
+    }, {
+      "x" : 476.0,
+      "y" : 376.0
+    } ],
+    "label" : "placeOrder",
+    "source_pointer" : "/relationships/0"
+  }, {
+    "id" : "m2",
+    "source" : "service",
+    "target" : "service",
+    "source_id" : "m2",
+    "projection_id" : "m2",
+    "routing_hints" : [ ],
+    "points" : [ {
+      "x" : 476.0,
+      "y" : 400.0
+    }, {
+      "x" : 516.0,
+      "y" : 400.0
+    }, {
+      "x" : 516.0,
+      "y" : 424.0
+    }, {
+      "x" : 476.0,
+      "y" : 424.0
+    } ],
+    "label" : "validateOrder",
+    "source_pointer" : "/relationships/1"
+  }, {
+    "id" : "m3",
+    "source" : "service",
+    "target" : "customer",
+    "source_id" : "m3",
+    "projection_id" : "m3",
+    "routing_hints" : [ ],
+    "points" : [ {
+      "x" : 476.0,
+      "y" : 448.0
+    }, {
+      "x" : 181.0,
+      "y" : 448.0
+    } ],
+    "label" : "orderConfirmed",
+    "source_pointer" : "/relationships/2"
+  } ],
+  "groups" : [ ],
+  "warnings" : [ ]
+}
