@@ -90,6 +90,46 @@
     </Or>
   </Match>
 
+  <!-- EI_EXPOSE_REP / EI_EXPOSE_REP2: semantics-uml.SequenceConstraint's four
+       records (LifelineOrder, MessageOrder, FragmentOpen, OperandOpen; Plan B
+       P5 Task 2) follow the identical construction discipline as the
+       contracts.* / ir.* records above: each wraps its List<String> component
+       via ContractCollections.listOrEmpty(...) (List.copyOf) in a compact
+       constructor, so the shared reference is genuinely immutable. Suppressed
+       rather than defensive-copied for consistency with the contracts/ir
+       records. Tracked in architecture-guidelines.md §12. -->
+  <Match>
+    <Or>
+      <Class name="dev.dediren.semantics.uml.SequenceConstraint$LifelineOrder"/>
+      <Class name="dev.dediren.semantics.uml.SequenceConstraint$MessageOrder"/>
+      <Class name="dev.dediren.semantics.uml.SequenceConstraint$FragmentOpen"/>
+      <Class name="dev.dediren.semantics.uml.SequenceConstraint$OperandOpen"/>
+    </Or>
+    <Or>
+      <Bug pattern="EI_EXPOSE_REP"/>
+      <Bug pattern="EI_EXPOSE_REP2"/>
+    </Or>
+  </Match>
+
+  <!-- EI_EXPOSE_REP / EI_EXPOSE_REP2: ir.LayoutIntent's sole record variant
+       (OrderedBand; Plan B P5 Task 1) follows the identical construction
+       discipline as the contracts.* / ir.* / semantics-uml records above: it
+       wraps its List<BandMember> component via
+       ContractCollections.listOrEmpty(...) (List.copyOf) in a compact
+       constructor, so the shared reference is genuinely immutable.
+       ir.BandMember (String id, double leadingGap) holds no List/Map
+       component and SpotBugs does not flag it, so it is intentionally not
+       listed here. Suppressed rather than defensive-copied for consistency
+       with the contracts/ir/semantics-uml records. Tracked in
+       architecture-guidelines.md §12. -->
+  <Match>
+    <Class name="dev.dediren.ir.LayoutIntent$OrderedBand"/>
+    <Or>
+      <Bug pattern="EI_EXPOSE_REP"/>
+      <Bug pattern="EI_EXPOSE_REP2"/>
+    </Or>
+  </Match>
+
   <!-- MS_EXPOSE_REP: JsonSupport.objectMapper() intentionally returns the
        shared ObjectMapper singleton. It is mutable in place (.configure(),
        .registerModule()) and exposed by design (one canonical mapper). The

@@ -5,8 +5,11 @@ import dev.dediren.contracts.CommandExitCode;
 import dev.dediren.contracts.ContractVersions;
 import dev.dediren.contracts.Diagnostic;
 import dev.dediren.contracts.DiagnosticCode;
+import dev.dediren.contracts.DiagnosticSeverity;
 import dev.dediren.contracts.export.ExportRequest;
 import dev.dediren.contracts.json.JsonSupport;
+import dev.dediren.contracts.layout.LaidOutEdge;
+import dev.dediren.contracts.layout.LaidOutNode;
 import dev.dediren.contracts.layout.LayoutResult;
 import dev.dediren.contracts.render.RenderMetadata;
 import dev.dediren.contracts.source.SourceDocument;
@@ -29,9 +32,12 @@ import dev.dediren.ir.LaidOutScene;
 import dev.dediren.ir.LaidOutSceneMapper;
 import dev.dediren.ir.LayoutRequestMapper;
 import dev.dediren.ir.SceneGraph;
+import dev.dediren.ir.quality.InvariantViolation;
+import dev.dediren.ir.quality.SequenceInvariants;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import tools.jackson.databind.JsonNode;
@@ -179,7 +185,8 @@ public final class CoreCommands {
   }
 
   private static ValidationResult validateLayoutResult(LayoutResult result) {
-    List<Diagnostic> diagnostics = LayoutQuality.validateLayoutDiagnostics(result);
+    List<Diagnostic> diagnostics = new ArrayList<>(LayoutQuality.validateLayoutDiagnostics(result));
+    diagnostics.addAll(sequenceInvariantDiagnostics(result));
     if (!diagnostics.isEmpty()) {
       return new ValidationResult(
           CommandExitCode.INPUT_ERROR.code(), CommandEnvelope.error(diagnostics));
@@ -194,6 +201,55 @@ public final class CoreCommands {
             ? CommandEnvelope.ok(data)
             : CommandEnvelope.warning(data, qualityWarnings);
     return new ValidationResult(CommandExitCode.OK.code(), envelope);
+  }
+
+  /**
+   * The typed-IR geometric invariants over a UML-sequence layout (Plan B P5), folded into the same
+   * hard-error lane as {@link LayoutQuality#validateLayoutDiagnostics}: a violated invariant (for
+   * example a message endpoint off its lifeline axis) is an input error, consistent with that
+   * lane's {@code INPUT_ERROR} verdict. Non-sequence layouts carry no lifeline/interaction
+   * geometry, so every {@link SequenceInvariants} check returns empty and this contributes nothing.
+   */
+  private static List<Diagnostic> sequenceInvariantDiagnostics(LayoutResult result) {
+    LaidOutScene scene = LaidOutSceneMapper.toScene(result);
+    List<InvariantViolation> violations = new ArrayList<>();
+    violations.addAll(SequenceInvariants.messageEndpointsOnLifelineAxis(scene));
+    violations.addAll(SequenceInvariants.messageYStrictlyIncreasing(scene));
+    violations.addAll(SequenceInvariants.interactionFrameEnclosesLifelines(scene));
+    return violations.stream()
+        .map(violation -> sequenceInvariantDiagnostic(result, violation))
+        .toList();
+  }
+
+  private static Diagnostic sequenceInvariantDiagnostic(
+      LayoutResult result, InvariantViolation violation) {
+    return new Diagnostic(
+        DiagnosticCode.LAYOUT_SEQUENCE_INVARIANT_VIOLATED.code(),
+        DiagnosticSeverity.ERROR,
+        "sequence invariant '"
+            + violation.invariant()
+            + "' violated by '"
+            + violation.elementId()
+            + "': "
+            + violation.detail(),
+        elementPath(result, violation.elementId()),
+        violation.origin() == null ? null : violation.origin().value());
+  }
+
+  private static String elementPath(LayoutResult result, String elementId) {
+    List<LaidOutNode> nodes = result.nodes();
+    for (int nodeIndex = 0; nodeIndex < nodes.size(); nodeIndex++) {
+      if (nodes.get(nodeIndex).id().equals(elementId)) {
+        return "$.nodes[" + nodeIndex + "]";
+      }
+    }
+    List<LaidOutEdge> edges = result.edges();
+    for (int edgeIndex = 0; edgeIndex < edges.size(); edgeIndex++) {
+      if (edges.get(edgeIndex).id().equals(elementId)) {
+        return "$.edges[" + edgeIndex + "]";
+      }
+    }
+    return "$";
   }
 
   public static PluginRunOutcome renderCommand(

@@ -45,6 +45,11 @@ public enum DiagnosticCode {
   LAYOUT_SELF_LOOP_DEGENERATE("DEDIREN_LAYOUT_SELF_LOOP_DEGENERATE"),
   LAYOUT_QUALITY_WARNING("DEDIREN_LAYOUT_QUALITY_WARNING"),
 
+  // Sequence-diagram geometric invariants over the typed IR (core: CoreCommands, checks owned by
+  // ir.quality.SequenceInvariants). Folded into the same hard-error lane as the LAYOUT_* codes
+  // above: a violated invariant (e.g. a message endpoint off its lifeline axis) is an input error.
+  LAYOUT_SEQUENCE_INVARIANT_VIOLATED("DEDIREN_LAYOUT_SEQUENCE_INVARIANT_VIOLATED"),
+
   // Export schema-validator availability (export plugins; owned here for cross-module reuse).
   OEF_SCHEMA_VALIDATOR_UNAVAILABLE("DEDIREN_OEF_SCHEMA_VALIDATOR_UNAVAILABLE"),
   XMI_SCHEMA_VALIDATOR_UNAVAILABLE("DEDIREN_XMI_SCHEMA_VALIDATOR_UNAVAILABLE");

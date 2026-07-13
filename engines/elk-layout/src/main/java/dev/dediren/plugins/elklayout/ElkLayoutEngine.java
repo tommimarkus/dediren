@@ -22,6 +22,8 @@ import dev.dediren.contracts.layout.LayoutRequest;
 import dev.dediren.contracts.layout.LayoutResult;
 import dev.dediren.contracts.layout.LayoutRoutingPreferences;
 import dev.dediren.contracts.layout.Point;
+import dev.dediren.ir.LayoutIntent;
+import dev.dediren.ir.LayoutIntentCodec;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumMap;
@@ -75,8 +77,9 @@ final class ElkLayoutEngine {
     LayoutPreferences preferences = request.layoutPreferences();
     Map<String, String> nodePointers = nodeSourcePointers(request);
     Map<String, String> edgePointers = edgeSourcePointers(request);
-    SequenceLayoutConstraints sequenceConstraints =
-        SequenceLayoutConstraints.from(request, nodePointers, edgePointers);
+    List<LayoutIntent> intents = LayoutIntentCodec.decode(request.constraints());
+    LayoutIntentNormalizer sequenceConstraints =
+        LayoutIntentNormalizer.from(intents, nodePointers, edgePointers);
     Direction layoutDirection =
         sequenceConstraints.active()
             ? Direction.RIGHT
@@ -615,7 +618,7 @@ final class ElkLayoutEngine {
   private static Map<String, EdgeEndpointSides> sequenceEdgeEndpointSides(
       List<LayoutEdge> edges,
       Map<String, LayoutNode> nodes,
-      SequenceLayoutConstraints sequenceConstraints) {
+      LayoutIntentNormalizer sequenceConstraints) {
     Map<String, EdgeEndpointSides> sidesByEdge = new HashMap<>();
     EdgeEndpointSides defaultSides = defaultEndpointSides(Direction.RIGHT);
     for (LayoutEdge edge : edges) {

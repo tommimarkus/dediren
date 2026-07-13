@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.dediren.contracts.ContractVersions;
 import dev.dediren.contracts.layout.GroupProvenance;
-import dev.dediren.contracts.layout.LayoutConstraint;
 import dev.dediren.contracts.layout.LayoutDensity;
 import dev.dediren.contracts.layout.LayoutDirection;
 import dev.dediren.contracts.layout.LayoutEdge;
@@ -17,6 +16,10 @@ import dev.dediren.contracts.layout.LayoutResult;
 import dev.dediren.contracts.layout.LayoutRoutingPreferences;
 import dev.dediren.contracts.layout.LayoutRoutingProfile;
 import dev.dediren.contracts.layout.LayoutRoutingStyle;
+import dev.dediren.ir.Axis;
+import dev.dediren.ir.BandMember;
+import dev.dediren.ir.LayoutIntent.OrderedBand;
+import dev.dediren.ir.LayoutIntentCodec;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -119,7 +122,7 @@ class ElkLayoutProvenanceTest {
 
   // Regression coverage for the UML sequence path. Sequence requests are routed through
   // layoutFlat's construction site (same as the plain test above) and then rewritten by
-  // SequenceLayoutConstraints#normalize, which rebuilds LaidOutNode/LaidOutEdge a second and third
+  // LayoutIntentNormalizer#normalize, which rebuilds LaidOutNode/LaidOutEdge a second and third
   // time (lifeline-column normalization, interaction-band normalization, message-edge
   // normalization) at their own construction sites. Each of those sites must re-thread
   // nodePointers/edgePointers explicitly; this codebase has a documented history of the sequence
@@ -182,15 +185,14 @@ class ElkLayoutProvenanceTest {
                     null,
                     "/relationships/1")),
             List.of(),
-            List.of(
-                new LayoutConstraint(
-                    "sequence-view.uml.sequence.lifeline-order",
-                    "uml.sequence.lifeline-order",
-                    List.of("customer", "service")),
-                new LayoutConstraint(
-                    "sequence-view.uml.sequence.message-order",
-                    "uml.sequence.message-order",
-                    List.of("m1", "m2"))),
+            LayoutIntentCodec.encode(
+                "sequence-view",
+                List.of(
+                    new OrderedBand(
+                        Axis.X,
+                        List.of(new BandMember("customer", 0.0), new BandMember("service", 0.0))),
+                    new OrderedBand(
+                        Axis.Y, List.of(new BandMember("m1", 0.0), new BandMember("m2", 0.0))))),
             new LayoutPreferences(
                 LayoutDirection.RIGHT,
                 LayoutDensity.READABLE,

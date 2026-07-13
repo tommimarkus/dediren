@@ -54,7 +54,7 @@ class MainTest {
     assertThat(layoutRequestData.at("/view_id").asText()).isEqualTo("sequence-view");
     assertThat(layoutRequestData.get("constraints"))
         .extracting(constraint -> constraint.at("/kind").asText())
-        .containsExactly("uml.sequence.lifeline-order", "uml.sequence.message-order");
+        .containsExactly("ordered-band:x", "ordered-band:y");
     Path layoutRequestFile = writeStdout("sequence-layout-request.json", layoutRequest);
 
     CliResult renderMetadata = runRenderMetadata(env, source, "sequence-view");

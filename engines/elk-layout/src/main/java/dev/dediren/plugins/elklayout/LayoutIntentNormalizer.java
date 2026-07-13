@@ -2,84 +2,79 @@ package dev.dediren.plugins.elklayout;
 
 import dev.dediren.contracts.layout.LaidOutEdge;
 import dev.dediren.contracts.layout.LaidOutNode;
-import dev.dediren.contracts.layout.LayoutConstraint;
 import dev.dediren.contracts.layout.LayoutEdge;
 import dev.dediren.contracts.layout.LayoutNode;
-import dev.dediren.contracts.layout.LayoutRequest;
 import dev.dediren.contracts.layout.LayoutResult;
 import dev.dediren.contracts.layout.Point;
+import dev.dediren.ir.BandMember;
+import dev.dediren.ir.LayoutIntent;
+import dev.dediren.ir.LayoutIntent.OrderedBand;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import org.eclipse.elk.core.options.PortSide;
 
-final class SequenceLayoutConstraints {
-  private static final String LIFELINE_ORDER_KIND = "uml.sequence.lifeline-order";
-  private static final String MESSAGE_ORDER_KIND = "uml.sequence.message-order";
-  private static final String FRAGMENT_OPEN_KIND = "uml.sequence.fragment-open";
-  private static final String OPERAND_OPEN_KIND = "uml.sequence.operand-open";
+/**
+ * The sequence-diagram geometry normalizer read from the neutral typed {@link LayoutIntent} seam:
+ * column placement, non-overlap rebuild, message Y lattice, stem anchoring, message straightening,
+ * interaction enclosure, and provenance re-threading, driven by {@code List<LayoutIntent>} decoded
+ * from the {@code LayoutRequest} constraints rather than the former stringly {@code uml.sequence.*}
+ * DTOs. Since the Plan B P5 cutover {@link ElkLayoutEngine} wires this class and the former {@code
+ * SequenceLayoutConstraints} re-derivation is deleted.
+ */
+final class LayoutIntentNormalizer {
   private static final double MINIMUM_MESSAGE_Y_STEP = 1.0;
   private static final double MESSAGE_HEAD_GAP = 24.0;
   private static final double MESSAGE_Y_STEP = 24.0;
   private static final double LIFELINE_COLUMN_GAP = 96.0;
-  // Extra vertical room reserved before a message that opens a combined fragment (header band +
-  // first-operand guard) or a non-first operand (separator line + guard). Coupled with the
-  // renderer's FRAGMENT_VERTICAL_PADDING; kept in sync so the render chrome clears message labels.
-  private static final double FRAGMENT_OPEN_GAP = 46.0;
-  private static final double OPERAND_OPEN_GAP = 68.0;
 
   private final List<String> lifelineOrder;
   private final List<String> messageOrder;
   private final Map<String, Integer> lifelineIndexById;
   private final Map<String, Integer> messageIndexById;
-  private final Set<String> fragmentOpenIds;
-  private final Set<String> operandOpenIds;
+  private final Map<String, Double> messageLeadingGapById;
   private final Map<String, String> nodePointers;
   private final Map<String, String> edgePointers;
 
-  private SequenceLayoutConstraints(
-      List<String> lifelineOrder,
-      List<String> messageOrder,
-      List<String> fragmentOpenIds,
-      List<String> operandOpenIds,
+  private LayoutIntentNormalizer(
+      List<BandMember> lifelineMembers,
+      List<BandMember> messageMembers,
       Map<String, String> nodePointers,
       Map<String, String> edgePointers) {
-    this.lifelineOrder = List.copyOf(lifelineOrder);
-    this.messageOrder = List.copyOf(messageOrder);
+    this.lifelineOrder = memberIds(lifelineMembers);
+    this.messageOrder = memberIds(messageMembers);
     this.lifelineIndexById = indexById(this.lifelineOrder);
     this.messageIndexById = indexById(this.messageOrder);
-    this.fragmentOpenIds = Set.copyOf(fragmentOpenIds);
-    this.operandOpenIds = Set.copyOf(operandOpenIds);
+    this.messageLeadingGapById = leadingGapById(messageMembers);
     // Map.copyOf rejects null values; a missing/optional source pointer is a legitimate value
     // here (pure copy-through), so keep a plain defensive copy instead.
     this.nodePointers = new HashMap<>(nodePointers);
     this.edgePointers = new HashMap<>(edgePointers);
   }
 
-  static SequenceLayoutConstraints from(
-      LayoutRequest request, Map<String, String> nodePointers, Map<String, String> edgePointers) {
-    List<String> lifelineOrder = List.of();
-    List<String> messageOrder = List.of();
-    List<String> fragmentOpenIds = List.of();
-    List<String> operandOpenIds = List.of();
-    for (LayoutConstraint constraint : request.constraints()) {
-      if (LIFELINE_ORDER_KIND.equals(constraint.kind())) {
-        lifelineOrder = constraint.subjects();
-      } else if (MESSAGE_ORDER_KIND.equals(constraint.kind())) {
-        messageOrder = constraint.subjects();
-      } else if (FRAGMENT_OPEN_KIND.equals(constraint.kind())) {
-        fragmentOpenIds = constraint.subjects();
-      } else if (OPERAND_OPEN_KIND.equals(constraint.kind())) {
-        operandOpenIds = constraint.subjects();
+  static LayoutIntentNormalizer from(
+      List<LayoutIntent> intents,
+      Map<String, String> nodePointers,
+      Map<String, String> edgePointers) {
+    List<BandMember> lifelineMembers = List.of();
+    List<BandMember> messageMembers = List.of();
+    for (LayoutIntent intent : intents) {
+      if (intent instanceof OrderedBand orderedBand) {
+        switch (orderedBand.axis()) {
+          case X -> lifelineMembers = orderedBand.members();
+          case Y -> messageMembers = orderedBand.members();
+        }
       }
     }
-    return new SequenceLayoutConstraints(
-        lifelineOrder, messageOrder, fragmentOpenIds, operandOpenIds, nodePointers, edgePointers);
+    return new LayoutIntentNormalizer(lifelineMembers, messageMembers, nodePointers, edgePointers);
   }
 
+  // Mirrors the old SequenceLayoutConstraints#active(): the parsed lifeline-order AND
+  // message-order lists must both be non-empty, not merely "a band was present". The lowering can
+  // emit an OrderedBand(Axis.Y, []) for a sequence view with lifelines but zero messages, which
+  // must stay inactive exactly like the old stringly constraints did.
   boolean active() {
     return !lifelineOrder.isEmpty() && !messageOrder.isEmpty();
   }
@@ -364,11 +359,7 @@ final class SequenceLayoutConstraints {
           y += MESSAGE_Y_STEP;
         }
         String id = orderedMessages.get(index).id();
-        if (fragmentOpenIds.contains(id)) {
-          y += FRAGMENT_OPEN_GAP;
-        } else if (operandOpenIds.contains(id)) {
-          y += OPERAND_OPEN_GAP;
-        }
+        y += messageLeadingGapById.getOrDefault(id, 0.0);
         ySlots.add(y);
       }
       return ySlots;
@@ -404,6 +395,18 @@ final class SequenceLayoutConstraints {
     Map<String, LaidOutNode> byId = new HashMap<>();
     for (LaidOutNode node : nodes) {
       byId.put(node.id(), node);
+    }
+    return byId;
+  }
+
+  private static List<String> memberIds(List<BandMember> members) {
+    return members.stream().map(BandMember::id).toList();
+  }
+
+  private static Map<String, Double> leadingGapById(List<BandMember> members) {
+    Map<String, Double> byId = new HashMap<>();
+    for (BandMember member : members) {
+      byId.putIfAbsent(member.id(), member.leadingGap());
     }
     return byId;
   }

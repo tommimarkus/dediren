@@ -2,7 +2,6 @@ package dev.dediren.semantics.uml;
 
 import dev.dediren.contracts.Diagnostic;
 import dev.dediren.contracts.DiagnosticSeverity;
-import dev.dediren.contracts.layout.LayoutConstraint;
 import dev.dediren.contracts.source.GenericGraphPluginData;
 import dev.dediren.contracts.source.GenericGraphView;
 import dev.dediren.contracts.source.GenericGraphViewKind;
@@ -11,6 +10,7 @@ import dev.dediren.contracts.source.SourceNode;
 import dev.dediren.contracts.source.SourceRelationship;
 import dev.dediren.engine.EngineException;
 import dev.dediren.engine.NotationSemantics;
+import dev.dediren.ir.LayoutIntent;
 import dev.dediren.uml.Uml;
 import dev.dediren.uml.UmlValidationException;
 import java.util.List;
@@ -69,8 +69,8 @@ public final class UmlNotationSemantics implements NotationSemantics {
   }
 
   @Override
-  public List<LayoutConstraint> layoutConstraints(SourceDocument source, GenericGraphView view) {
-    return UmlSequenceConstraints.of(source, view);
+  public List<LayoutIntent> layoutIntents(SourceDocument source, GenericGraphView view) {
+    return UmlSequenceConstraints.lower(UmlSequenceConstraints.sequenceConstraints(source, view));
   }
 
   @Override

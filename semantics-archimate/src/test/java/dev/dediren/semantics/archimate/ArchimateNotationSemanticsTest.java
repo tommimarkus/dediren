@@ -42,7 +42,7 @@ class ArchimateNotationSemanticsTest {
   void filtersNothingHasNoConstraintsAndNoRenderSelectors() {
     SourceNode node = new SourceNode("n", "ApplicationComponent", "N", Map.of());
     assertThat(notation.isSourceOnlyNode(null, node)).isFalse();
-    assertThat(notation.layoutConstraints(null, null)).isEmpty();
+    assertThat(notation.layoutIntents(null, null)).isEmpty();
     assertThat(notation.nodeRenderProperties(node)).isNull();
     assertThat(notation.edgeRenderProperties(null)).isNull();
   }

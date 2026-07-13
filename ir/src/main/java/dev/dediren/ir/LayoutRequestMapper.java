@@ -51,7 +51,7 @@ public final class LayoutRequestMapper {
         nodes,
         edges,
         groups,
-        graph.constraints(),
+        LayoutIntentCodec.encode(graph.viewId(), graph.constraints()),
         graph.preferences());
   }
 
@@ -90,7 +90,12 @@ public final class LayoutRequestMapper {
             .map(g -> new SceneGroup(g.id(), g.label(), g.members(), g.provenance()))
             .toList();
     return new SceneGraph(
-        request.viewId(), nodes, edges, groups, request.constraints(), request.layoutPreferences());
+        request.viewId(),
+        nodes,
+        edges,
+        groups,
+        LayoutIntentCodec.decode(request.constraints()),
+        request.layoutPreferences());
   }
 
   private static String pointerValue(SourcePointer pointer) {

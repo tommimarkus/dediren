@@ -303,7 +303,7 @@ class ArchitectureRulesTest {
         .dependOnClassesThat()
         .resideInAnyPackage(SEMANTICS)
         .because(
-            "elk-layout consumes only stringly LayoutConstraints over contracts; a compile"
+            "elk-layout consumes only the typed LayoutIntent over ir; a compile"
                 + " edge to a semantics front end would recreate the notation coupling P3 removed (§2)")
         .check(PRODUCTION_CLASSES);
   }

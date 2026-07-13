@@ -3,12 +3,12 @@ package dev.dediren.engine;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 
-import dev.dediren.contracts.layout.LayoutConstraint;
 import dev.dediren.contracts.source.GenericGraphPluginData;
 import dev.dediren.contracts.source.GenericGraphView;
 import dev.dediren.contracts.source.SourceDocument;
 import dev.dediren.contracts.source.SourceNode;
 import dev.dediren.contracts.source.SourceRelationship;
+import dev.dediren.ir.LayoutIntent;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
@@ -41,8 +41,7 @@ class NotationSemanticsTest {
         }
 
         @Override
-        public List<LayoutConstraint> layoutConstraints(
-            SourceDocument source, GenericGraphView view) {
+        public List<LayoutIntent> layoutIntents(SourceDocument source, GenericGraphView view) {
           return List.of();
         }
 
@@ -63,7 +62,7 @@ class NotationSemanticsTest {
     assertThat(NEUTRAL.widthHint(null)).isEqualTo(160.0);
     assertThat(NEUTRAL.heightHint(null)).isEqualTo(80.0);
     assertThat(NEUTRAL.isSourceOnlyNode(null, null)).isFalse();
-    assertThat(NEUTRAL.layoutConstraints(null, null)).isEmpty();
+    assertThat(NEUTRAL.layoutIntents(null, null)).isEmpty();
     assertThat(NEUTRAL.nodeRenderProperties(null)).isNull();
     assertThat(NEUTRAL.edgeRenderProperties(null)).isNull();
     assertThatCode(() -> NEUTRAL.validate(null, null)).doesNotThrowAnyException();

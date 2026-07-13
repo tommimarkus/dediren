@@ -431,6 +431,7 @@
                 <param>dev.dediren.plugins.elklayout.*</param>
                 <param>dev.dediren.plugins.render.*</param>
                 <param>dev.dediren.plugins.umlxmi.*</param>
+                <param>dev.dediren.ir.*</param>
               </targetClasses>
               <outputFormats>
                 <param>HTML</param>

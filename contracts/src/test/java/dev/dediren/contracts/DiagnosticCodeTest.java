@@ -37,6 +37,8 @@ class DiagnosticCodeTest {
         .isEqualTo("DEDIREN_LAYOUT_JUNCTION_OFF_INCIDENT_ROUTE");
     assertThat(DiagnosticCode.LAYOUT_QUALITY_WARNING.code())
         .isEqualTo("DEDIREN_LAYOUT_QUALITY_WARNING");
+    assertThat(DiagnosticCode.LAYOUT_SEQUENCE_INVARIANT_VIOLATED.code())
+        .isEqualTo("DEDIREN_LAYOUT_SEQUENCE_INVARIANT_VIOLATED");
   }
 
   @Test

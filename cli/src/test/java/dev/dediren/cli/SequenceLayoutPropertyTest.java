@@ -23,6 +23,7 @@ import net.jqwik.api.Combinators;
 import net.jqwik.api.ForAll;
 import net.jqwik.api.Property;
 import net.jqwik.api.Provide;
+import net.jqwik.api.statistics.Statistics;
 
 /**
  * Property test for Plan B P2 task 8: generated, engine-valid UML-sequence models are pushed
@@ -37,12 +38,20 @@ import net.jqwik.api.Provide;
  * validation/projection/layout logic and are the exact instances {@code EngineWiring} wires into
  * the CLI's in-memory dispatch.
  *
- * <p>The generator is intentionally minimal (Plan B P2 task 8 scope): an {@code Interaction}, 2-5
- * {@code Lifeline} nodes, and 1-10 {@code Message} relationships with unique strictly-increasing
- * {@code uml.sequence} integers between two distinct lifelines. No {@code CombinedFragment} /
- * {@code InteractionOperand} and no self-messages (same lifeline as source and target) — both are
- * out of scope for this task and would add validation/geometry complexity that isn't needed to
- * exercise the three named invariants.
+ * <p>The generator (Plan B P2 task 8 baseline) emits an {@code Interaction} and 2-5 {@code
+ * Lifeline} nodes, 1-10 {@code Message} relationships with unique strictly-increasing {@code
+ * uml.sequence} integers between two distinct lifelines, and — Plan B P5 task 7 (closing the W3
+ * gap) — on a minority of trials a single {@code CombinedFragment} node wrapping a contiguous span
+ * of those messages, split across one or two {@code InteractionOperand} children ({@code opt} /
+ * {@code loop} for one operand, {@code alt} / {@code par} for two). The fragment's operand(s)
+ * always own a contiguous, non-overlapping block of the generated messages (no interior gaps and no
+ * shared messages) so {@code Uml.validateSource} accepts every generated model, and so the
+ * fragment-open (first operand) / operand-open (later operands) leading-gap constraints {@code
+ * UmlSequenceConstraints} derives are non-empty and actually move message Y-positions when a
+ * fragment is present. No self-messages (same lifeline as source and target), nested fragments, or
+ * fragment {@code covered} lifeline sets — none are needed to exercise the leading-gap path. {@code
+ * ExecutionSpecification} / {@code DestructionOccurrenceSpecification} / create-delete messages
+ * (W1) remain out of scope and are a tracked follow-up.
  */
 class SequenceLayoutPropertyTest {
 
@@ -52,6 +61,7 @@ class SequenceLayoutPropertyTest {
   @Property(tries = 300, seed = "1")
   void generatedSequenceModelsSatisfySequenceInvariants(
       @ForAll("validSequenceModels") GeneratedSequenceModel model) throws Exception {
+    Statistics.collect(fragmentShapeLabel(model.fragment()));
     SourceDocument source =
         JsonSupport.objectMapper().readValue(buildSourceJson(model), SourceDocument.class);
 
@@ -79,6 +89,11 @@ class SequenceLayoutPropertyTest {
 
   // --- generator --------------------------------------------------------------------------------
 
+  // Probability a generated model has NO combined fragment at all: kept > 0.5 so the plain
+  // message-ordering path (the P2 task 8 baseline) still dominates the 300 trials, while a solid
+  // minority of trials exercise the W3 fragment/operand-open leading-gap path added for P5 task 7.
+  private static final double NO_FRAGMENT_PROBABILITY = 0.55;
+
   @Provide
   Arbitrary<GeneratedSequenceModel> validSequenceModels() {
     return Arbitraries.integers()
@@ -86,7 +101,75 @@ class SequenceLayoutPropertyTest {
         .flatMap(
             lifelineCount ->
                 generatedMessages(lifelineCount)
-                    .map(messages -> new GeneratedSequenceModel(lifelineCount, messages)));
+                    .flatMap(
+                        messages ->
+                            generatedFragment(messages.size())
+                                .map(
+                                    fragment ->
+                                        new GeneratedSequenceModel(
+                                            lifelineCount, messages, fragment))));
+  }
+
+  /**
+   * An optional {@link GeneratedFragment} covering a contiguous span of {@code [0, messageCount)}
+   * message indices, split across one or two {@link GeneratedOperand}s. Injecting {@code null} (no
+   * fragment) at {@link #NO_FRAGMENT_PROBABILITY} keeps most trials on the fragment-free baseline
+   * while still generating plenty of fragment-bearing trials across 300 tries.
+   */
+  private static Arbitrary<GeneratedFragment> generatedFragment(int messageCount) {
+    Arbitrary<GeneratedFragment> fragment =
+        Arbitraries.integers()
+            .between(0, messageCount - 1)
+            .flatMap(
+                spanStart ->
+                    Arbitraries.integers()
+                        .between(1, messageCount - spanStart)
+                        .flatMap(spanLength -> generatedFragmentOfSpan(spanStart, spanLength)));
+    return fragment.injectNull(NO_FRAGMENT_PROBABILITY);
+  }
+
+  /**
+   * Builds a fragment whose operand(s) exactly partition the message-index span {@code [spanStart,
+   * spanStart + spanLength)} into one contiguous block ({@code opt}/{@code loop}, always legal
+   * since both allow exactly one operand) or, when the span holds at least two messages, two
+   * contiguous, back-to-back blocks ({@code alt}/{@code par}, which require at least two operands).
+   * Contiguous, non-overlapping, back-to-back spans are what keep every generated fragment {@code
+   * Uml.validateSource}-legal: no message is ever owned by two operands, and no message inside the
+   * fragment's overall sequence range is left unowned by any operand.
+   */
+  private static Arbitrary<GeneratedFragment> generatedFragmentOfSpan(
+      int spanStart, int spanLength) {
+    Arbitrary<GeneratedFragment> singleOperand =
+        Arbitraries.of("opt", "loop")
+            .map(
+                operator ->
+                    new GeneratedFragment(
+                        operator,
+                        List.of(new GeneratedOperand(1, spanStart, spanStart + spanLength - 1))));
+    if (spanLength < 2) {
+      return singleOperand;
+    }
+    Arbitrary<GeneratedFragment> twoOperands =
+        Combinators.combine(
+                Arbitraries.integers().between(1, spanLength - 1), Arbitraries.of("alt", "par"))
+            .as(
+                (split, operator) ->
+                    new GeneratedFragment(
+                        operator,
+                        List.of(
+                            new GeneratedOperand(1, spanStart, spanStart + split - 1),
+                            new GeneratedOperand(
+                                2, spanStart + split, spanStart + spanLength - 1))));
+    return Arbitraries.oneOf(singleOperand, twoOperands);
+  }
+
+  private static String fragmentShapeLabel(GeneratedFragment fragment) {
+    if (fragment == null) {
+      return "no fragment";
+    }
+    return fragment.operands().size() == 1
+        ? "fragment: 1 operand (fragment-open only)"
+        : "fragment: 2 operands (fragment-open + operand-open)";
   }
 
   private static Arbitrary<List<GeneratedMessage>> generatedMessages(int lifelineCount) {
@@ -133,7 +216,15 @@ class SequenceLayoutPropertyTest {
   private record GeneratedMessage(
       int sourceLifelineIndex, int targetLifelineIndex, int sequence, String messageSort) {}
 
-  private record GeneratedSequenceModel(int lifelineCount, List<GeneratedMessage> messages) {}
+  // startMessageIndex/endMessageIndex are inclusive 0-based positions into the enclosing model's
+  // messages list; the message at index i has uml.sequence == i + 1 and relationship id "m-i", so
+  // an operand's span maps directly to a contiguous run of message ids/sequence numbers.
+  private record GeneratedOperand(int order, int startMessageIndex, int endMessageIndex) {}
+
+  private record GeneratedFragment(String operator, List<GeneratedOperand> operands) {}
+
+  private record GeneratedSequenceModel(
+      int lifelineCount, List<GeneratedMessage> messages, GeneratedFragment fragment) {}
 
   // --- source-document JSON assembly -------------------------------------------------------------
 
@@ -180,6 +271,8 @@ class SequenceLayoutPropertyTest {
       relationshipIdsJson.append("\"m-").append(i).append("\"");
     }
 
+    appendFragmentJson(model.fragment(), nodesJson, nodeIdsJson);
+
     return """
         {
           "model_schema_version": "model.schema.v1",
@@ -211,6 +304,60 @@ class SequenceLayoutPropertyTest {
         }
         """
         .formatted(nodesJson, relationshipsJson, nodeIdsJson, relationshipIdsJson);
+  }
+
+  /**
+   * Appends the {@code CombinedFragment} node (id {@code fragment-0}) and its {@code
+   * InteractionOperand} children (ids {@code operand-0}, {@code operand-1}) to both the source
+   * {@code nodes} array and the view's selected-node id list, when {@code fragment} is non-null.
+   * {@code CombinedFragment}/{@code InteractionOperand} are notation-only source nodes ({@link
+   * dev.dediren.semantics.uml.UmlNotationSemantics#isSourceOnlyNode}) — they never become scene
+   * nodes, so they add no new geometry for {@link #assertNoNodeRectsOverlap} to check; their only
+   * effect is the fragment-open/operand-open leading-gap constraints they let {@code
+   * UmlSequenceConstraints} derive.
+   */
+  private static void appendFragmentJson(
+      GeneratedFragment fragment, StringBuilder nodesJson, StringBuilder nodeIdsJson) {
+    if (fragment == null) {
+      return;
+    }
+    List<GeneratedOperand> operands = fragment.operands();
+    StringBuilder operandIdsJson = new StringBuilder();
+    for (int i = 0; i < operands.size(); i++) {
+      if (i > 0) {
+        operandIdsJson.append(",");
+      }
+      operandIdsJson.append("\"operand-").append(operands.get(i).order() - 1).append("\"");
+    }
+    nodesJson
+        .append(",")
+        .append(
+            ("{\"id\":\"fragment-0\",\"type\":\"CombinedFragment\",\"label\":\"Fragment\","
+                    + "\"properties\":{\"uml\":{\"interaction\":\"interaction\","
+                    + "\"operator\":\"%s\",\"operands\":[%s]}}}")
+                .formatted(fragment.operator(), operandIdsJson));
+    nodeIdsJson.append(",\"fragment-0\"");
+
+    for (GeneratedOperand operand : operands) {
+      String operandId = "operand-" + (operand.order() - 1);
+      StringBuilder operandMessageIdsJson = new StringBuilder();
+      for (int messageIndex = operand.startMessageIndex();
+          messageIndex <= operand.endMessageIndex();
+          messageIndex++) {
+        if (operandMessageIdsJson.length() > 0) {
+          operandMessageIdsJson.append(",");
+        }
+        operandMessageIdsJson.append("\"m-").append(messageIndex).append("\"");
+      }
+      nodesJson
+          .append(",")
+          .append(
+              ("{\"id\":\"%s\",\"type\":\"InteractionOperand\",\"label\":\"%s\","
+                      + "\"properties\":{\"uml\":{\"interaction\":\"interaction\","
+                      + "\"combined_fragment\":\"fragment-0\",\"order\":%d,\"fragments\":[%s]}}}")
+                  .formatted(operandId, operandId, operand.order(), operandMessageIdsJson));
+      nodeIdsJson.append(",\"").append(operandId).append("\"");
+    }
   }
 
   // --- extra geometry invariant: no sibling node rects overlap -----------------------------------
