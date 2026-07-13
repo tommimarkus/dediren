@@ -8,8 +8,8 @@ import dev.dediren.contracts.DiagnosticSeverity;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.core.commands.BuildRequest;
 import dev.dediren.core.commands.CoreCommands;
-import dev.dediren.core.plugins.PluginExecutionException;
-import dev.dediren.core.plugins.PluginRunOutcome;
+import dev.dediren.core.engine.EngineExecutionException;
+import dev.dediren.core.engine.EngineRunOutcome;
 import dev.dediren.core.source.SourceValidator;
 import dev.dediren.core.source.ValidationResult;
 import dev.dediren.engine.Engines;
@@ -145,7 +145,7 @@ public final class Main {
           return printPluginOutcome(
               CoreCommands.semanticValidateCommand(
                   plugin, profile, inputText.text(), inputText.baseDir(), env, engines));
-        } catch (PluginExecutionException error) {
+        } catch (EngineExecutionException error) {
           return printPluginError(error);
         } catch (UncheckedIOException error) {
           return printStructuralFailure(spec, error);
@@ -164,11 +164,11 @@ public final class Main {
       return writeEnvelope(spec, envelope, CommandExitCode.INPUT_ERROR);
     }
 
-    private Integer printPluginOutcome(PluginRunOutcome outcome) {
+    private Integer printPluginOutcome(EngineRunOutcome outcome) {
       return writePluginOutcome(spec, outcome);
     }
 
-    private Integer printPluginError(PluginExecutionException error) throws IOException {
+    private Integer printPluginError(EngineExecutionException error) throws IOException {
       return writePluginError(spec, error);
     }
   }
@@ -210,7 +210,7 @@ public final class Main {
             spec,
             CoreCommands.projectCommand(
                 plugin, target, view, inputText.text(), inputText.baseDir(), env, engines));
-      } catch (PluginExecutionException error) {
+      } catch (EngineExecutionException error) {
         return writePluginError(spec, error);
       } catch (UncheckedIOException error) {
         return printStructuralFailure(spec, error);
@@ -247,7 +247,7 @@ public final class Main {
       try {
         return writePluginOutcome(
             spec, CoreCommands.layoutCommand(plugin, inputText.text(), env, engines));
-      } catch (PluginExecutionException error) {
+      } catch (EngineExecutionException error) {
         return writePluginError(spec, error);
       }
     }
@@ -326,7 +326,7 @@ public final class Main {
                 layoutText.text(),
                 env,
                 engines));
-      } catch (PluginExecutionException error) {
+      } catch (EngineExecutionException error) {
         return writePluginError(spec, error);
       }
     }
@@ -381,7 +381,7 @@ public final class Main {
                 layoutText.text(),
                 env,
                 engines));
-      } catch (PluginExecutionException error) {
+      } catch (EngineExecutionException error) {
         return writePluginError(spec, error);
       }
     }
@@ -478,7 +478,7 @@ public final class Main {
       try {
         return writePluginOutcome(
             spec, dev.dediren.core.commands.BuildCommand.run(request, engines));
-      } catch (PluginExecutionException error) {
+      } catch (EngineExecutionException error) {
         return writePluginError(spec, error);
       }
     }
@@ -520,14 +520,14 @@ public final class Main {
     return exitCode.code();
   }
 
-  private static Integer writePluginOutcome(CommandSpec spec, PluginRunOutcome outcome) {
+  private static Integer writePluginOutcome(CommandSpec spec, EngineRunOutcome outcome) {
     PrintWriter out = spec.commandLine().getOut();
     out.print(outcome.stdout());
     out.flush();
     return outcome.exitCode();
   }
 
-  private static Integer writePluginError(CommandSpec spec, PluginExecutionException error)
+  private static Integer writePluginError(CommandSpec spec, EngineExecutionException error)
       throws IOException {
     return writeEnvelope(
         spec, CommandEnvelope.error(List.of(error.diagnostic())), CommandExitCode.PLUGIN_ERROR);

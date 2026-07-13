@@ -9,8 +9,6 @@ import dev.dediren.contracts.DiagnosticSeverity;
 import dev.dediren.contracts.EnvelopeStatus;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.contracts.util.ContractCollections;
-import dev.dediren.core.plugins.PluginExecutionException;
-import dev.dediren.core.plugins.PluginRunOutcome;
 import dev.dediren.engine.EngineException;
 import dev.dediren.engine.EngineResult;
 import dev.dediren.engine.Engines;
@@ -19,7 +17,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Maps a typed in-memory engine call to the {@link PluginRunOutcome}{@code (stdout, exitCode)} the
+ * Maps a typed in-memory engine call to the {@link EngineRunOutcome}{@code (stdout, exitCode)} the
  * cli renders, producing the exact command envelope shape agents consume on stdout. The registry is
  * the only transport; there is no process fallback.
  *
@@ -36,7 +34,7 @@ import java.util.Optional;
  *       structural failure's observable (message to stderr, exit 2); it must never be buried as
  *       {@link DiagnosticCode#ENGINE_FAILED}.
  *   <li><b>any other exception</b> — a {@link DiagnosticCode#ENGINE_FAILED} {@link
- *       PluginExecutionException}, the successor of the retired process-crash category.
+ *       EngineExecutionException}, the successor of the retired process-crash category.
  *   <li><b>unknown engine id / unsupported capability</b> — resolved by {@link #requireEngine}
  *       before dispatch: an id bound to no capability yields {@link DiagnosticCode#PLUGIN_UNKNOWN};
  *       an id bound only under another capability yields {@link
@@ -56,7 +54,7 @@ public final class EngineDispatch {
    * In-memory dispatch outcome: either the engine's typed {@link EngineResult}, or a published
    * error envelope's diagnostics plus exit code (an {@link EngineException}). An unexpected failure
    * is not an outcome here — {@link #dispatchInMemory} still throws {@link
-   * PluginExecutionException} ({@link DiagnosticCode#ENGINE_FAILED}); an {@link
+   * EngineExecutionException} ({@link DiagnosticCode#ENGINE_FAILED}); an {@link
    * UncheckedIOException} still propagates unchanged. It lets the in-memory build pipe an engine's
    * typed value straight into the next stage while the serializing {@link #dispatch} reuses the
    * same branches to render an envelope.
@@ -80,17 +78,17 @@ public final class EngineDispatch {
    */
   public static <T> T requireEngine(
       Engines engines, String engineId, String capability, Optional<T> engine)
-      throws PluginExecutionException {
+      throws EngineExecutionException {
     if (engine.isPresent()) {
       return engine.get();
     }
     if (isBoundToAnyCapability(engines, engineId)) {
-      throw PluginExecutionException.plugin(
+      throw EngineExecutionException.plugin(
           DiagnosticCode.PLUGIN_UNSUPPORTED_CAPABILITY.code(),
           engineId,
           "engine " + engineId + " does not support capability " + capability);
     }
-    throw PluginExecutionException.plugin(
+    throw EngineExecutionException.plugin(
         DiagnosticCode.PLUGIN_UNKNOWN.code(), engineId, "unknown engine id: " + engineId);
   }
 
@@ -98,12 +96,12 @@ public final class EngineDispatch {
    * Invokes the engine and folds its two published failure shapes into a typed {@link
    * InMemoryOutcome} instead of a serialized envelope: a {@link EngineException} becomes {@link
    * InMemoryOutcome.Failure} (its diagnostics + exit code), while an unexpected exception still
-   * maps to a {@link DiagnosticCode#ENGINE_FAILED} {@link PluginExecutionException} and an {@link
+   * maps to a {@link DiagnosticCode#ENGINE_FAILED} {@link EngineExecutionException} and an {@link
    * UncheckedIOException} still propagates unchanged. This is the transport the in-memory build
    * consumes; {@link #dispatch} is this method plus serialization.
    */
   public static <T> InMemoryOutcome<T> dispatchInMemory(
-      String engineId, EngineInvocation<T> invocation) throws PluginExecutionException {
+      String engineId, EngineInvocation<T> invocation) throws EngineExecutionException {
     try {
       return new InMemoryOutcome.Value<>(invocation.invoke());
     } catch (EngineException error) {
@@ -115,22 +113,22 @@ public final class EngineDispatch {
       // gone: catch Exception — wider than RuntimeException so even a sneaky-thrown checked
       // exception maps to the published diagnostic — but never Throwable, because Errors (OOM,
       // assertion failures) must crash loudly instead of being buried in an error envelope.
-      throw PluginExecutionException.plugin(
+      throw EngineExecutionException.plugin(
           DiagnosticCode.ENGINE_FAILED.code(),
           engineId,
           "engine " + engineId + " failed: " + error.getMessage());
     }
   }
 
-  public static <T> PluginRunOutcome dispatch(String engineId, EngineInvocation<T> invocation)
-      throws PluginExecutionException {
+  public static <T> EngineRunOutcome dispatch(String engineId, EngineInvocation<T> invocation)
+      throws EngineExecutionException {
     return switch (dispatchInMemory(engineId, invocation)) {
       case InMemoryOutcome.Value<T> value ->
-          new PluginRunOutcome(
+          new EngineRunOutcome(
               envelope(value.result().value(), value.result().diagnostics()),
               CommandExitCode.OK.code());
       case InMemoryOutcome.Failure<T> failure ->
-          new PluginRunOutcome(
+          new EngineRunOutcome(
               serialize(CommandEnvelope.error(failure.diagnostics())), failure.exitCode());
     };
   }

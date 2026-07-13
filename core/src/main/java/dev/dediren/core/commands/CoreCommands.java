@@ -15,9 +15,9 @@ import dev.dediren.contracts.render.RenderMetadata;
 import dev.dediren.contracts.source.SourceDocument;
 import dev.dediren.core.DedirenPaths;
 import dev.dediren.core.engine.EngineDispatch;
+import dev.dediren.core.engine.EngineExecutionException;
+import dev.dediren.core.engine.EngineRunOutcome;
 import dev.dediren.core.io.JsonInput;
-import dev.dediren.core.plugins.PluginExecutionException;
-import dev.dediren.core.plugins.PluginRunOutcome;
 import dev.dediren.core.quality.LayoutQuality;
 import dev.dediren.core.quality.LayoutQualityReport;
 import dev.dediren.core.source.SourceValidator;
@@ -52,9 +52,9 @@ import tools.jackson.databind.JsonNode;
 public final class CoreCommands {
   private CoreCommands() {}
 
-  public static PluginRunOutcome layoutCommand(
+  public static EngineRunOutcome layoutCommand(
       String engineId, String inputText, Map<String, String> env, Engines engines)
-      throws PluginExecutionException {
+      throws EngineExecutionException {
     // Unwrap a piped stage envelope to its data (the chained-workflow convenience), then route the
     // unwrapped bytes through the engine's parse entry point so a well-formed-but-invalid request
     // reproduces the published DEDIREN_ELK_INPUT_INVALID_JSON envelope rather than core's generic
@@ -70,7 +70,7 @@ public final class CoreCommands {
         });
   }
 
-  private static byte[] layoutRequestBytes(String inputText) throws PluginExecutionException {
+  private static byte[] layoutRequestBytes(String inputText) throws EngineExecutionException {
     JsonNode value;
     try {
       value = JsonSupport.objectMapper().readTree(inputText);
@@ -89,7 +89,7 @@ public final class CoreCommands {
     }
   }
 
-  public static PluginRunOutcome projectCommand(
+  public static EngineRunOutcome projectCommand(
       String engineId,
       String target,
       String view,
@@ -97,7 +97,7 @@ public final class CoreCommands {
       Path baseDir,
       Map<String, String> env,
       Engines engines)
-      throws PluginExecutionException {
+      throws EngineExecutionException {
     SourceDocument source;
     try {
       source = SourceValidator.loadAndValidateSourceDocument(inputText, baseDir);
@@ -124,14 +124,14 @@ public final class CoreCommands {
     throw new UncheckedIOException(new IOException("unsupported target: " + target));
   }
 
-  public static PluginRunOutcome semanticValidateCommand(
+  public static EngineRunOutcome semanticValidateCommand(
       String engineId,
       String profile,
       String inputText,
       Path baseDir,
       Map<String, String> env,
       Engines engines)
-      throws PluginExecutionException {
+      throws EngineExecutionException {
     SourceDocument source;
     try {
       source = SourceValidator.loadAndValidateSourceDocument(inputText, baseDir);
@@ -247,14 +247,14 @@ public final class CoreCommands {
     return "$";
   }
 
-  public static PluginRunOutcome renderCommand(
+  public static EngineRunOutcome renderCommand(
       String engineId,
       String policyText,
       String metadataText,
       String layoutText,
       Map<String, String> env,
       Engines engines)
-      throws PluginExecutionException {
+      throws EngineExecutionException {
     LayoutResult layoutResult = parseCommandData("render", layoutText, LayoutResult.class);
     JsonNode policy = parseJson("render", policyText);
     RenderMetadata metadata =
@@ -268,7 +268,7 @@ public final class CoreCommands {
         () -> renderEngine.render(LaidOutSceneMapper.toScene(layoutResult), policy, metadata));
   }
 
-  public static PluginRunOutcome exportCommand(
+  public static EngineRunOutcome exportCommand(
       String engineId,
       String policyText,
       String sourceText,
@@ -276,7 +276,7 @@ public final class CoreCommands {
       String layoutText,
       Map<String, String> env,
       Engines engines)
-      throws PluginExecutionException {
+      throws EngineExecutionException {
     SourceDocument source;
     try {
       source = SourceValidator.loadAndValidateSourceDocument(sourceText, sourceBaseDir);
@@ -297,9 +297,9 @@ public final class CoreCommands {
     return EngineDispatch.dispatch(engineId, () -> exportEngine.export(request, env, productRoot));
   }
 
-  static PluginRunOutcome errorOutcome(List<Diagnostic> diagnostics) {
+  static EngineRunOutcome errorOutcome(List<Diagnostic> diagnostics) {
     try {
-      return new PluginRunOutcome(
+      return new EngineRunOutcome(
           JsonSupport.objectMapper().writeValueAsString(CommandEnvelope.error(diagnostics)),
           CommandExitCode.INPUT_ERROR.code());
     } catch (RuntimeException error) {
@@ -308,7 +308,7 @@ public final class CoreCommands {
   }
 
   private static <T> T parseCommandData(String command, String text, Class<T> type)
-      throws PluginExecutionException {
+      throws EngineExecutionException {
     try {
       return JsonInput.parseCommandData(text, type);
     } catch (RuntimeException error) {
@@ -316,7 +316,7 @@ public final class CoreCommands {
     }
   }
 
-  static JsonNode parseJson(String command, String text) throws PluginExecutionException {
+  static JsonNode parseJson(String command, String text) throws EngineExecutionException {
     try {
       return JsonSupport.objectMapper().readTree(text);
     } catch (RuntimeException error) {
@@ -324,14 +324,14 @@ public final class CoreCommands {
     }
   }
 
-  private static PluginExecutionException commandInputInvalid(String command, Exception error) {
-    return PluginExecutionException.command(
+  private static EngineExecutionException commandInputInvalid(String command, Exception error) {
+    return EngineExecutionException.command(
         DiagnosticCode.COMMAND_INPUT_INVALID.code(), command, error.getMessage());
   }
 
   private static ValidationResult commandInputValidationResult(String command, Exception error) {
     var diagnostic =
-        PluginExecutionException.command(
+        EngineExecutionException.command(
                 DiagnosticCode.COMMAND_INPUT_INVALID.code(), command, error.getMessage())
             .diagnostic();
     return new ValidationResult(

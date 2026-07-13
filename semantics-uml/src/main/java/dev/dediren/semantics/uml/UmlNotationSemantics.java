@@ -1,7 +1,5 @@
 package dev.dediren.semantics.uml;
 
-import dev.dediren.contracts.Diagnostic;
-import dev.dediren.contracts.DiagnosticSeverity;
 import dev.dediren.contracts.layout.LayoutNodeRole;
 import dev.dediren.contracts.source.GenericGraphPluginData;
 import dev.dediren.contracts.source.GenericGraphView;
@@ -38,7 +36,7 @@ public final class UmlNotationSemantics implements NotationSemantics {
     try {
       Uml.validateSource(source, pluginData);
     } catch (UmlValidationException error) {
-      throw failure(error.code(), error.message(), error.path());
+      throw EngineException.semanticFailure(error.code(), error.message(), error.path());
     }
   }
 
@@ -92,10 +90,5 @@ public final class UmlNotationSemantics implements NotationSemantics {
   @Override
   public JsonNode edgeRenderProperties(SourceRelationship relationship) {
     return relationship.properties().get("uml");
-  }
-
-  private static EngineException failure(String code, String message, String path) {
-    return new EngineException(
-        List.of(new Diagnostic(code, DiagnosticSeverity.ERROR, message, path)), 3);
   }
 }

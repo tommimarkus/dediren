@@ -5,7 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.core.DedirenPaths;
 import dev.dediren.core.commands.CoreCommands;
-import dev.dediren.core.plugins.PluginRunOutcome;
+import dev.dediren.core.engine.EngineRunOutcome;
 import dev.dediren.core.schema.SchemaValidator;
 import dev.dediren.engine.Engines;
 import dev.dediren.testsupport.TestSupport;
@@ -37,7 +37,7 @@ class EngineEnvelopeContractTest {
     String source = read("fixtures/source/valid-archimate-oef.json");
     Path base = path("fixtures/source");
 
-    PluginRunOutcome outcome =
+    EngineRunOutcome outcome =
         CoreCommands.semanticValidateCommand(
             "generic-graph", "archimate", source, base, Map.of(), engines());
 
@@ -49,7 +49,7 @@ class EngineEnvelopeContractTest {
     String source = read("fixtures/source/valid-uml-basic.json");
     Path base = path("fixtures/source");
 
-    PluginRunOutcome outcome =
+    EngineRunOutcome outcome =
         CoreCommands.semanticValidateCommand(
             "generic-graph", "uml", source, base, Map.of(), engines());
 
@@ -63,7 +63,7 @@ class EngineEnvelopeContractTest {
     String source = read("fixtures/source/valid-archimate-oef.json");
     Path base = path("fixtures/source");
 
-    PluginRunOutcome outcome =
+    EngineRunOutcome outcome =
         CoreCommands.semanticValidateCommand(
             "generic-graph", null, source, base, Map.of(), engines());
 
@@ -77,7 +77,7 @@ class EngineEnvelopeContractTest {
     String source = read("fixtures/source/valid-basic.json");
     Path base = path("fixtures/source");
 
-    PluginRunOutcome outcome =
+    EngineRunOutcome outcome =
         CoreCommands.projectCommand(
             "generic-graph", "layout-request", "main", source, base, Map.of(), engines());
 
@@ -89,7 +89,7 @@ class EngineEnvelopeContractTest {
     String source = read("fixtures/source/valid-uml-basic.json");
     Path base = path("fixtures/source");
 
-    PluginRunOutcome outcome =
+    EngineRunOutcome outcome =
         CoreCommands.projectCommand(
             "generic-graph", "render-metadata", "class-view", source, base, Map.of(), engines());
 
@@ -102,7 +102,7 @@ class EngineEnvelopeContractTest {
   void layoutEmitsOkEnvelope() throws Exception {
     String request = read("fixtures/layout-request/basic.json");
 
-    PluginRunOutcome outcome =
+    EngineRunOutcome outcome =
         CoreCommands.layoutCommand("elk-layout", request, Map.of(), engines());
 
     assertOk(outcome);
@@ -114,7 +114,7 @@ class EngineEnvelopeContractTest {
     // ElkEngine.parseRequest, yielding DEDIREN_ELK_INPUT_INVALID_JSON / 3.
     String invalid = "{\"unexpected\":\"field\"}";
 
-    PluginRunOutcome outcome =
+    EngineRunOutcome outcome =
         CoreCommands.layoutCommand("elk-layout", invalid, Map.of(), engines());
 
     assertDiagnostic(outcome, 3, "DEDIREN_ELK_INPUT_INVALID_JSON");
@@ -127,7 +127,7 @@ class EngineEnvelopeContractTest {
     String policy = read("fixtures/render-policy/default-svg.json");
     String layout = read("fixtures/layout-result/basic.json");
 
-    PluginRunOutcome outcome =
+    EngineRunOutcome outcome =
         CoreCommands.renderCommand("render", policy, null, layout, Map.of(), engines());
 
     assertOk(outcome);
@@ -139,7 +139,7 @@ class EngineEnvelopeContractTest {
     String layout = read("fixtures/layout-result/uml-basic.json");
     String metadata = read("fixtures/render-metadata/uml-basic.json");
 
-    PluginRunOutcome outcome =
+    EngineRunOutcome outcome =
         CoreCommands.renderCommand("render", policy, metadata, layout, Map.of(), engines());
 
     assertOk(outcome);
@@ -154,7 +154,7 @@ class EngineEnvelopeContractTest {
             + "\"style\":{\"node\":{\"fill\":\"notacolor#\"}}}";
     String layout = read("fixtures/layout-result/basic.json");
 
-    PluginRunOutcome outcome =
+    EngineRunOutcome outcome =
         CoreCommands.renderCommand("render", policy, null, layout, Map.of(), engines());
 
     assertDiagnostic(outcome, 3, "DEDIREN_SVG_POLICY_INVALID");
@@ -170,7 +170,7 @@ class EngineEnvelopeContractTest {
     Path base = path("fixtures/source");
     String layout = read("fixtures/layout-result/archimate-oef-basic.json");
 
-    PluginRunOutcome outcome =
+    EngineRunOutcome outcome =
         CoreCommands.exportCommand(
             "archimate-oef", policy, source, base, layout, schema, engines());
 
@@ -183,7 +183,7 @@ class EngineEnvelopeContractTest {
     Path base = path("fixtures/source");
     String layout = read("fixtures/layout-result/archimate-oef-basic.json");
 
-    PluginRunOutcome outcome =
+    EngineRunOutcome outcome =
         CoreCommands.exportCommand(
             "archimate-oef", "{}", source, base, layout, Map.of(), engines());
 
@@ -200,7 +200,7 @@ class EngineEnvelopeContractTest {
     Path base = path("fixtures/source");
     String layout = read("fixtures/layout-result/uml-basic.json");
 
-    PluginRunOutcome outcome =
+    EngineRunOutcome outcome =
         CoreCommands.exportCommand("uml-xmi", policy, source, base, layout, schema, engines());
 
     assertOk(outcome);
@@ -212,7 +212,7 @@ class EngineEnvelopeContractTest {
     Path base = path("fixtures/source");
     String layout = read("fixtures/layout-result/uml-basic.json");
 
-    PluginRunOutcome outcome =
+    EngineRunOutcome outcome =
         CoreCommands.exportCommand("uml-xmi", "{}", source, base, layout, Map.of(), engines());
 
     assertDiagnostic(outcome, 3, "DEDIREN_UML_XMI_POLICY_INVALID");
@@ -268,14 +268,14 @@ class EngineEnvelopeContractTest {
     return EngineWiring.defaults();
   }
 
-  private void assertOk(PluginRunOutcome outcome) {
+  private void assertOk(EngineRunOutcome outcome) {
     assertThat(outcome.exitCode()).describedAs(outcome.stdout()).isZero();
     JsonNode envelope = JsonSupport.objectMapper().readTree(outcome.stdout());
     assertThat(envelope.get("status").asText()).isEqualTo("ok");
     assertSchemaValid(envelope);
   }
 
-  private void assertDiagnostic(PluginRunOutcome outcome, int exitCode, String code) {
+  private void assertDiagnostic(EngineRunOutcome outcome, int exitCode, String code) {
     assertThat(outcome.exitCode()).describedAs(outcome.stdout()).isEqualTo(exitCode);
     JsonNode envelope = JsonSupport.objectMapper().readTree(outcome.stdout());
     assertThat(envelope.get("status").asText()).isEqualTo("error");

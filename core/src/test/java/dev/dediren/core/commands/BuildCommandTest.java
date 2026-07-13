@@ -16,7 +16,7 @@ import dev.dediren.contracts.render.RenderMetadata;
 import dev.dediren.contracts.render.RenderResult;
 import dev.dediren.contracts.source.SourceDocument;
 import dev.dediren.core.DedirenPaths;
-import dev.dediren.core.plugins.PluginRunOutcome;
+import dev.dediren.core.engine.EngineRunOutcome;
 import dev.dediren.core.schema.SchemaValidator;
 import dev.dediren.engine.EngineException;
 import dev.dediren.engine.EngineResult;
@@ -89,7 +89,7 @@ class BuildCommandTest {
 
   @Test
   void rendersEveryViewInModelOrderAndWritesArtifacts() throws Exception {
-    PluginRunOutcome outcome = BuildCommand.run(renderOnlyRequest(), engines());
+    EngineRunOutcome outcome = BuildCommand.run(renderOnlyRequest(), engines());
 
     assertThat(outcome.exitCode()).isZero();
     BuildResult result = buildResult(outcome);
@@ -127,7 +127,7 @@ class BuildCommandTest {
     BuildRequest request =
         new BuildRequest(SOURCE, null, List.of(), null, "{}", "{}", Set.of(), out, Map.of());
 
-    PluginRunOutcome outcome = BuildCommand.run(request, engines());
+    EngineRunOutcome outcome = BuildCommand.run(request, engines());
 
     assertThat(outcome.exitCode()).isZero();
     BuildResult result = buildResult(outcome);
@@ -145,7 +145,7 @@ class BuildCommandTest {
   void qualityWarningDowngradesViewAndAggregateButKeepsArtifacts() throws Exception {
     Engines engines = enginesWith(Set.of(), Set.of("detail"));
 
-    PluginRunOutcome outcome = BuildCommand.run(renderOnlyRequest(), engines);
+    EngineRunOutcome outcome = BuildCommand.run(renderOnlyRequest(), engines);
 
     assertThat(outcome.exitCode()).isZero();
     BuildResult result = buildResult(outcome);
@@ -168,7 +168,7 @@ class BuildCommandTest {
   void failingViewDoesNotAbortOthersAndYieldsAggregateError() throws Exception {
     Engines engines = enginesWith(Set.of("detail"), Set.of());
 
-    PluginRunOutcome outcome = BuildCommand.run(renderOnlyRequest(), engines);
+    EngineRunOutcome outcome = BuildCommand.run(renderOnlyRequest(), engines);
 
     assertThat(outcome.exitCode()).isNotZero();
     BuildResult result = buildResult(outcome);
@@ -206,7 +206,7 @@ class BuildCommandTest {
             out,
             Map.of());
 
-    PluginRunOutcome outcome = BuildCommand.run(request, engines());
+    EngineRunOutcome outcome = BuildCommand.run(request, engines());
 
     assertThat(outcome.exitCode()).isEqualTo(2);
     BuildResult result = buildResult(outcome);
@@ -304,7 +304,7 @@ class BuildCommandTest {
     BuildRequest request =
         new BuildRequest(SOURCE, null, List.of(), null, null, null, Set.of(), out, Map.of());
 
-    PluginRunOutcome outcome = BuildCommand.run(request, engines());
+    EngineRunOutcome outcome = BuildCommand.run(request, engines());
 
     assertThat(outcome.exitCode()).isEqualTo(2);
     BuildResult result = buildResult(outcome);
@@ -322,7 +322,7 @@ class BuildCommandTest {
         new BuildRequest(
             "{\"nope\":true}", null, List.of(), "{}", null, null, Set.of(), out, Map.of());
 
-    PluginRunOutcome outcome = BuildCommand.run(request, engines());
+    EngineRunOutcome outcome = BuildCommand.run(request, engines());
 
     assertThat(outcome.exitCode()).isEqualTo(2);
     BuildResult result = buildResult(outcome);
@@ -338,7 +338,7 @@ class BuildCommandTest {
     // validation (still in the loop) fails the view at the layout-quality-validation stage.
     Engines engines = new FakeEngines().qualityFailingViews(Set.of("detail")).build();
 
-    PluginRunOutcome outcome = BuildCommand.run(renderOnlyRequest(), engines);
+    EngineRunOutcome outcome = BuildCommand.run(renderOnlyRequest(), engines);
 
     assertFailingViewDidNotAbortHealthyOverview(
         outcome, "svg", "DEDIREN_LAYOUT_ROUTE_POINTS_EMPTY");
@@ -348,7 +348,7 @@ class BuildCommandTest {
   void renderMetadataFailureIsAPerViewErrorAndDoesNotAbortOthers() throws Exception {
     Engines engines = new FakeEngines().metadataFailingViews(Set.of("detail")).build();
 
-    PluginRunOutcome outcome = BuildCommand.run(renderOnlyRequest(), engines);
+    EngineRunOutcome outcome = BuildCommand.run(renderOnlyRequest(), engines);
 
     assertFailingViewDidNotAbortHealthyOverview(outcome, "svg", "DEDIREN_FAKE_METADATA_FAILED");
   }
@@ -357,7 +357,7 @@ class BuildCommandTest {
   void renderFailureIsAPerViewErrorAndDoesNotAbortOthers() throws Exception {
     Engines engines = new FakeEngines().renderFailingViews(Set.of("detail")).build();
 
-    PluginRunOutcome outcome = BuildCommand.run(renderOnlyRequest(), engines);
+    EngineRunOutcome outcome = BuildCommand.run(renderOnlyRequest(), engines);
 
     assertFailingViewDidNotAbortHealthyOverview(outcome, "svg", "DEDIREN_FAKE_RENDER_FAILED");
   }
@@ -366,7 +366,7 @@ class BuildCommandTest {
   void oefExportFailureIsAPerViewErrorAndDoesNotAbortOthers() throws Exception {
     Engines engines = new FakeEngines().oefFailingViews(Set.of("detail")).build();
 
-    PluginRunOutcome outcome = BuildCommand.run(oefOnlyRequest(), engines);
+    EngineRunOutcome outcome = BuildCommand.run(oefOnlyRequest(), engines);
 
     assertFailingViewDidNotAbortHealthyOverview(
         outcome, "archimate+xml", "DEDIREN_FAKE_EXPORT_FAILED");
@@ -376,7 +376,7 @@ class BuildCommandTest {
   void xmiExportFailureIsAPerViewErrorAndDoesNotAbortOthers() throws Exception {
     Engines engines = new FakeEngines().xmiFailingViews(Set.of("detail")).build();
 
-    PluginRunOutcome outcome = BuildCommand.run(xmiOnlyRequest(), engines);
+    EngineRunOutcome outcome = BuildCommand.run(xmiOnlyRequest(), engines);
 
     assertFailingViewDidNotAbortHealthyOverview(outcome, "uml+xml", "DEDIREN_FAKE_EXPORT_FAILED");
   }
@@ -387,7 +387,7 @@ class BuildCommandTest {
     // stage, so a `|=` -> `&=` mutation would leave the view OK instead of WARNING.
     Engines engines = new FakeEngines().layoutRequestWarningViews(Set.of("detail")).build();
 
-    PluginRunOutcome outcome = BuildCommand.run(renderOnlyRequest(), engines);
+    EngineRunOutcome outcome = BuildCommand.run(renderOnlyRequest(), engines);
 
     assertOnlyDetailWarned(outcome, "svg", "DEDIREN_FAKE_LAYOUT_REQUEST_WARNING");
   }
@@ -397,7 +397,7 @@ class BuildCommandTest {
     // Pins `warning |= layout.warning()`: the only warning enters at the layout stage envelope.
     Engines engines = new FakeEngines().layoutStageWarningViews(Set.of("detail")).build();
 
-    PluginRunOutcome outcome = BuildCommand.run(renderOnlyRequest(), engines);
+    EngineRunOutcome outcome = BuildCommand.run(renderOnlyRequest(), engines);
 
     assertOnlyDetailWarned(outcome, "svg", "DEDIREN_FAKE_LAYOUT_STAGE_WARNING");
   }
@@ -407,7 +407,7 @@ class BuildCommandTest {
     // Pins `warning |= oef.warning()`: the OEF lane runs and its stage is the sole warning source.
     Engines engines = new FakeEngines().oefWarningViews(Set.of("detail")).build();
 
-    PluginRunOutcome outcome = BuildCommand.run(oefOnlyRequest(), engines);
+    EngineRunOutcome outcome = BuildCommand.run(oefOnlyRequest(), engines);
 
     assertOnlyDetailWarned(outcome, "archimate+xml", "DEDIREN_FAKE_EXPORT_WARNING");
   }
@@ -417,7 +417,7 @@ class BuildCommandTest {
     // Pins `warning |= xmi.warning()`: the XMI lane runs and its stage is the sole warning source.
     Engines engines = new FakeEngines().xmiWarningViews(Set.of("detail")).build();
 
-    PluginRunOutcome outcome = BuildCommand.run(xmiOnlyRequest(), engines);
+    EngineRunOutcome outcome = BuildCommand.run(xmiOnlyRequest(), engines);
 
     assertOnlyDetailWarned(outcome, "uml+xml", "DEDIREN_FAKE_EXPORT_WARNING");
   }
@@ -430,7 +430,7 @@ class BuildCommandTest {
         new BuildRequest(
             SOURCE_WITHOUT_VIEWS, null, List.of(), "{}", null, null, Set.of(), out, Map.of());
 
-    PluginRunOutcome outcome = BuildCommand.run(request, engines());
+    EngineRunOutcome outcome = BuildCommand.run(request, engines());
 
     assertThat(outcome.exitCode()).isZero();
     BuildResult result = buildResult(outcome);
@@ -454,7 +454,7 @@ class BuildCommandTest {
                 new FakeExportEngine("archimate-oef", "stats+json", "{}", Set.of(), Set.of()),
                 new FakeExportEngine("uml-xmi", "uml+xml", "<xmi/>", Set.of(), Set.of())));
 
-    PluginRunOutcome outcome = BuildCommand.run(oefOnlyRequest(), engines);
+    EngineRunOutcome outcome = BuildCommand.run(oefOnlyRequest(), engines);
 
     assertThat(outcome.exitCode()).isZero();
     BuildResult result = buildResult(outcome);
@@ -467,7 +467,7 @@ class BuildCommandTest {
 
   @Test
   void structuredStageExceptionIsFoldedPerViewNotThrown() throws Exception {
-    // A stage that raises a structured PluginExecutionException (here the render engine id resolves
+    // A stage that raises a structured EngineExecutionException (here the render engine id resolves
     // to no engine) is folded into the view by runStage's catch rather than aborting the build, so
     // the driver still returns a per-view error outcome.
     Engines engines =
@@ -477,7 +477,7 @@ class BuildCommandTest {
             List.of(),
             List.of());
 
-    PluginRunOutcome outcome = BuildCommand.run(renderOnlyRequest(), engines);
+    EngineRunOutcome outcome = BuildCommand.run(renderOnlyRequest(), engines);
 
     assertThat(outcome.exitCode()).isNotZero();
     BuildResult result = buildResult(outcome);
@@ -521,7 +521,7 @@ class BuildCommandTest {
   // the build errors and exits non-zero, overview still produces its lane artifact, and detail
   // errors with no artifacts and the expected diagnostic code.
   private void assertFailingViewDidNotAbortHealthyOverview(
-      PluginRunOutcome outcome, String overviewArtifactKind, String detailDiagnosticCode)
+      EngineRunOutcome outcome, String overviewArtifactKind, String detailDiagnosticCode)
       throws Exception {
     assertThat(outcome.exitCode()).isNotZero();
     BuildResult result = buildResult(outcome);
@@ -544,7 +544,7 @@ class BuildCommandTest {
   // detail keeps its lane artifact, and carries the expected warning diagnostic. A `warning |=` ->
   // `warning &=` mutation on the pinned stage would leave detail OK and fail this assertion.
   private void assertOnlyDetailWarned(
-      PluginRunOutcome outcome, String detailArtifactKind, String detailDiagnosticCode)
+      EngineRunOutcome outcome, String detailArtifactKind, String detailDiagnosticCode)
       throws Exception {
     assertThat(outcome.exitCode()).isZero();
     BuildResult result = buildResult(outcome);
@@ -671,11 +671,11 @@ class BuildCommandTest {
         : List.of();
   }
 
-  private static BuildResult buildResult(PluginRunOutcome outcome) {
+  private static BuildResult buildResult(EngineRunOutcome outcome) {
     return JsonSupport.readValue(outcome.stdout(), BuildResult.class);
   }
 
-  private static void assertSchemaValid(PluginRunOutcome outcome) {
+  private static void assertSchemaValid(EngineRunOutcome outcome) {
     JsonNode document = JsonSupport.objectMapper().readTree(outcome.stdout());
     List<String> errors =
         SchemaValidator.fromRepositoryRoot(DedirenPaths.productRoot())

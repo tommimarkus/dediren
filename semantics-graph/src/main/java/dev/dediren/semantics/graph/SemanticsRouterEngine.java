@@ -1,8 +1,6 @@
 package dev.dediren.semantics.graph;
 
 import dev.dediren.contracts.ContractVersions;
-import dev.dediren.contracts.Diagnostic;
-import dev.dediren.contracts.DiagnosticSeverity;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.contracts.layout.SemanticValidationResult;
 import dev.dediren.contracts.render.RenderMetadata;
@@ -68,7 +66,7 @@ public final class SemanticsRouterEngine implements SemanticsEngine {
    * semantics {@code Main}, the router is hosted in-process by the cli via {@code EngineWiring}.
    */
   static EngineException profileRequired() {
-    return failure(
+    return EngineException.semanticFailure(
         "DEDIREN_SEMANTIC_PROFILE_REQUIRED", "semantic validation requires --profile", null);
   }
 
@@ -81,12 +79,13 @@ public final class SemanticsRouterEngine implements SemanticsEngine {
     GenericGraphPluginData pluginData = pluginData(source);
     GenericGraphValidationError graphError = validateGenericGraphPluginData(source, pluginData);
     if (graphError != null) {
-      throw failure(graphError.code(), graphError.message(), graphError.path());
+      throw EngineException.semanticFailure(
+          graphError.code(), graphError.message(), graphError.path());
     }
 
     GenericGraphSemanticProfile requested = requestedProfile(profile);
     if (requested == null) {
-      throw failure(
+      throw EngineException.semanticFailure(
           "DEDIREN_SEMANTIC_PROFILE_UNSUPPORTED",
           "unsupported semantic profile: " + profile,
           "profile");
@@ -132,7 +131,8 @@ public final class SemanticsRouterEngine implements SemanticsEngine {
     GenericGraphPluginData pluginData = pluginData(source);
     GenericGraphValidationError graphError = validateGenericGraphPluginData(source, pluginData);
     if (graphError != null) {
-      throw failure(graphError.code(), graphError.message(), graphError.path());
+      throw EngineException.semanticFailure(
+          graphError.code(), graphError.message(), graphError.path());
     }
     GenericGraphView selectedView =
         pluginData.views().stream()
@@ -217,11 +217,6 @@ public final class SemanticsRouterEngine implements SemanticsEngine {
       }
     }
     return null;
-  }
-
-  private static EngineException failure(String code, String message, String path) {
-    return new EngineException(
-        List.of(new Diagnostic(code, DiagnosticSeverity.ERROR, message, path)), 3);
   }
 
   private record GenericGraphValidationError(String code, String message, String path) {}

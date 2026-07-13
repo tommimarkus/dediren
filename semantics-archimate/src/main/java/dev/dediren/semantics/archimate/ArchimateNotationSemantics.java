@@ -5,8 +5,6 @@ import dev.dediren.archimate.ArchimateJunctionValidationException;
 import dev.dediren.archimate.ArchimateTypeValidationException;
 import dev.dediren.archimate.JunctionValidationNode;
 import dev.dediren.archimate.JunctionValidationRelationship;
-import dev.dediren.contracts.Diagnostic;
-import dev.dediren.contracts.DiagnosticSeverity;
 import dev.dediren.contracts.layout.LayoutNodeRole;
 import dev.dediren.contracts.source.GenericGraphPluginData;
 import dev.dediren.contracts.source.GenericGraphView;
@@ -40,9 +38,9 @@ public final class ArchimateNotationSemantics implements NotationSemantics {
       validateArchimateSourceTypes(source);
       validateArchimateJunctionSemantics(source);
     } catch (ArchimateTypeValidationException error) {
-      throw failure(error.code(), error.message(), error.path());
+      throw EngineException.semanticFailure(error.code(), error.message(), error.path());
     } catch (ArchimateJunctionValidationException error) {
-      throw failure(error.code(), error.message(), error.path());
+      throw EngineException.semanticFailure(error.code(), error.message(), error.path());
     }
   }
 
@@ -123,10 +121,5 @@ public final class ArchimateNotationSemantics implements NotationSemantics {
                         relationship.type(), relationship.source(), relationship.target()))
             .toList();
     Archimate.validateJunctionRelationshipSemantics(nodes, relationships);
-  }
-
-  private static EngineException failure(String code, String message, String path) {
-    return new EngineException(
-        List.of(new Diagnostic(code, DiagnosticSeverity.ERROR, message, path)), 3);
   }
 }
