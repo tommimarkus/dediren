@@ -76,7 +76,7 @@ Stable Dependencies Principle).
 | `render` (engine) | `engine-api`, `contracts`, `archimate`, `uml`, `ir` | 2 — leaf engine |
 | `semantics-graph` (engine) | `engine-api`, `contracts`, `ir` | 2 — leaf engine |
 | `semantics-archimate` (engine) | `engine-api`, `contracts`, `archimate` | 2 — leaf engine |
-| `semantics-uml` (engine) | `engine-api`, `contracts`, `uml` | 2 — leaf engine |
+| `semantics-uml` (engine) | `engine-api`, `contracts`, `uml`, `ir` | 2 — leaf engine |
 | `elk-layout` (engine) | `engine-api`, `contracts`, `ir` | 2 — leaf engine |
 | `archimate-oef-export` (engine) | `engine-api`, `contracts`, `archimate`, `schema-cache` | 2 — leaf engine |
 | `uml-xmi-export` (engine) | `engine-api`, `contracts`, `uml`, `schema-cache` | 2 — leaf engine |
