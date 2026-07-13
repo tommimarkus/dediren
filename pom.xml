@@ -43,6 +43,11 @@
     <eclipse-elk.version>0.11.0</eclipse-elk.version>
     <guava.version>33.6.0-jre</guava.version>
     <jackson.version>3.2.0</jackson.version>
+    <!-- Jackson 3 keeps its annotation package at com.fasterxml.jackson.annotation by
+         design; contracts compiles against it directly, so it is declared and pinned. -->
+    <jackson-annotations.version>2.22</jackson-annotations.version>
+    <!-- EMF: elk-layout compiles against EMF's common types via the ELK graph model. -->
+    <emf.version>2.12.0</emf.version>
     <jazzer.version>0.30.0</jazzer.version>
     <jqwik.version>1.9.3</jqwik.version>
     <json-schema-validator.version>3.0.5</json-schema-validator.version>
@@ -87,6 +92,16 @@
         <groupId>tools.jackson.core</groupId>
         <artifactId>jackson-core</artifactId>
         <version>${jackson.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.fasterxml.jackson.core</groupId>
+        <artifactId>jackson-annotations</artifactId>
+        <version>${jackson-annotations.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.emf</groupId>
+        <artifactId>org.eclipse.emf.common</artifactId>
+        <version>${emf.version}</version>
       </dependency>
       <dependency>
         <groupId>tools.jackson.dataformat</groupId>
@@ -136,6 +151,14 @@
       <dependency>
         <groupId>org.junit.jupiter</groupId>
         <artifactId>junit-jupiter</artifactId>
+        <version>${junit.version}</version>
+      </dependency>
+      <!-- The aggregator above is what test modules want; test-support is a library that compiles
+           against the API alone, so it declares this instead (dependency:analyze flagged the
+           mismatch). -->
+      <dependency>
+        <groupId>org.junit.jupiter</groupId>
+        <artifactId>junit-jupiter-api</artifactId>
         <version>${junit.version}</version>
       </dependency>
       <!-- Property-based testing (Plan B P2 IR invariants). jqwik implements its

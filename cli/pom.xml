@@ -76,6 +76,15 @@
       <groupId>dev.dediren</groupId>
       <artifactId>ir</artifactId>
       <version>${project.version}</version>
+      <!-- RUNTIME scope, and it must stay declared. cli's main code does not compile against the
+           IR (it drives engines through engine-api and contracts), so compile scope overstated the
+           coupling — but the launcher's runtime classpath DOES need ir: the in-process engines
+           project scenes with it, and dist-tool assembles the bundle's lib/ from cli's resolved
+           runtime set. Do not "clean this up" to test scope: a direct declaration overrides the
+           transitive one from core, which silently drops ir from the packaged classpath and fails
+           the bundle with NoClassDefFoundError: dev/dediren/ir/SceneNode (caught by -Pdist-smoke,
+           invisible to unit tests). -->
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.assertj</groupId>
@@ -91,6 +100,15 @@
       <groupId>net.jqwik</groupId>
       <artifactId>jqwik</artifactId>
       <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>tools.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>dev.dediren</groupId>
+      <artifactId>engine-api</artifactId>
+      <version>${project.version}</version>
     </dependency>
   </dependencies>
 
