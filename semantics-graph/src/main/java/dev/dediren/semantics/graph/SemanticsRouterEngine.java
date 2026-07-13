@@ -1,6 +1,7 @@
 package dev.dediren.semantics.graph;
 
 import dev.dediren.contracts.ContractVersions;
+import dev.dediren.contracts.DiagnosticCode;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.contracts.layout.SemanticValidationResult;
 import dev.dediren.contracts.render.RenderMetadata;
@@ -67,7 +68,9 @@ public final class SemanticsRouterEngine implements SemanticsEngine {
    */
   static EngineException profileRequired() {
     return EngineException.semanticFailure(
-        "DEDIREN_SEMANTIC_PROFILE_REQUIRED", "semantic validation requires --profile", null);
+        DiagnosticCode.SEMANTIC_PROFILE_REQUIRED.code(),
+        "semantic validation requires --profile",
+        null);
   }
 
   @Override
@@ -86,7 +89,7 @@ public final class SemanticsRouterEngine implements SemanticsEngine {
     GenericGraphSemanticProfile requested = requestedProfile(profile);
     if (requested == null) {
       throw EngineException.semanticFailure(
-          "DEDIREN_SEMANTIC_PROFILE_UNSUPPORTED",
+          DiagnosticCode.SEMANTIC_PROFILE_UNSUPPORTED.code(),
           "unsupported semantic profile: " + profile,
           "profile");
     }
@@ -176,7 +179,7 @@ public final class SemanticsRouterEngine implements SemanticsEngine {
       GenericGraphView view = pluginData.views().get(viewIndex);
       if (!viewIds.add(view.id())) {
         return new GenericGraphValidationError(
-            "DEDIREN_GENERIC_GRAPH_DUPLICATE_VIEW_ID",
+            DiagnosticCode.GENERIC_GRAPH_DUPLICATE_VIEW_ID.code(),
             "duplicate generic-graph view id '" + view.id() + "'",
             "$.plugins.generic-graph.views[" + viewIndex + "].id");
       }
@@ -191,7 +194,7 @@ public final class SemanticsRouterEngine implements SemanticsEngine {
             && (!viewNodeIds.contains(relationship.source())
                 || !viewNodeIds.contains(relationship.target()))) {
           return new GenericGraphValidationError(
-              "DEDIREN_GENERIC_GRAPH_RELATIONSHIP_ENDPOINT_OUTSIDE_VIEW",
+              DiagnosticCode.GENERIC_GRAPH_RELATIONSHIP_ENDPOINT_OUTSIDE_VIEW.code(),
               "relationship '"
                   + relationshipId
                   + "' references an endpoint outside view '"
@@ -210,7 +213,7 @@ public final class SemanticsRouterEngine implements SemanticsEngine {
         GenericGraphViewGroup group = view.groups().get(groupIndex);
         if (!groupIds.add(group.id())) {
           return new GenericGraphValidationError(
-              "DEDIREN_GENERIC_GRAPH_DUPLICATE_GROUP_ID",
+              DiagnosticCode.GENERIC_GRAPH_DUPLICATE_GROUP_ID.code(),
               "duplicate generic-graph group id '" + group.id() + "' in view '" + view.id() + "'",
               "$.plugins.generic-graph.views[" + viewIndex + "].groups[" + groupIndex + "].id");
         }

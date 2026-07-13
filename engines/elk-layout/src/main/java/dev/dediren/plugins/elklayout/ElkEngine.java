@@ -1,6 +1,7 @@
 package dev.dediren.plugins.elklayout;
 
 import dev.dediren.contracts.Diagnostic;
+import dev.dediren.contracts.DiagnosticCode;
 import dev.dediren.contracts.DiagnosticSeverity;
 import dev.dediren.contracts.layout.LayoutRequest;
 import dev.dediren.engine.EngineException;
@@ -48,7 +49,7 @@ public final class ElkEngine implements LayoutEngine {
       throw new EngineException(
           List.of(
               diagnostic(
-                  "DEDIREN_ELK_INPUT_INVALID_JSON",
+                  DiagnosticCode.ELK_INPUT_INVALID_JSON.code(),
                   "layout request JSON is invalid: " + error.getMessage())),
           3);
     }
@@ -68,7 +69,9 @@ public final class ElkEngine implements LayoutEngine {
 
   private static EngineException layoutFailed(String message) {
     return new EngineException(
-        List.of(diagnostic("DEDIREN_ELK_LAYOUT_FAILED", "ELK layout failed: " + message)), 3);
+        List.of(
+            diagnostic(DiagnosticCode.ELK_LAYOUT_FAILED.code(), "ELK layout failed: " + message)),
+        3);
   }
 
   private static Diagnostic diagnostic(String code, String message) {

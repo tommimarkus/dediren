@@ -110,7 +110,7 @@ public final class OefExportEngine implements ExportEngine {
       validatePolicy(request.policy());
       policy = JsonSupport.objectMapper().treeToValue(request.policy(), OefExportPolicy.class);
     } catch (IllegalArgumentException error) {
-      throw failure("DEDIREN_OEF_POLICY_INVALID", error.getMessage(), "policy");
+      throw failure(DiagnosticCode.OEF_POLICY_INVALID.code(), error.getMessage(), "policy");
     }
 
     try {
@@ -175,7 +175,7 @@ public final class OefExportEngine implements ExportEngine {
     }
     return List.of(
         new Diagnostic(
-            "DEDIREN_OEF_VIEWS_OMITTED",
+            DiagnosticCode.OEF_VIEWS_OMITTED.code(),
             DiagnosticSeverity.INFO,
             omitted.size()
                 + " of "
@@ -284,7 +284,7 @@ public final class OefExportEngine implements ExportEngine {
       }
       if (!sourceNode.type().equals("Grouping")) {
         throw new GroupSemanticValidationException(
-            "DEDIREN_ARCHIMATE_GROUP_SOURCE_NOT_GROUPING",
+            DiagnosticCode.ARCHIMATE_GROUP_SOURCE_NOT_GROUPING.code(),
             "$.layout_result.groups[" + index + "].provenance",
             "layout group "
                 + group.id()
@@ -513,7 +513,7 @@ public final class OefExportEngine implements ExportEngine {
       return;
     }
     throw new OefSchemaValidationException(
-        "DEDIREN_OEF_SCHEMA_INVALID",
+        DiagnosticCode.OEF_SCHEMA_INVALID.code(),
         "generated OEF XML does not validate against the official OEF schema: "
             + outcome.details());
   }
@@ -548,7 +548,7 @@ public final class OefExportEngine implements ExportEngine {
       }
     } catch (SchemaCacheException error) {
       throw new OefSchemaValidationException(
-          "DEDIREN_OEF_SCHEMA_UNAVAILABLE",
+          DiagnosticCode.OEF_SCHEMA_UNAVAILABLE.code(),
           error.getMessage() + " " + OEF_SCHEMA_DOWNLOAD_REMEDIATION);
     }
     return schemaDir;
@@ -566,7 +566,7 @@ public final class OefExportEngine implements ExportEngine {
       Path schemaPath = schemaDir.resolve(fileName);
       if (!SchemaCacheModule.isNonEmptyFile(schemaPath)) {
         throw new OefSchemaValidationException(
-            "DEDIREN_OEF_SCHEMA_UNAVAILABLE",
+            DiagnosticCode.OEF_SCHEMA_UNAVAILABLE.code(),
             "official OEF schema file "
                 + schemaPath
                 + " is missing or empty; provide all ArchiMate 3.1 OEF XSD files or unset "
@@ -731,7 +731,7 @@ public final class OefExportEngine implements ExportEngine {
   }
 
   private static final class OefReferenceValidationException extends Exception {
-    private static final String CODE = "DEDIREN_OEF_LAYOUT_REFERENCE_MISSING";
+    private static final String CODE = DiagnosticCode.OEF_LAYOUT_REFERENCE_MISSING.code();
     private final String path;
 
     private OefReferenceValidationException(String path, String message) {

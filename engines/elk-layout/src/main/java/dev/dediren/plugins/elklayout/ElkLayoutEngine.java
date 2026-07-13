@@ -2,6 +2,7 @@ package dev.dediren.plugins.elklayout;
 
 import dev.dediren.contracts.ContractVersions;
 import dev.dediren.contracts.Diagnostic;
+import dev.dediren.contracts.DiagnosticCode;
 import dev.dediren.contracts.DiagnosticSeverity;
 import dev.dediren.contracts.layout.GroupProvenance;
 import dev.dediren.contracts.layout.LaidOutEdge;
@@ -122,7 +123,7 @@ final class ElkLayoutEngine {
       if (source == null || target == null) {
         warnings.add(
             new Diagnostic(
-                "DEDIREN_ELK_DANGLING_EDGE",
+                DiagnosticCode.ELK_DANGLING_EDGE.code(),
                 DiagnosticSeverity.WARNING,
                 "edge " + edge.id() + " references a missing endpoint",
                 "$.edges[" + originalEdgeIndexes.getOrDefault(edge, index) + "]"));
@@ -367,7 +368,7 @@ final class ElkLayoutEngine {
       if (source == null || target == null) {
         warnings.add(
             new Diagnostic(
-                "DEDIREN_ELK_DANGLING_EDGE",
+                DiagnosticCode.ELK_DANGLING_EDGE.code(),
                 DiagnosticSeverity.WARNING,
                 "edge " + edge.id() + " references a missing endpoint",
                 "$.edges[" + index + "]"));
@@ -1285,7 +1286,7 @@ final class ElkLayoutEngine {
         if (!nodeMember && !groupMember) {
           warnings.add(
               new Diagnostic(
-                  "DEDIREN_ELK_MISSING_GROUP_MEMBER",
+                  DiagnosticCode.ELK_MISSING_GROUP_MEMBER.code(),
                   DiagnosticSeverity.WARNING,
                   "group " + group.id() + " references missing member " + memberId,
                   "$.groups[" + groupIndex + "].members[" + memberIndex + "]"));
@@ -1296,7 +1297,7 @@ final class ElkLayoutEngine {
       if (groupNode == null || memberIds.isEmpty()) {
         warnings.add(
             new Diagnostic(
-                "DEDIREN_ELK_EMPTY_GROUP",
+                DiagnosticCode.ELK_EMPTY_GROUP.code(),
                 DiagnosticSeverity.WARNING,
                 "group " + group.id() + " has no laid out members",
                 "$.groups[" + groupIndex + "]"));

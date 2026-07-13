@@ -5,6 +5,7 @@ import static dev.dediren.plugins.render.svg.SvgDocument.renderSvg;
 import dev.dediren.archimate.ArchimateTypeValidationException;
 import dev.dediren.contracts.ContractVersions;
 import dev.dediren.contracts.Diagnostic;
+import dev.dediren.contracts.DiagnosticCode;
 import dev.dediren.contracts.DiagnosticSeverity;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.contracts.layout.LayoutResult;
@@ -52,7 +53,7 @@ public final class SvgRenderEngine implements RenderEngine {
     try {
       RenderInputValidator.validate(layout, metadataOrNull, renderPolicy);
     } catch (RenderInputValidator.PolicyValidationException error) {
-      throw failure("DEDIREN_SVG_POLICY_INVALID", error.getMessage(), error.path());
+      throw failure(DiagnosticCode.SVG_POLICY_INVALID.code(), error.getMessage(), error.path());
     } catch (RenderInputValidator.RenderMetadataUsageException error) {
       throw failure(error.code(), error.getMessage(), error.path());
     } catch (ArchimateTypeValidationException error) {

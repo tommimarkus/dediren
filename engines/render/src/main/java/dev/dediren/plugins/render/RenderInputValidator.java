@@ -2,6 +2,7 @@ package dev.dediren.plugins.render;
 
 import dev.dediren.archimate.Archimate;
 import dev.dediren.archimate.ArchimateTypeValidationException;
+import dev.dediren.contracts.DiagnosticCode;
 import dev.dediren.contracts.layout.LaidOutEdge;
 import dev.dediren.contracts.layout.LayoutResult;
 import dev.dediren.contracts.render.RenderMetadata;
@@ -62,19 +63,19 @@ public final class RenderInputValidator {
     }
     if (policy.semanticProfile() == null) {
       throw new RenderMetadataUsageException(
-          "DEDIREN_RENDER_METADATA_PROFILE_REQUIRED",
+          DiagnosticCode.RENDER_METADATA_PROFILE_REQUIRED.code(),
           "semantic_profile",
           "type-aware SVG render policies must declare semantic_profile");
     }
     if (metadata == null) {
       throw new RenderMetadataUsageException(
-          "DEDIREN_RENDER_METADATA_REQUIRED",
+          DiagnosticCode.RENDER_METADATA_REQUIRED.code(),
           "render_metadata",
           "type-aware SVG render policy requires render metadata");
     }
     if (!policy.semanticProfile().equals(metadata.semanticProfile())) {
       throw new RenderMetadataUsageException(
-          "DEDIREN_RENDER_METADATA_PROFILE_MISMATCH",
+          DiagnosticCode.RENDER_METADATA_PROFILE_MISMATCH.code(),
           "render_metadata.semantic_profile",
           "render metadata profile "
               + metadata.semanticProfile()
@@ -216,7 +217,7 @@ public final class RenderInputValidator {
     JsonNode operands = metadataProperty(properties, "operands");
     if (!hasSupportedCombinedFragmentOperandCount(operator, operands.size())) {
       throw new RenderMetadataUsageException(
-          "DEDIREN_UML_COMBINED_FRAGMENT_METADATA_INVALID",
+          DiagnosticCode.UML_COMBINED_FRAGMENT_METADATA_INVALID.code(),
           path + ".operands",
           "UML CombinedFragment render metadata operand count does not match operator " + operator);
     }
@@ -230,7 +231,7 @@ public final class RenderInputValidator {
           || !owner.isTextual()
           || !combinedFragmentId.equals(owner.asText())) {
         throw new RenderMetadataUsageException(
-            "DEDIREN_UML_COMBINED_FRAGMENT_METADATA_INVALID",
+            DiagnosticCode.UML_COMBINED_FRAGMENT_METADATA_INVALID.code(),
             path + ".operands",
             "UML CombinedFragment render metadata operands must reference owned InteractionOperand metadata");
       }
@@ -256,7 +257,7 @@ public final class RenderInputValidator {
       RenderMetadataSelector lifeline = metadata.nodes().get(coveredId.asText());
       if (lifeline == null || !"Lifeline".equals(lifeline.type())) {
         throw new RenderMetadataUsageException(
-            "DEDIREN_UML_COMBINED_FRAGMENT_METADATA_INVALID",
+            DiagnosticCode.UML_COMBINED_FRAGMENT_METADATA_INVALID.code(),
             path + ".covered",
             "UML CombinedFragment render metadata covered ids must reference Lifeline metadata");
       }
@@ -270,7 +271,7 @@ public final class RenderInputValidator {
     RenderMetadataSelector owner = metadata.nodes().get(combinedFragment.asText());
     if (owner == null || !"CombinedFragment".equals(owner.type())) {
       throw new RenderMetadataUsageException(
-          "DEDIREN_UML_INTERACTION_OPERAND_METADATA_INVALID",
+          DiagnosticCode.UML_INTERACTION_OPERAND_METADATA_INVALID.code(),
           path + ".combined_fragment",
           "UML InteractionOperand render metadata combined_fragment must reference CombinedFragment metadata");
     }
@@ -287,7 +288,7 @@ public final class RenderInputValidator {
         continue;
       }
       throw new RenderMetadataUsageException(
-          "DEDIREN_UML_INTERACTION_OPERAND_METADATA_INVALID",
+          DiagnosticCode.UML_INTERACTION_OPERAND_METADATA_INVALID.code(),
           path + ".fragments",
           "UML InteractionOperand render metadata fragments must reference laid out Message edges "
               + "or CombinedFragment metadata");
@@ -301,7 +302,7 @@ public final class RenderInputValidator {
         || !sequence.isIntegralNumber()
         || sequence.bigIntegerValue().signum() < 1) {
       throw new RenderMetadataUsageException(
-          "DEDIREN_UML_MESSAGE_METADATA_INVALID",
+          DiagnosticCode.UML_MESSAGE_METADATA_INVALID.code(),
           path + ".sequence",
           "UML Message render metadata sequence must be a positive integer");
     }
@@ -311,7 +312,7 @@ public final class RenderInputValidator {
         && (!messageSort.isTextual()
             || !UML_SEQUENCE_MESSAGE_SORTS.contains(messageSort.asText()))) {
       throw new RenderMetadataUsageException(
-          "DEDIREN_UML_MESSAGE_METADATA_INVALID",
+          DiagnosticCode.UML_MESSAGE_METADATA_INVALID.code(),
           path + ".message_sort",
           "UML Message render metadata message_sort, when present, must be one of "
               + UML_SEQUENCE_MESSAGE_SORTS);
@@ -325,7 +326,7 @@ public final class RenderInputValidator {
         || !operator.isTextual()
         || !UML_SEQUENCE_COMBINED_FRAGMENT_OPERATORS.contains(operator.asText())) {
       throw new RenderMetadataUsageException(
-          "DEDIREN_UML_COMBINED_FRAGMENT_METADATA_INVALID",
+          DiagnosticCode.UML_COMBINED_FRAGMENT_METADATA_INVALID.code(),
           path + ".operator",
           "UML CombinedFragment render metadata operator must be one of "
               + UML_SEQUENCE_COMBINED_FRAGMENT_OPERATORS);
@@ -334,7 +335,7 @@ public final class RenderInputValidator {
     JsonNode operands = metadataProperty(properties, "operands");
     if (!isNonEmptyTextArray(operands)) {
       throw new RenderMetadataUsageException(
-          "DEDIREN_UML_COMBINED_FRAGMENT_METADATA_INVALID",
+          DiagnosticCode.UML_COMBINED_FRAGMENT_METADATA_INVALID.code(),
           path + ".operands",
           "UML CombinedFragment render metadata operands must be a non-empty array of text ids");
     }
@@ -342,7 +343,7 @@ public final class RenderInputValidator {
     JsonNode covered = metadataProperty(properties, "covered");
     if (covered != null && !isTextArray(covered)) {
       throw new RenderMetadataUsageException(
-          "DEDIREN_UML_COMBINED_FRAGMENT_METADATA_INVALID",
+          DiagnosticCode.UML_COMBINED_FRAGMENT_METADATA_INVALID.code(),
           path + ".covered",
           "UML CombinedFragment render metadata covered, when present, must be an array of text ids");
     }
@@ -353,7 +354,7 @@ public final class RenderInputValidator {
     JsonNode combinedFragment = metadataProperty(properties, "combined_fragment");
     if (combinedFragment == null || !combinedFragment.isTextual()) {
       throw new RenderMetadataUsageException(
-          "DEDIREN_UML_INTERACTION_OPERAND_METADATA_INVALID",
+          DiagnosticCode.UML_INTERACTION_OPERAND_METADATA_INVALID.code(),
           path + ".combined_fragment",
           "UML InteractionOperand render metadata combined_fragment must be text");
     }
@@ -361,7 +362,7 @@ public final class RenderInputValidator {
     JsonNode order = metadataProperty(properties, "order");
     if (order == null || !order.isIntegralNumber() || order.bigIntegerValue().signum() < 1) {
       throw new RenderMetadataUsageException(
-          "DEDIREN_UML_INTERACTION_OPERAND_METADATA_INVALID",
+          DiagnosticCode.UML_INTERACTION_OPERAND_METADATA_INVALID.code(),
           path + ".order",
           "UML InteractionOperand render metadata order must be a positive integer");
     }
@@ -369,7 +370,7 @@ public final class RenderInputValidator {
     JsonNode fragments = metadataProperty(properties, "fragments");
     if (!isNonEmptyTextArray(fragments)) {
       throw new RenderMetadataUsageException(
-          "DEDIREN_UML_INTERACTION_OPERAND_METADATA_INVALID",
+          DiagnosticCode.UML_INTERACTION_OPERAND_METADATA_INVALID.code(),
           path + ".fragments",
           "UML InteractionOperand render metadata fragments must be a non-empty array of text ids");
     }
@@ -377,7 +378,7 @@ public final class RenderInputValidator {
     JsonNode guard = metadataProperty(properties, "guard");
     if (guard != null && !guard.isTextual()) {
       throw new RenderMetadataUsageException(
-          "DEDIREN_UML_INTERACTION_OPERAND_METADATA_INVALID",
+          DiagnosticCode.UML_INTERACTION_OPERAND_METADATA_INVALID.code(),
           path + ".guard",
           "UML InteractionOperand render metadata guard, when present, must be text");
     }

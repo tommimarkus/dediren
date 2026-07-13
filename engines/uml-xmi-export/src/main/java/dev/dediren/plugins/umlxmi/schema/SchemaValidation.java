@@ -77,12 +77,12 @@ public final class SchemaValidation {
       Element root = document.getDocumentElement();
       if (!XMI_NS.equals(root.getNamespaceURI()) || !"XMI".equals(root.getLocalName())) {
         throw new XmiValidationException(
-            "DEDIREN_XMI_SCHEMA_INVALID",
+            DiagnosticCode.XMI_SCHEMA_INVALID.code(),
             "generated UML/XMI XML root must be xmi:XMI in the OMG XMI namespace");
       }
       if (root.hasAttributeNS(XMI_NS, "version")) {
         throw new XmiValidationException(
-            "DEDIREN_XMI_SCHEMA_INVALID",
+            DiagnosticCode.XMI_SCHEMA_INVALID.code(),
             "generated UML/XMI XML uses xmi:version, which OMG XMI.xsd does not allow");
       }
       Set<String> ids = new HashSet<>();
@@ -95,18 +95,20 @@ public final class SchemaValidation {
         }
         if (!isXmlId(id)) {
           throw new XmiValidationException(
-              "DEDIREN_XMI_ID_INVALID", "generated UML/XMI XML contains invalid xmi:id " + id);
+              DiagnosticCode.XMI_ID_INVALID.code(),
+              "generated UML/XMI XML contains invalid xmi:id " + id);
         }
         if (!ids.add(id)) {
           throw new XmiValidationException(
-              "DEDIREN_XMI_ID_INVALID", "generated UML/XMI XML contains duplicate xmi:id " + id);
+              DiagnosticCode.XMI_ID_INVALID.code(),
+              "generated UML/XMI XML contains duplicate xmi:id " + id);
         }
       }
     } catch (XmiValidationException error) {
       throw error;
     } catch (Exception error) {
       throw new XmiValidationException(
-          "DEDIREN_XMI_XML_INVALID",
+          DiagnosticCode.XMI_XML_INVALID.code(),
           "generated UML/XMI XML is not well-formed: " + error.getMessage());
     }
   }
@@ -127,7 +129,7 @@ public final class SchemaValidation {
       return;
     }
     throw new XmiValidationException(
-        "DEDIREN_XMI_SCHEMA_INVALID",
+        DiagnosticCode.XMI_SCHEMA_INVALID.code(),
         "generated UML/XMI XML does not validate against OMG XMI.xsd: " + outcome.details());
   }
 
@@ -144,7 +146,7 @@ public final class SchemaValidation {
         return configured.get();
       }
       throw new XmiValidationException(
-          "DEDIREN_XMI_SCHEMA_UNAVAILABLE",
+          DiagnosticCode.XMI_SCHEMA_UNAVAILABLE.code(),
           "OMG XMI schema file "
               + configured.get()
               + " is missing or empty; provide the official XMI.xsd or unset "
@@ -167,7 +169,7 @@ public final class SchemaValidation {
           SchemaCacheModule.curlFetcher(SCHEMA_FETCHER));
     } catch (SchemaCacheException error) {
       throw new XmiValidationException(
-          "DEDIREN_XMI_SCHEMA_UNAVAILABLE",
+          DiagnosticCode.XMI_SCHEMA_UNAVAILABLE.code(),
           error.getMessage() + " " + XMI_SCHEMA_DOWNLOAD_REMEDIATION);
     }
     return schemaPath;
