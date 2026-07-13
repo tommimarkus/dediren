@@ -494,17 +494,23 @@ common changes:
   consumer base makes big-bang untenable, design a dual-read window as its
   own spec first — do not improvise one mid-bump.
 
-- **Bump or migrate Jackson.** The product JSON stack is Jackson 2
-  (`com.fasterxml.jackson`, 60 main-source files, `contracts` alone 30);
-  Jackson 3 (`tools.jackson`) is already on the classpath transitively via
-  networknt `json-schema-validator`, which is hand-pinned for two High CVEs
-  (GHSA-j3rv-43j4-c7qm, GHSA-rmj7-2vxq-3g9f) with `jackson-annotations`
-  pinned separately to keep Enforcer `dependencyConvergence` green across
-  both stacks. Routine bumps must move both stacks together and re-verify
-  convergence. The 2→3 migration is a repo-wide package-rename sweep with no
-  incremental path; its trigger conditions are Jackson 2 EOL, networknt
-  dropping the Jackson-2-compatible line, or an unfixed 2.x CVE — when one
-  fires, plan the sweep as a dedicated slice, contracts module first.
+- **Bump Jackson.** The 2→3 migration this section used to plan for has
+  **already happened**: Jackson 3 (`tools.jackson`, `jackson.version` 3.2.0 in
+  the root pom) is the product's sole JSON stack. 42 main-source files import
+  `tools.jackson`; **no** main-source file imports a `com.fasterxml.jackson`
+  runtime package. There is no dual-stack bump procedure to follow and no
+  migration left to schedule.
+
+  The one `com.fasterxml` surface that remains is deliberate and is not a
+  leftover: **annotations**. Jackson 3 keeps its annotation package at
+  `com.fasterxml.jackson.annotation` by design, so the 40 main-source files
+  carrying `@JsonProperty` / `@JsonInclude` are correct as they are — do not
+  "finish the migration" by rewriting them.
+
+  Routine bumps therefore move one stack. Keep Enforcer
+  `dependencyConvergence` green: networknt `json-schema-validator` is the other
+  consumer of Jackson on the classpath, so a bump that changes the databind
+  version must re-verify convergence against it.
 
 ---
 
