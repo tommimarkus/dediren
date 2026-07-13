@@ -579,7 +579,7 @@ speculatively):
 
 | Debt | Location | Guideline | Smell |
 |---|---|---|---|
-| Notation vocabulary duplicated because the source copy is `private` | `uml/UmlSequenceValidation.java` (private) vs `render/node/uml/RenderInputValidator.java` (re-declared) | §6 single source of truth | `java.SD-S` / `SD-C` |
+| Notation vocabulary duplicated because the source copy is `private` — **resolved 2026-07-13** | was: `uml/UmlSequenceValidation.java` (package-private) vs `render/node/uml/RenderInputValidator.java` and `uml-xmi-export/write/interaction/InteractionWriter.java` (each re-declaring the message sorts / fragment operators verbatim) | §6 single source of truth | (resolved) `UmlSequenceValidation` is now public and exports `messageSorts()` / `combinedFragmentOperators()`; both engines consume them, and the three copies are gone. The never-consumed `Uml.structuralTypes()` / `Uml.activityTypes()` accessors were deleted in the same change — the §6 export surface had been inverted relative to demand: what consumers needed was private, and what was exported nothing wanted |
 | Plugin `Main.java` god-files — **resolved**: split into per-notation packages (`render` → `.style`/`.svg`/`.node.{archimate,uml}`; `uml-xmi-export` → `.build`/`.policy`/`.schema`/`.write.*`) | `render/Main.java` 3,851→317 LOC, `uml-xmi-export/Main.java` 1,734→292 LOC | §8 thinness/cohesion | (resolved) |
 | Notation-core asymmetry (dependency + endpoint-rule modeling) | `archimate` (standalone, explicit triples) vs `uml` (→`contracts`, inline conditionals) | §6 symmetric role | `SD-S` (low) |
 | `CLAUDE.md` "semantics belong in export plugin" reads as contradicting shared cores | wording vs `archimate`/`uml` consumers | §6 validation-vs-mapping distinction | doc/code drift |

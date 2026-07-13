@@ -1,5 +1,6 @@
 package dev.dediren.semantics.graph;
 
+import dev.dediren.contracts.layout.LayoutNodeRole;
 import dev.dediren.contracts.source.GenericGraphPluginData;
 import dev.dediren.contracts.source.GenericGraphView;
 import dev.dediren.contracts.source.SourceDocument;
@@ -32,10 +33,10 @@ public final class GraphNotationSemantics implements NotationSemantics {
   @Override
   public String layoutRole(String sourceType) {
     if ("Lifeline".equals(sourceType)) {
-      return "lifeline";
+      return LayoutNodeRole.LIFELINE;
     }
     if ("Interaction".equals(sourceType)) {
-      return "interaction";
+      return LayoutNodeRole.INTERACTION;
     }
     return null;
   }

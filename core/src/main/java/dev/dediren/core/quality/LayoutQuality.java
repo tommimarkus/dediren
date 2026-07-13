@@ -6,6 +6,7 @@ import dev.dediren.contracts.DiagnosticSeverity;
 import dev.dediren.contracts.layout.LaidOutEdge;
 import dev.dediren.contracts.layout.LaidOutGroup;
 import dev.dediren.contracts.layout.LaidOutNode;
+import dev.dediren.contracts.layout.LayoutNodeRole;
 import dev.dediren.contracts.layout.LayoutResult;
 import dev.dediren.contracts.layout.Point;
 import java.util.ArrayList;
@@ -226,7 +227,7 @@ public final class LayoutQuality {
     }
     for (int nodeIndex = 0; nodeIndex < result.nodes().size(); nodeIndex++) {
       LaidOutNode node = result.nodes().get(nodeIndex);
-      if (!"junction".equals(node.role())) {
+      if (!LayoutNodeRole.isJunction(node.role())) {
         continue;
       }
       double centerX = node.x() + node.width() / 2.0;
@@ -345,7 +346,7 @@ public final class LayoutQuality {
     if (pointOnNodePerimeter(point, node, tolerance)) {
       return true;
     }
-    return "lifeline".equals(node.role()) && onLifelineAxis(point, node, tolerance);
+    return LayoutNodeRole.isLifeline(node.role()) && onLifelineAxis(point, node, tolerance);
   }
 
   // Sequence Message endpoints anchor to the lifeline axis: the participant head-box center,
@@ -365,7 +366,7 @@ public final class LayoutQuality {
     // A UML sequence interaction frame is a container that legitimately encloses its
     // lifelines, executions, and messages; it must not be counted as an overlap or a
     // route-through-node.
-    return "interaction".equals(node.role());
+    return LayoutNodeRole.isInteraction(node.role());
   }
 
   private static int countOverlaps(LayoutResult result) {
@@ -520,7 +521,7 @@ public final class LayoutQuality {
     for (LaidOutNode node : result.nodes()) {
       if (node.label() == null
           || node.label().isBlank()
-          || "junction".equals(node.role())
+          || LayoutNodeRole.isJunction(node.role())
           || Math.min(node.width(), node.height()) < LABEL_SPACE_MIN_DIMENSION) {
         continue;
       }

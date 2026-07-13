@@ -16,6 +16,7 @@ import dev.dediren.contracts.render.SvgGroupStyle;
 import dev.dediren.contracts.render.SvgNodeStyle;
 import dev.dediren.contracts.render.SvgStylePolicy;
 import dev.dediren.uml.Uml;
+import dev.dediren.uml.UmlSequenceValidation;
 import dev.dediren.uml.UmlValidationException;
 import java.util.HashSet;
 import java.util.List;
@@ -25,10 +26,12 @@ import java.util.regex.Pattern;
 import tools.jackson.databind.JsonNode;
 
 public final class RenderInputValidator {
+  // Owned by the uml notation core (architecture-guidelines §6 single source of truth); this file
+  // used to re-declare both sets verbatim.
   private static final Set<String> UML_SEQUENCE_MESSAGE_SORTS =
-      Set.of("synchCall", "asynchCall", "asynchSignal", "reply", "createMessage", "deleteMessage");
+      UmlSequenceValidation.messageSorts();
   private static final Set<String> UML_SEQUENCE_COMBINED_FRAGMENT_OPERATORS =
-      Set.of("alt", "opt", "loop", "par");
+      UmlSequenceValidation.combinedFragmentOperators();
 
   private RenderInputValidator() {}
 

@@ -1,5 +1,6 @@
 package dev.dediren.ir.quality;
 
+import dev.dediren.contracts.layout.LayoutNodeRole;
 import dev.dediren.contracts.layout.Point;
 import dev.dediren.ir.LaidOutScene;
 import dev.dediren.ir.PlacedNode;
@@ -120,7 +121,7 @@ public final class SequenceInvariants {
   public static List<InvariantViolation> interactionFrameEnclosesLifelines(LaidOutScene scene) {
     PlacedNode frame =
         scene.nodes().stream()
-            .filter(node -> "interaction".equals(node.role()))
+            .filter(node -> LayoutNodeRole.isInteraction(node.role()))
             .findFirst()
             .orElse(null);
     if (frame == null) {
@@ -199,7 +200,7 @@ public final class SequenceInvariants {
   }
 
   private static boolean isLifeline(PlacedNode node) {
-    return node != null && "lifeline".equals(node.role());
+    return node != null && LayoutNodeRole.isLifeline(node.role());
   }
 
   private static boolean isMessage(RoutedEdge edge, Map<String, PlacedNode> nodesById) {

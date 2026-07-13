@@ -2,6 +2,7 @@ package dev.dediren.semantics.uml;
 
 import dev.dediren.contracts.Diagnostic;
 import dev.dediren.contracts.DiagnosticSeverity;
+import dev.dediren.contracts.layout.LayoutNodeRole;
 import dev.dediren.contracts.source.GenericGraphPluginData;
 import dev.dediren.contracts.source.GenericGraphView;
 import dev.dediren.contracts.source.GenericGraphViewKind;
@@ -44,10 +45,10 @@ public final class UmlNotationSemantics implements NotationSemantics {
   @Override
   public String layoutRole(String sourceType) {
     if ("Lifeline".equals(sourceType)) {
-      return "lifeline";
+      return LayoutNodeRole.LIFELINE;
     }
     if ("Interaction".equals(sourceType)) {
-      return "interaction";
+      return LayoutNodeRole.INTERACTION;
     }
     return null;
   }

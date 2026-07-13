@@ -9,6 +9,7 @@ import dev.dediren.contracts.source.SourceRelationship;
 import dev.dediren.plugins.umlxmi.build.ExportScope;
 import dev.dediren.plugins.umlxmi.build.IdentifierMap;
 import dev.dediren.plugins.umlxmi.build.XmiExportException;
+import dev.dediren.uml.UmlSequenceValidation;
 import java.math.BigInteger;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -28,7 +29,7 @@ public final class InteractionWriter {
   private static final String UNSUPPORTED_SEQUENCE_NODE =
       "DEDIREN_UML_XMI_SEQUENCE_NODE_UNSUPPORTED";
   private static final Set<String> SUPPORTED_SEQUENCE_FRAGMENT_OPERATORS =
-      Set.of("alt", "opt", "loop", "par");
+      UmlSequenceValidation.combinedFragmentOperators();
 
   public static void writeInteraction(
       StringBuilder xml,
