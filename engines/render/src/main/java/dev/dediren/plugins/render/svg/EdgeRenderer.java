@@ -41,62 +41,7 @@ public final class EdgeRenderer {
   public static void edgeMarker(
       SvgWriter w, LaidOutEdge edge, ResolvedEdgeStyle style, String side) {
     SvgEdgeMarkerEnd marker = side.equals("start") ? style.markerStart() : style.markerEnd();
-    if (marker == SvgEdgeMarkerEnd.NONE) {
-      return;
-    }
-    String markerName = markerName(marker);
-    String id = "marker-" + side + "-" + edge.id();
-    String attribute = "data-dediren-edge-marker-" + side;
-    String fill = markerFill(marker, style);
-    String stroke = markerStroke(marker, style);
-    // Anchor the marker at its endpoint-facing extent so the whole adornment stays on the
-    // stroke side of the endpoint. Endpoints sit on node borders, and nodes paint over edges,
-    // so a centred marker (refX=5) has its far half hidden by the node. End markers point
-    // forward (tip at x=9); start markers trail back (base at x=1).
-    String refX = "start".equals(side) ? "1" : "9";
-    w.start("marker")
-        .attr("id", id)
-        .attr(attribute, markerName)
-        .attr("markerWidth", "10")
-        .attr("markerHeight", "10")
-        .attr("refX", refX)
-        .attr("refY", "5")
-        .attr("orient", "auto");
-    switch (marker) {
-      case FILLED_DIAMOND, HOLLOW_DIAMOND ->
-          w.empty("path")
-              .attr("d", "M 1 5 L 5 1 L 9 5 L 5 9 Z")
-              .attr("fill", fill)
-              .attr("stroke", stroke)
-              .attr("stroke-width", "1");
-      case HOLLOW_TRIANGLE ->
-          w.empty("path")
-              .attr("d", "M 1 1 L 9 5 L 1 9 Z")
-              .attr("fill", fill)
-              .attr("stroke", stroke)
-              .attr("stroke-width", "1");
-      case OPEN_ARROW ->
-          w.empty("path")
-              .attr("d", "M 1 1 L 9 5 L 1 9")
-              .attr("fill", "none")
-              .attr("stroke", stroke)
-              .attr("stroke-width", "1.5");
-      case FILLED_CIRCLE, HOLLOW_CIRCLE ->
-          w.empty("circle")
-              .attr("cx", "5")
-              .attr("cy", "5")
-              .attr("r", "3.5")
-              .attr("fill", fill)
-              .attr("stroke", stroke)
-              .attr("stroke-width", "1");
-      default ->
-          w.empty("path")
-              .attr("d", "M 1 1 L 9 5 L 1 9 Z")
-              .attr("fill", fill)
-              .attr("stroke", stroke)
-              .attr("stroke-width", "1");
-    }
-    w.end();
+    EdgeMarkers.emit(w, edge.id(), side, marker, style.stroke());
   }
 
   public static void lineJumpMasks(
@@ -243,25 +188,6 @@ public final class EdgeRenderer {
 
   public static double edgeLabelFontSize(double baseFontSize) {
     return Math.round(baseFontSize * EDGE_LABEL_FONT_SIZE_SCALE * 10.0) / 10.0;
-  }
-
-  public static String markerName(SvgEdgeMarkerEnd marker) {
-    return marker.name().toLowerCase(Locale.ROOT);
-  }
-
-  public static String markerFill(SvgEdgeMarkerEnd marker, ResolvedEdgeStyle style) {
-    return switch (marker) {
-      case HOLLOW_TRIANGLE, HOLLOW_DIAMOND, HOLLOW_CIRCLE -> "#ffffff";
-      case OPEN_ARROW -> "none";
-      default -> style.stroke();
-    };
-  }
-
-  public static String markerStroke(SvgEdgeMarkerEnd marker, ResolvedEdgeStyle style) {
-    return switch (marker) {
-      case FILLED_ARROW, FILLED_DIAMOND, FILLED_CIRCLE -> style.stroke();
-      default -> style.stroke();
-    };
   }
 
   public static String pathData(LaidOutEdge edge, List<LineJump> lineJumps) {

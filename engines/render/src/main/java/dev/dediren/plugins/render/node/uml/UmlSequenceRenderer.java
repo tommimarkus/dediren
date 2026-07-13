@@ -15,6 +15,7 @@ import dev.dediren.contracts.render.SvgEdgeStyle;
 import dev.dediren.contracts.render.SvgFontStyle;
 import dev.dediren.contracts.render.SvgNodeStyle;
 import dev.dediren.contracts.render.SvgStylePolicy;
+import dev.dediren.plugins.render.svg.EdgeMarkers;
 import dev.dediren.plugins.render.svg.SvgAccessibleName;
 import dev.dediren.plugins.render.svg.SvgWriter;
 import java.util.ArrayList;
@@ -442,41 +443,9 @@ public final class UmlSequenceRenderer {
 
   private void edgeMarker(
       SvgWriter w, LaidOutEdge edge, SvgEdgeMarkerEnd marker, String stroke, String side) {
-    if (marker == SvgEdgeMarkerEnd.NONE) {
-      return;
-    }
-    String markerName = marker.name().toLowerCase(Locale.ROOT);
-    String id = "marker-" + side + "-" + edge.id();
-    String attribute = "data-dediren-edge-marker-" + side;
-    String fill = marker == SvgEdgeMarkerEnd.OPEN_ARROW ? "none" : stroke;
-    // Message endpoints sit on the lifeline stem (the head-box center), so a centred marker
-    // (refX=5) would straddle the stem and drive the arrowhead's far half across the lifeline.
-    // Anchor the marker at its endpoint-facing extent instead: end markers point forward (tip at
-    // x=9), start markers trail back (base at x=1) -- the same convention EdgeRenderer applies so
-    // node/lifeline geometry cannot clip or be overlapped by the adornment.
-    String refX = "start".equals(side) ? "1" : "9";
-    w.start("marker")
-        .attr("id", id)
-        .attr(attribute, markerName)
-        .attr("markerWidth", "10")
-        .attr("markerHeight", "10")
-        .attr("refX", refX)
-        .attr("refY", "5")
-        .attr("orient", "auto");
-    if (marker == SvgEdgeMarkerEnd.OPEN_ARROW) {
-      w.empty("path")
-          .attr("d", "M 1 1 L 9 5 L 1 9")
-          .attr("fill", "none")
-          .attr("stroke", stroke)
-          .attr("stroke-width", "1.5");
-    } else {
-      w.empty("path")
-          .attr("d", "M 1 1 L 9 5 L 1 9 Z")
-          .attr("fill", fill)
-          .attr("stroke", stroke)
-          .attr("stroke-width", "1");
-    }
-    w.end();
+    // Message endpoints sit on the lifeline stem rather than a node border, but the anchoring rule
+    // is the same one EdgeMarkers states once for every edge in the product.
+    EdgeMarkers.emit(w, edge.id(), side, marker, stroke);
   }
 
   private void edgePath(SvgWriter w, LaidOutEdge edge, MessageAppearance appearance) {
