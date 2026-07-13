@@ -6,6 +6,7 @@ import dev.dediren.contracts.source.GenericGraphView;
 import dev.dediren.contracts.source.SourceDocument;
 import dev.dediren.contracts.source.SourceNode;
 import dev.dediren.contracts.source.SourceRelationship;
+import dev.dediren.ir.LayoutIntent;
 import java.util.List;
 import tools.jackson.databind.JsonNode;
 
@@ -48,6 +49,13 @@ public interface NotationSemantics {
    * Notation layout constraints for the view (the four stringly {@code uml.sequence.*}), or empty.
    */
   List<LayoutConstraint> layoutConstraints(SourceDocument source, GenericGraphView view);
+
+  /**
+   * Notation layout intents for the view, in the neutral {@link LayoutIntent} vocabulary. The P5
+   * typed successor to {@link #layoutConstraints}, which is removed at the cutover once this
+   * becomes the live producer.
+   */
+  List<LayoutIntent> layoutIntents(SourceDocument source, GenericGraphView view);
 
   /** Per-node render-metadata selector properties (the {@code uml} subtree), or {@code null}. */
   JsonNode nodeRenderProperties(SourceNode node);

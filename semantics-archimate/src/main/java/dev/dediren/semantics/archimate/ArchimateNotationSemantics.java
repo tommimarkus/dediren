@@ -15,6 +15,7 @@ import dev.dediren.contracts.source.SourceNode;
 import dev.dediren.contracts.source.SourceRelationship;
 import dev.dediren.engine.EngineException;
 import dev.dediren.engine.NotationSemantics;
+import dev.dediren.ir.LayoutIntent;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -67,6 +68,11 @@ public final class ArchimateNotationSemantics implements NotationSemantics {
 
   @Override
   public List<LayoutConstraint> layoutConstraints(SourceDocument source, GenericGraphView view) {
+    return List.of();
+  }
+
+  @Override
+  public List<LayoutIntent> layoutIntents(SourceDocument source, GenericGraphView view) {
     return List.of();
   }
 

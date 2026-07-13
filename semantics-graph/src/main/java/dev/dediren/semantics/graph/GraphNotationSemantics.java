@@ -7,6 +7,7 @@ import dev.dediren.contracts.source.SourceDocument;
 import dev.dediren.contracts.source.SourceNode;
 import dev.dediren.contracts.source.SourceRelationship;
 import dev.dediren.engine.NotationSemantics;
+import dev.dediren.ir.LayoutIntent;
 import java.util.List;
 import tools.jackson.databind.JsonNode;
 
@@ -57,6 +58,11 @@ public final class GraphNotationSemantics implements NotationSemantics {
 
   @Override
   public List<LayoutConstraint> layoutConstraints(SourceDocument source, GenericGraphView view) {
+    return List.of();
+  }
+
+  @Override
+  public List<LayoutIntent> layoutIntents(SourceDocument source, GenericGraphView view) {
     return List.of();
   }
 

@@ -76,6 +76,21 @@ class UmlNotationSemanticsTest {
   }
 
   @Test
+  void layoutIntentsDelegatesToLowering() throws Exception {
+    SourceDocument sequence = fixture("fixtures/source/valid-uml-sequence-basic.json");
+    GenericGraphView sequenceView = viewOf(sequence, "sequence-view");
+
+    assertThat(notation.layoutIntents(sequence, sequenceView))
+        .isEqualTo(
+            UmlSequenceConstraints.lower(
+                UmlSequenceConstraints.sequenceConstraints(sequence, sequenceView)));
+
+    SourceDocument classModel = fixture("fixtures/source/valid-uml-basic.json");
+    GenericGraphView classView = viewOf(classModel, "class-view");
+    assertThat(notation.layoutIntents(classModel, classView)).isEmpty();
+  }
+
+  @Test
   void nodeRenderPropertiesReturnsTheUmlSubtreeAcrossViewKinds() throws Exception {
     SourceDocument classModel = fixture("fixtures/source/valid-uml-basic.json");
     SourceDocument stateMachine = fixture("fixtures/source/valid-uml-state-machine-basic.json");
