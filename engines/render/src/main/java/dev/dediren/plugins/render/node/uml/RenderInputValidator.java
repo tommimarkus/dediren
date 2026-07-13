@@ -401,6 +401,18 @@ public final class RenderInputValidator {
   }
 
   private static void validateRenderPolicy(RenderPolicy policy) throws PolicyValidationException {
+    // page and margin are required by render-policy.schema.json but were never checked at runtime:
+    // a missing margin dereferenced null in SvgBounds.padded (an unstructured DEDIREN_ENGINE_FAILED
+    // crash), and a missing page was silently accepted. Both are authoring mistakes an agent must
+    // be
+    // able to diagnose from the published envelope alone.
+    if (policy.page() == null) {
+      throw new PolicyValidationException("page", "SVG render policy is missing the required page");
+    }
+    if (policy.margin() == null) {
+      throw new PolicyValidationException(
+          "margin", "SVG render policy is missing the required margin");
+    }
     SvgStylePolicy style = policy.style();
     if (style == null) {
       return;
