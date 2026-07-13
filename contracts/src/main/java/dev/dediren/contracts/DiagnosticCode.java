@@ -29,6 +29,9 @@ public enum DiagnosticCode {
   // Command-owned I/O failure (cli: Main), e.g. a build artifact write hitting an unwritable or
   // colliding --out.
   COMMAND_IO_FAILED("DEDIREN_COMMAND_IO_FAILED"),
+  // A misconfigured dediren.bundle.root / DEDIREN_BUNDLE_ROOT override, or a failed
+  // working-directory walk-up, could not resolve the Dediren product root (core: DedirenPaths).
+  PRODUCT_ROOT_UNRESOLVED("DEDIREN_PRODUCT_ROOT_UNRESOLVED"),
   VALIDATE_PROFILE_REQUIRED("DEDIREN_VALIDATE_PROFILE_REQUIRED"),
   VALIDATE_PLUGIN_REQUIRED("DEDIREN_VALIDATE_PLUGIN_REQUIRED"),
 

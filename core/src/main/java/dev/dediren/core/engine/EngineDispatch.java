@@ -9,6 +9,7 @@ import dev.dediren.contracts.DiagnosticSeverity;
 import dev.dediren.contracts.EnvelopeStatus;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.contracts.util.ContractCollections;
+import dev.dediren.core.ProductRootException;
 import dev.dediren.engine.EngineException;
 import dev.dediren.engine.EngineResult;
 import dev.dediren.engine.Engines;
@@ -107,6 +108,10 @@ public final class EngineDispatch {
     } catch (EngineException error) {
       return new InMemoryOutcome.Failure<>(error.diagnostics(), error.exitCode());
     } catch (UncheckedIOException error) {
+      throw error;
+    } catch (ProductRootException error) {
+      // Environment misconfiguration, not an engine defect: let cli convert it to its own
+      // envelope instead of burying it in DEDIREN_ENGINE_FAILED.
       throw error;
     } catch (Exception error) {
       // The only safety net for an unexpected engine failure now that the process fallback is

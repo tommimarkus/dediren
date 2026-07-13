@@ -39,7 +39,7 @@ public final class DedirenPaths {
       }
       current = current.getParent();
     }
-    throw new IllegalStateException(
+    throw new ProductRootException(
         "Could not locate Dediren product root from "
             + BUNDLE_ROOT_PROPERTY
             + ", "
@@ -60,7 +60,7 @@ public final class DedirenPaths {
     if (isProductRoot(root)) {
       return root;
     }
-    throw new IllegalStateException(
+    throw new ProductRootException(
         "Configured Dediren product root from "
             + source
             + " does not contain schemas/model.schema.json: "

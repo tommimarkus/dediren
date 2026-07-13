@@ -3,6 +3,7 @@ package dev.dediren.cli;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.dediren.contracts.json.JsonSupport;
+import dev.dediren.core.DedirenPaths;
 import java.io.StringReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -437,6 +438,27 @@ class MainTest {
     assertThat(envelope.at("/diagnostics/0/code").asText()).isEqualTo("DEDIREN_COMMAND_IO_FAILED");
     assertThat(envelope.at("/diagnostics/0/message").asText())
         .contains("failed to write build artifact");
+  }
+
+  @Test
+  void misconfiguredBundleRootEmitsErrorEnvelope(@TempDir Path tempDir) throws Exception {
+    String previous = System.getProperty(DedirenPaths.BUNDLE_ROOT_PROPERTY);
+    System.setProperty(DedirenPaths.BUNDLE_ROOT_PROPERTY, tempDir.resolve("missing").toString());
+    try {
+      CliResult result =
+          runValidate(
+              sequenceWorkflowEnv(), workspaceRoot().resolve("fixtures/source/valid-basic.json"));
+      assertThat(result.exitCode()).isEqualTo(2);
+      JsonNode envelope = JsonSupport.objectMapper().readTree(result.stdout());
+      assertThat(envelope.at("/diagnostics/0/code").asText())
+          .isEqualTo("DEDIREN_PRODUCT_ROOT_UNRESOLVED");
+    } finally {
+      if (previous == null) {
+        System.clearProperty(DedirenPaths.BUNDLE_ROOT_PROPERTY);
+      } else {
+        System.setProperty(DedirenPaths.BUNDLE_ROOT_PROPERTY, previous);
+      }
+    }
   }
 
   private CliResult runValidate(Map<String, String> env, Path source) throws Exception {

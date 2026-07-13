@@ -6,6 +6,7 @@ import dev.dediren.contracts.Diagnostic;
 import dev.dediren.contracts.DiagnosticCode;
 import dev.dediren.contracts.DiagnosticSeverity;
 import dev.dediren.contracts.json.JsonSupport;
+import dev.dediren.core.ProductRootException;
 import dev.dediren.core.commands.BuildRequest;
 import dev.dediren.core.commands.CoreCommands;
 import dev.dediren.core.engine.EngineExecutionException;
@@ -149,11 +150,17 @@ public final class Main {
           return printPluginError(error);
         } catch (UncheckedIOException error) {
           return printStructuralFailure(spec, error);
+        } catch (ProductRootException error) {
+          return printProductRootFailure(spec, error);
         }
       }
-      ValidationResult result =
-          SourceValidator.validateSourceJson(inputText.text(), inputText.baseDir());
-      return printValidationResult(result);
+      try {
+        ValidationResult result =
+            SourceValidator.validateSourceJson(inputText.text(), inputText.baseDir());
+        return printValidationResult(result);
+      } catch (ProductRootException error) {
+        return printProductRootFailure(spec, error);
+      }
     }
 
     private Integer printValidationResult(ValidationResult result) throws IOException {
@@ -214,6 +221,8 @@ public final class Main {
         return writePluginError(spec, error);
       } catch (UncheckedIOException error) {
         return printStructuralFailure(spec, error);
+      } catch (ProductRootException error) {
+        return printProductRootFailure(spec, error);
       }
     }
   }
@@ -383,6 +392,8 @@ public final class Main {
                 engines));
       } catch (EngineExecutionException error) {
         return writePluginError(spec, error);
+      } catch (ProductRootException error) {
+        return printProductRootFailure(spec, error);
       }
     }
   }
@@ -482,6 +493,8 @@ public final class Main {
         return writePluginError(spec, error);
       } catch (UncheckedIOException error) {
         return printCommandIoFailure(spec, error);
+      } catch (ProductRootException error) {
+        return printProductRootFailure(spec, error);
       }
     }
   }
@@ -558,6 +571,21 @@ public final class Main {
     return writeEnvelope(
         spec,
         usageError(DiagnosticCode.COMMAND_IO_FAILED.code(), error.getMessage()),
+        CommandExitCode.INPUT_ERROR);
+  }
+
+  /**
+   * A misconfigured or undiscoverable Dediren product root ({@code DEDIREN_BUNDLE_ROOT} / {@code
+   * dediren.bundle.root}, or a failed working-directory walk-up): an environment misconfiguration,
+   * not an engine defect, so it gets its own envelope instead of a raw stack trace and empty
+   * stdout.
+   */
+  private static Integer printProductRootFailure(CommandSpec spec, ProductRootException error)
+      throws IOException {
+    spec.commandLine().getErr().println(error.getMessage());
+    return writeEnvelope(
+        spec,
+        usageError(DiagnosticCode.PRODUCT_ROOT_UNRESOLVED.code(), error.getMessage()),
         CommandExitCode.INPUT_ERROR);
   }
 
