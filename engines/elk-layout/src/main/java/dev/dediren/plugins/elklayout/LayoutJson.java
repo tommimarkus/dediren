@@ -100,7 +100,6 @@ final class LayoutJson {
     }
 
     rejectNull(routing.get("style"), "$.layout_preferences.routing.style");
-    rejectNull(routing.get("profile"), "$.layout_preferences.routing.profile");
     rejectNull(routing.get("endpoint_merging"), "$.layout_preferences.routing.endpoint_merging");
   }
 
@@ -200,10 +199,6 @@ final class LayoutJson {
         routing.get("style"),
         "$.layout_preferences.routing.style",
         Set.of("orthogonal", "polyline", "spline"));
-    rejectUnsupportedText(
-        routing.get("profile"),
-        "$.layout_preferences.routing.profile",
-        Set.of("compact", "readable", "spacious"));
     rejectUnsupportedText(
         routing.get("endpoint_merging"),
         "$.layout_preferences.routing.endpoint_merging",

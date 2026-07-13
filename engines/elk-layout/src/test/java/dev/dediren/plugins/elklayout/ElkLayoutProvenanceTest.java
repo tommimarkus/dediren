@@ -14,7 +14,6 @@ import dev.dediren.contracts.layout.LayoutPreferences;
 import dev.dediren.contracts.layout.LayoutRequest;
 import dev.dediren.contracts.layout.LayoutResult;
 import dev.dediren.contracts.layout.LayoutRoutingPreferences;
-import dev.dediren.contracts.layout.LayoutRoutingProfile;
 import dev.dediren.contracts.layout.LayoutRoutingStyle;
 import dev.dediren.ir.Axis;
 import dev.dediren.ir.BandMember;
@@ -198,9 +197,7 @@ class ElkLayoutProvenanceTest {
                 LayoutDensity.READABLE,
                 null,
                 new LayoutRoutingPreferences(
-                    LayoutRoutingStyle.ORTHOGONAL,
-                    LayoutRoutingProfile.READABLE,
-                    LayoutEndpointMerging.OFF)));
+                    LayoutRoutingStyle.ORTHOGONAL, LayoutEndpointMerging.OFF)));
 
     LayoutResult result = new ElkLayoutEngine().layout(request);
 

@@ -401,7 +401,6 @@ class SemanticsRouterEngineTest {
                             "wrapping": "off",
                             "routing": {
                               "style": "orthogonal",
-                              "profile": "spacious",
                               "endpoint_merging": "off"
                             }
                           }
@@ -425,7 +424,6 @@ class SemanticsRouterEngineTest {
                           "wrapping": "off",
                           "routing": {
                             "style": "orthogonal",
-                            "profile": "spacious",
                             "endpoint_merging": "off"
                           }
                         }

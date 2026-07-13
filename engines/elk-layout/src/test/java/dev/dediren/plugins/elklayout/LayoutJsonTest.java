@@ -26,7 +26,6 @@ class LayoutJsonTest {
                 "wrapping": "off",
                 "routing": {
                   "style": "orthogonal",
-                  "profile": "spacious",
                   "endpoint_merging": "off"
                 }
               }
@@ -41,7 +40,6 @@ class LayoutJsonTest {
     assertEquals(LayoutDensity.READABLE, request.layoutPreferences().density());
     assertEquals(LayoutWrapping.OFF, request.layoutPreferences().wrapping());
     assertEquals(LayoutRoutingStyle.ORTHOGONAL, request.layoutPreferences().routing().style());
-    assertEquals(LayoutRoutingProfile.SPACIOUS, request.layoutPreferences().routing().profile());
     assertEquals(
         LayoutEndpointMerging.OFF, request.layoutPreferences().routing().endpointMerging());
   }

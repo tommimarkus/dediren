@@ -318,7 +318,6 @@ class SequenceLayoutPropertyTest {
                     "density": "readable",
                     "routing": {
                       "style": "orthogonal",
-                      "profile": "readable",
                       "endpoint_merging": "off"
                     }
                   }

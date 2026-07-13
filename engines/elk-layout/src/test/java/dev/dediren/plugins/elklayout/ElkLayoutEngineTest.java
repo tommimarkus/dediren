@@ -1787,9 +1787,7 @@ class ElkLayoutEngineTest {
                 LayoutDensity.SPACIOUS,
                 null,
                 new LayoutRoutingPreferences(
-                    LayoutRoutingStyle.ORTHOGONAL,
-                    LayoutRoutingProfile.SPACIOUS,
-                    LayoutEndpointMerging.OFF)));
+                    LayoutRoutingStyle.ORTHOGONAL, LayoutEndpointMerging.OFF)));
 
     LayoutResult result = new ElkLayoutEngine().layout(request);
     ElkLayoutRenderArtifacts.write(result);
@@ -2075,9 +2073,7 @@ class ElkLayoutEngineTest {
                 LayoutDensity.SPACIOUS,
                 null,
                 new LayoutRoutingPreferences(
-                    LayoutRoutingStyle.ORTHOGONAL,
-                    LayoutRoutingProfile.SPACIOUS,
-                    LayoutEndpointMerging.AUTO)));
+                    LayoutRoutingStyle.ORTHOGONAL, LayoutEndpointMerging.AUTO)));
 
     LayoutResult result = new ElkLayoutEngine().layout(request);
     ElkLayoutRenderArtifacts.write(result);
@@ -2422,8 +2418,7 @@ class ElkLayoutEngineTest {
         null,
         density,
         null,
-        new LayoutRoutingPreferences(
-            LayoutRoutingStyle.ORTHOGONAL, null, LayoutEndpointMerging.OFF));
+        new LayoutRoutingPreferences(LayoutRoutingStyle.ORTHOGONAL, LayoutEndpointMerging.OFF));
   }
 
   private static LayoutPreferences readableSequencePreferences() {
@@ -2431,10 +2426,7 @@ class ElkLayoutEngineTest {
         LayoutDirection.RIGHT,
         LayoutDensity.READABLE,
         null,
-        new LayoutRoutingPreferences(
-            LayoutRoutingStyle.ORTHOGONAL,
-            LayoutRoutingProfile.READABLE,
-            LayoutEndpointMerging.OFF));
+        new LayoutRoutingPreferences(LayoutRoutingStyle.ORTHOGONAL, LayoutEndpointMerging.OFF));
   }
 
   private static LayoutRequest gatewayFanOutRequest() {
@@ -3090,7 +3082,7 @@ class ElkLayoutEngineTest {
 
   private static LayoutPreferences routingStylePreferences(LayoutRoutingStyle style) {
     return new LayoutPreferences(
-        null, null, null, new LayoutRoutingPreferences(style, null, LayoutEndpointMerging.AUTO));
+        null, null, null, new LayoutRoutingPreferences(style, LayoutEndpointMerging.AUTO));
   }
 
   @Test

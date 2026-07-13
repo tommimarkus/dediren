@@ -775,7 +775,6 @@
             "density": "readable",
             "routing": {
               "style": "orthogonal",
-              "profile": "readable",
               "endpoint_merging": "off"
             }
           }
@@ -811,7 +810,6 @@
             "density": "readable",
             "routing": {
               "style": "orthogonal",
-              "profile": "readable",
               "endpoint_merging": "off"
             }
           }
@@ -850,7 +848,6 @@
             "density": "spacious",
             "routing": {
               "style": "orthogonal",
-              "profile": "spacious",
               "endpoint_merging": "off"
             }
           }
