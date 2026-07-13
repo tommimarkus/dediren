@@ -52,11 +52,6 @@ import tools.jackson.databind.JsonNode;
 public final class CoreCommands {
   private CoreCommands() {}
 
-  public static PluginRunOutcome layoutCommand(String engineId, String inputText, Engines engines)
-      throws PluginExecutionException {
-    return layoutCommand(engineId, inputText, System.getenv(), engines);
-  }
-
   public static PluginRunOutcome layoutCommand(
       String engineId, String inputText, Map<String, String> env, Engines engines)
       throws PluginExecutionException {
@@ -95,12 +90,6 @@ public final class CoreCommands {
   }
 
   public static PluginRunOutcome projectCommand(
-      String engineId, String target, String view, String inputText, Path baseDir, Engines engines)
-      throws PluginExecutionException {
-    return projectCommand(engineId, target, view, inputText, baseDir, System.getenv(), engines);
-  }
-
-  public static PluginRunOutcome projectCommand(
       String engineId,
       String target,
       String view,
@@ -133,12 +122,6 @@ public final class CoreCommands {
     // A structural failure's observable: message to stderr, exit 2. The cli catches this
     // UncheckedIOException and prints its cause, keeping the published non-enveloped form.
     throw new UncheckedIOException(new IOException("unsupported target: " + target));
-  }
-
-  public static PluginRunOutcome semanticValidateCommand(
-      String engineId, String profile, String inputText, Path baseDir, Engines engines)
-      throws PluginExecutionException {
-    return semanticValidateCommand(engineId, profile, inputText, baseDir, System.getenv(), engines);
   }
 
   public static PluginRunOutcome semanticValidateCommand(
@@ -253,12 +236,6 @@ public final class CoreCommands {
   }
 
   public static PluginRunOutcome renderCommand(
-      String engineId, String policyText, String metadataText, String layoutText, Engines engines)
-      throws PluginExecutionException {
-    return renderCommand(engineId, policyText, metadataText, layoutText, System.getenv(), engines);
-  }
-
-  public static PluginRunOutcome renderCommand(
       String engineId,
       String policyText,
       String metadataText,
@@ -277,18 +254,6 @@ public final class CoreCommands {
     return EngineDispatch.dispatch(
         engineId,
         () -> renderEngine.render(LaidOutSceneMapper.toScene(layoutResult), policy, metadata));
-  }
-
-  public static PluginRunOutcome exportCommand(
-      String engineId,
-      String policyText,
-      String sourceText,
-      Path sourceBaseDir,
-      String layoutText,
-      Engines engines)
-      throws PluginExecutionException {
-    return exportCommand(
-        engineId, policyText, sourceText, sourceBaseDir, layoutText, System.getenv(), engines);
   }
 
   public static PluginRunOutcome exportCommand(

@@ -26,11 +26,6 @@ class SchemaCacheModuleTest {
       "0000000000000000000000000000000000000000000000000000000000000000";
 
   @Test
-  void moduleLoads() {
-    assertThat(SchemaCacheModule.moduleName()).isEqualTo("schema-cache");
-  }
-
-  @Test
   void aFetcherFloodingStderrDoesNotDeadlock() throws Exception {
     // Same defect class as the schema validator: curlFetcher drained stdout to EOF before reading
     // stderr, so a fetcher that fills the ~64 KiB stderr pipe blocks in write(2) and never exits.

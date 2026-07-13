@@ -15,14 +15,6 @@ import java.util.Optional;
 public final class SchemaCacheModule {
   private SchemaCacheModule() {}
 
-  public static String moduleName() {
-    return "schema-cache";
-  }
-
-  public static Optional<Path> nonEmptyEnvPath(String name) {
-    return nonEmptyEnvPath(System.getenv(), name);
-  }
-
   public static Optional<Path> nonEmptyEnvPath(Map<String, String> env, String name) {
     String value = env.get(name);
     if (value == null || value.isEmpty()) {
@@ -65,11 +57,6 @@ public final class SchemaCacheModule {
     } catch (IOException error) {
       return false;
     }
-  }
-
-  public static Path schemaCacheBaseDir(String cacheDirEnv, String fallbackEnv)
-      throws SchemaCacheException {
-    return schemaCacheBaseDir(System.getenv(), cacheDirEnv, fallbackEnv);
   }
 
   public static Path schemaCacheBaseDir(

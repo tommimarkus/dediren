@@ -10,7 +10,6 @@ import dev.dediren.schemacache.SchemaCacheException;
 import dev.dediren.schemacache.SchemaCacheModule;
 import dev.dediren.schemacache.XmlSchemaValidator;
 import java.io.ByteArrayInputStream;
-import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
@@ -44,17 +43,6 @@ public final class SchemaValidation {
       "To download through an HTTP proxy, expose HTTP_PROXY, HTTPS_PROXY, and NO_PROXY (or their"
           + " lowercase forms) to this process. To skip the download, pre-fetch the OMG XMI.xsd and"
           + " set DEDIREN_XMI_SCHEMA_PATH to its absolute file path.";
-
-  public static boolean commandAvailable(String command) {
-    try {
-      return new ProcessBuilder(command, "--version").start().waitFor() == 0;
-    } catch (IOException | InterruptedException error) {
-      if (error instanceof InterruptedException) {
-        Thread.currentThread().interrupt();
-      }
-      return false;
-    }
-  }
 
   /**
    * Legacy two-argument seam retained for the same-package validation tests; resolves schema/cache

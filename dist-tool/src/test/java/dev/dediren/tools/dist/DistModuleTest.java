@@ -13,11 +13,6 @@ import tools.jackson.databind.JsonNode;
 
 class DistModuleTest {
   @Test
-  void moduleLoads() {
-    assertThat(DistModule.moduleName()).isEqualTo("dist");
-  }
-
-  @Test
   void bundleNameUsesVersionOnlyForJavaArchive() {
     assertThat(DistTool.bundleName("2026.06.0")).isEqualTo("dediren-agent-bundle-2026.06.0");
   }

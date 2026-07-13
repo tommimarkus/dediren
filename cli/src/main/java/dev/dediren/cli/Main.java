@@ -52,10 +52,6 @@ public final class Main {
     this.env = env;
   }
 
-  public static String moduleName() {
-    return "cli";
-  }
-
   public static void main(String[] args) {
     int exitCode =
         commandLine(
