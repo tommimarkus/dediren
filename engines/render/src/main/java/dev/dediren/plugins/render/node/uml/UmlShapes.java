@@ -2,6 +2,7 @@ package dev.dediren.plugins.render.node.uml;
 
 import static dev.dediren.plugins.render.node.NodeShapeSupport.decoratorName;
 import static dev.dediren.plugins.render.node.uml.UmlDecorators.textField;
+import static dev.dediren.plugins.render.svg.Svg.f1;
 import static dev.dediren.plugins.render.svg.Svg.styleNumber;
 
 import dev.dediren.contracts.layout.LaidOutNode;
@@ -361,9 +362,5 @@ public final class UmlShapes {
         .attr("font-size", styleNumber(fontSize))
         .text(symbol)
         .end();
-  }
-
-  private static String f1(double value) {
-    return String.format(Locale.ROOT, "%.1f", value);
   }
 }

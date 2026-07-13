@@ -17,7 +17,6 @@ import dev.dediren.engine.EngineResult;
 import dev.dediren.engine.RenderEngine;
 import dev.dediren.ir.LaidOutScene;
 import dev.dediren.ir.LaidOutSceneMapper;
-import dev.dediren.plugins.render.node.uml.RenderInputValidator;
 import dev.dediren.uml.UmlValidationException;
 import java.util.List;
 import tools.jackson.databind.JsonNode;

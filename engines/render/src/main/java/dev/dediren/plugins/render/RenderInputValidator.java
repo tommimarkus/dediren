@@ -1,4 +1,4 @@
-package dev.dediren.plugins.render.node.uml;
+package dev.dediren.plugins.render;
 
 import dev.dediren.archimate.Archimate;
 import dev.dediren.archimate.ArchimateTypeValidationException;

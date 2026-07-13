@@ -2,6 +2,7 @@ package dev.dediren.plugins.render.node.uml;
 
 import static dev.dediren.plugins.render.node.NodeShapeSupport.decoratorName;
 import static dev.dediren.plugins.render.node.NodeShapeSupport.umlDecoratorSuppliesNodeLabel;
+import static dev.dediren.plugins.render.svg.Svg.f1;
 import static dev.dediren.plugins.render.svg.Svg.styleNumber;
 
 import dev.dediren.contracts.layout.LaidOutNode;
@@ -11,7 +12,6 @@ import dev.dediren.plugins.render.style.ResolvedNodeStyle;
 import dev.dediren.plugins.render.svg.SvgWriter;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import tools.jackson.databind.JsonNode;
 
 public final class UmlDecorators {
@@ -253,9 +253,5 @@ public final class UmlDecorators {
   public static String textField(JsonNode value, String field, String fallback) {
     JsonNode fieldValue = value == null ? null : value.get(field);
     return fieldValue != null && fieldValue.isTextual() ? fieldValue.asText() : fallback;
-  }
-
-  private static String f1(double value) {
-    return String.format(Locale.ROOT, "%.1f", value);
   }
 }

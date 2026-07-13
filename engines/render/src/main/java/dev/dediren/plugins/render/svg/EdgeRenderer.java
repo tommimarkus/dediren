@@ -2,6 +2,8 @@ package dev.dediren.plugins.render.svg;
 
 import static dev.dediren.plugins.render.svg.Geometry.labelBox;
 import static dev.dediren.plugins.render.svg.Svg.dashArrayValue;
+import static dev.dediren.plugins.render.svg.Svg.f1;
+import static dev.dediren.plugins.render.svg.Svg.opacity;
 import static dev.dediren.plugins.render.svg.Svg.styleNumber;
 
 import dev.dediren.contracts.layout.LaidOutEdge;
@@ -620,13 +622,5 @@ public final class EdgeRenderer {
       }
     }
     return segments;
-  }
-
-  private static String f1(double value) {
-    return String.format(Locale.ROOT, "%.1f", value);
-  }
-
-  private static String opacity(Double value) {
-    return value == null ? null : styleNumber(value);
   }
 }

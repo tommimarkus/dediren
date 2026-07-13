@@ -33,6 +33,16 @@ public final class Svg {
   private static final double FULLWIDTH_ADVANCE_EM = 1.000;
   private static final double[] ASCII_ADVANCE_EM = buildAsciiAdvanceTable();
 
+  /** One-decimal coordinate formatter. The geometry formatter every emitter uses. */
+  public static String f1(double value) {
+    return String.format(Locale.ROOT, "%.1f", value);
+  }
+
+  /** Emits an opacity attribute value, or null when unset (so attrIf drops the attribute). */
+  public static String opacity(Double value) {
+    return value == null ? null : styleNumber(value);
+  }
+
   /** Coordinate/length formatter: drops the decimal for whole numbers, otherwise full precision. */
   public static String styleNumber(double value) {
     if (Math.rint(value) == value) {

@@ -7,8 +7,9 @@ import static dev.dediren.plugins.render.node.NodeShapeSupport.archimateJunction
 import static dev.dediren.plugins.render.node.NodeShapeSupport.hasArchimateCornerIcon;
 import static dev.dediren.plugins.render.node.NodeShapeSupport.umlCompactControlNodeLabelOutside;
 import static dev.dediren.plugins.render.svg.Svg.estimateTextWidth;
+import static dev.dediren.plugins.render.svg.Svg.f1;
 import static dev.dediren.plugins.render.svg.Svg.labelNumber;
-import static dev.dediren.plugins.render.svg.Svg.styleNumber;
+import static dev.dediren.plugins.render.svg.Svg.opacity;
 
 import dev.dediren.contracts.layout.LaidOutNode;
 import dev.dediren.contracts.render.SvgLabelAlign;
@@ -243,14 +244,6 @@ public final class NodeLabels {
     double minX = x - width / 2.0;
     double minY = y - fontSize;
     return new LabelBox(minX, minY, minX + width, y + fontSize * 0.25);
-  }
-
-  private static String f1(double value) {
-    return String.format(Locale.ROOT, "%.1f", value);
-  }
-
-  private static String opacity(Double value) {
-    return value == null ? null : styleNumber(value);
   }
 
   private static String enumValue(Enum<?> value) {
