@@ -42,16 +42,16 @@
     <assertj.version>3.27.7</assertj.version>
     <eclipse-elk.version>0.11.0</eclipse-elk.version>
     <guava.version>33.6.0-jre</guava.version>
-    <jackson.version>3.2.0</jackson.version>
+    <jackson.version>3.2.1</jackson.version>
     <!-- Jackson 3 keeps its annotation package at com.fasterxml.jackson.annotation by
          design; contracts compiles against it directly, so it is declared and pinned. -->
     <jackson-annotations.version>2.22</jackson-annotations.version>
     <!-- EMF: elk-layout compiles against EMF's common types via the ELK graph model. -->
-    <emf.version>2.12.0</emf.version>
+    <emf.version>2.45.0</emf.version>
     <jazzer.version>0.30.0</jazzer.version>
-    <jqwik.version>1.9.3</jqwik.version>
-    <json-schema-validator.version>3.0.5</json-schema-validator.version>
-    <junit.version>6.1.1</junit.version>
+    <jqwik.version>1.10.1</jqwik.version>
+    <json-schema-validator.version>3.0.6</json-schema-validator.version>
+    <junit.version>6.1.2</junit.version>
     <picocli.version>4.7.7</picocli.version>
     <xmlunit.version>2.12.0</xmlunit.version>
     <xtext-xbase.version>2.43.0</xtext-xbase.version>
@@ -63,11 +63,11 @@
     <maven-compiler-plugin.version>3.15.0</maven-compiler-plugin.version>
     <maven-enforcer-plugin.version>3.6.3</maven-enforcer-plugin.version>
     <maven-surefire-plugin.version>3.5.6</maven-surefire-plugin.version>
-    <pitest-maven-plugin.version>1.25.5</pitest-maven-plugin.version>
+    <pitest-maven-plugin.version>1.25.7</pitest-maven-plugin.version>
     <pitest-junit5-plugin.version>1.2.3</pitest-junit5-plugin.version>
     <jacoco-maven-plugin.version>0.8.15</jacoco-maven-plugin.version>
     <spotless-maven-plugin.version>3.8.0</spotless-maven-plugin.version>
-    <spotbugs-maven-plugin.version>4.10.2.0</spotbugs-maven-plugin.version>
+    <spotbugs-maven-plugin.version>4.10.3.0</spotbugs-maven-plugin.version>
   </properties>
 
   <dependencyManagement>
