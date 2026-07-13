@@ -313,8 +313,8 @@ class MainTest {
               ">Production Node<",
               ">Orders Runtime<",
               ">orders-service.jar<",
-              "&#171;device&#187;",
-              "&#171;executionEnvironment&#187;");
+              "«device»",
+              "«executionEnvironment»");
       groupWithAttribute(document, "data-dediren-node-id", "device-prod-node");
       groupWithAttribute(document, "data-dediren-node-id", "ee-orders-runtime");
       groupWithAttribute(document, "data-dediren-node-id", "artifact-orders-service");
@@ -902,7 +902,7 @@ class MainTest {
 
       assertThat(shape.getAttribute("data-dediren-node-shape")).isEqualTo("uml_enumeration");
       childGroupWithAttribute(enumeration, "data-dediren-node-decorator", "uml_enumeration");
-      assertThat(content).contains("&#171;enumeration&#187;", "Submitted");
+      assertThat(content).contains("«enumeration»", "Submitted");
     }
 
     @Test
@@ -1834,8 +1834,7 @@ class MainTest {
             node, "data-dediren-node-decorator", EXPECTED_UML_NODE_SHAPES.get(field.getKey()));
         index++;
       }
-      assertThat(content)
-          .contains("&#171;interface&#187;", "&#171;dataType&#187;", "&#171;enumeration&#187;");
+      assertThat(content).contains("«interface»", "«dataType»", "«enumeration»");
     }
 
     @Test

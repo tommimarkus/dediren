@@ -74,24 +74,6 @@ public final class SvgWriter {
     return this;
   }
 
-  /**
-   * Writes a pre-formed, already-correctly-escaped fragment verbatim (forcing the pending start tag
-   * closed first). For content that is already in final XML form and must not be re-escaped by the
-   * writer — notably the ArchiMate/UML guillemet stereotypes emitted as numeric character
-   * references ({@code &#171;…&#187;}) and labels the caller has pre-escaped. Not a general emit
-   * path: element/attribute/text output goes through the typed methods above so escaping stays a
-   * structural guarantee.
-   */
-  public SvgWriter raw(String fragment) {
-    run(
-        () -> {
-          writer.writeCharacters("");
-          writer.flush();
-          out.write(fragment);
-        });
-    return this;
-  }
-
   /** Flushes and returns the accumulated SVG document text. */
   public String finish() {
     run(writer::flush);

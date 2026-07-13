@@ -3,7 +3,6 @@ package dev.dediren.plugins.render.node.uml;
 import static dev.dediren.plugins.render.node.NodeShapeSupport.decoratorName;
 import static dev.dediren.plugins.render.node.NodeShapeSupport.umlDecoratorSuppliesNodeLabel;
 import static dev.dediren.plugins.render.svg.Svg.styleNumber;
-import static dev.dediren.plugins.render.svg.Svg.text;
 
 import dev.dediren.contracts.layout.LaidOutNode;
 import dev.dediren.contracts.render.RenderMetadataSelector;
@@ -62,9 +61,9 @@ public final class UmlDecorators {
       SvgWriter w, LaidOutNode node, ResolvedNodeStyle style, SvgNodeDecorator decorator) {
     String stereotype =
         switch (decorator) {
-          case UML_DEVICE -> "&#171;device&#187;";
-          case UML_EXECUTION_ENVIRONMENT -> "&#171;executionEnvironment&#187;";
-          case UML_DEPLOYMENT_SPECIFICATION -> "&#171;deployment spec&#187;";
+          case UML_DEVICE -> "«device»";
+          case UML_EXECUTION_ENVIRONMENT -> "«executionEnvironment»";
+          case UML_DEPLOYMENT_SPECIFICATION -> "«deployment spec»";
           default -> "";
         };
     w.start("text")
@@ -73,7 +72,7 @@ public final class UmlDecorators {
         .attr("text-anchor", "middle")
         .attr("fill", style.labelFill())
         .attr("font-size", "11")
-        .raw(stereotype)
+        .text(stereotype)
         .end();
   }
 
@@ -110,13 +109,13 @@ public final class UmlDecorators {
     JsonNode properties = selector == null ? null : selector.properties();
     List<String> titleLines = new ArrayList<>();
     if (decorator == SvgNodeDecorator.UML_ENUMERATION) {
-      titleLines.add("&#171;enumeration&#187;");
+      titleLines.add("«enumeration»");
     } else if (decorator == SvgNodeDecorator.UML_INTERFACE) {
-      titleLines.add("&#171;interface&#187;");
+      titleLines.add("«interface»");
     } else if (decorator == SvgNodeDecorator.UML_DATA_TYPE) {
-      titleLines.add("&#171;dataType&#187;");
+      titleLines.add("«dataType»");
     }
-    titleLines.add(text(node.label()));
+    titleLines.add(node.label());
 
     List<String> attributeLines =
         decorator == SvgNodeDecorator.UML_ENUMERATION
@@ -143,7 +142,7 @@ public final class UmlDecorators {
           .attr("text-anchor", "middle")
           .attr("fill", style.labelFill())
           .attr("font-size", "12")
-          .raw(line)
+          .text(line)
           .end();
       y += 15.0;
     }
