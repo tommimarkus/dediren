@@ -30,6 +30,11 @@ final class LayoutIntentNormalizer {
   private static final double MESSAGE_Y_STEP = 24.0;
   private static final double LIFELINE_COLUMN_GAP = 96.0;
 
+  // A self-message hooks off the lifeline stem and returns to it (the conventional UML self-call).
+  // Neutral band geometry, owned here like LIFELINE_COLUMN_GAP / MESSAGE_Y_STEP.
+  private static final double SELF_MESSAGE_LOOP_WIDTH = 40.0;
+  private static final double SELF_MESSAGE_LOOP_HEIGHT = 24.0;
+
   private final List<String> lifelineOrder;
   private final List<String> messageOrder;
   private final Map<String, Integer> lifelineIndexById;
@@ -321,15 +326,28 @@ final class LayoutIntentNormalizer {
     LaidOutNode target = normalizedNodesById.get(edge.target());
     Integer sourceIndex = lifelineIndexById.get(edge.source());
     Integer targetIndex = lifelineIndexById.get(edge.target());
-    if (source == null
-        || target == null
-        || sourceIndex == null
-        || targetIndex == null
-        || sourceIndex.equals(targetIndex)) {
+    if (source == null || target == null || sourceIndex == null || targetIndex == null) {
       return pointsAtY(edge.points(), y);
     }
-
+    if (sourceIndex.equals(targetIndex)) {
+      double stem = stemX(source);
+      return List.of(
+          new Point(stem, y),
+          new Point(stem + SELF_MESSAGE_LOOP_WIDTH, y),
+          new Point(stem + SELF_MESSAGE_LOOP_WIDTH, y + SELF_MESSAGE_LOOP_HEIGHT),
+          new Point(stem, y + SELF_MESSAGE_LOOP_HEIGHT));
+    }
     return List.of(new Point(stemX(source), y), new Point(stemX(target), y));
+  }
+
+  // A self-message (source lifeline == target lifeline) is legal UML but has no meaningful
+  // straight-line stem-to-stem geometry; it hooks off the stem instead (see
+  // normalizedMessagePoints). A dangling/unknown endpoint (null node or unmapped lifeline index)
+  // is a distinct case that still falls back to pointsAtY, handled separately above.
+  private boolean isSelfMessage(LaidOutEdge edge) {
+    Integer sourceIndex = lifelineIndexById.get(edge.source());
+    Integer targetIndex = lifelineIndexById.get(edge.target());
+    return sourceIndex != null && sourceIndex.equals(targetIndex);
   }
 
   // A message terminates on each participant's lifeline stem, which the renderer draws down the
@@ -357,6 +375,9 @@ final class LayoutIntentNormalizer {
       for (int index = 0; index < orderedMessages.size(); index++) {
         if (index > 0) {
           y += MESSAGE_Y_STEP;
+          if (isSelfMessage(orderedMessages.get(index - 1))) {
+            y += SELF_MESSAGE_LOOP_HEIGHT; // clear the previous hook's lower leg
+          }
         }
         String id = orderedMessages.get(index).id();
         y += messageLeadingGapById.getOrDefault(id, 0.0);
