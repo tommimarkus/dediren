@@ -222,6 +222,26 @@ jq -r '.data.artifacts[] | select(.artifact_kind=="svg") | .content' render-resu
 
 The `render` plugin emits only an `svg` artifact; it does not produce PNG. To get a raster image, convert the emitted SVG with an external tool — for example `rsvg-convert diagram.svg -o diagram.png`, `resvg diagram.svg diagram.png`, ImageMagick (`magick convert diagram.svg diagram.png`), or Inkscape (`inkscape diagram.svg --export-type=png`).
 
+### Layout constraints in a hand-written layout-request
+
+`project` emits any needed `constraints` for you, so most agents never write them.
+If you author a `layout-request` by hand, the vocabulary is:
+
+```json
+"constraints": [
+  { "id": "band-1", "kind": "ordered-band:x", "subjects": ["lifeline-a", "lifeline-b@48"] }
+]
+```
+
+- `kind` is `ordered-band:x` or `ordered-band:y` — the subjects form an ordered band
+  along that axis (this is how UML sequence lifelines and message rows are placed).
+  An unrecognised `kind` is rejected by the layout engine.
+- Each subject is a node id, optionally `@` plus a leading gap in layout units
+  (`lifeline-b@48` leaves 48 units before that member).
+- The `@` separator is not escaped, so keep node ids to the `model.schema` id
+  charset (`[A-Za-z0-9][A-Za-z0-9._-]*`). An id containing `@` is ambiguous and the
+  member may be silently dropped.
+
 ## Build
 
 `dediren build` runs the whole per-view pipeline — `project` (layout-request,

@@ -92,12 +92,20 @@
     },
     "constraint": {
       "type": "object",
+      "$comment": "A layout constraint the engines interpret. The vocabulary is deliberately free-form (kind is not an enum) so a new intent needs no schema bump — which means the grammar is a wire contract you must read here rather than infer from the types.",
       "additionalProperties": false,
       "required": ["id", "kind", "subjects"],
       "properties": {
         "id": { "type": "string" },
-        "kind": { "type": "string" },
-        "subjects": { "type": "array", "items": { "type": "string" } }
+        "kind": {
+          "type": "string",
+          "$comment": "Recognised today: 'ordered-band:x' and 'ordered-band:y' — the subjects form an ordered band along that axis (UML sequence lifelines and message rows). An unrecognised kind is rejected by the layout engine."
+        },
+        "subjects": {
+          "type": "array",
+          "items": { "type": "string" },
+          "$comment": "Each subject is a node id, optionally followed by '@' and a leading gap in layout units — e.g. 'lifeline-b@48', meaning leave 48 units before that member. The '@' separator is unescaped, so a node id containing '@' is ambiguous: keep ids to the model.schema id charset ([A-Za-z0-9][A-Za-z0-9._-]*)."
+        }
       }
     },
     "layoutPreferences": {
