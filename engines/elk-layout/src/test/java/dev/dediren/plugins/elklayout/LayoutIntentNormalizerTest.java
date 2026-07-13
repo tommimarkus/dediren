@@ -347,6 +347,38 @@ class LayoutIntentNormalizerTest {
   }
 
   @Test
+  void deleteMessageRunsFromTheSourceStemToTheDestructionsRightEdgeWhenSourceIsDeclaredRight() {
+    // Mirror of deleteMessageRunsFromTheSourceStemToTheDestructionsLeftEdge with the lifeline
+    // DECLARATION order reversed: [b, a] instead of [a, b]. Lifeline order is declaration order,
+    // so this places the destroyed lifeline b to the LEFT of the source lifeline a -- the message
+    // a -> destroy-b now runs right-to-left, and must land on destroy-b's RIGHT edge (its near
+    // side), not its left edge (the far side, which would draw the final segment clear across the
+    // marker box and point the arrowhead away from the glyph).
+    List<LayoutIntent> intents =
+        List.of(
+            new OrderedBand(Axis.X, List.of(new BandMember("b", 0.0), new BandMember("a", 0.0))),
+            new OrderedBand(
+                Axis.Y,
+                List.of(
+                    new BandMember("m1", 0.0),
+                    new BandMember("m2", 0.0),
+                    new BandMember("m3", 0.0))),
+            new StemSpan("exec-b", "b", "m1", "m2"),
+            new StemSpan("destroy-b", "b", "m3", "m3"));
+
+    LayoutResult out =
+        LayoutIntentNormalizer.from(intents, Map.of(), Map.of()).normalize(lifecycleResult());
+
+    LaidOutNode destruction = node(out, "destroy-b");
+    List<Point> pts = edge(out, "m3").points();
+    assertThat(pts).hasSize(2);
+    assertThat(pts.get(1).x())
+        .as("terminates on the destruction's RIGHT edge, its near side")
+        .isEqualTo(destruction.x() + destruction.width());
+    assertThat(pts.get(1).y()).isEqualTo(pts.get(0).y());
+  }
+
+  @Test
   void stemSpanNodesKeepTheirSourcePointerProvenance() {
     // The placement pass rebuilds the node record; the source pointer must survive it exactly as
     // normalizedLifelineNodes re-threads it.
@@ -364,7 +396,7 @@ class LayoutIntentNormalizerTest {
   @Test
   void interactionFrameEnclosesThePlacedExecutionAndDestruction() {
     LayoutResult out =
-        LayoutIntentNormalizer.from(lifecycleIntentsWithFrame(), Map.of(), Map.of())
+        LayoutIntentNormalizer.from(lifecycleIntents(), Map.of(), Map.of())
             .normalize(lifecycleResultWithFrame());
 
     LaidOutNode frame = node(out, "frame");
@@ -437,18 +469,15 @@ class LayoutIntentNormalizerTest {
         List.of());
   }
 
-  private static List<LayoutIntent> lifecycleIntentsWithFrame() {
-    return lifecycleIntents();
-  }
-
   private static LayoutResult lifecycleResultWithFrame() {
-    List<LaidOutNode> nodes = new java.util.ArrayList<>(lifecycleResult().nodes());
+    LayoutResult base = lifecycleResult();
+    List<LaidOutNode> nodes = new java.util.ArrayList<>(base.nodes());
     nodes.add(new LaidOutNode("frame", "frame", "frame", 0.0, 0.0, 1.0, 1.0, "sd", "interaction"));
     return new LayoutResult(
         ContractVersions.LAYOUT_RESULT_SCHEMA_VERSION,
         "sequence-view",
         List.copyOf(nodes),
-        lifecycleResult().edges(),
+        base.edges(),
         List.of(),
         List.of());
   }

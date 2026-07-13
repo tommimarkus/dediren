@@ -358,8 +358,14 @@ final class LayoutIntentNormalizer {
     Set<String> pointAnchoredIds = new HashSet<>();
     for (LaidOutNode node : nodes) {
       StemSpan span = stemSpanByNodeId.get(node.id());
-      LaidOutNode anchor = span == null ? null : byId.get(resolvedBandMemberId(node.id()));
-      if (span == null || anchor == null) {
+      // A StemSpan naming a lifeline as its own nodeId is unreachable through the current
+      // lowering (a lifeline is a band member, never a spanned node), but guard against it
+      // defensively: relocating a lifeline here would silently corrupt the column layout instead
+      // of just being a no-op.
+      boolean nodeIsLifeline = lifelineIndexById.containsKey(node.id());
+      LaidOutNode anchor =
+          span == null || nodeIsLifeline ? null : byId.get(resolvedBandMemberId(node.id()));
+      if (span == null || nodeIsLifeline || anchor == null) {
         normalized.add(node);
         continue;
       }
@@ -492,10 +498,15 @@ final class LayoutIntentNormalizer {
     if (pointAnchoredIds.contains(edge.target())) {
       // The route ends ON the point-anchored node, so it must land on that node's perimeter: the
       // stem runs through its centre, and a centre endpoint is inside the box, which core's
-      // endpoint-on-perimeter check rejects. Its left edge is on both the perimeter and the row.
+      // endpoint-on-perimeter check rejects. Either the left or the right edge sits on both the
+      // perimeter and the row, so terminate on the NEAR edge relative to the source's column:
+      // lifeline order is declaration order, so the source can legitimately be declared to the
+      // right of the node it is destroying. Landing on the far edge would run the final segment
+      // clear across the marker box, pointing the arrowhead away from the glyph.
       // Checked before the self-message hook: a marker anchored to the source's own band member
       // resolves to the same column, but it is a termination, not a self-call.
-      return List.of(new Point(stemX(sourceStem), y), new Point(target.x(), y));
+      double endX = sourceIndex > targetIndex ? target.x() + target.width() : target.x();
+      return List.of(new Point(stemX(sourceStem), y), new Point(endX, y));
     }
     if (sourceIndex.equals(targetIndex)) {
       double stem = stemX(sourceStem);
