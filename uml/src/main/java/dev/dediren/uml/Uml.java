@@ -275,8 +275,20 @@ public final class Uml {
             selectedNodeIds,
             selectedRelationshipIds,
             context);
+      } else if ("ExecutionSpecification".equals(nodeType)) {
+        UmlSequenceValidation.validateSelectedExecutionSpecificationProperties(
+            nodeId,
+            umlProperties,
+            sourceUmlPath,
+            selectedNodeIds,
+            selectedRelationshipIds,
+            context);
+      } else if ("DestructionOccurrenceSpecification".equals(nodeType)) {
+        UmlSequenceValidation.validateSelectedDestructionOccurrenceProperties(
+            nodeId, umlProperties, sourceUmlPath, selectedNodeIds, context);
       }
     }
+    UmlSequenceValidation.validateSelectedDestructionMessageUniqueness(viewIndex, view, context);
   }
 
   private static void validateUmlStateMachineViewProperties(
