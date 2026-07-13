@@ -7,10 +7,6 @@ public final class EngineExecutionException extends Exception {
   private final String code;
   private final String diagnosticPath;
 
-  private EngineExecutionException(String code, String diagnosticPath, String message) {
-    this(code, diagnosticPath, message, null);
-  }
-
   private EngineExecutionException(
       String code, String diagnosticPath, String message, Throwable cause) {
     super(message, cause);
