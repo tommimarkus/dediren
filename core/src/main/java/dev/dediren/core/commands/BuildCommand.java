@@ -204,8 +204,10 @@ public final class BuildCommand {
         layout.stageDiagnostics());
     warning |= layout.warning();
 
-    // Stage 3: layout-quality validation over the mapped record (unchanged verdict semantics).
-    ValidationResult quality = CoreCommands.validateLayout(layoutRecord);
+    // Stage 3: layout-quality validation. The scene is passed alongside the record it was mapped
+    // from, so the sequence invariants reuse it instead of re-deriving it (record -> scene) — one
+    // whole-graph conversion per built view that bought nothing. Verdict semantics unchanged.
+    ValidationResult quality = CoreCommands.validateLayout(laid, layoutRecord);
     diagnostics.addAll(quality.envelope().diagnostics());
     if (quality.envelope().status() == EnvelopeStatus.ERROR) {
       return failedView(view, artifacts, diagnostics, quality.exitCode());

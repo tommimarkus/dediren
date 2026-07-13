@@ -146,7 +146,8 @@ public final class CoreCommands {
 
   public static ValidationResult validateLayoutCommand(String inputText) {
     try {
-      return validateLayoutResult(JsonInput.parseCommandData(inputText, LayoutResult.class));
+      LayoutResult result = JsonInput.parseCommandData(inputText, LayoutResult.class);
+      return validateLayoutResult(LaidOutSceneMapper.toScene(result), result);
     } catch (RuntimeException error) {
       return commandInputValidationResult("validate-layout", error);
     }
@@ -160,16 +161,27 @@ public final class CoreCommands {
    * result exactly as the string entry point does.
    */
   public static ValidationResult validateLayout(LayoutResult result) {
+    return validateLayout(LaidOutSceneMapper.toScene(result), result);
+  }
+
+  /**
+   * The quality stage for a caller that already holds the typed scene. The in-memory build does: it
+   * receives a {@link LaidOutScene} from the layout engine and maps it to a record for the emit and
+   * export lanes, so re-deriving the scene here (scene -> record -> scene, a whole-graph conversion
+   * per built view) was pure tax. The standalone validate-layout command, which starts from JSON
+   * bytes, still maps once through the overload above.
+   */
+  public static ValidationResult validateLayout(LaidOutScene scene, LayoutResult result) {
     try {
-      return validateLayoutResult(result);
+      return validateLayoutResult(scene, result);
     } catch (RuntimeException error) {
       return commandInputValidationResult("validate-layout", error);
     }
   }
 
-  private static ValidationResult validateLayoutResult(LayoutResult result) {
+  private static ValidationResult validateLayoutResult(LaidOutScene scene, LayoutResult result) {
     List<Diagnostic> diagnostics = new ArrayList<>(LayoutQuality.validateLayoutDiagnostics(result));
-    diagnostics.addAll(sequenceInvariantDiagnostics(result));
+    diagnostics.addAll(sequenceInvariantDiagnostics(scene, result));
     if (!diagnostics.isEmpty()) {
       return new ValidationResult(
           CommandExitCode.INPUT_ERROR.code(), CommandEnvelope.error(diagnostics));
@@ -193,8 +205,8 @@ public final class CoreCommands {
    * lane's {@code INPUT_ERROR} verdict. Non-sequence layouts carry no lifeline/interaction
    * geometry, so every {@link SequenceInvariants} check returns empty and this contributes nothing.
    */
-  private static List<Diagnostic> sequenceInvariantDiagnostics(LayoutResult result) {
-    LaidOutScene scene = LaidOutSceneMapper.toScene(result);
+  private static List<Diagnostic> sequenceInvariantDiagnostics(
+      LaidOutScene scene, LayoutResult result) {
     List<InvariantViolation> violations = new ArrayList<>();
     violations.addAll(SequenceInvariants.messageEndpointsOnLifelineAxis(scene));
     violations.addAll(SequenceInvariants.messageYStrictlyIncreasing(scene));

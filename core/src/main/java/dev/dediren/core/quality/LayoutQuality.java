@@ -19,7 +19,8 @@ public final class LayoutQuality {
   private static final double ROUTE_CLOSE_PARALLEL_DISTANCE = 20.0;
   private static final double ROUTE_CLOSE_PARALLEL_MIN_OVERLAP = 40.0;
   private static final double GEOMETRY_EPSILON = 0.001;
-  private static final double ROUTE_ENDPOINT_TOLERANCE = 1.5;
+  private static final double ROUTE_ENDPOINT_TOLERANCE =
+      dev.dediren.ir.quality.LayoutTolerances.ROUTE_ENDPOINT_TOLERANCE;
   // Layout units reserved for the group title row; render draws the group label inside the
   // top of the group rect, so members inside this band collide with the label visually.
   private static final double GROUP_LABEL_BAND_HEIGHT = 24.0;

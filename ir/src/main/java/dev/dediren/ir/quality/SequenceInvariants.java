@@ -20,11 +20,10 @@ import java.util.Map;
  */
 public final class SequenceInvariants {
 
-  // Mirrors core's LayoutQuality#ROUTE_ENDPOINT_TOLERANCE / #onLifelineAxis: sequence message
-  // endpoints anchor to the lifeline axis (the participant head-box center-x, per the render
-  // engine's own stem/message-endpoint convention), so the same tolerance that accepts a message
-  // endpoint there is reused here to keep the two checks consistent.
-  private static final double LIFELINE_AXIS_TOLERANCE = 1.5;
+  // Sequence message endpoints anchor to the lifeline axis (the participant head-box centre-x, per
+  // the render engine's stem/message-endpoint convention). core's perimeter check accepts the same
+  // slack, so the value is declared once in LayoutTolerances and consumed by both.
+  private static final double LIFELINE_AXIS_TOLERANCE = LayoutTolerances.ROUTE_ENDPOINT_TOLERANCE;
 
   private SequenceInvariants() {}
 
