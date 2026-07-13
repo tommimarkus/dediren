@@ -65,14 +65,35 @@ public final class LayoutIntentCodec {
     throw new IllegalArgumentException("Unrecognized layout constraint kind: " + kind);
   }
 
+  /**
+   * Decodes {@code id} or {@code id@leadingGap}.
+   *
+   * <p>Node ids are constrained to {@code [A-Za-z0-9][A-Za-z0-9._-]*} by both model.schema and
+   * layout-request.schema, so an id can never itself contain '@': the separator is unambiguous, and
+   * a subject whose tail is not a number is simply malformed. Rejecting it is right — silently
+   * treating it as an id would drop the band member and quietly change the geometry. What was wrong
+   * was the *diagnostic*: a bare {@link NumberFormatException} surfaced as "For input string:
+   * \"notanumber\"", naming neither the subject nor the grammar it broke.
+   */
   private static BandMember decodeMember(String subject) {
     int at = subject.lastIndexOf('@');
     if (at < 0) {
       return new BandMember(subject, 0.0);
     }
     String id = subject.substring(0, at);
-    double leadingGap = Double.parseDouble(subject.substring(at + 1));
-    return new BandMember(id, leadingGap);
+    String gap = subject.substring(at + 1);
+    try {
+      return new BandMember(id, Double.parseDouble(gap));
+    } catch (NumberFormatException notAGap) {
+      throw new IllegalArgumentException(
+          "Malformed ordered-band subject \""
+              + subject
+              + "\": expected a node id, optionally followed by '@' and a numeric leading gap"
+              + " (for example \"lifeline-b@48\"), but \""
+              + gap
+              + "\" is not a number",
+          notAGap);
+    }
   }
 
   private static Axis parseAxis(String axisTag) {

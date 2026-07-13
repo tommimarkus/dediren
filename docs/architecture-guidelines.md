@@ -259,6 +259,29 @@ Discipline:
   (`YYYY.0M.MICRO`) encodes the release *date*, not compatibility — never
   communicate a breaking contract change through the version number. (See
   `CLAUDE.md` `## Versioning`.)
+- **When to bump a schema id — the rule, decided 2026-07-13.** The version
+  string is a schema `const` (`"model_schema_version": {"const":
+  "model.schema.v1"}`) and is `required`. So bumping an id does not merely
+  *signal* incompatibility — it *creates* it: every existing document of that
+  family instantly fails validation and must be rewritten, including the
+  documents that never touched whatever changed. A bump is therefore a
+  **big-bang migration for all consumers**, and is warranted only when *working*
+  documents must change.
+
+  It follows that a narrowing which can only invalidate documents whose content
+  had **no semantics** — an inert field nothing read, or a value that was
+  silently ignored — forces no working document to change and does **not**
+  warrant a bump. Such changes are communicated in the release notes instead.
+  Three narrowings landed under this rule on 2026-07-13 with the ids untouched:
+  retiring `routing.profile` (a knob no code read); constraining node `role` to
+  its enum (an unrecognised role was silently ignored, so only already-broken
+  documents fail); and aligning layout-request id charsets with `model.schema`
+  (ids that came from a model already complied). All 52 fixtures still validate,
+  which is the check that the narrowing hit only dead surface.
+
+  If you are ever unsure, the question to ask is not "did the schema change?"
+  but "**does a document that worked yesterday have to change today?**" If yes,
+  bump. If no, release-note it.
 - **Contract changes move together.** A change to a public JSON shape updates
   `schemas/`, `contracts`, fixtures, the mapping code in the owning plugin, and
   the schema/round-trip tests *in the same change* (*Martin 2017*, Common
