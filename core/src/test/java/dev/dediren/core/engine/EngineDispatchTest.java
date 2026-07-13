@@ -8,6 +8,7 @@ import dev.dediren.contracts.DiagnosticSeverity;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.contracts.layout.SemanticValidationResult;
 import dev.dediren.contracts.render.RenderResult;
+import dev.dediren.core.ProductRootException;
 import dev.dediren.core.commands.CoreCommands;
 import dev.dediren.engine.EngineException;
 import dev.dediren.engine.EngineResult;
@@ -131,6 +132,23 @@ class EngineDispatchTest {
     // observable; dispatchInMemory must not bury it as a Failure or ENGINE_FAILED.
     UncheckedIOException boom =
         new UncheckedIOException(new IOException("missing generic-graph view"));
+
+    assertThatThrownBy(
+            () ->
+                EngineDispatch.dispatchInMemory(
+                    "fake",
+                    () -> {
+                      throw boom;
+                    }))
+        .isSameAs(boom);
+  }
+
+  @Test
+  void dispatchInMemoryPropagatesProductRootExceptionUnchanged() {
+    // A misconfigured DEDIREN_BUNDLE_ROOT/dediren.bundle.root is an environment misconfiguration,
+    // not an engine defect: dispatchInMemory must not bury it as ENGINE_FAILED, so the cli can
+    // convert it to its own DEDIREN_PRODUCT_ROOT_UNRESOLVED envelope.
+    ProductRootException boom = new ProductRootException("could not locate Dediren product root");
 
     assertThatThrownBy(
             () ->
