@@ -1,7 +1,6 @@
 package dev.dediren.schemacache;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
@@ -92,39 +91,6 @@ public final class XmlSchemaValidator {
       process.destroyForcibly();
       throw new SchemaCacheException(
           "schema validator " + validatorCommand + " was interrupted", error);
-    }
-  }
-
-  /**
-   * Reads one process pipe to EOF on its own thread so neither pipe can back-pressure the other.
-   */
-  private static final class StreamDrain {
-    private volatile byte[] bytes = new byte[0];
-    private Thread thread;
-
-    static StreamDrain start(InputStream stream) {
-      StreamDrain drain = new StreamDrain();
-      Thread thread =
-          new Thread(
-              () -> {
-                try (InputStream source = stream) {
-                  drain.bytes = source.readAllBytes();
-                } catch (IOException ignored) {
-                  // A pipe that cannot be read leaves the details empty; commandOutputDetails then
-                  // falls back to naming the command and its exit status, which still reaches the
-                  // agent as a structured diagnostic.
-                }
-              });
-      thread.setDaemon(true);
-      thread.setName("dediren-schema-validator-drain");
-      drain.thread = thread;
-      thread.start();
-      return drain;
-    }
-
-    byte[] await() throws InterruptedException {
-      thread.join();
-      return bytes;
     }
   }
 }

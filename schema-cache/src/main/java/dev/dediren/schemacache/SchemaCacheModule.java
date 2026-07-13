@@ -199,10 +199,14 @@ public final class SchemaCacheModule {
                   "--output",
                   destination.toString())
               .start();
-      byte[] stdout = process.getInputStream().readAllBytes();
-      byte[] stderr = process.getErrorStream().readAllBytes();
+      // Both pipes are drained concurrently: a verbose fetch failure that fills the ~64 KiB stderr
+      // pipe would otherwise block the child in write(2) forever while this thread waited on a
+      // stdout EOF that can never arrive.
+      StreamDrain stdout = StreamDrain.start(process.getInputStream());
+      StreamDrain stderr = StreamDrain.start(process.getErrorStream());
       int exitCode = process.waitFor();
-      return new SchemaFetchResult(exitCode == 0, command, exitCode, stdout, stderr);
+      return new SchemaFetchResult(
+          exitCode == 0, command, exitCode, stdout.await(), stderr.await());
     };
   }
 
