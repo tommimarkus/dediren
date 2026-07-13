@@ -3,9 +3,37 @@ package dev.dediren.archimate;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.HashSet;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class ArchimateRelationshipRulesTest {
+
+  // Example endpoint triples, demoted from production (2026-07-13): they never took part in
+  // validation — enforcement is the five-triple deny list in Archimate — and an accessor nothing
+  // called made them look like curated legality. Kept as data so these tests still prove the
+  // examples reference real vocabulary.
+  private static final List<RelationshipEndpointTriple> CURATED_RELATIONSHIP_ENDPOINT_TRIPLES =
+      List.of(
+          new RelationshipEndpointTriple("Grouping", "Composition", "ApplicationComponent"),
+          new RelationshipEndpointTriple("Grouping", "Aggregation", "ApplicationService"),
+          new RelationshipEndpointTriple("BusinessRole", "Assignment", "BusinessProcess"),
+          new RelationshipEndpointTriple(
+              "ApplicationComponent", "Realization", "ApplicationService"),
+          new RelationshipEndpointTriple(
+              "ApplicationComponent", "Specialization", "ApplicationComponent"),
+          new RelationshipEndpointTriple("ApplicationService", "Serving", "ApplicationComponent"),
+          new RelationshipEndpointTriple("ApplicationComponent", "Serving", "BusinessActor"),
+          new RelationshipEndpointTriple("ApplicationFunction", "Access", "DataObject"),
+          new RelationshipEndpointTriple("ApplicationService", "Access", "DataObject"),
+          new RelationshipEndpointTriple("ApplicationComponent", "Access", "DataObject"),
+          new RelationshipEndpointTriple("Goal", "Influence", "Requirement"),
+          new RelationshipEndpointTriple("ApplicationComponent", "Flow", "ApplicationService"),
+          new RelationshipEndpointTriple("ApplicationService", "Flow", "ApplicationService"),
+          new RelationshipEndpointTriple("BusinessProcess", "Triggering", "BusinessProcess"),
+          new RelationshipEndpointTriple(
+              "ApplicationService", "Triggering", "ApplicationComponent"),
+          new RelationshipEndpointTriple("BusinessActor", "Association", "DataObject"));
+
   @Test
   void relationshipConnectorTypesAreSupportedElementTypes() {
     assertThat(Archimate.elementTypes()).contains("AndJunction", "OrJunction");
@@ -45,8 +73,8 @@ class ArchimateRelationshipRulesTest {
 
   @Test
   void curatedRelationshipTriplesOnlyReferenceSupportedNames() {
-    assertThat(Archimate.relationshipEndpointTriples()).hasSizeLessThanOrEqualTo(64);
-    for (RelationshipEndpointTriple triple : Archimate.relationshipEndpointTriples()) {
+    assertThat(CURATED_RELATIONSHIP_ENDPOINT_TRIPLES).hasSizeLessThanOrEqualTo(64);
+    for (RelationshipEndpointTriple triple : CURATED_RELATIONSHIP_ENDPOINT_TRIPLES) {
       assertThat(Archimate.elementTypes()).contains(triple.sourceType());
       assertThat(Archimate.relationshipTypes()).contains(triple.relationshipType());
       assertThat(Archimate.elementTypes()).contains(triple.targetType());
@@ -56,7 +84,7 @@ class ArchimateRelationshipRulesTest {
   @Test
   void curatedRelationshipTriplesAreUnique() {
     var seen = new HashSet<RelationshipEndpointTriple>();
-    for (RelationshipEndpointTriple triple : Archimate.relationshipEndpointTriples()) {
+    for (RelationshipEndpointTriple triple : CURATED_RELATIONSHIP_ENDPOINT_TRIPLES) {
       assertThat(seen.add(triple)).isTrue();
     }
   }

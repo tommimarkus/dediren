@@ -90,28 +90,6 @@ public final class Archimate {
           "Triggering",
           "Association");
 
-  private static final List<RelationshipEndpointTriple> CURATED_RELATIONSHIP_ENDPOINT_TRIPLES =
-      List.of(
-          new RelationshipEndpointTriple("Grouping", "Composition", "ApplicationComponent"),
-          new RelationshipEndpointTriple("Grouping", "Aggregation", "ApplicationService"),
-          new RelationshipEndpointTriple("BusinessRole", "Assignment", "BusinessProcess"),
-          new RelationshipEndpointTriple(
-              "ApplicationComponent", "Realization", "ApplicationService"),
-          new RelationshipEndpointTriple(
-              "ApplicationComponent", "Specialization", "ApplicationComponent"),
-          new RelationshipEndpointTriple("ApplicationService", "Serving", "ApplicationComponent"),
-          new RelationshipEndpointTriple("ApplicationComponent", "Serving", "BusinessActor"),
-          new RelationshipEndpointTriple("ApplicationFunction", "Access", "DataObject"),
-          new RelationshipEndpointTriple("ApplicationService", "Access", "DataObject"),
-          new RelationshipEndpointTriple("ApplicationComponent", "Access", "DataObject"),
-          new RelationshipEndpointTriple("Goal", "Influence", "Requirement"),
-          new RelationshipEndpointTriple("ApplicationComponent", "Flow", "ApplicationService"),
-          new RelationshipEndpointTriple("ApplicationService", "Flow", "ApplicationService"),
-          new RelationshipEndpointTriple("BusinessProcess", "Triggering", "BusinessProcess"),
-          new RelationshipEndpointTriple(
-              "ApplicationService", "Triggering", "ApplicationComponent"),
-          new RelationshipEndpointTriple("BusinessActor", "Association", "DataObject"));
-
   private static final Set<RelationshipEndpointTriple> REJECTED_RELATIONSHIP_ENDPOINT_TRIPLES =
       Set.of(
           new RelationshipEndpointTriple(
@@ -129,10 +107,6 @@ public final class Archimate {
 
   public static List<String> relationshipTypes() {
     return RELATIONSHIP_TYPES;
-  }
-
-  public static List<RelationshipEndpointTriple> relationshipEndpointTriples() {
-    return CURATED_RELATIONSHIP_ENDPOINT_TRIPLES;
   }
 
   public static boolean isRelationshipConnectorType(String value) {
@@ -153,6 +127,14 @@ public final class Archimate {
     }
   }
 
+  /**
+   * Validates one relationship's endpoints against a <strong>deny list</strong>. This is not a
+   * curated allow list: any (source, relationship, target) triple that is not among the five
+   * explicitly rejected combinations passes. The polarity is deliberate — ArchiMate's legal
+   * endpoint matrix is large and Dediren rejects only what is unambiguously wrong — but it is the
+   * opposite of {@code uml}, which defaults to rejecting what it does not recognise. Do not read
+   * this as curated legality.
+   */
   public static void validateRelationshipEndpointTypes(
       String relationshipType, String sourceType, String targetType, String path)
       throws ArchimateTypeValidationException {

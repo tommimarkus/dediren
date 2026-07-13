@@ -373,10 +373,21 @@ defect: the two copies drift, and a spec change must be made twice.
 types, ordering and nesting rules), and that asymmetry of *scope* is fine. What
 should be symmetric is their *architectural role and placement*: both are
 tier-1 notation cores consumed through the same engine roles. Today they differ even in dependency (`uml` → `contracts`, `archimate`
-standalone) and in how they model endpoint legality (`archimate` uses explicit
-curated/rejected triples; `uml` uses inline conditional logic). Prefer the
-explicit-data style for new endpoint rules — it is auditable — and let a core
-depend on `contracts` only when it genuinely consumes contract types. When a
+standalone) and in how they model endpoint legality.
+
+The endpoint-legality difference is one of **polarity**, and this document used to
+overstate it. `archimate` enforces a **deny list**: five explicitly rejected
+(source, relationship, target) triples, and everything else passes. `uml` defaults
+the other way, rejecting endpoint combinations it does not recognise. Neither is a
+curated allow list. (A 16-triple `CURATED_RELATIONSHIP_ENDPOINT_TRIPLES` table did
+live in `archimate` and read like one, but it never took part in validation and had
+no production caller; it was demoted to test data on 2026-07-13. Do not describe
+ArchiMate endpoint legality as curated — for agents, that is false validation
+confidence.)
+
+Prefer explicit data over inline conditionals for new endpoint rules — it is
+auditable — and let a core depend on `contracts` only when it genuinely consumes
+contract types. When a
 notation core keeps growing and pulling unrelated consumers along, that is the
 signal (*Evans 2003*) to split the shared part or accept deliberate duplication,
 not to keep enlarging the kernel.
