@@ -220,7 +220,7 @@ or the previous command envelope:
 jq -r '.data.artifacts[] | select(.artifact_kind=="svg") | .content' render-result.json > diagram.svg
 ```
 
-The `render` plugin emits only `svg` (and, in interactive modes, `html`) artifacts; it does not produce PNG. To get a raster image, convert the emitted SVG with an external tool — for example `rsvg-convert diagram.svg -o diagram.png`, `resvg diagram.svg diagram.png`, ImageMagick (`magick convert diagram.svg diagram.png`), or Inkscape (`inkscape diagram.svg --export-type=png`).
+The `render` plugin emits only an `svg` artifact; it does not produce PNG. To get a raster image, convert the emitted SVG with an external tool — for example `rsvg-convert diagram.svg -o diagram.png`, `resvg diagram.svg diagram.png`, ImageMagick (`magick convert diagram.svg diagram.png`), or Inkscape (`inkscape diagram.svg --export-type=png`).
 
 ## Build
 
@@ -297,14 +297,25 @@ back to the decomposed `export` subcommand.
 The render policy owns SVG presentation. Beyond `accessibility` (above), these
 options shape output:
 
-- **Interactive SVG.** `interactive` is `none` (default — a static SVG with no
-  embedded script), `svg` (a self-contained SVG that highlights a node's edges
-  on click), `html` (an HTML page wrapping that SVG), or `both` (an `svg` and an
-  `html` artifact). The render result is an ordered `artifacts[]` list — select
-  the one you want by `artifact_kind`. `style.interaction.highlight_stroke` and
-  `style.interaction.highlight_stroke_width` tune the highlight.
 - **Edge label backing.** Edge labels default to outlined text; set
   `style.edge.label_presentation` to `background` for a filled label backing.
+- **Generic node shapes.** For generic (non-notation) graphs, set `style.node.shape`
+  or a per-node/type `shape` override to `rectangle`, `rounded_rectangle`
+  (default), `ellipse`, `circle`, `diamond`, `hexagon`, `parallelogram`,
+  `stadium`, `cylinder`, or `triangle`. A `shape` is rejected under the
+  `archimate`/`uml` profiles or alongside a notation `decorator` — those notations
+  fix their own geometry.
+- **Colour & opacity.** Colours accept hex (`#RGB`…`#RRGGBBAA`), `rgb()`/`rgba()`,
+  and CSS colour names. `fill_opacity`/`stroke_opacity` (0–1) fade node and group
+  fills/strokes; edges take `stroke_opacity`; `background.fill_opacity` fades the
+  page. Node/group fills can be a `fill_gradient` (`type` linear/radial, `angle`,
+  `stops`).
+- **Line style.** Edges and node/group borders take `line_style`
+  (`solid`/`dashed`/`dotted`) and a custom `dash_pattern` array of 1–8 positive
+  lengths (e.g. `[4, 2]`), the pattern winning over the preset.
+- **Typography.** Global `font.weight`/`font.style` (bold/italic); per-element
+  `font_weight`, `font_style`, `font_family`, `label_align` (node/group labels),
+  and `label_opacity` on node/group/edge labels.
 - **UML association-end adornments.** In UML class diagrams, multiplicity and
   role carried in render metadata (`properties.uml.{source,target}_multiplicity`
   and `properties.uml.{source,target}_role`) are drawn beside their own end of

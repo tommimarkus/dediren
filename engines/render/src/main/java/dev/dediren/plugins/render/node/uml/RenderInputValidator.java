@@ -10,15 +10,18 @@ import dev.dediren.contracts.render.RenderPolicy;
 import dev.dediren.contracts.render.SvgBackgroundStyle;
 import dev.dediren.contracts.render.SvgEdgeStyle;
 import dev.dediren.contracts.render.SvgFontStyle;
+import dev.dediren.contracts.render.SvgGradient;
+import dev.dediren.contracts.render.SvgGradientStop;
 import dev.dediren.contracts.render.SvgGroupStyle;
-import dev.dediren.contracts.render.SvgInteractionStyle;
 import dev.dediren.contracts.render.SvgNodeStyle;
 import dev.dediren.contracts.render.SvgStylePolicy;
 import dev.dediren.uml.Uml;
 import dev.dediren.uml.UmlValidationException;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 import tools.jackson.databind.JsonNode;
 
 public final class RenderInputValidator {
@@ -35,6 +38,7 @@ public final class RenderInputValidator {
           ArchimateTypeValidationException,
           UmlValidationException {
     validateRenderPolicy(policy);
+    validateGenericShapePolicy(policy);
     validateRenderMetadataUsage(policy, metadata);
     validateArchimatePolicyTypes(policy);
     validateArchimateRenderMetadata(layout, metadata);
@@ -397,15 +401,6 @@ public final class RenderInputValidator {
   }
 
   private static void validateRenderPolicy(RenderPolicy policy) throws PolicyValidationException {
-    String interactive = policy.interactive();
-    if (interactive != null
-        && !interactive.equals("none")
-        && !interactive.equals("svg")
-        && !interactive.equals("html")
-        && !interactive.equals("both")) {
-      throw new PolicyValidationException(
-          "interactive", "SVG render policy interactive must be one of none, svg, html, both");
-    }
     SvgStylePolicy style = policy.style();
     if (style == null) {
       return;
@@ -415,7 +410,6 @@ public final class RenderInputValidator {
     validateNodeStyle(style.node(), "style.node");
     validateEdgeStyle(style.edge(), "style.edge");
     validateGroupStyle(style.group(), "style.group");
-    validateInteractionStyle(style.interaction(), "style.interaction");
     for (Map.Entry<String, SvgNodeStyle> entry : style.nodeTypeOverrides().entrySet()) {
       validateNodeStyle(entry.getValue(), "style.node_type_overrides." + entry.getKey());
     }
@@ -436,19 +430,43 @@ public final class RenderInputValidator {
     }
   }
 
+  private static void validateGenericShapePolicy(RenderPolicy policy)
+      throws PolicyValidationException {
+    String profile = policy.semanticProfile();
+    if (!"archimate".equals(profile) && !"uml".equals(profile)) {
+      return;
+    }
+    SvgStylePolicy style = policy.style();
+    if (style == null) {
+      return;
+    }
+    rejectShape(style.node(), "style.node", profile);
+    for (Map.Entry<String, SvgNodeStyle> entry : style.nodeTypeOverrides().entrySet()) {
+      rejectShape(entry.getValue(), "style.node_type_overrides." + entry.getKey(), profile);
+    }
+    for (Map.Entry<String, SvgNodeStyle> entry : style.nodeOverrides().entrySet()) {
+      rejectShape(entry.getValue(), "style.node_overrides." + entry.getKey(), profile);
+    }
+  }
+
+  private static void rejectShape(SvgNodeStyle style, String path, String profile)
+      throws PolicyValidationException {
+    if (style != null && style.shape() != null) {
+      throw new PolicyValidationException(
+          path + ".shape",
+          "SVG render policy "
+              + path
+              + " shape is not allowed under the "
+              + profile
+              + " profile; node shapes are for generic graphs");
+    }
+  }
+
   private static void validateBackgroundStyle(SvgBackgroundStyle style, String path)
       throws PolicyValidationException {
     if (style != null) {
       validateColor(style.fill(), path + ".fill");
-    }
-  }
-
-  private static void validateInteractionStyle(SvgInteractionStyle style, String path)
-      throws PolicyValidationException {
-    if (style != null) {
-      validateColor(style.highlightStroke(), path + ".highlight_stroke");
-      validateNumber(
-          style.highlightStrokeWidth(), path + ".highlight_stroke_width", Bound.MIN, 0.0, 24.0);
+      validateNumber(style.fillOpacity(), path + ".fill_opacity", Bound.MIN, 0.0, 1.0);
     }
   }
 
@@ -478,6 +496,16 @@ public final class RenderInputValidator {
     validateNumber(style.strokeWidth(), path + ".stroke_width", Bound.MIN, 0.0, 24.0);
     validateNumber(style.rx(), path + ".rx", Bound.MIN, 0.0, 80.0);
     validateColor(style.labelFill(), path + ".label_fill");
+    validateNumber(style.fillOpacity(), path + ".fill_opacity", Bound.MIN, 0.0, 1.0);
+    validateNumber(style.strokeOpacity(), path + ".stroke_opacity", Bound.MIN, 0.0, 1.0);
+    validateDashPattern(style.dashPattern(), path + ".dash_pattern");
+    validateFontFamily(style.fontFamily(), path + ".font_family");
+    validateNumber(style.labelOpacity(), path + ".label_opacity", Bound.MIN, 0.0, 1.0);
+    validateGradient(style.fillGradient(), path + ".fill_gradient");
+    if (style.shape() != null && style.decorator() != null) {
+      throw new PolicyValidationException(
+          path + ".shape", "SVG render policy " + path + " cannot set both shape and decorator");
+    }
   }
 
   private static void validateEdgeStyle(SvgEdgeStyle style, String path)
@@ -488,6 +516,9 @@ public final class RenderInputValidator {
     validateColor(style.stroke(), path + ".stroke");
     validateNumber(style.strokeWidth(), path + ".stroke_width", Bound.MIN, 0.0, 24.0);
     validateColor(style.labelFill(), path + ".label_fill");
+    validateNumber(style.strokeOpacity(), path + ".stroke_opacity", Bound.MIN, 0.0, 1.0);
+    validateDashPattern(style.dashPattern(), path + ".dash_pattern");
+    validateNumber(style.labelOpacity(), path + ".label_opacity", Bound.MIN, 0.0, 1.0);
   }
 
   private static void validateGroupStyle(SvgGroupStyle style, String path)
@@ -501,22 +532,97 @@ public final class RenderInputValidator {
     validateNumber(style.rx(), path + ".rx", Bound.MIN, 0.0, 80.0);
     validateColor(style.labelFill(), path + ".label_fill");
     validateNumber(style.labelSize(), path + ".label_size", Bound.EXCLUSIVE_MIN, 0.0, 96.0);
+    validateNumber(style.fillOpacity(), path + ".fill_opacity", Bound.MIN, 0.0, 1.0);
+    validateNumber(style.strokeOpacity(), path + ".stroke_opacity", Bound.MIN, 0.0, 1.0);
+    validateDashPattern(style.dashPattern(), path + ".dash_pattern");
+    validateFontFamily(style.fontFamily(), path + ".font_family");
+    validateNumber(style.labelOpacity(), path + ".label_opacity", Bound.MIN, 0.0, 1.0);
+    validateGradient(style.fillGradient(), path + ".fill_gradient");
+  }
+
+  // Broadened colour grammar: hex (#RGB/#RGBA/#RRGGBB/#RRGGBBAA), rgb()/rgba(), or a CSS colour
+  // keyword (letters, covering names plus none/transparent/currentColor). Every colour now lands
+  // only in XML-escaped SVG attribute contexts (fill/stroke/label_fill/gradient stops), so escaping
+  // is the correctness boundary; admitting no CSS metacharacters (; { } < > etc.) is kept as
+  // defense-in-depth. (There is no longer a raw CSS <style> sink — interactive-svg was retired.)
+  private static final Pattern COLOR =
+      Pattern.compile(
+          "#([0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})"
+              + "|rgba?\\(\\s*\\d{1,3}%?\\s*,\\s*\\d{1,3}%?\\s*,\\s*\\d{1,3}%?\\s*"
+              + "(?:,\\s*(?:\\d*\\.?\\d+%?)\\s*)?\\)"
+              + "|[A-Za-z]+");
+
+  private static void validateGradient(SvgGradient gradient, String path)
+      throws PolicyValidationException {
+    if (gradient == null) {
+      return;
+    }
+    if (gradient.type() == null) {
+      throw new PolicyValidationException(
+          path + ".type", "SVG render policy " + path + ".type is required");
+    }
+    List<SvgGradientStop> stops = gradient.stops();
+    if (stops == null || stops.isEmpty() || stops.size() > 16) {
+      throw new PolicyValidationException(
+          path + ".stops",
+          "SVG render policy " + path + ".stops must have between 1 and 16 entries");
+    }
+    for (int index = 0; index < stops.size(); index++) {
+      SvgGradientStop stop = stops.get(index);
+      String stopPath = path + ".stops[" + index + "]";
+      if (!Double.isFinite(stop.offset()) || stop.offset() < 0.0 || stop.offset() > 1.0) {
+        throw new PolicyValidationException(
+            stopPath + ".offset",
+            "SVG render policy " + stopPath + ".offset must be between 0 and 1");
+      }
+      if (stop.color() == null) {
+        throw new PolicyValidationException(
+            stopPath + ".color", "SVG render policy " + stopPath + ".color is required");
+      }
+      validateColor(stop.color(), stopPath + ".color");
+      validateNumber(stop.opacity(), stopPath + ".opacity", Bound.MIN, 0.0, 1.0);
+    }
+  }
+
+  private static void validateFontFamily(String family, String path)
+      throws PolicyValidationException {
+    if (family == null) {
+      return;
+    }
+    int length = family.codePointCount(0, family.length());
+    if (length < 1 || length > 120) {
+      throw new PolicyValidationException(
+          path, "SVG render policy " + path + " length is outside the allowed range");
+    }
+  }
+
+  private static void validateDashPattern(List<Double> pattern, String path)
+      throws PolicyValidationException {
+    if (pattern == null) {
+      return;
+    }
+    if (pattern.isEmpty() || pattern.size() > 8) {
+      throw new PolicyValidationException(
+          path, "SVG render policy " + path + " must have between 1 and 8 entries");
+    }
+    for (Double value : pattern) {
+      if (value == null || !Double.isFinite(value) || value <= 0.0 || value > 100.0) {
+        throw new PolicyValidationException(
+            path, "SVG render policy " + path + " entries must be positive numbers up to 100");
+      }
+    }
   }
 
   private static void validateColor(String value, String path) throws PolicyValidationException {
     if (value == null) {
       return;
     }
-    boolean valid =
-        value.length() == 7
-            && value.charAt(0) == '#'
-            && value
-                .substring(1)
-                .chars()
-                .allMatch(character -> Character.digit(character, 16) >= 0);
-    if (!valid) {
+    if (!COLOR.matcher(value).matches()) {
       throw new PolicyValidationException(
-          path, "SVG render policy " + path + " must be a #RRGGBB hex color");
+          path,
+          "SVG render policy "
+              + path
+              + " must be a hex (#RGB/#RGBA/#RRGGBB/#RRGGBBAA), rgb()/rgba(), or CSS color-name value");
     }
   }
 

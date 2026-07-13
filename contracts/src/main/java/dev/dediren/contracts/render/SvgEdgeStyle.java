@@ -1,5 +1,8 @@
 package dev.dediren.contracts.render;
 
+import dev.dediren.contracts.util.ContractCollections;
+import java.util.List;
+
 public record SvgEdgeStyle(
     String stroke,
     Double strokeWidth,
@@ -11,4 +14,11 @@ public record SvgEdgeStyle(
     SvgEdgeLabelHorizontalSide labelHorizontalSide,
     SvgEdgeLabelVerticalPosition labelVerticalPosition,
     SvgEdgeLabelVerticalSide labelVerticalSide,
-    SvgEdgeLabelPresentation labelPresentation) {}
+    SvgEdgeLabelPresentation labelPresentation,
+    Double strokeOpacity,
+    List<Double> dashPattern,
+    Double labelOpacity) {
+  public SvgEdgeStyle {
+    dashPattern = ContractCollections.copyOrNull(dashPattern);
+  }
+}

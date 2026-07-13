@@ -1,12 +1,15 @@
 package dev.dediren.plugins.render.svg;
 
+import dev.dediren.contracts.render.SvgEdgeLineStyle;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Locale;
 
 /**
- * Pure SVG text/number formatting primitives shared by the render entry point and the per-notation
- * decorators. No state and no rendering policy: just XML escaping, coordinate/number formatting,
- * and a cheap text-width estimate. Consumers static-import these so call sites stay unqualified.
+ * Pure SVG number/geometry formatting primitives shared by the render entry point and the
+ * per-notation decorators. No state and no rendering policy: coordinate/number formatting,
+ * stroke-dasharray assembly, and a cheap text-width estimate. XML escaping is {@link SvgWriter}'s
+ * job. Consumers static-import these so call sites stay unqualified.
  */
 public final class Svg {
   private Svg() {}
@@ -38,21 +41,31 @@ public final class Svg {
     return Double.toString(value);
   }
 
-  /** Escapes a value for use inside an SVG/XML attribute (quotes included). */
-  public static String attr(String value) {
-    return (value == null ? "" : value)
-        .replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
-        .replace("\"", "&quot;");
-  }
-
-  /** Escapes a value for use as SVG/XML text content. */
-  public static String text(String value) {
-    return (value == null ? "" : value)
-        .replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;");
+  /**
+   * The {@code stroke-dasharray} VALUE for a resolved line style: an explicit {@code dashPattern}
+   * (space-joined) wins; otherwise the {@code dashedDefault} for {@code DASHED}, a fine dotted
+   * pattern for {@code DOTTED}, and the empty string (solid) otherwise. Callers that own their own
+   * dash default (e.g. the ArchiMate grouping border) use this raw value to reconcile.
+   */
+  public static String dashArrayValue(
+      SvgEdgeLineStyle lineStyle, List<Double> dashPattern, String dashedDefault) {
+    if (dashPattern != null && !dashPattern.isEmpty()) {
+      StringBuilder joined = new StringBuilder();
+      for (Double value : dashPattern) {
+        if (joined.length() > 0) {
+          joined.append(' ');
+        }
+        joined.append(styleNumber(value));
+      }
+      return joined.toString();
+    }
+    if (lineStyle == SvgEdgeLineStyle.DASHED) {
+      return dashedDefault;
+    }
+    if (lineStyle == SvgEdgeLineStyle.DOTTED) {
+      return "1 3";
+    }
+    return "";
   }
 
   /** Floors to one decimal place and formats with a fixed locale (stable across environments). */

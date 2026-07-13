@@ -23,7 +23,10 @@ public final class StyleResolver {
 
   public static ResolvedStyle baseStyle(RenderPolicy policy) {
     SvgStylePolicy style = policy.style();
-    var defaultNode = new ResolvedNodeStyle("#f8fafc", "#334155", 1.5, 6.0, "#0f172a", null);
+    var defaultNode =
+        new ResolvedNodeStyle(
+            "#f8fafc", "#334155", 1.5, 6.0, "#0f172a", null, null, null, null, null, null, null,
+            null, null, null, null, null);
     var defaultEdge =
         new ResolvedEdgeStyle(
             "#64748b",
@@ -36,19 +39,30 @@ public final class StyleResolver {
             SvgEdgeLabelHorizontalSide.AUTO,
             SvgEdgeLabelVerticalPosition.CENTER,
             SvgEdgeLabelVerticalSide.LEFT,
-            SvgEdgeLabelPresentation.OUTLINE);
+            SvgEdgeLabelPresentation.OUTLINE,
+            null,
+            null,
+            null);
     var defaultGroup =
-        new ResolvedGroupStyle("#eff6ff", "#93c5fd", 1.0, 8.0, "#1e3a8a", 12.0, null);
+        new ResolvedGroupStyle(
+            "#eff6ff", "#93c5fd", 1.0, 8.0, "#1e3a8a", 12.0, null, null, null, null, null, null,
+            null, null, null, null, null);
     return new ResolvedStyle(
         Optional.ofNullable(style)
             .map(SvgStylePolicy::background)
             .map(SvgBackgroundStyle::fill)
             .orElse("#ffffff"),
         Optional.ofNullable(style)
+            .map(SvgStylePolicy::background)
+            .map(SvgBackgroundStyle::fillOpacity)
+            .orElse(null),
+        Optional.ofNullable(style)
             .map(SvgStylePolicy::font)
             .map(SvgFontStyle::family)
             .orElse("Inter, Arial, sans-serif"),
         Optional.ofNullable(style).map(SvgStylePolicy::font).map(SvgFontStyle::size).orElse(14.0),
+        Optional.ofNullable(style).map(SvgStylePolicy::font).map(SvgFontStyle::weight).orElse(null),
+        Optional.ofNullable(style).map(SvgStylePolicy::font).map(SvgFontStyle::style).orElse(null),
         mergeNodeStyle(defaultNode, style == null ? null : style.node()),
         mergeEdgeStyle(defaultEdge, style == null ? null : style.edge()),
         mergeGroupStyle(defaultGroup, style == null ? null : style.group()));
@@ -97,7 +111,18 @@ public final class StyleResolver {
         override.strokeWidth() == null ? base.strokeWidth() : override.strokeWidth(),
         override.rx() == null ? base.rx() : override.rx(),
         override.labelFill() == null ? base.labelFill() : override.labelFill(),
-        override.decorator() == null ? base.decorator() : override.decorator());
+        override.decorator() == null ? base.decorator() : override.decorator(),
+        override.shape() == null ? base.shape() : override.shape(),
+        override.fillOpacity() == null ? base.fillOpacity() : override.fillOpacity(),
+        override.strokeOpacity() == null ? base.strokeOpacity() : override.strokeOpacity(),
+        override.lineStyle() == null ? base.lineStyle() : override.lineStyle(),
+        override.dashPattern() == null ? base.dashPattern() : override.dashPattern(),
+        override.fontWeight() == null ? base.fontWeight() : override.fontWeight(),
+        override.fontStyle() == null ? base.fontStyle() : override.fontStyle(),
+        override.fontFamily() == null ? base.fontFamily() : override.fontFamily(),
+        override.labelAlign() == null ? base.labelAlign() : override.labelAlign(),
+        override.labelOpacity() == null ? base.labelOpacity() : override.labelOpacity(),
+        override.fillGradient() == null ? base.fillGradient() : override.fillGradient());
   }
 
   static ResolvedEdgeStyle mergeEdgeStyle(ResolvedEdgeStyle base, SvgEdgeStyle override) {
@@ -125,7 +150,10 @@ public final class StyleResolver {
             : override.labelVerticalSide(),
         override.labelPresentation() == null
             ? base.labelPresentation()
-            : override.labelPresentation());
+            : override.labelPresentation(),
+        override.strokeOpacity() == null ? base.strokeOpacity() : override.strokeOpacity(),
+        override.dashPattern() == null ? base.dashPattern() : override.dashPattern(),
+        override.labelOpacity() == null ? base.labelOpacity() : override.labelOpacity());
   }
 
   static ResolvedGroupStyle mergeGroupStyle(ResolvedGroupStyle base, SvgGroupStyle override) {
@@ -139,6 +167,16 @@ public final class StyleResolver {
         override.rx() == null ? base.rx() : override.rx(),
         override.labelFill() == null ? base.labelFill() : override.labelFill(),
         override.labelSize() == null ? base.labelSize() : override.labelSize(),
-        override.decorator() == null ? base.decorator() : override.decorator());
+        override.decorator() == null ? base.decorator() : override.decorator(),
+        override.fillOpacity() == null ? base.fillOpacity() : override.fillOpacity(),
+        override.strokeOpacity() == null ? base.strokeOpacity() : override.strokeOpacity(),
+        override.lineStyle() == null ? base.lineStyle() : override.lineStyle(),
+        override.dashPattern() == null ? base.dashPattern() : override.dashPattern(),
+        override.fontWeight() == null ? base.fontWeight() : override.fontWeight(),
+        override.fontStyle() == null ? base.fontStyle() : override.fontStyle(),
+        override.fontFamily() == null ? base.fontFamily() : override.fontFamily(),
+        override.labelAlign() == null ? base.labelAlign() : override.labelAlign(),
+        override.labelOpacity() == null ? base.labelOpacity() : override.labelOpacity(),
+        override.fillGradient() == null ? base.fillGradient() : override.fillGradient());
   }
 }

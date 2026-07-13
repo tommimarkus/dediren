@@ -5,16 +5,12 @@
   "additionalProperties": false,
   "required": ["render_policy_schema_version", "page", "margin"],
   "properties": {
-    "render_policy_schema_version": { "const": "render-policy.schema.v2" },
+    "render_policy_schema_version": { "const": "render-policy.schema.v3" },
     "semantic_profile": {
       "type": "string",
       "minLength": 1,
       "maxLength": 80,
       "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
-    },
-    "interactive": {
-      "enum": ["none", "svg", "html", "both"],
-      "default": "none"
     },
     "page": {
       "type": "object",
@@ -42,7 +38,64 @@
   "$defs": {
     "color": {
       "type": "string",
-      "pattern": "^#[0-9a-fA-F]{6}$"
+      "pattern": "^(#([0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})|rgba?\\([0-9%.,\\s]*\\)|[A-Za-z]+)$"
+    },
+    "opacity": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "lineStyle": {
+      "type": "string",
+      "enum": ["solid", "dashed", "dotted"]
+    },
+    "dashPattern": {
+      "type": "array",
+      "items": { "type": "number", "exclusiveMinimum": 0, "maximum": 100 },
+      "minItems": 1,
+      "maxItems": 8
+    },
+    "fontWeight": {
+      "type": "string",
+      "enum": ["normal", "bold"]
+    },
+    "fontSlant": {
+      "type": "string",
+      "enum": ["normal", "italic"]
+    },
+    "labelAlign": {
+      "type": "string",
+      "enum": ["start", "middle", "end"]
+    },
+    "fontFamily": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120
+    },
+    "gradientStop": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["offset", "color"],
+      "properties": {
+        "offset": { "type": "number", "minimum": 0, "maximum": 1 },
+        "color": { "$ref": "#/$defs/color" },
+        "opacity": { "$ref": "#/$defs/opacity" }
+      }
+    },
+    "gradient": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "stops"],
+      "properties": {
+        "type": { "type": "string", "enum": ["linear", "radial"] },
+        "angle": { "type": "number" },
+        "stops": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/gradientStop" },
+          "minItems": 1,
+          "maxItems": 16
+        }
+      }
     },
     "font": {
       "type": "object",
@@ -57,14 +110,17 @@
           "type": "number",
           "exclusiveMinimum": 0,
           "maximum": 96
-        }
+        },
+        "weight": { "$ref": "#/$defs/fontWeight" },
+        "style": { "$ref": "#/$defs/fontSlant" }
       }
     },
     "background": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "fill": { "$ref": "#/$defs/color" }
+        "fill": { "$ref": "#/$defs/color" },
+        "fill_opacity": { "$ref": "#/$defs/opacity" }
       }
     },
     "nodeStyle": {
@@ -184,7 +240,32 @@
             "uml_artifact",
             "uml_deployment_specification"
           ]
-        }
+        },
+        "shape": {
+          "type": "string",
+          "enum": [
+            "rectangle",
+            "rounded_rectangle",
+            "ellipse",
+            "circle",
+            "diamond",
+            "hexagon",
+            "parallelogram",
+            "stadium",
+            "cylinder",
+            "triangle"
+          ]
+        },
+        "fill_opacity": { "$ref": "#/$defs/opacity" },
+        "stroke_opacity": { "$ref": "#/$defs/opacity" },
+        "line_style": { "$ref": "#/$defs/lineStyle" },
+        "dash_pattern": { "$ref": "#/$defs/dashPattern" },
+        "font_weight": { "$ref": "#/$defs/fontWeight" },
+        "font_style": { "$ref": "#/$defs/fontSlant" },
+        "font_family": { "$ref": "#/$defs/fontFamily" },
+        "label_align": { "$ref": "#/$defs/labelAlign" },
+        "label_opacity": { "$ref": "#/$defs/opacity" },
+        "fill_gradient": { "$ref": "#/$defs/gradient" }
       }
     },
     "edgeStyle": {
@@ -198,10 +279,8 @@
           "maximum": 24
         },
         "label_fill": { "$ref": "#/$defs/color" },
-        "line_style": {
-          "type": "string",
-          "enum": ["solid", "dashed"]
-        },
+        "line_style": { "$ref": "#/$defs/lineStyle" },
+        "dash_pattern": { "$ref": "#/$defs/dashPattern" },
         "marker_start": {
           "type": "string",
           "enum": [
@@ -247,7 +326,9 @@
         "label_presentation": {
           "type": "string",
           "enum": ["outline", "background"]
-        }
+        },
+        "stroke_opacity": { "$ref": "#/$defs/opacity" },
+        "label_opacity": { "$ref": "#/$defs/opacity" }
       }
     },
     "groupStyle": {
@@ -272,7 +353,17 @@
           "exclusiveMinimum": 0,
           "maximum": 96
         },
-        "decorator": { "$ref": "#/$defs/nodeStyle/properties/decorator" }
+        "decorator": { "$ref": "#/$defs/nodeStyle/properties/decorator" },
+        "fill_opacity": { "$ref": "#/$defs/opacity" },
+        "stroke_opacity": { "$ref": "#/$defs/opacity" },
+        "line_style": { "$ref": "#/$defs/lineStyle" },
+        "dash_pattern": { "$ref": "#/$defs/dashPattern" },
+        "font_weight": { "$ref": "#/$defs/fontWeight" },
+        "font_style": { "$ref": "#/$defs/fontSlant" },
+        "font_family": { "$ref": "#/$defs/fontFamily" },
+        "label_align": { "$ref": "#/$defs/labelAlign" },
+        "label_opacity": { "$ref": "#/$defs/opacity" },
+        "fill_gradient": { "$ref": "#/$defs/gradient" }
       }
     },
     "nodeOverrideMap": {
@@ -301,16 +392,7 @@
         "group_type_overrides": { "$ref": "#/$defs/groupOverrideMap" },
         "node_overrides": { "$ref": "#/$defs/nodeOverrideMap" },
         "edge_overrides": { "$ref": "#/$defs/edgeOverrideMap" },
-        "group_overrides": { "$ref": "#/$defs/groupOverrideMap" },
-        "interaction": { "$ref": "#/$defs/interaction" }
-      }
-    },
-    "interaction": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "highlight_stroke": { "$ref": "#/$defs/color" },
-        "highlight_stroke_width": { "type": "number", "minimum": 0, "maximum": 24 }
+        "group_overrides": { "$ref": "#/$defs/groupOverrideMap" }
       }
     },
     "accessibility": {

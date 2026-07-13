@@ -117,9 +117,9 @@ dediren validate-layout --input layout-result.json
 
 ### `render`
 
-Asks the `render` plugin to produce SVG (and optionally interactive HTML).
-Output is an ordered `.data.artifacts[]` list; each entry has an `artifact_kind`
-(`svg` or `html`) and `content`. Select the artifact you want:
+Asks the `render` plugin to produce SVG. Output is a `.data.artifacts[]` list
+holding a single entry with `artifact_kind` `svg` and `content`. Select the
+artifact:
 
 ```bash
 dediren render --plugin render \

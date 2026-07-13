@@ -313,8 +313,8 @@ class MainTest {
               ">Production Node<",
               ">Orders Runtime<",
               ">orders-service.jar<",
-              "&#171;device&#187;",
-              "&#171;executionEnvironment&#187;");
+              "«device»",
+              "«executionEnvironment»");
       groupWithAttribute(document, "data-dediren-node-id", "device-prod-node");
       groupWithAttribute(document, "data-dediren-node-id", "ee-orders-runtime");
       groupWithAttribute(document, "data-dediren-node-id", "artifact-orders-service");
@@ -719,8 +719,8 @@ class MainTest {
                       "fixtures/layout-result/basic.json",
                       "fixtures/render-policy/default-svg.json")));
 
-      // The documented default is "none": a static SVG. No interaction script, no highlight
-      // <style>, and no edge source/target hooks that only make sense with the script.
+      // Render output is always a static SVG: no interaction script, no highlight <style>, and no
+      // edge source/target hooks (interactive-svg was retired).
       assertThat(content).doesNotContain("<script");
       assertThat(content).doesNotContain("dediren-edge-highlighted");
       assertThat(content).doesNotContain("data-dediren-edge-source");
@@ -740,134 +740,6 @@ class MainTest {
         }
       }
       assertThat(anyEdge).isTrue();
-    }
-
-    @Test
-    void noneModeSuppressesInteractionLayer() throws Exception {
-      ObjectNode input =
-          (ObjectNode)
-              renderInput(
-                  "fixtures/layout-result/basic.json", "fixtures/render-policy/default-svg.json");
-      ((ObjectNode) input.at("/policy")).put("interactive", "none");
-
-      String content = okContent(render(input));
-
-      assertThat(content).doesNotContain("data-dediren-edge-source");
-      assertThat(content).doesNotContain("<script");
-      assertThat(content).doesNotContain("dediren-edge-highlighted");
-    }
-
-    @Test
-    void invalidHighlightStrokeIsRejected() throws Exception {
-      ObjectNode input =
-          (ObjectNode)
-              renderInput(
-                  "fixtures/layout-result/basic.json", "fixtures/render-policy/default-svg.json");
-      ObjectNode style = ((ObjectNode) input.at("/policy")).putObject("style");
-      style.putObject("interaction").put("highlight_stroke", "#000;} *{display:none");
-
-      error(render(input), "DEDIREN_SVG_POLICY_INVALID");
-    }
-
-    @Test
-    void htmlModeWrapsInteractiveSvg() throws Exception {
-      ObjectNode input =
-          (ObjectNode)
-              renderInput(
-                  "fixtures/layout-result/basic.json", "fixtures/render-policy/default-svg.json");
-      ((ObjectNode) input.at("/policy")).put("interactive", "html");
-
-      JsonNode data = okData(render(input));
-
-      assertThat(data.at("/artifacts").size()).isEqualTo(1);
-      assertThat(data.at("/artifacts/0/artifact_kind").asText()).isEqualTo("html");
-      String html = data.at("/artifacts/0/content").asText();
-      assertThat(html).startsWith("<!DOCTYPE html");
-      assertThat(html).contains("<svg", "<script", "data-dediren-edge-source");
-    }
-
-    @Test
-    void bothModeReturnsSvgThenHtml() throws Exception {
-      JsonNode data =
-          okData(
-              render(
-                  renderInput(
-                      "fixtures/layout-result/basic.json",
-                      "fixtures/render-policy/interactive-svg.json")));
-
-      assertThat(data.at("/artifacts").size()).isEqualTo(2);
-      assertThat(data.at("/artifacts/0/artifact_kind").asText()).isEqualTo("svg");
-      assertThat(data.at("/artifacts/1/artifact_kind").asText()).isEqualTo("html");
-      assertThat(data.at("/artifacts/0/content").asText()).startsWith("<svg");
-      assertThat(data.at("/artifacts/1/content").asText()).startsWith("<!DOCTYPE html");
-    }
-
-    @Test
-    void invalidInteractiveModeIsRejected() throws Exception {
-      ObjectNode input =
-          (ObjectNode)
-              renderInput(
-                  "fixtures/layout-result/basic.json", "fixtures/render-policy/default-svg.json");
-      ((ObjectNode) input.at("/policy")).put("interactive", "bogus");
-
-      error(render(input), "DEDIREN_SVG_POLICY_INVALID");
-    }
-
-    @Test
-    void interactionStyleOverridesAppearInCss() throws Exception {
-      String svg =
-          okData(
-                  render(
-                      renderInput(
-                          "fixtures/layout-result/basic.json",
-                          "fixtures/render-policy/interactive-svg.json")))
-              .at("/artifacts/0/content")
-              .asText();
-
-      assertThat(svg).contains("stroke:#ff8800", "stroke-width:5");
-    }
-
-    @Test
-    void interactionStyleDefaultsWhenOmitted() throws Exception {
-      // Interactivity is opt-in; with it enabled but style.interaction omitted, the highlight
-      // appearance falls back to the built-in defaults.
-      ObjectNode input =
-          (ObjectNode)
-              renderInput(
-                  "fixtures/layout-result/basic.json", "fixtures/render-policy/default-svg.json");
-      ((ObjectNode) input.at("/policy")).put("interactive", "svg");
-
-      String svg = okContent(render(input));
-
-      assertThat(svg).contains("stroke:#1f6feb", "stroke-width:3");
-    }
-
-    @Test
-    void invalidHighlightStrokeWidthIsRejected() throws Exception {
-      ObjectNode input =
-          (ObjectNode)
-              renderInput(
-                  "fixtures/layout-result/basic.json", "fixtures/render-policy/default-svg.json");
-      ObjectNode style = ((ObjectNode) input.at("/policy")).putObject("style");
-      style.putObject("interaction").put("highlight_stroke_width", 999);
-
-      error(render(input), "DEDIREN_SVG_POLICY_INVALID");
-    }
-
-    @Test
-    void svgModeKeepsInteractionLayer() throws Exception {
-      ObjectNode input =
-          (ObjectNode)
-              renderInput(
-                  "fixtures/layout-result/basic.json", "fixtures/render-policy/default-svg.json");
-      ((ObjectNode) input.at("/policy")).put("interactive", "svg");
-
-      JsonNode data = okData(render(input));
-
-      assertThat(data.at("/artifacts").size()).isEqualTo(1);
-      assertThat(data.at("/artifacts/0/artifact_kind").asText()).isEqualTo("svg");
-      String svg = data.at("/artifacts/0/content").asText();
-      assertThat(svg).contains("<script", "data-dediren-edge-source");
     }
   }
 
@@ -1030,7 +902,7 @@ class MainTest {
 
       assertThat(shape.getAttribute("data-dediren-node-shape")).isEqualTo("uml_enumeration");
       childGroupWithAttribute(enumeration, "data-dediren-node-decorator", "uml_enumeration");
-      assertThat(content).contains("&#171;enumeration&#187;", "Submitted");
+      assertThat(content).contains("«enumeration»", "Submitted");
     }
 
     @Test
@@ -1357,7 +1229,7 @@ class MainTest {
               .readTree(
                   """
                     {
-                      "render_policy_schema_version": "render-policy.schema.v2",
+                      "render_policy_schema_version": "render-policy.schema.v3",
                       "semantic_profile": "archimate",
                       "page": { "width": 400, "height": 240 },
                       "margin": { "top": 24, "right": 24, "bottom": 24, "left": 24 },
@@ -1441,7 +1313,7 @@ class MainTest {
               .readTree(
                   """
                     {
-                      "render_policy_schema_version": "render-policy.schema.v2",
+                      "render_policy_schema_version": "render-policy.schema.v3",
                       "semantic_profile": "archimate",
                       "page": { "width": 400, "height": 240 },
                       "margin": { "top": 24, "right": 24, "bottom": 24, "left": 24 }
@@ -1962,8 +1834,7 @@ class MainTest {
             node, "data-dediren-node-decorator", EXPECTED_UML_NODE_SHAPES.get(field.getKey()));
         index++;
       }
-      assertThat(content)
-          .contains("&#171;interface&#187;", "&#171;dataType&#187;", "&#171;enumeration&#187;");
+      assertThat(content).contains("«interface»", "«dataType»", "«enumeration»");
     }
 
     @Test
@@ -2111,15 +1982,13 @@ class MainTest {
     }
 
     @Test
-    void umlSequencePackagedButNotScripted() throws Exception {
+    void umlSequenceIsStaticSvg() throws Exception {
       ObjectNode input = (ObjectNode) umlSequenceStyleInput();
-      ((ObjectNode) input.at("/policy")).put("interactive", "both");
 
       JsonNode data = okData(render(input));
 
-      assertThat(data.at("/artifacts").size()).isEqualTo(2);
+      assertThat(data.at("/artifacts").size()).isEqualTo(1);
       assertThat(data.at("/artifacts/0/artifact_kind").asText()).isEqualTo("svg");
-      assertThat(data.at("/artifacts/1/artifact_kind").asText()).isEqualTo("html");
       String svg = data.at("/artifacts/0/content").asText();
       assertThat(svg).doesNotContain("<script");
       assertThat(svg).doesNotContain("data-dediren-edge-source");
@@ -3866,20 +3735,20 @@ class MainTest {
   @Test
   void neverEmitsPngArtifact() throws Exception {
     // Permanent regression guard: PNG rasterization was removed with render-result.schema.v4.
-    // A normal render must only ever emit svg/html artifacts, never a png branch.
+    // A normal render must only ever emit an svg artifact, never a png branch.
     String policy =
         """
-            {"render_policy_schema_version":"render-policy.schema.v2",
+            {"render_policy_schema_version":"render-policy.schema.v3",
              "page":{"width":800,"height":600},
              "margin":{"top":0,"right":0,"bottom":0,"left":0}}""";
     String stdin = renderInputJson(MINIMAL_LAYOUT, null, policy);
     PluginResult result = Main.executeForTesting(new String[] {"render"}, stdin);
-    // Assert structurally, not by string search: every emitted artifact_kind must be svg/html, so
-    // a reintroduced png branch fails here regardless of how the envelope is serialized.
+    // Assert structurally, not by string search: every emitted artifact_kind must be svg, so a
+    // reintroduced png branch fails here regardless of how the envelope is serialized.
     JsonNode data = okData(result);
     int artifactCount = 0;
     for (JsonNode artifact : data.path("artifacts")) {
-      assertThat(artifact.path("artifact_kind").asText()).isIn("svg", "html");
+      assertThat(artifact.path("artifact_kind").asText()).isEqualTo("svg");
       artifactCount++;
     }
     assertThat(artifactCount).isPositive();
@@ -3929,7 +3798,7 @@ class MainTest {
     layout.set("warnings", JsonSupport.objectMapper().createArrayNode());
 
     ObjectNode policy = JsonSupport.objectMapper().createObjectNode();
-    policy.put("render_policy_schema_version", "render-policy.schema.v2");
+    policy.put("render_policy_schema_version", "render-policy.schema.v3");
     ObjectNode page = policy.putObject("page");
     page.put("width", 640);
     page.put("height", 360);

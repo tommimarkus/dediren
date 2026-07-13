@@ -33,8 +33,8 @@ or the token-efficient authoring guide in
   `engine-api` interfaces, dispatched in a single JVM. The core owns
   orchestration, validation, and diagnostics — not notation or styling.
 - **Multi-notation, multi-format output.** One semantic model can drive several
-  notations — generic graphs, ArchiMate 3.2, and UML 2.5.1 — and produce SVG
-  (static or interactive), ArchiMate OEF XML, or UML XMI XML.
+  notations — generic graphs, ArchiMate 3.2, and UML 2.5.1 — and produce SVG,
+  ArchiMate OEF XML, or UML XMI XML.
 
 ## Feature Pages
 
@@ -44,7 +44,7 @@ or the token-efficient authoring guide in
 | [Source Model & Views](source-model.md) | The semantic source graph, namespaced properties, views/projection, semantic profiles, and fragments |
 | [Engine Runtime](engine-runtime.md) | The engine contract, the five first-party engines, and runtime diagnostics |
 | [Layout (ELK)](layout.md) | The official Java ELK plugin, layout modes (`flow`/`packed`/`auto`), and `validate-layout` quality metrics |
-| [SVG Rendering](svg-render.md) | The render plugin, render policies, interactive modes, and the `artifacts[]` result shape |
+| [SVG Rendering](svg-render.md) | The render plugin, render policies, and the `artifacts[]` result shape |
 | [Exports (OEF & XMI)](exports.md) | ArchiMate 3.2 OEF and UML 2.5.1 XMI export, plus the supported UML notation coverage |
 | [Contracts & Schemas](contracts-and-schemas.md) | Public schemas, command envelopes, diagnostics, and version/compatibility signals |
 | [Distribution & Runtime](distribution-and-runtime.md) | The agent bundle, its single launcher, environment variables, Class-Data-Sharing, supply-chain artifacts, and versioning |
@@ -84,7 +84,7 @@ described in [`CLAUDE.md`](../../CLAUDE.md).
   update [Engine Runtime](engine-runtime.md).
 - **ELK layout behavior, a new layout mode, or a new `validate-layout` metric**
   → update [Layout (ELK)](layout.md).
-- **Render policy field, interaction mode, or styling behavior** → update
+- **Render policy field or styling behavior** → update
   [SVG Rendering](svg-render.md) alongside `schemas/render-policy.schema.json`.
 - **OEF/XMI export semantics or expanded UML notation coverage** → update
   [Exports (OEF & XMI)](exports.md).
