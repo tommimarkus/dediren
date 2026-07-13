@@ -189,7 +189,9 @@ final class ElkLayoutEngine {
       }
     }
 
-    List<LaidOutGroup> groups = groups(request, nodes, warnings);
+    // layout() routes any request with groups to layoutGrouped, so the flat path is only ever
+    // reached with zero groups.
+    List<LaidOutGroup> groups = List.of();
 
     LayoutResult result =
         new LayoutResult(
@@ -1351,67 +1353,6 @@ final class ElkLayoutEngine {
       points.add(new Point(section.getEndX() + offsetX, section.getEndY() + offsetY));
     }
     return points;
-  }
-
-  private static List<LaidOutGroup> groups(
-      LayoutRequest request, List<LaidOutNode> nodes, List<Diagnostic> warnings) {
-    Map<String, LaidOutNode> byId = new HashMap<>();
-    for (LaidOutNode node : nodes) {
-      byId.put(node.id(), node);
-    }
-
-    List<LaidOutGroup> groups = new ArrayList<>();
-    List<LayoutGroup> requestGroups = list(request.groups());
-    for (int groupIndex = 0; groupIndex < requestGroups.size(); groupIndex++) {
-      LayoutGroup group = requestGroups.get(groupIndex);
-      List<LaidOutNode> members = new ArrayList<>();
-      List<String> memberIds = new ArrayList<>();
-      List<String> requestedMembers = list(group.members());
-      for (int memberIndex = 0; memberIndex < requestedMembers.size(); memberIndex++) {
-        String memberId = requestedMembers.get(memberIndex);
-        LaidOutNode member = byId.get(memberId);
-        if (member == null) {
-          warnings.add(
-              new Diagnostic(
-                  "DEDIREN_ELK_MISSING_GROUP_MEMBER",
-                  DiagnosticSeverity.WARNING,
-                  "group " + group.id() + " references missing member " + memberId,
-                  "$.groups[" + groupIndex + "].members[" + memberIndex + "]"));
-          continue;
-        }
-        members.add(member);
-        memberIds.add(memberId);
-      }
-      if (members.isEmpty()) {
-        warnings.add(
-            new Diagnostic(
-                "DEDIREN_ELK_EMPTY_GROUP",
-                DiagnosticSeverity.WARNING,
-                "group " + group.id() + " has no laid out members",
-                "$.groups[" + groupIndex + "]"));
-        continue;
-      }
-
-      double minX = members.stream().mapToDouble(LaidOutNode::x).min().orElse(0.0);
-      double minY = members.stream().mapToDouble(LaidOutNode::y).min().orElse(0.0);
-      double maxX = members.stream().mapToDouble(node -> node.x() + node.width()).max().orElse(0.0);
-      double maxY =
-          members.stream().mapToDouble(node -> node.y() + node.height()).max().orElse(0.0);
-
-      groups.add(
-          new LaidOutGroup(
-              group.id(),
-              semanticBackedSourceId(group.provenance(), group.id()),
-              group.id(),
-              group.provenance(),
-              minX - ElkLayeredOptions.DEFAULT_GROUP_PADDING,
-              minY - ElkLayeredOptions.DEFAULT_GROUP_PADDING,
-              (maxX - minX) + (ElkLayeredOptions.DEFAULT_GROUP_PADDING * 2.0),
-              (maxY - minY) + (ElkLayeredOptions.DEFAULT_GROUP_PADDING * 2.0),
-              memberIds,
-              group.label()));
-    }
-    return groups;
   }
 
   private static String semanticBackedSourceId(GroupProvenance provenance, String fallback) {
