@@ -269,6 +269,8 @@ above use, and writes each view's artifacts under `--out`:
 
 At least one of `--render-policy`/`--oef-policy`/`--xmi-policy` is required;
 zero lanes is a rejected input (`DEDIREN_COMMAND_INPUT_INVALID`, exit `2`).
+An artifact write failure (an unwritable or colliding `--out`) yields a
+`DEDIREN_COMMAND_IO_FAILED` error envelope on stdout with exit `2`.
 
 Build's own stdout **is** the build result document — unlike every other
 command, it is not wrapped in the generic envelope's `.data`. Read it

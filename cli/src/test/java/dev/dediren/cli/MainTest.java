@@ -413,6 +413,32 @@ class MainTest {
             "xmi:type=\"uml:CommunicationPath\"");
   }
 
+  @Test
+  void buildArtifactWriteCollisionEmitsErrorEnvelope(@TempDir Path tempDir) throws Exception {
+    // --out points at an existing FILE, so Files.createDirectories(out/main) must fail.
+    Path outCollision = Files.writeString(tempDir.resolve("out"), "occupied");
+
+    CliResult result =
+        Main.executeForTesting(
+            new String[] {
+              "build",
+              "--input",
+              workspaceRoot().resolve("fixtures/source/valid-basic.json").toString(),
+              "--out",
+              outCollision.toString(),
+              "--render-policy",
+              workspaceRoot().resolve("fixtures/render-policy/default-svg.json").toString()
+            },
+            "",
+            sequenceWorkflowEnv());
+
+    assertThat(result.exitCode()).isEqualTo(2);
+    JsonNode envelope = JsonSupport.objectMapper().readTree(result.stdout());
+    assertThat(envelope.at("/diagnostics/0/code").asText()).isEqualTo("DEDIREN_COMMAND_IO_FAILED");
+    assertThat(envelope.at("/diagnostics/0/message").asText())
+        .contains("failed to write build artifact");
+  }
+
   private CliResult runValidate(Map<String, String> env, Path source) throws Exception {
     return Main.executeForTesting(
         new String[] {

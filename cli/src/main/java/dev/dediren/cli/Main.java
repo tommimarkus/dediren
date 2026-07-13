@@ -480,6 +480,8 @@ public final class Main {
             spec, dev.dediren.core.commands.BuildCommand.run(request, engines));
       } catch (EngineExecutionException error) {
         return writePluginError(spec, error);
+      } catch (UncheckedIOException error) {
+        return printCommandIoFailure(spec, error);
       }
     }
   }
@@ -543,6 +545,20 @@ public final class Main {
   private static Integer printStructuralFailure(CommandSpec spec, UncheckedIOException error) {
     spec.commandLine().getErr().println(error.getCause().getMessage());
     return CommandExitCode.INPUT_ERROR.code();
+  }
+
+  /**
+   * A command-owned I/O failure (for example a build artifact write hitting an unwritable or
+   * colliding {@code --out}): unlike printStructuralFailure's deliberately raw legacy observable,
+   * this is a first-class envelope so agents can decide the outcome from stdout alone.
+   */
+  private static Integer printCommandIoFailure(CommandSpec spec, UncheckedIOException error)
+      throws IOException {
+    spec.commandLine().getErr().println(error.getMessage());
+    return writeEnvelope(
+        spec,
+        usageError(DiagnosticCode.COMMAND_IO_FAILED.code(), error.getMessage()),
+        CommandExitCode.INPUT_ERROR);
   }
 
   private static CommandEnvelope<JsonNode> usageError(String code, String message) {

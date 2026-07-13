@@ -26,6 +26,9 @@ public enum DiagnosticCode {
 
   // Command input (core: CoreCommands; cli: Main).
   COMMAND_INPUT_INVALID("DEDIREN_COMMAND_INPUT_INVALID"),
+  // Command-owned I/O failure (cli: Main), e.g. a build artifact write hitting an unwritable or
+  // colliding --out.
+  COMMAND_IO_FAILED("DEDIREN_COMMAND_IO_FAILED"),
   VALIDATE_PROFILE_REQUIRED("DEDIREN_VALIDATE_PROFILE_REQUIRED"),
   VALIDATE_PLUGIN_REQUIRED("DEDIREN_VALIDATE_PLUGIN_REQUIRED"),
 
