@@ -9,13 +9,12 @@ import dev.dediren.contracts.layout.LayoutResult;
 import dev.dediren.contracts.layout.Point;
 import dev.dediren.contracts.render.RenderMetadata;
 import dev.dediren.contracts.render.RenderPolicy;
-import dev.dediren.contracts.render.SvgBackgroundStyle;
 import dev.dediren.contracts.render.SvgEdgeLineStyle;
 import dev.dediren.contracts.render.SvgEdgeMarkerEnd;
-import dev.dediren.contracts.render.SvgEdgeStyle;
-import dev.dediren.contracts.render.SvgFontStyle;
-import dev.dediren.contracts.render.SvgNodeStyle;
-import dev.dediren.contracts.render.SvgStylePolicy;
+import dev.dediren.plugins.render.style.ResolvedEdgeStyle;
+import dev.dediren.plugins.render.style.ResolvedNodeStyle;
+import dev.dediren.plugins.render.style.ResolvedStyle;
+import dev.dediren.plugins.render.style.StyleResolver;
 import dev.dediren.plugins.render.svg.EdgeMarkers;
 import dev.dediren.plugins.render.svg.Svg;
 import dev.dediren.plugins.render.svg.SvgAccessibleName;
@@ -27,7 +26,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import tools.jackson.databind.JsonNode;
 
@@ -41,8 +39,9 @@ public final class UmlSequenceRenderer {
   private static final double FRAGMENT_HEADER_HEIGHT = 24.0;
 
   private final LayoutResult result;
+  private final RenderMetadata metadata;
   private final RenderPolicy policy;
-  private final SequenceStyle base;
+  private final ResolvedStyle base;
   private final UmlSequenceModel model;
   private final Map<String, LaidOutNode> nodesById;
   private final Map<String, LaidOutEdge> edgesById;
@@ -53,8 +52,9 @@ public final class UmlSequenceRenderer {
 
   public UmlSequenceRenderer(LayoutResult result, RenderMetadata metadata, RenderPolicy policy) {
     this.result = result;
+    this.metadata = metadata;
     this.policy = policy;
-    this.base = SequenceStyle.from(policy);
+    this.base = StyleResolver.sequenceBaseStyle(policy);
     this.model = UmlSequenceModel.from(result, metadata);
     this.nodesById = nodesById(result.nodes());
     this.edgesById = edgesById(result.edges());
@@ -118,15 +118,15 @@ public final class UmlSequenceRenderer {
   }
 
   // Emits a box shape's optional fill/stroke opacity and dash (line_style preset only), matching
-  // NodePaint's former boxAttrs() string. Called right after the shape's fixed attributes, while
+  // the former private NodePaint's boxAttrs() string. Called right after the shape's fixed
   // the element's start tag is still open.
-  private static void boxAttrs(SvgWriter w, NodePaint paint) {
+  private static void boxAttrs(SvgWriter w, ResolvedNodeStyle paint) {
     w.attrIf("fill-opacity", opacity(paint.fillOpacity()))
         .attrIf("stroke-opacity", opacity(paint.strokeOpacity()))
         .attrIf("stroke-dasharray", boxDash(paint));
   }
 
-  private static String boxDash(NodePaint paint) {
+  private static String boxDash(ResolvedNodeStyle paint) {
     String value = dashArrayValue(paint.lineStyle(), null, "6 4");
     return value.isEmpty() ? null : value;
   }
@@ -143,7 +143,7 @@ public final class UmlSequenceRenderer {
     for (UmlSequenceModel.SequenceNode interaction : model.interactions()) {
       LaidOutNode node = interaction.node();
       SequenceFrame frame = interactionFrame(interaction);
-      NodePaint paint = nodePaint(node.id(), interaction.selector().type());
+      ResolvedNodeStyle paint = nodePaint(node.id(), interaction.selector().type());
       double titleWidth =
           Math.max(
               96.0,
@@ -207,7 +207,7 @@ public final class UmlSequenceRenderer {
             .toList();
     for (UmlSequenceModel.SequenceCombinedFragment fragment : fragments) {
       SequenceFrame frame = combinedFragmentFrames.get(fragment.id());
-      NodePaint paint = nodePaint(fragment.id(), fragment.selector().type());
+      ResolvedNodeStyle paint = nodePaint(fragment.id(), fragment.selector().type());
       double tabWidth =
           Math.max(
               44.0,
@@ -262,7 +262,7 @@ public final class UmlSequenceRenderer {
   private void renderLifelineHeads(SvgWriter w) {
     for (UmlSequenceModel.SequenceNode lifeline : model.lifelines()) {
       LaidOutNode node = lifeline.node();
-      NodePaint paint = nodePaint(node.id(), lifeline.selector().type());
+      ResolvedNodeStyle paint = nodePaint(node.id(), lifeline.selector().type());
       w.start("g")
           .attr("data-dediren-node-id", node.id())
           .attr("data-dediren-node-type", "Lifeline")
@@ -294,7 +294,7 @@ public final class UmlSequenceRenderer {
   private void renderLifelineStems(SvgWriter w) {
     for (UmlSequenceModel.SequenceNode lifeline : model.lifelines()) {
       LaidOutNode node = lifeline.node();
-      NodePaint paint = nodePaint(node.id(), lifeline.selector().type());
+      ResolvedNodeStyle paint = nodePaint(node.id(), lifeline.selector().type());
       double x = node.x() + node.width() / 2.0;
       double bottom = stemBottom(lifeline);
       w.empty("line")
@@ -312,7 +312,7 @@ public final class UmlSequenceRenderer {
   private void renderExecutions(SvgWriter w) {
     for (UmlSequenceModel.SequenceNode execution : model.executions()) {
       LaidOutNode node = execution.node();
-      NodePaint paint = nodePaint(node.id(), execution.selector().type());
+      ResolvedNodeStyle paint = nodePaint(node.id(), execution.selector().type());
       w.start("g")
           .attr("data-dediren-node-id", node.id())
           .attr("data-dediren-node-type", "ExecutionSpecification");
@@ -335,7 +335,7 @@ public final class UmlSequenceRenderer {
   private void renderGates(SvgWriter w) {
     for (UmlSequenceModel.SequenceNode gate : model.gates()) {
       LaidOutNode node = gate.node();
-      NodePaint paint = nodePaint(node.id(), gate.selector().type());
+      ResolvedNodeStyle paint = nodePaint(node.id(), gate.selector().type());
       double radius = Math.max(4.0, Math.min(node.width(), node.height()) / 2.0);
       w.start("g").attr("data-dediren-node-id", node.id()).attr("data-dediren-node-type", "Gate");
       w.empty("circle")
@@ -354,7 +354,7 @@ public final class UmlSequenceRenderer {
 
   private void renderMessages(SvgWriter w) {
     for (UmlSequenceModel.SequenceMessage message : model.messages()) {
-      EdgePaint paint = edgePaint(message.edge().id(), message.selector().type());
+      ResolvedEdgeStyle paint = edgePaint(message.edge().id(), message.selector().type());
       MessageAppearance appearance = MessageAppearance.from(message.messageSort(), paint);
       w.start("g")
           .attr("data-dediren-edge-id", message.edge().id())
@@ -374,7 +374,7 @@ public final class UmlSequenceRenderer {
         continue;
       }
       MarkerPoint point = deleteMarkerPoint(message.edge());
-      EdgePaint paint = edgePaint(message.edge().id(), message.selector().type());
+      ResolvedEdgeStyle paint = edgePaint(message.edge().id(), message.selector().type());
       double size = point.size();
       w.start("g").attr("data-dediren-sequence-delete-marker", point.id());
       w.empty("line")
@@ -399,7 +399,7 @@ public final class UmlSequenceRenderer {
       SvgWriter w,
       UmlSequenceModel.SequenceCombinedFragment fragment,
       SequenceFrame frame,
-      NodePaint paint) {
+      ResolvedNodeStyle paint) {
     List<UmlSequenceModel.SequenceOperand> operands = operandsFor(fragment);
     Map<String, SvgBox> operandBoxes = new HashMap<>();
     Map<String, Double> separators = new HashMap<>();
@@ -842,23 +842,14 @@ public final class UmlSequenceRenderer {
     return box.includeRect(node.x(), node.y(), node.width(), node.height());
   }
 
-  private NodePaint nodePaint(String nodeId, String type) {
-    SvgStylePolicy style = policy.style();
-    NodePaint paint =
-        new NodePaint("#ffffff", "#000000", 1.25, 0.0, "#000000", null, null, null, null);
-    paint = paint.merge(style == null ? null : style.node());
-    paint = paint.merge(style == null ? null : style.nodeTypeOverrides().get(type));
-    paint = paint.merge(style == null ? null : style.nodeOverrides().get(nodeId));
-    return paint;
+  // The base already carries the policy-level node/edge overrides; StyleResolver layers the
+  // per-type and per-id overrides on top, in the same order the private merge chain used to.
+  private ResolvedNodeStyle nodePaint(String nodeId, String type) {
+    return StyleResolver.nodeStyle(policy, metadata, nodeId, base);
   }
 
-  private EdgePaint edgePaint(String edgeId, String type) {
-    SvgStylePolicy style = policy.style();
-    EdgePaint paint = new EdgePaint("#000000", 1.25, "#000000", null, null);
-    paint = paint.merge(style == null ? null : style.edge());
-    paint = paint.merge(style == null ? null : style.edgeTypeOverrides().get(type));
-    paint = paint.merge(style == null ? null : style.edgeOverrides().get(edgeId));
-    return paint;
+  private ResolvedEdgeStyle edgePaint(String edgeId, String type) {
+    return StyleResolver.edgeStyle(policy, metadata, edgeId, base);
   }
 
   private static Map<String, LaidOutNode> nodesById(List<LaidOutNode> nodes) {
@@ -911,71 +902,6 @@ public final class UmlSequenceRenderer {
     return Svg.estimateTextWidth(label, fontSize);
   }
 
-  private record SequenceStyle(String backgroundFill, String fontFamily, double fontSize) {
-    static SequenceStyle from(RenderPolicy policy) {
-      SvgStylePolicy style = policy.style();
-      return new SequenceStyle(
-          Optional.ofNullable(style)
-              .map(SvgStylePolicy::background)
-              .map(SvgBackgroundStyle::fill)
-              .orElse("#ffffff"),
-          Optional.ofNullable(style)
-              .map(SvgStylePolicy::font)
-              .map(SvgFontStyle::family)
-              .orElse("Inter, Arial, sans-serif"),
-          Optional.ofNullable(style)
-              .map(SvgStylePolicy::font)
-              .map(SvgFontStyle::size)
-              .orElse(14.0));
-    }
-  }
-
-  private record NodePaint(
-      String fill,
-      String stroke,
-      double strokeWidth,
-      double rx,
-      String labelFill,
-      Double fillOpacity,
-      Double strokeOpacity,
-      SvgEdgeLineStyle lineStyle,
-      Double labelOpacity) {
-    NodePaint merge(SvgNodeStyle override) {
-      if (override == null) {
-        return this;
-      }
-      return new NodePaint(
-          override.fill() == null ? fill : override.fill(),
-          override.stroke() == null ? stroke : override.stroke(),
-          override.strokeWidth() == null ? strokeWidth : override.strokeWidth(),
-          override.rx() == null ? rx : override.rx(),
-          override.labelFill() == null ? labelFill : override.labelFill(),
-          override.fillOpacity() == null ? fillOpacity : override.fillOpacity(),
-          override.strokeOpacity() == null ? strokeOpacity : override.strokeOpacity(),
-          override.lineStyle() == null ? lineStyle : override.lineStyle(),
-          override.labelOpacity() == null ? labelOpacity : override.labelOpacity());
-    }
-  }
-
-  private record EdgePaint(
-      String stroke,
-      double strokeWidth,
-      String labelFill,
-      Double strokeOpacity,
-      Double labelOpacity) {
-    EdgePaint merge(SvgEdgeStyle override) {
-      if (override == null) {
-        return this;
-      }
-      return new EdgePaint(
-          override.stroke() == null ? stroke : override.stroke(),
-          override.strokeWidth() == null ? strokeWidth : override.strokeWidth(),
-          override.labelFill() == null ? labelFill : override.labelFill(),
-          override.strokeOpacity() == null ? strokeOpacity : override.strokeOpacity(),
-          override.labelOpacity() == null ? labelOpacity : override.labelOpacity());
-    }
-  }
-
   private record MessageAppearance(
       String stroke,
       double strokeWidth,
@@ -984,7 +910,7 @@ public final class UmlSequenceRenderer {
       SvgEdgeMarkerEnd markerEnd,
       Double strokeOpacity,
       Double labelOpacity) {
-    static MessageAppearance from(String messageSort, EdgePaint paint) {
+    static MessageAppearance from(String messageSort, ResolvedEdgeStyle paint) {
       SvgEdgeLineStyle lineStyle =
           "reply".equals(messageSort) ? SvgEdgeLineStyle.DASHED : SvgEdgeLineStyle.SOLID;
       SvgEdgeMarkerEnd markerEnd =
