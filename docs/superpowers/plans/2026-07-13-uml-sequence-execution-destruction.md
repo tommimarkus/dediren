@@ -16,7 +16,7 @@
   - `ExecutionSpecification`: `uml.covered` = the lifeline id it sits on; `uml.start` / `uml.finish` = message ids bounding the bar.
   - `DestructionOccurrenceSpecification`: `uml.covered` = the lifeline id it terminates. Its row = the row of the message that TARGETS it. Orphan (no message targets it) → anchored one `MESSAGE_Y_STEP` below the last message row.
 - **The new neutral IR variant (exact):** `record StemSpan(String nodeId, String bandMemberId, String fromMemberId, String toMemberId) implements LayoutIntent`. Wire: kind `"stem-span"`, subjects `[nodeId, bandMemberId, fromMemberId, toMemberId]`. `elk-layout` and `ir` must remain notation-free — no `ExecutionSpecification`/`uml.*` string may appear in either.
-- **NOTHING IS WEAKENED to get green.** The hard-error lane (`LayoutQuality.validateLayoutDiagnostics`, incl. `pointOnNodePerimeter`) is UNTOUCHED. That is precisely why a delete-message must terminate on the destruction's **left edge** (`x = destruction.x`), not its centre.
+- **NOTHING IS WEAKENED to get green.** The hard-error lane (`LayoutQuality.validateLayoutDiagnostics`, incl. `pointOnNodePerimeter`) is UNTOUCHED. That is precisely why a delete-message must terminate on an **edge** of the destruction, not its centre. **Corrected after the Task 3 review:** it must be the **NEAR** edge, chosen by relative column order — `endX = sourceIndex > targetIndex ? target.x() + target.width() : target.x()`. An unconditional left edge is a silent visual defect when the source lifeline is declared to the RIGHT of the destroyed one (the arrow crosses the whole ✕ and the arrowhead is drawn past the glyph pointing away — the mirror of the D′ arrowhead defect this repo already fixed once). Both edges satisfy `pointOnNodePerimeter`, so the near edge honours the "unweakened" constraint equally.
 - **The one legitimate extension:** `LayoutQuality.isSequenceContainer` (`core/.../LayoutQuality.java:363`) currently returns `"interaction".equals(node.role())` and its own comment says the frame "legitimately encloses its lifelines, **executions**, and messages". Extend it to also exempt `"execution"` and `"destruction"` from the soft overlap / connector-through-node COUNTS (same for the property test's `assertNoNodeRectsOverlap`). Without this, correct UML geometry (a bar sitting on the stem a message lands on) is reported as a defect. This extends an existing documented exemption — it is not a loosening invented for this change.
 - **BYTE-STABILITY GUARD:** no existing fixture contains any of these node types, so **every current `fixtures/layout-result/*.json` must stay byte-identical**. A diff there means the change leaked into ordinary sequence geometry — debug it, do NOT re-baseline.
 - **Maven under the sandbox:** run every `./mvnw` with the Bash tool's sandbox DISABLED (`dangerouslyDisableSandbox: true`) — tests fail under the sandbox on read-only `/tmp` (`@TempDir`) and the fuzz test's self-attach. Environment failures, not code failures.
@@ -251,7 +251,43 @@ git commit -m "fix(core): exempt execution/destruction sequence chrome from the 
 
 ---
 
-### Task 5: Fixture + end-to-end build test (the acceptance oracle)
+### Task 5: `uml` — validate occurrence properties (close the remaining exit-2 path)
+
+**Added after the Task 3 review**, which found that the exit-2 bug this slice exists to kill is **still reachable**: nothing validates `uml.covered`. The UML validator has no rules for `ExecutionSpecification` / `DestructionOccurrenceSpecification` properties at all — so a model that omits `uml.covered` on a destruction (or points it at a non-selected / non-Lifeline node) passes `validate --profile uml`, produces no `StemSpan`, falls through to ELK's raw route, and **hard-fails `build` with exit 2 and an obscure geometry diagnostic**. A clear semantic diagnostic at validation time beats an obscure geometry one at layout time.
+
+**Files:**
+- Modify: `uml/src/main/java/dev/dediren/uml/Uml.java` (sequence validation)
+- Test: `uml/src/test/java/dev/dediren/uml/UmlValidationTest.java`
+
+**Interfaces:** none new — this tightens validation only.
+
+**Rules to add (UML_SEQUENCE views only):**
+1. An `ExecutionSpecification` MUST carry `uml.covered` resolving to a `Lifeline` **selected in the same view**, and `uml.start` / `uml.finish` each resolving to a `Message` **selected in the same view**.
+2. A `DestructionOccurrenceSpecification` MUST carry `uml.covered` resolving to a selected `Lifeline`.
+3. **At most one** `Message` may target a given `DestructionOccurrenceSpecification` (a second delete-message would route to a row outside the ✕'s box and fail the perimeter check).
+
+Each violation throws the module's existing UML validation exception with a clear message naming the offending node id and the offending property — follow the idiom of the neighbouring sequence rules in `Uml.java` (e.g. the CombinedFragment/operand rules) exactly; reuse their diagnostic code and exit code. **Do not invent a new `DEDIREN_*` code** (that would churn `AgentUsageDocConsistencyTest`).
+
+**This is a deliberate tightening.** Models it now rejects were already broken — they hard-failed at layout with exit 2. Rejecting them at `validate` with a clear message is strictly better. Note it in the spec's non-goals/limitations if you touch that area.
+
+- [ ] **Step 1: Write the failing tests.** In `UmlValidationTest`, add cases (mirroring the existing sequence-validation test idiom): an ExecutionSpecification missing `uml.covered`; one whose `covered` names a non-Lifeline; one whose `start` names an unselected message; a DestructionOccurrenceSpecification missing `uml.covered`; and two Messages targeting the same destruction. Each must throw with a message naming the node and the property. Also add a POSITIVE case: a well-formed lifecycle model still validates `ok` (guards against over-tightening).
+
+- [ ] **Step 2: Run, confirm RED.** `./mvnw -pl uml -am test -Dtest=UmlValidationTest -Dsurefire.failIfNoSpecifiedTests=false`
+
+- [ ] **Step 3: Implement** the three rules.
+
+- [ ] **Step 4: Run to GREEN.** `./mvnw -pl uml,semantics-uml,cli -am test` → PASS. **Every existing fixture must still validate** — no current source fixture has these node types, so none may start failing.
+
+- [ ] **Step 5: Format + commit.**
+```bash
+./mvnw -Pquality spotless:apply
+git add uml/src/main/java/dev/dediren/uml/Uml.java uml/src/test/java/dev/dediren/uml/UmlValidationTest.java
+git commit -m "fix(uml): require covered/start/finish on sequence occurrences (was: obscure exit-2 at layout)"
+```
+
+---
+
+### Task 6: Fixture + end-to-end build test (the acceptance oracle)
 
 **Files:**
 - Create: `fixtures/source/valid-uml-sequence-lifecycle.json`
@@ -291,7 +327,7 @@ git commit -m "test(cli): execution/destruction sequence source builds end to en
 
 ---
 
-### Task 6: Render assertion — the bar and the ✕ are drawn on the stem
+### Task 7: Render assertion — the bar and the ✕ are drawn on the stem
 
 **Files:**
 - Test: `engines/render/src/test/java/dev/dediren/plugins/render/` (add to / mirror the existing UML-sequence render tests — e.g. `SequenceSelfMessageHookTest` is a good model)
@@ -314,7 +350,7 @@ git commit -m "test(render): execution bar and destruction marker render on the 
 
 ---
 
-### Task 7: Property-test coverage (close the hole for real)
+### Task 8: Property-test coverage (close the hole for real)
 
 **Files:**
 - Modify: `cli/src/test/java/dev/dediren/cli/SequenceLayoutPropertyTest.java`
@@ -337,7 +373,7 @@ git commit -m "test(cli): property test covers execution specs, destructions, an
 
 ---
 
-### Task 8: Full gate + audits
+### Task 9: Full gate + audits
 
 **Files:** none (verification only; fold any SpotBugs suppression surfaced here into its own small commit, recorded in `docs/architecture-guidelines.md §12`).
 
