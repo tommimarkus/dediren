@@ -44,6 +44,27 @@ class LayoutIntentNormalizerTest {
   }
 
   @Test
+  void trustsElkColumnsWhenLifelinesExactlyTouch() {
+    // a occupies x=[0,140), b starts exactly at x=140: a.x + a.width == b.x, the touching boundary
+    // that LayoutIntentNormalizer#columnsAreNonOverlapping treats as non-overlapping ("Touching
+    // edges are allowed"). Unlike rebuildsColumnsWhenElkPacksLifelinesCloserThanTheirWidth above,
+    // normalize() must trust ELK's columns here and leave both lifelines at their input x.
+    LayoutResult result = exactlyTouchingTwoLifelineResult();
+    List<LayoutIntent> intents =
+        List.of(
+            new OrderedBand(Axis.X, List.of(new BandMember("a", 0.0), new BandMember("b", 0.0))),
+            new OrderedBand(Axis.Y, List.of(new BandMember("m1", 0.0))));
+
+    LayoutResult normalized =
+        LayoutIntentNormalizer.from(intents, Map.of(), Map.of()).normalize(result);
+
+    LaidOutNode a = node(normalized, "a");
+    LaidOutNode b = node(normalized, "b");
+    assertThat(a.x()).as("ELK's column trusted: a keeps its input x").isEqualTo(0.0);
+    assertThat(b.x()).as("ELK's column trusted: b keeps its input x").isEqualTo(140.0);
+  }
+
+  @Test
   void straightensCrossLifelineMessageToStemCenters() {
     // mirror ElkLayoutEngineTest.normalizesSequenceMessagesToCleanHorizontalSegments:
     // lifelines at x=100 and x=520, width 140 -> stem centers 170 and 590
@@ -79,6 +100,29 @@ class LayoutIntentNormalizerTest {
                 "m1",
                 List.of(),
                 List.of(new Point(82, 60), new Point(171, 60)),
+                "m1")),
+        List.of(),
+        List.of());
+  }
+
+  private static LayoutResult exactlyTouchingTwoLifelineResult() {
+    // a's box occupies x=[0,140); b starts exactly at x=140, so a.x + a.width == b.x -- the
+    // touching (not overlapping) boundary distinct from overlappingTwoLifelineResult() above.
+    return new LayoutResult(
+        "layout-result.schema.v2",
+        "seq",
+        List.of(
+            new LaidOutNode("a", "a", "a", 0, 0, 140, 40, "A", "lifeline"),
+            new LaidOutNode("b", "b", "b", 140, 0, 140, 40, "B", "lifeline")),
+        List.of(
+            new LaidOutEdge(
+                "m1",
+                "a",
+                "b",
+                "m1",
+                "m1",
+                List.of(),
+                List.of(new Point(70, 60), new Point(210, 60)),
                 "m1")),
         List.of(),
         List.of());

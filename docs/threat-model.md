@@ -25,6 +25,16 @@ failure contract: `JsonSupportFuzzTest` (`contracts`) and
 `JacksonException` / `XmiValidationException` may escape parsing, running in
 deterministic regression mode over checked-in seed corpora in CI.
 
+Plan B P5 added a post-parse validation layer on top of that Jackson
+contract: `ir.LayoutIntentCodec.decode` rejects an unrecognized
+layout-constraint `kind` (or a malformed gap encoding) on the
+`layout-request` wire fail-closed, surfacing as the clean
+`DEDIREN_ELK_INPUT_INVALID_JSON` / exit-3 error envelope in place of the
+former fail-open silent-ignore in the deleted `SequenceLayoutConstraints`;
+and `validate-layout`/`build` now run `ir.quality.SequenceInvariants` against
+an agent-suppliable `LayoutResult`, folding any violation into the hard-error
+lane as `DEDIREN_LAYOUT_SEQUENCE_INVARIANT_VIOLATED`.
+
 ### Single-JVM engine runtime (no plugin execution surface)
 
 The runtime is a single JVM with no plugin discovery or execution surface:

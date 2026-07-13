@@ -39,4 +39,47 @@ class LayoutIntentCodecTest {
                 LayoutIntentCodec.decode(List.of(new LayoutConstraint("x", "mystery", List.of()))))
         .isInstanceOf(IllegalArgumentException.class);
   }
+
+  @Test
+  void roundTripsAnEmptyOrderedBand() {
+    // The reachable "sequence view with lifelines but zero messages" shape: LayoutIntentNormalizer
+    // treats an OrderedBand(Axis.Y, []) as present-but-inactive, so the codec must still round-trip
+    // it faithfully rather than dropping or normalizing it away.
+    List<LayoutIntent> intents = List.of(new OrderedBand(Axis.Y, List.of()));
+
+    List<LayoutConstraint> wire = LayoutIntentCodec.encode("sequence-view", intents);
+
+    assertThat(LayoutIntentCodec.decode(wire)).isEqualTo(intents);
+  }
+
+  @Test
+  void decodeRejectsAnUnknownAxisTag() {
+    assertThatThrownBy(
+            () ->
+                LayoutIntentCodec.decode(
+                    List.of(
+                        new LayoutConstraint(
+                            "sequence-view.ordered-band.z", "ordered-band:z", List.of()))))
+        .isInstanceOf(IllegalArgumentException.class);
+  }
+
+  @Test
+  void decodeRejectsAMalformedGapValue() {
+    assertThatThrownBy(
+            () ->
+                LayoutIntentCodec.decode(
+                    List.of(
+                        new LayoutConstraint(
+                            "sequence-view.ordered-band.y",
+                            "ordered-band:y",
+                            List.of("m1@notanumber")))))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(
+            () ->
+                LayoutIntentCodec.decode(
+                    List.of(
+                        new LayoutConstraint(
+                            "sequence-view.ordered-band.y", "ordered-band:y", List.of("m1@")))))
+        .isInstanceOf(IllegalArgumentException.class);
+  }
 }

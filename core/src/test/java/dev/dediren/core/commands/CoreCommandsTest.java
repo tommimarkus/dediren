@@ -167,6 +167,57 @@ class CoreCommandsTest {
     assertThat(diagnostic.sourcePointer()).isEqualTo("/edges/0");
   }
 
+  @Test
+  void validateLayoutRejectsALifelineOutsideTheInteractionFrame() {
+    // Negative case (Plan B P5 audit fix): an "interaction" role node (the frame) whose bbox does
+    // NOT enclose one of the "lifeline" nodes. No message edges at all, so this isolates
+    // SequenceInvariants#interactionFrameEnclosesLifelines from the other two invariants. The
+    // violating element is the LIFELINE NODE (not an edge), so this is also the only test that
+    // exercises CoreCommands#elementPath's node-id branch ($.nodes[N]) -- every other invariant
+    // test in this file violates on an edge, giving that branch no coverage.
+    var frame =
+        new LaidOutNode("frame", "frame", "frame", 0.0, 0.0, 300.0, 300.0, "frame", "interaction");
+    var customer = lifeline("customer", 50.0, 50.0); // box [50,190]x[50,98]: inside the frame
+    var service = lifeline("service", 1000.0, 1000.0); // box [1000,1140]x[1000,1048]: outside it
+    LayoutResult result = layoutResult(List.of(frame, customer, service), List.of());
+
+    ValidationResult validation = CoreCommands.validateLayout(result);
+
+    assertThat(validation.exitCode()).isEqualTo(2);
+    assertThat(validation.envelope().status()).isEqualTo(EnvelopeStatus.ERROR);
+    assertThat(validation.envelope().diagnostics())
+        .extracting(Diagnostic::code)
+        .containsExactly("DEDIREN_LAYOUT_SEQUENCE_INVARIANT_VIOLATED");
+    Diagnostic diagnostic = validation.envelope().diagnostics().get(0);
+    assertThat(diagnostic.message())
+        .contains("interaction_frame_encloses_lifelines")
+        .contains("service");
+    assertThat(diagnostic.path()).isEqualTo("$.nodes[2]");
+  }
+
+  @Test
+  void validateLayoutRejectsMessagesWhoseYIsNotStrictlyIncreasing() {
+    // Negative case (Plan B P5 audit fix): two messages, each with axis-compliant endpoints, whose
+    // representative y-values are non-increasing in scene order (220 then 180), so this isolates
+    // SequenceInvariants#messageYStrictlyIncreasing from the axis and frame invariants.
+    var customer = lifeline("customer", 100.0, 100.0); // center-x = 170
+    var service = lifeline("service", 520.0, 104.0); // center-x = 590
+    var m1 = message("m1", "customer", "service", 170.0, 220.0, 590.0, 220.0);
+    var m2 = message("m2", "service", "customer", 590.0, 180.0, 170.0, 180.0); // y decreases
+    LayoutResult result = layoutResult(List.of(customer, service), List.of(m1, m2));
+
+    ValidationResult validation = CoreCommands.validateLayout(result);
+
+    assertThat(validation.exitCode()).isEqualTo(2);
+    assertThat(validation.envelope().status()).isEqualTo(EnvelopeStatus.ERROR);
+    assertThat(validation.envelope().diagnostics())
+        .extracting(Diagnostic::code)
+        .containsExactly("DEDIREN_LAYOUT_SEQUENCE_INVARIANT_VIOLATED");
+    Diagnostic diagnostic = validation.envelope().diagnostics().get(0);
+    assertThat(diagnostic.message()).contains("message_y_strictly_increasing").contains("m2");
+    assertThat(diagnostic.path()).isEqualTo("$.edges[1]");
+  }
+
   private static LaidOutNode lifeline(String id, double x, double y) {
     return new LaidOutNode(id, id, id, x, y, 140.0, 48.0, id, "lifeline");
   }
