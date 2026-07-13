@@ -75,10 +75,12 @@ public final class SvgWriter {
   }
 
   /**
-   * Injects a pre-built, already-correctly-escaped fragment (an as-yet-unmigrated helper's string
-   * output). Transitional scaffold only: forces the pending start tag closed, then writes the
-   * fragment verbatim to the underlying buffer. Removed as each helper is converted to emit through
-   * this writer directly.
+   * Writes a pre-formed, already-correctly-escaped fragment verbatim (forcing the pending start tag
+   * closed first). For content that is already in final XML form and must not be re-escaped by the
+   * writer — notably the ArchiMate/UML guillemet stereotypes emitted as numeric character
+   * references ({@code &#171;…&#187;}) and labels the caller has pre-escaped. Not a general emit
+   * path: element/attribute/text output goes through the typed methods above so escaping stays a
+   * structural guarantee.
    */
   public SvgWriter raw(String fragment) {
     run(
