@@ -289,7 +289,7 @@ public final class SvgDocument {
       return;
     }
     if (decorator != null && isUmlDecorator(decorator)) {
-      w.raw(umlNodeShape(node, style, decorator, selector));
+      umlNodeShape(w, node, style, decorator, selector);
       return;
     }
     if (decorator == null && style.shape() != null) {
