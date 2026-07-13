@@ -111,6 +111,28 @@
     </Or>
   </Match>
 
+  <!-- EI_EXPOSE_REP / EI_EXPOSE_REP2: ir.LayoutIntent's two record variants
+       (OrderedBand, AlignmentAxis; Plan B P5 Task 1) follow the identical
+       construction discipline as the contracts.* / ir.* / semantics-uml
+       records above: each wraps its List<BandMember>/List<String> component
+       via ContractCollections.listOrEmpty(...) (List.copyOf) in a compact
+       constructor, so the shared reference is genuinely immutable.
+       ir.BandMember (String id, double leadingGap) holds no List/Map
+       component and SpotBugs does not flag it, so it is intentionally not
+       listed here. Suppressed rather than defensive-copied for consistency
+       with the contracts/ir/semantics-uml records. Tracked in
+       architecture-guidelines.md §12. -->
+  <Match>
+    <Or>
+      <Class name="dev.dediren.ir.LayoutIntent$OrderedBand"/>
+      <Class name="dev.dediren.ir.LayoutIntent$AlignmentAxis"/>
+    </Or>
+    <Or>
+      <Bug pattern="EI_EXPOSE_REP"/>
+      <Bug pattern="EI_EXPOSE_REP2"/>
+    </Or>
+  </Match>
+
   <!-- MS_EXPOSE_REP: JsonSupport.objectMapper() intentionally returns the
        shared ObjectMapper singleton. It is mutable in place (.configure(),
        .registerModule()) and exposed by design (one canonical mapper). The
