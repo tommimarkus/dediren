@@ -72,7 +72,7 @@ public final class SvgDocument {
                 bounds.minY(),
                 bounds.width(),
                 bounds.height()));
-    w.raw(SvgAccessibleName.markup(policy, result.viewId()));
+    SvgAccessibleName.markup(w, policy, result.viewId());
     w.empty("rect")
         .attr("x", f1(bounds.minX()))
         .attr("y", f1(bounds.minY()))

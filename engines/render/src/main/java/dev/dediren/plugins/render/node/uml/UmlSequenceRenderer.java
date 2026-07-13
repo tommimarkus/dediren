@@ -17,6 +17,7 @@ import dev.dediren.contracts.render.SvgFontStyle;
 import dev.dediren.contracts.render.SvgNodeStyle;
 import dev.dediren.contracts.render.SvgStylePolicy;
 import dev.dediren.plugins.render.svg.SvgAccessibleName;
+import dev.dediren.plugins.render.svg.SvgWriter;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -74,33 +75,33 @@ public final class UmlSequenceRenderer {
 
   public String render() {
     SvgBox bounds = bounds().padded(policy);
-    StringBuilder svg = new StringBuilder();
-    svg.append(
-        String.format(
-            Locale.ROOT,
-            "<svg xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" width=\"%.0f\" height=\"%.0f\" viewBox=\"%.1f %.1f %.1f %.1f\">",
-            bounds.width(),
-            bounds.height(),
-            bounds.minX(),
-            bounds.minY(),
-            bounds.width(),
-            bounds.height()));
-    svg.append(SvgAccessibleName.markup(policy, result.viewId()));
-    svg.append(
-        String.format(
-            Locale.ROOT,
-            "<rect x=\"%.1f\" y=\"%.1f\" width=\"%.1f\" height=\"%.1f\" fill=\"%s\"/>",
-            bounds.minX(),
-            bounds.minY(),
-            bounds.width(),
-            bounds.height(),
-            attr(base.backgroundFill())));
-    svg.append("<g font-family=\"")
-        .append(attr(base.fontFamily()))
-        .append("\" font-size=\"")
-        .append(styleNumber(base.fontSize()))
-        .append("\">");
+    SvgWriter w = new SvgWriter();
+    w.start("svg")
+        .attr("xmlns", "http://www.w3.org/2000/svg")
+        .attr("role", "img")
+        .attr("width", String.format(Locale.ROOT, "%.0f", bounds.width()))
+        .attr("height", String.format(Locale.ROOT, "%.0f", bounds.height()))
+        .attr(
+            "viewBox",
+            String.format(
+                Locale.ROOT,
+                "%.1f %.1f %.1f %.1f",
+                bounds.minX(),
+                bounds.minY(),
+                bounds.width(),
+                bounds.height()));
+    SvgAccessibleName.markup(w, policy, result.viewId());
+    w.empty("rect")
+        .attr("x", String.format(Locale.ROOT, "%.1f", bounds.minX()))
+        .attr("y", String.format(Locale.ROOT, "%.1f", bounds.minY()))
+        .attr("width", String.format(Locale.ROOT, "%.1f", bounds.width()))
+        .attr("height", String.format(Locale.ROOT, "%.1f", bounds.height()))
+        .attr("fill", base.backgroundFill());
+    w.start("g")
+        .attr("font-family", base.fontFamily())
+        .attr("font-size", styleNumber(base.fontSize()));
 
+    StringBuilder svg = new StringBuilder();
     renderInteractions(svg);
     renderCombinedFragments(svg);
     renderLifelineHeads(svg);
@@ -109,9 +110,11 @@ public final class UmlSequenceRenderer {
     renderGates(svg);
     renderMessages(svg);
     renderDeleteMarkers(svg);
+    w.raw(svg.toString());
 
-    svg.append("</g></svg>\n");
-    return svg.toString();
+    w.end();
+    w.end();
+    return w.finish() + "\n";
   }
 
   private void renderInteractions(StringBuilder svg) {

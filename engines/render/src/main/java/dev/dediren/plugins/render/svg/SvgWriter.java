@@ -24,15 +24,15 @@ import javax.xml.stream.XMLStreamWriter;
  */
 public final class SvgWriter {
 
-  // Public across the render engine's packages so per-notation leaf builders (node/edge shape,
-  // label, decorator, icon emitters) emit into the shared document writer. The constructor stays
-  // package-private: only the svg package assembles a document.
+  // Public across the render engine's packages so document assemblers (SvgDocument and the
+  // sequence renderer) can create one and per-notation leaf builders (node/edge shape, label,
+  // decorator, icon emitters) can emit into the shared writer.
   private static final XMLOutputFactory FACTORY = XMLOutputFactory.newInstance();
 
   private final StringWriter out = new StringWriter();
   private final XMLStreamWriter writer;
 
-  SvgWriter() {
+  public SvgWriter() {
     writer = run(() -> FACTORY.createXMLStreamWriter(out));
   }
 

@@ -17,19 +17,17 @@ public final class SvgAccessibleName {
 
   private static final String DEFAULT_TITLE = "Diagram";
 
-  public static String markup(RenderPolicy policy, String viewId) {
+  public static void markup(SvgWriter w, RenderPolicy policy, String viewId) {
     SvgAccessibility accessibility = policy == null ? null : policy.accessibility();
     String title = firstNonBlank(accessibility == null ? null : accessibility.title(), viewId);
     if (title == null) {
       title = DEFAULT_TITLE;
     }
     String description = accessibility == null ? null : accessibility.description();
-    StringBuilder markup = new StringBuilder();
-    markup.append("<title>").append(Svg.text(title)).append("</title>");
+    w.start("title").text(title).end();
     if (description != null && !description.isBlank()) {
-      markup.append("<desc>").append(Svg.text(description)).append("</desc>");
+      w.start("desc").text(description).end();
     }
-    return markup.toString();
   }
 
   private static String firstNonBlank(String preferred, String fallback) {
