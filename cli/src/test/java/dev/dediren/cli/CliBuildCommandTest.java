@@ -138,6 +138,42 @@ class CliBuildCommandTest {
   }
 
   @Test
+  void buildsASequenceViewContainingASelfMessage() throws Exception {
+    // Regression: a self-call (source lifeline == target lifeline) is legal UML but used to fail
+    // layout validation with ROUTE_ENDPOINT_OFF_NODE_PERIMETER + the lifeline-axis invariant,
+    // because the normalizer left self-messages on ELK's raw route.
+    Path root = workspaceRoot();
+    Path source = root.resolve("fixtures/source/valid-uml-sequence-self-message.json");
+    Path renderPolicy = root.resolve("fixtures/render-policy/uml-svg.json");
+    Path out = temp.resolve("self-message-out");
+
+    CliResult result =
+        Main.executeForTesting(
+            new String[] {
+              "build",
+              "--input",
+              source.toString(),
+              "--out",
+              out.toString(),
+              "--views",
+              "sequence-view",
+              "--render-policy",
+              renderPolicy.toString()
+            },
+            "");
+
+    assertThat(result.exitCode()).describedAs(result.stdout()).isZero();
+    JsonNode buildResult = assertBuildResultSchemaValid(result.stdout());
+    assertThat(buildResult.at("/status").asText()).isEqualTo("ok");
+    assertThat(buildResult.at("/diagnostics")).isEmpty();
+    assertThat(buildResult.at("/views/0/status").asText()).isEqualTo("ok");
+    assertThat(buildResult.at("/views/0/diagnostics")).isEmpty();
+    assertThat(buildResult.at("/views/0/artifacts/0/path").asText())
+        .isEqualTo("sequence-view/diagram.svg");
+    assertThat(Files.exists(out.resolve("sequence-view/diagram.svg"))).isTrue();
+  }
+
+  @Test
   void oefLaneWritesArchimateArtifactWithOfflineSchemaEnv() throws Exception {
     Path root = workspaceRoot();
     Path out = temp.resolve("oef-out");

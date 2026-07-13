@@ -75,6 +75,10 @@ class LayoutFixtureRegenerator {
           new FixtureMapping(
               "uml-sequence-basic.json", "valid-uml-sequence-basic.json", "sequence-view"),
           new FixtureMapping(
+              "uml-sequence-self-message.json",
+              "valid-uml-sequence-self-message.json",
+              "sequence-view"),
+          new FixtureMapping(
               "uml-sequence-fragments.json",
               "valid-uml-sequence-fragments.json",
               "sequence-fragments-view"),
