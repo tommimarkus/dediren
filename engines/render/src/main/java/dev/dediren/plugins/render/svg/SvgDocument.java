@@ -335,7 +335,7 @@ public final class SvgDocument {
       umlNodeDecorator(w, node, style, decorator, selector);
       return;
     }
-    w.raw(archimateNodeDecorator(node, style, decorator));
+    archimateNodeDecorator(w, node, style, decorator);
   }
 
   private static String f1(double value) {
