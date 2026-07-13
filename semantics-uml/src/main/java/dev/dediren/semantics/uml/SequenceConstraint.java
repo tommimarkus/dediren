@@ -5,11 +5,13 @@ import static dev.dediren.contracts.util.ContractCollections.listOrEmpty;
 import java.util.List;
 
 /**
- * Typed form of the four {@code uml.sequence.*} layout constraints produced by {@link
+ * Typed form of the {@code uml.sequence.*} layout constraints produced by {@link
  * UmlSequenceConstraints#sequenceConstraints}: lifeline order, message order (by the declared
- * {@code uml.sequence} value, then source declaration order), and the first-message anchor for each
+ * {@code uml.sequence} value, then source declaration order), the first-message anchor for each
  * combined fragment's opening operand ({@link FragmentOpen}) versus every subsequent operand
- * ({@link OperandOpen}). {@link UmlSequenceConstraints#lower} maps these to the neutral {@code
+ * ({@link OperandOpen}), and the two occurrence-specification variants ({@link ExecutionSpan},
+ * {@link DestructionAnchor}) that place an activation bar or a destruction mark on its covered
+ * lifeline. {@link UmlSequenceConstraints#lower} maps these to the neutral {@code
  * dev.dediren.ir.LayoutIntent} vocabulary that {@code elk-layout} consumes from Plan B P5 onward;
  * the stringly {@code uml.sequence.*} {@code LayoutConstraint} wire form produced by {@link
  * UmlSequenceConstraints#of} is unaffected and remains the live producer until the Task 5 cutover.
@@ -18,7 +20,9 @@ public sealed interface SequenceConstraint
     permits SequenceConstraint.LifelineOrder,
         SequenceConstraint.MessageOrder,
         SequenceConstraint.FragmentOpen,
-        SequenceConstraint.OperandOpen {
+        SequenceConstraint.OperandOpen,
+        SequenceConstraint.ExecutionSpan,
+        SequenceConstraint.DestructionAnchor {
 
   /** Lifeline participants in column order. */
   record LifelineOrder(List<String> lifelineIds) implements SequenceConstraint {
@@ -53,4 +57,22 @@ public sealed interface SequenceConstraint
       messageIds = listOrEmpty(messageIds);
     }
   }
+
+  /**
+   * An activation bar: {@code executionId} sits on {@code coveredLifelineId}'s stem, spanning from
+   * {@code startMessageId}'s row to {@code finishMessageId}'s row.
+   */
+  record ExecutionSpan(
+      String executionId, String coveredLifelineId, String startMessageId, String finishMessageId)
+      implements SequenceConstraint {}
+
+  /**
+   * A destruction mark (the {@code X}): {@code destructionId} sits on {@code coveredLifelineId}'s
+   * stem, at the row of {@code anchorMessageId} — the selected delete-message whose target is this
+   * node. {@code anchorMessageId} is {@code null} for the orphan case (no message targets this
+   * destruction); {@link UmlSequenceConstraints#lower} places the orphan below the last row rather
+   * than at the layout origin.
+   */
+  record DestructionAnchor(String destructionId, String coveredLifelineId, String anchorMessageId)
+      implements SequenceConstraint {}
 }

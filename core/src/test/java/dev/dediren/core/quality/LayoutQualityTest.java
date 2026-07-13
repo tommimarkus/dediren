@@ -362,6 +362,88 @@ class LayoutQualityTest {
   }
 
   @Test
+  void executionBarOnLifelineStemIsNotCountedAsOverlapOrConnectorThrough() {
+    var customer = lifelineNode("customer", 100.0, 100.0, 140.0, 48.0);
+    var service = lifelineNode("service", 520.0, 100.0, 140.0, 48.0);
+    // The activation bar legitimately sits ON the service lifeline's stem (centerX 590):
+    // its rectangle overlaps the lifeline head box, and the message that activates it
+    // terminates by passing through its rectangle -- exactly the geometry layout now produces
+    // once ExecutionSpecification bars are placed on the stem (correct UML, not a defect).
+    var exec = new LaidOutNode("exec", "exec", "exec", 584.0, 124.0, 12.0, 200.0, "", "execution");
+    var nodes = List.of(customer, service, exec);
+    var edges =
+        List.of(
+            edge(
+                "m1",
+                "customer",
+                "service",
+                List.of(new Point(170.0, 150.0), new Point(590.0, 200.0))));
+
+    LayoutQualityReport report =
+        LayoutQuality.validateLayout(layoutResult(nodes, edges, List.of()));
+
+    assertThat(report.overlapCount()).isEqualTo(0);
+    assertThat(report.connectorThroughNodeCount()).isEqualTo(0);
+    assertThat(report.status()).isEqualTo("ok");
+  }
+
+  @Test
+  void destructionMarkerOnLifelineStemIsNotCountedAsOverlapOrConnectorThrough() {
+    var customer = lifelineNode("customer", 100.0, 100.0, 140.0, 48.0);
+    var service = lifelineNode("service", 520.0, 100.0, 140.0, 48.0);
+    // The destruction marker legitimately sits ON the customer lifeline's stem (centerX 170),
+    // overlapping the head box, and the destroying message terminates by passing through its
+    // rectangle -- the same "chrome sits on the stem" geometry as an activation bar.
+    var destroy =
+        new LaidOutNode(
+            "destroy", "destroy", "destroy", 164.0, 124.0, 12.0, 24.0, "", "destruction");
+    var nodes = List.of(customer, service, destroy);
+    var edges =
+        List.of(
+            edge(
+                "m2",
+                "service",
+                "customer",
+                List.of(new Point(590.0, 150.0), new Point(170.0, 140.0))));
+
+    LayoutQualityReport report =
+        LayoutQuality.validateLayout(layoutResult(nodes, edges, List.of()));
+
+    assertThat(report.overlapCount()).isEqualTo(0);
+    assertThat(report.connectorThroughNodeCount()).isEqualTo(0);
+    assertThat(report.status()).isEqualTo("ok");
+  }
+
+  @Test
+  void sequenceChromeExemptionIsScopedAndOrdinaryOverlapsAreStillCounted() {
+    var customer = lifelineNode("customer", 100.0, 100.0, 140.0, 48.0);
+    var service = lifelineNode("service", 520.0, 100.0, 140.0, 48.0);
+    var exec = new LaidOutNode("exec", "exec", "exec", 584.0, 124.0, 12.0, 200.0, "", "execution");
+    // An unrelated pair of ORDINARY (non-chrome) nodes genuinely overlaps. This must still be
+    // counted: the exemption is scoped to interaction/execution/destruction chrome, not a
+    // blanket disable of the overlap counter.
+    var ordinaryA = node("ordinary-a", 700.0, 400.0);
+    var ordinaryB = node("ordinary-b", 750.0, 420.0);
+    var nodes = List.of(customer, service, exec, ordinaryA, ordinaryB);
+    var edges =
+        List.of(
+            edge(
+                "m1",
+                "customer",
+                "service",
+                List.of(new Point(170.0, 150.0), new Point(590.0, 200.0))));
+
+    LayoutQualityReport report =
+        LayoutQuality.validateLayout(layoutResult(nodes, edges, List.of()));
+
+    // The exec/service overlap and the message-through-exec hit are exempted sequence chrome;
+    // only the genuine ordinary-a/ordinary-b overlap is counted.
+    assertThat(report.overlapCount()).isEqualTo(1);
+    assertThat(report.connectorThroughNodeCount()).isEqualTo(0);
+    assertThat(report.status()).isEqualTo("warning");
+  }
+
+  @Test
   void nestedGroupMembersAreCountedAsGroupBoundaryMembers() {
     var nodes = List.of(node("source", 0.0, 30.0), node("target", 200.0, 30.0));
     var edges =

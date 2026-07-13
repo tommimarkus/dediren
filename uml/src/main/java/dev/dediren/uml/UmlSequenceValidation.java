@@ -11,6 +11,7 @@ import static dev.dediren.uml.UmlProperties.requiredTextArrayEntry;
 import static dev.dediren.uml.UmlProperties.requiredTextProperty;
 import static dev.dediren.uml.UmlProperties.textValueSet;
 
+import dev.dediren.contracts.source.GenericGraphView;
 import dev.dediren.contracts.source.SourceNode;
 import dev.dediren.contracts.source.SourceRelationship;
 import java.math.BigInteger;
@@ -114,6 +115,100 @@ public final class UmlSequenceValidation {
         throw new UmlValidationException(
             UmlTypeKind.ELEMENT_PROPERTY, fragmentId, path + ".fragments[" + fragmentIndex + "]");
       }
+    }
+  }
+
+  // Rules added after the Task 3 review found the exit-2 bug still reachable: nothing validated
+  // uml.covered/uml.start/uml.finish, so a malformed ExecutionSpecification/
+  // DestructionOccurrenceSpecification passed validate() and then hard-failed build() at layout
+  // with an obscure geometry diagnostic (DEDIREN_LAYOUT_ROUTE_ENDPOINT_OFF_NODE_PERIMETER). These
+  // three checks mirror exactly what UmlSequenceConstraints#executionSpanFor/destructionAnchorFor
+  // require to emit a StemSpan, so a model that passes validate() is guaranteed to get one.
+  static void validateSelectedExecutionSpecificationProperties(
+      String nodeId,
+      JsonNode umlProperties,
+      String path,
+      Set<String> selectedNodeIds,
+      Set<String> selectedRelationshipIds,
+      ValidationContext context)
+      throws UmlValidationException {
+    requireSelectedCoveredLifeline(nodeId, umlProperties, path, selectedNodeIds, context);
+    requireSelectedMessage(nodeId, umlProperties, "start", path, selectedRelationshipIds, context);
+    requireSelectedMessage(nodeId, umlProperties, "finish", path, selectedRelationshipIds, context);
+  }
+
+  static void validateSelectedDestructionOccurrenceProperties(
+      String nodeId,
+      JsonNode umlProperties,
+      String path,
+      Set<String> selectedNodeIds,
+      ValidationContext context)
+      throws UmlValidationException {
+    requireSelectedCoveredLifeline(nodeId, umlProperties, path, selectedNodeIds, context);
+  }
+
+  // At most one Message may target a given DestructionOccurrenceSpecification: a second
+  // delete-message would route to a row outside the destruction mark's box and fail the layout
+  // perimeter check. Scoped to the messages selected in this view, matching the scope
+  // destructionAnchorFor uses to pick its single anchor message.
+  static void validateSelectedDestructionMessageUniqueness(
+      int viewIndex, GenericGraphView view, ValidationContext context)
+      throws UmlValidationException {
+    var claimedDestinations = new HashSet<String>();
+    for (int relationshipIndex = 0;
+        relationshipIndex < view.relationships().size();
+        relationshipIndex++) {
+      String relationshipId = view.relationships().get(relationshipIndex);
+      if (!"Message".equals(context.relationshipTypes().get(relationshipId))) {
+        continue;
+      }
+      String target = context.relationshipTargets().get(relationshipId);
+      if (!"DestructionOccurrenceSpecification".equals(context.nodeTypes().get(target))) {
+        continue;
+      }
+      if (!claimedDestinations.add(target)) {
+        throw new UmlValidationException(
+            UmlTypeKind.ELEMENT_PROPERTY,
+            target + ".target",
+            "$.plugins.generic-graph.views["
+                + viewIndex
+                + "].relationships["
+                + relationshipIndex
+                + "]");
+      }
+    }
+  }
+
+  private static void requireSelectedCoveredLifeline(
+      String nodeId,
+      JsonNode umlProperties,
+      String path,
+      Set<String> selectedNodeIds,
+      ValidationContext context)
+      throws UmlValidationException {
+    String lifelineId = readTextProperty(umlProperties, "covered");
+    if (lifelineId == null
+        || !"Lifeline".equals(context.nodeTypes().get(lifelineId))
+        || !selectedNodeIds.contains(lifelineId)) {
+      throw new UmlValidationException(
+          UmlTypeKind.ELEMENT_PROPERTY, nodeId + ".covered", path + ".covered");
+    }
+  }
+
+  private static void requireSelectedMessage(
+      String nodeId,
+      JsonNode umlProperties,
+      String field,
+      String path,
+      Set<String> selectedRelationshipIds,
+      ValidationContext context)
+      throws UmlValidationException {
+    String messageId = readTextProperty(umlProperties, field);
+    if (messageId == null
+        || !"Message".equals(context.relationshipTypes().get(messageId))
+        || !selectedRelationshipIds.contains(messageId)) {
+      throw new UmlValidationException(
+          UmlTypeKind.ELEMENT_PROPERTY, nodeId + "." + field, path + "." + field);
     }
   }
 

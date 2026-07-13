@@ -506,11 +506,15 @@ public final class UmlSequenceRenderer {
   private MarkerPoint deleteMarkerPoint(LaidOutEdge edge) {
     LaidOutNode target = nodesById.get(edge.target());
     if (target != null) {
+      // Inscribe the X in the destruction node's own box (same convention renderGates() uses for
+      // its circle) rather than shrinking it below that box: layout anchors the deleteMessage edge
+      // at the node's real boundary, so a smaller marker leaves the incoming arrow stopping short
+      // of the X instead of touching it.
       return new MarkerPoint(
           target.id(),
           target.x() + target.width() / 2.0,
           target.y() + target.height() / 2.0,
-          Math.max(8.0, Math.min(target.width(), target.height()) * 0.32));
+          Math.max(4.0, Math.min(target.width(), target.height()) / 2.0));
     }
     Point point = edge.points().isEmpty() ? new Point(0.0, 0.0) : edge.points().getLast();
     return new MarkerPoint(edge.target(), point.x(), point.y(), 10.0);

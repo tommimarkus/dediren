@@ -34,8 +34,15 @@ public final class LayoutNodeRole {
   /** A relationship connector (ArchiMate junction): a routing point, not a real element. */
   public static final String JUNCTION = "junction";
 
+  /** A UML execution specification: a bar sitting on a lifeline stem for the span it is active. */
+  public static final String EXECUTION = "execution";
+
+  /** A UML destruction occurrence: the marker terminating a lifeline stem. */
+  public static final String DESTRUCTION = "destruction";
+
   /** Every role this product recognises. */
-  public static final Set<String> ALL = Set.of(LIFELINE, INTERACTION, JUNCTION);
+  public static final Set<String> ALL =
+      Set.of(LIFELINE, INTERACTION, JUNCTION, EXECUTION, DESTRUCTION);
 
   public static boolean isLifeline(String role) {
     return LIFELINE.equals(role);
@@ -47,5 +54,13 @@ public final class LayoutNodeRole {
 
   public static boolean isJunction(String role) {
     return JUNCTION.equals(role);
+  }
+
+  public static boolean isExecution(String role) {
+    return EXECUTION.equals(role);
+  }
+
+  public static boolean isDestruction(String role) {
+    return DESTRUCTION.equals(role);
   }
 }

@@ -1,0 +1,158 @@
+{
+  "model_schema_version": "model.schema.v1",
+  "required_plugins": [
+    {
+      "id": "generic-graph",
+      "version": "2026.07.14"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "interaction-lifecycle",
+      "type": "Interaction",
+      "label": "Worker Lifecycle",
+      "properties": {
+        "uml": {}
+      }
+    },
+    {
+      "id": "customer",
+      "type": "Lifeline",
+      "label": "Customer",
+      "properties": {
+        "uml": {
+          "interaction": "interaction-lifecycle"
+        }
+      }
+    },
+    {
+      "id": "service",
+      "type": "Lifeline",
+      "label": "Order Service",
+      "properties": {
+        "uml": {
+          "interaction": "interaction-lifecycle"
+        }
+      }
+    },
+    {
+      "id": "worker",
+      "type": "Lifeline",
+      "label": "Worker",
+      "properties": {
+        "uml": {
+          "interaction": "interaction-lifecycle"
+        }
+      }
+    },
+    {
+      "id": "exec-service",
+      "type": "ExecutionSpecification",
+      "label": "Order Service Activation",
+      "properties": {
+        "uml": {
+          "covered": "service",
+          "start": "m1",
+          "finish": "m4"
+        }
+      }
+    },
+    {
+      "id": "worker-destroyed",
+      "type": "DestructionOccurrenceSpecification",
+      "label": "Worker Destroyed",
+      "properties": {
+        "uml": {
+          "covered": "worker"
+        }
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "id": "m1",
+      "type": "Message",
+      "source": "customer",
+      "target": "service",
+      "label": "placeOrder",
+      "properties": {
+        "uml": {
+          "interaction": "interaction-lifecycle",
+          "sequence": 1,
+          "message_sort": "synchCall"
+        }
+      }
+    },
+    {
+      "id": "m2",
+      "type": "Message",
+      "source": "service",
+      "target": "worker",
+      "label": "createWorker",
+      "properties": {
+        "uml": {
+          "interaction": "interaction-lifecycle",
+          "sequence": 2,
+          "message_sort": "createMessage"
+        }
+      }
+    },
+    {
+      "id": "m3",
+      "type": "Message",
+      "source": "service",
+      "target": "worker-destroyed",
+      "label": "destroyWorker",
+      "properties": {
+        "uml": {
+          "interaction": "interaction-lifecycle",
+          "sequence": 3,
+          "message_sort": "deleteMessage"
+        }
+      }
+    },
+    {
+      "id": "m4",
+      "type": "Message",
+      "source": "service",
+      "target": "customer",
+      "label": "orderComplete",
+      "properties": {
+        "uml": {
+          "interaction": "interaction-lifecycle",
+          "sequence": 4,
+          "message_sort": "reply"
+        }
+      }
+    }
+  ],
+  "plugins": {
+    "generic-graph": {
+      "semantic_profile": "uml",
+      "views": [
+        {
+          "id": "sequence-view",
+          "label": "Worker Lifecycle Sequence",
+          "kind": "uml-sequence",
+          "nodes": [
+            "interaction-lifecycle",
+            "customer",
+            "service",
+            "worker",
+            "exec-service",
+            "worker-destroyed"
+          ],
+          "relationships": ["m1", "m2", "m3", "m4"],
+          "layout_preferences": {
+            "direction": "right",
+            "density": "readable",
+            "routing": {
+              "style": "orthogonal",
+              "endpoint_merging": "off"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

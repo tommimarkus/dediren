@@ -425,7 +425,165 @@ class UmlValidationTest {
             source -> {
               addSequenceNode(
                   source, "execution-service", "ExecutionSpecification", "Service execution");
+              ObjectNode executionUml = nodeUmlProperties(source, "execution-service");
+              executionUml.put("covered", "service");
+              executionUml.put("start", "m1");
+              executionUml.put("finish", "m2");
               addSequenceNode(source, "gate-inbound", "Gate", "Inbound gate");
+            });
+
+    Uml.validateSource(fixture.source(), fixture.pluginData());
+  }
+
+  // Task 5 (post-Task-3-review): validate.covered/uml.start/uml.finish on ExecutionSpecification /
+  // DestructionOccurrenceSpecification, so a malformed occurrence is rejected at validate() with a
+  // clear diagnostic instead of hard-failing build() with an obscure layout-geometry error.
+  @Test
+  void rejectsExecutionSpecificationMissingCovered() throws Exception {
+    Fixture fixture =
+        loadMutatedUmlSequenceFixture(
+            source -> {
+              addSequenceNode(
+                  source, "execution-service", "ExecutionSpecification", "Service execution");
+              ObjectNode executionUml = nodeUmlProperties(source, "execution-service");
+              executionUml.put("start", "m1");
+              executionUml.put("finish", "m2");
+            });
+
+    UmlValidationException error = assertRejected(fixture);
+
+    assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
+    assertThat(error.value()).isEqualTo("execution-service.covered");
+    assertThat(error.path()).contains("properties.uml.covered");
+  }
+
+  @Test
+  void rejectsExecutionSpecificationCoveredNamingNonLifeline() throws Exception {
+    Fixture fixture =
+        loadMutatedUmlSequenceFixture(
+            source -> {
+              addSequenceNode(
+                  source, "execution-service", "ExecutionSpecification", "Service execution");
+              ObjectNode executionUml = nodeUmlProperties(source, "execution-service");
+              executionUml.put("covered", "interaction-place-order");
+              executionUml.put("start", "m1");
+              executionUml.put("finish", "m2");
+            });
+
+    UmlValidationException error = assertRejected(fixture);
+
+    assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
+    assertThat(error.value()).isEqualTo("execution-service.covered");
+    assertThat(error.path()).contains("properties.uml.covered");
+  }
+
+  @Test
+  void rejectsExecutionSpecificationStartNamingUnselectedMessage() throws Exception {
+    Fixture fixture =
+        loadMutatedUmlSequenceFixture(
+            source -> {
+              addSequenceMessage(
+                  source, "m4", "service", "customer", "followUp", "interaction-place-order", 4);
+              removeViewRelationship(source, "m4");
+              addSequenceNode(
+                  source, "execution-service", "ExecutionSpecification", "Service execution");
+              ObjectNode executionUml = nodeUmlProperties(source, "execution-service");
+              executionUml.put("covered", "service");
+              executionUml.put("start", "m4");
+              executionUml.put("finish", "m2");
+            });
+
+    UmlValidationException error = assertRejected(fixture);
+
+    assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
+    assertThat(error.value()).isEqualTo("execution-service.start");
+    assertThat(error.path()).contains("properties.uml.start");
+  }
+
+  @Test
+  void rejectsDestructionOccurrenceMissingCovered() throws Exception {
+    Fixture fixture =
+        loadMutatedUmlSequenceFixture(
+            source ->
+                addSequenceNode(
+                    source,
+                    "service-destroyed",
+                    "DestructionOccurrenceSpecification",
+                    "Service destroyed"));
+
+    UmlValidationException error = assertRejected(fixture);
+
+    assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
+    assertThat(error.value()).isEqualTo("service-destroyed.covered");
+    assertThat(error.path()).contains("properties.uml.covered");
+  }
+
+  @Test
+  void rejectsSecondMessageTargetingSameDestructionOccurrence() throws Exception {
+    Fixture fixture =
+        loadMutatedUmlSequenceFixture(
+            source -> {
+              addSequenceNode(
+                  source,
+                  "service-destroyed",
+                  "DestructionOccurrenceSpecification",
+                  "Service destroyed");
+              nodeUmlProperties(source, "service-destroyed").put("covered", "service");
+              addSequenceMessage(
+                  source,
+                  "m4",
+                  "customer",
+                  "service-destroyed",
+                  "cancelOrder",
+                  "interaction-place-order",
+                  4);
+              relationshipUmlProperties(source, "m4").put("message_sort", "deleteMessage");
+              addSequenceMessage(
+                  source,
+                  "m5",
+                  "customer",
+                  "service-destroyed",
+                  "cancelOrderAgain",
+                  "interaction-place-order",
+                  5);
+              relationshipUmlProperties(source, "m5").put("message_sort", "deleteMessage");
+            });
+
+    UmlValidationException error = assertRejected(fixture);
+
+    assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
+    assertThat(error.value()).isEqualTo("service-destroyed.target");
+    assertThat(error.path()).contains("relationships[");
+  }
+
+  @Test
+  void acceptsWellFormedExecutionAndDestructionLifecycle() throws Exception {
+    Fixture fixture =
+        loadMutatedUmlSequenceFixture(
+            source -> {
+              addSequenceNode(
+                  source, "execution-service", "ExecutionSpecification", "Service execution");
+              ObjectNode executionUml = nodeUmlProperties(source, "execution-service");
+              executionUml.put("covered", "service");
+              executionUml.put("start", "m1");
+              executionUml.put("finish", "m3");
+
+              addSequenceNode(
+                  source,
+                  "service-destroyed",
+                  "DestructionOccurrenceSpecification",
+                  "Service destroyed");
+              nodeUmlProperties(source, "service-destroyed").put("covered", "service");
+
+              addSequenceMessage(
+                  source,
+                  "m4",
+                  "customer",
+                  "service-destroyed",
+                  "cancelOrder",
+                  "interaction-place-order",
+                  4);
+              relationshipUmlProperties(source, "m4").put("message_sort", "deleteMessage");
             });
 
     Uml.validateSource(fixture.source(), fixture.pluginData());
