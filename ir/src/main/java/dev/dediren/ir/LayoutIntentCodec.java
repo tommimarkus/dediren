@@ -2,17 +2,20 @@ package dev.dediren.ir;
 
 import dev.dediren.contracts.layout.LayoutConstraint;
 import dev.dediren.ir.LayoutIntent.OrderedBand;
+import dev.dediren.ir.LayoutIntent.StemSpan;
 import java.util.ArrayList;
 import java.util.List;
 
 /**
  * Notation-free wire codec between neutral {@link LayoutIntent} and the record-based {@link
  * LayoutConstraint} carried on {@code SceneGraph}. Knows only the neutral {@code ordered-band:}
- * kind and the {@code @}-gap subject encoding; no notation-specific vocabulary or values live here.
+ * kind, the {@code stem-span} kind, and the {@code @}-gap subject encoding; no notation-specific
+ * vocabulary or values live here.
  */
 public final class LayoutIntentCodec {
 
   private static final String ORDERED_BAND_PREFIX = "ordered-band:";
+  private static final String STEM_SPAN_KIND = "stem-span";
 
   private LayoutIntentCodec() {}
 
@@ -33,6 +36,15 @@ public final class LayoutIntentCodec {
         yield new LayoutConstraint(
             viewId + ".ordered-band." + axisTag, ORDERED_BAND_PREFIX + axisTag, subjects);
       }
+      case StemSpan stemSpan ->
+          new LayoutConstraint(
+              viewId + ".stem-span." + stemSpan.nodeId(),
+              STEM_SPAN_KIND,
+              List.of(
+                  stemSpan.nodeId(),
+                  stemSpan.bandMemberId(),
+                  stemSpan.fromMemberId(),
+                  stemSpan.toMemberId()));
     };
   }
 
@@ -61,6 +73,14 @@ public final class LayoutIntentCodec {
       List<BandMember> members =
           constraint.subjects().stream().map(LayoutIntentCodec::decodeMember).toList();
       return new OrderedBand(axis, members);
+    }
+    if (kind.equals(STEM_SPAN_KIND)) {
+      List<String> subjects = constraint.subjects();
+      if (subjects.size() != 4) {
+        throw new IllegalArgumentException(
+            "stem-span constraint requires exactly 4 subjects, got: " + subjects.size());
+      }
+      return new StemSpan(subjects.get(0), subjects.get(1), subjects.get(2), subjects.get(3));
     }
     throw new IllegalArgumentException("Unrecognized layout constraint kind: " + kind);
   }
