@@ -1,8 +1,10 @@
 package dev.dediren.contracts.util;
 
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 public final class ContractCollections {
   private ContractCollections() {}
@@ -20,7 +22,21 @@ public final class ContractCollections {
     return values == null ? null : List.copyOf(values);
   }
 
+  /**
+   * An immutable, null-hostile copy that preserves insertion order (unlike {@link Map#copyOf},
+   * which returns a hash-ordered map). Map-carrying contract records serialize their map fields in
+   * this order, so preserving it keeps output byte-stable and matches author intent.
+   */
   public static <T> Map<String, T> mapOrEmpty(Map<String, T> values) {
-    return values == null ? Map.of() : Map.copyOf(new LinkedHashMap<>(values));
+    if (values == null) {
+      return Map.of();
+    }
+    LinkedHashMap<String, T> copy = new LinkedHashMap<>(values);
+    copy.forEach(
+        (key, value) -> {
+          Objects.requireNonNull(key, "map key");
+          Objects.requireNonNull(value, "map value");
+        });
+    return Collections.unmodifiableMap(copy);
   }
 }
