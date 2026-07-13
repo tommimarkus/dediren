@@ -17,15 +17,14 @@ import dev.dediren.semantics.graph.SemanticsRouterEngine;
 import dev.dediren.semantics.uml.UmlNotationSemantics;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import net.jqwik.api.Arbitraries;
-import net.jqwik.api.Arbitrary;
-import net.jqwik.api.Combinators;
-import net.jqwik.api.ForAll;
-import net.jqwik.api.Property;
-import net.jqwik.api.Provide;
-import net.jqwik.api.statistics.Statistics;
+import java.util.Random;
+import java.util.stream.Stream;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 /**
  * Property test for Plan B P2 task 8: generated, engine-valid UML-sequence models are pushed
@@ -40,27 +39,35 @@ import net.jqwik.api.statistics.Statistics;
  * validation/projection/layout logic and are the exact instances {@code EngineWiring} wires into
  * the CLI's in-memory dispatch.
  *
- * <p>The generator (Plan B P2 task 8 baseline) emits an {@code Interaction} and 2-5 {@code
- * Lifeline} nodes and 1-10 {@code Message} relationships with unique strictly-increasing {@code
- * uml.sequence} integers between two lifelines — on roughly a {@code 1 / lifelineCount} share of
- * generated messages the source and target lifeline are the same one (a self-message), and
- * otherwise they are distinct — and — Plan B P5 task 7 (closing the W3 gap) — on a minority of
- * trials a single {@code CombinedFragment} node wrapping a contiguous span of those messages, split
- * across one or two {@code InteractionOperand} children ({@code opt} / {@code loop} for one
- * operand, {@code alt} / {@code par} for two). The fragment's operand(s) always own a contiguous,
- * non-overlapping block of the generated messages (no interior gaps and no shared messages) so
- * {@code Uml.validateSource} accepts every generated model, and so the fragment-open (first
- * operand) / operand-open (later operands) leading-gap constraints {@code UmlSequenceConstraints}
- * derives are non-empty and actually move message Y-positions when a fragment is present.
- * Self-messages (this bugfix's own regression class — see {@code SequenceLayoutPropertyTest}'s
- * sibling fixture {@code valid-uml-sequence-self-message.json}) are now generated and exercised end
- * to end through the real project&#8594;layout path, closing the coverage gap that let a self-call
- * hard-fail {@code build} ship unnoticed. Nested fragments and fragment {@code covered} lifeline
- * sets are not needed to exercise the leading-gap path and remain out of scope.
+ * <p><strong>Generation.</strong> The {@value #TRIALS} models are drawn from a {@link Random} fixed
+ * at {@link #GENERATOR_SEED} and replayed as JUnit {@link ParameterizedTest} cases, so trial
+ * <em>n</em> is the same model on every machine and on every run. A failing trial names its own
+ * index, and that index is the whole reproduction recipe: the corpus is a pure function of the
+ * seed. This buys determinism rather than shrinking — a failure reports the model it found rather
+ * than a minimised one (every {@code describedAs} below carries the record's {@code toString}) —
+ * which is the trade that keeps this suite on the JUnit engine the rest of the reactor already
+ * runs, with no second test engine on the classpath.
+ *
+ * <p>The generator emits an {@code Interaction} and 2-5 {@code Lifeline} nodes and 1-10 {@code
+ * Message} relationships with unique strictly-increasing {@code uml.sequence} integers between two
+ * lifelines — on roughly a {@code 1 / lifelineCount} share of generated messages the source and
+ * target lifeline are the same one (a self-message), and otherwise they are distinct — and — Plan B
+ * P5 task 7 (closing the W3 gap) — on a minority of trials a single {@code CombinedFragment} node
+ * wrapping a contiguous span of those messages, split across one or two {@code InteractionOperand}
+ * children ({@code opt} / {@code loop} for one operand, {@code alt} / {@code par} for two). The
+ * fragment's operand(s) always own a contiguous, non-overlapping block of the generated messages
+ * (no interior gaps and no shared messages) so {@code Uml.validateSource} accepts every generated
+ * model, and so the fragment-open (first operand) / operand-open (later operands) leading-gap
+ * constraints {@code UmlSequenceConstraints} derives are non-empty and actually move message
+ * Y-positions when a fragment is present. Self-messages (see this test's sibling fixture {@code
+ * valid-uml-sequence-self-message.json}) are generated and exercised end to end through the real
+ * project&#8594;layout path, closing the coverage gap that let a self-call hard-fail {@code build}
+ * ship unnoticed. Nested fragments and fragment {@code covered} lifeline sets are not needed to
+ * exercise the leading-gap path and remain out of scope.
  *
  * <p>Task 8 closes the rest of the W1 coverage hole — the one that let an activation bar land at
  * the canvas origin and a delete-message hard-fail {@code build} (exit 2) ship unnoticed. A
- * minority of trials now also carry an {@code ExecutionSpecification} (valid {@code covered}/{@code
+ * minority of trials also carry an {@code ExecutionSpecification} (valid {@code covered}/{@code
  * start}/{@code finish}, resolving to a selected lifeline and two selected messages) and,
  * independently, a {@code DestructionOccurrenceSpecification} (valid {@code covered}) targeted by
  * exactly one generated {@code deleteMessage}. Neither {@link SequenceInvariants} nor {@link
@@ -69,19 +76,31 @@ import net.jqwik.api.statistics.Statistics;
  * #assertDeleteMessageGeometry} asserts its geometry directly instead: the destruction marker
  * centred on its covered lifeline's stem, and the delete-message's last route point landing exactly
  * on the marker's near edge.
+ *
+ * <p>Whether the generator actually reaches all of those shapes is not left to a report a human has
+ * to read: {@link #generatorCoversEveryShapeUnderTest} asserts the corpus hits every one of them,
+ * so a generator regression that quietly stops emitting fragments (or self-messages, executions,
+ * destructions) fails the build instead of silently shrinking what this suite covers.
  */
 class SequenceLayoutPropertyTest {
 
   private static final List<String> MESSAGE_SORTS =
       List.of("synchCall", "asynchCall", "asynchSignal", "reply", "createMessage", "deleteMessage");
 
-  @Property(tries = 300, seed = "1")
-  void generatedSequenceModelsSatisfySequenceInvariants(
-      @ForAll("validSequenceModels") GeneratedSequenceModel model) throws Exception {
-    Statistics.collect(fragmentShapeLabel(model.fragment()));
-    Statistics.label("self-message").collect(selfMessageLabel(model));
-    Statistics.label("execution").collect(executionLabel(model));
-    Statistics.label("destruction").collect(destructionLabel(model));
+  /** How many generated models the invariants below are checked against. */
+  private static final int TRIALS = 300;
+
+  /**
+   * Fixes the corpus. Every generated model — and therefore every assertion in this class — is a
+   * pure function of this seed, so changing it means choosing a different {@value #TRIALS} models:
+   * change it deliberately, and re-read the coverage assertion when you do.
+   */
+  private static final long GENERATOR_SEED = 1L;
+
+  @ParameterizedTest(name = "trial {index}")
+  @MethodSource("generatedSequenceModels")
+  void generatedSequenceModelsSatisfySequenceInvariants(GeneratedSequenceModel model)
+      throws Exception {
     SourceDocument source =
         JsonSupport.objectMapper().readValue(buildSourceJson(model), SourceDocument.class);
 
@@ -108,6 +127,51 @@ class SequenceLayoutPropertyTest {
     assertDeleteMessageGeometry(scene, model);
   }
 
+  // --- generator coverage ------------------------------------------------------------------------
+
+  /**
+   * The smallest share of the {@value #TRIALS} trials a shape must claim before it counts as
+   * genuinely exercised rather than as a stray draw. Every shape below is gated on a
+   * coin-flip-scale probability, not a rare corner, so each is expected to land far above this
+   * floor; it fails only when a generator change collapses a shape — the exact failure the jqwik
+   * {@code Statistics} report this replaces could describe but never catch.
+   */
+  private static final int MIN_TRIALS_PER_SHAPE = 10;
+
+  @Test
+  void generatorCoversEveryShapeUnderTest() {
+    List<GeneratedSequenceModel> corpus = generatedSequenceModels().toList();
+    assertThat(corpus).hasSize(TRIALS);
+
+    Map<String, Integer> counts = new LinkedHashMap<>();
+    for (GeneratedSequenceModel model : corpus) {
+      counts.merge(fragmentShapeLabel(model.fragment()), 1, Integer::sum);
+      counts.merge(selfMessageLabel(model), 1, Integer::sum);
+      counts.merge(executionLabel(model), 1, Integer::sum);
+      counts.merge(destructionLabel(model), 1, Integer::sum);
+    }
+
+    List<String> shapes =
+        List.of(
+            "no fragment",
+            "fragment: 1 operand (fragment-open only)",
+            "fragment: 2 operands (fragment-open + operand-open)",
+            "self-message: present",
+            "self-message: absent",
+            "execution: present",
+            "execution: absent",
+            "destruction: present",
+            "destruction: absent");
+    for (String shape : shapes) {
+      assertThat(counts.getOrDefault(shape, 0))
+          .describedAs(
+              "shape '%s' must be exercised by at least %d of the %d generated trials"
+                  + " (full distribution: %s)",
+              shape, MIN_TRIALS_PER_SHAPE, TRIALS, counts)
+          .isGreaterThanOrEqualTo(MIN_TRIALS_PER_SHAPE);
+    }
+  }
+
   // --- generator --------------------------------------------------------------------------------
 
   // Probability a generated model has NO combined fragment at all: kept > 0.5 so the plain
@@ -122,83 +186,138 @@ class SequenceLayoutPropertyTest {
   private static final double NO_EXECUTION_PROBABILITY = 0.55;
   private static final double NO_DESTRUCTION_PROBABILITY = 0.55;
 
-  @Provide
-  Arbitrary<GeneratedSequenceModel> validSequenceModels() {
-    return Arbitraries.integers()
-        .between(2, 5)
-        .flatMap(
-            lifelineCount ->
-                generatedMessages(lifelineCount)
-                    .flatMap(
-                        messages ->
-                            generatedFragment(messages.size())
-                                .flatMap(
-                                    fragment ->
-                                        generatedExecution(lifelineCount, messages.size())
-                                            .flatMap(
-                                                execution ->
-                                                    generatedDestruction(lifelineCount)
-                                                        .map(
-                                                            destruction ->
-                                                                new GeneratedSequenceModel(
-                                                                    lifelineCount,
-                                                                    messages,
-                                                                    fragment,
-                                                                    execution,
-                                                                    destruction))))));
+  // Probability a generated message omits uml.message_sort entirely, so the absent-sort default
+  // path is exercised alongside the six explicit sorts.
+  private static final double NO_MESSAGE_SORT_PROBABILITY = 0.3;
+
+  /**
+   * The corpus: {@value #TRIALS} models drawn from a {@link Random} fixed at {@link
+   * #GENERATOR_SEED}. Drawn eagerly into a list rather than streamed lazily, so the draw order —
+   * and therefore which model sits at a given trial index — cannot vary with how JUnit chooses to
+   * consume the stream.
+   */
+  private static Stream<GeneratedSequenceModel> generatedSequenceModels() {
+    Random random = new Random(GENERATOR_SEED);
+    List<GeneratedSequenceModel> models = new ArrayList<>(TRIALS);
+    for (int trial = 0; trial < TRIALS; trial++) {
+      int lifelineCount = 2 + random.nextInt(4);
+      List<GeneratedMessage> messages = generateMessages(random, lifelineCount);
+      models.add(
+          new GeneratedSequenceModel(
+              lifelineCount,
+              messages,
+              generateFragment(random, messages.size()),
+              generateExecution(random, lifelineCount, messages.size()),
+              generateDestruction(random, lifelineCount)));
+    }
+    return models.stream();
+  }
+
+  /**
+   * 1-10 messages among the {@code lifelineCount} lifelines. A shift in {@code [0, lifelineCount)}
+   * applied mod {@code lifelineCount} lands back on the source lifeline itself when the shift is 0
+   * — a self-message, source == target — and on some other distinct participant for every nonzero
+   * shift. Both outcomes are valid Lifeline -&gt; Lifeline Message connections ({@code
+   * Uml.validateSource} never compares source/target identity for Message endpoints — see {@code
+   * Uml#isMessageEndpoint}), so including 0 needs no rejection filter to stay legal. This gives
+   * each generated message a {@code 1 / lifelineCount} chance of being a self-message: a
+   * non-trivial share across the trials (lifelineCount ranges 2-5) without dominating the plain
+   * distinct-endpoint case.
+   */
+  private static List<GeneratedMessage> generateMessages(Random random, int lifelineCount) {
+    int messageCount = 1 + random.nextInt(10);
+    List<GeneratedMessage> messages = new ArrayList<>(messageCount);
+    for (int i = 0; i < messageCount; i++) {
+      int sourceIndex = random.nextInt(lifelineCount);
+      int targetShift = random.nextInt(lifelineCount);
+      String messageSort =
+          random.nextDouble() < NO_MESSAGE_SORT_PROBABILITY
+              ? null
+              : MESSAGE_SORTS.get(random.nextInt(MESSAGE_SORTS.size()));
+      // Sequence assigned by list position: unique and strictly increasing by construction,
+      // matching the task's per-message uml.sequence requirement.
+      messages.add(
+          new GeneratedMessage(
+              sourceIndex, (sourceIndex + targetShift) % lifelineCount, i + 1, messageSort));
+    }
+    return List.copyOf(messages);
   }
 
   /**
    * An optional {@link GeneratedFragment} covering a contiguous span of {@code [0, messageCount)}
-   * message indices, split across one or two {@link GeneratedOperand}s. Injecting {@code null} (no
-   * fragment) at {@link #NO_FRAGMENT_PROBABILITY} keeps most trials on the fragment-free baseline
-   * while still generating plenty of fragment-bearing trials across 300 tries.
+   * message indices, split across one or two {@link GeneratedOperand}s: one contiguous block
+   * ({@code opt}/{@code loop}, always legal since both allow exactly one operand) or, when the span
+   * holds at least two messages, two contiguous, back-to-back blocks ({@code alt}/{@code par},
+   * which require at least two operands). Contiguous, non-overlapping, back-to-back spans are what
+   * keep every generated fragment {@code Uml.validateSource}-legal: no message is ever owned by two
+   * operands, and no message inside the fragment's overall sequence range is left unowned by any
+   * operand. Returning {@code null} at {@link #NO_FRAGMENT_PROBABILITY} keeps most trials on the
+   * fragment-free baseline while still generating plenty of fragment-bearing trials across the
+   * corpus.
    */
-  private static Arbitrary<GeneratedFragment> generatedFragment(int messageCount) {
-    Arbitrary<GeneratedFragment> fragment =
-        Arbitraries.integers()
-            .between(0, messageCount - 1)
-            .flatMap(
-                spanStart ->
-                    Arbitraries.integers()
-                        .between(1, messageCount - spanStart)
-                        .flatMap(spanLength -> generatedFragmentOfSpan(spanStart, spanLength)));
-    return fragment.injectNull(NO_FRAGMENT_PROBABILITY);
+  private static GeneratedFragment generateFragment(Random random, int messageCount) {
+    if (random.nextDouble() < NO_FRAGMENT_PROBABILITY) {
+      return null;
+    }
+    int spanStart = random.nextInt(messageCount);
+    int spanLength = 1 + random.nextInt(messageCount - spanStart);
+    int spanEnd = spanStart + spanLength - 1;
+
+    // A two-operand fragment needs at least two messages to split across. Where the span allows
+    // both, the one- and two-operand shapes are drawn evenly so neither starves across the corpus.
+    if (spanLength < 2 || random.nextBoolean()) {
+      return new GeneratedFragment(
+          random.nextBoolean() ? "opt" : "loop",
+          List.of(new GeneratedOperand(1, spanStart, spanEnd)));
+    }
+    int split = 1 + random.nextInt(spanLength - 1);
+    return new GeneratedFragment(
+        random.nextBoolean() ? "alt" : "par",
+        List.of(
+            new GeneratedOperand(1, spanStart, spanStart + split - 1),
+            new GeneratedOperand(2, spanStart + split, spanEnd)));
   }
 
   /**
-   * Builds a fragment whose operand(s) exactly partition the message-index span {@code [spanStart,
-   * spanStart + spanLength)} into one contiguous block ({@code opt}/{@code loop}, always legal
-   * since both allow exactly one operand) or, when the span holds at least two messages, two
-   * contiguous, back-to-back blocks ({@code alt}/{@code par}, which require at least two operands).
-   * Contiguous, non-overlapping, back-to-back spans are what keep every generated fragment {@code
-   * Uml.validateSource}-legal: no message is ever owned by two operands, and no message inside the
-   * fragment's overall sequence range is left unowned by any operand.
+   * An optional {@link GeneratedExecution}: an {@code ExecutionSpecification} covering a random
+   * lifeline, anchored to two of the generated messages in chronological order ({@code
+   * startMessageIndex} strictly before {@code finishMessageIndex}, both 0-based positions into the
+   * enclosing model's messages list). Needs at least two generated messages to pick a distinct
+   * start/finish pair, so trials with a single message never carry one. Returning {@code null} at
+   * {@link #NO_EXECUTION_PROBABILITY} keeps most trials free of an activation bar while still
+   * generating plenty across the corpus -- this closes the coverage gap that let a malformed
+   * ExecutionSpecification (a {@code covered}/{@code start}/{@code finish} absent, or present but
+   * not resolving to a selected lifeline/message) slip past {@code Uml.validateSource} and
+   * hard-fail layout unnoticed (see {@code
+   * UmlSequenceValidation#validateSelectedExecutionSpecificationProperties}).
    */
-  private static Arbitrary<GeneratedFragment> generatedFragmentOfSpan(
-      int spanStart, int spanLength) {
-    Arbitrary<GeneratedFragment> singleOperand =
-        Arbitraries.of("opt", "loop")
-            .map(
-                operator ->
-                    new GeneratedFragment(
-                        operator,
-                        List.of(new GeneratedOperand(1, spanStart, spanStart + spanLength - 1))));
-    if (spanLength < 2) {
-      return singleOperand;
+  private static GeneratedExecution generateExecution(
+      Random random, int lifelineCount, int messageCount) {
+    if (messageCount < 2 || random.nextDouble() < NO_EXECUTION_PROBABILITY) {
+      return null;
     }
-    Arbitrary<GeneratedFragment> twoOperands =
-        Combinators.combine(
-                Arbitraries.integers().between(1, spanLength - 1), Arbitraries.of("alt", "par"))
-            .as(
-                (split, operator) ->
-                    new GeneratedFragment(
-                        operator,
-                        List.of(
-                            new GeneratedOperand(1, spanStart, spanStart + split - 1),
-                            new GeneratedOperand(
-                                2, spanStart + split, spanStart + spanLength - 1))));
-    return Arbitraries.oneOf(singleOperand, twoOperands);
+    int startMessageIndex = random.nextInt(messageCount - 1);
+    int coveredLifelineIndex = random.nextInt(lifelineCount);
+    int finishMessageIndex =
+        startMessageIndex + 1 + random.nextInt(messageCount - 1 - startMessageIndex);
+    return new GeneratedExecution(coveredLifelineIndex, startMessageIndex, finishMessageIndex);
+  }
+
+  /**
+   * An optional {@link GeneratedDestruction}: a {@code DestructionOccurrenceSpecification} covering
+   * a random lifeline, targeted by exactly one generated {@code deleteMessage} from a (possibly the
+   * same) random lifeline. {@code Uml.validateSource} allows at most one Message to target a given
+   * destruction ({@code UmlSequenceValidation#validateSelectedDestructionMessageUniqueness}), and
+   * {@link #appendDestructionJson} only ever emits the single delete-message this record describes,
+   * so every generated model stays valid. Returning {@code null} at {@link
+   * #NO_DESTRUCTION_PROBABILITY} keeps most trials free of a destruction marker while still
+   * generating plenty across the corpus.
+   */
+  private static GeneratedDestruction generateDestruction(Random random, int lifelineCount) {
+    if (random.nextDouble() < NO_DESTRUCTION_PROBABILITY) {
+      return null;
+    }
+    return new GeneratedDestruction(random.nextInt(lifelineCount), random.nextInt(lifelineCount));
   }
 
   private static String fragmentShapeLabel(GeneratedFragment fragment) {
@@ -208,59 +327,6 @@ class SequenceLayoutPropertyTest {
     return fragment.operands().size() == 1
         ? "fragment: 1 operand (fragment-open only)"
         : "fragment: 2 operands (fragment-open + operand-open)";
-  }
-
-  /**
-   * An optional {@link GeneratedExecution}: an {@code ExecutionSpecification} covering a random
-   * lifeline, anchored to two of the generated messages in chronological order ({@code
-   * startMessageIndex} strictly before {@code finishMessageIndex}, both 0-based positions into the
-   * enclosing model's messages list). Needs at least two generated messages to pick a distinct
-   * start/finish pair, so trials with a single message never carry one. Injecting {@code null} at
-   * {@link #NO_EXECUTION_PROBABILITY} keeps most trials free of an activation bar while still
-   * generating plenty across 300 tries -- this closes the coverage gap that let a malformed
-   * ExecutionSpecification (a {@code covered}/{@code start}/{@code finish} absent, or present but
-   * not resolving to a selected lifeline/message) slip past {@code Uml.validateSource} and
-   * hard-fail layout unnoticed (see {@code
-   * UmlSequenceValidation#validateSelectedExecutionSpecificationProperties}).
-   */
-  private static Arbitrary<GeneratedExecution> generatedExecution(
-      int lifelineCount, int messageCount) {
-    if (messageCount < 2) {
-      Arbitrary<GeneratedExecution> none =
-          Arbitraries.integers().between(0, 0).map(ignored -> null);
-      return none;
-    }
-    Arbitrary<GeneratedExecution> execution =
-        Arbitraries.integers()
-            .between(0, messageCount - 2)
-            .flatMap(
-                startIndex ->
-                    Combinators.combine(
-                            Arbitraries.integers().between(0, lifelineCount - 1),
-                            Arbitraries.integers().between(startIndex + 1, messageCount - 1))
-                        .as(
-                            (covered, finishIndex) ->
-                                new GeneratedExecution(covered, startIndex, finishIndex)));
-    return execution.injectNull(NO_EXECUTION_PROBABILITY);
-  }
-
-  /**
-   * An optional {@link GeneratedDestruction}: a {@code DestructionOccurrenceSpecification} covering
-   * a random lifeline, targeted by exactly one generated {@code deleteMessage} from a (possibly the
-   * same) random lifeline. {@code Uml.validateSource} allows at most one Message to target a given
-   * destruction ({@code UmlSequenceValidation#validateSelectedDestructionMessageUniqueness}), and
-   * {@link #appendDestructionJson} only ever emits the single delete-message this record describes,
-   * so every generated model stays valid. Injecting {@code null} at {@link
-   * #NO_DESTRUCTION_PROBABILITY} keeps most trials free of a destruction marker while still
-   * generating plenty across 300 tries.
-   */
-  private static Arbitrary<GeneratedDestruction> generatedDestruction(int lifelineCount) {
-    Arbitrary<GeneratedDestruction> destruction =
-        Combinators.combine(
-                Arbitraries.integers().between(0, lifelineCount - 1),
-                Arbitraries.integers().between(0, lifelineCount - 1))
-            .as((covered, source) -> new GeneratedDestruction(covered, source));
-    return destruction.injectNull(NO_DESTRUCTION_PROBABILITY);
   }
 
   private static String executionLabel(GeneratedSequenceModel model) {
@@ -273,10 +339,9 @@ class SequenceLayoutPropertyTest {
 
   /**
    * Whether {@code model} contains at least one self-message (a {@code Message} whose source and
-   * target lifeline are the same), for {@link Statistics} observability of the self-message share
-   * this task adds. A self-message never adds a scene node of its own — it is still exactly one
-   * {@code Lifeline} pair like every other message — so it needs no counterpart in {@link
-   * #assertNoNodeRectsOverlap}.
+   * target lifeline are the same). A self-message never adds a scene node of its own — it is still
+   * exactly one {@code Lifeline} pair like every other message — so it needs no counterpart in
+   * {@link #assertNoNodeRectsOverlap}.
    */
   private static String selfMessageLabel(GeneratedSequenceModel model) {
     boolean hasSelfMessage =
@@ -284,52 +349,6 @@ class SequenceLayoutPropertyTest {
             .anyMatch(message -> message.sourceLifelineIndex() == message.targetLifelineIndex());
     return hasSelfMessage ? "self-message: present" : "self-message: absent";
   }
-
-  private static Arbitrary<List<GeneratedMessage>> generatedMessages(int lifelineCount) {
-    Arbitrary<Integer> sourceIndex = Arbitraries.integers().between(0, lifelineCount - 1);
-    // A shift in [0, lifelineCount - 1] applied mod lifelineCount lands back on the source
-    // lifeline itself when shift == 0 -- a self-message, source == target -- and on some other
-    // distinct participant for every nonzero shift. Both outcomes are valid Lifeline -> Lifeline
-    // Message connections (Uml.validateSource never compares source/target identity for Message
-    // endpoints -- see Uml#isMessageEndpoint), so widening the range to include 0 needs no filter
-    // (and its discard-ratio risk) to stay deterministic. This gives each generated message a
-    // 1 / lifelineCount chance of being a self-message: a non-trivial share across the 300 trials
-    // (lifelineCount ranges 2-5) without dominating the plain distinct-endpoint case.
-    Arbitrary<Integer> targetShift = Arbitraries.integers().between(0, lifelineCount - 1);
-    Arbitrary<String> messageSort = Arbitraries.of(MESSAGE_SORTS).injectNull(0.3);
-    Arbitrary<GeneratedEndpoints> endpoints =
-        Combinators.combine(sourceIndex, targetShift)
-            .as(
-                (source, shift) ->
-                    new GeneratedEndpoints(source, (source + shift) % lifelineCount));
-    Arbitrary<UnsequencedMessage> unsequenced =
-        Combinators.combine(endpoints, messageSort)
-            .as(
-                (pair, sort) ->
-                    new UnsequencedMessage(pair.sourceIndex(), pair.targetIndex(), sort));
-
-    return unsequenced
-        .list()
-        .ofMinSize(1)
-        .ofMaxSize(10)
-        .map(
-            specs -> {
-              List<GeneratedMessage> messages = new ArrayList<>();
-              for (int i = 0; i < specs.size(); i++) {
-                UnsequencedMessage spec = specs.get(i);
-                // Sequence assigned by list position: unique and strictly increasing by
-                // construction, matching the task's per-message uml.sequence requirement.
-                messages.add(
-                    new GeneratedMessage(
-                        spec.sourceIndex(), spec.targetIndex(), i + 1, spec.messageSort()));
-              }
-              return messages;
-            });
-  }
-
-  private record GeneratedEndpoints(int sourceIndex, int targetIndex) {}
-
-  private record UnsequencedMessage(int sourceIndex, int targetIndex, String messageSort) {}
 
   private record GeneratedMessage(
       int sourceLifelineIndex, int targetLifelineIndex, int sequence, String messageSort) {}
@@ -512,7 +531,7 @@ class SequenceLayoutPropertyTest {
    * model. Unlike {@code CombinedFragment}/{@code InteractionOperand}, an ExecutionSpecification
    * DOES become a {@code role=="execution"} scene node ({@link
    * dev.dediren.semantics.uml.UmlNotationSemantics#layoutRole}) -- the activation bar -- which is
-   * why {@link #assertNoNodeRectsOverlap} below now exempts that role instead of skipping it.
+   * why {@link #assertNoNodeRectsOverlap} below exempts that role instead of skipping it.
    */
   private static void appendExecutionJson(
       GeneratedExecution execution, StringBuilder nodesJson, StringBuilder nodeIdsJson) {

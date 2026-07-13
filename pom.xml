@@ -49,7 +49,6 @@
     <!-- EMF: elk-layout compiles against EMF's common types via the ELK graph model. -->
     <emf.version>2.45.0</emf.version>
     <jazzer.version>0.30.0</jazzer.version>
-    <jqwik.version>1.10.1</jqwik.version>
     <json-schema-validator.version>3.0.6</json-schema-validator.version>
     <junit.version>6.1.2</junit.version>
     <picocli.version>4.7.7</picocli.version>
@@ -161,26 +160,11 @@
         <artifactId>junit-jupiter-api</artifactId>
         <version>${junit.version}</version>
       </dependency>
-      <!-- Property-based testing (Plan B P2 IR invariants). jqwik implements its
-           own JUnit Platform TestEngine; 1.9.3 declares JUnit Platform 1.11/1.12
-           while this reactor runs JUnit Platform 6.1.1 (Jupiter 6). Verified via
-           core's JqwikSmokeTest that jqwik still discovers and runs correctly here.
-           The managed junit-platform-commons/junit-platform-engine entries below
-           pin jqwik's transitive JUnit Platform requests to this reactor's
-           converged version explicitly, so the dependencyConvergence enforcer
-           passing does not rely on Maven's nearest-wins declaration order.
-           Test-scope only. -->
-      <dependency>
-        <groupId>net.jqwik</groupId>
-        <artifactId>jqwik</artifactId>
-        <version>${jqwik.version}</version>
-        <scope>test</scope>
-      </dependency>
-      <!-- jqwik's transitive junit-platform-commons/junit-platform-engine requests (1.13.1)
-           currently converge to this reactor's junit.version only via Maven's nearest-wins
-           dependency-mediation order. Pin them explicitly so convergence is order-independent
-           rather than an incidental side effect of declaration order, mirroring how the
-           jazzer-junit platform-version mismatch above is handled. -->
+      <!-- Test dependencies (jazzer-junit, archunit) request JUnit Platform artifacts at their own
+           versions. Pin them to this reactor's junit.version so the dependencyConvergence enforcer
+           sees a single JUnit Platform version by declaration rather than by Maven's nearest-wins
+           dependency-mediation order, mirroring how the jazzer-junit platform-version mismatch
+           below is handled. -->
       <dependency>
         <groupId>org.junit.platform</groupId>
         <artifactId>junit-platform-commons</artifactId>
