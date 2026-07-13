@@ -3,7 +3,6 @@ package dev.dediren.plugins.render.svg;
 import static dev.dediren.plugins.render.svg.EdgeRenderer.edgeLabel;
 import static dev.dediren.plugins.render.svg.EdgeRenderer.edgeLabelCandidate;
 import static dev.dediren.plugins.render.svg.EdgeRenderer.edgeLabelVisibleBox;
-import static dev.dediren.plugins.render.svg.Svg.attr;
 
 import dev.dediren.contracts.layout.LaidOutEdge;
 import dev.dediren.contracts.layout.Point;
@@ -81,23 +80,19 @@ public final class EdgeEndAdornments {
   }
 
   /** Serialises the adornments to SVG, each wrapped in a machine-detectable {@code <g>}. */
-  public static String markup(
-      List<Adornment> adornments, ResolvedEdgeStyle style, String backgroundFill, double fontSize) {
-    if (adornments.isEmpty()) {
-      return "";
-    }
-    StringBuilder output = new StringBuilder();
+  public static void markup(
+      SvgWriter w,
+      List<Adornment> adornments,
+      ResolvedEdgeStyle style,
+      String backgroundFill,
+      double fontSize) {
     for (Adornment adornment : adornments) {
-      output
-          .append("<g data-dediren-edge-adornment=\"")
-          .append(attr(adornment.kind()))
-          .append("\" data-dediren-edge-adornment-end=\"")
-          .append(attr(adornment.end()))
-          .append("\">")
-          .append(edgeLabel(adornment.label(), adornment.text(), style, backgroundFill, fontSize))
-          .append("</g>");
+      w.start("g")
+          .attr("data-dediren-edge-adornment", adornment.kind())
+          .attr("data-dediren-edge-adornment-end", adornment.end());
+      w.raw(edgeLabel(adornment.label(), adornment.text(), style, backgroundFill, fontSize));
+      w.end();
     }
-    return output.toString();
   }
 
   /** The rendered bounding box of an adornment, for layout-bounds and overlap bookkeeping. */

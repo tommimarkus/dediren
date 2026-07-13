@@ -22,8 +22,11 @@ import javax.xml.stream.XMLStreamWriter;
  * Svg#styleNumber} or an explicit {@code %.1f}) to {@link #attr}, exactly matching the prior format
  * strings.
  */
-final class SvgWriter {
+public final class SvgWriter {
 
+  // Public across the render engine's packages so per-notation leaf builders (node/edge shape,
+  // label, decorator, icon emitters) emit into the shared document writer. The constructor stays
+  // package-private: only the svg package assembles a document.
   private static final XMLOutputFactory FACTORY = XMLOutputFactory.newInstance();
 
   private final StringWriter out = new StringWriter();
@@ -34,31 +37,31 @@ final class SvgWriter {
   }
 
   /** Opens an element; must be balanced by {@link #end}. */
-  SvgWriter start(String name) {
+  public SvgWriter start(String name) {
     run(() -> writer.writeStartElement(name));
     return this;
   }
 
   /** Writes a self-closing empty element (no {@link #end} follows). */
-  SvgWriter empty(String name) {
+  public SvgWriter empty(String name) {
     run(() -> writer.writeEmptyElement(name));
     return this;
   }
 
   /** Closes the element opened by the matching {@link #start}. */
-  SvgWriter end() {
+  public SvgWriter end() {
     run(writer::writeEndElement);
     return this;
   }
 
   /** Writes an attribute on the current start/empty element. The value is escaped by the writer. */
-  SvgWriter attr(String name, String value) {
+  public SvgWriter attr(String name, String value) {
     run(() -> writer.writeAttribute(name, value));
     return this;
   }
 
   /** Writes the attribute only when the value is non-null (optional presentation attributes). */
-  SvgWriter attrIf(String name, String value) {
+  public SvgWriter attrIf(String name, String value) {
     if (value != null) {
       attr(name, value);
     }
@@ -66,7 +69,7 @@ final class SvgWriter {
   }
 
   /** Writes escaped text content. */
-  SvgWriter text(String value) {
+  public SvgWriter text(String value) {
     run(() -> writer.writeCharacters(value == null ? "" : value));
     return this;
   }
@@ -77,7 +80,7 @@ final class SvgWriter {
    * fragment verbatim to the underlying buffer. Removed as each helper is converted to emit through
    * this writer directly.
    */
-  SvgWriter raw(String fragment) {
+  public SvgWriter raw(String fragment) {
     run(
         () -> {
           writer.writeCharacters("");
@@ -88,7 +91,7 @@ final class SvgWriter {
   }
 
   /** Flushes and returns the accumulated SVG document text. */
-  String finish() {
+  public String finish() {
     run(writer::flush);
     return out.toString();
   }

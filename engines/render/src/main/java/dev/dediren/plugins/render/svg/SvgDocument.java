@@ -166,8 +166,7 @@ public final class SvgDocument {
       List<EdgeEndAdornments.Adornment> endAdornments =
           EdgeEndAdornments.adornments(edge, edgeSelector, base.fontSize());
       if (!endAdornments.isEmpty()) {
-        w.raw(
-            EdgeEndAdornments.markup(endAdornments, style, base.backgroundFill(), base.fontSize()));
+        EdgeEndAdornments.markup(w, endAdornments, style, base.backgroundFill(), base.fontSize());
         for (EdgeEndAdornments.Adornment adornment : endAdornments) {
           placedLabelBoxes.add(EdgeEndAdornments.visibleBox(adornment, style));
         }
@@ -294,7 +293,7 @@ public final class SvgDocument {
       return;
     }
     if (decorator == null && style.shape() != null) {
-      w.raw(genericNodeShape(node, style));
+      genericNodeShape(w, node, style);
       return;
     }
     String shapeName = "archimate_rectangle";
@@ -303,7 +302,7 @@ public final class SvgDocument {
     if (decorator == null) {
       rx = style.rx();
     } else if (isArchimateCutCornerRectangle(decorator)) {
-      w.raw(archimateCutCornerShape(node, style));
+      archimateCutCornerShape(w, node, style);
       return;
     } else if (isArchimateRoundedRectangle(decorator)) {
       rx = Math.max(1.0, style.rx());
