@@ -66,6 +66,13 @@ class DedirenMcpServerTest {
 
   @Test
   void everyToolAdvertisesAnInputSchema(@TempDir Path root) {
+    // A static check on ToolSchemas' own JSON strings, not just "some schema is present": an
+    // advertised schema that forgot to require an argument DedirenTools actually needs (see its
+    // own missing-argument error envelopes) would still pass a bare non-null check.
+    Map<String, List<String>> expectedRequired =
+        Map.of(
+            "dediren_validate", List.of("source"),
+            "dediren_build", List.of("source", "out"));
     McpSyncServer server = serverIn(root, false);
     try {
       for (Tool tool : server.listTools()) {
@@ -75,6 +82,12 @@ class DedirenMcpServerTest {
         assertThat(tool.description())
             .as("tool %s must have a description", tool.name())
             .isNotBlank();
+        List<String> required = expectedRequired.get(tool.name());
+        if (required != null) {
+          assertThat(tool.inputSchema().get("required"))
+              .as("tool %s must require %s", tool.name(), required)
+              .isEqualTo(required);
+        }
       }
     } finally {
       server.close();
@@ -103,17 +116,20 @@ class DedirenMcpServerTest {
   }
 
   /**
-   * Regression test for silent response loss on a batch-EOF race: when a whole request batch is
-   * available on stdin from the start (as it is whenever stdin is redirected from a file, the
-   * packaged launcher's own dist-smoke drives it exactly this way), the underlying stream's EOF is
-   * observed essentially the instant the last byte is consumed. The vendored SDK's inbound-reader
-   * loop reacts to that EOF by closing its session synchronously, with no drain phase, so any
-   * response still in flight on another scheduler at that instant is dropped -- silently, with no
-   * error frame. Without the drain in {@code EofSignalingInputStream}, this reliably drops the tail
-   * of a multi-request batch; every request here must still get its matching response.
+   * An end-to-end smoke test of the real tool wiring: a whole request batch -- initialize, the
+   * initialized notification, tools/list, and a tools/call -- driven through {@code serveOn} with
+   * the actual {@link DedirenTools} handlers behind it (not the bare-bones {@link #slowToolServer}
+   * the tests below use), asserting every response is present and the guide tool's real content
+   * comes back.
+   *
+   * <p>It does <em>not</em> prove the batch-EOF drop-prevention fix on its own: {@code
+   * dediren_guide} answers from a string constant in single-digit milliseconds, so it wins the EOF
+   * race even against an implementation that does not really wait for anything still in flight.
+   * That claim belongs to {@code serveOnHoldsEofUntilASlowToolHasAnswered} below, which is shaped
+   * specifically to lose that race against anything but genuine request/response correlation.
    */
   @Test
-  void serveOnDoesNotDropResponsesWhenStdinBatchEofsImmediately(@TempDir Path root) {
+  void serveOnAnswersAWholeBatchThroughTheRealToolWiring(@TempDir Path root) {
     String requests =
         """
         {"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"regression-test","version":"1"}}}
@@ -366,6 +382,80 @@ class DedirenMcpServerTest {
                 true,
                 new ByteArrayInputStream(notifications.getBytes(StandardCharsets.UTF_8)),
                 new ByteArrayOutputStream()));
+  }
+
+  /**
+   * F5: a peer that never sends a newline must not be allowed to grow {@code
+   * EofSignalingInputStream}/{@code FrameSplitter}'s buffer without bound. {@link
+   * BoundedGarbageInputStream} declares a size well past {@link FrameSplitter#MAX_FRAME_BYTES} but
+   * produces bytes lazily rather than pre-materializing them, so the assertion below on how much of
+   * it was actually consumed is the load-bearing one: a pre-allocated array the size of the bound
+   * would resolve via the ordinary end-of-stream {@code flushPartial} path regardless of whether
+   * the bound fires early, and would prove nothing about boundedness. Reading only a small fraction
+   * of the declared size, rather than draining the whole thing before giving up, is exactly the
+   * "doesn't OOM" property F5 exists for.
+   */
+  @Test
+  void serveOnStopsReadingWellBeforeAnOversizedFrameEnds(@TempDir Path root) {
+    long declaredSize = 4L * FrameSplitter.MAX_FRAME_BYTES;
+    BoundedGarbageInputStream garbage = new BoundedGarbageInputStream(declaredSize);
+
+    assertTimeoutPreemptively(
+        Duration.ofSeconds(15),
+        () ->
+            DedirenMcpServer.serveOn(
+                root,
+                Engines.of(List.of(), List.of(), List.of(), List.of()),
+                Map.of(),
+                true,
+                garbage,
+                new ByteArrayOutputStream()));
+
+    assertThat(garbage.bytesProduced())
+        .as(
+            "the read loop must stop near MAX_FRAME_BYTES (%d), not drain the full declared size"
+                + " (%d)",
+            FrameSplitter.MAX_FRAME_BYTES, declaredSize)
+        .isLessThan(declaredSize / 2);
+  }
+
+  /**
+   * An {@link java.io.InputStream} that never pre-materializes its payload: it hands out {@code
+   * 'a'} bytes (no newline, ever) up to a fixed declared size, then EOFs, counting how many it
+   * actually produced. Standing in for a client that streams a multi-gigabyte frame -- the actual
+   * attack F5 defends against -- without the test itself needing to allocate that much memory.
+   */
+  private static final class BoundedGarbageInputStream extends java.io.InputStream {
+    private final long declaredSize;
+    private long produced;
+
+    BoundedGarbageInputStream(long declaredSize) {
+      this.declaredSize = declaredSize;
+    }
+
+    @Override
+    public synchronized int read() {
+      if (produced >= declaredSize) {
+        return -1;
+      }
+      produced++;
+      return 'a';
+    }
+
+    @Override
+    public synchronized int read(byte[] b, int off, int len) {
+      if (produced >= declaredSize) {
+        return -1;
+      }
+      int count = (int) Math.min(len, declaredSize - produced);
+      java.util.Arrays.fill(b, off, off + count, (byte) 'a');
+      produced += count;
+      return count;
+    }
+
+    synchronized long bytesProduced() {
+      return produced;
+    }
   }
 
   private static final String SLOW_TOOL_SENTINEL = "slow-tool-answered";

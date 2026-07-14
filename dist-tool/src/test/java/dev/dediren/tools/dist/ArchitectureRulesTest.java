@@ -74,6 +74,7 @@ class ArchitectureRulesTest {
     int semanticsGraphClasses = 0;
     int semanticsArchimateClasses = 0;
     int semanticsUmlClasses = 0;
+    int mcpClasses = 0;
     for (JavaClass javaClass : PRODUCTION_CLASSES) {
       String packageName = javaClass.getPackageName();
       if (packageName.startsWith("dev.dediren.core")) {
@@ -96,6 +97,8 @@ class ArchitectureRulesTest {
         semanticsArchimateClasses++;
       } else if (packageName.startsWith("dev.dediren.semantics.uml")) {
         semanticsUmlClasses++;
+      } else if (packageName.startsWith("dev.dediren.mcp")) {
+        mcpClasses++;
       }
     }
     assertThat(coreClasses).as("core production classes on the classpath").isPositive();
@@ -120,6 +123,7 @@ class ArchitectureRulesTest {
     assertThat(semanticsUmlClasses)
         .as("semantics-uml production classes on the classpath")
         .isPositive();
+    assertThat(mcpClasses).as("mcp-server production classes on the classpath").isPositive();
   }
 
   @Test

@@ -67,6 +67,20 @@ import java.util.concurrent.CountDownLatch;
  * see the failure to unwind its own loop. This is not a drain: like the fatal-frame path, the
  * transport is already gone, so there is nothing left to wait for.
  *
+ * <p><b>Not OOMing on a frame that never ends.</b> {@link FrameSplitter} bounds how much of a
+ * still-unterminated frame it will buffer ({@link FrameSplitter#MAX_FRAME_BYTES}), but bounding the
+ * buffer is not by itself enough to stop the underlying growth: the SDK's own {@code
+ * BufferedReader.readLine()} is reading this very stream in parallel, looking for the same newline,
+ * and its internal buffer grows exactly as unboundedly as {@link FrameSplitter}'s would have
+ * without the bound. Logging and releasing the latch -- the {@link #onUnreadableFrame} treatment --
+ * is not enough here either, because it does not stop {@code readLine()} from calling {@link #read}
+ * again: there is no complete line yet for the SDK to reject on its own, so it just keeps asking
+ * for more. The only way to stop it is the same one {@link #onReadFailure} already uses: make the
+ * read itself fail. So once {@link FrameSplitter#exceedsMaxFrameSize()} trips, {@link
+ * #checkFrameSize} throws an {@link IOException} of its own, which propagates up through that same
+ * blocked {@code readLine()} call and forces its loop to stop, exactly the way a dead pty (EIO)
+ * does.
+ *
  * <p>EOF or a read failure can surface from {@link #read()}, {@link #read(byte[])}, or {@link
  * #read(byte[], int, int)}, depending on which one the caller or a buffering layer above it happens
  * to use, so all three are overridden explicitly rather than left to {@link FilterInputStream}'s
@@ -113,6 +127,7 @@ final class EofSignalingInputStream extends FilterInputStream {
       onEof();
     } else {
       frames.accept(value);
+      checkFrameSize();
     }
     return value;
   }
@@ -137,6 +152,7 @@ final class EofSignalingInputStream extends FilterInputStream {
       onEof();
     } else if (count > 0) {
       frames.accept(b, off, count);
+      checkFrameSize();
     }
     return count;
   }
@@ -246,6 +262,48 @@ final class EofSignalingInputStream extends FilterInputStream {
             + failure
             + "), which is fatal to the JSON-RPC transport -- it stops reading, so no further"
             + " request on this connection can be answered. Shutting down rather than hanging.");
+    eofLatch.countDown();
+  }
+
+  /**
+   * Called after every successful read that fed {@link #frames}. Cheap in the overwhelmingly common
+   * case ({@link FrameSplitter#exceedsMaxFrameSize()} is one size comparison), and fatal in the
+   * rare one: see the class doc's "Not OOMing on a frame that never ends" for why this has to throw
+   * rather than merely log-and-release like {@link #onUnreadableFrame}.
+   */
+  private void checkFrameSize() throws IOException {
+    if (!frames.exceedsMaxFrameSize()) {
+      return;
+    }
+    IOException oversized =
+        new IOException(
+            "stdin carried a frame larger than "
+                + FrameSplitter.MAX_FRAME_BYTES
+                + " bytes with no terminating newline");
+    onOversizedFrame(oversized);
+    throw oversized;
+  }
+
+  /**
+   * Say so, then release EOF so the process can exit -- the same shape as {@link #onReadFailure},
+   * which this mirrors deliberately: {@link #checkFrameSize} rethrows {@code oversized} right after
+   * this returns, and that is what actually stops the SDK's read loop (see the class doc). There is
+   * nothing to drain: a frame this large was never going to finish being read anyway, so nothing
+   * downstream is owed a response for it.
+   */
+  private void onOversizedFrame(IOException oversized) {
+    if (eofLatch.getCount() == 0) {
+      // Already released -- an earlier failure or an unreadable frame already ended this session.
+      return;
+    }
+    // stderr, deliberately: stdout is the protocol channel (see StdoutIntegrity), and the SLF4J
+    // levels that would carry an alarm are banned in first-party code.
+    System.err.println(
+        "dediren mcp: "
+            + oversized.getMessage()
+            + ", which is fatal to the JSON-RPC transport -- it stops reading, so no further"
+            + " request on this connection can be answered. Shutting down rather than risking an"
+            + " unbounded buffer.");
     eofLatch.countDown();
   }
 

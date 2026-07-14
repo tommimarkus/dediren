@@ -32,6 +32,23 @@ import java.util.function.Consumer;
 final class FrameSplitter {
   private static final byte NEWLINE = (byte) '\n';
 
+  /**
+   * The most bytes a single still-unterminated frame may accumulate in {@link #partial}. Framing is
+   * newline-delimited, so nothing else bounds how long a "line" can run: without this, a peer that
+   * simply never sends a newline would grow {@link #partial} without limit and OOM the process one
+   * chunk at a time. 16 MiB is far above any legitimate request or response this product produces
+   * -- a large hand-authored source model is still comfortably under it -- while keeping the worst
+   * case a fixed, small multiple of one frame rather than unbounded.
+   *
+   * <p>This class only exposes the crossing as a query ({@link #exceedsMaxFrameSize()}); it never
+   * acts on it. {@code emit}/{@code flushPartial} are unaffected, so a caller that never checks the
+   * query keeps today's behavior exactly. Deciding what "oversized" means -- and whether that is
+   * even a meaningful concern, which it is only for untrusted input -- is the caller's job; see
+   * {@code EofSignalingInputStream#checkFrameSize} for the inbound side, which is the one direction
+   * a client actually controls.
+   */
+  static final int MAX_FRAME_BYTES = 16 * 1024 * 1024;
+
   private final ByteArrayOutputStream partial = new ByteArrayOutputStream();
   private final Consumer<String> onFrame;
 
@@ -81,6 +98,15 @@ final class FrameSplitter {
     }
     emit();
     return true;
+  }
+
+  /**
+   * Whether the still-unterminated frame currently buffered in {@link #partial} has crossed {@link
+   * #MAX_FRAME_BYTES}. A pure query: unlike {@link #emit}, nothing here clears the buffer or
+   * notifies {@link #onFrame}.
+   */
+  synchronized boolean exceedsMaxFrameSize() {
+    return partial.size() > MAX_FRAME_BYTES;
   }
 
   private void emit() {

@@ -53,21 +53,30 @@ tests (Task 4).
 
 ### MCP stdio server (`dediren mcp`)
 
-`dediren mcp` (module `mcp`, launched by `cli`'s `McpCommand`) is a long-lived,
-model-driven process holding a filesystem write primitive. It is the one boundary
-where a *model* — not a human — chooses the paths, and MCP clients frequently
-auto-approve tool calls, so the CLI's "a human typed this path" posture does not
-transfer.
+`dediren mcp` (module `mcp-server`, launched by `cli`'s `McpCommand`) is a
+long-lived, model-driven process holding a filesystem write primitive. It is the
+one boundary where a *model* — not a human — chooses the paths, and MCP clients
+frequently auto-approve tool calls, so the CLI's "a human typed this path"
+posture does not transfer.
 
-There is no network surface: stdio transport only, no port, no HTTP/SSE listener,
-no multi-client daemon. The MCP client spawns the process and owns its lifetime,
-so there is no daemon lifecycle to supervise.
+There is no network *listener*: stdio transport only, no port, no HTTP/SSE
+listener, no multi-client daemon, and the MCP client spawns the process and owns
+its lifetime, so there is no daemon lifecycle to supervise. That is inbound-only,
+though: a `dediren_build` call whose policy selects the OEF or XMI export lane
+reaches the same subprocess/outbound-HTTPS boundaries as the CLI's `build` and
+`export` commands (see "Schema cache + runtime download" and "XML parsing &
+external validator" below) — an `xmllint` subprocess always, and, absent a
+cached or offline schema, a `curl` fetch beforehand. `--read-only` withholds
+`dediren_build` entirely, removing both. Short of that, the
+`DEDIREN_OEF_SCHEMA_DIR` / `DEDIREN_XMI_SCHEMA_PATH` offline overrides remove
+only the outbound fetch — `xmllint` still runs against the supplied schema, with
+`--nonet` as noted below.
 
 Controls:
 
 - **Workspace-root confinement.** Every tool path argument is resolved against the
   `--root` (default: cwd) and real-path-resolved *before* the containment check
-  (`mcp/src/main/java/dev/dediren/mcp/WorkspacePaths.java`). Normalization alone is
+  (`mcp-server/src/main/java/dev/dediren/mcp/WorkspacePaths.java`). Normalization alone is
   insufficient — a symlink inside the root pointing outside is the interesting case,
   and only `toRealPath()` catches it. For an output directory that need not exist,
   the nearest existing ancestor is resolved instead. An escaping path yields a
