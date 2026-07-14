@@ -40,6 +40,10 @@ class SequenceSelfMessageHookTest {
 
     Document svg = SvgAudit.parse(RenderTestSupport.render(input));
 
+    // Regression pin, not an independent oracle: 455.0 was rebaselined together with the golden
+    // SVG and fixtures/layout-result/uml-sequence-self-message.json in the same pipeline run
+    // (commit 3d8d0e0). The stemX-derived checks below (points.get(0)/get(last) against this same
+    // stemX) are the actual invariant this test defends -- they hold regardless of the literal.
     double stemX = lifelineStemX(svg, "service");
     assertThat(stemX).as("service lifeline stem centre-x").isEqualTo(455.0);
 
@@ -48,6 +52,11 @@ class SequenceSelfMessageHookTest {
     // The hook: stem -> stem+40 -> down -> back to the stem (fixtures/layout-result/
     // uml-sequence-self-message.json's m2 points, verbatim -- edgePath emits raw layout points
     // with no additional offset).
+    //
+    // Also a regression pin rebaselined together with the golden SVG and the layout fixture in
+    // the same pipeline run (commit 3d8d0e0), not an independently derived expectation. The
+    // stemX-derived assertions below (points must start/end on lifelineStemX(svg, "service")) are
+    // the independent invariant oracle: they would still hold even if this literal moved.
     assertThat(path.getAttribute("d"))
         .isEqualTo("M 455.0 388.0 L 495.0 388.0 L 495.0 412.0 L 455.0 412.0");
 
