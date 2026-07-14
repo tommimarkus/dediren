@@ -360,6 +360,21 @@ class ArchitectureRulesTest {
   }
 
   @Test
+  void exportersDoNotImportIr() {
+    noClasses()
+        .that()
+        .resideInAnyPackage(ARCHIMATE_OEF, UML_XMI)
+        .should()
+        .dependOnClassesThat()
+        .resideInAPackage(IR)
+        .because(
+            "the export engines consume the record-based ExportRequest wire contract, not the"
+                + " in-memory IR; §2's edge table allows them no ir edge even though transitive"
+                + " compilation leaves it reachable (P4 forced deviation, §5)")
+        .check(PRODUCTION_CLASSES);
+  }
+
+  @Test
   void onlyEngineWiringTouchesEngineImplementations() {
     // The engine deps (four plugins.* engines plus the three semantics-* modules) are compile
     // scope so EngineWiring can construct them for the in-memory dispatch. That single named
