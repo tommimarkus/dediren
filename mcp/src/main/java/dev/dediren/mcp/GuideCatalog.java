@@ -50,6 +50,7 @@ public final class GuideCatalog {
     topics.put("export", "Export");
     topics.put("repair", "Repair Rules");
     topics.put("environment", "Plugin Environment");
+    topics.put("logging", "Debug Logging");
     return Map.copyOf(topics);
   }
 
