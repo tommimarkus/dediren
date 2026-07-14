@@ -73,47 +73,9 @@ class LaidOutSceneMapperTest {
 
     assertThat(roundTripped.layoutResultSchemaVersion())
         .isEqualTo(ContractVersions.LAYOUT_RESULT_SCHEMA_VERSION);
-    assertThat(roundTripped.viewId()).isEqualTo(result.viewId());
-
-    LaidOutNode originalNode = result.nodes().get(0);
-    LaidOutNode roundTrippedNode = roundTripped.nodes().get(0);
-    assertThat(roundTrippedNode.id()).isEqualTo(originalNode.id());
-    assertThat(roundTrippedNode.sourceId()).isEqualTo(originalNode.sourceId());
-    assertThat(roundTrippedNode.projectionId()).isEqualTo(originalNode.projectionId());
-    assertThat(roundTrippedNode.x()).isEqualTo(originalNode.x());
-    assertThat(roundTrippedNode.y()).isEqualTo(originalNode.y());
-    assertThat(roundTrippedNode.width()).isEqualTo(originalNode.width());
-    assertThat(roundTrippedNode.height()).isEqualTo(originalNode.height());
-    assertThat(roundTrippedNode.label()).isEqualTo(originalNode.label());
-    assertThat(roundTrippedNode.role()).isEqualTo(originalNode.role());
-    assertThat(roundTrippedNode.sourcePointer()).isEqualTo(originalNode.sourcePointer());
-
-    LaidOutEdge originalEdge = result.edges().get(0);
-    LaidOutEdge roundTrippedEdge = roundTripped.edges().get(0);
-    assertThat(roundTrippedEdge.id()).isEqualTo(originalEdge.id());
-    assertThat(roundTrippedEdge.source()).isEqualTo(originalEdge.source());
-    assertThat(roundTrippedEdge.target()).isEqualTo(originalEdge.target());
-    assertThat(roundTrippedEdge.sourceId()).isEqualTo(originalEdge.sourceId());
-    assertThat(roundTrippedEdge.projectionId()).isEqualTo(originalEdge.projectionId());
-    assertThat(roundTrippedEdge.routingHints()).isEqualTo(originalEdge.routingHints());
-    assertThat(roundTrippedEdge.points()).isEqualTo(originalEdge.points());
-    assertThat(roundTrippedEdge.label()).isEqualTo(originalEdge.label());
-    assertThat(roundTrippedEdge.sourcePointer()).isEqualTo(originalEdge.sourcePointer());
-
-    LaidOutGroup originalGroup = result.groups().get(0);
-    LaidOutGroup roundTrippedGroup = roundTripped.groups().get(0);
-    assertThat(roundTrippedGroup.id()).isEqualTo(originalGroup.id());
-    assertThat(roundTrippedGroup.sourceId()).isEqualTo(originalGroup.sourceId());
-    assertThat(roundTrippedGroup.projectionId()).isEqualTo(originalGroup.projectionId());
-    assertThat(roundTrippedGroup.provenance()).isEqualTo(originalGroup.provenance());
-    assertThat(roundTrippedGroup.x()).isEqualTo(originalGroup.x());
-    assertThat(roundTrippedGroup.y()).isEqualTo(originalGroup.y());
-    assertThat(roundTrippedGroup.width()).isEqualTo(originalGroup.width());
-    assertThat(roundTrippedGroup.height()).isEqualTo(originalGroup.height());
-    assertThat(roundTrippedGroup.members()).isEqualTo(originalGroup.members());
-    assertThat(roundTrippedGroup.label()).isEqualTo(originalGroup.label());
-
-    assertThat(roundTripped.warnings()).isEqualTo(result.warnings());
+    // Whole-record equality: a future field added to the records but missed by the mapper
+    // fails here structurally, instead of passing a hand-enumerated field list silently.
+    assertThat(roundTripped).isEqualTo(result);
   }
 
   @Test

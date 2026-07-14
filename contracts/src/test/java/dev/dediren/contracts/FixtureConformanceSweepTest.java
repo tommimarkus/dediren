@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
@@ -38,6 +39,13 @@ class FixtureConformanceSweepTest {
           "fixtures/render-policy", "schemas/render-policy.schema.json",
           "fixtures/build-result", "schemas/build-result.schema.json");
 
+  /** Fixture file -> schema, for directories whose fixtures use different schemas. */
+  private static final Map<String, String> PER_FILE_FAMILIES =
+      Map.of(
+          "fixtures/export-policy/default-oef.json", "schemas/oef-export-policy.schema.json",
+          "fixtures/export-policy/default-uml-xmi.json",
+              "schemas/uml-xmi-export-policy.schema.json");
+
   /**
    * Negative fixtures that exist precisely to be rejected by their schema. They are asserted
    * invalid below rather than skipped, so one silently becoming valid is a failure too.
@@ -62,6 +70,7 @@ class FixtureConformanceSweepTest {
             .forEach(fixture -> cases.add(new Object[] {fixture, family.getValue()}));
       }
     }
+    PER_FILE_FAMILIES.forEach((fixture, schema) -> cases.add(new Object[] {fixture, schema}));
     return cases.stream();
   }
 
@@ -88,6 +97,14 @@ class FixtureConformanceSweepTest {
             "%s exists to be rejected by %s; if it now validates, the schema has weakened",
             fixture, schema)
         .isNotEmpty();
+  }
+
+  @Test
+  void everyExportPolicyFixtureIsEnrolled() throws IOException {
+    try (Stream<Path> files = Files.list(workspaceRoot().resolve("fixtures/export-policy"))) {
+      assertThat(files.map(path -> "fixtures/export-policy/" + path.getFileName()).sorted())
+          .containsExactlyElementsOf(PER_FILE_FAMILIES.keySet().stream().sorted().toList());
+    }
   }
 
   private static Path workspaceRoot() {
