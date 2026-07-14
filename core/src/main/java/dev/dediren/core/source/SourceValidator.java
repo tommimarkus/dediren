@@ -103,12 +103,11 @@ public final class SourceValidator {
                     "fragment '" + fragment + "' must be relative to the source model",
                     "$.fragments[" + i + "]")));
       }
-      if (confinementRoot != null) {
-        requireFragmentWithinRoot(confinementRoot, baseDir, fragment, fragmentPath, i);
-      }
+      Path fragmentReadPath =
+          resolveFragmentReadPath(confinementRoot, baseDir, fragment, fragmentPath, i);
       SourceDocument fragmentDocument;
       try {
-        fragmentDocument = parseSourceDocument(Files.readString(baseDir.resolve(fragmentPath)));
+        fragmentDocument = parseSourceDocument(Files.readString(fragmentReadPath));
       } catch (IOException readError) {
         // CLI/human lane (null root): the real message helps a human and routinely carries the
         // resolved absolute path. MCP lane (root set): sanitize — echo only the model-supplied
@@ -140,11 +139,29 @@ public final class SourceValidator {
   }
 
   /**
-   * Confines a source-fragment path to {@code confinementRoot}, the MCP trust boundary where a
-   * model — not a human — chose the path. Mirrors {@code mcp WorkspacePaths.resolveForWrite} (core
-   * cannot depend on the mcp module): resolve the fragment against its base directory, then
-   * real-path-resolve the nearest existing ancestor so a symlink inside the root that points
-   * outside it is rejected rather than followed, and require the result to stay within the root.
+   * Resolves the path a source fragment is read from — the confinement decision and the read path
+   * are the same computation, so there is no second, independently-resolved path for the two to
+   * diverge on.
+   *
+   * <p>On the CLI/human lane ({@code confinementRoot} is null) this is byte-identical to the
+   * pre-confinement behaviour: the raw, unresolved {@code baseDir.resolve(fragmentPath)}, because a
+   * human legitimately references fragments across their own project and read failures should carry
+   * their real message.
+   *
+   * <p>On the MCP lane ({@code confinementRoot} is non-null, a model — not a human — chose the
+   * path) the path is confined to {@code confinementRoot} before it is returned. Mirrors {@code mcp
+   * WorkspacePaths.resolveForWrite} (core cannot depend on the mcp module): walk up from the
+   * requested path to the nearest existing ancestor, real-path-resolve that ancestor (following
+   * symlinks), then re-append the remainder and confine the result to the real root.
+   *
+   * <p>Critically, the walk starts from the <em>unnormalized</em> {@code baseDir.resolve(
+   * fragmentPath)} — calling {@link Path#normalize()} on the full path before the walk would
+   * lexically collapse a {@code link/..} sequence with no regard for what {@code link} actually is
+   * on disk, discarding the symlink before the walk (or the eventual physical read) ever sees it.
+   * {@link Files#exists} and {@link Path#toRealPath} both resolve symlinks physically,
+   * component-by-component — exactly like the OS call a read performs — so leaving the path
+   * unnormalized until it is anchored on a real, existing ancestor keeps the confinement decision
+   * and the physical read looking at the same target.
    *
    * <p>Fail closed and sanitized: an escape — or a root/ancestor that cannot be real-path-resolved
    * — yields {@link DiagnosticCode#MCP_PATH_OUTSIDE_ROOT} carrying only the model-supplied fragment
@@ -152,16 +169,19 @@ public final class SourceValidator {
    * host filesystem. A fragment that stays within the root but does not exist is left to the read
    * step, which reports it as a sanitized {@code FRAGMENT_READ_FAILED}.
    */
-  private static void requireFragmentWithinRoot(
+  private static Path resolveFragmentReadPath(
       Path confinementRoot, Path baseDir, String fragment, Path fragmentPath, int index)
       throws SourceDiagnosticsException {
+    Path resolved = baseDir.resolve(fragmentPath);
+    if (confinementRoot == null) {
+      return resolved;
+    }
     Path realRoot;
     try {
       realRoot = confinementRoot.toRealPath();
     } catch (IOException error) {
       throw fragmentOutsideRoot(fragment, index);
     }
-    Path resolved = baseDir.resolve(fragmentPath).normalize();
     Path existing = resolved;
     while (existing != null && !existing.toFile().exists()) {
       existing = existing.getParent();
@@ -175,10 +195,14 @@ public final class SourceValidator {
     } catch (IOException error) {
       throw fragmentOutsideRoot(fragment, index);
     }
-    Path target = realExisting.resolve(existing.relativize(resolved)).normalize();
-    if (!realExisting.startsWith(realRoot) || !target.startsWith(realRoot)) {
+    if (!realExisting.startsWith(realRoot)) {
       throw fragmentOutsideRoot(fragment, index);
     }
+    Path target = realExisting.resolve(existing.relativize(resolved)).normalize();
+    if (!target.startsWith(realRoot)) {
+      throw fragmentOutsideRoot(fragment, index);
+    }
+    return target;
   }
 
   private static SourceDiagnosticsException fragmentOutsideRoot(String fragment, int index) {
