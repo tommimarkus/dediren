@@ -8,6 +8,7 @@ import dev.dediren.contracts.Diagnostic;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.api.parallel.Isolated;
@@ -115,6 +116,28 @@ class SourceValidatorTest {
     // sibling violations, not the same violation reported twice.
     assertThat(diagnostics.stream().map(Diagnostic::message).distinct().count())
         .isGreaterThanOrEqualTo(2);
+  }
+
+  @Test
+  void aModelWithAnUnknownSchemaVersionSaysSoInsteadOfFailingGenericSchemaValidation() {
+    ValidationResult result =
+        SourceValidator.validateSourceJson(
+            """
+            {
+              "model_schema_version": "model.schema.v0",
+              "nodes": [],
+              "relationships": [],
+              "plugins": { "generic-graph": { "views": [] } }
+            }
+            """,
+            null);
+
+    assertThat(result.exitCode()).isNotZero();
+    List<Diagnostic> diagnostics = result.envelope().diagnostics();
+    assertThat(diagnostics).hasSize(1);
+    assertThat(diagnostics.get(0).code()).isEqualTo("DEDIREN_SCHEMA_VERSION_UNKNOWN");
+    assertThat(diagnostics.get(0).message()).contains("model.schema.v1");
+    assertThat(diagnostics.get(0).path()).isEqualTo("$.model_schema_version");
   }
 
   // --- Source-fragment confinement (the MCP trust boundary). The null confinement root is the

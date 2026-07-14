@@ -5,6 +5,7 @@ import dev.dediren.contracts.CommandExitCode;
 import dev.dediren.contracts.Diagnostic;
 import dev.dediren.contracts.DiagnosticCode;
 import dev.dediren.contracts.DiagnosticSeverity;
+import dev.dediren.contracts.KnownSchemaVersions;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.contracts.source.PluginRequirement;
 import dev.dediren.contracts.source.SourceDocument;
@@ -12,6 +13,7 @@ import dev.dediren.contracts.source.SourceNode;
 import dev.dediren.contracts.source.SourceRelationship;
 import dev.dediren.core.DedirenPaths;
 import dev.dediren.core.schema.SchemaValidator;
+import dev.dediren.core.schema.SchemaVersionGate;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -19,6 +21,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ArrayNode;
@@ -220,6 +223,12 @@ public final class SourceValidator {
       value = JsonSupport.objectMapper().readTree(text);
     } catch (JacksonException error) {
       throw new SourceDiagnosticsException(List.of(schemaError(error.getMessage())));
+    }
+    // Before structural validation: a stale version makes every downstream schema error noise, and
+    // the const mismatch it would otherwise produce never says "your file is old".
+    Optional<Diagnostic> staleVersion = SchemaVersionGate.check(KnownSchemaVersions.MODEL, value);
+    if (staleVersion.isPresent()) {
+      throw new SourceDiagnosticsException(List.of(staleVersion.get()));
     }
     var errors =
         SchemaValidator.fromRepositoryRoot(DedirenPaths.productRoot())
