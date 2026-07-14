@@ -110,6 +110,11 @@ public enum DiagnosticCode {
   GENERIC_GRAPH_RELATIONSHIP_ENDPOINT_OUTSIDE_VIEW(
       "DEDIREN_GENERIC_GRAPH_RELATIONSHIP_ENDPOINT_OUTSIDE_VIEW"),
   SEMANTIC_PROFILE_REQUIRED("DEDIREN_SEMANTIC_PROFILE_REQUIRED"),
+
+  // MCP stdio server: a model-supplied path that resolves outside the server's workspace root.
+  // Emitted by mcp WorkspacePaths for a path-shaped tool argument (source/out/policies) and by core
+  // SourceValidator for a source-document fragment path, when a confinement root is in force.
+  MCP_PATH_OUTSIDE_ROOT("DEDIREN_MCP_PATH_OUTSIDE_ROOT"),
   SEMANTIC_PROFILE_UNSUPPORTED("DEDIREN_SEMANTIC_PROFILE_UNSUPPORTED"),
 
   // UML notation core.

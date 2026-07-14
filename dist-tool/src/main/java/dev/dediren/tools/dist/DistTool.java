@@ -73,6 +73,7 @@ public final class DistTool {
           "elk-layout",
           "engine-api",
           "ir",
+          "mcp-server",
           "render",
           "schema-cache",
           "semantics-archimate",
@@ -99,6 +100,12 @@ public final class DistTool {
               attribution("NetworkNT JSON Schema Validator", "Apache-2.0")),
           Map.entry("jspecify", attribution("JSpecify", "Apache-2.0")),
           Map.entry("listenablefuture", attribution("Google Guava listenablefuture", "Apache-2.0")),
+          Map.entry("mcp", attribution("Model Context Protocol Java SDK", "MIT (MCP Java SDK)")),
+          Map.entry(
+              "mcp-core", attribution("Model Context Protocol Java SDK", "MIT (MCP Java SDK)")),
+          Map.entry(
+              "mcp-json-jackson3",
+              attribution("Model Context Protocol Java SDK", "MIT (MCP Java SDK)")),
           Map.entry(
               "org.eclipse.elk.alg.common", attribution("Eclipse Layout Kernel (ELK)", "EPL-2.0")),
           Map.entry(
@@ -117,6 +124,9 @@ public final class DistTool {
               attribution("Eclipse Modeling Framework (EMF)", "EPL-1.0")),
           Map.entry("org.eclipse.xtext.xbase.lib", attribution("Eclipse Xtext", "EPL-2.0")),
           Map.entry("picocli", attribution("picocli", "Apache-2.0")),
+          Map.entry(
+              "reactive-streams", attribution("Reactive Streams", "MIT-0 (Reactive Streams)")),
+          Map.entry("reactor-core", attribution("Project Reactor", "Apache-2.0")),
           Map.entry("slf4j-api", attribution("SLF4J", "MIT (SLF4J)")),
           Map.entry("slf4j-simple", attribution("SLF4J", "MIT (SLF4J)")),
           Map.entry("snakeyaml-engine", attribution("SnakeYAML Engine", "Apache-2.0")),
@@ -139,6 +149,8 @@ public final class DistTool {
           "EPL-2.0", "licenses/epl-2.0.txt",
           "EPL-1.0", "licenses/epl-1.0.txt",
           "MIT (SLF4J)", "licenses/mit-slf4j.txt",
+          "MIT (MCP Java SDK)", "licenses/mit-mcp-java-sdk.txt",
+          "MIT-0 (Reactive Streams)", "licenses/mit0-reactive-streams.txt",
           "SAX (public domain)", "licenses/sax.txt",
           "W3C Software License", "licenses/w3c-software.txt");
 
@@ -396,6 +408,9 @@ public final class DistTool {
       Path oefSchemas = writeOefSchemas(temp.resolve("oef-schemas"));
       // Full one-shot pipeline through the packaged launcher: render + OEF export in one build.
       assertBuildRendersAndExports(dediren, bundle, temp, oefSchemas);
+
+      assertMcpServesToolsOverStdio(bundle, temp);
+      assertMcpColdCdsStdoutClean(bundle, temp);
 
       Path request = temp.resolve("request.json");
       Path layout = temp.resolve("layout.json");
@@ -998,12 +1013,22 @@ public final class DistTool {
   private static BundleOutput runBundleCommandCapturingBoth(
       Path executable, Path bundle, List<String> args, Map<String, String> extraEnv)
       throws Exception {
+    return runBundleCommandCapturingBoth(executable, bundle, args, null, extraEnv);
+  }
+
+  /** Both streams of one bundled run, with an optional stdin redirect (for the MCP launches). */
+  private static BundleOutput runBundleCommandCapturingBoth(
+      Path executable, Path bundle, List<String> args, Path stdin, Map<String, String> extraEnv)
+      throws Exception {
     ProcessBuilder builder = new ProcessBuilder(command(executable.toString(), args));
     builder.directory(bundle.toFile());
     for (String name : CLEAN_ENV) {
       builder.environment().remove(name);
     }
     builder.environment().putAll(extraEnv);
+    if (stdin != null) {
+      builder.redirectInput(stdin.toFile());
+    }
     Process process = builder.start();
     String stdout = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
     String stderr = new String(process.getErrorStream().readAllBytes(), StandardCharsets.UTF_8);
@@ -1144,6 +1169,177 @@ public final class DistTool {
     assertNoJvmLogLines(validateStdout, "first-launch validate");
     // Must parse as a single ok JSON envelope, not JSON interleaved with CDS log noise.
     okData(validateStdout);
+  }
+
+  /**
+   * Drives the packaged MCP server over real stdio with real JSON-RPC.
+   *
+   * <p>Two things are only observable here. First, the protocol actually working through the
+   * bundled classpath — including that a tool which does <em>real work</em> gets its response
+   * written at all. The batch therefore ends in a genuine {@code dediren_build} — the flagship
+   * tool, a full compile through ELK and the SVG renderer, seconds rather than milliseconds — and
+   * its response frame is required to be present, by id, carrying an ok build envelope. This is the
+   * assertion that matters: an earlier drain implementation waited a fixed idle window after the
+   * last outbound byte, which is long enough for {@code dediren_guide} (a string constant, answered
+   * in milliseconds) and not remotely long enough for a build. Every response slower than that
+   * window was silently discarded by the SDK's EOF-triggered close, and a smoke test that called
+   * only the guide stayed green while the product's headline tool lost every reply it ever made.
+   *
+   * <p>Second, that stdout carries protocol frames and <em>nothing else</em> under a real build's
+   * worth of engine activity — a stray print from render/ELK/export code reaching stdout would
+   * corrupt the frame stream and a real client would silently go dark. This run does <em>not</em>,
+   * however, exercise the two noise sources {@code StdoutIntegrity} actually guards against: it
+   * runs after {@link #assertBuildRendersAndExports}, by which point the default CDS archive is
+   * already warm and SLF4J is already bound, so neither the JVM's first-launch CDS notice nor
+   * SLF4J's provider warning is live here. That gap is real: this assertion alone cannot tell
+   * {@code StdoutIntegrity}'s redirect being present from it being deleted, because there is
+   * nothing left for either noise source to leak. {@link #assertMcpColdCdsStdoutClean}, run
+   * immediately after this one, closes it with a genuinely first-launch CDS notice.
+   */
+  private static void assertMcpServesToolsOverStdio(Path bundle, Path temp) throws Exception {
+    Path dediren = bundle.resolve("bin/dediren");
+    Path requests = temp.resolve("mcp-requests.jsonl");
+    // The build tool confines every path inside --root, so the source, the policy and the output
+    // directory are all named relative to the bundle it is rooted at.
+    Files.writeString(
+        requests,
+        """
+        {"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"dist-smoke","version":"1"}}}
+        {"jsonrpc":"2.0","method":"notifications/initialized"}
+        {"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}
+        {"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"dediren_guide","arguments":{"topic":"source-json"}}}
+        {"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"dediren_build","arguments":{"source":"fixtures/source/valid-archimate-oef.json","out":"mcp-build-out","render_policy":"fixtures/render-policy/archimate-svg.json"}}}
+        """,
+        StandardCharsets.UTF_8);
+
+    String stdout =
+        runBundleCommand(dediren, bundle, List.of("mcp", "--root", bundle.toString()), requests);
+
+    Map<String, JsonNode> responses = assertStdoutIsJsonRpcFramesOnly(stdout, "mcp");
+
+    assertContains(stdout, "\"serverInfo\"", "mcp initialize response");
+    assertContains(stdout, "dediren_validate", "mcp tools/list response");
+    assertContains(stdout, "dediren_build", "mcp tools/list response");
+    assertContains(stdout, "dediren_guide", "mcp tools/list response");
+    assertContains(stdout, "Minimal Source JSON", "mcp guide tool call response");
+
+    assertMcpBuildAnswered(bundle, responses, stdout);
+    System.out.println(
+        "mcp stdio smoke passed: 3 tools, real build answered, protocol-only stdout");
+  }
+
+  /**
+   * The build response must be <em>present</em>, not merely unerrored. A dropped response is not an
+   * error the client can see: the frame is simply absent, the batch exits 0, and the call hangs on
+   * the far end. So assert on the id, then on the envelope it carries, then on the artifact it
+   * claims to have written.
+   */
+  private static void assertMcpBuildAnswered(
+      Path bundle, Map<String, JsonNode> responses, String stdout) throws IOException {
+    JsonNode build = responses.get("4");
+    if (build == null) {
+      throw new IllegalStateException(
+          "mcp dediren_build response (id 4) is ABSENT from stdout: the server dropped it on"
+              + " stdin's EOF instead of writing it. Frames seen: "
+              + responses.keySet()
+              + "\nstdout:\n"
+              + stdout);
+    }
+    if (build.path("result").path("isError").asBoolean()) {
+      throw new IllegalStateException("mcp dediren_build reported a tool error: " + build);
+    }
+    String envelopeText = build.path("result").path("content").path(0).path("text").asText();
+    JsonNode envelope = JsonSupport.objectMapper().readTree(envelopeText);
+    if (!"ok".equals(envelope.path("status").asText())) {
+      throw new IllegalStateException(
+          "mcp dediren_build envelope status should be ok: " + envelopeText);
+    }
+    // The build-result envelope the CLI publishes, verbatim: the MCP tool adds no second result
+    // format, so the artifact it claims to have written is named under views[].artifacts[].
+    JsonNode artifact = envelope.path("views").path(0).path("artifacts").path(0);
+    if (!"svg".equals(artifact.path("artifact_kind").asText())) {
+      throw new IllegalStateException(
+          "mcp dediren_build envelope should name the SVG it rendered: " + envelopeText);
+    }
+    Path svg = bundle.resolve("mcp-build-out").resolve(artifact.path("path").asText());
+    if (!Files.isRegularFile(svg)) {
+      throw new IllegalStateException("mcp dediren_build must actually write its render: " + svg);
+    }
+  }
+
+  /**
+   * Every non-blank line of an MCP stdout capture must be a JSON-RPC frame; nothing else may share
+   * that channel. Returns the id-keyed response frames, same as the inline loop this replaces used
+   * to build locally, so a caller that needs to inspect a specific response still can.
+   */
+  private static Map<String, JsonNode> assertStdoutIsJsonRpcFramesOnly(
+      String stdout, String label) {
+    Map<String, JsonNode> responses = new LinkedHashMap<>();
+    for (String line : stdout.split("\n")) {
+      if (line.isBlank()) {
+        continue;
+      }
+      JsonNode frame;
+      try {
+        frame = JsonSupport.objectMapper().readTree(line);
+      } catch (RuntimeException notJson) {
+        throw new IllegalStateException(
+            label + " stdout must carry JSON-RPC frames only; found a non-JSON line: " + line);
+      }
+      if (!"2.0".equals(frame.path("jsonrpc").asText())) {
+        throw new IllegalStateException(label + " stdout line is not a JSON-RPC frame: " + line);
+      }
+      if (frame.has("id")) {
+        responses.put(frame.path("id").asText(), frame);
+      }
+    }
+    return responses;
+  }
+
+  /**
+   * The MCP counterpart to {@link #assertFirstLaunchStdoutClean}: a cold, never-seeded {@code
+   * DEDIREN_CDS_DIR} so the first-launch {@code -XX:+AutoCreateSharedArchive} notice is genuinely
+   * in play, closing the gap {@link #assertMcpServesToolsOverStdio} leaves (see its doc) -- that
+   * warm run cannot tell {@code StdoutIntegrity}'s redirect being present from it being deleted,
+   * because by the time it runs there is nothing left for either noise source to leak. Also
+   * captures stderr, same discipline as {@link #assertStaleCdsStdoutClean}: proving the probe
+   * actually provoked the notice is what makes the clean-stdout assertion mean anything, rather
+   * than passing vacuously because nothing warned at all.
+   *
+   * <p>A minimal batch is enough -- this is about the JVM startup path shared by every command, not
+   * about any one tool, so there is no need to repeat {@link #assertMcpServesToolsOverStdio}'s full
+   * build.
+   */
+  private static void assertMcpColdCdsStdoutClean(Path bundle, Path temp) throws Exception {
+    Path dediren = bundle.resolve("bin/dediren");
+    Path requests = temp.resolve("mcp-cold-cds-requests.jsonl");
+    Files.writeString(
+        requests,
+        """
+        {"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"dist-smoke-cold-cds","version":"1"}}}
+        {"jsonrpc":"2.0","method":"notifications/initialized"}
+        {"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"dediren_guide","arguments":{"topic":"source-json"}}}
+        """,
+        StandardCharsets.UTF_8);
+
+    BundleOutput cold =
+        runBundleCommandCapturingBoth(
+            dediren,
+            bundle,
+            List.of("mcp", "--root", bundle.toString(), "--read-only"),
+            requests,
+            Map.of("DEDIREN_CDS_DIR", temp.resolve("fresh-cds-mcp").toString()));
+
+    if (!cold.stderr().contains("[cds")) {
+      throw new IllegalStateException(
+          "the cold-CDS mcp probe did not provoke a first-launch CDS notice, so its stdout-purity"
+              + " assertion proves nothing. Expected a [cds...] warning on stderr.\nstderr:\n"
+              + cold.stderr());
+    }
+    assertStdoutIsJsonRpcFramesOnly(cold.stdout(), "cold-CDS mcp");
+    assertContains(cold.stdout(), "\"serverInfo\"", "cold-CDS mcp initialize response");
+    assertContains(cold.stdout(), "Minimal Source JSON", "cold-CDS mcp guide tool call response");
+    System.out.println("cold-CDS mcp stdio smoke passed: first-launch CDS notice, clean stdout");
   }
 
   /**

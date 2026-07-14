@@ -120,6 +120,11 @@
       <artifactId>engine-api</artifactId>
       <version>${project.version}</version>
     </dependency>
+    <dependency>
+      <groupId>dev.dediren</groupId>
+      <artifactId>mcp-server</artifactId>
+      <version>${project.version}</version>
+    </dependency>
   </dependencies>
 
   <build>

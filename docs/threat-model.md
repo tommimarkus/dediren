@@ -51,6 +51,63 @@ the export engines receive the CLI's env map explicitly (schema-path
 variables) and read nothing else, pinned by the engines' no-`getenv` guard
 tests (Task 4).
 
+### MCP stdio server (`dediren mcp`)
+
+`dediren mcp` (module `mcp-server`, launched by `cli`'s `McpCommand`) is a
+long-lived, model-driven process holding a filesystem write primitive. It is the
+one boundary where a *model* — not a human — chooses the paths, and MCP clients
+frequently auto-approve tool calls, so the CLI's "a human typed this path"
+posture does not transfer.
+
+There is no network *listener*: stdio transport only, no port, no HTTP/SSE
+listener, no multi-client daemon, and the MCP client spawns the process and owns
+its lifetime, so there is no daemon lifecycle to supervise. That is inbound-only,
+though: a `dediren_build` call whose policy selects the OEF or XMI export lane
+reaches the same subprocess/outbound-HTTPS boundaries as the CLI's `build` and
+`export` commands (see "Schema cache + runtime download" and "XML parsing &
+external validator" below) — an `xmllint` subprocess always, and, absent a
+cached or offline schema, a `curl` fetch beforehand. `--read-only` withholds
+`dediren_build` entirely, removing both. Short of that, the
+`DEDIREN_OEF_SCHEMA_DIR` / `DEDIREN_XMI_SCHEMA_PATH` offline overrides remove
+only the outbound fetch — `xmllint` still runs against the supplied schema, with
+`--nonet` as noted below.
+
+Controls:
+
+- **Workspace-root confinement.** Every tool path argument is resolved against the
+  `--root` (default: cwd) and real-path-resolved *before* the containment check
+  (`mcp-server/src/main/java/dev/dediren/mcp/WorkspacePaths.java`). Normalization alone is
+  insufficient — a symlink inside the root pointing outside is the interesting case,
+  and only `toRealPath()` catches it. For an output directory that need not exist,
+  the nearest existing ancestor is resolved instead. An escaping path yields a
+  `DEDIREN_MCP_PATH_OUTSIDE_ROOT` error envelope. Pinned by `WorkspacePathsTest`.
+  The confinement also covers the *second* class of model-supplied paths: a source
+  document's `fragments[]` entries. The MCP handlers pass `--root` as an optional
+  confinement root into core's source loader (`SourceValidator`), which applies the
+  same nearest-existing-ancestor real-path containment to each fragment before
+  reading it (the CLI/human lane passes no root and is unconfined). An escaping
+  fragment yields the same `DEDIREN_MCP_PATH_OUTSIDE_ROOT` envelope, and both the
+  escape and any in-root read failure are sanitized to echo only the model's own
+  relative fragment string — never the resolved absolute path and never a
+  distinguishable exists-vs-not-exists signal. Reachable even under `--read-only`,
+  since `dediren_validate` loads fragments. Pinned by `DedirenToolsTest` and
+  `SourceValidatorTest`.
+- **Read-only mode.** `--read-only` does not register `dediren_build` at all, so the
+  write primitive is absent rather than present-and-refusing.
+- **stdout integrity.** In stdio MCP, stdout *is* the JSON-RPC channel; a stray
+  `System.out` write anywhere in core, an engine, or a dependency would corrupt a
+  frame and the client would silently go dark. `StdoutIntegrity.claimStdout()` takes
+  the real file descriptor for the transport and redirects `System.out` to stderr, so
+  a stray print degrades to log noise. Pinned by the dist-smoke assertion
+  `assertMcpServesToolsOverStdio`, which requires every stdout line to be a JSON-RPC
+  frame.
+
+Accepted residual — **TOCTOU**: real-path-resolve-then-open is not atomic, so a local
+attacker able to create symlinks inside the root during the window can defeat the
+confinement. Accepted: the server runs with the spawning user's authority, so this
+grants an attacker nothing they did not already have. The confinement exists to stop
+a *model* writing outside the workspace, not to contain a hostile local user.
+
 ### Schema cache + runtime download
 
 Runtime schema fetches go through
@@ -150,6 +207,8 @@ a documented accepted risk — see `SECURITY.md`.
 | Inject markup into a rendered SVG via model labels/ids | `SvgWriter` (StAX) structurally escapes every attribute value and text node at emission, with no verbatim-injection path; `LabelInjectionTest` proves an end-to-end breakout payload stays escaped and round-trips; `SvgAudit` rejects ill-formed output | The SVG is inert markup with no embedded script; a consumer that embeds it must still apply its own context's policy (e.g. CSP) |
 | Dependency compromise | Blocking Grype/SBOM gate on every push/PR/release (`ci.yml`, `release.yml`) plus weekly Dependabot updates (`.github/dependabot.yml`) | The weekly OWASP Dependency-Check cross-check (`dependency-audit.yml`) is intentionally non-blocking (`continue-on-error`), so advisories only it surfaces never gate a merge or release |
 | JVM-argument injection via `DEDIREN_LOG_LEVEL` | The launcher interpolates this env var into `JAVA_OPTS`, so it accepts only the six literals `trace\|debug\|info\|warn\|error\|off`; anything else is dropped with a note on stderr. A `-Pdist-smoke` probe asserts a smuggled `-XshowSettings:properties` neither reaches the JVM nor switches logging on | The guard is a shell `case` in the generated launcher; a caller who can already set arbitrary `JAVA_OPTS` needs no such trick, so this only closes the narrower "can set DEDIREN_* but not JAVA_OPTS" path |
+| A model reads or writes outside the workspace via an MCP tool (`dediren mcp`) | Every tool path argument resolves against `--root` and is `toRealPath()`-resolved *before* the containment check, so a symlink inside the root pointing outside it is rejected, not followed (`WorkspacePaths`); an escape yields `DEDIREN_MCP_PATH_OUTSIDE_ROOT`. Model-supplied source `fragments[]` paths — the second read primitive — are confined the same way by core's `SourceValidator` under the same `--root`, with fragment errors sanitized so they cannot leak an absolute path or an exists-vs-not oracle; this covers `dediren_validate` too, so it holds under `--read-only`. `--read-only` withholds `dediren_build` entirely, so the *write* primitive is absent rather than present-and-refusing | Resolve-then-open is not atomic (TOCTOU): a local attacker able to create symlinks inside the root during the window can defeat the check. Accepted — the server already runs with the spawning user's authority, so this grants nothing they did not already have. The control exists to stop a *model* reading or writing outside the workspace, not to contain a hostile local user |
+| A stray write corrupts the MCP JSON-RPC frame stream | In stdio MCP stdout *is* the protocol channel, so `StdoutIntegrity.claimStdout()` hands the transport the real stdout file descriptor and repoints `System.out` at stderr — a stray print anywhere in `core`, an engine, or a dependency degrades to log noise instead of corrupting a frame. The `-Pdist-smoke` probe asserts every stdout line of a real `bin/dediren mcp` run is a JSON-RPC frame | A frame silently lost after the session closes is the failure mode this boundary is most exposed to; requests are id-correlated and held open until answered, and an expired backstop names the unanswered ids on stderr rather than exiting quietly |
 | Sensitive data disclosed in debug logs | Logging is `off` by default and must be switched on per run; first-party code cannot log above `debug` (ArchUnit-enforced), and logs go to stderr, never the stdout envelope | With `DEDIREN_LOG_LEVEL=debug` a log line carries filesystem paths (schema cache, schema files), schema URLs, engine ids, and node/edge **counts**. No current call site logs model element ids, labels, or document content — keep it that way: a label is author-supplied text, and logging one would turn a debug switch into a content-disclosure channel. Debug output should still not be pasted into a public issue unreviewed, since the paths alone can leak a local directory layout |
 
 ## Incident Response Runbook

@@ -11,6 +11,7 @@
 
   <modules>
     <module>cli</module>
+    <module>mcp-server</module>
     <module>archimate</module>
     <module>contracts</module>
     <module>engine-api</module>
@@ -51,6 +52,13 @@
     <jazzer.version>0.30.0</jazzer.version>
     <json-schema-validator.version>3.0.6</json-schema-validator.version>
     <junit.version>6.1.2</junit.version>
+    <mcp.sdk.version>2.0.0</mcp.sdk.version>
+    <!-- Not an independent product choice: this is the reactor-core version mcp-core 2.0.0
+         actually resolves (verify with `./mvnw -pl mcp-server dependency:tree
+         -Dincludes=io.projectreactor:reactor-core`). Pinned explicitly, rather than left to
+         whatever the SDK's own pom declares, so a reactor-core CVE can be patched ahead of the
+         next SDK release instead of waiting on it. -->
+    <reactor-core.version>3.7.0</reactor-core.version>
     <picocli.version>4.7.7</picocli.version>
     <slf4j.version>2.0.17</slf4j.version>
     <xmlunit.version>2.12.0</xmlunit.version>
@@ -77,6 +85,25 @@
         <artifactId>json-schema-validator</artifactId>
         <version>${json-schema-validator.version}</version>
       </dependency>
+      <!-- The MCP SDK's BOM. It also requests slf4j-api 2.0.16 and json-schema-validator 3.0.0,
+           both of which the pins below/above already manage to a newer line, so
+           dependencyConvergence stays green. -->
+      <dependency>
+        <groupId>io.modelcontextprotocol.sdk</groupId>
+        <artifactId>mcp-bom</artifactId>
+        <version>${mcp.sdk.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <!-- reactor-core is a transitive of mcp-core (io.modelcontextprotocol.sdk:mcp-core), not a
+           direct dependency of any module here, and the mcp-bom import above does not pin it.
+           Pinned explicitly so a reactor-core security fix can land ahead of the SDK's own next
+           release rather than being blocked on it. -->
+      <dependency>
+        <groupId>io.projectreactor</groupId>
+        <artifactId>reactor-core</artifactId>
+        <version>${reactor-core.version}</version>
+      </dependency>
       <!-- SLF4J is the first-party logging facade. slf4j-api was already an unavoidable
            transitive: json-schema-validator calls LoggerFactory from ten of its classes, so
            excluding it yields NoClassDefFoundError. (It does NOT come from ELK — no ELK 0.11.0
@@ -98,10 +125,11 @@
       </dependency>
       <!-- Jackson 3 (tools.jackson) is the project's sole Jackson stack. Pin
            databind, core, and the yaml dataformat to one patched line.
-           json-schema-validator 3.0.5 (the latest release) pulls jackson-databind
-           3.1.1 transitively, which is affected by GHSA-j3rv-43j4-c7qm and
-           GHSA-rmj7-2vxq-3g9f (both High); 3.1.4 fixes them and is also the
-           version this project's own code compiles against. -->
+           json-schema-validator 3.0.5 pulled jackson-databind 3.1.1 transitively, which was
+           affected by GHSA-j3rv-43j4-c7qm and GHSA-rmj7-2vxq-3g9f (both High); this project pins
+           json-schema-validator to 3.0.6 (see json-schema-validator.version above) and
+           jackson-databind/-core to 3.2.1 here, which is also the version this project's own code
+           compiles against. -->
       <dependency>
         <groupId>tools.jackson.core</groupId>
         <artifactId>jackson-databind</artifactId>

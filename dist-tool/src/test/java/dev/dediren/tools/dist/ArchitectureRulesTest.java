@@ -30,6 +30,7 @@ class ArchitectureRulesTest {
   private static final String ENGINE_API = "dev.dediren.engine..";
   private static final String CORE = "dev.dediren.core..";
   private static final String CLI = "dev.dediren.cli..";
+  private static final String MCP = "dev.dediren.mcp..";
   private static final String PLUGINS = "dev.dediren.plugins..";
   private static final String IR = "dev.dediren.ir..";
 
@@ -73,6 +74,7 @@ class ArchitectureRulesTest {
     int semanticsGraphClasses = 0;
     int semanticsArchimateClasses = 0;
     int semanticsUmlClasses = 0;
+    int mcpClasses = 0;
     for (JavaClass javaClass : PRODUCTION_CLASSES) {
       String packageName = javaClass.getPackageName();
       if (packageName.startsWith("dev.dediren.core")) {
@@ -95,6 +97,8 @@ class ArchitectureRulesTest {
         semanticsArchimateClasses++;
       } else if (packageName.startsWith("dev.dediren.semantics.uml")) {
         semanticsUmlClasses++;
+      } else if (packageName.startsWith("dev.dediren.mcp")) {
+        mcpClasses++;
       }
     }
     assertThat(coreClasses).as("core production classes on the classpath").isPositive();
@@ -119,6 +123,7 @@ class ArchitectureRulesTest {
     assertThat(semanticsUmlClasses)
         .as("semantics-uml production classes on the classpath")
         .isPositive();
+    assertThat(mcpClasses).as("mcp-server production classes on the classpath").isPositive();
   }
 
   @Test
@@ -171,6 +176,39 @@ class ArchitectureRulesTest {
         .because(
             "cli parses arguments, assembles requests, calls core and prints envelopes; notation"
                 + " and schema-cache semantics belong to the engines that own them (§2, §3)")
+        .check(PRODUCTION_CLASSES);
+  }
+
+  @Test
+  void mcpDependsOnNoEngineImplementationAndNoCli() {
+    // §2: mcp is a tier-3 protocol adapter over contracts/core/engine-api. It receives an Engines
+    // registry through its constructor and must never name an engine implementation — that edge
+    // stays confined to cli's EngineWiring. It must also not depend on cli, which depends on it.
+    noClasses()
+        .that()
+        .resideInAPackage(MCP)
+        .should()
+        .dependOnClassesThat()
+        .resideInAnyPackage("dev.dediren.plugins..", "dev.dediren.semantics..", CLI)
+        .because(
+            "mcp is an adapter over the engine-api seam: it takes an Engines registry from cli's"
+                + " EngineWiring and never constructs or names an engine, and cli depends on mcp"
+                + " so the reverse edge would be a cycle")
+        .check(PRODUCTION_CLASSES);
+  }
+
+  @Test
+  void mcpDependsOnNoNotationCore() {
+    // §3 thin-adapter charter, mirroring cliDependsOnNoNotationOrUtilityCore: notation semantics
+    // belong in the semantics-* front ends, never in a protocol adapter.
+    noClasses()
+        .that()
+        .resideInAPackage(MCP)
+        .should()
+        .dependOnClassesThat()
+        .resideInAnyPackage("dev.dediren.archimate..", "dev.dediren.uml..")
+        .because(
+            "mcp marshals tool calls into core commands; notation logic belongs in semantics-*")
         .check(PRODUCTION_CLASSES);
   }
 

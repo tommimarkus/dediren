@@ -95,7 +95,7 @@ public final class BuildCommand {
     try {
       source =
           SourceValidator.loadAndValidateSourceDocument(
-              request.sourceText(), request.sourceBaseDir());
+              request.sourceText(), request.sourceBaseDir(), request.confinementRoot());
     } catch (SourceValidator.SourceDiagnosticsException error) {
       return buildLevelError(error.diagnostics());
     }
@@ -106,7 +106,26 @@ public final class BuildCommand {
     boolean anyWarning = false;
     int failureExit = CommandExitCode.OK.code();
     for (String view : views) {
-      ViewBuild built = buildView(request, engines, source, view);
+      ViewBuild built;
+      try {
+        built = buildView(request, engines, source, view);
+      } catch (ViewOutputEscapesRootException escape) {
+        // Re-confinement failed (see writeFile/requireWithinOutDir): fold into a per-view error
+        // exactly like the other per-view failure paths above, rather than aborting the whole
+        // build over one bad id. Never echo the resolved absolute target here -- only the view id,
+        // which is the caller's own input.
+        built =
+            failedView(
+                escape.view(),
+                List.of(),
+                List.of(
+                    new Diagnostic(
+                        DiagnosticCode.COMMAND_INPUT_INVALID.code(),
+                        DiagnosticSeverity.ERROR,
+                        "view id would write outside the output root: " + escape.view(),
+                        "views")),
+                CommandExitCode.INPUT_ERROR.code());
+      }
       outcomes.add(built.outcome());
       EnvelopeStatus viewStatus = built.outcome().status();
       if (viewStatus == EnvelopeStatus.ERROR) {
@@ -404,6 +423,7 @@ public final class BuildCommand {
   private static void writeFile(
       BuildRequest request, String view, String fileName, String content) {
     Path target = request.outDir().resolve(view).resolve(fileName);
+    requireWithinOutDir(request.outDir(), target, view);
     try {
       Path parent = target.getParent();
       if (parent != null) {
@@ -413,6 +433,23 @@ public final class BuildCommand {
     } catch (IOException error) {
       throw new UncheckedIOException(
           "failed to write build artifact " + target + ": " + error.getMessage(), error);
+    }
+  }
+
+  /**
+   * Re-confines the per-view write target to {@code outDir}, independent of any upstream view id
+   * validation. A view id reaching this point should already be schema-constrained ({@code
+   * ^[A-Za-z0-9][A-Za-z0-9._-]*$}, so never containing '/' or a leading '.') by the model schema
+   * and, on the MCP front end, an explicit guard on the {@code views} tool argument -- but this
+   * keeps the write itself self-defending rather than dependent on every caller staying in sync
+   * with that pattern. {@code outDir} need not exist yet (build creates it lazily), so this
+   * compares absolute-and-normalized paths rather than requiring a real-path resolution.
+   */
+  private static void requireWithinOutDir(Path outDir, Path target, String view) {
+    Path anchor = outDir.toAbsolutePath().normalize();
+    Path normalizedTarget = target.toAbsolutePath().normalize();
+    if (!normalizedTarget.startsWith(anchor)) {
+      throw new ViewOutputEscapesRootException(view);
     }
   }
 
@@ -479,4 +516,22 @@ public final class BuildCommand {
   }
 
   private record ViewBuild(BuildViewOutcome outcome, int failureExit) {}
+
+  /**
+   * Internal signal that a view id's write target normalizes outside {@code outDir} (see {@link
+   * #requireWithinOutDir}). Caught in {@link #run} and folded into a per-view error there, exactly
+   * like every other per-view failure, so one escaping id cannot abort the rest of the build.
+   */
+  private static final class ViewOutputEscapesRootException extends RuntimeException {
+    private static final long serialVersionUID = 1L;
+    private final String view;
+
+    ViewOutputEscapesRootException(String view) {
+      this.view = view;
+    }
+
+    String view() {
+      return view;
+    }
+  }
 }

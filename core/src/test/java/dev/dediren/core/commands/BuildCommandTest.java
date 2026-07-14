@@ -236,6 +236,52 @@ class BuildCommandTest {
   }
 
   @Test
+  void viewIdWithAPathSeparatorCannotWriteOutsideOutDirAndIsAPerViewError() throws Exception {
+    // "../evil" is not a real generic-graph view id and a schema-valid source or the MCP front
+    // end's own views-argument guard would both reject it upstream -- this pins core's own,
+    // independent re-confinement of the per-view write target (BuildCommand.requireWithinOutDir),
+    // which does not trust either of those upstream checks to have run.
+    BuildRequest request =
+        new BuildRequest(
+            SOURCE,
+            null,
+            List.of("overview", "../evil"),
+            "{}",
+            null,
+            null,
+            Set.of(),
+            out,
+            Map.of());
+
+    EngineRunOutcome outcome = BuildCommand.run(request, engines());
+
+    assertThat(outcome.exitCode()).isNotZero();
+    BuildResult result = buildResult(outcome);
+    assertSchemaValid(outcome);
+    assertThat(result.status()).isEqualTo(EnvelopeStatus.ERROR);
+
+    BuildViewOutcome overview = result.views().getFirst();
+    assertThat(overview.status()).isEqualTo(EnvelopeStatus.OK);
+    assertThat(overview.artifacts()).hasSize(1);
+    assertThat(Files.exists(out.resolve("overview/diagram.svg"))).isTrue();
+
+    BuildViewOutcome escaping = result.views().getLast();
+    assertThat(escaping.viewId()).isEqualTo("../evil");
+    assertThat(escaping.status()).isEqualTo(EnvelopeStatus.ERROR);
+    assertThat(escaping.artifacts()).isEmpty();
+    assertThat(escaping.diagnostics())
+        .anySatisfy(
+            diagnostic -> {
+              assertThat(diagnostic.code()).isEqualTo("DEDIREN_COMMAND_INPUT_INVALID");
+              assertThat(diagnostic.severity()).isEqualTo(DiagnosticSeverity.ERROR);
+            });
+    // The proof: nothing landed at the escaped, normalized location (a sibling of `out` named
+    // "evil"), which is what "../evil" under `out` normalizes to.
+    Path escapedTarget = out.resolveSibling("evil").resolve("diagram.svg");
+    assertThat(Files.exists(escapedTarget)).isFalse();
+  }
+
+  @Test
   void emitWritesStageEnvelopesUnderView() throws Exception {
     BuildRequest request =
         new BuildRequest(
@@ -736,9 +782,13 @@ class BuildCommandTest {
     }
 
     // Reproduces GenericGraphEngine's real observable for an unresolvable view: a raw
-    // UncheckedIOException structural failure, not an EngineException.
+    // UncheckedIOException structural failure, not an EngineException. Only "no-such-view" is
+    // treated as unresolvable (the one existing test that needs this); every other view id --
+    // including a defense-in-depth-only id like "../evil" that a real GenericGraphEngine would
+    // never see, because it is not a source view id -- is accepted here so per-view confinement
+    // checks further down the pipeline (BuildCommand.requireWithinOutDir) are what gets exercised.
     private static void requireKnownView(String view) {
-      if (!Set.of("overview", "detail").contains(view)) {
+      if (view.equals("no-such-view")) {
         throw new java.io.UncheckedIOException(
             new java.io.IOException("missing generic-graph view " + view));
       }

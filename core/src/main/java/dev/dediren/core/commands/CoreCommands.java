@@ -132,9 +132,27 @@ public final class CoreCommands {
       Map<String, String> env,
       Engines engines)
       throws EngineExecutionException {
+    return semanticValidateCommand(engineId, profile, inputText, baseDir, null, env, engines);
+  }
+
+  /**
+   * Confinement-aware overload. When {@code confinementRoot} is non-null (the MCP trust boundary),
+   * source-fragment paths are confined to it and fragment errors are sanitized; null is the
+   * unconfined CLI/human lane. See {@link
+   * dev.dediren.core.source.SourceValidator#validateSourceJson(String, Path, Path)}.
+   */
+  public static EngineRunOutcome semanticValidateCommand(
+      String engineId,
+      String profile,
+      String inputText,
+      Path baseDir,
+      Path confinementRoot,
+      Map<String, String> env,
+      Engines engines)
+      throws EngineExecutionException {
     SourceDocument source;
     try {
-      source = SourceValidator.loadAndValidateSourceDocument(inputText, baseDir);
+      source = SourceValidator.loadAndValidateSourceDocument(inputText, baseDir, confinementRoot);
     } catch (SourceValidator.SourceDiagnosticsException error) {
       return errorOutcome(error.diagnostics());
     }

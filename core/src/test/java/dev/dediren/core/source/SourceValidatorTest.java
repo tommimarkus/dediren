@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import dev.dediren.contracts.CommandExitCode;
 import dev.dediren.contracts.Diagnostic;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
@@ -114,6 +115,154 @@ class SourceValidatorTest {
     // sibling violations, not the same violation reported twice.
     assertThat(diagnostics.stream().map(Diagnostic::message).distinct().count())
         .isGreaterThanOrEqualTo(2);
+  }
+
+  // --- Source-fragment confinement (the MCP trust boundary). The null confinement root is the
+  // CLI/human lane and must stay byte-identical; a non-null root is the confined MCP lane. ---
+
+  private static final String FRAGMENT_NODE =
+      """
+      {
+        "model_schema_version": "model.schema.v1",
+        "nodes": [
+          { "id": "api", "type": "ApplicationComponent", "label": "API", "properties": {} }
+        ],
+        "relationships": [],
+        "plugins": { "generic-graph": { "views": [] } }
+      }
+      """;
+
+  private static String modelWithFragment(String fragmentPath) {
+    return """
+        {
+          "model_schema_version": "model.schema.v1",
+          "fragments": ["%s"],
+          "nodes": [],
+          "relationships": [],
+          "plugins": { "generic-graph": { "views": [] } }
+        }
+        """
+        .formatted(fragmentPath);
+  }
+
+  @Test
+  void cliLaneResolvesADotDotFragmentUnchanged() throws Exception {
+    // The human lane (null confinement root) must keep resolving a '..' traversal fragment exactly
+    // as before -- a human legitimately references fragments across their own project. This guards
+    // against accidentally confining the human lane.
+    Path base = Files.createDirectories(temp.resolve("base"));
+    Files.createDirectories(temp.resolve("shared"));
+    Files.writeString(temp.resolve("shared/piece.json"), FRAGMENT_NODE);
+
+    ValidationResult result =
+        SourceValidator.validateSourceJson(modelWithFragment("../shared/piece.json"), base);
+
+    assertThat(result.exitCode()).isZero();
+    assertThat(result.envelope().data().path("node_count").asInt()).isEqualTo(1);
+  }
+
+  @Test
+  void confinedLaneRejectsADotDotFragmentThatEscapesRoot() throws Exception {
+    Path base = Files.createDirectories(temp.resolve("base"));
+    // The escaping target need not exist: confinement decides before the read, so there is no
+    // exists-vs-not-exists oracle either way.
+    ValidationResult result =
+        SourceValidator.validateSourceJson(
+            modelWithFragment("../escape.json"), base, /* confinementRoot= */ base);
+
+    assertThat(result.exitCode()).isEqualTo(CommandExitCode.INPUT_ERROR.code());
+    Diagnostic diagnostic = result.envelope().diagnostics().get(0);
+    assertThat(diagnostic.code()).isEqualTo("DEDIREN_MCP_PATH_OUTSIDE_ROOT");
+    assertThat(diagnostic.path()).isEqualTo("$.fragments[0]");
+    // Sanitized: only the model-supplied relative string, never the resolved absolute target.
+    assertThat(diagnostic.message()).contains("../escape.json");
+    assertThat(diagnostic.message()).doesNotContain(temp.toString());
+    assertThat(diagnostic.message()).doesNotContain(temp.toRealPath().toString());
+  }
+
+  @Test
+  void confinedLaneLoadsAFragmentInsideRoot() throws Exception {
+    Path base = Files.createDirectories(temp.resolve("base"));
+    Files.writeString(base.resolve("piece.json"), FRAGMENT_NODE);
+
+    ValidationResult result =
+        SourceValidator.validateSourceJson(
+            modelWithFragment("piece.json"), base, /* confinementRoot= */ base);
+
+    assertThat(result.exitCode()).isZero();
+    assertThat(result.envelope().data().path("node_count").asInt()).isEqualTo(1);
+  }
+
+  // PoC for the symlink-then-'..' escape: requireFragmentWithinRoot used to
+  // baseDir.resolve(fragmentPath).normalize() the FULL path before ever touching the
+  // filesystem. Path.normalize() is purely lexical -- it cancels "link/.." textually with no
+  // regard for what "link" actually is on disk -- so it collapsed "link/../secret.json" down to
+  // "secret.json" *before* the confinement walk ever saw the symlink. The confinement check then
+  // approved a path that was never going to be read. Meanwhile the actual read
+  // (Files.readString(baseDir.resolve(fragmentPath))) used the RAW, un-normalized path, which the
+  // OS resolves physically: follow the "link" symlink first, THEN apply "..", landing outside
+  // root. Confined "approve" + raw "read" were two independent resolutions of the same string
+  // that disagreed -- exactly the divergence this test exists to close.
+  @Test
+  void confinedLaneRejectsASymlinkThenDotDotEscapeThroughAnOutOfRootSymlink(@TempDir Path outside)
+      throws Exception {
+    Path base = Files.createDirectories(temp.resolve("base"));
+    // "link" points at outside/child; "link/.." therefore physically resolves to "outside" --
+    // one level above the symlink target -- which is where the secret fragment lives. A fragment
+    // literally named "secret.json" is deliberately never created directly under base: the
+    // outside content must be readable ONLY by following the symlink then walking back up.
+    Path outsideChild = Files.createDirectories(outside.resolve("child"));
+    Files.writeString(outside.resolve("secret.json"), FRAGMENT_NODE);
+    Path link = base.resolve("link");
+    try {
+      Files.createSymbolicLink(link, outsideChild);
+    } catch (UnsupportedOperationException | IOException unsupported) {
+      return; // Filesystem without symlink support; other confinement tests still cover it.
+    }
+
+    ValidationResult result =
+        SourceValidator.validateSourceJson(
+            modelWithFragment("link/../secret.json"), base, /* confinementRoot= */ base);
+
+    // Fail closed: the escape must be REJECTED with the same code a plain '..' escape gets, not
+    // silently succeed (which would prove the outside fragment was read and merged) and not fall
+    // through to a generic read failure either (which would prove the check approved the wrong,
+    // never-read path instead of correctly identifying the escape).
+    assertThat(result.exitCode()).isEqualTo(CommandExitCode.INPUT_ERROR.code());
+    Diagnostic diagnostic = result.envelope().diagnostics().get(0);
+    assertThat(diagnostic.code()).isEqualTo("DEDIREN_MCP_PATH_OUTSIDE_ROOT");
+    assertThat(diagnostic.path()).isEqualTo("$.fragments[0]");
+    // Sanitized: only the model-supplied relative string, never the resolved absolute target or
+    // an exists-vs-not-exists signal for the outside file.
+    assertThat(diagnostic.message()).contains("link/../secret.json");
+    assertThat(diagnostic.message()).doesNotContain(outside.toString());
+    assertThat(diagnostic.message()).doesNotContain(outside.toRealPath().toString());
+    // No leak: the outside fragment's node must never have been merged into the result.
+    assertThat(result.envelope().data()).isNull();
+  }
+
+  // Guard against over-tightening: a symlink that stays entirely inside root (not a traversal
+  // trick) must still resolve. Real-path confinement rejects symlinks that escape the root; it
+  // must not reject symlinks that merely alias another location within it.
+  @Test
+  void confinedLaneLoadsAFragmentReachedThroughAnInRootSymlink() throws Exception {
+    Path base = Files.createDirectories(temp.resolve("base"));
+    Path real = Files.createDirectories(base.resolve("real"));
+    Files.writeString(real.resolve("piece.json"), FRAGMENT_NODE);
+    Path alias = base.resolve("alias");
+    try {
+      Files.createSymbolicLink(alias, real);
+    } catch (UnsupportedOperationException | IOException unsupported) {
+      return; // Filesystem without symlink support; confinedLaneLoadsAFragmentInsideRoot still
+      // covers the no-false-rejection guarantee for a plain in-root path.
+    }
+
+    ValidationResult result =
+        SourceValidator.validateSourceJson(
+            modelWithFragment("alias/piece.json"), base, /* confinementRoot= */ base);
+
+    assertThat(result.exitCode()).isZero();
+    assertThat(result.envelope().data().path("node_count").asInt()).isEqualTo(1);
   }
 
   private static void restoreProperty(String name, String value) {
