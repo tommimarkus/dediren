@@ -95,7 +95,7 @@ public final class BuildCommand {
     try {
       source =
           SourceValidator.loadAndValidateSourceDocument(
-              request.sourceText(), request.sourceBaseDir());
+              request.sourceText(), request.sourceBaseDir(), request.confinementRoot());
     } catch (SourceValidator.SourceDiagnosticsException error) {
       return buildLevelError(error.diagnostics());
     }

@@ -48,9 +48,10 @@ Three tools:
   `oef_policy`, `xmi_policy`). Returns the build-result envelope, which names
   every artifact written.
 
-Every tool path must resolve inside `--root` (default: the working directory).
-A path that escapes it returns a `DEDIREN_MCP_PATH_OUTSIDE_ROOT` error envelope.
-Launch with `--read-only` to serve only `dediren_validate` and `dediren_guide`.
+Every tool path must resolve inside `--root` (default: the working directory),
+and so must every `fragments[]` path inside a source you pass. A path that escapes
+it returns a `DEDIREN_MCP_PATH_OUTSIDE_ROOT` error envelope. Launch with
+`--read-only` to serve only `dediren_validate` and `dediren_guide`.
 
 Tool results carry the same envelope JSON the CLI prints on stdout, so the
 handoff rules in `## Command Handoff` apply unchanged.

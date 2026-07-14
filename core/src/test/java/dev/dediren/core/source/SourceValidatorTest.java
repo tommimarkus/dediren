@@ -116,6 +116,82 @@ class SourceValidatorTest {
         .isGreaterThanOrEqualTo(2);
   }
 
+  // --- Source-fragment confinement (the MCP trust boundary). The null confinement root is the
+  // CLI/human lane and must stay byte-identical; a non-null root is the confined MCP lane. ---
+
+  private static final String FRAGMENT_NODE =
+      """
+      {
+        "model_schema_version": "model.schema.v1",
+        "nodes": [
+          { "id": "api", "type": "ApplicationComponent", "label": "API", "properties": {} }
+        ],
+        "relationships": [],
+        "plugins": { "generic-graph": { "views": [] } }
+      }
+      """;
+
+  private static String modelWithFragment(String fragmentPath) {
+    return """
+        {
+          "model_schema_version": "model.schema.v1",
+          "fragments": ["%s"],
+          "nodes": [],
+          "relationships": [],
+          "plugins": { "generic-graph": { "views": [] } }
+        }
+        """
+        .formatted(fragmentPath);
+  }
+
+  @Test
+  void cliLaneResolvesADotDotFragmentUnchanged() throws Exception {
+    // The human lane (null confinement root) must keep resolving a '..' traversal fragment exactly
+    // as before -- a human legitimately references fragments across their own project. This guards
+    // against accidentally confining the human lane.
+    Path base = Files.createDirectories(temp.resolve("base"));
+    Files.createDirectories(temp.resolve("shared"));
+    Files.writeString(temp.resolve("shared/piece.json"), FRAGMENT_NODE);
+
+    ValidationResult result =
+        SourceValidator.validateSourceJson(modelWithFragment("../shared/piece.json"), base);
+
+    assertThat(result.exitCode()).isZero();
+    assertThat(result.envelope().data().path("node_count").asInt()).isEqualTo(1);
+  }
+
+  @Test
+  void confinedLaneRejectsADotDotFragmentThatEscapesRoot() throws Exception {
+    Path base = Files.createDirectories(temp.resolve("base"));
+    // The escaping target need not exist: confinement decides before the read, so there is no
+    // exists-vs-not-exists oracle either way.
+    ValidationResult result =
+        SourceValidator.validateSourceJson(
+            modelWithFragment("../escape.json"), base, /* confinementRoot= */ base);
+
+    assertThat(result.exitCode()).isEqualTo(CommandExitCode.INPUT_ERROR.code());
+    Diagnostic diagnostic = result.envelope().diagnostics().get(0);
+    assertThat(diagnostic.code()).isEqualTo("DEDIREN_MCP_PATH_OUTSIDE_ROOT");
+    assertThat(diagnostic.path()).isEqualTo("$.fragments[0]");
+    // Sanitized: only the model-supplied relative string, never the resolved absolute target.
+    assertThat(diagnostic.message()).contains("../escape.json");
+    assertThat(diagnostic.message()).doesNotContain(temp.toString());
+    assertThat(diagnostic.message()).doesNotContain(temp.toRealPath().toString());
+  }
+
+  @Test
+  void confinedLaneLoadsAFragmentInsideRoot() throws Exception {
+    Path base = Files.createDirectories(temp.resolve("base"));
+    Files.writeString(base.resolve("piece.json"), FRAGMENT_NODE);
+
+    ValidationResult result =
+        SourceValidator.validateSourceJson(
+            modelWithFragment("piece.json"), base, /* confinementRoot= */ base);
+
+    assertThat(result.exitCode()).isZero();
+    assertThat(result.envelope().data().path("node_count").asInt()).isEqualTo(1);
+  }
+
   private static void restoreProperty(String name, String value) {
     if (value == null) {
       System.clearProperty(name);

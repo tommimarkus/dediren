@@ -28,8 +28,21 @@ public final class SourceValidator {
   private SourceValidator() {}
 
   public static ValidationResult validateSourceJson(String text, Path baseDir) {
+    return validateSourceJson(text, baseDir, null);
+  }
+
+  /**
+   * The confinement-aware overload. When {@code confinementRoot} is non-null (the MCP trust
+   * boundary, where a model — not a human — chose the fragment paths), every source-fragment path
+   * is confined to that root and fragment errors are sanitized so the model-facing envelope cannot
+   * fingerprint the host filesystem. When it is null (the CLI/human lane), behaviour is
+   * byte-for-byte identical to the two-argument form: no confinement, and read failures carry their
+   * real message, because a human legitimately references fragments across their own project.
+   */
+  public static ValidationResult validateSourceJson(
+      String text, Path baseDir, Path confinementRoot) {
     try {
-      SourceDocument document = loadAndValidateSourceDocument(text, baseDir);
+      SourceDocument document = loadAndValidateSourceDocument(text, baseDir, confinementRoot);
       var data = JsonSupport.objectMapper().createObjectNode();
       data.put("model_schema_version", document.modelSchemaVersion());
       data.put("node_count", document.nodes().size());
@@ -43,7 +56,16 @@ public final class SourceValidator {
 
   public static SourceDocument loadAndValidateSourceDocument(String text, Path baseDir)
       throws SourceDiagnosticsException {
-    SourceDocument document = loadSourceDocument(text, baseDir);
+    return loadAndValidateSourceDocument(text, baseDir, null);
+  }
+
+  /**
+   * Confinement-aware overload; see {@link #validateSourceJson(String, Path, Path)} for the meaning
+   * of {@code confinementRoot}.
+   */
+  public static SourceDocument loadAndValidateSourceDocument(
+      String text, Path baseDir, Path confinementRoot) throws SourceDiagnosticsException {
+    SourceDocument document = loadSourceDocument(text, baseDir, confinementRoot);
     List<Diagnostic> diagnostics = validateSourceDocument(document);
     if (!diagnostics.isEmpty()) {
       throw new SourceDiagnosticsException(diagnostics);
@@ -51,7 +73,7 @@ public final class SourceValidator {
     return document;
   }
 
-  private static SourceDocument loadSourceDocument(String text, Path baseDir)
+  private static SourceDocument loadSourceDocument(String text, Path baseDir, Path confinementRoot)
       throws SourceDiagnosticsException {
     SourceDocument root = parseSourceDocument(text);
     if (root.fragments().isEmpty()) {
@@ -81,15 +103,23 @@ public final class SourceValidator {
                     "fragment '" + fragment + "' must be relative to the source model",
                     "$.fragments[" + i + "]")));
       }
+      if (confinementRoot != null) {
+        requireFragmentWithinRoot(confinementRoot, baseDir, fragment, fragmentPath, i);
+      }
       SourceDocument fragmentDocument;
       try {
         fragmentDocument = parseSourceDocument(Files.readString(baseDir.resolve(fragmentPath)));
       } catch (IOException readError) {
+        // CLI/human lane (null root): the real message helps a human and routinely carries the
+        // resolved absolute path. MCP lane (root set): sanitize — echo only the model-supplied
+        // fragment string, never the resolved absolute path or an exists-vs-not-exists signal.
         throw new SourceDiagnosticsException(
             List.of(
                 error(
                     DiagnosticCode.FRAGMENT_READ_FAILED,
-                    "failed to read fragment '" + fragment + "': " + readError.getMessage(),
+                    confinementRoot == null
+                        ? "failed to read fragment '" + fragment + "': " + readError.getMessage()
+                        : "failed to read fragment '" + fragment + "'",
                     "$.fragments[" + i + "]")));
       }
       if (!fragmentDocument.fragments().isEmpty()) {
@@ -107,6 +137,57 @@ public final class SourceValidator {
     }
     return new SourceDocument(
         root.modelSchemaVersion(), List.of(), requiredPlugins, nodes, relationships, plugins);
+  }
+
+  /**
+   * Confines a source-fragment path to {@code confinementRoot}, the MCP trust boundary where a
+   * model — not a human — chose the path. Mirrors {@code mcp WorkspacePaths.resolveForWrite} (core
+   * cannot depend on the mcp module): resolve the fragment against its base directory, then
+   * real-path-resolve the nearest existing ancestor so a symlink inside the root that points
+   * outside it is rejected rather than followed, and require the result to stay within the root.
+   *
+   * <p>Fail closed and sanitized: an escape — or a root/ancestor that cannot be real-path-resolved
+   * — yields {@link DiagnosticCode#MCP_PATH_OUTSIDE_ROOT} carrying only the model-supplied fragment
+   * string, never the resolved absolute target, so the model-facing envelope cannot fingerprint the
+   * host filesystem. A fragment that stays within the root but does not exist is left to the read
+   * step, which reports it as a sanitized {@code FRAGMENT_READ_FAILED}.
+   */
+  private static void requireFragmentWithinRoot(
+      Path confinementRoot, Path baseDir, String fragment, Path fragmentPath, int index)
+      throws SourceDiagnosticsException {
+    Path realRoot;
+    try {
+      realRoot = confinementRoot.toRealPath();
+    } catch (IOException error) {
+      throw fragmentOutsideRoot(fragment, index);
+    }
+    Path resolved = baseDir.resolve(fragmentPath).normalize();
+    Path existing = resolved;
+    while (existing != null && !existing.toFile().exists()) {
+      existing = existing.getParent();
+    }
+    if (existing == null) {
+      throw fragmentOutsideRoot(fragment, index);
+    }
+    Path realExisting;
+    try {
+      realExisting = existing.toRealPath();
+    } catch (IOException error) {
+      throw fragmentOutsideRoot(fragment, index);
+    }
+    Path target = realExisting.resolve(existing.relativize(resolved)).normalize();
+    if (!realExisting.startsWith(realRoot) || !target.startsWith(realRoot)) {
+      throw fragmentOutsideRoot(fragment, index);
+    }
+  }
+
+  private static SourceDiagnosticsException fragmentOutsideRoot(String fragment, int index) {
+    return new SourceDiagnosticsException(
+        List.of(
+            error(
+                DiagnosticCode.MCP_PATH_OUTSIDE_ROOT,
+                "fragment '" + fragment + "' resolves outside the workspace root",
+                "$.fragments[" + index + "]")));
   }
 
   private static SourceDocument parseSourceDocument(String text) throws SourceDiagnosticsException {

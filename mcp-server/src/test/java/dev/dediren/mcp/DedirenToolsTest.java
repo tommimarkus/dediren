@@ -121,6 +121,73 @@ class DedirenToolsTest {
     assertThat(diagnostic.path("message").asText()).doesNotContain(root.toRealPath().toString());
   }
 
+  // A source is model-supplied, so its fragments[] paths are model-supplied too. They must be
+  // confined to --root exactly like the tool's own path arguments, and their errors sanitized. No
+  // fixture carries a fragment shape, so these mirror CliValidateTest's inline fragment models.
+  private static String modelWithFragment(String fragmentPath) {
+    return """
+        {
+          "model_schema_version": "model.schema.v1",
+          "fragments": ["%s"],
+          "nodes": [],
+          "relationships": [],
+          "plugins": { "generic-graph": { "views": [] } }
+        }
+        """
+        .formatted(fragmentPath);
+  }
+
+  @Test
+  void validateConfinesAnEscapingSourceFragmentToTheRoot(@TempDir Path root) throws Exception {
+    // The source is inside root, but its fragment escapes it. The fragment target need not exist:
+    // confinement decides before the read, so no exists-vs-not-exists oracle is possible.
+    Files.writeString(root.resolve("model.json"), modelWithFragment("../frag-escape.json"));
+
+    CallToolResult result =
+        toolsIn(root)
+            .validate(new CallToolRequest("dediren_validate", Map.of("source", "model.json")));
+
+    assertThat(result.isError()).isTrue();
+    JsonNode diagnostic = envelopeOf(result).path("diagnostics").path(0);
+    assertThat(diagnostic.path("code").asText()).isEqualTo("DEDIREN_MCP_PATH_OUTSIDE_ROOT");
+    assertThat(diagnostic.path("path").asText()).isEqualTo("$.fragments[0]");
+    // Only the model's own relative fragment string comes back -- never the resolved absolute
+    // target or the workspace root, and never a distinguishable exists-vs-not-exists signal.
+    assertThat(diagnostic.path("message").asText()).contains("../frag-escape.json");
+    assertThat(diagnostic.path("message").asText()).doesNotContain(root.toString());
+    assertThat(diagnostic.path("message").asText()).doesNotContain(root.toRealPath().toString());
+    assertThat(diagnostic.path("message").asText())
+        .doesNotContain(root.getParent().toRealPath().toString());
+  }
+
+  @Test
+  void validateLoadsALegitimateFragmentInsideTheRoot(@TempDir Path root) throws Exception {
+    // A fragment in a subdirectory of root must still load -- confinement must not false-reject it.
+    Files.writeString(root.resolve("model.json"), modelWithFragment("sub/piece.json"));
+    Files.createDirectories(root.resolve("sub"));
+    Files.writeString(
+        root.resolve("sub/piece.json"),
+        """
+        {
+          "model_schema_version": "model.schema.v1",
+          "nodes": [
+            { "id": "api", "type": "ApplicationComponent", "label": "API", "properties": {} }
+          ],
+          "relationships": [],
+          "plugins": { "generic-graph": { "views": [] } }
+        }
+        """);
+
+    CallToolResult result =
+        toolsIn(root)
+            .validate(new CallToolRequest("dediren_validate", Map.of("source", "model.json")));
+
+    assertThat(result.isError()).isNotEqualTo(Boolean.TRUE);
+    JsonNode envelope = envelopeOf(result);
+    assertThat(envelope.path("status").asText()).isEqualTo("ok");
+    assertThat(envelope.path("data").path("node_count").asInt()).isEqualTo(1);
+  }
+
   @Test
   void buildRequiresASource(@TempDir Path root) {
     CallToolResult result =

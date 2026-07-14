@@ -87,10 +87,12 @@ public final class DedirenTools {
       if (profile != null) {
         EngineRunOutcome outcome =
             CoreCommands.semanticValidateCommand(
-                SEMANTICS_ENGINE, profile, text, baseDir, env, engines);
+                SEMANTICS_ENGINE, profile, text, baseDir, root, env, engines);
         return envelope(outcome.stdout(), outcome.exitCode() != 0);
       }
-      ValidationResult result = SourceValidator.validateSourceJson(text, baseDir);
+      // The model chose this source, so its fragment paths are model-supplied too: confine them to
+      // the same --root the tool arguments are confined to (fragment errors are sanitized in core).
+      ValidationResult result = SourceValidator.validateSourceJson(text, baseDir, root);
       return envelope(serialize(result.envelope()), result.exitCode() != 0);
     } catch (EngineExecutionException failure) {
       return engineFailure(failure);
@@ -146,6 +148,8 @@ public final class DedirenTools {
         new BuildRequest(
             sourceText,
             sourcePath.getParent(),
+            // The model chose this source, so confine its fragment paths to the same --root.
+            root,
             views,
             renderPolicy,
             oefPolicy,
