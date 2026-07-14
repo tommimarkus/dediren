@@ -91,4 +91,44 @@ class DedirenMcpServerTest {
                 new ByteArrayInputStream(new byte[0]),
                 new ByteArrayOutputStream()));
   }
+
+  /**
+   * Regression test for silent response loss on a batch-EOF race: when a whole request batch is
+   * available on stdin from the start (as it is whenever stdin is redirected from a file, the
+   * packaged launcher's own dist-smoke drives it exactly this way), the underlying stream's EOF is
+   * observed essentially the instant the last byte is consumed. The vendored SDK's inbound-reader
+   * loop reacts to that EOF by closing its session synchronously, with no drain phase, so any
+   * response still in flight on another scheduler at that instant is dropped -- silently, with no
+   * error frame. Without the drain in {@code EofSignalingInputStream}, this reliably drops the tail
+   * of a multi-request batch; every request here must still get its matching response.
+   */
+  @Test
+  void serveOnDoesNotDropResponsesWhenStdinBatchEofsImmediately(@TempDir Path root) {
+    String requests =
+        """
+        {"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"regression-test","version":"1"}}}
+        {"jsonrpc":"2.0","method":"notifications/initialized"}
+        {"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}
+        {"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"dediren_guide","arguments":{"topic":"source-json"}}}
+        """;
+    ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+
+    assertTimeoutPreemptively(
+        Duration.ofSeconds(10),
+        () ->
+            DedirenMcpServer.serveOn(
+                root,
+                Engines.of(List.of(), List.of(), List.of(), List.of()),
+                Map.of(),
+                true,
+                new ByteArrayInputStream(
+                    requests.getBytes(java.nio.charset.StandardCharsets.UTF_8)),
+                stdout));
+
+    String output = stdout.toString(java.nio.charset.StandardCharsets.UTF_8);
+    assertThat(output).as("initialize response").contains("\"id\":1");
+    assertThat(output).as("tools/list response").contains("\"id\":2");
+    assertThat(output).as("tools/call response").contains("\"id\":3");
+    assertThat(output).as("guide content").contains("Minimal Source JSON");
+  }
 }

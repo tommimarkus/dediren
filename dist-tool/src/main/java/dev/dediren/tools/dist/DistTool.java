@@ -73,6 +73,7 @@ public final class DistTool {
           "elk-layout",
           "engine-api",
           "ir",
+          "mcp",
           "render",
           "schema-cache",
           "semantics-archimate",
@@ -100,6 +101,11 @@ public final class DistTool {
           Map.entry("jspecify", attribution("JSpecify", "Apache-2.0")),
           Map.entry("listenablefuture", attribution("Google Guava listenablefuture", "Apache-2.0")),
           Map.entry(
+              "mcp-core", attribution("Model Context Protocol Java SDK", "MIT (MCP Java SDK)")),
+          Map.entry(
+              "mcp-json-jackson3",
+              attribution("Model Context Protocol Java SDK", "MIT (MCP Java SDK)")),
+          Map.entry(
               "org.eclipse.elk.alg.common", attribution("Eclipse Layout Kernel (ELK)", "EPL-2.0")),
           Map.entry(
               "org.eclipse.elk.alg.layered", attribution("Eclipse Layout Kernel (ELK)", "EPL-2.0")),
@@ -117,6 +123,9 @@ public final class DistTool {
               attribution("Eclipse Modeling Framework (EMF)", "EPL-1.0")),
           Map.entry("org.eclipse.xtext.xbase.lib", attribution("Eclipse Xtext", "EPL-2.0")),
           Map.entry("picocli", attribution("picocli", "Apache-2.0")),
+          Map.entry(
+              "reactive-streams", attribution("Reactive Streams", "MIT-0 (Reactive Streams)")),
+          Map.entry("reactor-core", attribution("Project Reactor", "Apache-2.0")),
           Map.entry("slf4j-api", attribution("SLF4J", "MIT (SLF4J)")),
           Map.entry("slf4j-simple", attribution("SLF4J", "MIT (SLF4J)")),
           Map.entry("snakeyaml-engine", attribution("SnakeYAML Engine", "Apache-2.0")),
@@ -139,6 +148,8 @@ public final class DistTool {
           "EPL-2.0", "licenses/epl-2.0.txt",
           "EPL-1.0", "licenses/epl-1.0.txt",
           "MIT (SLF4J)", "licenses/mit-slf4j.txt",
+          "MIT (MCP Java SDK)", "licenses/mit-mcp-java-sdk.txt",
+          "MIT-0 (Reactive Streams)", "licenses/mit0-reactive-streams.txt",
           "SAX (public domain)", "licenses/sax.txt",
           "W3C Software License", "licenses/w3c-software.txt");
 
@@ -262,6 +273,16 @@ public final class DistTool {
     System.out.println(archive);
   }
 
+  /**
+   * The dediren {@code mcp} module and the third-party {@code io.modelcontextprotocol.sdk:mcp}
+   * artifact both produce a jar literally named {@code mcp-<version>.jar}: {@link #jarArtifactId}
+   * strips only the version suffix, so artifact-id matching alone cannot tell the two apart. The
+   * third-party jar's version is pinned by {@code mcp.sdk.version} in the root POM, so its full
+   * filename is checked explicitly, ahead of the artifact-id lookup below, before "mcp" is allowed
+   * to resolve to the first-party module.
+   */
+  private static final String MCP_JAVA_SDK_CORE_JAR = "mcp-2.0.0.jar";
+
   private static void writeThirdPartyNotices(Path root, Path output) throws IOException {
     Set<String> jars = new java.util.TreeSet<>();
     for (Launcher launcher : LAUNCHERS) {
@@ -281,7 +302,9 @@ public final class DistTool {
     List<String> unattributed = new ArrayList<>();
     for (String jar : jars) {
       String artifact = jarArtifactId(jar);
-      if (FIRST_PARTY_ARTIFACTS.contains(artifact)) {
+      if (jar.equals(MCP_JAVA_SDK_CORE_JAR)) {
+        thirdParty.put(jar, attribution("Model Context Protocol Java SDK", "MIT (MCP Java SDK)"));
+      } else if (FIRST_PARTY_ARTIFACTS.contains(artifact)) {
         firstParty.add(jar);
       } else {
         ThirdPartyAttribution attribution = THIRD_PARTY_ATTRIBUTIONS.get(artifact);
@@ -396,6 +419,8 @@ public final class DistTool {
       Path oefSchemas = writeOefSchemas(temp.resolve("oef-schemas"));
       // Full one-shot pipeline through the packaged launcher: render + OEF export in one build.
       assertBuildRendersAndExports(dediren, bundle, temp, oefSchemas);
+
+      assertMcpServesToolsOverStdio(bundle, temp);
 
       Path request = temp.resolve("request.json");
       Path layout = temp.resolve("layout.json");
@@ -1144,6 +1169,57 @@ public final class DistTool {
     assertNoJvmLogLines(validateStdout, "first-launch validate");
     // Must parse as a single ok JSON envelope, not JSON interleaved with CDS log noise.
     okData(validateStdout);
+  }
+
+  /**
+   * Drives the packaged MCP server over real stdio with real JSON-RPC.
+   *
+   * <p>Two things are only observable here. First, the protocol actually working through the
+   * bundled classpath. Second — and this is the gate for the stdout-integrity control — that the
+   * server's stdout carries protocol frames and <em>nothing else</em>: the JVM's CDS notices and
+   * SLF4J's provider warning share this process, and if any of them (or a stray print from an
+   * engine) reached stdout, the frame stream would be corrupt and a real client would silently go
+   * dark.
+   */
+  private static void assertMcpServesToolsOverStdio(Path bundle, Path temp) throws Exception {
+    Path dediren = bundle.resolve("bin/dediren");
+    Path requests = temp.resolve("mcp-requests.jsonl");
+    Files.writeString(
+        requests,
+        """
+        {"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"dist-smoke","version":"1"}}}
+        {"jsonrpc":"2.0","method":"notifications/initialized"}
+        {"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}
+        {"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"dediren_guide","arguments":{"topic":"source-json"}}}
+        """,
+        StandardCharsets.UTF_8);
+
+    String stdout =
+        runBundleCommand(dediren, bundle, List.of("mcp", "--root", bundle.toString()), requests);
+
+    // Every non-blank stdout line must be a JSON-RPC frame. Nothing else may share this channel.
+    for (String line : stdout.split("\n")) {
+      if (line.isBlank()) {
+        continue;
+      }
+      JsonNode frame;
+      try {
+        frame = JsonSupport.objectMapper().readTree(line);
+      } catch (RuntimeException notJson) {
+        throw new IllegalStateException(
+            "mcp stdout must carry JSON-RPC frames only; found a non-JSON line: " + line);
+      }
+      if (!"2.0".equals(frame.path("jsonrpc").asText())) {
+        throw new IllegalStateException("mcp stdout line is not a JSON-RPC frame: " + line);
+      }
+    }
+
+    assertContains(stdout, "\"serverInfo\"", "mcp initialize response");
+    assertContains(stdout, "dediren_validate", "mcp tools/list response");
+    assertContains(stdout, "dediren_build", "mcp tools/list response");
+    assertContains(stdout, "dediren_guide", "mcp tools/list response");
+    assertContains(stdout, "Minimal Source JSON", "mcp guide tool call response");
+    System.out.println("mcp stdio smoke passed: 3 tools, protocol-only stdout");
   }
 
   /**

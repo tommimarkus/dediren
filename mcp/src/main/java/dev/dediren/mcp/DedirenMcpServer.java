@@ -102,6 +102,13 @@ public final class DedirenMcpServer {
    * neither calls {@code System.exit} nor interrupts this thread, so nothing unblocks a plain
    * self-join. {@code in} is wrapped so the wrapper counts down a latch the instant a read call
    * observes EOF, and this method awaits that latch instead, then closes the server itself.
+   *
+   * <p>{@code in} and {@code out} share an {@link OutboundActivityClock} (see {@link
+   * EofSignalingInputStream} and {@link DrainTrackingOutputStream}): before the input wrapper lets
+   * the SDK's reader observe EOF, it blocks until the output wrapper has written at least once and
+   * then gone quiet, so a response the SDK is still in the middle of producing is not truncated by
+   * its own EOF-triggered close. A run that reads nothing from {@code in} before EOF (nothing was
+   * ever in flight to drain) pays no penalty.
    */
   static void serveOn(
       Path root,
@@ -112,8 +119,10 @@ public final class DedirenMcpServer {
       OutputStream out)
       throws InterruptedException {
     CountDownLatch stdinClosed = new CountDownLatch(1);
-    InputStream eofSignaling = new EofSignalingInputStream(in, stdinClosed);
-    McpSyncServer server = create(root, engines, env, readOnly, eofSignaling, out);
+    OutboundActivityClock outboundActivity = new OutboundActivityClock();
+    InputStream eofSignaling = new EofSignalingInputStream(in, stdinClosed, outboundActivity);
+    OutputStream drainTracked = new DrainTrackingOutputStream(out, outboundActivity);
+    McpSyncServer server = create(root, engines, env, readOnly, eofSignaling, drainTracked);
     Runtime.getRuntime().addShutdownHook(new Thread(server::close));
     stdinClosed.await();
     server.close();
