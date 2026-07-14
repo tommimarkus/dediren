@@ -210,6 +210,7 @@ public final class EdgeRenderer {
     StringBuilder data = new StringBuilder();
     Point first = points.getFirst();
     data.append(String.format(Locale.ROOT, "M %.1f %.1f", first.x(), first.y()));
+    Point penStart = first;
     for (int index = 0; index < points.size() - 1; index++) {
       int segmentIndex = index;
       Point start = points.get(index);
@@ -217,13 +218,20 @@ public final class EdgeRenderer {
       RoundedCorner rounded =
           index + 2 < points.size() ? roundedCorner(start, end, points.get(index + 2)) : null;
       Point segmentEnd = rounded == null ? end : rounded.before();
+      double segmentStartProgress = segmentProgress(start, end, penStart.x(), penStart.y());
       double segmentEndProgress = segmentProgress(start, end, segmentEnd.x(), segmentEnd.y());
       List<LineJump> segmentJumps =
           lineJumps.stream()
               .filter(jump -> jump.segmentIndex() == segmentIndex)
               .filter(
-                  jump ->
-                      segmentProgress(start, end, jump.x(), jump.y()) <= segmentEndProgress + 0.001)
+                  jump -> {
+                    double progress = segmentProgress(start, end, jump.x(), jump.y());
+                    // Both bounds, symmetrically: the pen enters at the previous corner's
+                    // rounded.after() and leaves at this corner's rounded.before(); a jump
+                    // outside that window would make the path double back.
+                    return progress >= segmentStartProgress - 0.001
+                        && progress <= segmentEndProgress + 0.001;
+                  })
               .sorted(
                   (left, right) ->
                       Double.compare(
@@ -244,6 +252,7 @@ public final class EdgeRenderer {
                 rounded.after().x(),
                 rounded.after().y()));
       }
+      penStart = rounded == null ? end : rounded.after();
     }
     return data.toString();
   }
