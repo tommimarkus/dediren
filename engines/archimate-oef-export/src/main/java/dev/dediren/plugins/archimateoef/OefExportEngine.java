@@ -23,6 +23,7 @@ import dev.dediren.contracts.source.SourceRelationship;
 import dev.dediren.engine.EngineException;
 import dev.dediren.engine.EngineResult;
 import dev.dediren.engine.ExportEngine;
+import dev.dediren.engine.XmlText;
 import dev.dediren.schemacache.SchemaCacheException;
 import dev.dediren.schemacache.SchemaCacheModule;
 import dev.dediren.schemacache.XmlSchemaValidator;
@@ -670,7 +671,7 @@ public final class OefExportEngine implements ExportEngine {
   }
 
   private static String text(String value) {
-    return (value == null ? "" : value)
+    return XmlText.scrub(value == null ? "" : value)
         .replace("&", "&amp;")
         .replace("<", "&lt;")
         .replace(">", "&gt;");

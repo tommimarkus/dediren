@@ -54,16 +54,15 @@ tests (Task 4).
 ### Schema cache + runtime download
 
 Runtime schema fetches go through
-`schema-cache/src/main/java/dev/dediren/schemacache/SchemaCacheModule.java`'s
-`curlFetcher`, which forces `--proto '=https'` (no protocol downgrade on
-redirect), bounds the whole transfer at 60 seconds to prevent stalled downloads
-from blocking the export lane indefinitely, and verifies the download's SHA-256 against a pinned value before
-trusting it: the single `OMG_XMI_SCHEMA_SHA256` constant
+`schema-cache/src/main/java/dev/dediren/schemacache/SchemaCacheModule.java`'s `curlFetcher`,
+which forces `--proto '=https'` (no protocol downgrade on redirect), bounds the whole
+transfer at 60 seconds to prevent stalled downloads from blocking the export lane
+indefinitely, and verifies the download's SHA-256 against a pinned value before trusting it:
+the single `OMG_XMI_SCHEMA_SHA256` constant
 (`engines/uml-xmi-export/.../schema/SchemaValidation.java`) and the per-file
 `OFFICIAL_OEF_SCHEMA_SHA256` map (`engines/archimate-oef-export/.../OefExportEngine.java`).
-The offline overrides `DEDIREN_XMI_SCHEMA_PATH` / `DEDIREN_OEF_SCHEMA_DIR`
-bypass the SHA-256 check by design — they only require the supplied file to
-be non-empty.
+The offline overrides `DEDIREN_XMI_SCHEMA_PATH` / `DEDIREN_OEF_SCHEMA_DIR` bypass the
+SHA-256 check by design — they only require the supplied file to be non-empty.
 
 ### XML parsing & external validator
 
@@ -145,6 +144,7 @@ a documented accepted risk — see `SECURITY.md`.
 | --- | --- | --- |
 | Poison a release artifact | SHA-pinned Actions, blocking Grype/SBOM gate, attestation generated and verified before publish | Single-maintainer `main` has no required review (accepted risk, `SECURITY.md`) |
 | Tamper `main` or `v*` tags | `release.yml` cross-checks the tag version against `pom.xml`; attestation binds the published archive to its build | No branch protection on `main`; a bad commit is caught only by tests/scans, not review |
+| Tampered SBOM / SHA256SUMS after build | Bundle archive carries build provenance attestation | The SBOM and SHA256SUMS themselves are unattested, and the SBOM is regenerated in the publish job rather than carried from the attested build (accepted 2026-07) |
 | Malicious schema substitution | HTTPS-only curl plus SHA-256 pin verified before use (`SchemaCacheModule`) | `DEDIREN_XMI_SCHEMA_PATH` / `DEDIREN_OEF_SCHEMA_DIR` offline overrides bypass the SHA-256 check by design |
 | Malicious envelope input | Jackson 3 parsing plus fuzz-regression targets pinning the only-`JacksonException`/`XmiValidationException` invariant; hardened DOM factory blocks DOCTYPE/XXE | Fuzz targets run in deterministic regression mode over a fixed seed corpus in CI, not continuous coverage-guided fuzzing |
 | Inject markup into a rendered SVG via model labels/ids | `SvgWriter` (StAX) structurally escapes every attribute value and text node at emission, with no verbatim-injection path; `LabelInjectionTest` proves an end-to-end breakout payload stays escaped and round-trips; `SvgAudit` rejects ill-formed output | The SVG is inert markup with no embedded script; a consumer that embeds it must still apply its own context's policy (e.g. CSP) |

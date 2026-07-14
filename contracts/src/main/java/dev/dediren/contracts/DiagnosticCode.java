@@ -5,11 +5,11 @@ package dev.dediren.contracts;
  * emitted by every module that can depend on {@code contracts} — {@code core}, {@code cli}, the
  * engines, the semantics front ends, and the {@code uml} notation core. The one exception is {@code
  * archimate}, which is deliberately standalone (§2 allows it no internal dependencies) and
- * therefore owns its six {@code DEDIREN_ARCHIMATE_*} codes locally, emitted from a single switch
- * per exception type. This enum owns diagnostic codes only, not {@code DEDIREN_*}
- * environment-variable names (for example {@code DEDIREN_OEF_SCHEMA_DIR}), which are a separate
- * vocabulary. The {@link #code()} string is the wire contract and must never change for an existing
- * constant.
+ * therefore owns its five {@code DEDIREN_ARCHIMATE_*} codes locally: three from the {@code
+ * ArchimateTypeValidationException} switch, plus two constructor-site literals in {@code
+ * Archimate}. This enum owns diagnostic codes only, not {@code DEDIREN_*} environment-variable
+ * names (for example {@code DEDIREN_OEF_SCHEMA_DIR}), which are a separate vocabulary. The {@link
+ * #code()} string is the wire contract and must never change for an existing constant.
  */
 public enum DiagnosticCode {
   // In-memory engine registry (core: EngineDispatch). The two PLUGIN_* constants keep the wire

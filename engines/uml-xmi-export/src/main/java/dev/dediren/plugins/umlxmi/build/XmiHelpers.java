@@ -7,6 +7,7 @@ import dev.dediren.contracts.layout.LaidOutGroups;
 import dev.dediren.contracts.source.GenericGraphPluginData;
 import dev.dediren.contracts.source.SourceNode;
 import dev.dediren.contracts.source.SourceRelationship;
+import dev.dediren.engine.XmlText;
 import java.math.BigInteger;
 import java.util.List;
 import java.util.Map;
@@ -168,7 +169,7 @@ public final class XmiHelpers {
   }
 
   public static String attr(String value) {
-    return (value == null ? "" : value)
+    return XmlText.scrub(value == null ? "" : value)
         .replace("&", "&amp;")
         .replace("<", "&lt;")
         .replace(">", "&gt;")
@@ -176,7 +177,7 @@ public final class XmiHelpers {
   }
 
   public static String text(String value) {
-    return (value == null ? "" : value)
+    return XmlText.scrub(value == null ? "" : value)
         .replace("&", "&amp;")
         .replace("<", "&lt;")
         .replace(">", "&gt;");

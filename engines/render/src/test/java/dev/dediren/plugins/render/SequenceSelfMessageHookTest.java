@@ -14,7 +14,7 @@ import tools.jackson.databind.node.ObjectNode;
 /**
  * Self-message (source lifeline == target lifeline) hook geometry render check. Tasks 1-2 of the
  * self-message fix gave the {@code m2} edge stem-anchored hook points (fixtures/layout-result/
- * uml-sequence-self-message.json: {@code (476,400) (516,400) (516,424) (476,424)} -- out from the
+ * uml-sequence-self-message.json: {@code (455,388) (495,388) (495,412) (455,412)} -- out from the
  * "service" lifeline stem, down, and back to the same stem). This test locks in that {@link
  * dev.dediren.plugins.render.node.uml.UmlSequenceRenderer} actually renders that hook: the emitted
  * {@code d=} path walks all four points with both the first and last x on the lifeline stem's
@@ -40,16 +40,25 @@ class SequenceSelfMessageHookTest {
 
     Document svg = SvgAudit.parse(RenderTestSupport.render(input));
 
+    // Regression pin, not an independent oracle: 455.0 was rebaselined together with the golden
+    // SVG and fixtures/layout-result/uml-sequence-self-message.json in the same pipeline run
+    // (commit 3d8d0e0). The stemX-derived checks below (points.get(0)/get(last) against this same
+    // stemX) are the actual invariant this test defends -- they hold regardless of the literal.
     double stemX = lifelineStemX(svg, "service");
-    assertThat(stemX).as("service lifeline stem centre-x").isEqualTo(476.0);
+    assertThat(stemX).as("service lifeline stem centre-x").isEqualTo(455.0);
 
     Element path = pathWithAttribute(svg, "data-dediren-sequence-message", "m2");
 
     // The hook: stem -> stem+40 -> down -> back to the stem (fixtures/layout-result/
     // uml-sequence-self-message.json's m2 points, verbatim -- edgePath emits raw layout points
     // with no additional offset).
+    //
+    // Also a regression pin rebaselined together with the golden SVG and the layout fixture in
+    // the same pipeline run (commit 3d8d0e0), not an independently derived expectation. The
+    // stemX-derived assertions below (points must start/end on lifelineStemX(svg, "service")) are
+    // the independent invariant oracle: they would still hold even if this literal moved.
     assertThat(path.getAttribute("d"))
-        .isEqualTo("M 476.0 400.0 L 516.0 400.0 L 516.0 424.0 L 476.0 424.0");
+        .isEqualTo("M 455.0 388.0 L 495.0 388.0 L 495.0 412.0 L 455.0 412.0");
 
     List<double[]> points = pathPoints(path.getAttribute("d"));
     assertThat(points).hasSize(4);

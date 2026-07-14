@@ -74,6 +74,9 @@ class ContractVersionsTest {
           ContractVersions.UML_XMI_EXPORT_POLICY_SCHEMA_VERSION
         });
     versionConstBySchema.put(
+        "schemas/build-result.schema.json",
+        new String[] {"build_result_schema_version", ContractVersions.BUILD_RESULT_SCHEMA_VERSION});
+    versionConstBySchema.put(
         "schemas/runtime-capability.schema.json",
         new String[] {"plugin_protocol_version", ContractVersions.PLUGIN_PROTOCOL_VERSION});
 
@@ -113,5 +116,6 @@ class ContractVersionsTest {
         .isEqualTo("oef-export-policy.schema.v1");
     assertThat(ContractVersions.UML_XMI_EXPORT_POLICY_SCHEMA_VERSION)
         .isEqualTo("uml-xmi-export-policy.schema.v1");
+    assertThat(ContractVersions.BUILD_RESULT_SCHEMA_VERSION).isEqualTo("build-result.schema.v1");
   }
 }

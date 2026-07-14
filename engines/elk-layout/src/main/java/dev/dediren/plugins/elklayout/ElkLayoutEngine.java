@@ -81,10 +81,9 @@ final class ElkLayoutEngine {
     List<LayoutIntent> intents = LayoutIntentCodec.decode(request.constraints());
     LayoutIntentNormalizer sequenceConstraints =
         LayoutIntentNormalizer.from(intents, nodePointers, edgePointers);
+    boolean sequenceMode = sequenceConstraints.active();
     Direction layoutDirection =
-        sequenceConstraints.active()
-            ? Direction.RIGHT
-            : ElkLayeredOptions.preferredDirection(preferences);
+        sequenceMode ? Direction.RIGHT : ElkLayeredOptions.preferredDirection(preferences);
     ElkNode root = ElkGraphUtil.createGraph();
     ElkLayeredOptions.configureRoot(root, layoutDirection, preferences);
 
@@ -93,11 +92,11 @@ final class ElkLayoutEngine {
     Map<LayoutEdge, Integer> originalEdgeIndexes = originalEdgeIndexes(originalRequestEdges);
     List<LayoutEdge> requestEdges = sequenceConstraints.orderedEdges(originalRequestEdges);
     Map<String, EdgeEndpointMerge> endpointMerges =
-        sequenceConstraints.active()
+        sequenceMode
             ? emptyEndpointMerges(requestEdges)
             : flatEdgeEndpointMerges(requestEdges, requestNodes, preferences);
     Map<String, EdgeEndpointSides> endpointSides =
-        sequenceConstraints.active()
+        sequenceMode
             ? sequenceEdgeEndpointSides(requestEdges, requestNodes, sequenceConstraints)
             : flatEdgeEndpointSides(requestEdges, requestNodes, endpointMerges, layoutDirection);
     Map<String, EnumMap<PortSide, Integer>> portCounts =
@@ -127,6 +126,17 @@ final class ElkLayoutEngine {
                 DiagnosticSeverity.WARNING,
                 "edge " + edge.id() + " references a missing endpoint",
                 "$.edges[" + originalEdgeIndexes.getOrDefault(edge, index) + "]"));
+        continue;
+      }
+      if (sequenceMode && edge.source().equals(edge.target())) {
+        // A sequence self-message is drawn as a stem-anchored hook synthesized by the normalizer
+        // (LayoutIntentNormalizer#normalizedMessagePoints), so ELK never routes it. Withholding the
+        // self-loop from the ELK graph also stops ELK 0.11.0's self-loop margin placement from
+        // running: that machinery breaks a mirror-image tie by iterating a collection ordered by
+        // object identity hash, which made the whole diagram's cross-axis origin depend on JVM
+        // allocation history (a nondeterministic y that flapped the layout-fixture freshness gate).
+        // The message is re-materialized as a placeholder LaidOutEdge below and redrawn by
+        // normalize.
         continue;
       }
       EdgeEndpointMerge endpointMerge = endpointMerges.getOrDefault(edge.id(), NO_ENDPOINT_MERGE);
@@ -185,6 +195,24 @@ final class ElkLayoutEngine {
                 edge.id(),
                 routingHints(edge.id(), endpointMerges),
                 points(elkEdge),
+                edge.label(),
+                edgePointers.get(edge.id())));
+      } else if (sequenceMode
+          && edge.source().equals(edge.target())
+          && elkNodes.containsKey(edge.source())) {
+        // The self-loop was withheld from ELK above; re-materialize it with a placeholder route the
+        // sequence normalizer overwrites with the stem-anchored hook. Two points on the lifeline
+        // head keep the message in the row lattice (LayoutIntentNormalizer drops sub-two-point
+        // edges); the placeholder coordinates themselves are discarded by normalize().
+        edges.add(
+            new LaidOutEdge(
+                edge.id(),
+                edge.source(),
+                edge.target(),
+                edge.sourceId(),
+                edge.id(),
+                routingHints(edge.id(), endpointMerges),
+                selfLoopPlaceholderRoute(elkNodes.get(edge.source())),
                 edge.label(),
                 edgePointers.get(edge.id())));
       }
@@ -898,6 +926,15 @@ final class ElkLayoutEngine {
       hints.add(SHARED_TARGET_JUNCTION_HINT);
     }
     return hints;
+  }
+
+  // Two distinct points on a withheld self-loop's lifeline head. The sequence normalizer replaces
+  // them with the real stem-anchored hook; they exist only so the self-message keeps its slot in
+  // the message-row lattice, which drops edges with fewer than two route points.
+  private static List<Point> selfLoopPlaceholderRoute(ElkNode lifeline) {
+    double stemX = lifeline.getX() + lifeline.getWidth() / 2.0;
+    double headBottom = lifeline.getY() + lifeline.getHeight();
+    return List.of(new Point(stemX, headBottom), new Point(stemX, headBottom + 1.0));
   }
 
   private static Map<String, EnumMap<PortSide, Integer>> flatPortCounts(

@@ -152,7 +152,7 @@ Dediren source models are semantic and plugin-typed — no positions, sizes,
 colors, or fonts in source JSON; geometry is generated and presentation lives in
 render policy. One source model can drive several notations:
 
-- **Generic** graph views (`generic` profile).
+- **Generic** graph views (`generic-graph` profile).
 - **ArchiMate® 3.2** SVG and OEF XML (`archimate` profile, `archimate-oef`
   plugin; the emitted model validates against the ArchiMate 3.1 OEF exchange
   schema, the latest The Open Group publishes).

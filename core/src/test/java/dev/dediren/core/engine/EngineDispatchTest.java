@@ -260,6 +260,27 @@ class EngineDispatchTest {
   }
 
   @Test
+  void unexpectedEngineFailureWithNullMessageFallsBackToTheClassName() {
+    // A message-less exception must not surface as "failed: null": the catch-all falls back to
+    // the exception's simple class name so the diagnostic stays readable.
+    assertThatThrownBy(
+            () ->
+                EngineDispatch.dispatchInMemory(
+                    "elk",
+                    () -> {
+                      throw new IllegalStateException();
+                    }))
+        .isInstanceOf(EngineExecutionException.class)
+        .satisfies(
+            error -> {
+              Diagnostic diagnostic = ((EngineExecutionException) error).diagnostic();
+              assertThat(diagnostic.code()).isEqualTo("DEDIREN_ENGINE_FAILED");
+              assertThat(diagnostic.message())
+                  .isEqualTo("engine elk failed: IllegalStateException");
+            });
+  }
+
+  @Test
   void errorsPropagateInsteadOfBecomingEngineFailed() {
     // Errors (OOM, assertion failures) must crash loudly, never be buried in an error envelope.
     AssertionError boom = new AssertionError("engine invariant broken");

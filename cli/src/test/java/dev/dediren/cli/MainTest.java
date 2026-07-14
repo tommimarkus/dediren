@@ -1,10 +1,22 @@
 package dev.dediren.cli;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.catchThrowableOfType;
 
+import dev.dediren.contracts.CommandExitCode;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.core.DedirenPaths;
+import dev.dediren.core.commands.CoreCommands;
+import dev.dediren.core.engine.EngineExecutionException;
+import dev.dediren.engine.EngineResult;
+import dev.dediren.engine.Engines;
+import dev.dediren.engine.LayoutEngine;
+import dev.dediren.ir.LaidOutScene;
+import dev.dediren.ir.SceneGraph;
+import java.io.PrintWriter;
 import java.io.StringReader;
+import java.io.StringWriter;
+import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -18,6 +30,8 @@ import org.junit.jupiter.api.io.TempDir;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.xml.sax.InputSource;
+import picocli.CommandLine;
+import picocli.CommandLine.Model.CommandSpec;
 import tools.jackson.databind.JsonNode;
 
 class MainTest {
@@ -527,6 +541,82 @@ class MainTest {
   }
 
   /**
+   * Closes the audit gap left by core-level {@code EngineDispatchTest}: that suite proves an
+   * unexpected engine exception maps to a {@code DEDIREN_ENGINE_FAILED} {@link
+   * EngineExecutionException} with its cause intact, but nothing drives {@code
+   * Main.writePluginError} itself end to end to prove the cli actually writes that cause's stack
+   * trace to stderr alongside the stdout envelope.
+   *
+   * <p>Route taken: {@code Main} has no seam for injecting a fake {@link Engines} registry into a
+   * real CLI invocation -- {@code EngineWiring.defaults()} is constructed inline inside the private
+   * {@code commandLine()} factory, and {@code executeForTesting} does not accept an {@code Engines}
+   * override. Adding one would be a production change, out of scope for this test-only wave.
+   * Instead, this drives the exact real dispatch path a command's {@code call()} hits ({@link
+   * CoreCommands#layoutCommand} over {@code EngineDispatch.dispatch}) with a fake {@link
+   * LayoutEngine} that throws an unexpected {@link IllegalStateException}, producing a genuine
+   * {@code DEDIREN_ENGINE_FAILED} exception with its cause attached exactly as the elk-layout
+   * engine's real failures would. It then feeds that exception into {@code
+   * Main.writePluginError(CommandSpec, EngineExecutionException)} -- the one remaining untested
+   * link -- through a real picocli {@link CommandSpec}/{@link CommandLine} pair wired to {@link
+   * StringWriter} out/err, reached via reflection because {@code writePluginError} has no
+   * package-private test hook and none already exists to reuse.
+   */
+  @Test
+  void unexpectedEngineFailureWritesEngineFailedEnvelopeAndCauseStackTraceToStderr()
+      throws Exception {
+    Engines engines = Engines.of(List.of(), List.of(new BoomLayoutEngine()), List.of(), List.of());
+
+    EngineExecutionException error =
+        catchThrowableOfType(
+            () -> CoreCommands.layoutCommand("boom-layout", "{}", Map.of(), engines),
+            EngineExecutionException.class);
+
+    assertThat(error).isNotNull();
+    assertThat(error.diagnostic().code()).isEqualTo("DEDIREN_ENGINE_FAILED");
+    assertThat(error.getCause()).isInstanceOf(IllegalStateException.class);
+
+    CommandSpec spec = CommandSpec.create();
+    CommandLine commandLine = new CommandLine(spec);
+    StringWriter stdout = new StringWriter();
+    StringWriter stderr = new StringWriter();
+    commandLine.setOut(new PrintWriter(stdout, true));
+    commandLine.setErr(new PrintWriter(stderr, true));
+
+    Method writePluginError =
+        Main.class.getDeclaredMethod(
+            "writePluginError", CommandSpec.class, EngineExecutionException.class);
+    writePluginError.setAccessible(true);
+    Object exitCode = writePluginError.invoke(null, spec, error);
+
+    assertThat(exitCode).isEqualTo(CommandExitCode.PLUGIN_ERROR.code());
+    JsonNode envelope = JsonSupport.objectMapper().readTree(stdout.toString());
+    assertThat(envelope.at("/status").asText()).isEqualTo("error");
+    assertThat(envelope.at("/diagnostics/0/code").asText()).isEqualTo("DEDIREN_ENGINE_FAILED");
+
+    String stderrText = stderr.toString();
+    assertThat(stderrText).contains(IllegalStateException.class.getName());
+    assertThat(stderrText).contains("\tat ");
+  }
+
+  /** Throws from {@link #parseRequest} so {@code layout} is never reached (unreachable stub). */
+  private static final class BoomLayoutEngine implements LayoutEngine {
+    @Override
+    public String id() {
+      return "boom-layout";
+    }
+
+    @Override
+    public SceneGraph parseRequest(byte[] input) {
+      throw new IllegalStateException("boom");
+    }
+
+    @Override
+    public EngineResult<LaidOutScene> layout(SceneGraph scene) {
+      throw new UnsupportedOperationException("unreachable: parseRequest already threw");
+    }
+  }
+
+  /**
    * Runs a CLI invocation with {@code dediren.bundle.root} pointed at {@code bundleRoot}, restoring
    * the previous property value (or clearing it) in a finally block. The property override is read
    * from JVM globals by DedirenPaths, so the env map the tests inject does not reach it.
@@ -556,6 +646,12 @@ class MainTest {
     JsonNode envelope = JsonSupport.objectMapper().readTree(result.stdout());
     assertThat(envelope.at("/diagnostics/0/code").asText())
         .isEqualTo("DEDIREN_PRODUCT_ROOT_UNRESOLVED");
+    // Covers the cli-plumbing-to-message path end to end: DedirenPaths.requireProductRoot names
+    // the misconfigured source (dediren.bundle.root here, since every caller of this helper routes
+    // through withBundleRootProperty) in the diagnostic message it raises.
+    assertThat(envelope.at("/diagnostics/0/message").asText())
+        .isNotEmpty()
+        .contains(DedirenPaths.BUNDLE_ROOT_PROPERTY);
   }
 
   private CliResult runValidate(Map<String, String> env, Path source) throws Exception {

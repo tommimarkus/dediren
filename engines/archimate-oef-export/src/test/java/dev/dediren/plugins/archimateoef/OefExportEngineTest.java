@@ -5,15 +5,20 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import dev.dediren.contracts.export.ExportRequest;
+import dev.dediren.contracts.export.ExportResult;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.engine.EngineException;
 import dev.dediren.engine.EngineResult;
+import java.io.StringReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
+import javax.xml.parsers.DocumentBuilderFactory;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.w3c.dom.Document;
+import org.xml.sax.InputSource;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -47,6 +52,27 @@ class OefExportEngineTest {
     EngineResult<?> result = engine.export(request, env, Path.of("").toAbsolutePath());
 
     assertThat(engineTree(result.value())).isEqualTo(processData(input, env));
+  }
+
+  @Test
+  void exportedContentScrubsXmlInvalidLabelCharacters() throws Exception {
+    // A contract-valid label (model.schema constrains ids, not labels) may carry a C0 control
+    // character such as BEL; the emitted OEF must still be well-formed XML, with the control
+    // character replaced by U+FFFD rather than passed through raw (issue: shared XmlText scrub).
+    JsonNode inputJson = exportInputJson();
+    ((ObjectNode) inputJson.get("source").get("nodes").get(0))
+        .put("label", "Orders\u0007Component");
+    byte[] input =
+        JsonSupport.objectMapper().writeValueAsString(inputJson).getBytes(StandardCharsets.UTF_8);
+
+    ExportRequest request = engine.parseRequest(input);
+    EngineResult<ExportResult> result =
+        engine.export(request, envWithOefSchemas(), Path.of("").toAbsolutePath());
+    String content = result.value().content();
+
+    assertThat(parseXml(content)).isNotNull();
+    assertThat(content).contains("�");
+    assertThat(content).doesNotContain("\u0007");
   }
 
   @Test
@@ -181,6 +207,12 @@ class OefExportEngineTest {
       Files.writeString(schemaDir.resolve(fileName), schema, StandardCharsets.UTF_8);
     }
     return Map.of("DEDIREN_OEF_SCHEMA_DIR", schemaDir.toString());
+  }
+
+  private static Document parseXml(String content) throws Exception {
+    DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+    factory.setNamespaceAware(false);
+    return factory.newDocumentBuilder().parse(new InputSource(new StringReader(content)));
   }
 
   private static JsonNode fixtureJson(String path) throws Exception {
