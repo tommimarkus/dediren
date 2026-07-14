@@ -810,7 +810,9 @@ nothing else. Important explicit variables:
 
 - `DEDIREN_BUNDLE_ROOT`: explicit bundle or repository root for bundled
   schemas, fixtures, and the launcher. The packaged `dediren` launcher sets this
-  automatically.
+  automatically. If it points somewhere without `schemas/model.schema.json`, or
+  discovery fails entirely, schema-touching commands emit a
+  `DEDIREN_PRODUCT_ROOT_UNRESOLVED` error envelope on stdout with exit `2`.
 - `DEDIREN_OEF_SCHEMA_DIR`: local OEF schema directory.
 - `DEDIREN_XMI_SCHEMA_PATH`: local XMI schema file, or a driver schema that
   imports `XMI.xsd` plus a UML 2.5.1 XSD to also validate UML content.
