@@ -585,7 +585,7 @@ class ContractRoundTripTest {
                 {
                   "plugin_manifest_schema_version": "plugin-manifest.schema.v1",
                   "id": "generic-graph",
-                  "version": "2026.07.16",
+                  "version": "2026.07.17",
                   "capabilities": ["semantic-validation", "projection"],
                   "allowed_env": ["JAVA_HOME", "PATH"]
                 }
@@ -604,7 +604,7 @@ class ContractRoundTripTest {
             RuntimeCapabilities.class);
 
     assertThat(manifest.pluginManifestSchemaVersion()).isEqualTo("plugin-manifest.schema.v1");
-    assertThat(manifest.version()).isEqualTo("2026.07.16");
+    assertThat(manifest.version()).isEqualTo("2026.07.17");
     assertThat(manifest.allowedEnv()).containsExactly("JAVA_HOME", "PATH");
     assertThat(capabilities.pluginProtocolVersion())
         .isEqualTo(ContractVersions.PLUGIN_PROTOCOL_VERSION);
