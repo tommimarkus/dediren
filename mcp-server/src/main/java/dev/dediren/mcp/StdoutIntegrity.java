@@ -16,9 +16,9 @@ import java.nio.charset.StandardCharsets;
  * next dependency.
  *
  * <p>So: take the real file descriptor for the transport, then point {@code System.out} at stderr.
- * A stray print then degrades to log noise instead of protocol corruption. The dist-smoke test
- * ({@code DistTool.assertMcpStdoutIsProtocolOnly}) is this control's gate — it is the only place
- * the real process streams are observable.
+ * A stray print then degrades to log noise instead of protocol corruption. The dist-smoke tests
+ * ({@code DistTool.assertMcpServesToolsOverStdio} and {@code assertMcpColdCdsStdoutClean}) are this
+ * control's gate — they are the only place the real process streams are observable.
  */
 public final class StdoutIntegrity {
   private StdoutIntegrity() {}
