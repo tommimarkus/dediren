@@ -101,6 +101,32 @@ public final class BuildCommand {
       return buildLevelError(error.diagnostics());
     }
 
+    // Gate every supplied policy once, here, before any view is selected and before any engine
+    // runs -- the binding constraint is that a stale policy fails before any engine runs and before
+    // any artifact is written. Gating per view (the previous shape) let the render/layout engines
+    // and any --emit files run to completion, and even wrote overview/diagram.svg on the export
+    // lanes, before ever inspecting a stale OEF/XMI policy; it also re-parsed and re-emitted the
+    // same request-level diagnostic once per view. Parsing here instead means every lane's engine
+    // sees an already-validated JsonNode, not raw text.
+    JsonNode renderPolicy = null;
+    JsonNode oefPolicy = null;
+    JsonNode xmiPolicy = null;
+    try {
+      if (request.renderPolicyText() != null) {
+        renderPolicy =
+            CoreCommands.parsePolicy(
+                "render", request.renderPolicyText(), KnownSchemaVersions.RENDER_POLICY);
+      }
+      if (request.oefPolicyText() != null) {
+        oefPolicy = CoreCommands.parseExportPolicy(OEF_ENGINE, request.oefPolicyText());
+      }
+      if (request.xmiPolicyText() != null) {
+        xmiPolicy = CoreCommands.parseExportPolicy(XMI_ENGINE, request.xmiPolicyText());
+      }
+    } catch (EngineExecutionException error) {
+      return buildLevelError(List.of(error.diagnostic()), CommandExitCode.PLUGIN_ERROR.code());
+    }
+
     List<String> views = selectViews(request, source);
     List<BuildViewOutcome> outcomes = new ArrayList<>(views.size());
     boolean anyError = false;
@@ -109,7 +135,7 @@ public final class BuildCommand {
     for (String view : views) {
       ViewBuild built;
       try {
-        built = buildView(request, engines, source, view);
+        built = buildView(request, engines, source, view, renderPolicy, oefPolicy, xmiPolicy);
       } catch (ViewOutputEscapesRootException escape) {
         // Re-confinement failed (see writeFile/requireWithinOutDir): fold into a per-view error
         // exactly like the other per-view failure paths above, rather than aborting the whole
@@ -167,7 +193,13 @@ public final class BuildCommand {
   }
 
   private static ViewBuild buildView(
-      BuildRequest request, Engines engines, SourceDocument source, String view) {
+      BuildRequest request,
+      Engines engines,
+      SourceDocument source,
+      String view,
+      JsonNode renderPolicy,
+      JsonNode oefPolicy,
+      JsonNode xmiPolicy) {
     List<Diagnostic> diagnostics = new ArrayList<>();
     List<BuildArtifact> artifacts = new ArrayList<>();
     boolean warning = false;
@@ -266,14 +298,11 @@ public final class BuildCommand {
           runStage(
               diagnostics,
               () -> {
-                JsonNode policy =
-                    CoreCommands.parsePolicy(
-                        "render", request.renderPolicyText(), KnownSchemaVersions.RENDER_POLICY);
                 RenderEngine engine =
                     EngineDispatch.requireEngine(
                         engines, RENDER_ENGINE, "render", engines.renderEngine(RENDER_ENGINE));
                 return EngineDispatch.dispatchInMemory(
-                    RENDER_ENGINE, () -> engine.render(laid, policy, renderMetadata));
+                    RENDER_ENGINE, () -> engine.render(laid, renderPolicy, renderMetadata));
               });
       if (render.failed()) {
         return failedView(view, artifacts, diagnostics, render.exitCode());
@@ -286,13 +315,7 @@ public final class BuildCommand {
     if (request.oefPolicyText() != null) {
       InMemoryStage<ExportResult> oef =
           runExportStage(
-              request,
-              engines,
-              source,
-              layoutRecord,
-              OEF_ENGINE,
-              request.oefPolicyText(),
-              diagnostics);
+              request, engines, source, layoutRecord, OEF_ENGINE, oefPolicy, diagnostics);
       if (oef.failed()) {
         return failedView(view, artifacts, diagnostics, oef.exitCode());
       }
@@ -304,13 +327,7 @@ public final class BuildCommand {
     if (request.xmiPolicyText() != null) {
       InMemoryStage<ExportResult> xmi =
           runExportStage(
-              request,
-              engines,
-              source,
-              layoutRecord,
-              XMI_ENGINE,
-              request.xmiPolicyText(),
-              diagnostics);
+              request, engines, source, layoutRecord, XMI_ENGINE, xmiPolicy, diagnostics);
       if (xmi.failed()) {
         return failedView(view, artifacts, diagnostics, xmi.exitCode());
       }
@@ -329,12 +346,11 @@ public final class BuildCommand {
       SourceDocument source,
       LayoutResult layoutRecord,
       String engineId,
-      String policyText,
+      JsonNode policy,
       List<Diagnostic> diagnostics) {
     return runStage(
         diagnostics,
         () -> {
-          JsonNode policy = CoreCommands.parseExportPolicy(engineId, policyText);
           ExportEngine engine =
               EngineDispatch.requireEngine(
                   engines, engineId, "export", engines.exportEngine(engineId));
@@ -485,17 +501,21 @@ public final class BuildCommand {
   }
 
   private static EngineRunOutcome buildLevelError(Diagnostic diagnostic) {
-    return buildLevelError(List.of(diagnostic));
+    return buildLevelError(List.of(diagnostic), CommandExitCode.INPUT_ERROR.code());
   }
 
   private static EngineRunOutcome buildLevelError(List<Diagnostic> diagnostics) {
+    return buildLevelError(diagnostics, CommandExitCode.INPUT_ERROR.code());
+  }
+
+  private static EngineRunOutcome buildLevelError(List<Diagnostic> diagnostics, int exitCode) {
     return outcome(
         new BuildResult(
             ContractVersions.BUILD_RESULT_SCHEMA_VERSION,
             EnvelopeStatus.ERROR,
             List.of(),
             diagnostics),
-        CommandExitCode.INPUT_ERROR.code());
+        exitCode);
   }
 
   private static EngineRunOutcome outcome(BuildResult result, int exitCode) {

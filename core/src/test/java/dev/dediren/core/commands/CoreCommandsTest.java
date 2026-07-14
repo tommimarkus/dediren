@@ -1,6 +1,7 @@
 package dev.dediren.core.commands;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import dev.dediren.contracts.ContractVersions;
 import dev.dediren.contracts.Diagnostic;
@@ -11,6 +12,7 @@ import dev.dediren.contracts.layout.LaidOutNode;
 import dev.dediren.contracts.layout.LayoutRequest;
 import dev.dediren.contracts.layout.LayoutResult;
 import dev.dediren.contracts.layout.Point;
+import dev.dediren.core.engine.EngineExecutionException;
 import dev.dediren.core.engine.EngineRunOutcome;
 import dev.dediren.core.source.ValidationResult;
 import dev.dediren.engine.EngineResult;
@@ -302,6 +304,109 @@ class CoreCommandsTest {
 
     assertThat(outcome.exitCode()).isZero();
     assertThat(engine.lastParsedViewId).isEqualTo("piped-view");
+  }
+
+  // A schema-valid source with no plugins.generic-graph section -- exportCommand only needs a
+  // source that clears SourceValidator, not one with any particular view.
+  private static final String MINIMAL_SOURCE =
+      """
+      {
+        "model_schema_version": "model.schema.v1",
+        "nodes": [
+          { "id": "api", "type": "generic.component", "label": "API", "properties": {} }
+        ],
+        "relationships": [],
+        "plugins": {}
+      }
+      """;
+
+  private static final String MINIMAL_LAYOUT =
+      """
+      {
+        "layout_result_schema_version": "layout-result.schema.v2",
+        "view_id": "main",
+        "nodes": [
+          { "id": "a", "source_id": "a", "projection_id": "a", "x": 0.0, "y": 0.0, "width": 100.0, "height": 80.0, "label": "A" }
+        ],
+        "edges": [],
+        "groups": [],
+        "warnings": []
+      }
+      """;
+
+  @Test
+  void renderCommandRejectsAStalePolicyBeforeEngineLookup() {
+    // Task 4's binding constraint applies to every gated call site, not just build: the standalone
+    // render command must reject a stale policy before ever resolving an engine. An engine registry
+    // with no render engine at all proves the rejection cannot be riding on a successful lookup.
+    String stalePolicy = "{\"render_policy_schema_version\":\"render-policy.schema.v2\"}";
+
+    assertThatThrownBy(
+            () ->
+                CoreCommands.renderCommand(
+                    "nonexistent-render-engine",
+                    stalePolicy,
+                    null,
+                    MINIMAL_LAYOUT,
+                    Map.of(),
+                    emptyEngines()))
+        .isInstanceOf(EngineExecutionException.class)
+        .satisfies(
+            error ->
+                assertThat(((EngineExecutionException) error).diagnostic().code())
+                    .isEqualTo("DEDIREN_SCHEMA_VERSION_OUTDATED"));
+  }
+
+  @Test
+  void exportCommandRejectsAStalePolicyBeforeEngineLookup() {
+    // Mirrors renderCommandRejectsAStalePolicyBeforeEngineLookup for the standalone export command:
+    // a known export engine id ("archimate-oef") whose policy carries a version this build does not
+    // recognize is rejected before EngineDispatch.requireEngine ever runs.
+    String unknownVersionOefPolicy =
+        "{\"oef_export_policy_schema_version\":\"oef-export-policy.schema.v0\"}";
+
+    assertThatThrownBy(
+            () ->
+                CoreCommands.exportCommand(
+                    "archimate-oef",
+                    unknownVersionOefPolicy,
+                    MINIMAL_SOURCE,
+                    null,
+                    MINIMAL_LAYOUT,
+                    Map.of(),
+                    emptyEngines()))
+        .isInstanceOf(EngineExecutionException.class)
+        .satisfies(
+            error ->
+                assertThat(((EngineExecutionException) error).diagnostic().code())
+                    .isEqualTo("DEDIREN_SCHEMA_VERSION_UNKNOWN"));
+  }
+
+  @Test
+  void exportCommandUnknownEngineIdStillYieldsPluginUnknownNotAVersionDiagnostic() {
+    // exportPolicyFamily returns Optional.empty() for an engine id that is neither "archimate-oef"
+    // nor "uml-xmi", specifically so an unknown export engine id still reaches requireEngine and
+    // raises DEDIREN_PLUGIN_UNKNOWN instead of being swallowed by the version gate. The policy here
+    // carries no version field at all -- it would fail the gate if the gate ran -- so this proves
+    // the gate is genuinely skipped for an unrecognized engine id, not merely that this particular
+    // policy happens to pass it.
+    String versionlessPolicy = "{}";
+
+    assertThatThrownBy(
+            () ->
+                CoreCommands.exportCommand(
+                    "totally-unknown-engine",
+                    versionlessPolicy,
+                    MINIMAL_SOURCE,
+                    null,
+                    MINIMAL_LAYOUT,
+                    Map.of(),
+                    emptyEngines()))
+        .isInstanceOf(EngineExecutionException.class)
+        .satisfies(
+            error ->
+                assertThat(((EngineExecutionException) error).diagnostic().code())
+                    .isEqualTo("DEDIREN_PLUGIN_UNKNOWN"));
   }
 
   private static Engines emptyEngines() {

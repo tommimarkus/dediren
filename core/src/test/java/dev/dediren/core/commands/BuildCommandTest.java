@@ -200,8 +200,10 @@ class BuildCommandTest {
   }
 
   @Test
-  void aStaleRenderPolicyFailsTheBuildBeforeAnyArtifactIsWritten(@TempDir Path out)
-      throws Exception {
+  void aStaleRenderPolicyFailsTheBuildBeforeAnyArtifactIsWritten() throws Exception {
+    // --emit is set for all three stage envelopes, so this also proves the gate fires before
+    // emitEnvelope ever runs for any view -- a prior version of this test used Set.of() for emit,
+    // which meant it passed even when the gate fired only after the emitted files were written.
     BuildRequest request =
         new BuildRequest(
             SOURCE,
@@ -210,6 +212,42 @@ class BuildCommandTest {
             "{\"render_policy_schema_version\":\"render-policy.schema.v2\"}",
             null,
             null,
+            Set.of("layout-request", "layout-result", "render-metadata"),
+            out,
+            Map.of());
+
+    EngineRunOutcome outcome = BuildCommand.run(request, engines());
+
+    assertThat(outcome.exitCode()).isNotZero();
+    BuildResult result = buildResult(outcome);
+    assertSchemaValid(outcome);
+    assertThat(result.status()).isEqualTo(EnvelopeStatus.ERROR);
+    // No view was ever selected or built -- the gate runs before selectViews, not per view -- so
+    // there is exactly one request-level diagnostic, not one per view (SOURCE has two).
+    assertThat(result.views()).isEmpty();
+    assertThat(result.diagnostics()).hasSize(1);
+    Diagnostic diagnostic = result.diagnostics().getFirst();
+    assertThat(diagnostic.code()).isEqualTo("DEDIREN_SCHEMA_VERSION_OUTDATED");
+    assertThat(diagnostic.message()).contains("render-policy.schema.v2");
+    assertThat(out).isEmptyDirectory();
+  }
+
+  @Test
+  void aStaleExportPolicyFailsTheBuildBeforeAValidRenderPolicysArtifactIsWritten()
+      throws Exception {
+    // Before the gate moved to a single request-level check, this exact combination -- a valid
+    // render policy paired with a stale export policy -- let the render lane run to completion
+    // (writing overview/diagram.svg) for every view before the OEF lane's own gate ever rejected
+    // the stale policy. Gating every supplied policy once, up front, means neither lane's engine
+    // ever runs and nothing lands on disk.
+    BuildRequest request =
+        new BuildRequest(
+            SOURCE,
+            null,
+            List.of(),
+            RENDER_POLICY,
+            "{\"oef_export_policy_schema_version\":\"oef-export-policy.schema.v0\"}",
+            null,
             Set.of(),
             out,
             Map.of());
@@ -217,8 +255,12 @@ class BuildCommandTest {
     EngineRunOutcome outcome = BuildCommand.run(request, engines());
 
     assertThat(outcome.exitCode()).isNotZero();
-    assertThat(outcome.stdout()).contains("DEDIREN_SCHEMA_VERSION_OUTDATED");
-    assertThat(outcome.stdout()).contains("render-policy.schema.v2");
+    BuildResult result = buildResult(outcome);
+    assertSchemaValid(outcome);
+    assertThat(result.status()).isEqualTo(EnvelopeStatus.ERROR);
+    assertThat(result.views()).isEmpty();
+    assertThat(result.diagnostics()).hasSize(1);
+    assertThat(result.diagnostics().getFirst().code()).isEqualTo("DEDIREN_SCHEMA_VERSION_UNKNOWN");
     assertThat(out).isEmptyDirectory();
   }
 
@@ -504,10 +546,21 @@ class BuildCommandTest {
   @Test
   void sourceWithoutGenericGraphSectionBuildsNoViews() throws Exception {
     // selectViews' empty-view path: no explicit --views and no plugins.generic-graph section, so
-    // the build has nothing to render and reports an OK, exit-0, empty-views result.
+    // the build has nothing to render and reports an OK, exit-0, empty-views result. The render
+    // policy must now be schema-valid: the request-level policy gate runs before selectViews, so an
+    // incidental "{}" stub would fail the build on the stale policy before ever reaching the
+    // empty-views path this test is pinning.
     BuildRequest request =
         new BuildRequest(
-            SOURCE_WITHOUT_VIEWS, null, List.of(), "{}", null, null, Set.of(), out, Map.of());
+            SOURCE_WITHOUT_VIEWS,
+            null,
+            List.of(),
+            RENDER_POLICY,
+            null,
+            null,
+            Set.of(),
+            out,
+            Map.of());
 
     EngineRunOutcome outcome = BuildCommand.run(request, engines());
 
