@@ -6,6 +6,7 @@ import dev.dediren.contracts.Diagnostic;
 import dev.dediren.contracts.DiagnosticCode;
 import dev.dediren.contracts.DiagnosticSeverity;
 import dev.dediren.contracts.EnvelopeStatus;
+import dev.dediren.contracts.KnownSchemaVersions;
 import dev.dediren.contracts.build.BuildArtifact;
 import dev.dediren.contracts.build.BuildResult;
 import dev.dediren.contracts.build.BuildViewOutcome;
@@ -265,7 +266,9 @@ public final class BuildCommand {
           runStage(
               diagnostics,
               () -> {
-                JsonNode policy = CoreCommands.parseJson("render", request.renderPolicyText());
+                JsonNode policy =
+                    CoreCommands.parsePolicy(
+                        "render", request.renderPolicyText(), KnownSchemaVersions.RENDER_POLICY);
                 RenderEngine engine =
                     EngineDispatch.requireEngine(
                         engines, RENDER_ENGINE, "render", engines.renderEngine(RENDER_ENGINE));
@@ -331,7 +334,7 @@ public final class BuildCommand {
     return runStage(
         diagnostics,
         () -> {
-          JsonNode policy = CoreCommands.parseJson("export", policyText);
+          JsonNode policy = CoreCommands.parseExportPolicy(engineId, policyText);
           ExportEngine engine =
               EngineDispatch.requireEngine(
                   engines, engineId, "export", engines.exportEngine(engineId));

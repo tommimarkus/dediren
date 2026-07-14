@@ -6,6 +6,7 @@ import dev.dediren.contracts.ContractVersions;
 import dev.dediren.contracts.Diagnostic;
 import dev.dediren.contracts.DiagnosticCode;
 import dev.dediren.contracts.DiagnosticSeverity;
+import dev.dediren.contracts.KnownSchemaVersions;
 import dev.dediren.contracts.export.ExportRequest;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.contracts.layout.LaidOutEdge;
@@ -20,6 +21,7 @@ import dev.dediren.core.engine.EngineRunOutcome;
 import dev.dediren.core.io.JsonInput;
 import dev.dediren.core.quality.LayoutQuality;
 import dev.dediren.core.quality.LayoutQualityReport;
+import dev.dediren.core.schema.SchemaVersionGate;
 import dev.dediren.core.source.SourceValidator;
 import dev.dediren.core.source.ValidationResult;
 import dev.dediren.engine.EngineResult;
@@ -40,6 +42,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import tools.jackson.databind.JsonNode;
 
 /**
@@ -274,7 +277,7 @@ public final class CoreCommands {
       Engines engines)
       throws EngineExecutionException {
     LayoutResult layoutResult = parseCommandData("render", layoutText, LayoutResult.class);
-    JsonNode policy = parseJson("render", policyText);
+    JsonNode policy = parsePolicy("render", policyText, KnownSchemaVersions.RENDER_POLICY);
     RenderMetadata metadata =
         metadataText == null
             ? null
@@ -302,7 +305,7 @@ public final class CoreCommands {
       return errorOutcome(error.diagnostics());
     }
     LayoutResult layoutResult = parseCommandData("export", layoutText, LayoutResult.class);
-    JsonNode policy = parseJson("export", policyText);
+    JsonNode policy = parseExportPolicy(engineId, policyText);
     var request =
         new ExportRequest(
             ContractVersions.EXPORT_REQUEST_SCHEMA_VERSION, source, layoutResult, policy);
@@ -340,6 +343,45 @@ public final class CoreCommands {
     } catch (RuntimeException error) {
       throw commandInputInvalid(command, error);
     }
+  }
+
+  /**
+   * Parses a policy document and rejects it when it does not carry {@code family}'s current schema
+   * version. Every policy lane — the standalone render and export commands and both build lanes —
+   * goes through here, so a stale policy is caught once, before any engine runs.
+   */
+  static JsonNode parsePolicy(String command, String text, KnownSchemaVersions.Family family)
+      throws EngineExecutionException {
+    JsonNode policy = parseJson(command, text);
+    Optional<Diagnostic> stale = SchemaVersionGate.check(family, policy);
+    if (stale.isPresent()) {
+      Diagnostic diagnostic = stale.get();
+      throw EngineExecutionException.command(diagnostic.code(), command, diagnostic.message());
+    }
+    return policy;
+  }
+
+  /**
+   * The policy family an export engine id expects, or empty for an id that is neither export
+   * engine. Empty skips the gate and lets {@code requireEngine} raise {@code
+   * DEDIREN_PLUGIN_UNKNOWN}, which preserves today's error precedence: a malformed policy is
+   * reported before an unknown engine.
+   */
+  static Optional<KnownSchemaVersions.Family> exportPolicyFamily(String engineId) {
+    return switch (engineId) {
+      case "archimate-oef" -> Optional.of(KnownSchemaVersions.OEF_EXPORT_POLICY);
+      case "uml-xmi" -> Optional.of(KnownSchemaVersions.UML_XMI_EXPORT_POLICY);
+      default -> Optional.empty();
+    };
+  }
+
+  /** The export lanes' policy parse: which family applies depends on which engine is running. */
+  static JsonNode parseExportPolicy(String engineId, String policyText)
+      throws EngineExecutionException {
+    Optional<KnownSchemaVersions.Family> family = exportPolicyFamily(engineId);
+    return family.isPresent()
+        ? parsePolicy("export", policyText, family.get())
+        : parseJson("export", policyText);
   }
 
   private static EngineExecutionException commandInputInvalid(String command, Exception error) {

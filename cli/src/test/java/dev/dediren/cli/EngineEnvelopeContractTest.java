@@ -179,13 +179,17 @@ class EngineEnvelopeContractTest {
 
   @Test
   void exportOefInvalidPolicyKeepsPublishedErrorRow() throws Exception {
+    // A current-version but otherwise incomplete policy (missing model_identifier etc.) clears the
+    // schema-version gate and still reaches the engine's own policy-schema validation, so this pins
+    // that deep row rather than the earlier, more general DEDIREN_SCHEMA_VERSION_UNKNOWN.
+    String policy = "{\"oef_export_policy_schema_version\":\"oef-export-policy.schema.v1\"}";
     String source = read("fixtures/source/valid-archimate-oef.json");
     Path base = path("fixtures/source");
     String layout = read("fixtures/layout-result/archimate-oef-basic.json");
 
     EngineRunOutcome outcome =
         CoreCommands.exportCommand(
-            "archimate-oef", "{}", source, base, layout, Map.of(), engines());
+            "archimate-oef", policy, source, base, layout, Map.of(), engines());
 
     assertDiagnostic(outcome, 3, "DEDIREN_OEF_POLICY_INVALID");
   }
@@ -208,12 +212,17 @@ class EngineEnvelopeContractTest {
 
   @Test
   void exportUmlXmiInvalidPolicyKeepsPublishedErrorRow() throws Exception {
+    // Same rationale as exportOefInvalidPolicyKeepsPublishedErrorRow: a current-version but
+    // otherwise incomplete policy (missing model_identifier etc.) clears the schema-version gate
+    // and still fails the engine's own policy-schema validation.
+    String policy =
+        "{\"uml_xmi_export_policy_schema_version\":\"uml-xmi-export-policy.schema.v1\"}";
     String source = read("fixtures/source/valid-uml-basic.json");
     Path base = path("fixtures/source");
     String layout = read("fixtures/layout-result/uml-basic.json");
 
     EngineRunOutcome outcome =
-        CoreCommands.exportCommand("uml-xmi", "{}", source, base, layout, Map.of(), engines());
+        CoreCommands.exportCommand("uml-xmi", policy, source, base, layout, Map.of(), engines());
 
     assertDiagnostic(outcome, 3, "DEDIREN_UML_XMI_POLICY_INVALID");
   }

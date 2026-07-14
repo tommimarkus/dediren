@@ -85,6 +85,15 @@ class BuildCommandTest {
       }
       """;
 
+  // Stub policies that carry a current schema version, so they clear SchemaVersionGate; the fake
+  // engines in this file ignore the policy body entirely, so the version field alone is enough.
+  private static final String RENDER_POLICY =
+      "{\"render_policy_schema_version\":\"render-policy.schema.v3\"}";
+  private static final String OEF_POLICY =
+      "{\"oef_export_policy_schema_version\":\"oef-export-policy.schema.v1\"}";
+  private static final String XMI_POLICY =
+      "{\"uml_xmi_export_policy_schema_version\":\"uml-xmi-export-policy.schema.v1\"}";
+
   @TempDir Path out;
 
   @Test
@@ -115,7 +124,7 @@ class BuildCommandTest {
   void explicitViewSelectionControlsOrderAndSubset() throws Exception {
     BuildRequest request =
         new BuildRequest(
-            SOURCE, null, List.of("detail"), "{}", null, null, Set.of(), out, Map.of());
+            SOURCE, null, List.of("detail"), RENDER_POLICY, null, null, Set.of(), out, Map.of());
 
     BuildResult result = buildResult(BuildCommand.run(request, engines()));
 
@@ -125,7 +134,8 @@ class BuildCommandTest {
   @Test
   void runsBothExportLanesPerView() throws Exception {
     BuildRequest request =
-        new BuildRequest(SOURCE, null, List.of(), null, "{}", "{}", Set.of(), out, Map.of());
+        new BuildRequest(
+            SOURCE, null, List.of(), null, OEF_POLICY, XMI_POLICY, Set.of(), out, Map.of());
 
     EngineRunOutcome outcome = BuildCommand.run(request, engines());
 
@@ -190,6 +200,29 @@ class BuildCommandTest {
   }
 
   @Test
+  void aStaleRenderPolicyFailsTheBuildBeforeAnyArtifactIsWritten(@TempDir Path out)
+      throws Exception {
+    BuildRequest request =
+        new BuildRequest(
+            SOURCE,
+            null,
+            List.of(),
+            "{\"render_policy_schema_version\":\"render-policy.schema.v2\"}",
+            null,
+            null,
+            Set.of(),
+            out,
+            Map.of());
+
+    EngineRunOutcome outcome = BuildCommand.run(request, engines());
+
+    assertThat(outcome.exitCode()).isNotZero();
+    assertThat(outcome.stdout()).contains("DEDIREN_SCHEMA_VERSION_OUTDATED");
+    assertThat(outcome.stdout()).contains("render-policy.schema.v2");
+    assertThat(out).isEmptyDirectory();
+  }
+
+  @Test
   void unresolvableExplicitViewIsAPerViewErrorAndDoesNotAbortOthers() throws Exception {
     // A real semantics engine (GenericGraphEngine) surfaces an unknown --views entry as an
     // UncheckedIOException structural failure, not an EngineException; the fake reproduces that
@@ -199,7 +232,7 @@ class BuildCommandTest {
             SOURCE,
             null,
             List.of("overview", "no-such-view"),
-            "{}",
+            RENDER_POLICY,
             null,
             null,
             Set.of(),
@@ -246,7 +279,7 @@ class BuildCommandTest {
             SOURCE,
             null,
             List.of("overview", "../evil"),
-            "{}",
+            RENDER_POLICY,
             null,
             null,
             Set.of(),
@@ -288,7 +321,7 @@ class BuildCommandTest {
             SOURCE,
             null,
             List.of(),
-            "{}",
+            RENDER_POLICY,
             null,
             null,
             Set.of("layout-request", "layout-result", "render-metadata"),
@@ -316,7 +349,7 @@ class BuildCommandTest {
             SOURCE,
             null,
             List.of("overview"),
-            "{}",
+            RENDER_POLICY,
             null,
             null,
             Set.of("layout-request", "layout-result", "render-metadata"),
@@ -552,15 +585,18 @@ class BuildCommandTest {
       """;
 
   private BuildRequest renderOnlyRequest() {
-    return new BuildRequest(SOURCE, null, List.of(), "{}", null, null, Set.of(), out, Map.of());
+    return new BuildRequest(
+        SOURCE, null, List.of(), RENDER_POLICY, null, null, Set.of(), out, Map.of());
   }
 
   private BuildRequest oefOnlyRequest() {
-    return new BuildRequest(SOURCE, null, List.of(), null, "{}", null, Set.of(), out, Map.of());
+    return new BuildRequest(
+        SOURCE, null, List.of(), null, OEF_POLICY, null, Set.of(), out, Map.of());
   }
 
   private BuildRequest xmiOnlyRequest() {
-    return new BuildRequest(SOURCE, null, List.of(), null, null, "{}", Set.of(), out, Map.of());
+    return new BuildRequest(
+        SOURCE, null, List.of(), null, null, XMI_POLICY, Set.of(), out, Map.of());
   }
 
   // Asserts a single failing view ("detail") did not abort the healthy first view ("overview"):
