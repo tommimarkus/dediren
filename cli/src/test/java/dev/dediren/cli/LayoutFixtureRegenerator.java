@@ -48,7 +48,7 @@ import org.junit.jupiter.api.Test;
  */
 class LayoutFixtureRegenerator {
 
-  private record FixtureMapping(String fixtureName, String sourceFileName, String viewId) {}
+  record FixtureMapping(String fixtureName, String sourceFileName, String viewId) {}
 
   private static final List<FixtureMapping> MAPPINGS =
       List.of(
@@ -83,6 +83,41 @@ class LayoutFixtureRegenerator {
           new FixtureMapping(
               "uml-use-case-basic.json", "valid-uml-use-case-basic.json", "use-case-view"));
 
+  /** The (source fixture, view id) -&gt; target fixture table documented above. */
+  static List<FixtureMapping> mappings() {
+    return MAPPINGS;
+  }
+
+  /**
+   * Runs the real generic-graph + elk-layout pipeline for a single mapping and returns exactly the
+   * pretty-printed JSON (plus trailing {@code "\n"}) that {@link #regenerateLayoutFixtures()}
+   * writes to the checked-in fixture. Used both by the opt-in regenerator and by {@code
+   * LayoutFixtureFreshnessTest}'s always-on drift gate, so the two paths can never diverge.
+   */
+  static String regeneratedJson(FixtureMapping mapping) throws Exception {
+    Path sourceDir = TestSupport.workspaceRoot().resolve("fixtures/source");
+
+    SemanticsRouterEngine genericGraph = newGenericGraphEngine();
+    ElkEngine elk = new ElkEngine();
+
+    byte[] sourceBytes = Files.readAllBytes(sourceDir.resolve(mapping.sourceFileName()));
+    SourceDocument source = genericGraph.parseSource(sourceBytes);
+    SceneGraph scene = genericGraph.projectScene(source, mapping.viewId()).value();
+    LaidOutScene laid = elk.layout(scene).value();
+    LayoutResult result = LaidOutSceneMapper.toResult(laid);
+
+    return JsonSupport.objectMapper().writerWithDefaultPrettyPrinter().writeValueAsString(result)
+        + "\n";
+  }
+
+  private static SemanticsRouterEngine newGenericGraphEngine() {
+    return new SemanticsRouterEngine(
+        Map.of(
+            GenericGraphSemanticProfile.GENERIC_GRAPH, new GraphNotationSemantics(),
+            GenericGraphSemanticProfile.ARCHIMATE, new ArchimateNotationSemantics(),
+            GenericGraphSemanticProfile.UML, new UmlNotationSemantics()));
+  }
+
   @Test
   void regenerateLayoutFixtures() throws Exception {
     Assumptions.assumeTrue(
@@ -90,30 +125,11 @@ class LayoutFixtureRegenerator {
         "opt-in only; run via scripts/regen-layout-fixtures.sh"
             + " (-Ddediren.regen-layout-fixtures=true)");
 
-    Path workspaceRoot = TestSupport.workspaceRoot();
-    Path sourceDir = workspaceRoot.resolve("fixtures/source");
-    Path layoutResultDir = workspaceRoot.resolve("fixtures/layout-result");
+    Path layoutResultDir = TestSupport.workspaceRoot().resolve("fixtures/layout-result");
 
-    SemanticsRouterEngine genericGraph =
-        new SemanticsRouterEngine(
-            Map.of(
-                GenericGraphSemanticProfile.GENERIC_GRAPH, new GraphNotationSemantics(),
-                GenericGraphSemanticProfile.ARCHIMATE, new ArchimateNotationSemantics(),
-                GenericGraphSemanticProfile.UML, new UmlNotationSemantics()));
-    ElkEngine elk = new ElkEngine();
-
-    for (FixtureMapping mapping : MAPPINGS) {
-      byte[] sourceBytes = Files.readAllBytes(sourceDir.resolve(mapping.sourceFileName()));
-      SourceDocument source = genericGraph.parseSource(sourceBytes);
-      SceneGraph scene = genericGraph.projectScene(source, mapping.viewId()).value();
-      LaidOutScene laid = elk.layout(scene).value();
-      LayoutResult result = LaidOutSceneMapper.toResult(laid);
-
-      String json =
-          JsonSupport.objectMapper().writerWithDefaultPrettyPrinter().writeValueAsString(result)
-              + "\n";
-      Files.writeString(
-          layoutResultDir.resolve(mapping.fixtureName()), json, StandardCharsets.UTF_8);
+    for (FixtureMapping mapping : mappings()) {
+      Path target = layoutResultDir.resolve(mapping.fixtureName());
+      Files.writeString(target, regeneratedJson(mapping), StandardCharsets.UTF_8);
     }
   }
 }
