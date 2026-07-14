@@ -136,6 +136,16 @@ DEDIREN_LOG_LEVEL=debug "$BUNDLE/bin/dediren" layout --plugin elk-layout \
 Logs go to stderr and stdout stays a clean JSON envelope, so piping to `jq` keeps
 working with logging on. Logs are for humans — agents decide from stdout.
 
+### MCP server
+
+Agents can drive Dediren as MCP tools instead of the CLI:
+
+    claude mcp add dediren -- "$BUNDLE/bin/dediren" mcp --root .
+
+This serves `dediren_validate`, `dediren_build`, and `dediren_guide` (the agent
+guide, one section at a time) over stdio. Tool paths are confined to `--root`;
+`--read-only` withholds the build tool. See `docs/agent-usage.md`.
+
 ## Bundle Layout
 
 ```text

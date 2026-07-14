@@ -33,6 +33,7 @@ public final class GuideCatalog {
   private static Map<String, String> topicMap() {
     Map<String, String> topics = new LinkedHashMap<>();
     topics.put("fast-path", "Fast Path");
+    topics.put("mcp", "MCP Server");
     topics.put("artifacts", "Artifact Map");
     topics.put("source-json", "Minimal Source JSON");
     topics.put("profiles", "Semantic Profiles");

@@ -80,7 +80,8 @@ Stable Dependencies Principle).
 | `elk-layout` (engine) | `engine-api`, `contracts`, `ir` | 2 — leaf engine |
 | `archimate-oef-export` (engine) | `engine-api`, `contracts`, `archimate`, `schema-cache` | 2 — leaf engine |
 | `uml-xmi-export` (engine) | `engine-api`, `contracts`, `uml`, `schema-cache` | 2 — leaf engine |
-| `cli` | `contracts`, `core`, `engine-api`, `ir`; engine implementations **only in `EngineWiring`** | 3 — entrypoint + wiring |
+| `mcp` | `contracts`, `core`, `engine-api` | 3 — protocol adapter |
+| `cli` | `contracts`, `core`, `engine-api`, `ir`, `mcp`; engine implementations **only in `EngineWiring`** | 3 — entrypoint + wiring |
 | `dist-tool` | `contracts` (compile); `cli` (runtime, for bundling — the bundled engine and semantics-front-end modules arrive transitively through `cli`'s compile deps, so the single-launcher distribution needs no separate engine-launcher dependency) | 3 — assembly |
 | `coverage-report` | *(nothing in the default build)*; every product module (runtime, **`coverage`-profile-scoped only**, for JaCoCo `report-aggregate`) | 3 — build tooling |
 
@@ -118,6 +119,11 @@ Rules that fall out of this table and must be enforced, not just hoped for:
   `EngineWiring`, which constructs them explicitly (no `ServiceLoader`, no
   `PATH`, no runtime discovery). ArchUnit pins the edge to that single named
   class.
+- **`mcp` is an adapter over the engine seam, not an engine consumer.** It receives an
+  `Engines` registry through its constructor from `cli`'s `EngineWiring` and never names
+  an engine implementation, a notation core, or `cli`. ArchUnit pins both
+  (`mcpDependsOnNoEngineImplementationAndNoCli`, `mcpDependsOnNoNotationCore`). The
+  `cli → mcp` edge is the entrypoint wiring its adapter; the reverse would be a cycle.
 - **The four remaining `dev.dediren.plugins.*` engines live under
   `engines/<name>`** (directory move landed 2026-07-08); their packages are
   retained debt — see §12. The former fifth engine, `generic-graph`, was
@@ -218,6 +224,11 @@ charter below is the contract for "what changes for this reason lives here."
   checks the router dispatches to, each depending on its own notation core
   (`archimate` or `uml`) and nothing else notation-specific. No single module
   in this trio depends on both `archimate` and `uml`.
+
+- **`mcp`** — the MCP stdio protocol surface: tool schemas, handlers, path
+  confinement, and the guide topic map. It marshals tool calls into `core`
+  commands and returns their envelopes verbatim; it owns no orchestration, no
+  notation semantics, and no engine construction.
 
 - **`dist-tool`** — assembly and distribution: bundles the single `cli`
   launcher, which hosts the bundled engines in-process, into a runnable

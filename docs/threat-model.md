@@ -51,6 +51,43 @@ the export engines receive the CLI's env map explicitly (schema-path
 variables) and read nothing else, pinned by the engines' no-`getenv` guard
 tests (Task 4).
 
+### MCP stdio server (`dediren mcp`)
+
+`dediren mcp` (module `mcp`, launched by `cli`'s `McpCommand`) is a long-lived,
+model-driven process holding a filesystem write primitive. It is the one boundary
+where a *model* — not a human — chooses the paths, and MCP clients frequently
+auto-approve tool calls, so the CLI's "a human typed this path" posture does not
+transfer.
+
+There is no network surface: stdio transport only, no port, no HTTP/SSE listener,
+no multi-client daemon. The MCP client spawns the process and owns its lifetime,
+so there is no daemon lifecycle to supervise.
+
+Controls:
+
+- **Workspace-root confinement.** Every tool path argument is resolved against the
+  `--root` (default: cwd) and real-path-resolved *before* the containment check
+  (`mcp/src/main/java/dev/dediren/mcp/WorkspacePaths.java`). Normalization alone is
+  insufficient — a symlink inside the root pointing outside is the interesting case,
+  and only `toRealPath()` catches it. For an output directory that need not exist,
+  the nearest existing ancestor is resolved instead. An escaping path yields a
+  `DEDIREN_MCP_PATH_OUTSIDE_ROOT` error envelope. Pinned by `WorkspacePathsTest`.
+- **Read-only mode.** `--read-only` does not register `dediren_build` at all, so the
+  write primitive is absent rather than present-and-refusing.
+- **stdout integrity.** In stdio MCP, stdout *is* the JSON-RPC channel; a stray
+  `System.out` write anywhere in core, an engine, or a dependency would corrupt a
+  frame and the client would silently go dark. `StdoutIntegrity.claimStdout()` takes
+  the real file descriptor for the transport and redirects `System.out` to stderr, so
+  a stray print degrades to log noise. Pinned by the dist-smoke assertion
+  `assertMcpServesToolsOverStdio`, which requires every stdout line to be a JSON-RPC
+  frame.
+
+Accepted residual — **TOCTOU**: real-path-resolve-then-open is not atomic, so a local
+attacker able to create symlinks inside the root during the window can defeat the
+confinement. Accepted: the server runs with the spawning user's authority, so this
+grants an attacker nothing they did not already have. The confinement exists to stop
+a *model* writing outside the workspace, not to contain a hostile local user.
+
 ### Schema cache + runtime download
 
 Runtime schema fetches go through

@@ -32,6 +32,29 @@ guidance in that package.
    stage, inspect an intermediate result, or reuse a cached stage output.
 5. Inspect stdout JSON `.status` and `.diagnostics[]`; do not parse stderr.
 
+## MCP Server
+
+`dediren mcp` runs an MCP stdio server so an agent can drive Dediren as tools
+instead of shelling out. Register it once:
+
+    claude mcp add dediren -- /path/to/bundle/bin/dediren mcp --root .
+
+Three tools:
+
+- `dediren_guide` — this document, one section at a time. Pass `topic`, or omit
+  it to list the topics. Start with `topic: "source-json"`.
+- `dediren_validate` — `source` (path). Returns the validation envelope.
+- `dediren_build` — `source`, `out`, and at least one policy (`render_policy`,
+  `oef_policy`, `xmi_policy`). Returns the build-result envelope, which names
+  every artifact written.
+
+Every tool path must resolve inside `--root` (default: the working directory).
+A path that escapes it returns a `DEDIREN_MCP_PATH_OUTSIDE_ROOT` error envelope.
+Launch with `--read-only` to serve only `dediren_validate` and `dediren_guide`.
+
+Tool results carry the same envelope JSON the CLI prints on stdout, so the
+handoff rules in `## Command Handoff` apply unchanged.
+
 ## Artifact Map
 
 | Artifact | Agent authors it? | Schema | Example |
