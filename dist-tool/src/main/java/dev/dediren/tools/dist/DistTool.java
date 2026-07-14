@@ -277,11 +277,18 @@ public final class DistTool {
    * The dediren {@code mcp} module and the third-party {@code io.modelcontextprotocol.sdk:mcp}
    * artifact both produce a jar literally named {@code mcp-<version>.jar}: {@link #jarArtifactId}
    * strips only the version suffix, so artifact-id matching alone cannot tell the two apart. The
-   * third-party jar's version is pinned by {@code mcp.sdk.version} in the root POM, so its full
-   * filename is checked explicitly, ahead of the artifact-id lookup below, before "mcp" is allowed
-   * to resolve to the first-party module.
+   * third-party jar's full filename is therefore checked explicitly, ahead of the artifact-id
+   * lookup below, before "mcp" is allowed to resolve to the first-party module.
+   *
+   * <p>This literal must track {@code mcp.sdk.version} in the root POM, and nothing in the build
+   * makes it do so on its own — which is the whole danger. Bump the SDK to 2.1.0 and this no longer
+   * matches: {@code mcp-2.1.0.jar} falls through to the artifact-id lookup, resolves to {@code
+   * "mcp"}, is classified as first-party, and the SDK's MIT attribution silently vanishes from
+   * THIRD-PARTY-NOTICES.md — a licence-compliance regression shipped by a green build. {@code
+   * McpSdkJarPinTest} is what makes that impossible: it reads {@code mcp.sdk.version} out of the
+   * root POM and fails if this constant has drifted from it.
    */
-  private static final String MCP_JAVA_SDK_CORE_JAR = "mcp-2.0.0.jar";
+  static final String MCP_JAVA_SDK_CORE_JAR = "mcp-2.0.0.jar";
 
   private static void writeThirdPartyNotices(Path root, Path output) throws IOException {
     Set<String> jars = new java.util.TreeSet<>();
@@ -1174,16 +1181,28 @@ public final class DistTool {
   /**
    * Drives the packaged MCP server over real stdio with real JSON-RPC.
    *
-   * <p>Two things are only observable here. First, the protocol actually working through the
+   * <p>Three things are only observable here. First, the protocol actually working through the
    * bundled classpath. Second — and this is the gate for the stdout-integrity control — that the
    * server's stdout carries protocol frames and <em>nothing else</em>: the JVM's CDS notices and
    * SLF4J's provider warning share this process, and if any of them (or a stray print from an
    * engine) reached stdout, the frame stream would be corrupt and a real client would silently go
    * dark.
+   *
+   * <p>Third, that a tool which does <em>real work</em> gets its response written at all. The batch
+   * therefore ends in a genuine {@code dediren_build} — the flagship tool, a full compile through
+   * ELK and the SVG renderer, seconds rather than milliseconds — and its response frame is required
+   * to be present, by id, carrying an ok build envelope. This is the assertion that matters: an
+   * earlier drain implementation waited a fixed idle window after the last outbound byte, which is
+   * long enough for {@code dediren_guide} (a string constant, answered in milliseconds) and not
+   * remotely long enough for a build. Every response slower than that window was silently discarded
+   * by the SDK's EOF-triggered close, and a smoke test that called only the guide stayed green
+   * while the product's headline tool lost every reply it ever made.
    */
   private static void assertMcpServesToolsOverStdio(Path bundle, Path temp) throws Exception {
     Path dediren = bundle.resolve("bin/dediren");
     Path requests = temp.resolve("mcp-requests.jsonl");
+    // The build tool confines every path inside --root, so the source, the policy and the output
+    // directory are all named relative to the bundle it is rooted at.
     Files.writeString(
         requests,
         """
@@ -1191,6 +1210,7 @@ public final class DistTool {
         {"jsonrpc":"2.0","method":"notifications/initialized"}
         {"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}
         {"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"dediren_guide","arguments":{"topic":"source-json"}}}
+        {"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"dediren_build","arguments":{"source":"fixtures/source/valid-archimate-oef.json","out":"mcp-build-out","render_policy":"fixtures/render-policy/archimate-svg.json"}}}
         """,
         StandardCharsets.UTF_8);
 
@@ -1198,6 +1218,7 @@ public final class DistTool {
         runBundleCommand(dediren, bundle, List.of("mcp", "--root", bundle.toString()), requests);
 
     // Every non-blank stdout line must be a JSON-RPC frame. Nothing else may share this channel.
+    Map<String, JsonNode> responses = new LinkedHashMap<>();
     for (String line : stdout.split("\n")) {
       if (line.isBlank()) {
         continue;
@@ -1212,6 +1233,9 @@ public final class DistTool {
       if (!"2.0".equals(frame.path("jsonrpc").asText())) {
         throw new IllegalStateException("mcp stdout line is not a JSON-RPC frame: " + line);
       }
+      if (frame.has("id")) {
+        responses.put(frame.path("id").asText(), frame);
+      }
     }
 
     assertContains(stdout, "\"serverInfo\"", "mcp initialize response");
@@ -1219,7 +1243,49 @@ public final class DistTool {
     assertContains(stdout, "dediren_build", "mcp tools/list response");
     assertContains(stdout, "dediren_guide", "mcp tools/list response");
     assertContains(stdout, "Minimal Source JSON", "mcp guide tool call response");
-    System.out.println("mcp stdio smoke passed: 3 tools, protocol-only stdout");
+
+    assertMcpBuildAnswered(bundle, responses, stdout);
+    System.out.println(
+        "mcp stdio smoke passed: 3 tools, real build answered, protocol-only stdout");
+  }
+
+  /**
+   * The build response must be <em>present</em>, not merely unerrored. A dropped response is not an
+   * error the client can see: the frame is simply absent, the batch exits 0, and the call hangs on
+   * the far end. So assert on the id, then on the envelope it carries, then on the artifact it
+   * claims to have written.
+   */
+  private static void assertMcpBuildAnswered(
+      Path bundle, Map<String, JsonNode> responses, String stdout) throws IOException {
+    JsonNode build = responses.get("4");
+    if (build == null) {
+      throw new IllegalStateException(
+          "mcp dediren_build response (id 4) is ABSENT from stdout: the server dropped it on"
+              + " stdin's EOF instead of writing it. Frames seen: "
+              + responses.keySet()
+              + "\nstdout:\n"
+              + stdout);
+    }
+    if (build.path("result").path("isError").asBoolean()) {
+      throw new IllegalStateException("mcp dediren_build reported a tool error: " + build);
+    }
+    String envelopeText = build.path("result").path("content").path(0).path("text").asText();
+    JsonNode envelope = JsonSupport.objectMapper().readTree(envelopeText);
+    if (!"ok".equals(envelope.path("status").asText())) {
+      throw new IllegalStateException(
+          "mcp dediren_build envelope status should be ok: " + envelopeText);
+    }
+    // The build-result envelope the CLI publishes, verbatim: the MCP tool adds no second result
+    // format, so the artifact it claims to have written is named under views[].artifacts[].
+    JsonNode artifact = envelope.path("views").path(0).path("artifacts").path(0);
+    if (!"svg".equals(artifact.path("artifact_kind").asText())) {
+      throw new IllegalStateException(
+          "mcp dediren_build envelope should name the SVG it rendered: " + envelopeText);
+    }
+    Path svg = bundle.resolve("mcp-build-out").resolve(artifact.path("path").asText());
+    if (!Files.isRegularFile(svg)) {
+      throw new IllegalStateException("mcp dediren_build must actually write its render: " + svg);
+    }
   }
 
   /**

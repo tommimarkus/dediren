@@ -95,21 +95,13 @@ public final class DedirenMcpServer {
     serveOn(root, engines, env, readOnly, System.in, protocolChannel);
   }
 
-  /**
-   * Runs the server over the given streams, returning once {@code in} reaches EOF.
-   *
-   * <p>The stdio transport reads {@code in} on its own thread; on EOF it closes the session but
-   * neither calls {@code System.exit} nor interrupts this thread, so nothing unblocks a plain
-   * self-join. {@code in} is wrapped so the wrapper counts down a latch the instant a read call
-   * observes EOF, and this method awaits that latch instead, then closes the server itself.
-   *
-   * <p>{@code in} and {@code out} share an {@link OutboundActivityClock} (see {@link
-   * EofSignalingInputStream} and {@link DrainTrackingOutputStream}): before the input wrapper lets
-   * the SDK's reader observe EOF, it blocks until the output wrapper has written at least once and
-   * then gone quiet, so a response the SDK is still in the middle of producing is not truncated by
-   * its own EOF-triggered close. A run that reads nothing from {@code in} before EOF (nothing was
-   * ever in flight to drain) pays no penalty.
-   */
+  /** Builds an MCP server over the transport streams it is handed. */
+  @FunctionalInterface
+  interface ServerFactory {
+    McpSyncServer create(InputStream in, OutputStream out);
+  }
+
+  /** Runs the Dediren tool server over the given streams, returning once {@code in} reaches EOF. */
   static void serveOn(
       Path root,
       Engines engines,
@@ -118,11 +110,41 @@ public final class DedirenMcpServer {
       InputStream in,
       OutputStream out)
       throws InterruptedException {
+    serveOn(
+        in,
+        out,
+        (decoratedIn, decoratedOut) ->
+            create(root, engines, env, readOnly, decoratedIn, decoratedOut));
+  }
+
+  /**
+   * Runs the server the factory builds over the given streams, returning once {@code in} reaches
+   * EOF.
+   *
+   * <p>Everything here is transport-level and independent of which tools are registered, which is
+   * why the server arrives as a factory: the decoration has to happen before the transport is
+   * constructed, and tests need to drive this exact code path with a tool of their own choosing
+   * (one slow enough to lose the EOF race) rather than re-assembling a look-alike of it.
+   *
+   * <p>The stdio transport reads {@code in} on its own thread; on EOF it closes the session but
+   * neither calls {@code System.exit} nor interrupts this thread, so nothing unblocks a plain
+   * self-join. {@code in} is wrapped so the wrapper counts down a latch the instant a read call
+   * observes EOF, and this method awaits that latch instead, then closes the server itself.
+   *
+   * <p>{@code in} and {@code out} also share a {@link PendingRequests} ledger. The input wrapper
+   * registers each JSON-RPC request it reads; the output wrapper discharges each response it
+   * writes; and EOF is held from the SDK until the ledger is square, so a response still being
+   * computed when stdin closes cannot be discarded by the SDK's own EOF-triggered close. Requests
+   * in, responses out — nothing is guessed and nothing waits longer than it must.
+   */
+  static void serveOn(InputStream in, OutputStream out, ServerFactory factory)
+      throws InterruptedException {
     CountDownLatch stdinClosed = new CountDownLatch(1);
-    OutboundActivityClock outboundActivity = new OutboundActivityClock();
-    InputStream eofSignaling = new EofSignalingInputStream(in, stdinClosed, outboundActivity);
-    OutputStream drainTracked = new DrainTrackingOutputStream(out, outboundActivity);
-    McpSyncServer server = create(root, engines, env, readOnly, eofSignaling, drainTracked);
+    PendingRequests pending = new PendingRequests();
+    McpSyncServer server =
+        factory.create(
+            new EofSignalingInputStream(in, stdinClosed, pending),
+            new FrameScanningOutputStream(out, pending));
     Runtime.getRuntime().addShutdownHook(new Thread(server::close));
     stdinClosed.await();
     server.close();

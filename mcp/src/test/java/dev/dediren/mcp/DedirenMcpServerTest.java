@@ -4,16 +4,26 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
 import dev.dediren.engine.Engines;
+import io.modelcontextprotocol.json.McpJsonMapper;
+import io.modelcontextprotocol.json.jackson3.JacksonMcpJsonMapper;
+import io.modelcontextprotocol.server.McpServer;
 import io.modelcontextprotocol.server.McpSyncServer;
+import io.modelcontextprotocol.server.transport.StdioServerTransportProvider;
+import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
+import io.modelcontextprotocol.spec.McpSchema.ServerCapabilities;
 import io.modelcontextprotocol.spec.McpSchema.Tool;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import tools.jackson.databind.json.JsonMapper;
 
 class DedirenMcpServerTest {
 
@@ -130,5 +140,104 @@ class DedirenMcpServerTest {
     assertThat(output).as("tools/list response").contains("\"id\":2");
     assertThat(output).as("tools/call response").contains("\"id\":3");
     assertThat(output).as("guide content").contains("Minimal Source JSON");
+  }
+
+  /**
+   * The test above is green for the wrong reason, and on its own it is false confidence: {@code
+   * dediren_guide} answers from a string constant in single-digit milliseconds, so it wins the EOF
+   * race even against an implementation that does not really wait. That is exactly how the shipped
+   * bundle came to drop every {@code dediren_build} response while the suite stayed green.
+   *
+   * <p>The real contract is that the response of a tool that takes <em>real time</em> survives a
+   * batch that EOFs immediately. So drive the production {@code serveOn} transport path with a tool
+   * that deliberately sleeps well past any plausible idle window before answering. Against the
+   * time-based heuristic this replaced (a 150ms quiet period), both cases here fail with the
+   * response silently absent; against request/response correlation, the wait is exactly as long as
+   * the tool takes and no longer.
+   *
+   * <p>Two durations, because one is a coincidence: 200ms clears the old window by a hair, 800ms
+   * clears it by a mile, and neither may be truncated.
+   */
+  @ParameterizedTest(name = "a {0}ms tool still gets its response written")
+  @ValueSource(longs = {200, 800})
+  void serveOnHoldsEofUntilASlowToolHasAnswered(long toolMillis) {
+    String requests =
+        """
+        {"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"slow-tool-test","version":"1"}}}
+        {"jsonrpc":"2.0","method":"notifications/initialized"}
+        {"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"slow_tool","arguments":{}}}
+        """;
+    ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+
+    assertTimeoutPreemptively(
+        Duration.ofSeconds(30),
+        () ->
+            DedirenMcpServer.serveOn(
+                new ByteArrayInputStream(requests.getBytes(StandardCharsets.UTF_8)),
+                stdout,
+                (in, out) -> slowToolServer(in, out, Duration.ofMillis(toolMillis))));
+
+    String output = stdout.toString(StandardCharsets.UTF_8);
+    assertThat(output).as("initialize response").contains("\"id\":1");
+    assertThat(output)
+        .as("the slow tool's response must survive stdin's EOF, not be silently dropped")
+        .contains("\"id\":2");
+    assertThat(output).as("the slow tool's result payload").contains(SLOW_TOOL_SENTINEL);
+  }
+
+  /**
+   * A notification-only batch owes no responses at all, so EOF must be released immediately rather
+   * than paying out some fixed drain budget. (The heuristic this replaced always burned its full 2s
+   * cap here, because it was waiting for a write that was never coming.)
+   */
+  @Test
+  void serveOnDoesNotWaitOutABatchThatOwesNoResponses(@TempDir Path root) {
+    String notifications =
+        """
+        {"jsonrpc":"2.0","method":"notifications/initialized"}
+        {"jsonrpc":"2.0","method":"notifications/cancelled","params":{"requestId":"1"}}
+        """;
+
+    assertTimeoutPreemptively(
+        Duration.ofSeconds(2),
+        () ->
+            DedirenMcpServer.serveOn(
+                root,
+                Engines.of(List.of(), List.of(), List.of(), List.of()),
+                Map.of(),
+                true,
+                new ByteArrayInputStream(notifications.getBytes(StandardCharsets.UTF_8)),
+                new ByteArrayOutputStream()));
+  }
+
+  private static final String SLOW_TOOL_SENTINEL = "slow-tool-answered";
+
+  /**
+   * A server whose one tool takes {@code delay} to answer. The transport wiring is production's.
+   */
+  private static McpSyncServer slowToolServer(
+      java.io.InputStream in, java.io.OutputStream out, Duration delay) {
+    McpJsonMapper mapper = new JacksonMcpJsonMapper(JsonMapper.builder().build());
+    return McpServer.sync(new StdioServerTransportProvider(mapper, in, out))
+        .serverInfo("dediren-slow-tool-test", "1")
+        .capabilities(ServerCapabilities.builder().tools(false).build())
+        .toolCall(
+            Tool.builder()
+                .name("slow_tool")
+                .description("Sleeps, then answers. Stands in for any tool that does real work.")
+                .inputSchema(mapper, "{\"type\":\"object\",\"properties\":{}}")
+                .build(),
+            (exchange, request) -> {
+              try {
+                Thread.sleep(delay.toMillis());
+              } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+              }
+              return CallToolResult.builder()
+                  .addTextContent(SLOW_TOOL_SENTINEL)
+                  .isError(false)
+                  .build();
+            })
+        .build();
   }
 }
