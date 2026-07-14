@@ -79,7 +79,10 @@ public final class DedirenMcpServer {
                       "Compile a Dediren source model into artifacts (SVG render, ArchiMate OEF,"
                           + " and/or UML XMI) under an output directory. Select a lane by passing"
                           + " its policy: render_policy, oef_policy, xmi_policy. Returns the"
-                          + " build-result envelope, which names every artifact written.")
+                          + " build-result envelope, which names every artifact written. A"
+                          + " DEDIREN_SCHEMA_VERSION_OUTDATED error means a source or policy file"
+                          + " declares a superseded schema version: call dediren_guide with topic"
+                          + " 'migration' for the upgrade steps.")
                   .inputSchema(mapper, ToolSchemas.BUILD)
                   .build(),
               (exchange, request) -> tools.build(request));

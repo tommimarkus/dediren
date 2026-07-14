@@ -825,6 +825,37 @@ you can recover from stdout JSON alone.
 - `DEDIREN_COMMAND_INPUT_INVALID`: the CLI could not read or parse a command
   input file.
 
+## Migration
+
+`DEDIREN_SCHEMA_VERSION_OUTDATED` means the file declares a schema version this
+build has superseded. Find the version it declares below and apply each step in
+order until it declares the current one. `DEDIREN_SCHEMA_VERSION_UNKNOWN` means
+the version is absent, misspelled, or newer than this build — there is no
+upgrade path; fix the version field or use a newer bundle.
+
+Entries are keyed by schema id, not by release. A schema id changes only when
+the contract changes, so it is the only durable signal of what a file needs.
+
+### svg-render-policy.schema.v1 → render-policy.schema.v1
+
+The family was renamed, and the version field was renamed with it. Rename the
+field `svg_render_policy_schema_version` to `render_policy_schema_version` and
+set its value to `render-policy.schema.v1`. Nothing else changes.
+
+### render-policy.schema.v1 → render-policy.schema.v2
+
+Raster output was dropped. Remove the top-level `raster` block (its `scale` and
+`background` keys) and set `render_policy_schema_version` to
+`render-policy.schema.v2`. There is no replacement: renders are SVG only.
+
+### render-policy.schema.v2 → render-policy.schema.v3
+
+Interactive SVG was retired. Remove the top-level `interactive` key (`none`,
+`svg`, `html`, or `both`) and the `interaction` block under `style` (its
+`highlight_stroke` and `highlight_stroke_width` keys), then set
+`render_policy_schema_version` to `render-policy.schema.v3`. There is no
+replacement: renders are static.
+
 ## Plugin Environment
 
 The bundle launcher uses `DEDIREN_BUNDLE_ROOT` for product-root discovery. The
