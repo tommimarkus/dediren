@@ -685,11 +685,13 @@ package dev.dediren.mcp;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.dediren.contracts.json.JsonSupport;
+import dev.dediren.engine.Engines;
 import io.modelcontextprotocol.spec.McpSchema.CallToolRequest;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
 import io.modelcontextprotocol.spec.McpSchema.TextContent;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -710,8 +712,18 @@ class DedirenToolsTest {
     return JsonSupport.objectMapper().readTree(textOf(result));
   }
 
+  /**
+   * An empty registry. None of these cases reaches an engine: schema validation is engine-free
+   * (SourceValidator), the guide never touches core, and the path-escape and missing-argument cases
+   * fail before dispatch. Real-engine coverage lives in CliMcpParityTest (Task 6), which is in cli
+   * because only cli may construct engines — and mcp must not depend on cli, which depends on mcp.
+   */
+  private static Engines noEngines() {
+    return Engines.of(List.of(), List.of(), List.of(), List.of());
+  }
+
   private DedirenTools toolsIn(Path root) {
-    return new DedirenTools(root, dev.dediren.cli.EngineWiring.defaults(), Map.of());
+    return new DedirenTools(root, noEngines(), Map.of());
   }
 
   @Test
@@ -792,18 +804,7 @@ class DedirenToolsTest {
 }
 ```
 
-Note: this test needs `cli` on the test classpath for `EngineWiring.defaults()`. Add to `mcp/pom.xml` **test scope only**:
-
-```xml
-    <dependency>
-      <groupId>dev.dediren</groupId>
-      <artifactId>cli</artifactId>
-      <version>${project.version}</version>
-      <scope>test</scope>
-    </dependency>
-```
-
-This is a test-scope edge and does not violate the architecture rule (which pins *compile*-scope edges). The ArchUnit rule added in Task 5 analyses main classes only.
+**Do not add a `cli` dependency to `mcp/pom.xml`, in any scope.** `cli` compile-depends on `mcp` (Task 5), so an `mcp → cli` test edge is a reactor cycle and Maven will refuse to build it. That is why these tests use an empty `Engines` registry: none of them reaches an engine. Real-engine coverage is `CliMcpParityTest` (Task 6), which lives in `cli` precisely because only `cli` may construct engines.
 
 - [ ] **Step 2: Run the test to verify it fails**
 
@@ -1135,6 +1136,7 @@ package dev.dediren.mcp;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dev.dediren.engine.Engines;
 import io.modelcontextprotocol.server.McpSyncServer;
 import io.modelcontextprotocol.spec.McpSchema.Tool;
 import java.io.ByteArrayInputStream;
@@ -1147,10 +1149,11 @@ import org.junit.jupiter.api.io.TempDir;
 
 class DedirenMcpServerTest {
 
+  /** Tool registration is engine-independent; mcp must not depend on cli to get a real registry. */
   private McpSyncServer serverIn(Path root, boolean readOnly) {
     return DedirenMcpServer.create(
         root,
-        dev.dediren.cli.EngineWiring.defaults(),
+        Engines.of(List.of(), List.of(), List.of(), List.of()),
         Map.of(),
         readOnly,
         new ByteArrayInputStream(new byte[0]),
