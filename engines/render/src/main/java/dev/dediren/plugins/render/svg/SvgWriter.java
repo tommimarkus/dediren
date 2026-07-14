@@ -1,5 +1,6 @@
 package dev.dediren.plugins.render.svg;
 
+import dev.dediren.engine.XmlText;
 import java.io.StringWriter;
 import javax.xml.stream.XMLOutputFactory;
 import javax.xml.stream.XMLStreamException;
@@ -16,7 +17,12 @@ import javax.xml.stream.XMLStreamWriter;
  * <p>The JDK writer escapes exactly as the previous hand-rolled string emitter did ({@code & < > "}
  * in attribute values; {@code & < >} in text, leaving {@code "} raw), emits self-closing empty
  * elements with no space before {@code />}, and writes no XML prolog — verified against the render
- * golden fixtures.
+ * golden fixtures. Before that escaping, {@link #attr} and {@link #text} run every value through
+ * {@link dev.dediren.engine.XmlText#scrub}, the XML 1.0 validity scrub shared with the OEF and XMI
+ * emitters: characters XML 1.0 cannot represent at all (C0 controls other than tab/LF/CR, lone
+ * surrogates, U+FFFE/U+FFFF) become U+FFFD so a contract-valid label can never yield an ill-formed
+ * SVG, and the scrub's same-instance fast path on already-valid input keeps the render golden SVGs
+ * byte-identical.
  *
  * <p>Numeric formatting stays the caller's job: pass already-formatted strings (via {@link
  * Svg#styleNumber} or an explicit {@code %.1f}) to {@link #attr}, exactly matching the prior format
@@ -56,7 +62,7 @@ public final class SvgWriter {
 
   /** Writes an attribute on the current start/empty element. The value is escaped by the writer. */
   public SvgWriter attr(String name, String value) {
-    run(() -> writer.writeAttribute(name, value));
+    run(() -> writer.writeAttribute(name, XmlText.scrub(value)));
     return this;
   }
 
@@ -70,7 +76,7 @@ public final class SvgWriter {
 
   /** Writes escaped text content. */
   public SvgWriter text(String value) {
-    run(() -> writer.writeCharacters(value == null ? "" : value));
+    run(() -> writer.writeCharacters(value == null ? "" : XmlText.scrub(value)));
     return this;
   }
 
