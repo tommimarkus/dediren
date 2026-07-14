@@ -233,14 +233,24 @@ If you author a `layout-request` by hand, the vocabulary is:
 ]
 ```
 
-- `kind` is `ordered-band:x` or `ordered-band:y` — the subjects form an ordered band
-  along that axis (this is how UML sequence lifelines and message rows are placed).
-  An unrecognised `kind` is rejected by the layout engine.
-- Each subject is a node id, optionally `@` plus a leading gap in layout units
-  (`lifeline-b@48` leaves 48 units before that member).
-- The `@` separator is not escaped, so keep node ids to the `model.schema` id
-  charset (`[A-Za-z0-9][A-Za-z0-9._-]*`). An id containing `@` is ambiguous and the
-  member may be silently dropped.
+- `kind` is `ordered-band:x`, `ordered-band:y`, or `stem-span`. An ordered
+  band's subjects form an ordered band along that axis (this is how UML
+  sequence lifelines and message rows are placed). A `stem-span` constraint
+  carries exactly four subjects — `[node-id, band-member-id, from-member-id,
+  to-member-id]` — anchoring a node (an execution specification or a
+  destruction marker) to the named band member's stem, spanning the rows of
+  the `from`/`to` members; an empty `from`/`to` id anchors the node one
+  message step below the last member instead of spanning a range (the case
+  for a destruction marker with no targeting message). `project` emits
+  `stem-span` only for a sequence view that has execution or destruction
+  nodes to place — a plain lifelines-and-messages view sees only the two
+  `ordered-band` kinds. An unrecognised `kind` is rejected by the layout
+  engine.
+- Each ordered-band subject is a node id, optionally `@` plus a leading gap in
+  layout units (`lifeline-b@48` leaves 48 units before that member).
+- The `@` separator is unambiguous: the id charset
+  (`[A-Za-z0-9][A-Za-z0-9._-]*`) cannot contain `@`. A subject whose `@` tail
+  is not a number is rejected by the layout engine, not silently dropped.
 
 ## Build
 
@@ -262,7 +272,7 @@ above use, and writes each view's artifacts under `--out`:
 | `--input <path>` | Source model JSON; default stdin. |
 | `--out <dir>` | Output directory (required). Each view writes under `<out>/<view-id>/`. |
 | `--views <id,id,...>` | Views to build, in the given order; default is every view in model order. |
-| `--render-policy <path>` | Enable the SVG render lane; writes `<view-id>/diagram.<svg\|html>`. |
+| `--render-policy <path>` | Enable the SVG render lane; writes `<view-id>/diagram.svg`. |
 | `--oef-policy <path>` | Enable the ArchiMate OEF export lane; writes `<view-id>/oef.xml`. |
 | `--xmi-policy <path>` | Enable the UML/XMI export lane; writes `<view-id>/xmi.xml`. |
 | `--emit <kinds>` | Comma-separated subset of `layout-request,layout-result,render-metadata` stage command envelopes to also persist under `<view-id>/`; see below. |
@@ -816,9 +826,9 @@ launcher falls back to `${XDG_CACHE_HOME:-$HOME/.cache}/dediren/cds`.
 Set `DEDIREN_CDS_DIR` to an explicit writable path to relocate the archive.
 The feature is based on `-XX:+AutoCreateSharedArchive` and degrades silently if
 the archive directory is unwritable — startup continues at normal speed without
-any error. The launcher also passes `-Xlog:cds=off` so the JVM's per-invocation
-CDS archive-dump warnings never reach stdout/stderr; a healthy run stays quiet
-and stderr remains reserved for genuine diagnostics.
+any error. The launcher also passes `-Xlog:cds=off:stdout -Xlog:cds=warning:stderr`,
+keeping stdout JSON-pure while preserving first-launch CDS warnings on stderr
+(the human debug channel); once the archive exists, a healthy run stays quiet.
 
 The archive is seeded by the launcher's first invocation and is not regenerated
 while it stays valid, and its contents depend on what that first command loaded:

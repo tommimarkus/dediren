@@ -79,9 +79,10 @@ agent tools should be pointed here from their own entrypoint files (for example,
 
 - Public JSON shape changes: update `schemas/`, `contracts`, fixtures, plugin
   mapping code, and schema/round-trip tests together.
-- Engine contract or runtime changes: update `engine-api`, `core` dispatch,
-  `cli` `EngineWiring`, CLI behavior, README notes, and the engine envelope
-  regression tests together.
+- Engine contract or runtime changes: update `engine-api`, `ir` (the
+  SceneGraph/LaidOutScene seam types), `core` dispatch, `cli` `EngineWiring`,
+  CLI behavior, README notes, and the engine envelope regression tests
+  together.
 - User-facing command, workflow, install, artifact-location, or
   agent-authoring changes: update `README.md` and `docs/agent-usage.md` in the
   same change.
