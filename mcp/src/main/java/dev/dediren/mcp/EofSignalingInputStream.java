@@ -1,11 +1,15 @@
 package dev.dediren.mcp;
 
+import io.modelcontextprotocol.json.McpJsonMapper;
+import io.modelcontextprotocol.json.jackson3.JacksonMcpJsonMapper;
+import io.modelcontextprotocol.spec.McpSchema;
 import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Wraps stdin: registers every JSON-RPC request that passes through it, and when a read observes
@@ -43,6 +47,16 @@ import java.util.concurrent.CountDownLatch;
  * dropped a response, is the one thing this class must never do. (stderr, never stdout: stdout is
  * the protocol channel.)
  *
+ * <p><b>Not wedging on garbage.</b> EOF is not the only way the SDK's reader loop ends. A frame it
+ * cannot deserialize is fatal to it: {@code startInboundProcessing} catches the failure, breaks out
+ * of the loop, sets {@code isClosing} and closes the session -- and never reads this stream again.
+ * EOF is then never observed, the latch never counts down, {@code serveOn} waits on it forever, and
+ * because the SDK's schedulers are non-daemon threads the JVM does not exit either. One malformed
+ * line and the server is a wedged, unkillable process. {@link #MAX_WAIT} is no help: it bounds the
+ * ledger await, and the await never begins. So this stream watches for that frame itself and
+ * releases EOF when it sees one. See {@link #readableByTransport(String)} for why that check cannot
+ * false-positive.
+ *
  * <p>EOF can surface from {@link #read()}, {@link #read(byte[])}, or {@link #read(byte[], int,
  * int)}, depending on which one the caller or a buffering layer above it happens to use, so all
  * three are overridden explicitly rather than left to {@link FilterInputStream}'s default
@@ -50,6 +64,17 @@ import java.util.concurrent.CountDownLatch;
  */
 final class EofSignalingInputStream extends FilterInputStream {
   private static final Duration MAX_WAIT = Duration.ofSeconds(60);
+
+  /**
+   * Mirrors the mapper {@code DedirenMcpServer} hands the transport (a default {@link JsonMapper}),
+   * because {@link #readableByTransport} is only a faithful oracle for what the SDK will accept if
+   * it asks the same question of the same mapper.
+   */
+  private static final McpJsonMapper MAPPER =
+      new JacksonMcpJsonMapper(JsonMapper.builder().build());
+
+  /** How much of an unreadable frame to quote on stderr. Enough to identify it, not to flood. */
+  private static final int PREVIEW_LIMIT = 120;
 
   private final CountDownLatch eofLatch;
   private final PendingRequests pending;
@@ -59,7 +84,7 @@ final class EofSignalingInputStream extends FilterInputStream {
     super(in);
     this.eofLatch = eofLatch;
     this.pending = pending;
-    this.frames = new FrameSplitter(pending::observeInboundFrame);
+    this.frames = new FrameSplitter(this::observeInboundFrame);
   }
 
   @Override
@@ -90,15 +115,116 @@ final class EofSignalingInputStream extends FilterInputStream {
   }
 
   /**
+   * Registers a frame with the ledger, and notices the one kind of frame that kills the transport.
+   *
+   * <p>Ordering is the whole trick. This runs from inside the read that produced the bytes, so
+   * every request is on the ledger before the SDK has even parsed it, let alone answered it.
+   */
+  private void observeInboundFrame(String frame) {
+    pending.observeInboundFrame(frame);
+    if (!readableByTransport(frame)) {
+      onUnreadableFrame(frame);
+    }
+  }
+
+  /**
+   * Whether the SDK's reader can deserialize this frame -- answered by asking the SDK, not by
+   * reimplementing its judgement.
+   *
+   * <p>This is the safety property the whole fatal-frame path rests on. Releasing EOF early on a
+   * frame the SDK would in fact have accepted would shut the server down mid-conversation and drop
+   * live responses -- a cure worse than the wedge. Guessing at the classification (is a non-string
+   * {@code method} fatal? does a number coerce? is a bare array a frame?) is exactly how such a
+   * false positive gets written. So the question is put to {@link
+   * McpSchema#deserializeJsonRpcMessage}, which is the same call, on the same string, that the
+   * reader loop is about to make: if it throws here it will throw there, and if it does not, we do
+   * nothing. The cost is one extra parse per inbound frame, which against a tool call that compiles
+   * a diagram is not a cost at all.
+   */
+  private static boolean readableByTransport(String frame) {
+    try {
+      McpSchema.deserializeJsonRpcMessage(MAPPER, frame);
+      return true;
+    } catch (IOException | RuntimeException unreadable) {
+      return false;
+    }
+  }
+
+  /**
+   * The transport is about to die on this frame. Say so, then release EOF so the process can exit.
+   *
+   * <p>There is nothing here to drain. The SDK closes its session the moment it reaches this frame,
+   * after which it discards every outbound write, so responses still in flight are already lost --
+   * waiting for the ledger would buy nothing but a wedge with extra steps. Wait instead and the
+   * deadlock is total: the SDK cannot dispatch the frames it has not read yet, because the read
+   * that would deliver them is this one.
+   */
+  private void onUnreadableFrame(String frame) {
+    // stderr, deliberately: stdout is the protocol channel (see StdoutIntegrity), and the SLF4J
+    // levels that would carry an alarm are banned in first-party code.
+    System.err.println(
+        "dediren mcp: stdin carried a frame the JSON-RPC transport cannot read, which is fatal to"
+            + " it -- it stops reading, so no further request on this connection can be answered."
+            + " Shutting down rather than hanging. Offending frame: "
+            + preview(frame));
+    eofLatch.countDown();
+  }
+
+  private static String preview(String frame) {
+    String oneLine = frame.strip();
+    return oneLine.length() <= PREVIEW_LIMIT
+        ? "<" + oneLine + ">"
+        : "<" + oneLine.substring(0, PREVIEW_LIMIT) + "...> (" + oneLine.length() + " chars)";
+  }
+
+  /**
    * Runs on the SDK's own inbound-reader thread, inside the read call that is about to return
    * {@code -1}. Blocking here is the whole point: the SDK has not seen EOF yet, so its outbound
    * pipeline is still live and can finish writing what it owes.
    *
-   * <p>Every request this stream read was registered synchronously by the read that returned its
-   * bytes, so by the time EOF is observed the ledger is already complete: there is no request the
-   * transport can still be about to see.
+   * <p><b>But not every EOF may be blocked on</b>, and getting this backwards deadlocks the server.
+   * When stdin's last line has no trailing newline, {@code BufferedReader} sees EOF <em>twice</em>,
+   * and the two mean opposite things:
+   *
+   * <pre>
+   *   stdin "…{id:1}\n…{id:2}\n"      stdin "…{id:1}\n…{id:2}"   (no trailing newline)
+   *   ---------------------------     -------------------------------------------------
+   *   read()  -> bytes                read()  -> bytes
+   *   readLine -> id:1  (dispatched)  readLine -> id:1  (dispatched)
+   *   readLine -> id:2  (dispatched)  read()  -> -1   EOF #1: id:2 NOT dispatched yet --
+   *   read()  -> -1     EOF: safe                     readLine needs this -1 to know the
+   *   readLine -> null                                line ended. Block and it never ends.
+   *                                   readLine -> id:2  (dispatched)
+   *                                   read()  -> -1   EOF #2: safe, everything dispatched
+   *                                   readLine -> null
+   * </pre>
+   *
+   * <p>A non-empty splitter buffer is exactly the signal that tells the two apart: bytes still
+   * unterminated means the reader above has not been handed that line yet. So on EOF #1 we only
+   * <em>register</em> the tail request on the ledger and get out of the way, returning the {@code
+   * -1} that lets {@code readLine} complete the line and the SDK dispatch it. The wait then happens
+   * on EOF #2, by which time the ledger is complete and every frame has been dispatched. (An
+   * earlier draft of this fix flushed the tail and awaited in the same call, which registered the
+   * request correctly and then deadlocked waiting for a response to a request the SDK could not
+   * receive, because the read that would deliver it was the one doing the waiting.)
+   *
+   * <p>That EOF #2 always arrives is a property of {@code BufferedReader}: having returned an
+   * unterminated line, it must read again to distinguish "more data" from "end of input". {@code
+   * serveOnDoesNotDropTheFinalFrameWhenStdinHasNoTrailingNewline} is what holds that guarantee down
+   * -- if a JDK ever cached EOF and stopped re-reading, that test fails loudly rather than the
+   * server hanging quietly.
    */
   private void onEof() {
+    if (frames.flushPartial()) {
+      // EOF #1 of two: the tail is on the ledger, but the SDK is still waiting on this very read
+      // to be able to see it. Return -1 and let it.
+      return;
+    }
+    if (eofLatch.getCount() == 0) {
+      // Already released -- an unreadable frame killed the transport. Nothing will answer now, and
+      // waiting sixty seconds to discover that only delays the exit.
+      return;
+    }
     try {
       if (!pending.awaitAllAnswered(MAX_WAIT)) {
         reportUnanswered();

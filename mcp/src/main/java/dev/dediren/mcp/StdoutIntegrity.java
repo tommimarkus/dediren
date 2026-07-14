@@ -23,7 +23,18 @@ import java.nio.charset.StandardCharsets;
 public final class StdoutIntegrity {
   private StdoutIntegrity() {}
 
-  /** Returns the real stdout for the transport, and redirects {@code System.out} to stderr. */
+  /**
+   * Returns the real stdout for the transport, and redirects {@code System.out} to stderr.
+   *
+   * <p><b>The returned stream must stay unbuffered.</b> {@link FrameScanningOutputStream} decorates
+   * it and discharges the correlation ledger when a frame's trailing newline is <em>written</em>,
+   * which is one write before the transport flushes. That is only sound because the bytes reach the
+   * file descriptor as they are written: with a {@link java.io.BufferedOutputStream} in between,
+   * the ledger would go square while the final frame was still sitting in the buffer, {@code
+   * EofSignalingInputStream} would release stdin's EOF on the strength of it, and the SDK would
+   * close the session — losing exactly the response the ledger was invented to protect. Do not wrap
+   * this. If a buffer is ever genuinely needed here, the discharge must move to the flush.
+   */
   public static OutputStream claimStdout() {
     OutputStream protocolChannel = new FileOutputStream(FileDescriptor.out);
     System.setOut(

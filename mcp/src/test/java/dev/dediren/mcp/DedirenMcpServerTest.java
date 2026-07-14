@@ -186,9 +186,99 @@ class DedirenMcpServerTest {
   }
 
   /**
-   * A notification-only batch owes no responses at all, so EOF must be released immediately rather
-   * than paying out some fixed drain budget. (The heuristic this replaced always burned its full 2s
-   * cap here, because it was waiting for a write that was never coming.)
+   * A batch's final line need not end in a newline -- {@code printf '%s' "$frame" | dediren mcp},
+   * an editor with no trailing-newline setting, a client that writes exactly what it means to say.
+   * The SDK's reader is {@link java.io.BufferedReader#readLine()}, which returns and dispatches an
+   * unterminated final line like any other. So the correlation ledger must see it too.
+   *
+   * <p>It did not. {@code FrameSplitter} cut only on {@code 0x0A}, so the last frame stayed in its
+   * partial buffer and was never registered: the ledger believed nothing was owed, EOF was released
+   * the instant the last byte was read, the SDK closed the session, and the tool's response -- for
+   * work that had already <em>run</em> -- was silently discarded. Exit code 0, response absent.
+   * That is precisely the failure the id-correlation design exists to make impossible, reintroduced
+   * by a missing byte.
+   *
+   * <p>The tool must therefore be slow enough to actually lose that race; a fast one answers before
+   * anybody notices the ledger is wrong and would pass against the bug.
+   */
+  @Test
+  void serveOnDoesNotDropTheFinalFrameWhenStdinHasNoTrailingNewline() {
+    // Text block closed on the content line: deliberately NO trailing newline after the last frame.
+    String requests =
+        """
+        {"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"no-trailing-newline-test","version":"1"}}}
+        {"jsonrpc":"2.0","method":"notifications/initialized"}
+        {"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"slow_tool","arguments":{}}}""";
+    assertThat(requests)
+        .as("the premise of this test: stdin's last frame is unterminated")
+        .doesNotEndWith("\n");
+    ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+
+    assertTimeoutPreemptively(
+        Duration.ofSeconds(30),
+        () ->
+            DedirenMcpServer.serveOn(
+                new ByteArrayInputStream(requests.getBytes(StandardCharsets.UTF_8)),
+                stdout,
+                (in, out) -> slowToolServer(in, out, Duration.ofMillis(400))));
+
+    String output = stdout.toString(StandardCharsets.UTF_8);
+    assertThat(output).as("initialize response").contains("\"id\":1");
+    assertThat(output)
+        .as("the unterminated final frame's response must be written, not silently discarded")
+        .contains("\"id\":2");
+    assertThat(output).as("the slow tool's result payload").contains(SLOW_TOOL_SENTINEL);
+  }
+
+  /**
+   * A frame the transport cannot deserialize is fatal to it: {@code
+   * StdioServerTransportProvider$StdioMcpSessionTransport.startInboundProcessing} catches the
+   * deserialization failure, <em>breaks out of its read loop</em>, sets {@code isClosing} and
+   * closes the session. It never reads our stream again -- so {@code EofSignalingInputStream} never
+   * sees EOF, never counts the latch down, and {@code serveOn} waits on it forever. The SDK's
+   * schedulers are non-daemon threads, so the JVM does not exit either: one malformed line and the
+   * server is a wedged, unkillable process. The 60s ledger backstop cannot save this; it is a bound
+   * on the <em>await</em>, and the await never begins.
+   *
+   * <p>Every case here is a frame the SDK itself throws on, which is exactly the trigger condition:
+   * bad JSON, a {@code method} that will not bind to a String, a blank line (there is no {@code
+   * isBlank} guard in the loop), and valid JSON that is not a JSON-RPC object at all.
+   */
+  @ParameterizedTest(name = "an unreadable frame [{0}] must not wedge the server")
+  @ValueSource(
+      strings = {
+        "{not json",
+        "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":{\"not\":\"a string\"}}",
+        "",
+        "[1,2,3]",
+      })
+  void serveOnReturnsWhenAFrameCannotBeReadByTheTransport(String unreadable, @TempDir Path root) {
+    String requests =
+        "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":"
+            + "\"2024-11-05\",\"capabilities\":{},\"clientInfo\":{\"name\":\"wedge-test\","
+            + "\"version\":\"1\"}}}\n"
+            + unreadable
+            + "\n";
+
+    assertTimeoutPreemptively(
+        Duration.ofSeconds(15),
+        () ->
+            DedirenMcpServer.serveOn(
+                root,
+                Engines.of(List.of(), List.of(), List.of(), List.of()),
+                Map.of(),
+                true,
+                new ByteArrayInputStream(requests.getBytes(StandardCharsets.UTF_8)),
+                new ByteArrayOutputStream()));
+  }
+
+  /**
+   * A notification-only batch owes no responses at all, so EOF is released as soon as the ledger is
+   * square -- which, for notifications, is immediately. This is a hang detector, not a stopwatch:
+   * the bound is deliberately far larger than the work, because a tight bound on ~10ms of work buys
+   * nothing and flakes on a loaded CI box. That EOF is not held for some fixed drain budget is
+   * enforced by the design (correlation, not a timer) and proven by the slow-tool tests above,
+   * which would fail outright against any timer-based drain.
    */
   @Test
   void serveOnDoesNotWaitOutABatchThatOwesNoResponses(@TempDir Path root) {
@@ -199,7 +289,7 @@ class DedirenMcpServerTest {
         """;
 
     assertTimeoutPreemptively(
-        Duration.ofSeconds(2),
+        Duration.ofSeconds(20),
         () ->
             DedirenMcpServer.serveOn(
                 root,

@@ -19,6 +19,13 @@ import java.io.OutputStream;
  * recognized once its trailing newline arrives, which is the write immediately preceding the
  * transport's flush.
  *
+ * <p><b>This depends on the delegate being unbuffered</b> — and it is: {@link
+ * StdoutIntegrity#claimStdout()} hands over a raw {@link java.io.FileOutputStream} on the real
+ * stdout descriptor, so "written" means the bytes are gone. Interpose a {@link
+ * java.io.BufferedOutputStream} and "discharged" would come to mean "buffered": the ledger would
+ * read square, stdin's EOF would be released, the SDK would close the session, and the last frame
+ * would die in the buffer unflushed. If a buffer is ever needed, discharge on flush instead.
+ *
  * <p>All three {@code write} overloads forward explicitly rather than relying on {@link
  * FilterOutputStream}'s byte-at-a-time default, matching the sibling {@link
  * EofSignalingInputStream}'s treatment of its {@code read} overloads.
