@@ -87,15 +87,20 @@ class DedirenToolsTest {
   }
 
   @Test
-  void validateRejectsASourceOutsideTheRoot(@TempDir Path root) {
+  void validateRejectsASourceOutsideTheRoot(@TempDir Path root) throws Exception {
     CallToolResult result =
         toolsIn(root)
             .validate(
                 new CallToolRequest("dediren_validate", Map.of("source", "../../etc/passwd")));
 
     assertThat(result.isError()).isTrue();
-    assertThat(envelopeOf(result).path("diagnostics").path(0).path("code").asText())
-        .isEqualTo("DEDIREN_MCP_PATH_OUTSIDE_ROOT");
+    JsonNode diagnostic = envelopeOf(result).path("diagnostics").path(0);
+    assertThat(diagnostic.path("code").asText()).isEqualTo("DEDIREN_MCP_PATH_OUTSIDE_ROOT");
+    // The envelope goes to the model. It must never leak the resolved absolute workspace root
+    // (host filesystem reconnaissance) -- only the model's own candidate string comes back.
+    assertThat(diagnostic.path("message").asText()).doesNotContain(root.toString());
+    assertThat(diagnostic.path("message").asText()).doesNotContain(root.toRealPath().toString());
+    assertThat(diagnostic.path("message").asText()).contains("../../etc/passwd");
   }
 
   @Test
@@ -109,8 +114,11 @@ class DedirenToolsTest {
                     "dediren_build", Map.of("source", "model.json", "out", "../escape")));
 
     assertThat(result.isError()).isTrue();
-    assertThat(envelopeOf(result).path("diagnostics").path(0).path("code").asText())
-        .isEqualTo("DEDIREN_MCP_PATH_OUTSIDE_ROOT");
+    JsonNode diagnostic = envelopeOf(result).path("diagnostics").path(0);
+    assertThat(diagnostic.path("code").asText()).isEqualTo("DEDIREN_MCP_PATH_OUTSIDE_ROOT");
+    // Same host-filesystem-reconnaissance concern as the validate case above.
+    assertThat(diagnostic.path("message").asText()).doesNotContain(root.toString());
+    assertThat(diagnostic.path("message").asText()).doesNotContain(root.toRealPath().toString());
   }
 
   @Test
@@ -121,5 +129,26 @@ class DedirenToolsTest {
     assertThat(result.isError()).isTrue();
     assertThat(envelopeOf(result).path("diagnostics").path(0).path("code").asText())
         .isEqualTo("DEDIREN_COMMAND_INPUT_INVALID");
+  }
+
+  @Test
+  void buildRejectsAViewIdWithAPathSeparator(@TempDir Path root) throws Exception {
+    Files.copy(fixture("valid-basic.json"), root.resolve("model.json"));
+
+    CallToolResult result =
+        toolsIn(root)
+            .build(
+                new CallToolRequest(
+                    "dediren_build",
+                    Map.of(
+                        "source", "model.json",
+                        "out", "out",
+                        "views", List.of("../evil"))));
+
+    assertThat(result.isError()).isTrue();
+    assertThat(envelopeOf(result).path("diagnostics").path(0).path("code").asText())
+        .isEqualTo("DEDIREN_COMMAND_INPUT_INVALID");
+    // Rejected before any write: the out directory is never even created.
+    assertThat(Files.exists(root.resolve("out"))).isFalse();
   }
 }

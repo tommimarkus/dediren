@@ -25,6 +25,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 /**
  * The three tool handlers.
@@ -37,6 +38,14 @@ import java.util.Set;
 public final class DedirenTools {
   /** The semantics engine's wire id. A public contract string, like a schema id — not a class. */
   private static final String SEMANTICS_ENGINE = "generic-graph";
+
+  /**
+   * The model view id shape (schema {@code model.schema.json}). Applied here as a defence-in-depth
+   * guard on the {@code views} tool argument: a model-supplied view id feeds {@code core}'s
+   * per-view output path ({@code outDir.resolve(view)}), and this is a direct model input, not one
+   * validated against an actual model view id first.
+   */
+  private static final Pattern VIEW_ID_PATTERN = Pattern.compile("^[A-Za-z0-9][A-Za-z0-9._-]*$");
 
   private final Path root;
   private final Engines engines;
@@ -69,10 +78,7 @@ public final class DedirenTools {
     try {
       text = Files.readString(sourcePath);
     } catch (IOException error) {
-      return error(
-          DiagnosticCode.COMMAND_INPUT_INVALID,
-          "failed to read source: " + error.getMessage(),
-          source);
+      return readFailure("source", source, error);
     }
     Path baseDir = sourcePath.getParent();
 
@@ -104,6 +110,12 @@ public final class DedirenTools {
     if (out == null) {
       return error(DiagnosticCode.COMMAND_INPUT_INVALID, "build requires 'out'", null);
     }
+    List<String> views = stringListArg(request, "views");
+    for (String view : views) {
+      if (!VIEW_ID_PATTERN.matcher(view).matches()) {
+        return error(DiagnosticCode.COMMAND_INPUT_INVALID, "invalid view id: " + view, view);
+      }
+    }
 
     Path sourcePath;
     Path outPath;
@@ -119,27 +131,22 @@ public final class DedirenTools {
     } catch (PathOutsideRootException escape) {
       return pathEscape(escape);
     } catch (IOException error) {
-      return error(
-          DiagnosticCode.COMMAND_INPUT_INVALID,
-          "failed to read policy: " + error.getMessage(),
-          null);
+      System.err.println("dediren mcp: failed to read policy: " + error.getMessage());
+      return error(DiagnosticCode.COMMAND_INPUT_INVALID, "failed to read policy", null);
     }
 
     String sourceText;
     try {
       sourceText = Files.readString(sourcePath);
     } catch (IOException error) {
-      return error(
-          DiagnosticCode.COMMAND_INPUT_INVALID,
-          "failed to read source: " + error.getMessage(),
-          source);
+      return readFailure("source", source, error);
     }
 
     BuildRequest buildRequest =
         new BuildRequest(
             sourceText,
             sourcePath.getParent(),
-            stringListArg(request, "views"),
+            views,
             renderPolicy,
             oefPolicy,
             xmiPolicy,
@@ -191,7 +198,27 @@ public final class DedirenTools {
   }
 
   private static CallToolResult pathEscape(PathOutsideRootException escape) {
+    // stderr, deliberately: escape.getMessage() is already the model-safe generic text (see
+    // PathOutsideRootException's class doc). The resolved absolute target / IOException detail is
+    // for human debugging only and must never reach the tool result.
+    System.err.println("dediren mcp: path escape (" + escape.candidate() + "): " + escape.detail());
     return error(DiagnosticCode.MCP_PATH_OUTSIDE_ROOT, escape.getMessage(), escape.candidate());
+  }
+
+  /**
+   * Builds a generic, model-safe read-failure envelope and logs the real {@link IOException} text
+   * to stderr. {@code error.getMessage()} for a failed read on an already-resolved path routinely
+   * carries the resolved absolute path (for example {@code NoSuchFileException}'s message is the
+   * path itself), so it must never reach the model; {@code candidate} is the model's own original
+   * argument and is safe to echo back.
+   */
+  private static CallToolResult readFailure(String label, String candidate, IOException error) {
+    System.err.println(
+        "dediren mcp: failed to read " + label + " '" + candidate + "': " + error.getMessage());
+    return error(
+        DiagnosticCode.COMMAND_INPUT_INVALID,
+        "failed to read " + label + " '" + candidate + "'",
+        candidate);
   }
 
   private static CallToolResult engineFailure(EngineExecutionException failure) {

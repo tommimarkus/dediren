@@ -58,6 +58,35 @@ class WorkspacePathsTest {
   }
 
   @Test
+  void resolveExistingRejectsAbsolutePathOutsideRoot(@TempDir Path root, @TempDir Path outside)
+      throws Exception {
+    Path secret = Files.writeString(outside.resolve("secret.json"), "{}");
+
+    assertThatThrownBy(() -> WorkspacePaths.resolveExisting(root, secret.toString()))
+        .isInstanceOf(PathOutsideRootException.class)
+        .hasMessageContaining("outside the workspace root");
+  }
+
+  // A mutant that swapped WorkspacePaths.confine's `target.startsWith(realRoot)` (component-wise)
+  // for `target.toString().startsWith(realRoot.toString())` (a plain string prefix compare) leaves
+  // this file's existing tests all green -- none of them plants a sibling directory whose *name*
+  // has the root's name as a string prefix. "/rootspace-evil" does not start with the path
+  // "/rootspace", but the string "/rootspace-evil" does start with the string "/rootspace", so the
+  // mutant would let this escape through. See the class doc: symlink-in-root escapes are the
+  // documented residual; a sibling-directory escape like this is not, and must stay caught.
+  @Test
+  void resolveExistingRejectsSiblingDirectoryWhoseNameIsAStringPrefixOfRoot(@TempDir Path tmp)
+      throws Exception {
+    Path root = Files.createDirectory(tmp.resolve("rootspace"));
+    Path evilSibling = Files.createDirectory(tmp.resolve("rootspace-evil"));
+    Files.writeString(evilSibling.resolve("secret.json"), "{}");
+
+    assertThatThrownBy(() -> WorkspacePaths.resolveExisting(root, "../rootspace-evil/secret.json"))
+        .isInstanceOf(PathOutsideRootException.class)
+        .hasMessageContaining("outside the workspace root");
+  }
+
+  @Test
   void resolveForWriteAcceptsNonExistentPathInsideRoot(@TempDir Path root) throws Exception {
     Path resolved = WorkspacePaths.resolveForWrite(root, "out/nested/dir");
 
@@ -68,6 +97,28 @@ class WorkspacePathsTest {
   @Test
   void resolveForWriteRejectsNonExistentPathOutsideRoot(@TempDir Path root) {
     assertThatThrownBy(() -> WorkspacePaths.resolveForWrite(root, "../escape/out"))
+        .isInstanceOf(PathOutsideRootException.class)
+        .hasMessageContaining("outside the workspace root");
+  }
+
+  @Test
+  void resolveForWriteRejectsAbsolutePathOutsideRoot(@TempDir Path root, @TempDir Path outside) {
+    Path target = outside.resolve("out");
+
+    assertThatThrownBy(() -> WorkspacePaths.resolveForWrite(root, target.toString()))
+        .isInstanceOf(PathOutsideRootException.class)
+        .hasMessageContaining("outside the workspace root");
+  }
+
+  // See resolveExistingRejectsSiblingDirectoryWhoseNameIsAStringPrefixOfRoot: same sibling-prefix
+  // escape, driven through the write entry point instead of the existing-file entry point.
+  @Test
+  void resolveForWriteRejectsSiblingDirectoryWhoseNameIsAStringPrefixOfRoot(@TempDir Path tmp)
+      throws Exception {
+    Path root = Files.createDirectory(tmp.resolve("rootspace"));
+    Files.createDirectory(tmp.resolve("rootspace-evil"));
+
+    assertThatThrownBy(() -> WorkspacePaths.resolveForWrite(root, "../rootspace-evil/out"))
         .isInstanceOf(PathOutsideRootException.class)
         .hasMessageContaining("outside the workspace root");
   }
