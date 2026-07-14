@@ -61,7 +61,7 @@ The field is decorative. Two consequences:
 | `contracts` | `KnownSchemaVersions` | Pure data: schema family → ordered version history, current last. Plus the legacy version-*field* names per family. No logic — `contracts` stays dumb. |
 | `contracts` | 2 × `DiagnosticCode` | `SCHEMA_VERSION_OUTDATED`, `SCHEMA_VERSION_UNKNOWN`. |
 | `core` | `core/schema/SchemaVersionGate` | Classifies a parsed document's version. Backend-neutral validation, which `core` owns. |
-| `mcp` | `migration` guide topic | One line in `GuideCatalog.topicMap()`; one pointer in the `dediren_build` tool description. |
+| `mcp-server` | `migration` guide topic | One line in `GuideCatalog.topicMap()`; one pointer in the `dediren_build` tool description. |
 | `docs/agent-usage.md` | `## Migration` section | One `###` subsection per version step. |
 | tests | `MigrationRegistryTest` | Pins registry ↔ prose in both directions. |
 
@@ -130,13 +130,31 @@ The gate runs **before** JSON Schema validation. Today a stale
 `SCHEMA_INVALID`; running the gate first means it surfaces as
 `SCHEMA_VERSION_OUTDATED` instead.
 
-Policy files — `BuildCommand`, at the existing `CoreCommands.parseJson` sites
-(`BuildCommand.java:268` for render, `:334` for the export lanes):
+Policy files — every policy enters `core` as raw text and is parsed by the
+package-private `CoreCommands.parseJson`. There are **four** such sites, and the
+gate must cover all of them, not just `build`:
 
-    policy text → parseJson → SchemaVersionGate → engine dispatch
+| Site | Lane |
+|---|---|
+| `CoreCommands.renderCommand:277` | standalone `dediren render` |
+| `CoreCommands.exportCommand:303` | standalone `dediren export` (OEF or XMI, by engine id) |
+| `BuildCommand:268` | `build` render lane |
+| `BuildCommand:334` (`runExportStage`) | `build` export lanes (OEF or XMI, by engine id) |
+
+Rather than gate four times, `CoreCommands` grows one package-private
+chokepoint that all four call:
+
+    policy text → parsePolicy(command, text, family) → engine dispatch
+                    └── parseJson + SchemaVersionGate
 
 The gate runs before engine dispatch, so a stale policy fails before any engine
 runs and before any artifact is written. Engines stay unaware of versioning.
+
+For the two export sites the family is chosen from the engine id
+(`archimate-oef` → OEF policy, `uml-xmi` → XMI policy). An engine id matching
+neither skips the gate and falls through to the existing
+`DEDIREN_PLUGIN_UNKNOWN` from `requireEngine`, preserving today's error
+precedence (a malformed policy is reported before an unknown engine).
 
 ### Known asymmetry
 
