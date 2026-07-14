@@ -193,7 +193,10 @@ charter below is the contract for "what changes for this reason lives here."
 
 - **`cli`** — the thin entrypoint: parse arguments, assemble a request, call
   `core`, print the envelope. Must stay thin (see §8). No domain policy, no
-  plugin knowledge beyond `contracts`.
+  plugin knowledge beyond `contracts`. It is also the composition root for the
+  `mcp` adapter: `McpCommand` constructs the engine registry through
+  `EngineWiring` and hands it to the server, which is why the `cli → mcp` edge
+  runs in that direction and never the reverse.
 
 - **`archimate` / `uml`** — notation cores: the type vocabulary and semantic
   validation for ArchiMate and UML source models, shared by the plugins that
