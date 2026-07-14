@@ -95,6 +95,7 @@ public final class Main {
     commandLine.addSubcommand("render", new RenderCommand(stdin, env, engines));
     commandLine.addSubcommand("export", new ExportCommand(env, engines));
     commandLine.addSubcommand("build", new BuildCommand(stdin, env, engines));
+    commandLine.addSubcommand("mcp", new McpCommand(env, engines));
     commandLine.setOut(stdout);
     commandLine.setErr(stderr);
     return commandLine;
@@ -496,6 +497,41 @@ public final class Main {
       } catch (ProductRootException error) {
         return printProductRootFailure(spec, error);
       }
+    }
+  }
+
+  @Command(
+      name = "mcp",
+      mixinStandardHelpOptions = true,
+      description =
+          "Run the Model Context Protocol stdio server, exposing validate, build, and the agent"
+              + " guide as tools. The MCP client spawns and owns this process; stdout carries"
+              + " JSON-RPC only.")
+  static final class McpCommand implements Callable<Integer> {
+    private final Map<String, String> env;
+    private final Engines engines;
+
+    @Option(
+        names = "--root",
+        description =
+            "Workspace root. Every tool path must resolve inside it. Defaults to the working"
+                + " directory.")
+    private Path root = Path.of(".");
+
+    @Option(
+        names = "--read-only",
+        description = "Do not register the build tool; serve only validate and the guide.")
+    private boolean readOnly;
+
+    McpCommand(Map<String, String> env, Engines engines) {
+      this.env = env;
+      this.engines = engines;
+    }
+
+    @Override
+    public Integer call() throws Exception {
+      dev.dediren.mcp.DedirenMcpServer.serve(root, engines, env, readOnly);
+      return CommandExitCode.OK.code();
     }
   }
 
