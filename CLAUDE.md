@@ -79,6 +79,12 @@ agent tools should be pointed here from their own entrypoint files (for example,
 
 - Public JSON shape changes: update `schemas/`, `contracts`, fixtures, plugin
   mapping code, and schema/round-trip tests together.
+- Breaking schema-version bumps: update the schema, the `ContractVersions`
+  constant, the `KnownSchemaVersions` family (append the new version; the old
+  one becomes a prior version), and a `### <from> → <to>` subsection under
+  `## Migration` in `docs/agent-usage.md` together. `MigrationRegistryTest`
+  fails the build if a superseded version has no upgrade steps. If the version
+  *field* is renamed, add the old field name to the family's `versionFields`.
 - Engine contract or runtime changes: update `engine-api`, `ir` (the
   SceneGraph/LaidOutScene seam types), `core` dispatch, `cli` `EngineWiring`,
   CLI behavior, README notes, and the engine envelope regression tests
