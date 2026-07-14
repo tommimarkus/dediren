@@ -64,10 +64,12 @@ else.
 
 The `bin/dediren` launcher auto-creates a single Class-Data-Sharing archive
 (`-XX:+AutoCreateSharedArchive`, `cds/cli.jsa`) on first invocation to
-speed JVM startup on subsequent calls, and passes `-Xlog:cds=off`, which
-suppresses the JVM's archive-dump warnings (`[warning][cds] ... Old class has
-been linked`, `... Unsupported location`) so each invocation stays quiet on
-stdout/stderr while keeping the CDS speedup. Archive locations, the
+speed JVM startup on subsequent calls, and passes
+`-Xlog:all=off:stdout -Xlog:all=warning:stderr:uptime,level,tags`, which clears
+the JVM's default stdout log sink so no VM warning (archive-dump chatter, a
+stale-archive `[warning][cds,dynamic]`, cgroup limits) can ever land on top of
+the command envelope, while still routing those warnings to stderr for humans.
+Archive locations, the
 `DEDIREN_CDS_DIR` override, silent degradation when the archive directory is
 unwritable, and seeding guidance: [Agent Usage → Plugin
 Environment](../agent-usage.md#plugin-environment).

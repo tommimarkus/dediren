@@ -828,9 +828,12 @@ launcher falls back to `${XDG_CACHE_HOME:-$HOME/.cache}/dediren/cds`.
 Set `DEDIREN_CDS_DIR` to an explicit writable path to relocate the archive.
 The feature is based on `-XX:+AutoCreateSharedArchive` and degrades silently if
 the archive directory is unwritable — startup continues at normal speed without
-any error. The launcher also passes `-Xlog:cds=off:stdout -Xlog:cds=warning:stderr`,
-keeping stdout JSON-pure while preserving first-launch CDS warnings on stderr
-(the human debug channel); once the archive exists, a healthy run stays quiet.
+any error. The launcher also passes
+`-Xlog:all=off:stdout -Xlog:all=warning:stderr:uptime,level,tags`, which clears
+the JVM's default stdout log sink entirely and re-adds warnings on stderr (the
+human debug channel). That keeps stdout JSON-pure no matter what the VM warns
+about — CDS archive staleness, cgroup limits, anything — while preserving the
+warnings for humans; once the archive exists, a healthy run stays quiet.
 
 The archive is seeded by the launcher's first invocation and is not regenerated
 while it stays valid, and its contents depend on what that first command loaded:

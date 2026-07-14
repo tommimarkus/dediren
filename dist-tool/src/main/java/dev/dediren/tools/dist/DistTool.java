@@ -22,6 +22,7 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 import tools.jackson.databind.JsonNode;
 
 public final class DistTool {
@@ -373,6 +374,7 @@ public final class DistTool {
       assertLauncherJvmFlags(bundle);
       assertCdsConfigured(bundle);
       assertFirstLaunchStdoutClean(bundle, temp, version);
+      assertStaleCdsStdoutClean(bundle, temp);
       if (Files.exists(bundle.resolve("fixtures/plugins"))) {
         throw new IllegalStateException("archive must not include source fixture plugin manifests");
       }
@@ -863,12 +865,17 @@ public final class DistTool {
             + "JAVA_OPTS=\"$JAVA_OPTS -XX:+AutoCreateSharedArchive"
             + " -XX:SharedArchiveFile=$DEDIREN_CDS_DIR/"
             + cdsName
-            // Route first-launch AutoCreateSharedArchive warnings off stdout and onto stderr (the
-            // human debug channel) so a freshly unpacked bundle's first command keeps stdout
-            // JSON-pure. cds=warning:stderr alone only ADDS a stderr sink; the default stdout sink
-            // still emits them, so cds=off:stdout is required to actually clear stdout while
-            // preserving the warnings on stderr and leaving all other JVM logging untouched.
-            + ".jsa -Xlog:cds=off:stdout -Xlog:cds=warning:stderr\""
+            // Keep stdout JSON-pure: the JVM's DEFAULT unified-logging sink is stdout, so any
+            // warning the VM emits lands on top of the command envelope and breaks the agent
+            // contract. A per-tag selector cannot hold that line -- `cds` matches the tag set
+            // `cds` EXACTLY, so sibling sets like `cds,dynamic` ("Unable to use shared archive",
+            // emitted whenever the archive is stale, e.g. after any classpath change) fall
+            // through to stdout. Other tags can warn too (`os,container` under cgroups, for one).
+            // So clear the stdout sink for ALL tags, then re-add warnings on stderr (the human
+            // debug channel) to preserve the AutoCreateSharedArchive diagnostics.
+            // all=off:stdout, not -Xlog:disable: disable would also wipe a user's own JAVA_OPTS
+            // -Xlog file sink, whereas this only reconfigures the stdout and stderr outputs.
+            + ".jsa -Xlog:all=off:stdout -Xlog:all=warning:stderr:uptime,level,tags\""
             + nl
             + "export JAVA_OPTS"
             + nl;
@@ -1060,7 +1067,7 @@ public final class DistTool {
             null,
             Map.of("DEDIREN_CDS_DIR", temp.resolve("fresh-cds-version").toString()),
             Map.of());
-    assertNoCdsLines(versionStdout, "first-launch --version");
+    assertNoJvmLogLines(versionStdout, "first-launch --version");
     if (!versionStdout.strip().equals("dediren " + version)) {
       throw new IllegalStateException(
           "first-launch --version stdout must be exactly the version line: " + versionStdout);
@@ -1076,16 +1083,68 @@ public final class DistTool {
             null,
             Map.of("DEDIREN_CDS_DIR", temp.resolve("fresh-cds-validate").toString()),
             Map.of());
-    assertNoCdsLines(validateStdout, "first-launch validate");
+    assertNoJvmLogLines(validateStdout, "first-launch validate");
     // Must parse as a single ok JSON envelope, not JSON interleaved with CDS log noise.
     okData(validateStdout);
   }
 
-  private static void assertNoCdsLines(String stdout, String label) {
+  /**
+   * A FRESH archive (covered above) only exercises CDS creation. The stdout-corrupting case is a
+   * STALE one: a valid archive whose recorded classpath no longer matches, which makes the JVM warn
+   * "Unable to use shared archive" under the {@code cds,dynamic} tag set. That is reachable in the
+   * field because DEDIREN_CDS_DIR falls back to a version-independent ~/.cache dir when the bundle
+   * is not writable, so ANY classpath change -- an upgrade, a dependency added -- staleness-breaks
+   * the archive on first run. Seed an archive, then shift the classpath under it and prove the
+   * envelope still stands alone on stdout.
+   */
+  private static void assertStaleCdsStdoutClean(Path bundle, Path temp) throws Exception {
+    Path dediren = bundle.resolve("bin/dediren");
+    Path cds = temp.resolve("stale-cds");
+    List<String> validate =
+        List.of(
+            "validate", "--input", bundle.resolve("fixtures/source/valid-basic.json").toString());
+    // 1. Seed a valid archive for the bundle's real classpath.
+    runBundleCommand(
+        dediren, bundle, validate, null, Map.of("DEDIREN_CDS_DIR", cds.toString()), Map.of());
+    // 2. Shift the classpath out from under it. The probe must be a REAL jar on disk: the JVM
+    //    validates actual classpath entries, so a bogus path does not invalidate the archive.
+    Path probe = temp.resolve("stale-cds-probe.jar");
+    Files.copy(findAnyLibJar(bundle), probe, StandardCopyOption.REPLACE_EXISTING);
+    String stdout =
+        runBundleCommand(
+            dediren,
+            bundle,
+            validate,
+            null,
+            Map.of("DEDIREN_CDS_DIR", cds.toString(), "CLASSPATH_PREFIX", probe.toString()),
+            Map.of());
+    assertNoJvmLogLines(stdout, "stale-CDS validate");
+    okData(stdout);
+  }
+
+  private static Path findAnyLibJar(Path bundle) throws IOException {
+    try (Stream<Path> jars = Files.list(bundle.resolve("lib"))) {
+      return jars.filter(jar -> jar.getFileName().toString().endsWith(".jar"))
+          .sorted()
+          .findFirst()
+          .orElseThrow(() -> new IllegalStateException("bundle lib/ contains no jars"));
+    }
+  }
+
+  /**
+   * Matches a JVM unified-logging line with the launcher's {@code uptime,level,tags} decorations,
+   * e.g. {@code [0.007s][warning][cds,dynamic] Unable to use shared archive}. Deliberately broader
+   * than any single tag: the JVM's default log sink is stdout, so ANY tag that warns (cds,
+   * cds+dynamic, os+container under cgroups, ...) would land on top of the command envelope. An
+   * earlier {@code [cds]}-only check missed {@code [cds,dynamic]} and let exactly that through.
+   */
+  private static final Pattern JVM_LOG_LINE = Pattern.compile("^\\[[0-9]+[.,][0-9]+s\\]\\[");
+
+  private static void assertNoJvmLogLines(String stdout, String label) {
     for (String line : stdout.split("\n", -1)) {
-      if (line.contains("[cds]")) {
+      if (JVM_LOG_LINE.matcher(line).find()) {
         throw new IllegalStateException(
-            label + " stdout must not contain CDS log lines (they belong on stderr): " + line);
+            label + " stdout must not contain JVM log lines (they belong on stderr): " + line);
       }
     }
   }
@@ -1097,7 +1156,7 @@ public final class DistTool {
               bundle.resolve("bin").resolve(launcher.bundleScript()), StandardCharsets.UTF_8);
       if (!text.contains("-XX:+AutoCreateSharedArchive")
           || !text.contains(launcher.sourceScript() + ".jsa")
-          || !text.contains("-Xlog:cds=off:stdout -Xlog:cds=warning:stderr")) {
+          || !text.contains("-Xlog:all=off:stdout -Xlog:all=warning:stderr:uptime,level,tags")) {
         throw new IllegalStateException(
             "launcher " + launcher.bundleScript() + " is missing its CDS configuration");
       }
