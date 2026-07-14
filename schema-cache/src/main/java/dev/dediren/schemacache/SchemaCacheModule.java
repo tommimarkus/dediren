@@ -192,10 +192,10 @@ public final class SchemaCacheModule {
 
   public static SchemaFetcher curlFetcher(String command) {
     return (url, destination) -> {
-      List<String> command_ = new ArrayList<>();
-      command_.add(command);
-      command_.addAll(curlArgs(url, destination));
-      Process process = new ProcessBuilder(command_).start();
+      List<String> fullCommand = new ArrayList<>();
+      fullCommand.add(command);
+      fullCommand.addAll(curlArgs(url, destination));
+      Process process = new ProcessBuilder(fullCommand).start();
       // Both pipes are drained concurrently: a verbose fetch failure that fills the ~64 KiB stderr
       // pipe would otherwise block the child in write(2) forever while this thread waited on a
       // stdout EOF that can never arrive.

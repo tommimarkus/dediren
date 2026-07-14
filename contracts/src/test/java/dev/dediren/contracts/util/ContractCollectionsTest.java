@@ -26,6 +26,11 @@ class ContractCollectionsTest {
     Map<String, String> withNull = new LinkedHashMap<>();
     withNull.put("a", null);
     assertThrows(NullPointerException.class, () -> ContractCollections.mapOrEmpty(withNull));
+    // LinkedHashMap permits a null key (unlike Map.of), so this must be pinned separately from
+    // the null-value case above.
+    Map<String, String> withNullKey = new LinkedHashMap<>();
+    withNullKey.put(null, "v");
+    assertThrows(NullPointerException.class, () -> ContractCollections.mapOrEmpty(withNullKey));
     assertThat(ContractCollections.mapOrEmpty(null)).isEmpty();
   }
 }

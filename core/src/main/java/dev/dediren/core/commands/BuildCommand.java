@@ -411,7 +411,8 @@ public final class BuildCommand {
       }
       Files.writeString(target, content);
     } catch (IOException error) {
-      throw new UncheckedIOException("failed to write build artifact " + target, error);
+      throw new UncheckedIOException(
+          "failed to write build artifact " + target + ": " + error.getMessage(), error);
     }
   }
 

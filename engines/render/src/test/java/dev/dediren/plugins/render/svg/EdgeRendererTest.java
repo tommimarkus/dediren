@@ -28,4 +28,15 @@ class EdgeRendererTest {
     assertThat(EdgeRenderer.roundedPathDataWithLineJumps(points, List.of(insideEntry)))
         .isEqualTo(EdgeRenderer.roundedPathData(points));
   }
+
+  @Test
+  void jumpInsideRoundedCornerEntryRegionIsDroppedForHorizontalSegment() {
+    List<Point> points = List.of(new Point(0, 0), new Point(0, 100), new Point(100, 100));
+    // Segment 1 runs (0,100)->(100,100); the corner at (0,100) resumes the pen at (r, 100).
+    // A crossing at x=3 sits inside that entry region and must not be emitted.
+    LineJump insideEntry = new LineJump(1, 3.0, 100.0, false);
+
+    assertThat(EdgeRenderer.roundedPathDataWithLineJumps(points, List.of(insideEntry)))
+        .isEqualTo(EdgeRenderer.roundedPathData(points));
+  }
 }

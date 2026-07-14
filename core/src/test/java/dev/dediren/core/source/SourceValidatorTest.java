@@ -3,6 +3,8 @@ package dev.dediren.core.source;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import dev.dediren.contracts.CommandExitCode;
+import dev.dediren.contracts.Diagnostic;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
@@ -103,15 +105,14 @@ class SourceValidatorTest {
                 """,
             null);
 
-    assertThat(result.exitCode()).isEqualTo(2);
+    assertThat(result.exitCode()).isEqualTo(CommandExitCode.INPUT_ERROR.code());
     var diagnostics = result.envelope().diagnostics();
     assertThat(diagnostics.size()).isGreaterThanOrEqualTo(2);
     assertThat(diagnostics)
         .allSatisfy(d -> assertThat(d.code()).isEqualTo("DEDIREN_SCHEMA_INVALID"));
     // The two violation messages must be distinct: this proves they are independent
     // sibling violations, not the same violation reported twice.
-    assertThat(
-            diagnostics.stream().map(dev.dediren.contracts.Diagnostic::message).distinct().count())
+    assertThat(diagnostics.stream().map(Diagnostic::message).distinct().count())
         .isGreaterThanOrEqualTo(2);
   }
 

@@ -54,16 +54,15 @@ tests (Task 4).
 ### Schema cache + runtime download
 
 Runtime schema fetches go through
-`schema-cache/src/main/java/dev/dediren/schemacache/SchemaCacheModule.java`'s
-`curlFetcher`, which forces `--proto '=https'` (no protocol downgrade on
-redirect), bounds the whole transfer at 60 seconds to prevent stalled downloads
-from blocking the export lane indefinitely, and verifies the download's SHA-256 against a pinned value before
-trusting it: the single `OMG_XMI_SCHEMA_SHA256` constant
+`schema-cache/src/main/java/dev/dediren/schemacache/SchemaCacheModule.java`'s `curlFetcher`,
+which forces `--proto '=https'` (no protocol downgrade on redirect), bounds the whole
+transfer at 60 seconds to prevent stalled downloads from blocking the export lane
+indefinitely, and verifies the download's SHA-256 against a pinned value before trusting it:
+the single `OMG_XMI_SCHEMA_SHA256` constant
 (`engines/uml-xmi-export/.../schema/SchemaValidation.java`) and the per-file
 `OFFICIAL_OEF_SCHEMA_SHA256` map (`engines/archimate-oef-export/.../OefExportEngine.java`).
-The offline overrides `DEDIREN_XMI_SCHEMA_PATH` / `DEDIREN_OEF_SCHEMA_DIR`
-bypass the SHA-256 check by design — they only require the supplied file to
-be non-empty.
+The offline overrides `DEDIREN_XMI_SCHEMA_PATH` / `DEDIREN_OEF_SCHEMA_DIR` bypass the
+SHA-256 check by design — they only require the supplied file to be non-empty.
 
 ### XML parsing & external validator
 

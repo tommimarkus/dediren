@@ -102,7 +102,11 @@ class FixtureConformanceSweepTest {
   @Test
   void everyExportPolicyFixtureIsEnrolled() throws IOException {
     try (Stream<Path> files = Files.list(workspaceRoot().resolve("fixtures/export-policy"))) {
-      assertThat(files.map(path -> "fixtures/export-policy/" + path.getFileName()).sorted())
+      assertThat(
+              files
+                  .filter(path -> path.getFileName().toString().endsWith(".json"))
+                  .map(path -> "fixtures/export-policy/" + path.getFileName())
+                  .sorted())
           .containsExactlyElementsOf(PER_FILE_FAMILIES.keySet().stream().sorted().toList());
     }
   }

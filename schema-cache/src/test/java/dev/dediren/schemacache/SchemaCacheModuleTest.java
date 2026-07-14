@@ -368,6 +368,8 @@ class SchemaCacheModuleTest {
             "--fail",
             "--silent",
             "--show-error",
+            "--max-time",
+            "60",
             "https://example.test/schema.xsd",
             "--output");
   }
