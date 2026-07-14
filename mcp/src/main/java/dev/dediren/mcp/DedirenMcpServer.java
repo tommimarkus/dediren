@@ -12,6 +12,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Path;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
@@ -91,10 +92,30 @@ public final class DedirenMcpServer {
   public static void serve(Path root, Engines engines, Map<String, String> env, boolean readOnly)
       throws InterruptedException {
     OutputStream protocolChannel = StdoutIntegrity.claimStdout();
-    McpSyncServer server = create(root, engines, env, readOnly, System.in, protocolChannel);
+    serveOn(root, engines, env, readOnly, System.in, protocolChannel);
+  }
+
+  /**
+   * Runs the server over the given streams, returning once {@code in} reaches EOF.
+   *
+   * <p>The stdio transport reads {@code in} on its own thread; on EOF it closes the session but
+   * neither calls {@code System.exit} nor interrupts this thread, so nothing unblocks a plain
+   * self-join. {@code in} is wrapped so the wrapper counts down a latch the instant a read call
+   * observes EOF, and this method awaits that latch instead, then closes the server itself.
+   */
+  static void serveOn(
+      Path root,
+      Engines engines,
+      Map<String, String> env,
+      boolean readOnly,
+      InputStream in,
+      OutputStream out)
+      throws InterruptedException {
+    CountDownLatch stdinClosed = new CountDownLatch(1);
+    InputStream eofSignaling = new EofSignalingInputStream(in, stdinClosed);
+    McpSyncServer server = create(root, engines, env, readOnly, eofSignaling, out);
     Runtime.getRuntime().addShutdownHook(new Thread(server::close));
-    // The stdio transport reads System.in on its own thread and completes when the client closes
-    // it. Park until the JVM is torn down by that completion or by the shutdown hook.
-    Thread.currentThread().join();
+    stdinClosed.await();
+    server.close();
   }
 }

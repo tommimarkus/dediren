@@ -1,6 +1,7 @@
 package dev.dediren.mcp;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
 import dev.dediren.engine.Engines;
 import io.modelcontextprotocol.server.McpSyncServer;
@@ -8,6 +9,7 @@ import io.modelcontextprotocol.spec.McpSchema.Tool;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -67,5 +69,26 @@ class DedirenMcpServerTest {
     } finally {
       server.close();
     }
+  }
+
+  /**
+   * Regression test for a self-join hang: {@code serveOn} must return once stdin hits EOF, not
+   * block forever waiting on the calling thread to join itself. Stdin is already at EOF before the
+   * call, so a correct implementation returns promptly; the buggy {@code
+   * Thread.currentThread().join()} implementation never returns, and the JUnit 5 timeout fails the
+   * test loudly instead of hanging the suite.
+   */
+  @Test
+  void serveOnReturnsWhenStdinIsAtEof(@TempDir Path root) {
+    assertTimeoutPreemptively(
+        Duration.ofSeconds(10),
+        () ->
+            DedirenMcpServer.serveOn(
+                root,
+                Engines.of(List.of(), List.of(), List.of(), List.of()),
+                Map.of(),
+                true,
+                new ByteArrayInputStream(new byte[0]),
+                new ByteArrayOutputStream()));
   }
 }
