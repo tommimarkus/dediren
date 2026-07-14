@@ -273,6 +273,74 @@ class DedirenMcpServerTest {
   }
 
   /**
+   * A different door to the same wedge as the test above, and the one the fatal-frame fix did not
+   * close: {@code startInboundProcessing} also has a plain {@code catch (IOException)} around its
+   * read loop, and reacts to it exactly like the unreadable-frame case -- break out, close the
+   * session, never read this stream again. That is what a dying pty (EIO) or a FIFO/socket peer
+   * reset looks like from here: not a clean {@code -1}, but an {@link java.io.IOException} out of
+   * the underlying stream's {@code read}. Nothing about the fatal-frame fix touches that path,
+   * because it is not a frame at all -- there is no string for {@code readableByTransport} to
+   * judge. Without a read-failure handler in {@code EofSignalingInputStream}, {@link
+   * EofSignalingInputStream#onEof()} is simply never reached, the latch never counts down, and
+   * {@code serveOn} hangs forever (the SDK's schedulers are non-daemon, so not even the JVM exits).
+   *
+   * <p>The stream here answers a few bytes of a real request -- enough that {@code initialize}
+   * would have gone out over a healthy connection -- and then fails every subsequent read, standing
+   * in for the pty dying mid-conversation rather than at the very first byte.
+   */
+  @Test
+  void serveOnReturnsWhenStdinReadThrowsIoException(@TempDir Path root) {
+    String prefix =
+        "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":"
+            + "\"2024-11-05\",\"capabilities\":{},\"clientInfo\":{\"name\":\"read-failure-test\","
+            + "\"version\":\"1\"}}}\n";
+
+    assertTimeoutPreemptively(
+        Duration.ofSeconds(15),
+        () ->
+            DedirenMcpServer.serveOn(
+                root,
+                Engines.of(List.of(), List.of(), List.of(), List.of()),
+                Map.of(),
+                true,
+                new FailsAfterPrefixInputStream(prefix),
+                new ByteArrayOutputStream()));
+  }
+
+  /**
+   * An {@link java.io.InputStream} that answers a fixed prefix normally, then fails every
+   * subsequent read with an {@link java.io.IOException} -- standing in for a dying pty (EIO) or a
+   * FIFO/socket peer reset partway through a conversation, as opposed to a clean EOF.
+   */
+  private static final class FailsAfterPrefixInputStream extends java.io.InputStream {
+    private final byte[] prefix;
+    private int position;
+
+    FailsAfterPrefixInputStream(String prefix) {
+      this.prefix = prefix.getBytes(StandardCharsets.UTF_8);
+    }
+
+    @Override
+    public int read() throws java.io.IOException {
+      if (position >= prefix.length) {
+        throw new java.io.IOException("simulated EIO: dead pty");
+      }
+      return prefix[position++] & 0xFF;
+    }
+
+    @Override
+    public int read(byte[] b, int off, int len) throws java.io.IOException {
+      if (position >= prefix.length) {
+        throw new java.io.IOException("simulated EIO: dead pty");
+      }
+      int count = Math.min(len, prefix.length - position);
+      System.arraycopy(prefix, position, b, off, count);
+      position += count;
+      return count;
+    }
+  }
+
+  /**
    * A notification-only batch owes no responses at all, so EOF is released as soon as the ledger is
    * square -- which, for notifications, is immediately. This is a hang detector, not a stopwatch:
    * the bound is deliberately far larger than the work, because a tight bound on ~10ms of work buys

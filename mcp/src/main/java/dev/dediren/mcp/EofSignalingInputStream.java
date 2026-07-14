@@ -1,7 +1,6 @@
 package dev.dediren.mcp;
 
 import io.modelcontextprotocol.json.McpJsonMapper;
-import io.modelcontextprotocol.json.jackson3.JacksonMcpJsonMapper;
 import io.modelcontextprotocol.spec.McpSchema;
 import java.io.FilterInputStream;
 import java.io.IOException;
@@ -9,7 +8,6 @@ import java.io.InputStream;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
-import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Wraps stdin: registers every JSON-RPC request that passes through it, and when a read observes
@@ -57,21 +55,36 @@ import tools.jackson.databind.json.JsonMapper;
  * releases EOF when it sees one. See {@link #readableByTransport(String)} for why that check cannot
  * false-positive.
  *
- * <p>EOF can surface from {@link #read()}, {@link #read(byte[])}, or {@link #read(byte[], int,
- * int)}, depending on which one the caller or a buffering layer above it happens to use, so all
- * three are overridden explicitly rather than left to {@link FilterInputStream}'s default
- * delegation.
+ * <p><b>Not wedging on a read failure.</b> EOF is not the only way a read can end without producing
+ * a byte. {@code startInboundProcessing} also has a plain {@code catch (IOException)} around its
+ * read loop, and it treats that exactly like the fatal-frame case: break out, set {@code
+ * isClosing}, close the session, never read this stream again. A dying pty (EIO), a FIFO or socket
+ * peer reset, anything that surfaces as an {@link IOException} from the underlying stream rather
+ * than a clean {@code -1} -- none of it reaches {@link #onEof()}, so the latch never counts down
+ * and {@code serveOn} waits on it forever, same as the fatal-frame wedge. So every read override
+ * catches {@link IOException} from the delegate call, reports it the same way {@link
+ * #onUnreadableFrame} does, and releases the latch -- then rethrows, because the SDK still needs to
+ * see the failure to unwind its own loop. This is not a drain: like the fatal-frame path, the
+ * transport is already gone, so there is nothing left to wait for.
+ *
+ * <p>EOF or a read failure can surface from {@link #read()}, {@link #read(byte[])}, or {@link
+ * #read(byte[], int, int)}, depending on which one the caller or a buffering layer above it happens
+ * to use, so all three are overridden explicitly rather than left to {@link FilterInputStream}'s
+ * default delegation. {@link #skip(long)} is overridden too, even though nothing upstream calls it
+ * today ({@code BufferedReader}/{@code StreamDecoder} always read): {@link FilterInputStream}'s
+ * default {@code skip} delegates straight to the wrapped stream, which would let bytes pass the
+ * frame splitter and the correlation ledger unseen.
  */
 final class EofSignalingInputStream extends FilterInputStream {
   private static final Duration MAX_WAIT = Duration.ofSeconds(60);
 
   /**
-   * Mirrors the mapper {@code DedirenMcpServer} hands the transport (a default {@link JsonMapper}),
-   * because {@link #readableByTransport} is only a faithful oracle for what the SDK will accept if
-   * it asks the same question of the same mapper.
+   * Mirrors the mapper {@code DedirenMcpServer} hands the transport, because {@link
+   * #readableByTransport} is only a faithful oracle for what the SDK will accept if it asks the
+   * same question of the same mapper. Built by {@link McpJsonMappers#standard()} -- the one place
+   * that configuration lives -- so this cannot drift from the transport's own mapper.
    */
-  private static final McpJsonMapper MAPPER =
-      new JacksonMcpJsonMapper(JsonMapper.builder().build());
+  private static final McpJsonMapper MAPPER = McpJsonMappers.standard();
 
   /** How much of an unreadable frame to quote on stderr. Enough to identify it, not to flood. */
   private static final int PREVIEW_LIMIT = 120;
@@ -89,7 +102,13 @@ final class EofSignalingInputStream extends FilterInputStream {
 
   @Override
   public int read() throws IOException {
-    int value = super.read();
+    int value;
+    try {
+      value = super.read();
+    } catch (IOException failure) {
+      onReadFailure(failure);
+      throw failure;
+    }
     if (value == -1) {
       onEof();
     } else {
@@ -100,18 +119,52 @@ final class EofSignalingInputStream extends FilterInputStream {
 
   @Override
   public int read(byte[] b) throws IOException {
+    // Delegates to the (byte[], int, int) overload below, which is where the failure handling
+    // lives -- see that override for why this one needs none of its own.
     return read(b, 0, b.length);
   }
 
   @Override
   public int read(byte[] b, int off, int len) throws IOException {
-    int count = super.read(b, off, len);
+    int count;
+    try {
+      count = super.read(b, off, len);
+    } catch (IOException failure) {
+      onReadFailure(failure);
+      throw failure;
+    }
     if (count == -1) {
       onEof();
     } else if (count > 0) {
       frames.accept(b, off, count);
     }
     return count;
+  }
+
+  /**
+   * Discards {@code n} bytes by reading and dropping them through {@link #read(byte[], int, int)},
+   * rather than {@link FilterInputStream}'s default of delegating straight to the wrapped stream's
+   * {@code skip}. A delegated skip would move the underlying stream forward without the frame
+   * splitter or {@link PendingRequests} ever seeing those bytes -- silently corrupting whichever
+   * frame they belonged to, or dropping a request off the ledger entirely. Routing through {@link
+   * #read(byte[], int, int)} keeps every byte visible to both, at the cost of an allocation nothing
+   * upstream is known to trigger.
+   */
+  @Override
+  public long skip(long n) throws IOException {
+    if (n <= 0) {
+      return 0;
+    }
+    byte[] discard = new byte[(int) Math.min(n, 8192)];
+    long skipped = 0;
+    while (skipped < n) {
+      int count = read(discard, 0, (int) Math.min(discard.length, n - skipped));
+      if (count < 0) {
+        break;
+      }
+      skipped += count;
+    }
+    return skipped;
   }
 
   /**
@@ -167,6 +220,32 @@ final class EofSignalingInputStream extends FilterInputStream {
             + " it -- it stops reading, so no further request on this connection can be answered."
             + " Shutting down rather than hanging. Offending frame: "
             + preview(frame));
+    eofLatch.countDown();
+  }
+
+  /**
+   * The delegate read just failed. Say so, then release EOF so the process can exit -- symmetric
+   * with {@link #onUnreadableFrame}, and for the same reason: {@code startInboundProcessing}'s
+   * {@code catch (IOException)} breaks its read loop exactly the way the fatal-frame case does, and
+   * never reads this stream again, so nothing will ever call {@link #onEof()} for us.
+   *
+   * <p>There is nothing here to drain, for the same reason as {@link #onUnreadableFrame}: the SDK
+   * is about to close its session on catching this exception, and outbound writes made after that
+   * are discarded, so responses still in flight are already lost. This method never swallows the
+   * failure -- the caller must still rethrow it, so the SDK sees the same exception and unwinds.
+   */
+  private void onReadFailure(IOException failure) {
+    if (eofLatch.getCount() == 0) {
+      // Already released -- an earlier failure or an unreadable frame already ended this session.
+      return;
+    }
+    // stderr, deliberately: stdout is the protocol channel (see StdoutIntegrity), and the SLF4J
+    // levels that would carry an alarm are banned in first-party code.
+    System.err.println(
+        "dediren mcp: reading stdin failed ("
+            + failure
+            + "), which is fatal to the JSON-RPC transport -- it stops reading, so no further"
+            + " request on this connection can be answered. Shutting down rather than hanging.");
     eofLatch.countDown();
   }
 

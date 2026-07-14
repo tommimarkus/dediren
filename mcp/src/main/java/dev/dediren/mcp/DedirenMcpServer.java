@@ -2,7 +2,6 @@ package dev.dediren.mcp;
 
 import dev.dediren.engine.Engines;
 import io.modelcontextprotocol.json.McpJsonMapper;
-import io.modelcontextprotocol.json.jackson3.JacksonMcpJsonMapper;
 import io.modelcontextprotocol.server.McpServer;
 import io.modelcontextprotocol.server.McpSyncServer;
 import io.modelcontextprotocol.server.transport.StdioServerTransportProvider;
@@ -13,7 +12,6 @@ import java.io.OutputStream;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
-import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Assembles the {@code dediren mcp} stdio server.
@@ -40,8 +38,9 @@ public final class DedirenMcpServer {
       InputStream in,
       OutputStream out) {
     // The protocol mapper serializes MCP frames, not Dediren envelopes: envelopes are produced by
-    // core and passed through as text, so this mapper never touches the product contract.
-    McpJsonMapper mapper = new JacksonMcpJsonMapper(JsonMapper.builder().build());
+    // core and passed through as text, so this mapper never touches the product contract. Built by
+    // McpJsonMappers so this stays identical to the oracle EofSignalingInputStream uses.
+    McpJsonMapper mapper = McpJsonMappers.standard();
     StdioServerTransportProvider transport = new StdioServerTransportProvider(mapper, in, out);
     DedirenTools tools = new DedirenTools(root, engines, env);
 
