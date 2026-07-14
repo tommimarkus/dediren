@@ -124,6 +124,18 @@ tool such as `rsvg-convert`, `resvg`, ImageMagick, or Inkscape.
 ArchiMate/UML notations, exports, accessibility, and failure-repair rules,
 follow [`docs/agent-usage.md`](docs/agent-usage.md).
 
+Runs are quiet by default. When something needs investigating, set
+`DEDIREN_LOG_LEVEL=debug` for a window into engine dispatch, ELK layout size and
+timing, schema-cache hits, and the `xmllint` validator:
+
+```bash
+DEDIREN_LOG_LEVEL=debug "$BUNDLE/bin/dediren" layout --plugin elk-layout \
+  --input layout-request.json > layout-result.json
+```
+
+Logs go to stderr and stdout stays a clean JSON envelope, so piping to `jq` keeps
+working with logging on. Logs are for humans — agents decide from stdout.
+
 ## Bundle Layout
 
 ```text

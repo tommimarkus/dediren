@@ -6,6 +6,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Runs an external XML schema validator ({@code xmllint}) over a document supplied on stdin.
@@ -19,6 +21,9 @@ import java.util.concurrent.TimeUnit;
  * DEDIREN_XMI_SCHEMA_INVALID}), so this module stays notation-neutral.
  */
 public final class XmlSchemaValidator {
+  // debug/trace only, by architecture rule. An invalid document is an Outcome the caller maps to a
+  // published diagnostic code; it must not also be announced on stderr. See ArchitectureRulesTest.
+  private static final Logger LOG = LoggerFactory.getLogger(XmlSchemaValidator.class);
 
   private XmlSchemaValidator() {}
 
@@ -39,6 +44,9 @@ public final class XmlSchemaValidator {
   public static Outcome validate(
       String validatorCommand, Path schemaPath, String content, Duration timeout)
       throws SchemaCacheException {
+    // The one place a subprocess crosses the engine boundary — for both export engines. Which
+    // binary, against which schema, is the first question when a validation result surprises you.
+    LOG.debug("schema validator: command={} schema={}", validatorCommand, schemaPath);
     Process process;
     try {
       process =
@@ -79,6 +87,7 @@ public final class XmlSchemaValidator {
       int exitCode = process.exitValue();
       byte[] out = stdout.await();
       byte[] err = stderr.await();
+      LOG.debug("schema validator exit: command={} exitCode={}", validatorCommand, exitCode);
       if (exitCode == 0) {
         return new Outcome(true, 0, "");
       }

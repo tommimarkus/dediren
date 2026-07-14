@@ -177,6 +177,12 @@ enforcement authority for matching version, tag, and release actions.
   directories, no executable overrides. The bundled set is constructed
   explicitly in `cli` `EngineWiring`.
 - Keep stderr for human debugging only.
+- Log through SLF4J at `debug`/`trace` only. `Logger.info`/`warn`/`error` are
+  banned in first-party code and `ArchitectureRulesTest` fails the build on
+  them: anything an agent must act on belongs in the envelope's `diagnostics[]`,
+  so logging must never become the notification channel. Only `cli` binds an
+  SLF4J provider (and `test-support` for tests); library modules take
+  `slf4j-api` alone. Logging is off unless `DEDIREN_LOG_LEVEL` says otherwise.
 
 ## ELK Runtime
 

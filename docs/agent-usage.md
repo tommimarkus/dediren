@@ -820,6 +820,33 @@ nothing else. Important explicit variables:
 - `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY` (and their lowercase forms): forwarded
   to `curl` so it can download standards schemas through a proxy.
 - `DEDIREN_CDS_DIR`: directory for Class-Data-Sharing archives (see below).
+- `DEDIREN_LOG_LEVEL`: `trace`, `debug`, `info`, `warn`, `error`, or `off`
+  (default `off`). Turns on human-readable debug logging on **stderr** for one
+  run. Any other value is ignored with a note on stderr.
+
+## Debug Logging
+
+Logging is off by default and is a human debugging aid only — never part of the
+agent contract. Everything an agent must act on is already in the stdout
+envelope's `status` and `diagnostics[]`; nothing is only discoverable in a log
+line, and first-party code cannot log above `debug` (an architecture rule
+forbids `info`/`warn`/`error`). So do not parse logs, and do not switch logging
+on to make a decision — switch it on when a human is investigating.
+
+```bash
+DEDIREN_LOG_LEVEL=debug dediren layout --plugin elk-layout --input request.json
+```
+
+```
+[DEBUG] dev.dediren.core.engine.EngineDispatch - engine resolved: id=elk-layout capability=layout
+[DEBUG] dev.dediren.plugins.elklayout.ElkLayoutEngine - elk layout: nodes=6 edges=6 elapsedMs=82
+[DEBUG] dev.dediren.core.engine.EngineDispatch - engine ok: id=elk-layout
+```
+
+Logs go to stderr; stdout stays a clean JSON envelope, so `| jq` keeps working
+with logging on. Logged lines cover engine dispatch, ELK layout size and timing,
+schema-cache hits and misses, and the `xmllint` validator subprocess. Log output
+is not a stable contract and may change between releases.
 
 The `bin/dediren` launcher auto-creates a single Class-Data-Sharing archive on
 its first invocation to speed JVM startup on subsequent calls. The archive is

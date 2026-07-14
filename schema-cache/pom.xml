@@ -15,6 +15,22 @@
 
   <dependencies>
     <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-simple</artifactId>
+      <!-- TEST scope, and only here because schema-cache is the one logging module that does not
+           depend on test-support (which carries the provider for every other module's tests). With
+           slf4j-api but no provider, this module's own surefire fork prints the "No SLF4J providers
+           were found" banner. Test scope is not transitive, so this reaches nothing else and never
+           ships. No simplelogger.properties is needed: without a config file slf4j-simple defaults
+           to INFO, and first-party code cannot log above debug (ArchitectureRulesTest), so there is
+           nothing at INFO+ to print. -->
+      <scope>test</scope>
+    </dependency>
+    <dependency>
       <groupId>org.assertj</groupId>
       <artifactId>assertj-core</artifactId>
       <scope>test</scope>

@@ -46,7 +46,8 @@ class DiagnosticCodeOwnershipTest {
           "DEDIREN_OEF_SCHEMA_VALIDATOR",
           "DEDIREN_XMI_SCHEMA_VALIDATOR",
           "DEDIREN_BUNDLE_ROOT",
-          "DEDIREN_CDS_DIR");
+          "DEDIREN_CDS_DIR",
+          "DEDIREN_LOG_LEVEL");
 
   /**
    * {@code archimate} is deliberately standalone — §2 grants it no internal dependencies — so it

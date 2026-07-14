@@ -15,6 +15,16 @@
 
   <dependencies>
     <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-simple</artifactId>
+      <!-- The provider for TEST runs only. test-support is test-scope in every consumer and is not
+           in DistTool.FIRST_PARTY_ARTIFACTS, so this reaches each module's test classpath and never
+           the packaged bundle. Without it, every surefire fork that touches json-schema-validator
+           prints the "No SLF4J providers were found" banner. Level defaults to off via this
+           module's own src/main/resources/simplelogger.properties. -->
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
       <groupId>tools.jackson.core</groupId>
       <artifactId>jackson-databind</artifactId>
     </dependency>

@@ -50,9 +50,11 @@ public final class DistTool {
   // engine jars (+ transitives) and the packaged lib/ is verified against that one classpath.
   private static final List<Launcher> LAUNCHERS =
       List.of(new Launcher("cli/target/appassembler", "cli", "dediren"));
-  // Hermeticity scrub for smoke/bench child processes: the CDS directory is the only remaining
-  // dediren environment knob a caller's shell could leak into the packaged-bundle probes.
-  private static final List<String> CLEAN_ENV = List.of("DEDIREN_CDS_DIR");
+  // Hermeticity scrub for smoke/bench child processes: the dediren environment knobs a caller's
+  // shell could otherwise leak into the packaged-bundle probes. DEDIREN_LOG_LEVEL belongs here or a
+  // developer who happens to export it would turn on debug logging inside the probes and break the
+  // quiet-stderr assertions with a failure that reproduces on their machine only.
+  private static final List<String> CLEAN_ENV = List.of("DEDIREN_CDS_DIR", "DEDIREN_LOG_LEVEL");
 
   /** Licence attribution for one redistributed third-party artifact (jar name minus version). */
   private record ThirdPartyAttribution(String project, List<String> licenseIds) {}
@@ -116,6 +118,7 @@ public final class DistTool {
           Map.entry("org.eclipse.xtext.xbase.lib", attribution("Eclipse Xtext", "EPL-2.0")),
           Map.entry("picocli", attribution("picocli", "Apache-2.0")),
           Map.entry("slf4j-api", attribution("SLF4J", "MIT (SLF4J)")),
+          Map.entry("slf4j-simple", attribution("SLF4J", "MIT (SLF4J)")),
           Map.entry("snakeyaml-engine", attribution("SnakeYAML Engine", "Apache-2.0")),
           Map.entry(
               "xml-apis",
@@ -375,6 +378,7 @@ public final class DistTool {
       assertCdsConfigured(bundle);
       assertFirstLaunchStdoutClean(bundle, temp, version);
       assertStaleCdsStdoutClean(bundle, temp);
+      assertLoggingIsQuietAndSwitchable(bundle, temp);
       if (Files.exists(bundle.resolve("fixtures/plugins"))) {
         throw new IllegalStateException("archive must not include source fixture plugin manifests");
       }
@@ -877,6 +881,32 @@ public final class DistTool {
             // -Xlog file sink, whereas this only reconfigures the stdout and stderr outputs.
             + ".jsa -Xlog:all=off:stdout -Xlog:all=warning:stderr:uptime,level,tags\""
             + nl
+            // DEDIREN_LOG_LEVEL is the only switch for first-party logging. Mapping it here, before
+            // the JVM starts, sidesteps slf4j-simple's static-initializer ordering hazard: it reads
+            // its level once, on the first LoggerFactory call, so a post-launch flag could be
+            // clobbered by whichever class happened to load first.
+            //
+            // The case allowlist is load-bearing, not cosmetic. This value is interpolated into
+            // JAVA_OPTS, so an unvalidated env var is arbitrary JVM-argument injection: a caller
+            // could smuggle in -XX flags, an agent lib, or a debugger port through what looks like
+            // a log setting. Only these six literals reach the JVM; anything else is dropped with
+            // a note on stderr (never stdout -- the envelope stays JSON-pure even on misuse).
+            + "case \"${DEDIREN_LOG_LEVEL:-}\" in"
+            + nl
+            + "  trace|debug|info|warn|error|off)"
+            + nl
+            + "    JAVA_OPTS=\"$JAVA_OPTS"
+            + " -Dorg.slf4j.simpleLogger.defaultLogLevel=$DEDIREN_LOG_LEVEL\" ;;"
+            + nl
+            + "  \"\") ;;"
+            + nl
+            + "  *)"
+            + nl
+            + "    echo \"dediren: ignoring invalid DEDIREN_LOG_LEVEL"
+            + " (want trace|debug|info|warn|error|off)\" >&2 ;;"
+            + nl
+            + "esac"
+            + nl
             + "export JAVA_OPTS"
             + nl;
     return script.substring(0, insertionPoint) + block + script.substring(insertionPoint);
@@ -960,6 +990,34 @@ public final class DistTool {
   private static String runBundleCommand(
       Path executable, Path bundle, List<String> args, Path stdin) throws Exception {
     return runBundleCommand(executable, bundle, args, stdin, Map.of(), Map.of());
+  }
+
+  /** Both streams of one bundled run. Only stderr-sensitive probes need this. */
+  private record BundleOutput(String stdout, String stderr) {}
+
+  private static BundleOutput runBundleCommandCapturingBoth(
+      Path executable, Path bundle, List<String> args, Map<String, String> extraEnv)
+      throws Exception {
+    ProcessBuilder builder = new ProcessBuilder(command(executable.toString(), args));
+    builder.directory(bundle.toFile());
+    for (String name : CLEAN_ENV) {
+      builder.environment().remove(name);
+    }
+    builder.environment().putAll(extraEnv);
+    Process process = builder.start();
+    String stdout = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+    String stderr = new String(process.getErrorStream().readAllBytes(), StandardCharsets.UTF_8);
+    int exit = process.waitFor();
+    if (exit != 0) {
+      throw new IllegalStateException(
+          "bundled command failed with status "
+              + exit
+              + "\nstdout:\n"
+              + stdout
+              + "\nstderr:\n"
+              + stderr);
+    }
+    return new BundleOutput(stdout, stderr);
   }
 
   private static String runBundleCommand(
@@ -1110,16 +1168,145 @@ public final class DistTool {
     //    validates actual classpath entries, so a bogus path does not invalidate the archive.
     Path probe = temp.resolve("stale-cds-probe.jar");
     Files.copy(findAnyLibJar(bundle), probe, StandardCopyOption.REPLACE_EXISTING);
-    String stdout =
-        runBundleCommand(
+    BundleOutput stale =
+        runBundleCommandCapturingBoth(
             dediren,
             bundle,
             validate,
-            null,
-            Map.of("DEDIREN_CDS_DIR", cds.toString(), "CLASSPATH_PREFIX", probe.toString()),
-            Map.of());
-    assertNoJvmLogLines(stdout, "stale-CDS validate");
-    okData(stdout);
+            Map.of("DEDIREN_CDS_DIR", cds.toString(), "CLASSPATH_PREFIX", probe.toString()));
+
+    // 3. Prove the probe actually PROVOKED the condition before trusting the clean-stdout result.
+    //    Without this the test is a trap: if the archive ever stopped going stale (the jar copy
+    //    silently fails, a launcher change drops CLASSPATH_PREFIX, a JVM revision stops warning),
+    //    stdout would be clean because nothing warned at all, and this would keep passing while
+    //    testing nothing. The warning MUST appear -- on stderr, which is where it belongs.
+    if (!stale.stderr().contains("[cds")) {
+      throw new IllegalStateException(
+          "the stale-CDS probe did not make the archive stale, so its stdout-purity assertion"
+              + " proves nothing. Expected a [cds...] warning on stderr.\nstderr:\n"
+              + stale.stderr());
+    }
+    assertNoJvmLogLines(stale.stdout(), "stale-CDS validate");
+    okData(stale.stdout());
+  }
+
+  /**
+   * The bundled SLF4J behaviour, end to end. These must be subprocess probes: an in-process CLI
+   * test cannot see any of it, because Main swaps picocli's writers and never touches the JVM's
+   * real System.err — which is exactly where SLF4J writes. An in-process assertion here would be
+   * vacuously green.
+   */
+  private static void assertLoggingIsQuietAndSwitchable(Path bundle, Path temp) throws Exception {
+    Path dediren = bundle.resolve("bin/dediren");
+    Map<String, String> cds = Map.of("DEDIREN_CDS_DIR", temp.resolve("log-cds").toString());
+
+    // 1. The banner probe runs `validate`, and only asserts on the banner. `validate` initialises
+    //    SLF4J -- json-schema-validator calls LoggerFactory, which is what printed the banner on
+    //    every command before a provider was bound -- but it dispatches no engine, so it reaches
+    //    none of OUR debug statements. A default-off assertion here would therefore be vacuous:
+    //    silent whether the level were off or debug. That check belongs on `layout` below.
+    List<String> validate =
+        List.of(
+            "validate", "--input", bundle.resolve("fixtures/source/valid-basic.json").toString());
+    BundleOutput banner = runBundleCommandCapturingBoth(dediren, bundle, validate, cds);
+    if (banner.stderr().contains("SLF4J(")) {
+      throw new IllegalStateException(
+          "a default run must not print an SLF4J banner; the cli must bind a provider.\nstderr:\n"
+              + banner.stderr());
+    }
+    okData(banner.stdout());
+
+    // 2. Every remaining probe runs `layout`, which goes through EngineDispatch.requireEngine and
+    //    the ELK engine -- the seams where the debug lines actually live. Asserting on a command
+    //    that reaches no seam is the trap this whole method is shaped to avoid.
+    Path request = temp.resolve("log-request.json");
+    Files.writeString(
+        request,
+        runBundleCommand(
+            dediren,
+            bundle,
+            List.of(
+                "project",
+                "--target",
+                "layout-request",
+                "--plugin",
+                "generic-graph",
+                "--view",
+                "main",
+                "--input",
+                bundle.resolve("fixtures/source/valid-pipeline-rich.json").toString()),
+            null),
+        StandardCharsets.UTF_8);
+    List<String> layout =
+        List.of("layout", "--plugin", "elk-layout", "--input", request.toString());
+
+    // 3. Default-off, asserted where it can actually FAIL. `layout` emits debug lines the moment
+    //    the level is anything but off, so if simplelogger.properties ever regressed from off to
+    //    debug -- or the launcher's empty-DEDIREN_LOG_LEVEL branch started setting a level -- this
+    //    catches it. The same assertion against `validate` would be unfalsifiable.
+    BundleOutput quiet = runBundleCommandCapturingBoth(dediren, bundle, layout, cds);
+    if (quiet.stderr().contains("DEBUG")) {
+      throw new IllegalStateException(
+          "logging must default to off; a run with no DEDIREN_LOG_LEVEL emitted debug lines"
+              + " on a command that reaches a logging seam.\nstderr:\n"
+              + quiet.stderr());
+    }
+    okData(quiet.stdout());
+
+    // 4. Every literal in the launcher's allowlist must actually be honoured. Only exercising
+    //    `debug` would let a typo that dropped one of the six from the case pattern ship unnoticed:
+    //    the dropped level would fall through to the reject branch and silently stop working.
+    for (String level : List.of("trace", "debug", "info", "warn", "error", "off")) {
+      Map<String, String> env = new LinkedHashMap<>(cds);
+      env.put("DEDIREN_LOG_LEVEL", level);
+      BundleOutput accepted = runBundleCommandCapturingBoth(dediren, bundle, layout, env);
+      if (accepted.stderr().contains("ignoring invalid DEDIREN_LOG_LEVEL")) {
+        throw new IllegalStateException(
+            "DEDIREN_LOG_LEVEL=" + level + " is a valid level but the launcher rejected it");
+      }
+      assertNoJvmLogLines(accepted.stdout(), "DEDIREN_LOG_LEVEL=" + level + " layout");
+      okData(accepted.stdout());
+    }
+
+    // 5. DEDIREN_LOG_LEVEL=debug opens the channel -- on stderr, with stdout still a clean
+    // envelope.
+    // Both halves matter: a switch that also polluted stdout would trade one contract break for
+    // another.
+    Map<String, String> debugEnv = new LinkedHashMap<>(cds);
+    debugEnv.put("DEDIREN_LOG_LEVEL", "debug");
+    BundleOutput debug = runBundleCommandCapturingBoth(dediren, bundle, layout, debugEnv);
+    if (!debug.stderr().contains("DEBUG")) {
+      throw new IllegalStateException(
+          "DEDIREN_LOG_LEVEL=debug must emit debug lines on stderr.\nstderr:\n" + debug.stderr());
+    }
+    assertNoJvmLogLines(debug.stdout(), "DEDIREN_LOG_LEVEL=debug layout");
+    okData(debug.stdout());
+
+    // 3. The allowlist. This value is interpolated into JAVA_OPTS, so an unvalidated one is
+    //    arbitrary JVM-argument injection. -XshowSettings:properties would dump the JVM's whole
+    //    property table if it ever reached the java command; assert it does not, that the smuggled
+    //    level is dropped rather than honoured, and that the run still yields a clean envelope.
+    Map<String, String> injected = new LinkedHashMap<>(cds);
+    injected.put("DEDIREN_LOG_LEVEL", "debug -XshowSettings:properties");
+    BundleOutput rejected = runBundleCommandCapturingBoth(dediren, bundle, layout, injected);
+    if (rejected.stderr().contains("java.runtime.name")
+        || rejected.stdout().contains("java.runtime.name")) {
+      throw new IllegalStateException(
+          "DEDIREN_LOG_LEVEL was interpolated into JAVA_OPTS unvalidated -- a caller can inject"
+              + " arbitrary JVM arguments.\nstderr:\n"
+              + rejected.stderr());
+    }
+    if (!rejected.stderr().contains("ignoring invalid DEDIREN_LOG_LEVEL")) {
+      throw new IllegalStateException(
+          "an invalid DEDIREN_LOG_LEVEL must be reported and dropped.\nstderr:\n"
+              + rejected.stderr());
+    }
+    if (rejected.stderr().contains("DEBUG")) {
+      throw new IllegalStateException(
+          "a rejected DEDIREN_LOG_LEVEL must not still switch logging on.\nstderr:\n"
+              + rejected.stderr());
+    }
+    okData(rejected.stdout());
   }
 
   private static Path findAnyLibJar(Path bundle) throws IOException {

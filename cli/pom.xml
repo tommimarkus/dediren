@@ -87,6 +87,21 @@
       <scope>runtime</scope>
     </dependency>
     <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-simple</artifactId>
+      <!-- RUNTIME scope. cli is the runtime composition root (the same rule that puts EngineWiring
+           here), so cli is the ONE place that binds an SLF4J provider — library modules depend on
+           slf4j-api alone and never impose a binding on a consumer. Without a provider the api
+           announces "No SLF4J providers were found" on stderr at every launch and silently
+           no-ops. slf4j-simple writes to System.err with zero transitive deps; see
+           src/main/resources/simplelogger.properties, which defaults the level to off and pins the
+           sink to System.err so the stdout envelope can never be polluted. Turn it on per-run with
+           DEDIREN_LOG_LEVEL. Adding this jar to the bundle REQUIRES a matching
+           DistTool.THIRD_PARTY_ATTRIBUTIONS entry or the dist build fails on an unattributed
+           jar. -->
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
       <groupId>org.assertj</groupId>
       <artifactId>assertj-core</artifactId>
       <scope>test</scope>

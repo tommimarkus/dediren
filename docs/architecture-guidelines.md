@@ -290,6 +290,19 @@ Discipline:
   index of these change-sets; keep it current.
 - **stderr is human-only.** Anything a tool or agent must act on is in the JSON
   envelope. stderr carries debugging text and nothing load-bearing.
+- **Logging is debug/trace only, and the rule is enforced.** First-party code
+  logs through SLF4J at `debug`/`trace`; `ArchitectureRulesTest`
+  (`firstPartyCodeLogsOnlyAtDebugOrTrace`) fails the build on any call to
+  `Logger.info`/`warn`/`error`. This makes the bullet above structural rather
+  than aspirational: a logging facade is a standing temptation to report a
+  problem with `log.error(...)` instead of adding a diagnostic, and the moment
+  that happens stderr is load-bearing and an agent reading only stdout misses
+  it. With no level above `debug` available, a log line cannot plausibly be the
+  user's notification channel. It also makes the default-off posture safe —
+  slf4j-simple fails open to `INFO` if its config is lost, and there is nothing
+  at `INFO`+ to leak. Only `cli` (the runtime composition root) and
+  `test-support` (test-only, never shipped) bind a provider; library modules
+  take `slf4j-api` alone so they never impose a binding on a consumer.
 
 ---
 

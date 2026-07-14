@@ -46,8 +46,14 @@ import org.eclipse.elk.graph.ElkEdgeSection;
 import org.eclipse.elk.graph.ElkNode;
 import org.eclipse.elk.graph.ElkPort;
 import org.eclipse.elk.graph.util.ElkGraphUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 final class ElkLayoutEngine {
+  // debug/trace only, by architecture rule: a layout diagnostic an agent must act on belongs in the
+  // envelope's diagnostics[], never on stderr. See ArchitectureRulesTest.
+  private static final Logger LOG = LoggerFactory.getLogger(ElkLayoutEngine.class);
+
   private static final double DEFAULT_WIDTH = 160.0;
   private static final double DEFAULT_HEIGHT = 80.0;
   private static final double CONNECTOR_SOURCE_MAX_WIDTH = 48.0;
@@ -161,7 +167,7 @@ final class ElkLayoutEngine {
       ElkLayeredOptions.applyEdgeHints(elkEdge, edge);
     }
 
-    new RecursiveGraphLayoutEngine().layout(root, new BasicProgressMonitor());
+    runElkLayout(root, request);
 
     List<LaidOutNode> nodes = new ArrayList<>();
     for (LayoutNode node : list(request.nodes())) {
@@ -282,7 +288,7 @@ final class ElkLayoutEngine {
     }
     ElkLayeredOptions.activatePartitioning(root, list(request.nodes()));
 
-    new RecursiveGraphLayoutEngine().layout(root, new BasicProgressMonitor());
+    runElkLayout(root, request);
 
     List<LaidOutNode> nodes = new ArrayList<>();
     for (LayoutNode node : list(request.nodes())) {
@@ -448,7 +454,7 @@ final class ElkLayoutEngine {
       ElkLayeredOptions.applyEdgeHints(elkEdge, edge);
     }
 
-    new RecursiveGraphLayoutEngine().layout(root, new BasicProgressMonitor());
+    runElkLayout(root, request);
 
     List<LaidOutNode> nodes = new ArrayList<>();
     for (LayoutNode node : list(request.nodes())) {
@@ -1582,5 +1588,22 @@ final class ElkLayoutEngine {
 
   private static <T> List<T> list(List<T> values) {
     return values == null ? List.of() : values;
+  }
+
+  /**
+   * The single seam where ELK actually computes geometry. Timing and graph size are the two things
+   * you want when a layout comes out wrong or slow, and neither is recoverable from the envelope,
+   * so they are logged here rather than duplicated at each of the three call sites.
+   */
+  private static void runElkLayout(ElkNode root, LayoutRequest request) {
+    long startedNanos = System.nanoTime();
+    new RecursiveGraphLayoutEngine().layout(root, new BasicProgressMonitor());
+    if (LOG.isDebugEnabled()) {
+      LOG.debug(
+          "elk layout: nodes={} edges={} elapsedMs={}",
+          list(request.nodes()).size(),
+          list(request.edges()).size(),
+          (System.nanoTime() - startedNanos) / 1_000_000L);
+    }
   }
 }

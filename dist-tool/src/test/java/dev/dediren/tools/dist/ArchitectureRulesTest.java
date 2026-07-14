@@ -1,5 +1,9 @@
 package dev.dediren.tools.dist;
 
+import static com.tngtech.archunit.core.domain.JavaCall.Predicates.target;
+import static com.tngtech.archunit.core.domain.properties.HasName.Predicates.name;
+import static com.tngtech.archunit.core.domain.properties.HasName.Predicates.nameMatching;
+import static com.tngtech.archunit.core.domain.properties.HasOwner.Predicates.With.owner;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -392,6 +396,48 @@ class ArchitectureRulesTest {
             "only EngineWiring wires the concrete first-party engines; the rest of cli knows"
                 + " them through engine-api, confining the cli-to-engine-implementation edge to"
                 + " one class (§2, §5)")
+        .check(PRODUCTION_CLASSES);
+  }
+
+  /**
+   * Keeps the agent contract structural rather than aspirational. Logging is a standing temptation
+   * to report a problem with {@code log.error(...)} instead of adding a diagnostic — and the moment
+   * that happens, stderr is load-bearing and an agent that reads only stdout misses it. Confining
+   * first-party code to debug/trace makes that mistake unrepresentable: there is no level at which
+   * a log line could plausibly be the user's notification channel. Anything an agent must act on
+   * goes in the envelope's {@code diagnostics[]}.
+   *
+   * <p>It also makes the default-off posture safe. slf4j-simple fails open (no config file ⇒ INFO),
+   * but with nothing above debug in first-party code there is nothing at INFO+ to leak.
+   */
+  @Test
+  void firstPartyCodeLogsOnlyAtDebugOrTrace() {
+    noClasses()
+        .should()
+        .callMethodWhere(
+            target(owner(nameMatching("org\\.slf4j\\.Logger")))
+                .and(
+                    target(
+                        // The classic API.
+                        name("info")
+                            .or(name("warn"))
+                            .or(name("error"))
+                            // SLF4J 2.x's fluent API is the same capability under another name:
+                            // LOG.atWarn().log(..) is a warn, and banning only warn() would leave
+                            // the rule trivially bypassable (verified: it was).
+                            .or(name("atInfo"))
+                            .or(name("atWarn"))
+                            .or(name("atError"))
+                            // Level-by-value entry points defeat static enforcement outright --
+                            // atLevel(computeLevel()) cannot be proven not to be ERROR -- so they
+                            // are banned rather than analysed. debug()/trace() cover every
+                            // legitimate need here.
+                            .or(name("atLevel"))
+                            .or(name("makeLoggingEventBuilder")))))
+        .because(
+            "first-party logging is debug/trace only: anything an agent must act on belongs in the"
+                + " envelope's diagnostics[] on stdout, and stderr is never load-bearing (CLAUDE.md"
+                + " Engine Runtime Rules)")
         .check(PRODUCTION_CLASSES);
   }
 }

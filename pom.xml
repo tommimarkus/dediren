@@ -52,6 +52,7 @@
     <json-schema-validator.version>3.0.6</json-schema-validator.version>
     <junit.version>6.1.2</junit.version>
     <picocli.version>4.7.7</picocli.version>
+    <slf4j.version>2.0.17</slf4j.version>
     <xmlunit.version>2.12.0</xmlunit.version>
     <xtext-xbase.version>2.43.0</xtext-xbase.version>
     <appassembler-maven-plugin.version>2.1.0</appassembler-maven-plugin.version>
@@ -75,6 +76,25 @@
         <groupId>com.networknt</groupId>
         <artifactId>json-schema-validator</artifactId>
         <version>${json-schema-validator.version}</version>
+      </dependency>
+      <!-- SLF4J is the first-party logging facade. slf4j-api was already an unavoidable
+           transitive: json-schema-validator calls LoggerFactory from ten of its classes, so
+           excluding it yields NoClassDefFoundError. (It does NOT come from ELK — no ELK 0.11.0
+           pom declares slf4j.) Nothing pinned the version, so the redistributed jar drifted with
+           whatever json-schema-validator happened to declare; pin api and simple off one property
+           so dependencyConvergence stays green and the bundled jar set stays deterministic.
+           The PROVIDER is chosen only by cli (the runtime composition root) and test-support (the
+           shared, never-shipped test dep). Library modules take slf4j-api alone, so they never
+           impose a binding on a consumer. -->
+      <dependency>
+        <groupId>org.slf4j</groupId>
+        <artifactId>slf4j-api</artifactId>
+        <version>${slf4j.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.slf4j</groupId>
+        <artifactId>slf4j-simple</artifactId>
+        <version>${slf4j.version}</version>
       </dependency>
       <!-- Jackson 3 (tools.jackson) is the project's sole Jackson stack. Pin
            databind, core, and the yaml dataformat to one patched line.

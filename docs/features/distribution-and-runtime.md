@@ -59,6 +59,7 @@ else.
 | `DEDIREN_XMI_SCHEMA_PATH` | Local XMI schema file (offline export validation). |
 | `DEDIREN_SCHEMA_CACHE_DIR` | Cache directory for schema downloads. |
 | `DEDIREN_CDS_DIR` | Relocate Class-Data-Sharing archives (see below). |
+| `DEDIREN_LOG_LEVEL` | Debug logging on stderr for one run: `trace`/`debug`/`info`/`warn`/`error`/`off` (default `off`). Values outside that set are rejected — the launcher interpolates this into `JAVA_OPTS`, so an allowlist is what stops JVM-argument injection. |
 
 ## Startup Optimization (Class-Data-Sharing)
 

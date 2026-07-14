@@ -16,6 +16,8 @@ import dev.dediren.engine.Engines;
 import java.io.UncheckedIOException;
 import java.util.List;
 import java.util.Optional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Maps a typed in-memory engine call to the {@link EngineRunOutcome}{@code (stdout, exitCode)} the
@@ -43,6 +45,10 @@ import java.util.Optional;
  * </ol>
  */
 public final class EngineDispatch {
+  // debug/trace only, by architecture rule: anything an agent must act on belongs in the
+  // envelope's diagnostics[], never on stderr. See ArchitectureRulesTest.
+  private static final Logger LOG = LoggerFactory.getLogger(EngineDispatch.class);
+
   private EngineDispatch() {}
 
   /** A typed engine call: parses (if applicable) and invokes the engine, returning its result. */
@@ -81,6 +87,7 @@ public final class EngineDispatch {
       Engines engines, String engineId, String capability, Optional<T> engine)
       throws EngineExecutionException {
     if (engine.isPresent()) {
+      LOG.debug("engine resolved: id={} capability={}", engineId, capability);
       return engine.get();
     }
     if (isBoundToAnyCapability(engines, engineId)) {
@@ -104,8 +111,11 @@ public final class EngineDispatch {
   public static <T> InMemoryOutcome<T> dispatchInMemory(
       String engineId, EngineInvocation<T> invocation) throws EngineExecutionException {
     try {
-      return new InMemoryOutcome.Value<>(invocation.invoke());
+      InMemoryOutcome<T> value = new InMemoryOutcome.Value<>(invocation.invoke());
+      LOG.debug("engine ok: id={}", engineId);
+      return value;
     } catch (EngineException error) {
+      LOG.debug("engine returned error envelope: id={} exit={}", engineId, error.exitCode());
       return new InMemoryOutcome.Failure<>(error.diagnostics(), error.exitCode());
     } catch (UncheckedIOException error) {
       throw error;

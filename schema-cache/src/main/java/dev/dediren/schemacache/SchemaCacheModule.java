@@ -13,8 +13,14 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class SchemaCacheModule {
+  // debug/trace only, by architecture rule: a cache failure an agent must act on is a
+  // SchemaCacheException, not a log line. See ArchitectureRulesTest.
+  private static final Logger LOG = LoggerFactory.getLogger(SchemaCacheModule.class);
+
   private SchemaCacheModule() {}
 
   public static Optional<Path> nonEmptyEnvPath(Map<String, String> env, String name) {
@@ -90,8 +96,12 @@ public final class SchemaCacheModule {
     // F2). A mismatch means the cache is corrupt, stale, or poisoned, so we re-fetch rather than
     // serve it.
     if (isNonEmptyFile(schemaPath) && fileMatchesSha256(schemaPath, expectedSha256)) {
+      LOG.debug("schema cache hit: {} at {}", description, schemaPath);
       return;
     }
+    // Worth a line: a silent re-fetch here is the observable difference between a warm cache and a
+    // corrupt/poisoned one, and the envelope has no room to say which.
+    LOG.debug("schema cache miss, fetching: {} from {} into {}", description, url, schemaPath);
 
     Path parent = schemaPath.getParent();
     if (parent == null) {
