@@ -11,7 +11,7 @@
 
   <modules>
     <module>cli</module>
-    <module>mcp</module>
+    <module>mcp-server</module>
     <module>archimate</module>
     <module>contracts</module>
     <module>engine-api</module>

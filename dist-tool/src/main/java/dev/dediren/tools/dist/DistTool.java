@@ -73,7 +73,7 @@ public final class DistTool {
           "elk-layout",
           "engine-api",
           "ir",
-          "mcp",
+          "mcp-server",
           "render",
           "schema-cache",
           "semantics-archimate",
@@ -100,6 +100,7 @@ public final class DistTool {
               attribution("NetworkNT JSON Schema Validator", "Apache-2.0")),
           Map.entry("jspecify", attribution("JSpecify", "Apache-2.0")),
           Map.entry("listenablefuture", attribution("Google Guava listenablefuture", "Apache-2.0")),
+          Map.entry("mcp", attribution("Model Context Protocol Java SDK", "MIT (MCP Java SDK)")),
           Map.entry(
               "mcp-core", attribution("Model Context Protocol Java SDK", "MIT (MCP Java SDK)")),
           Map.entry(
@@ -273,23 +274,6 @@ public final class DistTool {
     System.out.println(archive);
   }
 
-  /**
-   * The dediren {@code mcp} module and the third-party {@code io.modelcontextprotocol.sdk:mcp}
-   * artifact both produce a jar literally named {@code mcp-<version>.jar}: {@link #jarArtifactId}
-   * strips only the version suffix, so artifact-id matching alone cannot tell the two apart. The
-   * third-party jar's full filename is therefore checked explicitly, ahead of the artifact-id
-   * lookup below, before "mcp" is allowed to resolve to the first-party module.
-   *
-   * <p>This literal must track {@code mcp.sdk.version} in the root POM, and nothing in the build
-   * makes it do so on its own — which is the whole danger. Bump the SDK to 2.1.0 and this no longer
-   * matches: {@code mcp-2.1.0.jar} falls through to the artifact-id lookup, resolves to {@code
-   * "mcp"}, is classified as first-party, and the SDK's MIT attribution silently vanishes from
-   * THIRD-PARTY-NOTICES.md — a licence-compliance regression shipped by a green build. {@code
-   * McpSdkJarPinTest} is what makes that impossible: it reads {@code mcp.sdk.version} out of the
-   * root POM and fails if this constant has drifted from it.
-   */
-  static final String MCP_JAVA_SDK_CORE_JAR = "mcp-2.0.0.jar";
-
   private static void writeThirdPartyNotices(Path root, Path output) throws IOException {
     Set<String> jars = new java.util.TreeSet<>();
     for (Launcher launcher : LAUNCHERS) {
@@ -309,9 +293,7 @@ public final class DistTool {
     List<String> unattributed = new ArrayList<>();
     for (String jar : jars) {
       String artifact = jarArtifactId(jar);
-      if (jar.equals(MCP_JAVA_SDK_CORE_JAR)) {
-        thirdParty.put(jar, attribution("Model Context Protocol Java SDK", "MIT (MCP Java SDK)"));
-      } else if (FIRST_PARTY_ARTIFACTS.contains(artifact)) {
+      if (FIRST_PARTY_ARTIFACTS.contains(artifact)) {
         firstParty.add(jar);
       } else {
         ThirdPartyAttribution attribution = THIRD_PARTY_ATTRIBUTIONS.get(artifact);
