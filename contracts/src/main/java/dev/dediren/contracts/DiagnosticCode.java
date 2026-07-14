@@ -37,6 +37,13 @@ public enum DiagnosticCode {
 
   // Source validation (core: SourceValidator).
   SCHEMA_INVALID("DEDIREN_SCHEMA_INVALID"),
+  // Schema version gating (core: SchemaVersionGate) over every hand-authored surface: the source
+  // model and the three policy files. OUTDATED means the registry recognizes the version as
+  // superseded and docs/agent-usage.md carries the upgrade steps, so the message points there.
+  // UNKNOWN means the version is absent, misspelled, or from a newer bundle than this one — there
+  // is nothing useful to say beyond naming the version this build wants.
+  SCHEMA_VERSION_OUTDATED("DEDIREN_SCHEMA_VERSION_OUTDATED"),
+  SCHEMA_VERSION_UNKNOWN("DEDIREN_SCHEMA_VERSION_UNKNOWN"),
   DUPLICATE_ID("DEDIREN_DUPLICATE_ID"),
   DANGLING_ENDPOINT("DEDIREN_DANGLING_ENDPOINT"),
   FRAGMENT_BASE_DIR_REQUIRED("DEDIREN_FRAGMENT_BASE_DIR_REQUIRED"),
