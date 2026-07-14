@@ -48,4 +48,37 @@
       <scope>test</scope>
     </dependency>
   </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-resources-plugin</artifactId>
+        <executions>
+          <execution>
+            <!-- The guide ships inside the jar rather than being read from the product root at
+                 runtime: it removes a filesystem read and the DEDIREN_PRODUCT_ROOT_UNRESOLVED
+                 failure lane from the guide tool, and copying at build time means the shipped
+                 guide cannot drift from docs/agent-usage.md. -->
+            <id>copy-agent-usage-guide</id>
+            <phase>generate-resources</phase>
+            <goals>
+              <goal>copy-resources</goal>
+            </goals>
+            <configuration>
+              <outputDirectory>${project.build.outputDirectory}/dediren</outputDirectory>
+              <resources>
+                <resource>
+                  <directory>${maven.multiModuleProjectDirectory}/docs</directory>
+                  <includes>
+                    <include>agent-usage.md</include>
+                  </includes>
+                </resource>
+              </resources>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
 </project>
