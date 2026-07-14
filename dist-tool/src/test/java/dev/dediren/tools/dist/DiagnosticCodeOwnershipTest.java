@@ -102,8 +102,26 @@ class DiagnosticCodeOwnershipTest {
           .filter(path -> path.toString().endsWith(".java"))
           .filter(path -> path.toString().contains("/src/main/"))
           .filter(path -> !path.toString().contains("/target/"))
+          .filter(path -> !isUnderDotDirectory(root, path))
           .toList();
     }
+  }
+
+  /**
+   * A nested git worktree ({@code .worktrees/<name>}, this repo's convention and gitignored) is a
+   * full second checkout. Walking into one scans every module a second time under a path whose
+   * first segment is {@code .worktrees}, so {@link #moduleOf} reports {@code .worktrees} instead of
+   * the real module — and the standalone-{@code archimate} exemption below stops matching, turning
+   * a developer's own worktree into a wall of false violations. Skip dotdirs, as
+   * AgentUsageDocConsistencyTest's walk already does.
+   */
+  private static boolean isUnderDotDirectory(Path root, Path path) {
+    for (Path segment : root.relativize(path)) {
+      if (segment.toString().startsWith(".")) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private static String moduleOf(Path source) {
