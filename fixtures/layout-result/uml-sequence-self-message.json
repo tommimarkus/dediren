@@ -5,9 +5,9 @@
     "id" : "interaction-self-message",
     "source_id" : "interaction-self-message",
     "projection_id" : "interaction-self-message",
-    "x" : 111.0,
-    "y" : 304.0,
-    "width" : 435.0,
+    "x" : 101.0,
+    "y" : 292.0,
+    "width" : 424.0,
     "height" : 144.0,
     "label" : "Validate Order",
     "role" : "interaction",
@@ -16,8 +16,8 @@
     "id" : "customer",
     "source_id" : "customer",
     "projection_id" : "customer",
-    "x" : 111.0,
-    "y" : 304.0,
+    "x" : 101.0,
+    "y" : 292.0,
     "width" : 140.0,
     "height" : 48.0,
     "label" : "Customer",
@@ -27,8 +27,8 @@
     "id" : "service",
     "source_id" : "service",
     "projection_id" : "service",
-    "x" : 406.0,
-    "y" : 304.0,
+    "x" : 385.0,
+    "y" : 292.0,
     "width" : 140.0,
     "height" : 48.0,
     "label" : "Order Service",
@@ -43,11 +43,11 @@
     "projection_id" : "m1",
     "routing_hints" : [ ],
     "points" : [ {
-      "x" : 181.0,
-      "y" : 376.0
+      "x" : 171.0,
+      "y" : 364.0
     }, {
-      "x" : 476.0,
-      "y" : 376.0
+      "x" : 455.0,
+      "y" : 364.0
     } ],
     "label" : "placeOrder",
     "source_pointer" : "/relationships/0"
@@ -59,17 +59,17 @@
     "projection_id" : "m2",
     "routing_hints" : [ ],
     "points" : [ {
-      "x" : 476.0,
-      "y" : 400.0
+      "x" : 455.0,
+      "y" : 388.0
     }, {
-      "x" : 516.0,
-      "y" : 400.0
+      "x" : 495.0,
+      "y" : 388.0
     }, {
-      "x" : 516.0,
-      "y" : 424.0
+      "x" : 495.0,
+      "y" : 412.0
     }, {
-      "x" : 476.0,
-      "y" : 424.0
+      "x" : 455.0,
+      "y" : 412.0
     } ],
     "label" : "validateOrder",
     "source_pointer" : "/relationships/1"
@@ -81,11 +81,11 @@
     "projection_id" : "m3",
     "routing_hints" : [ ],
     "points" : [ {
-      "x" : 476.0,
-      "y" : 448.0
+      "x" : 455.0,
+      "y" : 436.0
     }, {
-      "x" : 181.0,
-      "y" : 448.0
+      "x" : 171.0,
+      "y" : 436.0
     } ],
     "label" : "orderConfirmed",
     "source_pointer" : "/relationships/2"

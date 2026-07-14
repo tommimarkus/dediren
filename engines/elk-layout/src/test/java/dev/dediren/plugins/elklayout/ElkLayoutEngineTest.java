@@ -197,6 +197,86 @@ class ElkLayoutEngineTest {
   }
 
   @Test
+  void sequenceSelfMessageIsRenderedAsAStemAnchoredHook() {
+    // A self-message (source lifeline == target lifeline) is withheld from the ELK graph and drawn
+    // by the normalizer as a stem-anchored hook. Pin that shape end to end through the engine: m2
+    // survives as a four-point hook whose first and last points sit on the service stem and whose
+    // outward leg extends past it -- an ELK-independent, synthesized route, not an ELK self-loop.
+    LayoutResult result = new ElkLayoutEngine().layout(selfMessageSequenceRequest(true));
+
+    LaidOutNode service = nodeById(result, "service");
+    double stemX = service.x() + service.width() / 2.0;
+    LaidOutEdge m2 = edgeById(result, "m2");
+    List<Point> hook = m2.points();
+
+    assertEquals(4, hook.size(), "self-message hook has four points, m2=" + hook);
+    assertEquals(stemX, hook.get(0).x(), GEOMETRY_EPSILON, "hook starts on the service stem");
+    assertEquals(stemX, hook.get(3).x(), GEOMETRY_EPSILON, "hook returns to the service stem");
+    assertTrue(
+        hook.get(1).x() > stemX && hook.get(2).x() > stemX,
+        "hook's outward leg extends past the stem, m2=" + hook);
+    assertEquals(hook.get(0).y(), hook.get(1).y(), GEOMETRY_EPSILON, "hook top leg is horizontal");
+    assertTrue(hook.get(2).y() > hook.get(0).y(), "hook drops below its start row, m2=" + hook);
+  }
+
+  @Test
+  void sequenceSelfMessageIsInvisibleToElkNodePlacement() {
+    // Root-cause regression: ELK 0.11.0's self-loop margin machinery breaks a mirror-image tie by
+    // iterating an identity-hash-ordered collection, so a self-message left in the ELK graph made
+    // the whole diagram's geometry depend on JVM allocation history (the layout-fixture freshness
+    // gate flapped between y=304 and y=292). Withholding the self-loop makes the lifelines land in
+    // exactly the same place as an otherwise-identical request with no self-message at all -- proof
+    // that the self-loop no longer reaches ELK and no longer perturbs its placement.
+    LayoutResult withSelf = new ElkLayoutEngine().layout(selfMessageSequenceRequest(true));
+    LayoutResult withoutSelf = new ElkLayoutEngine().layout(selfMessageSequenceRequest(false));
+
+    for (String lifeline : List.of("customer", "service")) {
+      LaidOutNode a = nodeById(withSelf, lifeline);
+      LaidOutNode b = nodeById(withoutSelf, lifeline);
+      assertEquals(
+          b.x(),
+          a.x(),
+          GEOMETRY_EPSILON,
+          lifeline + " x must not shift when a self-message is added");
+      assertEquals(
+          b.y(),
+          a.y(),
+          GEOMETRY_EPSILON,
+          lifeline + " y must not shift when a self-message is added");
+    }
+  }
+
+  // customer -> service (m1), an optional service -> service self-message (m2), then service ->
+  // customer (m3): the minimal sequence shape from fixtures/layout-result/uml-sequence-self-message
+  // used by the two self-message tests above.
+  private static LayoutRequest selfMessageSequenceRequest(boolean includeSelfMessage) {
+    List<LayoutNode> nodes =
+        List.of(
+            new LayoutNode("customer", "Customer", "customer", 140.0, 48.0, "lifeline"),
+            new LayoutNode(
+                "interaction-self", "Validate", "interaction-self", 360.0, 260.0, "interaction"),
+            new LayoutNode("service", "Order Service", "service", 140.0, 48.0, "lifeline"));
+    List<LayoutEdge> edges = new ArrayList<>();
+    List<BandMember> messageBand = new ArrayList<>();
+    edges.add(new LayoutEdge("m1", "customer", "service", "placeOrder", "m1", "Message"));
+    messageBand.add(new BandMember("m1", 0.0));
+    if (includeSelfMessage) {
+      edges.add(new LayoutEdge("m2", "service", "service", "validate", "m2", "Message"));
+      messageBand.add(new BandMember("m2", 0.0));
+    }
+    edges.add(new LayoutEdge("m3", "service", "customer", "confirmed", "m3", "Message"));
+    messageBand.add(new BandMember("m3", 0.0));
+    return new LayoutRequest(
+        ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION,
+        "sequence-view",
+        nodes,
+        edges,
+        List.of(),
+        sequenceWire("sequence-view", List.of("customer", "service"), messageBand),
+        readableSequencePreferences());
+  }
+
+  @Test
   void sequenceLayoutPreservesLifelineRoleOnNodes() {
     LayoutResult result = new ElkLayoutEngine().layout(sequenceLayoutRequest());
 
