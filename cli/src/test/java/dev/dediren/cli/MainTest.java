@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
 
 import dev.dediren.contracts.CommandExitCode;
+import dev.dediren.contracts.ContractVersions;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.core.DedirenPaths;
 import dev.dediren.core.commands.CoreCommands;
@@ -568,7 +569,14 @@ class MainTest {
 
     EngineExecutionException error =
         catchThrowableOfType(
-            () -> CoreCommands.layoutCommand("boom-layout", "{}", Map.of(), engines),
+            () ->
+                CoreCommands.layoutCommand(
+                    "boom-layout",
+                    "{\"layout_request_schema_version\":\""
+                        + ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION
+                        + "\"}",
+                    Map.of(),
+                    engines),
             EngineExecutionException.class);
 
     assertThat(error).isNotNull();

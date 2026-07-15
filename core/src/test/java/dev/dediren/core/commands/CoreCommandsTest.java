@@ -500,6 +500,24 @@ class CoreCommandsTest {
         .isEqualTo("DEDIREN_SCHEMA_VERSION_OUTDATED");
   }
 
+  @Test
+  void layoutCommandGatesARequestWithNoVersionFieldAsUnknown() throws Exception {
+    // A version-less request is DEDIREN_SCHEMA_VERSION_UNKNOWN at the gate (exit 2), the same
+    // "absent, misspelled, or newer" semantic every gated family documents -- it no longer
+    // reaches the engine's own parser.
+    EngineRunOutcome outcome =
+        CoreCommands.layoutCommand(
+            "nonexistent-layout-engine", "{\"unexpected\":\"field\"}", Map.of(), emptyEngines());
+
+    assertThat(outcome.exitCode()).isEqualTo(2);
+    JsonNode envelope = JsonSupport.objectMapper().readTree(outcome.stdout());
+    assertThat(envelope.at("/status").asText()).isEqualTo("error");
+    assertThat(envelope.at("/diagnostics/0/code").asText())
+        .isEqualTo("DEDIREN_SCHEMA_VERSION_UNKNOWN");
+    assertThat(envelope.at("/diagnostics/0/path").asText())
+        .isEqualTo("$.layout_request_schema_version");
+  }
+
   private static Engines emptyEngines() {
     return Engines.of(List.of(), List.of(), List.of(), List.of());
   }
