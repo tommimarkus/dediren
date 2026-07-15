@@ -43,10 +43,12 @@ Three tools:
 
 - `dediren_guide` — this document, one section at a time. Pass `topic`, or omit
   it to list the topics. Start with `topic: "source-json"`.
-- `dediren_validate` — `source` (path). Returns the validation envelope.
+- `dediren_validate` — `source` (path); optional `profile` to also run
+  semantic profile validation. Returns the validation envelope.
 - `dediren_build` — `source`, `out`, and at least one policy (`render_policy`,
-  `oef_policy`, `xmi_policy`). Returns the build-result envelope, which names
-  every artifact written.
+  `oef_policy`, `xmi_policy`); optional `views` (subset of view ids) and
+  `emit` (extra artifact kinds). Returns the build-result envelope, which
+  names every artifact written.
 
 Every tool path must resolve inside `--root` (default: the working directory),
 and so must every `fragments[]` path inside a source you pass. A path that escapes
@@ -384,7 +386,11 @@ options shape output:
 Use `fixtures/source/valid-uml-sequence-basic.json` for the sequence MVP
 shape: one `Interaction`, `Lifeline` nodes, and ordered `Message`
 relationships with `properties.uml.sequence` plus `message_sort`. The SVG
-sequence path needs generated render metadata. For combined fragments, use
+sequence path needs generated render metadata — missing or mismatched
+metadata fails with `DEDIREN_RENDER_METADATA_REQUIRED`,
+`DEDIREN_RENDER_METADATA_PROFILE_REQUIRED`, or
+`DEDIREN_RENDER_METADATA_PROFILE_MISMATCH`; regenerate through `project`
+rather than hand-editing. For combined fragments, use
 `fixtures/source/valid-uml-sequence-fragments.json` and
 `--view sequence-fragments-view`; author `CombinedFragment` and
 `InteractionOperand` nodes under `properties.uml` for `alt`, `opt`, `loop`,
@@ -819,6 +825,14 @@ you can recover from stdout JSON alone.
 - `DEDIREN_PLUGIN_UNKNOWN`: unknown engine id — the bundled set is
   `generic-graph`, `elk-layout`, `render`, `archimate-oef`, `uml-xmi`. Fix the
   `--plugin` value.
+- `DEDIREN_PLUGIN_UNSUPPORTED_CAPABILITY`: the engine id exists but not for
+  this command's capability (for example asking `elk-layout` to render). Fix
+  the `--plugin` value for this command.
+- `DEDIREN_OEF_SCHEMA_VALIDATOR_UNAVAILABLE` /
+  `DEDIREN_XMI_SCHEMA_VALIDATOR_UNAVAILABLE`: the export engine's XML schema
+  validator (`xmllint` by default) is missing, timed out, or failed to start.
+  Install libxml2's `xmllint` or point the validator override variable at one
+  (see `## Plugin Environment`); not a JSON problem — do not modify the model.
 - `DEDIREN_ENGINE_FAILED`: an unexpected in-memory engine failure. Not an input
   problem — the diagnostic message names the engine; report it with the failing
   command and input rather than retrying with modified JSON.
@@ -871,8 +885,8 @@ constraints.
 
 The bundle launcher uses `DEDIREN_BUNDLE_ROOT` for product-root discovery. The
 bundled engines run inside the CLI process; the export engines receive the
-CLI's environment explicitly for the schema-path variables below and read
-nothing else. Important explicit variables:
+CLI's environment explicitly for the schema-path and validator-override
+variables below and read nothing else. Important explicit variables:
 
 - `DEDIREN_BUNDLE_ROOT`: explicit bundle or repository root for bundled
   schemas, fixtures, and the launcher. The packaged `dediren` launcher sets this
@@ -882,6 +896,13 @@ nothing else. Important explicit variables:
 - `DEDIREN_OEF_SCHEMA_DIR`: local OEF schema directory.
 - `DEDIREN_XMI_SCHEMA_PATH`: local XMI schema file, or a driver schema that
   imports `XMI.xsd` plus a UML 2.5.1 XSD to also validate UML content.
+- `DEDIREN_OEF_SCHEMA_VALIDATOR` / `DEDIREN_XMI_SCHEMA_VALIDATOR`: override the
+  `xmllint` command the export engines run for XML schema validation (a command
+  name or path). The named binary is trusted like `xmllint` itself and runs
+  under the same guards — bounded wall clock, concurrent output drain — and an
+  absent or wedged validator degrades to a
+  `DEDIREN_OEF_SCHEMA_VALIDATOR_UNAVAILABLE` /
+  `DEDIREN_XMI_SCHEMA_VALIDATOR_UNAVAILABLE` error envelope.
 - `DEDIREN_SCHEMA_CACHE_DIR`: cache directory for schema downloads.
 - `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY` (and their lowercase forms): forwarded
   to `curl` so it can download standards schemas through a proxy.

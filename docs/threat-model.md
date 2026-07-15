@@ -149,6 +149,12 @@ copies did not have:
   `DEDIREN_XMI_SCHEMA_VALIDATOR_UNAVAILABLE`, so a wedged or malicious validator
   binary degrades to a structured non-zero envelope rather than an indefinite
   stall.
+- **Validator selection is an environment input.** `DEDIREN_OEF_SCHEMA_VALIDATOR`
+  / `DEDIREN_XMI_SCHEMA_VALIDATOR` let the environment name the validator
+  command. Whoever sets the process environment already controls execution, so
+  the override grants no new privilege; the guards above bound a hostile or
+  broken choice, and the variables are documented in the shipped guide's
+  `## Plugin Environment` section.
 
 The runner returns a code-free outcome; each engine maps it onto its own
 published diagnostic codes, so `schema-cache` stays notation-neutral.
