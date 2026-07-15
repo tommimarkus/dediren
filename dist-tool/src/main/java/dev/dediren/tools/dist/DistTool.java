@@ -395,11 +395,23 @@ public final class DistTool {
     if (!Files.isRegularFile(archive)) {
       throw new IllegalStateException("archive not found: " + archive);
     }
+    long archiveBytes = Files.size(archive);
+    if (archiveBytes > MAX_ARCHIVE_BYTES) {
+      throw new IllegalStateException(
+          "release archive is "
+              + archiveBytes
+              + " bytes; the "
+              + MAX_ARCHIVE_BYTES
+              + "-byte ceiling exists to catch a silent shrink regression (unshrunk baseline"
+              + " ~15.1 MB, shrunk-but-deflated ~7.2 MB, shrunk+stored ~5.4 MB) — if legitimate"
+              + " dependency growth trips it, raise the ceiling deliberately in the same change");
+    }
     ensureJavaRuntime();
     Path temp = Files.createTempDirectory("dediren-dist-smoke-");
     try {
       runCommand(root, List.of("tar", "-xzf", archive.toString(), "-C", temp.toString()), null);
       Path bundle = findBundleDir(temp);
+      assertSingleShrunkLibJar(bundle, version);
       assertLauncherJvmFlags(bundle);
       assertCdsConfigured(bundle);
       assertFirstLaunchStdoutClean(bundle, temp, version);
@@ -868,6 +880,28 @@ public final class DistTool {
   /** The single shrunk classpath jar the bundle ships in {@code lib/}. */
   static String mergedJarName(String version) {
     return "dediren-bundle-" + version + ".jar";
+  }
+
+  /**
+   * Ceiling between the shipped size (~5.4 MB, shrunk + STORED repack) and the two regression
+   * shapes above it — STORED silently degrading to deflated entries (~7.2 MB) and the shrink pass
+   * degrading to pass-through (~15.1 MB). Trips on either regression, not ordinary growth.
+   */
+  private static final long MAX_ARCHIVE_BYTES = 7_000_000L;
+
+  /**
+   * The packaged lib/ must hold exactly the shrunk bundle jar — anything else means the CLASSPATH
+   * rewrite and the shrinker disagree about what ships.
+   */
+  private static void assertSingleShrunkLibJar(Path bundle, String version) throws IOException {
+    List<String> jars;
+    try (var entries = Files.list(bundle.resolve("lib"))) {
+      jars = entries.map(path -> path.getFileName().toString()).sorted().toList();
+    }
+    if (!jars.equals(List.of(mergedJarName(version)))) {
+      throw new IllegalStateException(
+          "bundle lib/ must hold exactly " + mergedJarName(version) + " but holds " + jars);
+    }
   }
 
   /**
