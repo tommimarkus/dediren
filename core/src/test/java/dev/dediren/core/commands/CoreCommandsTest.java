@@ -394,6 +394,34 @@ class CoreCommandsTest {
   }
 
   @Test
+  void exportCommandRejectsAStalePolicyBeforeEngineLookupForUmlXmi() throws Exception {
+    // Mirrors exportCommandRejectsAStalePolicyBeforeEngineLookup for the uml-xmi export engine:
+    // a known export engine id ("uml-xmi") whose policy carries a version this build does not
+    // recognize is rejected before EngineDispatch.requireEngine ever runs, at INPUT_ERROR (exit 2)
+    // with the gate's own "$.<field>" diagnostic path intact.
+    String unknownVersionXmiPolicy =
+        "{\"uml_xmi_export_policy_schema_version\":\"uml-xmi-export-policy.schema.v0\"}";
+
+    EngineRunOutcome outcome =
+        CoreCommands.exportCommand(
+            "uml-xmi",
+            unknownVersionXmiPolicy,
+            MINIMAL_SOURCE,
+            null,
+            MINIMAL_LAYOUT,
+            Map.of(),
+            emptyEngines());
+
+    assertThat(outcome.exitCode()).isEqualTo(2);
+    JsonNode envelope = JsonSupport.objectMapper().readTree(outcome.stdout());
+    assertThat(envelope.at("/status").asText()).isEqualTo("error");
+    assertThat(envelope.at("/diagnostics/0/code").asText())
+        .isEqualTo("DEDIREN_SCHEMA_VERSION_UNKNOWN");
+    assertThat(envelope.at("/diagnostics/0/path").asText())
+        .isEqualTo("$.uml_xmi_export_policy_schema_version");
+  }
+
+  @Test
   void exportCommandUnknownEngineIdStillYieldsPluginUnknownNotAVersionDiagnostic() {
     // exportPolicyFamily returns Optional.empty() for an engine id that is neither "archimate-oef"
     // nor "uml-xmi", specifically so an unknown export engine id still reaches requireEngine and
