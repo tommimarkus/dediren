@@ -325,6 +325,16 @@ class CliMcpParityTest {
                         "out", mcpOut.toString(),
                         "oef_policy", "oef.json")));
 
+    // Parity is asserted regardless of whether the export itself succeeds. OEF/XMI schema
+    // validation needs an XSD -- via DEDIREN_OEF_SCHEMA_DIR / a cache dir, or a network download --
+    // which this hermetic Map.of() env deliberately does not provide, so the lane legitimately
+    // errors (schema unavailable, offline) or succeeds (schema reachable) depending on the
+    // environment. Either way BOTH lanes must agree byte-for-byte: that is the seam under test --
+    // policy parse, engine dispatch, and env forwarding to the export engine, which only these two
+    // lanes exercise. Deliberately NOT asserting a specific status/exit: that would couple the test
+    // to schema/network availability and make it flaky. Successful-export CORRECTNESS is owned by
+    // the engine tests (OefExportEngineTest / umlxmi MainTest, which supply a stub XSD via env);
+    // this test does not duplicate it.
     assertThat(mcp.isError()).isEqualTo(cli.exitCode() != 0);
     assertThat(normalizePaths(textOf(mcp), mcpOut)).isEqualTo(normalizePaths(cli.stdout(), cliOut));
   }
@@ -362,6 +372,16 @@ class CliMcpParityTest {
                         "out", mcpOut.toString(),
                         "xmi_policy", "xmi.json")));
 
+    // Parity is asserted regardless of whether the export itself succeeds. OEF/XMI schema
+    // validation needs an XSD -- via DEDIREN_OEF_SCHEMA_DIR / a cache dir, or a network download --
+    // which this hermetic Map.of() env deliberately does not provide, so the lane legitimately
+    // errors (schema unavailable, offline) or succeeds (schema reachable) depending on the
+    // environment. Either way BOTH lanes must agree byte-for-byte: that is the seam under test --
+    // policy parse, engine dispatch, and env forwarding to the export engine, which only these two
+    // lanes exercise. Deliberately NOT asserting a specific status/exit: that would couple the test
+    // to schema/network availability and make it flaky. Successful-export CORRECTNESS is owned by
+    // the engine tests (OefExportEngineTest / umlxmi MainTest, which supply a stub XSD via env);
+    // this test does not duplicate it.
     assertThat(mcp.isError()).isEqualTo(cli.exitCode() != 0);
     assertThat(normalizePaths(textOf(mcp), mcpOut)).isEqualTo(normalizePaths(cli.stdout(), cliOut));
   }
