@@ -4,7 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.dediren.contracts.KnownSchemaVersions;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
@@ -66,5 +68,32 @@ class MigrationRegistryTest {
   void theMigrationTopicIsReachable() {
     assertThat(GuideCatalog.topics()).contains("migration");
     assertThat(GuideCatalog.section("migration")).doesNotContain("unknown topic");
+  }
+
+  @Test
+  void everyUpgradeStepPointsAtTheVersionThatSupersededIt() {
+    Map<String, String> successor = new HashMap<>();
+    for (KnownSchemaVersions.Family family : KnownSchemaVersions.ALL) {
+      List<String> versions = family.versions();
+      for (int i = 0; i < versions.size() - 1; i++) {
+        successor.put(versions.get(i), versions.get(i + 1));
+      }
+    }
+
+    Matcher matcher = STEP_HEADING.matcher(GuideCatalog.section("migration"));
+    List<String> wrong = new ArrayList<>();
+    while (matcher.find()) {
+      String expected = successor.get(matcher.group(1));
+      if (expected != null && !expected.equals(matcher.group(2))) {
+        wrong.add(matcher.group(1) + " → " + matcher.group(2) + " (expected → " + expected + ")");
+      }
+    }
+
+    assertThat(wrong)
+        .as(
+            "each '### <from> → <to>' heading must name the version that directly"
+                + " superseded <from> — a typo'd <to> sends the reader to a version"
+                + " that never followed it")
+        .isEmpty();
   }
 }
