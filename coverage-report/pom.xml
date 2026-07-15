@@ -25,15 +25,17 @@
     <profile>
       <id>coverage</id>
       <dependencies>
-        <!-- Aggregate coverage set: the 15 gated product modules. Keep this in
-             sync with the product modules — a new product module must be added
-             here to appear in the reactor aggregate report (it is gated by the
-             root profile automatically unless skipped).
+        <!-- Aggregate coverage set: the 16 gated product modules (pinned by
+             dist-tool's CoverageAggregateTest). Keep this in sync with the
+             product modules — a new product module must be added here to
+             appear in the reactor aggregate report (it is gated by the root
+             profile automatically unless skipped).
 
              ir and engine-api were missing until 2026-07-13: both are shipped
              product modules (DistTool.FIRST_PARTY_ARTIFACTS lists them), so the
              aggregate silently under-reported the reactor by ~1,034 main LOC and
-             anyone reading it believed those modules were counted. -->
+             anyone reading it believed those modules were counted. mcp-server
+             was missing until 2026-07-15. -->
         <dependency>
           <groupId>dev.dediren</groupId>
           <artifactId>contracts</artifactId>
@@ -61,6 +63,12 @@
         <dependency>
           <groupId>dev.dediren</groupId>
           <artifactId>cli</artifactId>
+          <version>${project.version}</version>
+          <scope>runtime</scope>
+        </dependency>
+        <dependency>
+          <groupId>dev.dediren</groupId>
+          <artifactId>mcp-server</artifactId>
           <version>${project.version}</version>
           <scope>runtime</scope>
         </dependency>
