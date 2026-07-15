@@ -448,6 +448,58 @@ class CoreCommandsTest {
                     .isEqualTo("DEDIREN_PLUGIN_UNKNOWN"));
   }
 
+  @Test
+  void layoutCommandRejectsAStaleRequestBeforeEngineLookup() throws Exception {
+    // Same contract as the policy gates: a superseded layout-request is a user-fixable
+    // INPUT_ERROR (exit 2) with the gate's own "$.<field>" path, rejected before
+    // requireEngine — an empty registry proves no engine lookup preceded it.
+    String staleRequest = "{\"layout_request_schema_version\":\"layout-request.schema.v1\"}";
+
+    EngineRunOutcome outcome =
+        CoreCommands.layoutCommand(
+            "nonexistent-layout-engine", staleRequest, Map.of(), emptyEngines());
+
+    assertThat(outcome.exitCode()).isEqualTo(2);
+    JsonNode envelope = JsonSupport.objectMapper().readTree(outcome.stdout());
+    assertThat(envelope.at("/status").asText()).isEqualTo("error");
+    assertThat(envelope.at("/diagnostics/0/code").asText())
+        .isEqualTo("DEDIREN_SCHEMA_VERSION_OUTDATED");
+    assertThat(envelope.at("/diagnostics/0/path").asText())
+        .isEqualTo("$.layout_request_schema_version");
+  }
+
+  @Test
+  void layoutCommandRejectsAnUnknownRequestVersion() throws Exception {
+    String unknownRequest = "{\"layout_request_schema_version\":\"layout-request.schema.v99\"}";
+
+    EngineRunOutcome outcome =
+        CoreCommands.layoutCommand(
+            "nonexistent-layout-engine", unknownRequest, Map.of(), emptyEngines());
+
+    assertThat(outcome.exitCode()).isEqualTo(2);
+    JsonNode envelope = JsonSupport.objectMapper().readTree(outcome.stdout());
+    assertThat(envelope.at("/diagnostics/0/code").asText())
+        .isEqualTo("DEDIREN_SCHEMA_VERSION_UNKNOWN");
+  }
+
+  @Test
+  void layoutCommandGatesTheUnwrappedDataOfAPipedEnvelope() throws Exception {
+    // The chained-workflow convenience (piping a stage envelope) must not bypass the gate:
+    // the gate runs on the unwrapped data node.
+    String pipedStale =
+        "{\"envelope_schema_version\":\"envelope.schema.v1\",\"status\":\"ok\","
+            + "\"data\":{\"layout_request_schema_version\":\"layout-request.schema.v1\"}}";
+
+    EngineRunOutcome outcome =
+        CoreCommands.layoutCommand(
+            "nonexistent-layout-engine", pipedStale, Map.of(), emptyEngines());
+
+    assertThat(outcome.exitCode()).isEqualTo(2);
+    JsonNode envelope = JsonSupport.objectMapper().readTree(outcome.stdout());
+    assertThat(envelope.at("/diagnostics/0/code").asText())
+        .isEqualTo("DEDIREN_SCHEMA_VERSION_OUTDATED");
+  }
+
   private static Engines emptyEngines() {
     return Engines.of(List.of(), List.of(), List.of(), List.of());
   }
