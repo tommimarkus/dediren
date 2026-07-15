@@ -957,7 +957,16 @@ public final class DistTool {
             // debug channel) to preserve the AutoCreateSharedArchive diagnostics.
             // all=off:stdout, not -Xlog:disable: disable would also wipe a user's own JAVA_OPTS
             // -Xlog file sink, whereas this only reconfigures the stdout and stderr outputs.
-            + ".jsa -Xlog:all=off:stdout -Xlog:all=warning:stderr:uptime,level,tags\""
+            //
+            // cds=off on the stderr sink silences one thing: the ~150-line [warning][cds] burst
+            // the archive-CREATION run dumps once per bundle-version install (issue #57) -- the
+            // "Old class has been linked" / dynamic-proxy "Unsupported location" chatter.
+            // That is guaranteed noise on every healthy first launch, not a diagnostic, and it
+            // buries the genuine startup output stderr is reserved for. Carve out only the EXACT
+            // `cds` tag set: the actionable `cds,dynamic` "Unable to use shared archive" (a stale
+            // archive -- a real signal) does not match `cds`, so it stays on stderr under
+            // all=warning.
+            + ".jsa -Xlog:all=off:stdout -Xlog:all=warning,cds=off:stderr:uptime,level,tags\""
             + nl
             // DEDIREN_LOG_LEVEL is the only switch for first-party logging. Mapping it here, before
             // the JVM starts, sidesteps slf4j-simple's static-initializer ordering hazard: it reads
@@ -1196,11 +1205,12 @@ public final class DistTool {
 
   /**
    * First-launch stdout purity guard. On the very first launch against a not-yet-seeded CDS
-   * directory, {@code -XX:+AutoCreateSharedArchive} emits ~150 {@code [warning][cds]} lines. Those
-   * must land on stderr (the human debug channel), never stdout: an agent whose first command
-   * against a freshly unpacked bundle pipes stdout to {@code jq} must still see only the version
-   * line / a single JSON envelope. Each probe uses its own fresh, empty CDS dir so it is a genuine
-   * cold start with the archive absent.
+   * directory, {@code -XX:+AutoCreateSharedArchive} emits ~150 {@code [warning][cds]} lines while
+   * it builds the archive. Whatever the JVM logs, stdout must stay clean: an agent whose first
+   * command against a freshly unpacked bundle pipes stdout to {@code jq} must still see only the
+   * version line / a single JSON envelope. (Since issue #57 that burst is silenced on stderr too,
+   * but this guard is only about stdout.) Each probe uses its own fresh, empty CDS dir so it is a
+   * genuine cold start with the archive absent.
    */
   private static void assertFirstLaunchStdoutClean(Path bundle, Path temp, String version)
       throws Exception {
@@ -1361,13 +1371,19 @@ public final class DistTool {
 
   /**
    * The MCP counterpart to {@link #assertFirstLaunchStdoutClean}: a cold, never-seeded {@code
-   * DEDIREN_CDS_DIR} so the first-launch {@code -XX:+AutoCreateSharedArchive} notice is genuinely
-   * in play, closing the gap {@link #assertMcpServesToolsOverStdio} leaves (see its doc) -- that
-   * warm run cannot tell {@code StdoutIntegrity}'s redirect being present from it being deleted,
-   * because by the time it runs there is nothing left for either noise source to leak. Also
-   * captures stderr, same discipline as {@link #assertStaleCdsStdoutClean}: proving the probe
-   * actually provoked the notice is what makes the clean-stdout assertion mean anything, rather
-   * than passing vacuously because nothing warned at all.
+   * DEDIREN_CDS_DIR} so the launch genuinely runs {@code -XX:+AutoCreateSharedArchive}'s
+   * archive-creation path, closing the gap {@link #assertMcpServesToolsOverStdio} leaves (see its
+   * doc) -- that warm run cannot tell {@code StdoutIntegrity}'s redirect being present from it
+   * being deleted, because by the time it runs there is nothing left for either noise source to
+   * leak.
+   *
+   * <p>Since issue #57 the launcher silences the creation run's {@code [warning][cds]} burst on
+   * stderr too (it is guaranteed once-per-install noise, not a diagnostic), so a warning on stderr
+   * can no longer prove the probe ran cold. This keys that proof to the archive file the create
+   * path dumps on exit instead, then asserts two things about a real first launch: stdout carries
+   * JSON-RPC frames only, and stderr is free of the {@code [warning][cds]} burst (the #57 guard).
+   * The still-wanted {@code cds,dynamic} stale-archive warning is a different tag set that stays on
+   * stderr and is covered by {@link #assertStaleCdsStdoutClean}.
    *
    * <p>A minimal batch is enough -- this is about the JVM startup path shared by every command, not
    * about any one tool, so there is no need to repeat {@link #assertMcpServesToolsOverStdio}'s full
@@ -1385,24 +1401,43 @@ public final class DistTool {
         """,
         StandardCharsets.UTF_8);
 
+    Path coldCdsDir = temp.resolve("fresh-cds-mcp");
+    Path coldArchive = coldCdsDir.resolve("cli.jsa");
     BundleOutput cold =
         runBundleCommandCapturingBoth(
             dediren,
             bundle,
             List.of("mcp", "--root", bundle.toString(), "--read-only"),
             requests,
-            Map.of("DEDIREN_CDS_DIR", temp.resolve("fresh-cds-mcp").toString()));
+            Map.of("DEDIREN_CDS_DIR", coldCdsDir.toString()));
 
-    if (!cold.stderr().contains("[cds")) {
+    // Prove the probe genuinely ran the cold archive-CREATION path -- otherwise a clean stdout /
+    // quiet stderr result passes vacuously. The [warning][cds] burst can no longer serve as that
+    // proof (issue #57 silences it on stderr too), so key it to the archive AutoCreateSharedArchive
+    // dumps on exit: the file exists only if the create path actually ran.
+    if (!Files.isRegularFile(coldArchive)) {
       throw new IllegalStateException(
-          "the cold-CDS mcp probe did not provoke a first-launch CDS notice, so its stdout-purity"
-              + " assertion proves nothing. Expected a [cds...] warning on stderr.\nstderr:\n"
+          "the cold-CDS mcp probe did not create its archive ("
+              + coldArchive
+              + "), so it was not a genuine first launch and its purity assertions prove nothing.");
+    }
+    // Issue #57 regression guard: the once-per-install [warning][cds] creation burst must NOT reach
+    // stderr. Only the EXACT `cds` tag set is silenced; [warning][cds,dynamic] (stale archive) is a
+    // different set and a fresh create does not emit it -- assertStaleCdsStdoutClean owns that
+    // case.
+    if (cold.stderr().contains("[warning][cds]")) {
+      throw new IllegalStateException(
+          "the cold-CDS mcp probe leaked the [warning][cds] archive-creation burst to stderr;"
+              + " the launcher's -Xlog ...,cds=off:stderr selector should silence it (issue"
+              + " #57).\nstderr:\n"
               + cold.stderr());
     }
     assertStdoutIsJsonRpcFramesOnly(cold.stdout(), "cold-CDS mcp");
     assertContains(cold.stdout(), "\"serverInfo\"", "cold-CDS mcp initialize response");
     assertContains(cold.stdout(), "Minimal Source JSON", "cold-CDS mcp guide tool call response");
-    System.out.println("cold-CDS mcp stdio smoke passed: first-launch CDS notice, clean stdout");
+    System.out.println(
+        "cold-CDS mcp stdio smoke passed: genuine first-launch archive create, no [cds] burst,"
+            + " clean stdout");
   }
 
   /**
@@ -1602,7 +1637,8 @@ public final class DistTool {
               bundle.resolve("bin").resolve(launcher.bundleScript()), StandardCharsets.UTF_8);
       if (!text.contains("-XX:+AutoCreateSharedArchive")
           || !text.contains(launcher.sourceScript() + ".jsa")
-          || !text.contains("-Xlog:all=off:stdout -Xlog:all=warning:stderr:uptime,level,tags")) {
+          || !text.contains(
+              "-Xlog:all=off:stdout -Xlog:all=warning,cds=off:stderr:uptime,level,tags")) {
         throw new IllegalStateException(
             "launcher " + launcher.bundleScript() + " is missing its CDS configuration");
       }
