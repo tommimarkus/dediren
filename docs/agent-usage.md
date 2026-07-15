@@ -975,11 +975,13 @@ Set `DEDIREN_CDS_DIR` to an explicit writable path to relocate the archive.
 The feature is based on `-XX:+AutoCreateSharedArchive` and degrades silently if
 the archive directory is unwritable — startup continues at normal speed without
 any error. The launcher also passes
-`-Xlog:all=off:stdout -Xlog:all=warning:stderr:uptime,level,tags`, which clears
-the JVM's default stdout log sink entirely and re-adds warnings on stderr (the
-human debug channel). That keeps stdout JSON-pure no matter what the VM warns
-about — CDS archive staleness, cgroup limits, anything — while preserving the
-warnings for humans; once the archive exists, a healthy run stays quiet.
+`-Xlog:all=off:stdout -Xlog:all=warning,cds=off:stderr:uptime,level,tags`, which
+clears the JVM's default stdout log sink entirely and re-adds warnings on stderr
+(the human debug channel), minus the exact `cds` tag set. That keeps stdout
+JSON-pure no matter what the VM warns about — archive staleness (`cds,dynamic`),
+cgroup limits, anything — while dropping the ~150-line `[warning][cds]` burst the
+archive-creation run emits once per install (pure noise, not a diagnostic). Once
+the archive exists, a healthy run stays quiet.
 
 The archive is seeded by the launcher's first invocation and is not regenerated
 while it stays valid, and its contents depend on what that first command loaded:

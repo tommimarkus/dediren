@@ -411,10 +411,11 @@ class DistModuleTest {
         .contains("-XX:+AutoCreateSharedArchive")
         .contains("-XX:SharedArchiveFile=$DEDIREN_CDS_DIR/elk-layout.jsa")
         // JVM log output must be routed OFF stdout and onto stderr so stdout stays JSON-pure
-        // (agents decide success from stdout alone). The selector is all=, not cds=: `cds` matches
-        // that tag set EXACTLY, so `cds,dynamic` ("Unable to use shared archive", emitted whenever
-        // the archive is stale) escaped to the JVM's default stdout sink and corrupted envelopes.
-        .contains("-Xlog:all=off:stdout -Xlog:all=warning:stderr:uptime,level,tags")
+        // (agents decide success from stdout alone). all=off:stdout clears the default stdout sink;
+        // stderr keeps warnings EXCEPT the exact `cds` tag set, whose once-per-install archive-
+        // creation burst is pure noise (issue #57). `cds` matches that set exactly, so the
+        // actionable `cds,dynamic` stale-archive warning still reaches stderr under all=warning.
+        .contains("-Xlog:all=off:stdout -Xlog:all=warning,cds=off:stderr:uptime,level,tags")
         .contains("${XDG_CACHE_HOME:-$HOME/.cache}/dediren/cds");
     // exec line still present and after the injected block
     org.assertj.core.api.Assertions.assertThat(rewritten.indexOf("DEDIREN_CDS_DIR="))
