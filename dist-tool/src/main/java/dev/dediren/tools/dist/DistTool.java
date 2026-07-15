@@ -214,20 +214,26 @@ public final class DistTool {
   }
 
   private static void build(Path root, String version, Path notices) throws Exception {
-    build(root, version, notices, staged -> {});
+    build(root, version, notices, staged -> {}, new ProGuardLibShrinker());
   }
 
   /**
-   * Staging seam (package-private for tests): {@code afterStage} runs against the fully staged
+   * Staging seams (package-private for tests): {@code afterStage} runs against the fully staged
    * bundle directory immediately before it is archived. It lets a test inject the runtime-generated
    * residue a launcher writes at first run — {@code cds/*.jsa} under {@code
    * $DEDIREN_BUNDLE_ROOT/cds}, a sibling of {@code lib/} — so the archive's {@code --exclude=cds}
-   * and {@code --exclude=*.jsa} hermeticity filters are actually exercised. Production callers pass
-   * a no-op; the seam runs after all staging and metadata writes, so it cannot perturb the packaged
-   * {@code lib/} verification.
+   * and {@code --exclude=*.jsa} hermeticity filters are actually exercised. {@code shrinker}
+   * produces the single packaged lib jar; tests whose staged "jars" are text fixtures inject a fake
+   * so the real ProGuard pass never sees them. Production callers pass a no-op and {@link
+   * ProGuardLibShrinker}; the {@code afterStage} seam runs after all staging and metadata writes,
+   * so it cannot perturb the packaged {@code lib/} verification.
    */
   static void build(
-      Path root, String version, Path notices, java.util.function.Consumer<Path> afterStage)
+      Path root,
+      String version,
+      Path notices,
+      java.util.function.Consumer<Path> afterStage,
+      LibShrinker shrinker)
       throws Exception {
     Path dist = root.resolve("dist");
     Path bundle = dist.resolve(bundleName(version));
@@ -239,11 +245,13 @@ public final class DistTool {
     Files.createDirectories(bundle.resolve("lib"));
     Files.createDirectories(bundle.resolve("docs"));
 
-    Set<String> declaredLibJars = new TreeSet<>();
+    String mergedJarName = mergedJarName(version);
+    List<Path> stagedJars = new ArrayList<>();
     for (Launcher launcher : LAUNCHERS) {
-      declaredLibJars.addAll(installLauncher(root, bundle, launcher));
+      stagedJars.addAll(installLauncher(root, bundle, launcher, mergedJarName));
     }
-    verifyPackagedLib(bundle.resolve("lib"), declaredLibJars);
+    shrinker.shrink(stagedJars, bundle.resolve("lib").resolve(mergedJarName));
+    verifyPackagedLib(bundle.resolve("lib"), Set.of(mergedJarName));
     copyDirectory(root.resolve("schemas"), bundle.resolve("schemas"));
     copyFixtures(root.resolve("fixtures"), bundle.resolve("fixtures"));
     Files.copy(
@@ -756,8 +764,8 @@ public final class DistTool {
     void run() throws Exception;
   }
 
-  private static Set<String> installLauncher(Path root, Path bundle, Launcher launcher)
-      throws IOException {
+  private static List<Path> installLauncher(
+      Path root, Path bundle, Launcher launcher, String mergedJarName) throws IOException {
     Path install = root.resolve(launcher.installDir());
     Path sourceBin = install.resolve("bin").resolve(launcher.sourceScript());
     if (!Files.isRegularFile(sourceBin)) {
@@ -769,10 +777,14 @@ public final class DistTool {
     Path targetBin = bundle.resolve("bin").resolve(launcher.bundleScript());
     String script = withBundleRootExport(sourceScript);
     script = withCdsArchive(script, launcher.sourceScript());
+    script = withMergedClasspath(script, mergedJarName);
     Files.writeString(targetBin, script, StandardCharsets.UTF_8);
     makeExecutable(targetBin);
-    copyDeclaredJars(install.resolve("lib"), bundle.resolve("lib"), declaredJars);
-    return declaredJars;
+    List<Path> stagedJars = new ArrayList<>();
+    for (String jar : declaredJars) {
+      stagedJars.add(install.resolve("lib").resolve(jar));
+    }
+    return stagedJars;
   }
 
   /** Extracts the {@code lib/} jar file names declared on the launcher script CLASSPATH line. */
@@ -832,15 +844,6 @@ public final class DistTool {
     }
   }
 
-  private static void copyDeclaredJars(Path sourceLib, Path targetLib, Set<String> declaredJars)
-      throws IOException {
-    Files.createDirectories(targetLib);
-    for (String jar : declaredJars) {
-      Files.copy(
-          sourceLib.resolve(jar), targetLib.resolve(jar), StandardCopyOption.REPLACE_EXISTING);
-    }
-  }
-
   /** Exact-match guard: the packaged {@code lib/} holds the declared jar set and nothing else. */
   private static void verifyPackagedLib(Path lib, Set<String> declaredJars) throws IOException {
     Set<String> packaged = new TreeSet<>();
@@ -857,6 +860,26 @@ public final class DistTool {
               + (extra.isEmpty() ? "" : "; unexpected entries: " + extra)
               + (missing.isEmpty() ? "" : "; missing jars: " + missing));
     }
+  }
+
+  /** The single shrunk classpath jar the bundle ships in {@code lib/}. */
+  static String mergedJarName(String version) {
+    return "dediren-bundle-" + version + ".jar";
+  }
+
+  /**
+   * Replaces the appassembler CLASSPATH line (the resolved multi-jar runtime classpath) with the
+   * single shrunk bundle jar. Must run AFTER {@link #declaredClasspathJars} has captured the
+   * original jar set: the original line is the hermeticity input contract; the rewritten line is
+   * what ships.
+   */
+  static String withMergedClasspath(String script, String mergedJarName) {
+    Matcher matcher = Pattern.compile("(?m)^CLASSPATH=.*$").matcher(script);
+    if (!matcher.find()) {
+      throw new IllegalArgumentException("launcher script has no CLASSPATH line to rewrite");
+    }
+    return matcher.replaceFirst(
+        Matcher.quoteReplacement("CLASSPATH=\"$BASEDIR\"/etc:\"$REPO\"/" + mergedJarName));
   }
 
   static String withCdsArchive(String script, String cdsName) {

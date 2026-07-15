@@ -44,16 +44,23 @@ class DistHermeticityTest {
   }
 
   @Test
-  void buildPackagesExactlyDeclaredJarsAndExcludesRuntimeGeneratedCdsContent(@TempDir Path root)
+  void buildPackagesSingleShrunkJarAndExcludesRuntimeGeneratedCdsContent(@TempDir Path root)
       throws Exception {
     writeDistributionRoot(root);
+    List<Path> shrunk = new java.util.ArrayList<>();
+    LibShrinker fakeShrinker =
+        (stagedJars, mergedJar) -> {
+          shrunk.addAll(stagedJars);
+          Files.writeString(mergedJar, "merged jar");
+        };
     // A launcher writes CDS archives at first run to DEDIREN_CDS_DIR, which defaults to
     // $DEDIREN_BUNDLE_ROOT/cds — i.e. <bundle-staging-root>/cds, a sibling of lib/. That residue
     // only exists AFTER staging, so plant it via the staging seam (after staging, before tar) at
     // the REAL runtime location. This is what makes the tar --exclude=cds / --exclude=*.jsa flags
     // load-bearing: injecting it inside cli/target/appassembler/lib would never reach the archive
-    // because copyDeclaredJars only copies allowlisted classpath jars, so the flags would never
-    // fire. A stray top-level *.jsa is added too, so each exclude flag is independently required.
+    // because only the shrinker's merged output lands in the packaged lib/, so the flags would
+    // never fire. A stray top-level *.jsa is added too, so each exclude flag is independently
+    // required.
     DistTool.build(
         root,
         VERSION,
@@ -66,7 +73,8 @@ class DistHermeticityTest {
           } catch (java.io.IOException error) {
             throw new java.io.UncheckedIOException(error);
           }
-        });
+        },
+        fakeShrinker);
 
     Path archive = root.resolve("dist/dediren-agent-bundle-" + VERSION + ".tar.gz");
     assertThat(archive).isRegularFile();
@@ -81,15 +89,34 @@ class DistHermeticityTest {
             .map(entry -> entry.substring(entry.lastIndexOf('/') + 1))
             .sorted()
             .toList();
-    assertThat(libJars)
+    // The packaged lib/ holds exactly the shrunk merged jar; the staged inputs never ship.
+    assertThat(libJars).containsExactly("dediren-bundle-" + VERSION + ".jar");
+    // The shrinker saw every staged jar, in launcher classpath order.
+    assertThat(shrunk)
+        .extracting(path -> path.getFileName().toString())
         .containsExactly(
-            "archimate-oef-export-module-" + VERSION + ".jar",
-            "cli-module-" + VERSION + ".jar",
             "dep-alpha-1.0.0.jar",
-            "elk-layout-module-" + VERSION + ".jar",
+            "cli-module-" + VERSION + ".jar",
             "generic-graph-module-" + VERSION + ".jar",
+            "elk-layout-module-" + VERSION + ".jar",
             "render-module-" + VERSION + ".jar",
+            "archimate-oef-export-module-" + VERSION + ".jar",
             "uml-xmi-export-module-" + VERSION + ".jar");
+    // The shipped launcher classpath is the single jar.
+    String script = readArchiveEntry(archive, "dediren-agent-bundle-" + VERSION + "/bin/dediren");
+    assertThat(script)
+        .contains("CLASSPATH=\"$BASEDIR\"/etc:\"$REPO\"/dediren-bundle-" + VERSION + ".jar")
+        .doesNotContain("dep-alpha-1.0.0.jar");
+  }
+
+  private static String readArchiveEntry(Path archive, String entry) throws Exception {
+    Process process =
+        new ProcessBuilder("tar", "-xOf", archive.toString(), entry)
+            .redirectErrorStream(true)
+            .start();
+    String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+    assertThat(process.waitFor()).as("tar -xOf %s %s%n%s", archive, entry, output).isZero();
+    return output;
   }
 
   private static void runBuild(Path root) throws Exception {
