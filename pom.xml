@@ -52,6 +52,7 @@
     <archunit.version>1.4.2</archunit.version>
     <assertj.version>3.27.7</assertj.version>
     <eclipse-elk.version>0.11.0</eclipse-elk.version>
+    <error-prone-annotations.version>2.47.0</error-prone-annotations.version>
     <guava.version>33.6.0-jre</guava.version>
     <jackson.version>3.2.1</jackson.version>
     <!-- Jackson 3 keeps its annotation package at com.fasterxml.jackson.annotation by
@@ -70,6 +71,7 @@
          next SDK release instead of waiting on it. -->
     <reactor-core.version>3.7.0</reactor-core.version>
     <picocli.version>4.7.7</picocli.version>
+    <proguard.version>7.7.0</proguard.version>
     <slf4j.version>2.0.17</slf4j.version>
     <xmlunit.version>2.12.0</xmlunit.version>
     <xtext-xbase.version>2.43.0</xtext-xbase.version>
@@ -169,6 +171,28 @@
         <groupId>com.google.guava</groupId>
         <artifactId>guava</artifactId>
         <version>${guava.version}</version>
+      </dependency>
+      <!-- guava resolves error_prone_annotations 2.47.0 at runtime scope; dist-tool's
+           proguard-base pulls 2.27.0 through gson. Pin the newer line so the
+           dependencyConvergence enforcer stays green. -->
+      <dependency>
+        <groupId>com.google.errorprone</groupId>
+        <artifactId>error_prone_annotations</artifactId>
+        <version>${error-prone-annotations.version}</version>
+      </dependency>
+      <!-- Build-time only: dist-tool's bundle shrinker. The shrunk output ships; this library
+           never does (it is not on any launcher classpath). -->
+      <dependency>
+        <groupId>com.guardsquare</groupId>
+        <artifactId>proguard-base</artifactId>
+        <version>${proguard.version}</version>
+      </dependency>
+      <!-- Divergence inside proguard-base's own tree: proguard-core requests 26.0.1 while its
+           kotlin-stdlib requests 13.0. Pin the newer line for dependencyConvergence. -->
+      <dependency>
+        <groupId>org.jetbrains</groupId>
+        <artifactId>annotations</artifactId>
+        <version>26.0.1</version>
       </dependency>
       <dependency>
         <groupId>org.assertj</groupId>

@@ -66,6 +66,12 @@
       <groupId>tools.jackson.core</groupId>
       <artifactId>jackson-databind</artifactId>
     </dependency>
+    <!-- Bundle shrinker (ProGuardLibShrinker). Build-time tool dependency: the dist build runs
+         it over the staged launcher classpath; nothing shipped depends on it. -->
+    <dependency>
+      <groupId>com.guardsquare</groupId>
+      <artifactId>proguard-base</artifactId>
+    </dependency>
   </dependencies>
 
   <properties>
