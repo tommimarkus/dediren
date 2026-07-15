@@ -59,5 +59,7 @@ class KnownSchemaVersionsTest {
         .isEqualTo(ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION);
     assertThat(KnownSchemaVersions.LAYOUT_REQUEST.versionField())
         .isEqualTo("layout_request_schema_version");
+    assertThat(KnownSchemaVersions.LAYOUT_REQUEST.versionFields())
+        .containsExactly("layout_request_schema_version");
   }
 }
