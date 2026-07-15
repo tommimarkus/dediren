@@ -134,8 +134,10 @@ Repair codes:
 - `DEDIREN_FRAGMENT_CONFLICT`: merging fragments hit a conflict — the same
   `required_plugins` id declared with two different versions, or the same
   `plugins` extension-data path merged to two different values. Duplicate
-  node, relationship, view, or group ids across merged fragments are
-  `DEDIREN_DUPLICATE_ID` instead (see `## Repair Rules`).
+  node or relationship ids across merged fragments are `DEDIREN_DUPLICATE_ID`
+  instead; duplicate view ids are `DEDIREN_GENERIC_GRAPH_DUPLICATE_VIEW_ID`
+  and duplicate group ids (scoped per view) are
+  `DEDIREN_GENERIC_GRAPH_DUPLICATE_GROUP_ID` (see `## Repair Rules`).
 
 ## Semantic Profiles
 
@@ -837,7 +839,10 @@ you can recover from stdout JSON alone.
   common cause is authored geometry (`x`, `y`, `width`, `height`) or other
   fields the schema rejects on a node — source JSON is semantic only, so remove
   them.
-- `DEDIREN_DUPLICATE_ID`: make node, relationship, view, and group ids unique.
+- `DEDIREN_DUPLICATE_ID`: make node and relationship ids unique.
+- `DEDIREN_GENERIC_GRAPH_DUPLICATE_VIEW_ID` /
+  `DEDIREN_GENERIC_GRAPH_DUPLICATE_GROUP_ID`: rename the colliding view id, or
+  the colliding group id within its view — group ids are scoped per view.
 - `DEDIREN_DANGLING_ENDPOINT`: repair relationship source/target ids or include
   the missing node.
 - `DEDIREN_PLUGIN_UNKNOWN`: unknown engine id — the bundled set is
