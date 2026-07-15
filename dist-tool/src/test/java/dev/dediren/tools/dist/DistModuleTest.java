@@ -64,16 +64,14 @@ class DistModuleTest {
     Files.createDirectories(staleBundle);
     Files.writeString(staleArchive, "stale archive");
 
-    DistTool.run(
-        new String[] {
-          "build",
-          "--root",
-          root.toString(),
-          "--version",
-          "2026.06.0",
-          "--notices",
-          notices.toString()
-        });
+    // Calls the build seam directly (fake shrinker; text-fixture jars must never reach the real
+    // ProGuard pass). CLI-arg dispatch for `build` is covered end-to-end by -Pdist-smoke.
+    DistTool.build(
+        root,
+        "2026.06.0",
+        notices,
+        bundleDir -> {},
+        (stagedJars, mergedJar) -> Files.writeString(mergedJar, "merged jar"));
 
     Path bundle = root.resolve("dist/dediren-agent-bundle-2026.06.0");
     assertThat(bundle).isDirectory();
@@ -149,7 +147,13 @@ class DistModuleTest {
         .contains("Eclipse Public License - v 2.0")
         .contains("Eclipse Public License - v 1.0")
         .contains("W3C® SOFTWARE NOTICE AND LICENSE")
-        .contains("QOS.ch");
+        .contains("QOS.ch")
+        // The bundle ships one shrink-merged jar, so the notices must describe modified
+        // redistribution and point at the relocated embedded licence files.
+        .contains("modified object form")
+        .contains("shrink-only")
+        .contains("`META-INF/third-party/<jar-name>/`")
+        .doesNotContain("unmodified object form");
   }
 
   @Test
@@ -167,6 +171,34 @@ class DistModuleTest {
                     }))
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("mystery-1.0.jar");
+  }
+
+  @Test
+  void withMergedClasspathReplacesClasspathLineWithSingleJar() {
+    String script =
+        "#!/bin/sh\n"
+            + "CLASSPATH=\"$BASEDIR\"/etc:\"$REPO\"/a-1.jar:\"$REPO\"/b-2.jar\n"
+            + "exec java\n";
+
+    String rewritten = DistTool.withMergedClasspath(script, "dediren-bundle-2026.06.0.jar");
+
+    assertThat(rewritten)
+        .contains("CLASSPATH=\"$BASEDIR\"/etc:\"$REPO\"/dediren-bundle-2026.06.0.jar")
+        .doesNotContain("a-1.jar")
+        .doesNotContain("b-2.jar")
+        .contains("exec java");
+  }
+
+  @Test
+  void withMergedClasspathFailsWithoutClasspathLine() {
+    assertThatThrownBy(() -> DistTool.withMergedClasspath("#!/bin/sh\nexec java\n", "x.jar"))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("CLASSPATH");
+  }
+
+  @Test
+  void mergedJarNameCarriesTheProductVersion() {
+    assertThat(DistTool.mergedJarName("2026.06.0")).isEqualTo("dediren-bundle-2026.06.0.jar");
   }
 
   @Test
@@ -407,7 +439,10 @@ class DistModuleTest {
         """
             #!/bin/sh
             BASEDIR=$(dirname "$0")/..
-            exec "$JAVACMD" "$@"
+            REPO="$BASEDIR"/lib
+            CLASSPATH="$BASEDIR"/etc:"$REPO"/cli-2026.06.0.jar
+            exec "$JAVACMD" -classpath "$CLASSPATH" "$@"
             """);
+    Files.writeString(install.resolve("lib/cli-2026.06.0.jar"), "module jar");
   }
 }

@@ -99,7 +99,6 @@ public final class DistTool {
           Map.entry("jackson-annotations", attribution("FasterXML Jackson", "Apache-2.0")),
           Map.entry("jackson-core", attribution("FasterXML Jackson", "Apache-2.0")),
           Map.entry("jackson-databind", attribution("FasterXML Jackson", "Apache-2.0")),
-          Map.entry("jackson-dataformat-yaml", attribution("FasterXML Jackson", "Apache-2.0")),
           Map.entry(
               "json-schema-validator",
               attribution("NetworkNT JSON Schema Validator", "Apache-2.0")),
@@ -134,7 +133,6 @@ public final class DistTool {
           Map.entry("reactor-core", attribution("Project Reactor", "Apache-2.0")),
           Map.entry("slf4j-api", attribution("SLF4J", "MIT (SLF4J)")),
           Map.entry("slf4j-simple", attribution("SLF4J", "MIT (SLF4J)")),
-          Map.entry("snakeyaml-engine", attribution("SnakeYAML Engine", "Apache-2.0")),
           Map.entry(
               "xml-apis",
               attribution(
@@ -216,20 +214,26 @@ public final class DistTool {
   }
 
   private static void build(Path root, String version, Path notices) throws Exception {
-    build(root, version, notices, staged -> {});
+    build(root, version, notices, staged -> {}, new ProGuardLibShrinker());
   }
 
   /**
-   * Staging seam (package-private for tests): {@code afterStage} runs against the fully staged
+   * Staging seams (package-private for tests): {@code afterStage} runs against the fully staged
    * bundle directory immediately before it is archived. It lets a test inject the runtime-generated
    * residue a launcher writes at first run — {@code cds/*.jsa} under {@code
    * $DEDIREN_BUNDLE_ROOT/cds}, a sibling of {@code lib/} — so the archive's {@code --exclude=cds}
-   * and {@code --exclude=*.jsa} hermeticity filters are actually exercised. Production callers pass
-   * a no-op; the seam runs after all staging and metadata writes, so it cannot perturb the packaged
-   * {@code lib/} verification.
+   * and {@code --exclude=*.jsa} hermeticity filters are actually exercised. {@code shrinker}
+   * produces the single packaged lib jar; tests whose staged "jars" are text fixtures inject a fake
+   * so the real ProGuard pass never sees them. Production callers pass a no-op and {@link
+   * ProGuardLibShrinker}; the {@code afterStage} seam runs after all staging and metadata writes,
+   * so it cannot perturb the packaged {@code lib/} verification.
    */
   static void build(
-      Path root, String version, Path notices, java.util.function.Consumer<Path> afterStage)
+      Path root,
+      String version,
+      Path notices,
+      java.util.function.Consumer<Path> afterStage,
+      LibShrinker shrinker)
       throws Exception {
     Path dist = root.resolve("dist");
     Path bundle = dist.resolve(bundleName(version));
@@ -241,11 +245,13 @@ public final class DistTool {
     Files.createDirectories(bundle.resolve("lib"));
     Files.createDirectories(bundle.resolve("docs"));
 
-    Set<String> declaredLibJars = new TreeSet<>();
+    String mergedJarName = mergedJarName(version);
+    List<Path> stagedJars = new ArrayList<>();
     for (Launcher launcher : LAUNCHERS) {
-      declaredLibJars.addAll(installLauncher(root, bundle, launcher));
+      stagedJars.addAll(installLauncher(root, bundle, launcher, mergedJarName));
     }
-    verifyPackagedLib(bundle.resolve("lib"), declaredLibJars);
+    shrinker.shrink(stagedJars, bundle.resolve("lib").resolve(mergedJarName));
+    verifyPackagedLib(bundle.resolve("lib"), Set.of(mergedJarName));
     copyDirectory(root.resolve("schemas"), bundle.resolve("schemas"));
     copyFixtures(root.resolve("fixtures"), bundle.resolve("fixtures"));
     Files.copy(
@@ -326,12 +332,15 @@ public final class DistTool {
     }
     notice.append('\n');
     notice.append("## Redistributed Third-Party Libraries\n\n");
-    notice.append("Each launcher `lib/` directory redistributes the libraries below in\n");
-    notice.append("unmodified object form. Every library remains covered by its upstream\n");
-    notice.append("licence, identified per jar as `(project, licence)`. Licence and notice\n");
-    notice.append("files embedded inside the jars (`META-INF/LICENSE`, `META-INF/NOTICE`,\n");
-    notice.append("`about.html`) are redistributed unchanged and remain authoritative for\n");
-    notice.append("their jar.\n\n");
+    notice.append("The bundle `lib/` jar redistributes the libraries below in\n");
+    notice.append("modified object form: classes and resources unreachable from Dediren's\n");
+    notice.append("entry points are removed (a shrink-only pass — no surviving class is\n");
+    notice.append("altered, optimized, or renamed) and the remainder is merged into the\n");
+    notice.append("single bundle jar. Every library remains covered by its upstream licence,\n");
+    notice.append("identified per input jar as `(project, licence)`. Licence and notice\n");
+    notice.append("files embedded inside the input jars (`META-INF/LICENSE`,\n");
+    notice.append("`META-INF/NOTICE`, `about.html`) are carried unchanged inside the bundle\n");
+    notice.append("jar under `META-INF/third-party/<jar-name>/`.\n\n");
     Set<String> licenseIds = new TreeSet<>();
     for (Map.Entry<String, ThirdPartyAttribution> entry : thirdParty.entrySet()) {
       ThirdPartyAttribution attribution = entry.getValue();
@@ -386,11 +395,23 @@ public final class DistTool {
     if (!Files.isRegularFile(archive)) {
       throw new IllegalStateException("archive not found: " + archive);
     }
+    long archiveBytes = Files.size(archive);
+    if (archiveBytes > MAX_ARCHIVE_BYTES) {
+      throw new IllegalStateException(
+          "release archive is "
+              + archiveBytes
+              + " bytes; the "
+              + MAX_ARCHIVE_BYTES
+              + "-byte ceiling exists to catch a silent shrink regression (unshrunk baseline"
+              + " ~15.1 MB, shrunk-but-deflated ~7.2 MB, shrunk+stored ~5.4 MB) — if legitimate"
+              + " dependency growth trips it, raise the ceiling deliberately in the same change");
+    }
     ensureJavaRuntime();
     Path temp = Files.createTempDirectory("dediren-dist-smoke-");
     try {
       runCommand(root, List.of("tar", "-xzf", archive.toString(), "-C", temp.toString()), null);
       Path bundle = findBundleDir(temp);
+      assertSingleShrunkLibJar(bundle, version);
       assertLauncherJvmFlags(bundle);
       assertCdsConfigured(bundle);
       assertFirstLaunchStdoutClean(bundle, temp, version);
@@ -758,8 +779,8 @@ public final class DistTool {
     void run() throws Exception;
   }
 
-  private static Set<String> installLauncher(Path root, Path bundle, Launcher launcher)
-      throws IOException {
+  private static List<Path> installLauncher(
+      Path root, Path bundle, Launcher launcher, String mergedJarName) throws IOException {
     Path install = root.resolve(launcher.installDir());
     Path sourceBin = install.resolve("bin").resolve(launcher.sourceScript());
     if (!Files.isRegularFile(sourceBin)) {
@@ -771,10 +792,14 @@ public final class DistTool {
     Path targetBin = bundle.resolve("bin").resolve(launcher.bundleScript());
     String script = withBundleRootExport(sourceScript);
     script = withCdsArchive(script, launcher.sourceScript());
+    script = withMergedClasspath(script, mergedJarName);
     Files.writeString(targetBin, script, StandardCharsets.UTF_8);
     makeExecutable(targetBin);
-    copyDeclaredJars(install.resolve("lib"), bundle.resolve("lib"), declaredJars);
-    return declaredJars;
+    List<Path> stagedJars = new ArrayList<>();
+    for (String jar : declaredJars) {
+      stagedJars.add(install.resolve("lib").resolve(jar));
+    }
+    return stagedJars;
   }
 
   /** Extracts the {@code lib/} jar file names declared on the launcher script CLASSPATH line. */
@@ -834,15 +859,6 @@ public final class DistTool {
     }
   }
 
-  private static void copyDeclaredJars(Path sourceLib, Path targetLib, Set<String> declaredJars)
-      throws IOException {
-    Files.createDirectories(targetLib);
-    for (String jar : declaredJars) {
-      Files.copy(
-          sourceLib.resolve(jar), targetLib.resolve(jar), StandardCopyOption.REPLACE_EXISTING);
-    }
-  }
-
   /** Exact-match guard: the packaged {@code lib/} holds the declared jar set and nothing else. */
   private static void verifyPackagedLib(Path lib, Set<String> declaredJars) throws IOException {
     Set<String> packaged = new TreeSet<>();
@@ -859,6 +875,48 @@ public final class DistTool {
               + (extra.isEmpty() ? "" : "; unexpected entries: " + extra)
               + (missing.isEmpty() ? "" : "; missing jars: " + missing));
     }
+  }
+
+  /** The single shrunk classpath jar the bundle ships in {@code lib/}. */
+  static String mergedJarName(String version) {
+    return "dediren-bundle-" + version + ".jar";
+  }
+
+  /**
+   * Ceiling between the shipped size (~5.4 MB, shrunk + STORED repack) and the two regression
+   * shapes above it — STORED silently degrading to deflated entries (~7.2 MB) and the shrink pass
+   * degrading to pass-through (~15.1 MB). Trips on either regression, not ordinary growth.
+   */
+  private static final long MAX_ARCHIVE_BYTES = 7_000_000L;
+
+  /**
+   * The packaged lib/ must hold exactly the shrunk bundle jar — anything else means the CLASSPATH
+   * rewrite and the shrinker disagree about what ships.
+   */
+  private static void assertSingleShrunkLibJar(Path bundle, String version) throws IOException {
+    List<String> jars;
+    try (var entries = Files.list(bundle.resolve("lib"))) {
+      jars = entries.map(path -> path.getFileName().toString()).sorted().toList();
+    }
+    if (!jars.equals(List.of(mergedJarName(version)))) {
+      throw new IllegalStateException(
+          "bundle lib/ must hold exactly " + mergedJarName(version) + " but holds " + jars);
+    }
+  }
+
+  /**
+   * Replaces the appassembler CLASSPATH line (the resolved multi-jar runtime classpath) with the
+   * single shrunk bundle jar. Must run AFTER {@link #declaredClasspathJars} has captured the
+   * original jar set: the original line is the hermeticity input contract; the rewritten line is
+   * what ships.
+   */
+  static String withMergedClasspath(String script, String mergedJarName) {
+    Matcher matcher = Pattern.compile("(?m)^CLASSPATH=.*$").matcher(script);
+    if (!matcher.find()) {
+      throw new IllegalArgumentException("launcher script has no CLASSPATH line to rewrite");
+    }
+    return matcher.replaceFirst(
+        Matcher.quoteReplacement("CLASSPATH=\"$BASEDIR\"/etc:\"$REPO\"/" + mergedJarName));
   }
 
   static String withCdsArchive(String script, String cdsName) {
