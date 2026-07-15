@@ -163,6 +163,52 @@ class CliMcpParityTest {
     assertThat(textOf(mcp)).contains("DEDIREN_COMMAND_IO_FAILED");
   }
 
+  @Test
+  void buildRejectsUnknownEmitKindThroughBothLanes(@TempDir Path root) throws Exception {
+    Path source = root.resolve("model.json");
+    Files.copy(fixture("valid-pipeline-rich.json"), source);
+    Path renderPolicy = root.resolve("policy.json");
+    Files.copy(policy("rich-svg.json"), renderPolicy);
+
+    Path cliOut = Files.createDirectories(root.resolve("cli-out"));
+    CliResult cli =
+        Main.executeForTesting(
+            new String[] {
+              "build",
+              "--input",
+              source.toString(),
+              "--out",
+              cliOut.toString(),
+              "--render-policy",
+              renderPolicy.toString(),
+              "--emit",
+              "bogus"
+            },
+            "",
+            Map.of());
+
+    Path mcpOut = Files.createDirectories(root.resolve("mcp-out"));
+    CallToolResult mcp =
+        new DedirenTools(root, EngineWiring.defaults(), Map.of())
+            .build(
+                new CallToolRequest(
+                    "dediren_build",
+                    Map.of(
+                        "source",
+                        "model.json",
+                        "out",
+                        mcpOut.toString(),
+                        "render_policy",
+                        "policy.json",
+                        "emit",
+                        java.util.List.of("bogus"))));
+
+    assertThat(cli.exitCode()).isNotZero();
+    assertThat(mcp.isError()).isEqualTo(cli.exitCode() != 0);
+    assertThat(normalizePaths(textOf(mcp), mcpOut)).isEqualTo(normalizePaths(cli.stdout(), cliOut));
+    assertThat(textOf(mcp)).contains("DEDIREN_COMMAND_INPUT_INVALID");
+  }
+
   /** The envelope names the artifacts it wrote, so the out dir differs between the two lanes. */
   private static String normalizePaths(String envelope, Path out) {
     return envelope.replace(out.toString(), "<OUT>").strip();
