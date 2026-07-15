@@ -1,5 +1,7 @@
 # Render plugin rename + PNG parity
 
+Status: superseded 2026-07-08 — PNG/raster support was dropped in 2026.07.13 (plans/2026-07-08-drop-png-raster-support.md); the plugin-rename half stands.
+
 Date: 2026-06-18
 
 ## Summary

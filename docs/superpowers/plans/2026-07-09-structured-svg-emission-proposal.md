@@ -1,6 +1,6 @@
 # Proposal: structured SVG emission for the render engine
 
-Status: proposal (not scheduled). Raised while broadening render styling
+Status: implemented — the full StAX emitter (SvgWriter) shipped in 2026.07.15. Raised while broadening render styling
 (generic shapes, colour, opacity, lines, typography), which repeatedly added
 attributes to hand-built SVG strings.
 

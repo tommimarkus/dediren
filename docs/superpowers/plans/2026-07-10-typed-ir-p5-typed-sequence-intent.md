@@ -1,5 +1,11 @@
 # Plan B P5 — Typed Sequence Intent + Delete the elk Re-derivation — Implementation Plan
 
+Status: complete — Plan B P1–P5 all shipped by 2026.07.15.
+
+> Erratum 2026-07-15: jqwik was removed 2026-07-14 (7b520b0). Read "jqwik
+> property test" as the seeded JUnit `@ParameterizedTest` sequence property
+> suite that replaced it.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Replace the stringly `uml.sequence.*` layout constraints with a typed two-level pipeline — sealed notation-owned `SequenceConstraint` (`semantics-uml`) lowered to a neutral `LayoutIntent` (`ir`) that `elk-layout` consumes — delete elk's 418-line `SequenceLayoutConstraints` UML re-derivation, and wire the `SequenceInvariants` into `validate-layout`. Geometry stays byte-identical.

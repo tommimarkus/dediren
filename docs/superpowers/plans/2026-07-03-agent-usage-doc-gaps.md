@@ -1,5 +1,7 @@
 # Agent-Usage Doc Gaps Implementation Plan
 
+Status: complete — executed on main; see reviews/2026-07-03-multi-viewpoint-product-review.md ("Remediation status").
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Close the documentation gaps that burned the cold-start reviewer on

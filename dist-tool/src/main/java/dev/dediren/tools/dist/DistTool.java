@@ -63,7 +63,9 @@ public final class DistTool {
     return new ThirdPartyAttribution(project, List.of(licenseIds));
   }
 
-  private static final Set<String> FIRST_PARTY_ARTIFACTS =
+  // Package-private (not private): CoverageAggregateTest in the same package pins
+  // coverage-report's JaCoCo aggregate to this list directly.
+  static final Set<String> FIRST_PARTY_ARTIFACTS =
       Set.of(
           "archimate",
           "archimate-oef-export",
@@ -81,6 +83,9 @@ public final class DistTool {
           "semantics-uml",
           "uml",
           "uml-xmi-export");
+
+  /** Bundle descriptor schema id; schemas/bundle.schema.json declares the same const. */
+  static final String BUNDLE_SCHEMA_VERSION = "dediren-bundle.schema.v2";
 
   private static final Map<String, ThirdPartyAttribution> THIRD_PARTY_ATTRIBUTIONS =
       Map.ofEntries(
@@ -984,7 +989,7 @@ public final class DistTool {
     // dediren-bundle.schema.v2 (Cutover B): the plugins[] array and elk_helper pointer described a
     // process-plugin surface that no longer exists; an honest descriptor drops them.
     Map<String, Object> metadata = new LinkedHashMap<>();
-    metadata.put("bundle_schema_version", "dediren-bundle.schema.v2");
+    metadata.put("bundle_schema_version", BUNDLE_SCHEMA_VERSION);
     metadata.put("product", "dediren");
     metadata.put("version", version);
     metadata.put("target", bundleMetadataTarget());

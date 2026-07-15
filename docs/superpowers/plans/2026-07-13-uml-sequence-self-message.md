@@ -1,5 +1,11 @@
 # UML Sequence Self-Message Geometry — Implementation Plan
 
+Status: complete — contained in 2026.07.15.
+
+> Erratum 2026-07-15: jqwik was removed 2026-07-14 (7b520b0). Read "jqwik
+> property test" as the seeded JUnit `@ParameterizedTest` sequence property
+> suite that replaced it.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make UML sequence diagrams containing a self-message (self-call) build successfully, by giving self-messages real stem-anchored geometry instead of leaving them on ELK's meaningless raw route.

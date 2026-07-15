@@ -2,6 +2,7 @@ package dev.dediren.cli;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dev.dediren.contracts.ContractVersions;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.core.DedirenPaths;
 import dev.dediren.core.commands.CoreCommands;
@@ -110,9 +111,13 @@ class EngineEnvelopeContractTest {
 
   @Test
   void layoutInvalidJsonKeepsPublishedParseRow() throws Exception {
-    // Published parse row: well-formed JSON that is not a valid layout request is routed through
-    // ElkEngine.parseRequest, yielding DEDIREN_ELK_INPUT_INVALID_JSON / 3.
-    String invalid = "{\"unexpected\":\"field\"}";
+    // A request carrying the current version but structurally invalid still reproduces the
+    // engine's published parse row: version-less input is gated upstream in core (see
+    // CoreCommandsTest).
+    String invalid =
+        "{\"layout_request_schema_version\":\""
+            + ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION
+            + "\",\"unexpected\":\"field\"}";
 
     EngineRunOutcome outcome =
         CoreCommands.layoutCommand("elk-layout", invalid, Map.of(), engines());

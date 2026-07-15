@@ -58,11 +58,19 @@ public final class CoreCommands {
   public static EngineRunOutcome layoutCommand(
       String engineId, String inputText, Map<String, String> env, Engines engines)
       throws EngineExecutionException {
-    // Unwrap a piped stage envelope to its data (the chained-workflow convenience), then route the
-    // unwrapped bytes through the engine's parse entry point so a well-formed-but-invalid request
-    // reproduces the published DEDIREN_ELK_INPUT_INVALID_JSON envelope rather than core's generic
-    // input diagnostic.
-    byte[] bytes = layoutRequestBytes(inputText);
+    // Unwrap a piped stage envelope to its data (the chained-workflow convenience), then gate the
+    // hand-authorable request's schema version (same INPUT_ERROR shape as the policy gates,
+    // before any engine is resolved): the gate rejects stale/unknown/absent versions first. A
+    // request carrying the current version but otherwise invalid still routes through the
+    // engine's parse entry point, so it reproduces the published DEDIREN_ELK_INPUT_INVALID_JSON
+    // envelope rather than core's generic input diagnostic.
+    JsonNode request = layoutRequestData(inputText);
+    Optional<Diagnostic> stale =
+        SchemaVersionGate.check(KnownSchemaVersions.LAYOUT_REQUEST, request);
+    if (stale.isPresent()) {
+      return errorOutcome(List.of(stale.get()));
+    }
+    byte[] bytes = layoutRequestBytes(request);
     LayoutEngine layout =
         EngineDispatch.requireEngine(engines, engineId, "layout", engines.layoutEngine(engineId));
     return EngineDispatch.dispatch(
@@ -73,7 +81,7 @@ public final class CoreCommands {
         });
   }
 
-  private static byte[] layoutRequestBytes(String inputText) throws EngineExecutionException {
+  private static JsonNode layoutRequestData(String inputText) throws EngineExecutionException {
     JsonNode value;
     try {
       value = JsonSupport.objectMapper().readTree(inputText);
@@ -85,6 +93,10 @@ public final class CoreCommands {
       throw commandInputInvalid(
           "layout", new IllegalArgumentException("command envelope does not contain data"));
     }
+    return data;
+  }
+
+  private static byte[] layoutRequestBytes(JsonNode data) throws EngineExecutionException {
     try {
       return JsonSupport.objectMapper().writeValueAsBytes(data);
     } catch (RuntimeException error) {

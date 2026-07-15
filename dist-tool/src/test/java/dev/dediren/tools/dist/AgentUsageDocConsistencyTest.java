@@ -60,6 +60,48 @@ class AgentUsageDocConsistencyTest {
   }
 
   @Test
+  void sourceTokensAreDocumentedIndividuallyOrByFamily() throws IOException {
+    Path repoRoot = repoRoot();
+    Set<String> documented = new TreeSet<>();
+    Set<String> documentedPrefixes = new TreeSet<>();
+    for (String docPath : List.of("docs/agent-usage.md", "README.md")) {
+      Matcher matcher =
+          TOKEN.matcher(Files.readString(repoRoot.resolve(docPath), StandardCharsets.UTF_8));
+      while (matcher.find()) {
+        String token = matcher.group();
+        if (token.endsWith("_")) {
+          documentedPrefixes.add(token);
+        } else {
+          documented.add(token);
+        }
+      }
+    }
+
+    Set<String> undocumented = new TreeSet<>();
+    // Production-only universe: an agent operating the shipped product can only ever encounter a
+    // DEDIREN_* code that production (src/main) code actually emits. Scanning test sources here
+    // would force test-fixture tokens (DEDIREN_FAKE_*, DEDIREN_TEST, DEDIREN_X, ...) into the
+    // shipped guide just to satisfy this check, wasting tokens on codes no agent will ever see.
+    // The forward test above intentionally stays broad (all .java sources): it guards against doc
+    // drift (a documented token that no longer exists anywhere), not against under-documentation.
+    for (String token : sourceTokens(repoRoot, /* mainOnly= */ true)) {
+      boolean covered =
+          documented.contains(token) || documentedPrefixes.stream().anyMatch(token::startsWith);
+      if (!covered) {
+        undocumented.add(token);
+      }
+    }
+
+    assertThat(undocumented)
+        .as(
+            "every DEDIREN_* token in production source (src/main) must be documented in"
+                + " docs/agent-usage.md or README.md, either individually or via a documented"
+                + " family prefix (e.g. DEDIREN_ELK_*) — add the code to '## Repair Rules' or"
+                + " extend the internal-families paragraph")
+        .isEmpty();
+  }
+
+  @Test
   void shippedDocVersionStringsMatchProductVersion() throws IOException {
     Path repoRoot = repoRoot();
     String expected = productVersion(repoRoot);
@@ -84,6 +126,10 @@ class AgentUsageDocConsistencyTest {
   }
 
   private static Set<String> sourceTokens(Path repoRoot) throws IOException {
+    return sourceTokens(repoRoot, /* mainOnly= */ false);
+  }
+
+  private static Set<String> sourceTokens(Path repoRoot, boolean mainOnly) throws IOException {
     Set<String> tokens = new TreeSet<>();
     Files.walkFileTree(
         repoRoot,
@@ -101,7 +147,11 @@ class AgentUsageDocConsistencyTest {
 
           @Override
           public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
-            if (file.toString().endsWith(".java")) {
+            String path = file.toString();
+            // mainOnly restricts the walk to shipped (src/main) code: see the comment at this
+            // method's reverse-direction caller (sourceTokensAreDocumentedIndividuallyOrByFamily)
+            // for why that universe must stay production-only rather than all sources.
+            if (path.endsWith(".java") && (!mainOnly || path.contains("/src/main/"))) {
               try {
                 Matcher matcher = TOKEN.matcher(Files.readString(file, StandardCharsets.UTF_8));
                 while (matcher.find()) {

@@ -1,5 +1,11 @@
 # Typed IR — Phase 2: Post-layout IR, IR Invariants, Property Tests, Fixture Full-Replace — Implementation Plan
 
+Status: complete — Plan B P1–P5 all shipped by 2026.07.15.
+
+> Erratum 2026-07-15: jqwik was removed 2026-07-14 (7b520b0). Read "jqwik
+> property test" as the seeded JUnit `@ParameterizedTest` sequence property
+> suite that replaced it.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Introduce the post-layout twin IR (`LaidOutScene`), relocate the geometric layout-quality checks onto it so quality diagnostics carry `source_pointer`, turn the UML-sequence defect class into named IR invariants backed by jqwik property tests, and fully replace the idealized golden `layout-result` fixtures with real-engine characterization snapshots.
