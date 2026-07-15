@@ -60,6 +60,42 @@ class AgentUsageDocConsistencyTest {
   }
 
   @Test
+  void sourceTokensAreDocumentedIndividuallyOrByFamily() throws IOException {
+    Path repoRoot = repoRoot();
+    Set<String> documented = new TreeSet<>();
+    Set<String> documentedPrefixes = new TreeSet<>();
+    for (String docPath : List.of("docs/agent-usage.md", "README.md")) {
+      Matcher matcher =
+          TOKEN.matcher(Files.readString(repoRoot.resolve(docPath), StandardCharsets.UTF_8));
+      while (matcher.find()) {
+        String token = matcher.group();
+        if (token.endsWith("_")) {
+          documentedPrefixes.add(token);
+        } else {
+          documented.add(token);
+        }
+      }
+    }
+
+    Set<String> undocumented = new TreeSet<>();
+    for (String token : sourceTokens(repoRoot)) {
+      boolean covered =
+          documented.contains(token) || documentedPrefixes.stream().anyMatch(token::startsWith);
+      if (!covered) {
+        undocumented.add(token);
+      }
+    }
+
+    assertThat(undocumented)
+        .as(
+            "every DEDIREN_* token in source must be documented in docs/agent-usage.md or"
+                + " README.md, either individually or via a documented family prefix"
+                + " (e.g. DEDIREN_ELK_*) — add the code to '## Repair Rules' or extend the"
+                + " internal-families paragraph")
+        .isEmpty();
+  }
+
+  @Test
   void shippedDocVersionStringsMatchProductVersion() throws IOException {
     Path repoRoot = repoRoot();
     String expected = productVersion(repoRoot);
