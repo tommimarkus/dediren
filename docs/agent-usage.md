@@ -46,9 +46,9 @@ Three tools:
 - `dediren_validate` — `source` (path); optional `profile` to also run
   semantic profile validation. Returns the validation envelope.
 - `dediren_build` — `source`, `out`, and at least one policy (`render_policy`,
-  `oef_policy`, `xmi_policy`); optional `views` (subset of view ids) and
-  `emit` (extra artifact kinds). Returns the build-result envelope, which
-  names every artifact written.
+  `oef_policy`, `xmi_policy`); optional `views` (subset of view ids) and `emit`
+  (extra stage envelopes to also write, for debugging). Returns the
+  build-result envelope, which names every artifact written.
 
 Every tool path must resolve inside `--root` (default: the working directory),
 and so must every `fragments[]` path inside a source you pass. A path that escapes
@@ -386,11 +386,13 @@ options shape output:
 Use `fixtures/source/valid-uml-sequence-basic.json` for the sequence MVP
 shape: one `Interaction`, `Lifeline` nodes, and ordered `Message`
 relationships with `properties.uml.sequence` plus `message_sort`. The SVG
-sequence path needs generated render metadata — missing or mismatched
-metadata fails with `DEDIREN_RENDER_METADATA_REQUIRED`,
-`DEDIREN_RENDER_METADATA_PROFILE_REQUIRED`, or
-`DEDIREN_RENDER_METADATA_PROFILE_MISMATCH`; regenerate through `project`
-rather than hand-editing. For combined fragments, use
+sequence path needs generated render metadata — missing metadata fails with
+`DEDIREN_RENDER_METADATA_REQUIRED` and mismatched metadata with
+`DEDIREN_RENDER_METADATA_PROFILE_MISMATCH`; regenerate through `project` rather
+than hand-editing. A render policy that uses type overrides without declaring
+`semantic_profile` fails with `DEDIREN_RENDER_METADATA_PROFILE_REQUIRED`
+instead — add `semantic_profile` to the render policy, not the metadata. For
+combined fragments, use
 `fixtures/source/valid-uml-sequence-fragments.json` and
 `--view sequence-fragments-view`; author `CombinedFragment` and
 `InteractionOperand` nodes under `properties.uml` for `alt`, `opt`, `loop`,

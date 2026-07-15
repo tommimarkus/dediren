@@ -47,9 +47,9 @@ an executable, spawns a child process, or reads a plugin path/trust
 environment variable; an unknown engine id is answered from the in-memory
 registry (`DEDIREN_PLUGIN_UNKNOWN`), not from any filesystem lookup. The
 former manifest env allowlist is gone because no child processes exist —
-the export engines receive the CLI's env map explicitly (schema-path
-variables) and read nothing else, pinned by the engines' no-`getenv` guard
-tests (Task 4).
+the export engines receive the CLI's env map explicitly (schema-path and
+validator-override variables) and read nothing else, pinned by the engines'
+no-`getenv` guard tests (Task 4).
 
 ### MCP stdio server (`dediren mcp`)
 
