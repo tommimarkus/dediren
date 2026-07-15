@@ -2,7 +2,15 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-Status: planned — not started.
+Status: complete — executed 2026-07-15 via subagent-driven development on
+branch `fix/coherence-remediation` (Tasks 1–12 review-approved; final gates:
+`-Pquality verify` ✓, dist-smoke ✓, full test suite ✓; `-Pcoverage verify`
+fails on a PRE-EXISTING `mcp-server` 0.67<0.70 branch-coverage gap verified
+identical at base `a75154c` — recorded in `2026-07-15-recorded-deferrals.md`).
+Deviations from the plan text (version-less layout requests now gate as
+`DEDIREN_SCHEMA_VERSION_UNKNOWN` exit 2; several plan-drafted doc sentences
+corrected against code) are recorded in the task reports and the merge
+handoff.
 
 **Goal:** Close every finding of the 2026-07-15 project coherence review: make the shipped docs stop contradicting shipped code, bring `layout-request` inside the schema-version-gating design, teach the governance docs about the MCP world, and pin the recurring drift classes with tests so they cannot reopen.
 
