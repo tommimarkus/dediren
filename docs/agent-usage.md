@@ -871,16 +871,6 @@ Their `message` and `path` are written to be self-repairing: follow the
 instruction in the message, and report any such code that persists after you
 have done so.
 
-A further set of tokens are fixtures in this repository's own test suite, not
-codes any shipped command can emit: `DEDIREN_FAKE_*` (build-command
-warning/failure fixtures), `DEDIREN_TEST`, `DEDIREN_TEST_WARNING`, `DEDIREN_X`,
-`DEDIREN_Y`, `DEDIREN_X_VALIDATOR` (generic dispatch/assertion fixtures),
-`DEDIREN_ERROR` (a generic fixture code), `DEDIREN_LITERAL` (a Java field name
-the pattern happens to match, not a code), and `DEDIREN_DIST_TARGET` (a
-retired build variable a release-workflow test asserts is absent). None of
-these can appear in real command output; if one ever does, treat it as a
-product defect and report it.
-
 ## Migration
 
 `DEDIREN_SCHEMA_VERSION_OUTDATED` means the file declares a schema version this
