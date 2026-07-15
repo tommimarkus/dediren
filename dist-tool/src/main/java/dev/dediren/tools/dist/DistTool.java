@@ -63,7 +63,9 @@ public final class DistTool {
     return new ThirdPartyAttribution(project, List.of(licenseIds));
   }
 
-  private static final Set<String> FIRST_PARTY_ARTIFACTS =
+  // Package-private (not private): CoverageAggregateTest in the same package pins
+  // coverage-report's JaCoCo aggregate to this list directly.
+  static final Set<String> FIRST_PARTY_ARTIFACTS =
       Set.of(
           "archimate",
           "archimate-oef-export",
