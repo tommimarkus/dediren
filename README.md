@@ -140,11 +140,13 @@ working with logging on. Logs are for humans — agents decide from stdout.
 
 Agents can drive Dediren as MCP tools instead of the CLI:
 
-    claude mcp add dediren -- "$BUNDLE/bin/dediren" mcp --root .
+    claude mcp add dediren -- "$BUNDLE/bin/dediren" mcp --root /path/to/your/project
 
 This serves `dediren_validate`, `dediren_build`, and `dediren_guide` (the agent
-guide, one section at a time) over stdio. Tool paths are confined to `--root`;
-`--read-only` withholds the build tool. See `docs/agent-usage.md`.
+guide, one section at a time) over stdio. Tool paths are confined to `--root` —
+point it at your project directory, since a bare `.` resolves to wherever the
+client spawns the server, not necessarily your project. `--read-only` withholds
+the build tool. See `docs/agent-usage.md`.
 
 ## Bundle Layout
 

@@ -26,7 +26,7 @@ repair failures.
 `dediren mcp` runs an MCP stdio server so an agent can drive Dediren as tools
 instead of shelling out. Register it once:
 
-    claude mcp add dediren -- /path/to/bundle/bin/dediren mcp --root .
+    claude mcp add dediren -- /path/to/bundle/bin/dediren mcp --root /path/to/your/project
 
 Three tools:
 
@@ -39,10 +39,17 @@ Three tools:
   (extra stage envelopes to also write, for debugging). Returns the
   build-result envelope, which names every artifact written.
 
-Every tool path must resolve inside `--root` (default: the working directory),
-and so must every `fragments[]` path inside a source you pass. A path that escapes
-it returns a `DEDIREN_MCP_PATH_OUTSIDE_ROOT` error envelope. Launch with
-`--read-only` to serve only `dediren_validate` and `dediren_guide`.
+Every tool path must resolve inside `--root`, and so must every `fragments[]`
+path inside a source you pass. Point `--root` at your project directory — an
+absolute path is safest, because a bare `.` resolves against wherever the MCP
+client spawns the server, which is not guaranteed to be your project. Claude
+Code sets `CLAUDE_PROJECT_DIR` in the server's environment (not at
+config-expansion time, so `${CLAUDE_PROJECT_DIR:-.}` in a hand-written
+`.mcp.json` falls back to `.`); to make `--root` track the project
+automatically, wrap the launch in a script that reads `$CLAUDE_PROJECT_DIR` at
+runtime, as the plugin distribution does. A path that escapes `--root` returns a
+`DEDIREN_MCP_PATH_OUTSIDE_ROOT` error envelope. Launch with `--read-only` to
+serve only `dediren_validate` and `dediren_guide`.
 
 Tool results carry the same envelope JSON the CLI prints on stdout, so the
 handoff rules in `## Command Handoff` apply unchanged.
