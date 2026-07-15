@@ -70,7 +70,7 @@ Stable Dependencies Principle).
 | `ir` | `contracts` | 0.5 — IR spine, between `contracts` and `engine-api` |
 | `archimate` | *(nothing internal)* | 1 — notation core |
 | `uml` | `contracts` | 1 — notation core |
-| `schema-cache` | `contracts` | 1 — utility core |
+| `schema-cache` | *(nothing internal)* | 1 — utility core |
 | `engine-api` | `contracts`, `ir` | 1 — engine seam |
 | `core` | `contracts`, `engine-api`, `ir` | 2 — orchestration + `build` driver |
 | `render` (engine) | `engine-api`, `contracts`, `archimate`, `uml`, `ir` | 2 — leaf engine |
@@ -80,10 +80,10 @@ Stable Dependencies Principle).
 | `elk-layout` (engine) | `engine-api`, `contracts`, `ir` | 2 — leaf engine |
 | `archimate-oef-export` (engine) | `engine-api`, `contracts`, `archimate`, `schema-cache` | 2 — leaf engine |
 | `uml-xmi-export` (engine) | `engine-api`, `contracts`, `uml`, `schema-cache` | 2 — leaf engine |
-| `mcp` | `contracts`, `core`, `engine-api` | 3 — protocol adapter |
-| `cli` | `contracts`, `core`, `engine-api`, `ir`, `mcp`; engine implementations **only in `EngineWiring`** | 3 — entrypoint + wiring |
+| `mcp-server` | `contracts`, `core`, `engine-api` | 3 — protocol adapter |
+| `cli` | `contracts`, `core`, `engine-api`, `ir` (runtime scope — cli's main code does not compile against the IR), `mcp-server`; engine implementations **only in `EngineWiring`** | 3 — entrypoint + wiring |
 | `dist-tool` | `contracts` (compile); `cli` (runtime, for bundling — the bundled engine and semantics-front-end modules arrive transitively through `cli`'s compile deps, so the single-launcher distribution needs no separate engine-launcher dependency) | 3 — assembly |
-| `coverage-report` | *(nothing in the default build)*; every product module (runtime, **`coverage`-profile-scoped only**, for JaCoCo `report-aggregate`) | 3 — build tooling |
+| `coverage-report` | *(nothing in the default build)*; every shipped first-party module (runtime, **`coverage`-profile-scoped only**, for JaCoCo `report-aggregate`, pinned to `DistTool.FIRST_PARTY_ARTIFACTS` by dist-tool's `CoverageAggregateTest`) | 3 — build tooling |
 
 Rules that fall out of this table and must be enforced, not just hoped for:
 
@@ -108,7 +108,9 @@ Rules that fall out of this table and must be enforced, not just hoped for:
 - **No engine depends on `core`.** The old plugin→`core` prohibition survives
   the reversal as an engine→`core` prohibition: engines depend on `engine-api`,
   `contracts`, and the notation/utility cores they need, never on `core` and
-  never on each other. The SVG emitter must not import ELK; exporters must not
+  never on each other (production classes; deliberate test-scope harness edges
+  exist — e.g. elk-layout tests render output — and the ArchUnit import
+  excludes tests). The SVG emitter must not import ELK; exporters must not
   import the SVG emitter.
 - **`core` never compile-depends on an engine implementation.** `core` drives
   engines only through the `engine-api` interfaces and the `contracts` records.
@@ -119,11 +121,11 @@ Rules that fall out of this table and must be enforced, not just hoped for:
   `EngineWiring`, which constructs them explicitly (no `ServiceLoader`, no
   `PATH`, no runtime discovery). ArchUnit pins the edge to that single named
   class.
-- **`mcp` is an adapter over the engine seam, not an engine consumer.** It receives an
+- **`mcp-server` is an adapter over the engine seam, not an engine consumer.** It receives an
   `Engines` registry through its constructor from `cli`'s `EngineWiring` and never names
   an engine implementation, a notation core, or `cli`. ArchUnit pins both
   (`mcpDependsOnNoEngineImplementationAndNoCli`, `mcpDependsOnNoNotationCore`). The
-  `cli → mcp` edge is the entrypoint wiring its adapter; the reverse would be a cycle.
+  `cli → mcp-server` edge is the entrypoint wiring its adapter; the reverse would be a cycle.
 - **The four remaining `dev.dediren.plugins.*` engines live under
   `engines/<name>`** (directory move landed 2026-07-08); their packages are
   retained debt — see §12. The former fifth engine, `generic-graph`, was
@@ -194,9 +196,9 @@ charter below is the contract for "what changes for this reason lives here."
 - **`cli`** — the thin entrypoint: parse arguments, assemble a request, call
   `core`, print the envelope. Must stay thin (see §8). No domain policy, no
   plugin knowledge beyond `contracts`. It is also the composition root for the
-  `mcp` adapter: `McpCommand` constructs the engine registry through
-  `EngineWiring` and hands it to the server, which is why the `cli → mcp` edge
-  runs in that direction and never the reverse.
+  `mcp-server` adapter: `McpCommand` constructs the engine registry through
+  `EngineWiring` and hands it to the server, which is why the `cli → mcp-server`
+  edge runs in that direction and never the reverse.
 
 - **`archimate` / `uml`** — notation cores: the type vocabulary and semantic
   validation for ArchiMate and UML source models, shared by the plugins that
@@ -228,7 +230,7 @@ charter below is the contract for "what changes for this reason lives here."
   (`archimate` or `uml`) and nothing else notation-specific. No single module
   in this trio depends on both `archimate` and `uml`.
 
-- **`mcp`** — the MCP stdio protocol surface: tool schemas, handlers, path
+- **`mcp-server`** — the MCP stdio protocol surface: tool schemas, handlers, path
   confinement, and the guide topic map. It marshals tool calls into `core`
   commands and returns their envelopes verbatim; it owns no orchestration, no
   notation semantics, and no engine construction.
@@ -256,7 +258,8 @@ not the Java API** (*Cockburn*: the port is the stable thing; *LSP*: the wire
 protocol is the compatibility boundary). Treat these as the stable product:
 
 - public JSON schemas under `schemas/`;
-- command envelopes on stdout (success and error);
+- command envelopes on stdout (success and error) (under `dediren mcp`, stdout
+  is the JSON-RPC frame channel and these envelopes ride inside tool results);
 - structured diagnostics agents inspect without scraping stderr;
 - the documented fixtures under `fixtures/`.
 

@@ -7,6 +7,10 @@ Date: 2026-05-08
 > compiler; the contract-first identity and pipeline scope stand. The historical
 > body below is preserved as the record of how the product began.
 
+> **Further amended 2026-07-14 by `2026-07-14-dediren-mcp-server-design.md`:**
+> an MCP stdio surface (`dediren mcp`, module `mcp-server`) joins the CLI as a
+> second in-boundary entrypoint serving the same envelopes over tool results.
+
 ## Purpose
 
 `dediren` is a structured-data-first diagram rendering CLI for agentic tools.
