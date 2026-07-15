@@ -36,6 +36,21 @@
     <dependency>
       <groupId>com.networknt</groupId>
       <artifactId>json-schema-validator</artifactId>
+      <!-- YAML input support is unused: no dediren code path feeds YAML to the validator or
+           to Jackson (verified 2026-07: zero production/test references). Excluding the YAML
+           stack keeps ~0.36 MB of deflated classes off every runtime classpath and out of the
+           bundle. Restoring YAML support must also restore the DistTool
+           THIRD_PARTY_ATTRIBUTIONS entries removed with this exclusion. -->
+      <exclusions>
+        <exclusion>
+          <groupId>tools.jackson.dataformat</groupId>
+          <artifactId>jackson-dataformat-yaml</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.snakeyaml</groupId>
+          <artifactId>snakeyaml-engine</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>dev.dediren</groupId>

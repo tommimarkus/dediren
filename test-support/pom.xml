@@ -31,6 +31,19 @@
     <dependency>
       <groupId>com.networknt</groupId>
       <artifactId>json-schema-validator</artifactId>
+      <!-- Same YAML exclusion as core's declaration (see core/pom.xml): the stack is unused
+           repo-wide, and with the root-pom yaml pin removed an unexcluded declaration here
+           would resolve networknt's own (older) requested version. -->
+      <exclusions>
+        <exclusion>
+          <groupId>tools.jackson.dataformat</groupId>
+          <artifactId>jackson-dataformat-yaml</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.snakeyaml</groupId>
+          <artifactId>snakeyaml-engine</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>org.assertj</groupId>

@@ -99,7 +99,6 @@ public final class DistTool {
           Map.entry("jackson-annotations", attribution("FasterXML Jackson", "Apache-2.0")),
           Map.entry("jackson-core", attribution("FasterXML Jackson", "Apache-2.0")),
           Map.entry("jackson-databind", attribution("FasterXML Jackson", "Apache-2.0")),
-          Map.entry("jackson-dataformat-yaml", attribution("FasterXML Jackson", "Apache-2.0")),
           Map.entry(
               "json-schema-validator",
               attribution("NetworkNT JSON Schema Validator", "Apache-2.0")),
@@ -134,7 +133,6 @@ public final class DistTool {
           Map.entry("reactor-core", attribution("Project Reactor", "Apache-2.0")),
           Map.entry("slf4j-api", attribution("SLF4J", "MIT (SLF4J)")),
           Map.entry("slf4j-simple", attribution("SLF4J", "MIT (SLF4J)")),
-          Map.entry("snakeyaml-engine", attribution("SnakeYAML Engine", "Apache-2.0")),
           Map.entry(
               "xml-apis",
               attribution(

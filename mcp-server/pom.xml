@@ -32,6 +32,20 @@
     <dependency>
       <groupId>io.modelcontextprotocol.sdk</groupId>
       <artifactId>mcp</artifactId>
+      <!-- Same YAML exclusion as core's json-schema-validator declaration (see core/pom.xml):
+           the SDK reaches json-schema-validator through mcp-core, and its YAML side is unused
+           repo-wide. With the root-pom yaml pin removed, an unexcluded path here would resolve
+           networknt's own (older) requested version. -->
+      <exclusions>
+        <exclusion>
+          <groupId>tools.jackson.dataformat</groupId>
+          <artifactId>jackson-dataformat-yaml</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.snakeyaml</groupId>
+          <artifactId>snakeyaml-engine</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>tools.jackson.core</groupId>
