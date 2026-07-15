@@ -21,7 +21,7 @@ class LoggingProviderLocalityTest {
 
   /** module dir path (relative to repo root) -> the only scope slf4j-simple may have there. */
   private static final Map<String, String> SIMPLE_ALLOWED =
-      Map.of("cli", "compile", "test-support", "compile", "schema-cache", "test");
+      Map.of("cli", "runtime", "test-support", "runtime", "schema-cache", "test");
 
   private static final List<String> BANNED_BACKENDS =
       List.of("logback-classic", "slf4j-jdk14", "slf4j-log4j12", "log4j-slf4j2-impl", "slf4j-nop");
@@ -49,22 +49,29 @@ class LoggingProviderLocalityTest {
             violations.add(module + " declares banned backend " + backend);
           }
         }
-        int at = xml.indexOf("<artifactId>slf4j-simple</artifactId>");
+        String tag = "<artifactId>slf4j-simple</artifactId>";
+        int at = xml.indexOf(tag);
         if (at >= 0) {
-          String allowedScope = SIMPLE_ALLOWED.get(module);
-          // Bound the scope search by this <dependency>'s own closing tag rather than a fixed
-          // character count: several of these bindings carry long explanatory comments between
-          // <artifactId> and <scope> (schema-cache's alone is 686 chars), so a short fixed window
-          // misses the real tag, and a large enough one risks reading the *next* dependency's
-          // <scope> instead (cli's slf4j-simple is immediately followed by an assertj-core
-          // dependency at test scope).
-          int close = xml.indexOf("</dependency>", at);
-          String window = xml.substring(at, close >= 0 ? close : xml.length());
-          boolean testScoped = window.contains("<scope>test</scope>");
-          if (allowedScope == null) {
-            violations.add(module + " binds slf4j-simple but is not an allowed binding site");
-          } else if (allowedScope.equals("test") != testScoped) {
-            violations.add(module + " binds slf4j-simple at the wrong scope");
+          if (xml.indexOf(tag, at + 1) >= 0) {
+            violations.add(
+                module
+                    + " declares slf4j-simple more than once — the locality guard cannot verify duplicate declarations");
+          } else {
+            String allowedScope = SIMPLE_ALLOWED.get(module);
+            // Bound the scope search by this <dependency>'s own closing tag rather than a fixed
+            // character count: several of these bindings carry long explanatory comments between
+            // <artifactId> and <scope> (schema-cache's alone is 686 chars), so a short fixed window
+            // misses the real tag, and a large enough one risks reading the *next* dependency's
+            // <scope> instead (cli's slf4j-simple is immediately followed by an assertj-core
+            // dependency at test scope).
+            int close = xml.indexOf("</dependency>", at);
+            String window = xml.substring(at, close >= 0 ? close : xml.length());
+            boolean testScoped = window.contains("<scope>test</scope>");
+            if (allowedScope == null) {
+              violations.add(module + " binds slf4j-simple but is not an allowed binding site");
+            } else if (allowedScope.equals("test") != testScoped) {
+              violations.add(module + " binds slf4j-simple at the wrong scope");
+            }
           }
         }
       }
