@@ -218,7 +218,12 @@ class BuildCommandTest {
 
     EngineRunOutcome outcome = BuildCommand.run(request, engines());
 
-    assertThat(outcome.exitCode()).isNotZero();
+    // A stale policy is a user-confirmed INPUT_ERROR (exit 2): the caller can fix the file, and no
+    // engine has run at the point the hoisted gate rejects it, so PLUGIN_ERROR (exit 3) would be
+    // factually wrong. Asserting the exact code (not just isNotZero()) is the point: a laundered
+    // rejection through EngineExecutionException.command still produces a non-zero exit, so a loose
+    // assertion here would not have caught the wrong exit code.
+    assertThat(outcome.exitCode()).isEqualTo(2);
     BuildResult result = buildResult(outcome);
     assertSchemaValid(outcome);
     assertThat(result.status()).isEqualTo(EnvelopeStatus.ERROR);
@@ -229,6 +234,7 @@ class BuildCommandTest {
     Diagnostic diagnostic = result.diagnostics().getFirst();
     assertThat(diagnostic.code()).isEqualTo("DEDIREN_SCHEMA_VERSION_OUTDATED");
     assertThat(diagnostic.message()).contains("render-policy.schema.v2");
+    assertThat(diagnostic.path()).isEqualTo("$.render_policy_schema_version");
     assertThat(out).isEmptyDirectory();
   }
 
@@ -254,13 +260,52 @@ class BuildCommandTest {
 
     EngineRunOutcome outcome = BuildCommand.run(request, engines());
 
-    assertThat(outcome.exitCode()).isNotZero();
+    // See aStaleRenderPolicyFailsTheBuildBeforeAnyArtifactIsWritten above: a stale export policy is
+    // the same INPUT_ERROR (exit 2), not a laundered PLUGIN_ERROR.
+    assertThat(outcome.exitCode()).isEqualTo(2);
     BuildResult result = buildResult(outcome);
     assertSchemaValid(outcome);
     assertThat(result.status()).isEqualTo(EnvelopeStatus.ERROR);
     assertThat(result.views()).isEmpty();
     assertThat(result.diagnostics()).hasSize(1);
-    assertThat(result.diagnostics().getFirst().code()).isEqualTo("DEDIREN_SCHEMA_VERSION_UNKNOWN");
+    Diagnostic diagnostic = result.diagnostics().getFirst();
+    assertThat(diagnostic.code()).isEqualTo("DEDIREN_SCHEMA_VERSION_UNKNOWN");
+    assertThat(diagnostic.path()).isEqualTo("$.oef_export_policy_schema_version");
+    assertThat(out).isEmptyDirectory();
+  }
+
+  @Test
+  void aStaleXmiPolicyFailsTheBuildBeforeAValidRenderPolicysArtifactIsWritten() throws Exception {
+    // Mirrors aStaleExportPolicyFailsTheBuildBeforeAValidRenderPolicysArtifactIsWritten for the
+    // uml-xmi lane: the build gates every supplied policy once, up front, so a stale XMI policy is
+    // caught before any engine runs and before the valid render policy's artifact is written. This
+    // specifically exercises the XMI lane's own gate binding (KnownSchemaVersions.UML_XMI_EXPORT_
+    // POLICY), which BuildCommand now reaches directly rather than through
+    // CoreCommands.exportPolicyFamily's engineId -> family string switch -- it fails against a
+    // build where the XMI lane's gate binding is missing or wrong.
+    BuildRequest request =
+        new BuildRequest(
+            SOURCE,
+            null,
+            List.of(),
+            RENDER_POLICY,
+            null,
+            "{\"uml_xmi_export_policy_schema_version\":\"uml-xmi-export-policy.schema.v0\"}",
+            Set.of(),
+            out,
+            Map.of());
+
+    EngineRunOutcome outcome = BuildCommand.run(request, engines());
+
+    assertThat(outcome.exitCode()).isEqualTo(2);
+    BuildResult result = buildResult(outcome);
+    assertSchemaValid(outcome);
+    assertThat(result.status()).isEqualTo(EnvelopeStatus.ERROR);
+    assertThat(result.views()).isEmpty();
+    assertThat(result.diagnostics()).hasSize(1);
+    Diagnostic diagnostic = result.diagnostics().getFirst();
+    assertThat(diagnostic.code()).isEqualTo("DEDIREN_SCHEMA_VERSION_UNKNOWN");
+    assertThat(diagnostic.path()).isEqualTo("$.uml_xmi_export_policy_schema_version");
     assertThat(out).isEmptyDirectory();
   }
 

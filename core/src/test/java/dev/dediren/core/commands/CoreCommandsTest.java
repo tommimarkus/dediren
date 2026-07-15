@@ -24,6 +24,7 @@ import dev.dediren.ir.SceneGraph;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.JsonNode;
 
 class CoreCommandsTest {
 
@@ -335,51 +336,61 @@ class CoreCommandsTest {
       """;
 
   @Test
-  void renderCommandRejectsAStalePolicyBeforeEngineLookup() {
+  void renderCommandRejectsAStalePolicyBeforeEngineLookup() throws Exception {
     // Task 4's binding constraint applies to every gated call site, not just build: the standalone
     // render command must reject a stale policy before ever resolving an engine. An engine registry
     // with no render engine at all proves the rejection cannot be riding on a successful lookup.
+    // A stale policy is a user-confirmed INPUT_ERROR (exit 2), not a laundered PLUGIN_ERROR: no
+    // engine has run, so the caller can fix the file. The rejection must also return an
+    // EngineRunOutcome rather than throw -- if this still threw EngineExecutionException, the
+    // exception's diagnostic() would rebuild the path as "command:render" instead of the gate's own
+    // "$.render_policy_schema_version", and every catch site would force exit 3.
     String stalePolicy = "{\"render_policy_schema_version\":\"render-policy.schema.v2\"}";
 
-    assertThatThrownBy(
-            () ->
-                CoreCommands.renderCommand(
-                    "nonexistent-render-engine",
-                    stalePolicy,
-                    null,
-                    MINIMAL_LAYOUT,
-                    Map.of(),
-                    emptyEngines()))
-        .isInstanceOf(EngineExecutionException.class)
-        .satisfies(
-            error ->
-                assertThat(((EngineExecutionException) error).diagnostic().code())
-                    .isEqualTo("DEDIREN_SCHEMA_VERSION_OUTDATED"));
+    EngineRunOutcome outcome =
+        CoreCommands.renderCommand(
+            "nonexistent-render-engine",
+            stalePolicy,
+            null,
+            MINIMAL_LAYOUT,
+            Map.of(),
+            emptyEngines());
+
+    assertThat(outcome.exitCode()).isEqualTo(2);
+    JsonNode envelope = JsonSupport.objectMapper().readTree(outcome.stdout());
+    assertThat(envelope.at("/status").asText()).isEqualTo("error");
+    assertThat(envelope.at("/diagnostics/0/code").asText())
+        .isEqualTo("DEDIREN_SCHEMA_VERSION_OUTDATED");
+    assertThat(envelope.at("/diagnostics/0/path").asText())
+        .isEqualTo("$.render_policy_schema_version");
   }
 
   @Test
-  void exportCommandRejectsAStalePolicyBeforeEngineLookup() {
+  void exportCommandRejectsAStalePolicyBeforeEngineLookup() throws Exception {
     // Mirrors renderCommandRejectsAStalePolicyBeforeEngineLookup for the standalone export command:
     // a known export engine id ("archimate-oef") whose policy carries a version this build does not
-    // recognize is rejected before EngineDispatch.requireEngine ever runs.
+    // recognize is rejected before EngineDispatch.requireEngine ever runs, at INPUT_ERROR (exit 2)
+    // with the gate's own "$.<field>" diagnostic path intact.
     String unknownVersionOefPolicy =
         "{\"oef_export_policy_schema_version\":\"oef-export-policy.schema.v0\"}";
 
-    assertThatThrownBy(
-            () ->
-                CoreCommands.exportCommand(
-                    "archimate-oef",
-                    unknownVersionOefPolicy,
-                    MINIMAL_SOURCE,
-                    null,
-                    MINIMAL_LAYOUT,
-                    Map.of(),
-                    emptyEngines()))
-        .isInstanceOf(EngineExecutionException.class)
-        .satisfies(
-            error ->
-                assertThat(((EngineExecutionException) error).diagnostic().code())
-                    .isEqualTo("DEDIREN_SCHEMA_VERSION_UNKNOWN"));
+    EngineRunOutcome outcome =
+        CoreCommands.exportCommand(
+            "archimate-oef",
+            unknownVersionOefPolicy,
+            MINIMAL_SOURCE,
+            null,
+            MINIMAL_LAYOUT,
+            Map.of(),
+            emptyEngines());
+
+    assertThat(outcome.exitCode()).isEqualTo(2);
+    JsonNode envelope = JsonSupport.objectMapper().readTree(outcome.stdout());
+    assertThat(envelope.at("/status").asText()).isEqualTo("error");
+    assertThat(envelope.at("/diagnostics/0/code").asText())
+        .isEqualTo("DEDIREN_SCHEMA_VERSION_UNKNOWN");
+    assertThat(envelope.at("/diagnostics/0/path").asText())
+        .isEqualTo("$.oef_export_policy_schema_version");
   }
 
   @Test

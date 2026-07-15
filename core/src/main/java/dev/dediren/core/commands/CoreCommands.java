@@ -277,7 +277,16 @@ public final class CoreCommands {
       Engines engines)
       throws EngineExecutionException {
     LayoutResult layoutResult = parseCommandData("render", layoutText, LayoutResult.class);
-    JsonNode policy = parsePolicy("render", policyText, KnownSchemaVersions.RENDER_POLICY);
+    JsonNode policy;
+    try {
+      policy = parsePolicy("render", policyText, KnownSchemaVersions.RENDER_POLICY);
+    } catch (PolicyVersionException error) {
+      // A stale/unknown policy version is an input error the caller can fix, and no engine has
+      // run yet -- publish the gate's diagnostic verbatim (code, message, and its "$.<field>"
+      // path) at INPUT_ERROR, exactly like SourceValidator.SourceDiagnosticsException below, rather
+      // than laundering it through EngineExecutionException.command (which would overwrite both).
+      return errorOutcome(List.of(error.diagnostic()));
+    }
     RenderMetadata metadata =
         metadataText == null
             ? null
@@ -305,7 +314,14 @@ public final class CoreCommands {
       return errorOutcome(error.diagnostics());
     }
     LayoutResult layoutResult = parseCommandData("export", layoutText, LayoutResult.class);
-    JsonNode policy = parseExportPolicy(engineId, policyText);
+    JsonNode policy;
+    try {
+      policy = parseExportPolicy(engineId, policyText);
+    } catch (PolicyVersionException error) {
+      // Same rationale as renderCommand above: a version-gate rejection is an input error with the
+      // gate's own diagnostic, surfaced before EngineDispatch.requireEngine ever runs.
+      return errorOutcome(List.of(error.diagnostic()));
+    }
     var request =
         new ExportRequest(
             ContractVersions.EXPORT_REQUEST_SCHEMA_VERSION, source, layoutResult, policy);
@@ -349,14 +365,24 @@ public final class CoreCommands {
    * Parses a policy document and rejects it when it does not carry {@code family}'s current schema
    * version. Every policy lane — the standalone render and export commands and both build lanes —
    * goes through here, so a stale policy is caught once, before any engine runs.
+   *
+   * <p>The gate check is a separate failure shape from a malformed (unparseable) policy: {@code
+   * text} that is not JSON at all still throws {@link EngineExecutionException} from {@link
+   * #parseJson}, unchanged. A version-gate rejection instead throws {@link PolicyVersionException}
+   * so the caller — which holds the family and knows whether it is a standalone command or a build
+   * lane — decides how to surface it, exactly as {@link
+   * dev.dediren.core.source.SourceValidator.SourceDiagnosticsException} lets its callers decide.
+   * That separation is what keeps the gate's {@link Diagnostic} (code, message, and its {@code
+   * $.<field>} path) intact instead of being laundered through {@link
+   * EngineExecutionException#command}, which would overwrite both the path and, at every catch
+   * site, the exit code.
    */
   static JsonNode parsePolicy(String command, String text, KnownSchemaVersions.Family family)
-      throws EngineExecutionException {
+      throws EngineExecutionException, PolicyVersionException {
     JsonNode policy = parseJson(command, text);
     Optional<Diagnostic> stale = SchemaVersionGate.check(family, policy);
     if (stale.isPresent()) {
-      Diagnostic diagnostic = stale.get();
-      throw EngineExecutionException.command(diagnostic.code(), command, diagnostic.message());
+      throw new PolicyVersionException(stale.get());
     }
     return policy;
   }
@@ -375,9 +401,17 @@ public final class CoreCommands {
     };
   }
 
-  /** The export lanes' policy parse: which family applies depends on which engine is running. */
+  /**
+   * The standalone {@code export} command's policy parse: which family applies depends on which
+   * engine id was requested, and an id that is neither export engine skips the gate entirely (see
+   * {@link #exportPolicyFamily}). Used ONLY by {@link #exportCommand}, where the engine id is
+   * genuinely user-supplied — {@link BuildCommand}'s two export lanes know their family statically
+   * and gate directly against {@link KnownSchemaVersions#OEF_EXPORT_POLICY} / {@link
+   * KnownSchemaVersions#UML_XMI_EXPORT_POLICY} instead, so a renamed or added engine id cannot
+   * silently bypass the gate there.
+   */
   static JsonNode parseExportPolicy(String engineId, String policyText)
-      throws EngineExecutionException {
+      throws EngineExecutionException, PolicyVersionException {
     Optional<KnownSchemaVersions.Family> family = exportPolicyFamily(engineId);
     return family.isPresent()
         ? parsePolicy("export", policyText, family.get())
@@ -396,5 +430,31 @@ public final class CoreCommands {
             .diagnostic();
     return new ValidationResult(
         CommandExitCode.INPUT_ERROR.code(), CommandEnvelope.error(List.of(diagnostic)));
+  }
+
+  /**
+   * Thrown by {@link #parsePolicy} when a policy document fails {@link SchemaVersionGate}: a
+   * superseded or unrecognized schema version. Mirrors {@link
+   * dev.dediren.core.source.SourceValidator.SourceDiagnosticsException}'s shape on purpose — a
+   * version-gate rejection is a genuinely different failure from a malformed/invalid policy (no
+   * engine has run, and the fix is "use the current version," not "fix your JSON" or "fix your
+   * policy content"), so it gets its own type instead of being folded into {@link
+   * EngineExecutionException}, whose {@code command(...)} factory always overwrites the
+   * diagnostic's path to {@code "command:" + command} and whose catch sites always map it to {@link
+   * CommandExitCode#PLUGIN_ERROR}. Carrying the gate's {@link Diagnostic} unchanged lets every
+   * caller — the standalone render/export commands and {@link BuildCommand}'s hoisted gate —
+   * publish it verbatim at {@link CommandExitCode#INPUT_ERROR} instead.
+   */
+  static final class PolicyVersionException extends Exception {
+    private final Diagnostic diagnostic;
+
+    PolicyVersionException(Diagnostic diagnostic) {
+      super(diagnostic.message());
+      this.diagnostic = diagnostic;
+    }
+
+    Diagnostic diagnostic() {
+      return diagnostic;
+    }
   }
 }

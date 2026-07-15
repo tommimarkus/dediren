@@ -108,6 +108,15 @@ public final class BuildCommand {
     // lanes, before ever inspecting a stale OEF/XMI policy; it also re-parsed and re-emitted the
     // same request-level diagnostic once per view. Parsing here instead means every lane's engine
     // sees an already-validated JsonNode, not raw text.
+    //
+    // Each export lane is gated directly against its own KnownSchemaVersions family constant
+    // (OEF_EXPORT_POLICY / UML_XMI_EXPORT_POLICY) rather than routed through
+    // CoreCommands.exportPolicyFamily's engineId -> family string switch. This lane already knows
+    // statically which family applies, so a renamed or added export engine id becomes a compile
+    // error here instead of silently falling into that switch's `default -> Optional.empty()`
+    // escape hatch (which exists only so the standalone `export` command's genuinely
+    // user-supplied engine id still reaches requireEngine and yields DEDIREN_PLUGIN_UNKNOWN for an
+    // unknown id) and shipping ungated.
     JsonNode renderPolicy = null;
     JsonNode oefPolicy = null;
     JsonNode xmiPolicy = null;
@@ -118,12 +127,25 @@ public final class BuildCommand {
                 "render", request.renderPolicyText(), KnownSchemaVersions.RENDER_POLICY);
       }
       if (request.oefPolicyText() != null) {
-        oefPolicy = CoreCommands.parseExportPolicy(OEF_ENGINE, request.oefPolicyText());
+        oefPolicy =
+            CoreCommands.parsePolicy(
+                "export", request.oefPolicyText(), KnownSchemaVersions.OEF_EXPORT_POLICY);
       }
       if (request.xmiPolicyText() != null) {
-        xmiPolicy = CoreCommands.parseExportPolicy(XMI_ENGINE, request.xmiPolicyText());
+        xmiPolicy =
+            CoreCommands.parsePolicy(
+                "export", request.xmiPolicyText(), KnownSchemaVersions.UML_XMI_EXPORT_POLICY);
       }
+    } catch (CoreCommands.PolicyVersionException error) {
+      // A stale/unknown policy version is an input error the caller can fix, and no engine has run
+      // yet -- the same buildLevelError(List<Diagnostic>) path a stale SOURCE model already takes
+      // above, which defaults to CommandExitCode.INPUT_ERROR. Publishing the gate's Diagnostic
+      // verbatim (not laundered through EngineExecutionException.command) keeps its own
+      // "$.<field>" path intact.
+      return buildLevelError(List.of(error.diagnostic()));
     } catch (EngineExecutionException error) {
+      // A malformed (unparseable) policy JSON is a genuinely different, pre-existing case -- the
+      // file is not even JSON -- and keeps its existing PLUGIN_ERROR exit.
       return buildLevelError(List.of(error.diagnostic()), CommandExitCode.PLUGIN_ERROR.code());
     }
 
@@ -369,11 +391,11 @@ public final class BuildCommand {
   /**
    * Runs one in-memory stage, folding the two published stage failures into the per-view
    * diagnostics exactly as the process CLI did: a structured {@link EngineExecutionException}
-   * (unknown engine, unsupported capability, invalid policy JSON, or an unexpected engine failure)
-   * folds with a {@code PLUGIN_ERROR} exit; a raw {@link UncheckedIOException} structural failure
-   * (an unresolvable {@code --views} entry) folds with an {@code INPUT_ERROR} exit so it never
-   * aborts the other views. On success the stage's own diagnostics are appended and its warning bit
-   * is the same the success envelope would carry (any non-info diagnostic).
+   * (unknown engine, unsupported capability, or an unexpected engine failure) folds with a {@code
+   * PLUGIN_ERROR} exit; a raw {@link UncheckedIOException} structural failure (an unresolvable
+   * {@code --views} entry) folds with an {@code INPUT_ERROR} exit so it never aborts the other
+   * views. On success the stage's own diagnostics are appended and its warning bit is the same the
+   * success envelope would carry (any non-info diagnostic).
    */
   private static <T> InMemoryStage<T> runStage(List<Diagnostic> diagnostics, InMemoryCall<T> call) {
     EngineDispatch.InMemoryOutcome<T> outcome;
