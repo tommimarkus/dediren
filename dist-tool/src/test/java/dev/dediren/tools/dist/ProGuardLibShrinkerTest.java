@@ -15,8 +15,10 @@ class ProGuardLibShrinkerTest {
     List<String> args =
         ProGuardLibShrinker.proGuardArgs(staged, Path.of("/out/merged.jar"), Path.of("/keep.pro"));
 
+    // Exhaustive: an extra or duplicated ProGuard argument silently changes shrink behavior,
+    // so the full argument vector is pinned, not just the relative order.
     assertThat(args)
-        .containsSubsequence(
+        .containsExactly(
             "-injars",
             "/lib/dep-alpha-1.0.0.jar" + ProGuardLibShrinker.INJAR_FILTER,
             "-injars",
@@ -34,8 +36,14 @@ class ProGuardLibShrinkerTest {
     // re-adds them collision-free under META-INF/third-party/<jar>/.
     assertThat(ProGuardLibShrinker.INJAR_FILTER)
         .contains("!META-INF/*.SF")
+        .contains("!META-INF/*.RSA")
+        .contains("!META-INF/*.DSA")
         .contains("!META-INF/LICENSE*")
         .contains("!META-INF/NOTICE*")
+        // about.html/about_files must stay out of the ProGuard pass: MergedJarPostProcessor
+        // re-adds them collision-free from the originals under META-INF/third-party/<jar>/.
+        .contains("!about.html")
+        .contains("!about_files/**")
         .contains("!META-INF/versions/**")
         .contains("!images/**")
         .contains("!model/**")

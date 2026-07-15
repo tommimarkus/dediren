@@ -64,6 +64,8 @@ class DistModuleTest {
     Files.createDirectories(staleBundle);
     Files.writeString(staleArchive, "stale archive");
 
+    // Calls the build seam directly (fake shrinker; text-fixture jars must never reach the real
+    // ProGuard pass). CLI-arg dispatch for `build` is covered end-to-end by -Pdist-smoke.
     DistTool.build(
         root,
         "2026.06.0",

@@ -25,12 +25,14 @@ class MergedJarPostProcessorTest {
             Map.of(
                 "META-INF/services/com.example.Spi", "com.example.AlphaImpl\n",
                 "com/example/AlphaImpl.class", "x"));
+    // b.jar re-declares AlphaImpl (dedup case), adds BetaImpl, and declares GoneImpl whose
+    // class did not survive shrinking.
     Path b =
         jar(
             dir.resolve("b.jar"),
             Map.of(
                 "META-INF/services/com.example.Spi",
-                "com.example.BetaImpl\n# comment\ncom.example.GoneImpl\n",
+                "com.example.AlphaImpl\ncom.example.BetaImpl\n# comment\ncom.example.GoneImpl\n",
                 "com/example/BetaImpl.class",
                 "x"));
     // The merged jar as a first-wins merge leaves it: only a.jar's service file survived,
@@ -51,10 +53,15 @@ class MergedJarPostProcessorTest {
 
   @Test
   void relocatesEmbeddedLicenceFilesUnderThirdPartyNamespace(@TempDir Path dir) throws Exception {
+    // docs/LICENSE.txt is nested content, not a jar-root licence artifact — it must NOT be
+    // relocated (the production depth check exists exactly for this).
     Path guava =
         jar(
             dir.resolve("guava-33.6.0-jre.jar"),
-            Map.of("META-INF/LICENSE", "apache text", "com/G.class", "x"));
+            Map.of(
+                "META-INF/LICENSE", "apache text",
+                "docs/LICENSE.txt", "unrelated nested content",
+                "com/G.class", "x"));
     Path elk =
         jar(
             dir.resolve("elk-core-0.11.0.jar"),
@@ -78,6 +85,11 @@ class MergedJarPostProcessorTest {
         .isEqualTo("epl text");
     // Non-licence resources are not relocated, and existing class entries survive untouched.
     assertThat(entryText(merged, "com/G.class")).isEqualTo("x");
+    try (ZipFile zip = new ZipFile(merged.toFile())) {
+      assertThat(zip.getEntry("META-INF/third-party/guava-33.6.0-jre/LICENSE.txt"))
+          .as("nested docs/LICENSE.txt must not be treated as a licence artifact")
+          .isNull();
+    }
   }
 
   @Test

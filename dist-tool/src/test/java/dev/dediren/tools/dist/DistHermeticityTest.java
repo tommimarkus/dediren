@@ -109,6 +109,30 @@ class DistHermeticityTest {
         .doesNotContain("dep-alpha-1.0.0.jar");
   }
 
+  @Test
+  void buildFailsWhenShrinkerLeavesUnexpectedLibEntries(@TempDir Path root) throws Exception {
+    writeDistributionRoot(root);
+    // A misbehaving shrinker that drops residue next to the merged jar must trip the packaged-lib
+    // exact-match guard (verifyPackagedLib) — the post-shrink half of the hermeticity contract.
+    LibShrinker leakyShrinker =
+        (stagedJars, mergedJar) -> {
+          Files.writeString(mergedJar, "merged jar");
+          Files.writeString(mergedJar.resolveSibling("stray-residue.jar"), "residue");
+        };
+
+    assertThatThrownBy(
+            () ->
+                DistTool.build(
+                    root,
+                    VERSION,
+                    root.resolve("THIRD-PARTY-NOTICES.md"),
+                    bundle -> {},
+                    leakyShrinker))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("stray-residue.jar");
+    assertThat(root.resolve("dist/dediren-agent-bundle-" + VERSION + ".tar.gz")).doesNotExist();
+  }
+
   private static String readArchiveEntry(Path archive, String entry) throws Exception {
     Process process =
         new ProcessBuilder("tar", "-xOf", archive.toString(), entry)
