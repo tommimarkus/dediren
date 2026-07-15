@@ -32,13 +32,18 @@ class CliMcpParityTest {
     return Path.of("..", "fixtures", "render-policy", name).toAbsolutePath().normalize();
   }
 
+  private static Path exportPolicy(String name) {
+    return Path.of("..", "fixtures", "export-policy", name).toAbsolutePath().normalize();
+  }
+
   @Test
   void validateProducesTheSameEnvelopeThroughBothLanes(@TempDir Path root) throws Exception {
     Path source = root.resolve("model.json");
     Files.copy(fixture("valid-pipeline-rich.json"), source);
 
     CliResult cli =
-        Main.executeForTesting(new String[] {"validate", "--input", source.toString()}, "");
+        Main.executeForTesting(
+            new String[] {"validate", "--input", source.toString()}, "", Map.of());
 
     CallToolResult mcp =
         new DedirenTools(root, EngineWiring.defaults(), Map.of())
@@ -54,7 +59,8 @@ class CliMcpParityTest {
     Files.copy(fixture("invalid-duplicate-id.json"), source);
 
     CliResult cli =
-        Main.executeForTesting(new String[] {"validate", "--input", source.toString()}, "");
+        Main.executeForTesting(
+            new String[] {"validate", "--input", source.toString()}, "", Map.of());
 
     CallToolResult mcp =
         new DedirenTools(root, EngineWiring.defaults(), Map.of())
@@ -84,7 +90,8 @@ class CliMcpParityTest {
               "--render-policy",
               renderPolicy.toString()
             },
-            "");
+            "",
+            Map.of());
 
     Path mcpOut = Files.createDirectories(root.resolve("mcp-out"));
     CallToolResult mcp =
@@ -140,7 +147,8 @@ class CliMcpParityTest {
               "--render-policy",
               renderPolicy.toString()
             },
-            "");
+            "",
+            Map.of());
 
     Path mcpOut = Files.createDirectories(root.resolve("mcp-out"));
     Files.writeString(mcpOut.resolve("main"), "occupied");
@@ -252,6 +260,158 @@ class CliMcpParityTest {
     assertThat(cli.exitCode()).isZero();
     assertThat(mcp.isError()).isNotEqualTo(Boolean.TRUE);
     assertThat(normalizePaths(textOf(mcp), mcpOut)).isEqualTo(normalizePaths(cli.stdout(), cliOut));
+  }
+
+  @Test
+  void validateWithProfileProducesTheSameEnvelopeThroughBothLanes(@TempDir Path root)
+      throws Exception {
+    Path source = root.resolve("model.json");
+    Files.copy(fixture("valid-pipeline-archimate.json"), source);
+
+    CliResult cli =
+        Main.executeForTesting(
+            new String[] {
+              "validate",
+              "--plugin",
+              "generic-graph",
+              "--profile",
+              "archimate",
+              "--input",
+              source.toString()
+            },
+            "",
+            Map.of());
+
+    CallToolResult mcp =
+        new DedirenTools(root, EngineWiring.defaults(), Map.of())
+            .validate(
+                new CallToolRequest(
+                    "dediren_validate", Map.of("source", "model.json", "profile", "archimate")));
+
+    assertThat(textOf(mcp).strip()).isEqualTo(cli.stdout().strip());
+    assertThat(mcp.isError()).isEqualTo(cli.exitCode() != 0);
+  }
+
+  @Test
+  void buildOefLaneProducesTheSameEnvelopeThroughBothLanes(@TempDir Path root) throws Exception {
+    Path source = root.resolve("model.json");
+    Files.copy(fixture("valid-pipeline-archimate.json"), source);
+    Path oefPolicy = root.resolve("oef.json");
+    Files.copy(exportPolicy("default-oef.json"), oefPolicy);
+
+    Path cliOut = Files.createDirectories(root.resolve("cli-out"));
+    CliResult cli =
+        Main.executeForTesting(
+            new String[] {
+              "build",
+              "--input",
+              source.toString(),
+              "--out",
+              cliOut.toString(),
+              "--oef-policy",
+              oefPolicy.toString()
+            },
+            "",
+            Map.of());
+
+    Path mcpOut = Files.createDirectories(root.resolve("mcp-out"));
+    CallToolResult mcp =
+        new DedirenTools(root, EngineWiring.defaults(), Map.of())
+            .build(
+                new CallToolRequest(
+                    "dediren_build",
+                    Map.of(
+                        "source", "model.json",
+                        "out", mcpOut.toString(),
+                        "oef_policy", "oef.json")));
+
+    assertThat(mcp.isError()).isEqualTo(cli.exitCode() != 0);
+    assertThat(normalizePaths(textOf(mcp), mcpOut)).isEqualTo(normalizePaths(cli.stdout(), cliOut));
+  }
+
+  @Test
+  void buildXmiLaneProducesTheSameEnvelopeThroughBothLanes(@TempDir Path root) throws Exception {
+    Path source = root.resolve("model.json");
+    Files.copy(fixture("valid-uml-basic.json"), source);
+    Path xmiPolicy = root.resolve("xmi.json");
+    Files.copy(exportPolicy("default-uml-xmi.json"), xmiPolicy);
+
+    Path cliOut = Files.createDirectories(root.resolve("cli-out"));
+    CliResult cli =
+        Main.executeForTesting(
+            new String[] {
+              "build",
+              "--input",
+              source.toString(),
+              "--out",
+              cliOut.toString(),
+              "--xmi-policy",
+              xmiPolicy.toString()
+            },
+            "",
+            Map.of());
+
+    Path mcpOut = Files.createDirectories(root.resolve("mcp-out"));
+    CallToolResult mcp =
+        new DedirenTools(root, EngineWiring.defaults(), Map.of())
+            .build(
+                new CallToolRequest(
+                    "dediren_build",
+                    Map.of(
+                        "source", "model.json",
+                        "out", mcpOut.toString(),
+                        "xmi_policy", "xmi.json")));
+
+    assertThat(mcp.isError()).isEqualTo(cli.exitCode() != 0);
+    assertThat(normalizePaths(textOf(mcp), mcpOut)).isEqualTo(normalizePaths(cli.stdout(), cliOut));
+  }
+
+  @Test
+  void buildWithAllEmitKindsProducesTheSameEnvelopeThroughBothLanes(@TempDir Path root)
+      throws Exception {
+    Path source = root.resolve("model.json");
+    Files.copy(fixture("valid-pipeline-rich.json"), source);
+    Path renderPolicy = root.resolve("policy.json");
+    Files.copy(policy("rich-svg.json"), renderPolicy);
+
+    Path cliOut = Files.createDirectories(root.resolve("cli-out"));
+    CliResult cli =
+        Main.executeForTesting(
+            new String[] {
+              "build",
+              "--input",
+              source.toString(),
+              "--out",
+              cliOut.toString(),
+              "--render-policy",
+              renderPolicy.toString(),
+              "--emit",
+              "layout-request,layout-result,render-metadata"
+            },
+            "",
+            Map.of());
+
+    Path mcpOut = Files.createDirectories(root.resolve("mcp-out"));
+    CallToolResult mcp =
+        new DedirenTools(root, EngineWiring.defaults(), Map.of())
+            .build(
+                new CallToolRequest(
+                    "dediren_build",
+                    Map.of(
+                        "source",
+                        "model.json",
+                        "out",
+                        mcpOut.toString(),
+                        "render_policy",
+                        "policy.json",
+                        "emit",
+                        java.util.List.of("layout-request", "layout-result", "render-metadata"))));
+
+    assertThat(cli.exitCode()).isZero();
+    assertThat(normalizePaths(textOf(mcp), mcpOut)).isEqualTo(normalizePaths(cli.stdout(), cliOut));
+    assertThat(mcpOut.resolve("main/layout-request.json")).exists();
+    assertThat(mcpOut.resolve("main/layout-result.json")).exists();
+    assertThat(mcpOut.resolve("main/render-metadata.json")).exists();
   }
 
   /** The envelope names the artifacts it wrote, so the out dir differs between the two lanes. */
