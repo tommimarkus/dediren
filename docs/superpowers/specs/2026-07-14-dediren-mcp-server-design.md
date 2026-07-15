@@ -155,9 +155,13 @@ That is how the calling agent locates its SVG/OEF/XMI outputs.
 |---|---|---|---|
 | `topic` | string | no | Omitted → a short index of available topics. |
 
-Curated topic map: `source-json`, `build`, `render-policy`, `export`,
-`archimate`, `uml-sequence`, `uml-state-machine`, `uml-use-case`,
-`uml-component`, `uml-deployment`, `repair`, `commands`, `runtime`.
+Curated topic map — the authoritative list is `GuideCatalog.TOPICS`, pinned
+bidirectionally against `docs/agent-usage.md`'s `##` headings by
+`GuideCatalogTest`. As shipped it covers: `source-json`, `build`, `commands`,
+`render-policy`, `export`, `archimate`, `uml-sequence`, `uml-state-machine`,
+`uml-use-case`, `uml-component`, `uml-deployment`, `profiles`, `artifacts`,
+`fast-path`, `smoke`, `runtime-probes`, `environment`, `logging`, `migration`,
+`repair`, and `mcp`.
 
 A test pins the map against `docs/agent-usage.md`'s `##` headings **in both
 directions**: every topic resolves to a real heading, and every heading is
