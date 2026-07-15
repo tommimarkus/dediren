@@ -332,12 +332,15 @@ public final class DistTool {
     }
     notice.append('\n');
     notice.append("## Redistributed Third-Party Libraries\n\n");
-    notice.append("Each launcher `lib/` directory redistributes the libraries below in\n");
-    notice.append("unmodified object form. Every library remains covered by its upstream\n");
-    notice.append("licence, identified per jar as `(project, licence)`. Licence and notice\n");
-    notice.append("files embedded inside the jars (`META-INF/LICENSE`, `META-INF/NOTICE`,\n");
-    notice.append("`about.html`) are redistributed unchanged and remain authoritative for\n");
-    notice.append("their jar.\n\n");
+    notice.append("The bundle `lib/` jar redistributes the libraries below in\n");
+    notice.append("modified object form: classes and resources unreachable from Dediren's\n");
+    notice.append("entry points are removed (a shrink-only pass — no surviving class is\n");
+    notice.append("altered, optimized, or renamed) and the remainder is merged into the\n");
+    notice.append("single bundle jar. Every library remains covered by its upstream licence,\n");
+    notice.append("identified per input jar as `(project, licence)`. Licence and notice\n");
+    notice.append("files embedded inside the input jars (`META-INF/LICENSE`,\n");
+    notice.append("`META-INF/NOTICE`, `about.html`) are carried unchanged inside the bundle\n");
+    notice.append("jar under `META-INF/third-party/<jar-name>/`.\n\n");
     Set<String> licenseIds = new TreeSet<>();
     for (Map.Entry<String, ThirdPartyAttribution> entry : thirdParty.entrySet()) {
       ThirdPartyAttribution attribution = entry.getValue();

@@ -145,7 +145,13 @@ class DistModuleTest {
         .contains("Eclipse Public License - v 2.0")
         .contains("Eclipse Public License - v 1.0")
         .contains("W3C® SOFTWARE NOTICE AND LICENSE")
-        .contains("QOS.ch");
+        .contains("QOS.ch")
+        // The bundle ships one shrink-merged jar, so the notices must describe modified
+        // redistribution and point at the relocated embedded licence files.
+        .contains("modified object form")
+        .contains("shrink-only")
+        .contains("`META-INF/third-party/<jar-name>/`")
+        .doesNotContain("unmodified object form");
   }
 
   @Test
