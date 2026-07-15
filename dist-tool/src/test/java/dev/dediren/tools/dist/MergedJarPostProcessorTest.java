@@ -58,7 +58,13 @@ class MergedJarPostProcessorTest {
     Path elk =
         jar(
             dir.resolve("elk-core-0.11.0.jar"),
-            Map.of("about.html", "epl text", "org/E.class", "x"));
+            Map.of(
+                "about.html",
+                "see about_files/epl-v20.html",
+                "about_files/epl-v20.html",
+                "epl text",
+                "org/E.class",
+                "x"));
     Path merged = jar(dir.resolve("merged.jar"), Map.of("com/G.class", "x", "org/E.class", "x"));
 
     MergedJarPostProcessor.apply(merged, List.of(guava, elk));
@@ -66,6 +72,9 @@ class MergedJarPostProcessorTest {
     assertThat(entryText(merged, "META-INF/third-party/guava-33.6.0-jre/LICENSE"))
         .isEqualTo("apache text");
     assertThat(entryText(merged, "META-INF/third-party/elk-core-0.11.0/about.html"))
+        .isEqualTo("see about_files/epl-v20.html");
+    // about.html's relative about_files/ links keep resolving in the relocated layout.
+    assertThat(entryText(merged, "META-INF/third-party/elk-core-0.11.0/about_files/epl-v20.html"))
         .isEqualTo("epl text");
     // Non-licence resources are not relocated, and existing class entries survive untouched.
     assertThat(entryText(merged, "com/G.class")).isEqualTo("x");

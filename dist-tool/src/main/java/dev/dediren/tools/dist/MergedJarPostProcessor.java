@@ -60,7 +60,11 @@ final class MergedJarPostProcessor {
     Map<String, LinkedHashSet<String>> services = new TreeMap<>();
     Map<String, byte[]> licences = new TreeMap<>();
     for (Path original : originalJars) {
-      String jarBase = original.getFileName().toString().replaceFirst("\\.jar$", "");
+      Path originalFileName = original.getFileName();
+      if (originalFileName == null) {
+        throw new IllegalArgumentException("staged jar path has no file name: " + original);
+      }
+      String jarBase = originalFileName.toString().replaceFirst("\\.jar$", "");
       try (ZipFile zip = new ZipFile(original.toFile())) {
         var names = zip.entries();
         while (names.hasMoreElements()) {
@@ -80,19 +84,25 @@ final class MergedJarPostProcessor {
                 services.computeIfAbsent(name, key -> new LinkedHashSet<>()).add(impl);
               }
             }
-          } else if (isLicenceFile(name)) {
-            byte[] data;
-            try (var in = zip.getInputStream(entry)) {
-              data = in.readAllBytes();
+          } else {
+            String licenceTarget = licenceTargetPath(name);
+            if (licenceTarget != null) {
+              byte[] data;
+              try (var in = zip.getInputStream(entry)) {
+                data = in.readAllBytes();
+              }
+              licences.put("META-INF/third-party/" + jarBase + "/" + licenceTarget, data);
             }
-            String file = name.substring(name.lastIndexOf('/') + 1);
-            licences.put("META-INF/third-party/" + jarBase + "/" + file, data);
           }
         }
       }
     }
 
-    Path repacked = Files.createTempFile(mergedJar.getParent(), "merged-post", ".jar");
+    Path mergedJarDir = mergedJar.toAbsolutePath().getParent();
+    if (mergedJarDir == null) {
+      throw new IllegalArgumentException("merged jar path has no parent directory: " + mergedJar);
+    }
+    Path repacked = Files.createTempFile(mergedJarDir, "merged-post", ".jar");
     try (ZipOutputStream out = new ZipOutputStream(Files.newOutputStream(repacked))) {
       for (Map.Entry<String, byte[]> entry : entries.entrySet()) {
         if (entry.getKey().startsWith("META-INF/services/")) {
@@ -113,14 +123,26 @@ final class MergedJarPostProcessor {
     Files.move(repacked, mergedJar, StandardCopyOption.REPLACE_EXISTING);
   }
 
-  /** Root-level or META-INF-root licence artifacts; deeper paths are content, not licences. */
-  private static boolean isLicenceFile(String name) {
+  /**
+   * Relocation target (relative to {@code META-INF/third-party/<jar>/}) for a licence artifact, or
+   * null when the entry is content, not a licence. Root-level or META-INF-root LICENSE- and
+   * NOTICE-prefixed files and about.html flatten to their file name; Eclipse {@code about_files/}
+   * entries (the licence texts about.html links to) keep their directory so those relative links
+   * still resolve.
+   */
+  private static String licenceTargetPath(String name) {
+    if (name.startsWith("about_files/")) {
+      return name;
+    }
     String file = name.substring(name.lastIndexOf('/') + 1);
     boolean metaInfRoot =
         name.startsWith("META-INF/") && name.indexOf('/', "META-INF/".length()) < 0;
     boolean atRoot = name.indexOf('/') < 0;
-    return (metaInfRoot || atRoot)
-        && (file.startsWith("LICENSE") || file.startsWith("NOTICE") || file.equals("about.html"));
+    if ((metaInfRoot || atRoot)
+        && (file.startsWith("LICENSE") || file.startsWith("NOTICE") || file.equals("about.html"))) {
+      return file;
+    }
+    return null;
   }
 
   /** STORED entries must carry size and CRC up front; java.util.zip enforces it. */
