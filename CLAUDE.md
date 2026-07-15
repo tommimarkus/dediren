@@ -108,6 +108,10 @@ agent tools should be pointed here from their own entrypoint files (for example,
   `AgentUsageDocConsistencyTest` (dist-tool) enforces that every `DEDIREN_*`
   token and CalVer version string in `docs/agent-usage.md` exists in source and
   matches the product version; keep it green when renaming codes or env vars.
+  The same test also enforces the reverse direction: every production
+  (`src/main`) `DEDIREN_*` token must be documented in the guide, individually
+  or via a documented family prefix — a new diagnostic code needs a
+  `## Repair Rules` entry or an internal-families extension.
 - ELK layout changes: update `engines/elk-layout`, CLI/distribution
   smoke coverage, and README/agent runtime notes together.
 - Render policy changes: update `schemas/render-policy.schema.json`,

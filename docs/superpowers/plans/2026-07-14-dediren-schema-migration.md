@@ -1,6 +1,6 @@
 # Dediren Schema Migration Implementation Plan
 
-Status: complete — implemented on main as 999ecd6..570b790; UNRELEASED as of 2026-07-15: fold the breaking stale-policy hard-fail into the next release's notes.
+Status: complete — implemented on main as 999ecd6..570b790; UNRELEASED as of 2026-07-15: fold the breaking stale-policy hard-fail into the next release's notes. Those notes must also mention that stale or version-less hand-written layout requests now fail at the version gate (exit 2, `DEDIREN_SCHEMA_VERSION_*` codes) instead of the engine's exit-3 parse row.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

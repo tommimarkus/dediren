@@ -1,8 +1,8 @@
 # Recorded deferrals (2026-07-15)
 
 Status: open — parked items with no other in-repo record, surfaced by the
-2026-07-15 coherence review. Each is deliberate scope-cutting, not a defect
-list; pick up individually.
+2026-07-15 coherence review. Entries are deliberate scope-cutting or newly
+recorded pre-existing gaps, not a defect list; pick up individually.
 
 - **Sequence-edge bend jitter** (visual-defect suite, 2026-07 era): minor
   route-bend wobble on dense sequence diagrams; deferred when the SvgAudit
