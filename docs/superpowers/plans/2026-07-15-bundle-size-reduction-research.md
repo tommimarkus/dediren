@@ -1,5 +1,10 @@
 # Bundle Size Reduction Research (2026-07-15)
 
+> **Status 2026-07-16:** adopted through "shrink + merge + strip + no-YAML + STORED repack,
+> `.tar.gz` retained" — implemented by `2026-07-16-bundle-shrink-implementation.md`
+> (shipped archive: 5,464,991 bytes vs the 15,150,460-byte baseline). The tar.xz format
+> switch (measured 3.50 MB) remains the unadopted follow-up.
+
 Goal: shrink the release asset `dediren-agent-bundle-<version>.tar.gz` from
 15.1 MB to under 5 MB. Research with PoCs; nothing here is shipped yet. All
 PoC variants below were validated with the real `DistTool smoke` (layout,

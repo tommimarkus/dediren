@@ -151,7 +151,7 @@ guide, one section at a time) over stdio. Tool paths are confined to `--root`;
 ```text
 dediren-agent-bundle-2026.07.18/
   bin/dediren     the single launcher (hosts all five engines in-process)
-  lib/            jars (no bundled JRE)
+  lib/            one shrink-merged classpath jar (no bundled JRE)
   schemas/        public JSON schemas
   fixtures/       source, policy, layout, render, and export examples
   docs/agent-usage.md
@@ -207,8 +207,11 @@ git tag -a v2026.07.18 -m "Release 2026.07.18"
 ```
 
 `dist-build` is hermetic and self-verifying — it regenerates each module's
-staging directory and fails if the packaged `lib/` diverges from the launcher
-classpaths — so a locally built archive is safe to distribute without a
+staging directory, verifies the staged jars against the launcher classpath,
+shrinks them into the single `lib/dediren-bundle-<version>.jar` (a shrink-only
+ProGuard pass; third-party licence files ride inside it under
+`META-INF/third-party/`), and fails if the packaged `lib/` diverges from that
+one jar — so a locally built archive is safe to distribute without a
 preceding `clean`. GitHub Releases publish one Java archive, `SHA256SUMS`, and
 CycloneDX SBOMs with GitHub artifact attestations; verify a download with:
 

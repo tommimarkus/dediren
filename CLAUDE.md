@@ -130,6 +130,12 @@ agent tools should be pointed here from their own entrypoint files (for example,
   `GuideCatalog` topics), the `## MCP Server` section of
   `docs/agent-usage.md`, the MCP rows of `docs/threat-model.md`, and the
   dist-tool packaged-MCP stdio smoke together.
+- Runtime dependencies or reflective surfaces on the cli classpath: the bundle
+  ships one shrink-merged `lib/` jar, so a new ServiceLoader registration,
+  annotation-driven library, or reflection-reached class needs a matching keep
+  rule in `dist-tool` `bundle-shrink.pro` (and a licence attribution in
+  `DistTool.THIRD_PARTY_ATTRIBUTIONS`) in the same change — `-Pdist-smoke` is
+  the gate that catches a miss.
 
 ## Versioning
 
