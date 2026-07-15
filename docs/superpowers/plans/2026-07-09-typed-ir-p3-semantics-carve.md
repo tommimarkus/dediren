@@ -1,5 +1,7 @@
 # Typed IR — Phase 3: Carve `generic-graph` into `semantics-graph/archimate/uml` — Implementation Plan
 
+Status: complete — Plan B P1–P5 all shipped by 2026.07.15.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Split the single `engines/generic-graph` module — which fuses base/plain projection, the ArchiMate front-end, and the UML front-end behind a stringly `semanticProfile` — into three focused modules (`semantics-graph`, `semantics-archimate`, `semantics-uml`), each depending only on its own notation core, coordinated by one profile-routing `SemanticsEngine` over a `NotationSemantics` hook SPI. Delete `engines/generic-graph`. **The wire is unchanged**: same command envelopes, same `contracts` records, same four stringly `uml.sequence.*` constraints, engine id still `generic-graph`, no schema bump.

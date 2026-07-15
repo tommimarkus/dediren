@@ -1,5 +1,7 @@
 # Dediren Schema Migration Implementation Plan
 
+Status: complete — implemented on main as 999ecd6..570b790; UNRELEASED as of 2026-07-15: fold the breaking stale-policy hard-fail into the next release's notes.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make a Dediren file written against an older schema tell its holder that it is stale, and where the upgrade steps are — instead of failing with a generic schema error (source model) or being silently accepted (policy files).

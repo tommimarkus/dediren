@@ -1,5 +1,7 @@
 # Dediren MCP Server Implementation Plan
 
+Status: complete — merged 51d7f33, released 2026.07.17.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Ship `dediren mcp` — an MCP stdio server exposing `dediren_validate`, `dediren_build`, and a sectioned `dediren_guide` as typed tools, so coding agents drive Dediren without shelling out to the CLI.

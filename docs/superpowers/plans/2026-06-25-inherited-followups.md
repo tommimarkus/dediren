@@ -47,6 +47,8 @@ NVD-backed gate.
 **Audit gate:** `souroldgeezer-audit:devsecops-audit` (quick) on the workflow
 diff.
 
+> Resolved differently (2026-07): OWASP dependency-check demoted to a weekly cross-check in .github/workflows/dependency-audit.yml (17ab377) instead of re-enabling in the main build.
+
 ---
 
 ## Item 2 — Decompose `uml/.../Uml.java` (1,833 lines)

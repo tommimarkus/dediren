@@ -1,7 +1,7 @@
 # Interactive SVG: Select Node → Highlight Edges — Design
 
 Date: 2026-06-10
-Status: approved design, pending implementation plan
+Status: implemented 2026-06; retired 2026-07 (render-policy.schema.v3 removed interactive output — see plans/2026-07-09-retire-interactive-svg.md).
 
 ## Problem
 

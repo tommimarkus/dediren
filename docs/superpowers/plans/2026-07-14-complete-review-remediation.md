@@ -1,5 +1,11 @@
 # Complete-Review Remediation Implementation Plan
 
+Status: complete — released 2026.07.16.
+
+> Erratum 2026-07-15: jqwik was removed 2026-07-14 (7b520b0). Read "jqwik
+> property test" as the seeded JUnit `@ParameterizedTest` sequence property
+> suite that replaced it.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Close the 27 adversarially-verified findings of the 2026-07-14 complete

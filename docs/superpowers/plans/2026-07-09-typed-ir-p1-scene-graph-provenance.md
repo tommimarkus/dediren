@@ -1,5 +1,11 @@
 # Typed IR — Phase 1: Scene Graph Skeleton + Source Provenance — Implementation Plan
 
+Status: complete — Plan B P1–P5 all shipped by 2026.07.15.
+
+> Erratum 2026-07-15: jqwik was removed 2026-07-14 (7b520b0). Read "jqwik
+> property test" as the seeded JUnit `@ParameterizedTest` sequence property
+> suite that replaced it.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Land the `ir` module skeleton and embed a JSON-Pointer `source_pointer` on the public `layout-request` / `layout-result` artifacts (schema v1→v2), as the first, independently-shippable phase of Plan B.

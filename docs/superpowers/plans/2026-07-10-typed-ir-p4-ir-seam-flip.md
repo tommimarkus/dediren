@@ -1,5 +1,11 @@
 # Typed IR P4 — IR Seam Flip Implementation Plan
 
+Status: complete — Plan B P1–P5 all shipped by 2026.07.15.
+
+> Erratum 2026-07-15: jqwik was removed 2026-07-14 (7b520b0). Read "jqwik
+> property test" as the seeded JUnit `@ParameterizedTest` sequence property
+> suite that replaced it.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Flip the `engine-api` boundary so the layout pipeline speaks the typed `ir` IR (`SceneGraph` pre-layout, `LaidOutScene` post-layout) end-to-end, and make the in-memory `build` driver pipe IR between stages with no JSON re-serialization — all behavior-preserving, no schema change.

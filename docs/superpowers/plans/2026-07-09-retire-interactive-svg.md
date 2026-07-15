@@ -1,8 +1,6 @@
 # Plan: retire interactive-svg (SVG-only render output)
 
-Status: in progress. Stacked on the `worktree-broaden-diagram-styling` branch
-(tip 65adab6) per the integration decision below. Precursor to the separate
-StAX emitter refactor (see `2026-07-09-structured-svg-emission-proposal.md`).
+Status: complete — shipped in 2026.07.15 (render-policy.schema.v3; the worktree-stacking note below is historical).
 
 ## Why
 
