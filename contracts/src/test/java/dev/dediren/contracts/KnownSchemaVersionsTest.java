@@ -47,6 +47,17 @@ class KnownSchemaVersionsTest {
             KnownSchemaVersions.MODEL,
             KnownSchemaVersions.RENDER_POLICY,
             KnownSchemaVersions.OEF_EXPORT_POLICY,
-            KnownSchemaVersions.UML_XMI_EXPORT_POLICY);
+            KnownSchemaVersions.UML_XMI_EXPORT_POLICY,
+            KnownSchemaVersions.LAYOUT_REQUEST);
+  }
+
+  @Test
+  void layoutRequestCarriesItsShippedHistoryOldestFirst() {
+    assertThat(KnownSchemaVersions.LAYOUT_REQUEST.priorVersions())
+        .containsExactly("layout-request.schema.v1");
+    assertThat(KnownSchemaVersions.LAYOUT_REQUEST.currentVersion())
+        .isEqualTo(ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION);
+    assertThat(KnownSchemaVersions.LAYOUT_REQUEST.versionField())
+        .isEqualTo("layout_request_schema_version");
   }
 }

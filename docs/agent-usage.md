@@ -856,6 +856,17 @@ Interactive SVG was retired. Remove the top-level `interactive` key (`none`,
 `render_policy_schema_version` to `render-policy.schema.v3`. There is no
 replacement: renders are static.
 
+### layout-request.schema.v1 → layout-request.schema.v2
+
+Usually not a hand edit: `dediren project` always emits the current version,
+so regenerate the request unless you deliberately keep a hand-written one. To
+upgrade a kept v1 file: set `layout_request_schema_version` to
+`layout-request.schema.v2`. v2 adds an optional `source_pointer` (a JSON
+Pointer into the source model, starting with `/`) on nodes and edges — add it
+only if you track provenance — and constrains node `id`/`role` charsets, so
+rename any id the v2 schema rejects consistently across nodes, edges, and
+constraints.
+
 ## Plugin Environment
 
 The bundle launcher uses `DEDIREN_BUNDLE_ROOT` for product-root discovery. The

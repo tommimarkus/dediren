@@ -3,8 +3,8 @@ package dev.dediren.contracts;
 import java.util.List;
 
 /**
- * The version history of every hand-authored Dediren schema family: which versions have shipped, in
- * order, and which JSON field carries the version.
+ * The version history of every hand-authorable Dediren input-schema family: which versions have
+ * shipped, in order, and which JSON field carries the version.
  *
  * <p>This registry is what lets the version gate tell "a version I recognize as superseded" apart
  * from "a string I have never heard of" — the difference between an actionable upgrade instruction
@@ -84,8 +84,18 @@ public final class KnownSchemaVersions {
           List.of("uml_xmi_export_policy_schema_version"),
           List.of(ContractVersions.UML_XMI_EXPORT_POLICY_SCHEMA_VERSION));
 
+  // layout-request is machine-emitted by `project` but documented as hand-authorable
+  // (agent-usage "Layout constraints in a hand-written layout-request"), and it genuinely
+  // shipped a v1 before the typed-IR v2 (291921d). Registering it gives a kept v1 file the
+  // same OUTDATED-with-upgrade-steps treatment as the other hand-authorable inputs.
+  public static final Family LAYOUT_REQUEST =
+      new Family(
+          "layout-request",
+          List.of("layout_request_schema_version"),
+          List.of("layout-request.schema.v1", ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION));
+
   public static final List<Family> ALL =
-      List.of(MODEL, RENDER_POLICY, OEF_EXPORT_POLICY, UML_XMI_EXPORT_POLICY);
+      List.of(MODEL, RENDER_POLICY, OEF_EXPORT_POLICY, UML_XMI_EXPORT_POLICY, LAYOUT_REQUEST);
 
   private KnownSchemaVersions() {}
 }
