@@ -314,9 +314,12 @@ Discipline:
   it. With no level above `debug` available, a log line cannot plausibly be the
   user's notification channel. It also makes the default-off posture safe —
   slf4j-simple fails open to `INFO` if its config is lost, and there is nothing
-  at `INFO`+ to leak. Only `cli` (the runtime composition root) and
-  `test-support` (test-only, never shipped) bind a provider; library modules
-  take `slf4j-api` alone so they never impose a binding on a consumer.
+  at `INFO`+ to leak. Only `cli` (the runtime composition root) binds a provider
+  at runtime, and `test-support` (test-only, never shipped) binds one for tests;
+  `schema-cache` also binds `slf4j-simple`, at test scope only, because it is
+  the one logging module that does not depend on `test-support`. Library modules
+  take `slf4j-api` alone so they never impose a binding on a consumer, and
+  `LoggingProviderLocalityTest` (`dist-tool`) pins this posture.
 
 ---
 

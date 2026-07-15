@@ -187,8 +187,11 @@ enforcement authority for matching version, tag, and release actions.
   banned in first-party code and `ArchitectureRulesTest` fails the build on
   them: anything an agent must act on belongs in the envelope's `diagnostics[]`,
   so logging must never become the notification channel. Only `cli` binds an
-  SLF4J provider (and `test-support` for tests); library modules take
-  `slf4j-api` alone. Logging is off unless `DEDIREN_LOG_LEVEL` says otherwise.
+  SLF4J provider at runtime; `test-support` binds one for
+  tests, and `schema-cache` binds `slf4j-simple` at test scope only (it is the
+  one logging module that does not depend on test-support). Library modules take
+  `slf4j-api` alone; `LoggingProviderLocalityTest` (dist-tool) pins this.
+  Logging is off unless `DEDIREN_LOG_LEVEL` says otherwise.
 
 ## ELK Runtime
 
