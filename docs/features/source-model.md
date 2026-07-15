@@ -18,7 +18,7 @@ plugin-owned document data (such as views).
 ```json
 {
   "model_schema_version": "model.schema.v1",
-  "required_plugins": [{ "id": "generic-graph", "version": "2026.07.18" }],
+  "required_plugins": [{ "id": "generic-graph", "version": "2026.07.19" }],
   "nodes": [
     { "id": "client", "type": "generic.actor", "label": "Client", "properties": {} },
     { "id": "api", "type": "generic.component", "label": "API", "properties": {} }
