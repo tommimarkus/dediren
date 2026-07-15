@@ -31,9 +31,22 @@ public record BuildRequest(
     Path outDir,
     Map<String, String> env) {
   public BuildRequest {
-    views = views == null ? List.of() : List.copyOf(views);
+    views = views == null ? List.of() : normalizeViews(views);
     emit = emit == null ? Set.of() : Set.copyOf(emit);
     env = env == null ? Map.of() : Map.copyOf(env);
+  }
+
+  // De-duplicate and drop blank view ids while preserving first-seen order, so the CLI (raw
+  // --views split, which keeps duplicates) and the MCP lane agree on which views are built; a
+  // repeated id would otherwise build the same view twice on the CLI lane.
+  private static List<String> normalizeViews(List<String> views) {
+    java.util.LinkedHashSet<String> ordered = new java.util.LinkedHashSet<>();
+    for (String view : views) {
+      if (view != null && !view.isBlank()) {
+        ordered.add(view);
+      }
+    }
+    return List.copyOf(ordered);
   }
 
   /** The unconfined CLI/human lane: no fragment confinement root. */
