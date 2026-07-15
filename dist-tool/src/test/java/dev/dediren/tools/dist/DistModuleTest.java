@@ -86,7 +86,7 @@ class DistModuleTest {
         readArchiveEntry(archive, "dediren-agent-bundle-2026.06.0/bundle.json");
     JsonNode metadata = JsonSupport.objectMapper().readTree(archiveMetadata);
     assertThat(metadata.path("bundle_schema_version").asText())
-        .isEqualTo("dediren-bundle.schema.v2");
+        .isEqualTo(DistTool.BUNDLE_SCHEMA_VERSION);
     assertThat(metadata.path("version").asText()).isEqualTo("2026.06.0");
     assertThat(metadata.path("target").asText()).isEqualTo("java");
     // Single-launcher cutover: the descriptor no longer advertises a process-plugin surface.

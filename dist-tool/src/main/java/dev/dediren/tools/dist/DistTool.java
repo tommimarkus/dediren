@@ -84,6 +84,9 @@ public final class DistTool {
           "uml",
           "uml-xmi-export");
 
+  /** Bundle descriptor schema id; schemas/bundle.schema.json declares the same const. */
+  static final String BUNDLE_SCHEMA_VERSION = "dediren-bundle.schema.v2";
+
   private static final Map<String, ThirdPartyAttribution> THIRD_PARTY_ATTRIBUTIONS =
       Map.ofEntries(
           Map.entry(
@@ -986,7 +989,7 @@ public final class DistTool {
     // dediren-bundle.schema.v2 (Cutover B): the plugins[] array and elk_helper pointer described a
     // process-plugin surface that no longer exists; an honest descriptor drops them.
     Map<String, Object> metadata = new LinkedHashMap<>();
-    metadata.put("bundle_schema_version", "dediren-bundle.schema.v2");
+    metadata.put("bundle_schema_version", BUNDLE_SCHEMA_VERSION);
     metadata.put("product", "dediren");
     metadata.put("version", version);
     metadata.put("target", bundleMetadataTarget());
