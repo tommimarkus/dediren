@@ -92,6 +92,29 @@ public final class BuildCommand {
               "command:build"));
     }
 
+    // Emit-kind validation lives here, in the one place that owns the emit vocabulary, so both the
+    // CLI and the MCP lane inherit it (an unknown kind would otherwise be silently dropped by
+    // emitEnvelope, which only writes for the three keys below).
+    java.util.Set<String> knownEmitKinds =
+        java.util.Set.of(EMIT_LAYOUT_REQUEST, EMIT_LAYOUT_RESULT, EMIT_RENDER_METADATA);
+    for (String kind : request.emit()) {
+      if (!knownEmitKinds.contains(kind)) {
+        return buildLevelError(
+            new Diagnostic(
+                DiagnosticCode.COMMAND_INPUT_INVALID.code(),
+                DiagnosticSeverity.ERROR,
+                "unknown emit kind '"
+                    + kind
+                    + "'; expected one of "
+                    + EMIT_LAYOUT_REQUEST
+                    + ", "
+                    + EMIT_LAYOUT_RESULT
+                    + ", "
+                    + EMIT_RENDER_METADATA,
+                "command:build"));
+      }
+    }
+
     SourceDocument source;
     try {
       source =

@@ -405,12 +405,6 @@ public final class Main {
           "Build one or more views end to end (project, layout, and one or more of render/OEF/XMI)"
               + " into an output directory")
   static final class BuildCommand implements Callable<Integer> {
-    // The subset of stage envelopes --emit can persist; kept in lockstep with the build driver's
-    // own emit vocabulary (dev.dediren.core.commands.BuildCommand), which is otherwise private to
-    // that class.
-    private static final Set<String> KNOWN_EMIT_KINDS =
-        Set.of("layout-request", "layout-result", "render-metadata");
-
     private final InputStream stdin;
     private final Map<String, String> env;
     private final Engines engines;
@@ -446,18 +440,6 @@ public final class Main {
 
     @Override
     public Integer call() throws Exception {
-      for (String kind : emit) {
-        if (!KNOWN_EMIT_KINDS.contains(kind)) {
-          return writeEnvelope(
-              spec,
-              usageError(
-                  DiagnosticCode.COMMAND_INPUT_INVALID.code(),
-                  "build --emit has unknown kind '"
-                      + kind
-                      + "'; expected one of layout-request, layout-result, render-metadata"),
-              CommandExitCode.INPUT_ERROR);
-        }
-      }
       JsonInputText inputText = readInput("input", input, stdin);
       if (inputText.error() != null) {
         return writeEnvelope(spec, inputText.error(), CommandExitCode.INPUT_ERROR);

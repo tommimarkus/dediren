@@ -331,7 +331,7 @@ class CliBuildCommandTest {
   }
 
   @Test
-  void unknownEmitValueIsAUsageErrorEnvelopeNotABuildResult() throws Exception {
+  void unknownEmitValueIsABuildLevelErrorEnvelope() throws Exception {
     Path root = workspaceRoot();
     Path out = temp.resolve("bad-emit-out");
 
@@ -350,11 +350,17 @@ class CliBuildCommandTest {
             },
             "");
 
+    // An unknown emit kind is a build-level input error, now caught in core alongside the
+    // empty-lane check, so it is the build-result error envelope (status error, no views) -- the
+    // same shape both the CLI and MCP lanes emit (pinned by CliMcpParityTest). This replaces the
+    // former CLI-only generic usage-error envelope, which was inconsistent with the empty-lane
+    // build-level error already produced by core.
     assertThat(result.exitCode()).isEqualTo(2);
     JsonNode envelope = JsonSupport.objectMapper().readTree(result.stdout());
     assertThat(envelope.has("build_result_schema_version"))
-        .describedAs("a usage error is the generic command envelope, not a build result")
-        .isFalse();
+        .describedAs(
+            "an unknown emit kind is a build-level error, shaped like the empty-lane error")
+        .isTrue();
     assertThat(envelope.at("/status").asText()).isEqualTo("error");
     assertThat(envelope.at("/diagnostics/0/code").asText())
         .isEqualTo("DEDIREN_COMMAND_INPUT_INVALID");
