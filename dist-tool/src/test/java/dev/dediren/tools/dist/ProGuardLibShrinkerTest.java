@@ -35,6 +35,9 @@ class ProGuardLibShrinkerTest {
     // Licence files are stripped from the ProGuard input because MergedJarPostProcessor
     // re-adds them collision-free under META-INF/third-party/<jar>/.
     assertThat(ProGuardLibShrinker.INJAR_FILTER)
+        // 45 input jars each carry a manifest; a classpath jar needs none, and excluding them
+        // keeps the merge deterministic instead of first-wins.
+        .contains("!META-INF/MANIFEST.MF")
         .contains("!META-INF/*.SF")
         .contains("!META-INF/*.RSA")
         .contains("!META-INF/*.DSA")

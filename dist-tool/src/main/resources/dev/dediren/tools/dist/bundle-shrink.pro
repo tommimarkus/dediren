@@ -39,7 +39,21 @@
     public static ** valueOf(java.lang.String);
 }
 
-# ELK/EMF/reactor reference OSGi, Eclipse runtime, micrometer, blockhound and other optional
-# platforms the plain-Java bundle intentionally omits; those references are dead code here.
--dontwarn **
+# Scoped, not `-dontwarn **`: these namespaces reference OSGi, Eclipse runtime, micrometer,
+# blockhound, sun.misc and other optional platforms the plain-Java bundle intentionally
+# omits — those references are dead code here. Anything OUTSIDE these namespaces that fails
+# to resolve still fails the dist build loudly, so a typo'd keep rule or a genuinely missing
+# class cannot be silenced by accident.
+-dontwarn org.eclipse.**
+-dontwarn reactor.**
+-dontwarn com.google.**
+-dontwarn io.modelcontextprotocol.**
+# networknt's optional ECMA-262 regex backends (joni, GraalVM polyglot) are not bundled.
+-dontwarn com.networknt.schema.regex.**
+# The YAML stack is deliberately excluded from every runtime classpath (see core/pom.xml);
+# networknt's YAML mapper holder is the one intentionally dangling reference left behind.
+-dontwarn com.networknt.schema.serialization.YamlMapperFactory*
+# MethodHandle.invokeExact is signature-polymorphic; ProGuard's library-member resolution
+# flags those call sites as missing members. False positive, not a real unresolved reference.
+-dontwarn tools.jackson.databind.**
 -dontnote **

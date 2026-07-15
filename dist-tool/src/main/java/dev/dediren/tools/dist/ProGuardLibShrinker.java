@@ -21,16 +21,20 @@ import proguard.ProGuard;
 final class ProGuardLibShrinker implements LibShrinker {
 
   /**
-   * Strips content that is dead outside Eclipse/OSGi hosts (UI icons under {@code images/}, {@code
-   * .ecore}/{@code .xsd} model sources, xtext {@code ._trace}, {@code .melk}, OSGi manifest
-   * extras), multi-release variants, signature files that cannot survive a merge, and embedded
-   * licence files (re-added collision-free by {@link MergedJarPostProcessor}).
+   * Strips content that is dead outside Eclipse/OSGi hosts (UI icons, {@code .ecore}/{@code .xsd}
+   * model sources, xtext {@code ._trace}, {@code .melk}, OSGi manifest extras, Eclipse branding
+   * files), multi-release variants, manifests and signature files that cannot survive a merge,
+   * embedded licence files (re-added collision-free by {@link MergedJarPostProcessor}), and {@code
+   * META-INF/services} files (rebuilt as cross-jar unions by the same post-processor — letting them
+   * through would only produce first-wins duplicates ProGuard warns about).
    */
   static final String INJAR_FILTER =
-      "(!META-INF/*.SF,!META-INF/*.RSA,!META-INF/*.DSA,!META-INF/LICENSE*,!META-INF/NOTICE*,"
+      "(!META-INF/MANIFEST.MF,!META-INF/*.SF,!META-INF/*.RSA,!META-INF/*.DSA,"
+          + "!META-INF/LICENSE*,!META-INF/NOTICE*,!META-INF/services/**,!META-INF/eclipse.inf,"
           + "!module-info.class,!META-INF/versions/**,!META-INF/maven/**,!**.melk,!**._trace,"
-          + "!images/**,!model/**,!schema/**,!plugin.xml,!plugin.properties,!about.html,"
-          + "!about_files/**,!.api_description,!.options,!profile.list,!systembundle.properties)";
+          + "!images/**,!model/**,!schema/**,!**.png,!plugin.xml,!plugin.properties,!about.html,"
+          + "!about_files/**,!about.ini,!about.properties,!about.mappings,"
+          + "!.api_description,!.options,!profile.list,!systembundle.properties)";
 
   private static final String KEEP_RULES_RESOURCE = "bundle-shrink.pro";
 

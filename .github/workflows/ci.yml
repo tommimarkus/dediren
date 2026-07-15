@@ -45,6 +45,12 @@ jobs:
       - name: Check workspace tests
         run: ./mvnw -B -ntp test
 
+      # Pre-merge shrink gate: the bundle ships one ProGuard-shrunk lib jar, and a missing
+      # keep rule only fails at the packaged-bundle smoke. Running it here surfaces that on
+      # the PR instead of on a tagged release build (unit tests skip: the step above ran them).
+      - name: Smoke packaged distribution
+        run: ./mvnw -B -ntp -pl dist-tool -am -DskipTests verify -Pdist-smoke
+
       - name: Check whitespace
         run: git diff --check
 
