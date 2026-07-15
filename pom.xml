@@ -34,7 +34,17 @@
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <maven.compiler.release>21</maven.compiler.release>
-    <argLine>-Dfile.encoding=UTF-8 -Djava.awt.headless=true</argLine>
+    <!-- Extra test-JVM flag, empty by default (the platform's default temp dir, usually /tmp, is
+         used). The `sandbox-tmpdir` profile fills it with -Djava.io.tmpdir=$TMPDIR when the
+         environment exports one. That covers sandboxed CI/agent runs where /tmp is mounted
+         read-only: the writable $TMPDIR is also OUTSIDE the repo tree, which matters because
+         product-root discovery walks up from the temp dir, and an in-repo temp dir (e.g. target/)
+         would wrongly resolve to this checkout's schemas/. java.io.tmpdir is read at JVM startup,
+         so it must be an argLine -D, not a surefire systemPropertyVariable (applied too late for
+         JUnit @TempDir / Files.createTemp*). JaCoCo overwrites `argLine` in the coverage profile,
+         so that profile's argLine (below) repeats this placeholder. -->
+    <dediren.test.tmpdir.arg></dediren.test.tmpdir.arg>
+    <argLine>-Dfile.encoding=UTF-8 -Djava.awt.headless=true ${dediren.test.tmpdir.arg}</argLine>
     <!-- Force UTF-8 on the single packaged dediren launcher's JVM streams. If the ambient locale
          drives native.encoding to US-ASCII, an unset stdout.encoding would mangle all non-ASCII
          output to '?' (issue #47), so the launcher pins UTF-8 for stdout/stderr and file I/O. -->
@@ -410,6 +420,22 @@
   </build>
 
   <profiles>
+    <!-- Redirect the test JVM's temp dir to $TMPDIR when the environment sets one. No-op on hosts
+         that leave TMPDIR unset (java.io.tmpdir stays the platform default, typically /tmp), so
+         ordinary CI and dev builds are unaffected. It exists for sandboxed CI/agent runs that mount
+         /tmp read-only but export a writable TMPDIR outside the repo. Property-activated, so it
+         composes with -P profiles (coverage/quality) rather than being disabled by them. -->
+    <profile>
+      <id>sandbox-tmpdir</id>
+      <activation>
+        <property>
+          <name>env.TMPDIR</name>
+        </property>
+      </activation>
+      <properties>
+        <dediren.test.tmpdir.arg>-Djava.io.tmpdir=${env.TMPDIR}</dediren.test.tmpdir.arg>
+      </properties>
+    </profile>
     <profile>
       <id>sbom</id>
       <build>
@@ -517,7 +543,7 @@
               <groupId>org.apache.maven.plugins</groupId>
               <artifactId>maven-surefire-plugin</artifactId>
               <configuration>
-                <argLine>@{argLine} -Dfile.encoding=UTF-8 -Djava.awt.headless=true</argLine>
+                <argLine>@{argLine} -Dfile.encoding=UTF-8 -Djava.awt.headless=true ${dediren.test.tmpdir.arg}</argLine>
               </configuration>
             </plugin>
             <plugin>
