@@ -36,6 +36,7 @@ public final class GuideCatalog {
     topics.put("mcp", "MCP Server");
     topics.put("artifacts", "Artifact Map");
     topics.put("source-json", "Minimal Source JSON");
+    topics.put("fragments", "Fragments");
     topics.put("profiles", "Semantic Profiles");
     topics.put("archimate", "ArchiMate Handoff");
     topics.put("commands", "Command Handoff");
@@ -53,6 +54,7 @@ public final class GuideCatalog {
     topics.put("migration", "Migration");
     topics.put("environment", "Plugin Environment");
     topics.put("logging", "Debug Logging");
+    topics.put("redistribution", "Redistribution");
     return Map.copyOf(topics);
   }
 

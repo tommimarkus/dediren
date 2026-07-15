@@ -5,17 +5,6 @@ bundle. Use schemas for exact validation and fixtures for examples, but use
 this file to decide which JSON to write, which JSON is generated, and how to
 repair failures.
 
-Source builds use the checked-in Maven Wrapper. Packaged bundle usage below is
-unchanged.
-
-Preserve the bundle root `LICENSE`, `THIRD-PARTY-NOTICES.md`, and this guide
-when redistributing a Dediren archive.
-
-This file is the shipped agent-facing contract for bundle usage. If Dediren is
-embedded in another agent skill, plugin, or tool package, preserve this path or
-carry the same JSON authoring, command handoff, runtime probe, and repair
-guidance in that package.
-
 ## Fast Path
 
 1. Author `model.json` with the `Minimal Source JSON` shape below.
@@ -120,6 +109,33 @@ an optional `accessibility` block in the render policy, for example
 `"accessibility": { "title": "Order Processing", "description": "Application cooperation view" }`;
 without it the `<title>` falls back to the layout `view_id`, so shipped
 diagrams should use a policy copy with a real title.
+
+## Fragments
+
+A source model may split across files: `fragments` is an array of relative
+paths, resolved against the main source file's directory and merged into the
+model before validation. Paths must stay relative; fragment files carry model
+content only and must not declare `fragments` of their own. Over MCP, every
+fragment path must also resolve inside `--root`, like any other tool path (see
+`## MCP Server`).
+
+Repair codes:
+
+- `DEDIREN_FRAGMENT_BASE_DIR_REQUIRED`: the source arrived on stdin, so
+  relative fragment paths have no base directory — pass a source file path
+  instead.
+- `DEDIREN_FRAGMENT_PATH_UNSUPPORTED`: the path is absolute — make it
+  relative. A relative path that resolves outside `--root` over MCP is the
+  separate `DEDIREN_MCP_PATH_OUTSIDE_ROOT` error (see `## MCP Server`), not
+  this code.
+- `DEDIREN_FRAGMENT_READ_FAILED`: no readable file at the resolved path.
+- `DEDIREN_FRAGMENT_NESTED_UNSUPPORTED`: a fragment declared `fragments`;
+  flatten the list into the main source.
+- `DEDIREN_FRAGMENT_CONFLICT`: merging fragments hit a conflict — the same
+  `required_plugins` id declared with two different versions, or the same
+  `plugins` extension-data path merged to two different values. Duplicate
+  node, relationship, view, or group ids across merged fragments are
+  `DEDIREN_DUPLICATE_ID` instead (see `## Repair Rules`).
 
 ## Semantic Profiles
 
@@ -961,3 +977,13 @@ instead of a trivial probe. To reseed, delete `cds/cli.jsa` or point
 
 Keep stderr for human debugging only. Agents should decide success or failure
 from stdout JSON.
+
+## Redistribution
+
+Preserve the bundle root `LICENSE`, `THIRD-PARTY-NOTICES.md`, and this guide
+when redistributing a Dediren archive.
+
+This file is the shipped agent-facing contract for bundle usage. If Dediren is
+embedded in another agent skill, plugin, or tool package, preserve this path or
+carry the same JSON authoring, command handoff, runtime probe, and repair
+guidance in that package.
