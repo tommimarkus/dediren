@@ -11,6 +11,8 @@ agent tools should be pointed here from their own entrypoint files (for example,
   downstream agents that author Dediren JSON or run packaged bundles.
 - Before changing behavior, load only the relevant local context:
   - Product boundary question: `docs/superpowers/specs/2026-05-08-dediren-design.md`
+    (as amended; for the MCP surface also
+    `docs/superpowers/specs/2026-07-14-dediren-mcp-server-design.md`)
   - Existing slice or planned task: matching file under `docs/superpowers/plans/`
   - User-facing command or workflow: `README.md`
   - Bundle-local agent authoring or runtime guidance: `docs/agent-usage.md`
@@ -67,6 +69,9 @@ agent tools should be pointed here from their own entrypoint files (for example,
 - First-party engines are library modules behind `engine-api`. Engines never
   depend on `core`; `core` never depends on engine implementations; only the
   `cli` `EngineWiring` class constructs them.
+- `mcp-server` adapts the CLI's command surface to MCP stdio (`dediren mcp`).
+  Its allowed edges are `contracts`, `core`, `engine-api` only (ArchUnit-pinned);
+  tool results carry the same envelopes the CLI prints.
 - Do not duplicate layout or routing features already provided by ELK. Express
   layout intent through ELK graph structure, ports, hierarchy, and options,
   then let ELK compute geometry and routes.
@@ -79,11 +84,16 @@ agent tools should be pointed here from their own entrypoint files (for example,
 
 - Public JSON shape changes: update `schemas/`, `contracts`, fixtures, plugin
   mapping code, and schema/round-trip tests together.
-- Breaking schema-version bumps: update the schema, the `ContractVersions`
-  constant, the `KnownSchemaVersions` family (append the new version; the old
-  one becomes a prior version), and a `### <from> → <to>` subsection under
-  `## Migration` in `docs/agent-usage.md` together. `MigrationRegistryTest`
-  fails the build if a superseded version has no upgrade steps. If the version
+- Breaking schema-version bumps: update the schema and the `ContractVersions`
+  constant. For the hand-authorable input families registered in
+  `KnownSchemaVersions` (source model, render policy, both export policies,
+  layout request): also append the new version to the family (the old one
+  becomes a prior version) and add a `### <from> → <to>` subsection under
+  `## Migration` in `docs/agent-usage.md` — `MigrationRegistryTest` fails the
+  build if a superseded registered version has no upgrade steps, or if a
+  heading's `<to>` is not the version that superseded `<from>`. Generated
+  engine-seam schemas (envelope, layout/render/export results, …) have no
+  family: bump the constant, fixtures, and mapping code only. If the version
   *field* is renamed, add the old field name to the family's `versionFields`.
 - Engine contract or runtime changes: update `engine-api`, `ir` (the
   SceneGraph/LaidOutScene seam types), `core` dispatch, `cli` `EngineWiring`,
@@ -112,6 +122,10 @@ agent tools should be pointed here from their own entrypoint files (for example,
 - Engine runtime, schema-cache fetching, envelope validation, XML
   parser hardening, or release workflow changes: update
   `docs/threat-model.md` in the same change.
+- MCP surface changes: update `mcp-server` (tools, `ToolSchemas`,
+  `GuideCatalog` topics), the `## MCP Server` section of
+  `docs/agent-usage.md`, the MCP rows of `docs/threat-model.md`, and the
+  dist-tool packaged-MCP stdio smoke together.
 
 ## Versioning
 
@@ -155,20 +169,24 @@ enforcement authority for matching version, tag, and release actions.
 - Known version assertion surfaces include
   `cli/src/test/java/dev/dediren/cli/MainTest.java`,
   `contracts/src/test/java/dev/dediren/contracts/ContractRoundTripTest.java`,
-  `engines/archimate-oef-export/src/test/java/dev/dediren/plugins/archimateoef/MainTest.java`,
-  and `dist-tool/src/test/java/dev/dediren/tools/dist/DistModuleTest.java`.
+  and `engines/archimate-oef-export/src/test/java/dev/dediren/plugins/archimateoef/MainTest.java`.
+  `docs/features/README.md` and `docs/features/source-model.md` also cite the
+  product version in examples; no test pins them, so sweep them by hand.
 - `.github/workflows/release.yml` validates tag `v<version>` against root
   `pom.xml`; update it only if the product version source changes.
 - Public schema ids such as `model.schema.v1` change only when the contract
   family intentionally changes. They are the durable compatibility signal,
   since CalVer does not encode compatibility.
 - After every product/plugin version bump, run a stale-version search over
-  `pom.xml`, `README.md`, `docs/agent-usage.md`, and `fixtures/source`.
+  `pom.xml`, `README.md`, `docs/agent-usage.md`, `docs/features`, and
+  `fixtures/source`.
 
 ## Engine Runtime Rules
 
 - Command envelopes on stdout remain the agent contract. Agents should be able
-  to decide success or failure from stdout JSON alone.
+  to decide success or failure from stdout JSON alone. Under `dediren mcp`,
+  stdout carries JSON-RPC frames instead and the same envelopes ride inside
+  tool results; `StdoutIntegrity` keeps stray writes off the frame channel.
 - Preserve valid engine error envelopes (an `EngineException` becomes the
   published error envelope with its exit code) and return a non-zero CLI exit.
 - The registry resolves engine lookups in memory: an unknown engine id yields
@@ -278,6 +296,13 @@ UML/XMI export changes:
 
 ```bash
 ./mvnw -pl engines/uml-xmi-export,cli -am test
+```
+
+MCP server changes:
+
+```bash
+./mvnw -pl mcp-server,cli -am test
+./mvnw -pl dist-tool -am verify -Pdist-smoke
 ```
 
 Distribution/release changes:
