@@ -11,14 +11,14 @@ import java.nio.charset.StandardCharsets;
  *
  * <p>In stdio MCP, stdout <em>is</em> the protocol. One {@code System.out.println} anywhere in
  * core, an engine, or a transitive dependency corrupts a frame, and the failure mode is the client
- * silently going dark — no error surfaces, the tools simply stop working. Today's SLF4J and CDS
- * notices happen to go to stderr, but that is luck, not a guarantee, and it will not survive the
- * next dependency.
+ * silently going dark — no error surfaces, the tools simply stop working. Today's SLF4J notices
+ * happen to go to stderr, but that is luck, not a guarantee, and it will not survive the next
+ * dependency.
  *
  * <p>So: take the real file descriptor for the transport, then point {@code System.out} at stderr.
- * A stray print then degrades to log noise instead of protocol corruption. The dist-smoke tests
- * ({@code DistTool.assertMcpServesToolsOverStdio} and {@code assertMcpColdCdsStdoutClean}) are this
- * control's gate — they are the only place the real process streams are observable.
+ * A stray print then degrades to log noise instead of protocol corruption. The dist-smoke test
+ * {@code DistTool.assertMcpServesToolsOverStdio} is this control's gate — it is the only place the
+ * real process streams are observable.
  */
 public final class StdoutIntegrity {
   private StdoutIntegrity() {}

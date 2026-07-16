@@ -158,7 +158,6 @@ dediren-agent-bundle-2026.07.20/
   fixtures/       source, policy, layout, render, and export examples
   docs/agent-usage.md
   LICENSE · THIRD-PARTY-NOTICES.md · bundle.json
-  cds/            generated at runtime — not a tracked artifact
 ```
 
 The `dediren` launcher sets `DEDIREN_BUNDLE_ROOT` so commands resolve bundled
@@ -167,8 +166,8 @@ first-party engines are compiled into the CLI; there is no runtime plugin
 discovery of any kind — see [`docs/threat-model.md`](docs/threat-model.md) for
 the single-JVM trust boundary.
 
-For the full runtime-environment variables and the Class-Data-Sharing startup
-cache, see [`docs/agent-usage.md`](docs/agent-usage.md).
+For the full set of runtime-environment variables, see
+[`docs/agent-usage.md`](docs/agent-usage.md).
 
 ## Notations
 

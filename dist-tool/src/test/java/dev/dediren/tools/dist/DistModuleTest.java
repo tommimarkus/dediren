@@ -398,36 +398,64 @@ class DistModuleTest {
   }
 
   @Test
-  void withCdsArchiveInjectsAutoCreateAfterBundleRootExport() {
+  void withJvmLoggingOptsInjectsLogRoutingAfterBundleRootExport() {
     String base =
         "#!/bin/sh\n"
             + "BASEDIR=$(dirname \"$0\")/..\n"
             + "DEDIREN_BUNDLE_ROOT=\"${DEDIREN_BUNDLE_ROOT:-$BASEDIR}\"\n"
             + "export DEDIREN_BUNDLE_ROOT\n"
             + "exec \"$JAVACMD\" $JAVA_OPTS -classpath \"$CLASSPATH\" dev.dediren.Main \"$@\"\n";
-    String rewritten = DistTool.withCdsArchive(base, "elk-layout");
+    String rewritten = DistTool.withJvmLoggingOpts(base);
     org.assertj.core.api.Assertions.assertThat(rewritten)
-        .contains("DEDIREN_CDS_DIR=\"${DEDIREN_CDS_DIR:-$DEDIREN_BUNDLE_ROOT/cds}\"")
-        .contains("-XX:+AutoCreateSharedArchive")
-        .contains("-XX:SharedArchiveFile=$DEDIREN_CDS_DIR/elk-layout.jsa")
         // JVM log output must be routed OFF stdout and onto stderr so stdout stays JSON-pure
         // (agents decide success from stdout alone). all=off:stdout clears the default stdout sink;
-        // stderr keeps warnings EXCEPT the exact `cds` tag set, whose once-per-install archive-
-        // creation burst is pure noise (issue #57). `cds` matches that set exactly, so the
-        // actionable `cds,dynamic` stale-archive warning still reaches stderr under all=warning.
-        .contains("-Xlog:all=off:stdout -Xlog:all=warning,cds=off:stderr:uptime,level,tags")
-        .contains("${XDG_CACHE_HOME:-$HOME/.cache}/dediren/cds");
-    // exec line still present and after the injected block
-    org.assertj.core.api.Assertions.assertThat(rewritten.indexOf("DEDIREN_CDS_DIR="))
+        // stderr keeps warnings so a VM diagnostic (e.g. os,container under cgroups) still
+        // surfaces.
+        .contains("-Xlog:all=off:stdout -Xlog:all=warning:stderr:uptime,level,tags")
+        // DEDIREN_LOG_LEVEL is mapped through the injection-safe allowlist before the JVM starts.
+        .contains("case \"${DEDIREN_LOG_LEVEL:-}\" in")
+        // AppCDS was removed: no archive setup should be injected anymore.
+        .doesNotContain("-XX:+AutoCreateSharedArchive")
+        .doesNotContain("DEDIREN_CDS_DIR")
+        .doesNotContain(".jsa");
+    // injected block sits after the BUNDLE_ROOT export and before the exec line
+    org.assertj.core.api.Assertions.assertThat(rewritten.indexOf("-Xlog:all=off:stdout"))
+        .isGreaterThan(rewritten.indexOf("export DEDIREN_BUNDLE_ROOT"))
         .isLessThan(rewritten.indexOf("exec "));
   }
 
   @Test
-  void withCdsArchiveIsIdempotent() {
+  void withJvmLoggingOptsIsIdempotent() {
     String base = "#!/bin/sh\nexport DEDIREN_BUNDLE_ROOT\nexec x\n";
-    String once = DistTool.withCdsArchive(base, "cli");
-    String twice = DistTool.withCdsArchive(once, "cli");
+    String once = DistTool.withJvmLoggingOpts(base);
+    String twice = DistTool.withJvmLoggingOpts(once);
     org.assertj.core.api.Assertions.assertThat(twice).isEqualTo(once);
+  }
+
+  @Test
+  void stdoutEnablingXlogAllowsTheRoutingButRejectsAnyStdoutSink() {
+    // The sanctioned routing (all off on stdout, warnings on stderr) is clean.
+    assertThat(
+            DistTool.stdoutEnablingXlog(
+                "JAVA_OPTS=\"$JAVA_OPTS -Xlog:all=off:stdout"
+                    + " -Xlog:all=warning:stderr:uptime,level,tags\""))
+        .isNull();
+    // Off-only or non-stdout directives a maintainer might legitimately add are fine.
+    assertThat(DistTool.stdoutEnablingXlog("-Xlog:gc:stderr")).isNull();
+    assertThat(DistTool.stdoutEnablingXlog("-Xlog:gc:file=/tmp/gc.log")).isNull();
+    assertThat(DistTool.stdoutEnablingXlog("-Xlog:all=off")).isNull();
+    assertThat(DistTool.stdoutEnablingXlog("-Xlog:gc=off:stdout")).isNull();
+    assertThat(DistTool.stdoutEnablingXlog("-Xlog:disable")).isNull();
+    // A later edit that re-opens the stdout sink -- explicitly, by omitting the output (stdout is
+    // -Xlog's default), via decorators-only, or as a bare -Xlog -- must be caught by name.
+    assertThat(DistTool.stdoutEnablingXlog("exec java -Xlog:gc:stdout x"))
+        .isEqualTo("-Xlog:gc:stdout");
+    assertThat(DistTool.stdoutEnablingXlog("exec java -Xlog:gc x")).isEqualTo("-Xlog:gc");
+    assertThat(DistTool.stdoutEnablingXlog("exec java -Xlog:safepoint::uptime x"))
+        .isEqualTo("-Xlog:safepoint::uptime");
+    assertThat(DistTool.stdoutEnablingXlog("exec java -Xlog:all=info:stdout x"))
+        .isEqualTo("-Xlog:all=info:stdout");
+    assertThat(DistTool.stdoutEnablingXlog("exec java -Xlog x")).isEqualTo("-Xlog");
   }
 
   private static void writeLauncher(Path root, String installDir, String sourceScript)

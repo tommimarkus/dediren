@@ -945,7 +945,6 @@ variables below and read nothing else. Important explicit variables:
 - `DEDIREN_SCHEMA_CACHE_DIR`: cache directory for schema downloads.
 - `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY` (and their lowercase forms): forwarded
   to `curl` so it can download standards schemas through a proxy.
-- `DEDIREN_CDS_DIR`: directory for Class-Data-Sharing archives (see below).
 - `DEDIREN_LOG_LEVEL`: `trace`, `debug`, `info`, `warn`, `error`, or `off`
   (default `off`). Turns on human-readable debug logging on **stderr** for one
   run. Any other value is ignored with a note on stderr.
@@ -974,32 +973,11 @@ with logging on. Logged lines cover engine dispatch, ELK layout size and timing,
 schema-cache hits and misses, and the `xmllint` validator subprocess. Log output
 is not a stable contract and may change between releases.
 
-The `bin/dediren` launcher auto-creates a single Class-Data-Sharing archive on
-its first invocation to speed JVM startup on subsequent calls. The archive is
-written to `<bundle>/cds/cli.jsa` by default. If that directory is read-only, the
-launcher falls back to `${XDG_CACHE_HOME:-$HOME/.cache}/dediren/cds`.
-Set `DEDIREN_CDS_DIR` to an explicit writable path to relocate the archive.
-The feature is based on `-XX:+AutoCreateSharedArchive` and degrades silently if
-the archive directory is unwritable — startup continues at normal speed without
-any error. The launcher also passes
-`-Xlog:all=off:stdout -Xlog:all=warning,cds=off:stderr:uptime,level,tags`, which
-clears the JVM's default stdout log sink entirely and re-adds warnings on stderr
-(the human debug channel), minus the exact `cds` tag set. That keeps stdout
-JSON-pure no matter what the VM warns about — archive staleness (`cds,dynamic`),
-cgroup limits, anything — while dropping the ~150-line `[warning][cds]` burst the
-archive-creation run emits once per install (pure noise, not a diagnostic). Once
-the archive exists, a healthy run stays quiet.
-
-The archive is seeded by the launcher's first invocation and is not regenerated
-while it stays valid, and its contents depend on what that first command loaded:
-an archive seeded by a bare `--version` probe stays measurably slower (about 30%
-per call) than one seeded by real work. Seed it with one representative
-workload — a single `dediren build` covers the whole pipeline — before or
-instead of a trivial probe. To reseed, delete `cds/cli.jsa` or point
-`DEDIREN_CDS_DIR` at a fresh directory.
-
-Keep stderr for human debugging only. Agents should decide success or failure
-from stdout JSON.
+The `bin/dediren` launcher routes JVM-level log output off stdout and onto
+stderr (`-Xlog:all=off:stdout -Xlog:all=warning:stderr:uptime,level,tags`), so no
+VM warning (cgroup resource limits, for one) can ever land on top of the command
+envelope. Keep stderr for human debugging only. Agents should decide success or
+failure from stdout JSON.
 
 ## Redistribution
 

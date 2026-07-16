@@ -47,7 +47,7 @@ or the token-efficient authoring guide in
 | [SVG Rendering](svg-render.md) | The render plugin, render policies, and the `artifacts[]` result shape |
 | [Exports (OEF & XMI)](exports.md) | ArchiMate 3.2 OEF and UML 2.5.1 XMI export, plus the supported UML notation coverage |
 | [Contracts & Schemas](contracts-and-schemas.md) | Public schemas, command envelopes, diagnostics, and version/compatibility signals |
-| [Distribution & Runtime](distribution-and-runtime.md) | The agent bundle, its single launcher, environment variables, Class-Data-Sharing, supply-chain artifacts, and versioning |
+| [Distribution & Runtime](distribution-and-runtime.md) | The agent bundle, its single launcher, environment variables, supply-chain artifacts, and versioning |
 
 ## At a Glance
 

@@ -62,5 +62,5 @@ Common engine diagnostics (full list and repair guidance in
 ## Related Pages
 
 - [Pipeline & Commands](pipeline-and-commands.md) — which command calls which engine.
-- [Distribution & Runtime](distribution-and-runtime.md) — the launcher, env vars, CDS.
+- [Distribution & Runtime](distribution-and-runtime.md) — the launcher, env vars, startup.
 - [Contracts & Schemas](contracts-and-schemas.md) — envelope and diagnostic schemas.

@@ -32,7 +32,6 @@ dediren-agent-bundle-<version>/
   LICENSE
   THIRD-PARTY-NOTICES.md
   bundle.json
-  cds/            generated at runtime — not a tracked artifact
 ```
 
 The Java archive is platform-neutral (not tied to CPU architecture) and contains
@@ -58,25 +57,17 @@ else.
 | `DEDIREN_OEF_SCHEMA_DIR` | Local OEF schema directory (offline export validation). |
 | `DEDIREN_XMI_SCHEMA_PATH` | Local XMI schema file (offline export validation). |
 | `DEDIREN_SCHEMA_CACHE_DIR` | Cache directory for schema downloads. |
-| `DEDIREN_CDS_DIR` | Relocate Class-Data-Sharing archives (see below). |
 | `DEDIREN_LOG_LEVEL` | Debug logging on stderr for one run: `trace`/`debug`/`info`/`warn`/`error`/`off` (default `off`). Values outside that set are rejected — the launcher interpolates this into `JAVA_OPTS`, so an allowlist is what stops JVM-argument injection. |
 
-## Startup Optimization (Class-Data-Sharing)
+## Startup Optimization
 
-The `bin/dediren` launcher auto-creates a single Class-Data-Sharing archive
-(`-XX:+AutoCreateSharedArchive`, `cds/cli.jsa`) on first invocation to
-speed JVM startup on subsequent calls, and passes
-`-Xlog:all=off:stdout -Xlog:all=warning,cds=off:stderr:uptime,level,tags`, which
-clears the JVM's default stdout log sink so no VM warning (archive-dump chatter, a
-stale-archive `[warning][cds,dynamic]`, cgroup limits) can ever land on top of
-the command envelope, while still routing the actionable ones to stderr for
-humans. The `cds=off` carve-out drops just the ~150-line `[warning][cds]` burst
-the archive-creation run emits once per install — noise, not a diagnostic — while
-the stale-archive `[warning][cds,dynamic]` signal still reaches stderr.
-Archive locations, the
-`DEDIREN_CDS_DIR` override, silent degradation when the archive directory is
-unwritable, and seeding guidance: [Agent Usage → Plugin
-Environment](../agent-usage.md#plugin-environment).
+The `bin/dediren` launcher applies lightweight JVM startup flags
+(`-XX:TieredStopAtLevel=1 -XX:+UseSerialGC`) suited to a short-lived, run-once
+process. It also passes
+`-Xlog:all=off:stdout -Xlog:all=warning:stderr:uptime,level,tags`, which clears
+the JVM's default stdout log sink so no VM warning (cgroup resource limits, for
+one) can ever land on top of the command envelope, while still routing warnings
+to stderr for humans.
 
 ## Release Artifacts & Verification
 

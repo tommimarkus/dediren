@@ -685,15 +685,19 @@ archaeology (promoted 2026-07-03 after the multi-viewpoint review, MT-5).
   add heap caps to the launcher.
 
 - **(c) JVM startup tiers.** Startup cost is attacked in ordered tiers:
-  Tier 1 launcher flags (shipped), Tier 2 AppCDS auto-created `.jsa`
-  archives (shipped; seeding caveat — archives are seeded by the first
-  invocation and a probe-seeded archive is ~30% slower per call than a
-  workload-seeded one, see `docs/agent-usage.md`), Tier 3 manifest-trust
-  probe skip (~50 ms/op; retired with the plugin process runtime — the
-  monolith removed the per-call probe entirely), Tier 4 Leyden AOT cache
-  (planned successor; gated on the pending Java 25 baseline decision). Tier 4
-  supersedes Tier 2 when adopted. The 2026-07-03 review appendix holds the
-  measured baseline for all of this.
+  Tier 1 launcher flags (shipped). Tier 2 AppCDS auto-created `.jsa` archives
+  were shipped and then **removed** (2026-07): after the monolith cutover
+  collapsed the multi-launcher plugin model to a single in-process launcher, the
+  isolated CDS win was no longer measured on the shipping bundle, it targeted
+  only class-loading (not the layout/render compute that dominates a real
+  command), and its coupling into the stdout/stderr envelope contract, the
+  ProGuard shrink keep-rules, and bundle hermeticity kept drawing maintenance
+  effort out of proportion to the benefit. Tier 3 manifest-trust probe skip
+  (~50 ms/op) retired with the plugin process runtime — the monolith removed the
+  per-call probe entirely. Tier 4 Leyden AOT cache is the eventual successor if
+  startup latency becomes a felt problem; gated on the pending Java 25 baseline
+  decision. The 2026-07-03 review appendix holds the measured baseline for all of
+  this.
 
 ---
 

@@ -46,7 +46,6 @@ class DiagnosticCodeOwnershipTest {
           "DEDIREN_OEF_SCHEMA_VALIDATOR",
           "DEDIREN_XMI_SCHEMA_VALIDATOR",
           "DEDIREN_BUNDLE_ROOT",
-          "DEDIREN_CDS_DIR",
           "DEDIREN_LOG_LEVEL");
 
   /**

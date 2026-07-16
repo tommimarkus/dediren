@@ -3,8 +3,9 @@
 # starts from dev.dediren.** (CLI main, MCP server, engines are all entry points).
 #
 # Keep-rule inventory — every rule exists because removing it breaks a validated runtime path:
-# - picocli.**: shrinking picocli makes CDS archive creation emit [warning][cds] lines on
-#   stderr ("super class ... is excluded"), failing the bundle's quiet-stderr contract.
+# - picocli.**: picocli builds its command model reflectively and instantiates help mixins, type
+#   converters and its exception hierarchy by name/annotation, which -dontoptimize reachability
+#   cannot fully trace; keeping the package whole stops an error-path class being shrunk away.
 # - org.slf4j.**: backend wired by ServiceLoader + string-configured log levels.
 # - com.fasterxml.jackson.**: Jackson annotations drive reflection on kept classes.
 # - tools.jackson.databind.ext.**: optional/ext handlers (java.time etc.) wired semi-lazily.

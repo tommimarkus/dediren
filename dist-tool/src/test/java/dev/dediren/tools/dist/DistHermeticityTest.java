@@ -12,8 +12,8 @@ import org.junit.jupiter.api.io.TempDir;
 
 /**
  * SEED-1 regression coverage: the dist build must package exactly the jars declared on each
- * appassembler launcher classpath, fail loudly on any divergence (stale or missing staged jars),
- * and never ship runtime-generated CDS content ({@code cds/}, {@code *.jsa}) in the archive.
+ * appassembler launcher classpath, and fail loudly on any divergence (stale or missing staged
+ * jars).
  */
 class DistHermeticityTest {
   private static final String VERSION = "2026.06.0";
@@ -44,8 +44,7 @@ class DistHermeticityTest {
   }
 
   @Test
-  void buildPackagesSingleShrunkJarAndExcludesRuntimeGeneratedCdsContent(@TempDir Path root)
-      throws Exception {
+  void buildPackagesSingleShrunkJar(@TempDir Path root) throws Exception {
     writeDistributionRoot(root);
     List<Path> shrunk = new java.util.ArrayList<>();
     LibShrinker fakeShrinker =
@@ -53,35 +52,12 @@ class DistHermeticityTest {
           shrunk.addAll(stagedJars);
           Files.writeString(mergedJar, "merged jar");
         };
-    // A launcher writes CDS archives at first run to DEDIREN_CDS_DIR, which defaults to
-    // $DEDIREN_BUNDLE_ROOT/cds — i.e. <bundle-staging-root>/cds, a sibling of lib/. That residue
-    // only exists AFTER staging, so plant it via the staging seam (after staging, before tar) at
-    // the REAL runtime location. This is what makes the tar --exclude=cds / --exclude=*.jsa flags
-    // load-bearing: injecting it inside cli/target/appassembler/lib would never reach the archive
-    // because only the shrinker's merged output lands in the packaged lib/, so the flags would
-    // never fire. A stray top-level *.jsa is added too, so each exclude flag is independently
-    // required.
     DistTool.build(
-        root,
-        VERSION,
-        root.resolve("THIRD-PARTY-NOTICES.md"),
-        bundle -> {
-          try {
-            Files.createDirectories(bundle.resolve("cds"));
-            Files.writeString(bundle.resolve("cds/cli.jsa"), "cds archive");
-            Files.writeString(bundle.resolve("stray.jsa"), "cds archive");
-          } catch (java.io.IOException error) {
-            throw new java.io.UncheckedIOException(error);
-          }
-        },
-        fakeShrinker);
+        root, VERSION, root.resolve("THIRD-PARTY-NOTICES.md"), bundle -> {}, fakeShrinker);
 
     Path archive = root.resolve("dist/dediren-agent-bundle-" + VERSION + ".tar.gz");
     assertThat(archive).isRegularFile();
     List<String> entries = archiveEntries(archive);
-    assertThat(entries)
-        .noneMatch(entry -> entry.endsWith(".jsa"))
-        .noneMatch(entry -> entry.contains("/cds"));
     List<String> libJars =
         entries.stream()
             .filter(entry -> entry.startsWith("dediren-agent-bundle-" + VERSION + "/lib/"))

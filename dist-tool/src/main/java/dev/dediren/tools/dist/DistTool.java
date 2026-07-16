@@ -50,11 +50,11 @@ public final class DistTool {
   // engine jars (+ transitives) and the packaged lib/ is verified against that one classpath.
   private static final List<Launcher> LAUNCHERS =
       List.of(new Launcher("cli/target/appassembler", "cli", "dediren"));
-  // Hermeticity scrub for smoke/bench child processes: the dediren environment knobs a caller's
+  // Hermeticity scrub for smoke/bench child processes: a dediren environment knob a caller's
   // shell could otherwise leak into the packaged-bundle probes. DEDIREN_LOG_LEVEL belongs here or a
   // developer who happens to export it would turn on debug logging inside the probes and break the
   // quiet-stderr assertions with a failure that reproduces on their machine only.
-  private static final List<String> CLEAN_ENV = List.of("DEDIREN_CDS_DIR", "DEDIREN_LOG_LEVEL");
+  private static final List<String> CLEAN_ENV = List.of("DEDIREN_LOG_LEVEL");
 
   /** Licence attribution for one redistributed third-party artifact (jar name minus version). */
   private record ThirdPartyAttribution(String project, List<String> licenseIds) {}
@@ -219,14 +219,12 @@ public final class DistTool {
 
   /**
    * Staging seams (package-private for tests): {@code afterStage} runs against the fully staged
-   * bundle directory immediately before it is archived. It lets a test inject the runtime-generated
-   * residue a launcher writes at first run — {@code cds/*.jsa} under {@code
-   * $DEDIREN_BUNDLE_ROOT/cds}, a sibling of {@code lib/} — so the archive's {@code --exclude=cds}
-   * and {@code --exclude=*.jsa} hermeticity filters are actually exercised. {@code shrinker}
-   * produces the single packaged lib jar; tests whose staged "jars" are text fixtures inject a fake
-   * so the real ProGuard pass never sees them. Production callers pass a no-op and {@link
-   * ProGuardLibShrinker}; the {@code afterStage} seam runs after all staging and metadata writes,
-   * so it cannot perturb the packaged {@code lib/} verification.
+   * bundle directory immediately before it is archived. It lets a test plant arbitrary pre-archive
+   * content to exercise the archiving step. {@code shrinker} produces the single packaged lib jar;
+   * tests whose staged "jars" are text fixtures inject a fake so the real ProGuard pass never sees
+   * them. Production callers pass a no-op and {@link ProGuardLibShrinker}; the {@code afterStage}
+   * seam runs after all staging and metadata writes, so it cannot perturb the packaged {@code lib/}
+   * verification.
    */
   static void build(
       Path root,
@@ -263,18 +261,13 @@ public final class DistTool {
     Files.copy(
         notices, bundle.resolve("THIRD-PARTY-NOTICES.md"), StandardCopyOption.REPLACE_EXISTING);
     writeBundleMetadata(bundle, version);
-    // Test seam: inject runtime-generated CDS residue into the staged tree just before archiving.
+    // Test seam: plant arbitrary pre-archive content into the staged tree just before archiving.
     afterStage.accept(bundle);
 
     runCommand(
         root,
         List.of(
             "tar",
-            // Runtime-generated CDS content must never ship in the archive
-            // (SEED-1): launchers auto-create cds/*.jsa next to the bundle at
-            // first run, and stale copies must not ride into a rebuild.
-            "--exclude=cds",
-            "--exclude=*.jsa",
             "-C",
             dist.toString(),
             "-czf",
@@ -413,9 +406,7 @@ public final class DistTool {
       Path bundle = findBundleDir(temp);
       assertSingleShrunkLibJar(bundle, version);
       assertLauncherJvmFlags(bundle);
-      assertCdsConfigured(bundle);
-      assertFirstLaunchStdoutClean(bundle, temp, version);
-      assertStaleCdsStdoutClean(bundle, temp);
+      assertLauncherLogRouting(bundle);
       assertLoggingIsQuietAndSwitchable(bundle, temp);
       if (Files.exists(bundle.resolve("fixtures/plugins"))) {
         throw new IllegalStateException("archive must not include source fixture plugin manifests");
@@ -436,7 +427,6 @@ public final class DistTool {
       assertBuildRendersAndExports(dediren, bundle, temp, oefSchemas);
 
       assertMcpServesToolsOverStdio(bundle, temp);
-      assertMcpColdCdsStdoutClean(bundle, temp);
 
       Path request = temp.resolve("request.json");
       Path layout = temp.resolve("layout.json");
@@ -465,8 +455,6 @@ public final class DistTool {
               List.of("layout", "--plugin", "elk-layout", "--input", request.toString()),
               null);
       Files.writeString(layout, layoutOutput, StandardCharsets.UTF_8);
-      // One CDS archive per launcher: the single cli launcher seeds cds/cli.jsa.
-      assertCdsArchiveCreated(bundle, "cli");
       assertQualityOutput(
           runBundleCommand(
               dediren, bundle, List.of("validate-layout", "--input", layout.toString()), null));
@@ -791,7 +779,7 @@ public final class DistTool {
     verifyStagedLib(install.resolve("lib"), declaredJars, launcher);
     Path targetBin = bundle.resolve("bin").resolve(launcher.bundleScript());
     String script = withBundleRootExport(sourceScript);
-    script = withCdsArchive(script, launcher.sourceScript());
+    script = withJvmLoggingOpts(script);
     script = withMergedClasspath(script, mergedJarName);
     Files.writeString(targetBin, script, StandardCharsets.UTF_8);
     makeExecutable(targetBin);
@@ -919,54 +907,31 @@ public final class DistTool {
         Matcher.quoteReplacement("CLASSPATH=\"$BASEDIR\"/etc:\"$REPO\"/" + mergedJarName));
   }
 
-  static String withCdsArchive(String script, String cdsName) {
-    if (script.contains("DEDIREN_CDS_DIR=")) {
+  static String withJvmLoggingOpts(String script) {
+    if (script.contains("-Xlog:all=off:stdout")) {
       return script;
     }
     String marker = "export DEDIREN_BUNDLE_ROOT";
     int markerIndex = script.indexOf(marker);
     if (markerIndex < 0) {
       throw new IllegalArgumentException(
-          "launcher script must contain the DEDIREN_BUNDLE_ROOT export before CDS injection");
+          "launcher script must contain the DEDIREN_BUNDLE_ROOT export before JVM-logging injection");
     }
     int lineEnd = script.indexOf('\n', markerIndex);
     int insertionPoint = lineEnd < 0 ? script.length() : lineEnd + 1;
     String nl = script.contains("\r\n") ? "\r\n" : "\n";
     String block =
         ""
-            + "DEDIREN_CDS_DIR=\"${DEDIREN_CDS_DIR:-$DEDIREN_BUNDLE_ROOT/cds}\""
-            + nl
-            + "if ! mkdir -p \"$DEDIREN_CDS_DIR\" 2>/dev/null || [ ! -w \"$DEDIREN_CDS_DIR\" ]; then"
-            + nl
-            + "  DEDIREN_CDS_DIR=\"${XDG_CACHE_HOME:-$HOME/.cache}/dediren/cds\""
-            + nl
-            + "  mkdir -p \"$DEDIREN_CDS_DIR\" 2>/dev/null || true"
-            + nl
-            + "fi"
-            + nl
-            + "JAVA_OPTS=\"$JAVA_OPTS -XX:+AutoCreateSharedArchive"
-            + " -XX:SharedArchiveFile=$DEDIREN_CDS_DIR/"
-            + cdsName
             // Keep stdout JSON-pure: the JVM's DEFAULT unified-logging sink is stdout, so any
-            // warning the VM emits lands on top of the command envelope and breaks the agent
-            // contract. A per-tag selector cannot hold that line -- `cds` matches the tag set
-            // `cds` EXACTLY, so sibling sets like `cds,dynamic` ("Unable to use shared archive",
-            // emitted whenever the archive is stale, e.g. after any classpath change) fall
-            // through to stdout. Other tags can warn too (`os,container` under cgroups, for one).
-            // So clear the stdout sink for ALL tags, then re-add warnings on stderr (the human
-            // debug channel) to preserve the AutoCreateSharedArchive diagnostics.
+            // warning the VM emits (e.g. `os,container` resource limits under cgroups) lands on top
+            // of the command envelope and breaks the agent contract -- and it does so below Java's
+            // System.out, so StdoutIntegrity's redirect cannot catch it; only this launcher-level
+            // selector can. Clear the stdout sink for ALL tags, then re-add warnings on stderr (the
+            // human debug channel).
             // all=off:stdout, not -Xlog:disable: disable would also wipe a user's own JAVA_OPTS
             // -Xlog file sink, whereas this only reconfigures the stdout and stderr outputs.
-            //
-            // cds=off on the stderr sink silences one thing: the ~150-line [warning][cds] burst
-            // the archive-CREATION run dumps once per bundle-version install (issue #57) -- the
-            // "Old class has been linked" / dynamic-proxy "Unsupported location" chatter.
-            // That is guaranteed noise on every healthy first launch, not a diagnostic, and it
-            // buries the genuine startup output stderr is reserved for. Carve out only the EXACT
-            // `cds` tag set: the actionable `cds,dynamic` "Unable to use shared archive" (a stale
-            // archive -- a real signal) does not match `cds`, so it stays on stderr under
-            // all=warning.
-            + ".jsa -Xlog:all=off:stdout -Xlog:all=warning,cds=off:stderr:uptime,level,tags\""
+            + "JAVA_OPTS=\"$JAVA_OPTS"
+            + " -Xlog:all=off:stdout -Xlog:all=warning:stderr:uptime,level,tags\""
             + nl
             // DEDIREN_LOG_LEVEL is the only switch for first-party logging. Mapping it here, before
             // the JVM starts, sidesteps slf4j-simple's static-initializer ordering hazard: it reads
@@ -1204,47 +1169,6 @@ public final class DistTool {
   }
 
   /**
-   * First-launch stdout purity guard. On the very first launch against a not-yet-seeded CDS
-   * directory, {@code -XX:+AutoCreateSharedArchive} emits ~150 {@code [warning][cds]} lines while
-   * it builds the archive. Whatever the JVM logs, stdout must stay clean: an agent whose first
-   * command against a freshly unpacked bundle pipes stdout to {@code jq} must still see only the
-   * version line / a single JSON envelope. (Since issue #57 that burst is silenced on stderr too,
-   * but this guard is only about stdout.) Each probe uses its own fresh, empty CDS dir so it is a
-   * genuine cold start with the archive absent.
-   */
-  private static void assertFirstLaunchStdoutClean(Path bundle, Path temp, String version)
-      throws Exception {
-    Path dediren = bundle.resolve("bin/dediren");
-    String versionStdout =
-        runBundleCommand(
-            dediren,
-            bundle,
-            List.of("--version"),
-            null,
-            Map.of("DEDIREN_CDS_DIR", temp.resolve("fresh-cds-version").toString()),
-            Map.of());
-    assertNoJvmLogLines(versionStdout, "first-launch --version");
-    if (!versionStdout.strip().equals("dediren " + version)) {
-      throw new IllegalStateException(
-          "first-launch --version stdout must be exactly the version line: " + versionStdout);
-    }
-    String validateStdout =
-        runBundleCommand(
-            dediren,
-            bundle,
-            List.of(
-                "validate",
-                "--input",
-                bundle.resolve("fixtures/source/valid-basic.json").toString()),
-            null,
-            Map.of("DEDIREN_CDS_DIR", temp.resolve("fresh-cds-validate").toString()),
-            Map.of());
-    assertNoJvmLogLines(validateStdout, "first-launch validate");
-    // Must parse as a single ok JSON envelope, not JSON interleaved with CDS log noise.
-    okData(validateStdout);
-  }
-
-  /**
    * Drives the packaged MCP server over real stdio with real JSON-RPC.
    *
    * <p>Two things are only observable here. First, the protocol actually working through the
@@ -1260,14 +1184,7 @@ public final class DistTool {
    *
    * <p>Second, that stdout carries protocol frames and <em>nothing else</em> under a real build's
    * worth of engine activity — a stray print from render/ELK/export code reaching stdout would
-   * corrupt the frame stream and a real client would silently go dark. This run does <em>not</em>,
-   * however, exercise the two noise sources {@code StdoutIntegrity} actually guards against: it
-   * runs after {@link #assertBuildRendersAndExports}, by which point the default CDS archive is
-   * already warm and SLF4J is already bound, so neither the JVM's first-launch CDS notice nor
-   * SLF4J's provider warning is live here. That gap is real: this assertion alone cannot tell
-   * {@code StdoutIntegrity}'s redirect being present from it being deleted, because there is
-   * nothing left for either noise source to leak. {@link #assertMcpColdCdsStdoutClean}, run
-   * immediately after this one, closes it with a genuinely first-launch CDS notice.
+   * corrupt the frame stream and a real client would silently go dark.
    */
   private static void assertMcpServesToolsOverStdio(Path bundle, Path temp) throws Exception {
     Path dediren = bundle.resolve("bin/dediren");
@@ -1370,121 +1287,6 @@ public final class DistTool {
   }
 
   /**
-   * The MCP counterpart to {@link #assertFirstLaunchStdoutClean}: a cold, never-seeded {@code
-   * DEDIREN_CDS_DIR} so the launch genuinely runs {@code -XX:+AutoCreateSharedArchive}'s
-   * archive-creation path, closing the gap {@link #assertMcpServesToolsOverStdio} leaves (see its
-   * doc) -- that warm run cannot tell {@code StdoutIntegrity}'s redirect being present from it
-   * being deleted, because by the time it runs there is nothing left for either noise source to
-   * leak.
-   *
-   * <p>Since issue #57 the launcher silences the creation run's {@code [warning][cds]} burst on
-   * stderr too (it is guaranteed once-per-install noise, not a diagnostic), so a warning on stderr
-   * can no longer prove the probe ran cold. This keys that proof to the archive file the create
-   * path dumps on exit instead, then asserts two things about a real first launch: stdout carries
-   * JSON-RPC frames only, and stderr is free of the {@code [warning][cds]} burst (the #57 guard).
-   * The still-wanted {@code cds,dynamic} stale-archive warning is a different tag set that stays on
-   * stderr and is covered by {@link #assertStaleCdsStdoutClean}.
-   *
-   * <p>A minimal batch is enough -- this is about the JVM startup path shared by every command, not
-   * about any one tool, so there is no need to repeat {@link #assertMcpServesToolsOverStdio}'s full
-   * build.
-   */
-  private static void assertMcpColdCdsStdoutClean(Path bundle, Path temp) throws Exception {
-    Path dediren = bundle.resolve("bin/dediren");
-    Path requests = temp.resolve("mcp-cold-cds-requests.jsonl");
-    Files.writeString(
-        requests,
-        """
-        {"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"dist-smoke-cold-cds","version":"1"}}}
-        {"jsonrpc":"2.0","method":"notifications/initialized"}
-        {"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"dediren_guide","arguments":{"topic":"source-json"}}}
-        """,
-        StandardCharsets.UTF_8);
-
-    Path coldCdsDir = temp.resolve("fresh-cds-mcp");
-    Path coldArchive = coldCdsDir.resolve("cli.jsa");
-    BundleOutput cold =
-        runBundleCommandCapturingBoth(
-            dediren,
-            bundle,
-            List.of("mcp", "--root", bundle.toString(), "--read-only"),
-            requests,
-            Map.of("DEDIREN_CDS_DIR", coldCdsDir.toString()));
-
-    // Prove the probe genuinely ran the cold archive-CREATION path -- otherwise a clean stdout /
-    // quiet stderr result passes vacuously. The [warning][cds] burst can no longer serve as that
-    // proof (issue #57 silences it on stderr too), so key it to the archive AutoCreateSharedArchive
-    // dumps on exit: the file exists only if the create path actually ran.
-    if (!Files.isRegularFile(coldArchive)) {
-      throw new IllegalStateException(
-          "the cold-CDS mcp probe did not create its archive ("
-              + coldArchive
-              + "), so it was not a genuine first launch and its purity assertions prove nothing.");
-    }
-    // Issue #57 regression guard: the once-per-install [warning][cds] creation burst must NOT reach
-    // stderr. Only the EXACT `cds` tag set is silenced; [warning][cds,dynamic] (stale archive) is a
-    // different set and a fresh create does not emit it -- assertStaleCdsStdoutClean owns that
-    // case.
-    if (cold.stderr().contains("[warning][cds]")) {
-      throw new IllegalStateException(
-          "the cold-CDS mcp probe leaked the [warning][cds] archive-creation burst to stderr;"
-              + " the launcher's -Xlog ...,cds=off:stderr selector should silence it (issue"
-              + " #57).\nstderr:\n"
-              + cold.stderr());
-    }
-    assertStdoutIsJsonRpcFramesOnly(cold.stdout(), "cold-CDS mcp");
-    assertContains(cold.stdout(), "\"serverInfo\"", "cold-CDS mcp initialize response");
-    assertContains(cold.stdout(), "Minimal Source JSON", "cold-CDS mcp guide tool call response");
-    System.out.println(
-        "cold-CDS mcp stdio smoke passed: genuine first-launch archive create, no [cds] burst,"
-            + " clean stdout");
-  }
-
-  /**
-   * A FRESH archive (covered above) only exercises CDS creation. The stdout-corrupting case is a
-   * STALE one: a valid archive whose recorded classpath no longer matches, which makes the JVM warn
-   * "Unable to use shared archive" under the {@code cds,dynamic} tag set. That is reachable in the
-   * field because DEDIREN_CDS_DIR falls back to a version-independent ~/.cache dir when the bundle
-   * is not writable, so ANY classpath change -- an upgrade, a dependency added -- staleness-breaks
-   * the archive on first run. Seed an archive, then shift the classpath under it and prove the
-   * envelope still stands alone on stdout.
-   */
-  private static void assertStaleCdsStdoutClean(Path bundle, Path temp) throws Exception {
-    Path dediren = bundle.resolve("bin/dediren");
-    Path cds = temp.resolve("stale-cds");
-    List<String> validate =
-        List.of(
-            "validate", "--input", bundle.resolve("fixtures/source/valid-basic.json").toString());
-    // 1. Seed a valid archive for the bundle's real classpath.
-    runBundleCommand(
-        dediren, bundle, validate, null, Map.of("DEDIREN_CDS_DIR", cds.toString()), Map.of());
-    // 2. Shift the classpath out from under it. The probe must be a REAL jar on disk: the JVM
-    //    validates actual classpath entries, so a bogus path does not invalidate the archive.
-    Path probe = temp.resolve("stale-cds-probe.jar");
-    Files.copy(findAnyLibJar(bundle), probe, StandardCopyOption.REPLACE_EXISTING);
-    BundleOutput stale =
-        runBundleCommandCapturingBoth(
-            dediren,
-            bundle,
-            validate,
-            Map.of("DEDIREN_CDS_DIR", cds.toString(), "CLASSPATH_PREFIX", probe.toString()));
-
-    // 3. Prove the probe actually PROVOKED the condition before trusting the clean-stdout result.
-    //    Without this the test is a trap: if the archive ever stopped going stale (the jar copy
-    //    silently fails, a launcher change drops CLASSPATH_PREFIX, a JVM revision stops warning),
-    //    stdout would be clean because nothing warned at all, and this would keep passing while
-    //    testing nothing. The warning MUST appear -- on stderr, which is where it belongs.
-    if (!stale.stderr().contains("[cds")) {
-      throw new IllegalStateException(
-          "the stale-CDS probe did not make the archive stale, so its stdout-purity assertion"
-              + " proves nothing. Expected a [cds...] warning on stderr.\nstderr:\n"
-              + stale.stderr());
-    }
-    assertNoJvmLogLines(stale.stdout(), "stale-CDS validate");
-    okData(stale.stdout());
-  }
-
-  /**
    * The bundled SLF4J behaviour, end to end. These must be subprocess probes: an in-process CLI
    * test cannot see any of it, because Main swaps picocli's writers and never touches the JVM's
    * real System.err — which is exactly where SLF4J writes. An in-process assertion here would be
@@ -1492,7 +1294,7 @@ public final class DistTool {
    */
   private static void assertLoggingIsQuietAndSwitchable(Path bundle, Path temp) throws Exception {
     Path dediren = bundle.resolve("bin/dediren");
-    Map<String, String> cds = Map.of("DEDIREN_CDS_DIR", temp.resolve("log-cds").toString());
+    Map<String, String> baseEnv = Map.of();
 
     // 1. The banner probe runs `validate`, and only asserts on the banner. `validate` initialises
     //    SLF4J -- json-schema-validator calls LoggerFactory, which is what printed the banner on
@@ -1502,7 +1304,7 @@ public final class DistTool {
     List<String> validate =
         List.of(
             "validate", "--input", bundle.resolve("fixtures/source/valid-basic.json").toString());
-    BundleOutput banner = runBundleCommandCapturingBoth(dediren, bundle, validate, cds);
+    BundleOutput banner = runBundleCommandCapturingBoth(dediren, bundle, validate, baseEnv);
     if (banner.stderr().contains("SLF4J(")) {
       throw new IllegalStateException(
           "a default run must not print an SLF4J banner; the cli must bind a provider.\nstderr:\n"
@@ -1538,7 +1340,7 @@ public final class DistTool {
     //    the level is anything but off, so if simplelogger.properties ever regressed from off to
     //    debug -- or the launcher's empty-DEDIREN_LOG_LEVEL branch started setting a level -- this
     //    catches it. The same assertion against `validate` would be unfalsifiable.
-    BundleOutput quiet = runBundleCommandCapturingBoth(dediren, bundle, layout, cds);
+    BundleOutput quiet = runBundleCommandCapturingBoth(dediren, bundle, layout, baseEnv);
     if (quiet.stderr().contains("DEBUG")) {
       throw new IllegalStateException(
           "logging must default to off; a run with no DEDIREN_LOG_LEVEL emitted debug lines"
@@ -1551,7 +1353,7 @@ public final class DistTool {
     //    `debug` would let a typo that dropped one of the six from the case pattern ship unnoticed:
     //    the dropped level would fall through to the reject branch and silently stop working.
     for (String level : List.of("trace", "debug", "info", "warn", "error", "off")) {
-      Map<String, String> env = new LinkedHashMap<>(cds);
+      Map<String, String> env = new LinkedHashMap<>(baseEnv);
       env.put("DEDIREN_LOG_LEVEL", level);
       BundleOutput accepted = runBundleCommandCapturingBoth(dediren, bundle, layout, env);
       if (accepted.stderr().contains("ignoring invalid DEDIREN_LOG_LEVEL")) {
@@ -1566,7 +1368,7 @@ public final class DistTool {
     // envelope.
     // Both halves matter: a switch that also polluted stdout would trade one contract break for
     // another.
-    Map<String, String> debugEnv = new LinkedHashMap<>(cds);
+    Map<String, String> debugEnv = new LinkedHashMap<>(baseEnv);
     debugEnv.put("DEDIREN_LOG_LEVEL", "debug");
     BundleOutput debug = runBundleCommandCapturingBoth(dediren, bundle, layout, debugEnv);
     if (!debug.stderr().contains("DEBUG")) {
@@ -1580,7 +1382,7 @@ public final class DistTool {
     //    arbitrary JVM-argument injection. -XshowSettings:properties would dump the JVM's whole
     //    property table if it ever reached the java command; assert it does not, that the smuggled
     //    level is dropped rather than honoured, and that the run still yields a clean envelope.
-    Map<String, String> injected = new LinkedHashMap<>(cds);
+    Map<String, String> injected = new LinkedHashMap<>(baseEnv);
     injected.put("DEDIREN_LOG_LEVEL", "debug -XshowSettings:properties");
     BundleOutput rejected = runBundleCommandCapturingBoth(dediren, bundle, layout, injected);
     if (rejected.stderr().contains("java.runtime.name")
@@ -1614,10 +1416,10 @@ public final class DistTool {
 
   /**
    * Matches a JVM unified-logging line with the launcher's {@code uptime,level,tags} decorations,
-   * e.g. {@code [0.007s][warning][cds,dynamic] Unable to use shared archive}. Deliberately broader
-   * than any single tag: the JVM's default log sink is stdout, so ANY tag that warns (cds,
-   * cds+dynamic, os+container under cgroups, ...) would land on top of the command envelope. An
-   * earlier {@code [cds]}-only check missed {@code [cds,dynamic]} and let exactly that through.
+   * e.g. {@code [0.007s][warning][os,container] ...}. Deliberately broader than any single tag: the
+   * JVM's default log sink is stdout, so ANY tag that warns (os+container resource limits under
+   * cgroups, for one) would land on top of the command envelope. The launcher routes every tag off
+   * stdout onto stderr; this guard is the belt to that suspenders.
    */
   private static final Pattern JVM_LOG_LINE = Pattern.compile("^\\[[0-9]+[.,][0-9]+s\\]\\[");
 
@@ -1630,26 +1432,82 @@ public final class DistTool {
     }
   }
 
-  private static void assertCdsConfigured(Path bundle) throws IOException {
+  private static void assertLauncherLogRouting(Path bundle) throws IOException {
     for (Launcher launcher : LAUNCHERS) {
       String text =
           Files.readString(
               bundle.resolve("bin").resolve(launcher.bundleScript()), StandardCharsets.UTF_8);
-      if (!text.contains("-XX:+AutoCreateSharedArchive")
-          || !text.contains(launcher.sourceScript() + ".jsa")
-          || !text.contains(
-              "-Xlog:all=off:stdout -Xlog:all=warning,cds=off:stderr:uptime,level,tags")) {
+      // The launcher must route every JVM log tag off stdout (which carries the command envelope /
+      // MCP frames) onto stderr. Without it a VM warning (e.g. os,container under cgroups) would
+      // land on stdout below Java's System.out, where StdoutIntegrity's redirect cannot reach it.
+      if (!text.contains("-Xlog:all=off:stdout -Xlog:all=warning:stderr:uptime,level,tags")) {
         throw new IllegalStateException(
-            "launcher " + launcher.bundleScript() + " is missing its CDS configuration");
+            "launcher " + launcher.bundleScript() + " is missing its JVM stdout-log routing");
+      }
+      // Guard the routing against a LATER edit re-opening the stdout sink. -Xlog is last-wins per
+      // output and its DEFAULT output is stdout, so a stray `-Xlog:gc` (or anything enabling a
+      // level on :stdout) placed after the off directive would put JVM log lines back on top of the
+      // envelope -- and a light smoke run might not make it fire, exactly how the CDS cds,dynamic
+      // leak once hid. Reject the whole class statically instead of hoping it emits at runtime.
+      String leak = stdoutEnablingXlog(text);
+      if (leak != null) {
+        throw new IllegalStateException(
+            "launcher "
+                + launcher.bundleScript()
+                + " has an -Xlog directive that enables JVM logging on stdout and would corrupt the"
+                + " command envelope: "
+                + leak
+                + " -- only -Xlog:all=off:stdout may target stdout; send logs to :stderr or :file=.");
       }
     }
   }
 
-  private static void assertCdsArchiveCreated(Path bundle, String cdsName) {
-    Path archive = bundle.resolve("cds").resolve(cdsName + ".jsa");
-    if (!Files.isRegularFile(archive)) {
-      throw new IllegalStateException("expected CDS archive was not auto-created: " + archive);
+  /**
+   * The first {@code -Xlog} token in a launcher that ENABLES JVM unified logging on stdout, or
+   * {@code null} if none does. A directive routes to stdout when it names {@code :stdout} or omits
+   * the output ({@code -Xlog}'s default output is stdout); it enables logging unless every tag
+   * selector sits at level {@code off} (or the whole directive is {@code disable}). The sanctioned
+   * {@code -Xlog:all=off:stdout} therefore passes -- it turns the sink off, not on. Scans the
+   * launcher text only, which is the exposed vector: an {@code -Xlog} inherited from the caller's
+   * {@code $JAVA_OPTS} is already neutralised because the off directive is appended after it.
+   */
+  static String stdoutEnablingXlog(String launcherText) {
+    for (String token : launcherText.replace('"', ' ').replace('\'', ' ').split("\\s+")) {
+      boolean bare = token.equals("-Xlog");
+      if (!bare && !token.startsWith("-Xlog:")) {
+        continue;
+      }
+      String what;
+      String output;
+      if (bare) {
+        what = "all"; // bare -Xlog == -Xlog:all=info:stdout
+        output = "";
+      } else {
+        String[] sections = token.substring("-Xlog:".length()).split(":", -1);
+        what = sections[0];
+        output = sections.length >= 2 ? sections[1] : "";
+      }
+      boolean routesToStdout = output.isEmpty() || output.equals("stdout");
+      if (routesToStdout && enablesAnyLevel(what)) {
+        return token;
+      }
     }
+    return null;
+  }
+
+  /** Whether an {@code -Xlog} tag-selector list turns any tag on (a level above {@code off}). */
+  private static boolean enablesAnyLevel(String what) {
+    if (what.equals("disable")) {
+      return false;
+    }
+    for (String selector : what.split(",")) {
+      int equals = selector.indexOf('=');
+      String level = equals >= 0 ? selector.substring(equals + 1) : "info"; // default level is info
+      if (!level.equals("off")) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private static Path writeOefSchemas(Path schemaDir) throws IOException {
