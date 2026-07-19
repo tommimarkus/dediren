@@ -11,22 +11,34 @@ import proguard.ConfigurationParser;
 import proguard.ProGuard;
 
 /**
- * Shrink-only ProGuard pass (no optimization, no obfuscation) over the staged launcher classpath,
- * merged into one output jar. Keep rules live in the checked-in {@code bundle-shrink.pro} resource
- * next to this class; the rule-by-rule rationale is documented there. {@link
- * MergedJarPostProcessor} then unions ServiceLoader registrations, relocates embedded licence
- * files, and repacks entries STORED — all things a first-wins deflated merge would silently get
- * wrong.
+ * Shrink ProGuard pass (no optimization, no renaming; the obfuscation phase runs only to strip
+ * debugger-local attributes, with every name pinned — see bundle-shrink.pro) over the staged
+ * launcher classpath, merged into one output jar. Keep rules live in the checked-in {@code
+ * bundle-shrink.pro} resource next to this class; the rule-by-rule rationale is documented there.
+ * {@link MergedJarPostProcessor} then unions ServiceLoader registrations, relocates embedded
+ * licence files, and repacks entries STORED — all things a first-wins deflated merge would silently
+ * get wrong.
  */
 final class ProGuardLibShrinker implements LibShrinker {
 
   /**
    * Strips content that is dead outside Eclipse/OSGi hosts (UI icons, {@code .ecore}/{@code .xsd}
-   * model sources, xtext {@code ._trace}, {@code .melk}, OSGi manifest extras, Eclipse branding
-   * files), multi-release variants, manifests and signature files that cannot survive a merge,
-   * embedded licence files (re-added collision-free by {@link MergedJarPostProcessor}), and {@code
-   * META-INF/services} files (rebuilt as cross-jar unions by the same post-processor — letting them
-   * through would only produce first-wins duplicates ProGuard warns about).
+   * model sources, xtext {@code ._trace}, {@code .melk}, OSGi manifest extras and {@code OSGI-INF}
+   * descriptors, Eclipse branding files, javadoc {@code package.html}, ELK doc pages), metadata for
+   * platforms the plain-Java bundle never runs on (GraalVM {@code native-image}, Android {@code
+   * META-INF/proguard}), multi-release variants, manifests and signature files that cannot survive
+   * a merge, embedded licence files including {@code about*.html} (re-added collision-free by
+   * {@link MergedJarPostProcessor}), and {@code META-INF/services} files (rebuilt as cross-jar
+   * unions by the same post-processor — letting them through would only produce first-wins
+   * duplicates ProGuard warns about).
+   *
+   * <p>Also drops runtime-reachable-but-provably-unused validator data: networknt's non-English
+   * {@code jsv-messages_*.properties} (the base bundle stays and is the ResourceBundle fallback),
+   * {@code ucd/**} Unicode data (read lazily by the idn-* format validators — no dediren schema or
+   * MCP tool schema uses the {@code format} keyword, and schema-cache feeds only XML XSDs to
+   * xmllint), and the draft-04/06/07/2019-09 meta-schemas (every dediren family is 2020-12). Adding
+   * a {@code format} keyword to any packaged schema means putting {@code ucd/**} and the message
+   * bundles back.
    */
   static final String INJAR_FILTER =
       "(!META-INF/MANIFEST.MF,!META-INF/*.SF,!META-INF/*.RSA,!META-INF/*.DSA,"
@@ -34,7 +46,11 @@ final class ProGuardLibShrinker implements LibShrinker {
           + "!module-info.class,!META-INF/versions/**,!META-INF/maven/**,!**.melk,!**._trace,"
           + "!images/**,!model/**,!schema/**,!**.png,!plugin.xml,!plugin.properties,!about.html,"
           + "!about_files/**,!about.ini,!about.properties,!about.mappings,"
-          + "!.api_description,!.options,!profile.list,!systembundle.properties)";
+          + "!.api_description,!.options,!profile.list,!systembundle.properties,"
+          + "!jsv-messages_*.properties,!ucd/**,"
+          + "!draft-04/**,!draft-06/**,!draft-07/**,!draft/2019-09/**,"
+          + "!**/package.html,!OSGI-INF/**,!META-INF/native-image/**,"
+          + "!META-INF/proguard/**,!about_*.html,!docs/**)";
 
   private static final String KEEP_RULES_RESOURCE = "bundle-shrink.pro";
 

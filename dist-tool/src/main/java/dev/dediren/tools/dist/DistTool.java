@@ -1,7 +1,9 @@
 package dev.dediren.tools.dist;
 
 import dev.dediren.contracts.json.JsonSupport;
+import java.io.BufferedOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
@@ -264,18 +266,41 @@ public final class DistTool {
     // Test seam: plant arbitrary pre-archive content into the staged tree just before archiving.
     afterStage.accept(bundle);
 
-    runCommand(
-        root,
-        List.of(
-            "tar",
-            "-C",
-            dist.toString(),
-            "-czf",
-            archive.toString(),
-            bundle.getFileName().toString()),
-        null);
+    Path tarball = dist.resolve(bundle.getFileName() + ".tar");
+    try {
+      runCommand(
+          root,
+          List.of(
+              "tar",
+              "-C",
+              dist.toString(),
+              "-cf",
+              tarball.toString(),
+              bundle.getFileName().toString()),
+          null);
+      gzipBestCompression(tarball, archive);
+    } finally {
+      Files.deleteIfExists(tarball);
+    }
     pruneStaleArtifacts(dist, bundle.getFileName().toString());
     System.out.println(archive);
+  }
+
+  /**
+   * {@code tar -czf} compresses at gzip's default level 6; level 9 is ~30 KB smaller on this bundle
+   * for free. Compressing in-process also keeps the gzip header free of the filename and timestamp
+   * fields, so the archive bytes depend only on the tar content, not on when or where it was built.
+   */
+  private static void gzipBestCompression(Path tarball, Path archive) throws IOException {
+    try (OutputStream out =
+        new java.util.zip.GZIPOutputStream(
+            new BufferedOutputStream(Files.newOutputStream(archive)), 64 * 1024) {
+          {
+            def.setLevel(java.util.zip.Deflater.BEST_COMPRESSION);
+          }
+        }) {
+      Files.copy(tarball, out);
+    }
   }
 
   private static void writeThirdPartyNotices(Path root, Path output) throws IOException {
@@ -871,11 +896,13 @@ public final class DistTool {
   }
 
   /**
-   * Ceiling between the shipped size (~5.4 MB, shrunk + STORED repack) and the two regression
-   * shapes above it — STORED silently degrading to deflated entries (~7.2 MB) and the shrink pass
-   * degrading to pass-through (~15.1 MB). Trips on either regression, not ordinary growth.
+   * Ceiling between the shipped size (~4.97 MB: shrunk + attribute-stripped + STORED repack + gzip
+   * -9) and the regression shapes above it — the attribute strip silently going inert (~5.4 MB; it
+   * depends on ProGuard's obfuscation phase running, see bundle-shrink.pro), STORED degrading to
+   * deflated entries (~7.2 MB), and the shrink pass degrading to pass-through (~15 MB). Trips on
+   * any of those regressions, not ordinary growth.
    */
-  private static final long MAX_ARCHIVE_BYTES = 7_000_000L;
+  private static final long MAX_ARCHIVE_BYTES = 5_300_000L;
 
   /**
    * The packaged lib/ must hold exactly the shrunk bundle jar — anything else means the CLASSPATH

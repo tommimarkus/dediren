@@ -1,6 +1,16 @@
-# Shrink-only pass over the staged launcher classpath (no optimization, no obfuscation):
-# unreachable classes and members are removed, nothing is altered or renamed. Reachability
-# starts from dev.dediren.** (CLI main, MCP server, engines are all entry points).
+# Shrink pass over the staged launcher classpath (no optimization, no renaming): unreachable
+# classes and members are removed and debugger-only attributes are stripped; every surviving
+# class, member and parameter keeps its exact name, and stack traces keep file/line info.
+# Reachability starts from dev.dediren.** (CLI main, MCP server, engines are all entry points).
+#
+# Attribute stripping mechanics: ProGuard drops attributes only in its obfuscation phase, so
+# that phase must run — `-keepnames class ** { *; }` pins every name, turning the phase into a
+# pure attribute filter. `-keepattributes` below keeps everything load-bearing (annotations,
+# generics Signature, Record/NestHost/NestMembers/PermittedSubclasses for the JVM, Method-
+# Parameters for Jackson creator binding, SourceFile/LineNumberTable for stack traces) and
+# omits only LocalVariableTable/LocalVariableTypeTable — debugger locals, 1.4 MB of the jar.
+# Structural attributes (Code, StackMapTable, BootstrapMethods, ConstantValue) are not
+# governed by -keepattributes and always survive.
 #
 # Keep-rule inventory — every rule exists because removing it breaks a validated runtime path:
 # - picocli.**: picocli builds its command model reflectively and instantiates help mixins, type
@@ -14,8 +24,8 @@
 #   JsonSchemaValidatorSupplier / TokenStreamFactory / ObjectMapper impls: ServiceLoader.
 # - IDataObject impls + enum values/valueOf: ELK parses layout option values reflectively.
 -dontoptimize
--dontobfuscate
--keepattributes *
+-keepnames class ** { *; }
+-keepattributes Exceptions,Signature,InnerClasses,EnclosingMethod,Deprecated,Synthetic,SourceFile,LineNumberTable,MethodParameters,*Annotation*,Record,PermittedSubclasses,NestHost,NestMembers
 -keepparameternames
 -keepdirectories META-INF/services
 

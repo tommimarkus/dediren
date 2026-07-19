@@ -72,9 +72,18 @@ class MergedJarPostProcessorTest {
                 "epl text",
                 "org/E.class",
                 "x"));
+    // Suffixed Eclipse branding/notice files (xtext ships about_<bundle>.html at jar root) are
+    // licence artifacts too: the injar filter drops them from the shrunk jar, so relocation is
+    // what preserves the notice text in the shipped artifact.
+    Path xtext =
+        jar(
+            dir.resolve("org.eclipse.xtext.xbase.lib-2.43.0.jar"),
+            Map.of(
+                "about_org.eclipse.xtext.xbase.lib.html", "xtext epl notice",
+                "org/X.class", "x"));
     Path merged = jar(dir.resolve("merged.jar"), Map.of("com/G.class", "x", "org/E.class", "x"));
 
-    MergedJarPostProcessor.apply(merged, List.of(guava, elk));
+    MergedJarPostProcessor.apply(merged, List.of(guava, elk, xtext));
 
     assertThat(entryText(merged, "META-INF/third-party/guava-33.6.0-jre/LICENSE"))
         .isEqualTo("apache text");
@@ -83,6 +92,12 @@ class MergedJarPostProcessorTest {
     // about.html's relative about_files/ links keep resolving in the relocated layout.
     assertThat(entryText(merged, "META-INF/third-party/elk-core-0.11.0/about_files/epl-v20.html"))
         .isEqualTo("epl text");
+    assertThat(
+            entryText(
+                merged,
+                "META-INF/third-party/org.eclipse.xtext.xbase.lib-2.43.0/"
+                    + "about_org.eclipse.xtext.xbase.lib.html"))
+        .isEqualTo("xtext epl notice");
     // Non-licence resources are not relocated, and existing class entries survive untouched.
     assertThat(entryText(merged, "com/G.class")).isEqualTo("x");
     try (ZipFile zip = new ZipFile(merged.toFile())) {

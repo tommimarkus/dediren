@@ -126,9 +126,9 @@ final class MergedJarPostProcessor {
   /**
    * Relocation target (relative to {@code META-INF/third-party/<jar>/}) for a licence artifact, or
    * null when the entry is content, not a licence. Root-level or META-INF-root LICENSE- and
-   * NOTICE-prefixed files and about.html flatten to their file name; Eclipse {@code about_files/}
-   * entries (the licence texts about.html links to) keep their directory so those relative links
-   * still resolve.
+   * NOTICE-prefixed files, about.html, and suffixed {@code about_<bundle>.html} branding pages
+   * (xtext's shape) flatten to their file name; Eclipse {@code about_files/} entries (the licence
+   * texts about.html links to) keep their directory so those relative links still resolve.
    */
   private static String licenceTargetPath(String name) {
     if (name.startsWith("about_files/")) {
@@ -138,8 +138,10 @@ final class MergedJarPostProcessor {
     boolean metaInfRoot =
         name.startsWith("META-INF/") && name.indexOf('/', "META-INF/".length()) < 0;
     boolean atRoot = name.indexOf('/') < 0;
+    boolean aboutPage =
+        file.equals("about.html") || (file.startsWith("about_") && file.endsWith(".html"));
     if ((metaInfRoot || atRoot)
-        && (file.startsWith("LICENSE") || file.startsWith("NOTICE") || file.equals("about.html"))) {
+        && (file.startsWith("LICENSE") || file.startsWith("NOTICE") || aboutPage)) {
       return file;
     }
     return null;
