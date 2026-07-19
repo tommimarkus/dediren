@@ -100,10 +100,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mapfile -t archives < <(find dist -maxdepth 1 -type f -name 'dediren-agent-bundle-*.tar.gz' | sort)
+          mapfile -t archives < <(find dist -maxdepth 1 -type f -name 'dediren-agent-bundle-*.tar.xz' | sort)
           if [[ "${#archives[@]}" -ne 1 ]]; then
             echo "Expected exactly one Java archive, found ${#archives[@]}" >&2
-            find dist -maxdepth 1 -type f -name 'dediren-agent-bundle-*.tar.gz' -print >&2
+            find dist -maxdepth 1 -type f -name 'dediren-agent-bundle-*.tar.xz' -print >&2
             exit 1
           fi
           echo "path=${archives[0]}" >> "$GITHUB_OUTPUT"
@@ -175,25 +175,25 @@ jobs:
           fi
 
           mkdir -p release-assets
-          cp release-artifacts/*.tar.gz release-assets/
+          cp release-artifacts/*.tar.xz release-assets/
           cp target/bom.json "release-assets/dediren-${VERSION}.cdx.json"
           cp target/bom.xml "release-assets/dediren-${VERSION}.cdx.xml"
 
-          tar_count=$(find release-artifacts -maxdepth 1 -type f -name '*.tar.gz' | wc -l)
+          tar_count=$(find release-artifacts -maxdepth 1 -type f -name '*.tar.xz' | wc -l)
           if [[ "$tar_count" -ne 1 ]]; then
             echo "Expected exactly one release archive, found $tar_count" >&2
             exit 1
           fi
 
           bundle="dediren-agent-bundle-${VERSION}"
-          archive="release-assets/dediren-agent-bundle-${VERSION}.tar.gz"
+          archive="release-assets/dediren-agent-bundle-${VERSION}.tar.xz"
           if [[ ! -f "$archive" ]]; then
             echo "Missing release archive: $archive" >&2
             exit 1
           fi
 
-          tar -tzf "$archive" "$bundle/LICENSE" >/dev/null
-          tar -tzf "$archive" "$bundle/docs/agent-usage.md" >/dev/null
+          tar -tf "$archive" "$bundle/LICENSE" >/dev/null
+          tar -tf "$archive" "$bundle/docs/agent-usage.md" >/dev/null
           tar -xOf "$archive" "$bundle/bundle.json" \
             | jq -e --arg version "$VERSION" \
                 '.version == $version and .target == "java"' >/dev/null
@@ -205,7 +205,7 @@ jobs:
 
           (
             cd release-assets
-            sha256sum *.tar.gz > SHA256SUMS
+            sha256sum *.tar.xz > SHA256SUMS
           )
 
       - name: Verify artifact attestations
@@ -214,7 +214,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          for archive in release-assets/*.tar.gz; do
+          for archive in release-assets/*.tar.xz; do
             gh attestation verify "$archive" --repo "$GITHUB_REPOSITORY"
           done
 
@@ -224,7 +224,7 @@ jobs:
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           gh release create "$GITHUB_REF_NAME" \
-            "release-assets/dediren-agent-bundle-${VERSION}.tar.gz" \
+            "release-assets/dediren-agent-bundle-${VERSION}.tar.xz" \
             "release-assets/dediren-${VERSION}.cdx.json" \
             "release-assets/dediren-${VERSION}.cdx.xml" \
             release-assets/SHA256SUMS \

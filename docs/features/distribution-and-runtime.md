@@ -76,7 +76,7 @@ checksum file, and CycloneDX SBOMs. The archive carries a GitHub artifact
 attestation, so a consumer can verify provenance before unpacking:
 
 ```bash
-gh attestation verify dediren-agent-bundle-<version>.tar.gz --repo tommimarkus/dediren
+gh attestation verify dediren-agent-bundle-<version>.tar.xz --repo tommimarkus/dediren
 ```
 
 ## Version Compatibility Signal

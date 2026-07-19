@@ -72,7 +72,7 @@ jars, no bundled JRE — Java 21+ is required at runtime):
 
 ```text
 dist/dediren-agent-bundle-2026.07.21/
-dist/dediren-agent-bundle-2026.07.21.tar.gz
+dist/dediren-agent-bundle-2026.07.21.tar.xz
 ```
 
 ## First Run
@@ -217,5 +217,5 @@ preceding `clean`. GitHub Releases publish one Java archive, `SHA256SUMS`, and
 CycloneDX SBOMs with GitHub artifact attestations; verify a download with:
 
 ```bash
-gh attestation verify dediren-agent-bundle-<version>.tar.gz --repo tommimarkus/dediren
+gh attestation verify dediren-agent-bundle-<version>.tar.xz --repo tommimarkus/dediren
 ```

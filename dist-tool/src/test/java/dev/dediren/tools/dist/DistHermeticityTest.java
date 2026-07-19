@@ -28,7 +28,7 @@ class DistHermeticityTest {
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("fake-stale-0.0.1.jar")
         .hasMessageContaining("cli/target/appassembler");
-    assertThat(root.resolve("dist/dediren-agent-bundle-" + VERSION + ".tar.gz")).doesNotExist();
+    assertThat(root.resolve("dist/dediren-agent-bundle-" + VERSION + ".tar.xz")).doesNotExist();
   }
 
   @Test
@@ -40,7 +40,7 @@ class DistHermeticityTest {
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("render-module-" + VERSION + ".jar")
         .hasMessageContaining("cli/target/appassembler");
-    assertThat(root.resolve("dist/dediren-agent-bundle-" + VERSION + ".tar.gz")).doesNotExist();
+    assertThat(root.resolve("dist/dediren-agent-bundle-" + VERSION + ".tar.xz")).doesNotExist();
   }
 
   @Test
@@ -55,7 +55,7 @@ class DistHermeticityTest {
     DistTool.build(
         root, VERSION, root.resolve("THIRD-PARTY-NOTICES.md"), bundle -> {}, fakeShrinker);
 
-    Path archive = root.resolve("dist/dediren-agent-bundle-" + VERSION + ".tar.gz");
+    Path archive = root.resolve("dist/dediren-agent-bundle-" + VERSION + ".tar.xz");
     assertThat(archive).isRegularFile();
     List<String> entries = archiveEntries(archive);
     List<String> libJars =
@@ -106,7 +106,7 @@ class DistHermeticityTest {
                     leakyShrinker))
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("stray-residue.jar");
-    assertThat(root.resolve("dist/dediren-agent-bundle-" + VERSION + ".tar.gz")).doesNotExist();
+    assertThat(root.resolve("dist/dediren-agent-bundle-" + VERSION + ".tar.xz")).doesNotExist();
   }
 
   private static String readArchiveEntry(Path archive, String entry) throws Exception {
@@ -182,9 +182,9 @@ class DistHermeticityTest {
 
   private static List<String> archiveEntries(Path archive) throws Exception {
     Process process =
-        new ProcessBuilder("tar", "-tzf", archive.toString()).redirectErrorStream(true).start();
+        new ProcessBuilder("tar", "-tf", archive.toString()).redirectErrorStream(true).start();
     String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-    assertThat(process.waitFor()).as("tar -tzf %s%n%s", archive, output).isZero();
+    assertThat(process.waitFor()).as("tar -tf %s%n%s", archive, output).isZero();
     return output.lines().toList();
   }
 }

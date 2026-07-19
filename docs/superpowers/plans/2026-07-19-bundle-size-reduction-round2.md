@@ -5,10 +5,13 @@
 > `about_*.html` relocation widening in `MergedJarPostProcessor`,
 > deterministic in-process gzip −9 archiving, and the smoke ceiling re-tuned
 > to 5,300,000 bytes. Declined for now: V2 (bundled stack traces keep line
-> numbers). Pending an explicit go/no-go: the `.tar.xz` format switch (the
-> extraction-latency question below is answered — it passes the install
-> budget — but the format change is outward-facing and stays a separate
-> decision). Everything below this box is the research record as written.
+> numbers). **Also adopted the same day, on explicit maintainer go-ahead: the
+> `.tar.xz` format switch** (3,164,352 bytes as built; extraction is `tar -xf` — every
+> supported Windows 11, Linux and macOS auto-detects it; the residual gap is
+> Windows Server 2022-era `tar.exe`, which needs an xz on PATH). The smoke
+> ceiling now sits at 3,400,000 bytes, under the ~3.49 MB
+> attribute-strip-inert plateau. Everything below this box is the research
+> record as written.
 >
 > Research method note: every "pass" row below was
 > validated with the real `DistTool smoke` (validate, layout, validate-layout,
@@ -42,7 +45,8 @@ round-1 recorded-but-unadopted `tar.xz` switch, the same content is
 
 The adopted combination keeps stack-trace line numbers (V1b, not V2) per the
 maintainer's call: −9.5% vs shipped, with `xz -9e` on the same content at
-3,164,580 bytes (−42.0% vs shipped) if the format switch is later taken.
+3,164,580 bytes (−42.0% vs shipped) — the format switch was subsequently taken
+(see the status box; the released asset is the `.tar.xz`).
 
 Outer-compression matrix (identical V6 content, byte-for-byte):
 

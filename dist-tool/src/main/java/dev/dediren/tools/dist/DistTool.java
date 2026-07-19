@@ -1,9 +1,7 @@
 package dev.dediren.tools.dist;
 
 import dev.dediren.contracts.json.JsonSupport;
-import java.io.BufferedOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
@@ -194,7 +192,7 @@ public final class DistTool {
         Path archive =
             options.containsKey("archive")
                 ? Path.of(options.get("archive"))
-                : root.resolve("dist").resolve(bundleName(version) + ".tar.gz");
+                : root.resolve("dist").resolve(bundleName(version) + ".tar.xz");
         smoke(root, archive.toAbsolutePath().normalize(), version);
         yield 0;
       }
@@ -204,7 +202,7 @@ public final class DistTool {
         Path archive =
             options.containsKey("archive")
                 ? Path.of(options.get("archive"))
-                : root.resolve("dist").resolve(bundleName(version) + ".tar.gz");
+                : root.resolve("dist").resolve(bundleName(version) + ".tar.xz");
         bench(root, archive.toAbsolutePath().normalize(), runs);
         yield 0;
       }
@@ -237,7 +235,7 @@ public final class DistTool {
       throws Exception {
     Path dist = root.resolve("dist");
     Path bundle = dist.resolve(bundleName(version));
-    Path archive = dist.resolve(bundle.getFileName() + ".tar.gz");
+    Path archive = dist.resolve(bundle.getFileName() + ".tar.xz");
 
     deleteIfExists(bundle);
     Files.deleteIfExists(archive);
@@ -278,29 +276,18 @@ public final class DistTool {
               tarball.toString(),
               bundle.getFileName().toString()),
           null);
-      gzipBestCompression(tarball, archive);
+      // xz -9e halves the archive against gzip -9 on this content (measured 4.94 MB -> 3.16 MB)
+      // and consumes the .tar in place (tarball.xz == archive). -T1 keeps the byte stream
+      // independent of the build machine's core count; extraction cost is ~35 ms over gzip.
+      runCommand(root, List.of("xz", "-9", "-e", "-T1", "-f", tarball.toString()), null);
+      if (!Files.isRegularFile(archive)) {
+        throw new IOException("xz reported success but wrote no archive at " + archive);
+      }
     } finally {
       Files.deleteIfExists(tarball);
     }
     pruneStaleArtifacts(dist, bundle.getFileName().toString());
     System.out.println(archive);
-  }
-
-  /**
-   * {@code tar -czf} compresses at gzip's default level 6; level 9 is ~30 KB smaller on this bundle
-   * for free. Compressing in-process also keeps the gzip header free of the filename and timestamp
-   * fields, so the archive bytes depend only on the tar content, not on when or where it was built.
-   */
-  private static void gzipBestCompression(Path tarball, Path archive) throws IOException {
-    try (OutputStream out =
-        new java.util.zip.GZIPOutputStream(
-            new BufferedOutputStream(Files.newOutputStream(archive)), 64 * 1024) {
-          {
-            def.setLevel(java.util.zip.Deflater.BEST_COMPRESSION);
-          }
-        }) {
-      Files.copy(tarball, out);
-    }
   }
 
   private static void writeThirdPartyNotices(Path root, Path output) throws IOException {
@@ -427,7 +414,7 @@ public final class DistTool {
     ensureJavaRuntime();
     Path temp = Files.createTempDirectory("dediren-dist-smoke-");
     try {
-      runCommand(root, List.of("tar", "-xzf", archive.toString(), "-C", temp.toString()), null);
+      runCommand(root, List.of("tar", "-xf", archive.toString(), "-C", temp.toString()), null);
       Path bundle = findBundleDir(temp);
       assertSingleShrunkLibJar(bundle, version);
       assertLauncherJvmFlags(bundle);
@@ -705,7 +692,7 @@ public final class DistTool {
     ensureJavaRuntime();
     Path temp = Files.createTempDirectory("dediren-dist-bench-");
     try {
-      runCommand(root, List.of("tar", "-xzf", archive.toString(), "-C", temp.toString()), null);
+      runCommand(root, List.of("tar", "-xf", archive.toString(), "-C", temp.toString()), null);
       Path bundle = findBundleDir(temp);
       Path dediren = bundle.resolve("bin/dediren");
 
@@ -896,13 +883,13 @@ public final class DistTool {
   }
 
   /**
-   * Ceiling between the shipped size (~4.97 MB: shrunk + attribute-stripped + STORED repack + gzip
-   * -9) and the regression shapes above it — the attribute strip silently going inert (~5.4 MB; it
-   * depends on ProGuard's obfuscation phase running, see bundle-shrink.pro), STORED degrading to
-   * deflated entries (~7.2 MB), and the shrink pass degrading to pass-through (~15 MB). Trips on
-   * any of those regressions, not ordinary growth.
+   * Ceiling between the shipped size (~3.17 MB: shrunk + attribute-stripped + STORED repack + xz
+   * -9e) and the regression shapes above it — the attribute strip silently going inert (~3.49 MB;
+   * it depends on ProGuard's obfuscation phase running, see bundle-shrink.pro), the archive
+   * degrading back to gzip (~4.94 MB), and STORED-to-deflated or shrink-to-pass-through regressions
+   * far above that. Trips on any of those, not ordinary growth.
    */
-  private static final long MAX_ARCHIVE_BYTES = 5_300_000L;
+  private static final long MAX_ARCHIVE_BYTES = 3_400_000L;
 
   /**
    * The packaged lib/ must hold exactly the shrunk bundle jar — anything else means the CLASSPATH
@@ -1679,7 +1666,7 @@ public final class DistTool {
         if (!name.startsWith("dediren-agent-bundle-")) {
           continue;
         }
-        if (name.equals(currentBundle) || name.equals(currentBundle + ".tar.gz")) {
+        if (name.equals(currentBundle) || name.equals(currentBundle + ".tar.xz")) {
           continue;
         }
         deleteIfExists(path);

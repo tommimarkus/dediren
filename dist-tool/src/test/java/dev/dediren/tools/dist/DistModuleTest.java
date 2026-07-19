@@ -75,7 +75,7 @@ class DistModuleTest {
 
     Path bundle = root.resolve("dist/dediren-agent-bundle-2026.06.0");
     assertThat(bundle).isDirectory();
-    Path archive = root.resolve("dist/dediren-agent-bundle-2026.06.0.tar.gz");
+    Path archive = root.resolve("dist/dediren-agent-bundle-2026.06.0.tar.xz");
     assertThat(archive).isRegularFile();
     assertThat(staleBundle).doesNotExist();
     assertThat(staleArchive).doesNotExist();
@@ -106,9 +106,9 @@ class DistModuleTest {
 
   private static java.util.List<String> archiveEntries(Path archive) throws Exception {
     Process process =
-        new ProcessBuilder("tar", "-tzf", archive.toString()).redirectErrorStream(true).start();
+        new ProcessBuilder("tar", "-tf", archive.toString()).redirectErrorStream(true).start();
     String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-    assertThat(process.waitFor()).as("tar -tzf %s%n%s", archive, output).isZero();
+    assertThat(process.waitFor()).as("tar -tf %s%n%s", archive, output).isZero();
     return output.lines().toList();
   }
 
@@ -285,8 +285,8 @@ class DistModuleTest {
 
     assertThat(publishReleaseStep)
         .doesNotContain(
-            "release-assets/*.tar.gz",
-            "release-assets/dediren-agent-bundle-*.tar.gz",
+            "release-assets/*.tar.xz",
+            "release-assets/dediren-agent-bundle-*.tar.xz",
             "release-assets/dediren-agent-bundle-${VERSION}-");
   }
 
