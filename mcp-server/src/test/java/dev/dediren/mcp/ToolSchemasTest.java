@@ -11,9 +11,11 @@ import tools.jackson.databind.JsonNode;
 
 /**
  * The build tool's advertised input schema is how an agent discovers what it may ask for; {@code
- * BuildCommand} is what actually enforces it. Nothing but this test stops the two from drifting,
- * and drift is silent in the direction that matters: a kind added to core but not advertised here
- * is simply unreachable over MCP.
+ * BuildCommand} is what actually enforces it. Nothing but this test stops the two from drifting.
+ * The motivating direction is the dangerous one: a kind added to {@code BuildCommand.EMIT_KINDS}
+ * but not advertised here is simply unreachable over MCP, with nothing else to surface the gap. The
+ * check itself is symmetric ({@code containsExactlyInAnyOrderElementsOf} is set equality), so it
+ * fails just as surely if the schema advertises a kind {@code BuildCommand} no longer accepts.
  */
 class ToolSchemasTest {
 

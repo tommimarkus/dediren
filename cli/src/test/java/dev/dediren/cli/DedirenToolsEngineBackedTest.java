@@ -9,6 +9,7 @@ import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
 import io.modelcontextprotocol.spec.McpSchema.TextContent;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -91,5 +92,50 @@ class DedirenToolsEngineBackedTest {
     JsonNode envelope = envelopeOf(result);
     assertThat(envelope.path("status").asText()).isEqualTo("error");
     assertThat(envelope.at("/diagnostics/0/code").asText()).isEqualTo("DEDIREN_COMMAND_IO_FAILED");
+  }
+
+  /**
+   * The real-harm case behind the {@code stringListArg} guard (see {@code DedirenTools.build}):
+   * with an empty engine registry, {@code mcp-server}'s own {@code DedirenToolsTest} can only prove
+   * that a regressed guard would let the request reach {@code BuildCommand} -- it fails there at
+   * engine dispatch either way, so it cannot show what a regression would actually *do*. Only a
+   * real registry can reproduce the shipped defect: a blank {@code views} element used to be
+   * silently dropped, collapsing the list to empty, which {@code BuildCommand.selectViews} reads as
+   * "build every view" -- so a malformed single-view request quietly became a different, larger,
+   * successful one. {@code valid-uml-basic.json} has three views (class-view, data-view,
+   * activity-view), so a regression here would build and write all three instead of rejecting the
+   * request.
+   */
+  @Test
+  void buildRejectsABlankViewsElementInsteadOfSilentlyBuildingEveryView(@TempDir Path root)
+      throws Exception {
+    Files.copy(fixture("valid-uml-basic.json"), root.resolve("model.json"));
+    Files.copy(policy("uml-svg.json"), root.resolve("policy.json"));
+    Path out = root.resolve("out");
+
+    CallToolResult result =
+        new DedirenTools(root, EngineWiring.defaults(), Map.of())
+            .build(
+                new CallToolRequest(
+                    "dediren_build",
+                    Map.of(
+                        "source",
+                        "model.json",
+                        "out",
+                        out.toString(),
+                        "render_policy",
+                        "policy.json",
+                        "views",
+                        List.of(""))));
+
+    assertThat(result.isError()).isTrue();
+    JsonNode diagnostic = envelopeOf(result).path("diagnostics").path(0);
+    assertThat(diagnostic.path("code").asText()).isEqualTo("DEDIREN_COMMAND_INPUT_INVALID");
+    assertThat(diagnostic.path("message").asText()).contains("'views'[0]");
+    // The whole point: a malformed request must not silently become "build every view" and write
+    // every view's output directory.
+    assertThat(Files.exists(out.resolve("class-view"))).isFalse();
+    assertThat(Files.exists(out.resolve("data-view"))).isFalse();
+    assertThat(Files.exists(out.resolve("activity-view"))).isFalse();
   }
 }

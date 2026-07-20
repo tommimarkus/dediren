@@ -23,6 +23,10 @@ class DedirenToolsTest {
     return Path.of("..", "fixtures", "source", name).toAbsolutePath().normalize();
   }
 
+  private static Path renderPolicyFixture(String name) {
+    return Path.of("..", "fixtures", "render-policy", name).toAbsolutePath().normalize();
+  }
+
   private static String textOf(CallToolResult result) {
     return ((TextContent) result.content().get(0)).text();
   }
@@ -276,9 +280,21 @@ class DedirenToolsTest {
   // no minLength), reaches this handler, and used to be dropped -- collapsing views to empty, which
   // BuildCommand.selectViews reads as "build every view". Verified on the shipped bundle: a 3-view
   // model with views:[""] built all three under status:"ok".
+  //
+  // A render_policy is supplied so a request that got past arg validation would actually reach
+  // BuildCommand instead of dying at its own no-output-lane check with the SAME
+  // DEDIREN_COMMAND_INPUT_INVALID code the fixed guard reports -- that coincidence is what made the
+  // code assertion below inert against a regression before this fixture was added. With a lane
+  // present, this suite's empty engine registry (noEngines()) means a regressed guard would instead
+  // fail per-view at engine dispatch (DEDIREN_PLUGIN_UNKNOWN, nested under views[0].diagnostics),
+  // leaving this top-level envelope's own diagnostics[] empty -- so the code assertion below now
+  // reads "" instead of DEDIREN_COMMAND_INPUT_INVALID and genuinely fails on a regression, rather
+  // than passing by coincidence. See DedirenToolsEngineBackedTest (cli) for the real-engine case
+  // that proves the actual harm -- a build that succeeds and writes every view's output.
   @Test
   void buildRejectsABlankViewsElement(@TempDir Path root) throws Exception {
     Files.copy(fixture("valid-basic.json"), root.resolve("model.json"));
+    Files.copy(renderPolicyFixture("default-svg.json"), root.resolve("policy.json"));
 
     CallToolResult result =
         toolsIn(root)
@@ -288,6 +304,7 @@ class DedirenToolsTest {
                     Map.of(
                         "source", "model.json",
                         "out", "out",
+                        "render_policy", "policy.json",
                         "views", List.of(""))));
 
     assertThat(result.isError()).isTrue();
@@ -300,9 +317,14 @@ class DedirenToolsTest {
 
   // Defence in depth. The SDK's input validation (on by default, opt-out only) rejects this over a
   // real connection before the handler sees it -- but the handler must not depend on that default.
+  //
+  // Same render_policy addition as buildRejectsABlankViewsElement, and for the same reason: without
+  // a lane, this would die at BuildCommand's no-output-lane check under the identical
+  // DEDIREN_COMMAND_INPUT_INVALID code whether or not the guard is doing its job.
   @Test
   void buildRejectsANonStringViewsElement(@TempDir Path root) throws Exception {
     Files.copy(fixture("valid-basic.json"), root.resolve("model.json"));
+    Files.copy(renderPolicyFixture("default-svg.json"), root.resolve("policy.json"));
 
     CallToolResult result =
         toolsIn(root)
@@ -312,6 +334,7 @@ class DedirenToolsTest {
                     Map.of(
                         "source", "model.json",
                         "out", "out",
+                        "render_policy", "policy.json",
                         "views", List.of(1))));
 
     assertThat(result.isError()).isTrue();
@@ -323,9 +346,13 @@ class DedirenToolsTest {
     assertThat(Files.exists(root.resolve("out"))).isFalse();
   }
 
+  // Same render_policy addition as buildRejectsABlankViewsElement, and for the same reason: without
+  // a lane, this would die at BuildCommand's no-output-lane check under the identical
+  // DEDIREN_COMMAND_INPUT_INVALID code whether or not the guard is doing its job.
   @Test
   void buildRejectsABlankEmitElement(@TempDir Path root) throws Exception {
     Files.copy(fixture("valid-basic.json"), root.resolve("model.json"));
+    Files.copy(renderPolicyFixture("default-svg.json"), root.resolve("policy.json"));
 
     CallToolResult result =
         toolsIn(root)
@@ -335,6 +362,7 @@ class DedirenToolsTest {
                     Map.of(
                         "source", "model.json",
                         "out", "out",
+                        "render_policy", "policy.json",
                         "emit", List.of("layout-request", "  "))));
 
     assertThat(result.isError()).isTrue();
@@ -343,9 +371,15 @@ class DedirenToolsTest {
     assertThat(diagnostic.path("message").asText()).contains("'emit'[1]");
   }
 
+  // Same render_policy addition as buildRejectsABlankViewsElement, and for the same reason: without
+  // a lane, this would die at BuildCommand's no-output-lane check under the identical
+  // DEDIREN_COMMAND_INPUT_INVALID code whether or not the guard is doing its job. (Pre-fix, a
+  // non-array 'views' also collapsed to an empty list rather than erroring -- the same silent
+  // "build every view" defect, just from a differently-shaped bad argument.)
   @Test
   void buildRejectsAViewsArgumentThatIsNotAnArray(@TempDir Path root) throws Exception {
     Files.copy(fixture("valid-basic.json"), root.resolve("model.json"));
+    Files.copy(renderPolicyFixture("default-svg.json"), root.resolve("policy.json"));
 
     CallToolResult result =
         toolsIn(root)
@@ -355,6 +389,7 @@ class DedirenToolsTest {
                     Map.of(
                         "source", "model.json",
                         "out", "out",
+                        "render_policy", "policy.json",
                         "views", "main")));
 
     assertThat(result.isError()).isTrue();
