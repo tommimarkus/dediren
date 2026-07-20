@@ -218,4 +218,95 @@ class DedirenToolsTest {
     // Rejected before any write: the out directory is never even created.
     assertThat(Files.exists(root.resolve("out"))).isFalse();
   }
+
+  // THE LIVE CASE. A blank string clears the SDK's input-schema validation ({"type":"string"} has
+  // no minLength), reaches this handler, and used to be dropped -- collapsing views to empty, which
+  // BuildCommand.selectViews reads as "build every view". Verified on the shipped bundle: a 3-view
+  // model with views:[""] built all three under status:"ok".
+  @Test
+  void buildRejectsABlankViewsElement(@TempDir Path root) throws Exception {
+    Files.copy(fixture("valid-basic.json"), root.resolve("model.json"));
+
+    CallToolResult result =
+        toolsIn(root)
+            .build(
+                new CallToolRequest(
+                    "dediren_build",
+                    Map.of(
+                        "source", "model.json",
+                        "out", "out",
+                        "views", List.of(""))));
+
+    assertThat(result.isError()).isTrue();
+    JsonNode diagnostic = envelopeOf(result).path("diagnostics").path(0);
+    assertThat(diagnostic.path("code").asText()).isEqualTo("DEDIREN_COMMAND_INPUT_INVALID");
+    assertThat(diagnostic.path("message").asText()).contains("'views'[0]");
+    // The whole point: a malformed list must not silently become "build every view".
+    assertThat(Files.exists(root.resolve("out"))).isFalse();
+  }
+
+  // Defence in depth. The SDK's input validation (on by default, opt-out only) rejects this over a
+  // real connection before the handler sees it -- but the handler must not depend on that default.
+  @Test
+  void buildRejectsANonStringViewsElement(@TempDir Path root) throws Exception {
+    Files.copy(fixture("valid-basic.json"), root.resolve("model.json"));
+
+    CallToolResult result =
+        toolsIn(root)
+            .build(
+                new CallToolRequest(
+                    "dediren_build",
+                    Map.of(
+                        "source", "model.json",
+                        "out", "out",
+                        "views", List.of(1))));
+
+    assertThat(result.isError()).isTrue();
+    JsonNode diagnostic = envelopeOf(result).path("diagnostics").path(0);
+    assertThat(diagnostic.path("code").asText()).isEqualTo("DEDIREN_COMMAND_INPUT_INVALID");
+    assertThat(diagnostic.path("message").asText()).contains("'views'[0]");
+    assertThat(diagnostic.path("path").asText()).isEqualTo("views");
+    // The whole point: a malformed list must not silently become "build every view".
+    assertThat(Files.exists(root.resolve("out"))).isFalse();
+  }
+
+  @Test
+  void buildRejectsABlankEmitElement(@TempDir Path root) throws Exception {
+    Files.copy(fixture("valid-basic.json"), root.resolve("model.json"));
+
+    CallToolResult result =
+        toolsIn(root)
+            .build(
+                new CallToolRequest(
+                    "dediren_build",
+                    Map.of(
+                        "source", "model.json",
+                        "out", "out",
+                        "emit", List.of("layout-request", "  "))));
+
+    assertThat(result.isError()).isTrue();
+    JsonNode diagnostic = envelopeOf(result).path("diagnostics").path(0);
+    assertThat(diagnostic.path("code").asText()).isEqualTo("DEDIREN_COMMAND_INPUT_INVALID");
+    assertThat(diagnostic.path("message").asText()).contains("'emit'[1]");
+  }
+
+  @Test
+  void buildRejectsAViewsArgumentThatIsNotAnArray(@TempDir Path root) throws Exception {
+    Files.copy(fixture("valid-basic.json"), root.resolve("model.json"));
+
+    CallToolResult result =
+        toolsIn(root)
+            .build(
+                new CallToolRequest(
+                    "dediren_build",
+                    Map.of(
+                        "source", "model.json",
+                        "out", "out",
+                        "views", "main")));
+
+    assertThat(result.isError()).isTrue();
+    JsonNode diagnostic = envelopeOf(result).path("diagnostics").path(0);
+    assertThat(diagnostic.path("code").asText()).isEqualTo("DEDIREN_COMMAND_INPUT_INVALID");
+    assertThat(diagnostic.path("message").asText()).contains("'views' must be an array of strings");
+  }
 }

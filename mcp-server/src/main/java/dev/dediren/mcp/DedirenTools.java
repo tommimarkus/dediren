@@ -112,7 +112,14 @@ public final class DedirenTools {
     if (out == null) {
       return error(DiagnosticCode.COMMAND_INPUT_INVALID, "build requires 'out'", null);
     }
-    List<String> views = stringListArg(request, "views");
+    List<String> views;
+    List<String> emit;
+    try {
+      views = stringListArg(request, "views");
+      emit = stringListArg(request, "emit");
+    } catch (InvalidListArgumentException invalid) {
+      return error(DiagnosticCode.COMMAND_INPUT_INVALID, invalid.getMessage(), invalid.argument());
+    }
     for (String view : views) {
       if (!VIEW_ID_PATTERN.matcher(view).matches()) {
         return error(DiagnosticCode.COMMAND_INPUT_INVALID, "invalid view id: " + view, view);
@@ -154,7 +161,7 @@ public final class DedirenTools {
             renderPolicy,
             oefPolicy,
             xmiPolicy,
-            Set.copyOf(stringListArg(request, "emit")),
+            Set.copyOf(emit),
             outPath,
             env);
     try {
@@ -183,18 +190,51 @@ public final class DedirenTools {
     return value instanceof String text && !text.isBlank() ? text : null;
   }
 
-  private static List<String> stringListArg(CallToolRequest request, String name) {
+  /**
+   * The de-duplicated string elements of a list argument, in first-seen order. An absent argument
+   * is an empty list; a <em>present but malformed</em> one is an error rather than a silent empty
+   * list, because empty already means something specific ("build every view", "emit nothing").
+   * Quietly turning a malformed request into that different, valid request is the failure this
+   * guards: {@code views: [123]} used to build every view under a success envelope.
+   *
+   * <p>The offending element is reported by index, not by value: the index is enough to repair, and
+   * an element can be an arbitrarily large nested structure.
+   */
+  private static List<String> stringListArg(CallToolRequest request, String name)
+      throws InvalidListArgumentException {
     Object value = request.arguments().get(name);
-    if (!(value instanceof List<?> raw)) {
+    if (value == null) {
       return List.of();
     }
+    if (!(value instanceof List<?> raw)) {
+      throw new InvalidListArgumentException(name, "'" + name + "' must be an array of strings");
+    }
     Set<String> items = new LinkedHashSet<>();
-    for (Object item : raw) {
-      if (item instanceof String text && !text.isBlank()) {
-        items.add(text);
+    for (int index = 0; index < raw.size(); index++) {
+      Object item = raw.get(index);
+      if (!(item instanceof String text) || text.isBlank()) {
+        throw new InvalidListArgumentException(
+            name, "'" + name + "'[" + index + "] must be a non-blank string");
       }
+      items.add(text);
     }
     return List.copyOf(items);
+  }
+
+  /** A list tool argument whose elements are not all non-blank strings. */
+  private static final class InvalidListArgumentException extends Exception {
+    private static final long serialVersionUID = 1L;
+
+    private final String argument;
+
+    InvalidListArgumentException(String argument, String message) {
+      super(message);
+      this.argument = argument;
+    }
+
+    String argument() {
+      return argument;
+    }
   }
 
   private static CallToolResult envelope(String json, boolean isError) {

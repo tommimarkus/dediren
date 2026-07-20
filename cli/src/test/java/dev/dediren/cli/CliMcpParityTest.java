@@ -434,6 +434,55 @@ class CliMcpParityTest {
     assertThat(mcpOut.resolve("main/render-metadata.json")).exists();
   }
 
+  /**
+   * An explicitly empty {@code views} list must keep meaning "build every view", exactly like
+   * omitting the argument. Only a list whose <em>elements</em> are malformed is an error — see
+   * DedirenToolsTest.buildRejectsANonStringViewsElement. Pinned here because the CLI lane is the
+   * oracle for what "build every view" produces.
+   */
+  @Test
+  void buildTreatsAnEmptyViewsListAsEveryViewThroughBothLanes(@TempDir Path root) throws Exception {
+    Path source = root.resolve("model.json");
+    Files.copy(fixture("valid-pipeline-rich.json"), source);
+    Path renderPolicy = root.resolve("policy.json");
+    Files.copy(policy("rich-svg.json"), renderPolicy);
+
+    Path cliOut = Files.createDirectories(root.resolve("cli-out"));
+    CliResult cli =
+        Main.executeForTesting(
+            new String[] {
+              "build",
+              "--input",
+              source.toString(),
+              "--out",
+              cliOut.toString(),
+              "--render-policy",
+              renderPolicy.toString()
+            },
+            "",
+            Map.of());
+
+    Path mcpOut = Files.createDirectories(root.resolve("mcp-out"));
+    CallToolResult mcp =
+        new DedirenTools(root, EngineWiring.defaults(), Map.of())
+            .build(
+                new CallToolRequest(
+                    "dediren_build",
+                    Map.of(
+                        "source",
+                        "model.json",
+                        "out",
+                        mcpOut.toString(),
+                        "render_policy",
+                        "policy.json",
+                        "views",
+                        java.util.List.of())));
+
+    assertThat(cli.exitCode()).isZero();
+    assertThat(mcp.isError()).isNotEqualTo(Boolean.TRUE);
+    assertThat(normalizePaths(textOf(mcp), mcpOut)).isEqualTo(normalizePaths(cli.stdout(), cliOut));
+  }
+
   /** The envelope names the artifacts it wrote, so the out dir differs between the two lanes. */
   private static String normalizePaths(String envelope, Path out) {
     return envelope.replace(out.toString(), "<OUT>").strip();
