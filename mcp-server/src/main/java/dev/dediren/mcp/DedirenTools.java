@@ -139,9 +139,8 @@ public final class DedirenTools {
       xmiPolicy = readOptionalPolicy(request, "xmi_policy");
     } catch (PathOutsideRootException escape) {
       return pathEscape(escape);
-    } catch (IOException error) {
-      System.err.println("dediren mcp: failed to read policy: " + error.getMessage());
-      return error(DiagnosticCode.COMMAND_INPUT_INVALID, "failed to read policy", null);
+    } catch (PolicyReadException failure) {
+      return readFailure(failure.argument(), failure.candidate(), failure.ioCause());
     }
 
     String sourceText;
@@ -177,12 +176,47 @@ public final class DedirenTools {
   }
 
   private String readOptionalPolicy(CallToolRequest request, String argument)
-      throws PathOutsideRootException, IOException {
+      throws PathOutsideRootException, PolicyReadException {
     String value = stringArg(request, argument);
     if (value == null) {
       return null;
     }
-    return Files.readString(WorkspacePaths.resolveExisting(root, value));
+    Path resolved = WorkspacePaths.resolveExisting(root, value);
+    try {
+      return Files.readString(resolved);
+    } catch (IOException error) {
+      // Carry the argument name out: three policy arguments share one catch in build(), and an
+      // agent repairing from the envelope has to know which one to fix.
+      throw new PolicyReadException(argument, value, error);
+    }
+  }
+
+  /** A policy argument that resolved inside the root but could not be read. */
+  private static final class PolicyReadException extends Exception {
+    private static final long serialVersionUID = 1L;
+
+    private final String argument;
+    private final String candidate;
+    private final IOException cause;
+
+    PolicyReadException(String argument, String candidate, IOException cause) {
+      super(cause);
+      this.argument = argument;
+      this.candidate = candidate;
+      this.cause = cause;
+    }
+
+    String argument() {
+      return argument;
+    }
+
+    String candidate() {
+      return candidate;
+    }
+
+    IOException ioCause() {
+      return cause;
+    }
   }
 
   private static String stringArg(CallToolRequest request, String name) {

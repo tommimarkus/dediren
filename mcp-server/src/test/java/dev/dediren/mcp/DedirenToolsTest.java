@@ -309,4 +309,30 @@ class DedirenToolsTest {
     assertThat(diagnostic.path("code").asText()).isEqualTo("DEDIREN_COMMAND_INPUT_INVALID");
     assertThat(diagnostic.path("message").asText()).contains("'views' must be an array of strings");
   }
+
+  @Test
+  void buildNamesWhichPolicyArgumentFailedToRead(@TempDir Path root) throws Exception {
+    Files.copy(fixture("valid-basic.json"), root.resolve("model.json"));
+    // A directory resolves like a file (so it clears WorkspacePaths) but cannot be read as one.
+    Files.createDirectory(root.resolve("oef.json"));
+
+    CallToolResult result =
+        toolsIn(root)
+            .build(
+                new CallToolRequest(
+                    "dediren_build",
+                    Map.of(
+                        "source", "model.json",
+                        "out", "out",
+                        "oef_policy", "oef.json")));
+
+    assertThat(result.isError()).isTrue();
+    JsonNode diagnostic = envelopeOf(result).path("diagnostics").path(0);
+    assertThat(diagnostic.path("code").asText()).isEqualTo("DEDIREN_COMMAND_INPUT_INVALID");
+    // Which of the three policy arguments failed must be in the envelope, not just on stderr.
+    assertThat(diagnostic.path("message").asText()).contains("oef_policy");
+    assertThat(diagnostic.path("path").asText()).isEqualTo("oef.json");
+    // The resolved absolute path is stderr-only and must never reach the model.
+    assertThat(diagnostic.path("message").asText()).doesNotContain(root.toRealPath().toString());
+  }
 }
