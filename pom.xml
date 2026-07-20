@@ -72,6 +72,9 @@
     <reactor-core.version>3.8.6</reactor-core.version>
     <picocli.version>4.7.7</picocli.version>
     <proguard.version>7.9.1</proguard.version>
+    <!-- Transitive-only, build-time only: convergence pins inside proguard-base's tree. -->
+    <log4j.version>2.25.3</log4j.version>
+    <kotlin-stdlib.version>2.3.0</kotlin-stdlib.version>
     <slf4j.version>2.0.18</slf4j.version>
     <xmlunit.version>2.12.0</xmlunit.version>
     <xtext-xbase.version>2.43.0</xtext-xbase.version>
@@ -193,6 +196,25 @@
         <groupId>org.jetbrains</groupId>
         <artifactId>annotations</artifactId>
         <version>26.1.0</version>
+      </dependency>
+      <!-- More divergence inside proguard-base 7.9.1's own tree: proguard-base requests
+           log4j 2.25.3 and kotlin-stdlib 2.2.0, while its proguard-core 9.3.2 requests
+           log4j 2.24.2 and kotlin-stdlib 2.3.0. Pin the newer line of each for
+           dependencyConvergence. Build-time only, like proguard-base itself. -->
+      <dependency>
+        <groupId>org.apache.logging.log4j</groupId>
+        <artifactId>log4j-api</artifactId>
+        <version>${log4j.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.logging.log4j</groupId>
+        <artifactId>log4j-core</artifactId>
+        <version>${log4j.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.jetbrains.kotlin</groupId>
+        <artifactId>kotlin-stdlib</artifactId>
+        <version>${kotlin-stdlib.version}</version>
       </dependency>
       <dependency>
         <groupId>org.assertj</groupId>
