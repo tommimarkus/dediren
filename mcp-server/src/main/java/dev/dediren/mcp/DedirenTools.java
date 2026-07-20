@@ -59,8 +59,16 @@ public final class DedirenTools {
 
   public CallToolResult guide(CallToolRequest request) {
     String topic = stringArg(request, "topic");
-    String body = topic == null ? GuideCatalog.index() : GuideCatalog.section(topic);
-    return CallToolResult.builder().addTextContent(body).isError(false).build();
+    if (topic == null) {
+      return CallToolResult.builder().addTextContent(GuideCatalog.index()).isError(false).build();
+    }
+    // An unknown topic is a failed call, not a successful one that happens to describe a failure:
+    // MCP clients branch on isError, and every other bad argument in this class sets it. The body
+    // still lists the valid topics, so the model can retry without a second round trip.
+    return CallToolResult.builder()
+        .addTextContent(GuideCatalog.section(topic))
+        .isError(!GuideCatalog.hasSection(topic))
+        .build();
   }
 
   public CallToolResult validate(CallToolRequest request) {

@@ -55,4 +55,14 @@ class GuideCatalogTest {
                 + " topic — add a topic to GuideCatalog.TOPICS when you add a section")
         .containsAll(GuideCatalog.headings());
   }
+
+  @Test
+  void hasSectionAgreesWithWhatSectionActuallyReturns() {
+    for (String topic : GuideCatalog.topics()) {
+      assertThat(GuideCatalog.hasSection(topic))
+          .as("topic '%s' resolves to a real section, so hasSection must say so", topic)
+          .isTrue();
+    }
+    assertThat(GuideCatalog.hasSection("no-such-topic")).isFalse();
+  }
 }

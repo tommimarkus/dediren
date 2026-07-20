@@ -63,6 +63,28 @@ class DedirenToolsTest {
   }
 
   @Test
+  void guideFlagsAnUnknownTopicAsAnError() {
+    CallToolResult result =
+        toolsIn(Path.of("."))
+            .guide(new CallToolRequest("dediren_guide", Map.of("topic", "no-such-topic")));
+
+    assertThat(result.isError()).isTrue();
+    // Still helpful: the body names the valid topics so the model can retry without a second call.
+    assertThat(textOf(result)).contains("unknown topic 'no-such-topic'");
+    assertThat(textOf(result)).contains("render-policy");
+  }
+
+  @Test
+  void guideFlagsAKnownTopicAsASuccess() {
+    CallToolResult result =
+        toolsIn(Path.of("."))
+            .guide(new CallToolRequest("dediren_guide", Map.of("topic", "repair")));
+
+    assertThat(result.isError()).isNotEqualTo(Boolean.TRUE);
+    assertThat(textOf(result)).contains("Repair Rules");
+  }
+
+  @Test
   void validateReturnsTheEnvelopeVerbatim(@TempDir Path root) throws Exception {
     Files.copy(fixture("valid-basic.json"), root.resolve("model.json"));
 

@@ -84,17 +84,29 @@ public final class GuideCatalog {
     return out.toString();
   }
 
+  /**
+   * Whether {@code topic} resolves to a real section, as opposed to the unknown-topic message. The
+   * one definition of "known", so {@code section} and the MCP tool's {@code isError} flag cannot
+   * disagree about it.
+   *
+   * <p>Null-tolerant on purpose: both backing maps are {@code Map.copyOf} results, which throw on a
+   * null key rather than returning null. The only caller today null-checks first, but this is
+   * public and the next one might not.
+   */
+  public static boolean hasSection(String topic) {
+    if (topic == null) {
+      return false;
+    }
+    String heading = TOPICS.get(topic);
+    return heading != null && SECTIONS.containsKey(heading);
+  }
+
   /** The markdown for one topic, or an "unknown topic" message naming the valid topics. */
   public static String section(String topic) {
-    String heading = TOPICS.get(topic);
-    if (heading == null) {
+    if (!hasSection(topic)) {
       return "unknown topic '" + topic + "'. Valid topics: " + String.join(", ", topics());
     }
-    String body = SECTIONS.get(heading);
-    if (body == null) {
-      return "unknown topic '" + topic + "'. Valid topics: " + String.join(", ", topics());
-    }
-    return body;
+    return SECTIONS.get(TOPICS.get(topic));
   }
 
   private static Map<String, String> loadSections() {
