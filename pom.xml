@@ -51,8 +51,8 @@
     <dediren.launcher.jvmArgs>-XX:TieredStopAtLevel=1 -XX:+UseSerialGC -Djava.awt.headless=true -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8 -Dfile.encoding=UTF-8</dediren.launcher.jvmArgs>
     <archunit.version>1.4.2</archunit.version>
     <assertj.version>3.27.7</assertj.version>
-    <eclipse-elk.version>0.11.0</eclipse-elk.version>
-    <error-prone-annotations.version>2.47.0</error-prone-annotations.version>
+    <eclipse-elk.version>0.12.0</eclipse-elk.version>
+    <error-prone-annotations.version>2.50.0</error-prone-annotations.version>
     <guava.version>33.6.0-jre</guava.version>
     <jackson.version>3.2.1</jackson.version>
     <!-- Jackson 3 keeps its annotation package at com.fasterxml.jackson.annotation by
@@ -69,10 +69,10 @@
          -Dincludes=io.projectreactor:reactor-core`). Pinned explicitly, rather than left to
          whatever the SDK's own pom declares, so a reactor-core CVE can be patched ahead of the
          next SDK release instead of waiting on it. -->
-    <reactor-core.version>3.7.0</reactor-core.version>
+    <reactor-core.version>3.8.6</reactor-core.version>
     <picocli.version>4.7.7</picocli.version>
-    <proguard.version>7.7.0</proguard.version>
-    <slf4j.version>2.0.17</slf4j.version>
+    <proguard.version>7.9.1</proguard.version>
+    <slf4j.version>2.0.18</slf4j.version>
     <xmlunit.version>2.12.0</xmlunit.version>
     <xtext-xbase.version>2.43.0</xtext-xbase.version>
     <appassembler-maven-plugin.version>2.1.0</appassembler-maven-plugin.version>
@@ -192,7 +192,7 @@
       <dependency>
         <groupId>org.jetbrains</groupId>
         <artifactId>annotations</artifactId>
-        <version>26.0.1</version>
+        <version>26.1.0</version>
       </dependency>
       <dependency>
         <groupId>org.assertj</groupId>
