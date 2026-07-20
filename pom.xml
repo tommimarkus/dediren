@@ -73,7 +73,7 @@
     <picocli.version>4.7.7</picocli.version>
     <proguard.version>7.9.1</proguard.version>
     <!-- Transitive-only, build-time only: convergence pins inside proguard-base's tree. -->
-    <log4j.version>2.25.3</log4j.version>
+    <log4j.version>2.25.4</log4j.version>
     <kotlin-stdlib.version>2.3.0</kotlin-stdlib.version>
     <slf4j.version>2.0.18</slf4j.version>
     <xmlunit.version>2.12.0</xmlunit.version>
