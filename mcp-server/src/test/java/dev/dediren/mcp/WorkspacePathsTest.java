@@ -137,4 +137,42 @@ class WorkspacePathsTest {
         .isInstanceOf(PathOutsideRootException.class)
         .hasMessageContaining("outside the workspace root");
   }
+
+  // A symlink whose target does not exist. File.exists() follows links and so reports it absent,
+  // which lets the ancestor walk step past it and confine the remainder textually only -- the guard
+  // then returns a path it has not actually established as contained, and containment falls to
+  // whatever the caller does with it. Anchoring the walk with NOFOLLOW_LINKS makes the symlink
+  // itself the nearest existing ancestor, which is then real-path-resolved (and fails).
+  //
+  // Nothing that succeeds today stops succeeding: the two existence checks differ only for
+  // dangling links. A dangling link fails either way -- this just fails at the guard, with a
+  // clear diagnostic, instead of later in the writer.
+  @Test
+  void resolveForWriteRejectsWriteThroughADanglingSymlink(@TempDir Path root, @TempDir Path outside)
+      throws Exception {
+    Path link = root.resolve("link");
+    try {
+      Files.createSymbolicLink(link, outside.resolve("never-created"));
+    } catch (UnsupportedOperationException | IOException unsupported) {
+      return; // Filesystem without symlink support.
+    }
+
+    assertThatThrownBy(() -> WorkspacePaths.resolveForWrite(root, "link/out"))
+        .isInstanceOf(PathOutsideRootException.class)
+        .hasMessageContaining("outside the workspace root");
+  }
+
+  @Test
+  void resolveForWriteRejectsADanglingSymlinkAsTheTargetItself(
+      @TempDir Path root, @TempDir Path outside) throws Exception {
+    Path link = root.resolve("out");
+    try {
+      Files.createSymbolicLink(link, outside.resolve("never-created"));
+    } catch (UnsupportedOperationException | IOException unsupported) {
+      return;
+    }
+
+    assertThatThrownBy(() -> WorkspacePaths.resolveForWrite(root, "out"))
+        .isInstanceOf(PathOutsideRootException.class);
+  }
 }

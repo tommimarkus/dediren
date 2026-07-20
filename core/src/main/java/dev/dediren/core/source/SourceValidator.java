@@ -16,6 +16,7 @@ import dev.dediren.core.schema.SchemaValidator;
 import dev.dediren.core.schema.SchemaVersionGate;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -154,17 +155,18 @@ public final class SourceValidator {
    * <p>On the MCP lane ({@code confinementRoot} is non-null, a model — not a human — chose the
    * path) the path is confined to {@code confinementRoot} before it is returned. Mirrors {@code mcp
    * WorkspacePaths.resolveForWrite} (core cannot depend on the mcp module): walk up from the
-   * requested path to the nearest existing ancestor, real-path-resolve that ancestor (following
-   * symlinks), then re-append the remainder and confine the result to the real root.
+   * requested path to the nearest existing ancestor, real-path-resolve that ancestor (the walk
+   * itself does not follow symlinks, so a dangling link anchors it rather than being stepped over),
+   * then re-append the remainder and confine the result to the real root.
    *
    * <p>Critically, the walk starts from the <em>unnormalized</em> {@code baseDir.resolve(
    * fragmentPath)} — calling {@link Path#normalize()} on the full path before the walk would
    * lexically collapse a {@code link/..} sequence with no regard for what {@code link} actually is
    * on disk, discarding the symlink before the walk (or the eventual physical read) ever sees it.
-   * {@link Files#exists} and {@link Path#toRealPath} both resolve symlinks physically,
-   * component-by-component — exactly like the OS call a read performs — so leaving the path
-   * unnormalized until it is anchored on a real, existing ancestor keeps the confinement decision
-   * and the physical read looking at the same target.
+   * {@link Path#toRealPath} resolves symlinks physically, component-by-component — exactly like the
+   * OS call a read performs — and the walk deliberately stops at a symlink rather than following
+   * it, so leaving the path unnormalized until it is anchored on a real, existing ancestor keeps
+   * the confinement decision and the physical read looking at the same target.
    *
    * <p>Fail closed and sanitized: an escape — or a root/ancestor that cannot be real-path-resolved
    * — yields {@link DiagnosticCode#MCP_PATH_OUTSIDE_ROOT} carrying only the model-supplied fragment
@@ -186,7 +188,7 @@ public final class SourceValidator {
       throw fragmentOutsideRoot(fragment, index);
     }
     Path existing = resolved;
-    while (existing != null && !existing.toFile().exists()) {
+    while (existing != null && !Files.exists(existing, LinkOption.NOFOLLOW_LINKS)) {
       existing = existing.getParent();
     }
     if (existing == null) {

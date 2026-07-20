@@ -1,6 +1,8 @@
 package dev.dediren.mcp;
 
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 
 /**
@@ -11,6 +13,14 @@ import java.nio.file.Path;
  * resolve symlinks before the containment check. For a path that need not exist yet (an output
  * directory), the nearest existing ancestor is real-path-resolved instead, and the remaining
  * segments are appended to it.
+ *
+ * <p>The ancestor walk deliberately does not follow symlinks. {@code File.exists()} does, so a
+ * dangling symlink inside the root would read as absent, the walk would step past it, and its name
+ * would become an unresolved remainder segment checked only as text -- leaving the guard to return
+ * a path whose containment it had not established, and the caller to establish it by accident. With
+ * {@code NOFOLLOW_LINKS} the symlink is itself the nearest existing ancestor and gets
+ * real-path-resolved like any other. Nothing that resolves today stops resolving: the two checks
+ * differ only for dangling links, which fail either way -- now at the guard rather than the writer.
  *
  * <p>Known and accepted residual: resolve-then-open is not atomic, so a local attacker who can
  * create symlinks inside the root during the window can defeat this. That grants them nothing they
@@ -39,7 +49,7 @@ public final class WorkspacePaths {
     Path resolved = realRoot.resolve(candidate).normalize();
 
     Path existing = resolved;
-    while (existing != null && !existing.toFile().exists()) {
+    while (existing != null && !Files.exists(existing, LinkOption.NOFOLLOW_LINKS)) {
       existing = existing.getParent();
     }
     if (existing == null) {

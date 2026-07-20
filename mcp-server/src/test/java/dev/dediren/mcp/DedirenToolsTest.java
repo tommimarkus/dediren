@@ -7,6 +7,7 @@ import dev.dediren.engine.Engines;
 import io.modelcontextprotocol.spec.McpSchema.CallToolRequest;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
 import io.modelcontextprotocol.spec.McpSchema.TextContent;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -208,6 +209,36 @@ class DedirenToolsTest {
     JsonNode envelope = envelopeOf(result);
     assertThat(envelope.path("status").asText()).isEqualTo("ok");
     assertThat(envelope.path("data").path("node_count").asInt()).isEqualTo(1);
+  }
+
+  // The core-side twin of resolveForWriteRejectsWriteThroughADanglingSymlink. SourceValidator's
+  // fragment walk carries the identical anchoring on the READ path, and its javadoc claims to
+  // mirror WorkspacePaths -- so the two must be pinned together, not just kept in sync by hand.
+  //
+  // Behavior change worth knowing: before this fix the walk stepped past the dangling link, the
+  // textual confine passed, and the failure surfaced later as FRAGMENT_READ_FAILED. Now the walk
+  // anchors ON the link, real-path resolution fails, and it is rejected as a confinement failure.
+  // Both are errors and the fragment is unreadable either way; only the code and message change.
+  @Test
+  void validateRejectsAFragmentReachedThroughADanglingSymlink(
+      @TempDir Path root, @TempDir Path outside) throws Exception {
+    Path link = root.resolve("link");
+    try {
+      Files.createSymbolicLink(link, outside.resolve("never-created"));
+    } catch (UnsupportedOperationException | IOException unsupported) {
+      return; // Filesystem without symlink support.
+    }
+    Files.writeString(root.resolve("model.json"), modelWithFragment("link/frag.json"));
+
+    CallToolResult result =
+        toolsIn(root)
+            .validate(new CallToolRequest("dediren_validate", Map.of("source", "model.json")));
+
+    assertThat(result.isError()).isTrue();
+    JsonNode diagnostic = envelopeOf(result).path("diagnostics").path(0);
+    assertThat(diagnostic.path("code").asText()).isEqualTo("DEDIREN_MCP_PATH_OUTSIDE_ROOT");
+    // Same anti-fingerprinting rule as the sibling fragment tests.
+    assertThat(diagnostic.path("message").asText()).doesNotContain(root.toRealPath().toString());
   }
 
   @Test
