@@ -76,6 +76,15 @@ public final class BuildCommand {
   private static final String EMIT_LAYOUT_RESULT = "layout-result";
   private static final String EMIT_RENDER_METADATA = "render-metadata";
 
+  /**
+   * The emit kinds {@code emitEnvelope} knows how to write. Public because this vocabulary is
+   * <em>published</em>, not merely enforced: the MCP build tool advertises it to agents in its
+   * input schema, and {@code ToolSchemasTest} pins that advertisement to this set. Adding a kind
+   * here without advertising it there makes the kind unreachable over MCP.
+   */
+  public static final java.util.Set<String> EMIT_KINDS =
+      java.util.Set.of(EMIT_LAYOUT_REQUEST, EMIT_LAYOUT_RESULT, EMIT_RENDER_METADATA);
+
   private BuildCommand() {}
 
   public static EngineRunOutcome run(BuildRequest request, Engines engines)
@@ -92,13 +101,12 @@ public final class BuildCommand {
               "command:build"));
     }
 
-    // Emit-kind validation lives here, in the one place that owns the emit vocabulary, so both the
+    // Emit-kind validation lives here, in the module that owns the emit vocabulary, so both the
     // CLI and the MCP lane inherit it (an unknown kind would otherwise be silently dropped by
-    // emitEnvelope, which only writes for the three keys below).
-    java.util.Set<String> knownEmitKinds =
-        java.util.Set.of(EMIT_LAYOUT_REQUEST, EMIT_LAYOUT_RESULT, EMIT_RENDER_METADATA);
+    // emitEnvelope, which only writes for the three keys in EMIT_KINDS). The MCP tool schema
+    // re-publishes the same set to agents; ToolSchemasTest pins the two together.
     for (String kind : request.emit()) {
-      if (!knownEmitKinds.contains(kind)) {
+      if (!EMIT_KINDS.contains(kind)) {
         return buildLevelError(
             new Diagnostic(
                 DiagnosticCode.COMMAND_INPUT_INVALID.code(),

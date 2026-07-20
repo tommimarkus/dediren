@@ -171,6 +171,13 @@ class CliMcpParityTest {
     assertThat(textOf(mcp)).contains("DEDIREN_COMMAND_IO_FAILED");
   }
 
+  /**
+   * Handler parity, not wire parity. This calls DedirenTools directly; over a real MCP connection
+   * the SDK validates arguments against ToolSchemas.BUILD's enum first (validateToolInputs defaults
+   * to true), so an unknown emit kind is rejected by the transport and this handler path is never
+   * reached. Both rejections are correct; they simply happen at different layers, which is why
+   * ToolSchemasTest pins the advertised enum to BuildCommand.EMIT_KINDS.
+   */
   @Test
   void buildRejectsUnknownEmitKindThroughBothLanes(@TempDir Path root) throws Exception {
     Path source = root.resolve("model.json");
