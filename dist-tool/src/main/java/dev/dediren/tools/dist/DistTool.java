@@ -1315,6 +1315,9 @@ public final class DistTool {
         {"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}
         {"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"dediren_guide","arguments":{"topic":"source-json"}}}
         {"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"dediren_build","arguments":{"source":"fixtures/source/valid-archimate-oef.json","out":"mcp-build-out","render_policy":"fixtures/render-policy/archimate-svg.json"}}}
+        {"jsonrpc":"2.0","id":5,"method":"resources/list","params":{}}
+        {"jsonrpc":"2.0","id":6,"method":"resources/read","params":{"uri":"dediren://schema/model.schema.json"}}
+        {"jsonrpc":"2.0","id":7,"method":"resources/read","params":{"uri":"dediren://diagnostics/catalog"}}
         """,
         StandardCharsets.UTF_8);
 
@@ -1328,10 +1331,16 @@ public final class DistTool {
     assertContains(stdout, "dediren_build", "mcp tools/list response");
     assertContains(stdout, "dediren_guide", "mcp tools/list response");
     assertContains(stdout, "Minimal Source JSON", "mcp guide tool call response");
+    // The resources surface serves the bundle's own bytes: the list names a schema URI, a schema
+    // read returns the shipped file's content, and the generated diagnostics catalog resolves.
+    assertContains(stdout, "dediren://schema/model.schema.json", "mcp resources/list response");
+    assertContains(stdout, "model_schema_version", "mcp schema resources/read response");
+    assertContains(
+        stdout, "DEDIREN_GENERIC_GRAPH_PLUGIN_REQUIRED", "mcp diagnostics catalog response");
 
     assertMcpBuildAnswered(bundle, responses, stdout);
     System.out.println(
-        "mcp stdio smoke passed: 3 tools, real build answered, protocol-only stdout");
+        "mcp stdio smoke passed: 3 tools + resources, real build answered, protocol-only stdout");
   }
 
   /**
