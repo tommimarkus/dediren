@@ -40,8 +40,10 @@ closed first-party enum in
 
 ## Standards Validation
 
-OEF and UML/XMI export paths validate against the official standards schemas
-using `xmllint` (required on `PATH`). Schema sources:
+Export paths validate against the official standards schemas — the OEF lane
+in-JVM via `javax.xml.validation` (no external binary; schema imports such as
+the W3C `xml.xsd` resolve local-only from the schema directory), the UML/XMI
+lane via `xmllint` (required on `PATH` for XMI). Schema sources:
 
 - **Online:** `curl` fetches schemas into a cache; set
   `DEDIREN_SCHEMA_CACHE_DIR` for a stable cache location. Behind a proxy, set
@@ -75,7 +77,9 @@ declares (and validates against) the diagram-bearing `archimate3_Diagram.xsd`,
 not the model-only `archimate3_Model.xsd` — a diagram-bearing OEF fails the
 latter. `DEDIREN_OEF_SCHEMA_DIR` must therefore contain all three ArchiMate 3.1
 OEF XSDs (`archimate3_Model.xsd`, `archimate3_View.xsd`, `archimate3_Diagram.xsd`)
-so `xmllint` can resolve the include/redefine chain.
+plus, for the real Open Group set, the W3C `xml.xsd` they import — the in-JVM
+validator resolves the include/import chain local-only from that directory (the
+cache-download lane fetches all four automatically).
 
 Node and relationship `properties` are preserved through the OEF property
 mechanism: each distinct key becomes a model-level `<propertyDefinition>` and each

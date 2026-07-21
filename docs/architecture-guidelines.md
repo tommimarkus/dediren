@@ -376,8 +376,8 @@ process-crash category.
   normalized to `DEDIREN_ENGINE_FAILED`; Errors crash loudly.
 - **A dependency belongs to the engine that needs it.** An engine reports its
   own missing runtime dependency as a structured error envelope (for example
-  the export engines emit `DEDIREN_OEF_SCHEMA_VALIDATOR_UNAVAILABLE` /
-  `DEDIREN_XMI_SCHEMA_VALIDATOR_UNAVAILABLE` when `xmllint` is absent). Keep
+  the XMI export engine emits `DEDIREN_XMI_SCHEMA_VALIDATOR_UNAVAILABLE` when
+  `xmllint` is absent; the OEF lane validates in-JVM). Keep
   this ownership line crisp when adding diagnostics.
 - **Ambient environment stays out of engines.** The export engines receive the
   CLI's env map explicitly for their schema-path variables and read nothing

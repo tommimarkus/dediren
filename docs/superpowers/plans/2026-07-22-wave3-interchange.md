@@ -1,6 +1,6 @@
 # Wave 3 — Interchange Completion Implementation Plan
 
-Status: in progress (started 2026-07-22). Parent:
+Status: complete (2026-07-22 — Part A and Part B both shipped). Parent:
 `2026-07-21-future-feature-roadmap-survey.md` (avenues 3.1 + 3.2, Wave 3).
 Out of this wave by survey decision: whole-model XMI (trails; collides with
 per-family deferred constructs) and UMLDI (evidence-gated on a Papyrus
@@ -106,13 +106,21 @@ schemas is unchanged).
 
 **Tasks:**
 
-- [ ] RED: OEF engine tests — valid content passes in-JVM against the
+- [x] RED: OEF engine tests — valid content passes in-JVM against the
       supplied XSD dir (stub set still works); invalid content yields
-      `DEDIREN_OEF_SCHEMA_INVALID`; missing xml.xsd/named-schema yields the
-      UNAVAILABLE-with-remediation diagnostic; the conformance info
-      diagnostic appears on success.
-- [ ] GREEN per the design; delete the OEF xmllint subprocess path.
-- [ ] Docs + threat model + README requirements + Repair Rules touch-ups.
+      `DEDIREN_OEF_SCHEMA_INVALID`; a broken/incomplete schema set (missing
+      xml.xsd import) yields the structured UNAVAILABLE-lane failure naming
+      the missing import; the conformance info diagnostic appears on success.
+- [x] GREEN per the design: `schemacache.InJvmXmlValidator` (secure
+      processing, local-only `LSResourceResolver`), OEF engine flipped off
+      the xmllint subprocess, xml.xsd joined the pinned fetch set
+      (sha256 61960fb3…), `DEDIREN_OEF_SCHEMA_VALIDATOR` env override and
+      `DEDIREN_OEF_SCHEMA_VALIDATOR_UNAVAILABLE` retired from the contracts
+      vocabulary and ownership allowlist.
+- [x] Docs + threat model + README requirements + Repair Rules touch-ups
+      (agent-usage validator bullet now XMI-only, README requirement line,
+      CLAUDE.md engine-runtime example, features engine-runtime/exports
+      pages, threat-model OEF rows, architecture-guidelines).
 
 ## Verification
 

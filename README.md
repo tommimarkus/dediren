@@ -44,7 +44,8 @@ notation.
 
 - Java 21 or newer on `PATH` as `java`.
 - The checked-in Maven Wrapper (`./mvnw`) to build.
-- `xmllint` on `PATH` for ArchiMate OEF / UML XMI standards validation.
+- `xmllint` on `PATH` for UML XMI standards validation (the ArchiMate OEF
+  lane validates in-JVM and needs no external validator).
 - `curl` on `PATH` only when export validation must fetch a standards schema.
   Offline runs supply schema files via `DEDIREN_OEF_SCHEMA_DIR` /
   `DEDIREN_XMI_SCHEMA_PATH`; behind a proxy, set `HTTP_PROXY` / `HTTPS_PROXY` /

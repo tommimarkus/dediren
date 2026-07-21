@@ -94,12 +94,6 @@ class DedirenResourcesTest {
     // Codes without an explicit bullet are self-repairing via their message: null, not absent.
     JsonNode elkInternal = entryFor(catalog, "DEDIREN_ELK_LAYOUT_FAILED");
     assertThat(elkInternal.get("repair_rule").isNull()).isTrue();
-    // A bullet naming two codes documents both.
-    assertThat(
-            entryFor(catalog, "DEDIREN_OEF_SCHEMA_VALIDATOR_UNAVAILABLE")
-                .get("repair_rule")
-                .asText())
-        .contains("xmllint");
     assertThat(
             entryFor(catalog, "DEDIREN_XMI_SCHEMA_VALIDATOR_UNAVAILABLE")
                 .get("repair_rule")

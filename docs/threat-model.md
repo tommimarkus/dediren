@@ -73,12 +73,12 @@ its lifetime, so there is no daemon lifecycle to supervise. That is inbound-only
 though: a `dediren_build` call whose policy selects the OEF or XMI export lane
 reaches the same subprocess/outbound-HTTPS boundaries as the CLI's `build` and
 `export` commands (see "Schema cache + runtime download" and "XML parsing &
-external validator" below) — an `xmllint` subprocess always, and, absent a
-cached or offline schema, a `curl` fetch beforehand. `--read-only` withholds
+external validator" below) — an `xmllint` subprocess on the XMI lane (the OEF
+lane validates in-JVM since wave 3, no subprocess), and, absent a cached or
+offline schema, a `curl` fetch beforehand. `--read-only` withholds
 `dediren_build` entirely, removing both. Short of that, the
 `DEDIREN_OEF_SCHEMA_DIR` / `DEDIREN_XMI_SCHEMA_PATH` offline overrides remove
-only the outbound fetch — `xmllint` still runs against the supplied schema, with
-`--nonet` as noted below.
+only the outbound fetch.
 
 Controls:
 
@@ -143,8 +143,12 @@ Generated UML/XMI XML is parsed with a hardened `DocumentBuilderFactory`
 (`SchemaValidation.secureXmiDocumentBuilderFactory()`): DOCTYPE declarations
 disallowed, `FEATURE_SECURE_PROCESSING` on, XInclude and entity-reference
 expansion off. The external `xmllint` schema validator runs with `--nonet`
-for both the OMG XMI schema (`engines/uml-xmi-export`) and the OEF
-ArchiMate schemas (`engines/archimate-oef-export`).
+for the OMG XMI schema (`engines/uml-xmi-export`). The OEF ArchiMate schemas
+(`engines/archimate-oef-export`) validate in-JVM since wave 3 via
+`schemacache.InJvmXmlValidator`: `javax.xml.validation` with secure processing
+on, external DTD/schema access denied, and schema imports (the W3C `xml.xsd`)
+resolved local-only from the schema directory — nothing is fetched at
+validation time and no subprocess runs on that lane.
 
 Both engines invoke that validator through one shared runner,
 `schemacache.XmlSchemaValidator` — engines may not depend on each other, so
@@ -161,16 +165,15 @@ copies did not have:
   a hang is invisible to an agent that decides from stdout JSON.
 - **Bounded wall clock.** A run that exceeds `XmlSchemaValidator.DEFAULT_TIMEOUT`
   (60s) is force-killed and reported as
-  `DEDIREN_OEF_SCHEMA_VALIDATOR_UNAVAILABLE` /
   `DEDIREN_XMI_SCHEMA_VALIDATOR_UNAVAILABLE`, so a wedged or malicious validator
   binary degrades to a structured non-zero envelope rather than an indefinite
   stall.
-- **Validator selection is an environment input.** `DEDIREN_OEF_SCHEMA_VALIDATOR`
-  / `DEDIREN_XMI_SCHEMA_VALIDATOR` let the environment name the validator
-  command. Whoever sets the process environment already controls execution, so
-  the override grants no new privilege; the guards above bound a hostile or
-  broken choice, and the variables are documented in the shipped guide's
-  `## Plugin Environment` section.
+- **Validator selection is an environment input.** `DEDIREN_XMI_SCHEMA_VALIDATOR`
+  lets the environment name the XMI validator command. Whoever sets the process
+  environment already controls execution, so the override grants no new
+  privilege; the guards above bound a hostile or broken choice, and the
+  variable is documented in the shipped guide's `## Plugin Environment`
+  section. The OEF lane reads no validator variable — it validates in-JVM.
 
 The runner returns a code-free outcome; each engine maps it onto its own
 published diagnostic codes, so `schema-cache` stays notation-neutral.

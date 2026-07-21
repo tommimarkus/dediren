@@ -68,8 +68,8 @@ public enum DiagnosticCode {
   // above: a violated invariant (e.g. a message endpoint off its lifeline axis) is an input error.
   LAYOUT_SEQUENCE_INVARIANT_VIOLATED("DEDIREN_LAYOUT_SEQUENCE_INVARIANT_VIOLATED"),
 
-  // Export schema-validator availability (export plugins; owned here for cross-module reuse).
-  OEF_SCHEMA_VALIDATOR_UNAVAILABLE("DEDIREN_OEF_SCHEMA_VALIDATOR_UNAVAILABLE"),
+  // External schema-validator availability (XMI lane only since wave 3: the OEF lane validates
+  // in-JVM and its former validator-unavailable code is retired with the xmllint subprocess).
   XMI_SCHEMA_VALIDATOR_UNAVAILABLE("DEDIREN_XMI_SCHEMA_VALIDATOR_UNAVAILABLE"),
   // Shared export-policy tripwire (both export engines): the policy still carries the shipped
   // fixture identity, so the artifact would introduce itself with placeholder identity. Warning,

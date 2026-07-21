@@ -15,8 +15,8 @@ class DiagnosticCodeTest {
     assertThat(DiagnosticCode.PLUGIN_UNSUPPORTED_CAPABILITY.code())
         .isEqualTo("DEDIREN_PLUGIN_UNSUPPORTED_CAPABILITY");
     assertThat(DiagnosticCode.ENGINE_FAILED.code()).isEqualTo("DEDIREN_ENGINE_FAILED");
-    assertThat(DiagnosticCode.OEF_SCHEMA_VALIDATOR_UNAVAILABLE.code())
-        .isEqualTo("DEDIREN_OEF_SCHEMA_VALIDATOR_UNAVAILABLE");
+    assertThat(DiagnosticCode.XMI_SCHEMA_VALIDATOR_UNAVAILABLE.code())
+        .isEqualTo("DEDIREN_XMI_SCHEMA_VALIDATOR_UNAVAILABLE");
   }
 
   @Test

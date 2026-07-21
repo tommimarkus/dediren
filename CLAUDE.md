@@ -211,8 +211,9 @@ enforcement authority for matching version, tag, and release actions.
   failure is `DEDIREN_ENGINE_FAILED`.
 - A missing runtime dependency is reported by the engine that owns the
   dependency, as a structured error envelope core preserves (for example the
-  export engines emit `DEDIREN_OEF_SCHEMA_VALIDATOR_UNAVAILABLE` /
-  `DEDIREN_XMI_SCHEMA_VALIDATOR_UNAVAILABLE` when `xmllint` is absent).
+  XMI export engine emits `DEDIREN_XMI_SCHEMA_VALIDATOR_UNAVAILABLE` when
+  `xmllint` is absent; the OEF lane validates in-JVM and needs no external
+  validator).
 - There is no engine discovery of any kind: no `PATH` lookup, no manifest
   directories, no executable overrides. The bundled set is constructed
   explicitly in `cli` `EngineWiring`.

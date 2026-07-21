@@ -18,9 +18,9 @@ them but owns none of their domain logic.
   `DEDIREN_PLUGIN_UNSUPPORTED_CAPABILITY`; an unexpected in-memory engine
   failure is normalized to `DEDIREN_ENGINE_FAILED`.
 - A **missing runtime dependency** is reported by the engine that owns it, as a
-  structured error envelope core preserves (the export engines emit
-  `DEDIREN_OEF_SCHEMA_VALIDATOR_UNAVAILABLE` /
-  `DEDIREN_XMI_SCHEMA_VALIDATOR_UNAVAILABLE` when `xmllint` is absent).
+  structured error envelope core preserves (the XMI export engine emits
+  `DEDIREN_XMI_SCHEMA_VALIDATOR_UNAVAILABLE` when `xmllint` is absent; the
+  OEF lane validates in-JVM and needs no external validator).
 - **stderr is for human debugging only.**
 
 ## First-Party Engines

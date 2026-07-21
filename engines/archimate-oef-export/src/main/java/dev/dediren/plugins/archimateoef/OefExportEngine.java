@@ -26,6 +26,7 @@ import dev.dediren.engine.EngineResult;
 import dev.dediren.engine.ExportEngine;
 import dev.dediren.engine.ModelExportRequest;
 import dev.dediren.engine.XmlText;
+import dev.dediren.schemacache.InJvmXmlValidator;
 import dev.dediren.schemacache.SchemaCacheException;
 import dev.dediren.schemacache.SchemaCacheModule;
 import dev.dediren.schemacache.XmlSchemaValidator;
@@ -65,14 +66,20 @@ public final class OefExportEngine implements ExportEngine {
   // (issue #34).
   private static final String OEF_SCHEMA =
       "http://www.opengroup.org/xsd/archimate/3.1/archimate3_Diagram.xsd";
-  static final String OEF_SCHEMA_VALIDATOR = "xmllint";
-  static final String OEF_SCHEMA_VALIDATOR_ENV = "DEDIREN_OEF_SCHEMA_VALIDATOR";
   private static final String OEF_SCHEMA_BASE_URL = "https://www.opengroup.org/xsd/archimate/3.1";
   static final String OEF_SCHEMA_DIR_ENV = "DEDIREN_OEF_SCHEMA_DIR";
   static final String SCHEMA_CACHE_DIR_ENV = "DEDIREN_SCHEMA_CACHE_DIR";
   static final String SCHEMA_FETCHER = "curl";
   private static final List<String> OFFICIAL_OEF_SCHEMA_FILES =
       List.of("archimate3_Model.xsd", "archimate3_View.xsd", "archimate3_Diagram.xsd");
+  // The official XSDs import the W3C xml namespace schema; the in-JVM validator resolves it
+  // local-only, so the cache lane fetches it alongside the OEF XSDs. In a hand-populated offline
+  // directory it is optional-until-needed: real Open Group XSDs require it, self-contained stub
+  // sets do not.
+  private static final String XML_NAMESPACE_SCHEMA_FILE = "xml.xsd";
+  private static final String XML_NAMESPACE_SCHEMA_URL = "https://www.w3.org/2001/xml.xsd";
+  private static final String XML_NAMESPACE_SCHEMA_SHA256 =
+      "61960fb3131e38022caad5360e2f33a3382578ab3c80cd58bd74320ede61b20c";
   // Pinned SHA-256 checksums per OEF XSD, verified after every runtime download (audit finding F2).
   // Source: https://www.opengroup.org/xsd/archimate/3.1/<file> — retrieved 2026-07-04.
   private static final Map<String, String> OFFICIAL_OEF_SCHEMA_SHA256 =
@@ -89,7 +96,8 @@ public final class OefExportEngine implements ExportEngine {
   private static final String OEF_SCHEMA_DOWNLOAD_REMEDIATION =
       "To download through an HTTP proxy, expose HTTP_PROXY, HTTPS_PROXY, and NO_PROXY (or their"
           + " lowercase forms) to this process. To skip the download, pre-fetch the ArchiMate 3.1"
-          + " OEF XSD files and set DEDIREN_OEF_SCHEMA_DIR to their absolute directory.";
+          + " OEF XSD files (plus the W3C xml.xsd they import) and set DEDIREN_OEF_SCHEMA_DIR to"
+          + " their absolute directory.";
 
   @Override
   public String id() {
@@ -679,14 +687,17 @@ public final class OefExportEngine implements ExportEngine {
       throws OefSchemaValidationException {
     Path schemaDir = resolveOfficialOefSchemaDir(env, productRoot);
     Path schemaPath = schemaDir.resolve("archimate3_Diagram.xsd");
-    String validator =
-        SchemaCacheModule.configuredValidator(env, OEF_SCHEMA_VALIDATOR_ENV, OEF_SCHEMA_VALIDATOR);
+    // In-JVM validation (wave 3): no xmllint subprocess in the OEF trust path. Schema imports
+    // (the W3C xml.xsd the official XSDs reference) resolve local-only from the schema directory;
+    // the cache-download lane fetches xml.xsd alongside the OEF XSDs, and an offline directory
+    // missing it fails here with a message naming it.
     XmlSchemaValidator.Outcome outcome;
     try {
-      outcome = XmlSchemaValidator.validate(validator, schemaPath, content);
+      outcome = InJvmXmlValidator.validate(schemaPath, content);
     } catch (SchemaCacheException error) {
       throw new OefSchemaValidationException(
-          DiagnosticCode.OEF_SCHEMA_VALIDATOR_UNAVAILABLE.code(), error.getMessage());
+          DiagnosticCode.OEF_SCHEMA_UNAVAILABLE.code(),
+          error.getMessage() + " " + OEF_SCHEMA_DOWNLOAD_REMEDIATION);
     }
     if (outcome.valid()) {
       return;
@@ -725,6 +736,12 @@ public final class OefExportEngine implements ExportEngine {
             OFFICIAL_OEF_SCHEMA_SHA256.get(fileName),
             SchemaCacheModule.curlFetcher(SCHEMA_FETCHER));
       }
+      SchemaCacheModule.ensureCachedSchemaFile(
+          schemaDir.resolve(XML_NAMESPACE_SCHEMA_FILE),
+          URI.create(XML_NAMESPACE_SCHEMA_URL),
+          "W3C xml namespace schema",
+          XML_NAMESPACE_SCHEMA_SHA256,
+          SchemaCacheModule.curlFetcher(SCHEMA_FETCHER));
     } catch (SchemaCacheException error) {
       throw new OefSchemaValidationException(
           DiagnosticCode.OEF_SCHEMA_UNAVAILABLE.code(),

@@ -43,7 +43,6 @@ class DiagnosticCodeOwnershipTest {
           "DEDIREN_OEF_SCHEMA_DIR",
           "DEDIREN_XMI_SCHEMA_PATH",
           "DEDIREN_SCHEMA_CACHE_DIR",
-          "DEDIREN_OEF_SCHEMA_VALIDATOR",
           "DEDIREN_XMI_SCHEMA_VALIDATOR",
           "DEDIREN_BUNDLE_ROOT",
           "DEDIREN_LOG_LEVEL");
