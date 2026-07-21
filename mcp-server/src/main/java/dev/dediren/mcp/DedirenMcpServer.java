@@ -47,7 +47,10 @@ public final class DedirenMcpServer {
     var specification =
         McpServer.sync(transport)
             .serverInfo(SERVER_NAME, System.getProperty("dediren.version", "unknown"))
-            .capabilities(ServerCapabilities.builder().tools(false).build())
+            .capabilities(ServerCapabilities.builder().tools(false).resources(false, false).build())
+            // Product-owned bundle bytes (schemas, fixtures, guide topics, diagnostics catalog):
+            // read-only in both modes, no workspace paths, so --root confinement is not involved.
+            .resources(DedirenResources.specifications())
             .toolCall(
                 Tool.builder()
                     .name("dediren_validate")

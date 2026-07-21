@@ -94,6 +94,14 @@ Controls:
   `SourceValidatorTest`.
 - **Read-only mode.** `--read-only` does not register `dediren_build` at all, so the
   write primitive is absent rather than present-and-refusing.
+- **Resources serve product bytes only.** The MCP resources surface
+  (`dediren://schema/…`, `dediren://fixture/…`, `dediren://guide/…`,
+  `dediren://diagnostics/catalog`) enumerates and reads exclusively under the
+  product root (the bundle's own `schemas/`, `fixtures/`, and packaged guide) —
+  never a workspace path, never a model-supplied path: `resources/read` resolves
+  a URI against the startup-enumerated set, so there is no path parameter to
+  confine and no new read primitive into the workspace. Served identically under
+  `--read-only`.
 - **stdout integrity.** In stdio MCP, stdout *is* the JSON-RPC channel; a stray
   `System.out` write anywhere in core, an engine, or a dependency would corrupt a
   frame and the client would silently go dark. `StdoutIntegrity.claimStdout()` takes

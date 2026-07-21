@@ -28,24 +28,25 @@ shipped files verbatim is the anti-drift strategy.
 
 **Tasks:**
 
-- [ ] RED: mcp-server tests — resource list contains the expected URI sets;
-      `resources/read` of a schema returns the exact file bytes; a guide
-      resource equals the `dediren_guide` tool output for the same topic;
-      the diagnostics catalog covers every `DiagnosticCode` and carries
-      repair text for the explicitly documented ones.
-- [ ] GREEN: `DedirenResources` (enumerate at startup from
-      `DedirenPaths.productRoot()`, read lazily in handlers);
-      `DedirenMcpServer` registers them and advertises the resources
-      capability in both modes.
-- [ ] Packaged stdio smoke: extend the dist-tool MCP smoke with
-      `resources/list` + one `resources/read`.
-- [ ] Docs together per CLAUDE.md MCP row: agent-usage `## MCP Server`
-      resources paragraph; threat-model MCP rows note the new surface serves
-      product-owned bundle bytes only (no workspace reads, no new write
-      primitive).
-- [ ] Coverage: new code fully covered; the pre-existing mcp-server branch
-      shortfall (0.67 < 0.70, stdio transport) is a recorded deferral — check
-      whether the new tests move it, record the number either way.
+- [x] Tests: resource list covers every schema/guide-topic URI; schema and
+      fixture reads are byte-identical to the shipped files; guide resources
+      equal `GuideCatalog.section` (= the `dediren_guide` tool text, pinned
+      transitively via `GuideCatalogTest`); the diagnostics catalog covers
+      every `DiagnosticCode`, attaches explicit repair bullets (including
+      multi-code bullets), and nulls the self-repairing rest.
+- [x] `DedirenResources` (startup enumeration from the product root, lazy
+      reads, SpotBugs-clean) registered by `DedirenMcpServer` with the
+      resources capability, both modes.
+- [x] Packaged stdio smoke extension AUTHORED (resources/list + schema read +
+      catalog read assertions in `DistTool`) but **uncommitted**: the same
+      file carries concurrent in-flight licence-verification work that does
+      not compile yet, so the hunk stays in the working tree until that work
+      lands; the full dist-smoke run is deferred with it.
+- [x] Docs: agent-usage `## MCP Server` resources paragraph; threat-model MCP
+      controls gained the "resources serve product bytes only" row.
+- [ ] DEFERRED to end-of-push (blocked by the concurrent dist-tool edit):
+      full `-Pquality verify`, dist-smoke, and the coverage-number check.
+      Module-scoped `-pl mcp-server,cli -am test` is green.
 
 **Verification:** `./mvnw -pl mcp-server,cli -am test`, full
 `-Pquality verify`, `-pl dist-tool -am verify -Pdist-smoke`.

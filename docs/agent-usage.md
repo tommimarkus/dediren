@@ -43,6 +43,16 @@ Three tools:
   (extra stage envelopes to also write, for debugging). Returns the
   build-result envelope, which names every artifact written.
 
+The server also serves read-only **resources** — the bundle's own bytes, so a
+fetch returns ground truth rather than prose about it:
+`dediren://schema/<file>` (every public JSON schema),
+`dediren://fixture/<relative-path>` (every bundled fixture),
+`dediren://guide/<topic>` (the same sections `dediren_guide` serves), and
+`dediren://diagnostics/catalog` (every `DEDIREN_*` code paired with its
+explicit `## Repair Rules` text, or `null` for codes that are self-repairing
+via their message). Resources are product-owned content: no workspace paths
+are involved, and the full set is served identically under `--read-only`.
+
 Every tool path must resolve inside `--root`, and so must every `fragments[]`
 path inside a source you pass. Point `--root` at your project directory — an
 absolute path is safest, because a bare `.` resolves against wherever the MCP
