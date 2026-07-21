@@ -121,7 +121,7 @@ public final class DistTool {
           Map.entry("org.eclipse.elk.core", attribution("Eclipse Layout Kernel (ELK)", "EPL-2.0")),
           Map.entry("org.eclipse.elk.graph", attribution("Eclipse Layout Kernel (ELK)", "EPL-2.0")),
           Map.entry(
-              "org.eclipse.emf.common", attribution("Eclipse Modeling Framework (EMF)", "EPL-1.0")),
+              "org.eclipse.emf.common", attribution("Eclipse Modeling Framework (EMF)", "EPL-2.0")),
           Map.entry(
               "org.eclipse.emf.ecore", attribution("Eclipse Modeling Framework (EMF)", "EPL-1.0")),
           Map.entry(
