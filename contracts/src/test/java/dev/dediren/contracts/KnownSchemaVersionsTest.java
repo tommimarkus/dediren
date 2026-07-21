@@ -1,7 +1,9 @@
 package dev.dediren.contracts;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class KnownSchemaVersionsTest {
@@ -61,5 +63,56 @@ class KnownSchemaVersionsTest {
         .isEqualTo("layout_request_schema_version");
     assertThat(KnownSchemaVersions.LAYOUT_REQUEST.versionFields())
         .containsExactly("layout_request_schema_version");
+  }
+
+  @Test
+  void familyWithoutAVersionFieldIsRejected() {
+    assertThatThrownBy(
+            () -> new KnownSchemaVersions.Family("fam", List.of(), List.of("v1"), List.of()))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("family 'fam' must name its version field");
+  }
+
+  @Test
+  void familyWithoutACurrentVersionIsRejected() {
+    assertThatThrownBy(
+            () ->
+                new KnownSchemaVersions.Family("fam", List.of("fam_version"), List.of(), List.of()))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("family 'fam' must have a current version");
+  }
+
+  @Test
+  void familyWhoseStepDoesNotChainAdjacentVersionsIsRejected() {
+    // Count guard passes (one step for two versions), so control reaches the chaining loop; the
+    // step's from/to do not join v1 -> v2, so the chaining guard fires. The message is built from
+    // the family's versions, not from the step's bad endpoints.
+    MigrationPath misChainedStep =
+        new MigrationPath("v0", "v9", List.of(MigrationOperation.regenerate()));
+    assertThatThrownBy(
+            () ->
+                new KnownSchemaVersions.Family(
+                    "fam", List.of("fam_version"), List.of("v1", "v2"), List.of(misChainedStep)))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("family 'fam' step 0 must take v1 to v2");
+  }
+
+  @Test
+  void familyWithoutOneMigrationStepPerSupersededVersionIsRejected() {
+    // Two versions need exactly one migration step; supplying none trips the count guard before the
+    // chaining loop. This is the enforcement that a version bump cannot ship without its steps.
+    assertThatThrownBy(
+            () ->
+                new KnownSchemaVersions.Family(
+                    "fam", List.of("fam_version"), List.of("v1", "v2"), List.of()))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("family 'fam' must carry one migration step per superseded version");
+  }
+
+  @Test
+  void migrationPathWithNoOperationsIsRejected() {
+    assertThatThrownBy(() -> new MigrationPath("a", "b", List.of()))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("migration path a -> b has no steps");
   }
 }
