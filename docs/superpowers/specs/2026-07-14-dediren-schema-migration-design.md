@@ -4,6 +4,11 @@
 
 Proposed. Brainstormed 2026-07-14.
 
+Amended 2026-07-21: Decision 2's delivery mechanism is revised from prose to
+structured data — see `## Amendment (2026-07-21): Machine-Readable Migration
+Steps` at the end of this document. Decisions 1, 3, 4, and 5 stand unchanged.
+The historical body below is preserved as brainstormed.
+
 ## Purpose
 
 Give an agent (or a human) that holds a Dediren file written against an older
@@ -227,3 +232,32 @@ files exactly the way `render-policy` v1 and v2 are stranded today.
   every extra tool costs the agent context window in `tools/list`.
 - Lenient / auto-upgrade-on-read mode (decision 5).
 - Widening `dediren_validate` to accept policy files (see Known asymmetry).
+
+## Amendment (2026-07-21): Machine-Readable Migration Steps
+
+Owner re-examination, recorded in
+`docs/superpowers/plans/2026-07-21-future-feature-roadmap-survey.md`
+(§ "Owner-directed re-examination").
+
+**What changes.** Decision 2's *delivery mechanism* is revised: prose is no
+longer the sole migration tool. Each registry step is additionally expressed
+as **structured operations** (RFC-6902-style: `rename_field` / `remove_key` /
+`set_version`, JSON-Pointer targets), carried to the consumer on the
+`DEDIREN_SCHEMA_VERSION_OUTDATED` diagnostic (and available to any future
+read-only surface, e.g. an MCP resource). The `## Migration` prose in
+`docs/agent-usage.md` remains the human-readable record, kept from drifting by
+deriving or test-pinning it against the same operation data. Every shipped
+operation list is fixture-verified (stale document + expected outcome) in CI.
+
+**What does not change.** Dediren still never applies the steps: no command
+rewrites or emits a migrated document, the stale file still fails validation
+until the consumer migrates it, and the consumer's diff remains the
+consumer's diff. Decision 5 (no lenient / auto-upgrade-on-read) is
+**reaffirmed** — the rejected alternative of emitting a migrated copy as a
+derived artifact was examined and declined, because the consumer would copy it
+over the source, making the tool a de facto rewriter of record and dissolving
+the review the big-bang philosophy exists to force.
+
+**Escalation triggers.** Revisit a full `dediren migrate` only if (i) a future
+bump's steps cannot be expressed as mechanical operations, or (ii) the first
+`model.schema` bump is contemplated — decide then, with the evidence in hand.
