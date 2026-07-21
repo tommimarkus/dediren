@@ -40,6 +40,112 @@ class CliValidateTest {
   }
 
   @Test
+  void validateAcceptsCurrentRenderPolicyDocument() throws Exception {
+    // The schema-migration design's "Known asymmetry": policies used to be gated only at build
+    // time. validate now dispatches on the document's version field, so a policy gets the same
+    // fast feedback as a source model.
+    CliResult result =
+        Main.executeForTesting(
+            new String[] {
+              "validate",
+              "--input",
+              workspaceRoot().resolve("fixtures/render-policy/default-svg.json").toString()
+            },
+            "");
+
+    JsonNode envelope = JsonSupport.objectMapper().readTree(result.stdout());
+
+    assertThat(result.exitCode()).isZero();
+    assertThat(envelope.get("status").asText()).isEqualTo("ok");
+    assertThat(envelope.at("/data/render_policy_schema_version").asText())
+        .isEqualTo("render-policy.schema.v3");
+  }
+
+  @Test
+  void validateAcceptsCurrentOefExportPolicyDocument() throws Exception {
+    CliResult result =
+        Main.executeForTesting(
+            new String[] {
+              "validate",
+              "--input",
+              workspaceRoot().resolve("fixtures/export-policy/default-oef.json").toString()
+            },
+            "");
+
+    JsonNode envelope = JsonSupport.objectMapper().readTree(result.stdout());
+
+    assertThat(result.exitCode()).isZero();
+    assertThat(envelope.get("status").asText()).isEqualTo("ok");
+    assertThat(envelope.at("/data/oef_export_policy_schema_version").asText())
+        .isEqualTo("oef-export-policy.schema.v1");
+  }
+
+  @Test
+  void validateFlagsStaleRenderPolicyAsOutdated() throws Exception {
+    Path policy = temp.resolve("stale-policy.json");
+    Files.writeString(policy, "{\"render_policy_schema_version\":\"render-policy.schema.v2\"}");
+
+    CliResult result =
+        Main.executeForTesting(new String[] {"validate", "--input", policy.toString()}, "");
+
+    JsonNode envelope = JsonSupport.objectMapper().readTree(result.stdout());
+
+    assertThat(result.exitCode()).isEqualTo(2);
+    assertThat(envelope.at("/diagnostics/0/code").asText())
+        .isEqualTo("DEDIREN_SCHEMA_VERSION_OUTDATED");
+  }
+
+  @Test
+  void validateRecognizesLegacyRenderPolicyVersionField() throws Exception {
+    // The renamed-field wrinkle: the oldest render-policy files carry
+    // svg_render_policy_schema_version and no current field at all; they must classify as
+    // outdated (with upgrade steps), never as unknown.
+    Path policy = temp.resolve("legacy-policy.json");
+    Files.writeString(
+        policy, "{\"svg_render_policy_schema_version\":\"svg-render-policy.schema.v1\"}");
+
+    CliResult result =
+        Main.executeForTesting(new String[] {"validate", "--input", policy.toString()}, "");
+
+    JsonNode envelope = JsonSupport.objectMapper().readTree(result.stdout());
+
+    assertThat(result.exitCode()).isEqualTo(2);
+    assertThat(envelope.at("/diagnostics/0/code").asText())
+        .isEqualTo("DEDIREN_SCHEMA_VERSION_OUTDATED");
+  }
+
+  @Test
+  void validateFlagsUnknownPolicyVersion() throws Exception {
+    Path policy = temp.resolve("unknown-policy.json");
+    Files.writeString(policy, "{\"render_policy_schema_version\":\"render-policy.schema.v9\"}");
+
+    CliResult result =
+        Main.executeForTesting(new String[] {"validate", "--input", policy.toString()}, "");
+
+    JsonNode envelope = JsonSupport.objectMapper().readTree(result.stdout());
+
+    assertThat(result.exitCode()).isEqualTo(2);
+    assertThat(envelope.at("/diagnostics/0/code").asText())
+        .isEqualTo("DEDIREN_SCHEMA_VERSION_UNKNOWN");
+  }
+
+  @Test
+  void validateRejectsSchemaInvalidCurrentVersionPolicy() throws Exception {
+    // Current version clears the gate; the missing required page/margin blocks must then fail
+    // JSON Schema validation against the policy's own schema, not the model schema.
+    Path policy = temp.resolve("invalid-policy.json");
+    Files.writeString(policy, "{\"render_policy_schema_version\":\"render-policy.schema.v3\"}");
+
+    CliResult result =
+        Main.executeForTesting(new String[] {"validate", "--input", policy.toString()}, "");
+
+    JsonNode envelope = JsonSupport.objectMapper().readTree(result.stdout());
+
+    assertThat(result.exitCode()).isEqualTo(2);
+    assertThat(envelope.at("/diagnostics/0/code").asText()).isEqualTo("DEDIREN_SCHEMA_INVALID");
+  }
+
+  @Test
   void validateRejectsAuthoredGeometry() throws Exception {
     CliResult result =
         Main.executeForTesting(

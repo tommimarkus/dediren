@@ -52,8 +52,10 @@ public final class DedirenMcpServer {
                 Tool.builder()
                     .name("dediren_validate")
                     .description(
-                        "Validate a Dediren source JSON model. Returns the validation envelope:"
-                            + " status 'ok' means the model is legal, status 'error' carries the"
+                        "Validate a Dediren source JSON model or a policy document (render/export"
+                            + " policy, kept layout-request) — the document's schema-version field"
+                            + " selects the family. Returns the validation envelope: status 'ok'"
+                            + " means the document is legal, status 'error' carries the"
                             + " diagnostics to repair. Call dediren_guide with topic 'repair' for"
                             + " the repair rules.")
                     .inputSchema(mapper, ToolSchemas.VALIDATE)

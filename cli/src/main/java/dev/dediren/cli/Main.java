@@ -11,7 +11,7 @@ import dev.dediren.core.commands.BuildRequest;
 import dev.dediren.core.commands.CoreCommands;
 import dev.dediren.core.engine.EngineExecutionException;
 import dev.dediren.core.engine.EngineRunOutcome;
-import dev.dediren.core.source.SourceValidator;
+import dev.dediren.core.source.DocumentValidator;
 import dev.dediren.core.source.ValidationResult;
 import dev.dediren.engine.Engines;
 import java.io.ByteArrayInputStream;
@@ -155,7 +155,7 @@ public final class Main {
       }
       try {
         ValidationResult result =
-            SourceValidator.validateSourceJson(inputText.text(), inputText.baseDir());
+            DocumentValidator.validateDocument(inputText.text(), inputText.baseDir(), null);
         return printValidationResult(result);
       } catch (ProductRootException error) {
         return printProductRootFailure(spec, error);

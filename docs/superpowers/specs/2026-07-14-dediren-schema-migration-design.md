@@ -261,3 +261,9 @@ the review the big-bang philosophy exists to force.
 **Escalation triggers.** Revisit a full `dediren migrate` only if (i) a future
 bump's steps cannot be expressed as mechanical operations, or (ii) the first
 `model.schema` bump is contemplated — decide then, with the evidence in hand.
+
+**Known asymmetry: closed (2026-07, wave-0).** The "plausible follow-up,
+deliberately not taken here" was taken: `validate` and `dediren_validate` now
+dispatch on the document's version field (current or legacy), so a policy or
+kept layout-request meets its version gate and JSON Schema at validate time,
+not only at build time. Source-model behaviour is unchanged.

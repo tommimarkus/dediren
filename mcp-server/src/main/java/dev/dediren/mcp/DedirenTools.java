@@ -11,7 +11,7 @@ import dev.dediren.core.commands.BuildRequest;
 import dev.dediren.core.commands.CoreCommands;
 import dev.dediren.core.engine.EngineExecutionException;
 import dev.dediren.core.engine.EngineRunOutcome;
-import dev.dediren.core.source.SourceValidator;
+import dev.dediren.core.source.DocumentValidator;
 import dev.dediren.core.source.ValidationResult;
 import dev.dediren.engine.Engines;
 import io.modelcontextprotocol.spec.McpSchema.CallToolRequest;
@@ -100,7 +100,7 @@ public final class DedirenTools {
       }
       // The model chose this source, so its fragment paths are model-supplied too: confine them to
       // the same --root the tool arguments are confined to (fragment errors are sanitized in core).
-      ValidationResult result = SourceValidator.validateSourceJson(text, baseDir, root);
+      ValidationResult result = DocumentValidator.validateDocument(text, baseDir, root);
       return envelope(serialize(result.envelope()), result.exitCode() != 0);
     } catch (EngineExecutionException failure) {
       return engineFailure(failure);

@@ -11,11 +11,11 @@ final class ToolSchemas {
         "properties": {
           "source": {
             "type": "string",
-            "description": "Path to the source JSON, relative to the workspace root."
+            "description": "Path to the document to validate (source model or policy JSON), relative to the workspace root."
           },
           "profile": {
             "type": "string",
-            "description": "Optional semantic profile (for example 'archimate' or 'uml'). When set, runs semantic profile validation in addition to schema validation."
+            "description": "Optional semantic profile (for example 'archimate' or 'uml'). When set, treats the document as a source model and runs semantic profile validation in addition to schema validation."
           }
         },
         "required": ["source"]

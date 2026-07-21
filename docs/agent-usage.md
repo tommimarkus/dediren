@@ -32,8 +32,12 @@ Three tools:
 
 - `dediren_guide` — this document, one section at a time. Pass `topic`, or omit
   it to list the topics. Start with `topic: "source-json"`.
-- `dediren_validate` — `source` (path); optional `profile` to also run
-  semantic profile validation. Returns the validation envelope.
+- `dediren_validate` — `source` (path to a source model **or a policy
+  document**: the schema-version field selects the family, so a render/export
+  policy or kept layout-request gets its version gate + JSON Schema check
+  here instead of only at build time); optional `profile` to also run
+  semantic profile validation (source models only). Returns the validation
+  envelope.
 - `dediren_build` — `source`, `out`, and at least one policy (`render_policy`,
   `oef_policy`, `xmi_policy`); optional `views` (subset of view ids) and `emit`
   (extra stage envelopes to also write, for debugging). Returns the
@@ -815,7 +819,10 @@ sets `model_identifier: "id-dediren-oef-basic-model"` and
 `model_name: "Dediren OEF Basic"`. Export succeeds with them unchanged, but
 the envelope carries the warning `DEDIREN_EXPORT_IDENTITY_PLACEHOLDER`
 (`status: warning`, exit still 0) so a mis-identified deliverable cannot ship
-silently — copy the policy and replace the identity fields for a real model:
+silently — copy the policy and replace the identity fields for a real model.
+Check the copied policy early with `dediren validate --input my-policy.json`
+(or `dediren_validate`): the document's schema-version field selects the
+family, so a stale or malformed policy fails here instead of at build time:
 
 ```json
 {

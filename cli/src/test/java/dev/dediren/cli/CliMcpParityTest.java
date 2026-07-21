@@ -72,6 +72,26 @@ class CliMcpParityTest {
   }
 
   @Test
+  void policyValidateProducesTheSameEnvelopeThroughBothLanes(@TempDir Path root) throws Exception {
+    // dediren_validate accepts policy documents like the CLI does (the schema-migration design's
+    // "Known asymmetry", closed): same family dispatch, same envelope, byte for byte.
+    Path policy = root.resolve("policy.json");
+    Files.copy(exportPolicy("default-oef.json"), policy);
+
+    CliResult cli =
+        Main.executeForTesting(
+            new String[] {"validate", "--input", policy.toString()}, "", Map.of());
+
+    CallToolResult mcp =
+        new DedirenTools(root, EngineWiring.defaults(), Map.of())
+            .validate(new CallToolRequest("dediren_validate", Map.of("source", "policy.json")));
+
+    assertThat(cli.exitCode()).isZero();
+    assertThat(textOf(mcp).strip()).isEqualTo(cli.stdout().strip());
+    assertThat(mcp.isError()).isFalse();
+  }
+
+  @Test
   void structuralFailureProducesTheSameEnvelopeThroughBothLanes(@TempDir Path root)
       throws Exception {
     // Missing plugins.generic-graph passes schema validation ("plugins": {} is legal) and fails

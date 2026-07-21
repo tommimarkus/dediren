@@ -102,18 +102,23 @@ Steps:
 
 Pre-legitimized open door (schema-migration spec "Known asymmetry").
 
-- [ ] RED: `validate --input <policy.json>` (no plugin/profile) dispatches on
-      the document's schema-version field: current → `ok` envelope; stale →
-      `SCHEMA_VERSION_OUTDATED`; unknown → `SCHEMA_VERSION_UNKNOWN`; plus
-      JSON-Schema validation against the matching policy schema.
-- [ ] GREEN: route through the existing `SchemaVersionGate` + schema
-      validation; family detected from the version field name/value
-      (`KnownSchemaVersions` already records legacy field names).
-- [ ] MCP `dediren_validate` gains the same acceptance (no new tool;
-      `ToolSchemas` description updated). MCP rows of `docs/threat-model.md`
-      reviewed (no new write primitive — expected no-op), packaged-MCP smoke
-      updated if tool description text is pinned there.
-- [ ] Docs: agent-usage `## MCP Server` + validate sections.
+- [x] RED: `validate --input <policy.json>` dispatches on the document's
+      schema-version field: current → `ok`; stale → `SCHEMA_VERSION_OUTDATED`
+      (incl. the legacy `svg_render_policy_schema_version` wrinkle); unknown
+      version → `SCHEMA_VERSION_UNKNOWN`; current-but-malformed →
+      `SCHEMA_INVALID` against the policy's own schema.
+- [x] GREEN: new `core/source/DocumentValidator` — family detection over
+      `KnownSchemaVersions` fields (model wins; unrecognized input keeps
+      today's model path byte for byte), then `SchemaVersionGate` + JSON
+      Schema; covers all registered non-model families incl. layout-request.
+- [x] MCP `dediren_validate` routes through the same entry (parity fixture
+      added); `ToolSchemas` + tool description updated. Threat-model MCP rows
+      reviewed: no change needed — the policy path is an ordinary confined
+      tool path; fragment confinement applies only to the model path, which
+      is untouched. Packaged smoke unaffected.
+- [x] Docs: `## MCP Server` bullet, `## Export` early-validate pointer, and a
+      dated "Known asymmetry: closed" note in the schema-migration spec's
+      amendment section.
 
 ## Task 4 — Contract truthfulness sweep (survey 1.3)
 
