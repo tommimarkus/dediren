@@ -388,6 +388,22 @@ class DistModuleTest {
             "release-assets/dediren-agent-bundle-${VERSION}-");
   }
 
+  @Test
+  void ciWorkflowRunsThePackagedDistSmokeGate() throws Exception {
+    // The -Pdist-smoke packaged smoke is the repo's only out-of-process proof (packaged jar +
+    // MCP-over-stdio, including the resources surface); ci.yml must keep invoking it on every PR or
+    // that sole E2E surface goes dark with no failing test.
+    // releaseWorkflowPublishesSingleJavaArchive
+    // pins the release-workflow dist step the same way; this pins the per-PR ci.yml step.
+    String workflow = Files.readString(workspaceRoot().resolve(".github/workflows/ci.yml"));
+    String testJob = workflowJob(workflow, "test");
+    String smokeStep = workflowStepContaining(testJob, "-Pdist-smoke");
+    assertThat(smokeStep)
+        .as("ci.yml test job must run the packaged -Pdist-smoke gate on the dist-tool module")
+        .contains("-Pdist-smoke")
+        .contains("dist-tool");
+  }
+
   private static Path workspaceRoot() {
     return dev.dediren.testsupport.TestSupport.workspaceRoot();
   }
