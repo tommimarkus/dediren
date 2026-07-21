@@ -371,6 +371,12 @@ class BuildCommandTest {
     // end's own views-argument guard would both reject it upstream -- this pins core's own,
     // independent re-confinement of the per-view write target (BuildCommand.requireWithinOutDir),
     // which does not trust either of those upstream checks to have run.
+    //
+    // The build's out dir is nested one level under the @TempDir so the escape's normalized
+    // target ("evil" as a SIBLING of the out dir) stays inside this test's own temp tree — a
+    // sibling of the raw @TempDir would be a JVM-global location (java.io.tmpdir/evil) that any
+    // historical pollution could occupy, making the not-exists proof flaky.
+    Path buildOut = Files.createDirectories(out.resolve("nested").resolve("build-out"));
     BuildRequest request =
         new BuildRequest(
             SOURCE,
@@ -380,7 +386,7 @@ class BuildCommandTest {
             null,
             null,
             Set.of(),
-            out,
+            buildOut,
             Map.of());
 
     EngineRunOutcome outcome = BuildCommand.run(request, engines());
@@ -393,7 +399,7 @@ class BuildCommandTest {
     BuildViewOutcome overview = result.views().getFirst();
     assertThat(overview.status()).isEqualTo(EnvelopeStatus.OK);
     assertThat(overview.artifacts()).hasSize(1);
-    assertThat(Files.exists(out.resolve("overview/diagram.svg"))).isTrue();
+    assertThat(Files.exists(buildOut.resolve("overview/diagram.svg"))).isTrue();
 
     BuildViewOutcome escaping = result.views().getLast();
     assertThat(escaping.viewId()).isEqualTo("../evil");
@@ -405,9 +411,9 @@ class BuildCommandTest {
               assertThat(diagnostic.code()).isEqualTo("DEDIREN_COMMAND_INPUT_INVALID");
               assertThat(diagnostic.severity()).isEqualTo(DiagnosticSeverity.ERROR);
             });
-    // The proof: nothing landed at the escaped, normalized location (a sibling of `out` named
-    // "evil"), which is what "../evil" under `out` normalizes to.
-    Path escapedTarget = out.resolveSibling("evil").resolve("diagram.svg");
+    // The proof: nothing landed at the escaped, normalized location (a sibling of the build out
+    // dir named "evil"), which is what "../evil" under it normalizes to.
+    Path escapedTarget = buildOut.resolveSibling("evil").resolve("diagram.svg");
     assertThat(Files.exists(escapedTarget)).isFalse();
   }
 
