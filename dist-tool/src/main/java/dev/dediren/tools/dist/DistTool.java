@@ -1336,7 +1336,9 @@ public final class DistTool {
     assertContains(stdout, "dediren://schema/model.schema.json", "mcp resources/list response");
     assertContains(stdout, "model_schema_version", "mcp schema resources/read response");
     assertContains(
-        stdout, "DEDIREN_GENERIC_GRAPH_PLUGIN_REQUIRED", "mcp diagnostics catalog response");
+        stdout,
+        DiagnosticCode.GENERIC_GRAPH_PLUGIN_REQUIRED.code(),
+        "mcp diagnostics catalog response");
 
     assertMcpBuildAnswered(bundle, responses, stdout);
     System.out.println(

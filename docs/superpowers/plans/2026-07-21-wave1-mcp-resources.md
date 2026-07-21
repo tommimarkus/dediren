@@ -37,16 +37,16 @@ shipped files verbatim is the anti-drift strategy.
 - [x] `DedirenResources` (startup enumeration from the product root, lazy
       reads, SpotBugs-clean) registered by `DedirenMcpServer` with the
       resources capability, both modes.
-- [x] Packaged stdio smoke extension AUTHORED (resources/list + schema read +
-      catalog read assertions in `DistTool`) but **uncommitted**: the same
-      file carries concurrent in-flight licence-verification work that does
-      not compile yet, so the hunk stays in the working tree until that work
-      lands; the full dist-smoke run is deferred with it.
+- [x] Packaged stdio smoke extension landed once the concurrent licence work
+      (dd52a4d) settled: resources/list + schema read + diagnostics-catalog
+      read ride the JSON-RPC smoke, frames-only stdout still enforced.
 - [x] Docs: agent-usage `## MCP Server` resources paragraph; threat-model MCP
       controls gained the "resources serve product bytes only" row.
-- [ ] DEFERRED to end-of-push (blocked by the concurrent dist-tool edit):
-      full `-Pquality verify`, dist-smoke, and the coverage-number check.
-      Module-scoped `-pl mcp-server,cli -am test` is green.
+- [x] Deferred gates CLEARED: full `-Pquality verify` and dist-smoke green.
+      Coverage: `-Pcoverage verify` on mcp-server now **passes** — the
+      wave-0/1 tests lifted branch coverage over the 0.70 floor, resolving
+      the recorded pre-existing deferral (0.67 at module landing) as a side
+      effect.
 
 **Verification:** `./mvnw -pl mcp-server,cli -am test`, full
 `-Pquality verify`, `-pl dist-tool -am verify -Pdist-smoke`.

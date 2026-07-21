@@ -32,8 +32,13 @@
       <Class name="dev.dediren.contracts.layout.LayoutGroup"/>
       <Class name="dev.dediren.contracts.layout.LayoutRequest"/>
       <Class name="dev.dediren.contracts.layout.LayoutResult"/>
-      <Class name="dev.dediren.contracts.plugin.PluginManifest"/>
-      <Class name="dev.dediren.contracts.plugin.RuntimeCapabilities"/>
+      <Class name="dev.dediren.contracts.analysis.DiffResult$EntityChanges"/>
+      <Class name="dev.dediren.contracts.analysis.DiffResult$ChangedEntity"/>
+      <Class name="dev.dediren.contracts.analysis.DiffResult$ChangedView"/>
+      <Class name="dev.dediren.contracts.analysis.DiffResult$ViewChanges"/>
+      <Class name="dev.dediren.contracts.analysis.QueryResult$Dependents"/>
+      <Class name="dev.dediren.contracts.analysis.QueryResult$Orphans"/>
+      <Class name="dev.dediren.contracts.analysis.QueryResult$ViewCoverage"/>
       <Class name="dev.dediren.contracts.render.RenderMetadata"/>
       <Class name="dev.dediren.contracts.render.RenderResult"/>
       <Class name="dev.dediren.contracts.render.SvgStylePolicy"/>

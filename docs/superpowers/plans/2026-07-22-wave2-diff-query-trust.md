@@ -58,19 +58,66 @@ per-stage-tools evidence gate).
 - [ ] Module gates: `-pl contracts,core,cli -am test`; full gates deferred
       (see Coordination).
 
-## Part B — Artifact trust chain (survey 2.2): probe-gated
+## Part B — Artifact trust chain (survey 2.2)
 
-The survey orders afternoon probes BEFORE committing this feature: canonical
-content-hash determinism (runnable here) and stamped-SVG survival through the
-external converters the guide blesses (rsvg-convert/Inkscape — availability to
-be checked in this environment; Archi import is not available here at all).
+**Probes: PASSED (2026-07-22).** Canonical-hash determinism holds (sorted-key
+compact serialization → identical digests across runs and key-reordered
+inputs). Stamped-SVG survival: a `<metadata id="dediren-provenance">` block
+injected after the root tag renders **byte-identical** PNGs through `resvg`
+(one of the guide's blessed converters; rsvg-convert/Inkscape absent here,
+Archi likewise — comment-carried OEF/XMI stamps are parser-transparent by XML
+conformance, so the SVG leg was the risky one and it passed).
 
-- [ ] Run the canonical-hash determinism probe over fixtures; record result.
-- [ ] Check converter availability; if absent, record 2.2 as
-      **probe-blocked in this environment** per the survey's own discipline
-      (the hash definition is a permanent mini-contract; it does not get
-      improvised without its survival evidence) and hand the remaining probe
-      to the owner as the unblocking step.
+**V1 design (decided before code):**
+
+- **Canonical hash contract:** SHA-256 over the canonical JSON of a document
+  — the parsed document re-serialized with recursively sorted object keys,
+  compact separators, UTF-8 (`core/analysis/CanonicalJson`). The model hash
+  is taken over the assembled, validated source document's serialized form
+  (so formatting/key order/fragment layout never change it); policy hashes
+  over the policy documents likewise. No timestamps anywhere — byte-stable.
+- **Stamp carriers:** SVG gets an inert `<metadata id="dediren-provenance">`
+  element holding compact JSON `{model_schema_version, model_sha256,
+  view_id, render_policy_sha256, dediren_version}`; OEF/XMI get an XML
+  comment `<!-- dediren-provenance {…} -->` after the XML declaration
+  (`oef_policy_sha256` / `xmi_policy_sha256` respectively). All values are
+  product-generated or charset-constrained (view ids), XML-escaped at
+  injection.
+- **Where stamping happens: the `build` lane only.** Core injects the stamp
+  into artifact content before writing — the one place where model, policies,
+  view id, and version are all naturally in scope. Engine seams stay
+  untouched, engine-level goldens stay byte-stable, and decomposed
+  single-stage outputs remain unstamped (`verify` reports them UNSTAMPED —
+  honest, and recorded as the follow-up seam if decomposed-stamping demand
+  appears).
+- **`dediren verify --input model.json --artifacts <dir>`:** recompute the
+  model hash, walk the artifact tree for stamps, and report per artifact:
+  stale (stamp's model_sha256 ≠ recomputed) → error diagnostic
+  `DEDIREN_ARTIFACT_STALE`, exit 2 — the CI drift gate; unstamped
+  recognized artifact kinds → warning `DEDIREN_ARTIFACT_UNSTAMPED`; current
+  → listed in data only. Envelope data = `verify-result.schema.v1`
+  (`{artifacts[{path, status}], model_sha256}`).
+- **`dediren status --root <dir>`:** workspace freshness index — scan for
+  model documents (files carrying `model_schema_version`) and stamped
+  artifacts; an artifact is `current` if its stamp matches any present
+  model's hash, else `stale`; unstamped artifacts listed as such. Data =
+  `status-result.schema.v1` (`{models[{path, sha256}], artifacts[{path,
+  status, model_sha256?}]}`). Read-only, no watch, no daemon.
+
+**Tasks:**
+
+- [ ] RED: CLI tests — build-lane SVG/OEF artifacts carry the stamp (parse
+      it back, hashes match the canonical hash of the source); verify:
+      current → ok, edited model → ARTIFACT_STALE error envelope, decomposed
+      render output → UNSTAMPED warning; status: index lists the model and
+      classifies artifacts; determinism (two builds → identical stamped
+      bytes).
+- [ ] GREEN: `CanonicalJson` + stamp injection in the build write path +
+      `verify`/`status` subcommands + two result schemas/records/consts.
+- [ ] Docs: agent-usage section (`## Provenance & Verify` + GuideCatalog
+      topic), README sentence, features page, threat-model note (stamp
+      injection is product-generated content, XML-escaped, no untrusted
+      verbatim path), Repair Rules entries for the two new codes.
 
 ## Coordination note
 
