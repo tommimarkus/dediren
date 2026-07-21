@@ -361,7 +361,13 @@ class DistModuleTest {
     assertThat(buildJob).doesNotContain("strategy:", "matrix:", "${{ matrix.");
     assertThat(buildStep).doesNotContain("DEDIREN_DIST_TARGET", "${{ matrix.");
     assertThat(countWorkflowStepsWithUses(buildJob, "uses: actions/upload-artifact@")).isEqualTo(1);
-    assertThat(uploadStep).doesNotContain("*", "${{ matrix.");
+    // The SBOM-binding hardening (audit F2) uploads the archive plus both CycloneDX
+    // serializations from release-staging/, so extension globs are expected there; the
+    // single-archive invariant is no matrix interpolation and no per-target archive pattern.
+    assertThat(uploadStep).doesNotContain("${{ matrix.", "dediren-agent-bundle-*");
+    assertThat(uploadStep)
+        .contains(
+            "release-staging/*.tar.xz", "release-staging/*.cdx.json", "release-staging/*.cdx.xml");
 
     assertThat(countWorkflowStepsWithUses(publishJob, "uses: actions/download-artifact@"))
         .isEqualTo(1);
