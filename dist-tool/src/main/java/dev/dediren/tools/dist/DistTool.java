@@ -177,7 +177,9 @@ public final class DistTool {
     return switch (args[0]) {
       case "notices" -> {
         Path output = Path.of(required(options, "output")).toAbsolutePath().normalize();
-        writeThirdPartyNotices(root, output);
+        Path licenceReport =
+            Path.of(required(options, "licence-report")).toAbsolutePath().normalize();
+        writeThirdPartyNotices(root, output, licenceReport);
         yield 0;
       }
       case "build" -> {
@@ -291,7 +293,8 @@ public final class DistTool {
     System.out.println(archive);
   }
 
-  private static void writeThirdPartyNotices(Path root, Path output) throws IOException {
+  private static void writeThirdPartyNotices(Path root, Path output, Path licenceReport)
+      throws IOException {
     Set<String> jars = new java.util.TreeSet<>();
     for (Launcher launcher : LAUNCHERS) {
       Path lib = root.resolve(launcher.installDir()).resolve("lib");
@@ -327,6 +330,8 @@ public final class DistTool {
               + unattributed
               + "; add DistTool.THIRD_PARTY_ATTRIBUTIONS (or FIRST_PARTY_ARTIFACTS) entries");
     }
+    verifyAttributionsAgainstResolvedLicences(
+        thirdParty, ResolvedLicenceReport.parse(licenceReport));
     Files.createDirectories(output.getParent());
     StringBuilder notice = new StringBuilder();
     notice.append("# Third-Party Notices\n\n");
@@ -382,6 +387,58 @@ public final class DistTool {
 
   private static String jarArtifactId(String jarName) {
     return jarName.replaceFirst("-\\d.*\\.jar$", "");
+  }
+
+  /**
+   * The attribution map is hand-curated, so a dependency bump that changes an upstream licence (EMF
+   * 2.12 → 2.45 moved from EPL-1.0 to EPL-2.0) would otherwise ship a stale label; every staged
+   * third-party jar must match the licences resolved from its effective pom, at the exact resolved
+   * version, before the notices are written.
+   */
+  private static void verifyAttributionsAgainstResolvedLicences(
+      Map<String, ThirdPartyAttribution> thirdParty, ResolvedLicenceReport report) {
+    List<String> problems = new ArrayList<>();
+    for (Map.Entry<String, ThirdPartyAttribution> staged : thirdParty.entrySet()) {
+      String jar = staged.getKey();
+      String artifactId = jarArtifactId(jar);
+      ResolvedLicenceReport.Entry entry = report.entryFor(artifactId);
+      if (entry == null) {
+        problems.add(jar + ": staged but absent from the resolved licence report");
+        continue;
+      }
+      String resolvedJar = artifactId + "-" + entry.version() + ".jar";
+      if (!jar.equals(resolvedJar)) {
+        problems.add(
+            jar + ": resolved licence report is stale (resolved version " + entry.version() + ")");
+        continue;
+      }
+      Set<String> attributed = new LinkedHashSet<>();
+      for (String licenseId : staged.getValue().licenseIds()) {
+        attributed.add(canonicalLicenceId(licenseId));
+      }
+      if (!attributed.containsAll(entry.licences())) {
+        problems.add(
+            jar
+                + ": attribution "
+                + attributed
+                + " does not cover resolved licences "
+                + entry.licences());
+      }
+    }
+    if (!problems.isEmpty()) {
+      throw new IllegalStateException(
+          "third-party attribution disagrees with the resolved licence report ("
+              + report.source()
+              + "):\n  "
+              + String.join("\n  ", problems)
+              + "\nverify the upstream licence, then fix DistTool.THIRD_PARTY_ATTRIBUTIONS or"
+              + " regenerate the report via the cli package phase");
+    }
+  }
+
+  /** "MIT (SLF4J)" → "MIT": the parenthetical picks the licence text, not a different licence. */
+  private static String canonicalLicenceId(String licenseId) {
+    return licenseId.replaceAll("\\s*\\([^)]*\\)$", "");
   }
 
   private static String licenseText(String licenseId) throws IOException {
@@ -1842,7 +1899,8 @@ public final class DistTool {
 
   private static void usage() {
     System.err.println(
-        "usage: DistTool notices|build|smoke|bench --root PATH [--version VERSION] [--runs N]");
+        "usage: DistTool notices|build|smoke|bench --root PATH [--output PATH]"
+            + " [--licence-report PATH] [--version VERSION] [--runs N]");
   }
 
   private record InsertionPoint(int index, String variable) {}

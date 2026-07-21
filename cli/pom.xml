@@ -147,6 +147,39 @@
           </execution>
         </executions>
       </plugin>
+      <!-- Resolved-licence report over the launcher's runtime classpath (= the bundle contents).
+           Effective-pom licences are normalized via licenseMerges and gated against the approved
+           set; DistTool `notices` then diffs THIRD_PARTY_ATTRIBUTIONS against this report, so a
+           dependency bump that changes an upstream licence fails the dist lane instead of
+           silently shipping a stale label. Bound to `package`: `./mvnw test` never pays for it. -->
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>license-maven-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>resolved-licence-report</id>
+            <phase>package</phase>
+            <goals>
+              <goal>add-third-party</goal>
+            </goals>
+            <configuration>
+              <outputDirectory>${project.build.directory}/licence-report</outputDirectory>
+              <thirdPartyFilename>THIRD-PARTY.txt</thirdPartyFilename>
+              <excludedScopes>test,provided</excludedScopes>
+              <failOnMissing>true</failOnMissing>
+              <failOnBlacklist>true</failOnBlacklist>
+              <includedLicenses>Apache-2.0|EPL-1.0|EPL-2.0|MIT|MIT-0</includedLicenses>
+              <licenseMerges>
+                <licenseMerge>Apache-2.0|Apache License, Version 2.0|The Apache Software License, Version 2.0|The Apache Software License, version 2.0|Apache License Version 2.0|Apache License 2.0|The Apache License, Version 2.0|Apache 2.0</licenseMerge>
+                <licenseMerge>EPL-1.0|The Eclipse Public License Version 1.0|Eclipse Public License - v 1.0|Eclipse Public License v1.0</licenseMerge>
+                <licenseMerge>EPL-2.0|Eclipse Public License - v 2.0|Eclipse Public License, Version 2.0|Eclipse Public License v. 2.0|Eclipse Public License 2.0|Eclipse Public License - Version 2.0</licenseMerge>
+                <licenseMerge>MIT|MIT License|The MIT License|MIT license</licenseMerge>
+                <licenseMerge>MIT-0|MIT No Attribution License|MIT-0 License</licenseMerge>
+              </licenseMerges>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
     </plugins>
   </build>
 </project>

@@ -135,7 +135,13 @@ agent tools should be pointed here from their own entrypoint files (for example,
   annotation-driven library, or reflection-reached class needs a matching keep
   rule in `dist-tool` `bundle-shrink.pro` (and a licence attribution in
   `DistTool.THIRD_PARTY_ATTRIBUTIONS`) in the same change — `-Pdist-smoke` is
-  the gate that catches a miss.
+  the gate that catches a miss. Attribution labels must agree with each
+  dependency's effective-pom licence: the cli `resolved-licence-report`
+  execution (license-maven-plugin) normalizes and allowlist-gates resolved
+  licences, and `DistTool` diffs the map against that report before writing
+  notices. A new dependency may need its pom's licence spelling added to
+  `licenseMerges` in `cli/pom.xml`; a licence outside the approved set is a
+  deliberate decision, not a config tweak.
 
 ## Versioning
 

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import dev.dediren.contracts.json.JsonSupport;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -127,9 +128,17 @@ class DistModuleTest {
       Files.writeString(lib.resolve(jar), "");
     }
     Path output = root.resolve("THIRD-PARTY-NOTICES.md");
+    Path report =
+        writeLicenceReport(
+            root,
+            "     (MIT) contracts (dev.dediren:contracts:2026.07.1 - no url defined)",
+            "     (Apache-2.0) Guava: Google Core Libraries for Java (com.google.guava:guava:33.6.0-jre - https://github.com/google/guava)",
+            "     (EPL-2.0) ELK Core Components (org.eclipse.elk:org.eclipse.elk.core:0.11.0 - https://www.eclipse.org/elk/)",
+            "     (EPL-1.0) org.eclipse.emf.ecore (org.eclipse.emf:org.eclipse.emf.ecore:2.12.0 - http://www.eclipse.org/emf)",
+            "     (MIT) SLF4J API Module (org.slf4j:slf4j-api:2.0.17 - http://www.slf4j.org)",
+            "     (Apache-2.0) XML Commons External Components XML APIs (xml-apis:xml-apis:1.4.01 - http://xml.apache.org/commons/)");
 
-    DistTool.run(
-        new String[] {"notices", "--root", root.toString(), "--output", output.toString()});
+    DistTool.run(noticesArgs(root, output, report));
 
     // Redistribution compliance: every third-party jar carries a licence identification,
     // EPL source availability is stated, and the referenced licence texts ride in the file.
@@ -162,15 +171,98 @@ class DistModuleTest {
     Files.createDirectories(lib);
     Files.writeString(lib.resolve("mystery-1.0.jar"), "");
     Path output = root.resolve("THIRD-PARTY-NOTICES.md");
+    Path report =
+        writeLicenceReport(
+            root, "     (MIT) mystery (org.example:mystery:1.0 - https://example.org)");
 
-    assertThatThrownBy(
-            () ->
-                DistTool.run(
-                    new String[] {
-                      "notices", "--root", root.toString(), "--output", output.toString()
-                    }))
+    assertThatThrownBy(() -> DistTool.run(noticesArgs(root, output, report)))
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("mystery-1.0.jar");
+  }
+
+  // The resolved licence report is the effective-pom ground truth (cli's license-maven-plugin
+  // execution); notices generation must refuse to write when the hand-curated attribution map
+  // disagrees with it, when it does not know a staged jar, or when it was generated for a
+  // different resolved version.
+
+  @Test
+  void noticesFailWhenAttributionDisagreesWithResolvedLicences(@TempDir Path root)
+      throws Exception {
+    Path lib = root.resolve("cli/target/appassembler/lib");
+    Files.createDirectories(lib);
+    Files.writeString(lib.resolve("org.eclipse.emf.ecore-2.12.0.jar"), "");
+    Path output = root.resolve("THIRD-PARTY-NOTICES.md");
+    // The EMF relicensing regression: the resolved licence moved on, the attribution did not.
+    Path report =
+        writeLicenceReport(
+            root,
+            "     (EPL-2.0) org.eclipse.emf.ecore (org.eclipse.emf:org.eclipse.emf.ecore:2.12.0 - http://www.eclipse.org/emf)");
+
+    assertThatThrownBy(() -> DistTool.run(noticesArgs(root, output, report)))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("org.eclipse.emf.ecore-2.12.0.jar")
+        .hasMessageContaining("EPL-1.0")
+        .hasMessageContaining("EPL-2.0");
+    assertThat(output).doesNotExist();
+  }
+
+  @Test
+  void noticesFailWhenStagedJarIsAbsentFromLicenceReport(@TempDir Path root) throws Exception {
+    Path lib = root.resolve("cli/target/appassembler/lib");
+    Files.createDirectories(lib);
+    Files.writeString(lib.resolve("guava-33.6.0-jre.jar"), "");
+    Path output = root.resolve("THIRD-PARTY-NOTICES.md");
+    Path report =
+        writeLicenceReport(
+            root,
+            "     (MIT) SLF4J API Module (org.slf4j:slf4j-api:2.0.17 - http://www.slf4j.org)");
+
+    assertThatThrownBy(() -> DistTool.run(noticesArgs(root, output, report)))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("guava-33.6.0-jre.jar")
+        .hasMessageContaining("absent from the resolved licence report");
+  }
+
+  @Test
+  void noticesFailWhenLicenceReportIsStale(@TempDir Path root) throws Exception {
+    Path lib = root.resolve("cli/target/appassembler/lib");
+    Files.createDirectories(lib);
+    Files.writeString(lib.resolve("guava-33.6.0-jre.jar"), "");
+    Path output = root.resolve("THIRD-PARTY-NOTICES.md");
+    Path report =
+        writeLicenceReport(
+            root,
+            "     (Apache-2.0) Guava: Google Core Libraries for Java (com.google.guava:guava:33.5.0-jre - https://github.com/google/guava)");
+
+    assertThatThrownBy(() -> DistTool.run(noticesArgs(root, output, report)))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("guava-33.6.0-jre.jar")
+        .hasMessageContaining("stale")
+        .hasMessageContaining("33.5.0-jre");
+  }
+
+  private static String[] noticesArgs(Path root, Path output, Path report) {
+    return new String[] {
+      "notices",
+      "--root",
+      root.toString(),
+      "--output",
+      output.toString(),
+      "--licence-report",
+      report.toString()
+    };
+  }
+
+  private static Path writeLicenceReport(Path root, String... entries) throws IOException {
+    Path report = root.resolve("cli/target/licence-report/THIRD-PARTY.txt");
+    Files.createDirectories(report.getParent());
+    StringBuilder content =
+        new StringBuilder("Lists of " + entries.length + " third-party dependencies.\n\n");
+    for (String entry : entries) {
+      content.append(entry).append('\n');
+    }
+    Files.writeString(report, content.toString());
+    return report;
   }
 
   @Test

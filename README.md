@@ -66,6 +66,12 @@ blocking CI/release gate (High/Critical advisories fail the build); **OWASP
 Dependency-Check** is a non-blocking weekly second opinion (`-Psecurity-sca`
 locally; set `NVD_API_KEY` for the authenticated NVD path). Produce the SBOM and
 third-party notices with the `-Psbom` and `-Pthird-party-notices` profiles.
+Licence hygiene is gated in the same lanes: the cli `package` phase resolves
+every runtime dependency's effective-pom licence against an approved allowlist
+(`license-maven-plugin`), and the dist build refuses to write
+`THIRD-PARTY-NOTICES.md` when that resolved report disagrees with the curated
+attribution map — a dependency bump that changes an upstream licence fails the
+build instead of shipping a stale label.
 
 `-Pdist-build` writes a platform-neutral archive under `dist/` (launch scripts +
 jars, no bundled JRE — Java 21+ is required at runtime):

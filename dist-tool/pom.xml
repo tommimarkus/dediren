@@ -110,6 +110,8 @@
                 <argument>${maven.multiModuleProjectDirectory}</argument>
                 <argument>--output</argument>
                 <argument>${project.build.directory}/reports/third-party/THIRD-PARTY-NOTICES.md</argument>
+                <argument>--licence-report</argument>
+                <argument>${maven.multiModuleProjectDirectory}/cli/target/licence-report/THIRD-PARTY.txt</argument>
               </arguments>
             </configuration>
           </execution>
