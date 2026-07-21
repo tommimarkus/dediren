@@ -288,6 +288,217 @@ class SourceValidatorTest {
     assertThat(result.envelope().data().path("node_count").asInt()).isEqualTo(1);
   }
 
+  // --- Fragment-merge CONFLICT / error partitions. Each triggers one published reject diagnostic
+  // and asserts the specific code + JSON-pointer path the SUT documents for that branch. The CLI
+  // (null confinement root) lane is used throughout: these guards are lane-independent. ---
+
+  private static String modelWithTwoFragments() {
+    return """
+        {
+          "model_schema_version": "model.schema.v1",
+          "fragments": ["frag-a.json", "frag-b.json"],
+          "nodes": [],
+          "relationships": [],
+          "plugins": { "generic-graph": { "views": [] } }
+        }
+        """;
+  }
+
+  @Test
+  void conflictingRequiredPluginVersionsBetweenFragmentsAreRejected() throws Exception {
+    // Covers mergeRequiredPlugins: the same required-plugin id appears in two fragments with
+    // different versions, so the second merge finds an existing id whose version differs.
+    Path base = Files.createDirectories(temp.resolve("base"));
+    Files.writeString(
+        base.resolve("frag-a.json"),
+        """
+        {
+          "model_schema_version": "model.schema.v1",
+          "required_plugins": [ { "id": "elk-layout", "version": "1.0.0" } ],
+          "nodes": [],
+          "relationships": [],
+          "plugins": { "generic-graph": { "views": [] } }
+        }
+        """);
+    Files.writeString(
+        base.resolve("frag-b.json"),
+        """
+        {
+          "model_schema_version": "model.schema.v1",
+          "required_plugins": [ { "id": "elk-layout", "version": "2.0.0" } ],
+          "nodes": [],
+          "relationships": [],
+          "plugins": { "generic-graph": { "views": [] } }
+        }
+        """);
+
+    ValidationResult result = SourceValidator.validateSourceJson(modelWithTwoFragments(), base);
+
+    assertThat(result.exitCode()).isEqualTo(CommandExitCode.INPUT_ERROR.code());
+    assertThat(result.envelope().diagnostics()).hasSize(1);
+    Diagnostic diagnostic = result.envelope().diagnostics().get(0);
+    assertThat(diagnostic.code()).isEqualTo("DEDIREN_FRAGMENT_CONFLICT");
+    assertThat(diagnostic.path()).isEqualTo("$.required_plugins");
+    assertThat(diagnostic.message()).contains("elk-layout").contains("1.0.0").contains("2.0.0");
+  }
+
+  @Test
+  void conflictingScalarValuesForTheSamePluginKeyBetweenFragmentsAreRejected() throws Exception {
+    // Covers mergeValue's leaf-conflict branch: two fragments set the same plugin-config scalar to
+    // different values. A sibling key under "plugins" (additionalProperties:true) is deliberate --
+    // "generic-graph" is additionalProperties:false and its only child "views" is an array that
+    // concatenates rather than conflicts, so it can never reach the scalar-conflict branch.
+    Path base = Files.createDirectories(temp.resolve("base"));
+    Files.writeString(
+        base.resolve("frag-a.json"),
+        """
+        {
+          "model_schema_version": "model.schema.v1",
+          "nodes": [],
+          "relationships": [],
+          "plugins": { "custom": { "mode": "a" } }
+        }
+        """);
+    Files.writeString(
+        base.resolve("frag-b.json"),
+        """
+        {
+          "model_schema_version": "model.schema.v1",
+          "nodes": [],
+          "relationships": [],
+          "plugins": { "custom": { "mode": "b" } }
+        }
+        """);
+
+    ValidationResult result = SourceValidator.validateSourceJson(modelWithTwoFragments(), base);
+
+    assertThat(result.exitCode()).isEqualTo(CommandExitCode.INPUT_ERROR.code());
+    assertThat(result.envelope().diagnostics()).hasSize(1);
+    Diagnostic diagnostic = result.envelope().diagnostics().get(0);
+    assertThat(diagnostic.code()).isEqualTo("DEDIREN_FRAGMENT_CONFLICT");
+    // Path is the fully-qualified pointer to the conflicting leaf: "$.plugins" + ".custom" +
+    // ".mode".
+    assertThat(diagnostic.path()).isEqualTo("$.plugins.custom.mode");
+    assertThat(diagnostic.message()).contains("$.plugins.custom.mode");
+  }
+
+  @Test
+  void aFragmentThatItselfDeclaresFragmentsIsRejected() throws Exception {
+    // Covers the nested-fragment guard: a read fragment whose own document declares fragments. The
+    // referenced "deeper.json" is never read -- the guard fires on the parsed fragment's own
+    // fragments() list before any further resolution.
+    Path base = Files.createDirectories(temp.resolve("base"));
+    Files.writeString(
+        base.resolve("frag-nested.json"),
+        """
+        {
+          "model_schema_version": "model.schema.v1",
+          "fragments": ["deeper.json"],
+          "nodes": [],
+          "relationships": [],
+          "plugins": { "generic-graph": { "views": [] } }
+        }
+        """);
+
+    ValidationResult result =
+        SourceValidator.validateSourceJson(modelWithFragment("frag-nested.json"), base);
+
+    assertThat(result.exitCode()).isEqualTo(CommandExitCode.INPUT_ERROR.code());
+    assertThat(result.envelope().diagnostics()).hasSize(1);
+    Diagnostic diagnostic = result.envelope().diagnostics().get(0);
+    assertThat(diagnostic.code()).isEqualTo("DEDIREN_FRAGMENT_NESTED_UNSUPPORTED");
+    assertThat(diagnostic.path()).isEqualTo("$.fragments[0]");
+    assertThat(diagnostic.message()).contains("frag-nested.json").contains("nested fragments");
+  }
+
+  @Test
+  void anAbsoluteFragmentPathIsRejected() throws Exception {
+    // Covers the absolute-path guard (fragmentPath.isAbsolute()), which fires before any read and
+    // regardless of confinement. The target need not exist -- rejection precedes resolution.
+    Path base = Files.createDirectories(temp.resolve("base"));
+
+    ValidationResult result =
+        SourceValidator.validateSourceJson(modelWithFragment("/nonexistent/abs.json"), base);
+
+    assertThat(result.exitCode()).isEqualTo(CommandExitCode.INPUT_ERROR.code());
+    assertThat(result.envelope().diagnostics()).hasSize(1);
+    Diagnostic diagnostic = result.envelope().diagnostics().get(0);
+    assertThat(diagnostic.code()).isEqualTo("DEDIREN_FRAGMENT_PATH_UNSUPPORTED");
+    assertThat(diagnostic.path()).isEqualTo("$.fragments[0]");
+    assertThat(diagnostic.message()).contains("/nonexistent/abs.json").contains("must be relative");
+  }
+
+  @Test
+  void aFragmentedSourceGivenNoBaseDirIsRejected() {
+    // Covers the base-dir guard: a source that declares fragments but is validated with a null
+    // baseDir (no file input), so relative fragment paths cannot be resolved.
+    ValidationResult result =
+        SourceValidator.validateSourceJson(modelWithFragment("piece.json"), null);
+
+    assertThat(result.exitCode()).isEqualTo(CommandExitCode.INPUT_ERROR.code());
+    assertThat(result.envelope().diagnostics()).hasSize(1);
+    Diagnostic diagnostic = result.envelope().diagnostics().get(0);
+    assertThat(diagnostic.code()).isEqualTo("DEDIREN_FRAGMENT_BASE_DIR_REQUIRED");
+    assertThat(diagnostic.path()).isEqualTo("$.fragments");
+    assertThat(diagnostic.message()).contains("source fragments require file input");
+  }
+
+  @Test
+  void duplicateNodeIdsAreReportedAsADuplicateIdDiagnostic() {
+    // Covers the DUPLICATE_ID branch: two nodes share an id, so the second insertion into the id
+    // set fails. The JSON schema does not enforce id uniqueness, so this is the SUT's own check.
+    ValidationResult result =
+        SourceValidator.validateSourceJson(
+            """
+            {
+              "model_schema_version": "model.schema.v1",
+              "nodes": [
+                { "id": "dup", "type": "T", "label": "One", "properties": {} },
+                { "id": "dup", "type": "T", "label": "Two", "properties": {} }
+              ],
+              "relationships": [],
+              "plugins": { "generic-graph": { "views": [] } }
+            }
+            """,
+            null);
+
+    assertThat(result.exitCode()).isEqualTo(CommandExitCode.INPUT_ERROR.code());
+    assertThat(result.envelope().diagnostics()).hasSize(1);
+    Diagnostic diagnostic = result.envelope().diagnostics().get(0);
+    assertThat(diagnostic.code()).isEqualTo("DEDIREN_DUPLICATE_ID");
+    assertThat(diagnostic.path()).isEqualTo("$.nodes[?(@.id=='dup')]");
+    assertThat(diagnostic.message()).contains("duplicate id 'dup'");
+  }
+
+  @Test
+  void aRelationshipReferencingAMissingEndpointIsReportedAsDangling() {
+    // Covers the DANGLING_ENDPOINT branch: a relationship whose target names a node id that no node
+    // declares. Source "a" resolves, so the single diagnostic is the missing target, not source.
+    ValidationResult result =
+        SourceValidator.validateSourceJson(
+            """
+            {
+              "model_schema_version": "model.schema.v1",
+              "nodes": [
+                { "id": "a", "type": "T", "label": "A", "properties": {} }
+              ],
+              "relationships": [
+                { "id": "r1", "type": "R", "source": "a", "target": "ghost",
+                  "label": "", "properties": {} }
+              ],
+              "plugins": { "generic-graph": { "views": [] } }
+            }
+            """,
+            null);
+
+    assertThat(result.exitCode()).isEqualTo(CommandExitCode.INPUT_ERROR.code());
+    assertThat(result.envelope().diagnostics()).hasSize(1);
+    Diagnostic diagnostic = result.envelope().diagnostics().get(0);
+    assertThat(diagnostic.code()).isEqualTo("DEDIREN_DANGLING_ENDPOINT");
+    assertThat(diagnostic.path()).isEqualTo("$.relationships[?(@.id=='r1')].target");
+    assertThat(diagnostic.message()).contains("r1").contains("ghost").contains("missing target");
+  }
+
   private static void restoreProperty(String name, String value) {
     if (value == null) {
       System.clearProperty(name);
