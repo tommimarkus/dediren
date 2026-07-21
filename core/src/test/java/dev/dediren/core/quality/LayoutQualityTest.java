@@ -1045,6 +1045,464 @@ class LayoutQualityTest {
         .isZero();
   }
 
+  // ---------------------------------------------------------------------------------------------
+  // Threshold-arithmetic boundary tests. These pin the exact constants and formulas inside the
+  // geometry helper predicates so PIT MathMutator / ConditionalsBoundaryMutator survivors die: a
+  // diagnostic-outcome test only proves *which* code came back, not that the arithmetic under it is
+  // the intended one. Each "why this coordinate" note derives the boundary from the named
+  // LayoutQuality constant, so a future reader can re-check it without running PIT.
+  // ---------------------------------------------------------------------------------------------
+
+  @Test
+  void junctionInteriorDiagonalAtReachBoundaryIsAccepted() {
+    // Pins distanceToSegment's point-to-segment distance formula for an INTERIOR projection
+    // (t strictly between 0 and 1) on a DIAGONAL segment (dx and dy both non-zero) -- the existing
+    // junctionEdge*Reach tests only exercise the clamped-endpoint case (dy == 0), which masks every
+    // MathMutator on the dy terms and on lengthSquared. The edge target is a non-existent node so
+    // findNode(target) == null short-circuits the endpoint checks (leaving only the junction
+    // check), which is the only way to test an interior foot: a real perimeter-anchored endpoint
+    // would sit <= 14 from the centre and dominate the minimum.
+    // Junction 28x28 at (186,186): centre (200,200), reach = min(28,28)/2 + JUNCTION_ROUTE_TOL
+    // = 14 + 2 = 16. Segment (129,128)->(289,248): dx=160, dy=120, lengthSquared=40000, and the
+    // centre projects to t = 20000/40000 = 0.5 -> foot (209,188) -> distance hypot(9,12) = 15.0
+    // exactly (a 3-4-5 triple). 15 <= 16 so the junction is on-route: accepted. Any perturbation of
+    // the distance formula throws the value to ~58/87/101, well past 16.
+    var nodes = List.of(junctionNode("j", 186.0, 186.0));
+    var edges =
+        List.of(
+            edge(
+                "into-ghost",
+                "j",
+                "ghost",
+                List.of(new Point(129.0, 128.0), new Point(289.0, 248.0))));
+
+    assertThat(LayoutQuality.validateLayoutDiagnostics(layoutResult(nodes, edges, List.of())))
+        .isEmpty();
+  }
+
+  @Test
+  void junctionInteriorDiagonalBeyondReachIsReported() {
+    // Companion to the accepted case: same interior-diagonal geometry, distance just over reach.
+    // Segment (132,124)->(292,244): dx=160, dy=120, t = 20000/40000 = 0.5 -> foot (212,184) ->
+    // distance hypot(12,16) = 20.0 exactly. 20 > reach 16 so the junction is off its incident
+    // route.
+    var nodes = List.of(junctionNode("j", 186.0, 186.0));
+    var edges =
+        List.of(
+            edge(
+                "into-ghost",
+                "j",
+                "ghost",
+                List.of(new Point(132.0, 124.0), new Point(292.0, 244.0))));
+
+    assertThat(LayoutQuality.validateLayoutDiagnostics(layoutResult(nodes, edges, List.of())))
+        .extracting(diagnostic -> diagnostic.code())
+        .containsExactly("DEDIREN_LAYOUT_JUNCTION_OFF_INCIDENT_ROUTE");
+  }
+
+  @Test
+  void selfLoopReachingExactlyLeftEscapeBoundaryIsDegenerate() {
+    // selfLoopEscapesNode escapes on the left when point.x() < left - SELF_LOOP_MIN_ESCAPE.
+    // Node "a" is 100x80 at the origin: left = 0, so the boundary is x = 0 - 4 = -4. A loop whose
+    // leftmost point sits exactly at x = -4 does NOT escape (-4 < -4 is false) and is degenerate.
+    // ConditionalsBoundary (< -> <=) would treat -4 as an escape and suppress the diagnostic.
+    var nodes = List.of(node("a", 0.0, 0.0));
+    var edges =
+        List.of(
+            edge(
+                "loop",
+                "a",
+                "a",
+                List.of(
+                    new Point(0.0, 20.0),
+                    new Point(-4.0, 20.0),
+                    new Point(-4.0, 60.0),
+                    new Point(0.0, 60.0))));
+
+    assertThat(LayoutQuality.validateLayoutDiagnostics(layoutResult(nodes, edges, List.of())))
+        .extracting(diagnostic -> diagnostic.code())
+        .containsExactly("DEDIREN_LAYOUT_SELF_LOOP_DEGENERATE");
+  }
+
+  @Test
+  void selfLoopReachingExactlyRightEscapeBoundaryIsDegenerate() {
+    // Right escape when point.x() > right + SELF_LOOP_MIN_ESCAPE. right = 0 + 100 = 100, so the
+    // boundary is x = 100 + 4 = 104. A loop poking exactly to x = 104 does NOT escape (104 > 104 is
+    // false) and is degenerate. Kills the ConditionalsBoundary (> -> >=) on the right test and the
+    // MathMutator on right + SELF_LOOP_MIN_ESCAPE and on right = node.x() + node.width().
+    var nodes = List.of(node("a", 0.0, 0.0));
+    var edges =
+        List.of(
+            edge(
+                "loop",
+                "a",
+                "a",
+                List.of(
+                    new Point(100.0, 20.0),
+                    new Point(104.0, 20.0),
+                    new Point(104.0, 60.0),
+                    new Point(100.0, 60.0))));
+
+    assertThat(LayoutQuality.validateLayoutDiagnostics(layoutResult(nodes, edges, List.of())))
+        .extracting(diagnostic -> diagnostic.code())
+        .containsExactly("DEDIREN_LAYOUT_SELF_LOOP_DEGENERATE");
+  }
+
+  @Test
+  void selfLoopReachingExactlyTopEscapeBoundaryIsDegenerate() {
+    // Top escape when point.y() < top - SELF_LOOP_MIN_ESCAPE. top = 0, boundary y = 0 - 4 = -4.
+    // A loop reaching exactly y = -4 does NOT escape (-4 < -4 is false) and is degenerate.
+    var nodes = List.of(node("a", 0.0, 0.0));
+    var edges =
+        List.of(
+            edge(
+                "loop",
+                "a",
+                "a",
+                List.of(
+                    new Point(20.0, 0.0),
+                    new Point(20.0, -4.0),
+                    new Point(60.0, -4.0),
+                    new Point(60.0, 0.0))));
+
+    assertThat(LayoutQuality.validateLayoutDiagnostics(layoutResult(nodes, edges, List.of())))
+        .extracting(diagnostic -> diagnostic.code())
+        .containsExactly("DEDIREN_LAYOUT_SELF_LOOP_DEGENERATE");
+  }
+
+  @Test
+  void selfLoopReachingExactlyBottomEscapeBoundaryIsDegenerate() {
+    // Bottom escape when point.y() > bottom + SELF_LOOP_MIN_ESCAPE. bottom = 0 + 80 = 80, boundary
+    // y = 80 + 4 = 84. A loop reaching exactly y = 84 does NOT escape (84 > 84 is false) and is
+    // degenerate. Kills the ConditionalsBoundary (> -> >=) and the MathMutator on
+    // bottom + SELF_LOOP_MIN_ESCAPE and on bottom = node.y() + node.height().
+    var nodes = List.of(node("a", 0.0, 0.0));
+    var edges =
+        List.of(
+            edge(
+                "loop",
+                "a",
+                "a",
+                List.of(
+                    new Point(20.0, 80.0),
+                    new Point(20.0, 84.0),
+                    new Point(60.0, 84.0),
+                    new Point(60.0, 80.0))));
+
+    assertThat(LayoutQuality.validateLayoutDiagnostics(layoutResult(nodes, edges, List.of())))
+        .extracting(diagnostic -> diagnostic.code())
+        .containsExactly("DEDIREN_LAYOUT_SELF_LOOP_DEGENERATE");
+  }
+
+  @Test
+  void endpointAtTopLeftPerimeterToleranceCornerIsAccepted() {
+    // pointOnNodePerimeter admits a point inside the box expanded by ROUTE_ENDPOINT_TOLERANCE
+    // (1.5). Target 100x80 at (300,0): left = 300, top = 0. The expanded top-left corner is
+    // (300 - 1.5, 0 - 1.5) = (298.5, -1.5); a route endpoint exactly there is on-perimeter
+    // (>= left - tol AND >= top - tol both hold with equality). ConditionalsBoundary (>= -> >) on
+    // either the x lower bound (L335) or the y lower bound (L337) would reject it.
+    var nodes = new ArrayList<LaidOutNode>();
+    nodes.add(node("source", 0.0, 0.0));
+    nodes.add(node("target", 300.0, 0.0));
+    var edges =
+        List.of(
+            edge("e", "source", "target", List.of(new Point(100.0, 40.0), new Point(298.5, -1.5))));
+
+    assertThat(LayoutQuality.validateLayoutDiagnostics(layoutResult(nodes, edges, List.of())))
+        .isEmpty();
+  }
+
+  @Test
+  void endpointAtBottomRightPerimeterToleranceCornerIsAccepted() {
+    // Mirror of the top-left corner on the upper bounds. Target 100x80 at (300,0): right = 400,
+    // bottom = 80. The expanded bottom-right corner is (400 + 1.5, 80 + 1.5) = (401.5, 81.5); a
+    // route endpoint exactly there is on-perimeter. Kills ConditionalsBoundary (<= -> <) on the x
+    // upper bound (L336) and y upper bound (L338), and the MathMutator on right + tolerance /
+    // bottom + tolerance.
+    var nodes = new ArrayList<LaidOutNode>();
+    nodes.add(node("source", 0.0, 0.0));
+    nodes.add(node("target", 300.0, 0.0));
+    var edges =
+        List.of(
+            edge("e", "source", "target", List.of(new Point(100.0, 40.0), new Point(401.5, 81.5))));
+
+    assertThat(LayoutQuality.validateLayoutDiagnostics(layoutResult(nodes, edges, List.of())))
+        .isEmpty();
+  }
+
+  @Test
+  void touchingRoutesAreNotCountedAsProperCrossings() {
+    // segmentsProperlyCross returns o1*o2 < 0 && o3*o4 < 0 -- interiors must intersect; a T-touch
+    // (an endpoint lying ON the other segment) is NOT a crossing. A vertical run (100,-50)->(100,0)
+    // touches a horizontal run (0,0)->(200,0) at the horizontal's interior point (100,0). One
+    // orientation determinant is then exactly 0, so exactly one of o1*o2 / o3*o4 is 0 -> the strict
+    // `< 0` keeps the product from counting. ConditionalsBoundary (< -> <=) would count 0 as a
+    // cross; the MathMutator (* -> /) turns the zero product into a signed infinity that is < 0
+    // (the collinear point is the divisor, the other endpoint is on the negative side). Swapping
+    // the edge order moves the zero from the first factor to the second, so both orderings are
+    // asserted to pin both `< 0` operators and both `*`.
+    var horizontal = edge("h", "hs", "ht", List.of(new Point(0.0, 0.0), new Point(200.0, 0.0)));
+    var vertical = edge("v", "vs", "vt", List.of(new Point(100.0, -50.0), new Point(100.0, 0.0)));
+
+    assertThat(
+            LayoutQuality.validateLayout(
+                    layoutResult(List.of(), List.of(horizontal, vertical), List.of()))
+                .edgeCrossingCount())
+        .isZero();
+    assertThat(
+            LayoutQuality.validateLayout(
+                    layoutResult(List.of(), List.of(vertical, horizontal), List.of()))
+                .edgeCrossingCount())
+        .isZero();
+  }
+
+  @Test
+  void detourAtExactlyRatioThresholdIsNotCounted() {
+    // hasExcessiveDetour needs routeLength > directLength * ROUTE_DETOUR_RATIO (1.5) AND
+    // routeLength - directLength > ROUTE_DETOUR_EXCESS (240). Staple (0,0)->(0,125)->(500,125)->
+    // (500,0): directLength = |0-500| + |0-0| = 500, routeLength = 125 + 500 + 125 = 750 = 1.5*500
+    // exactly. The ratio test is `>` so 750 > 750 is false -> not counted (excess 250 > 240 holds,
+    // so the ratio is the sole binding constraint). Kills ConditionalsBoundary (> -> >=) and
+    // MathMutator (* -> /, which drops the threshold to 500/1.5 ~= 333) on the ratio test.
+    var edges =
+        List.of(
+            edge(
+                "detour",
+                "s",
+                "t",
+                List.of(
+                    new Point(0.0, 0.0),
+                    new Point(0.0, 125.0),
+                    new Point(500.0, 125.0),
+                    new Point(500.0, 0.0))));
+
+    assertThat(
+            LayoutQuality.validateLayout(layoutResult(List.of(), edges, List.of()))
+                .routeDetourCount())
+        .isZero();
+  }
+
+  @Test
+  void detourAtExactlyExcessThresholdIsNotCounted() {
+    // Excess boundary with the ratio comfortably satisfied. Staple (0,0)->(0,120)->(200,120)->
+    // (200,0): directLength = 200, routeLength = 120 + 200 + 120 = 440, ratio 440/200 = 2.2 > 1.5.
+    // routeLength - directLength = 240 = ROUTE_DETOUR_EXCESS exactly; the excess test is `>` so
+    // 240 > 240 is false -> not counted. Kills ConditionalsBoundary (> -> >=) and MathMutator
+    // (- -> +, which turns 240 into routeLength + directLength = 640 > 240) on the excess test.
+    var edges =
+        List.of(
+            edge(
+                "detour",
+                "s",
+                "t",
+                List.of(
+                    new Point(0.0, 0.0),
+                    new Point(0.0, 120.0),
+                    new Point(200.0, 120.0),
+                    new Point(200.0, 0.0))));
+
+    assertThat(
+            LayoutQuality.validateLayout(layoutResult(List.of(), edges, List.of()))
+                .routeDetourCount())
+        .isZero();
+  }
+
+  @Test
+  void closedRouteWithZeroDirectLengthIsNeverADetour() {
+    // The directLength > 0.0 guard short-circuits a closed route (first point == last point) whose
+    // endpoints coincide: directLength = 0, so a straight-line "shortcut" length of 0 is never
+    // exceeded. Route (0,0)->(0,300)->(300,300)->(300,0)->(0,0) has directLength 0 and routeLength
+    // 1200. ConditionalsBoundary (> -> >=) on `directLength > 0.0` would let 0 through and then
+    // count 1200 > 0 as an infinite-ratio detour.
+    var edges =
+        List.of(
+            edge(
+                "closed",
+                "s",
+                "t",
+                List.of(
+                    new Point(0.0, 0.0),
+                    new Point(0.0, 300.0),
+                    new Point(300.0, 300.0),
+                    new Point(300.0, 0.0),
+                    new Point(0.0, 0.0))));
+
+    assertThat(
+            LayoutQuality.validateLayout(layoutResult(List.of(), edges, List.of()))
+                .routeDetourCount())
+        .isZero();
+  }
+
+  @Test
+  void detourDirectLengthIsManhattanSumNotDifference() {
+    // directLength = |dx| + |dy| (Manhattan). Endpoints (0,0)->(180,120) differ in BOTH axes, so
+    // the sum 300 differs from the MathMutator's |dx| - |dy| = 60. Route
+    // (0,0)->(-75,0)->(-75,120)->(180,120) has routeLength = 75 + 120 + 255 = 450 = 1.5 * 300, so
+    // the true ratio test is exactly on its boundary and NOT counted. Under the (+ -> -) mutant
+    // directLength collapses to 60, ratio 450 > 90 and excess 390 > 240 both hold -> counted, so
+    // the not-counted assertion kills it. (A horizontal-only route cannot distinguish +/- because
+    // dy = 0.)
+    var edges =
+        List.of(
+            edge(
+                "detour",
+                "s",
+                "t",
+                List.of(
+                    new Point(0.0, 0.0),
+                    new Point(-75.0, 0.0),
+                    new Point(-75.0, 120.0),
+                    new Point(180.0, 120.0))));
+
+    assertThat(
+            LayoutQuality.validateLayout(layoutResult(List.of(), edges, List.of()))
+                .routeDetourCount())
+        .isZero();
+  }
+
+  @Test
+  void groupMemberFlushWithTopLeftCornerIsContained() {
+    // rectangleContains requires innerX >= outerX AND innerY >= outerY (plus the far edges). Member
+    // 100x80 sharing the group's top-left corner (0,0) has innerX == outerX and innerY == outerY,
+    // so both lower-bound tests hold with equality -> contained, no boundary issue.
+    // ConditionalsBoundary (>= -> >) on either lower bound would flag the flush member as escaping.
+    var nodes = List.of(node("member", 0.0, 0.0));
+
+    assertThat(
+            LayoutQuality.validateLayout(layoutResult(nodes, List.of(), singleZoneGroup(null)))
+                .groupBoundaryIssueCount())
+        .isZero();
+  }
+
+  @Test
+  void groupMemberFlushWithBottomRightCornerIsContained() {
+    // Group is 300x200 at the origin (singleZoneGroup). Member 100x80 at (200,120) has
+    // innerX + innerWidth = 300 == outerX + outerWidth and innerY + innerHeight = 200 ==
+    // outerY + outerHeight, so both far-edge tests hold with equality -> contained.
+    // ConditionalsBoundary (<= -> <) on either far edge flags it; MathMutator (+ -> -) on
+    // outerX + outerWidth / outerY + outerHeight makes the right-hand side negative and rejects it.
+    var nodes = List.of(node("member", 200.0, 120.0));
+
+    assertThat(
+            LayoutQuality.validateLayout(layoutResult(nodes, List.of(), singleZoneGroup(null)))
+                .groupBoundaryIssueCount())
+        .isZero();
+  }
+
+  @Test
+  void groupMemberEscapingRightOnlyPinsInnerWidthSum() {
+    // Member 100x80 at (250,50) escapes ONLY on the right: innerX + innerWidth = 350 > 300, while
+    // the other three edges stay inside -> not contained, counted once. Under the MathMutator that
+    // rewrites innerX + innerWidth as innerX - innerWidth (150 <= 300) the member would read as
+    // contained and the count would drop to 0, so asserting exactly 1 kills that survivor -- a
+    // flush member cannot distinguish +/- here (the difference is always <= the sum for width > 0).
+    var nodes = List.of(node("member", 250.0, 50.0));
+
+    assertThat(
+            LayoutQuality.validateLayout(layoutResult(nodes, List.of(), singleZoneGroup(null)))
+                .groupBoundaryIssueCount())
+        .isEqualTo(1);
+  }
+
+  @Test
+  void nodesTouchingAtSharedVerticalEdgeDoNotOverlap() {
+    // rectanglesOverlap's first test is leftX < rightX + rightWidth. The first node (index 0, the
+    // left operand) sits at x = 100; the second (right operand) is 100 wide at x = 0, so
+    // rightX + rightWidth = 100. leftX < 100 is false (they only touch), so no overlap.
+    // ConditionalsBoundary (< -> <=) would count the shared edge as an overlap. (The MathMutator
+    // + -> - on this line is already killed by overlappingNodesAreCounted.)
+    var nodes = List.of(node("right", 100.0, 0.0), node("left", 0.0, 0.0));
+
+    assertThat(
+            LayoutQuality.validateLayout(layoutResult(nodes, List.of(), List.of())).overlapCount())
+        .isZero();
+  }
+
+  @Test
+  void escapedChildGroupIsCountedAsBoundaryIssue() {
+    // Exercises the child-GROUP containment branch of countGroupBoundaryIssues (previously only its
+    // node-member sibling was covered). A child group 100x100 at (50,50) escapes its 100x100 parent
+    // at the origin (50 + 100 = 150 > 100). The count++ there must run once; IncrementsMutator
+    // (++ -> --) would make it -1.
+    var groups =
+        List.of(
+            new LaidOutGroup(
+                "outer", "outer", "outer", null, 0.0, 0.0, 100.0, 100.0, List.of("child"), null),
+            new LaidOutGroup(
+                "child", "child", "child", null, 50.0, 50.0, 100.0, 100.0, List.of(), null));
+
+    assertThat(
+            LayoutQuality.validateLayout(layoutResult(List.of(), List.of(), groups))
+                .groupBoundaryIssueCount())
+        .isEqualTo(1);
+  }
+
+  @Test
+  void edgeCrossingUnrelatedGroupIsCountedAsBoundaryIssue() {
+    // Exercises the edge-through-group branch of countGroupBoundaryIssues. An edge from "a" to "b"
+    // -- neither a member of the group -- routes horizontally through a 100x100 group at (200,200):
+    // segment (100,250)->(400,250) intersects the group rect. The count++ there must run once;
+    // IncrementsMutator (++ -> --) would make it -1.
+    var groups =
+        List.of(new LaidOutGroup("g", "g", "g", null, 200.0, 200.0, 100.0, 100.0, List.of(), null));
+    var edges =
+        List.of(
+            edge("through", "a", "b", List.of(new Point(100.0, 250.0), new Point(400.0, 250.0))));
+
+    assertThat(
+            LayoutQuality.validateLayout(layoutResult(List.of(), edges, groups))
+                .groupBoundaryIssueCount())
+        .isEqualTo(1);
+  }
+
+  @Test
+  void childGroupWithinLabelBandIsCounted() {
+    // Exercises the child-GROUP branch of countGroupLabelBandIssues. Parent group is labeled, so it
+    // reserves the top GROUP_LABEL_BAND_HEIGHT (24) band. A child group at (10,10) 100x50 overlaps
+    // that band (its y-span 10..60 meets 0..24). The count++ there must run once; IncrementsMutator
+    // (++ -> --) would make it -1.
+    var groups =
+        List.of(
+            new LaidOutGroup(
+                "parent",
+                "parent",
+                "parent",
+                null,
+                0.0,
+                0.0,
+                300.0,
+                200.0,
+                List.of("child"),
+                "Zone"),
+            new LaidOutGroup(
+                "child", "child", "child", null, 10.0, 10.0, 100.0, 50.0, List.of(), "Child"));
+
+    assertThat(
+            LayoutQuality.validateLayout(layoutResult(List.of(), List.of(), groups))
+                .groupLabelBandIssueCount())
+        .isEqualTo(1);
+  }
+
+  @Test
+  void segmentTiltedByExactlyGeometryEpsilonIsNotHorizontal() {
+    // sameCoordinate treats two coordinates as equal when |left - right| <= GEOMETRY_EPSILON
+    // (0.001). A segment (100,0.0)->(500,0.001) has |dy| == 0.001 exactly (the literal 0.001 parses
+    // to the same double as the constant), so it is classified HORIZONTAL and pairs with the
+    // plainly horizontal edge 16 units away (< ROUTE_CLOSE_PARALLEL_DISTANCE 20, overlap 400 >=
+    // ROUTE_CLOSE_PARALLEL_MIN_OVERLAP 40) as one close-parallel run. ConditionalsBoundary
+    // (<= -> <) would make |dy| == 0.001 fail the equality, drop the segment (returns null), and
+    // erase the close-parallel pair -> count 0 instead of 1.
+    var edges =
+        List.of(
+            edge("tilted", "ts", "tt", List.of(new Point(100.0, 0.0), new Point(500.0, 0.001))),
+            edge("flat", "fs", "ft", List.of(new Point(100.0, 16.0), new Point(500.0, 16.0))));
+
+    assertThat(
+            LayoutQuality.validateLayout(layoutResult(List.of(), edges, List.of()))
+                .routeCloseParallelCount())
+        .isEqualTo(1);
+  }
+
   private static LayoutResult layoutResult(
       List<LaidOutNode> nodes, List<LaidOutEdge> edges, List<LaidOutGroup> groups) {
     return new LayoutResult(
