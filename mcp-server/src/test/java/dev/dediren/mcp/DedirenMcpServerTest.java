@@ -10,6 +10,7 @@ import io.modelcontextprotocol.server.McpServer;
 import io.modelcontextprotocol.server.McpSyncServer;
 import io.modelcontextprotocol.server.transport.StdioServerTransportProvider;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
+import io.modelcontextprotocol.spec.McpSchema.Resource;
 import io.modelcontextprotocol.spec.McpSchema.ServerCapabilities;
 import io.modelcontextprotocol.spec.McpSchema.Tool;
 import java.io.ByteArrayInputStream;
@@ -89,6 +90,35 @@ class DedirenMcpServerTest {
               .isEqualTo(required);
         }
       }
+    } finally {
+      server.close();
+    }
+  }
+
+  /**
+   * The read-only MCP resources are registered on the same server the CLI builds — verified here in
+   * process, cheaply, rather than only through the heavyweight packaged {@code -Pdist-smoke}. The
+   * two anchor URIs are stable product contract: {@code dediren://schema/model.schema.json} (the
+   * source-model schema served verbatim) and {@code dediren://diagnostics/catalog} (the generated
+   * catalog); a pinned guide topic and the fixture family cover the other two resource families.
+   * This in-process check guards the registration input ({@link DedirenResources#specifications()}
+   * wired via {@code .resources(...)}); the true {@code resources/list} / {@code resources/read}
+   * round-trip over stdio is covered by the dist-tool packaged MCP smoke.
+   */
+  @Test
+  void registersTheReadOnlyResourcesByDefault(@TempDir Path root) {
+    McpSyncServer server = serverIn(root, false);
+    try {
+      List<String> uris = server.listResources().stream().map(Resource::uri).toList();
+
+      assertThat(uris)
+          .contains(
+              "dediren://schema/model.schema.json",
+              "dediren://diagnostics/catalog",
+              "dediren://guide/source-json");
+      assertThat(uris)
+          .as("the bundle's fixture files are served as resources too")
+          .anyMatch(uri -> uri.startsWith("dediren://fixture/"));
     } finally {
       server.close();
     }
