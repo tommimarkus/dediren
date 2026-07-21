@@ -1,0 +1,118 @@
+# Wave 3 — Interchange Completion Implementation Plan
+
+Status: in progress (started 2026-07-22). Parent:
+`2026-07-21-future-feature-roadmap-survey.md` (avenues 3.1 + 3.2, Wave 3).
+Out of this wave by survey decision: whole-model XMI (trails; collides with
+per-family deferred constructs) and UMLDI (evidence-gated on a Papyrus
+probe).
+
+## Part A — Whole-model OEF + per-view identity (survey 3.1)
+
+OEF already exports the FULL element/relationship model — only the diagram
+section is single-view (`DEDIREN_OEF_VIEWS_OMITTED`), and identity is
+per-build ("Phase-1 limitation"). Whole-model = same elements + ALL view
+diagrams, each with its own identity.
+
+**Design:**
+
+- **Home: the build lane.** `dediren build --oef-policy …` keeps writing
+  per-view `<view>/oef.xml` unchanged AND additionally writes one
+  `model.oef.xml` at the out root containing every built view's diagram —
+  reusing each view's already-computed ELK layout verbatim. (A standalone
+  `export --scope model` would need N `--layout` inputs; build is where all
+  the laid-out views naturally exist. Recorded as the follow-up if
+  standalone demand appears.)
+- **Engine seam:** `engine-api` `ExportEngine` gains
+  `default Optional<EngineResult<ExportResult>> exportModel(ModelExportRequest, env, productRoot)`
+  returning empty (XMI keeps trailing by simply not overriding);
+  `OefExportEngine` overrides it. New `contracts.export.ModelExportRequest`:
+  `{export_request_schema_version, source, views[{view_id, layout_result}],
+  policy}`. Build calls it through the interface only (module rules hold).
+- **OEF composition:** extract the per-view `<view>` builder inside
+  `OefExportEngine.buildOef` and loop it over the supplied views; elements/
+  relationships emitted once (they already cover the whole source). Official
+  XSD validation runs on the composed document (the diagram XSD supports
+  multiple `<view>` children).
+- **Per-view identity:** `oef-export-policy.schema.json` gains an
+  **additive-optional** `views` object map
+  (`{"views": {"<view-id>": {"view_identifier"?, "view_name"?,
+  "viewpoint"?}}}`) — optional addition, existing policies stay valid byte
+  for byte, no schema-id bump. Resolution order per exported view (both the
+  single-view lane and the whole-model composition): explicit `views[id]`
+  override → source-derived default (`id-view-<view-id>` + the view's own
+  label; viewpoint falls back to the policy's top-level `viewpoint`). The
+  legacy top-level `view_identifier`/`view_name` remain what the SINGLE-view
+  lane uses when no override exists (unchanged behavior); the whole-model
+  document never reuses one identity for two views — that was the defect.
+  Identity-tripwire: unchanged (keys on `model_identifier`).
+- Diagnostics: the whole-model artifact emits no `OEF_VIEWS_OMITTED` (nothing
+  omitted); build result lists it as a build-level artifact entry (path
+  `model.oef.xml`) on a synthetic `model` scope — simplest: append it to the
+  build result as an extra view outcome with `view_id: "model"`? NO — keep
+  the build-result shape untouched: add the artifact to the FIRST view's
+  artifacts? Also no. Decision: `build-result.schema.json` gains an
+  additive-optional top-level `model_artifacts[]` (same artifact shape);
+  absent when no whole-model artifact was produced — output schema, additive,
+  no bump. Provenance stamp: stamped like other build artifacts (view_id
+  `"model"`).
+
+**Tasks:**
+
+- [ ] RED: CLI build test — `--oef-policy` build writes `model.oef.xml`
+      containing BOTH view diagrams with distinct per-view identity
+      (override honored for one view, source-derived default for the other);
+      build-result lists it under `model_artifacts`; single-view outputs and
+      their identity behavior byte-stable vs. before; engine test for the
+      composed document validating against the (stub) XSD env.
+- [ ] GREEN per the design above.
+- [ ] Docs: agent-usage Export section (whole-model + `views` override map +
+      resolution order), features exports page, README sentence; schema +
+      `OefExportPolicy` record + round-trip.
+
+## Part B — Real-standards validation lane, in-JVM (survey 3.2)
+
+**Spike result (2026-07-22): PASSED.** `fixtures/export/oef-basic.xml`
+validates against the REAL Open Group ArchiMate 3.1 XSD set (the pinned
+downloads, sha-verified) via `javax.xml.validation`, fully offline, provided
+the W3C `xml.xsd` import is resolved locally (`LSResourceResolver`; xml.xsd
+sha256 61960fb3…). Two design facts follow: xml.xsd joins the pinned schema
+set, and the resolver keeps the lane hermetic (no network at validation
+time; the existing pinned `curl` fetch/offline-dir behavior for OBTAINING
+schemas is unchanged).
+
+**Design:**
+
+- `schema-cache` gains an in-JVM `XmlSchemaValidation` used by the OEF
+  engine in place of the `xmllint` subprocess: compile the schema set with a
+  local-only resolver (deny anything not present in the supplied directory),
+  validate content, map failures to the existing
+  `DEDIREN_OEF_SCHEMA_INVALID` diagnostics; `xmllint` disappears from the
+  OEF trust path (the `DEDIREN_OEF_SCHEMA_VALIDATOR` override env and its
+  UNAVAILABLE diagnostic retire from that lane). XMI keeps xmllint for now
+  (its driver-schema flow differs; follow-up recorded) — so `xmllint` stays
+  a documented dependency only for the XMI lane.
+- xml.xsd: fetched alongside the three OEF XSDs with its own pinned SHA-256
+  and accepted in `DEDIREN_OEF_SCHEMA_DIR`; absence yields the existing
+  SCHEMA_UNAVAILABLE remediation message extended to name it.
+- Conformance-report: the OEF success path emits an `info` diagnostic naming
+  exactly what was validated against what ("validated against ArchiMate 3.1
+  archimate3_Diagram.xsd; 3.2 XSDs unpublished by The Open Group").
+- Docs/threat-model: XML-parsing rows updated — JDK validator with secure
+  local-only resolution replaces the xmllint subprocess for OEF; README
+  requirement line adjusts (`xmllint` needed for XMI lane only).
+
+**Tasks:**
+
+- [ ] RED: OEF engine tests — valid content passes in-JVM against the
+      supplied XSD dir (stub set still works); invalid content yields
+      `DEDIREN_OEF_SCHEMA_INVALID`; missing xml.xsd/named-schema yields the
+      UNAVAILABLE-with-remediation diagnostic; the conformance info
+      diagnostic appears on success.
+- [ ] GREEN per the design; delete the OEF xmllint subprocess path.
+- [ ] Docs + threat model + README requirements + Repair Rules touch-ups.
+
+## Verification
+
+Per part: `-pl engines/archimate-oef-export,engine-api,contracts,core,cli -am
+test`, then full `-Pquality verify` + dist-smoke (bundle smoke's OEF lanes
+exercise both changes end to end).
