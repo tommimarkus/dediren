@@ -11,6 +11,12 @@ name: Dependency Audit
 # report is always uploaded for human review. Because it does not gate, it also
 # self-heals across NVD outages — no manual re-enable is required when the NVD
 # API recovers.
+#
+# Triage posture (advisory-only): this report carries no remediation SLA. The
+# enforcing control with the fix-or-do-not-merge SLA is the blocking Grype gate
+# in ci.yml / release.yml; this cross-check is reviewed opportunistically only
+# when an advisory that Grype's database does not carry warrants it. It is a
+# second opinion, never a gate — do not treat a populated report as a control.
 
 on:
   schedule:

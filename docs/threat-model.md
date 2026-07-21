@@ -211,11 +211,15 @@ Inkscape) that runs outside the dediren trust boundary.
 commit SHA; the Maven Wrapper is SHA-256-pinned in
 `.mvn/wrapper/maven-wrapper.properties`. Every push, pull request, and
 release runs a blocking Grype/SBOM scan (`anchore/scan-action`,
-`fail-build: true`, `severity-cutoff: high`). The release `build` job
-generates artifact provenance attestation (`attest-build-provenance`); the
-`publish` job verifies it (`gh attestation verify`) before creating the
-GitHub release. Unprotected `main` (no required-review branch protection) is
-a documented accepted risk — see `SECURITY.md`.
+`fail-build: true`, `severity-cutoff: high`). The release `build` job generates
+one provenance attestation covering the archive **and** both CycloneDX SBOM
+serializations (`attest-build-provenance`), so the SBOM is bound to the attested
+build rather than regenerated downstream; the `publish` job verifies every
+attested subject (`gh attestation verify`) and then creates the release as a
+draft with all assets attached before flipping it to published, so a repository
+with release immutability enabled freezes a complete, attested asset set.
+Unprotected `main` (no required-review branch protection) is a documented
+accepted risk — see `SECURITY.md`.
 
 The bundle `lib/` jar is produced by a shrink ProGuard pass over the staged
 launcher classpath (`dist-tool`, keep rules checked in at
@@ -235,7 +239,7 @@ ceiling trips if shrinking or attribute stripping silently degrades.
 | --- | --- | --- |
 | Poison a release artifact | SHA-pinned Actions, blocking Grype/SBOM gate, attestation generated and verified before publish | Single-maintainer `main` has no required review (accepted risk, `SECURITY.md`) |
 | Tamper `main` or `v*` tags | `release.yml` cross-checks the tag version against `pom.xml`; attestation binds the published archive to its build | No branch protection on `main`; a bad commit is caught only by tests/scans, not review |
-| Tampered SBOM / SHA256SUMS after build | Bundle archive carries build provenance attestation | The SBOM and SHA256SUMS themselves are unattested, and the SBOM is regenerated in the publish job rather than carried from the attested build (accepted 2026-07) |
+| Tampered SBOM / SHA256SUMS after build | The archive and both CycloneDX SBOM serializations are subjects of one build-provenance attestation, verified for every asset before publish; `SHA256SUMS` covers the archive and both SBOMs; enabling repository release immutability freezes the published asset set | `SHA256SUMS` is itself unattested — its integrity rests on the attested files it lists plus release immutability, which is a repository setting that must be enabled to gain the post-publish freeze |
 | Shipped `THIRD-PARTY-NOTICES.md` misstates an upstream licence after a dependency bump, or a bump drags in a licence outside the approved set | cli's `license-maven-plugin` execution resolves every runtime dependency's effective-pom licence, normalizes it, and gates it against an approved allowlist; `DistTool` refuses to write notices when its hand-curated attribution map disagrees with that resolved report or the report is stale (`resolved-licence-report`, dist lanes) | Effective-pom licences are upstream-declared metadata, not scanned artifact contents; a pom that misstates its own jar's licence passes (mitigate with an `about.html`/`META-INF` spot-check when adopting a new dependency) |
 | Malicious schema substitution | HTTPS-only curl plus SHA-256 pin verified before use (`SchemaCacheModule`) | `DEDIREN_XMI_SCHEMA_PATH` / `DEDIREN_OEF_SCHEMA_DIR` offline overrides bypass the SHA-256 check by design |
 | Malicious envelope input | Jackson 3 parsing plus fuzz-regression targets pinning the only-`JacksonException`/`XmiValidationException` invariant; hardened DOM factory blocks DOCTYPE/XXE | Fuzz targets run in deterministic regression mode over a fixed seed corpus in CI, not continuous coverage-guided fuzzing |

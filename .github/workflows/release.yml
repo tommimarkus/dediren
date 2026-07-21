@@ -108,17 +108,44 @@ jobs:
           fi
           echo "path=${archives[0]}" >> "$GITHUB_OUTPUT"
 
-      - name: Attest archive provenance
+      # Generate the release SBOM inside the attested build job (not the publish
+      # job) so it can be a subject of the provenance attestation below. This
+      # binds the SBOM to the build and removes the prior regenerate-in-publish
+      # drift, where the attached SBOM had no cryptographic tie to the archive
+      # (devsecops audit F2).
+      - name: Generate release SBOM
+        run: ./mvnw -B -ntp -Psbom org.cyclonedx:cyclonedx-maven-plugin:makeAggregateBom
+
+      - name: Stage release assets
+        id: stage
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(awk '/<version>/{gsub(/.*<version>|<\/version>.*/, ""); print; exit}' pom.xml)"
+          mkdir -p release-staging
+          cp "${{ steps.archive.outputs.path }}" "release-staging/dediren-agent-bundle-${VERSION}.tar.xz"
+          cp target/bom.json "release-staging/dediren-${VERSION}.cdx.json"
+          cp target/bom.xml "release-staging/dediren-${VERSION}.cdx.xml"
+
+      # Attest the archive AND both SBOM serializations together, so each is a
+      # verifiable subject of one build-provenance attestation (audit F2).
+      - name: Attest release provenance
         if: startsWith(github.ref, 'refs/tags/v')
         uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
         with:
-          subject-path: ${{ steps.archive.outputs.path }}
+          subject-path: |
+            release-staging/*.tar.xz
+            release-staging/*.cdx.json
+            release-staging/*.cdx.xml
 
-      - name: Upload archive artifact
+      - name: Upload release artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: dediren-agent-bundle
-          path: ${{ steps.archive.outputs.path }}
+          path: |
+            release-staging/*.tar.xz
+            release-staging/*.cdx.json
+            release-staging/*.cdx.xml
           if-no-files-found: error
           retention-days: 14
           compression-level: 0
@@ -160,9 +187,6 @@ jobs:
           name: dediren-agent-bundle
           path: release-artifacts
 
-      - name: Generate SBOM
-        run: ./mvnw -B -ntp -Psbom org.cyclonedx:cyclonedx-maven-plugin:makeAggregateBom
-
       - name: Verify release assets
         run: |
           set -euo pipefail
@@ -176,8 +200,11 @@ jobs:
 
           mkdir -p release-assets
           cp release-artifacts/*.tar.xz release-assets/
-          cp target/bom.json "release-assets/dediren-${VERSION}.cdx.json"
-          cp target/bom.xml "release-assets/dediren-${VERSION}.cdx.xml"
+          # The SBOM is built and attested in the `build` job and carried here as
+          # an artifact, not regenerated — so the attached SBOM is the attested
+          # one (audit F2).
+          cp release-artifacts/*.cdx.json "release-assets/dediren-${VERSION}.cdx.json"
+          cp release-artifacts/*.cdx.xml "release-assets/dediren-${VERSION}.cdx.xml"
 
           tar_count=$(find release-artifacts -maxdepth 1 -type f -name '*.tar.xz' | wc -l)
           if [[ "$tar_count" -ne 1 ]]; then
@@ -205,7 +232,7 @@ jobs:
 
           (
             cd release-assets
-            sha256sum *.tar.xz > SHA256SUMS
+            sha256sum *.tar.xz *.cdx.json *.cdx.xml > SHA256SUMS
           )
 
       - name: Verify artifact attestations
@@ -214,8 +241,10 @@ jobs:
         run: |
           set -euo pipefail
 
-          for archive in release-assets/*.tar.xz; do
-            gh attestation verify "$archive" --repo "$GITHUB_REPOSITORY"
+          # Verify provenance for every attested subject: the archive and both
+          # SBOM serializations (audit F2).
+          for asset in release-assets/*.tar.xz release-assets/*.cdx.json release-assets/*.cdx.xml; do
+            gh attestation verify "$asset" --repo "$GITHUB_REPOSITORY"
           done
 
       - name: Publish release
@@ -223,11 +252,17 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
+          # Create the release as a draft with every asset attached, then flip it
+          # to published in one transition. With repository release immutability
+          # enabled, a release freezes at publish time, so all assets must be in
+          # place first — GitHub's documented draft-first ordering (audit F6).
           gh release create "$GITHUB_REF_NAME" \
             "release-assets/dediren-agent-bundle-${VERSION}.tar.xz" \
             "release-assets/dediren-${VERSION}.cdx.json" \
             "release-assets/dediren-${VERSION}.cdx.xml" \
             release-assets/SHA256SUMS \
+            --draft \
             --verify-tag \
             --title "Dediren $GITHUB_REF_NAME" \
             --generate-notes
+          gh release edit "$GITHUB_REF_NAME" --draft=false

@@ -78,6 +78,11 @@ every runtime dependency's effective-pom licence against an approved allowlist
 attribution map — a dependency bump that changes an upstream licence fails the
 build instead of shipping a stale label.
 
+Optionally enable the repo-local pre-commit secret scan — a shift-left companion
+to GitHub's server-side scanning: `git config core.hooksPath .githooks` (see
+[`.githooks/README.md`](.githooks/README.md)). It runs `gitleaks` over staged
+changes when installed, and skips with a note otherwise.
+
 `-Pdist-build` writes a platform-neutral archive under `dist/` (launch scripts +
 jars, no bundled JRE — Java 21+ is required at runtime):
 
@@ -230,3 +235,11 @@ CycloneDX SBOMs with GitHub artifact attestations; verify a download with:
 ```bash
 gh attestation verify dediren-agent-bundle-<version>.tar.xz --repo tommimarkus/dediren
 ```
+
+The archive, both CycloneDX SBOMs, and `SHA256SUMS` are attested together, so
+`gh attestation verify` covers the SBOMs too. To freeze published releases
+against post-publish asset tampering, enable repository release immutability
+(**Settings → General → Releases → Enable release immutability**; applies to
+future releases only). The release workflow is written for it: it creates each
+release as a draft with all assets attached, then publishes in one transition,
+so an immutable release always carries the complete, attested asset set.

@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Opt-in client-side secret-scan pre-commit hook (devsecops audit F3).
+#
+# Enable once per clone:
+#   git config core.hooksPath .githooks
+#
+# Runs gitleaks over the staged changes and blocks a commit that would introduce
+# a credential-shaped secret. It is a shift-left companion to GitHub's
+# server-side secret scanning / push protection (the backstop), not a
+# replacement. If gitleaks is not installed the hook skips with a note rather
+# than failing, so it stays friction-free to adopt.
+set -euo pipefail
+
+if command -v gitleaks >/dev/null 2>&1; then
+  exec gitleaks protect --staged --redact --no-banner
+fi
+
+echo "githooks/pre-commit: gitleaks not found; skipping local secret scan." >&2
+echo "  Install https://github.com/gitleaks/gitleaks to enable it." >&2
+echo "  (GitHub server-side secret scanning still applies on push.)" >&2
+exit 0
