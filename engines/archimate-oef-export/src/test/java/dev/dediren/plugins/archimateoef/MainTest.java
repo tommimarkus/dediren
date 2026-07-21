@@ -443,7 +443,13 @@ class MainTest {
   }
 
   @Test
-  void rejectsGeneratedXmlThatFailsOfficialOefSchema() throws Exception {
+  void rejectsGeneratedXmlWithAnInvalidXmlId() throws Exception {
+    // Scope: this exercises the schema validator's `xs:ID` built-in-type constraint (an identifier
+    // with spaces is not a legal XML ID) and asserts the published DEDIREN_OEF_SCHEMA_INVALID
+    // envelope. It does NOT prove structural conformance to the official ArchiMate 3.1 schema
+    // (element nesting/cardinality/allowed attributes): the test env supplies a permissive stand-in
+    // XSD to stay hermetic. Real structural conformance is enforced at runtime, where the engine
+    // validates against the fetched, SHA-256-pinned official Open Group XSD (archimate3_*.xsd).
     JsonNode input = exportInputJson();
     ((ObjectNode) input.get("policy")).put("model_identifier", "not a valid xml id");
 
