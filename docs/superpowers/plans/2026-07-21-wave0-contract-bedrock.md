@@ -1,8 +1,12 @@
 # Wave 0 — Contract Bedrock Implementation Plan
 
-Status: in progress (started 2026-07-21). Parent:
-`2026-07-21-future-feature-roadmap-survey.md` (Theme 1, Wave 0). Each item is
-independently shippable and lands as its own commit(s) with tests first.
+Status: **complete (2026-07-21).** Parent:
+`2026-07-21-future-feature-roadmap-survey.md` (Theme 1, Wave 0). Each item
+landed as its own commit with tests first: task 1 = envelope gap (5259c11),
+task 2 = identity tripwire (3dc120f), task 3 = policy validate (dde044f),
+task 4 = truthfulness sweep (9e70146), task 5 = migration steps (f5dab0e),
+task 6 = decided-not-built (design note below). The cross-cutting repeated
+`--target` quick win was re-examined and declined — see Task 6.
 
 **Goal:** repair the contract's load-bearing promises — every failure decidable
 from stdout JSON, no silently wrong deliverables, no schema values the tool can
@@ -171,7 +175,23 @@ composite `.data` keyed by target vs. multi-artifact list vs. leaving the CLI
 double-pass and only documenting. Decide when reached, as its own mini-design
 note in this file; do not improvise a contract shape mid-implementation.
 
-- [ ] Design note appended here; then RED/GREEN accordingly.
+- [x] **Design note (2026-07-21): not built — evidence-gated with its
+      siblings.** Every shape that collapses the two `project` passes into
+      one invocation changes the `project` envelope contract: a composite
+      `.data` keyed by target is a new result shape every consumer must
+      learn (and polymorphic against the single-target form), a
+      multi-artifact list re-invents the render-result artifacts wrapper for
+      a stage that today emits the artifact *as* `.data`, and two envelopes
+      on one stdout breaks one-envelope-per-command. Against that permanent
+      contract surface, the win is small: `build` already covers the common
+      path in one call; in decomposed mode the two passes are mechanical and
+      an agent issues them in a single shell block — one round-trip in
+      practice, with only a second JVM start as real cost. The honest
+      smallest change is no change. Revisit together with `--artifact-out`
+      and per-stage MCP tools under the same evidence gate this plan already
+      set for them: transcript evidence that decomposed-mode UML flows are
+      frequent (and, for MCP surface widening, the mcp-server coverage debt
+      paid first).
 
 ---
 
