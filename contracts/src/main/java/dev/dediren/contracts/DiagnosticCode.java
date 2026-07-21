@@ -75,6 +75,13 @@ public enum DiagnosticCode {
   // fixture identity, so the artifact would introduce itself with placeholder identity. Warning,
   // not error — the export succeeds; the agent decides.
   EXPORT_IDENTITY_PLACEHOLDER("DEDIREN_EXPORT_IDENTITY_PLACEHOLDER"),
+
+  // Artifact trust chain (core: ProvenanceCheck via `dediren verify`): a stamped artifact whose
+  // provenance no longer matches the model's recomputed canonical hash (error — the CI drift
+  // gate), and a recognized artifact carrying no stamp at all (warning; e.g. decomposed
+  // single-stage outputs, which the build lane alone stamps).
+  ARTIFACT_STALE("DEDIREN_ARTIFACT_STALE"),
+  ARTIFACT_UNSTAMPED("DEDIREN_ARTIFACT_UNSTAMPED"),
   // ArchiMate OEF export engine.
   ARCHIMATE_GROUP_SOURCE_NOT_GROUPING("DEDIREN_ARCHIMATE_GROUP_SOURCE_NOT_GROUPING"),
   OEF_LAYOUT_REFERENCE_MISSING("DEDIREN_OEF_LAYOUT_REFERENCE_MISSING"),

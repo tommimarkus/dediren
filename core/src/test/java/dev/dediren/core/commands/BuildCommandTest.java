@@ -116,8 +116,13 @@ class BuildCommandTest {
     assertThat(overview.artifacts()).hasSize(1);
     assertThat(overview.artifacts().getFirst().artifactKind()).isEqualTo("svg");
     assertThat(overview.artifacts().getFirst().path()).isEqualTo("overview/diagram.svg");
-    assertThat(Files.readString(out.resolve("overview/diagram.svg"))).isEqualTo("<svg/>");
-    assertThat(Files.readString(out.resolve("detail/diagram.svg"))).isEqualTo("<svg/>");
+    // Build-lane artifacts carry the provenance stamp injected inside the (reopened) root.
+    assertThat(Files.readString(out.resolve("overview/diagram.svg")))
+        .startsWith("<svg><metadata id=\"dediren-provenance\">")
+        .endsWith("</metadata></svg>")
+        .contains("\"view_id\":\"overview\"");
+    assertThat(Files.readString(out.resolve("detail/diagram.svg")))
+        .contains("dediren-provenance", "\"view_id\":\"detail\"");
   }
 
   @Test
@@ -147,8 +152,15 @@ class BuildCommandTest {
     assertThat(overview.artifacts())
         .extracting(a -> a.artifactKind() + " -> " + a.path())
         .containsExactly("archimate+xml -> overview/oef.xml", "uml+xml -> overview/xmi.xml");
-    assertThat(Files.readString(out.resolve("overview/oef.xml"))).isEqualTo("<oef/>");
-    assertThat(Files.readString(out.resolve("detail/xmi.xml"))).isEqualTo("<xmi/>");
+    // Export artifacts gain a leading provenance comment; the engine content follows unchanged.
+    assertThat(Files.readString(out.resolve("overview/oef.xml")))
+        .startsWith("<!-- dediren-provenance ")
+        .endsWith("<oef/>")
+        .contains("oef_policy_sha256");
+    assertThat(Files.readString(out.resolve("detail/xmi.xml")))
+        .startsWith("<!-- dediren-provenance ")
+        .endsWith("<xmi/>")
+        .contains("xmi_policy_sha256");
   }
 
   @Test
@@ -637,7 +649,9 @@ class BuildCommandTest {
     BuildViewOutcome overview = result.views().getFirst();
     assertThat(overview.artifacts().getFirst().artifactKind()).isEqualTo("stats+json");
     assertThat(overview.artifacts().getFirst().path()).isEqualTo("overview/oef.json");
-    assertThat(Files.readString(out.resolve("overview/oef.json"))).isEqualTo("{}");
+    assertThat(Files.readString(out.resolve("overview/oef.json")))
+        .startsWith("<!-- dediren-provenance ")
+        .endsWith("{}");
   }
 
   @Test

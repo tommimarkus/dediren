@@ -39,6 +39,8 @@
       <Class name="dev.dediren.contracts.analysis.QueryResult$Dependents"/>
       <Class name="dev.dediren.contracts.analysis.QueryResult$Orphans"/>
       <Class name="dev.dediren.contracts.analysis.QueryResult$ViewCoverage"/>
+      <Class name="dev.dediren.contracts.analysis.VerifyResult"/>
+      <Class name="dev.dediren.contracts.analysis.StatusResult"/>
       <Class name="dev.dediren.contracts.render.RenderMetadata"/>
       <Class name="dev.dediren.contracts.render.RenderResult"/>
       <Class name="dev.dediren.contracts.render.SvgStylePolicy"/>

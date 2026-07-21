@@ -27,6 +27,8 @@ class SchemaValidatorTest {
           "schemas/uml-xmi-export-policy.schema.json",
           "schemas/diff-result.schema.json",
           "schemas/query-result.schema.json",
+          "schemas/verify-result.schema.json",
+          "schemas/status-result.schema.json",
           "schemas/bundle.schema.json");
 
   @Test

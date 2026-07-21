@@ -28,9 +28,11 @@ writing each view's artifacts under `--out`; use the stage-by-stage form when
 you need to inspect, cache, or persist an intermediate stage envelope.
 `validate` guards the source model and `validate-layout` checks the generated
 geometry — both are quality gates that emit structured diagnostics. Beyond
-the pipeline, `dediren diff` compares two model revisions and `dediren query`
-answers fixed impact questions (dependents, orphans, view coverage) — both
-deterministic, both as stdout envelopes. See
+the pipeline, `dediren diff` compares two model revisions, `dediren query`
+answers fixed impact questions (dependents, orphans, view coverage), and
+build artifacts carry deterministic provenance stamps that `dediren verify`
+turns into a CI drift gate ("are these diagrams still current?") with
+`dediren status` as the workspace freshness index. See
 [`docs/agent-usage.md`](docs/agent-usage.md) for every command, flag, and
 notation.
 

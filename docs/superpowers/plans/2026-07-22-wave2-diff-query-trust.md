@@ -106,18 +106,26 @@ conformance, so the SVG leg was the risky one and it passed).
 
 **Tasks:**
 
-- [ ] RED: CLI tests — build-lane SVG/OEF artifacts carry the stamp (parse
-      it back, hashes match the canonical hash of the source); verify:
-      current → ok, edited model → ARTIFACT_STALE error envelope, decomposed
-      render output → UNSTAMPED warning; status: index lists the model and
-      classifies artifacts; determinism (two builds → identical stamped
-      bytes).
-- [ ] GREEN: `CanonicalJson` + stamp injection in the build write path +
-      `verify`/`status` subcommands + two result schemas/records/consts.
-- [ ] Docs: agent-usage section (`## Provenance & Verify` + GuideCatalog
-      topic), README sentence, features page, threat-model note (stamp
-      injection is product-generated content, XML-escaped, no untrusted
-      verbatim path), Repair Rules entries for the two new codes.
+- [x] RED→GREEN: `CliProvenanceTest` pins stamping, verify
+      current/stale/unstamped (incl. exit-2 drift gate), status indexing,
+      and two-build byte-determinism; `BuildCommandTest` +
+      `CliBuildCommandTest` pins updated to expect stamps (incl. the
+      documented build-vs-decomposed parity, now modulo-stamp).
+- [x] GREEN: `CanonicalJson` (recursively sorted, compact, UTF-8 SHA-256),
+      `Provenance` (SVG metadata incl. the self-closing-root edge, XML
+      comment, extraction), build-lane injection via a per-build `Stamps`
+      record, `ProvenanceCheck` verify/status (status loads candidates
+      through the full source path so its hashes equal the stamps' —
+      fragments included), two schemas/records/consts, `verify`/`status`
+      subcommands. Codes `DEDIREN_ARTIFACT_STALE` (error) /
+      `DEDIREN_ARTIFACT_UNSTAMPED` (warning).
+- [x] Docs: `## Provenance & Verify` + GuideCatalog topic, README, features
+      page, threat-model stamp note, Repair Rules entries. New records join
+      the recorded EI_EXPOSE_REP suppression set.
+- [x] Full `-Pquality verify` + dist-smoke green.
+
+**Wave 2 status: complete** — Part A (diff/query, 97e4eee) + Part B (trust
+chain) both shipped; probes recorded above.
 
 ## Coordination note
 

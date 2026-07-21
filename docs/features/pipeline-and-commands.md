@@ -180,6 +180,22 @@ dediren query --kind dependents --id api --input model.json
 
 Details for both: [Agent Usage → `## Diff & Query`](../agent-usage.md#diff--query).
 
+### `verify` / `status`
+
+`build` artifacts carry a deterministic provenance stamp (model canonical
+hash, view id, policy hash, tool version — never a timestamp). `verify`
+recomputes the model hash and classifies every artifact under a directory as
+`current`/`stale`/`unstamped` — stale is an error envelope with exit 2, the CI
+drift gate. `status` indexes a workspace tree: models by hash, artifacts
+classified against the models present.
+
+```bash
+dediren verify --input model.json --artifacts out
+dediren status --root .
+```
+
+Details: [Agent Usage → `## Provenance & Verify`](../agent-usage.md#provenance--verify).
+
 ## Output & Exit Codes
 
 - Every command but `build` produces a JSON command envelope on stdout

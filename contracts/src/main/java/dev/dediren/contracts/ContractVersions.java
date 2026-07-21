@@ -5,6 +5,8 @@ public final class ContractVersions {
   public static final String ENVELOPE_SCHEMA_VERSION = "envelope.schema.v1";
   public static final String DIFF_RESULT_SCHEMA_VERSION = "diff-result.schema.v1";
   public static final String QUERY_RESULT_SCHEMA_VERSION = "query-result.schema.v1";
+  public static final String VERIFY_RESULT_SCHEMA_VERSION = "verify-result.schema.v1";
+  public static final String STATUS_RESULT_SCHEMA_VERSION = "status-result.schema.v1";
   public static final String LAYOUT_REQUEST_SCHEMA_VERSION = "layout-request.schema.v2";
   public static final String LAYOUT_RESULT_SCHEMA_VERSION = "layout-result.schema.v2";
   public static final String SEMANTIC_VALIDATION_RESULT_SCHEMA_VERSION =

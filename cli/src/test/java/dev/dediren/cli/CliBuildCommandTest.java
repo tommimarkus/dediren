@@ -134,7 +134,11 @@ class CliBuildCommandTest {
             });
     String manualSvg = render.at("/artifacts/0/content").asText();
 
-    assertThat(builtSvg).isEqualTo(manualSvg);
+    // Build stamps its artifacts with provenance (the decomposed lane deliberately does not — it
+    // never sees the source model); modulo that stamp, the two flows stay byte-identical.
+    assertThat(builtSvg).contains("dediren-provenance");
+    assertThat(builtSvg.replaceFirst("<metadata id=\"dediren-provenance\">[^<]*</metadata>", ""))
+        .isEqualTo(manualSvg);
   }
 
   @Test

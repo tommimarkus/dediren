@@ -428,6 +428,32 @@ The vocabulary is fixed by design; an unsupported `--kind`, a missing `--id`,
 or an unknown node id is a `DEDIREN_COMMAND_INPUT_INVALID` usage envelope
 (exit 2).
 
+## Provenance & Verify
+
+Every artifact `dediren build` writes carries a deterministic provenance
+stamp: an inert `<metadata id="dediren-provenance">` element in SVG and a
+leading `<!-- dediren-provenance … -->` comment in OEF/XMI, holding compact
+JSON — `model_schema_version`, `model_sha256` (the SHA-256 of the assembled
+model's canonical JSON: keys sorted, compact, UTF-8, so formatting and key
+order never change it), `view_id`, the lane policy's hash
+(`render_policy_sha256` / `oef_policy_sha256` / `xmi_policy_sha256`), and
+`dediren_version`. Never a timestamp — identical inputs produce byte-identical
+stamped artifacts. Only `build` stamps; decomposed per-stage outputs are
+unstamped (the render stage never sees the source model).
+
+`dediren verify --input model.json --artifacts <dir>` recomputes the model
+hash and classifies every `.svg`/`.xml`/`.xmi` under the directory
+(`schemas/verify-result.schema.json`): `current`, `stale` (error
+`DEDIREN_ARTIFACT_STALE`, exit 2 — the CI drift gate: "diagrams may not be
+stale on main" becomes one command), or `unstamped` (warning
+`DEDIREN_ARTIFACT_UNSTAMPED`, exit 0).
+
+`dediren status --root <dir>` is the read-only workspace freshness index
+(`schemas/status-result.schema.json`): every model document with its
+canonical hash, every recognized artifact classified against the models
+actually present. An index, not a gate — `verify` is the exit-decidable
+check.
+
 ## Render Policy Options
 
 The render policy owns SVG presentation. Beyond `accessibility` (above), these
@@ -935,6 +961,13 @@ you can recover from stdout JSON alone.
   otherwise valid). Copy the default policy and replace its identity fields
   (see `## Export`); expected and ignorable when deliberately exporting the
   bundled fixtures.
+- `DEDIREN_ARTIFACT_STALE`: a stamped artifact's provenance no longer matches
+  the model's recomputed hash — the model changed after the artifact was
+  built. Rebuild the artifact (or check out the matching model revision);
+  see `## Provenance & Verify`.
+- `DEDIREN_ARTIFACT_UNSTAMPED`: a recognized artifact carries no provenance
+  stamp, so currency cannot be decided (a `warning`). Only `dediren build`
+  stamps artifacts; rebuild through `build` if you want it verifiable.
 - `DEDIREN_ENGINE_FAILED`: an unexpected in-memory engine failure. Not an input
   problem — the diagnostic message names the engine; report it with the failing
   command and input rather than retrying with modified JSON.

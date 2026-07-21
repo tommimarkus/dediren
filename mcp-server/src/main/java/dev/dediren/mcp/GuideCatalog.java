@@ -44,6 +44,7 @@ public final class GuideCatalog {
     topics.put("commands", "Command Handoff");
     topics.put("build", "Build");
     topics.put("diff-query", "Diff & Query");
+    topics.put("provenance", "Provenance & Verify");
     topics.put("render-policy", "Render Policy Options");
     topics.put("uml-sequence", "UML Sequence Handoff");
     topics.put("uml-state-machine", "UML State Machine Handoff");

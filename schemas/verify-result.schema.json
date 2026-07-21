@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dediren.dev/schemas/verify-result.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["verify_result_schema_version", "model_sha256", "artifacts"],
+  "properties": {
+    "verify_result_schema_version": { "const": "verify-result.schema.v1" },
+    "model_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "status"],
+        "properties": {
+          "path": { "type": "string", "minLength": 1 },
+          "status": { "enum": ["current", "stale", "unstamped"] }
+        }
+      }
+    }
+  }
+}

@@ -25,6 +25,14 @@ failure contract: `JsonSupportFuzzTest` (`contracts`) and
 `JacksonException` / `XmiValidationException` may escape parsing, running in
 deterministic regression mode over checked-in seed corpora in CI.
 
+Build artifacts additionally carry a provenance stamp (wave 2): core injects
+an inert SVG `<metadata>` element / leading XML comment holding
+product-generated JSON (canonical hashes, schema id, tool version, a
+charset-constrained view id) after each engine has validated its own content.
+Every stamped value is product-generated or constrained and the JSON is
+XML-escaped at injection, so the stamp introduces no untrusted verbatim path
+into any artifact; SVG output remains inert (no script/style).
+
 Plan B P5 added a post-parse validation layer on top of that Jackson
 contract: `ir.LayoutIntentCodec.decode` rejects an unrecognized
 layout-constraint `kind` (or a malformed gap encoding) on the

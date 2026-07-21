@@ -21,6 +21,8 @@ import dev.dediren.contracts.source.GenericGraphPluginData;
 import dev.dediren.contracts.source.GenericGraphView;
 import dev.dediren.contracts.source.SourceDocument;
 import dev.dediren.core.DedirenPaths;
+import dev.dediren.core.analysis.CanonicalJson;
+import dev.dediren.core.analysis.Provenance;
 import dev.dediren.core.engine.EngineDispatch;
 import dev.dediren.core.engine.EngineExecutionException;
 import dev.dediren.core.engine.EngineRunOutcome;
@@ -180,6 +182,15 @@ public final class BuildCommand {
       return buildLevelError(List.of(error.diagnostic()), CommandExitCode.PLUGIN_ERROR.code());
     }
 
+    Stamps stamps =
+        new Stamps(
+            source.modelSchemaVersion(),
+            CanonicalJson.sha256(JsonSupport.objectMapper().valueToTree(source)),
+            renderPolicy == null ? null : CanonicalJson.sha256(renderPolicy),
+            oefPolicy == null ? null : CanonicalJson.sha256(oefPolicy),
+            xmiPolicy == null ? null : CanonicalJson.sha256(xmiPolicy),
+            System.getProperty("dediren.version", "unknown"));
+
     List<String> views = selectViews(request, source);
     List<BuildViewOutcome> outcomes = new ArrayList<>(views.size());
     boolean anyError = false;
@@ -188,7 +199,8 @@ public final class BuildCommand {
     for (String view : views) {
       ViewBuild built;
       try {
-        built = buildView(request, engines, source, view, renderPolicy, oefPolicy, xmiPolicy);
+        built =
+            buildView(request, engines, source, view, renderPolicy, oefPolicy, xmiPolicy, stamps);
       } catch (ViewOutputEscapesRootException escape) {
         // Re-confinement failed (see writeFile/requireWithinOutDir): fold into a per-view error
         // exactly like the other per-view failure paths above, rather than aborting the whole
@@ -245,6 +257,18 @@ public final class BuildCommand {
     }
   }
 
+  /**
+   * The provenance inputs computed once per build: the model's canonical hash, each supplied lane
+   * policy's hash, and the tool version — everything a stamp carries, no timestamps.
+   */
+  private record Stamps(
+      String modelSchemaVersion,
+      String modelSha,
+      String renderPolicySha,
+      String oefPolicySha,
+      String xmiPolicySha,
+      String version) {}
+
   private static ViewBuild buildView(
       BuildRequest request,
       Engines engines,
@@ -252,7 +276,8 @@ public final class BuildCommand {
       String view,
       JsonNode renderPolicy,
       JsonNode oefPolicy,
-      JsonNode xmiPolicy) {
+      JsonNode xmiPolicy,
+      Stamps stamps) {
     List<Diagnostic> diagnostics = new ArrayList<>();
     List<BuildArtifact> artifacts = new ArrayList<>();
     boolean warning = false;
@@ -361,7 +386,7 @@ public final class BuildCommand {
         return failedView(view, artifacts, diagnostics, render.exitCode());
       }
       warning |= render.warning();
-      writeRenderArtifacts(request, view, render.value(), artifacts);
+      writeRenderArtifacts(request, view, render.value(), artifacts, stamps);
     }
 
     // Stage 5: ArchiMate/OEF export lane (map laid -> LayoutResult for the record ExportRequest).
@@ -373,7 +398,7 @@ public final class BuildCommand {
         return failedView(view, artifacts, diagnostics, oef.exitCode());
       }
       warning |= oef.warning();
-      writeExportArtifact(request, view, "oef", oef.value(), artifacts);
+      writeExportArtifact(request, view, "oef", oef.value(), artifacts, stamps);
     }
 
     // Stage 6: UML/XMI export lane.
@@ -385,7 +410,7 @@ public final class BuildCommand {
         return failedView(view, artifacts, diagnostics, xmi.exitCode());
       }
       warning |= xmi.warning();
-      writeExportArtifact(request, view, "xmi", xmi.value(), artifacts);
+      writeExportArtifact(request, view, "xmi", xmi.value(), artifacts, stamps);
     }
 
     EnvelopeStatus status = warning ? EnvelopeStatus.WARNING : EnvelopeStatus.OK;
@@ -466,10 +491,24 @@ public final class BuildCommand {
   }
 
   private static void writeRenderArtifacts(
-      BuildRequest request, String view, RenderResult result, List<BuildArtifact> artifacts) {
+      BuildRequest request,
+      String view,
+      RenderResult result,
+      List<BuildArtifact> artifacts,
+      Stamps stamps) {
     for (RenderArtifact artifact : result.artifacts()) {
       String fileName = "diagram." + renderExtension(artifact.artifactKind());
-      writeFile(request, view, fileName, artifact.content());
+      String stamped =
+          Provenance.stampSvg(
+              artifact.content(),
+              Provenance.payload(
+                  stamps.modelSchemaVersion(),
+                  stamps.modelSha(),
+                  view,
+                  "render_policy_sha256",
+                  stamps.renderPolicySha(),
+                  stamps.version()));
+      writeFile(request, view, fileName, stamped);
       artifacts.add(new BuildArtifact(artifact.artifactKind(), view + "/" + fileName));
     }
   }
@@ -479,9 +518,21 @@ public final class BuildCommand {
       String view,
       String baseName,
       ExportResult result,
-      List<BuildArtifact> artifacts) {
+      List<BuildArtifact> artifacts,
+      Stamps stamps) {
     String fileName = baseName + "." + exportExtension(result.artifactKind());
-    writeFile(request, view, fileName, result.content());
+    boolean oef = "oef".equals(baseName);
+    String stamped =
+        Provenance.stampXml(
+            result.content(),
+            Provenance.payload(
+                stamps.modelSchemaVersion(),
+                stamps.modelSha(),
+                view,
+                oef ? "oef_policy_sha256" : "xmi_policy_sha256",
+                oef ? stamps.oefPolicySha() : stamps.xmiPolicySha(),
+                stamps.version()));
+    writeFile(request, view, fileName, stamped);
     artifacts.add(new BuildArtifact(result.artifactKind(), view + "/" + fileName));
   }
 

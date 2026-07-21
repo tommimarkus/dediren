@@ -2,13 +2,17 @@ package dev.dediren.cli;
 
 import dev.dediren.contracts.CommandEnvelope;
 import dev.dediren.contracts.CommandExitCode;
+import dev.dediren.contracts.ContractVersions;
 import dev.dediren.contracts.Diagnostic;
 import dev.dediren.contracts.DiagnosticCode;
 import dev.dediren.contracts.DiagnosticSeverity;
+import dev.dediren.contracts.EnvelopeStatus;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.core.ProductRootException;
+import dev.dediren.core.analysis.CanonicalJson;
 import dev.dediren.core.analysis.ModelDiff;
 import dev.dediren.core.analysis.ModelQuery;
+import dev.dediren.core.analysis.ProvenanceCheck;
 import dev.dediren.core.commands.BuildRequest;
 import dev.dediren.core.commands.CoreCommands;
 import dev.dediren.core.engine.EngineExecutionException;
@@ -26,6 +30,7 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -95,6 +100,8 @@ public final class Main {
     commandLine.addSubcommand("project", new ProjectCommand(stdin, env, engines));
     commandLine.addSubcommand("diff", new DiffCommand());
     commandLine.addSubcommand("query", new QueryCommand(stdin));
+    commandLine.addSubcommand("verify", new VerifyCommand());
+    commandLine.addSubcommand("status", new StatusCommand());
     commandLine.addSubcommand("layout", new LayoutCommand(stdin, env, engines));
     commandLine.addSubcommand("validate-layout", new ValidateLayoutCommand(stdin));
     commandLine.addSubcommand("render", new RenderCommand(stdin, env, engines));
@@ -336,6 +343,116 @@ public final class Main {
       } catch (ProductRootException error) {
         return printProductRootFailure(spec, error);
       }
+    }
+  }
+
+  @Command(name = "verify", description = "Verify build artifacts against a model's provenance")
+  static final class VerifyCommand implements Callable<Integer> {
+    @Option(names = "--input", required = true)
+    private Path input;
+
+    @Option(names = "--artifacts", required = true)
+    private Path artifacts;
+
+    @Spec private CommandSpec spec;
+
+    @Override
+    public Integer call() throws Exception {
+      JsonInputText inputText = readFile("input", input);
+      if (inputText.error() != null) {
+        return writeEnvelope(spec, inputText.error(), CommandExitCode.INPUT_ERROR);
+      }
+      if (!Files.isDirectory(artifacts)) {
+        return writeEnvelope(
+            spec,
+            usageError(
+                DiagnosticCode.COMMAND_INPUT_INVALID.code(),
+                "--artifacts must name an existing directory: " + artifacts),
+            CommandExitCode.INPUT_ERROR);
+      }
+      try {
+        var document =
+            SourceValidator.loadAndValidateSourceDocument(inputText.text(), inputText.baseDir());
+        String modelSha = CanonicalJson.sha256(JsonSupport.objectMapper().valueToTree(document));
+        var result = ProvenanceCheck.verify(modelSha, artifacts);
+        var diagnostics = new ArrayList<Diagnostic>();
+        for (var artifact : result.artifacts()) {
+          if (ProvenanceCheck.STALE.equals(artifact.status())) {
+            diagnostics.add(
+                new Diagnostic(
+                    DiagnosticCode.ARTIFACT_STALE.code(),
+                    DiagnosticSeverity.ERROR,
+                    artifact.path()
+                        + " was built from a different model revision; rebuild it or check out"
+                        + " the matching model",
+                    artifact.path()));
+          } else if (ProvenanceCheck.UNSTAMPED.equals(artifact.status())) {
+            diagnostics.add(
+                new Diagnostic(
+                    DiagnosticCode.ARTIFACT_UNSTAMPED.code(),
+                    DiagnosticSeverity.WARNING,
+                    artifact.path()
+                        + " carries no provenance stamp (only `dediren build` artifacts are"
+                        + " stamped); currency cannot be decided",
+                    artifact.path()));
+          }
+        }
+        JsonNode data = JsonSupport.objectMapper().valueToTree(result);
+        boolean stale =
+            diagnostics.stream()
+                .anyMatch(d -> d.code().equals(DiagnosticCode.ARTIFACT_STALE.code()));
+        if (stale) {
+          return writeEnvelope(
+              spec,
+              new CommandEnvelope<>(
+                  ContractVersions.ENVELOPE_SCHEMA_VERSION,
+                  EnvelopeStatus.ERROR,
+                  data,
+                  diagnostics),
+              CommandExitCode.INPUT_ERROR);
+        }
+        if (!diagnostics.isEmpty()) {
+          return writeEnvelope(
+              spec,
+              new CommandEnvelope<>(
+                  ContractVersions.ENVELOPE_SCHEMA_VERSION,
+                  EnvelopeStatus.WARNING,
+                  data,
+                  diagnostics),
+              CommandExitCode.OK);
+        }
+        return writeEnvelope(spec, CommandEnvelope.ok(data), CommandExitCode.OK);
+      } catch (SourceValidator.SourceDiagnosticsException error) {
+        return writeEnvelope(
+            spec, CommandEnvelope.error(error.diagnostics()), CommandExitCode.INPUT_ERROR);
+      } catch (ProductRootException error) {
+        return printProductRootFailure(spec, error);
+      }
+    }
+  }
+
+  @Command(name = "status", description = "Index a workspace's models and stamped artifacts")
+  static final class StatusCommand implements Callable<Integer> {
+    @Option(names = "--root", required = true)
+    private Path root;
+
+    @Spec private CommandSpec spec;
+
+    @Override
+    public Integer call() throws Exception {
+      if (!Files.isDirectory(root)) {
+        return writeEnvelope(
+            spec,
+            usageError(
+                DiagnosticCode.COMMAND_INPUT_INVALID.code(),
+                "--root must name an existing directory: " + root),
+            CommandExitCode.INPUT_ERROR);
+      }
+      var result = ProvenanceCheck.status(root);
+      return writeEnvelope(
+          spec,
+          CommandEnvelope.ok(JsonSupport.objectMapper().valueToTree(result)),
+          CommandExitCode.OK);
     }
   }
 
