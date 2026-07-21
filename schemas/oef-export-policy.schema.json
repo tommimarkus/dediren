@@ -12,6 +12,18 @@
     "viewpoint"
   ],
   "properties": {
+    "views": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "view_identifier": { "type": "string", "minLength": 1 },
+          "view_name": { "type": "string", "minLength": 1 },
+          "viewpoint": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
     "oef_export_policy_schema_version": { "const": "oef-export-policy.schema.v1" },
     "model_identifier": { "type": "string", "minLength": 1 },
     "model_name": { "type": "string", "minLength": 1 },

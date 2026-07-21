@@ -84,12 +84,18 @@ relationship. This keeps evidence-classification markers (for example
 `candidate-from-source`, a confidence score, or a source path) attached to the
 exported concept instead of being dropped.
 
-An OEF export renders exactly the one laid-out view it is handed. When the source
-declares more views than the exported one, the omission is declared (not silently
-dropped) with an `info` diagnostic `DEDIREN_OEF_VIEWS_OMITTED` that names the
-omitted view ids and counts; the envelope `status` stays `ok`. Read
+A standalone OEF export renders exactly the one laid-out view it is handed. When
+the source declares more views than the exported one, the omission is declared
+(not silently dropped) with an `info` diagnostic `DEDIREN_OEF_VIEWS_OMITTED` that
+names the omitted view ids and counts; the envelope `status` stays `ok`. Read
 `.diagnostics[]` to see which diagrams a given OEF does not carry, and export the
 other views to represent them.
+
+For whole-model interchange, `dediren build` with `--oef-policy` also composes
+`model.oef.xml` at the output root — one document carrying every built view's
+diagram, each with its own identity (policy `views` override, else a
+source-derived default), listed under the build result's `model_artifacts`.
+Import that one file into Archi/EA instead of reassembling per-view files.
 
 ## UML/XMI
 

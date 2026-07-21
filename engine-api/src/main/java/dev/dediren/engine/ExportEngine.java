@@ -12,4 +12,16 @@ public interface ExportEngine {
 
   EngineResult<ExportResult> export(
       ExportRequest request, Map<String, String> env, Path productRoot) throws EngineException;
+
+  /**
+   * The whole-model export: one artifact carrying every supplied laid-out view. Empty when the
+   * notation does not (yet) support model-scoped interchange — the build driver simply skips the
+   * aggregate for that lane, so a notation opts in by overriding (whole-model XMI deliberately
+   * trails; see the wave-3 plan).
+   */
+  default java.util.Optional<EngineResult<ExportResult>> exportModel(
+      ModelExportRequest request, Map<String, String> env, Path productRoot)
+      throws EngineException {
+    return java.util.Optional.empty();
+  }
 }

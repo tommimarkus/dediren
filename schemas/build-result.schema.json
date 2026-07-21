@@ -14,6 +14,10 @@
     "diagnostics": {
       "type": "array",
       "items": { "$ref": "#/$defs/diagnostic" }
+    },
+    "model_artifacts": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/artifact" }
     }
   },
   "$defs": {

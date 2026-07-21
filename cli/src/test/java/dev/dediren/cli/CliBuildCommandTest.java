@@ -289,6 +289,69 @@ class CliBuildCommandTest {
   }
 
   @Test
+  void oefLaneAlsoWritesTheWholeModelAggregateWithPerViewIdentity() throws Exception {
+    // Whole-model interchange (wave 3): beside the per-view oef.xml files, build composes one
+    // model.oef.xml carrying EVERY built view's diagram, each with its own identity — an explicit
+    // views[] override when given, else the source-derived default — so a multi-view document
+    // never repeats one identity (the retired per-build "Phase-1 limitation").
+    Path root = workspaceRoot();
+    Path out = temp.resolve("model-oef-out");
+    JsonNode source =
+        JsonSupport.objectMapper()
+            .readTree(Files.readString(root.resolve("fixtures/source/valid-archimate-oef.json")));
+    JsonNode mainView = source.at("/plugins/generic-graph/views/0");
+    tools.jackson.databind.node.ObjectNode detail =
+        (tools.jackson.databind.node.ObjectNode) mainView.deepCopy();
+    detail.put("id", "detail");
+    detail.put("label", "Detail");
+    ((tools.jackson.databind.node.ArrayNode) source.at("/plugins/generic-graph/views")).add(detail);
+    Path sourceFile = temp.resolve("two-views.json");
+    Files.writeString(sourceFile, JsonSupport.objectMapper().writeValueAsString(source));
+
+    JsonNode policy =
+        JsonSupport.objectMapper()
+            .readTree(Files.readString(root.resolve("fixtures/export-policy/default-oef.json")));
+    ((tools.jackson.databind.node.ObjectNode) policy)
+        .putObject("views")
+        .putObject("detail")
+        .put("view_name", "Detail View")
+        .put("viewpoint", "Layered");
+    Path policyFile = temp.resolve("policy.json");
+    Files.writeString(policyFile, JsonSupport.objectMapper().writeValueAsString(policy));
+
+    CliResult result =
+        Main.executeForTesting(
+            new String[] {
+              "build",
+              "--input",
+              sourceFile.toString(),
+              "--out",
+              out.toString(),
+              "--oef-policy",
+              policyFile.toString()
+            },
+            "",
+            envWithOefSchemas());
+
+    assertThat(result.exitCode()).describedAs(result.stdout()).isZero();
+    JsonNode buildResult = assertBuildResultSchemaValid(result.stdout());
+    assertThat(buildResult.at("/model_artifacts/0/path").asText()).isEqualTo("model.oef.xml");
+    assertThat(buildResult.at("/model_artifacts/0/artifact_kind").asText())
+        .isEqualTo("archimate-oef+xml");
+
+    String modelOef = Files.readString(out.resolve("model.oef.xml"), StandardCharsets.UTF_8);
+    assertThat(modelOef)
+        .contains("dediren-provenance")
+        .contains("identifier=\"id-view-main\"")
+        .contains("identifier=\"id-view-detail\"")
+        .contains("viewpoint=\"Layered\"")
+        .contains("<name xml:lang=\"en\">Detail View</name>");
+    // Per-view artifacts unchanged beside the aggregate.
+    assertThat(Files.exists(out.resolve("main/oef.xml"))).isTrue();
+    assertThat(Files.exists(out.resolve("detail/oef.xml"))).isTrue();
+  }
+
+  @Test
   void failingViewDoesNotAbortOthersAndYieldsAggregateError() throws Exception {
     Path root = workspaceRoot();
     Path out = temp.resolve("aggregation-out");

@@ -15,6 +15,7 @@ import dev.dediren.contracts.export.OefExportPolicy;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.contracts.layout.LaidOutGroup;
 import dev.dediren.contracts.layout.LaidOutGroups;
+import dev.dediren.contracts.layout.LayoutResult;
 import dev.dediren.contracts.layout.Point;
 import dev.dediren.contracts.source.GenericGraphPluginData;
 import dev.dediren.contracts.source.GenericGraphView;
@@ -23,6 +24,7 @@ import dev.dediren.contracts.source.SourceRelationship;
 import dev.dediren.engine.EngineException;
 import dev.dediren.engine.EngineResult;
 import dev.dediren.engine.ExportEngine;
+import dev.dediren.engine.ModelExportRequest;
 import dev.dediren.engine.XmlText;
 import dev.dediren.schemacache.SchemaCacheException;
 import dev.dediren.schemacache.SchemaCacheModule;
@@ -141,6 +143,63 @@ public final class OefExportEngine implements ExportEngine {
             ContractVersions.EXPORT_RESULT_SCHEMA_VERSION, "archimate-oef+xml", content);
     return new EngineResult<>(
         result, withIdentityTripwire(policy, viewCoverageDiagnostics(request)));
+  }
+
+  /**
+   * The whole-model export: one OEF document carrying every supplied laid-out view, each with its
+   * own identity ({@link #resolveViewIdentity}). Elements and relationships already cover the full
+   * source in every OEF, so no {@code OEF_VIEWS_OMITTED} disclosure applies here — nothing is
+   * omitted. Validation mirrors the single-view lane per view, and the composed document passes the
+   * same official-XSD check.
+   */
+  @Override
+  public java.util.Optional<EngineResult<ExportResult>> exportModel(
+      ModelExportRequest request, Map<String, String> env, Path productRoot)
+      throws EngineException {
+    if (request.views().isEmpty()) {
+      return java.util.Optional.empty();
+    }
+    OefExportPolicy policy;
+    try {
+      validatePolicy(request.policy());
+      policy = JsonSupport.objectMapper().treeToValue(request.policy(), OefExportPolicy.class);
+    } catch (IllegalArgumentException error) {
+      throw failure(DiagnosticCode.OEF_POLICY_INVALID.code(), error.getMessage(), "policy");
+    }
+    try {
+      for (ModelExportRequest.ViewLayout view : request.views()) {
+        ExportRequest perView =
+            new ExportRequest(
+                ContractVersions.EXPORT_REQUEST_SCHEMA_VERSION,
+                request.source(),
+                view.layout(),
+                request.policy());
+        validateArchimateTypes(perView);
+        validateArchimateJunctionSemantics(perView);
+        validateArchimateGroupSemantics(perView);
+        validateLayoutReferences(perView);
+      }
+    } catch (ArchimateTypeValidationException error) {
+      throw failure(error.code(), error.message(), error.path());
+    } catch (ArchimateJunctionValidationException error) {
+      throw failure(error.code(), error.message(), error.path());
+    } catch (GroupSemanticValidationException error) {
+      throw failure(error.code(), error.getMessage(), error.path());
+    } catch (OefReferenceValidationException error) {
+      throw failure(error.code(), error.getMessage(), error.path());
+    }
+
+    String content = buildModelOef(request, policy);
+    try {
+      validateOfficialOefSchema(content, env, productRoot);
+    } catch (OefSchemaValidationException error) {
+      throw failure(error.code(), error.getMessage(), "content");
+    }
+    var result =
+        new ExportResult(
+            ContractVersions.EXPORT_RESULT_SCHEMA_VERSION, "archimate-oef+xml", content);
+    return java.util.Optional.of(
+        new EngineResult<>(result, withIdentityTripwire(policy, List.of())));
   }
 
   /**
@@ -376,38 +435,96 @@ public final class OefExportEngine implements ExportEngine {
     var propertyDefinitionIds = collectPropertyDefinitionIds(request, ids);
     var sourceNodesById =
         request.source().nodes().stream().collect(Collectors.toMap(SourceNode::id, node -> node));
-    var semanticGroups =
-        request.layoutResult().groups().stream()
-            .filter(
-                group -> {
-                  String sourceId = semanticGroupSourceId(group);
-                  SourceNode sourceNode = sourceId == null ? null : sourceNodesById.get(sourceId);
-                  return sourceNode != null && sourceNode.type().equals("Grouping");
-                })
-            .toList();
-    var viewNodeIds = new HashMap<String, String>();
-    request
-        .layoutResult()
-        .nodes()
-        .forEach(
-            node ->
-                viewNodeIds.put(
-                    node.id(), ids.oefId("vn-" + request.layoutResult().viewId(), node.id())));
-    var groupViewNodeIds = new HashMap<String, String>();
-    semanticGroups.forEach(
-        group ->
-            groupViewNodeIds.put(
-                group.id(), ids.oefId("vg-" + request.layoutResult().viewId(), group.id())));
-    var viewConnectionIds = new HashMap<String, String>();
-    request
-        .layoutResult()
-        .edges()
-        .forEach(
-            edge ->
-                viewConnectionIds.put(
-                    edge.id(), ids.oefId("vc-" + request.layoutResult().viewId(), edge.id())));
 
     StringBuilder xml = new StringBuilder();
+    openModel(xml, request, policy, elementIds, relationshipIds, propertyDefinitionIds);
+    xml.append("<views><diagrams>");
+    // The single-view lane keeps the legacy top-level identity fields verbatim (unchanged
+    // published behavior); per-view resolution applies on the whole-model lane only.
+    writeViewBody(
+        xml,
+        request.layoutResult(),
+        new OefExportPolicy.ViewIdentity(
+            policy.viewIdentifier(), policy.viewName(), policy.viewpoint()),
+        ids,
+        elementIds,
+        relationshipIds,
+        sourceNodesById);
+    xml.append("</diagrams></views></model>\n");
+    return xml.toString();
+  }
+
+  /** One document carrying every supplied laid-out view; see {@link #exportModel}. */
+  private static String buildModelOef(ModelExportRequest request, OefExportPolicy policy) {
+    ExportRequest first =
+        new ExportRequest(
+            ContractVersions.EXPORT_REQUEST_SCHEMA_VERSION,
+            request.source(),
+            request.views().getFirst().layout(),
+            request.policy());
+    var ids = new IdentifierMap();
+    var elementIds = new HashMap<String, String>();
+    request.source().nodes().forEach(node -> elementIds.put(node.id(), ids.oefId("el", node.id())));
+    var relationshipIds = new HashMap<String, String>();
+    request
+        .source()
+        .relationships()
+        .forEach(
+            relationship ->
+                relationshipIds.put(relationship.id(), ids.oefId("rel", relationship.id())));
+    var propertyDefinitionIds = collectPropertyDefinitionIds(first, ids);
+    var sourceNodesById =
+        request.source().nodes().stream().collect(Collectors.toMap(SourceNode::id, node -> node));
+
+    var viewLabels = new HashMap<String, String>();
+    for (GenericGraphView declared : declaredViews(first)) {
+      viewLabels.put(declared.id(), declared.label());
+    }
+
+    StringBuilder xml = new StringBuilder();
+    openModel(xml, first, policy, elementIds, relationshipIds, propertyDefinitionIds);
+    xml.append("<views><diagrams>");
+    for (ModelExportRequest.ViewLayout view : request.views()) {
+      writeViewBody(
+          xml,
+          view.layout(),
+          resolveViewIdentity(policy, view.viewId(), viewLabels.get(view.viewId())),
+          ids,
+          elementIds,
+          relationshipIds,
+          sourceNodesById);
+    }
+    xml.append("</diagrams></views></model>\n");
+    return xml.toString();
+  }
+
+  /**
+   * Whole-model identity resolution: explicit {@code views[id]} override wins field by field, then
+   * the source-derived default ({@code id-view-<view-id>}, the view's own label, the policy's
+   * top-level viewpoint) — never the legacy top-level view identity, which would repeat one
+   * identity across views (the per-build "Phase-1 limitation" this feature removes).
+   */
+  private static OefExportPolicy.ViewIdentity resolveViewIdentity(
+      OefExportPolicy policy, String viewId, String sourceLabel) {
+    OefExportPolicy.ViewIdentity override =
+        policy.views().getOrDefault(viewId, new OefExportPolicy.ViewIdentity(null, null, null));
+    String identifier =
+        override.viewIdentifier() != null ? override.viewIdentifier() : "id-view-" + viewId;
+    String name =
+        override.viewName() != null
+            ? override.viewName()
+            : sourceLabel != null ? sourceLabel : viewId;
+    String viewpoint = override.viewpoint() != null ? override.viewpoint() : policy.viewpoint();
+    return new OefExportPolicy.ViewIdentity(identifier, name, viewpoint);
+  }
+
+  private static void openModel(
+      StringBuilder xml,
+      ExportRequest request,
+      OefExportPolicy policy,
+      Map<String, String> elementIds,
+      Map<String, String> relationshipIds,
+      Map<String, String> propertyDefinitionIds) {
     xml.append("<model xmlns=\"")
         .append(OEF_NS)
         .append("\" xmlns:xsi=\"")
@@ -450,13 +567,45 @@ public final class OefExportEngine implements ExportEngine {
     }
     xml.append("</relationships>");
     writePropertyDefinitions(xml, propertyDefinitionIds);
+  }
 
-    xml.append("<views><diagrams><view identifier=\"")
-        .append(attr(policy.viewIdentifier()))
+  private static void writeViewBody(
+      StringBuilder xml,
+      LayoutResult layout,
+      OefExportPolicy.ViewIdentity identity,
+      IdentifierMap ids,
+      Map<String, String> elementIds,
+      Map<String, String> relationshipIds,
+      Map<String, SourceNode> sourceNodesById) {
+    var semanticGroups =
+        layout.groups().stream()
+            .filter(
+                group -> {
+                  String sourceId = semanticGroupSourceId(group);
+                  SourceNode sourceNode = sourceId == null ? null : sourceNodesById.get(sourceId);
+                  return sourceNode != null && sourceNode.type().equals("Grouping");
+                })
+            .toList();
+    var viewNodeIds = new HashMap<String, String>();
+    layout
+        .nodes()
+        .forEach(node -> viewNodeIds.put(node.id(), ids.oefId("vn-" + layout.viewId(), node.id())));
+    var groupViewNodeIds = new HashMap<String, String>();
+    semanticGroups.forEach(
+        group -> groupViewNodeIds.put(group.id(), ids.oefId("vg-" + layout.viewId(), group.id())));
+    var viewConnectionIds = new HashMap<String, String>();
+    layout
+        .edges()
+        .forEach(
+            edge ->
+                viewConnectionIds.put(edge.id(), ids.oefId("vc-" + layout.viewId(), edge.id())));
+
+    xml.append("<view identifier=\"")
+        .append(attr(identity.viewIdentifier()))
         .append("\" xsi:type=\"Diagram\" viewpoint=\"")
-        .append(attr(policy.viewpoint()))
+        .append(attr(identity.viewpoint()))
         .append("\">");
-    writeTextElement(xml, "name", policy.viewName());
+    writeTextElement(xml, "name", identity.viewName());
     for (var group : semanticGroups) {
       String sourceId = semanticGroupSourceId(group);
       xml.append("<node identifier=\"")
@@ -473,7 +622,7 @@ public final class OefExportEngine implements ExportEngine {
           .append(formatNumber(group.height()))
           .append("\"/>");
     }
-    for (var node : request.layoutResult().nodes()) {
+    for (var node : layout.nodes()) {
       xml.append("<node identifier=\"")
           .append(attr(viewNodeIds.get(node.id())))
           .append("\" xsi:type=\"Element\" elementRef=\"")
@@ -488,7 +637,7 @@ public final class OefExportEngine implements ExportEngine {
           .append(formatNumber(node.height()))
           .append("\"/>");
     }
-    for (var edge : request.layoutResult().edges()) {
+    for (var edge : layout.edges()) {
       xml.append("<connection identifier=\"")
           .append(attr(viewConnectionIds.get(edge.id())))
           .append("\" xsi:type=\"Relationship\" relationshipRef=\"")
@@ -501,8 +650,7 @@ public final class OefExportEngine implements ExportEngine {
       writeConnectionGeometry(xml, edge.points());
       xml.append("</connection>");
     }
-    xml.append("</view></diagrams></views></model>\n");
-    return xml.toString();
+    xml.append("</view>");
   }
 
   private static void writeConnectionGeometry(StringBuilder xml, List<Point> points) {

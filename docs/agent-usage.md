@@ -192,7 +192,16 @@ is declared (rather than dropped silently) with the `info` diagnostic
 `DEDIREN_OEF_VIEWS_OMITTED`, which names the omitted view ids and counts; the
 envelope `status` stays `ok` for omissions alone (an unedited default policy
 adds the `DEDIREN_EXPORT_IDENTITY_PLACEHOLDER` warning, which lifts it to
-`warning` — see `## Export`). Because the document always carries a
+`warning` — see `## Export`). For whole-model interchange, `dediren build`
+with `--oef-policy` additionally writes `model.oef.xml` at the `--out` root:
+one document carrying EVERY built view's diagram, listed in the build result
+under `model_artifacts` — nothing omitted, so no omission diagnostic. Each
+view in it carries its own identity: an explicit override from the policy's
+optional `views` map (`"views": {"<view-id>": {"view_identifier"?,
+"view_name"?, "viewpoint"?}}`), else the source-derived default
+(`id-view-<view-id>`, the view's own label, the policy's top-level
+`viewpoint`). The single-view lane keeps the legacy top-level view identity
+fields unchanged. Because the document always carries a
 `<views>`/`<diagrams>` element it declares and validates against
 `archimate3_Diagram.xsd`, not the model-only `archimate3_Model.xsd`; point
 `DEDIREN_OEF_SCHEMA_DIR` at a directory holding all three ArchiMate 3.1 OEF XSDs.

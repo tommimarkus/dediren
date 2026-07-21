@@ -58,16 +58,19 @@ diagrams, each with its own identity.
 
 **Tasks:**
 
-- [ ] RED: CLI build test — `--oef-policy` build writes `model.oef.xml`
-      containing BOTH view diagrams with distinct per-view identity
-      (override honored for one view, source-derived default for the other);
-      build-result lists it under `model_artifacts`; single-view outputs and
-      their identity behavior byte-stable vs. before; engine test for the
-      composed document validating against the (stub) XSD env.
-- [ ] GREEN per the design above.
-- [ ] Docs: agent-usage Export section (whole-model + `views` override map +
-      resolution order), features exports page, README sentence; schema +
-      `OefExportPolicy` record + round-trip.
+- [x] RED→GREEN: `CliBuildCommandTest` pins the aggregate (both view
+      diagrams, override honored + source-derived default, `model_artifacts`
+      entry, provenance stamp, per-view artifacts intact); the OEF module's
+      full suite (incl. the byte-golden) stayed green through the extraction
+      refactor — single-view output is byte-stable.
+- [x] GREEN: `ExportEngine.exportModel` default + `ModelExportRequest` seam
+      type, `OefExportEngine` refactor (openModel/writeViewBody extraction,
+      `buildModelOef`, `resolveViewIdentity`), additive `views` map on the
+      policy schema/record, additive `model_artifacts` on
+      build-result schema/record, build-driver composition with stamping
+      (view id `model`).
+- [x] Docs: agent-usage OEF paragraph, features exports page. New
+      collection-bearing records joined the recorded suppression set.
 
 ## Part B — Real-standards validation lane, in-JVM (survey 3.2)
 

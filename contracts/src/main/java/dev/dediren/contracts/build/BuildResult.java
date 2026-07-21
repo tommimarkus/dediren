@@ -20,9 +20,19 @@ public record BuildResult(
     String buildResultSchemaVersion,
     EnvelopeStatus status,
     List<BuildViewOutcome> views,
-    @JsonInclude(JsonInclude.Include.NON_EMPTY) List<Diagnostic> diagnostics) {
+    @JsonInclude(JsonInclude.Include.NON_EMPTY) List<Diagnostic> diagnostics,
+    @JsonInclude(JsonInclude.Include.NON_EMPTY) List<BuildArtifact> modelArtifacts) {
   public BuildResult {
     views = listOrEmpty(views);
     diagnostics = listOrEmpty(diagnostics);
+    modelArtifacts = listOrEmpty(modelArtifacts);
+  }
+
+  public BuildResult(
+      String buildResultSchemaVersion,
+      EnvelopeStatus status,
+      List<BuildViewOutcome> views,
+      List<Diagnostic> diagnostics) {
+    this(buildResultSchemaVersion, status, views, diagnostics, List.of());
   }
 }

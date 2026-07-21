@@ -28,9 +28,12 @@ import dev.dediren.core.engine.EngineExecutionException;
 import dev.dediren.core.engine.EngineRunOutcome;
 import dev.dediren.core.source.SourceValidator;
 import dev.dediren.core.source.ValidationResult;
+import dev.dediren.engine.EngineException;
+import dev.dediren.engine.EngineResult;
 import dev.dediren.engine.Engines;
 import dev.dediren.engine.ExportEngine;
 import dev.dediren.engine.LayoutEngine;
+import dev.dediren.engine.ModelExportRequest;
 import dev.dediren.engine.RenderEngine;
 import dev.dediren.engine.SemanticsEngine;
 import dev.dediren.ir.LaidOutScene;
@@ -196,6 +199,7 @@ public final class BuildCommand {
     boolean anyError = false;
     boolean anyWarning = false;
     int failureExit = CommandExitCode.OK.code();
+    var oefViewLayouts = new ArrayList<ModelExportRequest.ViewLayout>();
     for (String view : views) {
       ViewBuild built;
       try {
@@ -219,6 +223,9 @@ public final class BuildCommand {
                 CommandExitCode.INPUT_ERROR.code());
       }
       outcomes.add(built.outcome());
+      if (built.oefLayout() != null) {
+        oefViewLayouts.add(new ModelExportRequest.ViewLayout(view, built.oefLayout()));
+      }
       EnvelopeStatus viewStatus = built.outcome().status();
       if (viewStatus == EnvelopeStatus.ERROR) {
         anyError = true;
@@ -228,11 +235,61 @@ public final class BuildCommand {
       }
     }
 
+    // Whole-model OEF aggregate: one document carrying every successfully laid-out view, written
+    // beside the per-view artifacts. The engine opts in via ExportEngine.exportModel; a lane that
+    // does not (uml-xmi, deliberately trailing) is simply skipped.
+    var modelArtifacts = new ArrayList<BuildArtifact>();
+    var buildDiagnostics = new ArrayList<Diagnostic>();
+    if (oefPolicy != null && !oefViewLayouts.isEmpty()) {
+      try {
+        ExportEngine exporter =
+            EngineDispatch.requireEngine(
+                engines, OEF_ENGINE, "export", engines.exportEngine(OEF_ENGINE));
+        var modelExport =
+            exporter.exportModel(
+                new ModelExportRequest(source, oefViewLayouts, oefPolicy),
+                request.env(),
+                DedirenPaths.productRoot());
+        if (modelExport.isPresent()) {
+          EngineResult<ExportResult> composed = modelExport.get();
+          String stamped =
+              Provenance.stampXml(
+                  composed.value().content(),
+                  Provenance.payload(
+                      stamps.modelSchemaVersion(),
+                      stamps.modelSha(),
+                      "model",
+                      "oef_policy_sha256",
+                      stamps.oefPolicySha(),
+                      stamps.version()));
+          writeFile(request, "", "model.oef.xml", stamped);
+          modelArtifacts.add(new BuildArtifact(composed.value().artifactKind(), "model.oef.xml"));
+          buildDiagnostics.addAll(composed.diagnostics());
+          anyWarning |=
+              composed.diagnostics().stream()
+                  .anyMatch(d -> d.severity() != DiagnosticSeverity.INFO);
+        }
+      } catch (EngineException error) {
+        buildDiagnostics.addAll(error.diagnostics());
+        anyError = true;
+        failureExit = Math.max(failureExit, error.exitCode());
+      } catch (EngineExecutionException error) {
+        buildDiagnostics.add(error.diagnostic());
+        anyError = true;
+        failureExit = Math.max(failureExit, CommandExitCode.PLUGIN_ERROR.code());
+      }
+    }
+
     EnvelopeStatus status =
         anyError ? EnvelopeStatus.ERROR : anyWarning ? EnvelopeStatus.WARNING : EnvelopeStatus.OK;
     int exitCode = anyError ? failureExit : CommandExitCode.OK.code();
     return outcome(
-        new BuildResult(ContractVersions.BUILD_RESULT_SCHEMA_VERSION, status, outcomes, List.of()),
+        new BuildResult(
+            ContractVersions.BUILD_RESULT_SCHEMA_VERSION,
+            status,
+            outcomes,
+            buildDiagnostics,
+            modelArtifacts),
         exitCode);
   }
 
@@ -415,7 +472,9 @@ public final class BuildCommand {
 
     EnvelopeStatus status = warning ? EnvelopeStatus.WARNING : EnvelopeStatus.OK;
     return new ViewBuild(
-        new BuildViewOutcome(view, status, artifacts, diagnostics), CommandExitCode.OK.code());
+        new BuildViewOutcome(view, status, artifacts, diagnostics),
+        CommandExitCode.OK.code(),
+        request.oefPolicyText() != null ? layoutRecord : null);
   }
 
   private static InMemoryStage<ExportResult> runExportStage(
@@ -592,7 +651,7 @@ public final class BuildCommand {
   private static ViewBuild failedView(
       String view, List<BuildArtifact> artifacts, List<Diagnostic> diagnostics, int exitCode) {
     return new ViewBuild(
-        new BuildViewOutcome(view, EnvelopeStatus.ERROR, artifacts, diagnostics), exitCode);
+        new BuildViewOutcome(view, EnvelopeStatus.ERROR, artifacts, diagnostics), exitCode, null);
   }
 
   private static EngineRunOutcome buildLevelError(Diagnostic diagnostic) {
@@ -633,7 +692,7 @@ public final class BuildCommand {
     }
   }
 
-  private record ViewBuild(BuildViewOutcome outcome, int failureExit) {}
+  private record ViewBuild(BuildViewOutcome outcome, int failureExit, LayoutResult oefLayout) {}
 
   /**
    * Internal signal that a view id's write target normalizes outside {@code outDir} (see {@link

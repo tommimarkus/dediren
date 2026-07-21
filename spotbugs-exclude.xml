@@ -41,6 +41,7 @@
       <Class name="dev.dediren.contracts.analysis.QueryResult$ViewCoverage"/>
       <Class name="dev.dediren.contracts.analysis.VerifyResult"/>
       <Class name="dev.dediren.contracts.analysis.StatusResult"/>
+      <Class name="dev.dediren.contracts.export.OefExportPolicy"/>
       <Class name="dev.dediren.contracts.render.RenderMetadata"/>
       <Class name="dev.dediren.contracts.render.RenderResult"/>
       <Class name="dev.dediren.contracts.render.SvgStylePolicy"/>
@@ -80,6 +81,7 @@
       <Class name="dev.dediren.engine.EngineException"/>
       <Class name="dev.dediren.engine.EngineResult"/>
       <Class name="dev.dediren.engine.Engines"/>
+      <Class name="dev.dediren.engine.ModelExportRequest"/>
     </Or>
     <Or>
       <Bug pattern="EI_EXPOSE_REP"/>
