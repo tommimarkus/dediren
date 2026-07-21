@@ -3,6 +3,7 @@ package dev.dediren.plugins.archimateoef;
 import dev.dediren.contracts.CommandEnvelope;
 import dev.dediren.contracts.ContractVersions;
 import dev.dediren.contracts.Diagnostic;
+import dev.dediren.contracts.DiagnosticSeverity;
 import dev.dediren.contracts.EnvelopeStatus;
 import dev.dediren.contracts.export.ExportRequest;
 import dev.dediren.contracts.export.ExportResult;
@@ -81,17 +82,21 @@ public final class Main {
   }
 
   /**
-   * Shapes the success envelope, preserving the process form: a clean export emits {@link
-   * CommandEnvelope#ok} (no {@code diagnostics}), while info-level view-coverage diagnostics ride
-   * an {@code ok}-status envelope so a consumer sees the omission verdict without descending into
-   * {@code data} (issue #34).
+   * Shapes the success envelope with the same ok/warning/info-ride-ok policy as the real dispatch
+   * path: a clean export emits {@link CommandEnvelope#ok}, info-level view-coverage diagnostics
+   * ride an {@code ok}-status envelope (issue #34), and any non-info diagnostic (the
+   * identity-tripwire warning) lifts the status to {@code warning}.
    */
   private static CommandEnvelope<ExportResult> exportEnvelope(
       ExportResult result, List<Diagnostic> diagnostics) {
     if (diagnostics.isEmpty()) {
       return CommandEnvelope.ok(result);
     }
+    boolean warned = diagnostics.stream().anyMatch(d -> d.severity() != DiagnosticSeverity.INFO);
     return new CommandEnvelope<>(
-        ContractVersions.ENVELOPE_SCHEMA_VERSION, EnvelopeStatus.OK, result, diagnostics);
+        ContractVersions.ENVELOPE_SCHEMA_VERSION,
+        warned ? EnvelopeStatus.WARNING : EnvelopeStatus.OK,
+        result,
+        diagnostics);
   }
 }

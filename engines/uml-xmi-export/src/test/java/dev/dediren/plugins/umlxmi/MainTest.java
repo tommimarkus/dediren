@@ -29,7 +29,7 @@ class MainTest {
 
   @Test
   void outputsXmi() throws Exception {
-    String xml = exportXml(exportInput());
+    String xml = exportGoldenXml(exportInput());
 
     assertThat(xml)
         .containsSubsequence(
@@ -299,7 +299,7 @@ class MainTest {
             fixtureJson("fixtures/source/valid-uml-complex.json"),
             fixtureJson("fixtures/layout-result/uml-complex-class.json"));
 
-    String xml = exportXml(input);
+    String xml = exportGoldenXml(input);
 
     // Regression backstop only; the spec-named assertions in the sibling tests are the primary
     // oracle. Update this golden via a reviewed baseline refresh when the XMI contract changes
@@ -330,7 +330,7 @@ class MainTest {
     JsonNode input = exportSequenceInput();
     ((ObjectNode) input.at("/source/relationships/0/properties/uml")).remove("message_sort");
 
-    String xml = exportXml(input);
+    String xml = exportGoldenXml(input);
 
     assertThat(xml).isEqualTo(fixture("fixtures/export/uml-sequence-basic.xmi"));
     assertThat(xml)
@@ -349,10 +349,7 @@ class MainTest {
             fixtureJson("fixtures/source/valid-uml-sequence-fragments.json"),
             fixtureJson("fixtures/layout-result/uml-sequence-fragments.json"));
 
-    PluginResult result =
-        Main.executeForTesting(new String[] {"export"}, input.toString(), envWithXmiSchema());
-
-    String xml = okData(result).at("/content").asText();
+    String xml = exportGoldenXml(input);
     assertThat(xml)
         .containsSubsequence(
             "<uml:Model",
@@ -372,7 +369,7 @@ class MainTest {
             fixtureJson("fixtures/source/valid-uml-state-machine-basic.json"),
             fixtureJson("fixtures/layout-result/uml-state-machine-basic.json"));
 
-    String xml = exportXml(input);
+    String xml = exportGoldenXml(input);
 
     assertThat(xml).isEqualTo(fixture("fixtures/export/uml-state-machine-basic.xmi"));
     assertThat(xml)
@@ -418,7 +415,7 @@ class MainTest {
             fixtureJson("fixtures/source/valid-uml-use-case-basic.json"),
             fixtureJson("fixtures/layout-result/uml-use-case-basic.json"));
 
-    String xml = exportXml(input);
+    String xml = exportGoldenXml(input);
 
     assertThat(xml).isEqualTo(fixture("fixtures/export/uml-use-case-basic.xmi"));
     assertThat(xml)
@@ -454,7 +451,7 @@ class MainTest {
             fixtureJson("fixtures/source/valid-uml-component-basic.json"),
             fixtureJson("fixtures/layout-result/uml-component-basic.json"));
 
-    String xml = exportXml(input);
+    String xml = exportGoldenXml(input);
 
     assertThat(xml).isEqualTo(fixture("fixtures/export/uml-component-basic.xmi"));
     assertThat(xml)
@@ -488,7 +485,7 @@ class MainTest {
             fixtureJson("fixtures/source/valid-uml-deployment-basic.json"),
             fixtureJson("fixtures/layout-result/uml-deployment-basic.json"));
 
-    String xml = exportXml(input);
+    String xml = exportGoldenXml(input);
 
     assertThat(xml).isEqualTo(fixture("fixtures/export/uml-deployment-basic.xmi"));
     assertThat(xml)
@@ -964,6 +961,26 @@ class MainTest {
     return okData(result).at("/content").asText();
   }
 
+  /**
+   * Golden exports deliberately run the unedited shipped default policy — the checked-in {@code
+   * fixtures/export/*.xmi} embed its fixture identity — so the envelope carries the
+   * identity-tripwire warning; assert that once here and hand back the content for the golden
+   * comparison.
+   */
+  private String exportGoldenXml(JsonNode input) throws Exception {
+    ((ObjectNode) input).set("policy", fixtureJson("fixtures/export-policy/default-uml-xmi.json"));
+    PluginResult result =
+        Main.executeForTesting(
+            new String[] {"export"},
+            JsonSupport.objectMapper().writeValueAsString(input),
+            envWithXmiSchema());
+    JsonNode envelope = JsonSupport.objectMapper().readTree(result.stdout());
+    assertThat(result.exitCode()).describedAs(result.stdout()).isZero();
+    assertThat(envelope.at("/status").asText()).isEqualTo("warning");
+    diagnostic(envelope, "DEDIREN_EXPORT_IDENTITY_PLACEHOLDER");
+    return envelope.at("/data/content").asText();
+  }
+
   private JsonNode exportInput() throws Exception {
     return exportInput(
         fixtureJson("fixtures/source/valid-uml-basic.json"),
@@ -981,7 +998,12 @@ class MainTest {
     input.put("export_request_schema_version", "export-request.schema.v1");
     input.set("source", source);
     input.set("layout_result", layout);
-    input.set("policy", fixtureJson("fixtures/export-policy/default-uml-xmi.json"));
+    // A real (non-fixture) model identity: these envelope tests pin XMI content and envelope
+    // shape, not the identity tripwire (XmiExportEngineTest owns that), so keep the
+    // DEDIREN_EXPORT_IDENTITY_PLACEHOLDER warning out of their diagnostics.
+    ObjectNode policy = (ObjectNode) fixtureJson("fixtures/export-policy/default-uml-xmi.json");
+    policy.put("model_identifier", "id-maintest-real-model");
+    input.set("policy", policy);
     return input;
   }
 

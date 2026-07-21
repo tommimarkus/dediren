@@ -139,7 +139,37 @@ public final class OefExportEngine implements ExportEngine {
     var result =
         new ExportResult(
             ContractVersions.EXPORT_RESULT_SCHEMA_VERSION, "archimate-oef+xml", content);
-    return new EngineResult<>(result, viewCoverageDiagnostics(request));
+    return new EngineResult<>(
+        result, withIdentityTripwire(policy, viewCoverageDiagnostics(request)));
+  }
+
+  /**
+   * Keep in lockstep with {@code fixtures/export-policy/default-oef.json}; the drift-pin test fails
+   * if the shipped default changes without this constant.
+   */
+  static final String PLACEHOLDER_MODEL_IDENTIFIER = "id-dediren-oef-basic-model";
+
+  /**
+   * The shipped default policy hard-codes fixture identity and export succeeds with it unchanged,
+   * so a copied-but-unedited policy silently ships a mis-identified OEF. Appends a warning when the
+   * model identifier still equals the shipped placeholder — warning, not error: the export stays
+   * usable and the caller decides.
+   */
+  private static List<Diagnostic> withIdentityTripwire(
+      OefExportPolicy policy, List<Diagnostic> diagnostics) {
+    if (!PLACEHOLDER_MODEL_IDENTIFIER.equals(policy.modelIdentifier())) {
+      return diagnostics;
+    }
+    var combined = new ArrayList<>(diagnostics);
+    combined.add(
+        new Diagnostic(
+            DiagnosticCode.EXPORT_IDENTITY_PLACEHOLDER.code(),
+            DiagnosticSeverity.WARNING,
+            "export policy still carries the shipped fixture identity (model_identifier '"
+                + PLACEHOLDER_MODEL_IDENTIFIER
+                + "'); copy the default policy and replace its identity fields for a real model",
+            "policy.model_identifier"));
+    return combined;
   }
 
   private static EngineException failure(String code, String message, String path) {

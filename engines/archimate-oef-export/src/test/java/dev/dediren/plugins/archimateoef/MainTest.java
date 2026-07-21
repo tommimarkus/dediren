@@ -25,17 +25,24 @@ class MainTest {
 
   @Test
   void outputsModelValidOefXml() throws Exception {
+    // Deliberately the unedited shipped default policy: the golden below is exactly that
+    // fixture-identity export, and the envelope must carry the identity-tripwire warning for it.
     PluginResult result =
         Main.executeForTesting(
             new String[] {"export"},
             exportInput(
                 fixtureJson("fixtures/source/valid-archimate-oef.json"),
-                fixtureJson("fixtures/layout-result/archimate-oef-basic.json")),
+                fixtureJson("fixtures/layout-result/archimate-oef-basic.json"),
+                fixtureJson("fixtures/export-policy/default-oef.json")),
             envWithOefSchemas());
 
-    JsonNode data = okData(result);
+    JsonNode envelope = JsonSupport.objectMapper().readTree(result.stdout());
+    JsonNode data = envelope.get("data");
 
     assertThat(result.exitCode()).isZero();
+    assertThat(envelope.at("/status").asText()).isEqualTo("warning");
+    assertThat(envelope.at("/diagnostics/0/code").asText())
+        .isEqualTo("DEDIREN_EXPORT_IDENTITY_PLACEHOLDER");
     assertThat(data.at("/artifact_kind").asText()).isEqualTo("archimate-oef+xml");
     // Regression backstop only; the spec-named assertions in the sibling tests are the primary
     // oracle. Update this golden via a reviewed baseline refresh when the OEF contract changes
@@ -638,7 +645,12 @@ class MainTest {
   }
 
   private String exportInput(JsonNode source, JsonNode layout) throws Exception {
-    return exportInput(source, layout, fixtureJson("fixtures/export-policy/default-oef.json"));
+    // A real (non-fixture) model identity: these envelope tests pin view coverage and envelope
+    // shape, not the identity tripwire (OefExportEngineTest owns that), so keep the
+    // DEDIREN_EXPORT_IDENTITY_PLACEHOLDER warning out of their diagnostics.
+    ObjectNode policy = (ObjectNode) fixtureJson("fixtures/export-policy/default-oef.json");
+    policy.put("model_identifier", "id-maintest-real-model");
+    return exportInput(source, layout, policy);
   }
 
   private String exportInput(JsonNode source, JsonNode layout, JsonNode policy) throws Exception {

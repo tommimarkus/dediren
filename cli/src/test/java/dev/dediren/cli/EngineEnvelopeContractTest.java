@@ -170,7 +170,11 @@ class EngineEnvelopeContractTest {
   @Test
   void exportArchimateOefEmitsOkEnvelope() throws Exception {
     Map<String, String> schema = envWithOefSchemas();
-    String policy = read("fixtures/export-policy/default-oef.json");
+    // A real (non-fixture) identity keeps this the clean-export ok-envelope contract; the
+    // placeholder-identity warning envelope is pinned separately below.
+    String policy =
+        read("fixtures/export-policy/default-oef.json")
+            .replace("id-dediren-oef-basic-model", "id-contract-real-model");
     String source = read("fixtures/source/valid-archimate-oef.json");
     Path base = path("fixtures/source");
     String layout = read("fixtures/layout-result/archimate-oef-basic.json");
@@ -180,6 +184,29 @@ class EngineEnvelopeContractTest {
             "archimate-oef", policy, source, base, layout, schema, engines());
 
     assertOk(outcome);
+  }
+
+  @Test
+  void exportWithPlaceholderIdentityEmitsWarningEnvelope() throws Exception {
+    // The unedited shipped default policy trips DEDIREN_EXPORT_IDENTITY_PLACEHOLDER: warning
+    // status, exit 0, artifact still produced — the envelope row for the identity tripwire.
+    Map<String, String> schema = envWithOefSchemas();
+    String policy = read("fixtures/export-policy/default-oef.json");
+    String source = read("fixtures/source/valid-archimate-oef.json");
+    Path base = path("fixtures/source");
+    String layout = read("fixtures/layout-result/archimate-oef-basic.json");
+
+    EngineRunOutcome outcome =
+        CoreCommands.exportCommand(
+            "archimate-oef", policy, source, base, layout, schema, engines());
+
+    assertThat(outcome.exitCode()).describedAs(outcome.stdout()).isZero();
+    JsonNode envelope = JsonSupport.objectMapper().readTree(outcome.stdout());
+    assertThat(envelope.get("status").asText()).isEqualTo("warning");
+    assertThat(envelope.at("/diagnostics/0/code").asText())
+        .isEqualTo("DEDIREN_EXPORT_IDENTITY_PLACEHOLDER");
+    assertThat(envelope.at("/diagnostics/0/severity").asText()).isEqualTo("warning");
+    assertSchemaValid(envelope);
   }
 
   @Test
@@ -204,7 +231,10 @@ class EngineEnvelopeContractTest {
   @Test
   void exportUmlXmiEmitsOkEnvelope() throws Exception {
     Map<String, String> schema = envWithXmiSchema();
-    String policy = read("fixtures/export-policy/default-uml-xmi.json");
+    // Real identity for the same reason as the OEF ok-envelope test above.
+    String policy =
+        read("fixtures/export-policy/default-uml-xmi.json")
+            .replace("id-dediren-uml-basic-model", "id-contract-real-model");
     String source = read("fixtures/source/valid-uml-basic.json");
     Path base = path("fixtures/source");
     String layout = read("fixtures/layout-result/uml-basic.json");

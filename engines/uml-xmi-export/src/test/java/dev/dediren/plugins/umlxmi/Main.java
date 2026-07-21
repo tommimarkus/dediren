@@ -3,6 +3,7 @@ package dev.dediren.plugins.umlxmi;
 import dev.dediren.contracts.CommandEnvelope;
 import dev.dediren.contracts.ContractVersions;
 import dev.dediren.contracts.Diagnostic;
+import dev.dediren.contracts.DiagnosticSeverity;
 import dev.dediren.contracts.EnvelopeStatus;
 import dev.dediren.contracts.export.ExportRequest;
 import dev.dediren.contracts.export.ExportResult;
@@ -91,7 +92,11 @@ public final class Main {
     if (diagnostics.isEmpty()) {
       return CommandEnvelope.ok(result);
     }
+    boolean warned = diagnostics.stream().anyMatch(d -> d.severity() != DiagnosticSeverity.INFO);
     return new CommandEnvelope<>(
-        ContractVersions.ENVELOPE_SCHEMA_VERSION, EnvelopeStatus.OK, result, diagnostics);
+        ContractVersions.ENVELOPE_SCHEMA_VERSION,
+        warned ? EnvelopeStatus.WARNING : EnvelopeStatus.OK,
+        result,
+        diagnostics);
   }
 }

@@ -81,18 +81,22 @@ Steps:
 
 ## Task 2 — Placeholder-identity tripwire (survey 1.2a)
 
-- [ ] RED: export-engine tests — OEF/XMI export with the shipped default
-      policy identity values emits **warning** diagnostic
-      `DEDIREN_EXPORT_IDENTITY_PLACEHOLDER` (status `warning`, exit 0);
-      a real-identity policy emits nothing.
-- [ ] GREEN: new `DiagnosticCode`; known-placeholder value sets owned by each
-      export engine (source of truth: the shipped
-      `fixtures/export-policy/default-*.json` values, pinned by a test that
-      fails if fixture and constant drift).
-- [ ] `build` lane surfaces the same diagnostic (rides view diagnostics).
-- [ ] Docs: `## Repair Rules` entry (copy the policy, replace identity) —
-      turning the existing prose warning into a coded, decidable branch.
-- [ ] Defer `--strict-identity` escalation until demanded (record here).
+- [x] RED: export-engine tests — OEF/XMI export with the shipped default
+      policy identity emits the `DEDIREN_EXPORT_IDENTITY_PLACEHOLDER` warning;
+      a real-identity policy emits nothing. Trigger keyed on
+      `model_identifier` equality (the false-positive-proof signal).
+- [x] GREEN: shared `DiagnosticCode`; per-engine placeholder constants with
+      drift-pin tests against the shipped `default-*.json` fixtures.
+- [x] `build` lane + decomposed `export` + packaged bundle all pin the
+      warning: lane tests flipped to the truthful `warning` expectation where
+      they deliberately run the default policy; the dist-smoke now REQUIRES
+      the warning end-to-end (packaging-survival proof); the envelope-contract
+      suite gained the warning-envelope row. Test-harness `Main`s (both export
+      engines) were also fixed: they hardcoded `status: ok` for any
+      diagnostics — now they mirror the real ok/warning/info-ride-ok policy.
+- [x] Docs: `## Repair Rules` entry + `## Export` and both omission sections
+      note the warning; documented-workflow tests updated accordingly.
+- [x] `--strict-identity` escalation deferred until demanded.
 
 ## Task 3 — Policy validation via `validate` (survey 1.2b)
 

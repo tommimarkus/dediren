@@ -105,7 +105,7 @@ class MainTest {
 
     CliResult export = runExport(env, root, source, layoutFile);
 
-    JsonNode exportData = okData(export);
+    JsonNode exportData = exportDataExpectingIdentityWarning(export);
     String xmi = exportData.at("/content").asText();
     assertThat(exportData.at("/artifact_kind").asText()).isEqualTo("uml-xmi+xml");
     assertThat(xmi)
@@ -160,7 +160,7 @@ class MainTest {
 
     CliResult export = runExport(env, root, source, layoutFile);
 
-    JsonNode exportData = okData(export);
+    JsonNode exportData = exportDataExpectingIdentityWarning(export);
     String xmi = exportData.at("/content").asText();
     assertThat(exportData.at("/artifact_kind").asText()).isEqualTo("uml-xmi+xml");
     assertThat(xmi).contains("uml:CombinedFragment", "interactionOperator=\"alt\"");
@@ -213,7 +213,7 @@ class MainTest {
 
     CliResult export = runExport(env, root, source, layoutFile);
 
-    JsonNode exportData = okData(export);
+    JsonNode exportData = exportDataExpectingIdentityWarning(export);
     String xmi = exportData.at("/content").asText();
     assertThat(exportData.at("/artifact_kind").asText()).isEqualTo("uml-xmi+xml");
     assertThat(xmi).contains("uml:StateMachine", "id-order-lifecycle", "id-t-submit");
@@ -281,7 +281,7 @@ class MainTest {
 
     CliResult export = runExport(env, root, source, layoutFile);
 
-    JsonNode exportData = okData(export);
+    JsonNode exportData = exportDataExpectingIdentityWarning(export);
     String xmi = exportData.at("/content").asText();
     assertThat(exportData.at("/artifact_kind").asText()).isEqualTo("uml-xmi+xml");
     assertThat(xmi)
@@ -349,7 +349,7 @@ class MainTest {
 
     CliResult export = runExport(env, root, source, layoutFile);
 
-    JsonNode exportData = okData(export);
+    JsonNode exportData = exportDataExpectingIdentityWarning(export);
     String xmi = exportData.at("/content").asText();
     assertThat(exportData.at("/artifact_kind").asText()).isEqualTo("uml-xmi+xml");
     assertThat(xmi)
@@ -417,7 +417,7 @@ class MainTest {
 
     CliResult export = runExport(env, root, source, layoutFile);
 
-    JsonNode exportData = okData(export);
+    JsonNode exportData = exportDataExpectingIdentityWarning(export);
     String xmi = exportData.at("/content").asText();
     assertThat(exportData.at("/artifact_kind").asText()).isEqualTo("uml-xmi+xml");
     assertThat(xmi)
@@ -762,6 +762,21 @@ class MainTest {
     assertThat(result.exitCode()).describedAs(result.stdout()).isZero();
     assertThat(result.stderr()).isEmpty();
     assertThat(envelope.at("/status").asText()).describedAs(result.stdout()).isEqualTo("ok");
+    return envelope.get("data");
+  }
+
+  /**
+   * The documented workflows reuse the shipped default export policy verbatim, so the export
+   * envelope carries the identity-tripwire warning ({@code DEDIREN_EXPORT_IDENTITY_PLACEHOLDER});
+   * content and exit code are unaffected.
+   */
+  private JsonNode exportDataExpectingIdentityWarning(CliResult result) throws Exception {
+    JsonNode envelope = JsonSupport.objectMapper().readTree(result.stdout());
+    assertThat(result.exitCode()).describedAs(result.stdout()).isZero();
+    assertThat(result.stderr()).isEmpty();
+    assertThat(envelope.at("/status").asText()).describedAs(result.stdout()).isEqualTo("warning");
+    assertThat(envelope.at("/diagnostics/0/code").asText())
+        .isEqualTo("DEDIREN_EXPORT_IDENTITY_PLACEHOLDER");
     return envelope.get("data");
   }
 

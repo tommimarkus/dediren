@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import dev.dediren.contracts.DiagnosticSeverity;
 import dev.dediren.contracts.export.ExportRequest;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.engine.EngineException;
@@ -37,6 +38,49 @@ class XmiExportEngineTest {
   @Test
   void idIsUmlXmi() {
     assertThat(engine.id()).isEqualTo("uml-xmi");
+  }
+
+  @Test
+  void exportWithShippedDefaultPolicyIdentityWarnsPlaceholder() throws Exception {
+    // The shipped default policy hard-codes fixture identity and export succeeds with it
+    // unchanged — the tripwire turns that silent wrong-identity ship into a decidable warning.
+    ExportRequest request = engine.parseRequest(exportInput());
+
+    EngineResult<?> result =
+        engine.export(request, envWithXmiSchema(), Path.of("").toAbsolutePath());
+
+    assertThat(result.diagnostics())
+        .anySatisfy(
+            diagnostic -> {
+              assertThat(diagnostic.code()).isEqualTo("DEDIREN_EXPORT_IDENTITY_PLACEHOLDER");
+              assertThat(diagnostic.severity()).isEqualTo(DiagnosticSeverity.WARNING);
+              assertThat(diagnostic.message()).contains("id-dediren-uml-basic-model");
+            });
+  }
+
+  @Test
+  void exportWithRealModelIdentifierDoesNotWarnPlaceholder() throws Exception {
+    JsonNode inputJson = exportInputJson();
+    ((ObjectNode) inputJson.get("policy")).put("model_identifier", "id-acme-payments-model");
+    byte[] input =
+        JsonSupport.objectMapper().writeValueAsString(inputJson).getBytes(StandardCharsets.UTF_8);
+
+    ExportRequest request = engine.parseRequest(input);
+    EngineResult<?> result =
+        engine.export(request, envWithXmiSchema(), Path.of("").toAbsolutePath());
+
+    assertThat(result.diagnostics())
+        .noneMatch(diagnostic -> diagnostic.code().equals("DEDIREN_EXPORT_IDENTITY_PLACEHOLDER"));
+  }
+
+  @Test
+  void placeholderTripwireTracksTheShippedDefaultPolicy() throws Exception {
+    // If the shipped default policy's identity ever changes, the engine's placeholder constant
+    // must move with it or the tripwire goes blind.
+    JsonNode shipped = fixtureJson("fixtures/export-policy/default-uml-xmi.json");
+
+    assertThat(XmiExportEngine.PLACEHOLDER_MODEL_IDENTIFIER)
+        .isEqualTo(shipped.get("model_identifier").asText());
   }
 
   @Test

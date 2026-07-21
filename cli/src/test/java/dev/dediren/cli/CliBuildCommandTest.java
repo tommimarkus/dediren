@@ -230,7 +230,15 @@ class CliBuildCommandTest {
 
     assertThat(result.exitCode()).describedAs(result.stdout()).isZero();
     JsonNode buildResult = assertBuildResultSchemaValid(result.stdout());
-    assertThat(buildResult.at("/status").asText()).isEqualTo("ok");
+    // This lane deliberately runs the unedited shipped default policy (the content assertion
+    // below pins its fixture identity), so the per-view fold carries the identity-tripwire
+    // warning and the build status is warning, exit still 0.
+    assertThat(buildResult.at("/status").asText()).isEqualTo("warning");
+    assertThat(buildResult.at("/views/0/diagnostics"))
+        .anySatisfy(
+            diagnostic ->
+                assertThat(diagnostic.at("/code").asText())
+                    .isEqualTo("DEDIREN_EXPORT_IDENTITY_PLACEHOLDER"));
     assertThat(buildResult.at("/views/0/artifacts/0/artifact_kind").asText())
         .isEqualTo("archimate-oef+xml");
     assertThat(buildResult.at("/views/0/artifacts/0/path").asText()).isEqualTo("main/oef.xml");
@@ -261,7 +269,13 @@ class CliBuildCommandTest {
 
     assertThat(result.exitCode()).describedAs(result.stdout()).isZero();
     JsonNode buildResult = assertBuildResultSchemaValid(result.stdout());
-    assertThat(buildResult.at("/status").asText()).isEqualTo("ok");
+    // Unedited shipped default policy → identity-tripwire warning rides the view; exit still 0.
+    assertThat(buildResult.at("/status").asText()).isEqualTo("warning");
+    assertThat(buildResult.at("/views/0/diagnostics"))
+        .anySatisfy(
+            diagnostic ->
+                assertThat(diagnostic.at("/code").asText())
+                    .isEqualTo("DEDIREN_EXPORT_IDENTITY_PLACEHOLDER"));
     assertThat(buildResult.at("/views/0/artifacts/0/artifact_kind").asText())
         .isEqualTo("uml-xmi+xml");
     assertThat(buildResult.at("/views/0/artifacts/0/path").asText())

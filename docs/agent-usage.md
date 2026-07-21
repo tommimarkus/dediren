@@ -172,7 +172,9 @@ per-element `<property>` values, so evidence-classification markers survive the
 export. When the source declares more views than the exported one, the omission
 is declared (rather than dropped silently) with the `info` diagnostic
 `DEDIREN_OEF_VIEWS_OMITTED`, which names the omitted view ids and counts; the
-envelope `status` stays `ok`. Because the document always carries a
+envelope `status` stays `ok` for omissions alone (an unedited default policy
+adds the `DEDIREN_EXPORT_IDENTITY_PLACEHOLDER` warning, which lifts it to
+`warning` — see `## Export`). Because the document always carries a
 `<views>`/`<diagrams>` element it declares and validates against
 `archimate3_Diagram.xsd`, not the model-only `archimate3_Model.xsd`; point
 `DEDIREN_OEF_SCHEMA_DIR` at a directory holding all three ArchiMate 3.1 OEF XSDs.
@@ -231,7 +233,9 @@ the source model contains elements or relationships outside the exported view,
 the export declares them (rather than dropping them silently) with `info`
 diagnostics `DEDIREN_XMI_ELEMENTS_OMITTED` and
 `DEDIREN_XMI_RELATIONSHIPS_OMITTED`, each listing the omitted count and a
-per-type breakdown; the envelope `status` stays `ok`. Read those diagnostics
+per-type breakdown; the envelope `status` stays `ok` for omissions alone (an
+unedited default policy adds the `DEDIREN_EXPORT_IDENTITY_PLACEHOLDER`
+warning, which lifts it to `warning` — see `## Export`). Read those diagnostics
 from `.diagnostics[]` to know exactly what a given XMI does and does not cover
 (for example, to disclose "classes only") and export the other views to
 represent their content.
@@ -808,8 +812,10 @@ jq -r '.data.content' oef-result.json > model-oef.xml
 
 The default export policies hard-code fixture identity: `default-oef.json`
 sets `model_identifier: "id-dediren-oef-basic-model"` and
-`model_name: "Dediren OEF Basic"`. Export succeeds with them unchanged, so
-copy the policy and replace the identity fields for a real model:
+`model_name: "Dediren OEF Basic"`. Export succeeds with them unchanged, but
+the envelope carries the warning `DEDIREN_EXPORT_IDENTITY_PLACEHOLDER`
+(`status: warning`, exit still 0) so a mis-identified deliverable cannot ship
+silently — copy the policy and replace the identity fields for a real model:
 
 ```json
 {
@@ -872,6 +878,11 @@ you can recover from stdout JSON alone.
   validator (`xmllint` by default) is missing, timed out, or failed to start.
   Install libxml2's `xmllint` or point the validator override variable at one
   (see `## Plugin Environment`); not a JSON problem — do not modify the model.
+- `DEDIREN_EXPORT_IDENTITY_PLACEHOLDER`: the export policy still carries the
+  shipped fixture identity (a `warning`; the artifact was produced and is
+  otherwise valid). Copy the default policy and replace its identity fields
+  (see `## Export`); expected and ignorable when deliberately exporting the
+  bundled fixtures.
 - `DEDIREN_ENGINE_FAILED`: an unexpected in-memory engine failure. Not an input
   problem — the diagnostic message names the engine; report it with the failing
   command and input rather than retrying with modified JSON.

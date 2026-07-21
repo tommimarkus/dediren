@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import dev.dediren.contracts.DiagnosticSeverity;
 import dev.dediren.contracts.export.ExportRequest;
 import dev.dediren.contracts.export.ExportResult;
 import dev.dediren.contracts.json.JsonSupport;
@@ -41,6 +42,49 @@ class OefExportEngineTest {
   @Test
   void idIsArchimateOef() {
     assertThat(engine.id()).isEqualTo("archimate-oef");
+  }
+
+  @Test
+  void exportWithShippedDefaultPolicyIdentityWarnsPlaceholder() throws Exception {
+    // The shipped default policy hard-codes fixture identity and export succeeds with it
+    // unchanged — the tripwire turns that silent wrong-identity ship into a decidable warning.
+    ExportRequest request = engine.parseRequest(exportInput());
+
+    EngineResult<ExportResult> result =
+        engine.export(request, envWithOefSchemas(), Path.of("").toAbsolutePath());
+
+    assertThat(result.diagnostics())
+        .anySatisfy(
+            diagnostic -> {
+              assertThat(diagnostic.code()).isEqualTo("DEDIREN_EXPORT_IDENTITY_PLACEHOLDER");
+              assertThat(diagnostic.severity()).isEqualTo(DiagnosticSeverity.WARNING);
+              assertThat(diagnostic.message()).contains("id-dediren-oef-basic-model");
+            });
+  }
+
+  @Test
+  void exportWithRealModelIdentifierDoesNotWarnPlaceholder() throws Exception {
+    JsonNode inputJson = exportInputJson();
+    ((ObjectNode) inputJson.get("policy")).put("model_identifier", "id-acme-payments-model");
+    byte[] input =
+        JsonSupport.objectMapper().writeValueAsString(inputJson).getBytes(StandardCharsets.UTF_8);
+
+    ExportRequest request = engine.parseRequest(input);
+    EngineResult<ExportResult> result =
+        engine.export(request, envWithOefSchemas(), Path.of("").toAbsolutePath());
+
+    assertThat(result.diagnostics())
+        .noneMatch(diagnostic -> diagnostic.code().equals("DEDIREN_EXPORT_IDENTITY_PLACEHOLDER"));
+  }
+
+  @Test
+  void placeholderTripwireTracksTheShippedDefaultPolicy() throws Exception {
+    // If the shipped default policy's identity ever changes, the engine's placeholder constant
+    // must move with it or the tripwire goes blind.
+    JsonNode shipped = fixtureJson("fixtures/export-policy/default-oef.json");
+
+    assertThat(OefExportEngine.PLACEHOLDER_MODEL_IDENTIFIER)
+        .isEqualTo(shipped.get("model_identifier").asText());
   }
 
   @Test

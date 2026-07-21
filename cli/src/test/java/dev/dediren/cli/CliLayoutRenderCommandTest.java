@@ -312,7 +312,11 @@ class CliLayoutRenderCommandTest {
     JsonNode envelope = envelope(result);
 
     assertThat(result.exitCode()).isZero();
-    assertThat(envelope.at("/status").asText()).isEqualTo("ok");
+    // Unedited shipped default policy (its identity is pinned in the content assertion below), so
+    // the envelope carries the identity-tripwire warning; exit still 0.
+    assertThat(envelope.at("/status").asText()).isEqualTo("warning");
+    assertThat(envelope.at("/diagnostics/0/code").asText())
+        .isEqualTo("DEDIREN_EXPORT_IDENTITY_PLACEHOLDER");
     assertThat(envelope.at("/data/artifact_kind").asText()).isEqualTo("archimate-oef+xml");
     assertThat(envelope.at("/data/content").asText())
         .contains(
@@ -344,7 +348,14 @@ class CliLayoutRenderCommandTest {
     JsonNode envelope = envelope(result);
 
     assertThat(result.exitCode()).isZero();
-    assertThat(envelope.at("/status").asText()).isEqualTo("ok");
+    // Unedited shipped default policy → identity-tripwire warning (appended after the coverage
+    // info diagnostics); exit still 0.
+    assertThat(envelope.at("/status").asText()).isEqualTo("warning");
+    assertThat(envelope.at("/diagnostics"))
+        .anySatisfy(
+            diagnostic ->
+                assertThat(diagnostic.at("/code").asText())
+                    .isEqualTo("DEDIREN_EXPORT_IDENTITY_PLACEHOLDER"));
     assertThat(envelope.at("/data/artifact_kind").asText()).isEqualTo("uml-xmi+xml");
     assertThat(envelope.at("/data/content").asText())
         .contains("xmi:XMI", "<uml:Model", "xmi:type=\"uml:Class\"");

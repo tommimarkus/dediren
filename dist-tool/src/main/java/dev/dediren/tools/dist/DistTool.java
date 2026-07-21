@@ -1,5 +1,6 @@
 package dev.dediren.tools.dist;
 
+import dev.dediren.contracts.DiagnosticCode;
 import dev.dediren.contracts.json.JsonSupport;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -504,7 +505,7 @@ public final class DistTool {
               null,
               Map.of("DEDIREN_OEF_SCHEMA_DIR", oefSchemas.toString()),
               Map.of());
-      assertArtifactKind(oefOutput, "archimate-oef+xml");
+      assertExportWithFixtureIdentity(oefOutput, "archimate-oef+xml");
       Path xmiSchema = writeXmiSchema(temp.resolve("XMI.xsd"));
       String xmiOutput =
           runBundleCommand(
@@ -523,7 +524,7 @@ public final class DistTool {
               null,
               Map.of("DEDIREN_XMI_SCHEMA_PATH", xmiSchema.toString()),
               Map.of());
-      assertArtifactKind(xmiOutput, "uml-xmi+xml");
+      assertExportWithFixtureIdentity(xmiOutput, "uml-xmi+xml");
 
       // Issue #47 regression (rehomed from the retired plugin-runtime testbed): a non-ASCII model
       // rendered through the packaged launcher under a C locale must round-trip intact, proving the
@@ -563,8 +564,26 @@ public final class DistTool {
             Map.of("DEDIREN_OEF_SCHEMA_DIR", oefSchemas.toString()),
             Map.of());
     JsonNode buildResult = JsonSupport.objectMapper().readTree(stdout);
-    if (!"ok".equals(buildResult.path("status").asText())) {
+    // The smoke deliberately exports with the unedited shipped default policy, so the packaged
+    // bundle must answer exactly "warning" with the identity-tripwire diagnostic — this doubles as
+    // end-to-end proof the tripwire survives packaging. Any other status is a smoke failure.
+    if (!"warning".equals(buildResult.path("status").asText())) {
       throw new IllegalStateException("dediren build did not succeed: " + stdout);
+    }
+    boolean tripwireCarried = false;
+    for (JsonNode diagnostic : buildResult.at("/views/0/diagnostics")) {
+      if (DiagnosticCode.EXPORT_IDENTITY_PLACEHOLDER
+          .code()
+          .equals(diagnostic.path("code").asText())) {
+        tripwireCarried = true;
+      }
+    }
+    if (!tripwireCarried) {
+      throw new IllegalStateException(
+          "fixture-identity build must carry "
+              + DiagnosticCode.EXPORT_IDENTITY_PLACEHOLDER.code()
+              + ": "
+              + stdout);
     }
     Path svg = buildOut.resolve("main/diagram.svg");
     Path oef = buildOut.resolve("main/oef.xml");
@@ -1141,9 +1160,35 @@ public final class DistTool {
     }
   }
 
-  private static void assertArtifactKind(String stdout, String expected) throws IOException {
-    JsonNode data = okData(stdout);
-    if (!expected.equals(data.path("artifact_kind").asText())) {
+  /**
+   * The smoke's export lanes deliberately run the unedited shipped default policies, so the
+   * packaged bundle must answer exactly a {@code warning} envelope carrying the identity-tripwire
+   * diagnostic — end-to-end proof the tripwire survives packaging — while still producing the
+   * artifact.
+   */
+  private static void assertExportWithFixtureIdentity(String stdout, String expected)
+      throws IOException {
+    JsonNode envelope = JsonSupport.objectMapper().readTree(stdout);
+    if (!"warning".equals(envelope.path("status").asText())) {
+      throw new IllegalStateException(
+          "fixture-identity export status should be warning: " + stdout);
+    }
+    boolean tripwireCarried = false;
+    for (JsonNode diagnostic : envelope.path("diagnostics")) {
+      if (DiagnosticCode.EXPORT_IDENTITY_PLACEHOLDER
+          .code()
+          .equals(diagnostic.path("code").asText())) {
+        tripwireCarried = true;
+      }
+    }
+    if (!tripwireCarried) {
+      throw new IllegalStateException(
+          "fixture-identity export must carry "
+              + DiagnosticCode.EXPORT_IDENTITY_PLACEHOLDER.code()
+              + ": "
+              + stdout);
+    }
+    if (!expected.equals(envelope.path("data").path("artifact_kind").asText())) {
       throw new IllegalStateException("artifact_kind should be " + expected + ": " + stdout);
     }
   }

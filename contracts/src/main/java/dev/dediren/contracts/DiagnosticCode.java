@@ -71,6 +71,10 @@ public enum DiagnosticCode {
   // Export schema-validator availability (export plugins; owned here for cross-module reuse).
   OEF_SCHEMA_VALIDATOR_UNAVAILABLE("DEDIREN_OEF_SCHEMA_VALIDATOR_UNAVAILABLE"),
   XMI_SCHEMA_VALIDATOR_UNAVAILABLE("DEDIREN_XMI_SCHEMA_VALIDATOR_UNAVAILABLE"),
+  // Shared export-policy tripwire (both export engines): the policy still carries the shipped
+  // fixture identity, so the artifact would introduce itself with placeholder identity. Warning,
+  // not error — the export succeeds; the agent decides.
+  EXPORT_IDENTITY_PLACEHOLDER("DEDIREN_EXPORT_IDENTITY_PLACEHOLDER"),
   // ArchiMate OEF export engine.
   ARCHIMATE_GROUP_SOURCE_NOT_GROUPING("DEDIREN_ARCHIMATE_GROUP_SOURCE_NOT_GROUPING"),
   OEF_LAYOUT_REFERENCE_MISSING("DEDIREN_OEF_LAYOUT_REFERENCE_MISSING"),
