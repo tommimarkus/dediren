@@ -33,11 +33,11 @@ import org.slf4j.LoggerFactory;
  *   <li><b>{@link EngineException}</b> — {@link CommandEnvelope#error} with the exception's exit
  *       code. A parse entry point that fails surfaces its published parse-failure envelope this
  *       same way (for example elk {@code DEDIREN_ELK_INPUT_INVALID_JSON} / exit 3).
- *   <li><b>{@link UncheckedIOException}</b> — re-thrown unchanged so the cli can reproduce a
- *       structural failure's observable (message to stderr, exit 2); it must never be buried as
- *       {@link DiagnosticCode#ENGINE_FAILED}.
  *   <li><b>any other exception</b> — a {@link DiagnosticCode#ENGINE_FAILED} {@link
- *       EngineExecutionException}, the successor of the retired process-crash category.
+ *       EngineExecutionException}, the successor of the retired process-crash category. This
+ *       includes {@link UncheckedIOException}: structural failures are now published {@link
+ *       EngineException#structuralFailure} envelopes (outcome 2), so a stray unchecked I/O
+ *       exception is an engine defect like any other.
  *   <li><b>unknown engine id / unsupported capability</b> — resolved by {@link #requireEngine}
  *       before dispatch: an id bound to no capability yields {@link DiagnosticCode#PLUGIN_UNKNOWN};
  *       an id bound only under another capability yields {@link
@@ -61,10 +61,9 @@ public final class EngineDispatch {
    * In-memory dispatch outcome: either the engine's typed {@link EngineResult}, or a published
    * error envelope's diagnostics plus exit code (an {@link EngineException}). An unexpected failure
    * is not an outcome here — {@link #dispatchInMemory} still throws {@link
-   * EngineExecutionException} ({@link DiagnosticCode#ENGINE_FAILED}); an {@link
-   * UncheckedIOException} still propagates unchanged. It lets the in-memory build pipe an engine's
-   * typed value straight into the next stage while the serializing {@link #dispatch} reuses the
-   * same branches to render an envelope.
+   * EngineExecutionException} ({@link DiagnosticCode#ENGINE_FAILED}). It lets the in-memory build
+   * pipe an engine's typed value straight into the next stage while the serializing {@link
+   * #dispatch} reuses the same branches to render an envelope.
    */
   public sealed interface InMemoryOutcome<T> {
     record Value<T>(EngineResult<T> result) implements InMemoryOutcome<T> {}
@@ -79,7 +78,7 @@ public final class EngineDispatch {
   }
 
   /**
-   * Resolves outcome 5: returns the bound engine, or throws the published unknown-id /
+   * Resolves outcome 4: returns the bound engine, or throws the published unknown-id /
    * unsupported-capability diagnostic. An id bound under any other capability in {@code engines} is
    * a capability mismatch, not an unknown id.
    */
@@ -104,9 +103,8 @@ public final class EngineDispatch {
    * Invokes the engine and folds its two published failure shapes into a typed {@link
    * InMemoryOutcome} instead of a serialized envelope: a {@link EngineException} becomes {@link
    * InMemoryOutcome.Failure} (its diagnostics + exit code), while an unexpected exception still
-   * maps to a {@link DiagnosticCode#ENGINE_FAILED} {@link EngineExecutionException} and an {@link
-   * UncheckedIOException} still propagates unchanged. This is the transport the in-memory build
-   * consumes; {@link #dispatch} is this method plus serialization.
+   * maps to a {@link DiagnosticCode#ENGINE_FAILED} {@link EngineExecutionException}. This is the
+   * transport the in-memory build consumes; {@link #dispatch} is this method plus serialization.
    */
   public static <T> InMemoryOutcome<T> dispatchInMemory(
       String engineId, EngineInvocation<T> invocation) throws EngineExecutionException {
@@ -117,8 +115,6 @@ public final class EngineDispatch {
     } catch (EngineException error) {
       LOG.debug("engine returned error envelope: id={} exit={}", engineId, error.exitCode());
       return new InMemoryOutcome.Failure<>(error.diagnostics(), error.exitCode());
-    } catch (UncheckedIOException error) {
-      throw error;
     } catch (ProductRootException error) {
       // Environment misconfiguration, not an engine defect: let cli convert it to its own
       // envelope instead of burying it in DEDIREN_ENGINE_FAILED.

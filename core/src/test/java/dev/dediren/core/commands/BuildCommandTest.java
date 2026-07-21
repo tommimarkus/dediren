@@ -311,9 +311,9 @@ class BuildCommandTest {
 
   @Test
   void unresolvableExplicitViewIsAPerViewErrorAndDoesNotAbortOthers() throws Exception {
-    // A real semantics engine (GenericGraphEngine) surfaces an unknown --views entry as an
-    // UncheckedIOException structural failure, not an EngineException; the fake reproduces that
-    // exact observable so the driver's catch (not a fake-only code path) is what's pinned here.
+    // A real semantics engine (SemanticsRouterEngine) surfaces an unknown --views entry as a
+    // published EngineException.structuralFailure envelope; the fake reproduces that exact
+    // observable so the driver's Failure fold (not a fake-only code path) is what's pinned here.
     BuildRequest request =
         new BuildRequest(
             SOURCE,
@@ -345,12 +345,10 @@ class BuildCommandTest {
     assertThat(missing.diagnostics())
         .anySatisfy(
             diagnostic -> {
-              assertThat(diagnostic.code()).isEqualTo("DEDIREN_COMMAND_INPUT_INVALID");
+              // The engine's structural diagnostic folds into the per-view diagnostics verbatim —
+              // no build-side rewrapping to DEDIREN_COMMAND_INPUT_INVALID.
+              assertThat(diagnostic.code()).isEqualTo("DEDIREN_GENERIC_GRAPH_VIEW_UNKNOWN");
               assertThat(diagnostic.severity()).isEqualTo(DiagnosticSeverity.ERROR);
-              // Exact equality (not contains) discriminates the getCause() != null ternary in
-              // runStage: the cleaned cause message, not the wrapped UncheckedIOException's
-              // "java.io.IOException: ..." message. A mutant that took error.getMessage() would
-              // fail this assertion because that message starts with the exception class name.
               assertThat(diagnostic.message()).isEqualTo("missing generic-graph view no-such-view");
             });
   }
@@ -878,7 +876,8 @@ class BuildCommandTest {
     }
 
     @Override
-    public EngineResult<SceneGraph> projectScene(SourceDocument source, String view) {
+    public EngineResult<SceneGraph> projectScene(SourceDocument source, String view)
+        throws EngineException {
       requireKnownView(view);
       LayoutRequest layoutRequest =
           new LayoutRequest(
@@ -915,16 +914,19 @@ class BuildCommandTest {
           List.of());
     }
 
-    // Reproduces GenericGraphEngine's real observable for an unresolvable view: a raw
-    // UncheckedIOException structural failure, not an EngineException. Only "no-such-view" is
-    // treated as unresolvable (the one existing test that needs this); every other view id --
-    // including a defense-in-depth-only id like "../evil" that a real GenericGraphEngine would
-    // never see, because it is not a source view id -- is accepted here so per-view confinement
-    // checks further down the pipeline (BuildCommand.requireWithinOutDir) are what gets exercised.
-    private static void requireKnownView(String view) {
+    // Reproduces SemanticsRouterEngine's real observable for an unresolvable view: a published
+    // EngineException.structuralFailure envelope (GENERIC_GRAPH_VIEW_UNKNOWN, exit 2). Only
+    // "no-such-view" is treated as unresolvable (the one existing test that needs this); every
+    // other view id -- including a defense-in-depth-only id like "../evil" that a real semantics
+    // engine would never see, because it is not a source view id -- is accepted here so per-view
+    // confinement checks further down the pipeline (BuildCommand.requireWithinOutDir) are what
+    // gets exercised.
+    private static void requireKnownView(String view) throws EngineException {
       if (view.equals("no-such-view")) {
-        throw new java.io.UncheckedIOException(
-            new java.io.IOException("missing generic-graph view " + view));
+        throw EngineException.structuralFailure(
+            "DEDIREN_GENERIC_GRAPH_VIEW_UNKNOWN",
+            "missing generic-graph view " + view,
+            "$.plugins.generic-graph.views");
       }
     }
   }

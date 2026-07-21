@@ -30,13 +30,13 @@ import tools.jackson.databind.JsonNode;
  * diagnostic codes, JSON paths, and exit codes are preserved, with the notation legality that used
  * to switch on a string profile now delegated to the routed {@code NotationSemantics}.
  *
- * <p>Published enveloped diagnostics (exit 3) surface as {@link EngineException}. generic-graph
- * publishes no envelope for structural projection failures (missing {@code plugins.generic-graph}
- * or an unknown view id): those surface as today's raw non-enveloped exit, reproduced here by
- * throwing {@link UncheckedIOException}, which the interface's {@code throws EngineException}
- * clause cannot carry as a checked {@link IOException}; the cli's {@code Main} (hosting this engine
- * in-process via {@code EngineWiring}) routes them to today's exit codes — there is no separate
- * semantics {@code Main} in this module.
+ * <p>Every failure is enveloped. Semantic legality failures surface as {@link
+ * EngineException#semanticFailure} (exit 3); structural failures — a source without {@code
+ * plugins.generic-graph}, an unknown view id — surface as {@link EngineException#structuralFailure}
+ * (exit 2, the published INPUT_ERROR observable, now with the envelope on stdout). Post-validation
+ * projection invariants ({@link IOException} out of {@link SceneProjection}) still ride {@link
+ * UncheckedIOException} and are enveloped by dispatch as {@code DEDIREN_ENGINE_FAILED} — they are
+ * engine defects, not input errors.
  */
 public final class SemanticsRouterEngine implements SemanticsEngine {
 
@@ -143,7 +143,10 @@ public final class SemanticsRouterEngine implements SemanticsEngine {
             .findFirst()
             .orElse(null);
     if (selectedView == null) {
-      throw new UncheckedIOException(new IOException("missing generic-graph view " + view));
+      throw EngineException.structuralFailure(
+          DiagnosticCode.GENERIC_GRAPH_VIEW_UNKNOWN.code(),
+          "missing generic-graph view " + view,
+          "$.plugins.generic-graph.views");
     }
 
     GenericGraphSemanticProfile profile = SemanticProfiles.sourceSemanticProfile(pluginData);
@@ -160,10 +163,13 @@ public final class SemanticsRouterEngine implements SemanticsEngine {
     };
   }
 
-  private static GenericGraphPluginData pluginData(SourceDocument source) {
+  private static GenericGraphPluginData pluginData(SourceDocument source) throws EngineException {
     JsonNode pluginValue = source.plugins().get("generic-graph");
     if (pluginValue == null) {
-      throw new UncheckedIOException(new IOException("missing plugins.generic-graph"));
+      throw EngineException.structuralFailure(
+          DiagnosticCode.GENERIC_GRAPH_PLUGIN_REQUIRED.code(),
+          "missing plugins.generic-graph",
+          "$.plugins.generic-graph");
     }
     return JsonSupport.objectMapper().treeToValue(pluginValue, GenericGraphPluginData.class);
   }

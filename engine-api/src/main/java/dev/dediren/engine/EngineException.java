@@ -38,6 +38,19 @@ public final class EngineException extends Exception {
         List.of(new Diagnostic(code, DiagnosticSeverity.ERROR, message, path)), 3);
   }
 
+  /**
+   * An input-shaped structural failure: one ERROR diagnostic and exit 2.
+   *
+   * <p>Structural failures (a source without {@code plugins.generic-graph}, an unknown view id) are
+   * the caller's input being wrong, not the engine misbehaving, so they keep the published
+   * INPUT_ERROR exit {@code 2} — unlike {@link #semanticFailure}'s engine-boundary exit {@code 3}.
+   * The exit-code policy lives here at the boundary for the same reason semanticFailure's does.
+   */
+  public static EngineException structuralFailure(String code, String message, String path) {
+    return new EngineException(
+        List.of(new Diagnostic(code, DiagnosticSeverity.ERROR, message, path)), 2);
+  }
+
   public List<Diagnostic> diagnostics() {
     return diagnostics;
   }

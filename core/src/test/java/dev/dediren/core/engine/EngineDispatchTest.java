@@ -127,11 +127,12 @@ class EngineDispatchTest {
   }
 
   @Test
-  void dispatchInMemoryPropagatesUncheckedIoExceptionUnchanged() {
-    // A structural failure must ride the raw UncheckedIOException so the cli can reproduce its
-    // observable; dispatchInMemory must not bury it as a Failure or ENGINE_FAILED.
-    UncheckedIOException boom =
-        new UncheckedIOException(new IOException("missing generic-graph view"));
+  void dispatchInMemoryBuriesUncheckedIoExceptionAsEngineFailed() {
+    // Structural failures are published EngineException.structuralFailure envelopes now, so a
+    // stray UncheckedIOException out of an engine is an engine defect like any other unexpected
+    // exception: it maps to the published ENGINE_FAILED diagnostic instead of propagating raw —
+    // every outcome stays decidable from stdout JSON.
+    UncheckedIOException boom = new UncheckedIOException(new IOException("stray unchecked I/O"));
 
     assertThatThrownBy(
             () ->
@@ -140,7 +141,11 @@ class EngineDispatchTest {
                     () -> {
                       throw boom;
                     }))
-        .isSameAs(boom);
+        .isInstanceOf(EngineExecutionException.class)
+        .satisfies(
+            error ->
+                assertThat(((EngineExecutionException) error).diagnostic().code())
+                    .isEqualTo("DEDIREN_ENGINE_FAILED"));
   }
 
   @Test
@@ -296,11 +301,10 @@ class EngineDispatchTest {
   }
 
   @Test
-  void uncheckedIoExceptionPropagatesInsteadOfBecomingEngineFailed() {
-    // generic-graph structural failures ride UncheckedIOException so the cli can reproduce the
-    // plugin-native observable (message to stderr, exit 2); the dispatch must not bury them.
-    UncheckedIOException boom =
-        new UncheckedIOException(new IOException("missing generic-graph view"));
+  void uncheckedIoExceptionBecomesEngineFailed() {
+    // The serializing dispatch inherits the same burial: no raw exception class earns a
+    // non-enveloped exit anymore.
+    UncheckedIOException boom = new UncheckedIOException(new IOException("stray unchecked I/O"));
 
     assertThatThrownBy(
             () ->
@@ -309,7 +313,11 @@ class EngineDispatchTest {
                     () -> {
                       throw boom;
                     }))
-        .isSameAs(boom);
+        .isInstanceOf(EngineExecutionException.class)
+        .satisfies(
+            error ->
+                assertThat(((EngineExecutionException) error).diagnostic().code())
+                    .isEqualTo("DEDIREN_ENGINE_FAILED"));
   }
 
   @Test

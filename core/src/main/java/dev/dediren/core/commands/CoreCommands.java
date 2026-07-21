@@ -36,8 +36,6 @@ import dev.dediren.ir.LayoutRequestMapper;
 import dev.dediren.ir.SceneGraph;
 import dev.dediren.ir.quality.InvariantViolation;
 import dev.dediren.ir.quality.SequenceInvariants;
-import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -134,9 +132,13 @@ public final class CoreCommands {
                 LayoutRequestMapper.toRequest(projected.value()), projected.diagnostics());
           });
     }
-    // A structural failure's observable: message to stderr, exit 2. The cli catches this
-    // UncheckedIOException and prints its cause, keeping the published non-enveloped form.
-    throw new UncheckedIOException(new IOException("unsupported target: " + target));
+    return errorOutcome(
+        List.of(
+            new Diagnostic(
+                DiagnosticCode.COMMAND_TARGET_UNSUPPORTED.code(),
+                DiagnosticSeverity.ERROR,
+                "unsupported target: " + target,
+                null)));
   }
 
   public static EngineRunOutcome semanticValidateCommand(

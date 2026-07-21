@@ -303,7 +303,7 @@ class CliBuildCommandTest {
     assertThat(buildResult.at("/views/1/status").asText()).isEqualTo("error");
     assertThat(buildResult.at("/views/1/artifacts")).isEmpty();
     assertThat(buildResult.at("/views/1/diagnostics/0/code").asText())
-        .isEqualTo("DEDIREN_COMMAND_INPUT_INVALID");
+        .isEqualTo("DEDIREN_GENERIC_GRAPH_VIEW_UNKNOWN");
   }
 
   @Test

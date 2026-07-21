@@ -420,13 +420,14 @@ public final class BuildCommand {
   }
 
   /**
-   * Runs one in-memory stage, folding the two published stage failures into the per-view
-   * diagnostics exactly as the process CLI did: a structured {@link EngineExecutionException}
-   * (unknown engine, unsupported capability, or an unexpected engine failure) folds with a {@code
-   * PLUGIN_ERROR} exit; a raw {@link UncheckedIOException} structural failure (an unresolvable
-   * {@code --views} entry) folds with an {@code INPUT_ERROR} exit so it never aborts the other
-   * views. On success the stage's own diagnostics are appended and its warning bit is the same the
-   * success envelope would carry (any non-info diagnostic).
+   * Runs one in-memory stage, folding the published stage failure into the per-view diagnostics: a
+   * structured {@link EngineExecutionException} (unknown engine, unsupported capability, or an
+   * unexpected engine failure) folds with a {@code PLUGIN_ERROR} exit and never aborts the other
+   * views. A structural failure (an unresolvable {@code --views} entry) is no longer a raw
+   * exception: it arrives as an {@link EngineDispatch.InMemoryOutcome.Failure} carrying the
+   * engine's published structural envelope (exit 2) and folds through the outcome branch below. On
+   * success the stage's own diagnostics are appended and its warning bit is the same the success
+   * envelope would carry (any non-info diagnostic).
    */
   private static <T> InMemoryStage<T> runStage(List<Diagnostic> diagnostics, InMemoryCall<T> call) {
     EngineDispatch.InMemoryOutcome<T> outcome;
@@ -435,14 +436,6 @@ public final class BuildCommand {
     } catch (EngineExecutionException error) {
       diagnostics.add(error.diagnostic());
       return InMemoryStage.crashed(CommandExitCode.PLUGIN_ERROR.code());
-    } catch (UncheckedIOException error) {
-      diagnostics.add(
-          new Diagnostic(
-              DiagnosticCode.COMMAND_INPUT_INVALID.code(),
-              DiagnosticSeverity.ERROR,
-              error.getCause() != null ? error.getCause().getMessage() : error.getMessage(),
-              "command:build"));
-      return InMemoryStage.crashed(CommandExitCode.INPUT_ERROR.code());
     }
     return switch (outcome) {
       case EngineDispatch.InMemoryOutcome.Value<T> value -> {

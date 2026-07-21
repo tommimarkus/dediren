@@ -106,8 +106,6 @@ public final class DedirenTools {
       return engineFailure(failure);
     } catch (ProductRootException failure) {
       return error(DiagnosticCode.PRODUCT_ROOT_UNRESOLVED, failure.getMessage(), null);
-    } catch (UncheckedIOException failure) {
-      return error(DiagnosticCode.COMMAND_INPUT_INVALID, failure.getMessage(), source);
     }
   }
 

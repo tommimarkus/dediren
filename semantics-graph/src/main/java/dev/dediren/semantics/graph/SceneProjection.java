@@ -16,7 +16,6 @@ import dev.dediren.engine.NotationSemantics;
 import dev.dediren.ir.SceneGraph;
 import dev.dediren.ir.SceneGroup;
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -189,10 +188,13 @@ final class SceneProjection {
         selectedView.layoutPreferences());
   }
 
-  private static GenericGraphPluginData pluginData(SourceDocument source) {
+  // Unreachable in practice — the router resolves plugin data before projecting — so this is a
+  // checked invariant that dispatch would envelope as DEDIREN_ENGINE_FAILED, not a structural
+  // failure of its own.
+  private static GenericGraphPluginData pluginData(SourceDocument source) throws IOException {
     JsonNode pluginValue = source.plugins().get("generic-graph");
     if (pluginValue == null) {
-      throw new UncheckedIOException(new IOException("missing plugins.generic-graph"));
+      throw new IOException("missing plugins.generic-graph");
     }
     return JsonSupport.objectMapper().treeToValue(pluginValue, GenericGraphPluginData.class);
   }

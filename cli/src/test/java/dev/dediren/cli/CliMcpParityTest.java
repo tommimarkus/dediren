@@ -72,6 +72,49 @@ class CliMcpParityTest {
   }
 
   @Test
+  void structuralFailureProducesTheSameEnvelopeThroughBothLanes(@TempDir Path root)
+      throws Exception {
+    // Missing plugins.generic-graph passes schema validation ("plugins": {} is legal) and fails
+    // structurally in the semantics engine. Both lanes must carry the same error envelope — this
+    // failure class historically went raw (stderr + empty stdout) on the CLI lane only.
+    Path source = root.resolve("model.json");
+    Files.writeString(
+        source,
+        """
+        {
+          "model_schema_version": "model.schema.v1",
+          "nodes": [],
+          "relationships": [],
+          "plugins": {}
+        }
+        """);
+
+    CliResult cli =
+        Main.executeForTesting(
+            new String[] {
+              "validate",
+              "--plugin",
+              "generic-graph",
+              "--profile",
+              "archimate",
+              "--input",
+              source.toString()
+            },
+            "",
+            Map.of());
+
+    CallToolResult mcp =
+        new DedirenTools(root, EngineWiring.defaults(), Map.of())
+            .validate(
+                new CallToolRequest(
+                    "dediren_validate", Map.of("source", "model.json", "profile", "archimate")));
+
+    assertThat(cli.exitCode()).isEqualTo(2);
+    assertThat(textOf(mcp).strip()).isEqualTo(cli.stdout().strip());
+    assertThat(mcp.isError()).isTrue();
+  }
+
+  @Test
   void buildProducesTheSameEnvelopeThroughBothLanes(@TempDir Path root) throws Exception {
     Path source = root.resolve("model.json");
     Files.copy(fixture("valid-pipeline-rich.json"), source);

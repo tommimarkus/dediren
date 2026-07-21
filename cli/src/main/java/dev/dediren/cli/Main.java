@@ -149,8 +149,6 @@ public final class Main {
                   plugin, profile, inputText.text(), inputText.baseDir(), env, engines));
         } catch (EngineExecutionException error) {
           return printPluginError(error);
-        } catch (UncheckedIOException error) {
-          return printStructuralFailure(spec, error);
         } catch (ProductRootException error) {
           return printProductRootFailure(spec, error);
         }
@@ -220,8 +218,6 @@ public final class Main {
                 plugin, target, view, inputText.text(), inputText.baseDir(), env, engines));
       } catch (EngineExecutionException error) {
         return writePluginError(spec, error);
-      } catch (UncheckedIOException error) {
-        return printStructuralFailure(spec, error);
       } catch (ProductRootException error) {
         return printProductRootFailure(spec, error);
       }
@@ -567,18 +563,6 @@ public final class Main {
     }
     return writeEnvelope(
         spec, CommandEnvelope.error(List.of(error.diagnostic())), CommandExitCode.PLUGIN_ERROR);
-  }
-
-  /**
-   * Reproduces the plugin-native observable for a semantics structural failure (missing {@code
-   * plugins.generic-graph}, an unknown view, or an unsupported target): the engine surfaces it as
-   * an {@link UncheckedIOException}, and the process {@code Main} printed the cause message to
-   * stderr and exited {@code 2}. stdout stays empty; agents read this as a raw non-enveloped
-   * failure.
-   */
-  private static Integer printStructuralFailure(CommandSpec spec, UncheckedIOException error) {
-    spec.commandLine().getErr().println(error.getCause().getMessage());
-    return CommandExitCode.INPUT_ERROR.code();
   }
 
   /**

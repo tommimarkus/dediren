@@ -58,21 +58,26 @@ Design (verified against live code):
 
 Steps:
 
-- [ ] RED: CLI tests asserting stdout error envelope + exit 2 + code for all
+- [x] RED: CLI tests asserting stdout error envelope + exit 2 + code for all
       three classes (`validate --plugin/--profile` missing-plugins;
       `project` unknown view; `project --target bogus`); extend
       `CliMcpParityTest` for the MCP-reachable class (validate-with-profile,
-      missing plugins block) asserting CLI/MCP byte-identical envelopes.
-- [ ] GREEN: factory + codes + throw-site conversions + deletions above.
-- [ ] Update tests pinning the old observable
-      (`EngineDispatchTest` propagate-unchanged pair → burial-is-correct;
-      `RouterHarness`, `BuildCommandTest` message touchpoints) — updated, not
-      worked around.
-- [ ] Docs: three explicit `## Repair Rules` entries in
-      `docs/agent-usage.md` (add the plugins block / fix or add the view /
-      use `layout-request` or `render-metadata`).
-- [ ] Note the behavior change for the next release notes in the commit body
-      (consumers keyed on "empty stdout + exit 2" now get an envelope).
+      missing plugins block) asserting CLI/MCP byte-identical envelopes
+      (`CliStructuralEnvelopeTest` + parity fixture; RED confirmed empty
+      stdout on CLI and a diverging `COMMAND_INPUT_INVALID` wrap on MCP).
+- [x] GREEN: factory + codes + throw-site conversions + deletions above.
+      Bonus fold: build's per-view diagnostics now carry the engine's
+      structural code verbatim (`GENERIC_GRAPH_VIEW_UNKNOWN`) instead of
+      rewrapping as `COMMAND_INPUT_INVALID`; `runStage`'s dead
+      UncheckedIOException catch removed.
+- [x] Update tests pinning the old observable (`EngineDispatchTest`
+      propagate-unchanged pair → burial-is-correct; `BuildCommandTest` fake +
+      code assertions; `CliBuildCommandTest` per-view code) — updated, not
+      worked around. `RouterHarness` needed no change.
+- [x] Docs: three explicit `## Repair Rules` entries in
+      `docs/agent-usage.md`.
+- [x] Behavior change noted for release notes in the commit body.
+      Verified: module suites, full `-Pquality verify`, dist-smoke.
 
 ## Task 2 — Placeholder-identity tripwire (survey 1.2a)
 

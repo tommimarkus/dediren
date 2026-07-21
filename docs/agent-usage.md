@@ -852,6 +852,15 @@ you can recover from stdout JSON alone.
   the colliding group id within its view — group ids are scoped per view.
 - `DEDIREN_DANGLING_ENDPOINT`: repair relationship source/target ids or include
   the missing node.
+- `DEDIREN_GENERIC_GRAPH_PLUGIN_REQUIRED`: the source has no
+  `plugins.generic-graph` object. Add it with a `views` array (see
+  `## Minimal Source JSON`) — every semantic-validate, project, and build call
+  needs it.
+- `DEDIREN_GENERIC_GRAPH_VIEW_UNKNOWN`: the requested view id is not declared
+  in `plugins.generic-graph.views`. Fix the `--view`/`--views` value or add
+  the missing view to the source.
+- `DEDIREN_COMMAND_TARGET_UNSUPPORTED`: the `project --target` value is
+  outside the accepted set — use `layout-request` or `render-metadata`.
 - `DEDIREN_PLUGIN_UNKNOWN`: unknown engine id — the bundled set is
   `generic-graph`, `elk-layout`, `render`, `archimate-oef`, `uml-xmi`. Fix the
   `--plugin` value.

@@ -26,6 +26,8 @@ public enum DiagnosticCode {
 
   // Command input (core: CoreCommands; cli: Main).
   COMMAND_INPUT_INVALID("DEDIREN_COMMAND_INPUT_INVALID"),
+  // A project --target value outside the accepted set (core: CoreCommands).
+  COMMAND_TARGET_UNSUPPORTED("DEDIREN_COMMAND_TARGET_UNSUPPORTED"),
   // Command-owned I/O failure (cli: Main), e.g. a build artifact write hitting an unwritable or
   // colliding --out.
   COMMAND_IO_FAILED("DEDIREN_COMMAND_IO_FAILED"),
@@ -111,9 +113,13 @@ public enum DiagnosticCode {
   XMI_SCHEMA_UNAVAILABLE("DEDIREN_XMI_SCHEMA_UNAVAILABLE"),
   XMI_XML_INVALID("DEDIREN_XMI_XML_INVALID"),
 
-  // generic-graph semantics (profile routing, view integrity).
+  // generic-graph semantics (profile routing, view integrity). The two structural codes carry the
+  // failures that historically went raw (stderr + empty stdout): a source without the
+  // plugins.generic-graph object, and a view id no view in that object declares.
   GENERIC_GRAPH_DUPLICATE_GROUP_ID("DEDIREN_GENERIC_GRAPH_DUPLICATE_GROUP_ID"),
   GENERIC_GRAPH_DUPLICATE_VIEW_ID("DEDIREN_GENERIC_GRAPH_DUPLICATE_VIEW_ID"),
+  GENERIC_GRAPH_PLUGIN_REQUIRED("DEDIREN_GENERIC_GRAPH_PLUGIN_REQUIRED"),
+  GENERIC_GRAPH_VIEW_UNKNOWN("DEDIREN_GENERIC_GRAPH_VIEW_UNKNOWN"),
   GENERIC_GRAPH_RELATIONSHIP_ENDPOINT_OUTSIDE_VIEW(
       "DEDIREN_GENERIC_GRAPH_RELATIONSHIP_ENDPOINT_OUTSIDE_VIEW"),
   SEMANTIC_PROFILE_REQUIRED("DEDIREN_SEMANTIC_PROFILE_REQUIRED"),
