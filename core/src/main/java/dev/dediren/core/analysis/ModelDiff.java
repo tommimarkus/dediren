@@ -20,8 +20,10 @@ import tools.jackson.databind.node.StringNode;
 /**
  * Deterministic semantic diff between two validated source models, keyed on stable ids. A pure
  * function of the two documents: same inputs, byte-identical result — every list is sorted by id.
- * Field vocabulary: {@code type}, {@code label}, {@code source}, {@code target}, and {@code
- * properties.<top-level-key>} (shallow property compare). A report, never a merge.
+ * Within a single changed entity, field changes are ordered alphabetically by field name (they are
+ * collected into a {@link TreeMap}). Field vocabulary: {@code type}, {@code label}, {@code source},
+ * {@code target}, and {@code properties.<top-level-key>} (shallow property compare). A report,
+ * never a merge.
  */
 public final class ModelDiff {
 
