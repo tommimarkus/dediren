@@ -4,6 +4,10 @@ import dev.dediren.contracts.Diagnostic;
 import dev.dediren.contracts.DiagnosticCode;
 import dev.dediren.contracts.DiagnosticSeverity;
 import dev.dediren.contracts.KnownSchemaVersions;
+import dev.dediren.contracts.MigrationOperation;
+import dev.dediren.contracts.MigrationPath;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import tools.jackson.databind.JsonNode;
 
@@ -36,17 +40,18 @@ public final class SchemaVersionGate {
     if (found != null && family.priorVersions().contains(found)) {
       return Optional.of(
           diagnostic(
-              DiagnosticCode.SCHEMA_VERSION_OUTDATED,
-              family,
-              "'"
-                  + found
-                  + "' is a superseded "
-                  + family.name()
-                  + " schema version; this build accepts '"
-                  + family.currentVersion()
-                  + "'. To fix, "
-                  + GUIDE_POINTER
-                  + "."));
+                  DiagnosticCode.SCHEMA_VERSION_OUTDATED,
+                  family,
+                  "'"
+                      + found
+                      + "' is a superseded "
+                      + family.name()
+                      + " schema version; this build accepts '"
+                      + family.currentVersion()
+                      + "'. To fix, apply the attached migration operations, or "
+                      + GUIDE_POINTER
+                      + ".")
+              .withMigration(composedPath(family, found)));
     }
     String describedAs =
         found == null ? "no '" + family.versionField() + "' field" : "'" + found + "'";
@@ -60,6 +65,47 @@ public final class SchemaVersionGate {
                 + " schema version this build knows; it accepts '"
                 + family.currentVersion()
                 + "'."));
+  }
+
+  /**
+   * The machine-readable path from {@code found} to the family's current version: the registry's
+   * single-hop steps concatenated, with intermediate {@code set_version} writes to the same pointer
+   * pruned (only the final version write survives). A {@code regenerate} step anywhere in the chain
+   * collapses the whole path to just {@code regenerate} — mechanical edits cannot cross a
+   * judgment-bound hop.
+   */
+  private static MigrationPath composedPath(KnownSchemaVersions.Family family, String found) {
+    int start = family.versions().indexOf(found);
+    var operations = new ArrayList<MigrationOperation>();
+    for (int i = start; i < family.steps().size(); i++) {
+      for (MigrationOperation operation : family.steps().get(i).operations()) {
+        if ("regenerate".equals(operation.op())) {
+          return new MigrationPath(
+              found, family.currentVersion(), List.of(MigrationOperation.regenerate()));
+        }
+        operations.add(operation);
+      }
+    }
+    var pruned = new ArrayList<MigrationOperation>();
+    for (int i = 0; i < operations.size(); i++) {
+      MigrationOperation operation = operations.get(i);
+      if ("set_version".equals(operation.op()) && laterVersionWriteExists(operations, i)) {
+        continue;
+      }
+      pruned.add(operation);
+    }
+    return new MigrationPath(found, family.currentVersion(), pruned);
+  }
+
+  private static boolean laterVersionWriteExists(List<MigrationOperation> operations, int index) {
+    for (int i = index + 1; i < operations.size(); i++) {
+      MigrationOperation later = operations.get(i);
+      if ("set_version".equals(later.op())
+          && later.pointer().equals(operations.get(index).pointer())) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**

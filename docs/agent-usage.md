@@ -912,10 +912,17 @@ have done so.
 ## Migration
 
 `DEDIREN_SCHEMA_VERSION_OUTDATED` means the file declares a schema version this
-build has superseded. Find the version it declares below and apply each step in
-order until it declares the current one. `DEDIREN_SCHEMA_VERSION_UNKNOWN` means
-the version is absent, misspelled, or newer than this build — there is no
-upgrade path; fix the version field or use a newer bundle.
+build has superseded. The diagnostic carries the fix as data: its `migration`
+object holds `from`, `to`, and an ordered `operations` list of exact
+JSON-Pointer edits — `rename_field` (move the value at `pointer` to `to`),
+`remove_key` (delete `pointer`; absent keys are a no-op), `set_version` (set
+`pointer` to `value`), or `regenerate` (do not hand-edit; re-emit the file with
+its producing command, e.g. `dediren project` for a layout-request). Apply the
+operations in order — you are the hands; dediren never rewrites the file — and
+re-validate. The prose steps below remain the human-readable record of the
+same upgrades. `DEDIREN_SCHEMA_VERSION_UNKNOWN` means the version is absent,
+misspelled, or newer than this build — there is no upgrade path; fix the
+version field or use a newer bundle.
 
 Entries are keyed by schema id, not by release. A schema id changes only when
 the contract changes, so it is the only durable signal of what a file needs.

@@ -20,7 +20,32 @@
         "severity": { "enum": ["info", "warning", "error"] },
         "message": { "type": "string" },
         "path": { "type": "string" },
-        "source_pointer": { "type": "string", "pattern": "^/" }
+        "source_pointer": { "type": "string", "pattern": "^/" },
+        "migration": { "$ref": "#/$defs/migration" }
+      }
+    },
+    "migration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["from", "to", "operations"],
+      "properties": {
+        "from": { "type": "string" },
+        "to": { "type": "string" },
+        "operations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["op"],
+            "properties": {
+              "op": { "enum": ["rename_field", "remove_key", "set_version", "regenerate"] },
+              "pointer": { "type": "string", "pattern": "^/" },
+              "to": { "type": "string", "pattern": "^/" },
+              "value": { "type": "string" }
+            }
+          }
+        }
       }
     }
   }

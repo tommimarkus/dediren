@@ -141,23 +141,28 @@ Pre-legitimized open door (schema-migration spec "Known asymmetry").
 ## Task 5 — Machine-readable migration steps (survey Shape B, spec amendment
 2026-07-21)
 
-- [ ] Data: per-step operation lists (`rename_field` / `remove_key` /
-      `set_version`, JSON-Pointer targets) for the three render-policy steps,
-      as pure data in `contracts` beside `KnownSchemaVersions` (records only,
-      no logic — `contracts` stays dumb). `layout-request v1→v2` is
-      regenerate-first and partially judgment-bound: its entry carries a
-      `regenerate` marker instead of ops.
-- [ ] Delivery: `SchemaVersionGate` attaches the matching op list to the
-      `SCHEMA_VERSION_OUTDATED` diagnostic — additive-optional field on the
-      diagnostic object in `envelope.schema.json` (output schema; additive →
-      no id bump; verify round-trip fixtures).
-- [ ] Pinning: extend `MigrationRegistryTest` three ways — every prior
-      version has ops-or-marker; every ops list has a fixture pair (stale doc
-      + expected outcome) and applying ops to the stale fixture yields the
-      expected outcome; prose subsections still exist per step.
-- [ ] Docs: `## Migration` notes the machine-readable delivery; guide
-      `migration` topic unchanged otherwise. Dediren still never applies
-      steps (spec amendment holds).
+- [x] Data: `MigrationOperation` + `MigrationPath` records in `contracts`;
+      `Family` gains `steps` with a compact-constructor invariant (one chained
+      step per superseded version — a bump structurally cannot ship without
+      its ops). Three render-policy steps as ops; `layout-request v1→v2`
+      carries the `regenerate` marker (judgment-bound hop).
+- [x] Delivery: `SchemaVersionGate` composes found→current (concatenated
+      steps, intermediate `set_version` writes pruned; `regenerate` anywhere
+      collapses the path) and attaches it via `Diagnostic.withMigration` —
+      new optional 6th record component, NON_NULL so existing envelopes stay
+      byte-identical. `envelope.schema.json` + `build-result.schema.json`
+      diagnostic defs gained the optional `migration` object (additive, no id
+      bump).
+- [x] Pinning: completeness is constructor-enforced;
+      `MigrationPathApplicationTest` (core) is the application oracle — a
+      test-only reference applier runs each shipped path against stale
+      fixture documents and the outcome must equal the expected document AND
+      pass the family's gate + JSON Schema; `SchemaVersionGateTest` pins
+      composition/pruning/collapse; `CliValidateTest` pins the wire shape end
+      to end; `MigrationRegistryTest` prose pinning unchanged.
+- [x] Docs: `## Migration` intro documents the `migration` object and the
+      four-op vocabulary; "you are the hands; dediren never rewrites the
+      file". Spec amendment holds.
 
 ## Task 6 — Repeated `--target` on `project` (survey cross-cutting)
 

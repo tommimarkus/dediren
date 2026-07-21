@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import dev.dediren.contracts.ContractVersions;
 import dev.dediren.contracts.Diagnostic;
 import dev.dediren.contracts.KnownSchemaVersions;
+import dev.dediren.contracts.MigrationOperation;
 import dev.dediren.contracts.json.JsonSupport;
 import org.junit.jupiter.api.Test;
 
@@ -51,6 +52,60 @@ class SchemaVersionGateTest {
 
     assertThat(diagnostic.code()).isEqualTo("DEDIREN_SCHEMA_VERSION_OUTDATED");
     assertThat(diagnostic.message()).contains("svg-render-policy.schema.v1");
+  }
+
+  @Test
+  void anOutdatedVersionCarriesTheComposedMigrationOperations() {
+    var policy =
+        JsonSupport.readTree("{\"render_policy_schema_version\":\"render-policy.schema.v2\"}");
+
+    Diagnostic diagnostic =
+        SchemaVersionGate.check(KnownSchemaVersions.RENDER_POLICY, policy).orElseThrow();
+
+    assertThat(diagnostic.migration().from()).isEqualTo("render-policy.schema.v2");
+    assertThat(diagnostic.migration().to())
+        .isEqualTo(ContractVersions.RENDER_POLICY_SCHEMA_VERSION);
+    assertThat(diagnostic.migration().operations())
+        .containsExactly(
+            MigrationOperation.removeKey("/interactive"),
+            MigrationOperation.removeKey("/style/interaction"),
+            MigrationOperation.setVersion(
+                "/render_policy_schema_version", ContractVersions.RENDER_POLICY_SCHEMA_VERSION));
+  }
+
+  @Test
+  void aMultiHopPathComposesWithIntermediateVersionWritesPruned() {
+    // svg-v1 is three bumps behind: the composed path concatenates all three steps but keeps only
+    // the final set_version — an agent applying the list lands directly on the current version.
+    var policy =
+        JsonSupport.readTree(
+            "{\"svg_render_policy_schema_version\":\"svg-render-policy.schema.v1\"}");
+
+    Diagnostic diagnostic =
+        SchemaVersionGate.check(KnownSchemaVersions.RENDER_POLICY, policy).orElseThrow();
+
+    assertThat(diagnostic.migration().from()).isEqualTo("svg-render-policy.schema.v1");
+    assertThat(diagnostic.migration().operations())
+        .containsExactly(
+            MigrationOperation.renameField(
+                "/svg_render_policy_schema_version", "/render_policy_schema_version"),
+            MigrationOperation.removeKey("/raster"),
+            MigrationOperation.removeKey("/interactive"),
+            MigrationOperation.removeKey("/style/interaction"),
+            MigrationOperation.setVersion(
+                "/render_policy_schema_version", ContractVersions.RENDER_POLICY_SCHEMA_VERSION));
+  }
+
+  @Test
+  void aRegenerateFirstFamilyCollapsesToTheRegenerateMarker() {
+    var request =
+        JsonSupport.readTree("{\"layout_request_schema_version\":\"layout-request.schema.v1\"}");
+
+    Diagnostic diagnostic =
+        SchemaVersionGate.check(KnownSchemaVersions.LAYOUT_REQUEST, request).orElseThrow();
+
+    assertThat(diagnostic.migration().operations())
+        .containsExactly(MigrationOperation.regenerate());
   }
 
   @Test

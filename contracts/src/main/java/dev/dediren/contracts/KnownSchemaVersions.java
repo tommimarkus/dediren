@@ -24,16 +24,40 @@ public final class KnownSchemaVersions {
    *     first. More than one entry means the field itself was renamed, and a file written before
    *     that rename does not carry the current field name at all.
    * @param versions every version that has shipped, oldest first, current last. Never empty.
+   * @param steps one single-hop {@link MigrationPath} per bump, in version order — {@code steps[i]}
+   *     takes {@code versions[i]} to {@code versions[i + 1]}. The compact constructor enforces that
+   *     chaining, so a bump structurally cannot ship without its machine-readable steps
+   *     (schema-migration design, amendment 2026-07-21).
    */
-  public record Family(String name, List<String> versionFields, List<String> versions) {
+  public record Family(
+      String name, List<String> versionFields, List<String> versions, List<MigrationPath> steps) {
     public Family {
       versionFields = List.copyOf(versionFields);
       versions = List.copyOf(versions);
+      steps = List.copyOf(steps);
       if (versionFields.isEmpty()) {
         throw new IllegalArgumentException("family '" + name + "' must name its version field");
       }
       if (versions.isEmpty()) {
         throw new IllegalArgumentException("family '" + name + "' must have a current version");
+      }
+      if (steps.size() != versions.size() - 1) {
+        throw new IllegalArgumentException(
+            "family '" + name + "' must carry one migration step per superseded version");
+      }
+      for (int i = 0; i < steps.size(); i++) {
+        if (!steps.get(i).from().equals(versions.get(i))
+            || !steps.get(i).to().equals(versions.get(i + 1))) {
+          throw new IllegalArgumentException(
+              "family '"
+                  + name
+                  + "' step "
+                  + i
+                  + " must take "
+                  + versions.get(i)
+                  + " to "
+                  + versions.get(i + 1));
+        }
       }
     }
 
@@ -55,7 +79,10 @@ public final class KnownSchemaVersions {
 
   public static final Family MODEL =
       new Family(
-          "model", List.of("model_schema_version"), List.of(ContractVersions.MODEL_SCHEMA_VERSION));
+          "model",
+          List.of("model_schema_version"),
+          List.of(ContractVersions.MODEL_SCHEMA_VERSION),
+          List.of());
 
   // The oldest entry is a different family id on purpose: the schema was renamed from
   // svg-render-policy to render-policy (238da5a), and the version field was renamed with it. A
@@ -70,29 +97,63 @@ public final class KnownSchemaVersions {
               "svg-render-policy.schema.v1",
               "render-policy.schema.v1",
               "render-policy.schema.v2",
-              ContractVersions.RENDER_POLICY_SCHEMA_VERSION));
+              ContractVersions.RENDER_POLICY_SCHEMA_VERSION),
+          List.of(
+              new MigrationPath(
+                  "svg-render-policy.schema.v1",
+                  "render-policy.schema.v1",
+                  List.of(
+                      MigrationOperation.renameField(
+                          "/svg_render_policy_schema_version", "/render_policy_schema_version"),
+                      MigrationOperation.setVersion(
+                          "/render_policy_schema_version", "render-policy.schema.v1"))),
+              new MigrationPath(
+                  "render-policy.schema.v1",
+                  "render-policy.schema.v2",
+                  List.of(
+                      MigrationOperation.removeKey("/raster"),
+                      MigrationOperation.setVersion(
+                          "/render_policy_schema_version", "render-policy.schema.v2"))),
+              new MigrationPath(
+                  "render-policy.schema.v2",
+                  ContractVersions.RENDER_POLICY_SCHEMA_VERSION,
+                  List.of(
+                      MigrationOperation.removeKey("/interactive"),
+                      MigrationOperation.removeKey("/style/interaction"),
+                      MigrationOperation.setVersion(
+                          "/render_policy_schema_version",
+                          ContractVersions.RENDER_POLICY_SCHEMA_VERSION)))));
 
   public static final Family OEF_EXPORT_POLICY =
       new Family(
           "oef-export-policy",
           List.of("oef_export_policy_schema_version"),
-          List.of(ContractVersions.OEF_EXPORT_POLICY_SCHEMA_VERSION));
+          List.of(ContractVersions.OEF_EXPORT_POLICY_SCHEMA_VERSION),
+          List.of());
 
   public static final Family UML_XMI_EXPORT_POLICY =
       new Family(
           "uml-xmi-export-policy",
           List.of("uml_xmi_export_policy_schema_version"),
-          List.of(ContractVersions.UML_XMI_EXPORT_POLICY_SCHEMA_VERSION));
+          List.of(ContractVersions.UML_XMI_EXPORT_POLICY_SCHEMA_VERSION),
+          List.of());
 
   // layout-request is machine-emitted by `project` but documented as hand-authorable
   // (agent-usage "Layout constraints in a hand-written layout-request"), and it genuinely
   // shipped a v1 before the typed-IR v2 (291921d). Registering it gives a kept v1 file the
   // same OUTDATED-with-upgrade-steps treatment as the other hand-authorable inputs.
+  // The v1 -> v2 upgrade is regenerate-first: hand-upgrading a kept file needs judgment (id/role
+  // renames against the v2 charset), which the operation vocabulary deliberately cannot say.
   public static final Family LAYOUT_REQUEST =
       new Family(
           "layout-request",
           List.of("layout_request_schema_version"),
-          List.of("layout-request.schema.v1", ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION));
+          List.of("layout-request.schema.v1", ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION),
+          List.of(
+              new MigrationPath(
+                  "layout-request.schema.v1",
+                  ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION,
+                  List.of(MigrationOperation.regenerate()))));
 
   public static final List<Family> ALL =
       List.of(MODEL, RENDER_POLICY, OEF_EXPORT_POLICY, UML_XMI_EXPORT_POLICY, LAYOUT_REQUEST);

@@ -93,6 +93,19 @@ class CliValidateTest {
     assertThat(result.exitCode()).isEqualTo(2);
     assertThat(envelope.at("/diagnostics/0/code").asText())
         .isEqualTo("DEDIREN_SCHEMA_VERSION_OUTDATED");
+    // The machine-readable migration path rides the diagnostic (schema-migration amendment
+    // 2026-07-21): exact JSON-Pointer edits instead of prose transcription; the agent applies
+    // them, dediren never does.
+    assertThat(envelope.at("/diagnostics/0/migration/from").asText())
+        .isEqualTo("render-policy.schema.v2");
+    assertThat(envelope.at("/diagnostics/0/migration/to").asText())
+        .isEqualTo("render-policy.schema.v3");
+    assertThat(envelope.at("/diagnostics/0/migration/operations/0/op").asText())
+        .isEqualTo("remove_key");
+    assertThat(envelope.at("/diagnostics/0/migration/operations/0/pointer").asText())
+        .isEqualTo("/interactive");
+    assertThat(envelope.at("/diagnostics/0/migration/operations/2/op").asText())
+        .isEqualTo("set_version");
   }
 
   @Test
