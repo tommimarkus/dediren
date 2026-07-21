@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dediren.dev/schemas/query-result.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["query_result_schema_version", "kind"],
+  "properties": {
+    "query_result_schema_version": { "const": "query-result.schema.v1" },
+    "kind": { "enum": ["dependents", "orphans", "view-coverage"] },
+    "dependents": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "inbound", "outbound"],
+      "properties": {
+        "id": { "type": "string" },
+        "inbound": { "type": "array", "items": { "$ref": "#/$defs/edge" } },
+        "outbound": { "type": "array", "items": { "$ref": "#/$defs/edge" } }
+      }
+    },
+    "orphans": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["relationship_orphans", "view_orphans"],
+      "properties": {
+        "relationship_orphans": { "type": "array", "items": { "type": "string" } },
+        "view_orphans": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "view_coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["views", "model_node_count", "model_relationship_count", "uncovered_node_ids"],
+      "properties": {
+        "views": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "node_count", "relationship_count"],
+            "properties": {
+              "id": { "type": "string" },
+              "node_count": { "type": "integer", "minimum": 0 },
+              "relationship_count": { "type": "integer", "minimum": 0 }
+            }
+          }
+        },
+        "model_node_count": { "type": "integer", "minimum": 0 },
+        "model_relationship_count": { "type": "integer", "minimum": 0 },
+        "uncovered_node_ids": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  },
+  "$defs": {
+    "edge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["relationship_id", "type", "node_id"],
+      "properties": {
+        "relationship_id": { "type": "string" },
+        "type": { "type": "string" },
+        "node_id": { "type": "string" }
+      }
+    }
+  }
+}

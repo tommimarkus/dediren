@@ -397,6 +397,37 @@ and each still declares the source's other views via the `info`
 per-view `--oef-policy` — to get a correctly identified OEF per view, or fall
 back to the decomposed `export` subcommand.
 
+## Diff & Query
+
+Two read-only model-intelligence commands. Both consume a validated source
+model, print a standard envelope on stdout, and sort every list by id, so the
+same inputs always produce byte-identical output.
+
+`dediren diff --old old.json --new new.json` compares two revisions of a
+source model, keyed on stable ids. The `data` payload
+(`diff-result.schema.v1`, `schemas/diff-result.schema.json`) carries `nodes`,
+`relationships` (each `{added, removed, changed}`; changed entries list
+field-level `{field, from, to}` where `field` is `type`, `label`, `source`,
+`target`, or `properties.<key>`), and `views` (`added`/`removed` ids plus
+per-view membership changes). Both inputs must be valid current-schema models
+— a stale side fails with the version-gate envelope. A diff is a report,
+never a merge: nothing is written.
+
+`dediren query --kind <kind> --input model.json` answers one fixed question
+(`query-result.schema.v1`, `schemas/query-result.schema.json`):
+
+- `dependents` (requires `--id <node-id>`): fan-in (`inbound` — relationships
+  targeting the node, each `{relationship_id, type, node_id}`) and fan-out
+  (`outbound`).
+- `orphans`: `relationship_orphans` (nodes with no incident relationships)
+  and `view_orphans` (nodes referenced by no view).
+- `view-coverage`: per-view node/relationship counts, the model totals, and
+  `uncovered_node_ids` — the nodes no view shows.
+
+The vocabulary is fixed by design; an unsupported `--kind`, a missing `--id`,
+or an unknown node id is a `DEDIREN_COMMAND_INPUT_INVALID` usage envelope
+(exit 2).
+
 ## Render Policy Options
 
 The render policy owns SVG presentation. Beyond `accessibility` (above), these

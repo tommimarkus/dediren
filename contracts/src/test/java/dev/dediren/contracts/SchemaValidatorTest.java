@@ -25,6 +25,8 @@ class SchemaValidatorTest {
           "schemas/export-result.first-party.schema.json",
           "schemas/oef-export-policy.schema.json",
           "schemas/uml-xmi-export-policy.schema.json",
+          "schemas/diff-result.schema.json",
+          "schemas/query-result.schema.json",
           "schemas/bundle.schema.json");
 
   @Test

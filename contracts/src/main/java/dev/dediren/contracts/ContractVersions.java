@@ -3,6 +3,8 @@ package dev.dediren.contracts;
 public final class ContractVersions {
   public static final String MODEL_SCHEMA_VERSION = "model.schema.v1";
   public static final String ENVELOPE_SCHEMA_VERSION = "envelope.schema.v1";
+  public static final String DIFF_RESULT_SCHEMA_VERSION = "diff-result.schema.v1";
+  public static final String QUERY_RESULT_SCHEMA_VERSION = "query-result.schema.v1";
   public static final String LAYOUT_REQUEST_SCHEMA_VERSION = "layout-request.schema.v2";
   public static final String LAYOUT_RESULT_SCHEMA_VERSION = "layout-result.schema.v2";
   public static final String SEMANTIC_VALIDATION_RESULT_SCHEMA_VERSION =

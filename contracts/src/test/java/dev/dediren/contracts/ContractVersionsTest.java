@@ -76,6 +76,12 @@ class ContractVersionsTest {
     versionConstBySchema.put(
         "schemas/build-result.schema.json",
         new String[] {"build_result_schema_version", ContractVersions.BUILD_RESULT_SCHEMA_VERSION});
+    versionConstBySchema.put(
+        "schemas/diff-result.schema.json",
+        new String[] {"diff_result_schema_version", ContractVersions.DIFF_RESULT_SCHEMA_VERSION});
+    versionConstBySchema.put(
+        "schemas/query-result.schema.json",
+        new String[] {"query_result_schema_version", ContractVersions.QUERY_RESULT_SCHEMA_VERSION});
     for (var entry : versionConstBySchema.entrySet()) {
       String schemaPath = entry.getKey();
       String field = entry.getValue()[0];
@@ -101,6 +107,8 @@ class ContractVersionsTest {
     assertThat(ContractVersions.SEMANTIC_VALIDATION_RESULT_SCHEMA_VERSION)
         .isEqualTo("semantic-validation-result.schema.v1");
     assertThat(ContractVersions.RENDER_RESULT_SCHEMA_VERSION).isEqualTo("render-result.schema.v5");
+    assertThat(ContractVersions.DIFF_RESULT_SCHEMA_VERSION).isEqualTo("diff-result.schema.v1");
+    assertThat(ContractVersions.QUERY_RESULT_SCHEMA_VERSION).isEqualTo("query-result.schema.v1");
     assertThat(ContractVersions.RENDER_POLICY_SCHEMA_VERSION).isEqualTo("render-policy.schema.v3");
     assertThat(ContractVersions.RENDER_METADATA_SCHEMA_VERSION)
         .isEqualTo("render-metadata.schema.v1");

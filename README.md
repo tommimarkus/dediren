@@ -27,7 +27,10 @@ validate → project → layout → validate-layout → export   (ArchiMate OEF 
 writing each view's artifacts under `--out`; use the stage-by-stage form when
 you need to inspect, cache, or persist an intermediate stage envelope.
 `validate` guards the source model and `validate-layout` checks the generated
-geometry — both are quality gates that emit structured diagnostics. See
+geometry — both are quality gates that emit structured diagnostics. Beyond
+the pipeline, `dediren diff` compares two model revisions and `dediren query`
+answers fixed impact questions (dependents, orphans, view coverage) — both
+deterministic, both as stdout envelopes. See
 [`docs/agent-usage.md`](docs/agent-usage.md) for every command, flag, and
 notation.
 

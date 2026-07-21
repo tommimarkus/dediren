@@ -155,6 +155,31 @@ See [Exports (OEF & XMI)](exports.md).
 dediren --version
 ```
 
+### `diff`
+
+Compares two revisions of a source model, keyed on stable ids: added, removed,
+and field-level changed nodes/relationships plus per-view membership changes,
+every list sorted by id (`schemas/diff-result.schema.json`). Both sides must
+be valid current-schema models. A report, never a merge.
+
+```bash
+dediren diff --old model-before.json --new model-after.json
+```
+
+### `query`
+
+Answers one fixed-vocabulary question about a model
+(`schemas/query-result.schema.json`): `--kind dependents --id <node>`
+(fan-in/fan-out), `--kind orphans` (nodes without relationships; nodes in no
+view), or `--kind view-coverage` (per-view counts + uncovered nodes).
+Deterministic and read-only; deliberately not a query language.
+
+```bash
+dediren query --kind dependents --id api --input model.json
+```
+
+Details for both: [Agent Usage → `## Diff & Query`](../agent-usage.md#diff--query).
+
 ## Output & Exit Codes
 
 - Every command but `build` produces a JSON command envelope on stdout

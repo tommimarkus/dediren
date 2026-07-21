@@ -7,11 +7,14 @@ import dev.dediren.contracts.DiagnosticCode;
 import dev.dediren.contracts.DiagnosticSeverity;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.core.ProductRootException;
+import dev.dediren.core.analysis.ModelDiff;
+import dev.dediren.core.analysis.ModelQuery;
 import dev.dediren.core.commands.BuildRequest;
 import dev.dediren.core.commands.CoreCommands;
 import dev.dediren.core.engine.EngineExecutionException;
 import dev.dediren.core.engine.EngineRunOutcome;
 import dev.dediren.core.source.DocumentValidator;
+import dev.dediren.core.source.SourceValidator;
 import dev.dediren.core.source.ValidationResult;
 import dev.dediren.engine.Engines;
 import java.io.ByteArrayInputStream;
@@ -90,6 +93,8 @@ public final class Main {
     CommandLine commandLine = new CommandLine(new Main(stdin, env));
     commandLine.addSubcommand("validate", new ValidateCommand(stdin, env, engines));
     commandLine.addSubcommand("project", new ProjectCommand(stdin, env, engines));
+    commandLine.addSubcommand("diff", new DiffCommand());
+    commandLine.addSubcommand("query", new QueryCommand(stdin));
     commandLine.addSubcommand("layout", new LayoutCommand(stdin, env, engines));
     commandLine.addSubcommand("validate-layout", new ValidateLayoutCommand(stdin));
     commandLine.addSubcommand("render", new RenderCommand(stdin, env, engines));
@@ -218,6 +223,116 @@ public final class Main {
                 plugin, target, view, inputText.text(), inputText.baseDir(), env, engines));
       } catch (EngineExecutionException error) {
         return writePluginError(spec, error);
+      } catch (ProductRootException error) {
+        return printProductRootFailure(spec, error);
+      }
+    }
+  }
+
+  @Command(name = "diff", description = "Diff two source models")
+  static final class DiffCommand implements Callable<Integer> {
+    @Option(names = "--old", required = true)
+    private Path oldModel;
+
+    @Option(names = "--new", required = true)
+    private Path newModel;
+
+    @Spec private CommandSpec spec;
+
+    @Override
+    public Integer call() throws Exception {
+      JsonInputText oldText = readFile("old", oldModel);
+      if (oldText.error() != null) {
+        return writeEnvelope(spec, oldText.error(), CommandExitCode.INPUT_ERROR);
+      }
+      JsonInputText newText = readFile("new", newModel);
+      if (newText.error() != null) {
+        return writeEnvelope(spec, newText.error(), CommandExitCode.INPUT_ERROR);
+      }
+      try {
+        var oldDocument =
+            SourceValidator.loadAndValidateSourceDocument(oldText.text(), oldText.baseDir());
+        var newDocument =
+            SourceValidator.loadAndValidateSourceDocument(newText.text(), newText.baseDir());
+        var result = ModelDiff.diff(oldDocument, newDocument);
+        return writeEnvelope(
+            spec,
+            CommandEnvelope.ok(JsonSupport.objectMapper().valueToTree(result)),
+            CommandExitCode.OK);
+      } catch (SourceValidator.SourceDiagnosticsException error) {
+        return writeEnvelope(
+            spec, CommandEnvelope.error(error.diagnostics()), CommandExitCode.INPUT_ERROR);
+      } catch (ProductRootException error) {
+        return printProductRootFailure(spec, error);
+      }
+    }
+  }
+
+  @Command(name = "query", description = "Run a fixed-vocabulary model query")
+  static final class QueryCommand implements Callable<Integer> {
+    private final InputStream stdin;
+
+    @Option(names = "--kind", required = true)
+    private String kind;
+
+    @Option(names = "--id")
+    private String id;
+
+    @Option(names = "--input")
+    private Path input;
+
+    @Spec private CommandSpec spec;
+
+    QueryCommand(InputStream stdin) {
+      this.stdin = stdin;
+    }
+
+    @Override
+    public Integer call() throws Exception {
+      if (!List.of("dependents", "orphans", "view-coverage").contains(kind)) {
+        return writeEnvelope(
+            spec,
+            usageError(
+                DiagnosticCode.COMMAND_INPUT_INVALID.code(),
+                "unsupported query kind '" + kind + "': use dependents, orphans, or view-coverage"),
+            CommandExitCode.INPUT_ERROR);
+      }
+      if ("dependents".equals(kind) && id == null) {
+        return writeEnvelope(
+            spec,
+            usageError(
+                DiagnosticCode.COMMAND_INPUT_INVALID.code(),
+                "query --kind dependents requires --id"),
+            CommandExitCode.INPUT_ERROR);
+      }
+      JsonInputText inputText = readInput("input", input, stdin);
+      if (inputText.error() != null) {
+        return writeEnvelope(spec, inputText.error(), CommandExitCode.INPUT_ERROR);
+      }
+      try {
+        var document =
+            SourceValidator.loadAndValidateSourceDocument(inputText.text(), inputText.baseDir());
+        if ("dependents".equals(kind)
+            && document.nodes().stream().noneMatch(node -> id.equals(node.id()))) {
+          return writeEnvelope(
+              spec,
+              usageError(
+                  DiagnosticCode.COMMAND_INPUT_INVALID.code(), "unknown node id '" + id + "'"),
+              CommandExitCode.INPUT_ERROR);
+        }
+        var result =
+            switch (kind) {
+              case "dependents" -> ModelQuery.dependents(document, id);
+              case "orphans" -> ModelQuery.orphans(document);
+              default -> ModelQuery.viewCoverage(document);
+            };
+        return writeEnvelope(
+            spec,
+            CommandEnvelope.ok(JsonSupport.objectMapper().valueToTree(result)),
+            CommandExitCode.OK);
+      } catch (SourceValidator.SourceDiagnosticsException error) {
+        return writeEnvelope(
+            spec, CommandEnvelope.error(error.diagnostics()), CommandExitCode.INPUT_ERROR);
       } catch (ProductRootException error) {
         return printProductRootFailure(spec, error);
       }

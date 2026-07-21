@@ -23,6 +23,8 @@ import java.util.Map;
  */
 public final class GuideCatalog {
   private static final String RESOURCE = "/dediren/agent-usage.md";
+  // Topic additions move together with their agent-usage sections; GuideCatalogTest is
+  // bidirectional, so an unreachable section or a dangling topic fails the build.
 
   private static final Map<String, String> TOPICS = topicMap();
 
@@ -41,6 +43,7 @@ public final class GuideCatalog {
     topics.put("archimate", "ArchiMate Handoff");
     topics.put("commands", "Command Handoff");
     topics.put("build", "Build");
+    topics.put("diff-query", "Diff & Query");
     topics.put("render-policy", "Render Policy Options");
     topics.put("uml-sequence", "UML Sequence Handoff");
     topics.put("uml-state-machine", "UML State Machine Handoff");
