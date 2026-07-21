@@ -519,11 +519,9 @@ public final class BuildCommand {
   }
 
   private static String renderExtension(String artifactKind) {
-    return switch (artifactKind) {
-      case "svg" -> "svg";
-      case "html" -> "html";
-      default -> artifactKind;
-    };
+    // render-result.schema.v5 admits only "svg", whose extension is the kind itself; the identity
+    // keeps a seam for any future kind whose extension differs.
+    return artifactKind;
   }
 
   private static String exportExtension(String artifactKind) {

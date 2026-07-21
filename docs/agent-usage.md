@@ -114,6 +114,10 @@ Do not put `x`, `y`, `width`, `height`, colors, fonts, or SVG shape choices in
 source JSON. Source JSON is semantic. Layout results contain generated
 geometry. Render policy contains presentation.
 
+`required_plugins` is informational only: it names the bundled engines the
+model expects for human readers, but the in-memory registry never enforces the
+entries — commands run whether or not a matching entry is present.
+
 Every emitted SVG names itself for assistive technology: the root `<svg>` has
 `role="img"` with a `<title>` (and a `<desc>` when supplied). Set the text with
 an optional `accessibility` block in the render policy, for example

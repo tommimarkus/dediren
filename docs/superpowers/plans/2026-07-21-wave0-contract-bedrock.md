@@ -122,19 +122,21 @@ Pre-legitimized open door (schema-migration spec "Known asymmetry").
 
 ## Task 4 — Contract truthfulness sweep (survey 1.3)
 
-- [ ] `render-result.schema.v4 → v5`: drop `"html"` from `artifact_kind` and
-      `"base64"` from `encoding`. Generated engine-seam family: bump
-      `ContractVersions` constant, fixtures, mapping code, round-trip tests —
-      no migration family, no working-document cost. (Grep first for any
-      consumer of the dead branches; expect none.)
-- [ ] Delete orphaned `plugin-manifest.schema.json` +
-      `runtime-capability.schema.json`, their `contracts` records, and their
-      `ContractRoundTripTest` entries; drop the bundle copies (dist-tool
-      manifest/test updates).
-- [ ] Document `required_plugins[]` as informational/unenforced where it is
-      described (`docs/features/source-model.md` already says it; ensure
-      agent-usage says it too); its removal waits for the next warranted
-      `model.schema` bump.
+- [x] `render-result.schema.v4 → v5`: dropped `"html"` from `artifact_kind`
+      and `"base64"` from `encoding`; bumped `ContractVersions` + the three
+      version pins (round-trip, versions test, render MainTest); removed
+      `BuildCommand.renderExtension`'s dead html branch. Only production
+      consumer of the dead values was that branch. Verified with a `clean`
+      full build (inlined-constant staleness trap).
+- [x] Deleted `plugin-manifest.schema.json` + `runtime-capability.schema.json`,
+      the `contracts.plugin` records, `PLUGIN_PROTOCOL_VERSION`, and their
+      test entries (incl. the orphan round-trip test — which also removes one
+      product-version assertion surface from the bump sweep). No dist-tool
+      edit needed: schemas bundle via directory copy. Features docs updated
+      (orphan row removed; engine-runtime notes the cleanup).
+- [x] `required_plugins[]` documented as informational/unenforced in
+      agent-usage (prose note after the Minimal Source JSON example); its
+      removal waits for the next warranted `model.schema` bump.
 
 ## Task 5 — Machine-readable migration steps (survey Shape B, spec amendment
 2026-07-21)

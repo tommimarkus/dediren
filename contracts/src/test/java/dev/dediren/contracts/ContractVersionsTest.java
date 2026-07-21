@@ -76,10 +76,6 @@ class ContractVersionsTest {
     versionConstBySchema.put(
         "schemas/build-result.schema.json",
         new String[] {"build_result_schema_version", ContractVersions.BUILD_RESULT_SCHEMA_VERSION});
-    versionConstBySchema.put(
-        "schemas/runtime-capability.schema.json",
-        new String[] {"plugin_protocol_version", ContractVersions.PLUGIN_PROTOCOL_VERSION});
-
     for (var entry : versionConstBySchema.entrySet()) {
       String schemaPath = entry.getKey();
       String field = entry.getValue()[0];
@@ -99,13 +95,12 @@ class ContractVersionsTest {
   void schemaVersionConstantsMatchPublicSchemas() {
     assertThat(ContractVersions.MODEL_SCHEMA_VERSION).isEqualTo("model.schema.v1");
     assertThat(ContractVersions.ENVELOPE_SCHEMA_VERSION).isEqualTo("envelope.schema.v1");
-    assertThat(ContractVersions.PLUGIN_PROTOCOL_VERSION).isEqualTo("plugin.protocol.v1");
     assertThat(ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION)
         .isEqualTo("layout-request.schema.v2");
     assertThat(ContractVersions.LAYOUT_RESULT_SCHEMA_VERSION).isEqualTo("layout-result.schema.v2");
     assertThat(ContractVersions.SEMANTIC_VALIDATION_RESULT_SCHEMA_VERSION)
         .isEqualTo("semantic-validation-result.schema.v1");
-    assertThat(ContractVersions.RENDER_RESULT_SCHEMA_VERSION).isEqualTo("render-result.schema.v4");
+    assertThat(ContractVersions.RENDER_RESULT_SCHEMA_VERSION).isEqualTo("render-result.schema.v5");
     assertThat(ContractVersions.RENDER_POLICY_SCHEMA_VERSION).isEqualTo("render-policy.schema.v3");
     assertThat(ContractVersions.RENDER_METADATA_SCHEMA_VERSION)
         .isEqualTo("render-metadata.schema.v1");

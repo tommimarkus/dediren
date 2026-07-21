@@ -27,7 +27,6 @@ bundle. Shared protocol records and schema-version constants live in the
 | [`build-result.schema.json`](../../schemas/build-result.schema.json) | `build` command result: `.status`, `.views[]` (each with `.artifacts[]`/`.diagnostics[]`). Unlike every other command, `build`'s stdout **is** this document directly — it is not wrapped in `envelope.schema.json`'s `.data`. |
 | [`envelope.schema.json`](../../schemas/envelope.schema.json) | The command envelope wrapping every other command's stdout. |
 | [`bundle.schema.json`](../../schemas/bundle.schema.json) | The bundle's `bundle.json` metadata. |
-| [`plugin-manifest.schema.json`](../../schemas/plugin-manifest.schema.json) / [`runtime-capability.schema.json`](../../schemas/runtime-capability.schema.json) | **Orphaned, pending contract cleanup.** Shipped from the retired process-plugin runtime (deleted; see [Engine Runtime](engine-runtime.md)); no live code path constructs, discovers, or reads a manifest or a capability probe today. Round-tripped from inline JSON, not a live fixture, to keep the deferred cleanup visible (`ContractRoundTripTest`). |
 
 ### Who authors what
 

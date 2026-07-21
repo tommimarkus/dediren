@@ -42,10 +42,9 @@ the value you pass to `--plugin`.
 
 All five are hosted in-process by the single `bin/dediren` launcher; there is
 no per-engine launcher, standalone executable, or `capabilities` probe to run
-against. The `plugin-manifest.schema.json` and `runtime-capability.schema.json`
-schemas remain in `schemas/` from the retired process-plugin runtime; they are
-unused by any live code path and are pending contract cleanup — see
-[Contracts & Schemas](contracts-and-schemas.md#public-schemas).
+against. The retired process-plugin runtime's `plugin-manifest` and
+`runtime-capability` schemas and records were deleted with the wave-0 contract
+cleanup (2026-07); no trace of the plugin protocol ships in the bundle.
 
 ## Runtime Diagnostics
 

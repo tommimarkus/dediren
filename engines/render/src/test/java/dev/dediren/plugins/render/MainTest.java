@@ -51,7 +51,7 @@ class MainTest {
       String content = data.at("/artifacts/0/content").asText();
 
       assertThat(data.at("/render_result_schema_version").asText())
-          .isEqualTo("render-result.schema.v4");
+          .isEqualTo("render-result.schema.v5");
       assertThat(data.at("/artifacts/0/artifact_kind").asText()).isEqualTo("svg");
       assertThat(content).contains("<svg", "Client", "API");
     }
@@ -3734,7 +3734,7 @@ class MainTest {
 
   @Test
   void neverEmitsPngArtifact() throws Exception {
-    // Permanent regression guard: PNG rasterization was removed with render-result.schema.v4.
+    // Permanent regression guard: PNG rasterization was removed with render-result.schema.v5.
     // A normal render must only ever emit an svg artifact, never a png branch.
     String policy =
         """
