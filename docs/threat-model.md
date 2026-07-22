@@ -178,7 +178,12 @@ SHA-256 check by design — they only require the supplied file to be non-empty.
 Generated UML/XMI XML is parsed with a hardened `DocumentBuilderFactory`
 (`SchemaValidation.secureXmiDocumentBuilderFactory()`): DOCTYPE declarations
 disallowed, `FEATURE_SECURE_PROCESSING` on, XInclude and entity-reference
-expansion off.
+expansion off. The whole-model `model.uml.xml` lane appends OMG UMLDI diagram
+interchange (`umldi:`/`di:`/`dc:` shapes and waypoints derived from the ELK
+layout) as siblings of `<uml:Model>`; it flows through the same hardened parser,
+DOM `xmi:id` uniqueness check, and the same in-JVM XMI schema validation, whose
+tolerated no-declaration gap now also covers those DI namespaces (no normative
+OMG DI XSD is published) — no new fetch, subprocess, or parser surface.
 
 Standards-schema validation runs **in-JVM on both export lanes** via the one
 shared validator, `schemacache.InJvmXmlValidator` (engines may not depend on

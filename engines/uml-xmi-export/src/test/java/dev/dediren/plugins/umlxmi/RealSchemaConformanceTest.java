@@ -62,6 +62,51 @@ class RealSchemaConformanceTest {
             });
   }
 
+  @Test
+  void wholeModelUmldiExportValidatesAgainstThePinnedRealOmgXmiSchema() throws Exception {
+    // The whole-model lane emits OMG UMLDI (umldi:/di:/dc:) alongside <uml:Model>. Against the REAL
+    // pinned XMI.xsd, those DI namespaces have no declaration either — this pins that they ride the
+    // same tolerated no-normative-XSD gap as the UML content and do not flip the export to invalid.
+    dev.dediren.engine.ModelExportRequest request =
+        new dev.dediren.engine.ModelExportRequest(
+            JsonSupport.objectMapper()
+                .treeToValue(
+                    fixtureJson("fixtures/source/valid-uml-basic.json"),
+                    dev.dediren.contracts.source.SourceDocument.class),
+            java.util.List.of(
+                new dev.dediren.engine.ModelExportRequest.ViewLayout(
+                    "class-view",
+                    JsonSupport.objectMapper()
+                        .treeToValue(
+                            fixtureJson("fixtures/layout-result/uml-basic.json"),
+                            dev.dediren.contracts.layout.LayoutResult.class))),
+            fixtureJson("fixtures/export-policy/default-uml-xmi.json"));
+
+    java.util.Optional<EngineResult<ExportResult>> result =
+        engine.exportModel(
+            request,
+            Map.of(
+                "DEDIREN_SCHEMA_CACHE_DIR",
+                System.getProperty(
+                    "dediren.real-schemas.cache",
+                    Path.of(System.getProperty("user.home"), ".cache", "dediren-real-schemas")
+                        .toString())),
+            Path.of("").toAbsolutePath());
+
+    assertThat(result.orElseThrow().value().content())
+        .contains("<uml:Model")
+        .contains("<umldi:UMLDiagram")
+        .contains("<dc:Bounds");
+    assertThat(result.orElseThrow().diagnostics())
+        .anySatisfy(
+            diagnostic -> {
+              assertThat(diagnostic.code()).isEqualTo("DEDIREN_EXPORT_SCHEMA_CONFORMANCE");
+              assertThat(diagnostic.message())
+                  .contains("pinned OMG XMI 2.5.1")
+                  .contains("UML-namespace content accepted");
+            });
+  }
+
   private static JsonNode fixtureJson(String path) throws Exception {
     return JsonSupport.objectMapper().readTree(Files.readString(workspaceRoot().resolve(path)));
   }
