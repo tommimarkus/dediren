@@ -12,6 +12,8 @@ import dev.dediren.core.commands.BuildRequest;
 import dev.dediren.core.commands.CoreCommands;
 import dev.dediren.core.engine.EngineExecutionException;
 import dev.dediren.core.engine.EngineRunOutcome;
+import dev.dediren.core.io.BoundedReads;
+import dev.dediren.core.source.SourceLimits;
 import dev.dediren.core.source.ValidationResult;
 import dev.dediren.engine.Engines;
 import java.io.ByteArrayInputStream;
@@ -21,7 +23,6 @@ import java.io.InputStream;
 import java.io.PrintWriter;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -630,7 +631,8 @@ public final class Main {
   private static JsonInputText readFile(String label, Path path) {
     try {
       Path baseDir = path.getParent() == null ? Path.of(".") : path.getParent();
-      return new JsonInputText(Files.readString(path), baseDir, null);
+      return new JsonInputText(
+          BoundedReads.readString(path, SourceLimits.DEFAULT.maxInputFileBytes()), baseDir, null);
     } catch (IOException error) {
       return new JsonInputText(null, null, commandInputError(label, path, error));
     }
@@ -704,10 +706,14 @@ public final class Main {
   private static CommandEnvelope<JsonNode> commandInputError(
       String label, Path path, IOException error) {
     String diagnosticPath = path == null ? label : label + ":" + path;
+    DiagnosticCode code =
+        error instanceof BoundedReads.FileTooLargeException
+            ? DiagnosticCode.INPUT_FILE_TOO_LARGE
+            : DiagnosticCode.COMMAND_INPUT_INVALID;
     return CommandEnvelope.error(
         List.of(
             new Diagnostic(
-                DiagnosticCode.COMMAND_INPUT_INVALID.code(),
+                code.code(),
                 DiagnosticSeverity.ERROR,
                 "failed to read " + label + ": " + error.getMessage(),
                 diagnosticPath)));

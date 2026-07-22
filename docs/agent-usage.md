@@ -963,6 +963,13 @@ you can recover from stdout JSON alone.
   the colliding group id within its view — group ids are scoped per view.
 - `DEDIREN_DANGLING_ENDPOINT`: repair relationship source/target ids or include
   the missing node.
+- `DEDIREN_INPUT_FILE_TOO_LARGE`: an input file (source model, fragment, or
+  policy) exceeds the 64 MiB input ceiling; the message carries the actual and
+  maximum byte counts. Split the model into fragments or shrink the file.
+- `DEDIREN_SOURCE_FRAGMENT_LIMIT_EXCEEDED`: the source declares more than 1000
+  fragments. Consolidate fragments.
+- `DEDIREN_SOURCE_ELEMENT_LIMIT_EXCEEDED`: the merged model exceeds 100000
+  nodes plus relationships. Split it into separate models.
 - `DEDIREN_GENERIC_GRAPH_PLUGIN_REQUIRED`: the source has no
   `plugins.generic-graph` object. Add it with a `views` array (see
   `## Minimal Source JSON`) — every semantic-validate, project, and build call

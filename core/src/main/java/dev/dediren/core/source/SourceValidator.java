@@ -12,11 +12,11 @@ import dev.dediren.contracts.source.SourceDocument;
 import dev.dediren.contracts.source.SourceNode;
 import dev.dediren.contracts.source.SourceRelationship;
 import dev.dediren.core.DedirenPaths;
+import dev.dediren.core.io.BoundedReads;
 import dev.dediren.core.io.ConfinedPaths;
 import dev.dediren.core.schema.SchemaValidator;
 import dev.dediren.core.schema.SchemaVersionGate;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -69,7 +69,14 @@ public final class SourceValidator {
    */
   public static SourceDocument loadAndValidateSourceDocument(
       String text, Path baseDir, Path confinementRoot) throws SourceDiagnosticsException {
-    SourceDocument document = loadSourceDocument(text, baseDir, confinementRoot);
+    return loadAndValidateSourceDocument(text, baseDir, confinementRoot, SourceLimits.DEFAULT);
+  }
+
+  /** Ceiling-injecting overload; production callers take the defaults, tests use tiny limits. */
+  public static SourceDocument loadAndValidateSourceDocument(
+      String text, Path baseDir, Path confinementRoot, SourceLimits limits)
+      throws SourceDiagnosticsException {
+    SourceDocument document = loadSourceDocument(text, baseDir, confinementRoot, limits);
     List<Diagnostic> diagnostics = validateSourceDocument(document);
     if (!diagnostics.isEmpty()) {
       throw new SourceDiagnosticsException(diagnostics);
@@ -77,11 +84,24 @@ public final class SourceValidator {
     return document;
   }
 
-  private static SourceDocument loadSourceDocument(String text, Path baseDir, Path confinementRoot)
+  private static SourceDocument loadSourceDocument(
+      String text, Path baseDir, Path confinementRoot, SourceLimits limits)
       throws SourceDiagnosticsException {
     SourceDocument root = parseSourceDocument(text);
     if (root.fragments().isEmpty()) {
+      checkElementCeiling(root.nodes().size(), root.relationships().size(), limits);
       return root;
+    }
+    if (root.fragments().size() > limits.maxFragments()) {
+      throw new SourceDiagnosticsException(
+          List.of(
+              error(
+                  DiagnosticCode.SOURCE_FRAGMENT_LIMIT_EXCEEDED,
+                  "source declares "
+                      + root.fragments().size()
+                      + " fragments; the fragment ceiling is "
+                      + limits.maxFragments(),
+                  "$.fragments")));
     }
     if (baseDir == null) {
       throw new SourceDiagnosticsException(
@@ -111,7 +131,17 @@ public final class SourceValidator {
           resolveFragmentReadPath(confinementRoot, baseDir, fragment, fragmentPath, i);
       SourceDocument fragmentDocument;
       try {
-        fragmentDocument = parseSourceDocument(Files.readString(fragmentReadPath));
+        fragmentDocument =
+            parseSourceDocument(
+                BoundedReads.readString(fragmentReadPath, limits.maxInputFileBytes()));
+      } catch (BoundedReads.FileTooLargeException tooLarge) {
+        // Byte counts are safe to echo on both lanes; the resolved path never is on the MCP lane.
+        throw new SourceDiagnosticsException(
+            List.of(
+                error(
+                    DiagnosticCode.INPUT_FILE_TOO_LARGE,
+                    "fragment '" + fragment + "': " + tooLarge.getMessage(),
+                    "$.fragments[" + i + "]")));
       } catch (IOException readError) {
         // CLI/human lane (null root): the real message helps a human and routinely carries the
         // resolved absolute path. MCP lane (root set): sanitize — echo only the model-supplied
@@ -137,9 +167,32 @@ public final class SourceValidator {
       nodes.addAll(fragmentDocument.nodes());
       relationships.addAll(fragmentDocument.relationships());
       mergePlugins(plugins, fragmentDocument.plugins(), "$.plugins");
+      // Checked inside the loop so a runaway fragment set fails fast instead of accumulating an
+      // arbitrarily large merged model first.
+      checkElementCeiling(nodes.size(), relationships.size(), limits);
     }
     return new SourceDocument(
         root.modelSchemaVersion(), List.of(), requiredPlugins, nodes, relationships, plugins);
+  }
+
+  private static void checkElementCeiling(int nodeCount, int relationshipCount, SourceLimits limits)
+      throws SourceDiagnosticsException {
+    long total = (long) nodeCount + relationshipCount;
+    if (total > limits.maxElements()) {
+      throw new SourceDiagnosticsException(
+          List.of(
+              error(
+                  DiagnosticCode.SOURCE_ELEMENT_LIMIT_EXCEEDED,
+                  "model has "
+                      + nodeCount
+                      + " nodes and "
+                      + relationshipCount
+                      + " relationships ("
+                      + total
+                      + " elements); the element ceiling is "
+                      + limits.maxElements(),
+                  "$")));
+    }
   }
 
   /**
