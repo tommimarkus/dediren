@@ -289,6 +289,66 @@ class CliBuildCommandTest {
   }
 
   @Test
+  void xmiLaneWritesWholeModelUmldiAggregateForTheClassFamily() throws Exception {
+    // Whole-model interchange: beside the per-view xmi.xml files, build composes one model.uml.xml
+    // carrying <uml:Model> once plus one OMG UMLDI diagram per classifier-family view (uml-class,
+    // uml-data) with real ELK geometry — uml-activity is excluded from the aggregate. The
+    // union-scoped model emits each shared classifier exactly once (no duplicate xmi:id), which the
+    // document-wide xmi:id-uniqueness validation would otherwise reject.
+    Path root = workspaceRoot();
+    Path out = temp.resolve("model-uml-out");
+
+    CliResult result =
+        Main.executeForTesting(
+            new String[] {
+              "build",
+              "--input",
+              root.resolve("fixtures/source/valid-uml-basic.json").toString(),
+              "--out",
+              out.toString(),
+              "--xmi-policy",
+              root.resolve("fixtures/export-policy/default-uml-xmi.json").toString()
+            },
+            "",
+            envWithXmiSchema());
+
+    assertThat(result.exitCode()).describedAs(result.stdout()).isZero();
+    JsonNode buildResult = assertBuildResultSchemaValid(result.stdout());
+    assertThat(buildResult.at("/model_artifacts/0/path").asText()).isEqualTo("model.uml.xml");
+    assertThat(buildResult.at("/model_artifacts/0/artifact_kind").asText())
+        .isEqualTo("uml-xmi+xml");
+
+    String modelUml = Files.readString(out.resolve("model.uml.xml"), StandardCharsets.UTF_8);
+    // One model section; one diagram per classifier-family view (class + data), activity excluded.
+    assertThat(countOccurrences(modelUml, "<uml:Model ")).isEqualTo(1);
+    assertThat(countOccurrences(modelUml, "<umldi:UMLDiagram ")).isEqualTo(2);
+    // Default diagram identity is the source-derived id-diagram-<view-id>.
+    assertThat(modelUml)
+        .contains("dediren-provenance")
+        .contains("xmi:id=\"id-diagram-class-view\"")
+        .contains("xmi:id=\"id-diagram-data-view\"")
+        .contains("<dc:Bounds ")
+        .contains("modelElement=\"id-class-order\"")
+        .doesNotContain("id-diagram-activity-view");
+    // Union-scope dedup: the classifier shared by class-view and data-view is emitted once.
+    assertThat(countOccurrences(modelUml, "xmi:id=\"id-class-order\"")).isEqualTo(1);
+    // Per-view artifacts (model-only) still land beside the aggregate for every built view.
+    assertThat(Files.exists(out.resolve("class-view/xmi.xml"))).isTrue();
+    assertThat(Files.exists(out.resolve("data-view/xmi.xml"))).isTrue();
+    assertThat(Files.exists(out.resolve("activity-view/xmi.xml"))).isTrue();
+  }
+
+  private static int countOccurrences(String haystack, String needle) {
+    int count = 0;
+    for (int index = haystack.indexOf(needle);
+        index >= 0;
+        index = haystack.indexOf(needle, index + 1)) {
+      count++;
+    }
+    return count;
+  }
+
+  @Test
   void oefLaneAlsoWritesTheWholeModelAggregateWithPerViewIdentity() throws Exception {
     // Whole-model interchange (wave 3): beside the per-view oef.xml files, build composes one
     // model.oef.xml carrying EVERY built view's diagram, each with its own identity — an explicit
