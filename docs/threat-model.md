@@ -84,16 +84,23 @@ the outbound fetch.
 Controls:
 
 - **Workspace-root confinement.** Every tool path argument is resolved against the
-  `--root` (default: cwd) and real-path-resolved *before* the containment check
-  (`mcp-server/src/main/java/dev/dediren/mcp/WorkspacePaths.java`). Normalization alone is
+  `--root` (default: cwd) and real-path-resolved *before* the containment check.
+  The algorithm has exactly one implementation —
+  `core/src/main/java/dev/dediren/core/io/ConfinedPaths.java` — which
+  `mcp-server`'s `WorkspacePaths` adapts onto the sanitized MCP error surface
+  (previously two hand-mirrored copies that had already diverged on
+  normalization order). Normalization alone is
   insufficient — a symlink inside the root pointing outside is the interesting case,
-  and only `toRealPath()` catches it. For an output directory that need not exist,
-  the nearest existing ancestor is resolved instead. An escaping path yields a
+  and only `toRealPath()` catches it; the path stays *unnormalized* until it is
+  anchored on a real existing ancestor, so a `link/..` sequence is resolved
+  physically, never collapsed lexically. For an output directory that need not
+  exist, the nearest existing ancestor is resolved instead (the walk does not
+  follow symlinks). An escaping path yields a
   `DEDIREN_MCP_PATH_OUTSIDE_ROOT` error envelope. Pinned by `WorkspacePathsTest`.
   The confinement also covers the *second* class of model-supplied paths: a source
   document's `fragments[]` entries. The MCP handlers pass `--root` as an optional
   confinement root into core's source loader (`SourceValidator`), which applies the
-  same nearest-existing-ancestor real-path containment to each fragment before
+  same shared `ConfinedPaths` containment to each fragment before
   reading it (the CLI/human lane passes no root and is unconfined). An escaping
   fragment yields the same `DEDIREN_MCP_PATH_OUTSIDE_ROOT` envelope, and both the
   escape and any in-root read failure are sanitized to echo only the model's own
