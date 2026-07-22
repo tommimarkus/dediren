@@ -52,7 +52,8 @@ public final class XmiBuilder {
             .toList();
     StringBuilder xml = new StringBuilder();
     openRoot(xml, false);
-    writeModelContent(xml, request, policy, selectedNodes, selectedRelationships);
+    var ids = new IdentifierMap(policy.modelIdentifier());
+    writeModelContent(xml, ids, request, policy, selectedNodes, selectedRelationships);
     xml.append("</xmi:XMI>\n");
     return xml.toString();
   }
@@ -97,15 +98,16 @@ public final class XmiBuilder {
 
     StringBuilder xml = new StringBuilder();
     openRoot(xml, true);
+    var ids = new IdentifierMap(policy.modelIdentifier());
     ModelContent model =
-        writeModelContent(xml, representative, policy, selectedNodes, selectedRelationships);
+        writeModelContent(xml, ids, representative, policy, selectedNodes, selectedRelationships);
     Map<String, String> viewLabels = viewLabels(representative);
     for (ModelExportRequest.ViewLayout view : request.views()) {
       DiagramWriter.writeUmlDiagram(
           xml,
           view.layout(),
           resolveDiagramIdentity(policy, view.viewId(), viewLabels.get(view.viewId())),
-          model.ids(),
+          ids,
           model.nodeIds(),
           model.relationshipIds());
     }
@@ -159,22 +161,26 @@ public final class XmiBuilder {
   }
 
   /** The model-element id maps a UMLDI diagram needs to reference what the model section wrote. */
-  public record ModelContent(
-      IdentifierMap ids, Map<String, String> nodeIds, Map<String, String> relationshipIds) {}
+  private record ModelContent(Map<String, String> nodeIds, Map<String, String> relationshipIds) {
+    ModelContent {
+      nodeIds = Map.copyOf(nodeIds);
+      relationshipIds = Map.copyOf(relationshipIds);
+    }
+  }
 
   /**
-   * Writes the {@code <uml:Model>…</uml:Model>} section for the given scope and returns the id maps
-   * (and the shared {@link IdentifierMap}) so a caller can append UMLDI diagrams that reference the
-   * emitted elements and mint further globally-unique {@code xmi:id}s. Does not open or close the
-   * {@code xmi:XMI} root.
+   * Writes the {@code <uml:Model>…</uml:Model>} section for the given scope into {@code xml} using
+   * the caller's shared {@link IdentifierMap} (so the caller can mint further globally-unique
+   * {@code xmi:id}s for UMLDI), and returns the element id maps a diagram references. Does not open
+   * or close the {@code xmi:XMI} root.
    */
   private static ModelContent writeModelContent(
       StringBuilder xml,
+      IdentifierMap ids,
       ExportRequest request,
       UmlXmiExportPolicy policy,
       List<SourceNode> selectedNodes,
       List<SourceRelationship> selectedRelationships) {
-    var ids = new IdentifierMap(policy.modelIdentifier());
     var sourceNodesById =
         request.source().nodes().stream().collect(Collectors.toMap(SourceNode::id, node -> node));
     var nodeIds = new HashMap<String, String>();
@@ -259,7 +265,7 @@ public final class XmiBuilder {
     // has been written so all referenced types are known. XML idrefs need not precede their target.
     types.writeSynthesizedTypes(xml);
     xml.append("</uml:Model>");
-    return new ModelContent(ids, nodeIds, relationshipIds);
+    return new ModelContent(nodeIds, relationshipIds);
   }
 
   private static void writePackage(
