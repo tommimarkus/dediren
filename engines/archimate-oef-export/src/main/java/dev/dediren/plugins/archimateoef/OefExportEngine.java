@@ -25,6 +25,7 @@ import dev.dediren.engine.EngineException;
 import dev.dediren.engine.EngineResult;
 import dev.dediren.engine.ExportEngine;
 import dev.dediren.engine.ModelExportRequest;
+import dev.dediren.engine.XmlIds;
 import dev.dediren.engine.XmlText;
 import dev.dediren.schemacache.InJvmXmlValidator;
 import dev.dediren.schemacache.SchemaCacheException;
@@ -67,8 +68,6 @@ public final class OefExportEngine implements ExportEngine {
       "http://www.opengroup.org/xsd/archimate/3.1/archimate3_Diagram.xsd";
   private static final String OEF_SCHEMA_BASE_URL = "https://www.opengroup.org/xsd/archimate/3.1";
   static final String OEF_SCHEMA_DIR_ENV = "DEDIREN_OEF_SCHEMA_DIR";
-  static final String SCHEMA_CACHE_DIR_ENV = "DEDIREN_SCHEMA_CACHE_DIR";
-  static final String SCHEMA_FETCHER = "curl";
   // Offline gate: the three OEF XSDs are required in DEDIREN_OEF_SCHEMA_DIR. The W3C xml.xsd the
   // real Open Group set imports stays optional-until-needed there (self-contained stub sets do
   // not reference it); when it is missing the in-JVM compile fails naming it.
@@ -104,12 +103,12 @@ public final class OefExportEngine implements ExportEngine {
               "61960fb3131e38022caad5360e2f33a3382578ab3c80cd58bd74320ede61b20c",
               "W3C xml namespace schema"));
 
-  // Names both self-serve remediations for a failed schema download (issue #35): expose proxy
-  // configuration to this process, or skip the download by supplying the XSDs offline. Appended
-  // to DEDIREN_OEF_SCHEMA_UNAVAILABLE so an agent can recover from stdout JSON alone.
+  // The proxy half is the shared SchemaCacheModule.PROXY_REMEDIATION (issue #35); only the
+  // offline-placement tail is this engine's own. Appended to DEDIREN_OEF_SCHEMA_UNAVAILABLE so an
+  // agent can recover from stdout JSON alone.
   private static final String OEF_SCHEMA_DOWNLOAD_REMEDIATION =
-      "To download through an HTTP proxy, expose HTTP_PROXY, HTTPS_PROXY, and NO_PROXY (or their"
-          + " lowercase forms) to this process. To skip the download, pre-fetch the ArchiMate 3.1"
+      SchemaCacheModule.PROXY_REMEDIATION
+          + " To skip the download, pre-fetch the ArchiMate 3.1"
           + " OEF XSD files (plus the W3C xml.xsd they import) and set DEDIREN_OEF_SCHEMA_DIR to"
           + " their absolute directory.";
   // The offline lane never downloads, so its failures get placement advice, not proxy advice.
@@ -759,7 +758,8 @@ public final class OefExportEngine implements ExportEngine {
     // returned unchanged by Path.resolve, so the process path (product root == child cwd) is
     // byte-identical.
     Map<String, String> schemaEnv =
-        productRootRelativeEnv(env, productRoot, OEF_SCHEMA_DIR_ENV, SCHEMA_CACHE_DIR_ENV);
+        productRootRelativeEnv(
+            env, productRoot, OEF_SCHEMA_DIR_ENV, SchemaCacheModule.SCHEMA_CACHE_DIR_ENV);
     Optional<Path> configured = SchemaCacheModule.nonEmptyEnvPath(schemaEnv, OEF_SCHEMA_DIR_ENV);
     if (configured.isPresent()) {
       ensureOefSchemaFilesExist(configured.get());
@@ -773,7 +773,8 @@ public final class OefExportEngine implements ExportEngine {
     Path schemaDir;
     try {
       schemaDir =
-          SchemaCacheModule.schemaCacheBaseDir(schemaEnv, SCHEMA_CACHE_DIR_ENV, OEF_SCHEMA_DIR_ENV)
+          SchemaCacheModule.schemaCacheBaseDir(
+                  schemaEnv, SchemaCacheModule.SCHEMA_CACHE_DIR_ENV, OEF_SCHEMA_DIR_ENV)
               .resolve("opengroup")
               .resolve("archimate")
               .resolve("3.1");
@@ -783,7 +784,7 @@ public final class OefExportEngine implements ExportEngine {
             URI.create(pinned.url()),
             pinned.label(),
             pinned.sha256(),
-            SchemaCacheModule.curlFetcher(SCHEMA_FETCHER));
+            SchemaCacheModule.curlFetcher(SchemaCacheModule.SCHEMA_FETCHER));
       }
     } catch (SchemaCacheException error) {
       throw new OefSchemaValidationException(
@@ -908,50 +909,26 @@ public final class OefExportEngine implements ExportEngine {
     return Long.toString(Math.round(value));
   }
 
+  // In-file shorthands only: escaping and slugging are owned by engine-api's XmlText/XmlIds,
+  // shared with the uml-xmi engine (engines may not depend on each other).
   private static String attr(String value) {
-    return text(value).replace("\"", "&quot;");
+    return XmlText.attr(value);
   }
 
   private static String text(String value) {
-    return XmlText.scrub(value == null ? "" : value)
-        .replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;");
+    return XmlText.text(value);
+  }
+
+  private static String slug(String value) {
+    return XmlIds.slug(value);
   }
 
   private static final class IdentifierMap {
     private final Set<String> used = new HashSet<>();
 
     String oefId(String prefix, String value) {
-      String base = "id-" + slug(prefix) + "-" + slug(value);
-      if (used.add(base)) {
-        return base;
-      }
-      int suffix = 2;
-      while (true) {
-        String candidate = base + "-" + suffix;
-        if (used.add(candidate)) {
-          return candidate;
-        }
-        suffix++;
-      }
+      return XmlIds.unique(used, "id-" + slug(prefix) + "-" + slug(value));
     }
-  }
-
-  private static String slug(String value) {
-    StringBuilder result = new StringBuilder();
-    boolean previousDash = false;
-    for (char character : value.toCharArray()) {
-      if (Character.isLetterOrDigit(character) && character < 128) {
-        result.append(Character.toLowerCase(character));
-        previousDash = false;
-      } else if (!previousDash) {
-        result.append("-");
-        previousDash = true;
-      }
-    }
-    String trimmed = result.toString().replaceAll("^-+|-+$", "");
-    return trimmed.isEmpty() ? "item" : trimmed;
   }
 
   private static final class GroupSemanticValidationException extends Exception {

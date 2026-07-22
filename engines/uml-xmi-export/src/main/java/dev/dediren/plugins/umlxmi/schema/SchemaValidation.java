@@ -33,14 +33,12 @@ public final class SchemaValidation {
   private static final String OMG_XMI_SCHEMA_SHA256 =
       "7b228718d35a15a8e2fb99f078d36eee4b23b7a2cd405e7ac81b9d27bf2fab5d";
   public static final String XMI_SCHEMA_PATH_ENV = "DEDIREN_XMI_SCHEMA_PATH";
-  public static final String SCHEMA_CACHE_DIR_ENV = "DEDIREN_SCHEMA_CACHE_DIR";
-  public static final String SCHEMA_FETCHER = "curl";
-  // Names both self-serve remediations for a failed schema download (issue #35): expose proxy
-  // configuration to this process, or skip the download by supplying XMI.xsd offline. Appended
-  // to DEDIREN_XMI_SCHEMA_UNAVAILABLE so an agent can recover from stdout JSON alone.
+  // The proxy half is the shared SchemaCacheModule.PROXY_REMEDIATION (issue #35); only the
+  // offline-placement tail is this engine's own. Appended to DEDIREN_XMI_SCHEMA_UNAVAILABLE so an
+  // agent can recover from stdout JSON alone.
   private static final String XMI_SCHEMA_DOWNLOAD_REMEDIATION =
-      "To download through an HTTP proxy, expose HTTP_PROXY, HTTPS_PROXY, and NO_PROXY (or their"
-          + " lowercase forms) to this process. To skip the download, pre-fetch the OMG XMI.xsd and"
+      SchemaCacheModule.PROXY_REMEDIATION
+          + " To skip the download, pre-fetch the OMG XMI.xsd and"
           + " set DEDIREN_XMI_SCHEMA_PATH to its absolute file path.";
   // The offline lane never downloads, so its failures get placement advice, not proxy advice.
   private static final String XMI_SCHEMA_OFFLINE_REMEDIATION =
@@ -192,7 +190,8 @@ public final class SchemaValidation {
     Path schemaPath;
     try {
       schemaPath =
-          SchemaCacheModule.schemaCacheBaseDir(schemaEnv, SCHEMA_CACHE_DIR_ENV, XMI_SCHEMA_PATH_ENV)
+          SchemaCacheModule.schemaCacheBaseDir(
+                  schemaEnv, SchemaCacheModule.SCHEMA_CACHE_DIR_ENV, XMI_SCHEMA_PATH_ENV)
               .resolve("omg")
               .resolve("xmi")
               .resolve("2.5.1")
@@ -202,7 +201,7 @@ public final class SchemaValidation {
           URI.create(OMG_XMI_SCHEMA_URL),
           "OMG XMI schema",
           OMG_XMI_SCHEMA_SHA256,
-          SchemaCacheModule.curlFetcher(SCHEMA_FETCHER));
+          SchemaCacheModule.curlFetcher(SchemaCacheModule.SCHEMA_FETCHER));
     } catch (SchemaCacheException error) {
       throw new XmiValidationException(
           DiagnosticCode.XMI_SCHEMA_UNAVAILABLE.code(),
@@ -218,7 +217,7 @@ public final class SchemaValidation {
   public static Map<String, String> productRootRelativeEnv(
       Map<String, String> env, Path productRoot) {
     return SchemaCacheModule.productRootRelativeEnv(
-        env, productRoot, XMI_SCHEMA_PATH_ENV, SCHEMA_CACHE_DIR_ENV);
+        env, productRoot, XMI_SCHEMA_PATH_ENV, SchemaCacheModule.SCHEMA_CACHE_DIR_ENV);
   }
 
   /**

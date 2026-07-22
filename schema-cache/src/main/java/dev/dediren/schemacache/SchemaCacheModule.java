@@ -22,6 +22,24 @@ public final class SchemaCacheModule {
   // SchemaCacheException, not a log line. See ArchitectureRulesTest.
   private static final Logger LOG = LoggerFactory.getLogger(SchemaCacheModule.class);
 
+  /**
+   * The env var naming the shared schema-cache directory. Both export engines fetch into the same
+   * cache, so the name lives here (the seam both already depend on): a rename in an engine-local
+   * copy would silently split the common cache in two.
+   */
+  public static final String SCHEMA_CACHE_DIR_ENV = "DEDIREN_SCHEMA_CACHE_DIR";
+
+  /** The fetcher command both export lanes hand to {@link #curlFetcher}. */
+  public static final String SCHEMA_FETCHER = "curl";
+
+  /**
+   * The proxy half of the download remediation (issue #35), shared verbatim by both export engines;
+   * each appends its own offline-placement tail (schema dir vs schema path).
+   */
+  public static final String PROXY_REMEDIATION =
+      "To download through an HTTP proxy, expose HTTP_PROXY, HTTPS_PROXY, and NO_PROXY (or their"
+          + " lowercase forms) to this process.";
+
   private SchemaCacheModule() {}
 
   public static Optional<Path> nonEmptyEnvPath(Map<String, String> env, String name) {

@@ -2,6 +2,7 @@ package dev.dediren.plugins.umlxmi.build;
 
 import static dev.dediren.plugins.umlxmi.build.XmiHelpers.slug;
 
+import dev.dediren.engine.XmlIds;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -13,17 +14,6 @@ public final class IdentifierMap {
   }
 
   public String xmiId(String value) {
-    String base = "id-" + slug(value);
-    if (used.add(base)) {
-      return base;
-    }
-    int suffix = 2;
-    while (true) {
-      String candidate = base + "-" + suffix;
-      if (used.add(candidate)) {
-        return candidate;
-      }
-      suffix++;
-    }
+    return XmlIds.unique(used, "id-" + slug(value));
   }
 }
