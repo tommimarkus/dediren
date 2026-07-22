@@ -13,6 +13,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -79,6 +80,7 @@ public final class SchemaCacheModule {
       return home.get().resolve(".cache").resolve("dediren").resolve("schemas");
     }
     throw new SchemaCacheException(
+        SchemaCacheException.Kind.FETCH,
         "cannot determine schema cache directory; set " + cacheDirEnv + " or " + fallbackEnv);
   }
 
@@ -99,13 +101,16 @@ public final class SchemaCacheModule {
     Path parent = schemaPath.getParent();
     if (parent == null) {
       throw new SchemaCacheException(
+          SchemaCacheException.Kind.FETCH,
           "schema cache path " + schemaPath + " has no parent directory");
     }
     try {
       Files.createDirectories(parent);
     } catch (IOException error) {
       throw new SchemaCacheException(
-          "failed to create schema cache directory " + parent + ": " + error.getMessage(), error);
+          SchemaCacheException.Kind.FETCH,
+          "failed to create schema cache directory " + parent + ": " + error.getMessage(),
+          error);
     }
 
     Path tempFile;
@@ -113,6 +118,7 @@ public final class SchemaCacheModule {
       tempFile = Files.createTempFile(parent, ".dediren-schema-", ".tmp");
     } catch (IOException error) {
       throw new SchemaCacheException(
+          SchemaCacheException.Kind.FETCH,
           "failed to prepare temporary "
               + description
               + " download in "
@@ -126,6 +132,7 @@ public final class SchemaCacheModule {
       SchemaFetchResult result = fetcher.fetch(url, tempFile);
       if (!result.succeeded()) {
         throw new SchemaCacheException(
+            SchemaCacheException.Kind.FETCH,
             "failed to download "
                 + description
                 + " from "
@@ -135,11 +142,14 @@ public final class SchemaCacheModule {
                     result.command(), result.exitCode(), result.stdout(), result.stderr()));
       }
       if (!isNonEmptyFile(tempFile)) {
-        throw new SchemaCacheException("downloaded " + description + " from " + url + " was empty");
+        throw new SchemaCacheException(
+            SchemaCacheException.Kind.FETCH,
+            "downloaded " + description + " from " + url + " was empty");
       }
       String actualSha256 = sha256Hex(tempFile);
       if (!actualSha256.equalsIgnoreCase(expectedSha256)) {
         throw new SchemaCacheException(
+            SchemaCacheException.Kind.FETCH,
             "downloaded "
                 + description
                 + " from "
@@ -164,7 +174,9 @@ public final class SchemaCacheModule {
       throw error;
     } catch (Exception error) {
       throw new SchemaCacheException(
-          "failed to download " + description + " from " + url + ": " + error.getMessage(), error);
+          SchemaCacheException.Kind.FETCH,
+          "failed to download " + description + " from " + url + ": " + error.getMessage(),
+          error);
     } finally {
       try {
         Files.deleteIfExists(tempFile);
@@ -204,7 +216,30 @@ public final class SchemaCacheModule {
       // stdout EOF that can never arrive.
       StreamDrain stdout = StreamDrain.start(process.getInputStream());
       StreamDrain stderr = StreamDrain.start(process.getErrorStream());
-      int exitCode = process.waitFor();
+      // The child owns the transfer budget (--max-time 60); this bounded wait is the Java-side
+      // backstop for a fetcher binary that ignores or lacks that flag, so a hung child degrades to
+      // a structured fetch failure instead of blocking the export lane forever. On interrupt the
+      // child is killed and the flag restored, so cancellation propagates instead of being wrapped
+      // away as a download failure with a still-running child.
+      boolean finished;
+      try {
+        finished = process.waitFor(75, TimeUnit.SECONDS);
+      } catch (InterruptedException interrupted) {
+        process.destroyForcibly();
+        Thread.currentThread().interrupt();
+        throw interrupted;
+      }
+      if (!finished) {
+        process.destroyForcibly();
+        return new SchemaFetchResult(
+            false,
+            command,
+            -1,
+            stdout.await(),
+            "download did not complete within 75s; the fetcher process was killed"
+                .getBytes(StandardCharsets.UTF_8));
+      }
+      int exitCode = process.exitValue();
       return new SchemaFetchResult(
           exitCode == 0, command, exitCode, stdout.await(), stderr.await());
     };

@@ -130,7 +130,7 @@ public final class InJvmXmlValidator {
     }
   }
 
-  private record CompileResult(Schema schema, Set<Path> resolvedDependencies) {}
+  private record CompileResult(Schema schema, List<FileStamp> stamps) {}
 
   private InJvmXmlValidator() {}
 
@@ -158,6 +158,7 @@ public final class InJvmXmlValidator {
       throws SchemaCacheException {
     if (!VALIDATION_GATE.tryAcquire()) {
       throw new SchemaCacheException(
+          SchemaCacheException.Kind.SATURATED,
           "in-JVM schema validation against "
               + schemaPath
               + " could not start: the validator is at capacity ("
@@ -174,6 +175,7 @@ public final class InJvmXmlValidator {
     } catch (TimeoutException error) {
       future.cancel(true);
       throw new SchemaCacheException(
+          SchemaCacheException.Kind.TIMEOUT,
           "in-JVM schema validation against "
               + schemaPath
               + " did not complete within "
@@ -182,13 +184,16 @@ public final class InJvmXmlValidator {
     } catch (InterruptedException error) {
       Thread.currentThread().interrupt();
       future.cancel(true);
-      throw new SchemaCacheException("in-JVM schema validation was interrupted", error);
+      throw new SchemaCacheException(
+          SchemaCacheException.Kind.TIMEOUT, "in-JVM schema validation was interrupted", error);
     } catch (ExecutionException error) {
       if (error.getCause() instanceof SchemaCacheException cause) {
         throw cause;
       }
       throw new SchemaCacheException(
-          "in-JVM schema validation failed unexpectedly: " + error.getCause(), error.getCause());
+          SchemaCacheException.Kind.CONFIG,
+          "in-JVM schema validation failed unexpectedly: " + error.getCause(),
+          error.getCause());
     }
   }
 
@@ -216,7 +221,9 @@ public final class InJvmXmlValidator {
       // Configuration failures (an alternate JAXP provider rejecting the JAXP-1.5 lockdown
       // properties) are a broken validator, not an invalid document.
       throw new SchemaCacheException(
-          "in-JVM schema validator could not be configured: " + message(error), error);
+          SchemaCacheException.Kind.CONFIG,
+          "in-JVM schema validator could not be configured: " + message(error),
+          error);
     }
     try {
       validator.validate(new StreamSource(new StringReader(content)));
@@ -228,7 +235,9 @@ public final class InJvmXmlValidator {
       }
     } catch (IOException error) {
       throw new SchemaCacheException(
-          "in-JVM schema validation could not read the document: " + error.getMessage(), error);
+          SchemaCacheException.Kind.CONFIG,
+          "in-JVM schema validation could not read the document: " + error.getMessage(),
+          error);
     }
     return new Outcome(errors.isEmpty(), String.join("\n", errors));
   }
@@ -246,27 +255,17 @@ public final class InJvmXmlValidator {
   }
 
   /**
-   * Stores the compiled grammar with a freshness stamp per file that shaped it (top schema plus
-   * every resolved import/include). Skips caching when a just-compiled file cannot be re-stated —
-   * correct, merely uncached for that rare case — rather than storing an unverifiable entry.
+   * Stores the compiled grammar with the freshness stamps captured when each file was <em>read</em>
+   * (top schema before compile started, every import before its bytes were served to the compiler).
+   * Stamping at read time — never after the compile — means a file rewritten mid-compile carries
+   * its pre-rewrite stamp, so the worst case is one extra recompile on the next call, never a stale
+   * grammar served as fresh.
    */
   private static void cacheCompiled(Path key, CompileResult compiled) {
-    List<FileStamp> stamps;
-    try {
-      var collected = new ArrayList<FileStamp>(compiled.resolvedDependencies().size() + 1);
-      collected.add(FileStamp.of(key));
-      for (Path dependency : compiled.resolvedDependencies()) {
-        collected.add(FileStamp.of(dependency));
-      }
-      stamps = List.copyOf(collected);
-    } catch (IOException stampFailed) {
-      LOG.debug("in-JVM schema not cached: could not stamp a compiled file under {}", key);
-      return;
-    }
     if (COMPILED.size() >= MAX_CACHED_SCHEMAS && !COMPILED.containsKey(key)) {
       evictOne();
     }
-    COMPILED.put(key, new CachedSchema(compiled.schema(), stamps));
+    COMPILED.put(key, new CachedSchema(compiled.schema(), compiled.stamps()));
   }
 
   private static void evictOne() {
@@ -290,7 +289,19 @@ public final class InJvmXmlValidator {
 
   private static CompileResult compile(Path schemaPath) throws SchemaCacheException {
     Set<String> unresolved = new LinkedHashSet<>();
-    Set<Path> resolved = new LinkedHashSet<>();
+    Set<FileStamp> resolved = new LinkedHashSet<>();
+    // The top file's stamp is captured before the compiler consumes its bytes (imports are stamped
+    // the same way inside localOnly): a stamp taken before the read can only be conservative — a
+    // rewrite in the window makes the cached entry look stale and recompile, never look fresh.
+    FileStamp topStamp;
+    try {
+      topStamp = FileStamp.of(schemaPath.toAbsolutePath().normalize());
+    } catch (IOException unreadable) {
+      throw new SchemaCacheException(
+          SchemaCacheException.Kind.SCHEMA_SET,
+          "XML schema at " + schemaPath + " could not be read: " + unreadable.getMessage(),
+          unreadable);
+    }
     try {
       SchemaFactory factory = SchemaFactory.newInstance(XMLConstants.W3C_XML_SCHEMA_NS_URI);
       factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
@@ -298,13 +309,17 @@ public final class InJvmXmlValidator {
       factory.setProperty(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
       factory.setResourceResolver(localOnly(schemaPath.getParent(), unresolved, resolved));
       Schema schema = factory.newSchema(new StreamSource(schemaPath.toFile()));
-      return new CompileResult(schema, resolved);
+      var stamps = new ArrayList<FileStamp>(resolved.size() + 1);
+      stamps.add(topStamp);
+      stamps.addAll(resolved);
+      return new CompileResult(schema, List.copyOf(stamps));
     } catch (SAXException error) {
       String problems =
           unresolved.isEmpty()
               ? ""
               : " (unresolved schema references: " + String.join(", ", unresolved) + ")";
       throw new SchemaCacheException(
+          SchemaCacheException.Kind.SCHEMA_SET,
           "XML schema set at "
               + schemaPath.getParent()
               + " did not compile: "
@@ -322,7 +337,7 @@ public final class InJvmXmlValidator {
    * including {@code ..} segments or platform separators — cannot escape the directory.
    */
   private static LSResourceResolver localOnly(
-      Path directory, Set<String> unresolved, Set<Path> resolved) {
+      Path directory, Set<String> unresolved, Set<FileStamp> resolved) {
     return (type, namespaceUri, publicId, systemId, baseUri) -> {
       if (systemId == null || directory == null) {
         return null;
@@ -332,16 +347,19 @@ public final class InJvmXmlValidator {
         unresolved.add(systemId);
         return null;
       }
+      // The resolved set is the cache's dependency list: every served file that shaped the
+      // grammar, stamped BEFORE its bytes are read so a mid-compile rewrite can only trigger an
+      // extra recompile later, never a stale serve (see cacheCompiled).
+      FileStamp stamp;
       byte[] bytes;
       try {
+        stamp = FileStamp.of(local.toAbsolutePath().normalize());
         bytes = Files.readAllBytes(local);
       } catch (IOException error) {
         unresolved.add(systemId + " (unreadable: " + error.getMessage() + ")");
         return null;
       }
-      // The resolved set is the cache's dependency list: every served file that shaped the grammar,
-      // normalized so its later freshness stamp reads the same absolute path.
-      resolved.add(local.toAbsolutePath().normalize());
+      resolved.add(stamp);
       return new LocalInput(publicId, local.toUri().toString(), baseUri, bytes);
     };
   }

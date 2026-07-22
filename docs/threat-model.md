@@ -142,7 +142,11 @@ Runtime schema fetches go through
 `schema-cache/src/main/java/dev/dediren/schemacache/SchemaCacheModule.java`'s `curlFetcher`,
 which forces `--proto '=https'` (no protocol downgrade on redirect), bounds the whole
 transfer at 60 seconds to prevent stalled downloads from blocking the export lane
-indefinitely, and verifies the download's SHA-256 against a pinned value before trusting it:
+indefinitely — backed by a Java-side 75-second `waitFor` that `destroyForcibly`-kills a
+fetcher binary that ignores or lacks the `--max-time` flag, so a hung child degrades to a
+structured fetch failure instead of blocking the export thread forever (an interrupt during
+the wait also kills the child and re-sets the flag, so cancellation propagates) — and
+verifies the download's SHA-256 against a pinned value before trusting it:
 the single `OMG_XMI_SCHEMA_SHA256` constant
 (`engines/uml-xmi-export/.../schema/SchemaValidation.java`) and the per-file
 `PINNED_OEF_SCHEMA_SET` table (`engines/archimate-oef-export/.../OefExportEngine.java`),
@@ -185,12 +189,20 @@ time and no validator subprocess exists anywhere in the product. The retired
   (unresolved import, unreadable file, validator configuration failure,
   timeout) throw to the engines' `*_SCHEMA_UNAVAILABLE` lane; only genuine
   document-validity findings become `*_SCHEMA_INVALID`, so an environment
-  problem is never misreported as a defect in the generated XML.
+  problem is never misreported as a defect in the generated XML. The thrown
+  `SchemaCacheException` carries a failure `Kind` (schema-set / config /
+  timeout / saturated / fetch) and the engines append class-appropriate advice:
+  schema-placement/proxy remediation only for a missing or broken schema set,
+  "transient, retry" for saturation — so an agent is never told to reconfigure
+  a proxy for a capacity blip.
 - **Compiled-grammar reuse.** A compiled grammar is memoized per top-file path
   and served only while every file that shaped it — the top schema and the
-  imports it resolved — still matches its compile-time (size, mtime) stamp, so a
-  changed import recompiles rather than serving a stale grammar; the pinned
-  cache-lane contents are additionally SHA-256-verified at fetch time.
+  imports it resolved — still matches its (size, mtime) stamp. Each stamp is
+  captured when the file is *read* (top schema before compile, each import
+  before its bytes are served), never after the compile, so a file rewritten
+  mid-compile can only trigger an extra recompile on the next call — it can
+  never pin a stale grammar as fresh; the pinned cache-lane contents are
+  additionally SHA-256-verified at fetch time.
 
 The validator returns a code-free outcome the calling engine maps onto its own
 published diagnostic codes, so `schema-cache` stays notation-neutral, and every
@@ -200,7 +212,7 @@ pins the seam: local-only resolution and traversal confinement, the
 unavailable-vs-invalid split, single-recording of fatal errors, dependency-aware
 memoization, the bounded-run timeout, and the saturation fail-fast. The only subprocess left in the product is the
 schema-cache `curl` fetch (previous section), which keeps its own concurrent
-drain and 60-second transfer bound.
+drain, 60-second transfer bound, and Java-side 75-second kill backstop.
 
 ### SVG output escaping
 

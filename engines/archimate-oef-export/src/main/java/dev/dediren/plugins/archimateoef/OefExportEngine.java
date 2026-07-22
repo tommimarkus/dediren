@@ -718,9 +718,11 @@ public final class OefExportEngine implements ExportEngine {
     try {
       outcome = InJvmXmlValidator.validate(schemaPath, content);
     } catch (SchemaCacheException error) {
-      String remediation = source.unavailableRemediation();
+      // advice() picks by failure class: placement/proxy remediation only fits a missing or broken
+      // schema set; a saturated or timed-out validator says "retry" instead.
       throw new OefSchemaValidationException(
-          DiagnosticCode.OEF_SCHEMA_UNAVAILABLE.code(), error.getMessage() + " " + remediation);
+          DiagnosticCode.OEF_SCHEMA_UNAVAILABLE.code(),
+          error.getMessage() + " " + error.advice(source.unavailableRemediation()));
     }
     if (outcome.valid()) {
       return new Diagnostic(
