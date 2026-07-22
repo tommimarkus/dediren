@@ -7,6 +7,7 @@ import dev.dediren.contracts.layout.LaidOutGroups;
 import dev.dediren.contracts.source.GenericGraphPluginData;
 import dev.dediren.contracts.source.SourceNode;
 import dev.dediren.contracts.source.SourceRelationship;
+import dev.dediren.engine.XmlIds;
 import dev.dediren.engine.XmlText;
 import java.math.BigInteger;
 import java.util.List;
@@ -168,34 +169,17 @@ public final class XmiHelpers {
     return LaidOutGroups.semanticSourceId(group);
   }
 
+  // Module-local import point only: escaping and slugging are owned by engine-api's
+  // XmlText/XmlIds, shared with the archimate-oef engine (engines may not depend on each other).
   public static String attr(String value) {
-    return XmlText.scrub(value == null ? "" : value)
-        .replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
-        .replace("\"", "&quot;");
+    return XmlText.attr(value);
   }
 
   public static String text(String value) {
-    return XmlText.scrub(value == null ? "" : value)
-        .replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;");
+    return XmlText.text(value);
   }
 
   public static String slug(String value) {
-    StringBuilder result = new StringBuilder();
-    boolean previousDash = false;
-    for (char character : value.toCharArray()) {
-      if (Character.isLetterOrDigit(character) && character < 128) {
-        result.append(Character.toLowerCase(character));
-        previousDash = false;
-      } else if (!previousDash) {
-        result.append("-");
-        previousDash = true;
-      }
-    }
-    String trimmed = result.toString().replaceAll("^-+|-+$", "");
-    return trimmed.isEmpty() ? "item" : trimmed;
+    return XmlIds.slug(value);
   }
 }

@@ -1,6 +1,6 @@
 package dev.dediren.plugins.render;
 
-import static dev.dediren.plugins.render.svg.SvgDocument.renderSvg;
+import static dev.dediren.plugins.render.SvgDocument.renderSvg;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertThrows;

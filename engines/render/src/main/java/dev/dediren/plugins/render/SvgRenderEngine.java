@@ -1,6 +1,6 @@
 package dev.dediren.plugins.render;
 
-import static dev.dediren.plugins.render.svg.SvgDocument.renderSvg;
+import static dev.dediren.plugins.render.SvgDocument.renderSvg;
 
 import dev.dediren.archimate.ArchimateTypeValidationException;
 import dev.dediren.contracts.ContractVersions;

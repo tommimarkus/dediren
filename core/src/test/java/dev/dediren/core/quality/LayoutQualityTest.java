@@ -27,6 +27,26 @@ class LayoutQualityTest {
     assertThat(report.status()).isEqualTo("warning");
   }
 
+  /**
+   * Pins the overlap predicate's strict boundary: rectangles that exactly touch (x[i] + width[i] ==
+   * x[i+1]) are NOT an overlap. The elk-layout sequence normalizer guarantees lifeline columns
+   * satisfy exactly this touching-allowed invariant and documents that it matches this class's
+   * strict predicate — engines may not depend on core, so the agreement is held by this pin: a
+   * drift to an inclusive comparison here would flag every normalizer-packed sequence layout.
+   */
+  @Test
+  void exactlyTouchingNodesAreNotCountedAsOverlap() {
+    var nodes = new ArrayList<LaidOutNode>();
+    nodes.add(node("a", 0.0, 0.0));
+    nodes.add(node("b", 100.0, 0.0));
+
+    LayoutQualityReport report =
+        LayoutQuality.validateLayout(layoutResult(nodes, List.of(), List.of()));
+
+    assertThat(report.overlapCount()).isZero();
+    assertThat(report.status()).isEqualTo("ok");
+  }
+
   @Test
   void qualityWarningsAreEmittedPerNonzeroNonInformationalCountPointingIntoData() {
     var nodes = new ArrayList<LaidOutNode>();

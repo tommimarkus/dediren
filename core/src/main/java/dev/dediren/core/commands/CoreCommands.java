@@ -22,6 +22,7 @@ import dev.dediren.core.io.JsonInput;
 import dev.dediren.core.quality.LayoutQuality;
 import dev.dediren.core.quality.LayoutQualityReport;
 import dev.dediren.core.schema.SchemaVersionGate;
+import dev.dediren.core.source.DocumentValidator;
 import dev.dediren.core.source.SourceValidator;
 import dev.dediren.core.source.ValidationResult;
 import dev.dediren.engine.EngineResult;
@@ -139,6 +140,50 @@ public final class CoreCommands {
                 DiagnosticSeverity.ERROR,
                 "unsupported target: " + target,
                 null)));
+  }
+
+  /**
+   * The one place the {@code validate} dispatch decision lives: an engine id routes to that
+   * engine's semantic validation (which needs a profile — and a profile needs an engine, the two
+   * published usage errors), no engine runs the document gate. Both the CLI and the MCP validate
+   * tool call this, so the two lanes cannot decide what "validate" means differently: the CLI
+   * passes the user's {@code --plugin}/{@code --profile} verbatim, the MCP lane passes the default
+   * semantics engine whenever a profile is present.
+   */
+  public static EngineRunOutcome validateCommand(
+      String engineId,
+      String profile,
+      String inputText,
+      Path baseDir,
+      Path confinementRoot,
+      Map<String, String> env,
+      Engines engines)
+      throws EngineExecutionException {
+    if (engineId != null && profile == null) {
+      return usageErrorOutcome(
+          DiagnosticCode.VALIDATE_PROFILE_REQUIRED, "validate --plugin requires --profile");
+    }
+    if (engineId == null && profile != null) {
+      return usageErrorOutcome(
+          DiagnosticCode.VALIDATE_PLUGIN_REQUIRED, "validate --profile requires --plugin");
+    }
+    if (engineId != null) {
+      return semanticValidateCommand(
+          engineId, profile, inputText, baseDir, confinementRoot, env, engines);
+    }
+    ValidationResult result =
+        DocumentValidator.validateDocument(inputText, baseDir, confinementRoot);
+    return new EngineRunOutcome(
+        JsonSupport.objectMapper().writeValueAsString(result.envelope()), result.exitCode());
+  }
+
+  private static EngineRunOutcome usageErrorOutcome(DiagnosticCode code, String message) {
+    return new EngineRunOutcome(
+        JsonSupport.objectMapper()
+            .writeValueAsString(
+                CommandEnvelope.error(
+                    List.of(new Diagnostic(code.code(), DiagnosticSeverity.ERROR, message, null)))),
+        CommandExitCode.INPUT_ERROR.code());
   }
 
   public static EngineRunOutcome semanticValidateCommand(
