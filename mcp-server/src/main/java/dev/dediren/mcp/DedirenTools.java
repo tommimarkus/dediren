@@ -12,8 +12,6 @@ import dev.dediren.core.commands.BuildRequest;
 import dev.dediren.core.commands.CoreCommands;
 import dev.dediren.core.engine.EngineExecutionException;
 import dev.dediren.core.engine.EngineRunOutcome;
-import dev.dediren.core.source.DocumentValidator;
-import dev.dediren.core.source.ValidationResult;
 import dev.dediren.engine.Engines;
 import io.modelcontextprotocol.spec.McpSchema.CallToolRequest;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
@@ -90,16 +88,20 @@ public final class DedirenTools {
 
     String profile = stringArg(request, "profile");
     try {
-      if (profile != null) {
-        EngineRunOutcome outcome =
-            CoreCommands.semanticValidateCommand(
-                BuildCommand.SEMANTICS_ENGINE, profile, text, baseDir, root, env, engines);
-        return envelope(outcome.stdout(), outcome.exitCode() != 0);
-      }
-      // The model chose this source, so its fragment paths are model-supplied too: confine them to
-      // the same --root the tool arguments are confined to (fragment errors are sanitized in core).
-      ValidationResult result = DocumentValidator.validateDocument(text, baseDir, root);
-      return envelope(serialize(result.envelope()), result.exitCode() != 0);
+      // The profile/document dispatch decision lives in core's validateCommand, shared with the
+      // CLI. The model chose this source, so its fragment paths are model-supplied too: confine
+      // them to the same --root the tool arguments are confined to (fragment errors are sanitized
+      // in core).
+      EngineRunOutcome outcome =
+          CoreCommands.validateCommand(
+              profile == null ? null : BuildCommand.SEMANTICS_ENGINE,
+              profile,
+              text,
+              baseDir,
+              root,
+              env,
+              engines);
+      return envelope(outcome.stdout(), outcome.exitCode() != 0);
     } catch (EngineExecutionException failure) {
       return engineFailure(failure);
     } catch (UncheckedIOException failure) {

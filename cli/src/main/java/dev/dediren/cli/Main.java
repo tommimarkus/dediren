@@ -12,7 +12,6 @@ import dev.dediren.core.commands.BuildRequest;
 import dev.dediren.core.commands.CoreCommands;
 import dev.dediren.core.engine.EngineExecutionException;
 import dev.dediren.core.engine.EngineRunOutcome;
-import dev.dediren.core.source.DocumentValidator;
 import dev.dediren.core.source.ValidationResult;
 import dev.dediren.engine.Engines;
 import java.io.ByteArrayInputStream;
@@ -131,48 +130,23 @@ public final class Main {
 
     @Override
     public Integer call() throws Exception {
-      if (plugin != null && profile == null) {
-        return printEnvelope(
-            usageError(
-                DiagnosticCode.VALIDATE_PROFILE_REQUIRED.code(),
-                "validate --plugin requires --profile"));
-      }
-      if (plugin == null && profile != null) {
-        return printEnvelope(
-            usageError(
-                DiagnosticCode.VALIDATE_PLUGIN_REQUIRED.code(),
-                "validate --profile requires --plugin"));
-      }
       JsonInputText inputText = readInput("input", input, stdin);
       if (inputText.error() != null) {
         return printEnvelope(inputText.error());
       }
-      if (plugin != null) {
-        try {
-          return printPluginOutcome(
-              CoreCommands.semanticValidateCommand(
-                  plugin, profile, inputText.text(), inputText.baseDir(), env, engines));
-        } catch (EngineExecutionException error) {
-          return printPluginError(error);
-        } catch (UncheckedIOException error) {
-          return printCommandIoFailure(spec, error);
-        } catch (ProductRootException error) {
-          return printProductRootFailure(spec, error);
-        }
-      }
+      // The profile/document dispatch decision (and both usage rules) lives in core's
+      // validateCommand, shared with the MCP validate tool — the adapter only parses and prints.
       try {
-        ValidationResult result =
-            DocumentValidator.validateDocument(inputText.text(), inputText.baseDir(), null);
-        return printValidationResult(result);
+        return printPluginOutcome(
+            CoreCommands.validateCommand(
+                plugin, profile, inputText.text(), inputText.baseDir(), null, env, engines));
+      } catch (EngineExecutionException error) {
+        return printPluginError(error);
       } catch (UncheckedIOException error) {
         return printCommandIoFailure(spec, error);
       } catch (ProductRootException error) {
         return printProductRootFailure(spec, error);
       }
-    }
-
-    private Integer printValidationResult(ValidationResult result) throws IOException {
-      return writeValidationResult(spec, result);
     }
 
     private Integer printEnvelope(CommandEnvelope<JsonNode> envelope) throws IOException {
