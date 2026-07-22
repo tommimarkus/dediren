@@ -18,6 +18,20 @@ recorded pre-existing gaps, not a defect list; pick up individually.
   the 0.70 floor; `./mvnw -pl mcp-server -am -Pcoverage verify` passes. (Was:
   0.67 at module landing, concentrated in the stdio transport hardening.)
 
+- **Per-stage MCP tools** — recorded 2026-07-22 when CLI/MCP analysis-tool
+  parity shipped (`2026-07-22-cli-mcp-analysis-tool-parity.md`): the read-only
+  analysis and provenance commands (`diff`, `query`, `verify`, `status`) gained
+  MCP twins, but the five per-stage pipeline commands (`project`, `layout`,
+  `validate-layout`, `render`, `export`) remain CLI-only. Rationale: `build`
+  subsumes them end to end, so each MCP twin would add always-loaded tool
+  context for a debug decomposition an agent rarely drives directly. This
+  re-evaluates the roadmap survey's blanket "per-stage door": both of that
+  door's gates — the mcp-server coverage debt above (now paid) and transcript
+  evidence of decomposed-mode use — did not bind the read-only analysis twins,
+  which are not build decompositions. Revisit trigger: a concrete
+  decomposed-mode workflow that must inspect or hand-edit a stage envelope
+  between stages.
+
 - **XMI lane migration onto the in-JVM validator** — RESOLVED 2026-07-22
   (same day): a spike proved the JDK validator against the real OMG `XMI.xsd`
   (one tolerated finding: the strict-wildcard no-UML-declaration gap, Xerces

@@ -3,6 +3,7 @@ package dev.dediren.mcp;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.dediren.contracts.json.JsonSupport;
+import dev.dediren.core.commands.AnalysisCommands;
 import dev.dediren.core.commands.BuildCommand;
 import java.util.ArrayList;
 import java.util.List;
@@ -40,5 +41,26 @@ class ToolSchemasTest {
             "ToolSchemas.BUILD's emit enum is the only way an agent learns the emit vocabulary —"
                 + " a kind added to BuildCommand.EMIT_KINDS must be advertised here too")
         .containsExactlyInAnyOrderElementsOf(BuildCommand.EMIT_KINDS);
+  }
+
+  @Test
+  void advertisedQueryKindEnumMatchesTheVocabularyAnalysisCommandsAccepts() {
+    // Same drift guard as the emit case: the SDK validates 'kind' against this enum before the
+    // handler runs, so a kind added to AnalysisCommands.QUERY_KINDS but not advertised here is
+    // silently unreachable over MCP.
+    JsonNode advertisedEnum =
+        JsonSupport.objectMapper()
+            .readTree(ToolSchemas.QUERY)
+            .path("properties")
+            .path("kind")
+            .path("enum");
+
+    assertThat(advertisedEnum.isArray())
+        .as("ToolSchemas.QUERY must advertise a kind enum")
+        .isTrue();
+    List<String> advertised = new ArrayList<>();
+    advertisedEnum.forEach(node -> advertised.add(node.asText()));
+
+    assertThat(advertised).containsExactlyInAnyOrderElementsOf(AnalysisCommands.QUERY_KINDS);
   }
 }

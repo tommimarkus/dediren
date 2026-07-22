@@ -28,7 +28,7 @@ instead of shelling out. Register it once:
 
     claude mcp add dediren -- /path/to/bundle/bin/dediren mcp --root /path/to/your/project
 
-Three tools:
+Seven tools:
 
 - `dediren_guide` — this document, one section at a time. Pass `topic`, or omit
   it to list the topics. Start with `topic: "source-json"`.
@@ -38,6 +38,19 @@ Three tools:
   here instead of only at build time); optional `profile` to also run
   semantic profile validation (source models only). Returns the validation
   envelope.
+- `dediren_diff` — `old` and `new` (two source-model paths). Returns an envelope
+  of change records — nodes, relationships, and views added, removed, or
+  changed. Both sides must share the same schema id.
+- `dediren_query` — `source` and `kind` (`dependents` | `orphans` |
+  `view-coverage`); `id` is required when `kind` is `dependents`. A fixed query
+  vocabulary over one model, not a query language.
+- `dediren_verify` — `source` and `artifacts` (a directory of built artifacts).
+  Checks each artifact's provenance stamp against the model's recomputed hash:
+  `ok` means all current; a stale artifact is an error, an unstamped one a
+  warning.
+- `dediren_status` — optional `dir` (a workspace directory; omit to index the
+  root itself). Indexes the workspace's source models by hash and each stamped
+  artifact's currency against them.
 - `dediren_build` — `source`, `out`, and at least one policy (`render_policy`,
   `oef_policy`, `xmi_policy`); optional `views` (subset of view ids) and `emit`
   (extra stage envelopes to also write, for debugging). Returns the
@@ -63,7 +76,9 @@ config-expansion time, so `${CLAUDE_PROJECT_DIR:-.}` in a hand-written
 automatically, wrap the launch in a script that reads `$CLAUDE_PROJECT_DIR` at
 runtime, as the plugin distribution does. A path that escapes `--root` returns a
 `DEDIREN_MCP_PATH_OUTSIDE_ROOT` error envelope. Launch with `--read-only` to
-serve only `dediren_validate` and `dediren_guide`.
+withhold the artifact-writing `dediren_build`; the six read-only tools
+(`dediren_guide`, `dediren_validate`, `dediren_diff`, `dediren_query`,
+`dediren_verify`, `dediren_status`) all remain.
 
 Tool results carry the same envelope JSON the CLI prints on stdout, so the
 handoff rules in `## Command Handoff` apply unchanged.

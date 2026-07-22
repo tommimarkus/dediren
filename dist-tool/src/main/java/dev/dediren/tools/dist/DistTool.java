@@ -1318,6 +1318,7 @@ public final class DistTool {
         {"jsonrpc":"2.0","id":5,"method":"resources/list","params":{}}
         {"jsonrpc":"2.0","id":6,"method":"resources/read","params":{"uri":"dediren://schema/model.schema.json"}}
         {"jsonrpc":"2.0","id":7,"method":"resources/read","params":{"uri":"dediren://diagnostics/catalog"}}
+        {"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"dediren_query","arguments":{"source":"fixtures/source/valid-archimate-oef.json","kind":"orphans"}}}
         """,
         StandardCharsets.UTF_8);
 
@@ -1330,7 +1331,14 @@ public final class DistTool {
     assertContains(stdout, "dediren_validate", "mcp tools/list response");
     assertContains(stdout, "dediren_build", "mcp tools/list response");
     assertContains(stdout, "dediren_guide", "mcp tools/list response");
+    assertContains(stdout, "dediren_diff", "mcp tools/list response");
+    assertContains(stdout, "dediren_query", "mcp tools/list response");
+    assertContains(stdout, "dediren_verify", "mcp tools/list response");
+    assertContains(stdout, "dediren_status", "mcp tools/list response");
     assertContains(stdout, "Minimal Source JSON", "mcp guide tool call response");
+    // A read-only analysis tool answers end to end through the shrunk bundle, not just the flagship
+    // build: the query envelope carries its result schema id.
+    assertContains(stdout, "query-result.schema", "mcp query tool call response");
     // The resources surface serves the bundle's own bytes: the list names a schema URI, a schema
     // read returns the shipped file's content, and the generated diagnostics catalog resolves.
     assertContains(stdout, "dediren://schema/model.schema.json", "mcp resources/list response");
@@ -1342,7 +1350,8 @@ public final class DistTool {
 
     assertMcpBuildAnswered(bundle, responses, stdout);
     System.out.println(
-        "mcp stdio smoke passed: 3 tools + resources, real build answered, protocol-only stdout");
+        "mcp stdio smoke passed: 7 tools + resources, real build answered, query answered,"
+            + " protocol-only stdout");
   }
 
   /**

@@ -40,25 +40,41 @@ class DedirenMcpServerTest {
   }
 
   @Test
-  void registersAllThreeToolsByDefault(@TempDir Path root) {
+  void registersEveryToolByDefault(@TempDir Path root) {
     McpSyncServer server = serverIn(root, false);
     try {
       List<String> names = server.listTools().stream().map(Tool::name).toList();
 
       assertThat(names)
-          .containsExactlyInAnyOrder("dediren_validate", "dediren_build", "dediren_guide");
+          .containsExactlyInAnyOrder(
+              "dediren_validate",
+              "dediren_build",
+              "dediren_guide",
+              "dediren_diff",
+              "dediren_query",
+              "dediren_verify",
+              "dediren_status");
     } finally {
       server.close();
     }
   }
 
   @Test
-  void readOnlyModeOmitsTheBuildTool(@TempDir Path root) {
+  void readOnlyModeOmitsOnlyTheBuildTool(@TempDir Path root) {
     McpSyncServer server = serverIn(root, true);
     try {
       List<String> names = server.listTools().stream().map(Tool::name).toList();
 
-      assertThat(names).containsExactlyInAnyOrder("dediren_validate", "dediren_guide");
+      // The four analysis tools are read-only, so they stay registered under --read-only; only the
+      // artifact-writing build tool drops out.
+      assertThat(names)
+          .containsExactlyInAnyOrder(
+              "dediren_validate",
+              "dediren_guide",
+              "dediren_diff",
+              "dediren_query",
+              "dediren_verify",
+              "dediren_status");
       assertThat(names).doesNotContain("dediren_build");
     } finally {
       server.close();
@@ -73,7 +89,10 @@ class DedirenMcpServerTest {
     Map<String, List<String>> expectedRequired =
         Map.of(
             "dediren_validate", List.of("source"),
-            "dediren_build", List.of("source", "out"));
+            "dediren_build", List.of("source", "out"),
+            "dediren_diff", List.of("old", "new"),
+            "dediren_query", List.of("source", "kind"),
+            "dediren_verify", List.of("source", "artifacts"));
     McpSyncServer server = serverIn(root, false);
     try {
       for (Tool tool : server.listTools()) {

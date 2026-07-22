@@ -423,4 +423,270 @@ class DedirenToolsTest {
     // The resolved absolute path is stderr-only and must never reach the model.
     assertThat(diagnostic.path("message").asText()).doesNotContain(root.toRealPath().toString());
   }
+
+  // --- diff (engine-free, so it runs fully on the empty registry) -----------
+
+  @Test
+  void diffReturnsAChangeEnvelope(@TempDir Path root) throws Exception {
+    Files.copy(fixture("valid-basic.json"), root.resolve("old.json"));
+    Files.copy(fixture("valid-pipeline-rich.json"), root.resolve("new.json"));
+
+    CallToolResult result =
+        toolsIn(root)
+            .diff(
+                new CallToolRequest("dediren_diff", Map.of("old", "old.json", "new", "new.json")));
+
+    assertThat(result.isError()).isNotEqualTo(Boolean.TRUE);
+    assertThat(envelopeOf(result).path("data").path("diff_result_schema_version").asText())
+        .isEqualTo("diff-result.schema.v1");
+  }
+
+  @Test
+  void diffRequiresOldAndNew(@TempDir Path root) {
+    CallToolResult missingOld =
+        toolsIn(root).diff(new CallToolRequest("dediren_diff", Map.of("new", "new.json")));
+    assertThat(missingOld.isError()).isTrue();
+    assertThat(envelopeOf(missingOld).path("diagnostics").path(0).path("code").asText())
+        .isEqualTo("DEDIREN_COMMAND_INPUT_INVALID");
+
+    CallToolResult missingNew =
+        toolsIn(root).diff(new CallToolRequest("dediren_diff", Map.of("old", "old.json")));
+    assertThat(missingNew.isError()).isTrue();
+    assertThat(envelopeOf(missingNew).path("diagnostics").path(0).path("message").asText())
+        .contains("'new'");
+  }
+
+  @Test
+  void diffRejectsAModelOutsideTheRoot(@TempDir Path root) throws Exception {
+    Files.copy(fixture("valid-basic.json"), root.resolve("new.json"));
+
+    CallToolResult result =
+        toolsIn(root)
+            .diff(
+                new CallToolRequest(
+                    "dediren_diff", Map.of("old", "../../etc/passwd", "new", "new.json")));
+
+    assertThat(result.isError()).isTrue();
+    JsonNode diagnostic = envelopeOf(result).path("diagnostics").path(0);
+    assertThat(diagnostic.path("code").asText()).isEqualTo("DEDIREN_MCP_PATH_OUTSIDE_ROOT");
+    assertThat(diagnostic.path("message").asText()).doesNotContain(root.toRealPath().toString());
+  }
+
+  @Test
+  void diffNamesTheModelThatFailedToRead(@TempDir Path root) throws Exception {
+    Files.copy(fixture("valid-basic.json"), root.resolve("new.json"));
+    // A directory resolves like a file (clears WorkspacePaths) but cannot be read as one.
+    Files.createDirectory(root.resolve("old.json"));
+
+    CallToolResult result =
+        toolsIn(root)
+            .diff(
+                new CallToolRequest("dediren_diff", Map.of("old", "old.json", "new", "new.json")));
+
+    assertThat(result.isError()).isTrue();
+    JsonNode diagnostic = envelopeOf(result).path("diagnostics").path(0);
+    assertThat(diagnostic.path("code").asText()).isEqualTo("DEDIREN_COMMAND_INPUT_INVALID");
+    assertThat(diagnostic.path("message").asText()).contains("old");
+    assertThat(diagnostic.path("message").asText()).doesNotContain(root.toRealPath().toString());
+  }
+
+  // --- query ----------------------------------------------------------------
+
+  @Test
+  void queryReturnsAResultEnvelope(@TempDir Path root) throws Exception {
+    Files.copy(fixture("valid-basic.json"), root.resolve("model.json"));
+
+    CallToolResult result =
+        toolsIn(root)
+            .query(
+                new CallToolRequest(
+                    "dediren_query", Map.of("source", "model.json", "kind", "orphans")));
+
+    assertThat(result.isError()).isNotEqualTo(Boolean.TRUE);
+    assertThat(envelopeOf(result).path("data").path("query_result_schema_version").asText())
+        .isEqualTo("query-result.schema.v1");
+  }
+
+  @Test
+  void queryRequiresSourceAndKind(@TempDir Path root) {
+    CallToolResult missingSource =
+        toolsIn(root).query(new CallToolRequest("dediren_query", Map.of("kind", "orphans")));
+    assertThat(missingSource.isError()).isTrue();
+    assertThat(envelopeOf(missingSource).path("diagnostics").path(0).path("message").asText())
+        .contains("'source'");
+
+    CallToolResult missingKind =
+        toolsIn(root).query(new CallToolRequest("dediren_query", Map.of("source", "model.json")));
+    assertThat(missingKind.isError()).isTrue();
+    assertThat(envelopeOf(missingKind).path("diagnostics").path(0).path("message").asText())
+        .contains("'kind'");
+  }
+
+  @Test
+  void queryRejectsASourceOutsideTheRoot(@TempDir Path root) {
+    CallToolResult result =
+        toolsIn(root)
+            .query(
+                new CallToolRequest(
+                    "dediren_query", Map.of("source", "../../etc/passwd", "kind", "orphans")));
+
+    assertThat(result.isError()).isTrue();
+    assertThat(envelopeOf(result).path("diagnostics").path(0).path("code").asText())
+        .isEqualTo("DEDIREN_MCP_PATH_OUTSIDE_ROOT");
+  }
+
+  // --- verify ---------------------------------------------------------------
+
+  @Test
+  void verifyReportsAnUnstampedArtifact(@TempDir Path root) throws Exception {
+    Files.copy(fixture("valid-basic.json"), root.resolve("model.json"));
+    Path artifacts = Files.createDirectory(root.resolve("artifacts"));
+    // A plain SVG carries no provenance stamp, so verify reports it as unstamped (a warning).
+    Files.writeString(artifacts.resolve("diagram.svg"), "<svg/>");
+
+    CallToolResult result =
+        toolsIn(root)
+            .verify(
+                new CallToolRequest(
+                    "dediren_verify", Map.of("source", "model.json", "artifacts", "artifacts")));
+
+    assertThat(result.isError()).isNotEqualTo(Boolean.TRUE);
+    JsonNode envelope = envelopeOf(result);
+    assertThat(envelope.path("status").asText()).isEqualTo("warning");
+    assertThat(envelope.path("data").path("artifacts").path(0).path("status").asText())
+        .isEqualTo("unstamped");
+  }
+
+  @Test
+  void verifyRequiresSourceAndArtifacts(@TempDir Path root) {
+    CallToolResult missingSource =
+        toolsIn(root)
+            .verify(new CallToolRequest("dediren_verify", Map.of("artifacts", "artifacts")));
+    assertThat(missingSource.isError()).isTrue();
+    assertThat(envelopeOf(missingSource).path("diagnostics").path(0).path("message").asText())
+        .contains("'source'");
+
+    CallToolResult missingArtifacts =
+        toolsIn(root).verify(new CallToolRequest("dediren_verify", Map.of("source", "model.json")));
+    assertThat(missingArtifacts.isError()).isTrue();
+    assertThat(envelopeOf(missingArtifacts).path("diagnostics").path(0).path("message").asText())
+        .contains("'artifacts'");
+  }
+
+  @Test
+  void verifyRejectsArtifactsThatAreNotADirectory(@TempDir Path root) throws Exception {
+    Files.copy(fixture("valid-basic.json"), root.resolve("model.json"));
+    Files.writeString(root.resolve("not-a-dir"), "plain file");
+
+    CallToolResult result =
+        toolsIn(root)
+            .verify(
+                new CallToolRequest(
+                    "dediren_verify", Map.of("source", "model.json", "artifacts", "not-a-dir")));
+
+    assertThat(result.isError()).isTrue();
+    JsonNode diagnostic = envelopeOf(result).path("diagnostics").path(0);
+    assertThat(diagnostic.path("code").asText()).isEqualTo("DEDIREN_COMMAND_INPUT_INVALID");
+    assertThat(diagnostic.path("message").asText()).contains("not a directory");
+    // The model's own candidate, not the resolved absolute path.
+    assertThat(diagnostic.path("message").asText()).doesNotContain(root.toRealPath().toString());
+  }
+
+  // --- status ---------------------------------------------------------------
+
+  @Test
+  void statusIndexesTheRootByDefault(@TempDir Path root) throws Exception {
+    Files.copy(fixture("valid-basic.json"), root.resolve("model.json"));
+
+    CallToolResult result = toolsIn(root).status(new CallToolRequest("dediren_status", Map.of()));
+
+    assertThat(result.isError()).isNotEqualTo(Boolean.TRUE);
+    JsonNode envelope = envelopeOf(result);
+    assertThat(envelope.path("status").asText()).isEqualTo("ok");
+    assertThat(envelope.path("data").path("models").path(0).path("path").asText())
+        .isEqualTo("model.json");
+  }
+
+  @Test
+  void statusRejectsADirOutsideTheRoot(@TempDir Path root) {
+    CallToolResult result =
+        toolsIn(root).status(new CallToolRequest("dediren_status", Map.of("dir", "../../etc")));
+
+    assertThat(result.isError()).isTrue();
+    assertThat(envelopeOf(result).path("diagnostics").path(0).path("code").asText())
+        .isEqualTo("DEDIREN_MCP_PATH_OUTSIDE_ROOT");
+  }
+
+  @Test
+  void statusRejectsADirThatIsNotADirectory(@TempDir Path root) throws Exception {
+    Files.writeString(root.resolve("plain.txt"), "not a dir");
+
+    CallToolResult result =
+        toolsIn(root).status(new CallToolRequest("dediren_status", Map.of("dir", "plain.txt")));
+
+    assertThat(result.isError()).isTrue();
+    JsonNode diagnostic = envelopeOf(result).path("diagnostics").path(0);
+    assertThat(diagnostic.path("code").asText()).isEqualTo("DEDIREN_COMMAND_INPUT_INVALID");
+    assertThat(diagnostic.path("message").asText()).contains("not a directory");
+  }
+
+  // --- fragment confinement (each new source-loading handler must thread --root) ---------------
+  // A source is model-supplied, so its fragments[] paths are too. These prove diff/query/verify
+  // each
+  // pass --root as the confinement root into core's source loader: with a null root the escaping
+  // fragment would be read unconfined instead of rejected, so DEDIREN_MCP_PATH_OUTSIDE_ROOT here is
+  // the evidence the wiring is live (the mechanism itself is proven generically by
+  // SourceValidatorTest).
+
+  @Test
+  void diffConfinesAnEscapingSourceFragment(@TempDir Path root) throws Exception {
+    Files.writeString(root.resolve("old.json"), modelWithFragment("../frag-escape.json"));
+    Files.copy(fixture("valid-basic.json"), root.resolve("new.json"));
+
+    CallToolResult result =
+        toolsIn(root)
+            .diff(
+                new CallToolRequest("dediren_diff", Map.of("old", "old.json", "new", "new.json")));
+
+    assertThat(result.isError()).isTrue();
+    JsonNode diagnostic = envelopeOf(result).path("diagnostics").path(0);
+    assertThat(diagnostic.path("code").asText()).isEqualTo("DEDIREN_MCP_PATH_OUTSIDE_ROOT");
+    assertThat(diagnostic.path("path").asText()).isEqualTo("$.fragments[0]");
+    assertThat(diagnostic.path("message").asText()).doesNotContain(root.toRealPath().toString());
+  }
+
+  @Test
+  void queryConfinesAnEscapingSourceFragment(@TempDir Path root) throws Exception {
+    Files.writeString(root.resolve("model.json"), modelWithFragment("../frag-escape.json"));
+
+    CallToolResult result =
+        toolsIn(root)
+            .query(
+                new CallToolRequest(
+                    "dediren_query", Map.of("source", "model.json", "kind", "orphans")));
+
+    assertThat(result.isError()).isTrue();
+    JsonNode diagnostic = envelopeOf(result).path("diagnostics").path(0);
+    assertThat(diagnostic.path("code").asText()).isEqualTo("DEDIREN_MCP_PATH_OUTSIDE_ROOT");
+    assertThat(diagnostic.path("path").asText()).isEqualTo("$.fragments[0]");
+    assertThat(diagnostic.path("message").asText()).doesNotContain(root.toRealPath().toString());
+  }
+
+  @Test
+  void verifyConfinesAnEscapingSourceFragment(@TempDir Path root) throws Exception {
+    Files.writeString(root.resolve("model.json"), modelWithFragment("../frag-escape.json"));
+    Files.createDirectory(root.resolve("artifacts"));
+
+    CallToolResult result =
+        toolsIn(root)
+            .verify(
+                new CallToolRequest(
+                    "dediren_verify", Map.of("source", "model.json", "artifacts", "artifacts")));
+
+    assertThat(result.isError()).isTrue();
+    JsonNode diagnostic = envelopeOf(result).path("diagnostics").path(0);
+    assertThat(diagnostic.path("code").asText()).isEqualTo("DEDIREN_MCP_PATH_OUTSIDE_ROOT");
+    assertThat(diagnostic.path("path").asText()).isEqualTo("$.fragments[0]");
+    assertThat(diagnostic.path("message").asText()).doesNotContain(root.toRealPath().toString());
+  }
 }
