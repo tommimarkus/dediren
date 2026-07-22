@@ -15,6 +15,12 @@ review lead.
   package names, stub-XSD lanes, SpotBugs suppressions, port-count sizing,
   test-Main envelope boilerplate, LA-CODE-DUP-2).
 
+> **Re-reviewed the same day** against `cb67f71` (cli-mcp-parity merge
+> `ead672f` + release v2026.07.24): the block finding and the query-vocabulary
+> warn are **resolved**; see `## Re-review addendum` at the end for the full
+> resolved/open/new accounting. Body findings below are left as written at
+> `4c979c7`.
+
 ## Verdict
 
 The macro-architecture is in excellent shape: **every internal compile edge in
@@ -392,6 +398,72 @@ cross-group back-edge reversal justified · `ContractCollections` uniform across
 101 files · `KnownSchemaVersions` integrity checks · SourceValidator fragment
 confinement fail-closed · archimate deny-list javadoc intact, no new polarity
 asymmetries.
+
+## Re-review addendum — same day, at `cb67f71` (cli-mcp-parity + v2026.07.24)
+
+`main` gained the `plan/cli-mcp-parity` merge (`ead672f`, content commit
+`bc27831`) and the v2026.07.24 bump. The delta was re-reviewed in full
+(`AnalysisCommands`, the cli `Main` shrink, the four new MCP tools,
+`ToolSchemas`, `DedirenMcpServer` registration, the DistTool smoke extension).
+
+### Resolved by the parity change
+
+- **BLOCK [SD-B-4] cli verify verdict — RESOLVED.** Verdict assembly moved
+  verbatim into `core/commands/AnalysisCommands.verifyCommand`; cli
+  `VerifyCommand.call` is now parse → driver → print. `Main.java` is back to
+  732 LOC. The fix is the exact shape the finding named.
+- **[SD-S-2] query vocabulary triple-declared — RESOLVED.** `QUERY_KINDS` is
+  public in core with the kind whitelist, dependents-requires-id, and
+  unknown-node-id checks all in `queryCommand`;
+  `ToolSchemasTest.advertisedQueryKindEnumMatchesTheVocabularyAnalysisCommandsAccepts`
+  pins the advertised enum — the `EMIT_KINDS` pinning pattern this review
+  recommended, applied.
+- **Theme 1 (adapter-lane divergence) — substantially discharged for the
+  read lane.** diff/query/verify/status are single-owner in core;
+  `CliMcpParityTest` pins the two lanes byte-for-byte, which is a stronger
+  convergence guarantee than the review asked for. The `confinementRoot`
+  parameter follows the established convention (non-null on the MCP trust
+  boundary, null on the CLI lane) and each adapter keeps only input hygiene +
+  path confinement — the chartered adapter role.
+
+### Still open from the original findings (unchanged by the delta)
+
+Theme 1 residue: validate dispatch decision still made independently in cli
+and mcp; `SEMANTICS_ENGINE = "generic-graph"` still privately re-declared in
+`DedirenTools.java:41` vs `BuildCommand.java:74` (the new `QUERY_KINDS`
+precedent makes this fix mechanical now); whole-model OEF export still
+bypasses `EngineDispatch`; endpoint-legality still differs router-lane vs
+direct-XMI-lane; the `--root` confinement algorithm still duplicated
+(`WorkspacePaths` vs `SourceValidator`). All other warns/infos (themes 2–4,
+ELK, render, notation cores, schema-cache) are untouched by this delta.
+
+### Updated and new findings from the delta
+
+- **[SD-S-5] cli/src/main/java/dev/dediren/cli/Main.java:315,333 (updated,
+  still warn)** · The status/verify raw-stack-trace finding is now
+  *half-fixed, with a new lane asymmetry*: the MCP twins catch the
+  workspace-walk `UncheckedIOException` (`DedirenTools.ioFailure`,
+  path-free `COMMAND_IO_FAILED` envelope), but the CLI lane still doesn't —
+  the only CLI `UncheckedIOException` catch belongs to `build`. The same
+  unreadable tree now degrades gracefully over MCP and stack-traces on the
+  CLI, on the very commands whose envelopes are otherwise byte-parity-pinned.
+  **Action:** add the `printCommandIoFailure` catch to CLI verify/status.
+- **[SD-S-1] core/src/main/java/dev/dediren/core/commands/AnalysisCommands.java:31
+  (new, info)** · `EngineRunOutcome` (a `core.engine` dispatch type) is reused
+  as the analysis lanes' envelope carrier, and cli prints it via
+  `writePluginOutcome` — engine/plugin vocabulary now names non-engine output.
+  The reuse itself is argued in the javadoc and is what makes byte parity
+  trivial; the residue is naming only. **Action:** when next touched, rename
+  the shared carrier (e.g. `CommandOutcome`) or the cli printer; no structural
+  change wanted.
+
+### Delta quality note
+
+The new work applies this review's own recommended patterns unprompted
+(public-constant + pinning test; core drivers; caller-owned confinement with
+a documented convention; DistTool smoke extended end-to-end through the shrunk
+bundle for one new tool). No new boundary, coupling, or state findings in the
+delta beyond the two above.
 
 ## Footer
 
