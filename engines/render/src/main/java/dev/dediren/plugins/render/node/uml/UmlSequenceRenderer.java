@@ -137,7 +137,7 @@ public final class UmlSequenceRenderer {
     for (UmlSequenceModel.SequenceNode interaction : model.interactions()) {
       LaidOutNode node = interaction.node();
       SequenceFrame frame = interactionFrame(interaction);
-      ResolvedNodeStyle paint = nodePaint(node.id(), interaction.selector().type());
+      ResolvedNodeStyle paint = nodePaint(node.id());
       double titleWidth =
           Math.max(
               96.0,
@@ -201,7 +201,7 @@ public final class UmlSequenceRenderer {
             .toList();
     for (UmlSequenceModel.SequenceCombinedFragment fragment : fragments) {
       SequenceFrame frame = combinedFragmentFrames.get(fragment.id());
-      ResolvedNodeStyle paint = nodePaint(fragment.id(), fragment.selector().type());
+      ResolvedNodeStyle paint = nodePaint(fragment.id());
       double tabWidth =
           Math.max(
               44.0,
@@ -256,7 +256,7 @@ public final class UmlSequenceRenderer {
   private void renderLifelineHeads(SvgWriter w) {
     for (UmlSequenceModel.SequenceNode lifeline : model.lifelines()) {
       LaidOutNode node = lifeline.node();
-      ResolvedNodeStyle paint = nodePaint(node.id(), lifeline.selector().type());
+      ResolvedNodeStyle paint = nodePaint(node.id());
       w.start("g")
           .attr("data-dediren-node-id", node.id())
           .attr("data-dediren-node-type", "Lifeline")
@@ -288,7 +288,7 @@ public final class UmlSequenceRenderer {
   private void renderLifelineStems(SvgWriter w) {
     for (UmlSequenceModel.SequenceNode lifeline : model.lifelines()) {
       LaidOutNode node = lifeline.node();
-      ResolvedNodeStyle paint = nodePaint(node.id(), lifeline.selector().type());
+      ResolvedNodeStyle paint = nodePaint(node.id());
       double x = node.x() + node.width() / 2.0;
       double bottom = stemBottom(lifeline);
       w.empty("line")
@@ -306,7 +306,7 @@ public final class UmlSequenceRenderer {
   private void renderExecutions(SvgWriter w) {
     for (UmlSequenceModel.SequenceNode execution : model.executions()) {
       LaidOutNode node = execution.node();
-      ResolvedNodeStyle paint = nodePaint(node.id(), execution.selector().type());
+      ResolvedNodeStyle paint = nodePaint(node.id());
       w.start("g")
           .attr("data-dediren-node-id", node.id())
           .attr("data-dediren-node-type", "ExecutionSpecification");
@@ -329,7 +329,7 @@ public final class UmlSequenceRenderer {
   private void renderGates(SvgWriter w) {
     for (UmlSequenceModel.SequenceNode gate : model.gates()) {
       LaidOutNode node = gate.node();
-      ResolvedNodeStyle paint = nodePaint(node.id(), gate.selector().type());
+      ResolvedNodeStyle paint = nodePaint(node.id());
       double radius = Math.max(4.0, Math.min(node.width(), node.height()) / 2.0);
       w.start("g").attr("data-dediren-node-id", node.id()).attr("data-dediren-node-type", "Gate");
       w.empty("circle")
@@ -348,7 +348,7 @@ public final class UmlSequenceRenderer {
 
   private void renderMessages(SvgWriter w) {
     for (UmlSequenceModel.SequenceMessage message : model.messages()) {
-      ResolvedEdgeStyle paint = edgePaint(message.edge().id(), message.selector().type());
+      ResolvedEdgeStyle paint = edgePaint(message.edge().id());
       MessageAppearance appearance = MessageAppearance.from(message.messageSort(), paint);
       w.start("g")
           .attr("data-dediren-edge-id", message.edge().id())
@@ -368,7 +368,7 @@ public final class UmlSequenceRenderer {
         continue;
       }
       MarkerPoint point = deleteMarkerPoint(message.edge());
-      ResolvedEdgeStyle paint = edgePaint(message.edge().id(), message.selector().type());
+      ResolvedEdgeStyle paint = edgePaint(message.edge().id());
       double size = point.size();
       w.start("g").attr("data-dediren-sequence-delete-marker", point.id());
       w.empty("line")
@@ -841,12 +841,12 @@ public final class UmlSequenceRenderer {
   }
 
   // The base already carries the policy-level node/edge overrides; StyleResolver layers the
-  // per-type and per-id overrides on top, in the same order the private merge chain used to.
-  private ResolvedNodeStyle nodePaint(String nodeId, String type) {
+  // per-type and per-id overrides on top (looking the type up from metadata itself).
+  private ResolvedNodeStyle nodePaint(String nodeId) {
     return StyleResolver.nodeStyle(policy, metadata, nodeId, base);
   }
 
-  private ResolvedEdgeStyle edgePaint(String edgeId, String type) {
+  private ResolvedEdgeStyle edgePaint(String edgeId) {
     return StyleResolver.edgeStyle(policy, metadata, edgeId, base);
   }
 

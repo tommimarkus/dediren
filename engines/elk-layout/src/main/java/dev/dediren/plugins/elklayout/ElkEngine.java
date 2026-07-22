@@ -59,7 +59,6 @@ public final class ElkEngine implements LayoutEngine {
   public EngineResult<LaidOutScene> layout(SceneGraph scene) throws EngineException {
     try {
       LayoutRequest request = LayoutRequestMapper.toRequest(scene);
-      LayoutJson.validatePreferences(request);
       return new EngineResult<>(
           LaidOutSceneMapper.toScene(new ElkLayoutEngine().layout(request)), List.of());
     } catch (Exception error) {

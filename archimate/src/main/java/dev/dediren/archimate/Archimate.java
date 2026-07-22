@@ -105,10 +105,6 @@ public final class Archimate {
     return ELEMENT_TYPES;
   }
 
-  public static List<String> relationshipTypes() {
-    return RELATIONSHIP_TYPES;
-  }
-
   public static boolean isRelationshipConnectorType(String value) {
     return RELATIONSHIP_CONNECTOR_TYPES.contains(value);
   }
