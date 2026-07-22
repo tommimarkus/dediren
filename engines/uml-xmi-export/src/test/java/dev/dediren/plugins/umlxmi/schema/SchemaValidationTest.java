@@ -99,6 +99,52 @@ class SchemaValidationTest {
   }
 
   @Test
+  void diagramInterchangeNamespacesAreToleratedLikeTheUnavailableUmlSchema() throws Exception {
+    // The whole-model lane appends OMG UMLDI (umldi:/di:/dc:) elements as siblings of uml:Model.
+    // OMG publishes no XSD for those namespaces either, so their no-declaration errors are the same
+    // tolerated gap as the UML one and must not flip the export to a false SCHEMA_INVALID.
+    Path schemaPath = tempDir.resolve("XMI.xsd");
+    Files.writeString(
+        schemaPath,
+        """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+                            targetNamespace="http://www.omg.org/spec/XMI/20131001"
+                            xmlns="http://www.omg.org/spec/XMI/20131001"
+                            elementFormDefault="qualified">
+                  <xsd:element name="XMI">
+                    <xsd:complexType>
+                      <xsd:sequence>
+                        <xsd:any namespace="##other" processContents="strict"
+                                 minOccurs="0" maxOccurs="unbounded"/>
+                      </xsd:sequence>
+                    </xsd:complexType>
+                  </xsd:element>
+                </xsd:schema>
+                """,
+        StandardCharsets.UTF_8);
+    String content =
+        "<xmi:XMI xmlns:xmi=\""
+            + XMI_NS
+            + "\" xmlns:uml=\""
+            + UML_NS
+            + "\" xmlns:umldi=\"http://www.omg.org/spec/UML/20161101/UMLDI\""
+            + " xmlns:di=\"http://www.omg.org/spec/DD/20100524/DI\""
+            + " xmlns:dc=\"http://www.omg.org/spec/DD/20100524/DC\">"
+            + "<uml:Model xmi:id=\"m1\"/>"
+            + "<umldi:UMLDiagram xmi:id=\"d1\"><umldi:UMLShape xmi:id=\"s1\">"
+            + "<dc:Bounds x=\"1\" y=\"2\" width=\"3\" height=\"4\"/></umldi:UMLShape>"
+            + "<umldi:UMLEdge xmi:id=\"e1\"><di:waypoint x=\"1\" y=\"2\"/></umldi:UMLEdge>"
+            + "</umldi:UMLDiagram></xmi:XMI>";
+
+    assertThatCode(
+            () ->
+                SchemaValidation.validateXmiToAvailableStandards(
+                    content, Map.of("DEDIREN_XMI_SCHEMA_PATH", schemaPath.toString())))
+        .doesNotThrowAnyException();
+  }
+
+  @Test
   void documentRejectedBySuppliedXsdIsReportedAsSchemaInvalid() throws Exception {
     // A strict stand-in XMI.xsd whose XMI element allows no children: any child element in the
     // XMI namespace fails schema validation, which must surface as the schema-invalid code (the

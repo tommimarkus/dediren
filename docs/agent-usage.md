@@ -227,6 +227,20 @@ For UML® SVG notation or XMI export, use `semantic_profile: "uml"` and the
 `uml-activity`, `uml-sequence`, `uml-state-machine`, `uml-use-case`,
 `uml-component`, and `uml-deployment`.
 
+For whole-model interchange, `dediren build` with `--xmi-policy` additionally
+writes `model.uml.xml` at the `--out` root: one `<uml:Model>` plus one OMG UMLDI
+diagram (`umldi:UMLDiagram` with `dc:Bounds` shapes and `di:waypoint` edges) per
+classifier-diagram view (`uml-class`, `uml-data`), listed under the build
+result's `model_artifacts`. Each diagram's identity is an explicit override from
+the policy's optional `views` map (`"views": {"<view-id>":
+{"diagram_identifier"?, "diagram_name"?}}`), else the source-derived default
+(`id-diagram-<view-id>` and the view's label). Other UML families still get their
+per-view `xmi.xml` (model content only); diagram interchange for them is a later
+slice. The UMLDI dialect is **provisional** — it is not yet verified against a
+real UML tool's importer, and (like the UML namespace) has no normative OMG DI
+XSD, so its `di:`/`dc:`/`umldi:` content rides the same tolerated
+no-declaration gap the `uml:` model content does.
+
 ## ArchiMate Handoff
 
 The `archimate` profile accepts exactly these type names.

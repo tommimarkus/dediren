@@ -221,29 +221,45 @@ public final class SchemaValidation {
   }
 
   /**
-   * True when every reported problem is the one known, tolerated gap: elements in the UML namespace
-   * that OMG XMI.xsd alone cannot declare, because no normative OMG UML XSD is published. The
-   * generated document always binds prefix {@code uml} to {@value
-   * dev.dediren.plugins.umlxmi.build.XmiHelpers#UML_NS}, so the Xerces messages name elements as
-   * {@code 'uml:...'} — the two shapes below are the JDK validator's strict-wildcard
-   * (cvc-complex-type.2.4.c) and no-declaration (cvc-elt.1.a) wordings, verified against the real
-   * OMG XMI.xsd (spike 2026-07-22).
+   * OMG publishes no normative XSD for the UML namespace, nor for the DD shared packages ({@code
+   * di:}/{@code dc:}) and UML Diagram Interchange ({@code umldi:}) that the whole-model lane emits,
+   * so validating against XMI.xsd alone can never declare those elements. Their no-declaration
+   * errors are the one tolerated gap; the {@code uml:} case is verified against the real OMG
+   * XMI.xsd (spike 2026-07-22), and the DD/DI prefixes are the same class of gap (the DI dialect
+   * itself is provisional pending a real-tool render probe).
+   */
+  private static final java.util.List<String> UNDECLARED_TOLERATED_PREFIXES =
+      java.util.List.of("uml:", "umldi:", "di:", "dc:");
+
+  /**
+   * True when every reported problem is the tolerated no-normative-XSD gap for a UML/DD/DI element.
+   * The two shapes below are the JDK validator's strict-wildcard (cvc-complex-type.2.4.c) and
+   * no-declaration (cvc-elt.1.a) wordings; anything else is a real schema failure.
    */
   private static boolean xmiSchemaErrorsAreOnlyUnavailableUmlSchema(String details) {
-    boolean sawUmlSchemaGap = false;
+    boolean sawSchemaGap = false;
     for (String rawLine : details.lines().toList()) {
       String line = rawLine.trim();
       if (line.isEmpty()) {
         continue;
       }
-      if (line.contains("no declaration can be found for element 'uml:")
-          || line.contains("Cannot find the declaration of element 'uml:")) {
-        sawUmlSchemaGap = true;
+      if (isUndeclaredToleratedElement(line)) {
+        sawSchemaGap = true;
         continue;
       }
       return false;
     }
-    return sawUmlSchemaGap;
+    return sawSchemaGap;
+  }
+
+  private static boolean isUndeclaredToleratedElement(String line) {
+    for (String prefix : UNDECLARED_TOLERATED_PREFIXES) {
+      if (line.contains("no declaration can be found for element '" + prefix)
+          || line.contains("Cannot find the declaration of element '" + prefix)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   public static DocumentBuilderFactory secureXmiDocumentBuilderFactory()

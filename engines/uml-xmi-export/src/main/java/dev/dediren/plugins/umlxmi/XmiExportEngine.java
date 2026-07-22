@@ -1,5 +1,6 @@
 package dev.dediren.plugins.umlxmi;
 
+import static dev.dediren.plugins.umlxmi.build.XmiBuilder.buildModelXmi;
 import static dev.dediren.plugins.umlxmi.build.XmiBuilder.buildXmi;
 import static dev.dediren.plugins.umlxmi.build.XmiHelpers.genericGraphPluginData;
 import static dev.dediren.plugins.umlxmi.policy.PolicyValidation.validatePolicy;
@@ -19,6 +20,7 @@ import dev.dediren.contracts.source.GenericGraphPluginData;
 import dev.dediren.engine.EngineException;
 import dev.dediren.engine.EngineResult;
 import dev.dediren.engine.ExportEngine;
+import dev.dediren.engine.ModelExportRequest;
 import dev.dediren.plugins.umlxmi.build.Coverage;
 import dev.dediren.plugins.umlxmi.build.ExportScope;
 import dev.dediren.plugins.umlxmi.build.XmiExportException;
@@ -103,6 +105,59 @@ public final class XmiExportEngine implements ExportEngine {
         new java.util.ArrayList<>(withIdentityTripwire(policy, coverageDiagnostics(coverage)));
     diagnostics.add(conformance);
     return new EngineResult<>(result, diagnostics);
+  }
+
+  /**
+   * The whole-model lane: one {@code model.uml.xml} carrying the full model once plus one OMG UMLDI
+   * diagram per laid-out view (empty when no views are supplied, so the build driver skips it). The
+   * single-view {@link #export} stays model-only; diagram interchange lives only here. Diagram
+   * geometry for the class family is emitted today; other view kinds still contribute their model
+   * content but their diagram serialization is a later slice.
+   */
+  @Override
+  public java.util.Optional<EngineResult<ExportResult>> exportModel(
+      ModelExportRequest request, Map<String, String> env, Path productRoot)
+      throws EngineException {
+    if (request.views().isEmpty()) {
+      return java.util.Optional.empty();
+    }
+    UmlXmiExportPolicy policy;
+    try {
+      validatePolicy(request.policy());
+      policy = JsonSupport.objectMapper().treeToValue(request.policy(), UmlXmiExportPolicy.class);
+    } catch (IllegalArgumentException error) {
+      throw failure(DiagnosticCode.UML_XMI_POLICY_INVALID.code(), error.getMessage(), "policy");
+    }
+
+    ExportRequest representative =
+        new ExportRequest(
+            ContractVersions.EXPORT_REQUEST_SCHEMA_VERSION,
+            request.source(),
+            request.views().getFirst().layout(),
+            request.policy());
+    try {
+      GenericGraphPluginData pluginData = genericGraphPluginData(representative);
+      validateSelectedCombinedFragmentOperators(representative, pluginData);
+      Uml.validateSource(request.source(), pluginData);
+    } catch (UmlValidationException error) {
+      throw failure(error.code(), error.message(), error.path());
+    } catch (XmiExportException error) {
+      throw failure(error.code(), error.getMessage(), error.path());
+    }
+
+    String content = buildModelXmi(request, policy);
+    Diagnostic conformance;
+    try {
+      conformance = validateXmiToAvailableStandards(content, env, productRoot);
+    } catch (XmiValidationException error) {
+      throw failure(error.code(), error.getMessage(), "content");
+    }
+
+    var result =
+        new ExportResult(ContractVersions.EXPORT_RESULT_SCHEMA_VERSION, "uml-xmi+xml", content);
+    var diagnostics = new ArrayList<Diagnostic>();
+    diagnostics.add(conformance);
+    return java.util.Optional.of(new EngineResult<>(result, diagnostics));
   }
 
   /**

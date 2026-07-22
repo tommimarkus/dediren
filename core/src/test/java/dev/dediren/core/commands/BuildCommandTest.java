@@ -94,6 +94,35 @@ class BuildCommandTest {
   private static final String XMI_POLICY =
       "{\"uml_xmi_export_policy_schema_version\":\"uml-xmi-export-policy.schema.v1\"}";
 
+  // Three views spanning two families: the classifier-diagram kinds (uml-class, uml-data) feed the
+  // UMLDI aggregate; uml-activity does not.
+  private static final String CLASS_DATA_ACTIVITY_SOURCE =
+      """
+      {
+        "model_schema_version": "model.schema.v1",
+        "nodes": [
+          { "id": "a", "type": "generic.component", "label": "A", "properties": {} },
+          { "id": "b", "type": "generic.component", "label": "B", "properties": {} }
+        ],
+        "relationships": [
+          { "id": "r", "type": "generic.calls", "source": "a", "target": "b",
+            "label": "r", "properties": {} }
+        ],
+        "plugins": {
+          "generic-graph": {
+            "views": [
+              { "id": "class-view", "label": "Class", "kind": "uml-class",
+                "nodes": ["a", "b"], "relationships": ["r"] },
+              { "id": "data-view", "label": "Data", "kind": "uml-data",
+                "nodes": ["a", "b"], "relationships": ["r"] },
+              { "id": "activity-view", "label": "Activity", "kind": "uml-activity",
+                "nodes": ["a", "b"], "relationships": ["r"] }
+            ]
+          }
+        }
+      }
+      """;
+
   @TempDir Path out;
 
   @Test
@@ -161,6 +190,84 @@ class BuildCommandTest {
         .startsWith("<!-- dediren-provenance ")
         .endsWith("<xmi/>")
         .contains("xmi_policy_sha256");
+  }
+
+  @Test
+  void umldiAggregateCoversOnlyClassifierFamilyViews() throws Exception {
+    // The uml-xmi fake overrides exportModel to record which views the aggregate received and to
+    // return a stub model.uml.xml. The class-family gate must feed the classifier-diagram views
+    // (uml-class, uml-data) to the aggregate and exclude uml-activity, while every view still gets
+    // its own per-view xmi.xml.
+    var aggregateViews = new java.util.ArrayList<String>();
+    ExportEngine xmi =
+        new ExportEngine() {
+          @Override
+          public String id() {
+            return "uml-xmi";
+          }
+
+          @Override
+          public EngineResult<ExportResult> export(
+              dev.dediren.contracts.export.ExportRequest request,
+              Map<String, String> env,
+              Path productRoot) {
+            return new EngineResult<>(
+                new ExportResult(
+                    ContractVersions.EXPORT_RESULT_SCHEMA_VERSION, "uml+xml", "<xmi/>"),
+                List.of());
+          }
+
+          @Override
+          public java.util.Optional<EngineResult<ExportResult>> exportModel(
+              dev.dediren.engine.ModelExportRequest request,
+              Map<String, String> env,
+              Path productRoot) {
+            request.views().forEach(view -> aggregateViews.add(view.viewId()));
+            return java.util.Optional.of(
+                new EngineResult<>(
+                    new ExportResult(
+                        ContractVersions.EXPORT_RESULT_SCHEMA_VERSION, "uml+xml", "<model-uml/>"),
+                    List.of()));
+          }
+        };
+    Engines engines =
+        Engines.of(
+            List.of(new FakeSemanticsEngine(Set.of(), Set.of())),
+            List.of(new FakeLayoutEngine(Set.of(), Set.of(), Set.of(), Set.of())),
+            List.of(new FakeRenderEngine(Set.of())),
+            List.of(
+                new FakeExportEngine(
+                    "archimate-oef", "archimate+xml", "<oef/>", Set.of(), Set.of()),
+                xmi));
+    BuildRequest request =
+        new BuildRequest(
+            CLASS_DATA_ACTIVITY_SOURCE,
+            null,
+            List.of(),
+            null,
+            null,
+            XMI_POLICY,
+            Set.of(),
+            out,
+            Map.of());
+
+    EngineRunOutcome outcome = BuildCommand.run(request, engines);
+
+    assertThat(outcome.exitCode()).isZero();
+    BuildResult result = buildResult(outcome);
+    assertSchemaValid(outcome);
+    // Every view keeps its own per-view xmi.xml...
+    assertThat(Files.readString(out.resolve("class-view/xmi.xml"))).endsWith("<xmi/>");
+    assertThat(Files.readString(out.resolve("activity-view/xmi.xml"))).endsWith("<xmi/>");
+    // ...but the whole-model model.uml.xml covers only the classifier-family views.
+    assertThat(aggregateViews).containsExactlyInAnyOrder("class-view", "data-view");
+    assertThat(Files.readString(out.resolve("model.uml.xml")))
+        .startsWith("<!-- dediren-provenance ")
+        .endsWith("<model-uml/>")
+        .contains("xmi_policy_sha256");
+    assertThat(result.modelArtifacts())
+        .extracting(artifact -> artifact.path())
+        .containsExactly("model.uml.xml");
   }
 
   @Test

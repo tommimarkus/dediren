@@ -113,6 +113,13 @@ Use `semantic_profile: "uml"` and the `uml-xmi` plugin. View kinds: `uml-class`,
 generate render
 metadata (see [SVG Rendering](svg-render.md#notation-rendering--render-metadata)).
 
+For whole-model interchange, `dediren build` with `--xmi-policy` also composes
+`model.uml.xml` at the output root — one `<uml:Model>` plus one OMG UMLDI diagram
+per classifier-diagram view (`uml-class`, `uml-data`), each with its own diagram
+identity (policy `views` override, else a source-derived default), listed under
+`model_artifacts`. The UMLDI dialect is **provisional** (not yet verified against
+a real UML tool importer); other UML families contribute model content only.
+
 The following sections summarize each UML notation's supported vocabulary and
 rules, and the constructs intentionally deferred (non-goals for the current
 slices). The starter fixture is named for each.

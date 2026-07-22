@@ -3,6 +3,7 @@ package dev.dediren.plugins.umlxmi.build;
 import static dev.dediren.plugins.umlxmi.build.XmiHelpers.UML_NS;
 import static dev.dediren.plugins.umlxmi.build.XmiHelpers.XMI_NS;
 import static dev.dediren.plugins.umlxmi.build.XmiHelpers.attr;
+import static dev.dediren.plugins.umlxmi.build.XmiHelpers.genericGraphPluginData;
 import static dev.dediren.plugins.umlxmi.build.XmiHelpers.umlString;
 import static dev.dediren.plugins.umlxmi.build.XmiHelpers.writeEmptyPackagedElement;
 import static dev.dediren.plugins.umlxmi.write.activity.ActivityWriter.writeActivity;
@@ -16,10 +17,14 @@ import static dev.dediren.plugins.umlxmi.write.interaction.InteractionWriter.wri
 import static dev.dediren.plugins.umlxmi.write.statemachine.StateMachineWriter.writeStateMachine;
 import static dev.dediren.plugins.umlxmi.write.usecase.UseCaseWriter.writeUseCase;
 
+import dev.dediren.contracts.ContractVersions;
 import dev.dediren.contracts.export.ExportRequest;
 import dev.dediren.contracts.export.UmlXmiExportPolicy;
+import dev.dediren.contracts.source.GenericGraphView;
 import dev.dediren.contracts.source.SourceNode;
 import dev.dediren.contracts.source.SourceRelationship;
+import dev.dediren.engine.ModelExportRequest;
+import dev.dediren.plugins.umlxmi.write.diagram.DiagramWriter;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -36,7 +41,6 @@ public final class XmiBuilder {
       Set.of("Class", "Interface", "DataType", "Enumeration");
 
   public static String buildXmi(ExportRequest request, UmlXmiExportPolicy policy) {
-    var ids = new IdentifierMap(policy.modelIdentifier());
     ExportScope scope = ExportScope.fromRequest(request);
     var selectedNodes =
         request.source().nodes().stream()
@@ -46,6 +50,137 @@ public final class XmiBuilder {
         request.source().relationships().stream()
             .filter(relationship -> scope.relationshipIds().contains(relationship.id()))
             .toList();
+    StringBuilder xml = new StringBuilder();
+    openRoot(xml, false);
+    var ids = new IdentifierMap(policy.modelIdentifier());
+    writeModelContent(xml, ids, request, policy, selectedNodes, selectedRelationships);
+    xml.append("</xmi:XMI>\n");
+    return xml.toString();
+  }
+
+  /**
+   * The whole-model lane: one document carrying the full model once, then one OMG UMLDI diagram per
+   * supplied laid-out view (mirrors the ArchiMate-OEF {@code buildModelOef}). The model section
+   * includes every source element so a per-view diagram can reference any of them; each diagram
+   * serializes only its own view's geometry. The single-view {@link #buildXmi} stays model-only and
+   * byte-identical.
+   */
+  public static String buildModelXmi(ModelExportRequest request, UmlXmiExportPolicy policy) {
+    ExportRequest representative =
+        new ExportRequest(
+            ContractVersions.EXPORT_REQUEST_SCHEMA_VERSION,
+            request.source(),
+            request.views().getFirst().layout(),
+            request.policy());
+    // Scope the shared model section to the union of the exported views, not the whole source: the
+    // per-family element writers (activity, sequence, …) assume view-scoped input, so mixing an
+    // unrelated family's nodes into one model section collides xmi:ids. A class-only package thus
+    // emits exactly the single-view class model, plus its diagram.
+    Set<String> nodeScope = new java.util.HashSet<>();
+    Set<String> relationshipScope = new java.util.HashSet<>();
+    for (ModelExportRequest.ViewLayout view : request.views()) {
+      ExportScope scope =
+          ExportScope.fromRequest(
+              new ExportRequest(
+                  ContractVersions.EXPORT_REQUEST_SCHEMA_VERSION,
+                  request.source(),
+                  view.layout(),
+                  request.policy()));
+      nodeScope.addAll(scope.nodeIds());
+      relationshipScope.addAll(scope.relationshipIds());
+    }
+    var selectedNodes =
+        request.source().nodes().stream().filter(node -> nodeScope.contains(node.id())).toList();
+    var selectedRelationships =
+        request.source().relationships().stream()
+            .filter(relationship -> relationshipScope.contains(relationship.id()))
+            .toList();
+
+    StringBuilder xml = new StringBuilder();
+    openRoot(xml, true);
+    var ids = new IdentifierMap(policy.modelIdentifier());
+    ModelContent model =
+        writeModelContent(xml, ids, representative, policy, selectedNodes, selectedRelationships);
+    Map<String, String> viewLabels = viewLabels(representative);
+    for (ModelExportRequest.ViewLayout view : request.views()) {
+      DiagramWriter.writeUmlDiagram(
+          xml,
+          view.layout(),
+          resolveDiagramIdentity(policy, view.viewId(), viewLabels.get(view.viewId())),
+          ids,
+          model.nodeIds(),
+          model.relationshipIds());
+    }
+    xml.append("</xmi:XMI>\n");
+    return xml.toString();
+  }
+
+  /**
+   * Per-view UMLDI diagram identity: an explicit {@code views[viewId]} override wins field by
+   * field, else the source-derived default ({@code id-diagram-<viewId>} and the view's own label).
+   */
+  private static DiagramWriter.DiagramIdentity resolveDiagramIdentity(
+      UmlXmiExportPolicy policy, String viewId, String sourceLabel) {
+    UmlXmiExportPolicy.DiagramIdentity override =
+        policy.views().getOrDefault(viewId, new UmlXmiExportPolicy.DiagramIdentity(null, null));
+    String identifier =
+        override.diagramIdentifier() != null
+            ? override.diagramIdentifier()
+            : "id-diagram-" + viewId;
+    String name =
+        override.diagramName() != null
+            ? override.diagramName()
+            : sourceLabel != null ? sourceLabel : viewId;
+    return new DiagramWriter.DiagramIdentity(identifier, name);
+  }
+
+  private static Map<String, String> viewLabels(ExportRequest request) {
+    var labels = new HashMap<String, String>();
+    try {
+      for (GenericGraphView view : genericGraphPluginData(request).views()) {
+        labels.put(view.id(), view.label());
+      }
+    } catch (RuntimeException error) {
+      // A UML source always carries generic-graph views; if one somehow does not, fall back to the
+      // view id as the diagram name rather than failing the aggregate.
+    }
+    return labels;
+  }
+
+  private static void openRoot(StringBuilder xml, boolean withDiagramInterchange) {
+    xml.append("<xmi:XMI xmlns:xmi=\"").append(XMI_NS).append("\" xmlns:uml=\"").append(UML_NS);
+    if (withDiagramInterchange) {
+      xml.append("\" xmlns:umldi=\"")
+          .append(DiagramWriter.UMLDI_NS)
+          .append("\" xmlns:di=\"")
+          .append(DiagramWriter.DI_NS)
+          .append("\" xmlns:dc=\"")
+          .append(DiagramWriter.DC_NS);
+    }
+    xml.append("\">");
+  }
+
+  /** The model-element id maps a UMLDI diagram needs to reference what the model section wrote. */
+  private record ModelContent(Map<String, String> nodeIds, Map<String, String> relationshipIds) {
+    ModelContent {
+      nodeIds = Map.copyOf(nodeIds);
+      relationshipIds = Map.copyOf(relationshipIds);
+    }
+  }
+
+  /**
+   * Writes the {@code <uml:Model>…</uml:Model>} section for the given scope into {@code xml} using
+   * the caller's shared {@link IdentifierMap} (so the caller can mint further globally-unique
+   * {@code xmi:id}s for UMLDI), and returns the element id maps a diagram references. Does not open
+   * or close the {@code xmi:XMI} root.
+   */
+  private static ModelContent writeModelContent(
+      StringBuilder xml,
+      IdentifierMap ids,
+      ExportRequest request,
+      UmlXmiExportPolicy policy,
+      List<SourceNode> selectedNodes,
+      List<SourceRelationship> selectedRelationships) {
     var sourceNodesById =
         request.source().nodes().stream().collect(Collectors.toMap(SourceNode::id, node -> node));
     var nodeIds = new HashMap<String, String>();
@@ -83,12 +218,6 @@ public final class XmiBuilder {
       }
     }
 
-    StringBuilder xml = new StringBuilder();
-    xml.append("<xmi:XMI xmlns:xmi=\"")
-        .append(XMI_NS)
-        .append("\" xmlns:uml=\"")
-        .append(UML_NS)
-        .append("\">");
     xml.append("<uml:Model xmi:id=\"")
         .append(attr(policy.modelIdentifier()))
         .append("\" name=\"")
@@ -135,8 +264,8 @@ public final class XmiBuilder {
     // Emit the primitive/data type targets referenced by attributes above, after every classifier
     // has been written so all referenced types are known. XML idrefs need not precede their target.
     types.writeSynthesizedTypes(xml);
-    xml.append("</uml:Model></xmi:XMI>\n");
-    return xml.toString();
+    xml.append("</uml:Model>");
+    return new ModelContent(nodeIds, relationshipIds);
   }
 
   private static void writePackage(
