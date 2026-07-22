@@ -78,6 +78,27 @@ class OefExportEngineTest {
   }
 
   @Test
+  void singleViewLaneHonorsAnExplicitPolicyViewsOverride() throws Exception {
+    // Closes the Phase-1 limitation for the standalone <view-id>/oef.xml lane: an explicit
+    // views[viewId] entry now resolves per-view identity here too, matching the whole-model lane.
+    // The export fixture's laid-out view is "main"; a policy that omits views is unchanged (proven
+    // byte-identical by the shipped-default golden tests, which carry no views entry).
+    JsonNode inputJson = exportInputJson();
+    ObjectNode override =
+        ((ObjectNode) inputJson.get("policy")).putObject("views").putObject("main");
+    override.put("view_identifier", "id-main-override");
+    override.put("view_name", "Main Override");
+    byte[] input =
+        JsonSupport.objectMapper().writeValueAsString(inputJson).getBytes(StandardCharsets.UTF_8);
+
+    ExportRequest request = engine.parseRequest(input);
+    EngineResult<ExportResult> result =
+        engine.export(request, envWithOefSchemas(), Path.of("").toAbsolutePath());
+
+    assertThat(result.value().content()).contains("<view identifier=\"id-main-override\"");
+  }
+
+  @Test
   void placeholderTripwireTracksTheShippedDefaultPolicy() throws Exception {
     // If the shipped default policy's identity ever changes, the engine's placeholder constant
     // must move with it or the tripwire goes blind.

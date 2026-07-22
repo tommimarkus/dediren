@@ -469,19 +469,31 @@ public final class OefExportEngine implements ExportEngine {
     StringBuilder xml = new StringBuilder();
     openModel(xml, request, policy, elementIds, relationshipIds, propertyDefinitionIds);
     xml.append("<views><diagrams>");
-    // The single-view lane keeps the legacy top-level identity fields verbatim (unchanged
-    // published behavior); per-view resolution applies on the whole-model lane only.
+    // The single-view lane keeps the legacy top-level identity verbatim (unchanged published
+    // behavior) UNLESS the policy carries an explicit views[viewId] override for this view, in
+    // which case per-view resolution applies here too — closing the Phase-1 limitation for the
+    // standalone <view-id>/oef.xml files without changing output for any policy that omits it.
+    String viewId = request.layoutResult().viewId();
+    OefExportPolicy.ViewIdentity identity =
+        policy.views().containsKey(viewId)
+            ? resolveViewIdentity(policy, viewId, viewLabel(request, viewId))
+            : new OefExportPolicy.ViewIdentity(
+                policy.viewIdentifier(), policy.viewName(), policy.viewpoint());
     writeViewBody(
-        xml,
-        request.layoutResult(),
-        new OefExportPolicy.ViewIdentity(
-            policy.viewIdentifier(), policy.viewName(), policy.viewpoint()),
-        ids,
-        elementIds,
-        relationshipIds,
-        sourceNodesById);
+        xml, request.layoutResult(), identity, ids, elementIds, relationshipIds, sourceNodesById);
     xml.append("</diagrams></views></model>\n");
     return xml.toString();
+  }
+
+  /**
+   * The source label for {@code viewId} used as the per-view identity name default, if declared.
+   */
+  private static String viewLabel(ExportRequest request, String viewId) {
+    return declaredViews(request).stream()
+        .filter(view -> view.id().equals(viewId))
+        .map(GenericGraphView::label)
+        .findFirst()
+        .orElse(null);
   }
 
   /** One document carrying every supplied laid-out view; see {@link #exportModel}. */
