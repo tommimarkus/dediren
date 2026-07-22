@@ -269,8 +269,8 @@ Coverage (local, opt-in JaCoCo gate — LINE + BRANCH, not run in CI):
 ./mvnw -Pcoverage verify
 ```
 
-Code style + static analysis (local, opt-in gate — fails on violations; CI runs
-the same checks report-only):
+Code style + static analysis (local, opt-in gate — fails on violations; not
+run in CI — validation is local-first):
 
 ```bash
 ./mvnw -Pquality verify          # full gate (format + SpotBugs + tests)

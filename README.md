@@ -60,15 +60,17 @@ notation.
 ```
 
 Auto-fix formatting with `./mvnw -Pquality spotless:apply`. The `quality` and
-`coverage` gates fail the build locally; CI runs the same checks report-only.
-Narrower per-module verification lanes are listed in
+`coverage` gates fail the build locally; validation is local-first, and CI runs
+only on pull requests (chiefly Dependabot bumps), on demand, and on release
+tags. Narrower per-module verification lanes are listed in
 [`CLAUDE.md` §Verification](CLAUDE.md).
 
 Maven state is repo-local under `.cache/maven` for sandbox-friendly builds.
 Supply-chain scanning is layered: **Grype** scans the CycloneDX SBOM and is the
-blocking CI/release gate (High/Critical advisories fail the build); **OWASP
-Dependency-Check** is a non-blocking weekly second opinion (`-Psecurity-sca`
-locally; set `NVD_API_KEY` for the authenticated NVD path). Produce the SBOM and
+blocking gate on every pull request and release (High/Critical advisories fail
+the build); **OWASP Dependency-Check** is an on-demand local second opinion
+(`-Psecurity-sca`; set `NVD_API_KEY` for the authenticated NVD path); Dependabot
+alerts cover advisories published between runs. Produce the SBOM and
 third-party notices with the `-Psbom` and `-Pthird-party-notices` profiles.
 Licence hygiene is gated in the same lanes: the cli `package` phase resolves
 every runtime dependency's effective-pom licence against an approved allowlist

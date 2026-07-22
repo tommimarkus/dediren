@@ -37,9 +37,6 @@ jobs:
           restore-keys: |
             maven-${{ runner.os }}-
 
-      - name: Install XML tools
-        run: sudo apt-get update && sudo apt-get install -y libxml2-utils
-
       - name: Check workspace tests
         run: ./mvnw -B -ntp test
 
@@ -48,8 +45,7 @@ jobs:
 
       # Blocking supply-chain gate (Grype + GitHub Advisory DB / OSV) that scans
       # every release independently of the live NVD API. Fails on High/Critical
-      # advisories. OWASP Dependency-Check runs as a non-blocking weekly
-      # cross-check in dependency-audit.yml.
+      # advisories.
       - name: Generate SBOM
         run: ./mvnw -B -ntp -Psbom org.cyclonedx:cyclonedx-maven-plugin:makeAggregateBom
 
@@ -89,8 +85,8 @@ jobs:
           restore-keys: |
             maven-${{ runner.os }}-
 
-      - name: Install XML tools
-        run: sudo apt-get update && sudo apt-get install -y libxml2-utils jq
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
 
       - name: Build and smoke distribution
         run: ./mvnw -pl dist-tool -am verify -Pdist-smoke

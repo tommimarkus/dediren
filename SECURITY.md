@@ -31,9 +31,8 @@ GitHub release archives target SLSA Build Level 2 evidence:
   is itself an attested build subject;
 - the publish job verifies every asset's attestation before creating the
   release, and repository release immutability freezes the published asset set;
-- first-party Java is statically analyzed by CodeQL on pull requests, pushes to
-  `main`, and weekly; high-severity alerts surface in the repository's code
-  scanning view.
+- first-party Java is statically analyzed by CodeQL weekly and on demand;
+  high-severity alerts surface in the repository's code scanning view.
 
 See `docs/threat-model.md` for the full trust-boundary breakdown behind these
 controls.
@@ -52,10 +51,13 @@ accepted risk:
 - `release tags` blocks moving or deleting `v*` tags; released tags are
   additionally frozen by release immutability.
 
-Compensating controls still run on every push and pull request: the blocking
-Grype/SBOM supply-chain gate (fails on High/Critical advisories), the full test
-suite, and the whitespace check (`ci.yml`); `CODEOWNERS` records review
-ownership.
+Compensating controls (lean-CI posture — validation is local-first): every pull
+request, chiefly Dependabot bumps, runs the blocking Grype/SBOM supply-chain
+gate (fails on High/Critical advisories), the full test suite, and the
+packaged-bundle smoke (`ci.yml`); every tagged release re-runs the full suite
+and the same blocking gate (`release.yml`); direct pushes to `main` rely on the
+local verification lanes in `CLAUDE.md` and are recorded as ruleset bypass
+events. `CODEOWNERS` records review ownership.
 
 This posture is revisited when the project starts accepting external
 contributions or reaches a stable release. At that point, drop the admin

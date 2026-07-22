@@ -1,16 +1,14 @@
 name: CodeQL
 
+# Lean CI (2026-07 decision): CodeQL runs weekly and on demand rather than per
+# commit — alerts land a few days later, which is acceptable for a solo repo
+# with no push-time CI.
+
 on:
-  pull_request:
-    branches:
-      - main
-  push:
-    branches:
-      - main
   schedule:
-    # Weekly, Tuesday 06:00 UTC — offset from Dependabot (Mon) and the OWASP
-    # dependency-audit cross-check (Thu).
+    # Weekly, Tuesday 06:00 UTC — offset from Dependabot (Mon).
     - cron: "0 6 * * 2"
+  workflow_dispatch:
 
 permissions:
   contents: read

@@ -1,12 +1,17 @@
 name: CI
 
+# Lean CI (2026-07 decision): this workflow runs on pull requests only —
+# chiefly Dependabot bumps, which have no local validation — plus manual
+# dispatch. Direct pushes to main rely on the local verification lanes
+# (CLAUDE.md §Verification) and are recorded as ruleset bypass events; every
+# tagged release re-runs the full suite and the blocking Grype gate in
+# release.yml.
+
 on:
   pull_request:
     branches:
       - main
-  push:
-    branches:
-      - main
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -39,9 +44,6 @@ jobs:
           restore-keys: |
             maven-${{ runner.os }}-
 
-      - name: Install XML tools
-        run: sudo apt-get update && sudo apt-get install -y libxml2-utils
-
       - name: Check workspace tests
         run: ./mvnw -B -ntp test
 
@@ -54,59 +56,14 @@ jobs:
       - name: Check whitespace
         run: git diff --check
 
-  quality-report:
-    # Non-blocking: Spotless + SpotBugs run here report-only. The local
-    # `./mvnw -Pquality verify` gate is where these fail; CI only surfaces
-    # findings as artifacts. See
-    # docs/superpowers/specs/2026-07-01-spotless-spotbugs-quality-gates-design.md
-    runs-on: ubuntu-24.04
-    timeout-minutes: 20
-    steps:
-      - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with:
-          persist-credentials: false
-
-      - name: Set up Java
-        uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5.6.0
-        with:
-          distribution: temurin
-          java-version: "21"
-
-      - name: Cache Maven artifacts
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: .cache/maven
-          key: maven-${{ runner.os }}-${{ hashFiles('**/pom.xml', '.mvn/wrapper/maven-wrapper.properties') }}
-          restore-keys: |
-            maven-${{ runner.os }}-
-
-      - name: SpotBugs (report-only)
-        continue-on-error: true
-        run: ./mvnw -B -ntp -Pquality -Dquality.fail=false -Dspotless.check.skip=true -DskipTests verify
-
-      - name: Spotless drift (report-only)
-        continue-on-error: true
-        run: |
-          ./mvnw -B -ntp -Pquality spotless:apply
-          git --no-pager diff > spotless-drift.patch || true
-
-      - name: Upload quality reports
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: quality-reports
-          path: |
-            **/target/spotbugsXml.xml
-            spotless-drift.patch
-          if-no-files-found: ignore
-
   vulnerability-scan:
     # Blocking supply-chain gate: Grype matches the CycloneDX SBOM against the
     # GitHub Advisory DB / OSV (a prebuilt database, not the live NVD API), so it
-    # is fast and resilient to NVD outages. Fails CI on High/Critical advisories.
-    # OWASP Dependency-Check runs as a non-blocking weekly cross-check in
-    # dependency-audit.yml.
+    # is fast and resilient to NVD outages. Fails the pull request on
+    # High/Critical advisories — Dependabot bumps are the main traffic here. The
+    # same gate re-runs against every tagged release in release.yml; OWASP
+    # Dependency-Check remains available as an on-demand local second opinion
+    # (-Psecurity-sca, see README).
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
