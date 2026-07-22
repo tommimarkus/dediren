@@ -6,7 +6,7 @@
 
   <groupId>dev.dediren</groupId>
   <artifactId>dediren</artifactId>
-  <version>2026.07.22</version>
+  <version>2026.07.23</version>
   <packaging>pom</packaging>
 
   <licenses>
