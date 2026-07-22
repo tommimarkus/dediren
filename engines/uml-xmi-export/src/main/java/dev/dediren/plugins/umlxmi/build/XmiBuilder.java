@@ -3,6 +3,7 @@ package dev.dediren.plugins.umlxmi.build;
 import static dev.dediren.plugins.umlxmi.build.XmiHelpers.UML_NS;
 import static dev.dediren.plugins.umlxmi.build.XmiHelpers.XMI_NS;
 import static dev.dediren.plugins.umlxmi.build.XmiHelpers.attr;
+import static dev.dediren.plugins.umlxmi.build.XmiHelpers.genericGraphPluginData;
 import static dev.dediren.plugins.umlxmi.build.XmiHelpers.umlString;
 import static dev.dediren.plugins.umlxmi.build.XmiHelpers.writeEmptyPackagedElement;
 import static dev.dediren.plugins.umlxmi.write.activity.ActivityWriter.writeActivity;
@@ -19,6 +20,7 @@ import static dev.dediren.plugins.umlxmi.write.usecase.UseCaseWriter.writeUseCas
 import dev.dediren.contracts.ContractVersions;
 import dev.dediren.contracts.export.ExportRequest;
 import dev.dediren.contracts.export.UmlXmiExportPolicy;
+import dev.dediren.contracts.source.GenericGraphView;
 import dev.dediren.contracts.source.SourceNode;
 import dev.dediren.contracts.source.SourceRelationship;
 import dev.dediren.engine.ModelExportRequest;
@@ -97,17 +99,50 @@ public final class XmiBuilder {
     openRoot(xml, true);
     ModelContent model =
         writeModelContent(xml, representative, policy, selectedNodes, selectedRelationships);
+    Map<String, String> viewLabels = viewLabels(representative);
     for (ModelExportRequest.ViewLayout view : request.views()) {
       DiagramWriter.writeUmlDiagram(
           xml,
           view.layout(),
-          new DiagramWriter.DiagramIdentity("id-diagram-" + view.viewId(), view.viewId()),
+          resolveDiagramIdentity(policy, view.viewId(), viewLabels.get(view.viewId())),
           model.ids(),
           model.nodeIds(),
           model.relationshipIds());
     }
     xml.append("</xmi:XMI>\n");
     return xml.toString();
+  }
+
+  /**
+   * Per-view UMLDI diagram identity: an explicit {@code views[viewId]} override wins field by
+   * field, else the source-derived default ({@code id-diagram-<viewId>} and the view's own label).
+   */
+  private static DiagramWriter.DiagramIdentity resolveDiagramIdentity(
+      UmlXmiExportPolicy policy, String viewId, String sourceLabel) {
+    UmlXmiExportPolicy.DiagramIdentity override =
+        policy.views().getOrDefault(viewId, new UmlXmiExportPolicy.DiagramIdentity(null, null));
+    String identifier =
+        override.diagramIdentifier() != null
+            ? override.diagramIdentifier()
+            : "id-diagram-" + viewId;
+    String name =
+        override.diagramName() != null
+            ? override.diagramName()
+            : sourceLabel != null ? sourceLabel : viewId;
+    return new DiagramWriter.DiagramIdentity(identifier, name);
+  }
+
+  private static Map<String, String> viewLabels(ExportRequest request) {
+    var labels = new HashMap<String, String>();
+    try {
+      for (GenericGraphView view : genericGraphPluginData(request).views()) {
+        labels.put(view.id(), view.label());
+      }
+    } catch (RuntimeException error) {
+      // A UML source always carries generic-graph views; if one somehow does not, fall back to the
+      // view id as the diagram name rather than failing the aggregate.
+    }
+    return labels;
   }
 
   private static void openRoot(StringBuilder xml, boolean withDiagramInterchange) {

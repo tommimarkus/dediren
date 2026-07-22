@@ -13,6 +13,17 @@
     "model_identifier": { "type": "string", "minLength": 1 },
     "model_name": { "type": "string", "minLength": 1 },
     "xmi_version": { "enum": ["2.5.1"] },
-    "uml_version": { "enum": ["2.5.1"] }
+    "uml_version": { "enum": ["2.5.1"] },
+    "views": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "diagram_identifier": { "type": "string", "minLength": 1 },
+          "diagram_name": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
   }
 }

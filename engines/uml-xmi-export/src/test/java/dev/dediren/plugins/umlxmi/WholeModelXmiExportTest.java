@@ -16,6 +16,7 @@ import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import tools.jackson.databind.node.ObjectNode;
 
 /**
  * Exercises the whole-model {@code exportModel} lane end to end: it emits {@code <uml:Model>} once
@@ -66,6 +67,38 @@ class WholeModelXmiExportTest {
         .anySatisfy(
             diagnostic ->
                 assertThat(diagnostic.code()).isEqualTo("DEDIREN_EXPORT_SCHEMA_CONFORMANCE"));
+  }
+
+  @Test
+  void perViewDiagramIdentityOverrideFromThePolicyViewsMap() throws Exception {
+    Path schemaPath = writeStubXmiSchema();
+    ObjectNode policy =
+        (ObjectNode)
+            JsonSupport.objectMapper()
+                .readTree(
+                    Files.readString(
+                        workspaceRoot().resolve("fixtures/export-policy/default-uml-xmi.json")));
+    ObjectNode override = policy.putObject("views").putObject("class-view");
+    override.put("diagram_identifier", "id-my-diagram");
+    override.put("diagram_name", "My Class Diagram");
+    ModelExportRequest request =
+        new ModelExportRequest(
+            parse("fixtures/source/valid-uml-basic.json", SourceDocument.class),
+            List.of(
+                new ModelExportRequest.ViewLayout(
+                    "class-view",
+                    parse("fixtures/layout-result/uml-basic.json", LayoutResult.class))),
+            policy);
+
+    Optional<EngineResult<ExportResult>> result =
+        engine.exportModel(
+            request,
+            Map.of("DEDIREN_XMI_SCHEMA_PATH", schemaPath.toString()),
+            Path.of("").toAbsolutePath());
+
+    // The explicit override wins over the source-derived default id-diagram-<viewId>/label.
+    assertThat(result.orElseThrow().value().content())
+        .contains("<umldi:UMLDiagram xmi:id=\"id-my-diagram\" name=\"My Class Diagram\"");
   }
 
   private static <T> T parse(String fixture, Class<T> type) throws Exception {
