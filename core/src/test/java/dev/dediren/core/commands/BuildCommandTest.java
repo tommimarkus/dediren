@@ -372,11 +372,11 @@ class BuildCommandTest {
     // independent re-confinement of the per-view write target (BuildCommand.requireWithinOutDir),
     // which does not trust either of those upstream checks to have run.
     //
-    // The build's out dir is nested one level under the @TempDir so the escape's normalized
-    // target ("evil" as a SIBLING of the out dir) stays inside this test's own temp tree — a
-    // sibling of the raw @TempDir would be a JVM-global location (java.io.tmpdir/evil) that any
-    // historical pollution could occupy, making the not-exists proof flaky.
-    Path buildOut = Files.createDirectories(out.resolve("nested").resolve("build-out"));
+    // The build's out dir is nested under the @TempDir so the escape's normalized target ("evil"
+    // as a SIBLING of the out dir) stays inside this test's own temp tree — a sibling of the raw
+    // @TempDir would be a JVM-global location (java.io.tmpdir/evil) that any historical pollution
+    // could occupy, making the not-exists proof flaky.
+    Path buildOut = Files.createDirectories(out.resolve("build-out"));
     BuildRequest request =
         new BuildRequest(
             SOURCE,
