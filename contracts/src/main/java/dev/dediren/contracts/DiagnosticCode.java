@@ -53,6 +53,11 @@ public enum DiagnosticCode {
   FRAGMENT_READ_FAILED("DEDIREN_FRAGMENT_READ_FAILED"),
   FRAGMENT_NESTED_UNSUPPORTED("DEDIREN_FRAGMENT_NESTED_UNSUPPORTED"),
   FRAGMENT_CONFLICT("DEDIREN_FRAGMENT_CONFLICT"),
+  // Input ceilings (core SourceLimits): anti-exhaustion guards that turn pathological input into
+  // a clean diagnostic instead of an OOM or a wedged layout run. See docs/threat-model.md.
+  INPUT_FILE_TOO_LARGE("DEDIREN_INPUT_FILE_TOO_LARGE"),
+  SOURCE_FRAGMENT_LIMIT_EXCEEDED("DEDIREN_SOURCE_FRAGMENT_LIMIT_EXCEEDED"),
+  SOURCE_ELEMENT_LIMIT_EXCEEDED("DEDIREN_SOURCE_ELEMENT_LIMIT_EXCEEDED"),
 
   // Layout quality (core: LayoutQuality).
   LAYOUT_ROUTE_POINTS_EMPTY("DEDIREN_LAYOUT_ROUTE_POINTS_EMPTY"),

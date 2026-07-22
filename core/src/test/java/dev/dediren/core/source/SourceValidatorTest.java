@@ -499,6 +499,145 @@ class SourceValidatorTest {
     assertThat(diagnostic.message()).contains("r1").contains("ghost").contains("missing target");
   }
 
+  @Test
+  void aFragmentOverTheByteCeilingIsRejectedWithSizesButNoResolvedPath() throws Exception {
+    Path base = Files.createDirectories(temp.resolve("base"));
+    Files.writeString(base.resolve("piece.json"), FRAGMENT_NODE);
+
+    assertThatThrownBy(
+            () ->
+                SourceValidator.loadAndValidateSourceDocument(
+                    modelWithFragment("piece.json"),
+                    base,
+                    /* confinementRoot= */ base,
+                    new SourceLimits(16, 1_000, 100_000)))
+        .isInstanceOfSatisfying(
+            SourceValidator.SourceDiagnosticsException.class,
+            thrown -> {
+              Diagnostic diagnostic = thrown.diagnostics().get(0);
+              assertThat(diagnostic.code()).isEqualTo("DEDIREN_INPUT_FILE_TOO_LARGE");
+              assertThat(diagnostic.path()).isEqualTo("$.fragments[0]");
+              // Sanitized like every fragment diagnostic on the MCP lane: the model's own
+              // fragment string plus byte counts, never the resolved absolute path.
+              assertThat(diagnostic.message()).contains("piece.json");
+              assertThat(diagnostic.message()).contains("ceiling is 16 bytes");
+              assertThat(diagnostic.message()).doesNotContain(base.toString());
+            });
+  }
+
+  @Test
+  void aSourceOverTheFragmentCeilingIsRejectedBeforeAnyFragmentIsRead() throws Exception {
+    Path base = Files.createDirectories(temp.resolve("base"));
+    // None of the fragment files exist: the ceiling must fire before the first read, otherwise
+    // this test would fail with FRAGMENT_READ_FAILED instead.
+    String model =
+        """
+        {
+          "model_schema_version": "model.schema.v1",
+          "fragments": ["a.json", "b.json", "c.json"],
+          "nodes": [],
+          "relationships": [],
+          "plugins": { "generic-graph": { "views": [] } }
+        }
+        """;
+
+    assertThatThrownBy(
+            () ->
+                SourceValidator.loadAndValidateSourceDocument(
+                    model, base, null, new SourceLimits(1_000, 2, 100_000)))
+        .isInstanceOfSatisfying(
+            SourceValidator.SourceDiagnosticsException.class,
+            thrown -> {
+              Diagnostic diagnostic = thrown.diagnostics().get(0);
+              assertThat(diagnostic.code()).isEqualTo("DEDIREN_SOURCE_FRAGMENT_LIMIT_EXCEEDED");
+              assertThat(diagnostic.path()).isEqualTo("$.fragments");
+              assertThat(diagnostic.message()).contains("3 fragments");
+              assertThat(diagnostic.message()).contains("ceiling is 2");
+            });
+  }
+
+  @Test
+  void aFragmentlessModelOverTheElementCeilingIsRejected() {
+    assertThatThrownBy(
+            () ->
+                SourceValidator.loadAndValidateSourceDocument(
+                    modelWithNodes(3), null, null, new SourceLimits(1_000_000, 1_000, 2)))
+        .isInstanceOfSatisfying(
+            SourceValidator.SourceDiagnosticsException.class,
+            thrown -> {
+              Diagnostic diagnostic = thrown.diagnostics().get(0);
+              assertThat(diagnostic.code()).isEqualTo("DEDIREN_SOURCE_ELEMENT_LIMIT_EXCEEDED");
+              assertThat(diagnostic.path()).isEqualTo("$");
+              assertThat(diagnostic.message()).contains("3 nodes and 0 relationships");
+              assertThat(diagnostic.message()).contains("ceiling is 2");
+            });
+  }
+
+  @Test
+  void aModelExactlyAtTheElementCeilingPasses() throws Exception {
+    var document =
+        SourceValidator.loadAndValidateSourceDocument(
+            modelWithNodes(2), null, null, new SourceLimits(1_000_000, 1_000, 2));
+
+    assertThat(document.nodes()).hasSize(2);
+  }
+
+  @Test
+  void aFragmentMergePushingPastTheElementCeilingFailsDuringTheMerge() throws Exception {
+    Path base = Files.createDirectories(temp.resolve("base"));
+    Files.writeString(base.resolve("piece.json"), FRAGMENT_NODE);
+    // Root carries two nodes; the fragment's one node pushes the merged model past the ceiling.
+    String model =
+        """
+        {
+          "model_schema_version": "model.schema.v1",
+          "fragments": ["piece.json"],
+          "nodes": [
+            { "id": "n0", "type": "ApplicationComponent", "label": "N0", "properties": {} },
+            { "id": "n1", "type": "ApplicationComponent", "label": "N1", "properties": {} }
+          ],
+          "relationships": [],
+          "plugins": { "generic-graph": { "views": [] } }
+        }
+        """;
+
+    assertThatThrownBy(
+            () ->
+                SourceValidator.loadAndValidateSourceDocument(
+                    model, base, null, new SourceLimits(1_000_000, 1_000, 2)))
+        .isInstanceOfSatisfying(
+            SourceValidator.SourceDiagnosticsException.class,
+            thrown ->
+                assertThat(thrown.diagnostics().get(0).code())
+                    .isEqualTo("DEDIREN_SOURCE_ELEMENT_LIMIT_EXCEEDED"));
+  }
+
+  private static String modelWithNodes(int count) {
+    StringBuilder nodes = new StringBuilder();
+    for (int i = 0; i < count; i++) {
+      if (i > 0) {
+        nodes.append(",\n");
+      }
+      nodes
+          .append("    { \"id\": \"n")
+          .append(i)
+          .append("\", \"type\": \"ApplicationComponent\", \"label\": \"N")
+          .append(i)
+          .append("\", \"properties\": {} }");
+    }
+    return """
+        {
+          "model_schema_version": "model.schema.v1",
+          "nodes": [
+        %s
+          ],
+          "relationships": [],
+          "plugins": { "generic-graph": { "views": [] } }
+        }
+        """
+        .formatted(nodes);
+  }
+
   private static void restoreProperty(String name, String value) {
     if (value == null) {
       System.clearProperty(name);

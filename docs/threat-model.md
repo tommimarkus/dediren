@@ -43,6 +43,15 @@ and `validate-layout`/`build` now run `ir.quality.SequenceInvariants` against
 an agent-suppliable `LayoutResult`, folding any violation into the hard-error
 lane as `DEDIREN_LAYOUT_SEQUENCE_INVARIANT_VIOLATED`.
 
+Input ceilings bound what this boundary ingests (core `SourceLimits`, enforced
+through `BoundedReads` and `SourceValidator` on the CLI and MCP lanes alike):
+64 MiB per model-supplied input file, 1000 fragments, and 100000 merged
+elements, each failing as a clean `DEDIREN_INPUT_FILE_TOO_LARGE` /
+`DEDIREN_SOURCE_FRAGMENT_LIMIT_EXCEEDED` /
+`DEDIREN_SOURCE_ELEMENT_LIMIT_EXCEEDED` diagnostic instead of an OOM or a
+wedged layout run. The resource-exhaustion row in the attacker-goals table
+records what deliberately stays unbounded.
+
 ### Single-JVM engine runtime (no plugin execution surface)
 
 The runtime is a single JVM with no plugin discovery or execution surface:
@@ -299,6 +308,7 @@ ceiling trips if shrinking or attribute stripping silently degrades.
 | Shipped `THIRD-PARTY-NOTICES.md` misstates an upstream licence after a dependency bump, or a bump drags in a licence outside the approved set | cli's `license-maven-plugin` execution resolves every runtime dependency's effective-pom licence, normalizes it, and gates it against an approved allowlist; `DistTool` refuses to write notices when its hand-curated attribution map disagrees with that resolved report or the report is stale (`resolved-licence-report`, dist lanes) | Effective-pom licences are upstream-declared metadata, not scanned artifact contents; a pom that misstates its own jar's licence passes (mitigate with an `about.html`/`META-INF` spot-check when adopting a new dependency) |
 | Malicious schema substitution | HTTPS-only curl plus SHA-256 pin verified before use (`SchemaCacheModule`) | `DEDIREN_XMI_SCHEMA_PATH` / `DEDIREN_OEF_SCHEMA_DIR` offline overrides bypass the SHA-256 check by design |
 | Malicious envelope input | Jackson 3 parsing plus fuzz-regression targets pinning the only-`JacksonException`/`XmiValidationException` invariant; hardened DOM factory blocks DOCTYPE/XXE | Fuzz targets run in deterministic regression mode over a fixed seed corpus in CI, not continuous coverage-guided fuzzing |
+| Exhaust the host via pathological model input (CPU/heap) | Input ceilings (core `SourceLimits`, applied via `BoundedReads` and `SourceValidator` on both the CLI and MCP lanes): 64 MiB per model-supplied input file (source, fragment, policy), 1000 fragments, 100000 merged elements — the element check runs inside the fragment-merge loop so a runaway fragment set fails fast. Jackson 3's default nesting-depth cap (500) bounds nested JSON; the MCP transport bounds a single inbound frame at 16 MiB (`FrameSplitter`) | Compute on a legal-size model is unbounded: ELK layout has no timeout or cancellation, SVG output is materialized in memory, MCP tool calls have no per-call timeout (they run concurrently on bounded-elastic workers), and CLI stdin is unbounded (human-piped; the MCP lane never uses it). Accepted: the process runs with the invoking user's own authority and the MCP client owns the server's lifetime, so a wedged or OOM-killed process is recoverable by the user who caused it |
 | Inject markup into a rendered SVG via model labels/ids | `SvgWriter` (StAX) structurally escapes every attribute value and text node at emission, with no verbatim-injection path; `LabelInjectionTest` proves an end-to-end breakout payload stays escaped and round-trips; `SvgAudit` rejects ill-formed output | The SVG is inert markup with no embedded script; a consumer that embeds it must still apply its own context's policy (e.g. CSP) |
 | Dependency compromise | Blocking Grype/SBOM gate on every pull request and tagged release (`ci.yml`, `release.yml`); weekly grouped Dependabot updates plus event-driven Dependabot alerts (`.github/dependabot.yml`) | Direct pushes to `main` are not CI-scanned (lean-CI decision), so an advisory published between releases surfaces via Dependabot alerts or the next PR/release gate rather than a push-time scan; the scheduled OWASP Dependency-Check cross-check was retired with the same decision (`-Psecurity-sca` remains an on-demand local second opinion) |
 | JVM-argument injection via `DEDIREN_LOG_LEVEL` | The launcher interpolates this env var into `JAVA_OPTS`, so it accepts only the six literals `trace\|debug\|info\|warn\|error\|off`; anything else is dropped with a note on stderr. A `-Pdist-smoke` probe asserts a smuggled `-XshowSettings:properties` neither reaches the JVM nor switches logging on | The guard is a shell `case` in the generated launcher; a caller who can already set arbitrary `JAVA_OPTS` needs no such trick, so this only closes the narrower "can set DEDIREN_* but not JAVA_OPTS" path |

@@ -12,6 +12,8 @@ import dev.dediren.core.commands.BuildRequest;
 import dev.dediren.core.commands.CoreCommands;
 import dev.dediren.core.engine.EngineExecutionException;
 import dev.dediren.core.engine.EngineRunOutcome;
+import dev.dediren.core.io.BoundedReads;
+import dev.dediren.core.source.SourceLimits;
 import dev.dediren.engine.Engines;
 import io.modelcontextprotocol.spec.McpSchema.CallToolRequest;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
@@ -80,7 +82,7 @@ public final class DedirenTools {
     }
     String text;
     try {
-      text = Files.readString(sourcePath);
+      text = readBounded(sourcePath);
     } catch (IOException error) {
       return readFailure("source", source, error);
     }
@@ -130,13 +132,13 @@ public final class DedirenTools {
     }
     String oldText;
     try {
-      oldText = Files.readString(oldPath);
+      oldText = readBounded(oldPath);
     } catch (IOException error) {
       return readFailure("old", oldArg, error);
     }
     String newText;
     try {
-      newText = Files.readString(newPath);
+      newText = readBounded(newPath);
     } catch (IOException error) {
       return readFailure("new", newArg, error);
     }
@@ -172,7 +174,7 @@ public final class DedirenTools {
     }
     String text;
     try {
-      text = Files.readString(sourcePath);
+      text = readBounded(sourcePath);
     } catch (IOException error) {
       return readFailure("source", source, error);
     }
@@ -213,7 +215,7 @@ public final class DedirenTools {
     }
     String text;
     try {
-      text = Files.readString(sourcePath);
+      text = readBounded(sourcePath);
     } catch (IOException error) {
       return readFailure("source", source, error);
     }
@@ -289,7 +291,7 @@ public final class DedirenTools {
 
     String sourceText;
     try {
-      sourceText = Files.readString(sourcePath);
+      sourceText = readBounded(sourcePath);
     } catch (IOException error) {
       return readFailure("source", source, error);
     }
@@ -327,7 +329,7 @@ public final class DedirenTools {
     }
     Path resolved = WorkspacePaths.resolveExisting(root, value);
     try {
-      return Files.readString(resolved);
+      return readBounded(resolved);
     } catch (IOException error) {
       // Carry the argument name out: three policy arguments share one catch in build(), and an
       // agent repairing from the envelope has to know which one to fix.
@@ -434,9 +436,25 @@ public final class DedirenTools {
    * path itself), so it must never reach the model; {@code candidate} is the model's own original
    * argument and is safe to echo back.
    */
+  /**
+   * Every model-supplied path is read through the input byte ceiling, so an oversized file becomes
+   * a clean {@code INPUT_FILE_TOO_LARGE} envelope instead of an allocation the size of the file.
+   */
+  private static String readBounded(Path path) throws IOException {
+    return BoundedReads.readString(path, SourceLimits.DEFAULT.maxInputFileBytes());
+  }
+
   private static CallToolResult readFailure(String label, String candidate, IOException error) {
     System.err.println(
         "dediren mcp: failed to read " + label + " '" + candidate + "': " + error.getMessage());
+    if (error instanceof BoundedReads.FileTooLargeException) {
+      // Byte counts are safe to echo; a resolved path is not. The candidate is the model's own
+      // argument string, so the sanitization discipline of the plain read-failure branch holds.
+      return error(
+          DiagnosticCode.INPUT_FILE_TOO_LARGE,
+          "failed to read " + label + " '" + candidate + "': " + error.getMessage(),
+          candidate);
+    }
     return error(
         DiagnosticCode.COMMAND_INPUT_INVALID,
         "failed to read " + label + " '" + candidate + "'",
