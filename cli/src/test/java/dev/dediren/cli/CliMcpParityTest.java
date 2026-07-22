@@ -17,6 +17,14 @@ import org.junit.jupiter.api.io.TempDir;
  *
  * <p>Both lanes call the same core entry points, so a divergence here means the MCP layer has
  * started interpreting, reformatting, or re-deriving something it should be passing through.
+ *
+ * <p>Assertions compare {@code .strip()}ed text on purpose, not to launder a divergence: the
+ * envelope JSON is identical, but the CLI's {@code println} appends a trailing newline the MCP
+ * tool-result text does not — an immaterial, agent-invisible difference, since every consumer
+ * parses the envelope as JSON and none compares it as raw bytes. Only the older {@code
+ * validate}/{@code build} lanes actually rely on the strip; the four analysis commands are
+ * newline-free on both lanes (each passes through one pre-serialized {@code EngineRunOutcome}), so
+ * for them the strip is a no-op and the equality is genuinely byte-for-byte.
  */
 class CliMcpParityTest {
 
@@ -551,6 +559,141 @@ class CliMcpParityTest {
     assertThat(cli.exitCode()).isZero();
     assertThat(mcp.isError()).isNotEqualTo(Boolean.TRUE);
     assertThat(normalizePaths(textOf(mcp), mcpOut)).isEqualTo(normalizePaths(cli.stdout(), cliOut));
+  }
+
+  @Test
+  void diffProducesTheSameEnvelopeThroughBothLanes(@TempDir Path root) throws Exception {
+    Path oldModel = root.resolve("old.json");
+    Files.copy(fixture("valid-basic.json"), oldModel);
+    Path newModel = root.resolve("new.json");
+    Files.copy(fixture("valid-pipeline-rich.json"), newModel);
+
+    CliResult cli =
+        Main.executeForTesting(
+            new String[] {"diff", "--old", oldModel.toString(), "--new", newModel.toString()},
+            "",
+            Map.of());
+
+    CallToolResult mcp =
+        new DedirenTools(root, EngineWiring.defaults(), Map.of())
+            .diff(
+                new CallToolRequest("dediren_diff", Map.of("old", "old.json", "new", "new.json")));
+
+    // The parity claim is byte-equality + the isError mapping, not that the diff succeeds; that a
+    // real diff yields an ok result is pinned by DedirenToolsTest.diffReturnsAChangeEnvelope.
+    assertThat(textOf(mcp).strip()).isEqualTo(cli.stdout().strip());
+    assertThat(mcp.isError()).isEqualTo(cli.exitCode() != 0);
+  }
+
+  @Test
+  void queryProducesTheSameEnvelopeThroughBothLanes(@TempDir Path root) throws Exception {
+    Path source = root.resolve("model.json");
+    Files.copy(fixture("valid-pipeline-rich.json"), source);
+
+    CliResult cli =
+        Main.executeForTesting(
+            new String[] {"query", "--kind", "orphans", "--input", source.toString()},
+            "",
+            Map.of());
+
+    CallToolResult mcp =
+        new DedirenTools(root, EngineWiring.defaults(), Map.of())
+            .query(
+                new CallToolRequest(
+                    "dediren_query", Map.of("source", "model.json", "kind", "orphans")));
+
+    assertThat(textOf(mcp).strip()).isEqualTo(cli.stdout().strip());
+    assertThat(mcp.isError()).isEqualTo(cli.exitCode() != 0);
+  }
+
+  /** The argument validation moved into core (dependents needs an id) must reject identically. */
+  @Test
+  void queryDependentsWithoutIdRejectsThroughBothLanes(@TempDir Path root) throws Exception {
+    Path source = root.resolve("model.json");
+    Files.copy(fixture("valid-pipeline-rich.json"), source);
+
+    CliResult cli =
+        Main.executeForTesting(
+            new String[] {"query", "--kind", "dependents", "--input", source.toString()},
+            "",
+            Map.of());
+
+    CallToolResult mcp =
+        new DedirenTools(root, EngineWiring.defaults(), Map.of())
+            .query(
+                new CallToolRequest(
+                    "dediren_query", Map.of("source", "model.json", "kind", "dependents")));
+
+    assertThat(cli.exitCode()).isNotZero();
+    assertThat(textOf(mcp).strip()).isEqualTo(cli.stdout().strip());
+    assertThat(mcp.isError()).isTrue();
+  }
+
+  @Test
+  void verifyProducesTheSameEnvelopeThroughBothLanes(@TempDir Path root) throws Exception {
+    Path source = root.resolve("model.json");
+    Files.copy(fixture("valid-basic.json"), source);
+    Path out = buildArtifacts(root, source);
+
+    CliResult cli =
+        Main.executeForTesting(
+            new String[] {"verify", "--input", source.toString(), "--artifacts", out.toString()},
+            "",
+            Map.of());
+
+    CallToolResult mcp =
+        new DedirenTools(root, EngineWiring.defaults(), Map.of())
+            .verify(
+                new CallToolRequest(
+                    "dediren_verify", Map.of("source", "model.json", "artifacts", "out")));
+
+    assertThat(textOf(mcp).strip()).isEqualTo(cli.stdout().strip());
+    assertThat(mcp.isError()).isEqualTo(cli.exitCode() != 0);
+    // The invariant that makes verify parity possible: artifact paths are reported relative to the
+    // artifacts dir (pinned literally by CliProvenanceTest), so the MCP lane — which resolves that
+    // dir to an absolute real path — never echoes the server's absolute root back to the model.
+    assertThat(textOf(mcp)).doesNotContain(root.toString());
+  }
+
+  @Test
+  void statusProducesTheSameEnvelopeThroughBothLanes(@TempDir Path root) throws Exception {
+    Path source = root.resolve("model.json");
+    Files.copy(fixture("valid-basic.json"), source);
+    buildArtifacts(root, source);
+
+    CliResult cli =
+        Main.executeForTesting(new String[] {"status", "--root", root.toString()}, "", Map.of());
+
+    // Omitting 'dir' indexes the server root itself, matching --root.
+    CallToolResult mcp =
+        new DedirenTools(root, EngineWiring.defaults(), Map.of())
+            .status(new CallToolRequest("dediren_status", Map.of()));
+
+    assertThat(textOf(mcp).strip()).isEqualTo(cli.stdout().strip());
+    assertThat(mcp.isError()).isEqualTo(cli.exitCode() != 0);
+    assertThat(textOf(mcp)).doesNotContain(root.toString());
+  }
+
+  /** Builds the render lane into {@code <root>/out} so verify/status have a stamped artifact. */
+  private static Path buildArtifacts(Path root, Path source) throws Exception {
+    Path renderPolicy = root.resolve("policy.json");
+    Files.copy(policy("default-svg.json"), renderPolicy);
+    Path out = Files.createDirectories(root.resolve("out"));
+    CliResult built =
+        Main.executeForTesting(
+            new String[] {
+              "build",
+              "--input",
+              source.toString(),
+              "--out",
+              out.toString(),
+              "--render-policy",
+              renderPolicy.toString()
+            },
+            "",
+            Map.of());
+    assertThat(built.exitCode()).describedAs(built.stdout()).isZero();
+    return out;
   }
 
   /** The envelope names the artifacts it wrote, so the out dir differs between the two lanes. */

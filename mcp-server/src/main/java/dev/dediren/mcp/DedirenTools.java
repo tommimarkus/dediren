@@ -6,6 +6,7 @@ import dev.dediren.contracts.DiagnosticCode;
 import dev.dediren.contracts.DiagnosticSeverity;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.core.ProductRootException;
+import dev.dediren.core.commands.AnalysisCommands;
 import dev.dediren.core.commands.BuildCommand;
 import dev.dediren.core.commands.BuildRequest;
 import dev.dediren.core.commands.CoreCommands;
@@ -106,6 +107,138 @@ public final class DedirenTools {
       return engineFailure(failure);
     } catch (ProductRootException failure) {
       return error(DiagnosticCode.PRODUCT_ROOT_UNRESOLVED, failure.getMessage(), null);
+    }
+  }
+
+  public CallToolResult diff(CallToolRequest request) {
+    String oldArg = stringArg(request, "old");
+    if (oldArg == null) {
+      return error(DiagnosticCode.COMMAND_INPUT_INVALID, "diff requires 'old'", null);
+    }
+    String newArg = stringArg(request, "new");
+    if (newArg == null) {
+      return error(DiagnosticCode.COMMAND_INPUT_INVALID, "diff requires 'new'", null);
+    }
+    Path oldPath;
+    Path newPath;
+    try {
+      oldPath = WorkspacePaths.resolveExisting(root, oldArg);
+      newPath = WorkspacePaths.resolveExisting(root, newArg);
+    } catch (PathOutsideRootException escape) {
+      return pathEscape(escape);
+    }
+    String oldText;
+    try {
+      oldText = Files.readString(oldPath);
+    } catch (IOException error) {
+      return readFailure("old", oldArg, error);
+    }
+    String newText;
+    try {
+      newText = Files.readString(newPath);
+    } catch (IOException error) {
+      return readFailure("new", newArg, error);
+    }
+    try {
+      // The model chose both sources, so their fragment paths are model-supplied too: confine them
+      // to the same --root the tool arguments are confined to.
+      EngineRunOutcome outcome =
+          AnalysisCommands.diffCommand(
+              oldText, oldPath.getParent(), newText, newPath.getParent(), root);
+      return envelope(outcome.stdout(), outcome.exitCode() != 0);
+    } catch (ProductRootException failure) {
+      return error(DiagnosticCode.PRODUCT_ROOT_UNRESOLVED, failure.getMessage(), null);
+    }
+  }
+
+  public CallToolResult query(CallToolRequest request) {
+    String source = stringArg(request, "source");
+    if (source == null) {
+      return error(DiagnosticCode.COMMAND_INPUT_INVALID, "query requires 'source'", null);
+    }
+    String kind = stringArg(request, "kind");
+    if (kind == null) {
+      return error(DiagnosticCode.COMMAND_INPUT_INVALID, "query requires 'kind'", null);
+    }
+    String id = stringArg(request, "id");
+    Path sourcePath;
+    try {
+      sourcePath = WorkspacePaths.resolveExisting(root, source);
+    } catch (PathOutsideRootException escape) {
+      return pathEscape(escape);
+    }
+    String text;
+    try {
+      text = Files.readString(sourcePath);
+    } catch (IOException error) {
+      return readFailure("source", source, error);
+    }
+    try {
+      EngineRunOutcome outcome =
+          AnalysisCommands.queryCommand(kind, id, text, sourcePath.getParent(), root);
+      return envelope(outcome.stdout(), outcome.exitCode() != 0);
+    } catch (ProductRootException failure) {
+      return error(DiagnosticCode.PRODUCT_ROOT_UNRESOLVED, failure.getMessage(), null);
+    }
+  }
+
+  public CallToolResult verify(CallToolRequest request) {
+    String source = stringArg(request, "source");
+    if (source == null) {
+      return error(DiagnosticCode.COMMAND_INPUT_INVALID, "verify requires 'source'", null);
+    }
+    String artifactsArg = stringArg(request, "artifacts");
+    if (artifactsArg == null) {
+      return error(DiagnosticCode.COMMAND_INPUT_INVALID, "verify requires 'artifacts'", null);
+    }
+    Path sourcePath;
+    Path artifactsPath;
+    try {
+      sourcePath = WorkspacePaths.resolveExisting(root, source);
+      artifactsPath = WorkspacePaths.resolveExisting(root, artifactsArg);
+    } catch (PathOutsideRootException escape) {
+      return pathEscape(escape);
+    }
+    // Report the model's own candidate, never the resolved absolute path, in the failure message.
+    if (!Files.isDirectory(artifactsPath)) {
+      return error(
+          DiagnosticCode.COMMAND_INPUT_INVALID,
+          "'artifacts' is not a directory: " + artifactsArg,
+          artifactsArg);
+    }
+    String text;
+    try {
+      text = Files.readString(sourcePath);
+    } catch (IOException error) {
+      return readFailure("source", source, error);
+    }
+    try {
+      EngineRunOutcome outcome =
+          AnalysisCommands.verifyCommand(text, sourcePath.getParent(), root, artifactsPath);
+      return envelope(outcome.stdout(), outcome.exitCode() != 0);
+    } catch (ProductRootException failure) {
+      return error(DiagnosticCode.PRODUCT_ROOT_UNRESOLVED, failure.getMessage(), null);
+    } catch (UncheckedIOException failure) {
+      return ioFailure(failure);
+    }
+  }
+
+  public CallToolResult status(CallToolRequest request) {
+    String dir = stringArg(request, "dir");
+    Path target;
+    try {
+      target = WorkspacePaths.resolveExisting(root, dir == null ? "." : dir);
+    } catch (PathOutsideRootException escape) {
+      return pathEscape(escape);
+    }
+    if (!Files.isDirectory(target)) {
+      return error(DiagnosticCode.COMMAND_INPUT_INVALID, "'dir' is not a directory: " + dir, dir);
+    }
+    try {
+      EngineRunOutcome outcome = AnalysisCommands.statusCommand(target);
+      return envelope(outcome.stdout(), outcome.exitCode() != 0);
+    } catch (UncheckedIOException failure) {
+      return ioFailure(failure);
     }
   }
 
@@ -303,6 +436,21 @@ public final class DedirenTools {
         DiagnosticCode.COMMAND_INPUT_INVALID,
         "failed to read " + label + " '" + candidate + "'",
         candidate);
+  }
+
+  /**
+   * A workspace I/O failure while walking the confined tree (for example an unreadable subdirectory
+   * under {@code artifacts}/{@code dir}). The {@link UncheckedIOException}'s message can carry a
+   * resolved absolute path (an {@code AccessDeniedException} names the path itself), so keep it
+   * stderr-only and return a path-free envelope — the same discipline {@link #pathEscape} and
+   * {@link #readFailure} apply. ({@code build}'s own catch keeps the message verbatim on purpose:
+   * it is pinned lane-for-lane against the CLI's {@code printCommandIoFailure} by {@code
+   * CliMcpParityTest}, and the CLI lane deliberately surfaces the path for human debugging.)
+   */
+  private static CallToolResult ioFailure(UncheckedIOException failure) {
+    System.err.println("dediren mcp: workspace I/O failure: " + failure.getMessage());
+    return error(
+        DiagnosticCode.COMMAND_IO_FAILED, "an I/O error occurred accessing the workspace", null);
   }
 
   private static CallToolResult engineFailure(EngineExecutionException failure) {

@@ -53,6 +53,78 @@ final class ToolSchemas {
       }
       """;
 
+  static final String DIFF =
+      """
+      {
+        "type": "object",
+        "properties": {
+          "old": {
+            "type": "string",
+            "description": "Path to the baseline source model, relative to the workspace root."
+          },
+          "new": {
+            "type": "string",
+            "description": "Path to the changed source model, relative to the workspace root."
+          }
+        },
+        "required": ["old", "new"]
+      }
+      """;
+
+  static final String QUERY =
+      """
+      {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string",
+            "description": "Path to the source model, relative to the workspace root."
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["dependents", "orphans", "view-coverage"],
+            "description": "The fixed query to run. 'dependents' also needs 'id'."
+          },
+          "id": {
+            "type": "string",
+            "description": "Node id to query. Required when kind is 'dependents'."
+          }
+        },
+        "required": ["source", "kind"]
+      }
+      """;
+
+  static final String VERIFY =
+      """
+      {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string",
+            "description": "Path to the source model, relative to the workspace root."
+          },
+          "artifacts": {
+            "type": "string",
+            "description": "Path to the directory of built artifacts to verify, relative to the workspace root."
+          }
+        },
+        "required": ["source", "artifacts"]
+      }
+      """;
+
+  static final String STATUS =
+      """
+      {
+        "type": "object",
+        "properties": {
+          "dir": {
+            "type": "string",
+            "description": "Workspace directory to index, relative to the workspace root. Omit to index the root itself."
+          }
+        }
+      }
+      """;
+
   static final String GUIDE =
       """
       {

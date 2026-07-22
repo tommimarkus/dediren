@@ -2,23 +2,17 @@ package dev.dediren.cli;
 
 import dev.dediren.contracts.CommandEnvelope;
 import dev.dediren.contracts.CommandExitCode;
-import dev.dediren.contracts.ContractVersions;
 import dev.dediren.contracts.Diagnostic;
 import dev.dediren.contracts.DiagnosticCode;
 import dev.dediren.contracts.DiagnosticSeverity;
-import dev.dediren.contracts.EnvelopeStatus;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.core.ProductRootException;
-import dev.dediren.core.analysis.CanonicalJson;
-import dev.dediren.core.analysis.ModelDiff;
-import dev.dediren.core.analysis.ModelQuery;
-import dev.dediren.core.analysis.ProvenanceCheck;
+import dev.dediren.core.commands.AnalysisCommands;
 import dev.dediren.core.commands.BuildRequest;
 import dev.dediren.core.commands.CoreCommands;
 import dev.dediren.core.engine.EngineExecutionException;
 import dev.dediren.core.engine.EngineRunOutcome;
 import dev.dediren.core.source.DocumentValidator;
-import dev.dediren.core.source.SourceValidator;
 import dev.dediren.core.source.ValidationResult;
 import dev.dediren.engine.Engines;
 import java.io.ByteArrayInputStream;
@@ -30,7 +24,6 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -257,18 +250,10 @@ public final class Main {
         return writeEnvelope(spec, newText.error(), CommandExitCode.INPUT_ERROR);
       }
       try {
-        var oldDocument =
-            SourceValidator.loadAndValidateSourceDocument(oldText.text(), oldText.baseDir());
-        var newDocument =
-            SourceValidator.loadAndValidateSourceDocument(newText.text(), newText.baseDir());
-        var result = ModelDiff.diff(oldDocument, newDocument);
-        return writeEnvelope(
+        return writePluginOutcome(
             spec,
-            CommandEnvelope.ok(JsonSupport.objectMapper().valueToTree(result)),
-            CommandExitCode.OK);
-      } catch (SourceValidator.SourceDiagnosticsException error) {
-        return writeEnvelope(
-            spec, CommandEnvelope.error(error.diagnostics()), CommandExitCode.INPUT_ERROR);
+            AnalysisCommands.diffCommand(
+                oldText.text(), oldText.baseDir(), newText.text(), newText.baseDir(), null));
       } catch (ProductRootException error) {
         return printProductRootFailure(spec, error);
       }
@@ -296,50 +281,14 @@ public final class Main {
 
     @Override
     public Integer call() throws Exception {
-      if (!List.of("dependents", "orphans", "view-coverage").contains(kind)) {
-        return writeEnvelope(
-            spec,
-            usageError(
-                DiagnosticCode.COMMAND_INPUT_INVALID.code(),
-                "unsupported query kind '" + kind + "': use dependents, orphans, or view-coverage"),
-            CommandExitCode.INPUT_ERROR);
-      }
-      if ("dependents".equals(kind) && id == null) {
-        return writeEnvelope(
-            spec,
-            usageError(
-                DiagnosticCode.COMMAND_INPUT_INVALID.code(),
-                "query --kind dependents requires --id"),
-            CommandExitCode.INPUT_ERROR);
-      }
       JsonInputText inputText = readInput("input", input, stdin);
       if (inputText.error() != null) {
         return writeEnvelope(spec, inputText.error(), CommandExitCode.INPUT_ERROR);
       }
       try {
-        var document =
-            SourceValidator.loadAndValidateSourceDocument(inputText.text(), inputText.baseDir());
-        if ("dependents".equals(kind)
-            && document.nodes().stream().noneMatch(node -> id.equals(node.id()))) {
-          return writeEnvelope(
-              spec,
-              usageError(
-                  DiagnosticCode.COMMAND_INPUT_INVALID.code(), "unknown node id '" + id + "'"),
-              CommandExitCode.INPUT_ERROR);
-        }
-        var result =
-            switch (kind) {
-              case "dependents" -> ModelQuery.dependents(document, id);
-              case "orphans" -> ModelQuery.orphans(document);
-              default -> ModelQuery.viewCoverage(document);
-            };
-        return writeEnvelope(
+        return writePluginOutcome(
             spec,
-            CommandEnvelope.ok(JsonSupport.objectMapper().valueToTree(result)),
-            CommandExitCode.OK);
-      } catch (SourceValidator.SourceDiagnosticsException error) {
-        return writeEnvelope(
-            spec, CommandEnvelope.error(error.diagnostics()), CommandExitCode.INPUT_ERROR);
+            AnalysisCommands.queryCommand(kind, id, inputText.text(), inputText.baseDir(), null));
       } catch (ProductRootException error) {
         return printProductRootFailure(spec, error);
       }
@@ -362,69 +311,10 @@ public final class Main {
       if (inputText.error() != null) {
         return writeEnvelope(spec, inputText.error(), CommandExitCode.INPUT_ERROR);
       }
-      if (!Files.isDirectory(artifacts)) {
-        return writeEnvelope(
-            spec,
-            usageError(
-                DiagnosticCode.COMMAND_INPUT_INVALID.code(),
-                "--artifacts must name an existing directory: " + artifacts),
-            CommandExitCode.INPUT_ERROR);
-      }
       try {
-        var document =
-            SourceValidator.loadAndValidateSourceDocument(inputText.text(), inputText.baseDir());
-        String modelSha = CanonicalJson.sha256(JsonSupport.objectMapper().valueToTree(document));
-        var result = ProvenanceCheck.verify(modelSha, artifacts);
-        var diagnostics = new ArrayList<Diagnostic>();
-        for (var artifact : result.artifacts()) {
-          if (ProvenanceCheck.STALE.equals(artifact.status())) {
-            diagnostics.add(
-                new Diagnostic(
-                    DiagnosticCode.ARTIFACT_STALE.code(),
-                    DiagnosticSeverity.ERROR,
-                    artifact.path()
-                        + " was built from a different model revision; rebuild it or check out"
-                        + " the matching model",
-                    artifact.path()));
-          } else if (ProvenanceCheck.UNSTAMPED.equals(artifact.status())) {
-            diagnostics.add(
-                new Diagnostic(
-                    DiagnosticCode.ARTIFACT_UNSTAMPED.code(),
-                    DiagnosticSeverity.WARNING,
-                    artifact.path()
-                        + " carries no provenance stamp (only `dediren build` artifacts are"
-                        + " stamped); currency cannot be decided",
-                    artifact.path()));
-          }
-        }
-        JsonNode data = JsonSupport.objectMapper().valueToTree(result);
-        boolean stale =
-            diagnostics.stream()
-                .anyMatch(d -> d.code().equals(DiagnosticCode.ARTIFACT_STALE.code()));
-        if (stale) {
-          return writeEnvelope(
-              spec,
-              new CommandEnvelope<>(
-                  ContractVersions.ENVELOPE_SCHEMA_VERSION,
-                  EnvelopeStatus.ERROR,
-                  data,
-                  diagnostics),
-              CommandExitCode.INPUT_ERROR);
-        }
-        if (!diagnostics.isEmpty()) {
-          return writeEnvelope(
-              spec,
-              new CommandEnvelope<>(
-                  ContractVersions.ENVELOPE_SCHEMA_VERSION,
-                  EnvelopeStatus.WARNING,
-                  data,
-                  diagnostics),
-              CommandExitCode.OK);
-        }
-        return writeEnvelope(spec, CommandEnvelope.ok(data), CommandExitCode.OK);
-      } catch (SourceValidator.SourceDiagnosticsException error) {
-        return writeEnvelope(
-            spec, CommandEnvelope.error(error.diagnostics()), CommandExitCode.INPUT_ERROR);
+        return writePluginOutcome(
+            spec,
+            AnalysisCommands.verifyCommand(inputText.text(), inputText.baseDir(), null, artifacts));
       } catch (ProductRootException error) {
         return printProductRootFailure(spec, error);
       }
@@ -440,19 +330,7 @@ public final class Main {
 
     @Override
     public Integer call() throws Exception {
-      if (!Files.isDirectory(root)) {
-        return writeEnvelope(
-            spec,
-            usageError(
-                DiagnosticCode.COMMAND_INPUT_INVALID.code(),
-                "--root must name an existing directory: " + root),
-            CommandExitCode.INPUT_ERROR);
-      }
-      var result = ProvenanceCheck.status(root);
-      return writeEnvelope(
-          spec,
-          CommandEnvelope.ok(JsonSupport.objectMapper().valueToTree(result)),
-          CommandExitCode.OK);
+      return writePluginOutcome(spec, AnalysisCommands.statusCommand(root));
     }
   }
 

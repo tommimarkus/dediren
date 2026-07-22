@@ -73,7 +73,50 @@ public final class DedirenMcpServer {
                             + " model: topic 'source-json' is the minimal source shape.")
                     .inputSchema(mapper, ToolSchemas.GUIDE)
                     .build(),
-                (exchange, request) -> tools.guide(request));
+                (exchange, request) -> tools.guide(request))
+            .toolCall(
+                Tool.builder()
+                    .name("dediren_diff")
+                    .description(
+                        "Diff two Dediren source models — baseline 'old' vs changed 'new'. Returns"
+                            + " an envelope of change records: nodes, relationships, and views"
+                            + " added, removed, or changed. Read-only; both models must share the"
+                            + " same schema id.")
+                    .inputSchema(mapper, ToolSchemas.DIFF)
+                    .build(),
+                (exchange, request) -> tools.diff(request))
+            .toolCall(
+                Tool.builder()
+                    .name("dediren_query")
+                    .description(
+                        "Run a fixed-vocabulary query over a Dediren source model. kind"
+                            + " 'dependents' (requires 'id') lists what points at a node; 'orphans'"
+                            + " lists unreferenced nodes; 'view-coverage' reports which nodes each"
+                            + " view includes. Read-only.")
+                    .inputSchema(mapper, ToolSchemas.QUERY)
+                    .build(),
+                (exchange, request) -> tools.query(request))
+            .toolCall(
+                Tool.builder()
+                    .name("dediren_verify")
+                    .description(
+                        "Check built artifacts under a directory against a source model's"
+                            + " provenance stamps. status 'ok' means every artifact is current; a"
+                            + " stale artifact (built from a different model revision) is an error,"
+                            + " an unstamped one a warning. Read-only.")
+                    .inputSchema(mapper, ToolSchemas.VERIFY)
+                    .build(),
+                (exchange, request) -> tools.verify(request))
+            .toolCall(
+                Tool.builder()
+                    .name("dediren_status")
+                    .description(
+                        "Index a workspace directory: its source models by canonical hash and every"
+                            + " stamped artifact's currency against them. Omit 'dir' to index the"
+                            + " server root. Read-only.")
+                    .inputSchema(mapper, ToolSchemas.STATUS)
+                    .build(),
+                (exchange, request) -> tools.status(request));
 
     if (!readOnly) {
       specification =
