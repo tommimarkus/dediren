@@ -67,8 +67,10 @@ PKG=docs/architecture/dediren.dediren
 Each view writes under `out/self-model/<view-id>/` (`diagram.svg`, `oef.xml`,
 `xmi.xml`); copy the SVGs and exports into `generated/`. The committed SVGs then
 get the skill's `svg-accessible-name.sh` post-render step, which adds a
-`role="img"`/`<title>`/`<desc>` accessible name plus a visible title band. That
-step currently introduces two cosmetic defects — see *Known tool defects*.
+`role="img"`/`<title>`/`<desc>` accessible name plus a visible title band. The
+band is height-synced to the expanded `viewBox` (so browsers do not letterbox
+the diagram) and painted with the diagram's own background colour and a
+contrasting title fill, so it stays readable on the dark Amber CRT canvas.
 
 ## Modelling decisions (disclosed)
 
@@ -93,25 +95,6 @@ step currently introduces two cosmetic defects — see *Known tool defects*.
 - **Evidence:** every node and edge is `source-backed`, extracted from each
   module's `pom.xml` and the guidelines' allowed-edge table. No
   architect-owned or low-confidence content.
-
-## Known tool defects
-
-Two cosmetic issues come from the skill's `svg-accessible-name.sh` post-render
-helper — not the dediren runtime or the render policy — and the SVGs ship with
-them as-is (reported, not hand-patched) pending a fix to that script:
-
-- **Letterbox "border".** The helper expands the SVG `viewBox` by 32px to make
-  room for the title band but leaves the root `width`/`height` unchanged, so the
-  viewport and viewBox aspect ratios differ. Browsers letterbox the diagram,
-  showing thin transparent bars that read as a white border on light pages.
-- **Title invisible on dark.** The visible title band is black text on a
-  transparent strip, so on the dark Amber CRT canvas it is unreadable. The
-  accessible `<title>`/`<desc>` (consumed by assistive technology) are
-  unaffected.
-
-Neither is themeable through the render policy; both need a fix in
-`svg-accessible-name.sh` (keep `width`/`height` in sync with the `viewBox`, and
-make the title band theme-aware).
 
 ## Known layout note
 
