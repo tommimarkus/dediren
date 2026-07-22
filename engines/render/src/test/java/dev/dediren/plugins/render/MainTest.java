@@ -2028,6 +2028,9 @@ class MainTest {
               groupWithAttribute(document, "data-dediren-edge-id", "routed-edge"), "text");
 
       assertThat(label.getAttribute("text-anchor")).isEqualTo("end");
+      // x: route x 100 - 6.0 (first EdgeRenderer.verticalLabelCandidates offset {6.0, 34.0, 62.0}),
+      //    placed left of the route (anchor "end"). y: vertical-route midpoint (minY 0 + maxY
+      // 200)/2.
       assertThat(Double.parseDouble(label.getAttribute("x")))
           .isCloseTo(94.0, org.assertj.core.data.Offset.offset(3.0));
       assertThat(Double.parseDouble(label.getAttribute("y")))
@@ -2760,6 +2763,9 @@ class MainTest {
 
       Document document = svgDocument(okContent(render(input)));
 
+      // viewBox = content bounds padded by the render-policy margin (SvgBounds.padded), which
+      // styledInlineInput sets to 16 per side: node (320,240) 120x64 -> 320-16=304, 240-16=224,
+      // width 120+16+16=152, height 64+16+16=96.
       assertThat(document.getDocumentElement().getAttribute("viewBox"))
           .isEqualTo("304.0 224.0 152.0 96.0");
     }

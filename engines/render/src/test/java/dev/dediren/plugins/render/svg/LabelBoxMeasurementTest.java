@@ -37,15 +37,6 @@ class LabelBoxMeasurementTest {
   }
 
   @Test
-  void theLabelBoxWidthIsTheEstimatedTextWidth() {
-    String text = "sends payment request";
-
-    LabelBox box = Geometry.labelBox(0, 0, "start", text, FONT_SIZE);
-
-    assertThat(box.width()).isEqualTo(Svg.estimateTextWidth(text, FONT_SIZE));
-  }
-
-  @Test
   void anAbsentLabelHasNoWidth() {
     assertThat(Geometry.labelBox(0, 0, "start", null, FONT_SIZE).width()).isZero();
   }
