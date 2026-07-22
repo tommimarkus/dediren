@@ -97,6 +97,9 @@ class LayoutIntentCodecTest {
 
   @Test
   void decodeRejectsAMalformedGapValue() {
+    // The point of this rejection was the *diagnostic*, not merely the type: the message must name
+    // the offending subject and the grammar it broke (a numeric leading gap), not surface a bare
+    // NumberFormatException. Pin both so a regression to the opaque message can't slip through.
     assertThatThrownBy(
             () ->
                 LayoutIntentCodec.decode(
@@ -105,13 +108,15 @@ class LayoutIntentCodecTest {
                             "sequence-view.ordered-band.y",
                             "ordered-band:y",
                             List.of("m1@notanumber")))))
-        .isInstanceOf(IllegalArgumentException.class);
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContainingAll("m1@notanumber", "numeric leading gap", "is not a number");
     assertThatThrownBy(
             () ->
                 LayoutIntentCodec.decode(
                     List.of(
                         new LayoutConstraint(
                             "sequence-view.ordered-band.y", "ordered-band:y", List.of("m1@")))))
-        .isInstanceOf(IllegalArgumentException.class);
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContainingAll("m1@", "numeric leading gap", "is not a number");
   }
 }

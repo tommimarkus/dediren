@@ -20,6 +20,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 
 /**
@@ -159,8 +160,11 @@ class SemanticsRouterEngineTest {
   void parseSourceRejectsUnparseableInput() {
     // generic-graph publishes no parse-failure envelope: unparseable stdin surfaces as today's raw
     // (non-enveloped) failure, so the parse entry point throws rather than returning a diagnostic.
+    // That raw failure is JsonSupport's documented parse type -- Jackson 3's unchecked
+    // JacksonException (every stream/databind failure is a subtype) -- not a bare Exception an NPE
+    // would also satisfy.
     assertThatThrownBy(() -> fullEngine.parseSource("not-json".getBytes(StandardCharsets.UTF_8)))
-        .isInstanceOf(Exception.class);
+        .isInstanceOf(JacksonException.class);
   }
 
   // --- envelope-shaped base/routing cases (relocated GenericGraphPluginTest base cases) ----------
