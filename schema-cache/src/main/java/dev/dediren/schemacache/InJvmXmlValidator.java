@@ -20,6 +20,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
@@ -58,7 +59,9 @@ public final class InJvmXmlValidator {
 
   // A timed-out in-JVM compile/validate cannot be force-killed the way the subprocess lane's
   // destroyForcibly kills xmllint; the bounded future cancels (interrupts) and abandons the worker,
-  // which is a daemon thread so a wedged validation never blocks process exit.
+  // which is a daemon thread so a wedged validation never blocks process exit. Because such a
+  // worker cannot be reclaimed (Xerces does not observe the interrupt), the VALIDATION_GATE below
+  // bounds how many can pile up.
   private static final ExecutorService WORKERS =
       Executors.newCachedThreadPool(
           runnable -> {
@@ -66,6 +69,18 @@ public final class InJvmXmlValidator {
             thread.setDaemon(true);
             return thread;
           });
+
+  // Bounds concurrent validations so abandoned (wedged) workers cannot accumulate without limit: at
+  // most this many run at once, and a submission that would exceed it fails fast as an unavailable
+  // lane rather than spawning another unreclaimable thread. The cap tracks core count within a
+  // modest floor/ceiling — comfortably above this product's real concurrency (validations complete
+  // in milliseconds), while capping leaked wedged threads to a bounded ceiling. Accepted tradeoff:
+  // if that many workers ever wedge permanently, the lane stays unavailable (a saturation cliff)
+  // rather than leaking unboundedly.
+  static final int MAX_CONCURRENT_VALIDATIONS =
+      Math.max(2, Math.min(Runtime.getRuntime().availableProcessors(), 16));
+
+  private static final Semaphore VALIDATION_GATE = new Semaphore(MAX_CONCURRENT_VALIDATIONS);
 
   // Compiled grammars are immutable and thread-safe by JAXP contract, and recompiling the pinned
   // set dominates the per-call cost, so one Schema is cached per top-file path and served only
@@ -141,7 +156,19 @@ public final class InJvmXmlValidator {
 
   static <T> T runBounded(Callable<T> work, Duration timeout, Path schemaPath)
       throws SchemaCacheException {
-    Future<T> future = WORKERS.submit(work);
+    if (!VALIDATION_GATE.tryAcquire()) {
+      throw new SchemaCacheException(
+          "in-JVM schema validation against "
+              + schemaPath
+              + " could not start: the validator is at capacity ("
+              + MAX_CONCURRENT_VALIDATIONS
+              + " concurrent validations in flight; a prior validation may be wedged past its"
+              + " timeout)");
+    }
+    // The permit is released by the worker itself (see releasingPermit), not here: a worker the
+    // cancel below cannot interrupt keeps holding its permit until it truly finishes, which is what
+    // makes the gate bound wedged workers rather than merely serialize timeouts.
+    Future<T> future = WORKERS.submit(releasingPermit(work));
     try {
       return future.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
     } catch (TimeoutException error) {
@@ -163,6 +190,17 @@ public final class InJvmXmlValidator {
       throw new SchemaCacheException(
           "in-JVM schema validation failed unexpectedly: " + error.getCause(), error.getCause());
     }
+  }
+
+  /** Wraps the work so the concurrency permit is released when the worker actually finishes. */
+  private static <T> Callable<T> releasingPermit(Callable<T> work) {
+    return () -> {
+      try {
+        return work.call();
+      } finally {
+        VALIDATION_GATE.release();
+      }
+    };
   }
 
   private static Outcome doValidate(Path schemaPath, String content) throws SchemaCacheException {
@@ -244,6 +282,10 @@ public final class InJvmXmlValidator {
 
   static long compiledCount() {
     return COMPILE_COUNT.get();
+  }
+
+  static int availableValidationPermits() {
+    return VALIDATION_GATE.availablePermits();
   }
 
   private static CompileResult compile(Path schemaPath) throws SchemaCacheException {

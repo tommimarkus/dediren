@@ -163,22 +163,29 @@ time and no validator subprocess exists anywhere in the product. The retired
   rather than an indefinite stall (a pathological schema in a hand-supplied
   directory cannot hang the envelope; the abandoned worker thread ends with the
   process, since an in-process computation cannot be force-killed the way a
-  subprocess could).
+  subprocess could). Because such a worker cannot be reclaimed, a concurrency
+  gate (`InJvmXmlValidator.MAX_CONCURRENT_VALIDATIONS`) bounds how many run at
+  once: a submission that would exceed it fails fast to the same
+  `*_SCHEMA_UNAVAILABLE` lane, so repeated timeouts degrade to unavailability
+  instead of leaking worker threads without limit.
 - **Broken-validator vs invalid-document split.** Schema-set problems
   (unresolved import, unreadable file, validator configuration failure,
   timeout) throw to the engines' `*_SCHEMA_UNAVAILABLE` lane; only genuine
   document-validity findings become `*_SCHEMA_INVALID`, so an environment
   problem is never misreported as a defect in the generated XML.
-- **Compiled-grammar reuse.** Schemas memoize per (path, size, mtime); the
-  pinned cache-lane contents are additionally SHA-256-verified at fetch time.
+- **Compiled-grammar reuse.** A compiled grammar is memoized per top-file path
+  and served only while every file that shaped it — the top schema and the
+  imports it resolved — still matches its compile-time (size, mtime) stamp, so a
+  changed import recompiles rather than serving a stale grammar; the pinned
+  cache-lane contents are additionally SHA-256-verified at fetch time.
 
 The validator returns a code-free outcome the calling engine maps onto its own
 published diagnostic codes, so `schema-cache` stays notation-neutral, and every
 successful export declares what it was validated against via the
 `DEDIREN_EXPORT_SCHEMA_CONFORMANCE` info diagnostic. `InJvmXmlValidatorTest`
 pins the seam: local-only resolution and traversal confinement, the
-unavailable-vs-invalid split, single-recording of fatal errors, memoization,
-and the bounded-run timeout. The only subprocess left in the product is the
+unavailable-vs-invalid split, single-recording of fatal errors, dependency-aware
+memoization, the bounded-run timeout, and the saturation fail-fast. The only subprocess left in the product is the
 schema-cache `curl` fetch (previous section), which keeps its own concurrent
 drain and 60-second transfer bound.
 

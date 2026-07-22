@@ -6,6 +6,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.concurrent.Callable;
+import java.util.concurrent.Semaphore;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -316,5 +318,39 @@ class InJvmXmlValidatorTest {
                     dir.resolve("slow.xsd")))
         .isInstanceOf(SchemaCacheException.class)
         .hasMessageContaining("did not complete within");
+  }
+
+  @Test
+  void runBoundedFailsFastWhenEveryValidationPermitIsHeld() throws Exception {
+    // Fill every permit with a worker that ignores the cancel's interrupt, exactly as a wedged
+    // Xerces validation would, then assert the next submission is rejected instead of spawning
+    // another unreclaimable thread.
+    int cap = InJvmXmlValidator.MAX_CONCURRENT_VALIDATIONS;
+    Semaphore blocker = new Semaphore(0);
+    Callable<Void> wedge =
+        () -> {
+          blocker.acquireUninterruptibly();
+          return null;
+        };
+    Path schema = dir.resolve("wedged.xsd");
+    try {
+      for (int i = 0; i < cap; i++) {
+        assertThatThrownBy(() -> InJvmXmlValidator.runBounded(wedge, Duration.ofMillis(50), schema))
+            .isInstanceOf(SchemaCacheException.class)
+            .hasMessageContaining("did not complete within");
+      }
+      assertThatThrownBy(
+              () -> InJvmXmlValidator.runBounded(() -> null, Duration.ofSeconds(30), schema))
+          .isInstanceOf(SchemaCacheException.class)
+          .hasMessageContaining("at capacity");
+    } finally {
+      blocker.release(cap);
+    }
+    // The freed workers hand every permit back — no leak on the timeout path — so a later
+    // validation starts from a full gate.
+    for (int i = 0; i < 500 && InJvmXmlValidator.availableValidationPermits() < cap; i++) {
+      Thread.sleep(10);
+    }
+    assertThat(InJvmXmlValidator.availableValidationPermits()).isEqualTo(cap);
   }
 }
