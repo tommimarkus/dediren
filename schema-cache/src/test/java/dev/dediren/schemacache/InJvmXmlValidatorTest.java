@@ -214,19 +214,93 @@ class InJvmXmlValidatorTest {
   @Test
   void compiledSchemaIsReusedUntilTheFileChanges() throws Exception {
     Path schema = writeSchema("memo.xsd", MAIN_SCHEMA);
-    int before = InJvmXmlValidator.compiledCacheSize();
+    int sizeBefore = InJvmXmlValidator.compiledCacheSize();
+    long compilesBefore = InJvmXmlValidator.compiledCount();
 
     InJvmXmlValidator.validate(schema, VALID_DOCUMENT);
     InJvmXmlValidator.validate(schema, VALID_DOCUMENT);
-    assertThat(InJvmXmlValidator.compiledCacheSize()).isEqualTo(before + 1);
+    assertThat(InJvmXmlValidator.validate(schema, VALID_DOCUMENT).valid()).isTrue();
+    // One compile, then reused: repeated validation of the unchanged file does not recompile and
+    // adds a single entry.
+    assertThat(InJvmXmlValidator.compiledCount()).isEqualTo(compilesBefore + 1);
+    assertThat(InJvmXmlValidator.compiledCacheSize()).isEqualTo(sizeBefore + 1);
 
-    // An edited schema (new mtime) recompiles instead of serving the stale grammar.
+    // A stricter, smaller grammar (the size stamp alone catches the edit) recompiles instead of
+    // serving the stale one, and overwrites the path-keyed entry in place rather than growing.
+    Files.writeString(
+        schema,
+        """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+          targetNamespace="urn:dediren:test" elementFormDefault="qualified">
+          <xs:element name="root" type="xs:string"/>
+        </xs:schema>
+        """);
     Files.setLastModifiedTime(
         schema,
         java.nio.file.attribute.FileTime.fromMillis(
             Files.getLastModifiedTime(schema).toMillis() + 2_000));
-    InJvmXmlValidator.validate(schema, VALID_DOCUMENT);
-    assertThat(InJvmXmlValidator.compiledCacheSize()).isEqualTo(before + 2);
+
+    // VALID_DOCUMENT carries an <item> child the now string-typed root no longer allows.
+    assertThat(InJvmXmlValidator.validate(schema, VALID_DOCUMENT).valid()).isFalse();
+    assertThat(InJvmXmlValidator.compiledCount()).isEqualTo(compilesBefore + 2);
+    assertThat(InJvmXmlValidator.compiledCacheSize()).isEqualTo(sizeBefore + 1);
+  }
+
+  @Test
+  void compiledSchemaRecompilesWhenAnImportedSiblingChanges() throws Exception {
+    // F1: the cached grammar embeds imported siblings, so a changed import must invalidate the
+    // cache even though the top schema file is untouched.
+    writeSchema(
+        "sub/helper.xsd",
+        """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+          targetNamespace="urn:dediren:helper">
+          <xs:simpleType name="value"><xs:restriction base="xs:string"/></xs:simpleType>
+        </xs:schema>
+        """);
+    Path schema =
+        writeSchema(
+            "main.xsd",
+            """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:h="urn:dediren:helper"
+              targetNamespace="urn:dediren:test" elementFormDefault="qualified">
+              <xs:import namespace="urn:dediren:helper" schemaLocation="sub/helper.xsd"/>
+              <xs:element name="root" type="h:value"/>
+            </xs:schema>
+            """);
+    String document = "<root xmlns=\"urn:dediren:test\">abc</root>";
+    int sizeBefore = InJvmXmlValidator.compiledCacheSize();
+    long compilesBefore = InJvmXmlValidator.compiledCount();
+
+    assertThat(InJvmXmlValidator.validate(schema, document).valid()).isTrue();
+    assertThat(InJvmXmlValidator.validate(schema, document).valid()).isTrue();
+    // Compiled once for the whole set, then the unchanged import is reused.
+    assertThat(InJvmXmlValidator.compiledCount()).isEqualTo(compilesBefore + 1);
+
+    // The imported sibling now restricts the value to an int; main.xsd is untouched.
+    Path helper = dir.resolve("sub/helper.xsd");
+    Files.writeString(
+        helper,
+        """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+          targetNamespace="urn:dediren:helper">
+          <xs:simpleType name="value"><xs:restriction base="xs:int"/></xs:simpleType>
+        </xs:schema>
+        """);
+    Files.setLastModifiedTime(
+        helper,
+        java.nio.file.attribute.FileTime.fromMillis(
+            Files.getLastModifiedTime(helper).toMillis() + 2_000));
+
+    // The recompiled grammar rejects the now-out-of-range document; the path-keyed entry was
+    // overwritten in place rather than growing the cache.
+    assertThat(InJvmXmlValidator.validate(schema, document).valid()).isFalse();
+    assertThat(InJvmXmlValidator.compiledCount()).isEqualTo(compilesBefore + 2);
+    assertThat(InJvmXmlValidator.compiledCacheSize()).isEqualTo(sizeBefore + 1);
   }
 
   @Test

@@ -22,6 +22,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicLong;
 import javax.xml.XMLConstants;
 import javax.xml.transform.stream.StreamSource;
 import javax.xml.validation.Schema;
@@ -67,11 +68,54 @@ public final class InJvmXmlValidator {
           });
 
   // Compiled grammars are immutable and thread-safe by JAXP contract, and recompiling the pinned
-  // set dominates the per-call cost, so one Schema is shared per (path, size, mtime) — an edited
-  // offline-directory schema recompiles, an unchanged one is compiled once per process.
-  private static final ConcurrentHashMap<SchemaKey, Schema> COMPILED = new ConcurrentHashMap<>();
+  // set dominates the per-call cost, so one Schema is cached per top-file path and served only
+  // while every file that shaped it still matches its compile-time (size, mtime) stamp. The stamp
+  // set covers the top schema AND the imports/includes it pulled in — all confined to the schema
+  // directory — so a changed import recompiles even when the top file is untouched. Keying on the
+  // path (not a content stamp) overwrites in place on any change, so the map stays bounded by the
+  // handful of distinct schema paths this product validates against, not by the edit history.
+  private static final ConcurrentHashMap<Path, CachedSchema> COMPILED = new ConcurrentHashMap<>();
 
-  private record SchemaKey(Path path, long size, long lastModifiedMillis) {}
+  // Defensive ceiling only: the product validates against a few distinct schema paths (the OEF and
+  // XMI sets plus any offline overrides), so the map is naturally tiny. The cap bounds a
+  // pathological caller that cycles through unbounded distinct schema paths in one process.
+  private static final int MAX_CACHED_SCHEMAS = 64;
+
+  // Test seam: counts real compiles so a suite can prove reuse (unchanged input does not recompile)
+  // and invalidation (a changed dependency does), which the path-keyed map size alone cannot show.
+  private static final AtomicLong COMPILE_COUNT = new AtomicLong();
+
+  /** A file's freshness stamp under the cache's (size, mtime) change-detection heuristic. */
+  private record FileStamp(Path path, long size, long lastModifiedMillis) {
+    static FileStamp of(Path path) throws IOException {
+      return new FileStamp(path, Files.size(path), Files.getLastModifiedTime(path).toMillis());
+    }
+
+    boolean matchesDisk() {
+      try {
+        return Files.size(path) == size
+            && Files.getLastModifiedTime(path).toMillis() == lastModifiedMillis;
+      } catch (IOException changedOrGone) {
+        // A dependency that vanished or became unreadable counts as changed: recompiling then
+        // surfaces the real structured failure instead of serving a grammar built from it.
+        return false;
+      }
+    }
+  }
+
+  /** A compiled grammar paired with the freshness stamps of every file that shaped it. */
+  private record CachedSchema(Schema schema, List<FileStamp> dependencies) {
+    boolean isFresh() {
+      for (FileStamp dependency : dependencies) {
+        if (!dependency.matchesDisk()) {
+          return false;
+        }
+      }
+      return true;
+    }
+  }
+
+  private record CompileResult(Schema schema, Set<Path> resolvedDependencies) {}
 
   private InJvmXmlValidator() {}
 
@@ -152,41 +196,67 @@ public final class InJvmXmlValidator {
   }
 
   private static Schema compiledSchema(Path schemaPath) throws SchemaCacheException {
-    SchemaKey key = keyFor(schemaPath);
-    Schema cached = COMPILED.get(key);
-    if (cached != null) {
-      return cached;
+    Path key = schemaPath.toAbsolutePath().normalize();
+    CachedSchema cached = COMPILED.get(key);
+    if (cached != null && cached.isFresh()) {
+      return cached.schema();
     }
-    Schema compiled = compile(schemaPath);
-    COMPILED.put(key, compiled);
-    return compiled;
+    CompileResult compiled = compile(schemaPath);
+    COMPILE_COUNT.incrementAndGet();
+    cacheCompiled(key, compiled);
+    return compiled.schema();
+  }
+
+  /**
+   * Stores the compiled grammar with a freshness stamp per file that shaped it (top schema plus
+   * every resolved import/include). Skips caching when a just-compiled file cannot be re-stated —
+   * correct, merely uncached for that rare case — rather than storing an unverifiable entry.
+   */
+  private static void cacheCompiled(Path key, CompileResult compiled) {
+    List<FileStamp> stamps;
+    try {
+      var collected = new ArrayList<FileStamp>(compiled.resolvedDependencies().size() + 1);
+      collected.add(FileStamp.of(key));
+      for (Path dependency : compiled.resolvedDependencies()) {
+        collected.add(FileStamp.of(dependency));
+      }
+      stamps = List.copyOf(collected);
+    } catch (IOException stampFailed) {
+      LOG.debug("in-JVM schema not cached: could not stamp a compiled file under {}", key);
+      return;
+    }
+    if (COMPILED.size() >= MAX_CACHED_SCHEMAS && !COMPILED.containsKey(key)) {
+      evictOne();
+    }
+    COMPILED.put(key, new CachedSchema(compiled.schema(), stamps));
+  }
+
+  private static void evictOne() {
+    var iterator = COMPILED.keySet().iterator();
+    if (iterator.hasNext()) {
+      COMPILED.remove(iterator.next());
+    }
   }
 
   static int compiledCacheSize() {
     return COMPILED.size();
   }
 
-  private static SchemaKey keyFor(Path schemaPath) throws SchemaCacheException {
-    try {
-      return new SchemaKey(
-          schemaPath.toAbsolutePath().normalize(),
-          Files.size(schemaPath),
-          Files.getLastModifiedTime(schemaPath).toMillis());
-    } catch (IOException error) {
-      throw new SchemaCacheException(
-          "XML schema at " + schemaPath + " is not readable: " + error.getMessage(), error);
-    }
+  static long compiledCount() {
+    return COMPILE_COUNT.get();
   }
 
-  private static Schema compile(Path schemaPath) throws SchemaCacheException {
+  private static CompileResult compile(Path schemaPath) throws SchemaCacheException {
     Set<String> unresolved = new LinkedHashSet<>();
+    Set<Path> resolved = new LinkedHashSet<>();
     try {
       SchemaFactory factory = SchemaFactory.newInstance(XMLConstants.W3C_XML_SCHEMA_NS_URI);
       factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
       factory.setProperty(XMLConstants.ACCESS_EXTERNAL_DTD, "");
       factory.setProperty(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
-      factory.setResourceResolver(localOnly(schemaPath.getParent(), unresolved));
-      return factory.newSchema(new StreamSource(schemaPath.toFile()));
+      factory.setResourceResolver(localOnly(schemaPath.getParent(), unresolved, resolved));
+      Schema schema = factory.newSchema(new StreamSource(schemaPath.toFile()));
+      return new CompileResult(schema, resolved);
     } catch (SAXException error) {
       String problems =
           unresolved.isEmpty()
@@ -209,7 +279,8 @@ public final class InJvmXmlValidator {
    * and is reported by name. The normalize/startsWith check is the enforcement that a reference —
    * including {@code ..} segments or platform separators — cannot escape the directory.
    */
-  private static LSResourceResolver localOnly(Path directory, Set<String> unresolved) {
+  private static LSResourceResolver localOnly(
+      Path directory, Set<String> unresolved, Set<Path> resolved) {
     return (type, namespaceUri, publicId, systemId, baseUri) -> {
       if (systemId == null || directory == null) {
         return null;
@@ -226,6 +297,9 @@ public final class InJvmXmlValidator {
         unresolved.add(systemId + " (unreadable: " + error.getMessage() + ")");
         return null;
       }
+      // The resolved set is the cache's dependency list: every served file that shaped the grammar,
+      // normalized so its later freshness stamp reads the same absolute path.
+      resolved.add(local.toAbsolutePath().normalize());
       return new LocalInput(publicId, local.toUri().toString(), baseUri, bytes);
     };
   }
