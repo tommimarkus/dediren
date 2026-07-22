@@ -92,14 +92,19 @@ schemas is unchanged).
   `DEDIREN_OEF_SCHEMA_INVALID` diagnostics; `xmllint` disappears from the
   OEF trust path (the `DEDIREN_OEF_SCHEMA_VALIDATOR` override env and its
   UNAVAILABLE diagnostic retire from that lane). XMI keeps xmllint for now
-  (its driver-schema flow differs; follow-up recorded) — so `xmllint` stays
-  a documented dependency only for the XMI lane.
+  (its driver-schema flow differs; follow-up recorded in
+  `2026-07-15-recorded-deferrals.md`) — so `xmllint` stays a documented
+  dependency only for the XMI lane.
 - xml.xsd: fetched alongside the three OEF XSDs with its own pinned SHA-256
   and accepted in `DEDIREN_OEF_SCHEMA_DIR`; absence yields the existing
   SCHEMA_UNAVAILABLE remediation message extended to name it.
 - Conformance-report: the OEF success path emits an `info` diagnostic naming
   exactly what was validated against what ("validated against ArchiMate 3.1
   archimate3_Diagram.xsd; 3.2 XSDs unpublished by The Open Group").
+  **Decided-not-built in this wave (recorded 2026-07-22):** a new `DEDIREN_*`
+  code touches every OEF golden envelope, the guide's Repair Rules, and the
+  ownership/doc-consistency guards — a slice of its own, deferred to
+  `2026-07-15-recorded-deferrals.md`, not silently dropped.
 - Docs/threat-model: XML-parsing rows updated — JDK validator with secure
   local-only resolution replaces the xmllint subprocess for OEF; README
   requirement line adjusts (`xmllint` needed for XMI lane only).
@@ -110,7 +115,8 @@ schemas is unchanged).
       supplied XSD dir (stub set still works); invalid content yields
       `DEDIREN_OEF_SCHEMA_INVALID`; a broken/incomplete schema set (missing
       xml.xsd import) yields the structured UNAVAILABLE-lane failure naming
-      the missing import; the conformance info diagnostic appears on success.
+      the missing import. (The conformance info diagnostic is decided-not-built
+      — see the design bullet above.)
 - [x] GREEN per the design: `schemacache.InJvmXmlValidator` (secure
       processing, local-only `LSResourceResolver`), OEF engine flipped off
       the xmllint subprocess, xml.xsd joined the pinned fetch set
@@ -127,3 +133,31 @@ schemas is unchanged).
 Per part: `-pl engines/archimate-oef-export,engine-api,contracts,core,cli -am
 test`, then full `-Pquality verify` + dist-smoke (bundle smoke's OEF lanes
 exercise both changes end to end).
+
+## Post-wave review remediation (2026-07-22)
+
+A ten-angle code review of the wave-3 commits surfaced and fixed, same day:
+validator-setup failures now throw to the UNAVAILABLE lane instead of being
+misreported as `DEDIREN_OEF_SCHEMA_INVALID`; the in-JVM lane regained the
+subprocess lane's 60s wall-clock ceiling (bounded daemon worker) and its
+debug-level trace; compile failures name each unresolved schema reference
+(relative subdirectory references now resolve; unreadable and empty files are
+reported, not conflated with absent); the compiled `Schema` is memoized per
+(path, size, mtime); offline-lane failures carry placement advice instead of
+download/proxy advice; the pinned fetch set is one table
+(`PINNED_OEF_SCHEMA_SET`); and `InJvmXmlValidatorTest` restores the
+schema-cache `-Pcoverage` gate. Doc trues-ups rode along (agent-usage offline
+xml.xsd requirement, threat-model runner/pin rows, distribution-and-runtime
+prerequisites, guidelines §12 rows).
+
+## Release-note obligations (next release)
+
+- The OEF export lane no longer needs `xmllint`; it validates in-JVM.
+  `DEDIREN_OEF_SCHEMA_VALIDATOR` is retired (the XMI lane keeps
+  `DEDIREN_XMI_SCHEMA_VALIDATOR`).
+- A warm pre-upgrade `DEDIREN_SCHEMA_CACHE_DIR` (three OEF XSDs) performs a
+  one-time fetch of the newly pinned W3C `xml.xsd` on the first post-upgrade
+  OEF export; network-denied environments must add that file to the cache (or
+  use `DEDIREN_OEF_SCHEMA_DIR`) before upgrading.
+- Hand-populated `DEDIREN_OEF_SCHEMA_DIR` directories holding the real Open
+  Group XSDs must now include the W3C `xml.xsd` those XSDs import.

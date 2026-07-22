@@ -204,7 +204,8 @@ optional `views` map (`"views": {"<view-id>": {"view_identifier"?,
 fields unchanged. Because the document always carries a
 `<views>`/`<diagrams>` element it declares and validates against
 `archimate3_Diagram.xsd`, not the model-only `archimate3_Model.xsd`; point
-`DEDIREN_OEF_SCHEMA_DIR` at a directory holding all three ArchiMate 3.1 OEF XSDs.
+`DEDIREN_OEF_SCHEMA_DIR` at a directory holding all three ArchiMate 3.1 OEF
+XSDs plus, for the real Open Group set, the W3C `xml.xsd` they import.
 
 For UML® SVG notation or XMI export, use `semantic_profile: "uml"` and the
 `uml-xmi` plugin. Supported UML view kinds are `uml-class`, `uml-data`,
@@ -918,7 +919,8 @@ family, so a stale or malformed policy fails here instead of at build time:
 Use `DEDIREN_OEF_SCHEMA_DIR` or `DEDIREN_XMI_SCHEMA_PATH` for offline schema
 validation. `DEDIREN_OEF_SCHEMA_DIR` must point at a flat directory containing
 the ArchiMate 3.1 XSDs (`archimate3_Model.xsd`, `archimate3_View.xsd`,
-`archimate3_Diagram.xsd`); `DEDIREN_XMI_SCHEMA_PATH` points at the XMI 2.5.1
+`archimate3_Diagram.xsd`) and — for the real Open Group set — the W3C
+`xml.xsd` they import; `DEDIREN_XMI_SCHEMA_PATH` points at the XMI 2.5.1
 `XMI.xsd` file itself. Use `DEDIREN_SCHEMA_CACHE_DIR` when downloads are
 allowed and a stable cache location is desired; one online run populates a
 reusable offline cache (subtrees `opengroup/archimate/3.1/` and

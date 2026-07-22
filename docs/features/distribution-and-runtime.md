@@ -13,7 +13,8 @@ To run a bundle (building from source is covered in
 [`README.md`](../../README.md)):
 
 - **Java 21 or newer** on `PATH` as `java`.
-- `xmllint` on `PATH` for OEF/XMI standards validation.
+- `xmllint` on `PATH` for UML XMI standards validation (the ArchiMate OEF
+  lane validates in-JVM and needs no external validator).
 - `curl` on `PATH` only when export validation must download a standards schema
   (offline runs supply schemas via env vars instead).
 

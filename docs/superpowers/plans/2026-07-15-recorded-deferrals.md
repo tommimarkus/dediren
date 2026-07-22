@@ -18,6 +18,21 @@ recorded pre-existing gaps, not a defect list; pick up individually.
   the 0.70 floor; `./mvnw -pl mcp-server -am -Pcoverage verify` passes. (Was:
   0.67 at module landing, concentrated in the stdio transport hardening.)
 
+- **XMI lane migration onto the in-JVM validator** (wave 3, recorded
+  2026-07-22): the OEF lane validates via `schemacache.InJvmXmlValidator`;
+  the UML/XMI lane still runs the `xmllint` subprocess through
+  `schemacache.XmlSchemaValidator` because its driver-schema flow (a wrapper
+  XSD importing `XMI.xsd` plus a UML XSD) differs. Until migrated, schema-cache
+  carries two validator stacks and every validation hardening must be weighed
+  for both; start from `InJvmXmlValidatorTest` as the seam contract.
+- **OEF conformance-report diagnostic** (wave 3 survey 3.2 item, recorded
+  2026-07-22): an `info` diagnostic on OEF export success naming exactly what
+  was validated against what ("ArchiMate 3.1 `archimate3_Diagram.xsd`; 3.2
+  XSDs unpublished by The Open Group"). Decided-not-built in wave 3: a new
+  `DEDIREN_*` code ripples through every OEF golden envelope, the guide's
+  Repair Rules, and the ownership/doc-consistency guards — schedule as its own
+  small slice.
+
 ELK vocabulary deferrals (node/edge `priority`, `layer_choice`,
 `position_choice`, alternate layout algorithms) are already recorded in
 `2026-07-05-elk-node-placement-hints.md` and `2026-07-05-elk-algorithm-gate.md`

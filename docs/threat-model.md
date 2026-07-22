@@ -133,7 +133,11 @@ transfer at 60 seconds to prevent stalled downloads from blocking the export lan
 indefinitely, and verifies the download's SHA-256 against a pinned value before trusting it:
 the single `OMG_XMI_SCHEMA_SHA256` constant
 (`engines/uml-xmi-export/.../schema/SchemaValidation.java`) and the per-file
-`OFFICIAL_OEF_SCHEMA_SHA256` map (`engines/archimate-oef-export/.../OefExportEngine.java`).
+`PINNED_OEF_SCHEMA_SET` table (`engines/archimate-oef-export/.../OefExportEngine.java`),
+which pins the three Open Group OEF XSDs (opengroup.org) plus the W3C
+`xml.xsd` they import (www.w3.org — the one non-standards-body-of-origin
+endpoint in the fetch set; the in-JVM validator resolves the import from the
+local copy, never from the network).
 The offline overrides `DEDIREN_XMI_SCHEMA_PATH` / `DEDIREN_OEF_SCHEMA_DIR` bypass the
 SHA-256 check by design — they only require the supplied file to be non-empty.
 
@@ -150,7 +154,7 @@ on, external DTD/schema access denied, and schema imports (the W3C `xml.xsd`)
 resolved local-only from the schema directory — nothing is fetched at
 validation time and no subprocess runs on that lane.
 
-Both engines invoke that validator through one shared runner,
+The XMI engine invokes that subprocess through the shared runner,
 `schemacache.XmlSchemaValidator` — engines may not depend on each other, so
 before it each kept its own copy of the subprocess block and every hardening
 fix had to be applied twice. The runner owns two availability properties the
@@ -167,7 +171,12 @@ copies did not have:
   (60s) is force-killed and reported as
   `DEDIREN_XMI_SCHEMA_VALIDATOR_UNAVAILABLE`, so a wedged or malicious validator
   binary degrades to a structured non-zero envelope rather than an indefinite
-  stall.
+  stall. The in-JVM OEF lane shares the same ceiling: `InJvmXmlValidator` runs
+  compile+validate on a bounded daemon worker and reports an overrun as a
+  structured `DEDIREN_OEF_SCHEMA_UNAVAILABLE` (a pathological schema — e.g. an
+  adversarial content model in a hand-supplied `DEDIREN_OEF_SCHEMA_DIR` — cannot
+  stall the envelope; the abandoned worker thread ends with the process, since
+  an in-process computation cannot be force-killed the way a subprocess can).
 - **Validator selection is an environment input.** `DEDIREN_XMI_SCHEMA_VALIDATOR`
   lets the environment name the XMI validator command. Whoever sets the process
   environment already controls execution, so the override grants no new
@@ -175,8 +184,9 @@ copies did not have:
   variable is documented in the shipped guide's `## Plugin Environment`
   section. The OEF lane reads no validator variable — it validates in-JVM.
 
-The runner returns a code-free outcome; each engine maps it onto its own
-published diagnostic codes, so `schema-cache` stays notation-neutral.
+Both the runner and the in-JVM validator return a code-free outcome the
+calling engine maps onto its own published diagnostic codes, so
+`schema-cache` stays notation-neutral.
 `XmlSchemaValidatorTest` pins both properties, including a stderr-flooding
 validator as an explicit deadlock regression.
 
