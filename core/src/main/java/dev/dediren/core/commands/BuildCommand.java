@@ -19,6 +19,7 @@ import dev.dediren.contracts.render.RenderMetadata;
 import dev.dediren.contracts.render.RenderResult;
 import dev.dediren.contracts.source.GenericGraphPluginData;
 import dev.dediren.contracts.source.GenericGraphView;
+import dev.dediren.contracts.source.GenericGraphViewKind;
 import dev.dediren.contracts.source.SourceDocument;
 import dev.dediren.core.DedirenPaths;
 import dev.dediren.core.analysis.CanonicalJson;
@@ -45,6 +46,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import tools.jackson.databind.JsonNode;
 
@@ -82,6 +84,15 @@ public final class BuildCommand {
   private static final String RENDER_ENGINE = "render";
   private static final String OEF_ENGINE = "archimate-oef";
   private static final String XMI_ENGINE = "uml-xmi";
+
+  /**
+   * Diagram kinds whose model content is classifier-based and composes safely in one aggregate
+   * document. Other UML families (activity, sequence, …) have element writers that walk the full
+   * source node list, so mixing them into one model section collides xmi:ids — they are excluded
+   * from the whole-model UMLDI aggregate for now (class-family first).
+   */
+  private static final java.util.Set<GenericGraphViewKind> CLASS_FAMILY_KINDS =
+      java.util.Set.of(GenericGraphViewKind.UML_CLASS, GenericGraphViewKind.UML_DATA);
 
   private static final String EMIT_LAYOUT_REQUEST = "layout-request";
   private static final String EMIT_LAYOUT_RESULT = "layout-result";
@@ -201,11 +212,13 @@ public final class BuildCommand {
             System.getProperty("dediren.version", "unknown"));
 
     List<String> views = selectViews(request, source);
+    Map<String, GenericGraphViewKind> viewKindById = viewKinds(source);
     List<BuildViewOutcome> outcomes = new ArrayList<>(views.size());
     boolean anyError = false;
     boolean anyWarning = false;
     int failureExit = CommandExitCode.OK.code();
     var oefViewLayouts = new ArrayList<ModelExportRequest.ViewLayout>();
+    var xmiViewLayouts = new ArrayList<ModelExportRequest.ViewLayout>();
     for (String view : views) {
       ViewBuild built;
       try {
@@ -247,6 +260,16 @@ public final class BuildCommand {
       if (built.oefLayout() != null) {
         oefViewLayouts.add(new ModelExportRequest.ViewLayout(view, built.oefLayout()));
       }
+      // Class-family first: only classifier-diagram kinds (uml-class, uml-data) feed the UMLDI
+      // aggregate — their content goes through the view-safe classifier writers, and the union
+      // scope + view-qualified diagram ids keep overlapping classifiers collision-free. Other kinds
+      // still get their per-view xmi.xml, just no diagram interchange yet. A kindless (generic)
+      // view
+      // is never in the class family, and Set.of rejects a null argument, so guard before contains.
+      GenericGraphViewKind viewKind = viewKindById.get(view);
+      if (built.xmiLayout() != null && viewKind != null && CLASS_FAMILY_KINDS.contains(viewKind)) {
+        xmiViewLayouts.add(new ModelExportRequest.ViewLayout(view, built.xmiLayout()));
+      }
       EnvelopeStatus viewStatus = built.outcome().status();
       if (viewStatus == EnvelopeStatus.ERROR) {
         anyError = true;
@@ -256,76 +279,39 @@ public final class BuildCommand {
       }
     }
 
-    // Whole-model OEF aggregate: one document carrying every successfully laid-out view, written
-    // beside the per-view artifacts. The engine opts in via ExportEngine.exportModel; a lane that
-    // does not (uml-xmi, deliberately trailing) is simply skipped.
+    // Whole-model aggregates: one document per lane carrying every laid-out view it covers, written
+    // beside the per-view artifacts. Each engine opts in via ExportEngine.exportModel — OEF for all
+    // its views, UML/XMI for the class family (which serializes UMLDI geometry).
     var modelArtifacts = new ArrayList<BuildArtifact>();
     var buildDiagnostics = new ArrayList<Diagnostic>();
+    var aggregates = new ArrayList<AggregateSpec>();
     if (oefPolicy != null && !oefViewLayouts.isEmpty()) {
-      try {
-        ExportEngine exporter =
-            EngineDispatch.requireEngine(
-                engines, OEF_ENGINE, "export", engines.exportEngine(OEF_ENGINE));
-        var modelRequest = new ModelExportRequest(source, oefViewLayouts, oefPolicy);
-        Path productRoot = DedirenPaths.productRoot();
-        // Dispatched like every other engine call so an unexpected aggregate-export failure maps
-        // to the published DEDIREN_ENGINE_FAILED instead of escaping as a raw exception. The
-        // engine's Optional opt-out is folded into the dispatched result's value.
-        var aggregate =
-            EngineDispatch.dispatchInMemory(
-                OEF_ENGINE,
-                () -> {
-                  var modelExport = exporter.exportModel(modelRequest, request.env(), productRoot);
-                  return modelExport
-                      .map(
-                          composed ->
-                              new EngineResult<>(
-                                  Optional.of(composed.value()), composed.diagnostics()))
-                      .orElseGet(
-                          () -> new EngineResult<>(Optional.<ExportResult>empty(), List.of()));
-                });
-        switch (aggregate) {
-          case EngineDispatch.InMemoryOutcome.Value<Optional<ExportResult>> value -> {
-            if (value.result().value().isPresent()) {
-              ExportResult composed = value.result().value().get();
-              String stamped =
-                  Provenance.stampXml(
-                      composed.content(),
-                      Provenance.payload(
-                          stamps.modelSchemaVersion(),
-                          stamps.modelSha(),
-                          "model",
-                          "oef_policy_sha256",
-                          stamps.oefPolicySha(),
-                          stamps.version()));
-              writeFile(request, "", "model.oef.xml", stamped);
-              modelArtifacts.add(new BuildArtifact(composed.artifactKind(), "model.oef.xml"));
-              buildDiagnostics.addAll(value.result().diagnostics());
-              anyWarning |=
-                  value.result().diagnostics().stream()
-                      .anyMatch(d -> d.severity() != DiagnosticSeverity.INFO);
-            }
-          }
-          case EngineDispatch.InMemoryOutcome.Failure<Optional<ExportResult>> failure -> {
-            buildDiagnostics.addAll(failure.diagnostics());
-            anyError = true;
-            failureExit = Math.max(failureExit, failure.exitCode());
-          }
-        }
-      } catch (EngineExecutionException error) {
-        buildDiagnostics.add(error.diagnostic());
-        anyError = true;
-        failureExit = Math.max(failureExit, CommandExitCode.PLUGIN_ERROR.code());
-      } catch (UncheckedIOException error) {
-        buildDiagnostics.add(
-            new Diagnostic(
-                DiagnosticCode.COMMAND_IO_FAILED.code(),
-                DiagnosticSeverity.ERROR,
-                error.getMessage(),
-                "out"));
-        anyError = true;
-        failureExit = Math.max(failureExit, CommandExitCode.INPUT_ERROR.code());
-      }
+      aggregates.add(
+          new AggregateSpec(
+              OEF_ENGINE,
+              oefViewLayouts,
+              oefPolicy,
+              "model.oef.xml",
+              "oef_policy_sha256",
+              stamps.oefPolicySha()));
+    }
+    if (xmiPolicy != null && !xmiViewLayouts.isEmpty()) {
+      aggregates.add(
+          new AggregateSpec(
+              XMI_ENGINE,
+              xmiViewLayouts,
+              xmiPolicy,
+              "model.uml.xml",
+              "xmi_policy_sha256",
+              stamps.xmiPolicySha()));
+    }
+    for (AggregateSpec spec : aggregates) {
+      AggregateResult result = exportModelAggregate(request, engines, source, spec, stamps);
+      modelArtifacts.addAll(result.artifacts());
+      buildDiagnostics.addAll(result.diagnostics());
+      anyError |= result.anyError();
+      anyWarning |= result.anyWarning();
+      failureExit = Math.max(failureExit, result.failureExit());
     }
 
     EnvelopeStatus status =
@@ -522,7 +508,8 @@ public final class BuildCommand {
     return new ViewBuild(
         new BuildViewOutcome(view, status, artifacts, diagnostics),
         CommandExitCode.OK.code(),
-        request.oefPolicyText() != null ? layoutRecord : null);
+        request.oefPolicyText() != null ? layoutRecord : null,
+        request.xmiPolicyText() != null ? layoutRecord : null);
   }
 
   private static InMemoryStage<ExportResult> runExportStage(
@@ -549,6 +536,127 @@ public final class BuildCommand {
           return EngineDispatch.dispatchInMemory(
               engineId, () -> engine.export(exportRequest, request.env(), productRoot));
         });
+  }
+
+  /**
+   * One whole-model aggregate lane to run: the engine, its views, policy, and provenance labels.
+   */
+  private record AggregateSpec(
+      String engineId,
+      List<ModelExportRequest.ViewLayout> viewLayouts,
+      JsonNode policy,
+      String fileName,
+      String policyShaKey,
+      String policySha) {}
+
+  /** What one aggregate lane contributed: artifacts, diagnostics, and its rolled-up status bits. */
+  private record AggregateResult(
+      List<BuildArtifact> artifacts,
+      List<Diagnostic> diagnostics,
+      boolean anyError,
+      boolean anyWarning,
+      int failureExit) {}
+
+  /**
+   * Runs one engine's whole-model {@code exportModel} the same way a per-stage export is
+   * dispatched, so an unexpected aggregate failure maps to the published {@code
+   * DEDIREN_ENGINE_FAILED} rather than escaping as a raw exception. The engine's {@code Optional}
+   * opt-out is folded into an empty result. The composed artifact is stamped and written at the
+   * out-root (no per-view subdir).
+   */
+  private static AggregateResult exportModelAggregate(
+      BuildRequest request,
+      Engines engines,
+      SourceDocument source,
+      AggregateSpec spec,
+      Stamps stamps) {
+    var artifacts = new ArrayList<BuildArtifact>();
+    var diagnostics = new ArrayList<Diagnostic>();
+    boolean anyError = false;
+    boolean anyWarning = false;
+    int failureExit = CommandExitCode.OK.code();
+    try {
+      ExportEngine exporter =
+          EngineDispatch.requireEngine(
+              engines, spec.engineId(), "export", engines.exportEngine(spec.engineId()));
+      var modelRequest = new ModelExportRequest(source, spec.viewLayouts(), spec.policy());
+      Path productRoot = DedirenPaths.productRoot();
+      var aggregate =
+          EngineDispatch.dispatchInMemory(
+              spec.engineId(),
+              () -> {
+                var modelExport = exporter.exportModel(modelRequest, request.env(), productRoot);
+                return modelExport
+                    .map(
+                        composed ->
+                            new EngineResult<>(
+                                Optional.of(composed.value()), composed.diagnostics()))
+                    .orElseGet(() -> new EngineResult<>(Optional.<ExportResult>empty(), List.of()));
+              });
+      switch (aggregate) {
+        case EngineDispatch.InMemoryOutcome.Value<Optional<ExportResult>> value -> {
+          if (value.result().value().isPresent()) {
+            ExportResult composed = value.result().value().get();
+            String stamped =
+                Provenance.stampXml(
+                    composed.content(),
+                    Provenance.payload(
+                        stamps.modelSchemaVersion(),
+                        stamps.modelSha(),
+                        "model",
+                        spec.policyShaKey(),
+                        spec.policySha(),
+                        stamps.version()));
+            writeFile(request, "", spec.fileName(), stamped);
+            artifacts.add(new BuildArtifact(composed.artifactKind(), spec.fileName()));
+            diagnostics.addAll(value.result().diagnostics());
+            anyWarning |=
+                value.result().diagnostics().stream()
+                    .anyMatch(d -> d.severity() != DiagnosticSeverity.INFO);
+          }
+        }
+        case EngineDispatch.InMemoryOutcome.Failure<Optional<ExportResult>> failure -> {
+          diagnostics.addAll(failure.diagnostics());
+          anyError = true;
+          failureExit = Math.max(failureExit, failure.exitCode());
+        }
+      }
+    } catch (EngineExecutionException error) {
+      diagnostics.add(error.diagnostic());
+      anyError = true;
+      failureExit = Math.max(failureExit, CommandExitCode.PLUGIN_ERROR.code());
+    } catch (UncheckedIOException error) {
+      diagnostics.add(
+          new Diagnostic(
+              DiagnosticCode.COMMAND_IO_FAILED.code(),
+              DiagnosticSeverity.ERROR,
+              error.getMessage(),
+              "out"));
+      anyError = true;
+      failureExit = Math.max(failureExit, CommandExitCode.INPUT_ERROR.code());
+    }
+    return new AggregateResult(artifacts, diagnostics, anyError, anyWarning, failureExit);
+  }
+
+  /** Maps every declared view id to its kind so the build can gate lanes by diagram family. */
+  private static Map<String, GenericGraphViewKind> viewKinds(SourceDocument source) {
+    JsonNode genericGraph = source.plugins().get(SEMANTICS_ENGINE);
+    if (genericGraph == null) {
+      return Map.of();
+    }
+    try {
+      GenericGraphPluginData data =
+          JsonSupport.objectMapper().treeToValue(genericGraph, GenericGraphPluginData.class);
+      var kinds = new java.util.HashMap<String, GenericGraphViewKind>();
+      for (GenericGraphView view : data.views()) {
+        kinds.put(view.id(), view.kind());
+      }
+      return kinds;
+    } catch (RuntimeException error) {
+      // selectViews already surfaces an unreadable view list as a build-level error; here it just
+      // means no lane can be gated by kind, so the class-family aggregate is skipped.
+      return Map.of();
+    }
   }
 
   /**
@@ -699,7 +807,10 @@ public final class BuildCommand {
   private static ViewBuild failedView(
       String view, List<BuildArtifact> artifacts, List<Diagnostic> diagnostics, int exitCode) {
     return new ViewBuild(
-        new BuildViewOutcome(view, EnvelopeStatus.ERROR, artifacts, diagnostics), exitCode, null);
+        new BuildViewOutcome(view, EnvelopeStatus.ERROR, artifacts, diagnostics),
+        exitCode,
+        null,
+        null);
   }
 
   private static EngineRunOutcome buildLevelError(Diagnostic diagnostic) {
@@ -740,7 +851,8 @@ public final class BuildCommand {
     }
   }
 
-  private record ViewBuild(BuildViewOutcome outcome, int failureExit, LayoutResult oefLayout) {}
+  private record ViewBuild(
+      BuildViewOutcome outcome, int failureExit, LayoutResult oefLayout, LayoutResult xmiLayout) {}
 
   /**
    * Internal signal that a view id's write target normalizes outside {@code outDir} (see {@link
