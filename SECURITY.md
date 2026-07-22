@@ -38,19 +38,26 @@ GitHub release archives target SLSA Build Level 2 evidence:
 See `docs/threat-model.md` for the full trust-boundary breakdown behind these
 controls.
 
-## Branch Protection (deferred)
+## Branch Protection (partial)
 
-While the project is pre-release and maintained by a single author, the default
-branch (`main`) is intentionally left without required-review branch protection
-to keep solo iteration fast. Direct pushes to `main` are an accepted risk for
-now. Compensating controls run on every push and pull request:
+While the project is pre-release and maintained by a single author, `main` has
+no required-review protection and the maintainer keeps a direct-push workflow.
+Repository rulesets (declarative source: `.github/rulesets/`) bound that
+accepted risk:
 
-- the blocking Grype/SBOM supply-chain gate (`ci.yml`) fails on High/Critical
-  advisories;
-- the full test suite and whitespace check run in the same workflow;
-- `CODEOWNERS` records review ownership for when protection is enabled.
+- `main protection` blocks force-pushes and deletion of `main`, with no bypass;
+- `main required checks` requires the `test` and `vulnerability-scan` checks
+  (`ci.yml`) before `main` moves — repository admins bypass it, and every
+  bypass is recorded as a bypass event;
+- `release tags` blocks moving or deleting `v*` tags; released tags are
+  additionally frozen by release immutability.
 
-This decision is revisited when the project starts accepting external
-contributions or reaches a stable release. At that point, enable a `main`
-ruleset that requires the `test` and `vulnerability-scan` status checks (and,
-optionally, `CODEOWNERS` review).
+Compensating controls still run on every push and pull request: the blocking
+Grype/SBOM supply-chain gate (fails on High/Critical advisories), the full test
+suite, and the whitespace check (`ci.yml`); `CODEOWNERS` records review
+ownership.
+
+This posture is revisited when the project starts accepting external
+contributions or reaches a stable release. At that point, drop the admin
+bypass from `main required checks` (and, optionally, require `CODEOWNERS`
+review).
