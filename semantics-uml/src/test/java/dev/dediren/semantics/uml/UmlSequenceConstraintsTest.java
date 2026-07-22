@@ -31,6 +31,54 @@ import tools.jackson.databind.node.ObjectNode;
 
 class UmlSequenceConstraintsTest {
 
+  /**
+   * Pins the mirrored-predicate contract between modules: {@code
+   * UmlSequenceValidation.validateSelectedExecutionSpecificationProperties} (uml) promises that "a
+   * model that passes validate() is guaranteed to get" its {@code ExecutionSpan} / {@code
+   * DestructionAnchor} from this class — but the two predicates are maintained by hand with no
+   * shared code. If this class's requirements ever grow past what the validator checks, a
+   * validate()-clean model stops yielding a constraint here and the old exit-2 layout bug returns;
+   * this test fails first.
+   */
+  @Test
+  void everyValidatedExecutionAndDestructionYieldsItsConstraint() throws Exception {
+    SourceDocument source = fixture("fixtures/source/valid-uml-sequence-lifecycle.json");
+    GenericGraphView view = viewOf(source, "sequence-view");
+    // Precondition: the fixture passes the uml core's source validation (throws on violation).
+    dev.dediren.uml.Uml.validateSource(source, pluginData(source));
+
+    List<SequenceConstraint> constraints = UmlSequenceConstraints.sequenceConstraints(source, view);
+
+    var viewNodes = java.util.Set.copyOf(view.nodes());
+    List<String> executions =
+        source.nodes().stream()
+            .filter(n -> viewNodes.contains(n.id()) && "ExecutionSpecification".equals(n.type()))
+            .map(SourceNode::id)
+            .toList();
+    List<String> destructions =
+        source.nodes().stream()
+            .filter(
+                n ->
+                    viewNodes.contains(n.id())
+                        && "DestructionOccurrenceSpecification".equals(n.type()))
+            .map(SourceNode::id)
+            .toList();
+    assertThat(executions).isNotEmpty();
+    assertThat(destructions).isNotEmpty();
+    assertThat(
+            constraints.stream()
+                .filter(ExecutionSpan.class::isInstance)
+                .map(c -> ((ExecutionSpan) c).executionId())
+                .toList())
+        .containsExactlyInAnyOrderElementsOf(executions);
+    assertThat(
+            constraints.stream()
+                .filter(DestructionAnchor.class::isInstance)
+                .map(c -> ((DestructionAnchor) c).destructionId())
+                .toList())
+        .containsExactlyInAnyOrderElementsOf(destructions);
+  }
+
   @Test
   void sequenceConstraintsReturnsEmptyForNonSequenceViewKinds() throws Exception {
     SourceDocument source = fixture("fixtures/source/valid-uml-basic.json");
