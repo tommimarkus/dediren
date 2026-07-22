@@ -132,9 +132,11 @@ public final class SchemaValidation {
     try {
       outcome = InJvmXmlValidator.validate(source.path(), content);
     } catch (SchemaCacheException error) {
+      // advice() picks by failure class: placement/proxy remediation only fits a missing or broken
+      // schema set; a saturated or timed-out validator says "retry" instead.
       throw new XmiValidationException(
           DiagnosticCode.XMI_SCHEMA_UNAVAILABLE.code(),
-          error.getMessage() + " " + source.unavailableRemediation());
+          error.getMessage() + " " + error.advice(source.unavailableRemediation()));
     }
     if (outcome.valid()) {
       return conformance(source.conformanceMessage() + "; the schema set accepted the UML content");

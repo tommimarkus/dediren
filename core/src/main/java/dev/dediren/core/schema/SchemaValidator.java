@@ -8,6 +8,7 @@ import com.networknt.schema.SpecificationVersion;
 import dev.dediren.contracts.json.JsonSupport;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -27,16 +28,26 @@ public final class SchemaValidator {
   }
 
   public List<String> validate(String schemaPath, JsonNode document) {
+    Schema schema;
     try {
-      Schema schema = loadSchema(schemaPath);
+      schema = loadSchema(schemaPath);
+    } catch (IOException | RuntimeException error) {
+      // A schema that cannot be loaded is a broken product install, not an invalid document: it
+      // must ride the command I/O lane (DEDIREN_COMMAND_IO_FAILED), never be reported against the
+      // user's model as DEDIREN_SCHEMA_INVALID.
+      throw new UncheckedIOException(
+          "product schema " + schemaPath + " could not be loaded: " + error.getMessage(),
+          error instanceof IOException io ? io : new IOException(error));
+    }
+    try {
       return schema
           .validate(JsonSupport.objectMapper().writeValueAsString(document), InputFormat.JSON)
           .stream()
           .map(Error::getMessage)
           .sorted()
           .toList();
-    } catch (IOException | RuntimeException error) {
-      return List.of(error.getMessage());
+    } catch (RuntimeException error) {
+      return List.of(String.valueOf(error.getMessage()));
     }
   }
 

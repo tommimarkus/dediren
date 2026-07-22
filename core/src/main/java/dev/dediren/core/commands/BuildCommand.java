@@ -28,7 +28,6 @@ import dev.dediren.core.engine.EngineExecutionException;
 import dev.dediren.core.engine.EngineRunOutcome;
 import dev.dediren.core.source.SourceValidator;
 import dev.dediren.core.source.ValidationResult;
-import dev.dediren.engine.EngineException;
 import dev.dediren.engine.EngineResult;
 import dev.dediren.engine.Engines;
 import dev.dediren.engine.ExportEngine;
@@ -46,6 +45,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import tools.jackson.databind.JsonNode;
 
 /**
@@ -71,7 +71,13 @@ import tools.jackson.databind.JsonNode;
  * selection stays on the per-stage subcommands.
  */
 public final class BuildCommand {
-  private static final String SEMANTICS_ENGINE = "generic-graph";
+  /**
+   * The default semantics engine's wire id. Public for the same reason as {@link #EMIT_KINDS}: the
+   * MCP validate lane defaults to the same engine, and a direct reference to this constant is what
+   * keeps the two lanes converging on one id instead of drifting through private copies.
+   */
+  public static final String SEMANTICS_ENGINE = "generic-graph";
+
   private static final String LAYOUT_ENGINE = "elk-layout";
   private static final String RENDER_ENGINE = "render";
   private static final String OEF_ENGINE = "archimate-oef";
@@ -221,6 +227,21 @@ public final class BuildCommand {
                         "view id would write outside the output root: " + escape.view(),
                         "views")),
                 CommandExitCode.INPUT_ERROR.code());
+      } catch (UncheckedIOException failure) {
+        // An artifact write failure (unwritable --out, disk full) is a per-view error like the
+        // re-confinement branch above, so one bad view still never aborts the others and the
+        // BuildResult records what was written before the failure.
+        built =
+            failedView(
+                view,
+                List.of(),
+                List.of(
+                    new Diagnostic(
+                        DiagnosticCode.COMMAND_IO_FAILED.code(),
+                        DiagnosticSeverity.ERROR,
+                        failure.getMessage(),
+                        "out")),
+                CommandExitCode.INPUT_ERROR.code());
       }
       outcomes.add(built.outcome());
       if (built.oefLayout() != null) {
@@ -245,38 +266,65 @@ public final class BuildCommand {
         ExportEngine exporter =
             EngineDispatch.requireEngine(
                 engines, OEF_ENGINE, "export", engines.exportEngine(OEF_ENGINE));
-        var modelExport =
-            exporter.exportModel(
-                new ModelExportRequest(source, oefViewLayouts, oefPolicy),
-                request.env(),
-                DedirenPaths.productRoot());
-        if (modelExport.isPresent()) {
-          EngineResult<ExportResult> composed = modelExport.get();
-          String stamped =
-              Provenance.stampXml(
-                  composed.value().content(),
-                  Provenance.payload(
-                      stamps.modelSchemaVersion(),
-                      stamps.modelSha(),
-                      "model",
-                      "oef_policy_sha256",
-                      stamps.oefPolicySha(),
-                      stamps.version()));
-          writeFile(request, "", "model.oef.xml", stamped);
-          modelArtifacts.add(new BuildArtifact(composed.value().artifactKind(), "model.oef.xml"));
-          buildDiagnostics.addAll(composed.diagnostics());
-          anyWarning |=
-              composed.diagnostics().stream()
-                  .anyMatch(d -> d.severity() != DiagnosticSeverity.INFO);
+        var modelRequest = new ModelExportRequest(source, oefViewLayouts, oefPolicy);
+        Path productRoot = DedirenPaths.productRoot();
+        // Dispatched like every other engine call so an unexpected aggregate-export failure maps
+        // to the published DEDIREN_ENGINE_FAILED instead of escaping as a raw exception. The
+        // engine's Optional opt-out is folded into the dispatched result's value.
+        var aggregate =
+            EngineDispatch.dispatchInMemory(
+                OEF_ENGINE,
+                () -> {
+                  var modelExport = exporter.exportModel(modelRequest, request.env(), productRoot);
+                  return modelExport
+                      .map(
+                          composed ->
+                              new EngineResult<>(
+                                  Optional.of(composed.value()), composed.diagnostics()))
+                      .orElseGet(
+                          () -> new EngineResult<>(Optional.<ExportResult>empty(), List.of()));
+                });
+        switch (aggregate) {
+          case EngineDispatch.InMemoryOutcome.Value<Optional<ExportResult>> value -> {
+            if (value.result().value().isPresent()) {
+              ExportResult composed = value.result().value().get();
+              String stamped =
+                  Provenance.stampXml(
+                      composed.content(),
+                      Provenance.payload(
+                          stamps.modelSchemaVersion(),
+                          stamps.modelSha(),
+                          "model",
+                          "oef_policy_sha256",
+                          stamps.oefPolicySha(),
+                          stamps.version()));
+              writeFile(request, "", "model.oef.xml", stamped);
+              modelArtifacts.add(new BuildArtifact(composed.artifactKind(), "model.oef.xml"));
+              buildDiagnostics.addAll(value.result().diagnostics());
+              anyWarning |=
+                  value.result().diagnostics().stream()
+                      .anyMatch(d -> d.severity() != DiagnosticSeverity.INFO);
+            }
+          }
+          case EngineDispatch.InMemoryOutcome.Failure<Optional<ExportResult>> failure -> {
+            buildDiagnostics.addAll(failure.diagnostics());
+            anyError = true;
+            failureExit = Math.max(failureExit, failure.exitCode());
+          }
         }
-      } catch (EngineException error) {
-        buildDiagnostics.addAll(error.diagnostics());
-        anyError = true;
-        failureExit = Math.max(failureExit, error.exitCode());
       } catch (EngineExecutionException error) {
         buildDiagnostics.add(error.diagnostic());
         anyError = true;
         failureExit = Math.max(failureExit, CommandExitCode.PLUGIN_ERROR.code());
+      } catch (UncheckedIOException error) {
+        buildDiagnostics.add(
+            new Diagnostic(
+                DiagnosticCode.COMMAND_IO_FAILED.code(),
+                DiagnosticSeverity.ERROR,
+                error.getMessage(),
+                "out"));
+        anyError = true;
+        failureExit = Math.max(failureExit, CommandExitCode.INPUT_ERROR.code());
       }
     }
 

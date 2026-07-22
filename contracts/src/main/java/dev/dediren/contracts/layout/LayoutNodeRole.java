@@ -1,7 +1,5 @@
 package dev.dediren.contracts.layout;
 
-import java.util.Set;
-
 /**
  * The layout-role vocabulary a node may carry.
  *
@@ -39,10 +37,6 @@ public final class LayoutNodeRole {
 
   /** A UML destruction occurrence: the marker terminating a lifeline stem. */
   public static final String DESTRUCTION = "destruction";
-
-  /** Every role this product recognises. */
-  public static final Set<String> ALL =
-      Set.of(LIFELINE, INTERACTION, JUNCTION, EXECUTION, DESTRUCTION);
 
   public static boolean isLifeline(String role) {
     return LIFELINE.equals(role);

@@ -18,17 +18,6 @@ final class LayoutJson {
     return JsonSupport.objectMapper().treeToValue(root, LayoutRequest.class);
   }
 
-  /**
-   * Runs the layout-preference value validation on an already-parsed, in-memory request. The stream
-   * reader ({@link #readLayoutRequest}) performs this while parsing; extracting it here lets the
-   * in-memory engine path reject the same inputs with the same {@link
-   * LayoutPreferenceValidationException}. The explicit-null rejection is a parse-only concern (a
-   * typed request cannot carry explicit JSON nulls) and stays in the stream reader.
-   */
-  static void validatePreferences(LayoutRequest request) {
-    rejectUnsupportedPreferenceValues(JsonSupport.objectMapper().valueToTree(request));
-  }
-
   private static void rejectExplicitPreferenceNulls(JsonNode root) throws MismatchedInputException {
     if (root == null || !root.isObject()) {
       return;

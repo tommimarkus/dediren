@@ -21,7 +21,6 @@ import dev.dediren.contracts.layout.LayoutPlacementStrategy;
 import dev.dediren.contracts.layout.LayoutPreferences;
 import dev.dediren.contracts.layout.LayoutRequest;
 import dev.dediren.contracts.layout.LayoutResult;
-import dev.dediren.contracts.layout.LayoutRoutingPreferences;
 import dev.dediren.contracts.layout.Point;
 import dev.dediren.ir.LayoutIntent;
 import dev.dediren.ir.LayoutIntentCodec;
@@ -1480,14 +1479,7 @@ final class ElkLayoutEngine {
     if (preferences == null) {
       return;
     }
-    validateRoutingPreferences(preferences.routing(), path + ".routing");
     validateAlgorithmCompatibility(preferences, path);
-  }
-
-  private static void validateRoutingPreferences(LayoutRoutingPreferences routing, String path) {
-    if (routing == null) {
-      return;
-    }
   }
 
   private static void validateAlgorithmCompatibility(LayoutPreferences preferences, String path) {

@@ -736,15 +736,22 @@ public final class UmlSequenceValidation {
     }
   }
 
+  /**
+   * Whether {@code count} operands are legal for {@code operator} — the notation's arity rule,
+   * exported (like {@link #messageSorts()}) so render's metadata validation applies the same rule
+   * instead of keeping a drifting private copy.
+   */
+  public static boolean supportsOperandCount(String operator, int count) {
+    return switch (operator) {
+      case "opt", "loop" -> count == 1;
+      case "alt", "par" -> count >= 2;
+      default -> false;
+    };
+  }
+
   private static void validateOperandCount(String operator, JsonNode operands, String path)
       throws UmlValidationException {
-    boolean supported =
-        switch (operator) {
-          case "opt", "loop" -> operands.size() == 1;
-          case "alt", "par" -> operands.size() >= 2;
-          default -> false;
-        };
-    if (!supported) {
+    if (!supportsOperandCount(operator, operands.size())) {
       throw new UmlValidationException(
           UmlTypeKind.ELEMENT_PROPERTY, "CombinedFragment." + operator + ".operands", path);
     }

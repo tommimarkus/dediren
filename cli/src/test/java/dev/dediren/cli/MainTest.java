@@ -431,7 +431,9 @@ class MainTest {
 
   @Test
   void buildArtifactWriteCollisionEmitsErrorEnvelope(@TempDir Path tempDir) throws Exception {
-    // --out points at an existing FILE, so Files.createDirectories(out/main) must fail.
+    // --out points at an existing FILE, so Files.createDirectories(out/main) must fail. The write
+    // failure folds into a per-view error inside a published BuildResult — one bad view never
+    // aborts the others, and what was written before the failure stays recorded.
     Path outCollision = Files.writeString(tempDir.resolve("out"), "occupied");
 
     CliResult result =
@@ -449,9 +451,12 @@ class MainTest {
             sequenceWorkflowEnv());
 
     assertThat(result.exitCode()).isEqualTo(2);
-    JsonNode envelope = JsonSupport.objectMapper().readTree(result.stdout());
-    assertThat(envelope.at("/diagnostics/0/code").asText()).isEqualTo("DEDIREN_COMMAND_IO_FAILED");
-    assertThat(envelope.at("/diagnostics/0/message").asText())
+    JsonNode buildResult = JsonSupport.objectMapper().readTree(result.stdout());
+    assertThat(buildResult.at("/status").asText()).isEqualTo("error");
+    assertThat(buildResult.at("/views/0/status").asText()).isEqualTo("error");
+    assertThat(buildResult.at("/views/0/diagnostics/0/code").asText())
+        .isEqualTo("DEDIREN_COMMAND_IO_FAILED");
+    assertThat(buildResult.at("/views/0/diagnostics/0/message").asText())
         .contains("failed to write build artifact");
   }
 

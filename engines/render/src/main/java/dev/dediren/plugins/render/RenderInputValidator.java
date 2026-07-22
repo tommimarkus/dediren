@@ -215,7 +215,7 @@ public final class RenderInputValidator {
       throws RenderMetadataUsageException {
     String operator = metadataProperty(properties, "operator").asText();
     JsonNode operands = metadataProperty(properties, "operands");
-    if (!hasSupportedCombinedFragmentOperandCount(operator, operands.size())) {
+    if (!UmlSequenceValidation.supportsOperandCount(operator, operands.size())) {
       throw new RenderMetadataUsageException(
           DiagnosticCode.UML_COMBINED_FRAGMENT_METADATA_INVALID.code(),
           path + ".operands",
@@ -236,14 +236,6 @@ public final class RenderInputValidator {
             "UML CombinedFragment render metadata operands must reference owned InteractionOperand metadata");
       }
     }
-  }
-
-  private static boolean hasSupportedCombinedFragmentOperandCount(String operator, int count) {
-    return switch (operator) {
-      case "opt", "loop" -> count == 1;
-      case "alt", "par" -> count >= 2;
-      default -> false;
-    };
   }
 
   private static void validateCombinedFragmentCoveredReferences(

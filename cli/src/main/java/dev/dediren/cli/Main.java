@@ -154,6 +154,8 @@ public final class Main {
                   plugin, profile, inputText.text(), inputText.baseDir(), env, engines));
         } catch (EngineExecutionException error) {
           return printPluginError(error);
+        } catch (UncheckedIOException error) {
+          return printCommandIoFailure(spec, error);
         } catch (ProductRootException error) {
           return printProductRootFailure(spec, error);
         }
@@ -162,6 +164,8 @@ public final class Main {
         ValidationResult result =
             DocumentValidator.validateDocument(inputText.text(), inputText.baseDir(), null);
         return printValidationResult(result);
+      } catch (UncheckedIOException error) {
+        return printCommandIoFailure(spec, error);
       } catch (ProductRootException error) {
         return printProductRootFailure(spec, error);
       }
@@ -223,6 +227,8 @@ public final class Main {
                 plugin, target, view, inputText.text(), inputText.baseDir(), env, engines));
       } catch (EngineExecutionException error) {
         return writePluginError(spec, error);
+      } catch (UncheckedIOException error) {
+        return printCommandIoFailure(spec, error);
       } catch (ProductRootException error) {
         return printProductRootFailure(spec, error);
       }
@@ -254,6 +260,8 @@ public final class Main {
             spec,
             AnalysisCommands.diffCommand(
                 oldText.text(), oldText.baseDir(), newText.text(), newText.baseDir(), null));
+      } catch (UncheckedIOException error) {
+        return printCommandIoFailure(spec, error);
       } catch (ProductRootException error) {
         return printProductRootFailure(spec, error);
       }
@@ -289,6 +297,8 @@ public final class Main {
         return writePluginOutcome(
             spec,
             AnalysisCommands.queryCommand(kind, id, inputText.text(), inputText.baseDir(), null));
+      } catch (UncheckedIOException error) {
+        return printCommandIoFailure(spec, error);
       } catch (ProductRootException error) {
         return printProductRootFailure(spec, error);
       }
@@ -315,6 +325,8 @@ public final class Main {
         return writePluginOutcome(
             spec,
             AnalysisCommands.verifyCommand(inputText.text(), inputText.baseDir(), null, artifacts));
+      } catch (UncheckedIOException error) {
+        return printCommandIoFailure(spec, error);
       } catch (ProductRootException error) {
         return printProductRootFailure(spec, error);
       }
@@ -330,7 +342,11 @@ public final class Main {
 
     @Override
     public Integer call() throws Exception {
-      return writePluginOutcome(spec, AnalysisCommands.statusCommand(root));
+      try {
+        return writePluginOutcome(spec, AnalysisCommands.statusCommand(root));
+      } catch (UncheckedIOException error) {
+        return printCommandIoFailure(spec, error);
+      }
     }
   }
 
@@ -499,6 +515,8 @@ public final class Main {
                 engines));
       } catch (EngineExecutionException error) {
         return writePluginError(spec, error);
+      } catch (UncheckedIOException error) {
+        return printCommandIoFailure(spec, error);
       } catch (ProductRootException error) {
         return printProductRootFailure(spec, error);
       }
