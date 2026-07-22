@@ -12,8 +12,8 @@ import org.junit.jupiter.api.Test;
  *
  * <p>Generated UML/XMI XML is validated in two stages; this target exercises only the first, {@link
  * SchemaValidation#validateXmiDocumentAndIds(String)} — the hardened, DOCTYPE-disallowing DOM parse
- * plus root/{@code xmi:version}/{@code xmi:id} checks — WITHOUT launching the external {@code
- * xmllint} subprocess. The invariant is that the only {@link Throwable} allowed to escape is {@link
+ * plus root/{@code xmi:version}/{@code xmi:id} checks — WITHOUT reaching the schema-validation
+ * step. The invariant is that the only {@link Throwable} allowed to escape is {@link
  * XmiValidationException}: the method wraps every parser failure (malformed XML, forbidden DOCTYPE,
  * decoding errors) into that type, so a raw {@code SAXParseException}, {@link StackOverflowError},
  * {@link NullPointerException}, ... escaping is the finding we want.

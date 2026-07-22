@@ -43,12 +43,12 @@ import org.xml.sax.SAXParseException;
  * directory cannot supply is reported by name in the compile failure — nothing is ever fetched at
  * validation time, so the lane is hermetic by construction.
  *
- * <p>The outcome mirrors {@link XmlSchemaValidator.Outcome}: document-validity problems collect
- * into an invalid outcome the caller maps to its notation's published diagnostic code, while a
- * broken validator lane — schema-set problems (missing or broken XSD, unresolved import), validator
- * configuration failures, or a run exceeding {@link XmlSchemaValidator#DEFAULT_TIMEOUT} — throws
- * {@link SchemaCacheException} for the caller's unavailable lane, matching the subprocess runner's
- * ran-and-invalid versus could-not-run split.
+ * <p>The outcome is deliberately code-free: document-validity problems collect into an invalid
+ * {@link Outcome} the caller maps to its notation's published diagnostic code, while a broken
+ * validator lane — schema-set problems (missing or broken XSD, unresolved import), validator
+ * configuration failures, or a run exceeding {@link #DEFAULT_TIMEOUT} — throws {@link
+ * SchemaCacheException} for the caller's unavailable lane, keeping ran-and-invalid distinct from
+ * could-not-run.
  */
 public final class InJvmXmlValidator {
   // debug/trace only, by architecture rule. An invalid document is an Outcome the caller maps to a
@@ -75,12 +75,20 @@ public final class InJvmXmlValidator {
 
   private InJvmXmlValidator() {}
 
-  public static XmlSchemaValidator.Outcome validate(Path schemaPath, String content)
-      throws SchemaCacheException {
-    return validate(schemaPath, content, XmlSchemaValidator.DEFAULT_TIMEOUT);
+  /** Wall-clock ceiling for one compile+validate run before it is reported as unavailable. */
+  public static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(60);
+
+  /**
+   * The result of one validation. {@code details} carries the collected line-numbered problems for
+   * an invalid document and is empty for a valid one.
+   */
+  public record Outcome(boolean valid, String details) {}
+
+  public static Outcome validate(Path schemaPath, String content) throws SchemaCacheException {
+    return validate(schemaPath, content, DEFAULT_TIMEOUT);
   }
 
-  static XmlSchemaValidator.Outcome validate(Path schemaPath, String content, Duration timeout)
+  static Outcome validate(Path schemaPath, String content, Duration timeout)
       throws SchemaCacheException {
     // Which schema was compiled is the first question when a validation result surprises you.
     LOG.debug("in-JVM schema validation: schema={}", schemaPath);
@@ -113,8 +121,7 @@ public final class InJvmXmlValidator {
     }
   }
 
-  private static XmlSchemaValidator.Outcome doValidate(Path schemaPath, String content)
-      throws SchemaCacheException {
+  private static Outcome doValidate(Path schemaPath, String content) throws SchemaCacheException {
     Schema schema = compiledSchema(schemaPath);
     var errors = new ArrayList<String>();
     Validator validator;
@@ -141,8 +148,7 @@ public final class InJvmXmlValidator {
       throw new SchemaCacheException(
           "in-JVM schema validation could not read the document: " + error.getMessage(), error);
     }
-    return new XmlSchemaValidator.Outcome(
-        errors.isEmpty(), errors.isEmpty() ? 0 : 1, String.join("\n", errors));
+    return new Outcome(errors.isEmpty(), String.join("\n", errors));
   }
 
   private static Schema compiledSchema(Path schemaPath) throws SchemaCacheException {

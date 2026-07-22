@@ -68,13 +68,14 @@ public enum DiagnosticCode {
   // above: a violated invariant (e.g. a message endpoint off its lifeline axis) is an input error.
   LAYOUT_SEQUENCE_INVARIANT_VIOLATED("DEDIREN_LAYOUT_SEQUENCE_INVARIANT_VIOLATED"),
 
-  // External schema-validator availability (XMI lane only since wave 3: the OEF lane validates
-  // in-JVM and its former validator-unavailable code is retired with the xmllint subprocess).
-  XMI_SCHEMA_VALIDATOR_UNAVAILABLE("DEDIREN_XMI_SCHEMA_VALIDATOR_UNAVAILABLE"),
   // Shared export-policy tripwire (both export engines): the policy still carries the shipped
   // fixture identity, so the artifact would introduce itself with placeholder identity. Warning,
   // not error — the export succeeds; the agent decides.
   EXPORT_IDENTITY_PLACEHOLDER("DEDIREN_EXPORT_IDENTITY_PLACEHOLDER"),
+  // Shared conformance report (both export engines, info): names exactly which standards schema
+  // the artifact was validated against and its provenance (pinned download vs user-supplied), so
+  // stub-vs-real assurance is decidable from stdout JSON alone. Informational — no action needed.
+  EXPORT_SCHEMA_CONFORMANCE("DEDIREN_EXPORT_SCHEMA_CONFORMANCE"),
 
   // Artifact trust chain (core: ProvenanceCheck via `dediren verify`): a stamped artifact whose
   // provenance no longer matches the model's recomputed canonical hash (error — the CI drift

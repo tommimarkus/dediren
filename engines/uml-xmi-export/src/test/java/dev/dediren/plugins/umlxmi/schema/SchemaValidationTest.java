@@ -57,12 +57,13 @@ class SchemaValidationTest {
   @Test
   void aDocumentWhoseOnlyErrorsAreTheUnavailableUmlSchemaIsAccepted() throws Exception {
     // The success path of every real UML/XMI export. OMG publishes no UML XSD, so validating
-    // against XMI.xsd alone can never resolve the uml:* children: xmllint exits non-zero and the
-    // export is rescued only by recognising that every reported error is the missing-UML-schema
-    // gap. That recognition matches xmllint's literal wording, so it is pinned here — if a libxml2
-    // message change silently broke it, every UML export would flip to a false
-    // DEDIREN_XMI_SCHEMA_INVALID. A stand-in XMI.xsd with a strict wildcard reproduces the exact
-    // condition offline, without downloading the real OMG schema.
+    // against XMI.xsd alone can never resolve the uml:* children: the in-JVM validator reports
+    // them and the export is rescued only by recognising that every reported error is the
+    // missing-UML-schema gap. That recognition matches the JDK validator's literal wording, so it
+    // is pinned here through the real validation path — if a Xerces message change silently broke
+    // it, every UML export would flip to a false DEDIREN_XMI_SCHEMA_INVALID. A stand-in XMI.xsd
+    // with a strict wildcard reproduces the exact condition offline, without downloading the real
+    // OMG schema.
     Path schemaPath = tempDir.resolve("XMI.xsd");
     Files.writeString(
         schemaPath,
@@ -100,7 +101,7 @@ class SchemaValidationTest {
   @Test
   void documentRejectedBySuppliedXsdIsReportedAsSchemaInvalid() throws Exception {
     // A strict stand-in XMI.xsd whose XMI element allows no children: any child element in the
-    // XMI namespace fails xmllint validation, which must surface as the schema-invalid code (the
+    // XMI namespace fails schema validation, which must surface as the schema-invalid code (the
     // tolerated unavailable-UML-schema case only covers UML-namespace declaration gaps).
     Path schemaPath = tempDir.resolve("XMI.xsd");
     Files.writeString(

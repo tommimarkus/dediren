@@ -44,8 +44,6 @@ notation.
 
 - Java 21 or newer on `PATH` as `java`.
 - The checked-in Maven Wrapper (`./mvnw`) to build.
-- `xmllint` on `PATH` for UML XMI standards validation (the ArchiMate OEF
-  lane validates in-JVM and needs no external validator).
 - `curl` on `PATH` only when export validation must fetch a standards schema.
   Offline runs supply schema files via `DEDIREN_OEF_SCHEMA_DIR` /
   `DEDIREN_XMI_SCHEMA_PATH`; behind a proxy, set `HTTP_PROXY` / `HTTPS_PROXY` /
@@ -143,7 +141,7 @@ follow [`docs/agent-usage.md`](docs/agent-usage.md).
 
 Runs are quiet by default. When something needs investigating, set
 `DEDIREN_LOG_LEVEL=debug` for a window into engine dispatch, ELK layout size and
-timing, schema-cache hits, and the `xmllint` validator:
+timing, schema-cache hits, and the in-JVM schema validation step:
 
 ```bash
 DEDIREN_LOG_LEVEL=debug "$BUNDLE/bin/dediren" layout --plugin elk-layout \

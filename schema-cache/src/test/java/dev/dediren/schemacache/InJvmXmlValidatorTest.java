@@ -44,7 +44,7 @@ class InJvmXmlValidatorTest {
   void validDocumentPasses() throws Exception {
     Path schema = writeSchema("main.xsd", MAIN_SCHEMA);
 
-    XmlSchemaValidator.Outcome outcome = InJvmXmlValidator.validate(schema, VALID_DOCUMENT);
+    InJvmXmlValidator.Outcome outcome = InJvmXmlValidator.validate(schema, VALID_DOCUMENT);
 
     assertThat(outcome.valid()).isTrue();
     assertThat(outcome.details()).isEmpty();
@@ -55,7 +55,7 @@ class InJvmXmlValidatorTest {
     Path schema = writeSchema("main.xsd", MAIN_SCHEMA);
     String invalid = "<root xmlns=\"urn:dediren:test\"><bogus/></root>";
 
-    XmlSchemaValidator.Outcome outcome = InJvmXmlValidator.validate(schema, invalid);
+    InJvmXmlValidator.Outcome outcome = InJvmXmlValidator.validate(schema, invalid);
 
     assertThat(outcome.valid()).isFalse();
     assertThat(outcome.details()).startsWith("line ").contains("bogus");
@@ -67,7 +67,7 @@ class InJvmXmlValidatorTest {
     // outcome must carry the failure once, not once per reporting path.
     Path schema = writeSchema("main.xsd", MAIN_SCHEMA);
 
-    XmlSchemaValidator.Outcome outcome = InJvmXmlValidator.validate(schema, "<root");
+    InJvmXmlValidator.Outcome outcome = InJvmXmlValidator.validate(schema, "<root");
 
     assertThat(outcome.valid()).isFalse();
     assertThat(outcome.details().lines()).hasSize(1);
@@ -119,7 +119,7 @@ class InJvmXmlValidatorTest {
             </xs:schema>
             """);
 
-    XmlSchemaValidator.Outcome outcome =
+    InJvmXmlValidator.Outcome outcome =
         InJvmXmlValidator.validate(schema, "<root xmlns=\"urn:dediren:test\">ok</root>");
 
     assertThat(outcome.valid()).isTrue();
@@ -151,7 +151,7 @@ class InJvmXmlValidatorTest {
             </xs:schema>
             """);
 
-    XmlSchemaValidator.Outcome outcome =
+    InJvmXmlValidator.Outcome outcome =
         InJvmXmlValidator.validate(schema, "<root xmlns=\"urn:dediren:test\">ok</root>");
 
     assertThat(outcome.valid()).isTrue();

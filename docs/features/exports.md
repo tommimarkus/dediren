@@ -40,10 +40,14 @@ closed first-party enum in
 
 ## Standards Validation
 
-Export paths validate against the official standards schemas — the OEF lane
-in-JVM via `javax.xml.validation` (no external binary; schema imports such as
-the W3C `xml.xsd` resolve local-only from the schema directory), the UML/XMI
-lane via `xmllint` (required on `PATH` for XMI). Schema sources:
+Export paths validate against the official standards schemas in-JVM via
+`javax.xml.validation` — no external validator binary on either lane. Schema
+imports (the W3C `xml.xsd` the ArchiMate XSDs reference, or a UML XSD beside
+an XMI driver schema) resolve local-only from the schema file's own directory.
+Every successful export carries a `DEDIREN_EXPORT_SCHEMA_CONFORMANCE` `info`
+diagnostic naming exactly which schema was validated against and its
+provenance (pinned SHA-256-verified download vs user-supplied path), so
+stub-vs-real assurance is decidable from stdout JSON alone. Schema sources:
 
 - **Online:** `curl` fetches schemas into a cache; set
   `DEDIREN_SCHEMA_CACHE_DIR` for a stable cache location. Behind a proxy, set

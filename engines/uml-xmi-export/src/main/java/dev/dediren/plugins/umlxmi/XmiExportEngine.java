@@ -85,8 +85,9 @@ public final class XmiExportEngine implements ExportEngine {
     }
 
     String content = buildXmi(request, policy);
+    Diagnostic conformance;
     try {
-      validateXmiToAvailableStandards(content, env, productRoot);
+      conformance = validateXmiToAvailableStandards(content, env, productRoot);
     } catch (XmiValidationException error) {
       throw failure(error.code(), error.getMessage(), "content");
     }
@@ -98,7 +99,10 @@ public final class XmiExportEngine implements ExportEngine {
             request.source().nodes(),
             request.source().relationships(),
             ExportScope.fromRequest(request));
-    return new EngineResult<>(result, withIdentityTripwire(policy, coverageDiagnostics(coverage)));
+    var diagnostics =
+        new java.util.ArrayList<>(withIdentityTripwire(policy, coverageDiagnostics(coverage)));
+    diagnostics.add(conformance);
+    return new EngineResult<>(result, diagnostics);
   }
 
   /**

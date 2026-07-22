@@ -549,7 +549,10 @@ class MainTest {
     JsonNode envelope = exportEnvelope(fixtureJson("fixtures/source/valid-archimate-oef.json"));
 
     assertThat(envelope.at("/status").asText()).isEqualTo("ok");
-    assertThat(envelope.at("/diagnostics")).isEmpty();
+    // No coverage diagnostic; the only entry is the always-present conformance report (info).
+    assertThat(envelope.at("/diagnostics")).hasSize(1);
+    assertThat(envelope.at("/diagnostics/0/code").asText())
+        .isEqualTo("DEDIREN_EXPORT_SCHEMA_CONFORMANCE");
   }
 
   @Test
@@ -592,7 +595,10 @@ class MainTest {
     JsonNode envelope = exportEnvelope(source);
 
     assertThat(envelope.at("/status").asText()).isEqualTo("ok");
-    assertThat(envelope.at("/diagnostics")).isEmpty();
+    // Degrades to no VIEW diagnostic; the conformance report (info) is always present.
+    assertThat(envelope.at("/diagnostics")).hasSize(1);
+    assertThat(envelope.at("/diagnostics/0/code").asText())
+        .isEqualTo("DEDIREN_EXPORT_SCHEMA_CONFORMANCE");
   }
 
   @Test

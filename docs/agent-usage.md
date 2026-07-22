@@ -276,10 +276,11 @@ owned `lowerValue` (`uml:LiteralInteger`) / `upperValue`
 (`uml:LiteralUnlimitedNatural`, `*` for unbounded) value-specification children
 rather than XML attributes. To schema-check the emitted UML content, point
 `DEDIREN_XMI_SCHEMA_PATH` at a driver schema that imports the OMG `XMI.xsd` and
-a UML 2.5.1 XSD and run `xmllint --nonet --noout --schema <driver.xsd>
-<document>`; OMG does not publish an importable UML 2.5.1 XSD, so supply or
-generate one, or import the document into a UML tool. Without a UML schema only
-the XMI envelope is checked.
+a UML 2.5.1 XSD (both sitting beside the driver — imports resolve local-only
+from its directory); OMG does not publish an importable UML 2.5.1 XSD, so
+supply or generate one, or import the document into a UML tool. Without a UML
+schema only the XMI envelope is checked — the export's
+`DEDIREN_EXPORT_SCHEMA_CONFORMANCE` diagnostic states which case applied.
 
 ## Command Handoff
 
@@ -962,11 +963,10 @@ you can recover from stdout JSON alone.
 - `DEDIREN_PLUGIN_UNSUPPORTED_CAPABILITY`: the engine id exists but not for
   this command's capability (for example asking `elk-layout` to render). Fix
   the `--plugin` value for this command.
-- `DEDIREN_XMI_SCHEMA_VALIDATOR_UNAVAILABLE`: the XMI export's XML schema
-  validator (`xmllint` by default) is missing, timed out, or failed to start.
-  Install libxml2's `xmllint` or point the validator override variable at one
-  (see `## Plugin Environment`); not a JSON problem — do not modify the model.
-  (The OEF lane validates in-JVM — no external validator involved.)
+- `DEDIREN_EXPORT_SCHEMA_CONFORMANCE`: informational (`info`, rides an `ok`
+  envelope) — names exactly which standards schema the export was validated
+  against and its provenance (pinned SHA-256-verified download, or the
+  user-supplied schema path/directory). No action needed.
 - `DEDIREN_EXPORT_IDENTITY_PLACEHOLDER`: the export policy still carries the
   shipped fixture identity (a `warning`; the artifact was produced and is
   otherwise valid). Copy the default policy and replace its identity fields
@@ -1057,14 +1057,9 @@ variables below and read nothing else. Important explicit variables:
   `DEDIREN_PRODUCT_ROOT_UNRESOLVED` error envelope on stdout with exit `2`.
 - `DEDIREN_OEF_SCHEMA_DIR`: local OEF schema directory.
 - `DEDIREN_XMI_SCHEMA_PATH`: local XMI schema file, or a driver schema that
-  imports `XMI.xsd` plus a UML 2.5.1 XSD to also validate UML content.
-- `DEDIREN_XMI_SCHEMA_VALIDATOR`: override the `xmllint` command the XMI
-  export engine runs for XML schema validation (a command
-  name or path). The named binary is trusted like `xmllint` itself and runs
-  under the same guards — bounded wall clock, concurrent output drain — and an
-  absent or wedged validator degrades to a
-  `DEDIREN_XMI_SCHEMA_VALIDATOR_UNAVAILABLE` error envelope. The OEF lane
-  validates in-JVM and reads no validator variable.
+  imports `XMI.xsd` plus a UML 2.5.1 XSD to also validate UML content (imports
+  resolve local-only from the driver's own directory). Both export lanes
+  validate in-JVM — no external validator binary or override variable exists.
 - `DEDIREN_SCHEMA_CACHE_DIR`: cache directory for schema downloads.
 - `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY` (and their lowercase forms): forwarded
   to `curl` so it can download standards schemas through a proxy.
@@ -1093,7 +1088,7 @@ DEDIREN_LOG_LEVEL=debug dediren layout --plugin elk-layout --input request.json
 
 Logs go to stderr; stdout stays a clean JSON envelope, so `| jq` keeps working
 with logging on. Logged lines cover engine dispatch, ELK layout size and timing,
-schema-cache hits and misses, and the `xmllint` validator subprocess. Log output
+schema-cache hits and misses, and the in-JVM schema validation step. Log output
 is not a stable contract and may change between releases.
 
 The `bin/dediren` launcher routes JVM-level log output off stdout and onto

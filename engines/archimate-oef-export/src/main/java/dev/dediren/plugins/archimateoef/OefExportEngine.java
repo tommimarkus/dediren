@@ -29,7 +29,6 @@ import dev.dediren.engine.XmlText;
 import dev.dediren.schemacache.InJvmXmlValidator;
 import dev.dediren.schemacache.SchemaCacheException;
 import dev.dediren.schemacache.SchemaCacheModule;
-import dev.dediren.schemacache.XmlSchemaValidator;
 import java.net.URI;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -159,8 +158,9 @@ public final class OefExportEngine implements ExportEngine {
     }
 
     String content = buildOef(request, policy);
+    Diagnostic conformance;
     try {
-      validateOfficialOefSchema(content, env, productRoot);
+      conformance = validateOfficialOefSchema(content, env, productRoot);
     } catch (OefSchemaValidationException error) {
       throw failure(error.code(), error.getMessage(), "content");
     }
@@ -169,7 +169,9 @@ public final class OefExportEngine implements ExportEngine {
         new ExportResult(
             ContractVersions.EXPORT_RESULT_SCHEMA_VERSION, "archimate-oef+xml", content);
     return new EngineResult<>(
-        result, withIdentityTripwire(policy, viewCoverageDiagnostics(request)));
+        result,
+        withConformance(
+            withIdentityTripwire(policy, viewCoverageDiagnostics(request)), conformance));
   }
 
   /**
@@ -217,8 +219,9 @@ public final class OefExportEngine implements ExportEngine {
     }
 
     String content = buildModelOef(request, policy);
+    Diagnostic conformance;
     try {
-      validateOfficialOefSchema(content, env, productRoot);
+      conformance = validateOfficialOefSchema(content, env, productRoot);
     } catch (OefSchemaValidationException error) {
       throw failure(error.code(), error.getMessage(), "content");
     }
@@ -226,7 +229,8 @@ public final class OefExportEngine implements ExportEngine {
         new ExportResult(
             ContractVersions.EXPORT_RESULT_SCHEMA_VERSION, "archimate-oef+xml", content);
     return java.util.Optional.of(
-        new EngineResult<>(result, withIdentityTripwire(policy, List.of())));
+        new EngineResult<>(
+            result, withConformance(withIdentityTripwire(policy, List.of()), conformance)));
   }
 
   /**
@@ -701,7 +705,7 @@ public final class OefExportEngine implements ExportEngine {
         .append("\"/>");
   }
 
-  private static void validateOfficialOefSchema(
+  private static Diagnostic validateOfficialOefSchema(
       String content, Map<String, String> env, Path productRoot)
       throws OefSchemaValidationException {
     OefSchemaDirSource source = resolveOfficialOefSchemaDir(env, productRoot);
@@ -710,7 +714,7 @@ public final class OefExportEngine implements ExportEngine {
     // (the W3C xml.xsd the official XSDs reference) resolve local-only from the schema directory;
     // the cache-download lane fetches xml.xsd alongside the OEF XSDs, and an offline directory
     // missing it fails here with a message naming it and the remediation for its own lane.
-    XmlSchemaValidator.Outcome outcome;
+    InJvmXmlValidator.Outcome outcome;
     try {
       outcome = InJvmXmlValidator.validate(schemaPath, content);
     } catch (SchemaCacheException error) {
@@ -719,7 +723,11 @@ public final class OefExportEngine implements ExportEngine {
           DiagnosticCode.OEF_SCHEMA_UNAVAILABLE.code(), error.getMessage() + " " + remediation);
     }
     if (outcome.valid()) {
-      return;
+      return new Diagnostic(
+          DiagnosticCode.EXPORT_SCHEMA_CONFORMANCE.code(),
+          DiagnosticSeverity.INFO,
+          source.conformanceMessage(),
+          "content");
     }
     throw new OefSchemaValidationException(
         DiagnosticCode.OEF_SCHEMA_INVALID.code(),
@@ -727,8 +735,20 @@ public final class OefExportEngine implements ExportEngine {
             + outcome.details());
   }
 
-  /** Where the schema set came from decides which remediation a later failure names. */
-  private record OefSchemaDirSource(Path dir, String unavailableRemediation) {}
+  /** Appends the shared conformance report last, after every actionable diagnostic. */
+  private static List<Diagnostic> withConformance(
+      List<Diagnostic> diagnostics, Diagnostic conformance) {
+    var combined = new ArrayList<>(diagnostics);
+    combined.add(conformance);
+    return combined;
+  }
+
+  /**
+   * Where the schema set came from decides which remediation a later failure names and how the
+   * conformance report describes the schema's provenance.
+   */
+  private record OefSchemaDirSource(
+      Path dir, String unavailableRemediation, String conformanceMessage) {}
 
   private static OefSchemaDirSource resolveOfficialOefSchemaDir(
       Map<String, String> env, Path productRoot) throws OefSchemaValidationException {
@@ -741,7 +761,12 @@ public final class OefExportEngine implements ExportEngine {
     Optional<Path> configured = SchemaCacheModule.nonEmptyEnvPath(schemaEnv, OEF_SCHEMA_DIR_ENV);
     if (configured.isPresent()) {
       ensureOefSchemaFilesExist(configured.get());
-      return new OefSchemaDirSource(configured.get(), OEF_SCHEMA_OFFLINE_REMEDIATION);
+      return new OefSchemaDirSource(
+          configured.get(),
+          OEF_SCHEMA_OFFLINE_REMEDIATION,
+          "validated in-JVM against archimate3_Diagram.xsd from the user-supplied"
+              + " DEDIREN_OEF_SCHEMA_DIR directory; ArchiMate 3.2 XSDs are unpublished by The Open"
+              + " Group");
     }
     Path schemaDir;
     try {
@@ -763,7 +788,11 @@ public final class OefExportEngine implements ExportEngine {
           DiagnosticCode.OEF_SCHEMA_UNAVAILABLE.code(),
           error.getMessage() + " " + OEF_SCHEMA_DOWNLOAD_REMEDIATION);
     }
-    return new OefSchemaDirSource(schemaDir, OEF_SCHEMA_DOWNLOAD_REMEDIATION);
+    return new OefSchemaDirSource(
+        schemaDir,
+        OEF_SCHEMA_DOWNLOAD_REMEDIATION,
+        "validated in-JVM against the pinned Open Group ArchiMate 3.1 archimate3_Diagram.xsd"
+            + " (SHA-256-verified download); ArchiMate 3.2 XSDs are unpublished by The Open Group");
   }
 
   /** Resolves this engine's schema/cache env paths against the product root (Decision 9). */

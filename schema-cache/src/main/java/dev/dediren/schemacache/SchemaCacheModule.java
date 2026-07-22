@@ -52,13 +52,6 @@ public final class SchemaCacheModule {
     return resolved;
   }
 
-  /** Returns the validator command an env override names, or {@code defaultCommand} if unset. */
-  public static String configuredValidator(
-      Map<String, String> env, String validatorEnvName, String defaultCommand) {
-    String configured = env.get(validatorEnvName);
-    return configured == null || configured.isBlank() ? defaultCommand : configured;
-  }
-
   public static boolean isNonEmptyFile(Path path) {
     try {
       return Files.isRegularFile(path) && Files.size(path) > 0;
@@ -191,7 +184,7 @@ public final class SchemaCacheModule {
         "--fail",
         "--silent",
         "--show-error",
-        // Bound the whole transfer like XmlSchemaValidator bounds its subprocess: a stalled
+        // Bound the whole transfer like InJvmXmlValidator bounds its worker: a stalled
         // download must degrade to a structured fetch failure, not hang the export lane.
         "--max-time",
         "60",

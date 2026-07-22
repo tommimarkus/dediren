@@ -71,14 +71,13 @@ There is no network *listener*: stdio transport only, no port, no HTTP/SSE
 listener, no multi-client daemon, and the MCP client spawns the process and owns
 its lifetime, so there is no daemon lifecycle to supervise. That is inbound-only,
 though: a `dediren_build` call whose policy selects the OEF or XMI export lane
-reaches the same subprocess/outbound-HTTPS boundaries as the CLI's `build` and
+reaches the same outbound-HTTPS boundary as the CLI's `build` and
 `export` commands (see "Schema cache + runtime download" and "XML parsing &
-external validator" below) — an `xmllint` subprocess on the XMI lane (the OEF
-lane validates in-JVM since wave 3, no subprocess), and, absent a cached or
-offline schema, a `curl` fetch beforehand. `--read-only` withholds
-`dediren_build` entirely, removing both. Short of that, the
+schema validation" below) — absent a cached or offline schema, a `curl` fetch;
+schema validation itself runs in-JVM on both lanes with no subprocess.
+`--read-only` withholds `dediren_build` entirely. Short of that, the
 `DEDIREN_OEF_SCHEMA_DIR` / `DEDIREN_XMI_SCHEMA_PATH` offline overrides remove
-only the outbound fetch.
+the outbound fetch.
 
 Controls:
 
@@ -141,54 +140,47 @@ local copy, never from the network).
 The offline overrides `DEDIREN_XMI_SCHEMA_PATH` / `DEDIREN_OEF_SCHEMA_DIR` bypass the
 SHA-256 check by design — they only require the supplied file to be non-empty.
 
-### XML parsing & external validator
+### XML parsing & schema validation
 
 Generated UML/XMI XML is parsed with a hardened `DocumentBuilderFactory`
 (`SchemaValidation.secureXmiDocumentBuilderFactory()`): DOCTYPE declarations
 disallowed, `FEATURE_SECURE_PROCESSING` on, XInclude and entity-reference
-expansion off. The external `xmllint` schema validator runs with `--nonet`
-for the OMG XMI schema (`engines/uml-xmi-export`). The OEF ArchiMate schemas
-(`engines/archimate-oef-export`) validate in-JVM since wave 3 via
-`schemacache.InJvmXmlValidator`: `javax.xml.validation` with secure processing
-on, external DTD/schema access denied, and schema imports (the W3C `xml.xsd`)
-resolved local-only from the schema directory — nothing is fetched at
-validation time and no subprocess runs on that lane.
+expansion off.
 
-The XMI engine invokes that subprocess through the shared runner,
-`schemacache.XmlSchemaValidator` — engines may not depend on each other, so
-before it each kept its own copy of the subprocess block and every hardening
-fix had to be applied twice. The runner owns two availability properties the
-copies did not have:
+Standards-schema validation runs **in-JVM on both export lanes** via the one
+shared validator, `schemacache.InJvmXmlValidator` (engines may not depend on
+each other, so hardening lives once): `javax.xml.validation` with secure
+processing on, external DTD/schema access denied, and schema imports (the W3C
+`xml.xsd` the ArchiMate XSDs reference; a UML XSD beside an XMI driver schema)
+resolved **local-only** from the schema file's own directory, confinement
+enforced by a normalize/startsWith check — nothing is fetched at validation
+time and no validator subprocess exists anywhere in the product. The retired
+`xmllint` lane's guards carry over in in-process form:
 
-- **No drain deadlock.** stdout and stderr are drained concurrently. The
-  previous code read stdout to EOF *before* stderr, with an unbounded
-  `waitFor()` after: a validator that fills the ~64 KiB stderr pipe blocks in
-  `write(2)`, so it never exits, so stdout never reaches EOF. A schema-invalid
-  document with a systematic per-element violation reaches that volume easily —
-  the export hung precisely when it should have reported the schema error, and
-  a hang is invisible to an agent that decides from stdout JSON.
-- **Bounded wall clock.** A run that exceeds `XmlSchemaValidator.DEFAULT_TIMEOUT`
-  (60s) is force-killed and reported as
-  `DEDIREN_XMI_SCHEMA_VALIDATOR_UNAVAILABLE`, so a wedged or malicious validator
-  binary degrades to a structured non-zero envelope rather than an indefinite
-  stall. The in-JVM OEF lane shares the same ceiling: `InJvmXmlValidator` runs
-  compile+validate on a bounded daemon worker and reports an overrun as a
-  structured `DEDIREN_OEF_SCHEMA_UNAVAILABLE` (a pathological schema — e.g. an
-  adversarial content model in a hand-supplied `DEDIREN_OEF_SCHEMA_DIR` — cannot
-  stall the envelope; the abandoned worker thread ends with the process, since
-  an in-process computation cannot be force-killed the way a subprocess can).
-- **Validator selection is an environment input.** `DEDIREN_XMI_SCHEMA_VALIDATOR`
-  lets the environment name the XMI validator command. Whoever sets the process
-  environment already controls execution, so the override grants no new
-  privilege; the guards above bound a hostile or broken choice, and the
-  variable is documented in the shipped guide's `## Plugin Environment`
-  section. The OEF lane reads no validator variable — it validates in-JVM.
+- **Bounded wall clock.** Compile+validate run on a bounded daemon worker;
+  exceeding `InJvmXmlValidator.DEFAULT_TIMEOUT` (60s) is reported as a
+  structured `DEDIREN_OEF_SCHEMA_UNAVAILABLE` / `DEDIREN_XMI_SCHEMA_UNAVAILABLE`
+  rather than an indefinite stall (a pathological schema in a hand-supplied
+  directory cannot hang the envelope; the abandoned worker thread ends with the
+  process, since an in-process computation cannot be force-killed the way a
+  subprocess could).
+- **Broken-validator vs invalid-document split.** Schema-set problems
+  (unresolved import, unreadable file, validator configuration failure,
+  timeout) throw to the engines' `*_SCHEMA_UNAVAILABLE` lane; only genuine
+  document-validity findings become `*_SCHEMA_INVALID`, so an environment
+  problem is never misreported as a defect in the generated XML.
+- **Compiled-grammar reuse.** Schemas memoize per (path, size, mtime); the
+  pinned cache-lane contents are additionally SHA-256-verified at fetch time.
 
-Both the runner and the in-JVM validator return a code-free outcome the
-calling engine maps onto its own published diagnostic codes, so
-`schema-cache` stays notation-neutral.
-`XmlSchemaValidatorTest` pins both properties, including a stderr-flooding
-validator as an explicit deadlock regression.
+The validator returns a code-free outcome the calling engine maps onto its own
+published diagnostic codes, so `schema-cache` stays notation-neutral, and every
+successful export declares what it was validated against via the
+`DEDIREN_EXPORT_SCHEMA_CONFORMANCE` info diagnostic. `InJvmXmlValidatorTest`
+pins the seam: local-only resolution and traversal confinement, the
+unavailable-vs-invalid split, single-recording of fatal errors, memoization,
+and the bounded-run timeout. The only subprocess left in the product is the
+schema-cache `curl` fetch (previous section), which keeps its own concurrent
+drain and 60-second transfer bound.
 
 ### SVG output escaping
 

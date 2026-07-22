@@ -88,20 +88,6 @@ class SchemaCacheModuleTest {
   }
 
   @Test
-  void aConfiguredValidatorOverridesTheDefaultCommandUnlessItIsBlank() {
-    assertThat(SchemaCacheModule.configuredValidator(Map.of(), "DEDIREN_X_VALIDATOR", "xmllint"))
-        .isEqualTo("xmllint");
-    assertThat(
-            SchemaCacheModule.configuredValidator(
-                Map.of("DEDIREN_X_VALIDATOR", "  "), "DEDIREN_X_VALIDATOR", "xmllint"))
-        .isEqualTo("xmllint");
-    assertThat(
-            SchemaCacheModule.configuredValidator(
-                Map.of("DEDIREN_X_VALIDATOR", "/opt/xmllint"), "DEDIREN_X_VALIDATOR", "xmllint"))
-        .isEqualTo("/opt/xmllint");
-  }
-
-  @Test
   void ignoresEmptyEnvironmentValuesWhenResolvingPaths() {
     assertThat(SchemaCacheModule.nonEmptyEnvPath(Map.of("TEST_PATH", ""), "TEST_PATH")).isEmpty();
     assertThat(

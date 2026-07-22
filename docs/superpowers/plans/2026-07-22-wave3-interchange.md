@@ -150,14 +150,31 @@ schema-cache `-Pcoverage` gate. Doc trues-ups rode along (agent-usage offline
 xml.xsd requirement, threat-model runner/pin rows, distribution-and-runtime
 prerequisites, guidelines §12 rows).
 
+## Follow-on slice (2026-07-22): the validator story finished
+
+Executed same day on owner go-ahead: the XMI lane joined the in-JVM validator
+(spike against real OMG `XMI.xsd` first; xmllint-shaped UML-gap tolerance
+rewritten for the Xerces wording), the whole subprocess stack was deleted
+(`xmllint` is gone from the product), both lanes gained the
+`DEDIREN_EXPORT_SCHEMA_CONFORMANCE` info diagnostic, and the opt-in
+real-schema test lane (`RealSchemaConformanceTest`, `-Ddediren.real-schemas=true`)
+now proves both emitters against the pinned real Open Group / OMG downloads —
+closing the test-quality audit's P0 remainder. Deferral-register entries
+resolved accordingly.
+
 ## Release-note obligations (next release)
 
-- The OEF export lane no longer needs `xmllint`; it validates in-JVM.
-  `DEDIREN_OEF_SCHEMA_VALIDATOR` is retired (the XMI lane keeps
-  `DEDIREN_XMI_SCHEMA_VALIDATOR`).
+- `xmllint` is no longer needed for anything: both export lanes validate
+  in-JVM. `DEDIREN_OEF_SCHEMA_VALIDATOR`, `DEDIREN_XMI_SCHEMA_VALIDATOR`, and
+  the codes `DEDIREN_OEF_SCHEMA_VALIDATOR_UNAVAILABLE` /
+  `DEDIREN_XMI_SCHEMA_VALIDATOR_UNAVAILABLE` are retired.
+- Every successful export now carries a `DEDIREN_EXPORT_SCHEMA_CONFORMANCE`
+  `info` diagnostic (rides `ok`); consumers asserting exact diagnostics
+  arrays on export envelopes will see one new trailing entry.
 - A warm pre-upgrade `DEDIREN_SCHEMA_CACHE_DIR` (three OEF XSDs) performs a
   one-time fetch of the newly pinned W3C `xml.xsd` on the first post-upgrade
   OEF export; network-denied environments must add that file to the cache (or
   use `DEDIREN_OEF_SCHEMA_DIR`) before upgrading.
 - Hand-populated `DEDIREN_OEF_SCHEMA_DIR` directories holding the real Open
-  Group XSDs must now include the W3C `xml.xsd` those XSDs import.
+  Group XSDs must now include the W3C `xml.xsd` those XSDs import; an XMI
+  driver schema's imports resolve local-only from the driver's directory.

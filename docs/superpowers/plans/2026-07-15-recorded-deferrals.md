@@ -18,20 +18,18 @@ recorded pre-existing gaps, not a defect list; pick up individually.
   the 0.70 floor; `./mvnw -pl mcp-server -am -Pcoverage verify` passes. (Was:
   0.67 at module landing, concentrated in the stdio transport hardening.)
 
-- **XMI lane migration onto the in-JVM validator** (wave 3, recorded
-  2026-07-22): the OEF lane validates via `schemacache.InJvmXmlValidator`;
-  the UML/XMI lane still runs the `xmllint` subprocess through
-  `schemacache.XmlSchemaValidator` because its driver-schema flow (a wrapper
-  XSD importing `XMI.xsd` plus a UML XSD) differs. Until migrated, schema-cache
-  carries two validator stacks and every validation hardening must be weighed
-  for both; start from `InJvmXmlValidatorTest` as the seam contract.
-- **OEF conformance-report diagnostic** (wave 3 survey 3.2 item, recorded
-  2026-07-22): an `info` diagnostic on OEF export success naming exactly what
-  was validated against what ("ArchiMate 3.1 `archimate3_Diagram.xsd`; 3.2
-  XSDs unpublished by The Open Group"). Decided-not-built in wave 3: a new
-  `DEDIREN_*` code ripples through every OEF golden envelope, the guide's
-  Repair Rules, and the ownership/doc-consistency guards — schedule as its own
-  small slice.
+- **XMI lane migration onto the in-JVM validator** — RESOLVED 2026-07-22
+  (same day): a spike proved the JDK validator against the real OMG `XMI.xsd`
+  (one tolerated finding: the strict-wildcard no-UML-declaration gap, Xerces
+  wording), the lane flipped to `schemacache.InJvmXmlValidator`, and the
+  entire subprocess stack (`XmlSchemaValidator`, its test, the
+  `DEDIREN_XMI_SCHEMA_VALIDATOR` override, `configuredValidator`) was
+  deleted — `xmllint` is no longer a product dependency on any lane.
+- **OEF conformance-report diagnostic** — RESOLVED 2026-07-22 (same day),
+  broadened to both lanes: every successful export now carries
+  `DEDIREN_EXPORT_SCHEMA_CONFORMANCE` (`info`) naming the schema validated
+  against and its provenance; the XMI variant discloses when UML-namespace
+  content rode the no-normative-UML-XSD gap.
 
 ELK vocabulary deferrals (node/edge `priority`, `layer_choice`,
 `position_choice`, alternate layout algorithms) are already recorded in

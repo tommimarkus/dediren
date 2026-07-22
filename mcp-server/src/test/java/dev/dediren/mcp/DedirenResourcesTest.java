@@ -101,11 +101,9 @@ class DedirenResourcesTest {
     assertThat(duplicateView.get("repair_rule").asText()).contains("colliding view id");
     assertThat(duplicateGroup.get("repair_rule").asText())
         .isEqualTo(duplicateView.get("repair_rule").asText());
-    assertThat(
-            entryFor(catalog, "DEDIREN_XMI_SCHEMA_VALIDATOR_UNAVAILABLE")
-                .get("repair_rule")
-                .asText())
-        .contains("xmllint");
+    // Documented in guide prose (its message names both remediations), not as a bullet: null.
+    assertThat(entryFor(catalog, "DEDIREN_XMI_SCHEMA_UNAVAILABLE").get("repair_rule").isNull())
+        .isTrue();
   }
 
   private static JsonNode entryFor(JsonNode catalog, String code) {

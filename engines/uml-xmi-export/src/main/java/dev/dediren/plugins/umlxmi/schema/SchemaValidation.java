@@ -1,14 +1,15 @@
 package dev.dediren.plugins.umlxmi.schema;
 
-import static dev.dediren.plugins.umlxmi.build.XmiHelpers.UML_NS;
 import static dev.dediren.plugins.umlxmi.build.XmiHelpers.XMI_NS;
 import static dev.dediren.plugins.umlxmi.build.XmiHelpers.isXmlId;
 
+import dev.dediren.contracts.Diagnostic;
 import dev.dediren.contracts.DiagnosticCode;
+import dev.dediren.contracts.DiagnosticSeverity;
 import dev.dediren.plugins.umlxmi.build.XmiValidationException;
+import dev.dediren.schemacache.InJvmXmlValidator;
 import dev.dediren.schemacache.SchemaCacheException;
 import dev.dediren.schemacache.SchemaCacheModule;
-import dev.dediren.schemacache.XmlSchemaValidator;
 import java.io.ByteArrayInputStream;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -26,8 +27,6 @@ public final class SchemaValidation {
 
   private SchemaValidation() {}
 
-  public static final String XMI_SCHEMA_VALIDATOR = "xmllint";
-  public static final String XMI_SCHEMA_VALIDATOR_ENV = "DEDIREN_XMI_SCHEMA_VALIDATOR";
   private static final String OMG_XMI_SCHEMA_URL = "https://www.omg.org/spec/XMI/20131001/XMI.xsd";
   // Pinned SHA-256 of the OMG XMI schema, verified after every runtime download (audit finding F2).
   // Source: https://www.omg.org/spec/XMI/20131001/XMI.xsd — retrieved 2026-07-04.
@@ -43,29 +42,38 @@ public final class SchemaValidation {
       "To download through an HTTP proxy, expose HTTP_PROXY, HTTPS_PROXY, and NO_PROXY (or their"
           + " lowercase forms) to this process. To skip the download, pre-fetch the OMG XMI.xsd and"
           + " set DEDIREN_XMI_SCHEMA_PATH to its absolute file path.";
+  // The offline lane never downloads, so its failures get placement advice, not proxy advice.
+  private static final String XMI_SCHEMA_OFFLINE_REMEDIATION =
+      "Replace the file at DEDIREN_XMI_SCHEMA_PATH with a usable OMG XMI.xsd, or a driver schema"
+          + " whose imports sit beside it in the same directory.";
 
   /**
    * Legacy two-argument seam retained for the same-package validation tests; resolves schema/cache
    * env paths against the JVM cwd. The engine path threads an explicit {@code productRoot} through
    * the three-argument form instead.
    */
-  public static void validateXmiToAvailableStandards(String content, Map<String, String> env)
+  public static Diagnostic validateXmiToAvailableStandards(String content, Map<String, String> env)
       throws XmiValidationException {
-    validateXmiToAvailableStandards(content, env, Path.of("").toAbsolutePath());
+    return validateXmiToAvailableStandards(content, env, Path.of("").toAbsolutePath());
   }
 
-  public static void validateXmiToAvailableStandards(
+  /**
+   * Validates and returns the shared conformance report ({@code info}): exactly which standards
+   * schema the artifact was validated against, its provenance, and whether UML-namespace content
+   * rode the known no-normative-UML-XSD gap.
+   */
+  public static Diagnostic validateXmiToAvailableStandards(
       String content, Map<String, String> env, Path productRoot) throws XmiValidationException {
     validateXmiDocumentAndIds(content);
-    validateOmgXmiSchema(content, env, productRoot);
+    return validateOmgXmiSchema(content, env, productRoot);
   }
 
   /**
    * Local DOM validation seam (package-private for tests): parses {@code content} with the hardened
    * DOCTYPE-disallowing builder and checks the XMI root, forbidden {@code xmi:version}, and {@code
-   * xmi:id} shape/uniqueness without launching the external {@code xmllint} subprocess. The
-   * fuzz-regression target {@code SchemaValidationFuzzTest} (audit finding F7) exercises this path
-   * directly to prove the only Throwable that escapes is {@link XmiValidationException}.
+   * xmi:id} shape/uniqueness before the schema-validation step. The fuzz-regression target {@code
+   * SchemaValidationFuzzTest} (audit finding F7) exercises this path directly to prove the only
+   * Throwable that escapes is {@link XmiValidationException}.
    */
   static void validateXmiDocumentAndIds(String content) throws XmiValidationException {
     try {
@@ -113,27 +121,50 @@ public final class SchemaValidation {
     }
   }
 
-  private static void validateOmgXmiSchema(
+  private static Diagnostic validateOmgXmiSchema(
       String content, Map<String, String> env, Path productRoot) throws XmiValidationException {
-    Path schemaPath = resolveOmgXmiSchemaPath(env, productRoot);
-    String validator =
-        SchemaCacheModule.configuredValidator(env, XMI_SCHEMA_VALIDATOR_ENV, XMI_SCHEMA_VALIDATOR);
-    XmlSchemaValidator.Outcome outcome;
+    XmiSchemaSource source = resolveOmgXmiSchemaPath(env, productRoot);
+    // In-JVM validation: no xmllint subprocess in the trust path. A driver schema's imports
+    // (XMI.xsd plus a UML XSD) resolve local-only from the schema file's own directory; a broken
+    // schema set fails as a structured SCHEMA_UNAVAILABLE naming the unresolved reference and the
+    // remediation for its own lane.
+    InJvmXmlValidator.Outcome outcome;
     try {
-      outcome = XmlSchemaValidator.validate(validator, schemaPath, content);
+      outcome = InJvmXmlValidator.validate(source.path(), content);
     } catch (SchemaCacheException error) {
       throw new XmiValidationException(
-          DiagnosticCode.XMI_SCHEMA_VALIDATOR_UNAVAILABLE.code(), error.getMessage());
+          DiagnosticCode.XMI_SCHEMA_UNAVAILABLE.code(),
+          error.getMessage() + " " + source.unavailableRemediation());
     }
-    if (outcome.valid() || xmiSchemaErrorsAreOnlyUnavailableUmlSchema(outcome.details())) {
-      return;
+    if (outcome.valid()) {
+      return conformance(source.conformanceMessage() + "; the schema set accepted the UML content");
+    }
+    if (xmiSchemaErrorsAreOnlyUnavailableUmlSchema(outcome.details())) {
+      return conformance(
+          source.conformanceMessage()
+              + "; UML-namespace content accepted — no normative OMG UML 2.5.1 XSD is published");
     }
     throw new XmiValidationException(
         DiagnosticCode.XMI_SCHEMA_INVALID.code(),
         "generated UML/XMI XML does not validate against OMG XMI.xsd: " + outcome.details());
   }
 
-  private static Path resolveOmgXmiSchemaPath(Map<String, String> env, Path productRoot)
+  private static Diagnostic conformance(String message) {
+    return new Diagnostic(
+        DiagnosticCode.EXPORT_SCHEMA_CONFORMANCE.code(),
+        DiagnosticSeverity.INFO,
+        message,
+        "content");
+  }
+
+  /**
+   * Where the schema came from decides which remediation a later failure names and how the
+   * conformance report describes the schema's provenance.
+   */
+  private record XmiSchemaSource(
+      Path path, String unavailableRemediation, String conformanceMessage) {}
+
+  private static XmiSchemaSource resolveOmgXmiSchemaPath(Map<String, String> env, Path productRoot)
       throws XmiValidationException {
     // Decision 9: a relative schema/cache env path resolves against the product root, not the JVM
     // cwd, so an in-memory build path can supply the product root explicitly. An absolute value is
@@ -143,7 +174,10 @@ public final class SchemaValidation {
     Optional<Path> configured = SchemaCacheModule.nonEmptyEnvPath(schemaEnv, XMI_SCHEMA_PATH_ENV);
     if (configured.isPresent()) {
       if (SchemaCacheModule.isNonEmptyFile(configured.get())) {
-        return configured.get();
+        return new XmiSchemaSource(
+            configured.get(),
+            XMI_SCHEMA_OFFLINE_REMEDIATION,
+            "validated in-JVM against the schema at the user-supplied DEDIREN_XMI_SCHEMA_PATH");
       }
       throw new XmiValidationException(
           DiagnosticCode.XMI_SCHEMA_UNAVAILABLE.code(),
@@ -172,7 +206,10 @@ public final class SchemaValidation {
           DiagnosticCode.XMI_SCHEMA_UNAVAILABLE.code(),
           error.getMessage() + " " + XMI_SCHEMA_DOWNLOAD_REMEDIATION);
     }
-    return schemaPath;
+    return new XmiSchemaSource(
+        schemaPath,
+        XMI_SCHEMA_DOWNLOAD_REMEDIATION,
+        "validated in-JVM against the pinned OMG XMI 2.5.1 XMI.xsd (SHA-256-verified download)");
   }
 
   /** Resolves this engine's schema/cache env paths against the product root (Decision 9). */
@@ -182,15 +219,24 @@ public final class SchemaValidation {
         env, productRoot, XMI_SCHEMA_PATH_ENV, SCHEMA_CACHE_DIR_ENV);
   }
 
+  /**
+   * True when every reported problem is the one known, tolerated gap: elements in the UML namespace
+   * that OMG XMI.xsd alone cannot declare, because no normative OMG UML XSD is published. The
+   * generated document always binds prefix {@code uml} to {@value
+   * dev.dediren.plugins.umlxmi.build.XmiHelpers#UML_NS}, so the Xerces messages name elements as
+   * {@code 'uml:...'} — the two shapes below are the JDK validator's strict-wildcard
+   * (cvc-complex-type.2.4.c) and no-declaration (cvc-elt.1.a) wordings, verified against the real
+   * OMG XMI.xsd (spike 2026-07-22).
+   */
   private static boolean xmiSchemaErrorsAreOnlyUnavailableUmlSchema(String details) {
     boolean sawUmlSchemaGap = false;
     for (String rawLine : details.lines().toList()) {
       String line = rawLine.trim();
-      if (line.isEmpty() || line.endsWith("fails to validate")) {
+      if (line.isEmpty()) {
         continue;
       }
-      if (line.contains(UML_NS)
-          && line.contains("No matching global element declaration available")) {
+      if (line.contains("no declaration can be found for element 'uml:")
+          || line.contains("Cannot find the declaration of element 'uml:")) {
         sawUmlSchemaGap = true;
         continue;
       }

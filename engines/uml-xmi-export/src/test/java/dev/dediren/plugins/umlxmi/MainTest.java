@@ -120,10 +120,10 @@ class MainTest {
   @Test
   void validatesUmlContentAgainstSuppliedUmlDeclaringSchemaSet() throws Exception {
     // The plugin accepts DEDIREN_XMI_SCHEMA_PATH pointing at a schema (set). Supplying a schema
-    // that also declares the UML namespace elements makes UML-content validation possible: xmllint
-    // then resolves the emitted uml:* elements against real global declarations under a strict
-    // wildcard instead of skipping them. This exercises the documented recipe end to end against
-    // the canonical serialization (issue #33 defect 3).
+    // that also declares the UML namespace elements makes UML-content validation possible: the
+    // in-JVM validator then resolves the emitted uml:* elements against real global declarations
+    // under a strict wildcard instead of skipping them. This exercises the documented recipe end
+    // to end against the canonical serialization (issue #33 defect 3).
     PluginResult result =
         Main.executeForTesting(
             new String[] {"export"}, exportInput().toString(), envWithXmiAndUmlSchema());
@@ -134,15 +134,30 @@ class MainTest {
   }
 
   @Test
-  void missingXmiSchemaValidatorIsStructured() throws Exception {
-    Map<String, String> env = new java.util.HashMap<>(envWithXmiSchema());
-    env.put("DEDIREN_XMI_SCHEMA_VALIDATOR", tempDir.resolve("no-such-validator").toString());
+  void brokenDriverSchemaSetIsStructuredAndNamesTheMissingImport() throws Exception {
+    // The in-JVM lane compiles the supplied schema with local-only import resolution: a driver
+    // schema whose import is not present beside it must fail as a structured SCHEMA_UNAVAILABLE
+    // naming the unresolved reference and the offline lane's placement advice, never as a crash.
+    Path driver = tempDir.resolve("driver.xsd");
+    Files.writeString(
+        driver,
+        """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+          targetNamespace="http://www.omg.org/spec/XMI/20131001"
+          elementFormDefault="qualified">
+          <xs:include schemaLocation="XMI.xsd"/>
+        </xs:schema>
+        """);
+    Map<String, String> env = Map.of("DEDIREN_XMI_SCHEMA_PATH", driver.toString());
 
     PluginResult result =
         Main.executeForTesting(new String[] {"export"}, exportInput().toString(), env);
 
     CommandEnvelopeAssertions.assertErrorCode(
-        result.stdout(), DiagnosticCode.XMI_SCHEMA_VALIDATOR_UNAVAILABLE.code());
+        result.stdout(), DiagnosticCode.XMI_SCHEMA_UNAVAILABLE.code());
+    assertThat(result.stdout()).contains("unresolved schema references: XMI.xsd");
+    assertThat(result.stdout()).contains("DEDIREN_XMI_SCHEMA_PATH");
   }
 
   @Test
@@ -289,7 +304,10 @@ class MainTest {
 
     JsonNode envelope = JsonSupport.objectMapper().readTree(result.stdout());
     assertThat(envelope.at("/status").asText()).isEqualTo("ok");
-    assertThat(envelope.at("/diagnostics").size()).isZero();
+    // No coverage diagnostics; the only entry is the always-present conformance report (info).
+    assertThat(envelope.at("/diagnostics").size()).isEqualTo(1);
+    assertThat(envelope.at("/diagnostics/0/code").asText())
+        .isEqualTo("DEDIREN_EXPORT_SCHEMA_CONFORMANCE");
   }
 
   @Test
@@ -1035,8 +1053,8 @@ class MainTest {
    * Writes the documented UML-content validation schema set: an XMI driver schema whose {@code
    * xmi:XMI} demands a strict global element declaration for its non-XMI children, importing a UML
    * schema that declares the emitted {@code uml:} elements. Pointing {@code
-   * DEDIREN_XMI_SCHEMA_PATH} at the driver lets {@code xmllint} validate UML content rather than
-   * skipping it.
+   * DEDIREN_XMI_SCHEMA_PATH} at the driver lets the in-JVM validator check UML content rather than
+   * skipping it (imports resolve local-only from the driver's directory).
    */
   private Map<String, String> envWithXmiAndUmlSchema() throws Exception {
     Files.writeString(
