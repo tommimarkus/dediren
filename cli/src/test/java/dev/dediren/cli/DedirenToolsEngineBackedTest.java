@@ -71,8 +71,7 @@ class DedirenToolsEngineBackedTest {
    * that test's doc for why the write collision reaches this branch specifically.
    */
   @Test
-  void buildReachesAnExceptionToEnvelopeBranchOnAWriteCollision(@TempDir Path root)
-      throws Exception {
+  void buildRecordsAWriteCollisionAsAPerViewError(@TempDir Path root) throws Exception {
     Files.copy(fixture("valid-basic.json"), root.resolve("model.json"));
     Files.copy(policy("default-svg.json"), root.resolve("policy.json"));
     Path out = Files.createDirectories(root.resolve("out"));
@@ -89,9 +88,11 @@ class DedirenToolsEngineBackedTest {
                         "render_policy", "policy.json")));
 
     assertThat(result.isError()).isTrue();
-    JsonNode envelope = envelopeOf(result);
-    assertThat(envelope.path("status").asText()).isEqualTo("error");
-    assertThat(envelope.at("/diagnostics/0/code").asText()).isEqualTo("DEDIREN_COMMAND_IO_FAILED");
+    JsonNode buildResult = envelopeOf(result);
+    assertThat(buildResult.path("status").asText()).isEqualTo("error");
+    assertThat(buildResult.at("/views/0/status").asText()).isEqualTo("error");
+    assertThat(buildResult.at("/views/0/diagnostics/0/code").asText())
+        .isEqualTo("DEDIREN_COMMAND_IO_FAILED");
   }
 
   /**

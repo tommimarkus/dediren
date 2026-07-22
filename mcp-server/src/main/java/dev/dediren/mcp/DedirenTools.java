@@ -37,9 +37,6 @@ import java.util.regex.Pattern;
  * MCP layer adds no second result format, only MCP's native {@code isError} flag on top.
  */
 public final class DedirenTools {
-  /** The semantics engine's wire id. A public contract string, like a schema id — not a class. */
-  private static final String SEMANTICS_ENGINE = "generic-graph";
-
   /**
    * The model view id shape (schema {@code model.schema.json}). Applied here as a defence-in-depth
    * guard on the {@code views} tool argument: a model-supplied view id feeds {@code core}'s
@@ -96,7 +93,7 @@ public final class DedirenTools {
       if (profile != null) {
         EngineRunOutcome outcome =
             CoreCommands.semanticValidateCommand(
-                SEMANTICS_ENGINE, profile, text, baseDir, root, env, engines);
+                BuildCommand.SEMANTICS_ENGINE, profile, text, baseDir, root, env, engines);
         return envelope(outcome.stdout(), outcome.exitCode() != 0);
       }
       // The model chose this source, so its fragment paths are model-supplied too: confine them to
@@ -105,6 +102,8 @@ public final class DedirenTools {
       return envelope(serialize(result.envelope()), result.exitCode() != 0);
     } catch (EngineExecutionException failure) {
       return engineFailure(failure);
+    } catch (UncheckedIOException failure) {
+      return ioFailure(failure);
     } catch (ProductRootException failure) {
       return error(DiagnosticCode.PRODUCT_ROOT_UNRESOLVED, failure.getMessage(), null);
     }
@@ -146,6 +145,8 @@ public final class DedirenTools {
           AnalysisCommands.diffCommand(
               oldText, oldPath.getParent(), newText, newPath.getParent(), root);
       return envelope(outcome.stdout(), outcome.exitCode() != 0);
+    } catch (UncheckedIOException failure) {
+      return ioFailure(failure);
     } catch (ProductRootException failure) {
       return error(DiagnosticCode.PRODUCT_ROOT_UNRESOLVED, failure.getMessage(), null);
     }
@@ -177,6 +178,8 @@ public final class DedirenTools {
       EngineRunOutcome outcome =
           AnalysisCommands.queryCommand(kind, id, text, sourcePath.getParent(), root);
       return envelope(outcome.stdout(), outcome.exitCode() != 0);
+    } catch (UncheckedIOException failure) {
+      return ioFailure(failure);
     } catch (ProductRootException failure) {
       return error(DiagnosticCode.PRODUCT_ROOT_UNRESOLVED, failure.getMessage(), null);
     }
@@ -440,11 +443,12 @@ public final class DedirenTools {
 
   /**
    * A workspace I/O failure while walking the confined tree (for example an unreadable subdirectory
-   * under {@code artifacts}/{@code dir}). The {@link UncheckedIOException}'s message can carry a
-   * resolved absolute path (an {@code AccessDeniedException} names the path itself), so keep it
-   * stderr-only and return a path-free envelope — the same discipline {@link #pathEscape} and
-   * {@link #readFailure} apply. ({@code build}'s own catch keeps the message verbatim on purpose:
-   * it is pinned lane-for-lane against the CLI's {@code printCommandIoFailure} by {@code
+   * under {@code artifacts}/{@code dir}), or a product schema that failed to load during source
+   * validation (a broken install). The {@link UncheckedIOException}'s message can carry a resolved
+   * absolute path (an {@code AccessDeniedException} names the path itself), so keep it stderr-only
+   * and return a path-free envelope — the same discipline {@link #pathEscape} and {@link
+   * #readFailure} apply. ({@code build}'s own catch keeps the message verbatim on purpose: it is
+   * pinned lane-for-lane against the CLI's {@code printCommandIoFailure} by {@code
    * CliMcpParityTest}, and the CLI lane deliberately surfaces the path for human debugging.)
    */
   private static CallToolResult ioFailure(UncheckedIOException failure) {
