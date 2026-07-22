@@ -210,10 +210,10 @@ enforcement authority for matching version, tag, and release actions.
   `DEDIREN_PLUGIN_UNSUPPORTED_CAPABILITY`. An unexpected in-memory engine
   failure is `DEDIREN_ENGINE_FAILED`.
 - A missing runtime dependency is reported by the engine that owns the
-  dependency, as a structured error envelope core preserves (for example the
-  XMI export engine emits `DEDIREN_XMI_SCHEMA_VALIDATOR_UNAVAILABLE` when
-  `xmllint` is absent; the OEF lane validates in-JVM and needs no external
-  validator).
+  dependency, as a structured error envelope core preserves (for example an
+  export engine emits `DEDIREN_OEF_SCHEMA_UNAVAILABLE` /
+  `DEDIREN_XMI_SCHEMA_UNAVAILABLE` when its schema must be fetched and `curl`
+  is absent; both export lanes validate in-JVM with no external validator).
 - There is no engine discovery of any kind: no `PATH` lookup, no manifest
   directories, no executable overrides. The bundled set is constructed
   explicitly in `cli` `EngineWiring`.
@@ -313,6 +313,15 @@ UML/XMI export changes:
 
 ```bash
 ./mvnw -pl engines/uml-xmi-export,cli -am test
+```
+
+Real-standards conformance (opt-in; first run fetches the pinned real
+schemas, so it needs network or a warm `~/.cache/dediren-real-schemas`):
+
+```bash
+./mvnw -pl engines/archimate-oef-export,engines/uml-xmi-export -am test \
+  -Dtest=RealSchemaConformanceTest -Ddediren.real-schemas=true \
+  -Dsurefire.failIfNoSpecifiedTests=false
 ```
 
 MCP server changes:
