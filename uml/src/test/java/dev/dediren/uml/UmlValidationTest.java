@@ -1,6 +1,8 @@
 package dev.dediren.uml;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Named.named;
+import static org.junit.jupiter.params.provider.Arguments.arguments;
 
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.contracts.source.GenericGraphPluginData;
@@ -8,8 +10,11 @@ import dev.dediren.contracts.source.SourceDocument;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.function.Consumer;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.NullNode;
@@ -652,74 +657,113 @@ class UmlValidationTest {
         "$.nodes[12].properties.uml.operands");
   }
 
-  @Test
-  void rejectsMalformedCombinedFragmentRequiredProperties() throws Exception {
-    assertUmlSequenceFragmentsMutationRejected(
-        source -> nodeUmlProperties(source, "cf-availability").remove("interaction"),
-        "$.nodes[5].properties.uml.interaction");
-    assertUmlSequenceFragmentsMutationRejected(
-        source -> nodeUmlProperties(source, "cf-availability").put("interaction", 3),
-        "$.nodes[5].properties.uml.interaction");
-    assertUmlSequenceFragmentsMutationRejected(
-        source -> nodeUmlProperties(source, "cf-availability").remove("operator"),
-        "$.nodes[5].properties.uml.operator");
-    assertUmlSequenceFragmentsMutationRejected(
-        source -> nodeUmlProperties(source, "cf-availability").put("operator", 3),
-        "$.nodes[5].properties.uml.operator");
-    assertUmlSequenceFragmentsMutationRejected(
-        source -> nodeUmlProperties(source, "cf-availability").remove("operands"),
-        "$.nodes[5].properties.uml.operands");
-    assertUmlSequenceFragmentsMutationRejected(
-        source -> nodeUmlProperties(source, "cf-availability").put("operands", "op-in-stock"),
-        "$.nodes[5].properties.uml.operands");
-    assertUmlSequenceFragmentsMutationRejected(
-        source -> nodeUmlProperties(source, "cf-availability").putArray("operands"),
-        "$.nodes[5].properties.uml.operands");
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("malformedCombinedFragmentRequiredPropertyCases")
+  void rejectsMalformedCombinedFragmentRequiredProperties(
+      Consumer<ObjectNode> mutation, String expectedPath) throws Exception {
+    assertUmlSequenceFragmentsMutationRejected(mutation, expectedPath);
   }
 
-  @Test
-  void rejectsMalformedCombinedFragmentCoveredProperty() throws Exception {
-    assertUmlSequenceFragmentsMutationRejected(
-        source -> nodeUmlProperties(source, "cf-availability").put("covered", "customer"),
-        "$.nodes[5].properties.uml.covered");
-    assertUmlSequenceFragmentsMutationRejected(
-        source -> {
-          var covered = JsonSupport.objectMapper().createArrayNode();
-          covered.add(3);
-          nodeUmlProperties(source, "cf-availability").set("covered", covered);
-        },
-        "$.nodes[5].properties.uml.covered[0]");
+  private static Stream<Arguments> malformedCombinedFragmentRequiredPropertyCases() {
+    return Stream.of(
+        fragmentRejectionCase(
+            "interaction-removed",
+            source -> nodeUmlProperties(source, "cf-availability").remove("interaction"),
+            "$.nodes[5].properties.uml.interaction"),
+        fragmentRejectionCase(
+            "interaction-non-string",
+            source -> nodeUmlProperties(source, "cf-availability").put("interaction", 3),
+            "$.nodes[5].properties.uml.interaction"),
+        fragmentRejectionCase(
+            "operator-removed",
+            source -> nodeUmlProperties(source, "cf-availability").remove("operator"),
+            "$.nodes[5].properties.uml.operator"),
+        fragmentRejectionCase(
+            "operator-non-string",
+            source -> nodeUmlProperties(source, "cf-availability").put("operator", 3),
+            "$.nodes[5].properties.uml.operator"),
+        fragmentRejectionCase(
+            "operands-removed",
+            source -> nodeUmlProperties(source, "cf-availability").remove("operands"),
+            "$.nodes[5].properties.uml.operands"),
+        fragmentRejectionCase(
+            "operands-non-array",
+            source -> nodeUmlProperties(source, "cf-availability").put("operands", "op-in-stock"),
+            "$.nodes[5].properties.uml.operands"),
+        fragmentRejectionCase(
+            "operands-empty-array",
+            source -> nodeUmlProperties(source, "cf-availability").putArray("operands"),
+            "$.nodes[5].properties.uml.operands"));
   }
 
-  @Test
-  void rejectsMalformedInteractionOperandRequiredProperties() throws Exception {
-    assertUmlSequenceFragmentsMutationRejected(
-        source -> nodeUmlProperties(source, "op-in-stock").remove("interaction"),
-        "$.nodes[6].properties.uml.interaction");
-    assertUmlSequenceFragmentsMutationRejected(
-        source -> nodeUmlProperties(source, "op-in-stock").put("interaction", 3),
-        "$.nodes[6].properties.uml.interaction");
-    assertUmlSequenceFragmentsMutationRejected(
-        source -> nodeUmlProperties(source, "op-in-stock").remove("combined_fragment"),
-        "$.nodes[6].properties.uml.combined_fragment");
-    assertUmlSequenceFragmentsMutationRejected(
-        source -> nodeUmlProperties(source, "op-in-stock").put("combined_fragment", 3),
-        "$.nodes[6].properties.uml.combined_fragment");
-    assertUmlSequenceFragmentsMutationRejected(
-        source -> nodeUmlProperties(source, "op-in-stock").remove("order"),
-        "$.nodes[6].properties.uml.order");
-    assertUmlSequenceFragmentsMutationRejected(
-        source -> nodeUmlProperties(source, "op-in-stock").put("order", 1.5),
-        "$.nodes[6].properties.uml.order");
-    assertUmlSequenceFragmentsMutationRejected(
-        source -> nodeUmlProperties(source, "op-in-stock").remove("fragments"),
-        "$.nodes[6].properties.uml.fragments");
-    assertUmlSequenceFragmentsMutationRejected(
-        source -> nodeUmlProperties(source, "op-in-stock").put("fragments", "m1"),
-        "$.nodes[6].properties.uml.fragments");
-    assertUmlSequenceFragmentsMutationRejected(
-        source -> nodeUmlProperties(source, "op-in-stock").putArray("fragments"),
-        "$.nodes[6].properties.uml.fragments");
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("malformedCombinedFragmentCoveredPropertyCases")
+  void rejectsMalformedCombinedFragmentCoveredProperty(
+      Consumer<ObjectNode> mutation, String expectedPath) throws Exception {
+    assertUmlSequenceFragmentsMutationRejected(mutation, expectedPath);
+  }
+
+  private static Stream<Arguments> malformedCombinedFragmentCoveredPropertyCases() {
+    return Stream.of(
+        fragmentRejectionCase(
+            "covered-non-array",
+            source -> nodeUmlProperties(source, "cf-availability").put("covered", "customer"),
+            "$.nodes[5].properties.uml.covered"),
+        fragmentRejectionCase(
+            "covered-element-non-string",
+            source -> {
+              var covered = JsonSupport.objectMapper().createArrayNode();
+              covered.add(3);
+              nodeUmlProperties(source, "cf-availability").set("covered", covered);
+            },
+            "$.nodes[5].properties.uml.covered[0]"));
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("malformedInteractionOperandRequiredPropertyCases")
+  void rejectsMalformedInteractionOperandRequiredProperties(
+      Consumer<ObjectNode> mutation, String expectedPath) throws Exception {
+    assertUmlSequenceFragmentsMutationRejected(mutation, expectedPath);
+  }
+
+  private static Stream<Arguments> malformedInteractionOperandRequiredPropertyCases() {
+    return Stream.of(
+        fragmentRejectionCase(
+            "interaction-removed",
+            source -> nodeUmlProperties(source, "op-in-stock").remove("interaction"),
+            "$.nodes[6].properties.uml.interaction"),
+        fragmentRejectionCase(
+            "interaction-non-string",
+            source -> nodeUmlProperties(source, "op-in-stock").put("interaction", 3),
+            "$.nodes[6].properties.uml.interaction"),
+        fragmentRejectionCase(
+            "combined-fragment-removed",
+            source -> nodeUmlProperties(source, "op-in-stock").remove("combined_fragment"),
+            "$.nodes[6].properties.uml.combined_fragment"),
+        fragmentRejectionCase(
+            "combined-fragment-non-string",
+            source -> nodeUmlProperties(source, "op-in-stock").put("combined_fragment", 3),
+            "$.nodes[6].properties.uml.combined_fragment"),
+        fragmentRejectionCase(
+            "order-removed",
+            source -> nodeUmlProperties(source, "op-in-stock").remove("order"),
+            "$.nodes[6].properties.uml.order"),
+        fragmentRejectionCase(
+            "order-non-integer",
+            source -> nodeUmlProperties(source, "op-in-stock").put("order", 1.5),
+            "$.nodes[6].properties.uml.order"),
+        fragmentRejectionCase(
+            "fragments-removed",
+            source -> nodeUmlProperties(source, "op-in-stock").remove("fragments"),
+            "$.nodes[6].properties.uml.fragments"),
+        fragmentRejectionCase(
+            "fragments-non-array",
+            source -> nodeUmlProperties(source, "op-in-stock").put("fragments", "m1"),
+            "$.nodes[6].properties.uml.fragments"),
+        fragmentRejectionCase(
+            "fragments-empty-array",
+            source -> nodeUmlProperties(source, "op-in-stock").putArray("fragments"),
+            "$.nodes[6].properties.uml.fragments"));
   }
 
   @Test
@@ -1520,18 +1564,22 @@ class UmlValidationTest {
     Uml.validateSource(fixture.source(), fixture.pluginData());
   }
 
-  @Test
-  void acceptsSupportedMessageSorts() throws Exception {
-    for (String sort :
-        new String[] {
-          "synchCall", "asynchCall", "asynchSignal", "reply", "createMessage", "deleteMessage"
-        }) {
-      Fixture fixture =
-          loadMutatedUmlSequenceFixture(
-              source -> firstMessageUmlProperties(source).put("message_sort", sort));
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "synchCall",
+        "asynchCall",
+        "asynchSignal",
+        "reply",
+        "createMessage",
+        "deleteMessage"
+      })
+  void acceptsSupportedMessageSorts(String messageSort) throws Exception {
+    Fixture fixture =
+        loadMutatedUmlSequenceFixture(
+            source -> firstMessageUmlProperties(source).put("message_sort", messageSort));
 
-      Uml.validateSource(fixture.source(), fixture.pluginData());
-    }
+    Uml.validateSource(fixture.source(), fixture.pluginData());
   }
 
   private static Fixture loadUmlFixture() throws Exception {
@@ -1708,6 +1756,11 @@ class UmlValidationTest {
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
     assertThat(error.path()).isEqualTo(expectedPath);
+  }
+
+  private static Arguments fragmentRejectionCase(
+      String name, Consumer<ObjectNode> mutation, String expectedPath) {
+    return arguments(named(name, mutation), expectedPath);
   }
 
   private static UmlValidationException assertRejected(Fixture fixture) {
