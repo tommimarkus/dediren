@@ -25,8 +25,9 @@ Hand-authored, checked-in source (edit these):
 
 - `model.json`, `model-uml.json` — the two notation models.
 - `project.json` — binds models to views and exports (v2 multi-model layout).
-- `render-policy.json` (Amber CRT, matching the README pipeline diagram),
-  `render-policy-uml.json` (classic UML on white).
+- `render-policy.json` and `render-policy-uml.json` — both in the repo's Amber
+  CRT theme (matching the README pipeline diagram); the UML policy accents
+  interfaces in emerald and classes in amber.
 - `export-policy.json` (OEF), `export-policy-uml.json` (XMI).
 
 Reproducible output (regenerated from the source above):
@@ -37,8 +38,10 @@ Reproducible output (regenerated from the source above):
 - `generated/export/dediren.uml.xmi` — UML 2.5.1 XMI export.
 - `gallery.html` — a self-contained, zoomable, notation-grouped viewer over both
   SVGs.
-- `generated/layout/` and `generated/render-metadata/` — intermediate geometry
-  and marker metadata (git-ignored; recreated on every build).
+- `generated/render-metadata/*.json` — per-view marker metadata (committed; the
+  gallery builder reads it to rebuild and drift-check `gallery.html`).
+- `generated/layout/` — intermediate ELK geometry (git-ignored; recreated on
+  every build).
 
 ## Regenerate
 
@@ -62,12 +65,10 @@ PKG=docs/architecture/dediren.dediren
 ```
 
 Each view writes under `out/self-model/<view-id>/` (`diagram.svg`, `oef.xml`,
-`xmi.xml`); copy the SVGs and exports into `generated/`. The committed SVGs are
-not byte-identical to a bare `dediren build`: a post-render step adds an
-accessible-name/visible-title band so they stay identifiable outside the
-package, and the dark ArchiMate hero gets a small theme legibility pass (a
-title-band background plus light title text) so its title reads in both light
-and dark GitHub themes.
+`xmi.xml`); copy the SVGs and exports into `generated/`. The committed SVGs then
+get the skill's `svg-accessible-name.sh` post-render step, which adds a
+`role="img"`/`<title>`/`<desc>` accessible name plus a visible title band. That
+step currently introduces two cosmetic defects — see *Known tool defects*.
 
 ## Modelling decisions (disclosed)
 
@@ -92,6 +93,25 @@ and dark GitHub themes.
 - **Evidence:** every node and edge is `source-backed`, extracted from each
   module's `pom.xml` and the guidelines' allowed-edge table. No
   architect-owned or low-confidence content.
+
+## Known tool defects
+
+Two cosmetic issues come from the skill's `svg-accessible-name.sh` post-render
+helper — not the dediren runtime or the render policy — and the SVGs ship with
+them as-is (reported, not hand-patched) pending a fix to that script:
+
+- **Letterbox "border".** The helper expands the SVG `viewBox` by 32px to make
+  room for the title band but leaves the root `width`/`height` unchanged, so the
+  viewport and viewBox aspect ratios differ. Browsers letterbox the diagram,
+  showing thin transparent bars that read as a white border on light pages.
+- **Title invisible on dark.** The visible title band is black text on a
+  transparent strip, so on the dark Amber CRT canvas it is unreadable. The
+  accessible `<title>`/`<desc>` (consumed by assistive technology) are
+  unaffected.
+
+Neither is themeable through the render policy; both need a fix in
+`svg-accessible-name.sh` (keep `width`/`height` in sync with the `viewBox`, and
+make the title band theme-aware).
 
 ## Known layout note
 

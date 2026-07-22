@@ -18,10 +18,10 @@
 /.idea
 
 # docs/architecture self-model package: commit hand-authored source, the rendered
-# SVGs, the shareable gallery, and the OEF/XMI exports; ignore the reproducible
-# layout/render-metadata intermediates and the build staging dir.
+# SVGs, the render-metadata (needed to rebuild and drift-check the gallery), the
+# shareable gallery, and the OEF/XMI exports; ignore only the reproducible layout
+# geometry and the build staging dir.
 /docs/architecture/dediren.dediren/.dediren-build/
 /docs/architecture/dediren.dediren/generated/layout/
-/docs/architecture/dediren.dediren/generated/render-metadata/
 !/docs/architecture/dediren.dediren/generated/svg/module-architecture.svg
 !/docs/architecture/dediren.dediren/generated/svg/engine-seam.svg

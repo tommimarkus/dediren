@@ -4,24 +4,24 @@
   "page": { "width": 1120, "height": 840 },
   "margin": { "top": 28, "right": 28, "bottom": 28, "left": 28 },
   "style": {
-    "background": { "fill": "#ffffff" },
+    "background": { "fill": "#0C0A06" },
     "font": { "family": "Inter, Arial, sans-serif", "size": 13 },
-    "node": { "fill": "#ffffff", "stroke": "#1f2937", "stroke_width": 1.25, "rx": 0, "label_fill": "#0f172a" },
+    "node": { "fill": "#17110A", "stroke": "#7A6B4E", "stroke_width": 1.25, "rx": 0, "label_fill": "#ECDFC7" },
     "edge": {
-      "stroke": "#1f2937",
+      "stroke": "#7A6B4E",
       "stroke_width": 1.25,
-      "label_fill": "#0f172a",
+      "label_fill": "#A2957A",
       "label_horizontal_position": "center",
       "label_horizontal_side": "auto",
       "label_vertical_position": "center",
       "label_vertical_side": "left"
     },
-    "group": { "fill": "#f8fafc", "stroke": "#94a3b8", "stroke_width": 1, "rx": 0, "label_fill": "#334155", "label_size": 12 },
+    "group": { "fill": "#100B05", "stroke": "#4A3F2C", "stroke_width": 1, "rx": 0, "label_fill": "#F2A93B", "label_size": 12 },
     "node_type_overrides": {
-      "Package": { "fill": "#ffffff", "stroke": "#1f2937", "label_fill": "#0f172a", "decorator": "uml_package" },
-      "Interface": { "fill": "#eef4ff", "stroke": "#1f3a8a", "label_fill": "#0f172a", "decorator": "uml_interface" },
-      "Class": { "fill": "#ffffff", "stroke": "#1f2937", "label_fill": "#0f172a", "decorator": "uml_class" },
-      "Enumeration": { "fill": "#ffffff", "stroke": "#1f2937", "label_fill": "#0f172a", "decorator": "uml_enumeration" }
+      "Package": { "fill": "#100B05", "stroke": "#4A3F2C", "label_fill": "#F2A93B", "decorator": "uml_package" },
+      "Interface": { "fill": "#17110A", "stroke": "#54D98A", "label_fill": "#ECDFC7", "decorator": "uml_interface" },
+      "Class": { "fill": "#17110A", "stroke": "#F2A93B", "label_fill": "#ECDFC7", "decorator": "uml_class" },
+      "Enumeration": { "fill": "#17110A", "stroke": "#F2A93B", "label_fill": "#ECDFC7", "decorator": "uml_enumeration" }
     },
     "edge_type_overrides": {
       "Realization": { "line_style": "dashed", "marker_end": "hollow_triangle" },
@@ -31,7 +31,7 @@
       "Aggregation": { "marker_start": "hollow_diamond", "marker_end": "none" }
     },
     "group_type_overrides": {
-      "Package": { "fill": "#f8fafc", "stroke": "#94a3b8", "label_fill": "#334155", "decorator": "uml_package" }
+      "Package": { "fill": "#100B05", "stroke": "#4A3F2C", "label_fill": "#F2A93B", "decorator": "uml_package" }
     },
     "node_overrides": {},
     "edge_overrides": {},

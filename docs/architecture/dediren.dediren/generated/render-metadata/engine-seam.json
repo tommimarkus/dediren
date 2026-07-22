@@ -1,0 +1,522 @@
+{
+  "render_metadata_schema_version": "render-metadata.schema.v1",
+  "semantic_profile": "uml",
+  "nodes": {
+    "if-semantics-engine": {
+      "type": "Interface",
+      "source_id": "if-semantics-engine",
+      "properties": {
+        "package": "pkg-engine-api",
+        "operations": [
+          {
+            "name": "id",
+            "visibility": "public",
+            "parameters": [],
+            "return_type": "String"
+          },
+          {
+            "name": "validate",
+            "visibility": "public",
+            "parameters": [
+              {
+                "name": "source",
+                "type": "SourceDocument"
+              },
+              {
+                "name": "profile",
+                "type": "String"
+              }
+            ],
+            "return_type": "EngineResult<SemanticValidationResult>"
+          },
+          {
+            "name": "projectScene",
+            "visibility": "public",
+            "parameters": [
+              {
+                "name": "source",
+                "type": "SourceDocument"
+              },
+              {
+                "name": "view",
+                "type": "String"
+              }
+            ],
+            "return_type": "EngineResult<SceneGraph>"
+          },
+          {
+            "name": "projectRenderMetadata",
+            "visibility": "public",
+            "parameters": [
+              {
+                "name": "source",
+                "type": "SourceDocument"
+              },
+              {
+                "name": "view",
+                "type": "String"
+              }
+            ],
+            "return_type": "EngineResult<RenderMetadata>"
+          }
+        ]
+      }
+    },
+    "if-layout-engine": {
+      "type": "Interface",
+      "source_id": "if-layout-engine",
+      "properties": {
+        "package": "pkg-engine-api",
+        "operations": [
+          {
+            "name": "id",
+            "visibility": "public",
+            "parameters": [],
+            "return_type": "String"
+          },
+          {
+            "name": "parseRequest",
+            "visibility": "public",
+            "parameters": [
+              {
+                "name": "input",
+                "type": "byte[]"
+              }
+            ],
+            "return_type": "SceneGraph"
+          },
+          {
+            "name": "layout",
+            "visibility": "public",
+            "parameters": [
+              {
+                "name": "scene",
+                "type": "SceneGraph"
+              }
+            ],
+            "return_type": "EngineResult<LaidOutScene>"
+          }
+        ]
+      }
+    },
+    "if-render-engine": {
+      "type": "Interface",
+      "source_id": "if-render-engine",
+      "properties": {
+        "package": "pkg-engine-api",
+        "operations": [
+          {
+            "name": "id",
+            "visibility": "public",
+            "parameters": [],
+            "return_type": "String"
+          },
+          {
+            "name": "render",
+            "visibility": "public",
+            "parameters": [
+              {
+                "name": "layout",
+                "type": "LaidOutScene"
+              },
+              {
+                "name": "policy",
+                "type": "JsonNode"
+              },
+              {
+                "name": "metadataOrNull",
+                "type": "RenderMetadata"
+              }
+            ],
+            "return_type": "EngineResult<RenderResult>"
+          }
+        ]
+      }
+    },
+    "if-export-engine": {
+      "type": "Interface",
+      "source_id": "if-export-engine",
+      "properties": {
+        "package": "pkg-engine-api",
+        "operations": [
+          {
+            "name": "id",
+            "visibility": "public",
+            "parameters": [],
+            "return_type": "String"
+          },
+          {
+            "name": "export",
+            "visibility": "public",
+            "parameters": [
+              {
+                "name": "request",
+                "type": "ExportRequest"
+              },
+              {
+                "name": "env",
+                "type": "Map<String,String>"
+              },
+              {
+                "name": "productRoot",
+                "type": "Path"
+              }
+            ],
+            "return_type": "EngineResult<ExportResult>"
+          },
+          {
+            "name": "exportModel",
+            "visibility": "public",
+            "parameters": [
+              {
+                "name": "request",
+                "type": "ModelExportRequest"
+              },
+              {
+                "name": "env",
+                "type": "Map<String,String>"
+              },
+              {
+                "name": "productRoot",
+                "type": "Path"
+              }
+            ],
+            "return_type": "Optional<EngineResult<ExportResult>>"
+          }
+        ]
+      }
+    },
+    "if-notation-semantics": {
+      "type": "Interface",
+      "source_id": "if-notation-semantics",
+      "properties": {
+        "package": "pkg-engine-api",
+        "operations": [
+          {
+            "name": "validate",
+            "visibility": "public",
+            "parameters": [
+              {
+                "name": "source",
+                "type": "SourceDocument"
+              },
+              {
+                "name": "pluginData",
+                "type": "GenericGraphPluginData"
+              }
+            ],
+            "return_type": "void"
+          },
+          {
+            "name": "layoutRole",
+            "visibility": "public",
+            "parameters": [
+              {
+                "name": "sourceType",
+                "type": "String"
+              }
+            ],
+            "return_type": "String"
+          },
+          {
+            "name": "layoutIntents",
+            "visibility": "public",
+            "parameters": [
+              {
+                "name": "source",
+                "type": "SourceDocument"
+              },
+              {
+                "name": "view",
+                "type": "GenericGraphView"
+              }
+            ],
+            "return_type": "List<LayoutIntent>"
+          }
+        ]
+      }
+    },
+    "cls-semantics-router": {
+      "type": "Class",
+      "source_id": "cls-semantics-router",
+      "properties": {
+        "package": "pkg-engines",
+        "attributes": [],
+        "operations": [
+          {
+            "name": "id",
+            "visibility": "public",
+            "parameters": [],
+            "return_type": "String"
+          },
+          {
+            "name": "projectScene",
+            "visibility": "public",
+            "parameters": [
+              {
+                "name": "source",
+                "type": "SourceDocument"
+              },
+              {
+                "name": "view",
+                "type": "String"
+              }
+            ],
+            "return_type": "EngineResult<SceneGraph>"
+          }
+        ]
+      }
+    },
+    "cls-graph-notation": {
+      "type": "Class",
+      "source_id": "cls-graph-notation",
+      "properties": {
+        "package": "pkg-engines",
+        "attributes": [],
+        "operations": [
+          {
+            "name": "layoutRole",
+            "visibility": "public",
+            "parameters": [
+              {
+                "name": "sourceType",
+                "type": "String"
+              }
+            ],
+            "return_type": "String"
+          }
+        ]
+      }
+    },
+    "cls-archimate-notation": {
+      "type": "Class",
+      "source_id": "cls-archimate-notation",
+      "properties": {
+        "package": "pkg-engines",
+        "attributes": [],
+        "operations": [
+          {
+            "name": "validate",
+            "visibility": "public",
+            "parameters": [
+              {
+                "name": "source",
+                "type": "SourceDocument"
+              },
+              {
+                "name": "pluginData",
+                "type": "GenericGraphPluginData"
+              }
+            ],
+            "return_type": "void"
+          }
+        ]
+      }
+    },
+    "cls-uml-notation": {
+      "type": "Class",
+      "source_id": "cls-uml-notation",
+      "properties": {
+        "package": "pkg-engines",
+        "attributes": [],
+        "operations": [
+          {
+            "name": "validate",
+            "visibility": "public",
+            "parameters": [
+              {
+                "name": "source",
+                "type": "SourceDocument"
+              },
+              {
+                "name": "pluginData",
+                "type": "GenericGraphPluginData"
+              }
+            ],
+            "return_type": "void"
+          }
+        ]
+      }
+    },
+    "cls-elk-engine": {
+      "type": "Class",
+      "source_id": "cls-elk-engine",
+      "properties": {
+        "package": "pkg-engines",
+        "attributes": [],
+        "operations": [
+          {
+            "name": "id",
+            "visibility": "public",
+            "parameters": [],
+            "return_type": "String"
+          },
+          {
+            "name": "layout",
+            "visibility": "public",
+            "parameters": [
+              {
+                "name": "scene",
+                "type": "SceneGraph"
+              }
+            ],
+            "return_type": "EngineResult<LaidOutScene>"
+          }
+        ]
+      }
+    },
+    "cls-svg-render": {
+      "type": "Class",
+      "source_id": "cls-svg-render",
+      "properties": {
+        "package": "pkg-engines",
+        "attributes": [],
+        "operations": [
+          {
+            "name": "id",
+            "visibility": "public",
+            "parameters": [],
+            "return_type": "String"
+          },
+          {
+            "name": "render",
+            "visibility": "public",
+            "parameters": [
+              {
+                "name": "layout",
+                "type": "LaidOutScene"
+              },
+              {
+                "name": "policy",
+                "type": "JsonNode"
+              },
+              {
+                "name": "metadataOrNull",
+                "type": "RenderMetadata"
+              }
+            ],
+            "return_type": "EngineResult<RenderResult>"
+          }
+        ]
+      }
+    },
+    "cls-oef-export": {
+      "type": "Class",
+      "source_id": "cls-oef-export",
+      "properties": {
+        "package": "pkg-engines",
+        "attributes": [],
+        "operations": [
+          {
+            "name": "id",
+            "visibility": "public",
+            "parameters": [],
+            "return_type": "String"
+          },
+          {
+            "name": "export",
+            "visibility": "public",
+            "parameters": [
+              {
+                "name": "request",
+                "type": "ExportRequest"
+              },
+              {
+                "name": "env",
+                "type": "Map<String,String>"
+              },
+              {
+                "name": "productRoot",
+                "type": "Path"
+              }
+            ],
+            "return_type": "EngineResult<ExportResult>"
+          }
+        ]
+      }
+    },
+    "cls-xmi-export": {
+      "type": "Class",
+      "source_id": "cls-xmi-export",
+      "properties": {
+        "package": "pkg-engines",
+        "attributes": [],
+        "operations": [
+          {
+            "name": "id",
+            "visibility": "public",
+            "parameters": [],
+            "return_type": "String"
+          },
+          {
+            "name": "export",
+            "visibility": "public",
+            "parameters": [
+              {
+                "name": "request",
+                "type": "ExportRequest"
+              },
+              {
+                "name": "env",
+                "type": "Map<String,String>"
+              },
+              {
+                "name": "productRoot",
+                "type": "Path"
+              }
+            ],
+            "return_type": "EngineResult<ExportResult>"
+          }
+        ]
+      }
+    }
+  },
+  "edges": {
+    "real-router-semantics": {
+      "type": "Realization",
+      "source_id": "real-router-semantics"
+    },
+    "real-elk-layout": {
+      "type": "Realization",
+      "source_id": "real-elk-layout"
+    },
+    "real-svg-render": {
+      "type": "Realization",
+      "source_id": "real-svg-render"
+    },
+    "real-oef-export": {
+      "type": "Realization",
+      "source_id": "real-oef-export"
+    },
+    "real-xmi-export": {
+      "type": "Realization",
+      "source_id": "real-xmi-export"
+    },
+    "real-graph-notation": {
+      "type": "Realization",
+      "source_id": "real-graph-notation"
+    },
+    "real-archimate-notation": {
+      "type": "Realization",
+      "source_id": "real-archimate-notation"
+    },
+    "real-uml-notation": {
+      "type": "Realization",
+      "source_id": "real-uml-notation"
+    },
+    "dep-router-notation": {
+      "type": "Dependency",
+      "source_id": "dep-router-notation"
+    }
+  },
+  "groups": {
+    "engine-api-boundary": {
+      "type": "Package",
+      "source_id": "pkg-engine-api"
+    },
+    "engines-boundary": {
+      "type": "Package",
+      "source_id": "pkg-engines"
+    }
+  }
+}

@@ -1,0 +1,169 @@
+{
+  "render_metadata_schema_version": "render-metadata.schema.v1",
+  "semantic_profile": "archimate",
+  "nodes": {
+    "contracts": {
+      "type": "ApplicationComponent",
+      "source_id": "contracts"
+    },
+    "ir": {
+      "type": "ApplicationComponent",
+      "source_id": "ir"
+    },
+    "archimate": {
+      "type": "ApplicationComponent",
+      "source_id": "archimate"
+    },
+    "uml": {
+      "type": "ApplicationComponent",
+      "source_id": "uml"
+    },
+    "schema-cache": {
+      "type": "ApplicationComponent",
+      "source_id": "schema-cache"
+    },
+    "engine-api": {
+      "type": "ApplicationComponent",
+      "source_id": "engine-api"
+    },
+    "core": {
+      "type": "ApplicationComponent",
+      "source_id": "core"
+    },
+    "semantics-graph": {
+      "type": "ApplicationComponent",
+      "source_id": "semantics-graph"
+    },
+    "semantics-archimate": {
+      "type": "ApplicationComponent",
+      "source_id": "semantics-archimate"
+    },
+    "semantics-uml": {
+      "type": "ApplicationComponent",
+      "source_id": "semantics-uml"
+    },
+    "elk-layout": {
+      "type": "ApplicationComponent",
+      "source_id": "elk-layout"
+    },
+    "render": {
+      "type": "ApplicationComponent",
+      "source_id": "render"
+    },
+    "archimate-oef-export": {
+      "type": "ApplicationComponent",
+      "source_id": "archimate-oef-export"
+    },
+    "uml-xmi-export": {
+      "type": "ApplicationComponent",
+      "source_id": "uml-xmi-export"
+    },
+    "mcp-server": {
+      "type": "ApplicationComponent",
+      "source_id": "mcp-server"
+    },
+    "cli": {
+      "type": "ApplicationComponent",
+      "source_id": "cli"
+    },
+    "dist-tool": {
+      "type": "ApplicationComponent",
+      "source_id": "dist-tool"
+    }
+  },
+  "edges": {
+    "serv-contracts-ir": {
+      "type": "Serving",
+      "source_id": "serv-contracts-ir"
+    },
+    "serv-contracts-uml": {
+      "type": "Serving",
+      "source_id": "serv-contracts-uml"
+    },
+    "serv-ir-engine-api": {
+      "type": "Serving",
+      "source_id": "serv-ir-engine-api"
+    },
+    "serv-engine-api-core": {
+      "type": "Serving",
+      "source_id": "serv-engine-api-core"
+    },
+    "serv-engine-api-semantics-graph": {
+      "type": "Serving",
+      "source_id": "serv-engine-api-semantics-graph"
+    },
+    "serv-engine-api-semantics-archimate": {
+      "type": "Serving",
+      "source_id": "serv-engine-api-semantics-archimate"
+    },
+    "serv-engine-api-semantics-uml": {
+      "type": "Serving",
+      "source_id": "serv-engine-api-semantics-uml"
+    },
+    "serv-engine-api-elk-layout": {
+      "type": "Serving",
+      "source_id": "serv-engine-api-elk-layout"
+    },
+    "serv-engine-api-render": {
+      "type": "Serving",
+      "source_id": "serv-engine-api-render"
+    },
+    "serv-engine-api-archimate-oef-export": {
+      "type": "Serving",
+      "source_id": "serv-engine-api-archimate-oef-export"
+    },
+    "serv-engine-api-uml-xmi-export": {
+      "type": "Serving",
+      "source_id": "serv-engine-api-uml-xmi-export"
+    },
+    "serv-archimate-semantics-archimate": {
+      "type": "Serving",
+      "source_id": "serv-archimate-semantics-archimate"
+    },
+    "serv-archimate-render": {
+      "type": "Serving",
+      "source_id": "serv-archimate-render"
+    },
+    "serv-archimate-archimate-oef-export": {
+      "type": "Serving",
+      "source_id": "serv-archimate-archimate-oef-export"
+    },
+    "serv-uml-semantics-uml": {
+      "type": "Serving",
+      "source_id": "serv-uml-semantics-uml"
+    },
+    "serv-uml-render": {
+      "type": "Serving",
+      "source_id": "serv-uml-render"
+    },
+    "serv-uml-uml-xmi-export": {
+      "type": "Serving",
+      "source_id": "serv-uml-uml-xmi-export"
+    },
+    "serv-schema-cache-archimate-oef-export": {
+      "type": "Serving",
+      "source_id": "serv-schema-cache-archimate-oef-export"
+    },
+    "serv-schema-cache-uml-xmi-export": {
+      "type": "Serving",
+      "source_id": "serv-schema-cache-uml-xmi-export"
+    },
+    "serv-core-mcp-server": {
+      "type": "Serving",
+      "source_id": "serv-core-mcp-server"
+    },
+    "serv-core-cli": {
+      "type": "Serving",
+      "source_id": "serv-core-cli"
+    },
+    "serv-mcp-server-cli": {
+      "type": "Serving",
+      "source_id": "serv-mcp-server-cli"
+    },
+    "serv-cli-dist-tool": {
+      "type": "Serving",
+      "source_id": "serv-cli-dist-tool"
+    }
+  },
+  "groups": {}
+}
