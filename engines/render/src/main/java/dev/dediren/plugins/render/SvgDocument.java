@@ -1,6 +1,7 @@
-package dev.dediren.plugins.render.svg;
+package dev.dediren.plugins.render;
 
 import static dev.dediren.plugins.render.node.NodeLabels.nodeLabel;
+import static dev.dediren.plugins.render.node.NodeLabels.nodeLabelBoxes;
 import static dev.dediren.plugins.render.node.NodeShapeSupport.archimateJunctionRadius;
 import static dev.dediren.plugins.render.node.NodeShapeSupport.decoratorName;
 import static dev.dediren.plugins.render.node.NodeShapeSupport.isArchimateCutCornerRectangle;
@@ -20,7 +21,6 @@ import static dev.dediren.plugins.render.svg.EdgeRenderer.edgePath;
 import static dev.dediren.plugins.render.svg.EdgeRenderer.lineJumpMasks;
 import static dev.dediren.plugins.render.svg.EdgeRenderer.lineJumps;
 import static dev.dediren.plugins.render.svg.Geometry.labelObstacleBoxesForEdge;
-import static dev.dediren.plugins.render.svg.Geometry.svgBounds;
 import static dev.dediren.plugins.render.svg.Svg.dashArrayValue;
 import static dev.dediren.plugins.render.svg.Svg.f1;
 import static dev.dediren.plugins.render.svg.Svg.opacity;
@@ -30,6 +30,7 @@ import dev.dediren.contracts.layout.LaidOutEdge;
 import dev.dediren.contracts.layout.LaidOutGroup;
 import dev.dediren.contracts.layout.LaidOutNode;
 import dev.dediren.contracts.layout.LayoutResult;
+import dev.dediren.contracts.layout.Point;
 import dev.dediren.contracts.render.RenderMetadata;
 import dev.dediren.contracts.render.RenderMetadataSelector;
 import dev.dediren.contracts.render.RenderPolicy;
@@ -44,6 +45,13 @@ import dev.dediren.plugins.render.style.ResolvedGroupStyle;
 import dev.dediren.plugins.render.style.ResolvedNodeStyle;
 import dev.dediren.plugins.render.style.ResolvedStyle;
 import dev.dediren.plugins.render.style.StyleResolver;
+import dev.dediren.plugins.render.svg.EdgeEndAdornments;
+import dev.dediren.plugins.render.svg.EdgeLabel;
+import dev.dediren.plugins.render.svg.LabelBox;
+import dev.dediren.plugins.render.svg.LineJump;
+import dev.dediren.plugins.render.svg.SvgAccessibleName;
+import dev.dediren.plugins.render.svg.SvgBounds;
+import dev.dediren.plugins.render.svg.SvgWriter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -342,5 +350,60 @@ public final class SvgDocument {
 
   private static String enumValue(Enum<?> value) {
     return value == null ? null : value.name().toLowerCase(Locale.ROOT);
+  }
+
+  /**
+   * The document bounds: every group/edge/node rect plus rendered node labels, edge labels, and end
+   * adornments. Node-aware (it consults the node package's label boxes and decorator rules), which
+   * is why it lives here with its only caller and not in the svg package's Geometry — the svg
+   * package stays a leaf with no node.* imports.
+   */
+  private static SvgBounds svgBounds(
+      LayoutResult result, RenderMetadata metadata, RenderPolicy policy, ResolvedStyle base) {
+    var bounds = SvgBounds.empty();
+    for (LaidOutGroup group : result.groups()) {
+      bounds.includeRect(group.x(), group.y(), group.width(), group.height());
+    }
+    for (LaidOutEdge edge : result.edges()) {
+      for (Point point : edge.points()) {
+        bounds.includePoint(point.x(), point.y());
+      }
+    }
+    for (LaidOutNode node : result.nodes()) {
+      bounds.includeRect(node.x(), node.y(), node.width(), node.height());
+      ResolvedNodeStyle style = StyleResolver.nodeStyle(policy, metadata, node.id(), base);
+      if (shouldRenderPlainNodeLabel(node, style.decorator())) {
+        for (LabelBox labelBox : nodeLabelBoxes(node, style, base.fontSize())) {
+          bounds.includeRect(labelBox.minX(), labelBox.minY(), labelBox.width(), labelBox.height());
+        }
+      }
+    }
+    List<LabelBox> placedLabelBoxes = new ArrayList<>();
+    for (int edgeIndex = 0; edgeIndex < result.edges().size(); edgeIndex++) {
+      LaidOutEdge edge = result.edges().get(edgeIndex);
+      ResolvedEdgeStyle style = StyleResolver.edgeStyle(policy, metadata, edge.id(), base);
+      if (edge.label() != null && !edge.label().isEmpty()) {
+        EdgeLabel label =
+            edgeLabel(
+                edge,
+                style,
+                labelObstacleBoxesForEdge(result, edgeIndex, placedLabelBoxes),
+                edgeLabelFontSize(base.fontSize()));
+        LabelBox labelBox = edgeLabelVisibleBox(label, style.labelPresentation());
+        bounds.includeRect(labelBox.minX(), labelBox.minY(), labelBox.width(), labelBox.height());
+        placedLabelBoxes.add(labelBox);
+      }
+      RenderMetadataSelector selector = metadata == null ? null : metadata.edges().get(edge.id());
+      for (EdgeEndAdornments.Adornment adornment :
+          EdgeEndAdornments.adornments(edge, selector, base.fontSize())) {
+        LabelBox box = EdgeEndAdornments.visibleBox(adornment, style);
+        bounds.includeRect(box.minX(), box.minY(), box.width(), box.height());
+        placedLabelBoxes.add(box);
+      }
+    }
+    if (bounds.isEmpty()) {
+      bounds.includeRect(0.0, 0.0, policy.page().width(), policy.page().height());
+    }
+    return bounds.padded(policy);
   }
 }

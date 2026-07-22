@@ -1,10 +1,5 @@
 package dev.dediren.plugins.render.svg;
 
-import static dev.dediren.plugins.render.node.NodeLabels.nodeLabelBoxes;
-import static dev.dediren.plugins.render.node.NodeShapeSupport.shouldRenderPlainNodeLabel;
-import static dev.dediren.plugins.render.svg.EdgeRenderer.edgeLabel;
-import static dev.dediren.plugins.render.svg.EdgeRenderer.edgeLabelFontSize;
-import static dev.dediren.plugins.render.svg.EdgeRenderer.edgeLabelVisibleBox;
 import static dev.dediren.plugins.render.svg.EdgeRenderer.nearlyEqual;
 
 import dev.dediren.contracts.layout.LaidOutEdge;
@@ -12,16 +7,14 @@ import dev.dediren.contracts.layout.LaidOutGroup;
 import dev.dediren.contracts.layout.LaidOutNode;
 import dev.dediren.contracts.layout.LayoutResult;
 import dev.dediren.contracts.layout.Point;
-import dev.dediren.contracts.render.RenderMetadata;
-import dev.dediren.contracts.render.RenderMetadataSelector;
-import dev.dediren.contracts.render.RenderPolicy;
-import dev.dediren.plugins.render.style.ResolvedEdgeStyle;
-import dev.dediren.plugins.render.style.ResolvedNodeStyle;
-import dev.dediren.plugins.render.style.ResolvedStyle;
-import dev.dediren.plugins.render.style.StyleResolver;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Pure obstacle/label geometry over laid-out contracts types. Deliberately free of {@code node.*}
+ * imports so the svg package stays a leaf: the node-aware document bounds computation lives with
+ * its caller, {@code SvgDocument.svgBounds}, one package up.
+ */
 public final class Geometry {
 
   private Geometry() {}
@@ -29,55 +22,6 @@ public final class Geometry {
   private static final double EDGE_ROUTE_LABEL_OBSTACLE_PADDING = 6.0;
   private static final double GROUP_BORDER_LABEL_OBSTACLE_PADDING = 4.0;
   private static final double GROUP_TITLE_LABEL_OBSTACLE_HEIGHT = 24.0;
-
-  public static SvgBounds svgBounds(
-      LayoutResult result, RenderMetadata metadata, RenderPolicy policy, ResolvedStyle base) {
-    var bounds = SvgBounds.empty();
-    for (LaidOutGroup group : result.groups()) {
-      bounds.includeRect(group.x(), group.y(), group.width(), group.height());
-    }
-    for (LaidOutEdge edge : result.edges()) {
-      for (Point point : edge.points()) {
-        bounds.includePoint(point.x(), point.y());
-      }
-    }
-    for (LaidOutNode node : result.nodes()) {
-      bounds.includeRect(node.x(), node.y(), node.width(), node.height());
-      ResolvedNodeStyle style = StyleResolver.nodeStyle(policy, metadata, node.id(), base);
-      if (shouldRenderPlainNodeLabel(node, style.decorator())) {
-        for (LabelBox labelBox : nodeLabelBoxes(node, style, base.fontSize())) {
-          bounds.includeRect(labelBox.minX(), labelBox.minY(), labelBox.width(), labelBox.height());
-        }
-      }
-    }
-    List<LabelBox> placedLabelBoxes = new ArrayList<>();
-    for (int edgeIndex = 0; edgeIndex < result.edges().size(); edgeIndex++) {
-      LaidOutEdge edge = result.edges().get(edgeIndex);
-      ResolvedEdgeStyle style = StyleResolver.edgeStyle(policy, metadata, edge.id(), base);
-      if (edge.label() != null && !edge.label().isEmpty()) {
-        EdgeLabel label =
-            edgeLabel(
-                edge,
-                style,
-                labelObstacleBoxesForEdge(result, edgeIndex, placedLabelBoxes),
-                edgeLabelFontSize(base.fontSize()));
-        LabelBox labelBox = edgeLabelVisibleBox(label, style.labelPresentation());
-        bounds.includeRect(labelBox.minX(), labelBox.minY(), labelBox.width(), labelBox.height());
-        placedLabelBoxes.add(labelBox);
-      }
-      RenderMetadataSelector selector = metadata == null ? null : metadata.edges().get(edge.id());
-      for (EdgeEndAdornments.Adornment adornment :
-          EdgeEndAdornments.adornments(edge, selector, base.fontSize())) {
-        LabelBox box = EdgeEndAdornments.visibleBox(adornment, style);
-        bounds.includeRect(box.minX(), box.minY(), box.width(), box.height());
-        placedLabelBoxes.add(box);
-      }
-    }
-    if (bounds.isEmpty()) {
-      bounds.includeRect(0.0, 0.0, policy.page().width(), policy.page().height());
-    }
-    return bounds.padded(policy);
-  }
 
   public static List<LabelBox> nodeObstacleBoxes(LayoutResult result) {
     List<LabelBox> boxes = new ArrayList<>();
