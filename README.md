@@ -238,9 +238,11 @@ gh attestation verify dediren-agent-bundle-<version>.tar.xz --repo tommimarkus/d
 ```
 
 The archive, both CycloneDX SBOMs, and `SHA256SUMS` are attested together, so
-`gh attestation verify` covers the SBOMs too. To freeze published releases
-against post-publish asset tampering, enable repository release immutability
-(**Settings → General → Releases → Enable release immutability**; applies to
-future releases only). The release workflow is written for it: it creates each
-release as a draft with all assets attached, then publishes in one transition,
-so an immutable release always carries the complete, attested asset set.
+`gh attestation verify` covers every published asset, and the publish job
+checks the assets against the attested `SHA256SUMS` before releasing.
+Repository release immutability is enabled, so a published release's tag and
+asset set are frozen against post-publish tampering (releases published before
+2026-07-23 predate the setting and remain mutable). The release workflow
+creates each release as a draft with all assets attached, then publishes in
+one transition, so an immutable release always carries the complete, attested
+asset set.

@@ -126,9 +126,17 @@ jobs:
           cp "${{ steps.archive.outputs.path }}" "release-staging/dediren-agent-bundle-${VERSION}.tar.xz"
           cp target/bom.json "release-staging/dediren-${VERSION}.cdx.json"
           cp target/bom.xml "release-staging/dediren-${VERSION}.cdx.xml"
+          # Compute SHA256SUMS here, not in the publish job, so the checksum
+          # file can be a subject of the provenance attestation below alongside
+          # the files it lists.
+          (
+            cd release-staging
+            sha256sum *.tar.xz *.cdx.json *.cdx.xml > SHA256SUMS
+          )
 
-      # Attest the archive AND both SBOM serializations together, so each is a
-      # verifiable subject of one build-provenance attestation (audit F2).
+      # Attest the archive, both SBOM serializations, and the SHA256SUMS
+      # checksum file together, so each is a verifiable subject of one
+      # build-provenance attestation (audit F2).
       - name: Attest release provenance
         if: startsWith(github.ref, 'refs/tags/v')
         uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
@@ -137,6 +145,7 @@ jobs:
             release-staging/*.tar.xz
             release-staging/*.cdx.json
             release-staging/*.cdx.xml
+            release-staging/SHA256SUMS
 
       - name: Upload release artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -146,6 +155,7 @@ jobs:
             release-staging/*.tar.xz
             release-staging/*.cdx.json
             release-staging/*.cdx.xml
+            release-staging/SHA256SUMS
           if-no-files-found: error
           retention-days: 14
           compression-level: 0
@@ -230,9 +240,14 @@ jobs:
             "release-assets/dediren-${VERSION}.cdx.json" >/dev/null
           test -s "release-assets/dediren-${VERSION}.cdx.xml"
 
+          # SHA256SUMS is generated and attested in the `build` job; carry it
+          # here and check the staged assets against it instead of regenerating,
+          # so the published checksum file is the attested one and the assets
+          # provably match it.
+          cp release-artifacts/SHA256SUMS release-assets/SHA256SUMS
           (
             cd release-assets
-            sha256sum *.tar.xz *.cdx.json *.cdx.xml > SHA256SUMS
+            sha256sum -c SHA256SUMS
           )
 
       - name: Verify artifact attestations
@@ -241,9 +256,9 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Verify provenance for every attested subject: the archive and both
-          # SBOM serializations (audit F2).
-          for asset in release-assets/*.tar.xz release-assets/*.cdx.json release-assets/*.cdx.xml; do
+          # Verify provenance for every attested subject: the archive, both
+          # SBOM serializations, and the SHA256SUMS checksum file (audit F2).
+          for asset in release-assets/*.tar.xz release-assets/*.cdx.json release-assets/*.cdx.xml release-assets/SHA256SUMS; do
             gh attestation verify "$asset" --repo "$GITHUB_REPOSITORY"
           done
 

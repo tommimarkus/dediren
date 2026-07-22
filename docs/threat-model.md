@@ -256,14 +256,17 @@ commit SHA; the Maven Wrapper is SHA-256-pinned in
 `.mvn/wrapper/maven-wrapper.properties`. Every push, pull request, and
 release runs a blocking Grype/SBOM scan (`anchore/scan-action`,
 `fail-build: true`, `severity-cutoff: high`). The release `build` job generates
-one provenance attestation covering the archive **and** both CycloneDX SBOM
-serializations (`attest-build-provenance`), so the SBOM is bound to the attested
+one provenance attestation covering the archive, both CycloneDX SBOM
+serializations, **and** the `SHA256SUMS` checksum file
+(`attest-build-provenance`), so the SBOM and checksums are bound to the attested
 build rather than regenerated downstream; the `publish` job verifies every
-attested subject (`gh attestation verify`) and then creates the release as a
-draft with all assets attached before flipping it to published, so a repository
-with release immutability enabled freezes a complete, attested asset set.
-Unprotected `main` (no required-review branch protection) is a documented
-accepted risk — see `SECURITY.md`.
+attested subject (`gh attestation verify`), checks the staged assets against the
+attested `SHA256SUMS` (`sha256sum -c`), and then creates the release as a
+draft with all assets attached before flipping it to published. Repository
+release immutability is enabled, so publishing freezes the complete, attested
+asset set (releases published before 2026-07-23 predate the setting and remain
+mutable). Unprotected `main` (no required-review branch protection) is a
+documented accepted risk — see `SECURITY.md`.
 
 The bundle `lib/` jar is produced by a shrink ProGuard pass over the staged
 launcher classpath (`dist-tool`, keep rules checked in at
@@ -283,7 +286,7 @@ ceiling trips if shrinking or attribute stripping silently degrades.
 | --- | --- | --- |
 | Poison a release artifact | SHA-pinned Actions, blocking Grype/SBOM gate, attestation generated and verified before publish | Single-maintainer `main` has no required review (accepted risk, `SECURITY.md`) |
 | Tamper `main` or `v*` tags | `release.yml` cross-checks the tag version against `pom.xml`; attestation binds the published archive to its build | No branch protection on `main`; a bad commit is caught only by tests/scans, not review |
-| Tampered SBOM / SHA256SUMS after build | The archive and both CycloneDX SBOM serializations are subjects of one build-provenance attestation, verified for every asset before publish; `SHA256SUMS` covers the archive and both SBOMs; enabling repository release immutability freezes the published asset set | `SHA256SUMS` is itself unattested — its integrity rests on the attested files it lists plus release immutability, which is a repository setting that must be enabled to gain the post-publish freeze |
+| Tampered SBOM / SHA256SUMS after build | The archive, both CycloneDX SBOM serializations, and `SHA256SUMS` are subjects of one build-provenance attestation, each verified before publish; the publish job additionally checks the staged assets against the attested `SHA256SUMS` (`sha256sum -c`); repository release immutability (enabled) freezes the published asset set | Immutability covers only releases published after it was enabled (2026-07-22); earlier releases remain mutable and rest on their attestations alone |
 | Shipped `THIRD-PARTY-NOTICES.md` misstates an upstream licence after a dependency bump, or a bump drags in a licence outside the approved set | cli's `license-maven-plugin` execution resolves every runtime dependency's effective-pom licence, normalizes it, and gates it against an approved allowlist; `DistTool` refuses to write notices when its hand-curated attribution map disagrees with that resolved report or the report is stale (`resolved-licence-report`, dist lanes) | Effective-pom licences are upstream-declared metadata, not scanned artifact contents; a pom that misstates its own jar's licence passes (mitigate with an `about.html`/`META-INF` spot-check when adopting a new dependency) |
 | Malicious schema substitution | HTTPS-only curl plus SHA-256 pin verified before use (`SchemaCacheModule`) | `DEDIREN_XMI_SCHEMA_PATH` / `DEDIREN_OEF_SCHEMA_DIR` offline overrides bypass the SHA-256 check by design |
 | Malicious envelope input | Jackson 3 parsing plus fuzz-regression targets pinning the only-`JacksonException`/`XmiValidationException` invariant; hardened DOM factory blocks DOCTYPE/XXE | Fuzz targets run in deterministic regression mode over a fixed seed corpus in CI, not continuous coverage-guided fuzzing |
