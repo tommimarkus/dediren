@@ -2,6 +2,7 @@ package dev.dediren.core.analysis;
 
 import dev.dediren.contracts.json.JsonSupport;
 import java.util.Optional;
+import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -82,20 +83,36 @@ public final class Provenance {
     if (start < 0) {
       return Optional.empty();
     }
+    // Find the payload object's closing brace with a string-aware scan: '{'/'}' inside a JSON
+    // string value (or its \" escapes) are skipped, so a brace-bearing value cannot truncate the
+    // stamp the way raw depth-counting did, and only the object itself — never the trailing
+    // </metadata> or --> markup — is handed to the parser. The SVG lane XML-escapes the payload at
+    // injection, so unescape the isolated object before parsing.
+    boolean inString = false;
+    boolean escaped = false;
     int depth = 0;
     for (int i = start; i < content.length(); i++) {
       char c = content.charAt(i);
-      if (c == '{') {
+      if (inString) {
+        if (escaped) {
+          escaped = false;
+        } else if (c == '\\') {
+          escaped = true;
+        } else if (c == '"') {
+          inString = false;
+        }
+        continue;
+      }
+      if (c == '"') {
+        inString = true;
+      } else if (c == '{') {
         depth++;
-      } else if (c == '}') {
-        depth--;
-        if (depth == 0) {
-          String json = unescapeXml(content.substring(start, i + 1));
-          try {
-            return Optional.of(JsonSupport.objectMapper().readTree(json));
-          } catch (RuntimeException error) {
-            return Optional.empty();
-          }
+      } else if (c == '}' && --depth == 0) {
+        try {
+          JsonNode node = JsonSupport.readTree(unescapeXml(content.substring(start, i + 1)));
+          return node == null || node.isMissingNode() ? Optional.empty() : Optional.of(node);
+        } catch (JacksonException error) {
+          return Optional.empty();
         }
       }
     }
