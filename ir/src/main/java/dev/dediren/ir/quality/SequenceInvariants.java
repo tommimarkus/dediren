@@ -13,8 +13,9 @@ import java.util.Map;
 /**
  * Named geometric invariants over a UML-sequence {@link LaidOutScene}. Each method returns the
  * (possibly empty) list of {@link InvariantViolation}s: empty means the invariant holds. These
- * checks are pure geometry over the typed IR; they do not map to {@code Diagnostic}s or wire into
- * {@code core}'s layout-quality reporting (that live wiring is a later task).
+ * checks are pure geometry over the typed IR; {@code core} maps the violations onto published
+ * diagnostics (see {@code CoreCommands.sequenceInvariantDiagnostics}) — this module stays
+ * diagnostic-free so the seam remains notation- and envelope-neutral.
  *
  * <p>A "message" is a {@link RoutedEdge} whose {@code source} and {@code target} both resolve (by
  * id) to {@code role=="lifeline"} {@link PlacedNode}s.

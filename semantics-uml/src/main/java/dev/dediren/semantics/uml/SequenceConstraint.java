@@ -12,9 +12,7 @@ import java.util.List;
  * ({@link OperandOpen}), and the two occurrence-specification variants ({@link ExecutionSpan},
  * {@link DestructionAnchor}) that place an activation bar or a destruction mark on its covered
  * lifeline. {@link UmlSequenceConstraints#lower} maps these to the neutral {@code
- * dev.dediren.ir.LayoutIntent} vocabulary that {@code elk-layout} consumes from Plan B P5 onward;
- * the stringly {@code uml.sequence.*} {@code LayoutConstraint} wire form produced by {@link
- * UmlSequenceConstraints#of} is unaffected and remains the live producer until the Task 5 cutover.
+ * dev.dediren.ir.LayoutIntent} vocabulary that {@code elk-layout} consumes.
  */
 public sealed interface SequenceConstraint
     permits SequenceConstraint.LifelineOrder,

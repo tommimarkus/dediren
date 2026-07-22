@@ -479,19 +479,24 @@ capability ELK already provides is design debt, not a feature.
 
 Entrypoints and adapters stay thin; the work lives in owned policy modules
 (*Java extension default*: entrypoints/adapters are thin). `cli` honors this
-today (446 LOC). The active divergence is **plugin `Main.java` god-files**:
+today (~724 LOC of `Main.java`, all of it subcommand shells: the 2026-07
+`AnalysisCommands`/`validateCommand` driver moves put every command verdict in
+`core`, so cli parses, calls, and prints). The former plugin `Main.java`
+god-files were split in 2026-07 (`render` → per-notation packages,
+`uml-xmi-export` → `build`/`policy`/`schema`/`write.*`).
 
-> **Known debt:** `render/Main.java` is ~3,851 LOC and `uml-xmi-export/Main.java`
-> ~1,734 LOC in single files; `uml/Uml.java` (904) and
-> `uml/UmlSequenceValidation.java` (798) are also large. A single file carrying
-> an entire backend mixes many reasons to change and raises cognitive load
-> (*Parnas 1972*; ISO/IEC 25010 maintainability). When one of these files is next
-> touched substantively, split it along the responsibilities already implicit in
-> it (input validation, mapping, serialization, per-diagram logic) rather than
-> growing it further.
+The active watchlist is **single-class engines re-forming the same shape**
+(2026-07-22 design review; registered with triggers in §12):
+`ElkLayoutEngine` (~1,600 LOC, ~8 responsibilities), `OefExportEngine`
+(~980 LOC, single file — the only engine never split), and the `uml` core's
+`Uml.java` (~860 LOC facade). A single class carrying an entire backend mixes
+many reasons to change and raises cognitive load (*Parnas 1972*; ISO/IEC 25010
+maintainability). When one of these is next touched substantively, split it
+along the responsibilities already implicit in it rather than growing it
+further.
 
-Guideline: a plugin's `Main.java` should orchestrate and delegate, not *be* the
-backend. Treat a multi-thousand-line entrypoint as a boundary smell to pay down
+Guideline: an engine's top class should orchestrate and delegate, not *be* the
+backend. Treat a multi-thousand-line class as a boundary smell to pay down
 on the next real change in that file — not a reason for a speculative rewrite.
 
 ---
@@ -657,6 +662,22 @@ speculatively):
 | Port-count node sizing in `elk-layout` looks like it duplicates an ELK capability, but does not — **trialled and rejected 2026-07-13** | `ElkLayoutEngine.setGeneratedDimensions` / `requiredPortSideLength` / `flatPortCounts` / `groupedPortCounts` (~117 LOC) | §7 ELK-first | **keep, with evidence.** §7 says try the official ELK option before hand-rolling, so it was tried: `CoreOptions.NODE_SIZE_CONSTRAINTS = minimumSizeWithPorts()` + `NODE_SIZE_MINIMUM`, with the custom growth removed. It is **not** equivalent. ELK's constraint enforces port fit at *every* port count, so it inflated a typical 80px node to **161px** to seat three ports; the custom math deliberately leaves nodes at their hinted size until a side exceeds `DEFAULT_SHORT_SIDE_PORT_CAPACITY` (3) and only then grows it. That divergence is a product decision, and it is already pinned by `ElkLayoutEngineTest.threeShortSidePortsKeepTheDefaultNodeSize`, which the trial failed with exactly that 80→161 delta. The code is size *intent* ELK's option cannot express, not a re-implementation of it. Do not "simplify" it to the ELK option without re-litigating that test |
 | Typed-IR double representation: `ir` scene types and their `contracts` record twins are maintained in parallel, with 1:1 mappers between them | `ir/LaidOutSceneMapper.java`, `ir/LayoutRequestMapper.java` (~237 LOC of field-for-field copying); type pairs `PlacedGroup`↔`LaidOutGroup`, `PlacedNode`↔`LaidOutNode`, `RoutedEdge`↔`LaidOutEdge`, `SceneNode`↔`LayoutNode`, `SceneEdge`↔`LayoutEdge`, `SceneGroup`↔`LayoutGroup` | §2 dependency spine (Plan B P4 seam flip) | **accepted, with a trigger.** This is the deliberate P4 "adapt at boundary" decision: heavy engine internals stayed record-based and were adapted at a thin boundary so byte-stability was provable (`toResult ∘ toScene = identity`). That payoff has now been *collected* — the migration landed — but the tax is permanent: every concept has two names, and one new scene field touches the schema, the contracts record, the ir record, the mapper constructors, fixtures and tests (~7 surfaces). Registered here so it is a choice rather than an accident. **Trigger:** when `elk-layout` or `render` internals are next substantively reworked, move that engine's internals onto the `ir` types so its mapper calls collapse; the mappers should end up serving only the two real wire edges (`LayoutEngine.parseRequest` and artifact emission). Two conversions have already been removed this way (2026-07-13): `build` now hands the scene it already holds to `CoreCommands.validateLayout`, and the shared route-endpoint tolerance moved to `ir.quality.LayoutTolerances` |
 | Default automated schema-validation lanes (unit through dist-smoke) validate OEF/XMI output against permissive stub XSDs, never the official OMG/OpenGroup schemas — both lanes in-JVM via `schemacache.InJvmXmlValidator` | `engines/{archimate-oef-export,uml-xmi-export}` test resources, dist-smoke | §4 contract surface | real schemas are not redistributable and remote fetch is non-hermetic, so the default suites stay stub-based and "schema-valid export" is proven for the plumbing only; every export envelope discloses which case applied via `DEDIREN_EXPORT_SCHEMA_CONFORMANCE`. The opt-in real-schema lane (`RealSchemaConformanceTest` in both export modules, `-Ddediren.real-schemas=true`, network or warm `DEDIREN_SCHEMA_CACHE_DIR` on first run) validates the emitters against the pinned real downloads; CI wiring for it is the remaining open piece (accepted 2026-07) |
+
+The 2026-07-22 whole-repo design review
+(`docs/superpowers/reviews/2026-07-22-software-design-review.md`) added the
+rows below; its block/warn findings outside this register were remediated the
+same week (slices A and B, merged 2026-07-22). These are the accepted
+remainders, each with its trigger:
+
+| Debt | Location | Guideline | Smell |
+|---|---|---|---|
+| `ElkLayoutEngine` is a re-forming god class: ~8 separable responsibilities (request validation, three per-mode orchestrations, direction inference, endpoint-merge policy, port planning, group construction, result extraction, sequence special-casing) in ~1,600 LOC | `engines/elk-layout/.../ElkLayoutEngine.java` | §8 thinness/cohesion | `SD-B-1`; **trigger:** on the next substantive change, extract the two lowest-coupling seams first — a `LayoutRequestValidator` (the validation cluster is already self-contained) and a `PortPlan` value object bundling endpoint-merge/side/count/index state with the methods that compute it; the three per-mode orchestrators may stay |
+| `OefExportEngine` is the one engine never split: policy validation, ArchiMate validation orchestration, OEF serialization, id assignment, schema resolution/fetch, and schema validation in a single ~980 LOC file, with intra-file duplication already visible (policy-parse block verbatim in `export`/`exportModel`) | `engines/archimate-oef-export/.../OefExportEngine.java` | §8 thinness/cohesion | `SD-B-1`; **trigger:** on the next substantive change, mirror the uml-xmi `policy`/`schema`/`build`/`write.*` split; first move is the schema-resolution/fetch cluster into a `schema`-package peer of the sibling's `SchemaValidation` |
+| `Uml.java` is an ~860 LOC facade holding seven rule families (vocabulary, endpoint legality, multiplicity grammar, per-type property validation, cross-entity consistency, four near-identical per-view-kind endpoint loops, sequence orchestration) | `uml/src/main/java/dev/dediren/uml/Uml.java` | §8 thinness/cohesion | `SD-B-1`; **trigger:** on the next substantive change, dedupe the four endpoint loops (or delete them per the lane-unification row below), then extract the state-machine and multiplicity families along the `UmlSequenceValidation` precedent |
+| Sequence lifeline columns are rebuilt post-ELK (`distinctColumnXSlots`) where ELK Layered partitioning (`PARTITIONING_PARTITION`/`ACTIVATE`, already wired in `ElkLayeredOptions.applyNodeHints`) guarantees the same property in-engine — the one §7 candidate with no trialled-and-rejected record | `engines/elk-layout/.../LayoutIntentNormalizer.java` (`distinctColumnXSlots`) | §7 ELK-first | `SD-C-2`; **trigger:** trial partition-per-lifeline in sequence mode with real-render evidence (the port-sizing row above is the template); keep the rebuild only as a documented fallback, or record it here as litigated |
+| Endpoint-selection legality differs by entry lane: the router runs a strictly-stricter base check (`GENERIC_GRAPH_RELATIONSHIP_ENDPOINT_OUTSIDE_VIEW`) before `Uml`'s per-view-kind loops (whose component/deployment widening is unreachable there), while `XmiExportEngine` calls `Uml.validateSource` directly with no base check — same model, two legality outcomes | `semantics-graph/.../SemanticsRouterEngine.java` vs `engines/uml-xmi-export/.../XmiExportEngine.java` | §6 shared-kernel validation | `SD-S-1`; **trigger:** needs a design decision — the router owns the base rule, with a `NotationSemantics` hook if a notation must genuinely widen the selected set; delete the shadowed loops and add a lane-agreement test when unified |
+| `KnownSchemaVersions` prior-version recognition has an entry gate but no exit: every superseded hand-authorable version stays recognized (and documented in `docs/agent-usage.md ## Migration`) forever | `contracts/.../KnownSchemaVersions.java` | §4 contract surface | `SD-E-2`; **recorded decision (2026-07-22): keep-forever is the posture** — agent-repairable migration is the product story and the families are tiny; revisit (design a sunset rule first) if any family's prior-version list grows past ~5 entries |
+| `EngineRunOutcome` (a `core.engine` dispatch type) is the envelope carrier for the non-engine analysis/validate drivers, and cli prints it via `writePluginOutcome` — engine/plugin vocabulary naming non-engine output | `core/.../AnalysisCommands.java`, `CoreCommands.validateCommand`, `cli/.../Main.java` | §3 module charter | `SD-S-1` (info); deliberate reuse (it is what makes CLI/MCP byte parity trivial); **trigger:** rename the carrier (e.g. `CommandOutcome`) or the cli printer on the next touch — no structural change wanted |
 
 None of these block the architecture; they are propagation-cost and clarity
 debts with a clear, local fix when their files are next worked.
