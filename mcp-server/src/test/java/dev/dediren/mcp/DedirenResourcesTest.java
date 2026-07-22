@@ -94,6 +94,13 @@ class DedirenResourcesTest {
     // Codes without an explicit bullet are self-repairing via their message: null, not absent.
     JsonNode elkInternal = entryFor(catalog, "DEDIREN_ELK_LAYOUT_FAILED");
     assertThat(elkInternal.get("repair_rule").isNull()).isTrue();
+    // A bullet naming two codes documents both — this pins the multi-code parse path of
+    // repairRules() against a regression to one-code-per-bullet.
+    JsonNode duplicateView = entryFor(catalog, "DEDIREN_GENERIC_GRAPH_DUPLICATE_VIEW_ID");
+    JsonNode duplicateGroup = entryFor(catalog, "DEDIREN_GENERIC_GRAPH_DUPLICATE_GROUP_ID");
+    assertThat(duplicateView.get("repair_rule").asText()).contains("colliding view id");
+    assertThat(duplicateGroup.get("repair_rule").asText())
+        .isEqualTo(duplicateView.get("repair_rule").asText());
     assertThat(
             entryFor(catalog, "DEDIREN_XMI_SCHEMA_VALIDATOR_UNAVAILABLE")
                 .get("repair_rule")
