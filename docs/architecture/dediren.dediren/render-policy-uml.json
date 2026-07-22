@@ -1,0 +1,44 @@
+{
+  "render_policy_schema_version": "render-policy.schema.v3",
+  "semantic_profile": "uml",
+  "page": { "width": 1120, "height": 840 },
+  "margin": { "top": 28, "right": 28, "bottom": 28, "left": 28 },
+  "style": {
+    "background": { "fill": "#ffffff" },
+    "font": { "family": "Inter, Arial, sans-serif", "size": 13 },
+    "node": { "fill": "#ffffff", "stroke": "#1f2937", "stroke_width": 1.25, "rx": 0, "label_fill": "#0f172a" },
+    "edge": {
+      "stroke": "#1f2937",
+      "stroke_width": 1.25,
+      "label_fill": "#0f172a",
+      "label_horizontal_position": "center",
+      "label_horizontal_side": "auto",
+      "label_vertical_position": "center",
+      "label_vertical_side": "left"
+    },
+    "group": { "fill": "#f8fafc", "stroke": "#94a3b8", "stroke_width": 1, "rx": 0, "label_fill": "#334155", "label_size": 12 },
+    "node_type_overrides": {
+      "Package": { "fill": "#ffffff", "stroke": "#1f2937", "label_fill": "#0f172a", "decorator": "uml_package" },
+      "Interface": { "fill": "#eef4ff", "stroke": "#1f3a8a", "label_fill": "#0f172a", "decorator": "uml_interface" },
+      "Class": { "fill": "#ffffff", "stroke": "#1f2937", "label_fill": "#0f172a", "decorator": "uml_class" },
+      "Enumeration": { "fill": "#ffffff", "stroke": "#1f2937", "label_fill": "#0f172a", "decorator": "uml_enumeration" }
+    },
+    "edge_type_overrides": {
+      "Realization": { "line_style": "dashed", "marker_end": "hollow_triangle" },
+      "Dependency": { "line_style": "dashed", "marker_end": "open_arrow" },
+      "Association": { "marker_start": "none", "marker_end": "none" },
+      "Composition": { "marker_start": "filled_diamond", "marker_end": "none" },
+      "Aggregation": { "marker_start": "hollow_diamond", "marker_end": "none" }
+    },
+    "group_type_overrides": {
+      "Package": { "fill": "#f8fafc", "stroke": "#94a3b8", "label_fill": "#334155", "decorator": "uml_package" }
+    },
+    "node_overrides": {},
+    "edge_overrides": {},
+    "group_overrides": {}
+  },
+  "accessibility": {
+    "title": "Engine seam — typed interfaces and realizations",
+    "description": "What typed interfaces does engine-api define, and which engine classes realize them?"
+  }
+}

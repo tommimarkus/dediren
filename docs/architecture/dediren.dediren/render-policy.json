@@ -1,0 +1,37 @@
+{
+  "render_policy_schema_version": "render-policy.schema.v3",
+  "semantic_profile": "archimate",
+  "page": { "width": 1180, "height": 760 },
+  "margin": { "top": 28, "right": 28, "bottom": 28, "left": 28 },
+  "style": {
+    "background": { "fill": "#0C0A06" },
+    "font": { "family": "Inter, Arial, sans-serif", "size": 13 },
+    "node": { "fill": "#17110A", "stroke": "#7A6B4E", "stroke_width": 1.5, "rx": 6, "label_fill": "#ECDFC7" },
+    "edge": {
+      "stroke": "#7A6B4E",
+      "stroke_width": 1.4,
+      "label_fill": "#A2957A",
+      "label_horizontal_position": "center",
+      "label_horizontal_side": "auto",
+      "label_vertical_position": "center",
+      "label_vertical_side": "left"
+    },
+    "group": { "fill": "#100B05", "stroke": "#4A3F2C", "stroke_width": 1, "rx": 10, "label_fill": "#F2A93B", "label_size": 12 },
+    "node_type_overrides": {
+      "ApplicationComponent": { "fill": "#17110A", "stroke": "#F2A93B", "label_fill": "#ECDFC7", "decorator": "archimate_application_component" }
+    },
+    "edge_type_overrides": {
+      "Serving": { "marker_end": "open_arrow" }
+    },
+    "group_type_overrides": {},
+    "node_overrides": {
+      "contracts": { "stroke": "#54D98A", "label_fill": "#54D98A" }
+    },
+    "edge_overrides": {},
+    "group_overrides": {}
+  },
+  "accessibility": {
+    "title": "Dediren module architecture",
+    "description": "Which modules make up the dediren compiler, and how do they depend on each other?"
+  }
+}

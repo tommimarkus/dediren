@@ -40,6 +40,34 @@ notation.
 > by hand — [`docs/assets/`](docs/assets/) holds the source model and a
 > one-command regeneration.
 
+## Architecture
+
+Dediren is a **contract-first modular monolith**: a Maven reactor of small
+modules with an explicit, acyclic dependency graph rooted at `contracts`. The
+diagram below is that module architecture **modelled by Dediren from itself** —
+an ArchiMate® Application Cooperation view compiled through the same
+`project → layout → render` pipeline shown above.
+
+![Dediren module architecture: seventeen Maven modules in four stability-tier bands — contracts and the IR spine at the foundation; the ArchiMate and UML notation cores, the schema-cache utility, and the engine-api seam; the orchestration core and seven engines; and the cli entrypoint with its MCP adapter and dist-tool — connected by Serving relationships that run from each module to the modules depending on it.](docs/architecture/dediren.dediren/generated/svg/module-architecture.svg)
+
+Four stability-tier bands read left to right: the `contracts` kernel (in
+emerald) and the `ir` spine, then the notation/utility cores and the
+`engine-api` seam, then orchestration `core` and the seven engines behind the
+seam, and finally the thin `cli` entrypoint with its `mcp-server` adapter and
+`dist-tool`. A companion **UML® class view** zooms into the `engine-api` seam —
+the typed `SemanticsEngine` / `LayoutEngine` / `RenderEngine` / `ExportEngine`
+interfaces and the engine classes that realise them.
+
+Both views, plus the ArchiMate OEF and UML XMI exports Dediren produced from
+them, live in
+[`docs/architecture/dediren.dediren/`](docs/architecture/dediren.dediren/); open
+[`gallery.html`](docs/architecture/dediren.dediren/gallery.html) for a zoomable,
+notation-grouped viewer. The `Serving` arrows run from a module to the modules
+that depend on it, so the bands — not the arrowheads — carry the layering; the
+hero view shows the architecturally significant compile edges, with the full
+edge set in [`docs/architecture-guidelines.md`](docs/architecture-guidelines.md)
+§2.
+
 ## Requirements
 
 - Java 21 or newer on `PATH` as `java`.

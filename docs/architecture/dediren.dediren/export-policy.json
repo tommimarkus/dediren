@@ -1,0 +1,8 @@
+{
+  "oef_export_policy_schema_version": "oef-export-policy.schema.v1",
+  "model_identifier": "id-dediren-arch-model",
+  "model_name": "Dediren module architecture (ArchiMate)",
+  "view_identifier": "id-module-architecture",
+  "view_name": "Dediren module architecture",
+  "viewpoint": "Application Cooperation"
+}

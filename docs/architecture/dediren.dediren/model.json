@@ -1,0 +1,914 @@
+{
+  "model_schema_version": "model.schema.v1",
+  "required_plugins": [
+    {
+      "id": "generic-graph",
+      "version": "2026.07.22"
+    },
+    {
+      "id": "archimate-oef",
+      "version": "2026.07.22"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "contracts",
+      "type": "ApplicationComponent",
+      "label": "contracts",
+      "properties": {
+        "layer": "Application",
+        "viewpoint": "Application Cooperation",
+        "tier": "0",
+        "rationale": "Shared protocol vocabulary: command envelopes, diagnostics, schema-version constants, and the record/enum families for layout/render/export/source/plugin. The stable kernel; its real product surface is the JSON schemas under schemas/, of which these records are the typed projection.",
+        "evidence": "source-backed",
+        "source": "contracts/pom.xml; docs/architecture-guidelines.md \u00a72\u2013\u00a73"
+      }
+    },
+    {
+      "id": "ir",
+      "type": "ApplicationComponent",
+      "label": "ir",
+      "properties": {
+        "layer": "Application",
+        "viewpoint": "Application Cooperation",
+        "tier": "0.5",
+        "rationale": "Typed IR spine \u2014 the SceneGraph / LaidOutScene seam types that engine-api speaks (Plan B P4). Sits between contracts and engine-api.",
+        "evidence": "source-backed",
+        "source": "ir/pom.xml; docs/architecture-guidelines.md \u00a72\u2013\u00a73"
+      }
+    },
+    {
+      "id": "archimate",
+      "type": "ApplicationComponent",
+      "label": "archimate",
+      "properties": {
+        "layer": "Application",
+        "viewpoint": "Application Cooperation",
+        "tier": "1",
+        "rationale": "ArchiMate notation core: the type vocabulary and semantic validation for ArchiMate source models. Depends on nothing internal.",
+        "evidence": "source-backed",
+        "source": "archimate/pom.xml; docs/architecture-guidelines.md \u00a72\u2013\u00a73"
+      }
+    },
+    {
+      "id": "uml",
+      "type": "ApplicationComponent",
+      "label": "uml",
+      "properties": {
+        "layer": "Application",
+        "viewpoint": "Application Cooperation",
+        "tier": "1",
+        "rationale": "UML notation core: the type vocabulary and semantic validation for UML source models.",
+        "evidence": "source-backed",
+        "source": "uml/pom.xml; docs/architecture-guidelines.md \u00a72\u2013\u00a73"
+      }
+    },
+    {
+      "id": "schema-cache",
+      "type": "ApplicationComponent",
+      "label": "schema-cache",
+      "properties": {
+        "layer": "Application",
+        "viewpoint": "Application Cooperation",
+        "tier": "1",
+        "rationale": "Small utility core that fetches and caches external standards schemas for export validation.",
+        "evidence": "source-backed",
+        "source": "schema-cache/pom.xml; docs/architecture-guidelines.md \u00a72\u2013\u00a73"
+      }
+    },
+    {
+      "id": "engine-api",
+      "type": "ApplicationComponent",
+      "label": "engine-api",
+      "properties": {
+        "layer": "Application",
+        "viewpoint": "Application Cooperation",
+        "tier": "1",
+        "rationale": "The typed engine seam: SemanticsEngine / LayoutEngine / RenderEngine / ExportEngine interfaces. Interfaces only; depends on contracts and ir.",
+        "evidence": "source-backed",
+        "source": "engine-api/pom.xml; docs/architecture-guidelines.md \u00a72\u2013\u00a73"
+      }
+    },
+    {
+      "id": "core",
+      "type": "ApplicationComponent",
+      "label": "core",
+      "properties": {
+        "layer": "Application",
+        "viewpoint": "Application Cooperation",
+        "tier": "2",
+        "rationale": "Orchestration and backend-neutral policy: command handlers, the build driver, in-memory engine dispatch, schema/source validation, and layout-quality checks. Drives engines only through engine-api.",
+        "evidence": "source-backed",
+        "source": "core/pom.xml; docs/architecture-guidelines.md \u00a72\u2013\u00a73"
+      }
+    },
+    {
+      "id": "semantics-graph",
+      "type": "ApplicationComponent",
+      "label": "semantics-graph",
+      "properties": {
+        "layer": "Application",
+        "viewpoint": "Application Cooperation",
+        "tier": "2",
+        "rationale": "Profile-routing semantics engine (wire id still generic-graph) plus base scene projection. Dispatches to the per-notation front ends.",
+        "evidence": "source-backed",
+        "source": "semantics-graph/pom.xml; docs/architecture-guidelines.md \u00a72\u2013\u00a73"
+      }
+    },
+    {
+      "id": "semantics-archimate",
+      "type": "ApplicationComponent",
+      "label": "semantics-archimate",
+      "properties": {
+        "layer": "Application",
+        "viewpoint": "Application Cooperation",
+        "tier": "2",
+        "rationale": "ArchiMate notation front end: the per-notation legality checks the router dispatches to. Depends on the archimate core.",
+        "evidence": "source-backed",
+        "source": "semantics-archimate/pom.xml; docs/architecture-guidelines.md \u00a72\u2013\u00a73"
+      }
+    },
+    {
+      "id": "semantics-uml",
+      "type": "ApplicationComponent",
+      "label": "semantics-uml",
+      "properties": {
+        "layer": "Application",
+        "viewpoint": "Application Cooperation",
+        "tier": "2",
+        "rationale": "UML notation front end: the per-notation legality checks the router dispatches to. Depends on the uml core.",
+        "evidence": "source-backed",
+        "source": "semantics-uml/pom.xml; docs/architecture-guidelines.md \u00a72\u2013\u00a73"
+      }
+    },
+    {
+      "id": "elk-layout",
+      "type": "ApplicationComponent",
+      "label": "elk-layout",
+      "properties": {
+        "layer": "Application",
+        "viewpoint": "Application Cooperation",
+        "tier": "2",
+        "rationale": "The Eclipse ELK Layered layout engine: computes node geometry and edge routes.",
+        "evidence": "source-backed",
+        "source": "engines/elk-layout/pom.xml; docs/architecture-guidelines.md \u00a72\u2013\u00a73"
+      }
+    },
+    {
+      "id": "render",
+      "type": "ApplicationComponent",
+      "label": "render",
+      "properties": {
+        "layer": "Application",
+        "viewpoint": "Application Cooperation",
+        "tier": "2",
+        "rationale": "The SVG render engine: owns styling and marker policy. The only engine that touches both notation cores.",
+        "evidence": "source-backed",
+        "source": "engines/render/pom.xml; docs/architecture-guidelines.md \u00a72\u2013\u00a73"
+      }
+    },
+    {
+      "id": "archimate-oef-export",
+      "type": "ApplicationComponent",
+      "label": "archimate-oef-export",
+      "properties": {
+        "layer": "Application",
+        "viewpoint": "Application Cooperation",
+        "tier": "2",
+        "rationale": "ArchiMate Open Exchange Format (OEF) compatibility export engine. Validates in-JVM via schema-cache.",
+        "evidence": "source-backed",
+        "source": "engines/archimate-oef-export/pom.xml; docs/architecture-guidelines.md \u00a72\u2013\u00a73"
+      }
+    },
+    {
+      "id": "uml-xmi-export",
+      "type": "ApplicationComponent",
+      "label": "uml-xmi-export",
+      "properties": {
+        "layer": "Application",
+        "viewpoint": "Application Cooperation",
+        "tier": "2",
+        "rationale": "UML/XMI compatibility export engine. Validates in-JVM via schema-cache.",
+        "evidence": "source-backed",
+        "source": "engines/uml-xmi-export/pom.xml; docs/architecture-guidelines.md \u00a72\u2013\u00a73"
+      }
+    },
+    {
+      "id": "mcp-server",
+      "type": "ApplicationComponent",
+      "label": "mcp-server",
+      "properties": {
+        "layer": "Application",
+        "viewpoint": "Application Cooperation",
+        "tier": "3",
+        "rationale": "MCP stdio protocol adapter: marshals tool calls into core commands and returns the same envelopes verbatim. Owns no orchestration or engine construction.",
+        "evidence": "source-backed",
+        "source": "mcp-server/pom.xml; docs/architecture-guidelines.md \u00a72\u2013\u00a73"
+      }
+    },
+    {
+      "id": "cli",
+      "type": "ApplicationComponent",
+      "label": "cli",
+      "properties": {
+        "layer": "Application",
+        "viewpoint": "Application Cooperation",
+        "tier": "3",
+        "rationale": "The thin entrypoint and composition root: parses arguments, assembles a request, calls core, prints the envelope. EngineWiring is the one class that constructs the engine implementations.",
+        "evidence": "source-backed",
+        "source": "cli/pom.xml; docs/architecture-guidelines.md \u00a72\u2013\u00a73"
+      }
+    },
+    {
+      "id": "dist-tool",
+      "type": "ApplicationComponent",
+      "label": "dist-tool",
+      "properties": {
+        "layer": "Application",
+        "viewpoint": "Application Cooperation",
+        "tier": "3",
+        "rationale": "Assembly and distribution: bundles the single cli launcher (hosting the engines in-process), generates third-party notices and the SBOM, and runs the dist smoke. Top of the graph.",
+        "evidence": "source-backed",
+        "source": "dist-tool/pom.xml; docs/architecture-guidelines.md \u00a72\u2013\u00a73"
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "id": "serv-contracts-ir",
+      "type": "Serving",
+      "source": "contracts",
+      "target": "ir",
+      "label": "",
+      "properties": {
+        "visible": true,
+        "evidence": "source-backed"
+      }
+    },
+    {
+      "id": "serv-contracts-uml",
+      "type": "Serving",
+      "source": "contracts",
+      "target": "uml",
+      "label": "",
+      "properties": {
+        "visible": true,
+        "evidence": "source-backed"
+      }
+    },
+    {
+      "id": "serv-contracts-engine-api",
+      "type": "Serving",
+      "source": "contracts",
+      "target": "engine-api",
+      "label": "",
+      "properties": {
+        "visible": true,
+        "evidence": "source-backed"
+      }
+    },
+    {
+      "id": "serv-contracts-core",
+      "type": "Serving",
+      "source": "contracts",
+      "target": "core",
+      "label": "",
+      "properties": {
+        "visible": true,
+        "evidence": "source-backed"
+      }
+    },
+    {
+      "id": "serv-contracts-semantics-graph",
+      "type": "Serving",
+      "source": "contracts",
+      "target": "semantics-graph",
+      "label": "",
+      "properties": {
+        "visible": true,
+        "evidence": "source-backed"
+      }
+    },
+    {
+      "id": "serv-contracts-semantics-archimate",
+      "type": "Serving",
+      "source": "contracts",
+      "target": "semantics-archimate",
+      "label": "",
+      "properties": {
+        "visible": true,
+        "evidence": "source-backed"
+      }
+    },
+    {
+      "id": "serv-contracts-semantics-uml",
+      "type": "Serving",
+      "source": "contracts",
+      "target": "semantics-uml",
+      "label": "",
+      "properties": {
+        "visible": true,
+        "evidence": "source-backed"
+      }
+    },
+    {
+      "id": "serv-contracts-elk-layout",
+      "type": "Serving",
+      "source": "contracts",
+      "target": "elk-layout",
+      "label": "",
+      "properties": {
+        "visible": true,
+        "evidence": "source-backed"
+      }
+    },
+    {
+      "id": "serv-contracts-render",
+      "type": "Serving",
+      "source": "contracts",
+      "target": "render",
+      "label": "",
+      "properties": {
+        "visible": true,
+        "evidence": "source-backed"
+      }
+    },
+    {
+      "id": "serv-contracts-archimate-oef-export",
+      "type": "Serving",
+      "source": "contracts",
+      "target": "archimate-oef-export",
+      "label": "",
+      "properties": {
+        "visible": true,
+        "evidence": "source-backed"
+      }
+    },
+    {
+      "id": "serv-contracts-uml-xmi-export",
+      "type": "Serving",
+      "source": "contracts",
+      "target": "uml-xmi-export",
+      "label": "",
+      "properties": {
+        "visible": true,
+        "evidence": "source-backed"
+      }
+    },
+    {
+      "id": "serv-contracts-mcp-server",
+      "type": "Serving",
+      "source": "contracts",
+      "target": "mcp-server",
+      "label": "",
+      "properties": {
+        "visible": true,
+        "evidence": "source-backed"
+      }
+    },
+    {
+      "id": "serv-contracts-cli",
+      "type": "Serving",
+      "source": "contracts",
+      "target": "cli",
+      "label": "",
+      "properties": {
+        "visible": true,
+        "evidence": "source-backed"
+      }
+    },
+    {
+      "id": "serv-contracts-dist-tool",
+      "type": "Serving",
+      "source": "contracts",
+      "target": "dist-tool",
+      "label": "",
+      "properties": {
+        "visible": true,
+        "evidence": "source-backed"
+      }
+    },
+    {
+      "id": "serv-ir-engine-api",
+      "type": "Serving",
+      "source": "ir",
+      "target": "engine-api",
+      "label": "",
+      "properties": {
+        "visible": true,
+        "evidence": "source-backed"
+      }
+    },
+    {
+      "id": "serv-ir-core",
+      "type": "Serving",
+      "source": "ir",
+      "target": "core",
+      "label": "",
+      "properties": {
+        "visible": true,
+        "evidence": "source-backed"
+      }
+    },
+    {
+      "id": "serv-ir-semantics-graph",
+      "type": "Serving",
+      "source": "ir",
+      "target": "semantics-graph",
+      "label": "",
+      "properties": {
+        "visible": true,
+        "evidence": "source-backed"
+      }
+    },
+    {
+      "id": "serv-ir-semantics-archimate",
+      "type": "Serving",
+      "source": "ir",
+      "target": "semantics-archimate",
+      "label": "",
+      "properties": {
+        "visible": true,
+        "evidence": "source-backed"
+      }
+    },
+    {
+      "id": "serv-ir-semantics-uml",
+      "type": "Serving",
+      "source": "ir",
+      "target": "semantics-uml",
+      "label": "",
+      "properties": {
+        "visible": true,
+        "evidence": "source-backed"
+      }
+    },
+    {
+      "id": "serv-ir-elk-layout",
+      "type": "Serving",
+      "source": "ir",
+      "target": "elk-layout",
+      "label": "",
+      "properties": {
+        "visible": true,
+        "evidence": "source-backed"
+      }
+    },
+    {
+      "id": "serv-ir-render",
+      "type": "Serving",
+      "source": "ir",
+      "target": "render",
+      "label": "",
+      "properties": {
+        "visible": true,
+        "evidence": "source-backed"
+      }
+    },
+    {
+      "id": "serv-ir-cli",
+      "type": "Serving",
+      "source": "ir",
+      "target": "cli",
+      "label": "",
+      "properties": {
+        "visible": true,
+        "evidence": "source-backed"
+      }
+    },
+    {
+      "id": "serv-archimate-semantics-archimate",
+      "type": "Serving",
+      "source": "archimate",
+      "target": "semantics-archimate",
+      "label": "",
+      "properties": {
+        "visible": true,
+        "evidence": "source-backed"
+      }
+    },
+    {
+      "id": "serv-archimate-render",
+      "type": "Serving",
+      "source": "archimate",
+      "target": "render",
+      "label": "",
+      "properties": {
+        "visible": true,
+        "evidence": "source-backed"
+      }
+    },
+    {
+      "id": "serv-archimate-archimate-oef-export",
+      "type": "Serving",
+      "source": "archimate",
+      "target": "archimate-oef-export",
+      "label": "",
+      "properties": {
+        "visible": true,
+        "evidence": "source-backed"
+      }
+    },
+    {
+      "id": "serv-uml-semantics-uml",
+      "type": "Serving",
+      "source": "uml",
+      "target": "semantics-uml",
+      "label": "",
+      "properties": {
+        "visible": true,
+        "evidence": "source-backed"
+      }
+    },
+    {
+      "id": "serv-uml-render",
+      "type": "Serving",
+      "source": "uml",
+      "target": "render",
+      "label": "",
+      "properties": {
+        "visible": true,
+        "evidence": "source-backed"
+      }
+    },
+    {
+      "id": "serv-uml-uml-xmi-export",
+      "type": "Serving",
+      "source": "uml",
+      "target": "uml-xmi-export",
+      "label": "",
+      "properties": {
+        "visible": true,
+        "evidence": "source-backed"
+      }
+    },
+    {
+      "id": "serv-schema-cache-archimate-oef-export",
+      "type": "Serving",
+      "source": "schema-cache",
+      "target": "archimate-oef-export",
+      "label": "",
+      "properties": {
+        "visible": true,
+        "evidence": "source-backed"
+      }
+    },
+    {
+      "id": "serv-schema-cache-uml-xmi-export",
+      "type": "Serving",
+      "source": "schema-cache",
+      "target": "uml-xmi-export",
+      "label": "",
+      "properties": {
+        "visible": true,
+        "evidence": "source-backed"
+      }
+    },
+    {
+      "id": "serv-engine-api-core",
+      "type": "Serving",
+      "source": "engine-api",
+      "target": "core",
+      "label": "",
+      "properties": {
+        "visible": true,
+        "evidence": "source-backed"
+      }
+    },
+    {
+      "id": "serv-engine-api-semantics-graph",
+      "type": "Serving",
+      "source": "engine-api",
+      "target": "semantics-graph",
+      "label": "",
+      "properties": {
+        "visible": true,
+        "evidence": "source-backed"
+      }
+    },
+    {
+      "id": "serv-engine-api-semantics-archimate",
+      "type": "Serving",
+      "source": "engine-api",
+      "target": "semantics-archimate",
+      "label": "",
+      "properties": {
+        "visible": true,
+        "evidence": "source-backed"
+      }
+    },
+    {
+      "id": "serv-engine-api-semantics-uml",
+      "type": "Serving",
+      "source": "engine-api",
+      "target": "semantics-uml",
+      "label": "",
+      "properties": {
+        "visible": true,
+        "evidence": "source-backed"
+      }
+    },
+    {
+      "id": "serv-engine-api-elk-layout",
+      "type": "Serving",
+      "source": "engine-api",
+      "target": "elk-layout",
+      "label": "",
+      "properties": {
+        "visible": true,
+        "evidence": "source-backed"
+      }
+    },
+    {
+      "id": "serv-engine-api-render",
+      "type": "Serving",
+      "source": "engine-api",
+      "target": "render",
+      "label": "",
+      "properties": {
+        "visible": true,
+        "evidence": "source-backed"
+      }
+    },
+    {
+      "id": "serv-engine-api-archimate-oef-export",
+      "type": "Serving",
+      "source": "engine-api",
+      "target": "archimate-oef-export",
+      "label": "",
+      "properties": {
+        "visible": true,
+        "evidence": "source-backed"
+      }
+    },
+    {
+      "id": "serv-engine-api-uml-xmi-export",
+      "type": "Serving",
+      "source": "engine-api",
+      "target": "uml-xmi-export",
+      "label": "",
+      "properties": {
+        "visible": true,
+        "evidence": "source-backed"
+      }
+    },
+    {
+      "id": "serv-engine-api-mcp-server",
+      "type": "Serving",
+      "source": "engine-api",
+      "target": "mcp-server",
+      "label": "",
+      "properties": {
+        "visible": true,
+        "evidence": "source-backed"
+      }
+    },
+    {
+      "id": "serv-engine-api-cli",
+      "type": "Serving",
+      "source": "engine-api",
+      "target": "cli",
+      "label": "",
+      "properties": {
+        "visible": true,
+        "evidence": "source-backed"
+      }
+    },
+    {
+      "id": "serv-core-mcp-server",
+      "type": "Serving",
+      "source": "core",
+      "target": "mcp-server",
+      "label": "",
+      "properties": {
+        "visible": true,
+        "evidence": "source-backed"
+      }
+    },
+    {
+      "id": "serv-core-cli",
+      "type": "Serving",
+      "source": "core",
+      "target": "cli",
+      "label": "",
+      "properties": {
+        "visible": true,
+        "evidence": "source-backed"
+      }
+    },
+    {
+      "id": "serv-semantics-graph-cli",
+      "type": "Serving",
+      "source": "semantics-graph",
+      "target": "cli",
+      "label": "",
+      "properties": {
+        "visible": true,
+        "evidence": "source-backed"
+      }
+    },
+    {
+      "id": "serv-semantics-archimate-cli",
+      "type": "Serving",
+      "source": "semantics-archimate",
+      "target": "cli",
+      "label": "",
+      "properties": {
+        "visible": true,
+        "evidence": "source-backed"
+      }
+    },
+    {
+      "id": "serv-semantics-uml-cli",
+      "type": "Serving",
+      "source": "semantics-uml",
+      "target": "cli",
+      "label": "",
+      "properties": {
+        "visible": true,
+        "evidence": "source-backed"
+      }
+    },
+    {
+      "id": "serv-elk-layout-cli",
+      "type": "Serving",
+      "source": "elk-layout",
+      "target": "cli",
+      "label": "",
+      "properties": {
+        "visible": true,
+        "evidence": "source-backed"
+      }
+    },
+    {
+      "id": "serv-render-cli",
+      "type": "Serving",
+      "source": "render",
+      "target": "cli",
+      "label": "",
+      "properties": {
+        "visible": true,
+        "evidence": "source-backed"
+      }
+    },
+    {
+      "id": "serv-archimate-oef-export-cli",
+      "type": "Serving",
+      "source": "archimate-oef-export",
+      "target": "cli",
+      "label": "",
+      "properties": {
+        "visible": true,
+        "evidence": "source-backed"
+      }
+    },
+    {
+      "id": "serv-uml-xmi-export-cli",
+      "type": "Serving",
+      "source": "uml-xmi-export",
+      "target": "cli",
+      "label": "",
+      "properties": {
+        "visible": true,
+        "evidence": "source-backed"
+      }
+    },
+    {
+      "id": "serv-mcp-server-cli",
+      "type": "Serving",
+      "source": "mcp-server",
+      "target": "cli",
+      "label": "",
+      "properties": {
+        "visible": true,
+        "evidence": "source-backed"
+      }
+    },
+    {
+      "id": "serv-cli-dist-tool",
+      "type": "Serving",
+      "source": "cli",
+      "target": "dist-tool",
+      "label": "",
+      "properties": {
+        "visible": true,
+        "evidence": "source-backed"
+      }
+    }
+  ],
+  "plugins": {
+    "generic-graph": {
+      "semantic_profile": "archimate",
+      "views": [
+        {
+          "id": "module-architecture",
+          "label": "Dediren module architecture",
+          "nodes": [
+            "contracts",
+            "ir",
+            "archimate",
+            "uml",
+            "schema-cache",
+            "engine-api",
+            "core",
+            "semantics-graph",
+            "semantics-archimate",
+            "semantics-uml",
+            "elk-layout",
+            "render",
+            "archimate-oef-export",
+            "uml-xmi-export",
+            "mcp-server",
+            "cli",
+            "dist-tool"
+          ],
+          "relationships": [
+            "serv-contracts-ir",
+            "serv-contracts-uml",
+            "serv-ir-engine-api",
+            "serv-engine-api-core",
+            "serv-engine-api-semantics-graph",
+            "serv-engine-api-semantics-archimate",
+            "serv-engine-api-semantics-uml",
+            "serv-engine-api-elk-layout",
+            "serv-engine-api-render",
+            "serv-engine-api-archimate-oef-export",
+            "serv-engine-api-uml-xmi-export",
+            "serv-archimate-semantics-archimate",
+            "serv-archimate-render",
+            "serv-archimate-archimate-oef-export",
+            "serv-uml-semantics-uml",
+            "serv-uml-render",
+            "serv-uml-uml-xmi-export",
+            "serv-schema-cache-archimate-oef-export",
+            "serv-schema-cache-uml-xmi-export",
+            "serv-core-mcp-server",
+            "serv-core-cli",
+            "serv-mcp-server-cli",
+            "serv-cli-dist-tool"
+          ],
+          "groups": [
+            {
+              "id": "grp-tier0",
+              "label": "Foundation \u00b7 contracts + IR spine (tier 0)",
+              "role": "layout-only",
+              "members": [
+                "contracts",
+                "ir"
+              ]
+            },
+            {
+              "id": "grp-tier1",
+              "label": "Notation & utility cores \u00b7 engine seam (tier 1)",
+              "role": "layout-only",
+              "members": [
+                "archimate",
+                "uml",
+                "schema-cache",
+                "engine-api"
+              ]
+            },
+            {
+              "id": "grp-tier2",
+              "label": "Orchestration & engines (tier 2)",
+              "role": "layout-only",
+              "members": [
+                "core",
+                "semantics-graph",
+                "semantics-archimate",
+                "semantics-uml",
+                "elk-layout",
+                "render",
+                "archimate-oef-export",
+                "uml-xmi-export"
+              ]
+            },
+            {
+              "id": "grp-tier3",
+              "label": "Entrypoint & assembly (tier 3)",
+              "role": "layout-only",
+              "members": [
+                "mcp-server",
+                "cli",
+                "dist-tool"
+              ]
+            }
+          ],
+          "layout_preferences": {
+            "algorithm": "layered",
+            "mode": "flow",
+            "direction": "right",
+            "density": "readable",
+            "placement": {
+              "strategy": "network-simplex"
+            },
+            "routing": {
+              "style": "orthogonal",
+              "endpoint_merging": "local"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

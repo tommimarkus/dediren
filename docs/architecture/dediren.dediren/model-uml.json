@@ -1,0 +1,188 @@
+{
+  "model_schema_version": "model.schema.v1",
+  "required_plugins": [
+    { "id": "generic-graph", "version": "2026.07.22" },
+    { "id": "uml-xmi", "version": "2026.07.22" }
+  ],
+  "nodes": [
+    {
+      "id": "pkg-engine-api",
+      "type": "Package",
+      "label": "engine-api",
+      "properties": {
+        "uml": {
+          "kind": "package",
+          "architecture_context": { "profile": "archimate", "element_id": "engine-api", "relationship": "elaborates" }
+        },
+        "rationale": "The engine-api module: interfaces only. Elaborates the ArchiMate engine-api application component."
+      }
+    },
+    {
+      "id": "pkg-engines",
+      "type": "Package",
+      "label": "engine implementations",
+      "properties": {
+        "uml": { "kind": "package" },
+        "rationale": "The concrete engines wired in cli.EngineWiring, drawn from the elk-layout, render, archimate-oef-export, uml-xmi-export, semantics-graph, semantics-archimate, and semantics-uml modules."
+      }
+    },
+
+    {
+      "id": "if-semantics-engine",
+      "type": "Interface",
+      "label": "SemanticsEngine",
+      "properties": { "uml": { "package": "pkg-engine-api", "operations": [
+        { "name": "id", "visibility": "public", "parameters": [], "return_type": "String" },
+        { "name": "validate", "visibility": "public", "parameters": [ { "name": "source", "type": "SourceDocument" }, { "name": "profile", "type": "String" } ], "return_type": "EngineResult<SemanticValidationResult>" },
+        { "name": "projectScene", "visibility": "public", "parameters": [ { "name": "source", "type": "SourceDocument" }, { "name": "view", "type": "String" } ], "return_type": "EngineResult<SceneGraph>" },
+        { "name": "projectRenderMetadata", "visibility": "public", "parameters": [ { "name": "source", "type": "SourceDocument" }, { "name": "view", "type": "String" } ], "return_type": "EngineResult<RenderMetadata>" }
+      ] } }
+    },
+    {
+      "id": "if-layout-engine",
+      "type": "Interface",
+      "label": "LayoutEngine",
+      "properties": { "uml": { "package": "pkg-engine-api", "operations": [
+        { "name": "id", "visibility": "public", "parameters": [], "return_type": "String" },
+        { "name": "parseRequest", "visibility": "public", "parameters": [ { "name": "input", "type": "byte[]" } ], "return_type": "SceneGraph" },
+        { "name": "layout", "visibility": "public", "parameters": [ { "name": "scene", "type": "SceneGraph" } ], "return_type": "EngineResult<LaidOutScene>" }
+      ] } }
+    },
+    {
+      "id": "if-render-engine",
+      "type": "Interface",
+      "label": "RenderEngine",
+      "properties": { "uml": { "package": "pkg-engine-api", "operations": [
+        { "name": "id", "visibility": "public", "parameters": [], "return_type": "String" },
+        { "name": "render", "visibility": "public", "parameters": [ { "name": "layout", "type": "LaidOutScene" }, { "name": "policy", "type": "JsonNode" }, { "name": "metadataOrNull", "type": "RenderMetadata" } ], "return_type": "EngineResult<RenderResult>" }
+      ] } }
+    },
+    {
+      "id": "if-export-engine",
+      "type": "Interface",
+      "label": "ExportEngine",
+      "properties": { "uml": { "package": "pkg-engine-api", "operations": [
+        { "name": "id", "visibility": "public", "parameters": [], "return_type": "String" },
+        { "name": "export", "visibility": "public", "parameters": [ { "name": "request", "type": "ExportRequest" }, { "name": "env", "type": "Map<String,String>" }, { "name": "productRoot", "type": "Path" } ], "return_type": "EngineResult<ExportResult>" },
+        { "name": "exportModel", "visibility": "public", "parameters": [ { "name": "request", "type": "ModelExportRequest" }, { "name": "env", "type": "Map<String,String>" }, { "name": "productRoot", "type": "Path" } ], "return_type": "Optional<EngineResult<ExportResult>>" }
+      ] } }
+    },
+    {
+      "id": "if-notation-semantics",
+      "type": "Interface",
+      "label": "NotationSemantics",
+      "properties": { "uml": { "package": "pkg-engine-api", "operations": [
+        { "name": "validate", "visibility": "public", "parameters": [ { "name": "source", "type": "SourceDocument" }, { "name": "pluginData", "type": "GenericGraphPluginData" } ], "return_type": "void" },
+        { "name": "layoutRole", "visibility": "public", "parameters": [ { "name": "sourceType", "type": "String" } ], "return_type": "String" },
+        { "name": "layoutIntents", "visibility": "public", "parameters": [ { "name": "source", "type": "SourceDocument" }, { "name": "view", "type": "GenericGraphView" } ], "return_type": "List<LayoutIntent>" }
+      ] } }
+    },
+
+    {
+      "id": "cls-semantics-router",
+      "type": "Class",
+      "label": "SemanticsRouterEngine",
+      "properties": { "uml": { "package": "pkg-engines", "attributes": [], "operations": [
+        { "name": "id", "visibility": "public", "parameters": [], "return_type": "String" },
+        { "name": "projectScene", "visibility": "public", "parameters": [ { "name": "source", "type": "SourceDocument" }, { "name": "view", "type": "String" } ], "return_type": "EngineResult<SceneGraph>" }
+      ] }, "rationale": "semantics-graph module (wire id generic-graph); routes projection/validation to the notation front ends." }
+    },
+    {
+      "id": "cls-graph-notation",
+      "type": "Class",
+      "label": "GraphNotationSemantics",
+      "properties": { "uml": { "package": "pkg-engines", "attributes": [], "operations": [ { "name": "layoutRole", "visibility": "public", "parameters": [ { "name": "sourceType", "type": "String" } ], "return_type": "String" } ] }, "rationale": "semantics-graph module: generic-graph base notation." }
+    },
+    {
+      "id": "cls-archimate-notation",
+      "type": "Class",
+      "label": "ArchimateNotationSemantics",
+      "properties": { "uml": { "package": "pkg-engines", "attributes": [], "operations": [ { "name": "validate", "visibility": "public", "parameters": [ { "name": "source", "type": "SourceDocument" }, { "name": "pluginData", "type": "GenericGraphPluginData" } ], "return_type": "void" } ] }, "rationale": "semantics-archimate module." }
+    },
+    {
+      "id": "cls-uml-notation",
+      "type": "Class",
+      "label": "UmlNotationSemantics",
+      "properties": { "uml": { "package": "pkg-engines", "attributes": [], "operations": [ { "name": "validate", "visibility": "public", "parameters": [ { "name": "source", "type": "SourceDocument" }, { "name": "pluginData", "type": "GenericGraphPluginData" } ], "return_type": "void" } ] }, "rationale": "semantics-uml module." }
+    },
+    {
+      "id": "cls-elk-engine",
+      "type": "Class",
+      "label": "ElkEngine",
+      "properties": { "uml": { "package": "pkg-engines", "attributes": [], "operations": [
+        { "name": "id", "visibility": "public", "parameters": [], "return_type": "String" },
+        { "name": "layout", "visibility": "public", "parameters": [ { "name": "scene", "type": "SceneGraph" } ], "return_type": "EngineResult<LaidOutScene>" }
+      ] }, "rationale": "elk-layout module: Eclipse ELK Layered." }
+    },
+    {
+      "id": "cls-svg-render",
+      "type": "Class",
+      "label": "SvgRenderEngine",
+      "properties": { "uml": { "package": "pkg-engines", "attributes": [], "operations": [
+        { "name": "id", "visibility": "public", "parameters": [], "return_type": "String" },
+        { "name": "render", "visibility": "public", "parameters": [ { "name": "layout", "type": "LaidOutScene" }, { "name": "policy", "type": "JsonNode" }, { "name": "metadataOrNull", "type": "RenderMetadata" } ], "return_type": "EngineResult<RenderResult>" }
+      ] }, "rationale": "render module: SVG emitter." }
+    },
+    {
+      "id": "cls-oef-export",
+      "type": "Class",
+      "label": "OefExportEngine",
+      "properties": { "uml": { "package": "pkg-engines", "attributes": [], "operations": [
+        { "name": "id", "visibility": "public", "parameters": [], "return_type": "String" },
+        { "name": "export", "visibility": "public", "parameters": [ { "name": "request", "type": "ExportRequest" }, { "name": "env", "type": "Map<String,String>" }, { "name": "productRoot", "type": "Path" } ], "return_type": "EngineResult<ExportResult>" }
+      ] }, "rationale": "archimate-oef-export module." }
+    },
+    {
+      "id": "cls-xmi-export",
+      "type": "Class",
+      "label": "XmiExportEngine",
+      "properties": { "uml": { "package": "pkg-engines", "attributes": [], "operations": [
+        { "name": "id", "visibility": "public", "parameters": [], "return_type": "String" },
+        { "name": "export", "visibility": "public", "parameters": [ { "name": "request", "type": "ExportRequest" }, { "name": "env", "type": "Map<String,String>" }, { "name": "productRoot", "type": "Path" } ], "return_type": "EngineResult<ExportResult>" }
+      ] }, "rationale": "uml-xmi-export module." }
+    }
+  ],
+  "relationships": [
+    { "id": "real-router-semantics", "type": "Realization", "source": "cls-semantics-router", "target": "if-semantics-engine", "label": "realizes", "properties": {} },
+    { "id": "real-elk-layout", "type": "Realization", "source": "cls-elk-engine", "target": "if-layout-engine", "label": "realizes", "properties": {} },
+    { "id": "real-svg-render", "type": "Realization", "source": "cls-svg-render", "target": "if-render-engine", "label": "realizes", "properties": {} },
+    { "id": "real-oef-export", "type": "Realization", "source": "cls-oef-export", "target": "if-export-engine", "label": "realizes", "properties": {} },
+    { "id": "real-xmi-export", "type": "Realization", "source": "cls-xmi-export", "target": "if-export-engine", "label": "realizes", "properties": {} },
+    { "id": "real-graph-notation", "type": "Realization", "source": "cls-graph-notation", "target": "if-notation-semantics", "label": "realizes", "properties": {} },
+    { "id": "real-archimate-notation", "type": "Realization", "source": "cls-archimate-notation", "target": "if-notation-semantics", "label": "realizes", "properties": {} },
+    { "id": "real-uml-notation", "type": "Realization", "source": "cls-uml-notation", "target": "if-notation-semantics", "label": "realizes", "properties": {} },
+    { "id": "dep-router-notation", "type": "Dependency", "source": "cls-semantics-router", "target": "if-notation-semantics", "label": "dispatches to", "properties": {} }
+  ],
+  "plugins": {
+    "generic-graph": {
+      "semantic_profile": "uml",
+      "views": [
+        {
+          "id": "engine-seam",
+          "label": "Engine seam — typed interfaces and realizations",
+          "kind": "uml-class",
+          "nodes": [
+            "if-semantics-engine", "if-layout-engine", "if-render-engine", "if-export-engine", "if-notation-semantics",
+            "cls-semantics-router", "cls-graph-notation", "cls-archimate-notation", "cls-uml-notation",
+            "cls-elk-engine", "cls-svg-render", "cls-oef-export", "cls-xmi-export"
+          ],
+          "relationships": [
+            "real-router-semantics", "real-elk-layout", "real-svg-render", "real-oef-export", "real-xmi-export",
+            "real-graph-notation", "real-archimate-notation", "real-uml-notation", "dep-router-notation"
+          ],
+          "groups": [
+            { "id": "engine-api-boundary", "label": "engine-api", "role": "semantic-boundary", "semantic_source_id": "pkg-engine-api", "members": [ "if-semantics-engine", "if-layout-engine", "if-render-engine", "if-export-engine", "if-notation-semantics" ] },
+            { "id": "engines-boundary", "label": "engine implementations", "role": "semantic-boundary", "semantic_source_id": "pkg-engines", "members": [ "cls-semantics-router", "cls-graph-notation", "cls-archimate-notation", "cls-uml-notation", "cls-elk-engine", "cls-svg-render", "cls-oef-export", "cls-xmi-export" ] }
+          ],
+          "layout_preferences": {
+            "algorithm": "layered",
+            "mode": "flow",
+            "direction": "right",
+            "density": "readable",
+            "placement": { "strategy": "network-simplex" }
+          }
+        }
+      ]
+    }
+  }
+}

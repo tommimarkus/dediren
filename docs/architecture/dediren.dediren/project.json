@@ -1,0 +1,34 @@
+{
+  "schema": "souroldgeezer.architecture.dediren.project.v2",
+  "feature": "dediren",
+  "models": [
+    { "id": "arch", "file": "model.json", "profile": "archimate" },
+    { "id": "uml", "file": "model-uml.json", "profile": "uml" }
+  ],
+  "views": [
+    {
+      "id": "module-architecture",
+      "model": "arch",
+      "title": "Dediren module architecture",
+      "diagramKind": "Application Cooperation",
+      "projection": { "plugin": "generic-graph", "target": "layout-request" },
+      "metadata": { "plugin": "generic-graph", "target": "render-metadata", "output": "generated/render-metadata/module-architecture.json" },
+      "layout": { "plugin": "elk-layout", "output": "generated/layout/module-architecture.json" },
+      "render": { "plugin": "render", "policy": "render-policy.json", "metadata": "generated/render-metadata/module-architecture.json", "output": "generated/svg/module-architecture.svg" }
+    },
+    {
+      "id": "engine-seam",
+      "model": "uml",
+      "title": "Engine seam — typed interfaces and realizations",
+      "diagramKind": "UML Class",
+      "projection": { "plugin": "generic-graph", "target": "layout-request" },
+      "metadata": { "plugin": "generic-graph", "target": "render-metadata", "output": "generated/render-metadata/engine-seam.json" },
+      "layout": { "plugin": "elk-layout", "output": "generated/layout/engine-seam.json" },
+      "render": { "plugin": "render", "policy": "render-policy-uml.json", "metadata": "generated/render-metadata/engine-seam.json", "output": "generated/svg/engine-seam.svg" }
+    }
+  ],
+  "exports": [
+    { "id": "arch-oef", "model": "arch", "view": "module-architecture", "plugin": "archimate-oef", "policy": "export-policy.json", "output": "generated/export/dediren.oef.xml" },
+    { "id": "uml-xmi", "model": "uml", "view": "engine-seam", "plugin": "uml-xmi", "policy": "export-policy-uml.json", "output": "generated/export/dediren.uml.xmi" }
+  ]
+}
