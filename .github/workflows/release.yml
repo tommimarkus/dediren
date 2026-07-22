@@ -77,13 +77,10 @@ jobs:
           distribution: temurin
           java-version: "21"
 
-      - name: Cache Maven artifacts
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: .cache/maven
-          key: maven-${{ runner.os }}-${{ hashFiles('**/pom.xml', '.mvn/wrapper/maven-wrapper.properties') }}
-          restore-keys: |
-            maven-${{ runner.os }}-
+      # No Maven cache in this job on purpose: the attested build cold-resolves
+      # every dependency from Maven Central with strict checksums (-C in
+      # .mvn/maven.config), so the provenance's input set is the tagged commit
+      # plus checksum-verified downloads — never a mutable cross-run cache blob.
 
       - name: Install jq
         run: sudo apt-get update && sudo apt-get install -y jq
@@ -170,19 +167,8 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Set up Java
-        uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5.6.0
-        with:
-          distribution: temurin
-          java-version: "21"
-
-      - name: Cache Maven artifacts
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: .cache/maven
-          key: maven-${{ runner.os }}-${{ hashFiles('**/pom.xml', '.mvn/wrapper/maven-wrapper.properties') }}
-          restore-keys: |
-            maven-${{ runner.os }}-
+      # This job never runs Maven — it verifies and publishes carried-forward
+      # artifacts with jq and gh — so it sets up no Java and restores no cache.
 
       - name: Install jq
         run: sudo apt-get update && sudo apt-get install -y jq

@@ -264,7 +264,10 @@ serializations, **and** the `SHA256SUMS` checksum file
 build rather than regenerated downstream; the `publish` job verifies every
 attested subject (`gh attestation verify`), checks the staged assets against the
 attested `SHA256SUMS` (`sha256sum -c`), and then creates the release as a
-draft with all assets attached before flipping it to published. Repository
+draft with all assets attached before flipping it to published. The attested
+`build` job restores no cross-run cache: every dependency cold-resolves from
+Maven Central under Maven's strict-checksums flag, so the provenance's input
+set is the tagged commit plus checksum-verified downloads. Repository
 release immutability is enabled, so publishing freezes the complete, attested
 asset set (releases published before 2026-07-23 predate the setting and remain
 mutable). Repository rulesets (declarative source: `.github/rulesets/`) block
