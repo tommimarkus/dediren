@@ -168,6 +168,67 @@ class OefExportEngineTest {
     assertThat(resolved.get("DEDIREN_OEF_SCHEMA_DIR")).isEqualTo(absolute);
   }
 
+  @Test
+  void exportModelComposesEveryViewWithItsOwnIdentity() throws Exception {
+    // Module-level twin of the CLI-level whole-model test: two views ride one document, the
+    // policy `views` override wins for the view it names, the other gets the source-derived
+    // default (`id-view-<id>` + source label), and a view unknown to the source falls back to
+    // its id as the name. No OEF_VIEWS_OMITTED — nothing is omitted from the aggregate.
+    var mapper = JsonSupport.objectMapper();
+    var source =
+        mapper.treeToValue(
+            fixtureJson("fixtures/source/valid-archimate-oef.json"),
+            dev.dediren.contracts.source.SourceDocument.class);
+    var layout =
+        mapper.treeToValue(
+            fixtureJson("fixtures/layout-result/archimate-oef-basic.json"),
+            dev.dediren.contracts.layout.LayoutResult.class);
+    ObjectNode policy = (ObjectNode) fixtureJson("fixtures/export-policy/default-oef.json");
+    ObjectNode views = policy.putObject("views");
+    views.putObject("second").put("view_identifier", "id-second-override");
+
+    java.util.Optional<EngineResult<ExportResult>> result =
+        engine.exportModel(
+            new dev.dediren.engine.ModelExportRequest(
+                source,
+                java.util.List.of(
+                    new dev.dediren.engine.ModelExportRequest.ViewLayout("main", layout),
+                    new dev.dediren.engine.ModelExportRequest.ViewLayout("second", layout)),
+                policy),
+            envWithOefSchemas(),
+            Path.of("").toAbsolutePath());
+
+    assertThat(result).isPresent();
+    String content = result.get().value().content();
+    assertThat(content)
+        .contains("identifier=\"id-view-main\"")
+        .contains("<name xml:lang=\"en\">Main</name>");
+    assertThat(content)
+        .contains("identifier=\"id-second-override\"")
+        .contains("<name xml:lang=\"en\">second</name>");
+    assertThat(result.get().diagnostics())
+        .noneMatch(diagnostic -> diagnostic.code().equals("DEDIREN_OEF_VIEWS_OMITTED"));
+  }
+
+  @Test
+  void exportModelWithNoViewsIsEmpty() throws Exception {
+    var source =
+        JsonSupport.objectMapper()
+            .treeToValue(
+                fixtureJson("fixtures/source/valid-archimate-oef.json"),
+                dev.dediren.contracts.source.SourceDocument.class);
+
+    assertThat(
+            engine.exportModel(
+                new dev.dediren.engine.ModelExportRequest(
+                    source,
+                    java.util.List.of(),
+                    fixtureJson("fixtures/export-policy/default-oef.json")),
+                envWithOefSchemas(),
+                Path.of("").toAbsolutePath()))
+        .isEmpty();
+  }
+
   private static JsonNode engineTree(Object value) {
     return JsonSupport.objectMapper()
         .readTree(JsonSupport.objectMapper().writeValueAsString(value));

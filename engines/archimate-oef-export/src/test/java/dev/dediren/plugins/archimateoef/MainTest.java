@@ -55,8 +55,6 @@ class MainTest {
     // The in-JVM lane compiles the schema set with local-only import resolution: a directory whose
     // XSD imports a file that is not present (the real Open Group set without the W3C xml.xsd)
     // must fail as a structured SCHEMA_UNAVAILABLE naming what to add, never as an engine crash.
-    java.nio.file.Path schemaDir = tempDir.resolve("broken-schemas");
-    java.nio.file.Files.createDirectories(schemaDir);
     String importing =
         """
         <?xml version="1.0" encoding="UTF-8"?>
@@ -68,12 +66,7 @@ class MainTest {
           <xs:element name="model" type="xs:anyType"/>
         </xs:schema>
         """;
-    for (String name :
-        java.util.List.of(
-            "archimate3_Model.xsd", "archimate3_View.xsd", "archimate3_Diagram.xsd")) {
-      java.nio.file.Files.writeString(schemaDir.resolve(name), importing);
-    }
-    Map<String, String> env = Map.of("DEDIREN_OEF_SCHEMA_DIR", schemaDir.toString());
+    Map<String, String> env = oefSchemaDirEnv(tempDir.resolve("broken-schemas"), importing);
 
     PluginResult result =
         Main.executeForTesting(
@@ -85,7 +78,11 @@ class MainTest {
 
     CommandEnvelopeAssertions.assertErrorCode(
         result.stdout(), DiagnosticCode.OEF_SCHEMA_UNAVAILABLE.code());
-    assertThat(result.stdout()).contains("xml.xsd");
+    // The dynamic phrase, not the static remediation suffix (which also mentions xml.xsd): the
+    // compile failure must name the reference that actually failed to resolve.
+    assertThat(result.stdout()).contains("unresolved schema references: xml.xsd");
+    // The offline lane's failure carries placement advice, not download/proxy advice.
+    assertThat(result.stdout()).contains("Add the named file");
   }
 
   @Test
@@ -735,7 +732,6 @@ class MainTest {
 
   private Map<String, String> envWithOefSchemas() throws Exception {
     Path schemaDir = tempDir.resolve("oef-schemas");
-    Files.createDirectories(schemaDir);
     String schema =
         """
                 <?xml version="1.0" encoding="UTF-8"?>
@@ -795,9 +791,16 @@ class MainTest {
                   </xs:complexType>
                 </xs:schema>
                 """;
+    return oefSchemaDirEnv(schemaDir, schema);
+  }
+
+  /** Writes {@code schemaContent} as all three OEF XSD names and points the schema env at it. */
+  private static Map<String, String> oefSchemaDirEnv(Path schemaDir, String schemaContent)
+      throws Exception {
+    Files.createDirectories(schemaDir);
     for (String fileName :
         new String[] {"archimate3_Model.xsd", "archimate3_View.xsd", "archimate3_Diagram.xsd"}) {
-      Files.writeString(schemaDir.resolve(fileName), schema, StandardCharsets.UTF_8);
+      Files.writeString(schemaDir.resolve(fileName), schemaContent, StandardCharsets.UTF_8);
     }
     return Map.of("DEDIREN_OEF_SCHEMA_DIR", schemaDir.toString());
   }

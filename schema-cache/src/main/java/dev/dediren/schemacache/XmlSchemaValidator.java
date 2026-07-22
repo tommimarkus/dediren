@@ -12,7 +12,8 @@ import org.slf4j.LoggerFactory;
 /**
  * Runs an external XML schema validator ({@code xmllint}) over a document supplied on stdin.
  *
- * <p>This is the single home for the validator subprocess both export engines need. Engines may not
+ * <p>This is the single home for the validator subprocess the UML/XMI export engine needs (the OEF
+ * lane validates in-JVM via {@link InJvmXmlValidator} and runs no subprocess). Engines may not
  * depend on each other, so before this class each maintained its own copy of the run block; the
  * copies drifted, and every hardening fix had to be applied twice.
  *
@@ -44,8 +45,9 @@ public final class XmlSchemaValidator {
   public static Outcome validate(
       String validatorCommand, Path schemaPath, String content, Duration timeout)
       throws SchemaCacheException {
-    // The one place a subprocess crosses the engine boundary — for both export engines. Which
-    // binary, against which schema, is the first question when a validation result surprises you.
+    // The one place a subprocess crosses the engine boundary (the XMI lane; OEF validates
+    // in-JVM). Which binary, against which schema, is the first question when a validation
+    // result surprises you.
     LOG.debug("schema validator: command={} schema={}", validatorCommand, schemaPath);
     Process process;
     try {
