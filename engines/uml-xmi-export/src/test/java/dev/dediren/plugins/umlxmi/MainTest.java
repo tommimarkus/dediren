@@ -17,6 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.xml.sax.SAXParseException;
 import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 class MainTest {
@@ -478,10 +479,10 @@ class MainTest {
     assertThat(xml)
         .contains(
             "xmi:type=\"uml:Component\"",
-            // Port is typed by its provided Interface so Port::/provided derives; the derived
-            // provided/required are no longer emitted as (unbacked) structural attributes.
-            "<ownedAttribute xmi:type=\"uml:Port\" xmi:id=\"id-port-rest-api\" name=\"REST\""
-                + " type=\"id-interface-order-api\"/>",
+            // A bare Port: Port::/provided and /required are DERIVED from the Port's type
+            // (UML 2.5.1 §11.8.14), so they are carried at the Component (InterfaceRealization /
+            // Usage), never as unbacked structural attributes on the Port itself.
+            "<ownedAttribute xmi:type=\"uml:Port\" xmi:id=\"id-port-rest-api\" name=\"REST\"/>",
             // Component→Interface realization is a nested InterfaceRealization (drives /provided).
             "<interfaceRealization xmi:type=\"uml:InterfaceRealization\""
                 + " xmi:id=\"id-order-api-realizes-order-api\" name=\"realizes\""
@@ -489,7 +490,50 @@ class MainTest {
             // Required interface carried by a Usage.
             "xmi:type=\"uml:Usage\"",
             "client=\"id-component-order-api\" supplier=\"id-interface-payment-gateway\"");
-    assertThat(xml).doesNotContain("provided=\"id-interface", "required=\"id-interface");
+    assertThat(xml)
+        .doesNotContain(
+            "provided=\"id-interface",
+            "required=\"id-interface",
+            "uml:Port\" xmi:id=\"id-port-rest-api\" name=\"REST\" type=");
+  }
+
+  @Test
+  void derivesComponentInterfaceWiringFromPortsAloneWhenNoExplicitRelationship() throws Exception {
+    // Regression guard for the silent-drop the audit fixed: a source that expresses a port's
+    // provided/required interfaces ONLY on the Port (no explicit component→interface
+    // Realization/Usage) must still emit a conformant InterfaceRealization (per provided) and Usage
+    // (per required) owned by the Component, so Component::/provided and /required derive. Strip
+    // the
+    // explicit component→interface relationships, leaving the wiring only on port-rest-api.
+    JsonNode source = fixtureJson("fixtures/source/valid-uml-component-basic.json");
+    ArrayNode relationships = (ArrayNode) source.at("/relationships");
+    // Remove order-api-realizes-order-api (idx 0) and order-api-uses-payment (idx 1); keep the
+    // payment-adapter realization and the controller dependency.
+    relationships.remove(1);
+    relationships.remove(0);
+    ArrayNode viewRelationships =
+        (ArrayNode) source.at("/plugins/generic-graph/views/0/relationships");
+    for (int index = viewRelationships.size() - 1; index >= 0; index--) {
+      String id = viewRelationships.get(index).asText();
+      if (id.equals("order-api-realizes-order-api") || id.equals("order-api-uses-payment")) {
+        viewRelationships.remove(index);
+      }
+    }
+    JsonNode input =
+        exportInput(source, fixtureJson("fixtures/layout-result/uml-component-basic.json"));
+
+    String xml = exportGoldenXml(input);
+
+    assertThat(xml)
+        .contains(
+            // provided derived from port-rest-api, synthesized realization id.
+            "<interfaceRealization xmi:type=\"uml:InterfaceRealization\""
+                + " xmi:id=\"id-component-order-api-provides-interface-order-api\" name=\"\""
+                + " contract=\"id-interface-order-api\"/>",
+            // required derived from port-rest-api, synthesized usage id.
+            "<packagedElement xmi:type=\"uml:Usage\""
+                + " xmi:id=\"id-component-order-api-requires-interface-payment-gateway\" name=\"\""
+                + " client=\"id-component-order-api\" supplier=\"id-interface-payment-gateway\"/>");
   }
 
   @Test

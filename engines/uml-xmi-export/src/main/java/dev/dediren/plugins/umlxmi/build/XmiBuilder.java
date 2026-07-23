@@ -327,7 +327,7 @@ public final class XmiBuilder {
     writeUseCaseAssociations(
         xml, ids, selectedRelationships, sourceNodesById, nodeIds, relationshipIds);
     writeComponentRelationships(
-        xml, selectedRelationships, sourceNodesById, nodeIds, relationshipIds);
+        xml, ids, selectedNodes, selectedRelationships, sourceNodesById, nodeIds, relationshipIds);
     // Emit the primitive/data type targets referenced by attributes above, after every classifier
     // has been written so all referenced types are known. XML idrefs need not precede their target.
     types.writeSynthesizedTypes(xml);
@@ -399,6 +399,7 @@ public final class XmiBuilder {
       case "Component" ->
           writeComponent(
               xml,
+              ids,
               node,
               elementId,
               selectedNodes,
