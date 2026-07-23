@@ -267,6 +267,15 @@ final class ElkLayeredOptions {
     };
   }
 
+  /**
+   * The density-aware padding a visual-only group's drawn band leaves around its members. Shared
+   * with {@code ElkLayoutEngine}'s banded (partition + bounding-box) path, which draws the box
+   * itself rather than letting ELK reserve compound-node padding.
+   */
+  static double groupBandPadding(LayoutPreferences preferences) {
+    return groupPadding(preferences);
+  }
+
   private static boolean groupedWrappingEnabled(LayoutPreferences preferences) {
     return preferences != null && preferences.wrapping() == LayoutWrapping.MULTI_EDGE;
   }
