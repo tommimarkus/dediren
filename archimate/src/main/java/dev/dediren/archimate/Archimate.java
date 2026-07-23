@@ -90,15 +90,6 @@ public final class Archimate {
           "Triggering",
           "Association");
 
-  private static final Set<RelationshipEndpointTriple> REJECTED_RELATIONSHIP_ENDPOINT_TRIPLES =
-      Set.of(
-          new RelationshipEndpointTriple(
-              "ApplicationService", "Realization", "ApplicationComponent"),
-          new RelationshipEndpointTriple("BusinessActor", "Triggering", "DataObject"),
-          new RelationshipEndpointTriple("DataObject", "Serving", "ApplicationService"),
-          new RelationshipEndpointTriple("ApplicationComponent", "Access", "ApplicationFunction"),
-          new RelationshipEndpointTriple("BusinessObject", "Flow", "ApplicationComponent"));
-
   private Archimate() {}
 
   public static List<String> elementTypes() {
@@ -124,12 +115,14 @@ public final class Archimate {
   }
 
   /**
-   * Validates one relationship's endpoints against a <strong>deny list</strong>. This is not a
-   * curated allow list: any (source, relationship, target) triple that is not among the five
-   * explicitly rejected combinations passes. The polarity is deliberate — ArchiMate's legal
-   * endpoint matrix is large and Dediren rejects only what is unambiguously wrong — but it is the
-   * opposite of {@code uml}, which defaults to rejecting what it does not recognise. Do not read
-   * this as curated legality.
+   * Validates one relationship's endpoints against Dediren's own metamodel-derived legality rules
+   * ({@link RelationshipLegality}). The rules express the ArchiMate generic-metamodel relationship
+   * semantics (&sect;4&ndash;5) over element categories: any combination they do not recognise as
+   * legal is rejected. The check is a sound under-approximation &mdash; it never rejects a valid
+   * combination, but does not compute Appendix B's full derivation closure, so a minority of
+   * invalid combinations pass. {@code Association} is always accepted; relationship-connector
+   * (junction) endpoints are validated separately by {@link
+   * #validateJunctionRelationshipSemantics}.
    */
   public static void validateRelationshipEndpointTypes(
       String relationshipType, String sourceType, String targetType, String path)
@@ -140,8 +133,7 @@ public final class Archimate {
     if (isRelationshipConnectorType(sourceType) || isRelationshipConnectorType(targetType)) {
       return;
     }
-    if (REJECTED_RELATIONSHIP_ENDPOINT_TRIPLES.contains(
-        new RelationshipEndpointTriple(sourceType, relationshipType, targetType))) {
+    if (!RelationshipLegality.isAllowedEndpoint(relationshipType, sourceType, targetType)) {
       throw new ArchimateTypeValidationException(
           ArchimateTypeKind.RELATIONSHIP_ENDPOINT,
           sourceType + " -[" + relationshipType + "]-> " + targetType,

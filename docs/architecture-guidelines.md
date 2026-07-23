@@ -432,15 +432,25 @@ should be symmetric is their *architectural role and placement*: both are
 tier-1 notation cores consumed through the same engine roles. Today they differ even in dependency (`uml` → `contracts`, `archimate`
 standalone) and in how they model endpoint legality.
 
-The endpoint-legality difference is one of **polarity**, and this document used to
-overstate it. `archimate` enforces a **deny list**: five explicitly rejected
-(source, relationship, target) triples, and everything else passes. `uml` defaults
-the other way, rejecting endpoint combinations it does not recognise. Neither is a
-curated allow list. (A 16-triple `CURATED_RELATIONSHIP_ENDPOINT_TRIPLES` table did
-live in `archimate` and read like one, but it never took part in validation and had
-no production caller; it was demoted to test data on 2026-07-13. Do not describe
-ArchiMate endpoint legality as curated — for agents, that is false validation
-confidence.)
+Both cores are allow-oriented. `archimate` enforces metamodel-derived legality
+(`RelationshipLegality`): it accepts an endpoint pair only when the relationship's
+semantics permit that pair of ArchiMate element *categories* (active structure,
+behavior, service, event, passive structure, motivation, composite), and rejects
+the rest; `uml` likewise defaults to rejecting endpoint combinations it does not
+recognise. `archimate`'s rules are a deliberate **sound under-approximation** of
+ArchiMate Appendix B — they never reject a valid combination and do not compute
+the full derivation closure, so a minority of invalid pairs pass; `Association` is
+always accepted and `Grouping`/`Location` connect to anything. Crucially, the
+rules are Dediren's own expression of the language's *generic metamodel* (§4–5
+category semantics), **not** a reproduction of the copyrighted Appendix B.5 table:
+they copy none of its selection, ordering, grouping, or letter-code notation
+(implementing a standard's functional rules is not the same as redistributing its
+tables). This restores real endpoint validation without the IP exposure of the
+2026-05-27 embedded-matrix transcription, which was removed for that reason.
+(Historically `archimate` then carried only a five-triple deny list — plus a
+16-triple `CURATED_RELATIONSHIP_ENDPOINT_TRIPLES` table that read like an allow
+list but never validated, demoted to test data on 2026-07-13 — until metamodel
+legality was restored on 2026-07-26.)
 
 Prefer explicit data over inline conditionals for new endpoint rules — it is
 auditable — and let a core depend on `contracts` only when it genuinely consumes

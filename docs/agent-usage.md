@@ -265,10 +265,18 @@ Relationships: `Composition`, `Aggregation`, `Assignment`, `Realization`,
 `Specialization`, `Serving`, `Access`, `Influence`, `Flow`, `Triggering`,
 `Association`. `AndJunction`/`OrJunction` are relationship connector nodes.
 
-Relationship endpoint pairs are semantically validated with the relationship
-direction mattering (for example `ApplicationComponent --Realization-->
-ApplicationService` and `ApplicationService --Serving--> BusinessActor` are
-valid; the reversed directions are diagnosed).
+Relationship endpoint pairs are validated against Dediren's metamodel-derived
+legality rules, keyed on each element's ArchiMate category (active structure,
+behavior, service, event, passive structure, motivation, composite) and the
+relationship's semantics, so direction matters (for example `ApplicationComponent
+--Realization--> ApplicationService` is valid but the reverse `ApplicationService
+--Realization--> ApplicationComponent` is diagnosed, and `ApplicationFunction
+--Access--> DataObject` is valid but `Access` to a non-passive target is
+diagnosed). `Association` is always accepted (the unspecified relationship), and
+`Grouping`/`Location` connect to anything. The check is a sound
+under-approximation of ArchiMate Appendix B: it never rejects a valid combination
+but does not compute the full derivation closure, so some invalid pairs still
+pass.
 
 ```bash
 "$BUNDLE/bin/dediren" validate \
