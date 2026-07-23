@@ -8,11 +8,13 @@ import static dev.dediren.plugins.umlxmi.build.XmiHelpers.umlString;
 import static dev.dediren.plugins.umlxmi.build.XmiHelpers.writeEmptyPackagedElement;
 import static dev.dediren.plugins.umlxmi.write.activity.ActivityWriter.writeActivity;
 import static dev.dediren.plugins.umlxmi.write.classifier.ClassRelationshipWriter.writeClassRelationships;
+import static dev.dediren.plugins.umlxmi.write.classifier.ClassRelationshipWriter.writeUseCaseAssociations;
 import static dev.dediren.plugins.umlxmi.write.classifier.ClassifierWriter.writeClassifier;
 import static dev.dediren.plugins.umlxmi.write.classifier.ClassifierWriter.writeEnumeration;
 import static dev.dediren.plugins.umlxmi.write.component.ComponentWriter.writeComponent;
 import static dev.dediren.plugins.umlxmi.write.component.ComponentWriter.writeComponentRelationships;
-import static dev.dediren.plugins.umlxmi.write.deployment.DeploymentWriter.writeDeploymentRelationships;
+import static dev.dediren.plugins.umlxmi.write.deployment.DeploymentWriter.isDeploymentNodeType;
+import static dev.dediren.plugins.umlxmi.write.deployment.DeploymentWriter.writeDeploymentModel;
 import static dev.dediren.plugins.umlxmi.write.interaction.InteractionWriter.writeInteraction;
 import static dev.dediren.plugins.umlxmi.write.statemachine.StateMachineWriter.writeStateMachine;
 import static dev.dediren.plugins.umlxmi.write.usecase.UseCaseWriter.writeUseCase;
@@ -25,6 +27,7 @@ import dev.dediren.contracts.source.SourceNode;
 import dev.dediren.contracts.source.SourceRelationship;
 import dev.dediren.engine.ModelExportRequest;
 import dev.dediren.plugins.umlxmi.write.diagram.DiagramWriter;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -40,7 +43,21 @@ public final class XmiBuilder {
   private static final Set<String> CLASSIFIER_TYPES =
       Set.of("Class", "Interface", "DataType", "Enumeration");
 
-  public static String buildXmi(ExportRequest request, UmlXmiExportPolicy policy) {
+  /**
+   * A built single-view model plus the set of selected source ids the writers actually emitted, so
+   * the engine can distinguish in-view content that is represented from in-view content silently
+   * dropped (the coverage blind spot). An id is represented iff its {@code xmi:id} appears in the
+   * document.
+   */
+  public record BuiltModel(
+      String content, Set<String> representedNodeIds, Set<String> representedRelationshipIds) {
+    public BuiltModel {
+      representedNodeIds = Set.copyOf(representedNodeIds);
+      representedRelationshipIds = Set.copyOf(representedRelationshipIds);
+    }
+  }
+
+  public static BuiltModel buildXmi(ExportRequest request, UmlXmiExportPolicy policy) {
     ExportScope scope = ExportScope.fromRequest(request);
     var selectedNodes =
         request.source().nodes().stream()
@@ -53,17 +70,32 @@ public final class XmiBuilder {
     StringBuilder xml = new StringBuilder();
     openRoot(xml, false);
     var ids = new IdentifierMap(policy.modelIdentifier());
-    writeModelContent(xml, ids, request, policy, selectedNodes, selectedRelationships);
+    ModelContent model =
+        writeModelContent(xml, ids, request, policy, selectedNodes, selectedRelationships);
     xml.append("</xmi:XMI>\n");
-    return xml.toString();
+    String content = xml.toString();
+    Set<String> representedNodeIds =
+        selectedNodes.stream()
+            .map(SourceNode::id)
+            .filter(id -> isRepresented(content, model.nodeIds().get(id)))
+            .collect(Collectors.toSet());
+    Set<String> representedRelationshipIds =
+        selectedRelationships.stream()
+            .map(SourceRelationship::id)
+            .filter(id -> isRepresented(content, model.relationshipIds().get(id)))
+            .collect(Collectors.toSet());
+    return new BuiltModel(content, representedNodeIds, representedRelationshipIds);
+  }
+
+  private static boolean isRepresented(String content, String xmiId) {
+    return xmiId != null && content.contains("xmi:id=\"" + xmiId + "\"");
   }
 
   /**
    * The whole-model lane: one document carrying the full model once, then one OMG UMLDI diagram per
    * supplied laid-out view (mirrors the ArchiMate-OEF {@code buildModelOef}). The model section
    * includes every source element so a per-view diagram can reference any of them; each diagram
-   * serializes only its own view's geometry. The single-view {@link #buildXmi} stays model-only and
-   * byte-identical.
+   * serializes only its own view's geometry. The single-view {@link #buildXmi} stays model-only.
    */
   public static String buildModelXmi(ModelExportRequest request, UmlXmiExportPolicy policy) {
     ExportRequest representative =
@@ -199,6 +231,34 @@ public final class XmiBuilder {
     }
     var types = new TypeResolver(ids, classifierIdByName);
 
+    // Generalizations are owned by the specific (source) Classifier, so gather them by owner to
+    // nest
+    // inside the classifier element rather than emit them as (illegal) standalone packagedElements.
+    var generalizationsBySpecific = new HashMap<String, List<String[]>>();
+    for (SourceRelationship relationship : selectedRelationships) {
+      if (relationship.type().equals("Generalization")
+          && relationshipIds.containsKey(relationship.id())
+          && nodeIds.containsKey(relationship.source())
+          && nodeIds.containsKey(relationship.target())
+          && isClassifier(sourceNodesById.get(relationship.source()))
+          && isClassifier(sourceNodesById.get(relationship.target()))) {
+        generalizationsBySpecific
+            .computeIfAbsent(relationship.source(), key -> new ArrayList<>())
+            .add(
+                new String[] {
+                  relationshipIds.get(relationship.id()), nodeIds.get(relationship.target())
+                });
+      }
+    }
+
+    // Deployment node types are emitted as one ownership hierarchy by DeploymentWriter, not by the
+    // generic node loop below.
+    Set<String> deploymentNodeIds =
+        selectedNodes.stream()
+            .filter(node -> isDeploymentNodeType(node.type()))
+            .map(SourceNode::id)
+            .collect(Collectors.toSet());
+
     // Nest classifiers under the Package they declare via properties.uml.package, when that
     // Package is itself in scope; everything else stays a direct Model child.
     Set<String> selectedPackageIds =
@@ -211,6 +271,7 @@ public final class XmiBuilder {
     for (SourceNode node : selectedNodes) {
       String packageId = umlString(node, "package");
       if (!node.type().equals("Package")
+          && !deploymentNodeIds.contains(node.id())
           && packageId != null
           && selectedPackageIds.contains(packageId)) {
         membersByPackage.computeIfAbsent(packageId, key -> new java.util.ArrayList<>()).add(node);
@@ -224,8 +285,8 @@ public final class XmiBuilder {
         .append(attr(policy.modelName()))
         .append("\">");
     for (SourceNode node : selectedNodes) {
-      if (nestedNodeIds.contains(node.id())) {
-        continue; // written inside its owning Package below
+      if (nestedNodeIds.contains(node.id()) || deploymentNodeIds.contains(node.id())) {
+        continue; // written inside its owning Package, or by the deployment hierarchy, below
       }
       String elementId = nodeIds.get(node.id());
       if (node.type().equals("Package")) {
@@ -239,8 +300,10 @@ public final class XmiBuilder {
             membersByPackage.getOrDefault(node.id(), List.of()),
             selectedNodes,
             selectedRelationships,
+            sourceNodesById,
             nodeIds,
-            relationshipIds);
+            relationshipIds,
+            generalizationsBySpecific);
       } else {
         writeNodeElement(
             xml,
@@ -251,21 +314,29 @@ public final class XmiBuilder {
             elementId,
             selectedNodes,
             selectedRelationships,
+            sourceNodesById,
             nodeIds,
-            relationshipIds);
+            relationshipIds,
+            generalizationsBySpecific);
       }
     }
+    writeDeploymentModel(
+        xml, ids, selectedNodes, selectedRelationships, sourceNodesById, nodeIds, relationshipIds);
     writeClassRelationships(
         xml, ids, selectedRelationships, sourceNodesById, nodeIds, relationshipIds);
+    writeUseCaseAssociations(
+        xml, ids, selectedRelationships, sourceNodesById, nodeIds, relationshipIds);
     writeComponentRelationships(
-        xml, selectedRelationships, sourceNodesById, nodeIds, relationshipIds);
-    writeDeploymentRelationships(
         xml, selectedRelationships, sourceNodesById, nodeIds, relationshipIds);
     // Emit the primitive/data type targets referenced by attributes above, after every classifier
     // has been written so all referenced types are known. XML idrefs need not precede their target.
     types.writeSynthesizedTypes(xml);
     xml.append("</uml:Model>");
     return new ModelContent(nodeIds, relationshipIds);
+  }
+
+  private static boolean isClassifier(SourceNode node) {
+    return node != null && CLASSIFIER_TYPES.contains(node.type());
   }
 
   private static void writePackage(
@@ -278,8 +349,10 @@ public final class XmiBuilder {
       List<SourceNode> members,
       List<SourceNode> selectedNodes,
       List<SourceRelationship> selectedRelationships,
+      Map<String, SourceNode> sourceNodesById,
       Map<String, String> nodeIds,
-      Map<String, String> relationshipIds) {
+      Map<String, String> relationshipIds,
+      Map<String, List<String[]>> generalizationsBySpecific) {
     if (members.isEmpty()) {
       writeEmptyPackagedElement(xml, "uml:Package", packageNode, elementId);
       return;
@@ -299,8 +372,10 @@ public final class XmiBuilder {
           nodeIds.get(member.id()),
           selectedNodes,
           selectedRelationships,
+          sourceNodesById,
           nodeIds,
-          relationshipIds);
+          relationshipIds,
+          generalizationsBySpecific);
     }
     xml.append("</packagedElement>");
   }
@@ -314,22 +389,30 @@ public final class XmiBuilder {
       String elementId,
       List<SourceNode> selectedNodes,
       List<SourceRelationship> selectedRelationships,
+      Map<String, SourceNode> sourceNodesById,
       Map<String, String> nodeIds,
-      Map<String, String> relationshipIds) {
+      Map<String, String> relationshipIds,
+      Map<String, List<String[]>> generalizationsBySpecific) {
+    List<String[]> generalizations = generalizationsBySpecific.getOrDefault(node.id(), List.of());
     switch (node.type()) {
       case "Package" -> writeEmptyPackagedElement(xml, "uml:Package", node, elementId);
-      case "Component" -> writeComponent(xml, node, elementId, selectedNodes, nodeIds);
-      case "Class" -> writeClassifier(xml, ids, types, "uml:Class", node, elementId);
-      case "Interface" -> writeClassifier(xml, ids, types, "uml:Interface", node, elementId);
-      case "DataType" -> writeClassifier(xml, ids, types, "uml:DataType", node, elementId);
+      case "Component" ->
+          writeComponent(
+              xml,
+              node,
+              elementId,
+              selectedNodes,
+              selectedRelationships,
+              sourceNodesById,
+              nodeIds,
+              relationshipIds);
+      case "Class" ->
+          writeClassifier(xml, ids, types, "uml:Class", node, elementId, generalizations);
+      case "Interface" ->
+          writeClassifier(xml, ids, types, "uml:Interface", node, elementId, generalizations);
+      case "DataType" ->
+          writeClassifier(xml, ids, types, "uml:DataType", node, elementId, generalizations);
       case "Enumeration" -> writeEnumeration(xml, ids, node, elementId);
-      case "Node" -> writeEmptyPackagedElement(xml, "uml:Node", node, elementId);
-      case "Device" -> writeEmptyPackagedElement(xml, "uml:Device", node, elementId);
-      case "ExecutionEnvironment" ->
-          writeEmptyPackagedElement(xml, "uml:ExecutionEnvironment", node, elementId);
-      case "Artifact" -> writeEmptyPackagedElement(xml, "uml:Artifact", node, elementId);
-      case "DeploymentSpecification" ->
-          writeEmptyPackagedElement(xml, "uml:DeploymentSpecification", node, elementId);
       case "Actor" -> writeEmptyPackagedElement(xml, "uml:Actor", node, elementId);
       case "UseCase" ->
           writeUseCase(
@@ -337,6 +420,8 @@ public final class XmiBuilder {
       case "Activity" ->
           writeActivity(
               xml,
+              ids,
+              types,
               node,
               elementId,
               request.source().nodes(),

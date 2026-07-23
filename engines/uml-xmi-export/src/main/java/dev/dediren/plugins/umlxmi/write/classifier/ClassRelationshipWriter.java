@@ -56,6 +56,41 @@ public final class ClassRelationshipWriter {
     }
   }
 
+  /**
+   * Emits Actor↔UseCase {@code uml:Association}s. Actor and UseCase are Classifiers, so their
+   * association is an ordinary binary Association with two {@code ownedEnd}s — the same shape as a
+   * class association. Their endpoint types are excluded from {@link #isClassRelationship}, so this
+   * lane handles them (the source validator accepts them via {@code Uml.isActorUseCasePair});
+   * without it the defining relationship of a use-case diagram is silently dropped.
+   */
+  public static void writeUseCaseAssociations(
+      StringBuilder xml,
+      IdentifierMap ids,
+      List<SourceRelationship> selectedRelationships,
+      Map<String, SourceNode> sourceNodesById,
+      Map<String, String> nodeIds,
+      Map<String, String> relationshipIds) {
+    for (SourceRelationship relationship : selectedRelationships) {
+      if (!"Association".equals(relationship.type())
+          || !relationshipIds.containsKey(relationship.id())
+          || !nodeIds.containsKey(relationship.source())
+          || !nodeIds.containsKey(relationship.target())
+          || !isActorUseCasePair(
+              sourceNodesById.get(relationship.source()),
+              sourceNodesById.get(relationship.target()))) {
+        continue;
+      }
+      writeAssociation(xml, ids, relationship, nodeIds, relationshipIds);
+    }
+  }
+
+  private static boolean isActorUseCasePair(SourceNode source, SourceNode target) {
+    return source != null
+        && target != null
+        && ((source.type().equals("Actor") && target.type().equals("UseCase"))
+            || (source.type().equals("UseCase") && target.type().equals("Actor")));
+  }
+
   public static boolean isClassRelationship(
       SourceRelationship relationship, Map<String, SourceNode> sourceNodesById) {
     if (!CLASS_RELATIONSHIP_TYPES.contains(relationship.type())) {

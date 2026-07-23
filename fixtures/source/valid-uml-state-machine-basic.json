@@ -109,7 +109,7 @@
         "uml": {
           "region": "main-region",
           "kind": "external",
-          "trigger": "create"
+          "effect": "initialize"
         }
       }
     },

@@ -23,6 +23,7 @@ import dev.dediren.engine.ExportEngine;
 import dev.dediren.engine.ModelExportRequest;
 import dev.dediren.plugins.umlxmi.build.Coverage;
 import dev.dediren.plugins.umlxmi.build.ExportScope;
+import dev.dediren.plugins.umlxmi.build.XmiBuilder;
 import dev.dediren.plugins.umlxmi.build.XmiExportException;
 import dev.dediren.plugins.umlxmi.build.XmiValidationException;
 import dev.dediren.uml.Uml;
@@ -86,7 +87,8 @@ public final class XmiExportEngine implements ExportEngine {
       throw failure(error.code(), error.getMessage(), error.path());
     }
 
-    String content = buildXmi(request, policy);
+    XmiBuilder.BuiltModel built = buildXmi(request, policy);
+    String content = built.content();
     Diagnostic conformance;
     try {
       conformance = validateXmiToAvailableStandards(content, env, productRoot);
@@ -100,7 +102,9 @@ public final class XmiExportEngine implements ExportEngine {
         Coverage.compute(
             request.source().nodes(),
             request.source().relationships(),
-            ExportScope.fromRequest(request));
+            ExportScope.fromRequest(request),
+            built.representedNodeIds(),
+            built.representedRelationshipIds());
     var diagnostics =
         new java.util.ArrayList<>(withIdentityTripwire(policy, coverageDiagnostics(coverage)));
     diagnostics.add(conformance);
@@ -230,6 +234,33 @@ public final class XmiExportEngine implements ExportEngine {
                   + Coverage.describe(coverage.omittedRelationshipTypes())
                   + "). This export covers a single laid-out view; export the other views to"
                   + " represent them.",
+              "source.relationships"));
+    }
+    // In-view but not representable: a fidelity gap in the UML/XMI mapping (selected content no
+    // writer
+    // emitted), surfaced so it cannot pass as silently represented. Empty for a conformant export.
+    if (coverage.unrepresentedInViewNodes() > 0) {
+      diagnostics.add(
+          new Diagnostic(
+              DiagnosticCode.XMI_ELEMENTS_OMITTED.code(),
+              DiagnosticSeverity.INFO,
+              coverage.unrepresentedInViewNodes()
+                  + " source elements are within the exported view but could not be represented in"
+                  + " this XMI (by type: "
+                  + Coverage.describe(coverage.unrepresentedInViewNodeTypes())
+                  + "). This is a fidelity gap in the UML/XMI mapping, not a view-scoping omission.",
+              "source.nodes"));
+    }
+    if (coverage.unrepresentedInViewRelationships() > 0) {
+      diagnostics.add(
+          new Diagnostic(
+              DiagnosticCode.XMI_RELATIONSHIPS_OMITTED.code(),
+              DiagnosticSeverity.INFO,
+              coverage.unrepresentedInViewRelationships()
+                  + " source relationships are within the exported view but could not be represented"
+                  + " in this XMI (by type: "
+                  + Coverage.describe(coverage.unrepresentedInViewRelationshipTypes())
+                  + "). This is a fidelity gap in the UML/XMI mapping, not a view-scoping omission.",
               "source.relationships"));
     }
     return diagnostics;

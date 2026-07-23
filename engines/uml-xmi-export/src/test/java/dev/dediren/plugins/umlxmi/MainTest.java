@@ -444,7 +444,10 @@ class MainTest {
             "<extensionPoint xmi:id=\"id-payment-extension\" name=\"payment authorized\"/>",
             "<include xmi:id=\"id-include-authentication\" name=\"include\" addition=\"id-authenticate-customer\"/>",
             "<extend xmi:id=\"id-extend-discount\" name=\"extend\""
-                + " extendedCase=\"id-place-order\" extensionLocation=\"id-payment-extension\"/>");
+                + " extendedCase=\"id-place-order\" extensionLocation=\"id-payment-extension\"/>",
+            // The defining relationship of a use-case diagram: Actor↔UseCase Associations.
+            "<packagedElement xmi:type=\"uml:Association\" xmi:id=\"id-customer-place-order\"",
+            "<ownedEnd xmi:id=\"id-customer-place-order-source-end\" type=\"id-customer\"");
     assertThat(xml).doesNotContain("xmi:type=\"uml:ExtensionPoint\"");
   }
 
@@ -475,12 +478,18 @@ class MainTest {
     assertThat(xml)
         .contains(
             "xmi:type=\"uml:Component\"",
-            "xmi:type=\"uml:Port\"",
-            "provided=\"id-interface-order-api\"",
-            "required=\"id-interface-payment-gateway\"",
+            // Port is typed by its provided Interface so Port::/provided derives; the derived
+            // provided/required are no longer emitted as (unbacked) structural attributes.
+            "<ownedAttribute xmi:type=\"uml:Port\" xmi:id=\"id-port-rest-api\" name=\"REST\""
+                + " type=\"id-interface-order-api\"/>",
+            // Component→Interface realization is a nested InterfaceRealization (drives /provided).
+            "<interfaceRealization xmi:type=\"uml:InterfaceRealization\""
+                + " xmi:id=\"id-order-api-realizes-order-api\" name=\"realizes\""
+                + " contract=\"id-interface-order-api\"/>",
+            // Required interface carried by a Usage.
             "xmi:type=\"uml:Usage\"",
-            "xmi:type=\"uml:Realization\"",
             "client=\"id-component-order-api\" supplier=\"id-interface-payment-gateway\"");
+    assertThat(xml).doesNotContain("provided=\"id-interface", "required=\"id-interface");
   }
 
   @Test
@@ -509,17 +518,27 @@ class MainTest {
     assertThat(xml)
         .contains(
             "xmi:type=\"uml:Device\"",
-            "xmi:type=\"uml:ExecutionEnvironment\"",
+            // ExecutionEnvironment nests inside its Device via nestedNode (nestedNode subsets
+            // ownedMember).
+            "<nestedNode xmi:type=\"uml:ExecutionEnvironment\" xmi:id=\"id-ee-orders-runtime\"",
             "xmi:type=\"uml:Node\"",
             "xmi:type=\"uml:Artifact\"",
             "xmi:type=\"uml:DeploymentSpecification\"",
-            "xmi:type=\"uml:Deployment\"",
-            "deployedArtifact=\"id-artifact-orders-service\"",
-            "location=\"id-ee-orders-runtime\"",
-            "xmi:type=\"uml:Manifestation\"",
-            "utilizedElement=\"id-component-order-api\"",
+            // Deployment nests in its location Node; deployedArtifact = supplier, location =
+            // client.
+            "<deployment xmi:type=\"uml:Deployment\" xmi:id=\"id-deploy-orders-service\" name=\"deploy\""
+                + " deployedArtifact=\"id-artifact-orders-service\" location=\"id-ee-orders-runtime\"/>",
+            // Manifestation nests in its Artifact.
+            "<manifestation xmi:type=\"uml:Manifestation\""
+                + " xmi:id=\"id-artifact-manifests-order-api\" name=\"manifests\""
+                + " utilizedElement=\"id-component-order-api\"/>",
+            // CommunicationPath is an Association with two ownedEnds (no bare derived endType).
             "xmi:type=\"uml:CommunicationPath\"",
-            "endType=\"id-ee-orders-runtime id-node-payment-network\"");
+            "<ownedEnd xmi:id=\"id-orders-runtime-payment-path-end-source\""
+                + " type=\"id-ee-orders-runtime\"",
+            "<ownedEnd xmi:id=\"id-orders-runtime-payment-path-end-target\""
+                + " type=\"id-node-payment-network\"");
+    assertThat(xml).doesNotContain("endType=");
   }
 
   @Test
@@ -532,6 +551,182 @@ class MainTest {
 
     exportExpectingError(
         input, "DEDIREN_UML_RELATIONSHIP_ENDPOINT_UNSUPPORTED", "$.relationships[0]");
+  }
+
+  @Test
+  void exportsActivityViewGolden() throws Exception {
+    JsonNode input =
+        exportInput(
+            fixtureJson("fixtures/source/valid-uml-basic.json"),
+            fixtureJson("fixtures/layout-result/uml-activity.json"));
+
+    String xml = exportGoldenXml(input);
+
+    assertThat(xml).isEqualTo(fixture("fixtures/export/uml-activity.xmi"));
+    assertThat(xml)
+        .contains(
+            "xmi:type=\"uml:Activity\"",
+            "xmi:type=\"uml:OpaqueAction\"",
+            // ActivityEdge::guard emitted as an owned ValueSpecification (not dropped).
+            "<guard xmi:type=\"uml:OpaqueExpression\"",
+            "<body>valid</body>",
+            // ActivityPartitions (swimlanes) emitted with node membership (not dropped).
+            "<group xmi:type=\"uml:ActivityPartition\"",
+            "name=\"Customer\"");
+  }
+
+  @Test
+  void exportsDataViewGolden() throws Exception {
+    JsonNode input =
+        exportInput(
+            fixtureJson("fixtures/source/valid-uml-basic.json"),
+            fixtureJson("fixtures/layout-result/uml-data.json"));
+
+    String xml = exportGoldenXml(input);
+
+    assertThat(xml).isEqualTo(fixture("fixtures/export/uml-data.xmi"));
+    assertThat(xml).contains("xmi:type=\"uml:Class\"", "xmi:type=\"uml:Enumeration\"");
+  }
+
+  @Test
+  void emitsOperationParametersAndReturnType() throws Exception {
+    JsonNode input =
+        exportInput(
+            fixtureJson("fixtures/source/valid-uml-complex.json"),
+            fixtureJson("fixtures/layout-result/uml-complex-class.json"));
+
+    String xml = exportXml(input);
+
+    // Operation signatures survive: an in parameter and a return parameter, types resolved to ids.
+    assertThat(xml)
+        .contains(
+            "<ownedParameter xmi:id=\"id-class-customer-placeorder-param-cart\" name=\"cart\""
+                + " direction=\"in\" type=\"id-datatype-cart\"/>",
+            "<ownedParameter xmi:id=\"id-class-customer-placeorder-return\" direction=\"return\""
+                + " type=\"id-class-order\"/>");
+    // A void operation emits no return parameter.
+    assertThat(xml).contains("<ownedOperation xmi:id=\"id-class-order-submit\" name=\"submit\"");
+  }
+
+  @Test
+  void emitsGeneralizationNestedInTheSpecificClassifier() throws Exception {
+    JsonNode input =
+        exportInput(
+            fixtureJson("fixtures/source/valid-uml-complex.json"),
+            fixtureJson("fixtures/layout-result/uml-complex-class.json"));
+    // Add a base Class and a Generalization (Customer is-a Account). Both endpoints are
+    // classifiers,
+    // so the source validator accepts it; the exporter must nest it in the specific classifier.
+    ((tools.jackson.databind.node.ArrayNode) input.at("/source/nodes"))
+        .add(
+            JsonSupport.objectMapper()
+                .readTree(
+                    """
+                {"id":"class-account","type":"Class","label":"Account",
+                 "properties":{"uml":{"package":"pkg-commerce"}}}
+                """));
+    ((tools.jackson.databind.node.ArrayNode) input.at("/source/relationships"))
+        .add(
+            JsonSupport.objectMapper()
+                .readTree(
+                    """
+                {"id":"customer-is-account","type":"Generalization","source":"class-customer",
+                 "target":"class-account","label":"","properties":{}}
+                """));
+    ((tools.jackson.databind.node.ArrayNode) input.at("/layout_result/nodes"))
+        .add(
+            JsonSupport.objectMapper()
+                .readTree(
+                    """
+                {"id":"class-account","source_id":"class-account","projection_id":"class-account",
+                 "x":700,"y":72,"width":160,"height":80,"label":"Account"}
+                """));
+    ((tools.jackson.databind.node.ArrayNode) input.at("/layout_result/edges"))
+        .add(
+            JsonSupport.objectMapper()
+                .readTree(
+                    """
+                {"id":"customer-is-account","source":"class-customer","target":"class-account",
+                 "source_id":"customer-is-account","projection_id":"customer-is-account",
+                 "points":[{"x":120,"y":112},{"x":700,"y":112}],"label":""}
+                """));
+
+    String xml = exportXml(input);
+
+    assertThat(xml)
+        .containsSubsequence(
+            "<packagedElement xmi:type=\"uml:Class\" xmi:id=\"id-class-customer\"",
+            "<generalization xmi:type=\"uml:Generalization\" xmi:id=\"id-customer-is-account\""
+                + " general=\"id-class-account\"/>",
+            "</packagedElement>");
+    // Generalization is never a standalone packagedElement.
+    assertThat(xml).doesNotContain("<packagedElement xmi:type=\"uml:Generalization\"");
+  }
+
+  @Test
+  void resolvesObjectNodeTypeToAnInDocumentIdNotARawName() throws Exception {
+    JsonNode input =
+        exportInput(
+            fixtureJson("fixtures/source/valid-uml-basic.json"),
+            fixtureJson("fixtures/layout-result/uml-activity.json"));
+    ((tools.jackson.databind.node.ArrayNode) input.at("/source/nodes"))
+        .add(
+            JsonSupport.objectMapper()
+                .readTree(
+                    """
+                {"id":"object-order","type":"ObjectNode","label":"Order",
+                 "properties":{"uml":{"activity":"activity-submit-order","type":"Order"}}}
+                """));
+    ((tools.jackson.databind.node.ArrayNode) input.at("/layout_result/nodes"))
+        .add(
+            JsonSupport.objectMapper()
+                .readTree(
+                    """
+                {"id":"object-order","source_id":"object-order","projection_id":"object-order",
+                 "x":300,"y":300,"width":80,"height":40,"label":"Order"}
+                """));
+
+    String xml = exportXml(input);
+
+    // The ObjectNode (CentralBufferNode) type resolves to a synthesized in-document id, never the
+    // raw type name (which would be a dangling IDREF).
+    assertThat(xml).contains("xmi:type=\"uml:CentralBufferNode\"", "type=\"id-datatype-order\"");
+    assertThat(xml).doesNotContain("type=\"Order\"");
+  }
+
+  @Test
+  void exportsDeleteMessageReceiveEventAsDestructionOccurrence() throws Exception {
+    JsonNode input = exportSequenceInput();
+    ((tools.jackson.databind.node.ArrayNode) input.at("/source/relationships"))
+        .add(
+            JsonSupport.objectMapper()
+                .readTree(
+                    """
+                {"id":"m-delete","type":"Message","source":"customer","target":"service",
+                 "label":"close","properties":{"uml":{"interaction":"interaction-place-order",
+                 "sequence":99,"message_sort":"deleteMessage"}}}
+                """));
+    ((tools.jackson.databind.node.ArrayNode) input.at("/layout_result/edges"))
+        .add(
+            JsonSupport.objectMapper()
+                .readTree(
+                    """
+                {"id":"m-delete","source":"customer","target":"service","source_id":"m-delete",
+                 "projection_id":"m-delete","points":[{"x":166,"y":360},{"x":442,"y":360}],
+                 "label":"close"}
+                """));
+
+    String xml = exportXml(input);
+
+    // UML 2.5.1 §17.4: a deleteMessage must end in a DestructionOccurrenceSpecification (its
+    // receive
+    // event); the send event stays an ordinary MessageOccurrenceSpecification.
+    assertThat(xml)
+        .contains(
+            "<fragment xmi:type=\"uml:DestructionOccurrenceSpecification\""
+                + " xmi:id=\"id-m-delete-receive-event\"",
+            "<fragment xmi:type=\"uml:MessageOccurrenceSpecification\""
+                + " xmi:id=\"id-m-delete-send-event\"");
   }
 
   @Test
