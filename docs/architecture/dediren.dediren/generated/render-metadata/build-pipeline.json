@@ -1,0 +1,209 @@
+{
+  "render_metadata_schema_version": "render-metadata.schema.v1",
+  "semantic_profile": "uml",
+  "nodes": {
+    "ix-build": {
+      "type": "Interaction",
+      "source_id": "ix-build",
+      "properties": {}
+    },
+    "lf-cli": {
+      "type": "Lifeline",
+      "source_id": "lf-cli",
+      "properties": {
+        "interaction": "ix-build"
+      }
+    },
+    "lf-core": {
+      "type": "Lifeline",
+      "source_id": "lf-core",
+      "properties": {
+        "interaction": "ix-build"
+      }
+    },
+    "lf-semantics": {
+      "type": "Lifeline",
+      "source_id": "lf-semantics",
+      "properties": {
+        "interaction": "ix-build"
+      }
+    },
+    "lf-layout": {
+      "type": "Lifeline",
+      "source_id": "lf-layout",
+      "properties": {
+        "interaction": "ix-build"
+      }
+    },
+    "lf-render": {
+      "type": "Lifeline",
+      "source_id": "lf-render",
+      "properties": {
+        "interaction": "ix-build"
+      }
+    },
+    "lf-export": {
+      "type": "Lifeline",
+      "source_id": "lf-export",
+      "properties": {
+        "interaction": "ix-build"
+      }
+    },
+    "cf-emit": {
+      "type": "CombinedFragment",
+      "source_id": "cf-emit",
+      "properties": {
+        "interaction": "ix-build",
+        "operator": "alt",
+        "operands": [
+          "op-render",
+          "op-export"
+        ],
+        "covered": [
+          "lf-core",
+          "lf-render",
+          "lf-export"
+        ]
+      }
+    },
+    "op-render": {
+      "type": "InteractionOperand",
+      "source_id": "op-render",
+      "properties": {
+        "interaction": "ix-build",
+        "combined_fragment": "cf-emit",
+        "order": 1,
+        "guard": "render_policy",
+        "fragments": [
+          "m-render",
+          "m-render-reply"
+        ]
+      }
+    },
+    "op-export": {
+      "type": "InteractionOperand",
+      "source_id": "op-export",
+      "properties": {
+        "interaction": "ix-build",
+        "combined_fragment": "cf-emit",
+        "order": 2,
+        "guard": "oef_policy / xmi_policy",
+        "fragments": [
+          "m-export",
+          "m-export-reply"
+        ]
+      }
+    }
+  },
+  "edges": {
+    "m-build": {
+      "type": "Message",
+      "source_id": "m-build",
+      "properties": {
+        "interaction": "ix-build",
+        "sequence": 1,
+        "message_sort": "synchCall"
+      }
+    },
+    "m-validate": {
+      "type": "Message",
+      "source_id": "m-validate",
+      "properties": {
+        "interaction": "ix-build",
+        "sequence": 2,
+        "message_sort": "synchCall"
+      }
+    },
+    "m-validate-reply": {
+      "type": "Message",
+      "source_id": "m-validate-reply",
+      "properties": {
+        "interaction": "ix-build",
+        "sequence": 3,
+        "message_sort": "reply"
+      }
+    },
+    "m-project": {
+      "type": "Message",
+      "source_id": "m-project",
+      "properties": {
+        "interaction": "ix-build",
+        "sequence": 4,
+        "message_sort": "synchCall"
+      }
+    },
+    "m-project-reply": {
+      "type": "Message",
+      "source_id": "m-project-reply",
+      "properties": {
+        "interaction": "ix-build",
+        "sequence": 5,
+        "message_sort": "reply"
+      }
+    },
+    "m-layout": {
+      "type": "Message",
+      "source_id": "m-layout",
+      "properties": {
+        "interaction": "ix-build",
+        "sequence": 6,
+        "message_sort": "synchCall"
+      }
+    },
+    "m-layout-reply": {
+      "type": "Message",
+      "source_id": "m-layout-reply",
+      "properties": {
+        "interaction": "ix-build",
+        "sequence": 7,
+        "message_sort": "reply"
+      }
+    },
+    "m-render": {
+      "type": "Message",
+      "source_id": "m-render",
+      "properties": {
+        "interaction": "ix-build",
+        "sequence": 8,
+        "message_sort": "synchCall"
+      }
+    },
+    "m-render-reply": {
+      "type": "Message",
+      "source_id": "m-render-reply",
+      "properties": {
+        "interaction": "ix-build",
+        "sequence": 9,
+        "message_sort": "reply"
+      }
+    },
+    "m-export": {
+      "type": "Message",
+      "source_id": "m-export",
+      "properties": {
+        "interaction": "ix-build",
+        "sequence": 10,
+        "message_sort": "synchCall"
+      }
+    },
+    "m-export-reply": {
+      "type": "Message",
+      "source_id": "m-export-reply",
+      "properties": {
+        "interaction": "ix-build",
+        "sequence": 11,
+        "message_sort": "reply"
+      }
+    },
+    "m-envelope": {
+      "type": "Message",
+      "source_id": "m-envelope",
+      "properties": {
+        "interaction": "ix-build",
+        "sequence": 12,
+        "message_sort": "reply"
+      }
+    }
+  },
+  "groups": {}
+}

@@ -3,7 +3,9 @@
   "feature": "dediren",
   "models": [
     { "id": "arch", "file": "model.json", "profile": "archimate" },
-    { "id": "uml", "file": "model-uml.json", "profile": "uml" }
+    { "id": "uml", "file": "model-uml.json", "profile": "uml" },
+    { "id": "seq", "file": "model-sequence.json", "profile": "uml" },
+    { "id": "deploy", "file": "model-deployment.json", "profile": "uml" }
   ],
   "views": [
     {
@@ -25,6 +27,26 @@
       "metadata": { "plugin": "generic-graph", "target": "render-metadata", "output": "generated/render-metadata/engine-seam.json" },
       "layout": { "plugin": "elk-layout", "output": "generated/layout/engine-seam.json" },
       "render": { "plugin": "render", "policy": "render-policy-uml.json", "metadata": "generated/render-metadata/engine-seam.json", "output": "generated/svg/engine-seam.svg" }
+    },
+    {
+      "id": "build-pipeline",
+      "model": "seq",
+      "title": "Build pipeline — a dediren build call",
+      "diagramKind": "UML Sequence",
+      "projection": { "plugin": "generic-graph", "target": "layout-request" },
+      "metadata": { "plugin": "generic-graph", "target": "render-metadata", "output": "generated/render-metadata/build-pipeline.json" },
+      "layout": { "plugin": "elk-layout", "output": "generated/layout/build-pipeline.json" },
+      "render": { "plugin": "render", "policy": "render-policy-sequence.json", "metadata": "generated/render-metadata/build-pipeline.json", "output": "generated/svg/build-pipeline.svg" }
+    },
+    {
+      "id": "distribution",
+      "model": "deploy",
+      "title": "Distribution — one launcher, engines in-process",
+      "diagramKind": "UML Deployment",
+      "projection": { "plugin": "generic-graph", "target": "layout-request" },
+      "metadata": { "plugin": "generic-graph", "target": "render-metadata", "output": "generated/render-metadata/distribution.json" },
+      "layout": { "plugin": "elk-layout", "output": "generated/layout/distribution.json" },
+      "render": { "plugin": "render", "policy": "render-policy-deployment.json", "metadata": "generated/render-metadata/distribution.json", "output": "generated/svg/distribution.svg" }
     }
   ],
   "exports": [

@@ -1,0 +1,75 @@
+{
+  "model_schema_version": "model.schema.v1",
+  "required_plugins": [
+    { "id": "generic-graph", "version": "2026.07.22" }
+  ],
+  "nodes": [
+    {
+      "id": "ix-build",
+      "type": "Interaction",
+      "label": "dediren build",
+      "properties": {
+        "uml": {},
+        "rationale": "One build command: a source model goes in, an SVG plus optional OEF/XMI exports come out. The lifelines are the same engine-api participants the engine-seam view types.",
+        "architecture_context": { "profile": "archimate", "element_id": "core", "relationship": "elaborates" }
+      }
+    },
+    { "id": "lf-cli", "type": "Lifeline", "label": "cli", "properties": { "uml": { "interaction": "ix-build" } } },
+    { "id": "lf-core", "type": "Lifeline", "label": "core · BuildDriver", "properties": { "uml": { "interaction": "ix-build" } } },
+    { "id": "lf-semantics", "type": "Lifeline", "label": "SemanticsEngine", "properties": { "uml": { "interaction": "ix-build" } } },
+    { "id": "lf-layout", "type": "Lifeline", "label": "LayoutEngine", "properties": { "uml": { "interaction": "ix-build" } } },
+    { "id": "lf-render", "type": "Lifeline", "label": "RenderEngine", "properties": { "uml": { "interaction": "ix-build" } } },
+    { "id": "lf-export", "type": "Lifeline", "label": "ExportEngine", "properties": { "uml": { "interaction": "ix-build" } } },
+    {
+      "id": "cf-emit",
+      "type": "CombinedFragment",
+      "label": "alt",
+      "properties": { "uml": { "interaction": "ix-build", "operator": "alt", "operands": ["op-render", "op-export"], "covered": ["lf-core", "lf-render", "lf-export"] } }
+    },
+    {
+      "id": "op-render",
+      "type": "InteractionOperand",
+      "label": "render lane",
+      "properties": { "uml": { "interaction": "ix-build", "combined_fragment": "cf-emit", "order": 1, "guard": "render_policy", "fragments": ["m-render", "m-render-reply"] } }
+    },
+    {
+      "id": "op-export",
+      "type": "InteractionOperand",
+      "label": "export lane",
+      "properties": { "uml": { "interaction": "ix-build", "combined_fragment": "cf-emit", "order": 2, "guard": "oef_policy / xmi_policy", "fragments": ["m-export", "m-export-reply"] } }
+    }
+  ],
+  "relationships": [
+    { "id": "m-build", "type": "Message", "source": "lf-cli", "target": "lf-core", "label": "build(request)", "properties": { "uml": { "interaction": "ix-build", "sequence": 1, "message_sort": "synchCall" } } },
+    { "id": "m-validate", "type": "Message", "source": "lf-core", "target": "lf-semantics", "label": "validate(source, profile)", "properties": { "uml": { "interaction": "ix-build", "sequence": 2, "message_sort": "synchCall" } } },
+    { "id": "m-validate-reply", "type": "Message", "source": "lf-semantics", "target": "lf-core", "label": "SemanticValidationResult", "properties": { "uml": { "interaction": "ix-build", "sequence": 3, "message_sort": "reply" } } },
+    { "id": "m-project", "type": "Message", "source": "lf-core", "target": "lf-semantics", "label": "projectScene(source, view)", "properties": { "uml": { "interaction": "ix-build", "sequence": 4, "message_sort": "synchCall" } } },
+    { "id": "m-project-reply", "type": "Message", "source": "lf-semantics", "target": "lf-core", "label": "SceneGraph", "properties": { "uml": { "interaction": "ix-build", "sequence": 5, "message_sort": "reply" } } },
+    { "id": "m-layout", "type": "Message", "source": "lf-core", "target": "lf-layout", "label": "layout(scene)", "properties": { "uml": { "interaction": "ix-build", "sequence": 6, "message_sort": "synchCall" } } },
+    { "id": "m-layout-reply", "type": "Message", "source": "lf-layout", "target": "lf-core", "label": "LaidOutScene", "properties": { "uml": { "interaction": "ix-build", "sequence": 7, "message_sort": "reply" } } },
+    { "id": "m-render", "type": "Message", "source": "lf-core", "target": "lf-render", "label": "render(layout, policy)", "properties": { "uml": { "interaction": "ix-build", "sequence": 8, "message_sort": "synchCall" } } },
+    { "id": "m-render-reply", "type": "Message", "source": "lf-render", "target": "lf-core", "label": "RenderResult (SVG)", "properties": { "uml": { "interaction": "ix-build", "sequence": 9, "message_sort": "reply" } } },
+    { "id": "m-export", "type": "Message", "source": "lf-core", "target": "lf-export", "label": "export(request, env)", "properties": { "uml": { "interaction": "ix-build", "sequence": 10, "message_sort": "synchCall" } } },
+    { "id": "m-export-reply", "type": "Message", "source": "lf-export", "target": "lf-core", "label": "ExportResult (OEF / XMI)", "properties": { "uml": { "interaction": "ix-build", "sequence": 11, "message_sort": "reply" } } },
+    { "id": "m-envelope", "type": "Message", "source": "lf-core", "target": "lf-cli", "label": "EngineResult envelope", "properties": { "uml": { "interaction": "ix-build", "sequence": 12, "message_sort": "reply" } } }
+  ],
+  "plugins": {
+    "generic-graph": {
+      "semantic_profile": "uml",
+      "views": [
+        {
+          "id": "build-pipeline",
+          "label": "Build pipeline — a dediren build call",
+          "kind": "uml-sequence",
+          "nodes": ["ix-build", "lf-cli", "lf-core", "lf-semantics", "lf-layout", "lf-render", "lf-export", "cf-emit", "op-render", "op-export"],
+          "relationships": ["m-build", "m-validate", "m-validate-reply", "m-project", "m-project-reply", "m-layout", "m-layout-reply", "m-render", "m-render-reply", "m-export", "m-export-reply", "m-envelope"],
+          "layout_preferences": {
+            "direction": "right",
+            "density": "readable",
+            "routing": { "style": "orthogonal", "endpoint_merging": "off" }
+          }
+        }
+      ]
+    }
+  }
+}

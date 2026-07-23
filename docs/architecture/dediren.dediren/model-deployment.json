@@ -1,0 +1,70 @@
+{
+  "model_schema_version": "model.schema.v1",
+  "required_plugins": [
+    { "id": "generic-graph", "version": "2026.07.22" }
+  ],
+  "nodes": [
+    {
+      "id": "host",
+      "type": "Device",
+      "label": "Host",
+      "properties": {
+        "uml": { "kind": "device" },
+        "rationale": "Any developer or agent host with a JDK; shown as the deployment boundary."
+      }
+    },
+    { "id": "ee-jvm", "type": "ExecutionEnvironment", "label": "JVM 21+", "properties": { "uml": { "node": "host" } } },
+    {
+      "id": "art-launcher",
+      "type": "Artifact",
+      "label": "bin/dediren",
+      "properties": { "uml": {}, "rationale": "The single launcher script — there is no per-plugin appassembler launcher." }
+    },
+    {
+      "id": "art-lib",
+      "type": "Artifact",
+      "label": "lib/ · shrink-merged jar",
+      "properties": { "uml": {}, "rationale": "One merged jar carrying the cli composition root and every engine; the basis of hosting engines in-process." }
+    },
+    {
+      "id": "comp-cli",
+      "type": "Component",
+      "label": "cli (composition root)",
+      "properties": { "uml": {}, "architecture_context": { "profile": "archimate", "element_id": "cli", "relationship": "elaborates" } }
+    },
+    {
+      "id": "comp-engines",
+      "type": "Component",
+      "label": "engines (in-process)",
+      "properties": { "uml": {}, "rationale": "elk-layout, render, the two export engines and the semantics front ends, all loaded into the launcher process." }
+    }
+  ],
+  "relationships": [
+    { "id": "dep-launcher", "type": "Deployment", "source": "art-launcher", "target": "ee-jvm", "label": "runs on", "properties": { "uml": {} } },
+    { "id": "dep-lib", "type": "Deployment", "source": "art-lib", "target": "ee-jvm", "label": "hosted by", "properties": { "uml": {} } },
+    { "id": "man-cli", "type": "Manifestation", "source": "art-lib", "target": "comp-cli", "label": "manifests", "properties": { "uml": {} } },
+    { "id": "man-engines", "type": "Manifestation", "source": "art-lib", "target": "comp-engines", "label": "manifests", "properties": { "uml": {} } }
+  ],
+  "plugins": {
+    "generic-graph": {
+      "semantic_profile": "uml",
+      "views": [
+        {
+          "id": "distribution",
+          "label": "Distribution — one launcher, engines in-process",
+          "kind": "uml-deployment",
+          "nodes": ["ee-jvm", "art-launcher", "art-lib", "comp-cli", "comp-engines"],
+          "relationships": ["dep-launcher", "dep-lib", "man-cli", "man-engines"],
+          "groups": [
+            { "id": "grp-host", "label": "Host · JVM 21+", "role": "semantic-boundary", "semantic_source_id": "host", "members": ["ee-jvm", "art-launcher", "art-lib"] }
+          ],
+          "layout_preferences": {
+            "direction": "right",
+            "density": "readable",
+            "routing": { "style": "orthogonal", "endpoint_merging": "off" }
+          }
+        }
+      ]
+    }
+  }
+}
