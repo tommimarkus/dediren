@@ -152,4 +152,85 @@ class ArchimateRelationshipRulesTest {
     assertThat(error.path()).isEqualTo("$.relationships[0].type");
     assertThat(error.message()).contains("ConnectsTo");
   }
+
+  // --- metamodel-derived endpoint legality (RelationshipLegality) ---------------------------
+
+  @Test
+  void acceptsRepresentativeLegalEndpoints() throws Exception {
+    // §5 category rules: active->behavior assignment, service->behavior serving, behavior->passive
+    // access, any->motivation influence, concrete->abstract realization, same-aspect composition,
+    // active-structure composes its interface, behavior->behavior triggering/flow.
+    assertAllowed("Assignment", "BusinessRole", "BusinessProcess");
+    assertAllowed("Serving", "ApplicationService", "BusinessProcess");
+    assertAllowed("Access", "ApplicationFunction", "DataObject");
+    assertAllowed("Influence", "ApplicationComponent", "Requirement");
+    assertAllowed("Realization", "Artifact", "ApplicationComponent");
+    assertAllowed("Composition", "Node", "Device");
+    assertAllowed("Composition", "ApplicationComponent", "ApplicationInterface");
+    assertAllowed("Triggering", "BusinessProcess", "BusinessEvent");
+    assertAllowed("Flow", "ApplicationFunction", "ApplicationFunction");
+  }
+
+  @Test
+  void acceptsAssociationBetweenAnyEndpoints() throws Exception {
+    // Association is the "unspecified relationship" — always legal, the escape hatch.
+    assertAllowed("Association", "DataObject", "Goal");
+    assertAllowed("Association", "Meaning", "CommunicationNetwork");
+  }
+
+  @Test
+  void acceptsSpecificationDefinedCrossTypeSpecializations() throws Exception {
+    // The two specializations the spec itself defines: Contract is-a BusinessObject (§8),
+    // Constraint is-a Requirement (§6). Plus same-type specialization.
+    assertAllowed("Specialization", "Constraint", "Requirement");
+    assertAllowed("Specialization", "Contract", "BusinessObject");
+    assertAllowed("Specialization", "BusinessProcess", "BusinessProcess");
+  }
+
+  @Test
+  void acceptsGroupingAndLocationAsUniversalConnectors() throws Exception {
+    // Grouping/Location connect to anything, even where the bare category rule would reject.
+    assertAllowed("Serving", "Grouping", "DataObject");
+    assertAllowed("Access", "DataObject", "Location");
+  }
+
+  @Test
+  void rejectsAllFiveHistoricallyDeniedTriples() {
+    // The endpoint violations the previous deny-list rejected must stay rejected (superset).
+    assertRejected("Realization", "ApplicationService", "ApplicationComponent");
+    assertRejected("Triggering", "BusinessActor", "DataObject");
+    assertRejected("Serving", "DataObject", "ApplicationService");
+    assertRejected("Access", "ApplicationComponent", "ApplicationFunction");
+    assertRejected("Flow", "BusinessObject", "ApplicationComponent");
+  }
+
+  @Test
+  void rejectsCategoryViolatingEndpoints() {
+    // New teeth the deny-list missed, each a §5 category violation.
+    assertRejected("Access", "BusinessProcess", "BusinessProcess"); // access target must be passive
+    assertRejected(
+        "Influence",
+        "ApplicationComponent",
+        "ApplicationComponent"); // influence -> motivation only
+    assertRejected("Serving", "ApplicationService", "DataObject"); // never serve a passive object
+    assertRejected(
+        "Assignment", "DataObject", "BusinessProcess"); // passive cannot be an assignment source
+    assertRejected(
+        "Triggering", "BusinessProcess", "Goal"); // triggering is behavior/event, not motivation
+    assertRejected(
+        "Specialization", "BusinessProcess", "BusinessFunction"); // specialization is same concept
+  }
+
+  private static void assertAllowed(String relationship, String source, String target)
+      throws Exception {
+    Archimate.validateRelationshipEndpointTypes(relationship, source, target, "$.relationships[0]");
+  }
+
+  private static void assertRejected(String relationship, String source, String target) {
+    org.junit.jupiter.api.Assertions.assertThrows(
+        ArchimateTypeValidationException.class,
+        () ->
+            Archimate.validateRelationshipEndpointTypes(
+                relationship, source, target, "$.relationships[0]"));
+  }
 }
