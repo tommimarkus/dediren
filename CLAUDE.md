@@ -324,6 +324,18 @@ schemas, so it needs network or a warm `~/.cache/dediren-real-schemas`):
   -Dsurefire.failIfNoSpecifiedTests=false
 ```
 
+ArchiMate relationship-legality conformance (opt-in; needs a local oracle file
+of allowed `Source|Relationship|Target` lines derived from the copyrighted
+ArchiMate 3.2 Appendix B.5 tables — never committed). Asserts the legality model
+never rejects a spec-legal endpoint and still catches the bulk of illegal ones:
+
+```bash
+./mvnw -pl archimate -am test \
+  -Dtest=ArchimateRelationshipLegalityConformanceTest#modelMatchesRelationshipTableOracle \
+  -Ddediren.archimate-oracle=/path/to/allowed-triples.txt \
+  -Dsurefire.failIfNoSpecifiedTests=false
+```
+
 MCP server changes:
 
 ```bash
