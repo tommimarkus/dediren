@@ -1,0 +1,38 @@
+{
+  "render_policy_schema_version": "render-policy.schema.v3",
+  "semantic_profile": "uml",
+  "page": { "width": 1120, "height": 720 },
+  "margin": { "top": 28, "right": 28, "bottom": 28, "left": 28 },
+  "style": {
+    "background": { "fill": "#0C0A06" },
+    "font": { "family": "Inter, Arial, sans-serif", "size": 13 },
+    "node": { "fill": "#17110A", "stroke": "#7A6B4E", "stroke_width": 1.25, "rx": 0, "label_fill": "#ECDFC7" },
+    "edge": {
+      "stroke": "#7A6B4E",
+      "stroke_width": 1.25,
+      "label_fill": "#A2957A",
+      "label_horizontal_position": "center",
+      "label_horizontal_side": "auto",
+      "label_vertical_position": "center",
+      "label_vertical_side": "left"
+    },
+    "group": { "fill": "#100B05", "stroke": "#4A3F2C", "stroke_width": 1, "rx": 0, "label_fill": "#F2A93B", "label_size": 12 },
+    "node_type_overrides": {
+      "Artifact": { "fill": "#17110A", "stroke": "#F2A93B", "label_fill": "#ECDFC7" },
+      "Component": { "fill": "#17110A", "stroke": "#54D98A", "label_fill": "#ECDFC7" },
+      "ExecutionEnvironment": { "fill": "#100B05", "stroke": "#4A3F2C", "label_fill": "#F2A93B" }
+    },
+    "edge_type_overrides": {
+      "Deployment": { "line_style": "dashed", "marker_end": "open_arrow" },
+      "Manifestation": { "line_style": "dashed", "marker_end": "open_arrow" },
+      "CommunicationPath": { "marker_start": "none", "marker_end": "none" }
+    },
+    "node_overrides": {},
+    "edge_overrides": {},
+    "group_overrides": {}
+  },
+  "accessibility": {
+    "title": "Distribution — one launcher, engines in-process",
+    "description": "How does dediren ship and run — the single bin/dediren launcher and one shrink-merged lib jar hosting the cli and every engine in one process?"
+  }
+}

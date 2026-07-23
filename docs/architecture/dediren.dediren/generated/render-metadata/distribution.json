@@ -1,0 +1,61 @@
+{
+  "render_metadata_schema_version": "render-metadata.schema.v1",
+  "semantic_profile": "uml",
+  "nodes": {
+    "ee-jvm": {
+      "type": "ExecutionEnvironment",
+      "source_id": "ee-jvm",
+      "properties": {
+        "node": "host"
+      }
+    },
+    "art-launcher": {
+      "type": "Artifact",
+      "source_id": "art-launcher",
+      "properties": {}
+    },
+    "art-lib": {
+      "type": "Artifact",
+      "source_id": "art-lib",
+      "properties": {}
+    },
+    "comp-cli": {
+      "type": "Component",
+      "source_id": "comp-cli",
+      "properties": {}
+    },
+    "comp-engines": {
+      "type": "Component",
+      "source_id": "comp-engines",
+      "properties": {}
+    }
+  },
+  "edges": {
+    "dep-launcher": {
+      "type": "Deployment",
+      "source_id": "dep-launcher",
+      "properties": {}
+    },
+    "dep-lib": {
+      "type": "Deployment",
+      "source_id": "dep-lib",
+      "properties": {}
+    },
+    "man-cli": {
+      "type": "Manifestation",
+      "source_id": "man-cli",
+      "properties": {}
+    },
+    "man-engines": {
+      "type": "Manifestation",
+      "source_id": "man-engines",
+      "properties": {}
+    }
+  },
+  "groups": {
+    "grp-host": {
+      "type": "Device",
+      "source_id": "host"
+    }
+  }
+}

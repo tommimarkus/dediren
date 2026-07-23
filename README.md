@@ -54,11 +54,14 @@ Four stability-tier bands read left to right: the `contracts` kernel (in
 emerald) and the `ir` spine, then the notation/utility cores and the
 `engine-api` seam, then orchestration `core` and the seven engines behind the
 seam, and finally the thin `cli` entrypoint with its `mcp-server` adapter and
-`dist-tool`. A companion **UML® class view** zooms into the `engine-api` seam —
-the typed `SemanticsEngine` / `LayoutEngine` / `RenderEngine` / `ExportEngine`
-interfaces and the engine classes that realise them.
+`dist-tool`. Three companion **UML®** views zoom in: a **class** view of the
+`engine-api` seam — the typed `SemanticsEngine` / `LayoutEngine` /
+`RenderEngine` / `ExportEngine` interfaces and the engine classes that realise
+them; a **sequence** view tracing one `dediren build` through those same
+interfaces; and a **deployment** view of how Dediren ships — the single
+`bin/dediren` launcher hosting every engine in-process.
 
-Both views, plus the ArchiMate OEF and UML XMI exports Dediren produced from
+All four views, plus the ArchiMate OEF and UML XMI exports Dediren produced from
 them, live in
 [`docs/architecture/dediren.dediren/`](docs/architecture/dediren.dediren/); open
 [`gallery.html`](docs/architecture/dediren.dediren/gallery.html) for a zoomable,
