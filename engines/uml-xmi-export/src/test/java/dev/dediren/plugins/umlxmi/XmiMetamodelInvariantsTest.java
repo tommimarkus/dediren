@@ -16,6 +16,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -39,6 +40,8 @@ import tools.jackson.databind.JsonNode;
  * covered by their point tests in {@link MainTest} — see the class-level note in the audit handoff.
  */
 class XmiMetamodelInvariantsTest {
+
+  @TempDir Path tempDir;
 
   static Stream<Path> committedGoldens() throws Exception {
     try (Stream<Path> entries = Files.list(workspaceRoot().resolve("fixtures/export"))) {
@@ -295,13 +298,13 @@ class XmiMetamodelInvariantsTest {
         .parse(new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8)));
   }
 
-  private static String exportContent(String source, String layout) throws Exception {
+  private String exportContent(String source, String layout) throws Exception {
     var input = JsonSupport.objectMapper().createObjectNode();
     input.put("export_request_schema_version", "export-request.schema.v1");
     input.set("source", fixtureJson("fixtures/source/" + source + ".json"));
     input.set("layout_result", fixtureJson("fixtures/layout-result/" + layout + ".json"));
     input.set("policy", fixtureJson("fixtures/export-policy/default-uml-xmi.json"));
-    Path schemaPath = Files.createTempFile("XMI", ".xsd");
+    Path schemaPath = tempDir.resolve("XMI.xsd");
     Files.writeString(
         schemaPath,
         """
