@@ -171,6 +171,15 @@ public final class XmiExportEngine implements ExportEngine {
   static final String PLACEHOLDER_MODEL_IDENTIFIER = "id-dediren-uml-basic-model";
 
   /**
+   * Distinctive tail of the diagnostic message for an in-view fidelity gap (selected content that
+   * no writer emitted), which an out-of-view omission never carries. {@code
+   * XmiConformanceInvariantsTest} keys its "nothing within the exported view is silently dropped"
+   * gate on this exact text across every family, so engine and gate move together by construction.
+   */
+  static final String IN_VIEW_FIDELITY_GAP_MARKER =
+      "This is a fidelity gap in the UML/XMI mapping, not a view-scoping omission.";
+
+  /**
    * The shipped default policy hard-codes fixture identity and export succeeds with it unchanged,
    * so a copied-but-unedited policy silently ships a mis-identified XMI. Appends a warning when the
    * model identifier still equals the shipped placeholder — warning, not error: the export stays
@@ -248,7 +257,8 @@ public final class XmiExportEngine implements ExportEngine {
                   + " source elements are within the exported view but could not be represented in"
                   + " this XMI (by type: "
                   + Coverage.describe(coverage.unrepresentedInViewNodeTypes())
-                  + "). This is a fidelity gap in the UML/XMI mapping, not a view-scoping omission.",
+                  + "). "
+                  + IN_VIEW_FIDELITY_GAP_MARKER,
               "source.nodes"));
     }
     if (coverage.unrepresentedInViewRelationships() > 0) {
@@ -260,7 +270,8 @@ public final class XmiExportEngine implements ExportEngine {
                   + " source relationships are within the exported view but could not be represented"
                   + " in this XMI (by type: "
                   + Coverage.describe(coverage.unrepresentedInViewRelationshipTypes())
-                  + "). This is a fidelity gap in the UML/XMI mapping, not a view-scoping omission.",
+                  + "). "
+                  + IN_VIEW_FIDELITY_GAP_MARKER,
               "source.relationships"));
     }
     return diagnostics;
