@@ -633,6 +633,26 @@ class MainTest {
   }
 
   @Test
+  void exportsGeneralizationViewGolden() throws Exception {
+    JsonNode input =
+        exportInput(
+            fixtureJson("fixtures/source/valid-uml-generalization.json"),
+            fixtureJson("fixtures/layout-result/uml-generalization.json"));
+
+    String xml = exportGoldenXml(input);
+
+    assertThat(xml).isEqualTo(fixture("fixtures/export/uml-generalization.xmi"));
+    // The Generalization is nested in the SPECIFIC classifier (Customer) with general= naming the
+    // general one (Account) — never a standalone Model child (UML 2.5.1 §9.2.3, §9.9.7).
+    assertThat(xml)
+        .containsSubsequence(
+            "<packagedElement xmi:type=\"uml:Class\" xmi:id=\"id-class-customer\" name=\"Customer\">",
+            "<generalization xmi:type=\"uml:Generalization\" xmi:id=\"id-customer-is-account\""
+                + " general=\"id-class-account\"/>",
+            "</packagedElement>");
+  }
+
+  @Test
   void emitsOperationParametersAndReturnType() throws Exception {
     JsonNode input =
         exportInput(

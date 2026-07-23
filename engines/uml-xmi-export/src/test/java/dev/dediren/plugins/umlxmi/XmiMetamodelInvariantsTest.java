@@ -35,9 +35,9 @@ import tools.jackson.databind.JsonNode;
  * point test.
  *
  * <p>Each rule names the UML 2.5.1 clause it enforces and corresponds to a structural-shape defect
- * class this audit fixed. Constructs with no committed-golden coverage (a {@code Generalization}
- * does not appear in any golden; trigger/guard/deleteMessage semantics are single-fixture) stay
- * covered by their point tests in {@link MainTest} — see the class-level note in the audit handoff.
+ * class this audit fixed (M-GEN gained a dedicated {@code valid-uml-generalization} golden so it is
+ * a real check, not a vacuous scan). The remaining single-fixture semantic rules
+ * (trigger/guard/deleteMessage) stay covered by their point tests in {@link MainTest}.
  */
 class XmiMetamodelInvariantsTest {
 
@@ -97,6 +97,31 @@ class XmiMetamodelInvariantsTest {
       assertThat(typeById.get(deployment.getAttribute("deployedArtifact")))
           .describedAs("Deployment %s deployedArtifact target type in %s", ownerId, golden)
           .isIn("uml:Artifact", "uml:DeploymentSpecification");
+    }
+  }
+
+  // ---- M-GEN: a Generalization is owned by the specific Classifier (§9.2.3, §9.9.7) -------------
+
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("committedGoldens")
+  void everyGeneralizationIsOwnedByItsSpecificClassifier(Path golden) throws Exception {
+    Document document = parse(golden);
+    Map<String, String> typeById = xmiTypeById(document);
+    NodeList generalizations = document.getElementsByTagName("generalization");
+    for (int i = 0; i < generalizations.getLength(); i++) {
+      Element generalization = (Element) generalizations.item(i);
+      String id = generalization.getAttributeNS(XmiHelpers.XMI_NS, "id");
+      // Classifier::generalization (subsets ownedElement): a Generalization is nested in its
+      // SPECIFIC classifier, never a standalone Model child (the CL-1 defect), and general names
+      // the
+      // GENERAL classifier — both ends are Classifiers.
+      assertThat(
+              ((Element) generalization.getParentNode()).getAttributeNS(XmiHelpers.XMI_NS, "type"))
+          .describedAs("Generalization %s owner in %s", id, golden.getFileName())
+          .isIn("uml:Class", "uml:Interface", "uml:DataType", "uml:Enumeration");
+      assertThat(typeById.get(generalization.getAttribute("general")))
+          .describedAs("Generalization %s general target type in %s", id, golden.getFileName())
+          .isIn("uml:Class", "uml:Interface", "uml:DataType", "uml:Enumeration");
     }
   }
 
@@ -178,9 +203,11 @@ class XmiMetamodelInvariantsTest {
 
   @Test
   void theStructuralInvariantsActuallyCatchTheirViolations() throws Exception {
-    // One document that breaks all three structural rules at once, proving none is vacuous:
-    // an Association with a single end, a Deployment not owned by its location, and a Port that
-    // still carries derived provided=/type= attributes.
+    // One document that breaks every structural rule at once, proving none is vacuous: an
+    // Association with a single end, a Deployment not owned by its location, a Port that still
+    // carries derived provided=/type= attributes, and a Generalization emitted as a standalone
+    // Model
+    // child instead of nested in its specific classifier.
     Document broken =
         parse(
             "<xmi:XMI xmlns:xmi=\""
@@ -198,12 +225,15 @@ class XmiMetamodelInvariantsTest {
                 + "<packagedElement xmi:type=\"uml:Association\" xmi:id=\"id-assoc\">"
                 + "<ownedEnd xmi:id=\"id-only-end\" type=\"id-comp\"/>"
                 + "</packagedElement>"
+                + "<generalization xmi:type=\"uml:Generalization\" xmi:id=\"id-loose-gen\""
+                + " general=\"id-comp\"/>"
                 + "</uml:Model></xmi:XMI>");
 
     Map<String, String> typeById = xmiTypeById(broken);
     Element association = packagedElementsOfType(broken, Set.of("uml:Association")).get(0);
     Element deployment = (Element) broken.getElementsByTagName("deployment").item(0);
     Element port = elementsByTag(broken, "ownedAttribute").get(0);
+    Element looseGeneralization = (Element) broken.getElementsByTagName("generalization").item(0);
 
     assertThat(childElements(association, "ownedEnd")).hasSize(1); // < 2 → M-ENDS would fail
     assertThat(deployment.getAttribute("location"))
@@ -213,6 +243,8 @@ class XmiMetamodelInvariantsTest {
         .isEqualTo("uml:Node"); // not an Artifact → M-DEPLOY would fail
     assertThat(port.hasAttribute("provided")).isTrue(); // → M-PORT would fail
     assertThat(port.hasAttribute("type")).isTrue();
+    // parent is uml:Model, not a classifier → M-GEN would fail
+    assertThat(((Element) looseGeneralization.getParentNode()).getLocalName()).isEqualTo("Model");
   }
 
   // ---- helpers --------------------------------------------------------------------------------

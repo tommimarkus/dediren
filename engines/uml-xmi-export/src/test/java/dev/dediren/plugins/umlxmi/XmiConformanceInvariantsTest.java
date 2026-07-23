@@ -172,7 +172,8 @@ class XmiConformanceInvariantsTest {
         Arguments.of("component", "valid-uml-component-basic", "uml-component-basic"),
         Arguments.of("deployment", "valid-uml-deployment-basic", "uml-deployment-basic"),
         Arguments.of("activity", "valid-uml-basic", "uml-activity"),
-        Arguments.of("data", "valid-uml-basic", "uml-data"));
+        Arguments.of("data", "valid-uml-basic", "uml-data"),
+        Arguments.of("generalization", "valid-uml-generalization", "uml-generalization"));
   }
 
   @ParameterizedTest(name = "{0}")

@@ -49,6 +49,7 @@ class GoldenExportRegenerator {
     write("uml-deployment-basic", "valid-uml-deployment-basic", "uml-deployment-basic", null);
     write("uml-activity", "valid-uml-basic", "uml-activity", null);
     write("uml-data", "valid-uml-basic", "uml-data", null);
+    write("uml-generalization", "valid-uml-generalization", "uml-generalization", null);
   }
 
   private void write(String golden, String source, String layout, Consumer<JsonNode> mutate)
