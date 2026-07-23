@@ -1,0 +1,66 @@
+{
+  "model_schema_version": "model.schema.v1",
+  "required_plugins": [
+    {
+      "id": "generic-graph",
+      "version": "2026.07.21"
+    },
+    {
+      "id": "uml-xmi",
+      "version": "2026.07.21"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "class-account",
+      "type": "Class",
+      "label": "Account",
+      "properties": {
+        "uml": {}
+      }
+    },
+    {
+      "id": "class-customer",
+      "type": "Class",
+      "label": "Customer",
+      "properties": {
+        "uml": {}
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "id": "customer-is-account",
+      "type": "Generalization",
+      "source": "class-customer",
+      "target": "class-account",
+      "label": "",
+      "properties": {
+        "uml": {}
+      }
+    }
+  ],
+  "plugins": {
+    "generic-graph": {
+      "semantic_profile": "uml",
+      "views": [
+        {
+          "id": "class-view",
+          "label": "Account Hierarchy",
+          "kind": "uml-class",
+          "nodes": [
+            "class-account",
+            "class-customer"
+          ],
+          "relationships": [
+            "customer-is-account"
+          ],
+          "layout_preferences": {
+            "direction": "down",
+            "density": "readable"
+          }
+        }
+      ]
+    }
+  }
+}

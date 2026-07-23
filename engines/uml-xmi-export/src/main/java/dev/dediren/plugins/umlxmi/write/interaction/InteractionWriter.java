@@ -392,7 +392,16 @@ public final class InteractionWriter {
 
   public static void writeMessageOccurrence(
       StringBuilder xml, MessageExport message, String kind, String eventId, String coveredNodeId) {
-    xml.append("<fragment xmi:type=\"uml:MessageOccurrenceSpecification\" xmi:id=\"")
+    // UML 2.5.1 §17.4: an object-deletion Message must end in a DestructionOccurrenceSpecification
+    // (a subclass of MessageOccurrenceSpecification, so it still carries covered/message). The
+    // receiveEvent of a deleteMessage therefore uses the destruction subtype.
+    String occurrenceType =
+        "receive".equals(kind) && "deleteMessage".equals(message.messageSort())
+            ? "uml:DestructionOccurrenceSpecification"
+            : "uml:MessageOccurrenceSpecification";
+    xml.append("<fragment xmi:type=\"")
+        .append(occurrenceType)
+        .append("\" xmi:id=\"")
         .append(attr(eventId))
         .append("\" name=\"")
         .append(attr(message.relationship().label()))

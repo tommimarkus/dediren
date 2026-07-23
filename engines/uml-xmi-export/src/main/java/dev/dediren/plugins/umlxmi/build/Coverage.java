@@ -4,6 +4,7 @@ import dev.dediren.contracts.source.SourceNode;
 import dev.dediren.contracts.source.SourceRelationship;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
 
@@ -14,6 +15,12 @@ import java.util.stream.Collectors;
  * #compute} measures represented vs omitted content against the {@link ExportScope} selection so
  * the export envelope can declare the omissions (issue #32) instead of shipping silently lossy
  * interchange.
+ *
+ * <p>Selection alone is not enough: an element can be selected yet unemitted if no writer supports
+ * it (the coverage blind spot the 2026-07-23 conformance audit found). {@link #compute} therefore
+ * also takes the set of ids the emitter actually wrote and separates <em>in-view but not
+ * represented</em> content — a fidelity gap, not a view-scoping omission — so a future silent drop
+ * surfaces rather than being counted as represented.
  */
 public record Coverage(
     int representedNodes,
@@ -21,33 +28,63 @@ public record Coverage(
     Map<String, Integer> omittedNodeTypes,
     int representedRelationships,
     int omittedRelationships,
-    Map<String, Integer> omittedRelationshipTypes) {
+    Map<String, Integer> omittedRelationshipTypes,
+    Map<String, Integer> unrepresentedInViewNodeTypes,
+    Map<String, Integer> unrepresentedInViewRelationshipTypes) {
 
   public Coverage {
     omittedNodeTypes = Map.copyOf(omittedNodeTypes);
     omittedRelationshipTypes = Map.copyOf(omittedRelationshipTypes);
+    unrepresentedInViewNodeTypes = Map.copyOf(unrepresentedInViewNodeTypes);
+    unrepresentedInViewRelationshipTypes = Map.copyOf(unrepresentedInViewRelationshipTypes);
   }
 
   public boolean hasOmissions() {
     return omittedNodes > 0 || omittedRelationships > 0;
   }
 
+  public int unrepresentedInViewNodes() {
+    return count(unrepresentedInViewNodeTypes);
+  }
+
+  public int unrepresentedInViewRelationships() {
+    return count(unrepresentedInViewRelationshipTypes);
+  }
+
+  public boolean hasUnrepresentedInView() {
+    return unrepresentedInViewNodes() > 0 || unrepresentedInViewRelationships() > 0;
+  }
+
   public static Coverage compute(
-      List<SourceNode> nodes, List<SourceRelationship> relationships, ExportScope scope) {
+      List<SourceNode> nodes,
+      List<SourceRelationship> relationships,
+      ExportScope scope,
+      Set<String> representedNodeIds,
+      Set<String> representedRelationshipIds) {
     int representedNodes = 0;
     var omittedNodeTypes = new TreeMap<String, Integer>();
+    var unrepresentedInViewNodeTypes = new TreeMap<String, Integer>();
     for (SourceNode node : nodes) {
       if (scope.nodeIds().contains(node.id())) {
-        representedNodes++;
+        if (representedNodeIds.contains(node.id())) {
+          representedNodes++;
+        } else {
+          unrepresentedInViewNodeTypes.merge(node.type(), 1, Integer::sum);
+        }
       } else {
         omittedNodeTypes.merge(node.type(), 1, Integer::sum);
       }
     }
     int representedRelationships = 0;
     var omittedRelationshipTypes = new TreeMap<String, Integer>();
+    var unrepresentedInViewRelationshipTypes = new TreeMap<String, Integer>();
     for (SourceRelationship relationship : relationships) {
       if (scope.relationshipIds().contains(relationship.id())) {
-        representedRelationships++;
+        if (representedRelationshipIds.contains(relationship.id())) {
+          representedRelationships++;
+        } else {
+          unrepresentedInViewRelationshipTypes.merge(relationship.type(), 1, Integer::sum);
+        }
       } else {
         omittedRelationshipTypes.merge(relationship.type(), 1, Integer::sum);
       }
@@ -58,7 +95,9 @@ public record Coverage(
         omittedNodeTypes,
         representedRelationships,
         count(omittedRelationshipTypes),
-        omittedRelationshipTypes);
+        omittedRelationshipTypes,
+        unrepresentedInViewNodeTypes,
+        unrepresentedInViewRelationshipTypes);
   }
 
   /**

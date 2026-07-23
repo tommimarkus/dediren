@@ -38,9 +38,11 @@ class CoverageTest {
             relationship("deploy-1", "Deployment"));
     ExportScope scope = new ExportScope(Set.of("class-order"), Set.of());
 
-    Coverage coverage = Coverage.compute(nodes, relationships, scope);
+    Coverage coverage =
+        Coverage.compute(nodes, relationships, scope, Set.of("class-order"), Set.of());
 
     assertThat(coverage.hasOmissions()).isTrue();
+    assertThat(coverage.hasUnrepresentedInView()).isFalse();
     assertThat(coverage.representedNodes()).isEqualTo(1);
     assertThat(coverage.omittedNodes()).isEqualTo(5);
     assertThat(coverage.omittedNodeTypes())
@@ -64,12 +66,34 @@ class CoverageTest {
     List<SourceRelationship> relationships = List.of(relationship("has-line", "Composition"));
     ExportScope scope = new ExportScope(Set.of("class-order", "class-line"), Set.of("has-line"));
 
-    Coverage coverage = Coverage.compute(nodes, relationships, scope);
+    Coverage coverage =
+        Coverage.compute(
+            nodes, relationships, scope, Set.of("class-order", "class-line"), Set.of("has-line"));
 
     assertThat(coverage.hasOmissions()).isFalse();
+    assertThat(coverage.hasUnrepresentedInView()).isFalse();
     assertThat(coverage.omittedNodes()).isZero();
     assertThat(coverage.omittedRelationships()).isZero();
     assertThat(coverage.representedNodes()).isEqualTo(2);
     assertThat(coverage.representedRelationships()).isEqualTo(1);
+  }
+
+  @Test
+  void separatesInViewContentTheWritersDidNotEmitFromOutOfViewOmissions() {
+    // A Generalization is selected in the view but (hypothetically) not emitted: it is neither
+    // represented nor out-of-view, so it is reported as an in-view fidelity gap, not an omission.
+    List<SourceNode> nodes = List.of(node("class-order", "Class"), node("class-base", "Class"));
+    List<SourceRelationship> relationships = List.of(relationship("g1", "Generalization"));
+    ExportScope scope = new ExportScope(Set.of("class-order", "class-base"), Set.of("g1"));
+
+    Coverage coverage =
+        Coverage.compute(
+            nodes, relationships, scope, Set.of("class-order", "class-base"), Set.of());
+
+    assertThat(coverage.hasOmissions()).isFalse();
+    assertThat(coverage.hasUnrepresentedInView()).isTrue();
+    assertThat(coverage.unrepresentedInViewRelationships()).isEqualTo(1);
+    assertThat(coverage.unrepresentedInViewRelationshipTypes()).containsEntry("Generalization", 1);
+    assertThat(coverage.representedNodes()).isEqualTo(2);
   }
 }

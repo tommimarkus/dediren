@@ -1,0 +1,52 @@
+{
+  "layout_result_schema_version": "layout-result.schema.v2",
+  "view_id": "class-view",
+  "nodes": [
+    {
+      "id": "class-account",
+      "source_id": "class-account",
+      "projection_id": "class-account",
+      "x": 100.0,
+      "y": 40.0,
+      "width": 160.0,
+      "height": 80.0,
+      "label": "Account",
+      "source_pointer": "/nodes/0"
+    },
+    {
+      "id": "class-customer",
+      "source_id": "class-customer",
+      "projection_id": "class-customer",
+      "x": 100.0,
+      "y": 220.0,
+      "width": 160.0,
+      "height": 80.0,
+      "label": "Customer",
+      "source_pointer": "/nodes/1"
+    }
+  ],
+  "edges": [
+    {
+      "id": "customer-is-account",
+      "source": "class-customer",
+      "target": "class-account",
+      "source_id": "customer-is-account",
+      "projection_id": "customer-is-account",
+      "routing_hints": [],
+      "points": [
+        {
+          "x": 180.0,
+          "y": 220.0
+        },
+        {
+          "x": 180.0,
+          "y": 120.0
+        }
+      ],
+      "label": "",
+      "source_pointer": "/relationships/0"
+    }
+  ],
+  "groups": [],
+  "warnings": []
+}

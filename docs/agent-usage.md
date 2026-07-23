@@ -290,20 +290,25 @@ Continue with the Bundle Smoke Workflow commands, using
 SVG notation, and the OEF export under `## Export`.
 
 A `uml-xmi` export represents the single laid-out view it is handed, not the
-whole source model. In a `uml-class`/`uml-data` view it emits class
-relationships (`Association`, `Aggregation`, `Composition`, `Dependency`, and
-`Realization` between classifiers) as owned `packagedElement`s and nests
-classifiers under the `Package` they declare via `properties.uml.package`. When
-the source model contains elements or relationships outside the exported view,
-the export declares them (rather than dropping them silently) with `info`
-diagnostics `DEDIREN_XMI_ELEMENTS_OMITTED` and
-`DEDIREN_XMI_RELATIONSHIPS_OMITTED`, each listing the omitted count and a
-per-type breakdown; the envelope `status` stays `ok` for omissions alone (an
+whole source model. It emits conformant UML 2.5.1 abstract syntax for whatever
+view kind is exported: class/data classifiers and their relationships
+(`Association`, `Aggregation`, `Composition`, `Dependency`, `Realization`,
+`Generalization`) with operation signatures; use-case actors, use cases, and
+their associations; activities with partitions and edge guards; state machines
+with transition triggers, guards, and effects; components with typed ports and
+interface realizations; and deployments with nested nodes, deployments, and
+manifestations. Classifiers nest under the `Package` they declare via
+`properties.uml.package`. When the source model contains elements or
+relationships outside the exported view — or in-view content the UML/XMI mapping
+could not represent — the export declares them (rather than dropping them
+silently) with `info` diagnostics `DEDIREN_XMI_ELEMENTS_OMITTED` and
+`DEDIREN_XMI_RELATIONSHIPS_OMITTED`, each listing the count and a per-type
+breakdown (the message states whether the content was outside the view or an
+in-view mapping gap); the envelope `status` stays `ok` for these alone (an
 unedited default policy adds the `DEDIREN_EXPORT_IDENTITY_PLACEHOLDER`
 warning, which lifts it to `warning` — see `## Export`). Read those diagnostics
-from `.diagnostics[]` to know exactly what a given XMI does and does not cover
-(for example, to disclose "classes only") and export the other views to
-represent their content.
+from `.diagnostics[]` to know exactly what a given XMI does and does not cover,
+and export the other views to represent their content.
 
 Class content is canonical UML 2.5.1: every attribute `type` resolves to an
 `xmi:id` in the document (an emitted classifier, or a self-contained

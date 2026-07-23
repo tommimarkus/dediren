@@ -10,8 +10,12 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -29,29 +33,44 @@ class RealSchemaConformanceTest {
 
   private final XmiExportEngine engine = new XmiExportEngine();
 
-  @Test
-  void fixtureExportValidatesAgainstThePinnedRealOmgXmiSchema() throws Exception {
+  static Stream<Arguments> everyFamily() {
+    // The eight shipped families plus the two extra view-scopings MainTest pins as goldens: every
+    // family's per-view export must be well-formed XMI the REAL pinned OMG XMI.xsd accepts, not
+    // just
+    // the class family the single-fixture case once covered. (source fixture, layout-result
+    // fixture.)
+    return Stream.of(
+        Arguments.of("class", "valid-uml-basic", "uml-basic"),
+        Arguments.of("complex-class", "valid-uml-complex", "uml-complex-class"),
+        Arguments.of("sequence", "valid-uml-sequence-basic", "uml-sequence-basic"),
+        Arguments.of(
+            "sequence-fragments", "valid-uml-sequence-fragments", "uml-sequence-fragments"),
+        Arguments.of("state-machine", "valid-uml-state-machine-basic", "uml-state-machine-basic"),
+        Arguments.of("use-case", "valid-uml-use-case-basic", "uml-use-case-basic"),
+        Arguments.of("component", "valid-uml-component-basic", "uml-component-basic"),
+        Arguments.of("deployment", "valid-uml-deployment-basic", "uml-deployment-basic"),
+        Arguments.of("activity", "valid-uml-basic", "uml-activity"),
+        Arguments.of("data", "valid-uml-basic", "uml-data"),
+        Arguments.of("generalization", "valid-uml-generalization", "uml-generalization"));
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("everyFamily")
+  void everyFamilyExportValidatesAgainstThePinnedRealOmgXmiSchema(
+      String label, String source, String layout) throws Exception {
     ObjectNode input = JsonSupport.objectMapper().createObjectNode();
     input.put("export_request_schema_version", "export-request.schema.v1");
-    input.set("source", fixtureJson("fixtures/source/valid-uml-basic.json"));
-    input.set("layout_result", fixtureJson("fixtures/layout-result/uml-basic.json"));
+    input.set("source", fixtureJson("fixtures/source/" + source + ".json"));
+    input.set("layout_result", fixtureJson("fixtures/layout-result/" + layout + ".json"));
     input.set("policy", fixtureJson("fixtures/export-policy/default-uml-xmi.json"));
     ExportRequest request =
         engine.parseRequest(
             JsonSupport.objectMapper().writeValueAsString(input).getBytes(StandardCharsets.UTF_8));
 
     EngineResult<ExportResult> result =
-        engine.export(
-            request,
-            Map.of(
-                "DEDIREN_SCHEMA_CACHE_DIR",
-                System.getProperty(
-                    "dediren.real-schemas.cache",
-                    Path.of(System.getProperty("user.home"), ".cache", "dediren-real-schemas")
-                        .toString())),
-            Path.of("").toAbsolutePath());
+        engine.export(request, realSchemaCacheEnv(), Path.of("").toAbsolutePath());
 
-    assertThat(result.value().content()).contains("<uml:Model");
+    assertThat(result.value().content()).describedAs("%s export", label).contains("<uml:Model");
     assertThat(result.diagnostics())
         .anySatisfy(
             diagnostic -> {
@@ -83,15 +102,7 @@ class RealSchemaConformanceTest {
             fixtureJson("fixtures/export-policy/default-uml-xmi.json"));
 
     java.util.Optional<EngineResult<ExportResult>> result =
-        engine.exportModel(
-            request,
-            Map.of(
-                "DEDIREN_SCHEMA_CACHE_DIR",
-                System.getProperty(
-                    "dediren.real-schemas.cache",
-                    Path.of(System.getProperty("user.home"), ".cache", "dediren-real-schemas")
-                        .toString())),
-            Path.of("").toAbsolutePath());
+        engine.exportModel(request, realSchemaCacheEnv(), Path.of("").toAbsolutePath());
 
     assertThat(result.orElseThrow().value().content())
         .contains("<uml:Model")
@@ -105,6 +116,14 @@ class RealSchemaConformanceTest {
                   .contains("pinned OMG XMI 2.5.1")
                   .contains("UML-namespace content accepted");
             });
+  }
+
+  private static Map<String, String> realSchemaCacheEnv() {
+    return Map.of(
+        "DEDIREN_SCHEMA_CACHE_DIR",
+        System.getProperty(
+            "dediren.real-schemas.cache",
+            Path.of(System.getProperty("user.home"), ".cache", "dediren-real-schemas").toString()));
   }
 
   private static JsonNode fixtureJson(String path) throws Exception {

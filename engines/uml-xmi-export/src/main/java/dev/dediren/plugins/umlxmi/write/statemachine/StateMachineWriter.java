@@ -106,6 +106,18 @@ public final class StateMachineWriter {
         .append("\" kind=\"")
         .append(attr(Optional.ofNullable(umlString(transition, "kind")).orElse("external")))
         .append("\">");
+    // UML 2.5.1 §14.5.11: Transition owns trigger/guard/effect. The source carries a trigger name
+    // only, so emit a named uml:Trigger — the [1..1] Trigger::event needs a CallEvent/SignalEvent
+    // bound to an Operation/Signal the diagram source does not supply, so the name is the faithful
+    // carrier rather than a fabricated event.
+    String trigger = umlString(transition, "trigger");
+    if (trigger != null && !trigger.isBlank()) {
+      xml.append("<trigger xmi:type=\"uml:Trigger\" xmi:id=\"")
+          .append(attr(ids.xmiId(transition.id() + "-trigger")))
+          .append("\" name=\"")
+          .append(attr(trigger))
+          .append("\"/>");
+    }
     String guard = umlString(transition, "guard");
     if (guard != null && !guard.isBlank()) {
       String guardId = ids.xmiId(transition.id() + "-guard");
@@ -122,6 +134,16 @@ public final class StateMachineWriter {
           .append(text(guard))
           .append("</body>")
           .append("</specification></guard>");
+    }
+    String effect = umlString(transition, "effect");
+    if (effect != null && !effect.isBlank()) {
+      xml.append("<effect xmi:type=\"uml:OpaqueBehavior\" xmi:id=\"")
+          .append(attr(ids.xmiId(transition.id() + "-effect")))
+          .append("\" name=\"")
+          .append(attr(effect))
+          .append("\"><body>")
+          .append(text(effect))
+          .append("</body></effect>");
     }
     xml.append("</transition>");
   }
