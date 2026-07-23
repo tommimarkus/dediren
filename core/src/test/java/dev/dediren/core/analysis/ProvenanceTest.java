@@ -13,7 +13,7 @@ class ProvenanceTest {
 
   private static String payload(String viewId) {
     return Provenance.payload(
-        "model.schema.v1", "deadbeef", viewId, "oef_policy_sha256", "cafef00d", "2026.07.26");
+        "model.schema.v1", "deadbeef", viewId, "oef_policy_sha256", "cafef00d", "2026.07.27");
   }
 
   @Test
@@ -28,7 +28,7 @@ class ProvenanceTest {
       assertThat(stamp.path("model_sha256").asText()).isEqualTo("deadbeef");
       assertThat(stamp.path("view_id").asText()).isEqualTo("main");
       assertThat(stamp.path("oef_policy_sha256").asText()).isEqualTo("cafef00d");
-      assertThat(stamp.path("dediren_version").asText()).isEqualTo("2026.07.26");
+      assertThat(stamp.path("dediren_version").asText()).isEqualTo("2026.07.27");
     }
   }
 
