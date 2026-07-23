@@ -99,15 +99,15 @@ contrasting title fill, so it stays readable on the dark Amber CRT canvas.
 ## Layout note
 
 The `module-architecture` view is laid out top-to-bottom (`direction: down`), so
-the four stability tiers read as stacked bands, with **spline** edge routing and
-endpoint merging **off**. That combination is what keeps the `engine-api` seam's
-8-way fan-out into tier 2 individually traceable: each dependency is its own
-curve from source to target rather than a merged orthogonal trunk. The view
+the four stability tiers read as stacked bands, with orthogonal edge routing and
+endpoint merging **off** (off so each dependency shows distinctly — a merged
+arrow would hide that, e.g., `render` has three incoming dependencies). The view
 passes `validate-layout` with no quality warning.
 
-(The earlier orthogonal + merged routing piled those cross-tier edges into a
-shared bus that overlapped in the tier-boundary gutter — legible as tiers, but
-impossible to follow edge by edge. Because `layout-only` tier groups are still
-laid out as ELK hierarchy, the boxes route every cross-tier edge through their
-boundary; spline + merge-off is what disambiguates them while keeping the
-boxes.)
+The tier boxes are `role: "layout-only"` groups. The layout engine draws such a
+group as a **partition-aligned band with a bounding box** over its members — not
+as an ELK compound node — so every cross-tier dependency routes node-to-node on
+the flat graph and stays individually followable, while the labelled tier bands
+still frame the reading. (A `SEMANTIC_BOUNDARY` group, a real containment, keeps
+the nested-hierarchy layout, where routing edges through the boundary is
+correct.)
