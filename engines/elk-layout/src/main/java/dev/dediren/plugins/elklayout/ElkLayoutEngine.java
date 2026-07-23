@@ -69,10 +69,34 @@ final class ElkLayoutEngine {
       return layoutPacked(request);
     }
     if (!list(request.groups()).isEmpty()) {
+      if (bandableGroups(request)) {
+        return layoutFlatBanded(request);
+      }
       return layoutGrouped(request);
     }
 
     return layoutFlat(request);
+  }
+
+  /**
+   * A view whose groups are all {@code visualOnly} and none nested inside another is drawn as
+   * partition-aligned bands (see {@link #layoutFlatBanded}) rather than ELK compound nodes: the
+   * boxes are only a visual grouping, so nesting the members would force every cross-group edge to
+   * route through a box boundary and pile up in the gutter. A semantic-boundary group (a real
+   * containment) still takes the hierarchy path, where that routing is correct.
+   */
+  private static boolean bandableGroups(LayoutRequest request) {
+    List<LayoutGroup> groups = list(request.groups());
+    if (groups.isEmpty() || !ownerByGroup(request).isEmpty()) {
+      return false;
+    }
+    for (LayoutGroup group : groups) {
+      GroupProvenance provenance = group.provenance();
+      if (provenance == null || !provenance.visualOnly()) {
+        return false;
+      }
+    }
+    return true;
   }
 
   private static LayoutMode layoutMode(LayoutPreferences preferences) {
@@ -236,6 +260,141 @@ final class ElkLayoutEngine {
             groups,
             warnings);
     return sequenceConstraints.normalize(result);
+  }
+
+  /**
+   * Lays out a view whose groups are visual-only tier bands. The members are laid out flat (no ELK
+   * compound nodes) with an ELK partition per group so each band occupies its own ordered layer;
+   * edges route node-to-node and never through a box boundary. Each group's labelled box is then a
+   * bounding box computed over its laid-out members. This is the readable counterpart to {@link
+   * #layoutGrouped}, which nests members and is correct only for semantic containment.
+   */
+  private static LayoutResult layoutFlatBanded(LayoutRequest request) {
+    List<LayoutGroup> groups = list(request.groups());
+    Map<String, Integer> partitionByGroup = new HashMap<>();
+    for (int index = 0; index < groups.size(); index++) {
+      partitionByGroup.put(groups.get(index).id(), index);
+    }
+    Map<String, String> ownerByNode = ownerByNode(request, requestNodesById(request));
+
+    List<LayoutNode> bandedNodes = new ArrayList<>();
+    for (LayoutNode node : list(request.nodes())) {
+      Integer partition = node.partition();
+      if (partition == null) {
+        String owner = ownerByNode.get(node.id());
+        partition = owner == null ? null : partitionByGroup.get(owner);
+      }
+      bandedNodes.add(
+          new LayoutNode(
+              node.id(),
+              node.label(),
+              node.sourceId(),
+              node.widthHint(),
+              node.heightHint(),
+              node.role(),
+              partition,
+              node.layerConstraint(),
+              node.sourcePointer()));
+    }
+
+    // Reuse the flat path verbatim (routing, endpoint merging, ports). Stripping the groups makes
+    // it run the plain-flat layout; the derived partitions align each band without a compound node.
+    LayoutRequest flatRequest =
+        new LayoutRequest(
+            request.layoutRequestSchemaVersion(),
+            request.viewId(),
+            bandedNodes,
+            request.edges(),
+            List.of(),
+            request.constraints(),
+            request.layoutPreferences());
+    LayoutResult flat = layoutFlat(flatRequest);
+
+    List<Diagnostic> warnings = new ArrayList<>(flat.warnings());
+    List<LaidOutGroup> bands =
+        bandBounds(groups, flat.nodes(), request.layoutPreferences(), warnings);
+
+    return new LayoutResult(
+        ContractVersions.LAYOUT_RESULT_SCHEMA_VERSION,
+        request.viewId(),
+        flat.nodes(),
+        flat.edges(),
+        bands,
+        warnings);
+  }
+
+  /** Bounding box (plus density-aware padding) around each visual-only group's laid-out members. */
+  private static List<LaidOutGroup> bandBounds(
+      List<LayoutGroup> groups,
+      List<LaidOutNode> laidOutNodes,
+      LayoutPreferences preferences,
+      List<Diagnostic> warnings) {
+    Map<String, LaidOutNode> nodeById = new HashMap<>();
+    for (LaidOutNode node : laidOutNodes) {
+      nodeById.put(node.id(), node);
+    }
+    double padding = ElkLayeredOptions.groupBandPadding(preferences);
+    List<LaidOutGroup> bands = new ArrayList<>();
+    for (int groupIndex = 0; groupIndex < groups.size(); groupIndex++) {
+      LayoutGroup group = groups.get(groupIndex);
+      List<String> memberIds = new ArrayList<>();
+      double minX = Double.POSITIVE_INFINITY;
+      double minY = Double.POSITIVE_INFINITY;
+      double maxX = Double.NEGATIVE_INFINITY;
+      double maxY = Double.NEGATIVE_INFINITY;
+      for (String member : list(group.members())) {
+        LaidOutNode node = nodeById.get(member);
+        if (node == null) {
+          continue;
+        }
+        memberIds.add(member);
+        minX = Math.min(minX, node.x());
+        minY = Math.min(minY, node.y());
+        maxX = Math.max(maxX, node.x() + node.width());
+        maxY = Math.max(maxY, node.y() + node.height());
+      }
+      if (memberIds.isEmpty()) {
+        warnings.add(
+            new Diagnostic(
+                DiagnosticCode.ELK_EMPTY_GROUP.code(),
+                DiagnosticSeverity.WARNING,
+                "group " + group.id() + " has no laid out members",
+                "$.groups[" + groupIndex + "]"));
+        continue;
+      }
+      LaidOutGroup band =
+          new LaidOutGroup(
+              group.id(),
+              semanticBackedSourceId(group.provenance(), group.id()),
+              group.id(),
+              group.provenance(),
+              minX - padding,
+              minY - padding,
+              (maxX - minX) + 2 * padding,
+              (maxY - minY) + 2 * padding,
+              memberIds,
+              group.label());
+      for (LaidOutGroup other : bands) {
+        if (bandsOverlap(band, other)) {
+          warnings.add(
+              new Diagnostic(
+                  DiagnosticCode.ELK_GROUP_BANDS_OVERLAP.code(),
+                  DiagnosticSeverity.WARNING,
+                  "group band " + group.id() + " overlaps band " + other.id(),
+                  "$.groups[" + groupIndex + "]"));
+          break;
+        }
+      }
+      bands.add(band);
+    }
+    return bands;
+  }
+
+  private static boolean bandsOverlap(LaidOutGroup a, LaidOutGroup b) {
+    return a.x() < b.x() + b.width()
+        && b.x() < a.x() + a.width()
+        && a.y() < b.y() + b.height()
+        && b.y() < a.y() + a.height();
   }
 
   private static LayoutResult layoutPacked(LayoutRequest request) {

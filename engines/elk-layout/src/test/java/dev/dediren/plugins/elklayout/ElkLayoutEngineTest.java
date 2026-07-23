@@ -817,6 +817,97 @@ class ElkLayoutEngineTest {
   }
 
   @Test
+  void visualOnlyGroupBandWrapsMembersWithBandPadding() {
+    // A visual-only group is drawn as a bounding box over its flat-laid-out members (partition
+    // banding), NOT as an ELK compound node. The box is exactly the member span plus the
+    // density-aware band padding — the tell that no hierarchy padding/insets were applied.
+    LayoutRequest request =
+        new LayoutRequest(
+            ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION,
+            "main",
+            List.of(
+                new LayoutNode("a", "A", "a", 160.0, 80.0),
+                new LayoutNode("b", "B", "b", 160.0, 80.0)),
+            List.of(new LayoutEdge("a-b", "a", "b", "", "a-b")),
+            List.of(
+                new LayoutGroup(
+                    "band", "Band", List.of("a", "b"), GroupProvenance.visualOnlyGroup())),
+            List.of(),
+            new LayoutPreferences(
+                LayoutDirection.DOWN,
+                LayoutDensity.READABLE,
+                null,
+                new LayoutRoutingPreferences(
+                    LayoutRoutingStyle.ORTHOGONAL, LayoutEndpointMerging.OFF)));
+
+    LayoutResult result = new ElkLayoutEngine().layout(request);
+    ElkLayoutRenderArtifacts.write(result);
+
+    assertEquals(List.of(), result.warnings());
+    LaidOutGroup band = groupById(result, "band");
+    assertEquals(List.of("a", "b"), band.members());
+    assertGroupContainsMembers(result, band);
+    LaidOutNode a = nodeById(result, "a");
+    LaidOutNode b = nodeById(result, "b");
+    double padding = 32.0; // READABLE band padding
+    double minX = Math.min(a.x(), b.x());
+    double minY = Math.min(a.y(), b.y());
+    double maxX = Math.max(a.x() + a.width(), b.x() + b.width());
+    double maxY = Math.max(a.y() + a.height(), b.y() + b.height());
+    assertEquals(minX - padding, band.x(), 1e-6);
+    assertEquals(minY - padding, band.y(), 1e-6);
+    assertEquals(maxX + padding, band.x() + band.width(), 1e-6);
+    assertEquals(maxY + padding, band.y() + band.height(), 1e-6);
+  }
+
+  @Test
+  void visualOnlyGroupsPartitionIntoOrderedNonOverlappingBands() {
+    // Three visual-only tier groups + a chain edge, laid out downward. Partitioning must stack the
+    // bands in group order with no vertical overlap, so the tiers read at a glance — the property
+    // that made grouping worth keeping once edges no longer route through the box boundaries.
+    LayoutRequest request =
+        new LayoutRequest(
+            ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION,
+            "main",
+            List.of(
+                new LayoutNode("t0", "T0", "t0", 160.0, 80.0),
+                new LayoutNode("t1", "T1", "t1", 160.0, 80.0),
+                new LayoutNode("t2", "T2", "t2", 160.0, 80.0)),
+            List.of(
+                new LayoutEdge("e01", "t0", "t1", "", "e01"),
+                new LayoutEdge("e12", "t1", "t2", "", "e12")),
+            List.of(
+                new LayoutGroup(
+                    "tier0", "Tier 0", List.of("t0"), GroupProvenance.visualOnlyGroup()),
+                new LayoutGroup(
+                    "tier1", "Tier 1", List.of("t1"), GroupProvenance.visualOnlyGroup()),
+                new LayoutGroup(
+                    "tier2", "Tier 2", List.of("t2"), GroupProvenance.visualOnlyGroup())),
+            List.of(),
+            new LayoutPreferences(
+                LayoutDirection.DOWN,
+                LayoutDensity.READABLE,
+                null,
+                new LayoutRoutingPreferences(
+                    LayoutRoutingStyle.ORTHOGONAL, LayoutEndpointMerging.OFF)));
+
+    LayoutResult result = new ElkLayoutEngine().layout(request);
+    ElkLayoutRenderArtifacts.write(result);
+
+    assertEquals(3, result.groups().size());
+    assertEquals(List.of(), result.warnings());
+    double y0 = nodeById(result, "t0").y();
+    double y1 = nodeById(result, "t1").y();
+    double y2 = nodeById(result, "t2").y();
+    assertTrue(y0 < y1 && y1 < y2, "visual-only tiers band top-to-bottom in group order");
+    LaidOutGroup tier0 = groupById(result, "tier0");
+    LaidOutGroup tier1 = groupById(result, "tier1");
+    LaidOutGroup tier2 = groupById(result, "tier2");
+    assertFalse(Rect.of(tier0).overlaps(Rect.of(tier1)), "tier bands should not overlap");
+    assertFalse(Rect.of(tier1).overlaps(Rect.of(tier2)), "tier bands should not overlap");
+  }
+
+  @Test
   void groupedLayoutSupportsNestedGroupMembers() {
     LayoutRequest request =
         new LayoutRequest(
