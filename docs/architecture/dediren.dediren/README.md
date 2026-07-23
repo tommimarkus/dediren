@@ -96,9 +96,18 @@ contrasting title fill, so it stays readable on the dark Amber CRT canvas.
   module's `pom.xml` and the guidelines' allowed-edge table. No
   architect-owned or low-confidence content.
 
-## Known layout note
+## Layout note
 
-The `module-architecture` view carries a `route_close_parallel_count: 25`
-layout-quality warning — inherent to the `engine-api` seam's 8-way fan-out and
-unchanged by density/endpoint-merging tuning. The routes render clearly
-separated; the warning is disclosed rather than suppressed.
+The `module-architecture` view is laid out top-to-bottom (`direction: down`), so
+the four stability tiers read as stacked bands, with **spline** edge routing and
+endpoint merging **off**. That combination is what keeps the `engine-api` seam's
+8-way fan-out into tier 2 individually traceable: each dependency is its own
+curve from source to target rather than a merged orthogonal trunk. The view
+passes `validate-layout` with no quality warning.
+
+(The earlier orthogonal + merged routing piled those cross-tier edges into a
+shared bus that overlapped in the tier-boundary gutter — legible as tiers, but
+impossible to follow edge by edge. Because `layout-only` tier groups are still
+laid out as ELK hierarchy, the boxes route every cross-tier edge through their
+boundary; spline + merge-off is what disambiguates them while keeping the
+boxes.)

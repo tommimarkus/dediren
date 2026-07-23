@@ -903,8 +903,8 @@
               "strategy": "network-simplex"
             },
             "routing": {
-              "style": "orthogonal",
-              "endpoint_merging": "local"
+              "style": "spline",
+              "endpoint_merging": "off"
             }
           }
         }
