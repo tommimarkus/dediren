@@ -897,7 +897,7 @@
           "layout_preferences": {
             "algorithm": "layered",
             "mode": "flow",
-            "direction": "right",
+            "direction": "down",
             "density": "readable",
             "placement": {
               "strategy": "network-simplex"
