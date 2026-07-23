@@ -103,7 +103,7 @@ handoff rules in `## Command Handoff` apply unchanged.
 {
   "model_schema_version": "model.schema.v1",
   "required_plugins": [
-    { "id": "generic-graph", "version": "2026.07.25" }
+    { "id": "generic-graph", "version": "2026.07.26" }
   ],
   "nodes": [
     { "id": "client", "type": "generic.actor", "label": "Client", "properties": {} },
@@ -187,8 +187,8 @@ profile and use ArchiMate type names:
 ```json
 {
   "required_plugins": [
-    { "id": "generic-graph", "version": "2026.07.25" },
-    { "id": "archimate-oef", "version": "2026.07.25" }
+    { "id": "generic-graph", "version": "2026.07.26" },
+    { "id": "archimate-oef", "version": "2026.07.26" }
   ],
   "plugins": {
     "generic-graph": {
@@ -812,7 +812,7 @@ deployment slots, and UMLDI.
 ## Runtime Probes
 
 ```bash
-VERSION=2026.07.25
+VERSION=2026.07.26
 BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-${VERSION}
 
 "$BUNDLE/bin/dediren" --version

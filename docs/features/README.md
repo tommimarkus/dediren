@@ -91,7 +91,7 @@ described in [`CLAUDE.md`](../../CLAUDE.md).
 - **Bundle layout, launcher behavior, environment variable, or release/version
   policy** → update [Distribution & Runtime](distribution-and-runtime.md).
 
-**Version strings.** Pages cite the current product version (`2026.07.25` at the
+**Version strings.** Pages cite the current product version (`2026.07.26` at the
 time of writing) only in illustrative bundle paths and `required_plugins`
 examples. When the product version bumps (see [Versioning in
 `CLAUDE.md`](../../CLAUDE.md) and the `release-policy`), include this directory
