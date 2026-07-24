@@ -47,9 +47,16 @@ final class ToolSchemas {
             "type": "array",
             "items": {"type": "string", "enum": ["layout-request", "layout-result", "render-metadata"]},
             "description": "Optional stage envelopes to also write under 'out', for debugging."
+          },
+          "package": {
+            "type": "string",
+            "description": "Path to a package.json declaring models, views, and exports, relative to the workspace root. Builds the whole package end to end; mutually exclusive with source/out and the per-lane policies."
+          },
+          "no_export": {
+            "type": "boolean",
+            "description": "In package mode, suppress the export lanes."
           }
-        },
-        "required": ["source", "out"]
+        }
       }
       """;
 
