@@ -130,6 +130,12 @@ agent tools should be pointed here from their own entrypoint files (for example,
   `GuideCatalog` topics), the `## MCP Server` section of
   `docs/agent-usage.md`, the MCP rows of `docs/threat-model.md`, and the
   dist-tool packaged-MCP stdio smoke together.
+- Package model changes: update `schemas/package.schema.json` +
+  `schemas/package-build-result.schema.json`, the `contracts` `pkg/` records,
+  `fixtures/package*`, `core` `pkg/` (`PackageBuildCommand` / `PackageValidator`)
+  with the `DEDIREN_PACKAGE_*` codes, the `cli` `--package` wiring, the
+  `mcp-server` `dediren_build` package argument, and
+  `README.md`/`docs/agent-usage.md`/`docs/threat-model.md` together.
 - Runtime dependencies or reflective surfaces on the cli classpath: the bundle
   ships one shrink-merged `lib/` jar, so a new ServiceLoader registration,
   annotation-driven library, or reflection-reached class needs a matching keep

@@ -130,6 +130,17 @@ Controls:
   write primitive is absent rather than present-and-refusing. The four analysis
   tools (`dediren_diff`, `dediren_query`, `dediren_verify`, `dediren_status`) are
   read-only and stay registered in both modes.
+- **Package declared outputs.** `dediren build --package` (and `dediren_build` with
+  a `package` argument) add a caller-*declared* write surface: each view and export
+  names the path its artifact lands at. Every declared output path — and every
+  declared input reference (`models[].source`, the render/export policies) — is
+  resolved against the package file's directory and confined with the same
+  `ConfinedPaths` real-path check as the single-model lane: on the CLI/human lane to
+  the package directory, under MCP to the server `--root`. An escaping path is a
+  structured `DEDIREN_COMMAND_INPUT_INVALID` (CLI) / `DEDIREN_MCP_PATH_OUTSIDE_ROOT`
+  (MCP) error, never a write, and colliding declared paths are rejected before any
+  build begins. Pinned by `PackageBuildCommandTest`, `PackageValidatorTest`,
+  `CliPackageBuildTest`, and `DedirenBuildPackageToolTest`.
 - **Resources serve product bytes only.** The MCP resources surface
   (`dediren://schema/…`, `dediren://fixture/…`, `dediren://guide/…`,
   `dediren://diagnostics/catalog`) enumerates and reads exclusively under the
