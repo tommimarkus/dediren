@@ -56,6 +56,10 @@
       <Class name="dev.dediren.contracts.source.SourceDocument"/>
       <Class name="dev.dediren.contracts.source.SourceNode"/>
       <Class name="dev.dediren.contracts.source.SourceRelationship"/>
+      <Class name="dev.dediren.contracts.pkg.PackageDocument"/>
+      <Class name="dev.dediren.contracts.pkg.PackageBuildResult"/>
+      <Class name="dev.dediren.contracts.pkg.PackageViewOutcome"/>
+      <Class name="dev.dediren.contracts.pkg.PackageExportOutcome"/>
       <Class name="dev.dediren.schemacache.SchemaFetchResult"/>
       <Class name="dev.dediren.ir.SceneGraph"/>
       <Class name="dev.dediren.ir.SceneGroup"/>

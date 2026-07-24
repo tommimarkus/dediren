@@ -1,7 +1,5 @@
 package dev.dediren.core.pkg;
 
-import static dev.dediren.contracts.util.ContractCollections.listOrEmpty;
-
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -28,6 +26,8 @@ public record PackageBuildRequest(
     boolean noExport) {
   public PackageBuildRequest {
     env = env == null ? Map.of() : Map.copyOf(env);
-    views = listOrEmpty(views);
+    // List.copyOf inline (not the ContractCollections helper) so SpotBugs models the copy as
+    // immutable and does not flag EI_EXPOSE_REP — this request is core-internal, not a wire record.
+    views = views == null ? List.of() : List.copyOf(views);
   }
 }
