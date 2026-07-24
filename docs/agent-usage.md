@@ -1037,8 +1037,9 @@ you can recover from stdout JSON alone.
 Codes not listed in this guide are internal: `DEDIREN_ELK_*` (layout engine
 internals), `DEDIREN_LAYOUT_*` (layout quality gates), `DEDIREN_GENERIC_GRAPH_*`,
 `DEDIREN_ARCHIMATE_*`, `DEDIREN_UML_*` (profile and notation validation),
-`DEDIREN_OEF_*` / `DEDIREN_XMI_*` (export validation), `DEDIREN_SEMANTIC_*`,
-`DEDIREN_VALIDATE_*`, `DEDIREN_SVG_*`, `DEDIREN_COMMAND_*`, `DEDIREN_MCP_*`.
+`DEDIREN_OEF_*` / `DEDIREN_XMI_*` (export validation), `DEDIREN_PACKAGE_*`
+(package build validation), `DEDIREN_SEMANTIC_*`, `DEDIREN_VALIDATE_*`,
+`DEDIREN_SVG_*`, `DEDIREN_COMMAND_*`, `DEDIREN_MCP_*`.
 Their `message` and `path` are written to be self-repairing: follow the
 instruction in the message, and report any such code that persists after you
 have done so.
