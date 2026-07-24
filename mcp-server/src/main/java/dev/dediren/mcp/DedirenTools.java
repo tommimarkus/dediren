@@ -13,6 +13,8 @@ import dev.dediren.core.commands.CoreCommands;
 import dev.dediren.core.engine.EngineExecutionException;
 import dev.dediren.core.engine.EngineRunOutcome;
 import dev.dediren.core.io.BoundedReads;
+import dev.dediren.core.pkg.PackageBuildCommand;
+import dev.dediren.core.pkg.PackageBuildRequest;
 import dev.dediren.core.source.SourceLimits;
 import dev.dediren.engine.Engines;
 import io.modelcontextprotocol.spec.McpSchema.CallToolRequest;
@@ -250,6 +252,10 @@ public final class DedirenTools {
   }
 
   public CallToolResult build(CallToolRequest request) {
+    String packageArg = stringArg(request, "package");
+    if (packageArg != null) {
+      return buildPackage(request, packageArg);
+    }
     String source = stringArg(request, "source");
     if (source == null) {
       return error(DiagnosticCode.COMMAND_INPUT_INVALID, "build requires 'source'", null);
@@ -311,6 +317,57 @@ public final class DedirenTools {
             env);
     try {
       EngineRunOutcome outcome = BuildCommand.run(buildRequest, engines);
+      return envelope(outcome.stdout(), outcome.exitCode() != 0);
+    } catch (EngineExecutionException failure) {
+      return engineFailure(failure);
+    } catch (ProductRootException failure) {
+      return error(DiagnosticCode.PRODUCT_ROOT_UNRESOLVED, failure.getMessage(), null);
+    } catch (UncheckedIOException failure) {
+      return error(DiagnosticCode.COMMAND_IO_FAILED, failure.getMessage(), null);
+    }
+  }
+
+  private CallToolResult buildPackage(CallToolRequest request, String packageArg) {
+    if (stringArg(request, "source") != null
+        || stringArg(request, "out") != null
+        || stringArg(request, "render_policy") != null
+        || stringArg(request, "oef_policy") != null
+        || stringArg(request, "xmi_policy") != null) {
+      return error(
+          DiagnosticCode.COMMAND_INPUT_INVALID,
+          "'package' is mutually exclusive with source/out/render_policy/oef_policy/xmi_policy",
+          null);
+    }
+    List<String> views;
+    try {
+      views = stringListArg(request, "views");
+    } catch (InvalidListArgumentException invalid) {
+      return error(DiagnosticCode.COMMAND_INPUT_INVALID, invalid.getMessage(), invalid.argument());
+    }
+    for (String view : views) {
+      if (!VIEW_ID_PATTERN.matcher(view).matches()) {
+        return error(DiagnosticCode.COMMAND_INPUT_INVALID, "invalid view id: " + view, view);
+      }
+    }
+    boolean noExport = request.arguments().get("no_export") instanceof Boolean flag && flag;
+
+    Path packagePath;
+    try {
+      packagePath = WorkspacePaths.resolveExisting(root, packageArg);
+    } catch (PathOutsideRootException escape) {
+      return pathEscape(escape);
+    }
+    String packageText;
+    try {
+      packageText = readBounded(packagePath);
+    } catch (IOException error) {
+      return readFailure("package", packageArg, error);
+    }
+
+    PackageBuildRequest packageRequest =
+        new PackageBuildRequest(packageText, packagePath.getParent(), root, env, views, noExport);
+    try {
+      EngineRunOutcome outcome = PackageBuildCommand.run(packageRequest, engines);
       return envelope(outcome.stdout(), outcome.exitCode() != 0);
     } catch (EngineExecutionException failure) {
       return engineFailure(failure);

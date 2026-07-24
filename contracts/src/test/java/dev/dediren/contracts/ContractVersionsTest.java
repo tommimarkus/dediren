@@ -77,6 +77,15 @@ class ContractVersionsTest {
         "schemas/build-result.schema.json",
         new String[] {"build_result_schema_version", ContractVersions.BUILD_RESULT_SCHEMA_VERSION});
     versionConstBySchema.put(
+        "schemas/package.schema.json",
+        new String[] {"package_schema_version", ContractVersions.PACKAGE_SCHEMA_VERSION});
+    versionConstBySchema.put(
+        "schemas/package-build-result.schema.json",
+        new String[] {
+          "package_build_result_schema_version",
+          ContractVersions.PACKAGE_BUILD_RESULT_SCHEMA_VERSION
+        });
+    versionConstBySchema.put(
         "schemas/diff-result.schema.json",
         new String[] {"diff_result_schema_version", ContractVersions.DIFF_RESULT_SCHEMA_VERSION});
     versionConstBySchema.put(
@@ -132,5 +141,8 @@ class ContractVersionsTest {
     assertThat(ContractVersions.UML_XMI_EXPORT_POLICY_SCHEMA_VERSION)
         .isEqualTo("uml-xmi-export-policy.schema.v1");
     assertThat(ContractVersions.BUILD_RESULT_SCHEMA_VERSION).isEqualTo("build-result.schema.v1");
+    assertThat(ContractVersions.PACKAGE_SCHEMA_VERSION).isEqualTo("package.schema.v1");
+    assertThat(ContractVersions.PACKAGE_BUILD_RESULT_SCHEMA_VERSION)
+        .isEqualTo("package-build-result.schema.v1");
   }
 }

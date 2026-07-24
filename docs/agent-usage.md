@@ -54,7 +54,11 @@ Seven tools:
 - `dediren_build` — `source`, `out`, and at least one policy (`render_policy`,
   `oef_policy`, `xmi_policy`); optional `views` (subset of view ids) and `emit`
   (extra stage envelopes to also write, for debugging). Returns the
-  build-result envelope, which names every artifact written.
+  build-result envelope, which names every artifact written. To build a whole
+  **package** instead, pass `package` (a `package.json` path) — mutually
+  exclusive with `source`/`out`/the policies — plus optional `no_export`; the
+  result is a `package-build-result` naming every artifact at its declared path
+  (see `## Build`).
 
 The server also serves read-only **resources** — the bundle's own bytes, so a
 fetch returns ground truth rather than prose about it:
@@ -449,6 +453,46 @@ and each still declares the source's other views via the `info`
 `--views` to one view per `dediren build` invocation — with a matching
 per-view `--oef-policy` — to get a correctly identified OEF per view, or fall
 back to the decomposed `export` subcommand.
+
+### Package build
+
+Build a whole **package** — several views across several models, each with its
+own render policy, presentation, and declared output path, plus view- or
+model-scoped exports — in one call:
+
+```bash
+"$BUNDLE/bin/dediren" build --package package.json
+# or read package.json at a directory root:
+"$BUNDLE/bin/dediren" build path/to/package-dir
+```
+
+`--package` is mutually exclusive with the single-model options
+(`--input`/`--out`/`--render-policy`/`--oef-policy`/`--xmi-policy`/`--emit`);
+`--no-export` suppresses the export lanes. Every package-relative path resolves
+against the package file's directory and is confined there.
+
+A `package.json` (schema `package.schema.v1`) declares:
+
+- `models[]` — `{ id, source }` per source model (multi-notation packages list
+  several); a view binds to one via `views[].model` (optional when there is one).
+- `views[]` — `{ id, model?, render_policy, presentation?, outputs }`.
+  `presentation` is `{ title?, question?, diagram_kind? }`, carried and echoed;
+  `title`/`question` are fed to the render lane as the SVG accessible name
+  (`<title>`/`<desc>`), so each view gets its own even under a shared policy.
+  `outputs` is `{ diagram, render_metadata?, layout? }` declared paths — the
+  `render_metadata`/`layout` payloads are the unwrapped stage data, not `--emit`
+  envelopes.
+- `exports[]` — `{ id, view | model, lane, policy, output }`. Each export targets
+  exactly one of a `view` (one focused file) or a whole `model` (the aggregate
+  lane — every one of that model's views in a single file). `lane` is
+  `archimate-oef` or `uml-xmi`.
+
+Unlike single-model `build`, the package build's stdout **is** wrapped in the
+standard command envelope: read `.data` for a `package-build-result` naming every
+artifact at its final declared path, with one `.status` rollup and per-view /
+per-export `status` and `diagnostics`. A cross-reference or declared-path
+collision the package cannot satisfy is a `DEDIREN_PACKAGE_*` error before any
+build begins.
 
 ## Diff & Query
 
@@ -1037,8 +1081,9 @@ you can recover from stdout JSON alone.
 Codes not listed in this guide are internal: `DEDIREN_ELK_*` (layout engine
 internals), `DEDIREN_LAYOUT_*` (layout quality gates), `DEDIREN_GENERIC_GRAPH_*`,
 `DEDIREN_ARCHIMATE_*`, `DEDIREN_UML_*` (profile and notation validation),
-`DEDIREN_OEF_*` / `DEDIREN_XMI_*` (export validation), `DEDIREN_SEMANTIC_*`,
-`DEDIREN_VALIDATE_*`, `DEDIREN_SVG_*`, `DEDIREN_COMMAND_*`, `DEDIREN_MCP_*`.
+`DEDIREN_OEF_*` / `DEDIREN_XMI_*` (export validation), `DEDIREN_PACKAGE_*`
+(package build validation), `DEDIREN_SEMANTIC_*`, `DEDIREN_VALIDATE_*`,
+`DEDIREN_SVG_*`, `DEDIREN_COMMAND_*`, `DEDIREN_MCP_*`.
 Their `message` and `path` are written to be self-repairing: follow the
 instruction in the message, and report any such code that persists after you
 have done so.

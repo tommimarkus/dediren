@@ -37,7 +37,9 @@ class FixtureConformanceSweepTest {
           "fixtures/layout-result", "schemas/layout-result.schema.json",
           "fixtures/render-metadata", "schemas/render-metadata.schema.json",
           "fixtures/render-policy", "schemas/render-policy.schema.json",
-          "fixtures/build-result", "schemas/build-result.schema.json");
+          "fixtures/build-result", "schemas/build-result.schema.json",
+          "fixtures/package", "schemas/package.schema.json",
+          "fixtures/package-build-result", "schemas/package-build-result.schema.json");
 
   /** Fixture file -> schema, for directories whose fixtures use different schemas. */
   private static final Map<String, String> PER_FILE_FAMILIES =
@@ -55,7 +57,10 @@ class FixtureConformanceSweepTest {
    * semantic validation, so they stay in the positive sweep where they belong.
    */
   private static final Map<String, String> SCHEMA_INVALID_BY_DESIGN =
-      Map.of("fixtures/source/invalid-absolute-geometry.json", "schemas/model.schema.json");
+      Map.of(
+          "fixtures/source/invalid-absolute-geometry.json", "schemas/model.schema.json",
+          "fixtures/package/invalid-export-both-targets.json", "schemas/package.schema.json",
+          "fixtures/package/invalid-export-no-target.json", "schemas/package.schema.json");
 
   static Stream<Object[]> fixtures() throws IOException {
     List<Object[]> cases = new ArrayList<>();

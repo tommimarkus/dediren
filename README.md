@@ -142,6 +142,13 @@ BUNDLE=$(ls -d dist/dediren-agent-bundle-* | grep -v '\.tar\.gz$' | sort | tail 
 cp out/main/diagram.svg diagram.svg
 ```
 
+To build a whole **package** — several views across several models, each with its
+own render policy and declared output path, plus view- or model-scoped exports —
+in one call, pass `--package package.json` (or a directory whose `package.json`
+to read). It writes each artifact to its declared path and returns one command
+envelope wrapping a `package-build-result`; see
+[`docs/agent-usage.md`](docs/agent-usage.md) `## Build`.
+
 `build` chains `project` → `layout` → `validate-layout` → `render`/`export`
 for every requested view in one process call and writes each view's artifacts
 under `--out/<view-id>/`; read its stdout `.status` and `.views[]` (see

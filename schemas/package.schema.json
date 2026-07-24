@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dediren.dev/schemas/package.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["package_schema_version", "models", "views"],
+  "properties": {
+    "package_schema_version": { "const": "package.schema.v1" },
+    "models": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/model" }
+    },
+    "views": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/view" }
+    },
+    "exports": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/export" }
+    }
+  },
+  "$defs": {
+    "model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "source"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "source": { "type": "string", "minLength": 1 }
+      }
+    },
+    "view": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "render_policy", "outputs"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "model": { "type": "string", "minLength": 1 },
+        "render_policy": { "type": "string", "minLength": 1 },
+        "presentation": { "$ref": "#/$defs/presentation" },
+        "outputs": { "$ref": "#/$defs/outputs" }
+      }
+    },
+    "presentation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "title": { "type": "string", "minLength": 1 },
+        "question": { "type": "string", "minLength": 1 },
+        "diagram_kind": { "type": "string", "minLength": 1 }
+      }
+    },
+    "outputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["diagram"],
+      "properties": {
+        "diagram": { "type": "string", "minLength": 1 },
+        "render_metadata": { "type": "string", "minLength": 1 },
+        "layout": { "type": "string", "minLength": 1 }
+      }
+    },
+    "export": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "lane", "policy", "output"],
+      "oneOf": [{ "required": ["view"] }, { "required": ["model"] }],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "view": { "type": "string", "minLength": 1 },
+        "model": { "type": "string", "minLength": 1 },
+        "lane": { "enum": ["archimate-oef", "uml-xmi"] },
+        "policy": { "type": "string", "minLength": 1 },
+        "output": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

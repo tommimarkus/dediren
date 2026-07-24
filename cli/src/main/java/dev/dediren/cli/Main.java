@@ -13,6 +13,8 @@ import dev.dediren.core.commands.CoreCommands;
 import dev.dediren.core.engine.EngineExecutionException;
 import dev.dediren.core.engine.EngineRunOutcome;
 import dev.dediren.core.io.BoundedReads;
+import dev.dediren.core.pkg.PackageBuildCommand;
+import dev.dediren.core.pkg.PackageBuildRequest;
 import dev.dediren.core.source.SourceLimits;
 import dev.dediren.core.source.ValidationResult;
 import dev.dediren.engine.Engines;
@@ -32,6 +34,7 @@ import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Option;
+import picocli.CommandLine.Parameters;
 import picocli.CommandLine.Spec;
 import tools.jackson.databind.JsonNode;
 
@@ -511,7 +514,7 @@ public final class Main {
     @Option(names = "--input")
     private Path input;
 
-    @Option(names = "--out", required = true)
+    @Option(names = "--out")
     private Path out;
 
     @Option(names = "--views", split = ",")
@@ -529,6 +532,22 @@ public final class Main {
     @Option(names = "--emit", split = ",")
     private List<String> emit = List.of();
 
+    @Option(
+        names = "--package",
+        description =
+            "Build a whole package (models, views, exports) declared by this package.json file;"
+                + " mutually exclusive with the single-model options")
+    private Path packagePath;
+
+    @Option(names = "--no-export", description = "In package mode, suppress the export lanes")
+    private boolean noExport;
+
+    @Parameters(
+        arity = "0..1",
+        paramLabel = "PACKAGE_DIR",
+        description = "A directory whose package.json to build (package-mode convenience)")
+    private Path packageDir;
+
     @Spec private CommandSpec spec;
 
     BuildCommand(InputStream stdin, Map<String, String> env, Engines engines) {
@@ -539,6 +558,55 @@ public final class Main {
 
     @Override
     public Integer call() throws Exception {
+      Path pkgPath =
+          packagePath != null
+              ? packagePath
+              : packageDir != null ? packageDir.resolve("package.json") : null;
+      if (pkgPath != null) {
+        return callPackage(pkgPath);
+      }
+      return callLegacy();
+    }
+
+    private Integer callPackage(Path pkgPath) throws Exception {
+      if (packagePath != null && packageDir != null) {
+        return usageError("--package and a package directory are mutually exclusive");
+      }
+      if (input != null
+          || out != null
+          || renderPolicy != null
+          || oefPolicy != null
+          || xmiPolicy != null
+          || !emit.isEmpty()) {
+        return usageError(
+            "--package cannot be combined with"
+                + " --input/--out/--render-policy/--oef-policy/--xmi-policy/--emit");
+      }
+      JsonInputText packageText = readFile("package", pkgPath);
+      if (packageText.error() != null) {
+        return writeEnvelope(spec, packageText.error(), CommandExitCode.INPUT_ERROR);
+      }
+      Path baseDir = pkgPath.toAbsolutePath().normalize().getParent();
+      if (baseDir == null) {
+        baseDir = Path.of(".").toAbsolutePath().normalize();
+      }
+      PackageBuildRequest request =
+          new PackageBuildRequest(packageText.text(), baseDir, baseDir, env, views, noExport);
+      try {
+        return writePluginOutcome(spec, PackageBuildCommand.run(request, engines));
+      } catch (EngineExecutionException error) {
+        return writePluginError(spec, error);
+      } catch (UncheckedIOException error) {
+        return printCommandIoFailure(spec, error);
+      } catch (ProductRootException error) {
+        return printProductRootFailure(spec, error);
+      }
+    }
+
+    private Integer callLegacy() throws Exception {
+      if (out == null) {
+        return usageError("--out is required");
+      }
       JsonInputText inputText = readInput("input", input, stdin);
       if (inputText.error() != null) {
         return writeEnvelope(spec, inputText.error(), CommandExitCode.INPUT_ERROR);
@@ -578,6 +646,19 @@ public final class Main {
       } catch (ProductRootException error) {
         return printProductRootFailure(spec, error);
       }
+    }
+
+    private Integer usageError(String message) throws Exception {
+      return writeEnvelope(
+          spec,
+          dev.dediren.contracts.CommandEnvelope.error(
+              List.of(
+                  new dev.dediren.contracts.Diagnostic(
+                      dev.dediren.contracts.DiagnosticCode.COMMAND_INPUT_INVALID.code(),
+                      dev.dediren.contracts.DiagnosticSeverity.ERROR,
+                      message,
+                      null))),
+          CommandExitCode.INPUT_ERROR);
     }
   }
 

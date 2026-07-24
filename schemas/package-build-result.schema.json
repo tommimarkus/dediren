@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dediren.dev/schemas/package-build-result.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["package_build_result_schema_version", "status", "views"],
+  "properties": {
+    "package_build_result_schema_version": { "const": "package-build-result.schema.v1" },
+    "status": { "enum": ["ok", "warning", "error"] },
+    "views": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/viewOutcome" }
+    },
+    "exports": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/exportOutcome" }
+    },
+    "diagnostics": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/diagnostic" }
+    }
+  },
+  "$defs": {
+    "viewOutcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["view_id", "status"],
+      "properties": {
+        "view_id": { "type": "string", "minLength": 1 },
+        "status": { "enum": ["ok", "warning", "error"] },
+        "artifacts": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "diagram": { "type": "string", "minLength": 1 },
+            "render_metadata": { "type": "string", "minLength": 1 },
+            "layout": { "type": "string", "minLength": 1 }
+          }
+        },
+        "presentation": { "$ref": "#/$defs/presentation" },
+        "diagnostics": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/diagnostic" }
+        }
+      }
+    },
+    "exportOutcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["export_id", "status"],
+      "properties": {
+        "export_id": { "type": "string", "minLength": 1 },
+        "view": { "type": "string", "minLength": 1 },
+        "model": { "type": "string", "minLength": 1 },
+        "status": { "enum": ["ok", "warning", "error"] },
+        "artifact": { "type": "string", "minLength": 1 },
+        "diagnostics": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/diagnostic" }
+        }
+      }
+    },
+    "presentation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "title": { "type": "string", "minLength": 1 },
+        "question": { "type": "string", "minLength": 1 },
+        "diagram_kind": { "type": "string", "minLength": 1 }
+      }
+    },
+    "diagnostic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "severity", "message"],
+      "properties": {
+        "code": { "type": "string", "minLength": 1 },
+        "severity": { "enum": ["info", "warning", "error"] },
+        "message": { "type": "string" },
+        "path": { "type": "string" },
+        "source_pointer": { "type": "string", "pattern": "^/" }
+      }
+    }
+  }
+}

@@ -29,6 +29,7 @@ class SchemaValidatorTest {
           "schemas/query-result.schema.json",
           "schemas/verify-result.schema.json",
           "schemas/status-result.schema.json",
+          "schemas/package.schema.json",
           "schemas/bundle.schema.json");
 
   @Test

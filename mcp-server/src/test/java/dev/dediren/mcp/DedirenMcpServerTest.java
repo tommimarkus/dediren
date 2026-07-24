@@ -86,10 +86,12 @@ class DedirenMcpServerTest {
     // A static check on ToolSchemas' own JSON strings, not just "some schema is present": an
     // advertised schema that forgot to require an argument DedirenTools actually needs (see its
     // own missing-argument error envelopes) would still pass a bare non-null check.
+    // dediren_build is intentionally absent here: it now has two mutually-exclusive lanes
+    // (single-model source/out vs a whole package), so no argument is unconditionally required at
+    // the schema level — DedirenTools enforces the per-lane requirement in its handler.
     Map<String, List<String>> expectedRequired =
         Map.of(
             "dediren_validate", List.of("source"),
-            "dediren_build", List.of("source", "out"),
             "dediren_diff", List.of("old", "new"),
             "dediren_query", List.of("source", "kind"),
             "dediren_verify", List.of("source", "artifacts"));
