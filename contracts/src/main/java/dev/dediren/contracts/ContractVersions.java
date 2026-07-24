@@ -20,6 +20,8 @@ public final class ContractVersions {
   public static final String UML_XMI_EXPORT_POLICY_SCHEMA_VERSION =
       "uml-xmi-export-policy.schema.v1";
   public static final String BUILD_RESULT_SCHEMA_VERSION = "build-result.schema.v1";
+  public static final String PACKAGE_SCHEMA_VERSION = "package.schema.v1";
+  public static final String PACKAGE_BUILD_RESULT_SCHEMA_VERSION = "package-build-result.schema.v1";
 
   private ContractVersions() {}
 }

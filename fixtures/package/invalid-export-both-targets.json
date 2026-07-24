@@ -1,0 +1,24 @@
+{
+  "package_schema_version": "package.schema.v1",
+  "models": [
+    { "id": "arch", "source": "model.json" }
+  ],
+  "views": [
+    {
+      "id": "v",
+      "model": "arch",
+      "render_policy": "render-policy.json",
+      "outputs": { "diagram": "generated/svg/v.svg" }
+    }
+  ],
+  "exports": [
+    {
+      "id": "e",
+      "view": "v",
+      "model": "arch",
+      "lane": "archimate-oef",
+      "policy": "export-policy.json",
+      "output": "generated/export/e.oef.xml"
+    }
+  ]
+}

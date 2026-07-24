@@ -1,0 +1,32 @@
+{
+  "package_schema_version": "package.schema.v1",
+  "models": [
+    { "id": "arch", "source": "model.json" }
+  ],
+  "views": [
+    {
+      "id": "app-cooperation",
+      "model": "arch",
+      "render_policy": "render-policy.json",
+      "presentation": {
+        "title": "Application Cooperation",
+        "question": "How do the components cooperate?",
+        "diagram_kind": "Application Cooperation"
+      },
+      "outputs": {
+        "diagram": "generated/svg/app-cooperation.svg",
+        "render_metadata": "generated/render-metadata/app-cooperation.json",
+        "layout": "generated/layout/app-cooperation.json"
+      }
+    }
+  ],
+  "exports": [
+    {
+      "id": "arch-oef",
+      "view": "app-cooperation",
+      "lane": "archimate-oef",
+      "policy": "export-policy.json",
+      "output": "generated/export/app-cooperation.oef.xml"
+    }
+  ]
+}

@@ -1,0 +1,50 @@
+{
+  "package_schema_version": "package.schema.v1",
+  "models": [
+    { "id": "arch", "source": "model.json" },
+    { "id": "uml", "source": "model-uml.json" }
+  ],
+  "views": [
+    {
+      "id": "app-cooperation",
+      "model": "arch",
+      "render_policy": "render-policy.json",
+      "presentation": {
+        "title": "Application Cooperation",
+        "question": "How do the components cooperate?"
+      },
+      "outputs": {
+        "diagram": "generated/svg/app-cooperation.svg"
+      }
+    },
+    {
+      "id": "domain-class",
+      "model": "uml",
+      "render_policy": "render-policy-uml.json",
+      "presentation": {
+        "title": "Domain Class View",
+        "diagram_kind": "UML Class"
+      },
+      "outputs": {
+        "diagram": "generated/svg/domain-class.svg",
+        "render_metadata": "generated/render-metadata/domain-class.json"
+      }
+    }
+  ],
+  "exports": [
+    {
+      "id": "arch-oef",
+      "model": "arch",
+      "lane": "archimate-oef",
+      "policy": "export-policy.json",
+      "output": "generated/export/arch.oef.xml"
+    },
+    {
+      "id": "uml-xmi",
+      "view": "domain-class",
+      "lane": "uml-xmi",
+      "policy": "export-policy-uml.json",
+      "output": "generated/export/domain-class.uml.xmi"
+    }
+  ]
+}

@@ -155,8 +155,18 @@ public final class KnownSchemaVersions {
                   ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION,
                   List.of(MigrationOperation.regenerate()))));
 
+  // package is a new top-level container above the source model (2026-07-24 package-model design).
+  // A brand-new single-version family: no prior versions, no migration steps, no ## Migration doc.
+  public static final Family PACKAGE =
+      new Family(
+          "package",
+          List.of("package_schema_version"),
+          List.of(ContractVersions.PACKAGE_SCHEMA_VERSION),
+          List.of());
+
   public static final List<Family> ALL =
-      List.of(MODEL, RENDER_POLICY, OEF_EXPORT_POLICY, UML_XMI_EXPORT_POLICY, LAYOUT_REQUEST);
+      List.of(
+          MODEL, RENDER_POLICY, OEF_EXPORT_POLICY, UML_XMI_EXPORT_POLICY, LAYOUT_REQUEST, PACKAGE);
 
   private KnownSchemaVersions() {}
 }

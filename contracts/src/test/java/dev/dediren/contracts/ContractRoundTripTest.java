@@ -31,6 +31,13 @@ import dev.dediren.contracts.layout.LayoutResult;
 import dev.dediren.contracts.layout.LayoutRoutingStyle;
 import dev.dediren.contracts.layout.LayoutThoroughness;
 import dev.dediren.contracts.layout.LayoutWrapping;
+import dev.dediren.contracts.pkg.PackageBuildResult;
+import dev.dediren.contracts.pkg.PackageDocument;
+import dev.dediren.contracts.pkg.PackageExport;
+import dev.dediren.contracts.pkg.PackageExportLane;
+import dev.dediren.contracts.pkg.PackageModel;
+import dev.dediren.contracts.pkg.PackageView;
+import dev.dediren.contracts.pkg.PackageViewOutcome;
 import dev.dediren.contracts.render.RenderMetadata;
 import dev.dediren.contracts.render.RenderPolicy;
 import dev.dediren.contracts.render.RenderResult;
@@ -748,6 +755,122 @@ class ContractRoundTripTest {
   private static BuildResult reparse(BuildResult result) throws Exception {
     return JsonSupport.objectMapper()
         .treeToValue(JsonSupport.objectMapper().valueToTree(result), BuildResult.class);
+  }
+
+  @Test
+  void packageDocumentRoundTripsFromFixtures() throws Exception {
+    PackageDocument basic = readFixture("fixtures/package/valid-basic.json", PackageDocument.class);
+    PackageDocument mixed = readFixture("fixtures/package/valid-mixed.json", PackageDocument.class);
+
+    assertThat(
+            SchemaAssertions.validateFixture(
+                workspaceRoot(),
+                "schemas/package.schema.json",
+                "fixtures/package/valid-basic.json"))
+        .describedAs("basic package fixture")
+        .isEmpty();
+    assertThat(
+            SchemaAssertions.validateFixture(
+                workspaceRoot(),
+                "schemas/package.schema.json",
+                "fixtures/package/valid-mixed.json"))
+        .describedAs("mixed package fixture")
+        .isEmpty();
+
+    assertThat(basic.packageSchemaVersion()).isEqualTo(ContractVersions.PACKAGE_SCHEMA_VERSION);
+    assertThat(basic.models()).extracting(PackageModel::id).containsExactly("arch");
+    PackageView view = basic.views().getFirst();
+    assertThat(view.id()).isEqualTo("app-cooperation");
+    assertThat(view.renderPolicy()).isEqualTo("render-policy.json");
+    assertThat(view.presentation().title()).isEqualTo("Application Cooperation");
+    assertThat(view.outputs().diagram()).isEqualTo("generated/svg/app-cooperation.svg");
+    PackageExport export = basic.exports().getFirst();
+    assertThat(export.view()).isEqualTo("app-cooperation");
+    assertThat(export.model()).isNull();
+    assertThat(export.lane()).isEqualTo(PackageExportLane.ARCHIMATE_OEF);
+
+    // Mixed package: two models, and a model-target export coexisting with a view-target export.
+    assertThat(mixed.models()).extracting(PackageModel::id).containsExactly("arch", "uml");
+    assertThat(mixed.exports())
+        .extracting(PackageExport::id)
+        .containsExactly("arch-oef", "uml-xmi");
+    assertThat(mixed.exports().getFirst().model()).isEqualTo("arch");
+    assertThat(mixed.exports().getFirst().view()).isNull();
+    assertThat(mixed.exports().getLast().view()).isEqualTo("domain-class");
+    assertThat(mixed.exports().getLast().lane()).isEqualTo(PackageExportLane.UML_XMI);
+
+    JsonNode encoded = JsonSupport.objectMapper().valueToTree(basic);
+    assertThat(encoded.at("/package_schema_version").asText()).isEqualTo("package.schema.v1");
+    assertThat(encoded.at("/views/0/render_policy").asText()).isEqualTo("render-policy.json");
+    assertThat(encoded.at("/views/0/presentation/diagram_kind").asText())
+        .isEqualTo("Application Cooperation");
+    assertThat(encoded.at("/views/0/outputs/render_metadata").asText())
+        .isEqualTo("generated/render-metadata/app-cooperation.json");
+    assertThat(encoded.at("/exports/0/lane").asText()).isEqualTo("archimate-oef");
+
+    assertThat(reparse(basic)).isEqualTo(basic);
+    assertThat(reparse(mixed)).isEqualTo(mixed);
+  }
+
+  @Test
+  void packageBuildResultContractsRoundTripFromFixtures() throws Exception {
+    PackageBuildResult basic =
+        readFixture("fixtures/package-build-result/basic.json", PackageBuildResult.class);
+    PackageBuildResult error =
+        readFixture("fixtures/package-build-result/error.json", PackageBuildResult.class);
+
+    assertThat(
+            SchemaAssertions.validateFixture(
+                workspaceRoot(),
+                "schemas/package-build-result.schema.json",
+                "fixtures/package-build-result/basic.json"))
+        .describedAs("basic package-build-result fixture")
+        .isEmpty();
+    assertThat(
+            SchemaAssertions.validateFixture(
+                workspaceRoot(),
+                "schemas/package-build-result.schema.json",
+                "fixtures/package-build-result/error.json"))
+        .describedAs("error package-build-result fixture")
+        .isEmpty();
+
+    assertThat(basic.packageBuildResultSchemaVersion())
+        .isEqualTo(ContractVersions.PACKAGE_BUILD_RESULT_SCHEMA_VERSION);
+    assertThat(basic.status()).isEqualTo(EnvelopeStatus.OK);
+    PackageViewOutcome view = basic.views().getFirst();
+    assertThat(view.viewId()).isEqualTo("app-cooperation");
+    assertThat(view.artifacts()).containsEntry("diagram", "generated/svg/app-cooperation.svg");
+    assertThat(view.presentation().title()).isEqualTo("Application Cooperation");
+    assertThat(basic.exports().getFirst().artifact())
+        .isEqualTo("generated/export/app-cooperation.oef.xml");
+
+    assertThat(error.status()).isEqualTo(EnvelopeStatus.ERROR);
+    assertThat(error.views().getFirst().status()).isEqualTo(EnvelopeStatus.WARNING);
+    assertThat(error.exports().getFirst().status()).isEqualTo(EnvelopeStatus.ERROR);
+    assertThat(error.exports().getFirst().diagnostics())
+        .first()
+        .extracting(Diagnostic::severity)
+        .isEqualTo(DiagnosticSeverity.ERROR);
+
+    JsonNode encoded = JsonSupport.objectMapper().valueToTree(basic);
+    assertThat(encoded.at("/package_build_result_schema_version").asText())
+        .isEqualTo("package-build-result.schema.v1");
+    assertThat(encoded.at("/views/0/artifacts/diagram").asText())
+        .isEqualTo("generated/svg/app-cooperation.svg");
+    assertThat(encoded.at("/exports/0/export_id").asText()).isEqualTo("arch-oef");
+
+    assertThat(reparse(basic)).isEqualTo(basic);
+    assertThat(reparse(error)).isEqualTo(error);
+  }
+
+  private static PackageDocument reparse(PackageDocument document) throws Exception {
+    return JsonSupport.objectMapper()
+        .treeToValue(JsonSupport.objectMapper().valueToTree(document), PackageDocument.class);
+  }
+
+  private static PackageBuildResult reparse(PackageBuildResult result) throws Exception {
+    return JsonSupport.objectMapper()
+        .treeToValue(JsonSupport.objectMapper().valueToTree(result), PackageBuildResult.class);
   }
 
   private static <T> T readFixture(String fixture, Class<T> type) throws Exception {

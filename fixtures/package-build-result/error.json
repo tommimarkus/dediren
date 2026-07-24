@@ -1,0 +1,38 @@
+{
+  "package_build_result_schema_version": "package-build-result.schema.v1",
+  "status": "error",
+  "views": [
+    {
+      "view_id": "app-cooperation",
+      "status": "warning",
+      "artifacts": {
+        "diagram": "generated/svg/app-cooperation.svg"
+      },
+      "presentation": {
+        "title": "Application Cooperation"
+      },
+      "diagnostics": [
+        {
+          "code": "DEDIREN_EXPORT_IDENTITY_PLACEHOLDER",
+          "severity": "warning",
+          "message": "default export identity in use"
+        }
+      ]
+    }
+  ],
+  "exports": [
+    {
+      "export_id": "uml-xmi",
+      "view": "domain-class",
+      "status": "error",
+      "diagnostics": [
+        {
+          "code": "DEDIREN_ENGINE_FAILED",
+          "severity": "error",
+          "message": "export engine failed"
+        }
+      ]
+    }
+  ],
+  "diagnostics": []
+}
