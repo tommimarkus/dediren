@@ -7,6 +7,8 @@ import dev.dediren.contracts.export.ExportResult;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.contracts.layout.LayoutRequest;
 import dev.dediren.contracts.pkg.PackageBuildResult;
+import dev.dediren.contracts.pkg.PackageExportOutcome;
+import dev.dediren.contracts.pkg.PackageViewOutcome;
 import dev.dediren.contracts.render.RenderArtifact;
 import dev.dediren.contracts.render.RenderMetadata;
 import dev.dediren.contracts.render.RenderResult;
@@ -68,6 +70,16 @@ class PackageBuildCommandTest {
         "oef_export_policy_schema_version": "oef-export-policy.schema.v1",
         "model_identifier": "m", "model_name": "M",
         "view_identifier": "v", "view_name": "V", "viewpoint": "vp"
+      }
+      """;
+
+  private static final String RENDER_POLICY_WITH_A11Y =
+      """
+      {
+        "render_policy_schema_version": "render-policy.schema.v3",
+        "page": { "width": 100, "height": 100 },
+        "margin": { "top": 0, "right": 0, "bottom": 0, "left": 0 },
+        "accessibility": { "title": "Policy Title" }
       }
       """;
 
@@ -288,6 +300,223 @@ class PackageBuildCommandTest {
     assertThat(Files.exists(dir.resolve("generated/export/main.oef.xml"))).isFalse();
   }
 
+  @Test
+  void viewsFilterBuildsOnlyTheSelectedViews(@TempDir Path dir) throws Exception {
+    writeInputs(dir);
+
+    EngineRunOutcome outcome = run(twoViewPackage(), dir, List.of("a"), false);
+
+    assertThat(status(outcome)).isEqualTo("ok");
+    assertThat(result(outcome).views()).extracting(PackageViewOutcome::viewId).containsExactly("a");
+    assertThat(Files.exists(dir.resolve("generated/svg/a.svg"))).isTrue();
+    assertThat(Files.exists(dir.resolve("generated/svg/b.svg"))).isFalse();
+  }
+
+  @Test
+  void anUnknownViewInTheFilterIsRejected(@TempDir Path dir) throws Exception {
+    writeInputs(dir);
+
+    EngineRunOutcome outcome = run(twoViewPackage(), dir, List.of("ghost"), false);
+
+    assertThat(status(outcome)).isEqualTo("error");
+    assertThat(outcome.exitCode()).isEqualTo(2);
+    assertThat(result(outcome).diagnostics())
+        .anySatisfy(d -> assertThat(d.code()).isEqualTo("DEDIREN_PACKAGE_VIEW_UNKNOWN"));
+  }
+
+  @Test
+  void anExportTargetingAViewThatFailedToBuildIsReported(@TempDir Path dir) throws Exception {
+    writeInputs(dir);
+    String pkg =
+        """
+        {
+          "package_schema_version": "package.schema.v1",
+          "models": [ { "id": "arch", "source": "model.json" } ],
+          "views": [
+            { "id": "main", "model": "arch", "render_policy": "render-policy.json",
+              "outputs": { "diagram": "generated/svg/main.svg" } }
+          ],
+          "exports": [
+            { "id": "oef", "view": "main", "lane": "archimate-oef",
+              "policy": "export-policy.json", "output": "generated/export/main.oef.xml" }
+          ]
+        }
+        """;
+
+    EngineRunOutcome outcome = run(pkg, dir, List.of(), false, Set.of("main"));
+
+    assertThat(status(outcome)).isEqualTo("error");
+    PackageExportOutcome export = result(outcome).exports().getFirst();
+    assertThat(export.status().wire()).isEqualTo("error");
+    assertThat(export.diagnostics())
+        .anySatisfy(d -> assertThat(d.code()).isEqualTo("DEDIREN_PACKAGE_VIEW_UNKNOWN"));
+    assertThat(Files.exists(dir.resolve("generated/export/main.oef.xml"))).isFalse();
+  }
+
+  @Test
+  void aModelTargetExportWithNoBuiltViewsFails(@TempDir Path dir) throws Exception {
+    writeInputs(dir);
+    String pkg =
+        """
+        {
+          "package_schema_version": "package.schema.v1",
+          "models": [ { "id": "arch", "source": "model.json" } ],
+          "views": [
+            { "id": "main", "model": "arch", "render_policy": "render-policy.json",
+              "outputs": { "diagram": "generated/svg/main.svg" } }
+          ],
+          "exports": [
+            { "id": "agg", "model": "arch", "lane": "archimate-oef",
+              "policy": "export-policy.json", "output": "generated/export/arch.oef.xml" }
+          ]
+        }
+        """;
+
+    // The model's only view fails to build, so the aggregate lane receives zero views.
+    EngineRunOutcome outcome = run(pkg, dir, List.of(), false, Set.of("main"));
+
+    assertThat(status(outcome)).isEqualTo("error");
+    PackageExportOutcome export = result(outcome).exports().getFirst();
+    assertThat(export.status().wire()).isEqualTo("error");
+    assertThat(export.diagnostics())
+        .anySatisfy(d -> assertThat(d.code()).isEqualTo("DEDIREN_ENGINE_FAILED"));
+  }
+
+  @Test
+  void aStageWarningRollsUpToPackageWarningStatus(@TempDir Path dir) throws Exception {
+    writeInputs(dir);
+
+    EngineRunOutcome outcome =
+        run(singleViewPackage(), dir, List.of(), false, Set.of(), Set.of("main"));
+
+    assertThat(status(outcome)).isEqualTo("warning");
+    assertThat(outcome.exitCode()).isZero();
+    assertThat(result(outcome).views().getFirst().status().wire()).isEqualTo("warning");
+  }
+
+  @Test
+  void policyAccessibilityWinsOverViewPresentation(@TempDir Path dir) throws Exception {
+    writeInputs(dir);
+    Files.writeString(dir.resolve("render-policy-a11y.json"), RENDER_POLICY_WITH_A11Y);
+    String pkg =
+        """
+        {
+          "package_schema_version": "package.schema.v1",
+          "models": [ { "id": "arch", "source": "model.json" } ],
+          "views": [
+            { "id": "main", "model": "arch", "render_policy": "render-policy-a11y.json",
+              "presentation": { "title": "Injected Title" },
+              "outputs": { "diagram": "generated/svg/main.svg" } }
+          ]
+        }
+        """;
+
+    EngineRunOutcome outcome = run(pkg, dir, List.of(), false);
+
+    assertThat(status(outcome)).isEqualTo("ok");
+    // The policy already set accessibility.title, so the presentation must NOT override it.
+    assertThat(Files.readString(dir.resolve("generated/svg/main.svg")))
+        .contains("Policy Title")
+        .doesNotContain("Injected Title");
+  }
+
+  @Test
+  void anEscapingDeclaredOutputPathIsRejectedAndNeverWritten(@TempDir Path dir) throws Exception {
+    writeInputs(dir);
+    String pkg =
+        """
+        {
+          "package_schema_version": "package.schema.v1",
+          "models": [ { "id": "arch", "source": "model.json" } ],
+          "views": [
+            { "id": "main", "model": "arch", "render_policy": "render-policy.json",
+              "outputs": { "diagram": "../escape.svg" } }
+          ]
+        }
+        """;
+
+    EngineRunOutcome outcome = run(pkg, dir, List.of(), false);
+
+    assertThat(status(outcome)).isEqualTo("error");
+    assertThat(result(outcome).views().getFirst().diagnostics())
+        .anySatisfy(d -> assertThat(d.code()).isEqualTo("DEDIREN_COMMAND_INPUT_INVALID"));
+    assertThat(Files.exists(dir.getParent().resolve("escape.svg"))).isFalse();
+  }
+
+  @Test
+  void anEscapingDeclaredModelSourceIsRejected(@TempDir Path dir) throws Exception {
+    writeInputs(dir);
+    // A real file that exists OUTSIDE the confinement root — the resolve succeeds, the confinement
+    // check rejects it (a true escape, not merely a not-found).
+    Files.writeString(dir.getParent().resolve("outside-model.json"), MODEL);
+    String pkg =
+        """
+        {
+          "package_schema_version": "package.schema.v1",
+          "models": [ { "id": "arch", "source": "../outside-model.json" } ],
+          "views": [
+            { "id": "main", "model": "arch", "render_policy": "render-policy.json",
+              "outputs": { "diagram": "generated/svg/main.svg" } }
+          ]
+        }
+        """;
+
+    EngineRunOutcome outcome = run(pkg, dir, List.of(), false);
+
+    assertThat(status(outcome)).isEqualTo("error");
+    assertThat(result(outcome).views().getFirst().diagnostics())
+        .anySatisfy(d -> assertThat(d.code()).isEqualTo("DEDIREN_COMMAND_INPUT_INVALID"));
+  }
+
+  @Test
+  void confinementIsEnforcedAgainstTheConfinementRootNotBaseDir(@TempDir Path root)
+      throws Exception {
+    // MCP-shape: baseDir (the package dir) is a subdirectory of the confinement root. A path that
+    // escapes baseDir but stays inside the confinement root is allowed — proving the boundary is
+    // the
+    // confinement root, not baseDir.
+    Path pkgDir = Files.createDirectories(root.resolve("pkg"));
+    Files.writeString(pkgDir.resolve("model.json"), MODEL);
+    Files.writeString(pkgDir.resolve("render-policy.json"), RENDER_POLICY);
+    String pkg =
+        """
+        {
+          "package_schema_version": "package.schema.v1",
+          "models": [ { "id": "arch", "source": "model.json" } ],
+          "views": [
+            { "id": "main", "model": "arch", "render_policy": "render-policy.json",
+              "outputs": { "diagram": "../root-level.svg" } }
+          ]
+        }
+        """;
+
+    EngineRunOutcome outcome =
+        PackageBuildCommand.run(
+            new PackageBuildRequest(pkg, pkgDir, root, Map.of(), List.of(), false),
+            engines(Set.of(), Set.of()));
+
+    assertThat(status(outcome)).describedAs(outcome.stdout()).isEqualTo("ok");
+    assertThat(Files.exists(root.resolve("root-level.svg"))).isTrue();
+    assertThat(Files.exists(pkgDir.resolve("root-level.svg"))).isFalse();
+  }
+
+  @Test
+  void anOversizedModelSourceIsRejectedByTheInputCeiling(@TempDir Path dir) throws Exception {
+    writeInputs(dir);
+    // A sparse file just over the 64 MiB ceiling: BoundedReads rejects on Files.size before any
+    // read, so this is fast and never allocates the file — the regression guard for the OOM vector.
+    try (java.io.RandomAccessFile raf =
+        new java.io.RandomAccessFile(dir.resolve("model.json").toFile(), "rw")) {
+      raf.setLength(64L * 1024 * 1024 + 1);
+    }
+
+    EngineRunOutcome outcome = run(singleViewPackage(), dir, List.of(), false);
+
+    assertThat(status(outcome)).isEqualTo("error");
+    assertThat(result(outcome).views().getFirst().diagnostics())
+        .anySatisfy(d -> assertThat(d.code()).isEqualTo("DEDIREN_INPUT_FILE_TOO_LARGE"));
+  }
+
   // --- harness ----------------------------------------------------------------------------------
 
   private static void writeInputs(Path dir) throws Exception {
@@ -298,22 +527,64 @@ class PackageBuildCommandTest {
 
   private static EngineRunOutcome run(String pkg, Path dir, List<String> views, boolean noExport)
       throws EngineExecutionException {
-    return run(pkg, dir, views, noExport, Set.of());
+    return run(pkg, dir, views, noExport, Set.of(), Set.of());
   }
 
   private static EngineRunOutcome run(
       String pkg, Path dir, List<String> views, boolean noExport, Set<String> renderFailingViews)
       throws EngineExecutionException {
-    Engines engines =
-        Engines.of(
-            List.of(new FakeSemanticsEngine()),
-            List.of(new FakeLayoutEngine()),
-            List.of(new FakeRenderEngine(renderFailingViews)),
-            List.of(
-                new FakeExportEngine("archimate-oef", "archimate-oef+xml"),
-                new FakeExportEngine("uml-xmi", "uml-xmi+xml")));
+    return run(pkg, dir, views, noExport, renderFailingViews, Set.of());
+  }
+
+  private static EngineRunOutcome run(
+      String pkg,
+      Path dir,
+      List<String> views,
+      boolean noExport,
+      Set<String> renderFailingViews,
+      Set<String> layoutWarningViews)
+      throws EngineExecutionException {
     return PackageBuildCommand.run(
-        new PackageBuildRequest(pkg, dir, dir, Map.of(), views, noExport), engines);
+        new PackageBuildRequest(pkg, dir, dir, Map.of(), views, noExport),
+        engines(renderFailingViews, layoutWarningViews));
+  }
+
+  private static Engines engines(Set<String> renderFailingViews, Set<String> layoutWarningViews) {
+    return Engines.of(
+        List.of(new FakeSemanticsEngine()),
+        List.of(new FakeLayoutEngine(layoutWarningViews)),
+        List.of(new FakeRenderEngine(renderFailingViews)),
+        List.of(
+            new FakeExportEngine("archimate-oef", "archimate-oef+xml"),
+            new FakeExportEngine("uml-xmi", "uml-xmi+xml")));
+  }
+
+  private static String singleViewPackage() {
+    return """
+        {
+          "package_schema_version": "package.schema.v1",
+          "models": [ { "id": "arch", "source": "model.json" } ],
+          "views": [
+            { "id": "main", "model": "arch", "render_policy": "render-policy.json",
+              "outputs": { "diagram": "generated/svg/main.svg" } }
+          ]
+        }
+        """;
+  }
+
+  private static String twoViewPackage() {
+    return """
+        {
+          "package_schema_version": "package.schema.v1",
+          "models": [ { "id": "arch", "source": "model.json" } ],
+          "views": [
+            { "id": "a", "model": "arch", "render_policy": "render-policy.json",
+              "outputs": { "diagram": "generated/svg/a.svg" } },
+            { "id": "b", "model": "arch", "render_policy": "render-policy.json",
+              "outputs": { "diagram": "generated/svg/b.svg" } }
+          ]
+        }
+        """;
   }
 
   private static String status(EngineRunOutcome outcome) {
@@ -366,7 +637,7 @@ class PackageBuildCommandTest {
     }
   }
 
-  private record FakeLayoutEngine() implements LayoutEngine {
+  private record FakeLayoutEngine(java.util.Set<String> warningViews) implements LayoutEngine {
     @Override
     public String id() {
       return "elk-layout";
@@ -381,8 +652,18 @@ class PackageBuildCommandTest {
 
     @Override
     public EngineResult<LaidOutScene> layout(SceneGraph scene) {
+      java.util.List<dev.dediren.contracts.Diagnostic> diagnostics =
+          warningViews.contains(scene.viewId())
+              ? List.of(
+                  new dev.dediren.contracts.Diagnostic(
+                      "DEDIREN_FAKE_LAYOUT_WARNING",
+                      dev.dediren.contracts.DiagnosticSeverity.WARNING,
+                      "layout warning",
+                      null))
+              : List.of();
       return new EngineResult<>(
-          new LaidOutScene(scene.viewId(), List.of(), List.of(), List.of(), List.of()), List.of());
+          new LaidOutScene(scene.viewId(), List.of(), List.of(), List.of(), List.of()),
+          diagnostics);
     }
   }
 

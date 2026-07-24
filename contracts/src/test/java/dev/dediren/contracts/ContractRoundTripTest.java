@@ -803,7 +803,7 @@ class ContractRoundTripTest {
     assertThat(encoded.at("/package_schema_version").asText()).isEqualTo("package.schema.v1");
     assertThat(encoded.at("/views/0/render_policy").asText()).isEqualTo("render-policy.json");
     assertThat(encoded.at("/views/0/presentation/diagram_kind").asText())
-        .isEqualTo("Application Cooperation");
+        .isEqualTo("Cooperation Diagram");
     assertThat(encoded.at("/views/0/outputs/render_metadata").asText())
         .isEqualTo("generated/render-metadata/app-cooperation.json");
     assertThat(encoded.at("/exports/0/lane").asText()).isEqualTo("archimate-oef");

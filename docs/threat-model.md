@@ -139,8 +139,13 @@ Controls:
   the package directory, under MCP to the server `--root`. An escaping path is a
   structured `DEDIREN_COMMAND_INPUT_INVALID` (CLI) / `DEDIREN_MCP_PATH_OUTSIDE_ROOT`
   (MCP) error, never a write, and colliding declared paths are rejected before any
-  build begins. Pinned by `PackageBuildCommandTest`, `PackageValidatorTest`,
-  `CliPackageBuildTest`, and `DedirenBuildPackageToolTest`.
+  build begins. Collision detection is lexical (normalized-path string compare),
+  not real-path, so — as with the `ConfinedPaths` symlink residual above — a
+  pre-existing symlink alias *inside* the confined tree could let two
+  lexically-distinct declared paths resolve to the same file; that needs the same
+  in-root filesystem control the accepted TOCTOU residual already assumes, and does
+  not escape confinement. Pinned by `PackageBuildCommandTest`,
+  `PackageValidatorTest`, `CliPackageBuildTest`, and `DedirenBuildPackageToolTest`.
 - **Resources serve product bytes only.** The MCP resources surface
   (`dediren://schema/…`, `dediren://fixture/…`, `dediren://guide/…`,
   `dediren://diagnostics/catalog`) enumerates and reads exclusively under the

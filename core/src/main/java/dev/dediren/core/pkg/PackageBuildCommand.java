@@ -30,9 +30,11 @@ import dev.dediren.core.commands.CoreCommands;
 import dev.dediren.core.engine.EngineDispatch;
 import dev.dediren.core.engine.EngineExecutionException;
 import dev.dediren.core.engine.EngineRunOutcome;
+import dev.dediren.core.io.BoundedReads;
 import dev.dediren.core.io.ConfinedPaths;
 import dev.dediren.core.schema.SchemaValidator;
 import dev.dediren.core.schema.SchemaVersionGate;
+import dev.dediren.core.source.SourceLimits;
 import dev.dediren.core.source.SourceValidator;
 import dev.dediren.core.source.ValidationResult;
 import dev.dediren.engine.EngineException;
@@ -460,7 +462,18 @@ public final class PackageBuildCommand {
     }
     String text;
     try {
-      text = Files.readString(modelPath);
+      text = BoundedReads.readString(modelPath, SourceLimits.DEFAULT.maxInputFileBytes());
+    } catch (BoundedReads.FileTooLargeException tooLarge) {
+      // Byte counts are safe to echo on both lanes; the resolved path never is on the MCP lane.
+      models.put(
+          modelId,
+          new ModelLoad(
+              null,
+              List.of(
+                  diag(
+                      DiagnosticCode.INPUT_FILE_TOO_LARGE,
+                      "model '" + model.source() + "': " + tooLarge.getMessage()))));
+      return;
     } catch (IOException error) {
       models.put(
           modelId,
@@ -490,7 +503,13 @@ public final class PackageBuildCommand {
     Path path = resolveInput(request, relPath);
     String text;
     try {
-      text = Files.readString(path);
+      text = BoundedReads.readString(path, SourceLimits.DEFAULT.maxInputFileBytes());
+    } catch (BoundedReads.FileTooLargeException tooLarge) {
+      throw new InputProblem(
+          diag(
+              DiagnosticCode.INPUT_FILE_TOO_LARGE,
+              "policy '" + relPath + "': " + tooLarge.getMessage()),
+          CommandExitCode.INPUT_ERROR.code());
     } catch (IOException error) {
       throw new InputProblem(
           diag(DiagnosticCode.COMMAND_IO_FAILED, "failed to read policy '" + relPath + "'"),
