@@ -109,6 +109,53 @@ class PackageValidatorTest {
   }
 
   @Test
+  void duplicateModelIdsAreRejected() {
+    PackageDocument pkg =
+        pkg(
+            List.of(new PackageModel("arch", "model.json"), new PackageModel("arch", "other.json")),
+            List.of(view("main", "arch", "generated/svg/main.svg")),
+            List.of());
+    List<Diagnostic> diagnostics = PackageValidator.validate(pkg);
+    assertThat(diagnostics)
+        .extracting(Diagnostic::code)
+        .containsExactly("DEDIREN_PACKAGE_DUPLICATE_ID");
+    assertThat(diagnostics.getFirst().message()).isEqualTo("models[] declares duplicate id 'arch'");
+  }
+
+  @Test
+  void duplicateViewIdsAreRejected() {
+    // Distinct output paths, so the only finding is the duplicate id itself.
+    PackageDocument pkg =
+        pkg(
+            List.of(new PackageModel("arch", "model.json")),
+            List.of(
+                view("main", "arch", "generated/svg/main-a.svg"),
+                view("main", "arch", "generated/svg/main-b.svg")),
+            List.of());
+    List<Diagnostic> diagnostics = PackageValidator.validate(pkg);
+    assertThat(diagnostics)
+        .extracting(Diagnostic::code)
+        .containsExactly("DEDIREN_PACKAGE_DUPLICATE_ID");
+    assertThat(diagnostics.getFirst().message()).isEqualTo("views[] declares duplicate id 'main'");
+  }
+
+  @Test
+  void duplicateExportIdsAreRejected() {
+    PackageDocument pkg =
+        pkg(
+            List.of(new PackageModel("arch", "model.json")),
+            List.of(view("main", "arch", "generated/svg/main.svg")),
+            List.of(
+                oefExport("e", "main", null, "generated/export/a.oef.xml"),
+                oefExport("e", "main", null, "generated/export/b.oef.xml")));
+    List<Diagnostic> diagnostics = PackageValidator.validate(pkg);
+    assertThat(diagnostics)
+        .extracting(Diagnostic::code)
+        .containsExactly("DEDIREN_PACKAGE_DUPLICATE_ID");
+    assertThat(diagnostics.getFirst().message()).isEqualTo("exports[] declares duplicate id 'e'");
+  }
+
+  @Test
   void collidingDeclaredOutputPathsAreRejectedAfterNormalization() {
     // The export writes the same file the view's diagram already declares, once "./" is normalized.
     PackageDocument pkg =
