@@ -3,6 +3,7 @@ package dev.dediren.plugins.render.node.uml;
 import static dev.dediren.plugins.render.node.NodeShapeSupport.decoratorName;
 import static dev.dediren.plugins.render.node.NodeShapeSupport.umlDecoratorSuppliesNodeLabel;
 import static dev.dediren.plugins.render.svg.Svg.f1;
+import static dev.dediren.plugins.render.svg.Svg.opacity;
 import static dev.dediren.plugins.render.svg.Svg.styleNumber;
 
 import dev.dediren.contracts.layout.LaidOutNode;
@@ -36,6 +37,7 @@ public final class UmlDecorators {
           .attr("y", f1(node.y() + 16.0))
           .attr("fill", style.labelFill())
           .attr("font-size", "12")
+          .attrIf("fill-opacity", opacity(style.labelOpacity()))
           .text(node.label())
           .end();
     } else if (decorator == SvgNodeDecorator.UML_ACTOR) {
@@ -45,6 +47,7 @@ public final class UmlDecorators {
           .attr("text-anchor", "middle")
           .attr("fill", style.labelFill())
           .attr("font-size", "12")
+          .attrIf("fill-opacity", opacity(style.labelOpacity()))
           .text(node.label())
           .end();
     } else if (decorator == SvgNodeDecorator.UML_COMPONENT) {
@@ -72,6 +75,7 @@ public final class UmlDecorators {
         .attr("text-anchor", "middle")
         .attr("fill", style.labelFill())
         .attr("font-size", "11")
+        .attrIf("fill-opacity", opacity(style.labelOpacity()))
         .text(stereotype)
         .end();
   }
@@ -142,6 +146,7 @@ public final class UmlDecorators {
           .attr("text-anchor", "middle")
           .attr("fill", style.labelFill())
           .attr("font-size", "12")
+          .attrIf("fill-opacity", opacity(style.labelOpacity()))
           .text(line)
           .end();
       y += 15.0;
@@ -153,6 +158,7 @@ public final class UmlDecorators {
           .attr("y", f1(y))
           .attr("fill", style.labelFill())
           .attr("font-size", "12")
+          .attrIf("fill-opacity", opacity(style.labelOpacity()))
           .text(line)
           .end();
       y += 14.0;
@@ -164,6 +170,7 @@ public final class UmlDecorators {
           .attr("y", f1(y))
           .attr("fill", style.labelFill())
           .attr("font-size", "12")
+          .attrIf("fill-opacity", opacity(style.labelOpacity()))
           .text(line)
           .end();
       y += 14.0;

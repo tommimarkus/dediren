@@ -841,6 +841,28 @@ class MainTest {
     }
 
     @Test
+    void umlClassifierLabelOpacityReachesTitleAndCompartmentText() throws Exception {
+      ObjectNode input = (ObjectNode) umlStyleInput();
+      ((ObjectNode) input.at("/policy/style/node_overrides"))
+          .putObject("class-order")
+          .put("label_opacity", 0.35);
+
+      Document document = svgDocument(okContent(render(input)));
+
+      Element order = groupWithAttribute(document, "data-dediren-node-id", "class-order");
+      org.w3c.dom.NodeList texts = order.getElementsByTagName("text");
+      assertThat(texts.getLength())
+          .as("classifier renders a title row plus attribute and operation rows")
+          .isGreaterThanOrEqualTo(3);
+      for (int index = 0; index < texts.getLength(); index++) {
+        Element text = (Element) texts.item(index);
+        assertThat(text.getAttribute("fill-opacity"))
+            .as("classifier row \"%s\" carries the label opacity", text.getTextContent())
+            .isEqualTo("0.35");
+      }
+    }
+
+    @Test
     void umlActorLabelSitsBelowFigure() throws Exception {
       JsonNode policy = fixtureJson("fixtures/render-policy/uml-svg.json");
       ArrayNode nodes = JsonSupport.objectMapper().createArrayNode();
@@ -1515,6 +1537,58 @@ class MainTest {
               groupWithAttribute(document, "data-dediren-node-id", "n"), "data-dediren-node-shape");
       assertThat(shape.getAttribute("data-dediren-node-shape")).isEqualTo("archimate_rectangle");
       assertThat(shape.getAttribute("stroke-dasharray")).isEqualTo("3 2");
+    }
+
+    @Test
+    void archimateGroupingNodeUserDashPatternWinsOverGroupingDash() throws Exception {
+      JsonNode policy = fixtureJson("fixtures/render-policy/archimate-svg.json");
+      ArrayNode dashPattern =
+          ((ObjectNode) policy.at("/style/node_type_overrides/Grouping")).putArray("dash_pattern");
+      dashPattern.add(9);
+      dashPattern.add(3);
+      ArrayNode nodes = JsonSupport.objectMapper().createArrayNode();
+      nodes.add(
+          JsonSupport.objectMapper()
+              .readTree(
+                  """
+                    {
+                      "id": "n",
+                      "source_id": "n",
+                      "projection_id": "n",
+                      "x": 40, "y": 40, "width": 160, "height": 80,
+                      "label": "Grouping"
+                    }
+                    """));
+      ObjectNode metadataNodes = JsonSupport.objectMapper().createObjectNode();
+      metadataNodes.set(
+          "n",
+          JsonSupport.objectMapper()
+              .readTree(
+                  """
+                    { "type": "Grouping", "source_id": "n" }
+                    """));
+
+      Document document =
+          svgDocument(
+              okContent(
+                  render(
+                      semanticRenderInput(
+                          "archimate",
+                          nodes,
+                          JsonSupport.objectMapper().createArrayNode(),
+                          metadataNodes,
+                          JsonSupport.objectMapper().createObjectNode(),
+                          policy))));
+
+      // The user dash also triggers the opacity/dash wrapper <g>, so the shape sits one level
+      // below the node group and needs the descendant-aware lookup.
+      Element shape =
+          firstDescendantWithAttribute(
+              groupWithAttribute(document, "data-dediren-node-id", "n"), "data-dediren-node-shape");
+      assertThat(shape.getAttribute("data-dediren-node-shape")).isEqualTo("archimate_rectangle");
+      assertThat(shape.getAttribute("stroke-dasharray"))
+          .as("a user dash_pattern must beat the grouping decorator's built-in dash")
+          .isEqualTo("9 3");
     }
 
     @Test
@@ -3992,6 +4066,30 @@ class MainTest {
       }
     }
     throw new AssertionError("expected child element with " + name);
+  }
+
+  private static Element firstDescendantWithAttribute(Element parent, String name) {
+    Element found = findDescendantWithAttribute(parent, name);
+    if (found == null) {
+      throw new AssertionError("expected descendant element with " + name);
+    }
+    return found;
+  }
+
+  private static Element findDescendantWithAttribute(Element parent, String name) {
+    var children = parent.getChildNodes();
+    for (int index = 0; index < children.getLength(); index++) {
+      if (children.item(index) instanceof Element child) {
+        if (child.hasAttribute(name)) {
+          return child;
+        }
+        Element nested = findDescendantWithAttribute(child, name);
+        if (nested != null) {
+          return nested;
+        }
+      }
+    }
+    return null;
   }
 
   private static Element marker(Document document, String id, String markerAttribute) {

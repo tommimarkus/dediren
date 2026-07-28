@@ -58,6 +58,12 @@ import java.util.Locale;
 
 public final class SvgDocument {
 
+  // ArchiMate grouping borders fall back to this fine dash. A user dash (dash_pattern/line_style)
+  // must win in both the group lane and the node lane: a shape's own stroke-dasharray attribute
+  // beats the user dash riding the wrapper <g>, so this fallback may only be emitted when the
+  // resolved style carries no dash of its own.
+  private static final String ARCHIMATE_GROUPING_DASH = "3 2";
+
   private SvgDocument() {}
 
   public static String renderSvg(
@@ -111,7 +117,7 @@ public final class SvgDocument {
       }
       String groupDashValue = dashArrayValue(style.lineStyle(), style.dashPattern(), "6 4");
       if (groupDashValue.isEmpty() && style.decorator() == SvgNodeDecorator.ARCHIMATE_GROUPING) {
-        groupDashValue = "3 2";
+        groupDashValue = ARCHIMATE_GROUPING_DASH;
       }
       w.empty("rect")
           .attr("x", f1(group.x()))
@@ -318,7 +324,8 @@ public final class SvgDocument {
       rx = Math.max(1.0, style.rx());
       shapeName = "archimate_rounded_rectangle";
     } else if (decorator == SvgNodeDecorator.ARCHIMATE_GROUPING) {
-      dashArray = "3 2";
+      String userDash = dashArrayValue(style.lineStyle(), style.dashPattern(), "6 4");
+      dashArray = userDash.isEmpty() ? ARCHIMATE_GROUPING_DASH : userDash;
     }
     w.empty("rect")
         .attr("data-dediren-node-shape", shapeName)

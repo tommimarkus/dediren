@@ -14,7 +14,7 @@ public final class ArchimateLayoutSizing {
   private static final double ARCHIMATE_MIN_HEIGHT = 80.0;
   private static final double ARCHIMATE_TEXT_CHAR_WIDTH = 8.7;
 
-  // Must equal ARCHIMATE_LABEL_ICON_RESERVE in engines/render Main: per-side
+  // Must equal ARCHIMATE_LABEL_ICON_RESERVE in engines/render NodeLabels: per-side
   // room reserved so a centered label clears the upper-right type icon.
   // Enforced by dist-tool ArchimateLabelReserveConsistencyTest.
   public static final double ARCHIMATE_LABEL_ICON_RESERVE = 34.0;
