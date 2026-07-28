@@ -35,10 +35,11 @@ final class ProGuardLibShrinker implements LibShrinker {
    * <p>Also drops runtime-reachable-but-provably-unused validator data: networknt's non-English
    * {@code jsv-messages_*.properties} (the base bundle stays and is the ResourceBundle fallback),
    * {@code ucd/**} Unicode data (read lazily by the idn-* format validators — no dediren schema or
-   * MCP tool schema uses the {@code format} keyword, and schema-cache feeds only XML XSDs to
-   * xmllint), and the draft-04/06/07/2019-09 meta-schemas (every dediren family is 2020-12). Adding
-   * a {@code format} keyword to any packaged schema means putting {@code ucd/**} and the message
-   * bundles back.
+   * MCP tool schema uses the {@code format} keyword, and XML export validation runs in-JVM through
+   * {@code javax.xml.validation} in schema-cache, never through networknt's JSON validators), and
+   * the draft-04/06/07/2019-09 meta-schemas (every dediren family is 2020-12). Adding a {@code
+   * format} keyword to any packaged schema means putting {@code ucd/**} and the message bundles
+   * back.
    */
   static final String INJAR_FILTER =
       "(!META-INF/MANIFEST.MF,!META-INF/*.SF,!META-INF/*.RSA,!META-INF/*.DSA,"

@@ -561,9 +561,12 @@
                 <param>dev.dediren.core.*</param>
                 <param>dev.dediren.engine.*</param>
                 <param>dev.dediren.cli.*</param>
+                <param>dev.dediren.mcp.*</param>
+                <param>dev.dediren.schemacache.*</param>
                 <param>dev.dediren.semantics.archimate.*</param>
                 <param>dev.dediren.semantics.uml.*</param>
                 <param>dev.dediren.semantics.graph.*</param>
+                <param>dev.dediren.plugins.archimateoef.*</param>
                 <param>dev.dediren.plugins.elklayout.*</param>
                 <param>dev.dediren.plugins.render.*</param>
                 <param>dev.dediren.plugins.umlxmi.*</param>
@@ -659,10 +662,10 @@
       </build>
     </profile>
     <profile>
-      <!-- Opt-in code-quality gate: Spotless (formatting) + SpotBugs (added in
-           a later change). Local `./mvnw -Pquality verify` is a hard gate;
-           CI runs the same checks report-only. `quality.fail` toggles SpotBugs'
-           fail-on-bug behavior; Spotless always gates when this profile runs.
+      <!-- Opt-in code-quality gate: Spotless (formatting) + SpotBugs. Local-first
+           validation: `./mvnw -Pquality verify` is a hard gate and CI does not
+           run this profile. `quality.fail` toggles SpotBugs' fail-on-bug
+           behavior; Spotless always gates when this profile runs.
            See docs/superpowers/specs/2026-07-01-spotless-spotbugs-quality-gates-design.md -->
       <id>quality</id>
       <properties>
@@ -700,7 +703,9 @@
               <configuration>
                 <effort>Max</effort>
                 <threshold>Medium</threshold>
-                <!-- ${quality.fail}=true → local gate; CI passes false for report-only. -->
+                <!-- ${quality.fail}=true (profile default) → hard gate; pass
+                     -Dquality.fail=false for a local report-only run. CI does
+                     not run this profile. -->
                 <failOnError>${quality.fail}</failOnError>
                 <includeTests>false</includeTests>
                 <excludeFilterFile>${maven.multiModuleProjectDirectory}/spotbugs-exclude.xml</excludeFilterFile>
