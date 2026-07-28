@@ -103,6 +103,7 @@ public enum DiagnosticCode {
   ELK_INPUT_INVALID_JSON("DEDIREN_ELK_INPUT_INVALID_JSON"),
   ELK_LAYOUT_FAILED("DEDIREN_ELK_LAYOUT_FAILED"),
   ELK_MISSING_GROUP_MEMBER("DEDIREN_ELK_MISSING_GROUP_MEMBER"),
+  ELK_PACKED_OPTION_IGNORED("DEDIREN_ELK_PACKED_OPTION_IGNORED"),
 
   // SVG render engine.
   RENDER_METADATA_PROFILE_MISMATCH("DEDIREN_RENDER_METADATA_PROFILE_MISMATCH"),
@@ -129,14 +130,26 @@ public enum DiagnosticCode {
   XMI_RELATIONSHIPS_OMITTED("DEDIREN_XMI_RELATIONSHIPS_OMITTED"),
   XMI_SCHEMA_INVALID("DEDIREN_XMI_SCHEMA_INVALID"),
   XMI_SCHEMA_UNAVAILABLE("DEDIREN_XMI_SCHEMA_UNAVAILABLE"),
+  // Info: several selected classifiers share one label, so name-based attribute/parameter type
+  // resolution binds to the first and silently shadows the rest (the source contract carries type
+  // names, not ids).
+  XMI_TYPE_NAME_AMBIGUOUS("DEDIREN_XMI_TYPE_NAME_AMBIGUOUS"),
   XMI_XML_INVALID("DEDIREN_XMI_XML_INVALID"),
 
-  // generic-graph semantics (profile routing, view integrity). The two structural codes carry the
-  // failures that historically went raw (stderr + empty stdout): a source without the
-  // plugins.generic-graph object, and a view id no view in that object declares.
+  // generic-graph semantics (profile routing, view integrity). The structural codes carry the
+  // failures that historically went raw (stderr + empty stdout) or crashed projection into
+  // DEDIREN_ENGINE_FAILED: a source without the plugins.generic-graph object, a view id no view
+  // in that object declares, and the four ghost view references (a view node or relationship id
+  // absent from the source, a group member outside its view, a semantic_source_id naming no
+  // source node).
   GENERIC_GRAPH_DUPLICATE_GROUP_ID("DEDIREN_GENERIC_GRAPH_DUPLICATE_GROUP_ID"),
   GENERIC_GRAPH_DUPLICATE_VIEW_ID("DEDIREN_GENERIC_GRAPH_DUPLICATE_VIEW_ID"),
+  GENERIC_GRAPH_GROUP_MEMBER_OUTSIDE_VIEW("DEDIREN_GENERIC_GRAPH_GROUP_MEMBER_OUTSIDE_VIEW"),
+  GENERIC_GRAPH_GROUP_SEMANTIC_SOURCE_UNKNOWN(
+      "DEDIREN_GENERIC_GRAPH_GROUP_SEMANTIC_SOURCE_UNKNOWN"),
   GENERIC_GRAPH_PLUGIN_REQUIRED("DEDIREN_GENERIC_GRAPH_PLUGIN_REQUIRED"),
+  GENERIC_GRAPH_VIEW_NODE_UNKNOWN("DEDIREN_GENERIC_GRAPH_VIEW_NODE_UNKNOWN"),
+  GENERIC_GRAPH_VIEW_RELATIONSHIP_UNKNOWN("DEDIREN_GENERIC_GRAPH_VIEW_RELATIONSHIP_UNKNOWN"),
   GENERIC_GRAPH_VIEW_UNKNOWN("DEDIREN_GENERIC_GRAPH_VIEW_UNKNOWN"),
   GENERIC_GRAPH_RELATIONSHIP_ENDPOINT_OUTSIDE_VIEW(
       "DEDIREN_GENERIC_GRAPH_RELATIONSHIP_ENDPOINT_OUTSIDE_VIEW"),
@@ -163,7 +176,8 @@ public enum DiagnosticCode {
   PACKAGE_MODEL_UNRESOLVED("DEDIREN_PACKAGE_MODEL_UNRESOLVED"),
   PACKAGE_VIEW_UNKNOWN("DEDIREN_PACKAGE_VIEW_UNKNOWN"),
   PACKAGE_EXPORT_TARGET_INVALID("DEDIREN_PACKAGE_EXPORT_TARGET_INVALID"),
-  PACKAGE_OUTPUT_COLLISION("DEDIREN_PACKAGE_OUTPUT_COLLISION");
+  PACKAGE_OUTPUT_COLLISION("DEDIREN_PACKAGE_OUTPUT_COLLISION"),
+  PACKAGE_DUPLICATE_ID("DEDIREN_PACKAGE_DUPLICATE_ID");
 
   private final String code;
 

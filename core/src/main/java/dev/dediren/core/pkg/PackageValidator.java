@@ -5,6 +5,7 @@ import dev.dediren.contracts.DiagnosticCode;
 import dev.dediren.contracts.DiagnosticSeverity;
 import dev.dediren.contracts.pkg.PackageDocument;
 import dev.dediren.contracts.pkg.PackageExport;
+import dev.dediren.contracts.pkg.PackageModel;
 import dev.dediren.contracts.pkg.PackageOutputs;
 import dev.dediren.contracts.pkg.PackageView;
 import java.nio.file.Path;
@@ -28,10 +29,37 @@ public final class PackageValidator {
 
   public static List<Diagnostic> validate(PackageDocument pkg) {
     List<Diagnostic> diagnostics = new ArrayList<>();
+    // Each id space (models[], views[], exports[]) must be duplicate-free: the schema cannot
+    // express uniqueness across array items, and a silent set dedup would let one entry shadow
+    // another — a duplicate view id makes the export binding take the last built view, a duplicate
+    // model id makes every reference load the first source.
     Set<String> modelIds = new LinkedHashSet<>();
-    pkg.models().forEach(model -> modelIds.add(model.id()));
+    for (PackageModel model : pkg.models()) {
+      if (!modelIds.add(model.id())) {
+        diagnostics.add(
+            error(
+                DiagnosticCode.PACKAGE_DUPLICATE_ID,
+                "models[] declares duplicate id '" + model.id() + "'"));
+      }
+    }
     Set<String> viewIds = new LinkedHashSet<>();
-    pkg.views().forEach(view -> viewIds.add(view.id()));
+    for (PackageView view : pkg.views()) {
+      if (!viewIds.add(view.id())) {
+        diagnostics.add(
+            error(
+                DiagnosticCode.PACKAGE_DUPLICATE_ID,
+                "views[] declares duplicate id '" + view.id() + "'"));
+      }
+    }
+    Set<String> exportIds = new LinkedHashSet<>();
+    for (PackageExport export : pkg.exports()) {
+      if (!exportIds.add(export.id())) {
+        diagnostics.add(
+            error(
+                DiagnosticCode.PACKAGE_DUPLICATE_ID,
+                "exports[] declares duplicate id '" + export.id() + "'"));
+      }
+    }
     boolean singleModel = pkg.models().size() == 1;
 
     for (PackageView view : pkg.views()) {

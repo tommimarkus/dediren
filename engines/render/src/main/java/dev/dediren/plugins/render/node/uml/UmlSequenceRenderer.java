@@ -908,6 +908,12 @@ public final class UmlSequenceRenderer {
       SvgEdgeMarkerEnd markerEnd,
       Double strokeOpacity,
       Double labelOpacity) {
+    // Marker and line style derive from message_sort alone — the notation-correct rendering per
+    // UML sort (reply → dashed; asynch/create/reply → open arrow; delete → none; else filled
+    // arrow). The edge-style overrides for marker_end/line_style/dash_pattern, and the edge label
+    // position fields, are intentionally not consulted here; only the paint dimensions below
+    // (stroke, widths, label fill, opacities) pass through. Mirrors boxAttrs' "line_style preset
+    // only" constraint for sequence boxes.
     static MessageAppearance from(String messageSort, ResolvedEdgeStyle paint) {
       SvgEdgeLineStyle lineStyle =
           "reply".equals(messageSort) ? SvgEdgeLineStyle.DASHED : SvgEdgeLineStyle.SOLID;

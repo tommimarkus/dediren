@@ -24,8 +24,8 @@ public final class NodeLabels {
 
   private NodeLabels() {}
 
-  // Must equal ARCHIMATE_LABEL_ICON_RESERVE in engines/generic-graph
-  // GenericGraphLayoutSizing: per-side room reserved so a centered label clears
+  // Must equal ARCHIMATE_LABEL_ICON_RESERVE in semantics-archimate
+  // ArchimateLayoutSizing: per-side room reserved so a centered label clears
   // the upper-right type icon. Enforced by dist-tool ArchimateLabelReserveConsistencyTest.
   private static final double ARCHIMATE_LABEL_ICON_RESERVE = 34.0;
   private static final double NODE_LABEL_VERTICAL_PADDING = 8.0;

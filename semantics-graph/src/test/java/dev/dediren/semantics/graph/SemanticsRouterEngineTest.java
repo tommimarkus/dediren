@@ -104,6 +104,41 @@ class SemanticsRouterEngineTest {
         .isInstanceOf(NullPointerException.class);
   }
 
+  @Test
+  void projectSceneRejectsGhostViewNodeAsStructuralFailure() {
+    // Typed-caller seam (cli/mcp dispatch): a ghost view reference must surface as a structured
+    // EngineException (exit 2), never as the UncheckedIOException projection crash that dispatch
+    // would bury in DEDIREN_ENGINE_FAILED.
+    SourceDocument source =
+        engine.parseSource(
+            """
+                {
+                  "model_schema_version": "model.schema.v1",
+                  "nodes": [
+                    { "id": "client", "type": "generic.actor", "label": "Client", "properties": {} }
+                  ],
+                  "relationships": [],
+                  "plugins": {
+                    "generic-graph": {
+                      "views": [
+                        { "id": "main", "label": "Main", "nodes": ["client", "clientt"], "relationships": [] }
+                      ]
+                    }
+                  }
+                }
+                """
+                .getBytes(StandardCharsets.UTF_8));
+
+    assertThatThrownBy(() -> engine.projectScene(source, "main"))
+        .isInstanceOfSatisfying(
+            EngineException.class,
+            error -> {
+              assertThat(error.exitCode()).isEqualTo(2);
+              assertThat(error.diagnostics().getFirst().code())
+                  .isEqualTo("DEDIREN_GENERIC_GRAPH_VIEW_NODE_UNKNOWN");
+            });
+  }
+
   // --- engine-seam envelope round-trip parity (relocated GenericGraphEngineTest) ----------------
 
   @Test
@@ -544,9 +579,191 @@ class SemanticsRouterEngineTest {
                 }
                 """);
 
+    // Same exit-2 observable the retired process lane published, but as the structured envelope on
+    // stdout now instead of a raw stderr line from the projection crash.
+    JsonNode envelope = JsonSupport.objectMapper().readTree(result.stdout());
+
     assertThat(result.exitCode()).isEqualTo(2);
-    assertThat(result.stderr())
-        .contains("group bad-group semantic_source_id references missing node");
+    assertThat(envelope.at("/status").asText()).isEqualTo("error");
+    assertThat(envelope.at("/diagnostics/0/code").asText())
+        .isEqualTo("DEDIREN_GENERIC_GRAPH_GROUP_SEMANTIC_SOURCE_UNKNOWN");
+    assertThat(envelope.at("/diagnostics/0/message").asText())
+        .contains("bad-group")
+        .contains("semantic_source_id references missing node")
+        .contains("missing-grouping-node");
+  }
+
+  // --- ghost view references: structured input errors, not projection crashes (exit 2) ----------
+  // Each of the four hand-authorable typo classes that used to pass every validation lane and
+  // crash SceneProjection into the DEDIREN_ENGINE_FAILED lane must now surface as its own
+  // structural error envelope, precise enough for an agent to fix the offending id.
+
+  @Test
+  void rejectsViewNodeIdThatIsNotASourceNode() throws Exception {
+    RouterResult result =
+        RouterHarness.executeForTesting(
+            new String[] {"project", "--target", "layout-request", "--view", "main"},
+            """
+                {
+                  "model_schema_version": "model.schema.v1",
+                  "nodes": [
+                    { "id": "client", "type": "generic.actor", "label": "Client", "properties": {} }
+                  ],
+                  "relationships": [],
+                  "plugins": {
+                    "generic-graph": {
+                      "views": [
+                        {
+                          "id": "main",
+                          "label": "Main",
+                          "nodes": ["client", "clientt"],
+                          "relationships": []
+                        }
+                      ]
+                    }
+                  }
+                }
+                """);
+
+    JsonNode envelope = JsonSupport.objectMapper().readTree(result.stdout());
+
+    assertThat(result.exitCode()).isEqualTo(2);
+    assertThat(envelope.at("/status").asText()).isEqualTo("error");
+    assertThat(envelope.at("/diagnostics/0/code").asText())
+        .isEqualTo("DEDIREN_GENERIC_GRAPH_VIEW_NODE_UNKNOWN");
+    assertThat(envelope.at("/diagnostics/0/message").asText()).contains("main").contains("clientt");
+    assertThat(envelope.at("/diagnostics/0/path").asText())
+        .isEqualTo("$.plugins.generic-graph.views[0].nodes[1]");
+  }
+
+  @Test
+  void rejectsViewRelationshipIdThatIsNotASourceRelationship() throws Exception {
+    // The endpoint-outside-view check used to skip an unresolvable relationship id silently,
+    // deferring the failure to the projection crash; the ghost id gets its own loud error now.
+    RouterResult result =
+        RouterHarness.executeForTesting(
+            new String[] {"project", "--target", "layout-request", "--view", "main"},
+            """
+                {
+                  "model_schema_version": "model.schema.v1",
+                  "nodes": [
+                    { "id": "client", "type": "generic.actor", "label": "Client", "properties": {} },
+                    { "id": "api", "type": "generic.component", "label": "API", "properties": {} }
+                  ],
+                  "relationships": [
+                    {
+                      "id": "client-calls-api",
+                      "type": "generic.calls",
+                      "source": "client",
+                      "target": "api",
+                      "label": "calls",
+                      "properties": {}
+                    }
+                  ],
+                  "plugins": {
+                    "generic-graph": {
+                      "views": [
+                        {
+                          "id": "main",
+                          "label": "Main",
+                          "nodes": ["client", "api"],
+                          "relationships": ["client-calls-apii"]
+                        }
+                      ]
+                    }
+                  }
+                }
+                """);
+
+    JsonNode envelope = JsonSupport.objectMapper().readTree(result.stdout());
+
+    assertThat(result.exitCode()).isEqualTo(2);
+    assertThat(envelope.at("/status").asText()).isEqualTo("error");
+    assertThat(envelope.at("/diagnostics/0/code").asText())
+        .isEqualTo("DEDIREN_GENERIC_GRAPH_VIEW_RELATIONSHIP_UNKNOWN");
+    assertThat(envelope.at("/diagnostics/0/message").asText())
+        .contains("main")
+        .contains("client-calls-apii");
+    assertThat(envelope.at("/diagnostics/0/path").asText())
+        .isEqualTo("$.plugins.generic-graph.views[0].relationships[0]");
+  }
+
+  @Test
+  void rejectsGroupMemberThatIsOutsideTheView() throws Exception {
+    // "api" exists in the source but is not a view node (nor a group id), so the member is a
+    // distinct ghost class from a missing source node.
+    RouterResult result =
+        RouterHarness.executeForTesting(
+            new String[] {"project", "--target", "layout-request", "--view", "main"},
+            """
+                {
+                  "model_schema_version": "model.schema.v1",
+                  "nodes": [
+                    { "id": "client", "type": "generic.actor", "label": "Client", "properties": {} },
+                    { "id": "api", "type": "generic.component", "label": "API", "properties": {} }
+                  ],
+                  "relationships": [],
+                  "plugins": {
+                    "generic-graph": {
+                      "views": [
+                        {
+                          "id": "main",
+                          "label": "Main",
+                          "nodes": ["client"],
+                          "relationships": [],
+                          "groups": [
+                            { "id": "boundary", "label": "Boundary", "members": ["client", "api"] }
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                }
+                """);
+
+    JsonNode envelope = JsonSupport.objectMapper().readTree(result.stdout());
+
+    assertThat(result.exitCode()).isEqualTo(2);
+    assertThat(envelope.at("/status").asText()).isEqualTo("error");
+    assertThat(envelope.at("/diagnostics/0/code").asText())
+        .isEqualTo("DEDIREN_GENERIC_GRAPH_GROUP_MEMBER_OUTSIDE_VIEW");
+    assertThat(envelope.at("/diagnostics/0/message").asText()).contains("boundary").contains("api");
+    assertThat(envelope.at("/diagnostics/0/path").asText())
+        .isEqualTo("$.plugins.generic-graph.views[0].groups[0].members[1]");
+  }
+
+  @Test
+  void validateRejectsGhostViewReference() throws Exception {
+    // The semantic-validate lane runs the same whole-document base validation, so a ghost view
+    // reference can no longer pass `validate` and first explode at build/projection time. The
+    // base check precedes profile routing, so the notation never runs.
+    RouterResult result =
+        RouterHarness.executeForTesting(
+            new String[] {"validate", "--profile", "archimate"},
+            """
+                {
+                  "model_schema_version": "model.schema.v1",
+                  "nodes": [
+                    { "id": "client", "type": "BusinessActor", "label": "Client", "properties": {} }
+                  ],
+                  "relationships": [],
+                  "plugins": {
+                    "generic-graph": {
+                      "views": [
+                        {
+                          "id": "main",
+                          "label": "Main",
+                          "nodes": ["client", "clientt"],
+                          "relationships": []
+                        }
+                      ]
+                    }
+                  }
+                }
+                """);
+
+    assertThat(result.exitCode()).isEqualTo(2);
+    assertErrorCode(result, "DEDIREN_GENERIC_GRAPH_VIEW_NODE_UNKNOWN");
   }
 
   @Test

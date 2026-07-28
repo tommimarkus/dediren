@@ -26,8 +26,9 @@ public interface NotationSemantics {
   void validate(SourceDocument source, GenericGraphPluginData pluginData) throws EngineException;
 
   /**
-   * Layout role for a source node type ({@code "lifeline"}/{@code "interaction"}/{@code
-   * "junction"}), or {@code null} for none.
+   * Layout role for a source node type, or {@code null} for none. The value must be one of the five
+   * roles declared by {@link dev.dediren.contracts.layout.LayoutNodeRole}: {@code "lifeline"},
+   * {@code "interaction"}, {@code "junction"}, {@code "execution"}, {@code "destruction"}.
    */
   String layoutRole(String sourceType);
 

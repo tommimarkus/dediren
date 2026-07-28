@@ -131,16 +131,19 @@ public final class XmiHelpers {
    * uml:LiteralUnlimitedNatural} (with {@code *} denoting unlimited). Owner elements that carry a
    * multiplicity ({@code ownedAttribute}, association {@code ownedEnd}) must be written as open
    * elements so these children can nest inside them, rather than serializing bounds as XML
-   * attributes, which UML importers ignore or reject (issue #33 defect 2).
+   * attributes, which UML importers ignore or reject (issue #33 defect 2). The {@code -lower} and
+   * {@code -upper} child ids are claimed through {@code ids} so an independently minted sibling id
+   * can never duplicate them.
    */
-  public static void writeMultiplicityValues(StringBuilder xml, String ownerId, String[] bounds) {
+  public static void writeMultiplicityValues(
+      StringBuilder xml, IdentifierMap ids, String ownerId, String[] bounds) {
     xml.append("<lowerValue xmi:type=\"uml:LiteralInteger\" xmi:id=\"")
-        .append(attr(ownerId + "-lower"))
+        .append(attr(ids.derivedId(ownerId, "-lower")))
         .append("\" value=\"")
         .append(attr(bounds[0]))
         .append("\"/>");
     xml.append("<upperValue xmi:type=\"uml:LiteralUnlimitedNatural\" xmi:id=\"")
-        .append(attr(ownerId + "-upper"))
+        .append(attr(ids.derivedId(ownerId, "-upper")))
         .append("\" value=\"")
         .append(attr(bounds[1]))
         .append("\"/>");

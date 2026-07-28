@@ -108,24 +108,14 @@ public final class XmiBuilder {
     // per-family element writers (activity, sequence, …) assume view-scoped input, so mixing an
     // unrelated family's nodes into one model section collides xmi:ids. A class-only package thus
     // emits exactly the single-view class model, plus its diagram.
-    Set<String> nodeScope = new java.util.HashSet<>();
-    Set<String> relationshipScope = new java.util.HashSet<>();
-    for (ModelExportRequest.ViewLayout view : request.views()) {
-      ExportScope scope =
-          ExportScope.fromRequest(
-              new ExportRequest(
-                  ContractVersions.EXPORT_REQUEST_SCHEMA_VERSION,
-                  request.source(),
-                  view.layout(),
-                  request.policy()));
-      nodeScope.addAll(scope.nodeIds());
-      relationshipScope.addAll(scope.relationshipIds());
-    }
+    ExportScope scope = modelScope(request);
     var selectedNodes =
-        request.source().nodes().stream().filter(node -> nodeScope.contains(node.id())).toList();
+        request.source().nodes().stream()
+            .filter(node -> scope.nodeIds().contains(node.id()))
+            .toList();
     var selectedRelationships =
         request.source().relationships().stream()
-            .filter(relationship -> relationshipScope.contains(relationship.id()))
+            .filter(relationship -> scope.relationshipIds().contains(relationship.id()))
             .toList();
 
     StringBuilder xml = new StringBuilder();
@@ -145,6 +135,28 @@ public final class XmiBuilder {
     }
     xml.append("</xmi:XMI>\n");
     return xml.toString();
+  }
+
+  /**
+   * The union of the supplied views' selection scopes — exactly the node and relationship ids
+   * {@link #buildModelXmi} admits into the shared model section, exposed so the engine's
+   * diagnostics pre-passes see the same selection the writers do.
+   */
+  public static ExportScope modelScope(ModelExportRequest request) {
+    Set<String> nodeScope = new java.util.HashSet<>();
+    Set<String> relationshipScope = new java.util.HashSet<>();
+    for (ModelExportRequest.ViewLayout view : request.views()) {
+      ExportScope scope =
+          ExportScope.fromRequest(
+              new ExportRequest(
+                  ContractVersions.EXPORT_REQUEST_SCHEMA_VERSION,
+                  request.source(),
+                  view.layout(),
+                  request.policy()));
+      nodeScope.addAll(scope.nodeIds());
+      relationshipScope.addAll(scope.relationshipIds());
+    }
+    return new ExportScope(nodeScope, relationshipScope);
   }
 
   /**
@@ -335,7 +347,13 @@ public final class XmiBuilder {
     return new ModelContent(nodeIds, relationshipIds);
   }
 
-  private static boolean isClassifier(SourceNode node) {
+  /**
+   * True when {@code node}'s emitted element can be the target of a name-based attribute/parameter
+   * type reference — the population whose duplicate labels make {@link TypeResolver} resolution
+   * ambiguous (the engine's {@code DEDIREN_XMI_TYPE_NAME_AMBIGUOUS} pre-pass keys on this same
+   * predicate).
+   */
+  public static boolean isClassifier(SourceNode node) {
     return node != null && CLASSIFIER_TYPES.contains(node.type());
   }
 

@@ -14,10 +14,12 @@ package dev.dediren.contracts.layout;
  * did not error: it silently stopped matching, and the behaviour it gates (sequence invariants,
  * interaction-frame enclosure, junction quality rules) quietly switched off with no diagnostic.
  *
- * <p>This is the single declaration. The wire form stays a plain string — {@code role} is not
- * constrained by an enum in layout-request.schema.json, so a hand-authored request can still carry
- * an unrecognised role and be silently ignored downstream. Constraining the schema is a contract
- * narrowing and therefore a maintainer's decision, not a cleanup's.
+ * <p>This is the single declaration. The wire form stays a plain string in the Java records, but
+ * layout-request.schema.json and layout-result.schema.json both enum-constrain {@code role} to
+ * exactly these five values, so {@code dediren validate} rejects an unrecognised role. The one
+ * remaining silent lane is direct {@code dediren layout}: it gates the schema version only and then
+ * Jackson-parses {@code role} into this String field, so a hand-authored request carrying an
+ * unrecognised role is accepted there and ignored downstream.
  */
 public final class LayoutNodeRole {
 

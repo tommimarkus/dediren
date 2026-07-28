@@ -24,8 +24,13 @@ import dev.dediren.contracts.pkg.PackageView;
 import dev.dediren.contracts.pkg.PackageViewOutcome;
 import dev.dediren.contracts.render.RenderMetadata;
 import dev.dediren.contracts.render.RenderResult;
+import dev.dediren.contracts.source.GenericGraphPluginData;
+import dev.dediren.contracts.source.GenericGraphView;
+import dev.dediren.contracts.source.GenericGraphViewKind;
 import dev.dediren.contracts.source.SourceDocument;
 import dev.dediren.core.DedirenPaths;
+import dev.dediren.core.analysis.CanonicalJson;
+import dev.dediren.core.analysis.Provenance;
 import dev.dediren.core.commands.CoreCommands;
 import dev.dediren.core.engine.EngineDispatch;
 import dev.dediren.core.engine.EngineExecutionException;
@@ -51,6 +56,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -84,6 +90,16 @@ public final class PackageBuildCommand {
   private static final String RENDER_ENGINE = "render";
   private static final String OEF_ENGINE = "archimate-oef";
   private static final String XMI_ENGINE = "uml-xmi";
+
+  /**
+   * Mirror of the twin driver's {@code BuildCommand.CLASS_FAMILY_KINDS} (private there): diagram
+   * kinds whose model content is classifier-based and composes safely in one aggregate document.
+   * Other UML families (activity, sequence, …) have element writers that walk the full source node
+   * list, so mixing them into one model section collides xmi:ids — they are excluded from the
+   * whole-model UMLDI aggregate for now (class-family first).
+   */
+  private static final Set<GenericGraphViewKind> CLASS_FAMILY_KINDS =
+      Set.of(GenericGraphViewKind.UML_CLASS, GenericGraphViewKind.UML_DATA);
 
   private PackageBuildCommand() {}
 
@@ -155,12 +171,12 @@ public final class PackageBuildCommand {
         failureExit = worst(failureExit, CommandExitCode.INPUT_ERROR.code());
         continue;
       }
-      ViewRun run = buildView(request, engines, model.source(), view);
+      ViewRun run = buildView(request, engines, model, view);
       viewOutcomes.add(run.outcome());
       if (run.outcome().status() == EnvelopeStatus.ERROR) {
         failureExit = worst(failureExit, run.exitCode());
       } else if (run.layout() != null) {
-        builtViews.put(view.id(), new ViewContext(model.source(), run.layout()));
+        builtViews.put(view.id(), new ViewContext(model, run.layout()));
         layoutsByModel
             .computeIfAbsent(modelId, id -> new ArrayList<>())
             .add(new ModelExportRequest.ViewLayout(view.id(), run.layout()));
@@ -201,7 +217,8 @@ public final class PackageBuildCommand {
   // --- per-view pipeline ------------------------------------------------------------------------
 
   private static ViewRun buildView(
-      PackageBuildRequest request, Engines engines, SourceDocument source, PackageView view) {
+      PackageBuildRequest request, Engines engines, ModelLoad model, PackageView view) {
+    SourceDocument source = model.source();
     List<Diagnostic> diagnostics = new ArrayList<>();
     Map<String, String> artifacts = new LinkedHashMap<>();
     boolean warning = false;
@@ -298,7 +315,21 @@ public final class PackageBuildCommand {
           render.value().artifacts().isEmpty()
               ? ""
               : render.value().artifacts().getFirst().content();
-      writeOutput(request, outputs.diagram(), diagram);
+      // Stamped like the twin's render lane: the model's canonical hash plus the hash of the
+      // policy the renderer actually consumed (the effective policy, presentation folded in). The
+      // layout and render-metadata JSON stay unstamped, exactly as the twin's --emit stage files.
+      writeOutput(
+          request,
+          outputs.diagram(),
+          Provenance.stampSvg(
+              diagram,
+              Provenance.payload(
+                  source.modelSchemaVersion(),
+                  model.sha(),
+                  viewId,
+                  "render_policy_sha256",
+                  CanonicalJson.sha256(effectivePolicy),
+                  dedirenVersion())));
       artifacts.put("diagram", outputs.diagram());
       if (outputs.renderMetadata() != null) {
         writeOutput(
@@ -346,6 +377,8 @@ public final class PackageBuildCommand {
     }
 
     InMemoryStage<ExportResult> stage;
+    ModelLoad owner;
+    String stampViewId;
     if (export.view() != null) {
       ViewContext context = builtViews.get(export.view());
       if (context == null) {
@@ -359,7 +392,9 @@ public final class PackageBuildCommand {
                     + "' did not build"));
         return failedExport(export, diagnostics, CommandExitCode.INPUT_ERROR.code());
       }
-      SourceDocument source = context.source();
+      owner = context.model();
+      stampViewId = export.view();
+      SourceDocument source = owner.source();
       LayoutResult layout = context.layout();
       stage =
           runStage(
@@ -378,8 +413,6 @@ public final class PackageBuildCommand {
     } else {
       String modelId = export.model();
       ModelLoad model = models.get(modelId);
-      List<ModelExportRequest.ViewLayout> viewLayouts =
-          layoutsByModel.getOrDefault(modelId, List.of());
       if (model == null || model.failed()) {
         diagnostics.add(
             diag(
@@ -387,6 +420,26 @@ public final class PackageBuildCommand {
                 "export '" + export.id() + "' cannot run: model '" + modelId + "' did not load"));
         return failedExport(export, diagnostics, CommandExitCode.INPUT_ERROR.code());
       }
+      owner = model;
+      // The twin stamps its whole-model aggregates with the literal "model" as the view id.
+      stampViewId = "model";
+      // Class-family first, mirroring the twin's CLASS_FAMILY_KINDS gate in BuildCommand: only
+      // classifier diagram kinds (uml-class, uml-data) feed a whole-model uml-xmi aggregate —
+      // other families' element writers walk the full source node list, so a mixed union collides
+      // xmi:ids and would ship provisional UMLDI for kinds outside the class family. The OEF
+      // aggregate keeps every view. A kindless (generic) view is never in the class family.
+      List<ModelExportRequest.ViewLayout> allLayouts =
+          layoutsByModel.getOrDefault(modelId, List.of());
+      List<ModelExportRequest.ViewLayout> viewLayouts =
+          export.lane() == PackageExportLane.UML_XMI
+              ? allLayouts.stream()
+                  .filter(
+                      layout -> {
+                        GenericGraphViewKind kind = model.viewKinds().get(layout.viewId());
+                        return kind != null && CLASS_FAMILY_KINDS.contains(kind);
+                      })
+                  .toList()
+              : allLayouts;
       SourceDocument source = model.source();
       stage =
           runStage(
@@ -418,8 +471,23 @@ public final class PackageBuildCommand {
     if (stage.failed()) {
       return failedExport(export, diagnostics, stage.exitCode());
     }
+    String policyShaKey =
+        export.lane() == PackageExportLane.ARCHIMATE_OEF
+            ? "oef_policy_sha256"
+            : "xmi_policy_sha256";
     try {
-      writeOutput(request, export.output(), stage.value().content());
+      writeOutput(
+          request,
+          export.output(),
+          Provenance.stampXml(
+              stage.value().content(),
+              Provenance.payload(
+                  owner.source().modelSchemaVersion(),
+                  owner.sha(),
+                  stampViewId,
+                  policyShaKey,
+                  CanonicalJson.sha256(policy),
+                  dedirenVersion())));
     } catch (InputProblem problem) {
       diagnostics.add(problem.diagnostic());
       return failedExport(export, diagnostics, problem.exitCode());
@@ -445,8 +513,7 @@ public final class PackageBuildCommand {
       // that passed validation; guard defensively rather than NPE.
       models.put(
           modelId,
-          new ModelLoad(
-              null,
+          ModelLoad.failed(
               List.of(
                   diag(
                       DiagnosticCode.PACKAGE_MODEL_UNKNOWN,
@@ -457,7 +524,7 @@ public final class PackageBuildCommand {
     try {
       modelPath = resolveInput(req, model.source());
     } catch (InputProblem problem) {
-      models.put(modelId, new ModelLoad(null, List.of(problem.diagnostic())));
+      models.put(modelId, ModelLoad.failed(List.of(problem.diagnostic())));
       return;
     }
     String text;
@@ -467,8 +534,7 @@ public final class PackageBuildCommand {
       // Byte counts are safe to echo on both lanes; the resolved path never is on the MCP lane.
       models.put(
           modelId,
-          new ModelLoad(
-              null,
+          ModelLoad.failed(
               List.of(
                   diag(
                       DiagnosticCode.INPUT_FILE_TOO_LARGE,
@@ -477,8 +543,7 @@ public final class PackageBuildCommand {
     } catch (IOException error) {
       models.put(
           modelId,
-          new ModelLoad(
-              null,
+          ModelLoad.failed(
               List.of(
                   diag(
                       DiagnosticCode.COMMAND_IO_FAILED,
@@ -489,9 +554,9 @@ public final class PackageBuildCommand {
       SourceDocument source =
           SourceValidator.loadAndValidateSourceDocument(
               text, modelPath.getParent(), req.confinementRoot());
-      models.put(modelId, new ModelLoad(source, List.of()));
+      models.put(modelId, ModelLoad.loaded(source));
     } catch (SourceValidator.SourceDiagnosticsException error) {
-      models.put(modelId, new ModelLoad(null, error.diagnostics()));
+      models.put(modelId, ModelLoad.failed(error.diagnostics()));
     }
   }
 
@@ -511,14 +576,18 @@ public final class PackageBuildCommand {
               "policy '" + relPath + "': " + tooLarge.getMessage()),
           CommandExitCode.INPUT_ERROR.code());
     } catch (IOException error) {
+      // An unreadable policy is caller-fixable input, like an unreadable model on this lane and
+      // like the CLI single-model lane's policy-read mapping: COMMAND_IO_FAILED + INPUT_ERROR.
       throw new InputProblem(
           diag(DiagnosticCode.COMMAND_IO_FAILED, "failed to read policy '" + relPath + "'"),
-          CommandExitCode.PLUGIN_ERROR.code());
+          CommandExitCode.INPUT_ERROR.code());
     }
     JsonNode node;
     try {
       node = JsonSupport.objectMapper().readTree(text);
     } catch (JacksonException error) {
+      // Deliberate divergence from the twin's commented LEGACY PLUGIN_ERROR mapping for malformed
+      // policy JSON: on this lane's contract, a policy that is not even JSON is an input error.
       throw new InputProblem(
           diag(DiagnosticCode.SCHEMA_INVALID, "policy '" + relPath + "' is not valid JSON"),
           CommandExitCode.INPUT_ERROR.code());
@@ -593,9 +662,12 @@ public final class PackageBuildCommand {
       }
       Files.writeString(target, content);
     } catch (IOException error) {
+      // An artifact write failure (unwritable target, disk full) is caller-fixable input exactly
+      // as in the twin: it folds into a per-outcome error that never aborts the other views, with
+      // COMMAND_IO_FAILED + INPUT_ERROR.
       throw new InputProblem(
           diag(DiagnosticCode.COMMAND_IO_FAILED, "failed to write output '" + relPath + "'"),
-          CommandExitCode.PLUGIN_ERROR.code());
+          CommandExitCode.INPUT_ERROR.code());
     }
   }
 
@@ -616,6 +688,34 @@ public final class PackageBuildCommand {
 
   private static String resolveModelId(PackageView view, PackageDocument pkg) {
     return view.model() != null ? view.model() : pkg.models().getFirst().id();
+  }
+
+  /**
+   * Maps every view id a model declares to its kind, so the uml-xmi aggregate lane can be gated by
+   * diagram family (mirrors the twin's {@code BuildCommand.viewKinds}).
+   */
+  private static Map<String, GenericGraphViewKind> viewKinds(SourceDocument source) {
+    JsonNode genericGraph = source.plugins().get(SEMANTICS_ENGINE);
+    if (genericGraph == null) {
+      return Map.of();
+    }
+    try {
+      GenericGraphPluginData data =
+          JsonSupport.objectMapper().treeToValue(genericGraph, GenericGraphPluginData.class);
+      Map<String, GenericGraphViewKind> kinds = new HashMap<>();
+      for (GenericGraphView view : data.views()) {
+        kinds.put(view.id(), view.kind());
+      }
+      return kinds;
+    } catch (RuntimeException error) {
+      // An unreadable view list only means no view can prove a class-family kind, so the uml-xmi
+      // aggregate skips them all — the same fallback the twin takes.
+      return Map.of();
+    }
+  }
+
+  private static String dedirenVersion() {
+    return System.getProperty("dediren.version", "unknown");
   }
 
   private static int worst(int current, int candidate) {
@@ -691,13 +791,35 @@ public final class PackageBuildCommand {
 
   private record InMemoryStage<T>(T value, boolean failed, boolean warning, int exitCode) {}
 
-  private record ModelLoad(SourceDocument source, List<Diagnostic> diagnostics) {
+  /**
+   * One loaded model plus the provenance and gating inputs derived from it exactly once: the
+   * canonical hash every stamp of the model's artifacts carries (the twin's {@code Stamps} analog)
+   * and the view-id-to-kind map the class-family gate consults.
+   */
+  private record ModelLoad(
+      SourceDocument source,
+      String sha,
+      Map<String, GenericGraphViewKind> viewKinds,
+      List<Diagnostic> diagnostics) {
+
+    static ModelLoad loaded(SourceDocument source) {
+      return new ModelLoad(
+          source,
+          CanonicalJson.sha256(JsonSupport.objectMapper().valueToTree(source)),
+          PackageBuildCommand.viewKinds(source),
+          List.of());
+    }
+
+    static ModelLoad failed(List<Diagnostic> diagnostics) {
+      return new ModelLoad(null, null, Map.of(), diagnostics);
+    }
+
     boolean failed() {
       return source == null;
     }
   }
 
-  private record ViewContext(SourceDocument source, LayoutResult layout) {}
+  private record ViewContext(ModelLoad model, LayoutResult layout) {}
 
   private record ViewRun(PackageViewOutcome outcome, LayoutResult layout, int exitCode) {}
 

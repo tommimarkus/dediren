@@ -86,7 +86,6 @@
       "Dependency": { "line_style": "dashed", "marker_end": "open_arrow" },
       "ControlFlow": { "marker_end": "open_arrow" },
       "ObjectFlow": { "marker_end": "open_arrow" },
-      "Message": { "marker_end": "filled_arrow", "label_horizontal_position": "center" },
       "Transition": {
         "marker_end": "open_arrow",
         "label_horizontal_position": "center",

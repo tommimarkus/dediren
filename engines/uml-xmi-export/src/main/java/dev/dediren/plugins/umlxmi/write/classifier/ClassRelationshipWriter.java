@@ -122,6 +122,7 @@ public final class ClassRelationshipWriter {
         .append("\">");
     writeOwnedEnd(
         xml,
+        ids,
         sourceEndId,
         umlString(relationship, "source_role"),
         nodeIds.get(relationship.source()),
@@ -130,6 +131,7 @@ public final class ClassRelationshipWriter {
         umlString(relationship, "source_multiplicity"));
     writeOwnedEnd(
         xml,
+        ids,
         targetEndId,
         umlString(relationship, "target_role"),
         nodeIds.get(relationship.target()),
@@ -141,6 +143,7 @@ public final class ClassRelationshipWriter {
 
   private static void writeOwnedEnd(
       StringBuilder xml,
+      IdentifierMap ids,
       String endId,
       String role,
       String typeId,
@@ -159,7 +162,7 @@ public final class ClassRelationshipWriter {
         .append("\" association=\"")
         .append(attr(associationId))
         .append("\">");
-    writeMultiplicityValues(xml, endId, bounds);
+    writeMultiplicityValues(xml, ids, endId, bounds);
     xml.append("</ownedEnd>");
   }
 

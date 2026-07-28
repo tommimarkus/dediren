@@ -2,6 +2,7 @@ package dev.dediren.plugins.umlxmi;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dev.dediren.contracts.DiagnosticSeverity;
 import dev.dediren.contracts.export.ExportResult;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.contracts.layout.LayoutResult;
@@ -99,6 +100,87 @@ class WholeModelXmiExportTest {
     // The explicit override wins over the source-derived default id-diagram-<viewId>/label.
     assertThat(result.orElseThrow().value().content())
         .contains("<umldi:UMLDiagram xmi:id=\"id-my-diagram\" name=\"My Class Diagram\"");
+  }
+
+  @Test
+  void unionScopeKeepsOtherFamiliesRelationshipsOutOfTheActivity() throws Exception {
+    // The union scope of a class view and an activity view puts the class relationships' endpoints
+    // in the shared model section; the Activity must not claim those relationships as edges (their
+    // shared minted xmi:id is already used by the class-family elements — the duplicate hard-fails
+    // the export), only flows whose endpoints declare membership in it.
+    Path schemaPath = writeStubXmiSchema();
+    ModelExportRequest request =
+        new ModelExportRequest(
+            parse("fixtures/source/valid-uml-basic.json", SourceDocument.class),
+            List.of(
+                new ModelExportRequest.ViewLayout(
+                    "class-view",
+                    parse("fixtures/layout-result/uml-basic.json", LayoutResult.class)),
+                new ModelExportRequest.ViewLayout(
+                    "activity-view",
+                    parse("fixtures/layout-result/uml-activity.json", LayoutResult.class))),
+            JsonSupport.objectMapper()
+                .readTree(
+                    Files.readString(
+                        workspaceRoot().resolve("fixtures/export-policy/default-uml-xmi.json"))));
+
+    Optional<EngineResult<ExportResult>> result =
+        engine.exportModel(
+            request,
+            Map.of("DEDIREN_XMI_SCHEMA_PATH", schemaPath.toString()),
+            Path.of("").toAbsolutePath());
+
+    assertThat(result).isPresent();
+    String content = result.orElseThrow().value().content();
+    assertThat(content).containsOnlyOnce("xmi:id=\"id-order-has-lines\"");
+    assertThat(content).containsOnlyOnce("xmi:id=\"id-order-status-dependency\"");
+    int activityStart = content.indexOf("xmi:id=\"id-activity-submit-order\"");
+    assertThat(activityStart).isNotNegative();
+    String activity =
+        content.substring(activityStart, content.indexOf("</packagedElement>", activityStart));
+    assertThat(activity)
+        .contains("id-flow-start-enter")
+        .doesNotContain("id-order-has-lines")
+        .doesNotContain("id-order-status-dependency");
+  }
+
+  @Test
+  void exportModelDeclaresDuplicateClassifierLabelsAsTypeNameAmbiguity() throws Exception {
+    // The whole-model lane runs the same name-ambiguity pre-pass over its union scope as the
+    // single-view lane: two selected classifiers sharing one label is declared, not silent.
+    Path schemaPath = writeStubXmiSchema();
+    ObjectNode sourceJson =
+        (ObjectNode)
+            JsonSupport.objectMapper()
+                .readTree(
+                    Files.readString(
+                        workspaceRoot().resolve("fixtures/source/valid-uml-basic.json")));
+    ((ObjectNode) sourceJson.at("/nodes/3")).put("label", "Order");
+    ModelExportRequest request =
+        new ModelExportRequest(
+            JsonSupport.objectMapper().treeToValue(sourceJson, SourceDocument.class),
+            List.of(
+                new ModelExportRequest.ViewLayout(
+                    "class-view",
+                    parse("fixtures/layout-result/uml-basic.json", LayoutResult.class))),
+            JsonSupport.objectMapper()
+                .readTree(
+                    Files.readString(
+                        workspaceRoot().resolve("fixtures/export-policy/default-uml-xmi.json"))));
+
+    Optional<EngineResult<ExportResult>> result =
+        engine.exportModel(
+            request,
+            Map.of("DEDIREN_XMI_SCHEMA_PATH", schemaPath.toString()),
+            Path.of("").toAbsolutePath());
+
+    assertThat(result.orElseThrow().diagnostics())
+        .anySatisfy(
+            diagnostic -> {
+              assertThat(diagnostic.code()).isEqualTo("DEDIREN_XMI_TYPE_NAME_AMBIGUOUS");
+              assertThat(diagnostic.severity()).isEqualTo(DiagnosticSeverity.INFO);
+              assertThat(diagnostic.message()).contains("class-order").contains("class-order-line");
+            });
   }
 
   private static <T> T parse(String fixture, Class<T> type) throws Exception {

@@ -61,8 +61,10 @@ public final class Provenance {
 
   /** Injects the stamp as a comment before the XML document's root element. */
   public static String stampXml(String xml, String payloadJson) {
-    // XML comments must not contain "--"; the payload is product-generated JSON (hex hashes,
-    // schema ids, constrained view ids), so the substring cannot occur, but escape defensively.
+    // XML comments must not contain "--", and the payload CAN: the view-id charset
+    // ([A-Za-z0-9][A-Za-z0-9._-]*) permits consecutive hyphens ("a--b"), and view_id rides the
+    // payload. The escape keeps the comment well-formed; extract's unescapeXml deliberately does
+    // not reverse it — accepted, because no consumer reads view_id back out of a stamp.
     String comment = "<!-- " + MARKER + " " + payloadJson.replace("--", "&#45;&#45;") + " -->\n";
     int declarationEnd = xml.startsWith("<?xml") ? xml.indexOf("?>") + 2 : 0;
     String head = xml.substring(0, declarationEnd);

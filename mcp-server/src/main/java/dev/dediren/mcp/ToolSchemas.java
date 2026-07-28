@@ -1,6 +1,6 @@
 package dev.dediren.mcp;
 
-/** The JSON input schemas advertised for the three tools. */
+/** The JSON input schemas the registered tools advertise, one constant per tool. */
 final class ToolSchemas {
   private ToolSchemas() {}
 

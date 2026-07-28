@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import dev.dediren.contracts.ContractVersions;
+import dev.dediren.contracts.DiagnosticSeverity;
 import dev.dediren.contracts.layout.*;
 import dev.dediren.contracts.layout.LayoutAlgorithm;
 import dev.dediren.contracts.layout.LayoutCycleBreaking;
@@ -614,6 +615,131 @@ class ElkLayoutEngineTest {
     assertGroupContainsGroup(outer, inner);
     assertGroupContainsNode(inner, nodeById(result, "initial"));
     assertGroupContainsNode(inner, nodeById(result, "draft"));
+  }
+
+  @Test
+  void packedLayoutWarnsOnceNamingIgnoredLayeredOnlyPreferences() {
+    LayoutRequest request =
+        new LayoutRequest(
+            ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION,
+            "map",
+            List.of(
+                new LayoutNode("crm", "CRM", "crm", 160.0, 80.0),
+                new LayoutNode("billing", "Billing", "billing", 160.0, 80.0)),
+            List.of(),
+            List.of(),
+            List.of(),
+            new LayoutPreferences(
+                LayoutMode.PACKED,
+                null,
+                null,
+                null,
+                null,
+                LayoutCycleBreaking.GREEDY,
+                null,
+                null,
+                new LayoutPlacementPreferences(LayoutPlacementStrategy.NETWORK_SIMPLEX)));
+
+    LayoutResult result = new ElkLayoutEngine().layout(request);
+
+    assertEquals(2, result.nodes().size());
+    assertEquals(1, result.warnings().size());
+    var warning = result.warnings().getFirst();
+    assertEquals("DEDIREN_ELK_PACKED_OPTION_IGNORED", warning.code());
+    assertEquals(DiagnosticSeverity.WARNING, warning.severity());
+    assertEquals("$.layout_preferences.mode", warning.path());
+    assertTrue(
+        warning.message().contains("$.layout_preferences.cycle_breaking"),
+        "warning should name the ignored cycle_breaking preference, was: " + warning.message());
+    assertTrue(
+        warning.message().contains("$.layout_preferences.placement"),
+        "warning should name the ignored placement preference, was: " + warning.message());
+  }
+
+  @Test
+  void packedLayoutWarnsOnIgnoredNodePartitionAndLayerConstraintHints() {
+    LayoutRequest request =
+        new LayoutRequest(
+            ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION,
+            "map",
+            List.of(
+                new LayoutNode("crm", "CRM", "crm", 160.0, 80.0, null, 1, null),
+                new LayoutNode(
+                    "billing",
+                    "Billing",
+                    "billing",
+                    160.0,
+                    80.0,
+                    null,
+                    null,
+                    LayoutLayerConstraint.FIRST)),
+            List.of(),
+            List.of(),
+            List.of(),
+            new LayoutPreferences(LayoutMode.PACKED, null, LayoutDensity.READABLE, null, null));
+
+    LayoutResult result = new ElkLayoutEngine().layout(request);
+
+    assertEquals(2, result.nodes().size());
+    assertEquals(1, result.warnings().size());
+    var warning = result.warnings().getFirst();
+    assertEquals("DEDIREN_ELK_PACKED_OPTION_IGNORED", warning.code());
+    assertTrue(
+        warning.message().contains("$.nodes[0].partition"),
+        "warning should name the ignored partition hint, was: " + warning.message());
+    assertTrue(
+        warning.message().contains("$.nodes[1].layer_constraint"),
+        "warning should name the ignored layer_constraint hint, was: " + warning.message());
+  }
+
+  @Test
+  void packedLayoutWithoutLayeredOnlyContentCarriesNoIgnoredOptionWarning() {
+    LayoutRequest request =
+        new LayoutRequest(
+            ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION,
+            "map",
+            List.of(
+                new LayoutNode("crm", "CRM", "crm", 160.0, 80.0),
+                new LayoutNode("billing", "Billing", "billing", 160.0, 80.0)),
+            List.of(),
+            List.of(),
+            List.of(),
+            new LayoutPreferences(LayoutMode.PACKED, null, LayoutDensity.SPACIOUS, null, null));
+
+    LayoutResult result = new ElkLayoutEngine().layout(request);
+
+    assertEquals(2, result.nodes().size());
+    assertEquals(List.of(), result.warnings());
+  }
+
+  @Test
+  void flowModeWithLayeredOnlyContentCarriesNoIgnoredOptionWarning() {
+    LayoutRequest request =
+        new LayoutRequest(
+            ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION,
+            "main",
+            List.of(
+                new LayoutNode("client", "Client", "client", 160.0, 80.0, null, 0, null),
+                new LayoutNode("api", "API", "api", 160.0, 80.0, null, 1, null)),
+            List.of(
+                new LayoutEdge("client-calls-api", "client", "api", "calls", "client-calls-api")),
+            List.of(),
+            List.of(),
+            new LayoutPreferences(
+                LayoutMode.FLOW,
+                null,
+                null,
+                null,
+                null,
+                LayoutCycleBreaking.GREEDY,
+                null,
+                null,
+                null));
+
+    LayoutResult result = new ElkLayoutEngine().layout(request);
+
+    assertEquals(2, result.nodes().size());
+    assertEquals(List.of(), result.warnings());
   }
 
   @Test

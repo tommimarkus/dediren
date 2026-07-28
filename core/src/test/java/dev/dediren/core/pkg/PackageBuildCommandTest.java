@@ -13,8 +13,11 @@ import dev.dediren.contracts.render.RenderArtifact;
 import dev.dediren.contracts.render.RenderMetadata;
 import dev.dediren.contracts.render.RenderResult;
 import dev.dediren.contracts.source.SourceDocument;
+import dev.dediren.core.DedirenPaths;
+import dev.dediren.core.analysis.Provenance;
 import dev.dediren.core.engine.EngineExecutionException;
 import dev.dediren.core.engine.EngineRunOutcome;
+import dev.dediren.core.schema.SchemaValidator;
 import dev.dediren.engine.EngineException;
 import dev.dediren.engine.EngineResult;
 import dev.dediren.engine.Engines;
@@ -80,6 +83,45 @@ class PackageBuildCommandTest {
         "page": { "width": 100, "height": 100 },
         "margin": { "top": 0, "right": 0, "bottom": 0, "left": 0 },
         "accessibility": { "title": "Policy Title" }
+      }
+      """;
+
+  // A prior-version policy the SchemaVersionGate rejects as OUTDATED, attaching the composed
+  // migration path; the render engine never sees it.
+  private static final String STALE_RENDER_POLICY =
+      """
+      {
+        "render_policy_schema_version": "render-policy.schema.v2",
+        "page": { "width": 100, "height": 100 },
+        "margin": { "top": 0, "right": 0, "bottom": 0, "left": 0 }
+      }
+      """;
+
+  // A stub policy carrying the current schema version; the fake export engines ignore the body.
+  private static final String XMI_POLICY =
+      "{\"uml_xmi_export_policy_schema_version\":\"uml-xmi-export-policy.schema.v1\"}";
+
+  // Two views spanning two families: the classifier kind (uml-class) is in the class family the
+  // uml-xmi model aggregate covers; uml-activity is not.
+  private static final String CLASS_AND_ACTIVITY_MODEL =
+      """
+      {
+        "model_schema_version": "model.schema.v1",
+        "nodes": [
+          { "id": "a", "type": "generic.component", "label": "A", "properties": {} },
+          { "id": "b", "type": "generic.component", "label": "B", "properties": {} }
+        ],
+        "relationships": [],
+        "plugins": {
+          "generic-graph": {
+            "views": [
+              { "id": "class-view", "label": "Class", "kind": "uml-class",
+                "nodes": ["a", "b"], "relationships": [] },
+              { "id": "activity-view", "label": "Activity", "kind": "uml-activity",
+                "nodes": ["a", "b"], "relationships": [] }
+            ]
+          }
+        }
       }
       """;
 
@@ -515,6 +557,169 @@ class PackageBuildCommandTest {
     assertThat(status(outcome)).isEqualTo("error");
     assertThat(result(outcome).views().getFirst().diagnostics())
         .anySatisfy(d -> assertThat(d.code()).isEqualTo("DEDIREN_INPUT_FILE_TOO_LARGE"));
+  }
+
+  @Test
+  void stampsDiagramAndExportArtifactsWithProvenance(@TempDir Path dir) throws Exception {
+    writeInputs(dir);
+    String pkg =
+        """
+        {
+          "package_schema_version": "package.schema.v1",
+          "models": [ { "id": "arch", "source": "model.json" } ],
+          "views": [
+            { "id": "main", "model": "arch", "render_policy": "render-policy.json",
+              "outputs": {
+                "diagram": "generated/svg/main.svg",
+                "render_metadata": "generated/render-metadata/main.json",
+                "layout": "generated/layout/main.json" } }
+          ],
+          "exports": [
+            { "id": "view-oef", "view": "main", "lane": "archimate-oef",
+              "policy": "export-policy.json", "output": "generated/export/main.oef.xml" },
+            { "id": "model-oef", "model": "arch", "lane": "archimate-oef",
+              "policy": "export-policy.json", "output": "generated/export/arch.oef.xml" }
+          ]
+        }
+        """;
+
+    EngineRunOutcome outcome = run(pkg, dir, List.of(), false);
+
+    assertThat(status(outcome)).describedAs(outcome.stdout()).isEqualTo("ok");
+    // The diagram carries the same in-root <metadata> stamp the twin's render lane injects, with
+    // the view id and the render-policy hash extractable from it.
+    String svg = Files.readString(dir.resolve("generated/svg/main.svg"));
+    JsonNode svgStamp = Provenance.extract(svg).orElseThrow();
+    assertThat(svg).contains("<metadata id=\"dediren-provenance\">");
+    assertThat(svgStamp.path("view_id").asText()).isEqualTo("main");
+    assertThat(svgStamp.path("model_sha256").asText()).isNotEmpty();
+    assertThat(svgStamp.path("render_policy_sha256").asText()).isNotEmpty();
+    // Exports gain the twin's leading provenance comment: the view id for a view-scoped export,
+    // the literal "model" for a whole-model aggregate.
+    String viewExport = Files.readString(dir.resolve("generated/export/main.oef.xml"));
+    assertThat(viewExport).startsWith("<!-- dediren-provenance ");
+    JsonNode viewStamp = Provenance.extract(viewExport).orElseThrow();
+    assertThat(viewStamp.path("view_id").asText()).isEqualTo("main");
+    assertThat(viewStamp.path("oef_policy_sha256").asText()).isNotEmpty();
+    JsonNode modelStamp =
+        Provenance.extract(Files.readString(dir.resolve("generated/export/arch.oef.xml")))
+            .orElseThrow();
+    assertThat(modelStamp.path("view_id").asText()).isEqualTo("model");
+    assertThat(modelStamp.path("model_sha256").asText())
+        .isEqualTo(svgStamp.path("model_sha256").asText());
+    // The JSON side outputs stay unstamped, exactly like the twin's --emit stage files.
+    assertThat(Files.readString(dir.resolve("generated/layout/main.json")))
+        .doesNotContain("dediren-provenance");
+    assertThat(Files.readString(dir.resolve("generated/render-metadata/main.json")))
+        .doesNotContain("dediren-provenance");
+  }
+
+  @Test
+  void modelScopedXmiExportCoversOnlyClassFamilyViews(@TempDir Path dir) throws Exception {
+    writeInputs(dir);
+    Files.writeString(dir.resolve("model-kinds.json"), CLASS_AND_ACTIVITY_MODEL);
+    Files.writeString(dir.resolve("xmi-policy.json"), XMI_POLICY);
+    String pkg =
+        """
+        {
+          "package_schema_version": "package.schema.v1",
+          "models": [ { "id": "uml", "source": "model-kinds.json" } ],
+          "views": [
+            { "id": "class-view", "model": "uml", "render_policy": "render-policy.json",
+              "outputs": { "diagram": "generated/svg/class-view.svg" } },
+            { "id": "activity-view", "model": "uml", "render_policy": "render-policy.json",
+              "outputs": { "diagram": "generated/svg/activity-view.svg" } }
+          ],
+          "exports": [
+            { "id": "uml-agg", "model": "uml", "lane": "uml-xmi",
+              "policy": "xmi-policy.json", "output": "generated/export/model.uml.xml" },
+            { "id": "oef-agg", "model": "uml", "lane": "archimate-oef",
+              "policy": "export-policy.json", "output": "generated/export/model.oef.xml" }
+          ]
+        }
+        """;
+
+    EngineRunOutcome outcome = run(pkg, dir, List.of(), false);
+
+    assertThat(status(outcome)).describedAs(outcome.stdout()).isEqualTo("ok");
+    // The class-family gate (the twin's CLASS_FAMILY_KINDS) feeds only classifier-kind views to
+    // the uml-xmi model aggregate; the OEF aggregate still receives every view of the model.
+    assertThat(Files.readString(dir.resolve("generated/export/model.uml.xml")))
+        .contains("views=\"class-view\"")
+        .doesNotContain("activity-view");
+    assertThat(Files.readString(dir.resolve("generated/export/model.oef.xml")))
+        .contains("views=\"class-view,activity-view\"");
+  }
+
+  @Test
+  void staleRenderPolicyCarriesMigrationAndResultObeysItsSchema(@TempDir Path dir)
+      throws Exception {
+    writeInputs(dir);
+    Files.writeString(dir.resolve("render-policy.json"), STALE_RENDER_POLICY);
+
+    EngineRunOutcome outcome = run(singleViewPackage(), dir, List.of(), false);
+
+    assertThat(status(outcome)).isEqualTo("error");
+    assertThat(outcome.exitCode()).isEqualTo(2);
+    JsonNode data = JsonSupport.objectMapper().readTree(outcome.stdout()).get("data");
+    // The gate's OUTDATED diagnostic keeps its machine-readable migration payload end to end.
+    JsonNode migration = null;
+    for (JsonNode diagnostic : data.at("/views/0/diagnostics")) {
+      if ("DEDIREN_SCHEMA_VERSION_OUTDATED".equals(diagnostic.path("code").asText())) {
+        migration = diagnostic.path("migration");
+      }
+    }
+    assertThat(migration).describedAs(outcome.stdout()).isNotNull();
+    assertThat(migration.isMissingNode()).describedAs(outcome.stdout()).isFalse();
+    assertThat(migration.path("from").asText()).isEqualTo("render-policy.schema.v2");
+    assertThat(migration.path("to").asText()).isEqualTo("render-policy.schema.v3");
+    assertThat(migration.path("operations")).isNotEmpty();
+    // The emitted result must satisfy its own published schema, migration payload included.
+    List<String> errors =
+        SchemaValidator.fromRepositoryRoot(DedirenPaths.productRoot())
+            .validate("schemas/package-build-result.schema.json", data);
+    assertThat(errors).describedAs(outcome.stdout()).isEmpty();
+  }
+
+  @Test
+  void artifactWriteFailureIsAnInputError(@TempDir Path dir) throws Exception {
+    writeInputs(dir);
+    // A directory squatting on the declared diagram path makes the write itself fail.
+    Files.createDirectories(dir.resolve("generated/svg/main.svg"));
+
+    EngineRunOutcome outcome = run(singleViewPackage(), dir, List.of(), false);
+
+    assertThat(status(outcome)).isEqualTo("error");
+    // COMMAND_IO_FAILED + INPUT_ERROR, mirroring the twin's artifact-write mapping.
+    assertThat(outcome.exitCode()).isEqualTo(2);
+    assertThat(result(outcome).views().getFirst().diagnostics())
+        .anySatisfy(d -> assertThat(d.code()).isEqualTo("DEDIREN_COMMAND_IO_FAILED"));
+  }
+
+  @Test
+  void unreadableRenderPolicyIsAnInputError(@TempDir Path dir) throws Exception {
+    writeInputs(dir);
+    String pkg =
+        """
+        {
+          "package_schema_version": "package.schema.v1",
+          "models": [ { "id": "arch", "source": "model.json" } ],
+          "views": [
+            { "id": "main", "model": "arch", "render_policy": "policy-dir",
+              "outputs": { "diagram": "generated/svg/main.svg" } }
+          ]
+        }
+        """;
+    // The policy path resolves (it exists) but cannot be read as a file.
+    Files.createDirectories(dir.resolve("policy-dir"));
+
+    EngineRunOutcome outcome = run(pkg, dir, List.of(), false);
+
+    assertThat(status(outcome)).isEqualTo("error");
+    // COMMAND_IO_FAILED + INPUT_ERROR, matching the model-read lane and the CLI's policy mapping.
+    assertThat(outcome.exitCode()).isEqualTo(2);
+    assertThat(result(outcome).views().getFirst().diagnostics())
+        .anySatisfy(d -> assertThat(d.code()).isEqualTo("DEDIREN_COMMAND_IO_FAILED"));
   }
 
   // --- harness ----------------------------------------------------------------------------------

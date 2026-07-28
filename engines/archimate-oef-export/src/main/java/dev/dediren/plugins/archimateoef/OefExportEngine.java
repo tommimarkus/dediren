@@ -19,6 +19,7 @@ import dev.dediren.contracts.layout.LayoutResult;
 import dev.dediren.contracts.layout.Point;
 import dev.dediren.contracts.source.GenericGraphPluginData;
 import dev.dediren.contracts.source.GenericGraphView;
+import dev.dediren.contracts.source.SourceDocument;
 import dev.dediren.contracts.source.SourceNode;
 import dev.dediren.contracts.source.SourceRelationship;
 import dev.dediren.engine.EngineException;
@@ -175,10 +176,12 @@ public final class OefExportEngine implements ExportEngine {
 
   /**
    * The whole-model export: one OEF document carrying every supplied laid-out view, each with its
-   * own identity ({@link #resolveViewIdentity}). Elements and relationships already cover the full
-   * source in every OEF, so no {@code OEF_VIEWS_OMITTED} disclosure applies here — nothing is
-   * omitted. Validation mirrors the single-view lane per view, and the composed document passes the
-   * same official-XSD check.
+   * own identity ({@link #resolveViewIdentity}). Elements and relationships always cover the full
+   * source, but the diagram set covers only the views the driver supplies — and both drivers can
+   * supply a subset (cli {@code --views}, and the package lane excludes views whose layout failed)
+   * — so a declared view left unsupplied gets the same {@code OEF_VIEWS_OMITTED} disclosure as the
+   * single-view lane. Validation mirrors the single-view lane per view, and the composed document
+   * passes the same official-XSD check.
    */
   @Override
   public java.util.Optional<EngineResult<ExportResult>> exportModel(
@@ -229,7 +232,9 @@ public final class OefExportEngine implements ExportEngine {
             ContractVersions.EXPORT_RESULT_SCHEMA_VERSION, "archimate-oef+xml", content);
     return java.util.Optional.of(
         new EngineResult<>(
-            result, withConformance(withIdentityTripwire(policy, List.of()), conformance)));
+            result,
+            withConformance(
+                withIdentityTripwire(policy, viewCoverageDiagnostics(request)), conformance)));
   }
 
   /**
@@ -275,18 +280,40 @@ public final class OefExportEngine implements ExportEngine {
    * {@code ok}.
    */
   private static List<Diagnostic> viewCoverageDiagnostics(ExportRequest request) {
-    List<GenericGraphView> declaredViews = declaredViews(request);
-    if (declaredViews.isEmpty()) {
-      return List.of();
-    }
     // Compare declared view ids against the one exported view rather than gating on the declared
     // count: a source that declares a single view whose id is not the exported view is still a
     // silent diagram loss, so it must be declared too (issue #34).
     String exportedViewId = request.layoutResult().viewId();
+    return viewCoverageDiagnostics(
+        declaredViews(request.source()),
+        exportedViewId == null ? Set.of() : Set.of(exportedViewId),
+        "the single laid-out view '" + exportedViewId + "'");
+  }
+
+  /**
+   * The whole-model variant of {@link #viewCoverageDiagnostics(ExportRequest)}: the aggregate's
+   * diagram set covers exactly the supplied views, so declared-but-unsupplied views are the same
+   * silent diagram loss the single-view lane declares (issue #34).
+   */
+  private static List<Diagnostic> viewCoverageDiagnostics(ModelExportRequest request) {
+    List<String> suppliedViewIds =
+        request.views().stream().map(ModelExportRequest.ViewLayout::viewId).toList();
+    return viewCoverageDiagnostics(
+        declaredViews(request.source()),
+        new HashSet<>(suppliedViewIds),
+        "the supplied laid-out views (" + String.join(", ", suppliedViewIds) + ")");
+  }
+
+  /** Shared omission verdict: declared views minus the exported set, disclosed as {@code info}. */
+  private static List<Diagnostic> viewCoverageDiagnostics(
+      List<GenericGraphView> declaredViews, Set<String> exportedViewIds, String coverage) {
+    if (declaredViews.isEmpty()) {
+      return List.of();
+    }
     List<String> omitted =
         declaredViews.stream()
             .map(GenericGraphView::id)
-            .filter(id -> id != null && !id.equals(exportedViewId))
+            .filter(id -> id != null && !exportedViewIds.contains(id))
             .distinct()
             .sorted()
             .toList();
@@ -303,14 +330,14 @@ public final class OefExportEngine implements ExportEngine {
                 + " ArchiMate views declared in the source are not represented in this OEF"
                 + " (omitted: "
                 + String.join(", ", omitted)
-                + "). This export covers the single laid-out view '"
-                + exportedViewId
-                + "'; export the other views to represent them.",
+                + "). This export covers "
+                + coverage
+                + "; export the other views to represent them.",
             "source.plugins.generic-graph.views"));
   }
 
-  private static List<GenericGraphView> declaredViews(ExportRequest request) {
-    JsonNode pluginData = request.source().plugins().get("generic-graph");
+  private static List<GenericGraphView> declaredViews(SourceDocument source) {
+    JsonNode pluginData = source.plugins().get("generic-graph");
     if (pluginData == null || !pluginData.isObject()) {
       return List.of();
     }
@@ -489,7 +516,7 @@ public final class OefExportEngine implements ExportEngine {
    * The source label for {@code viewId} used as the per-view identity name default, if declared.
    */
   private static String viewLabel(ExportRequest request, String viewId) {
-    return declaredViews(request).stream()
+    return declaredViews(request.source()).stream()
         .filter(view -> view.id().equals(viewId))
         .map(GenericGraphView::label)
         .findFirst()
@@ -519,7 +546,7 @@ public final class OefExportEngine implements ExportEngine {
         request.source().nodes().stream().collect(Collectors.toMap(SourceNode::id, node -> node));
 
     var viewLabels = new HashMap<String, String>();
-    for (GenericGraphView declared : declaredViews(first)) {
+    for (GenericGraphView declared : declaredViews(request.source())) {
       viewLabels.put(declared.id(), declared.label());
     }
 

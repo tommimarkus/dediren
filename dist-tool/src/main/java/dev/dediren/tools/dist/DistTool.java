@@ -3,6 +3,7 @@ package dev.dediren.tools.dist;
 import dev.dediren.contracts.DiagnosticCode;
 import dev.dediren.contracts.json.JsonSupport;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
@@ -23,7 +24,6 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Stream;
 import tools.jackson.databind.JsonNode;
 
 public final class DistTool {
@@ -1156,20 +1156,17 @@ public final class DistTool {
     if (stdin != null) {
       builder.redirectInput(stdin.toFile());
     }
-    Process process = builder.start();
-    String stdout = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-    String stderr = new String(process.getErrorStream().readAllBytes(), StandardCharsets.UTF_8);
-    int exit = process.waitFor();
-    if (exit != 0) {
+    ProcessOutput output = drainProcess(builder.start());
+    if (output.exit() != 0) {
       throw new IllegalStateException(
           "bundled command failed with status "
-              + exit
+              + output.exit()
               + "\nstdout:\n"
-              + stdout
+              + output.stdout()
               + "\nstderr:\n"
-              + stderr);
+              + output.stderr());
     }
-    return new BundleOutput(stdout, stderr);
+    return new BundleOutput(output.stdout(), output.stderr());
   }
 
   private static String runBundleCommand(
@@ -1190,20 +1187,54 @@ public final class DistTool {
     if (stdin != null) {
       builder.redirectInput(stdin.toFile());
     }
-    Process process = builder.start();
-    String stdout = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-    String stderr = new String(process.getErrorStream().readAllBytes(), StandardCharsets.UTF_8);
-    int exit = process.waitFor();
-    if (exit != 0) {
+    ProcessOutput output = drainProcess(builder.start());
+    if (output.exit() != 0) {
       throw new IllegalStateException(
           "bundled command failed with status "
-              + exit
+              + output.exit()
               + "\nstdout:\n"
-              + stdout
+              + output.stdout()
               + "\nstderr:\n"
-              + stderr);
+              + output.stderr());
     }
-    return stdout;
+    return output.stdout();
+  }
+
+  /** Both streams and the exit status of one fully drained child process. */
+  private record ProcessOutput(String stdout, String stderr, int exit) {}
+
+  /**
+   * Reads both pipes of a child to EOF concurrently, then waits for it to exit. The pipes must be
+   * drained in parallel: reading stdout to EOF before touching stderr deadlocks as soon as the
+   * child fills the ~64 KiB stderr pipe — it blocks in {@code write(2)}, so it never exits, so
+   * stdout never reaches EOF. The logging probes deliberately run bundled children at trace level
+   * (a switch third-party SLF4J debug rides too), so a stderr that outgrows the pipe is a real
+   * shape here, not a theoretical one.
+   */
+  private static ProcessOutput drainProcess(Process process)
+      throws IOException, InterruptedException {
+    byte[][] stderrBytes = {new byte[0]};
+    Thread stderrDrain =
+        new Thread(
+            () -> {
+              try (InputStream stderr = process.getErrorStream()) {
+                stderrBytes[0] = stderr.readAllBytes();
+              } catch (IOException ignored) {
+                // An unreadable stderr pipe leaves the capture empty; a failure message still
+                // carries the exit status and stdout.
+              }
+            },
+            "dist-tool-stderr-drain");
+    stderrDrain.setDaemon(true);
+    stderrDrain.start();
+    String stdout;
+    try (InputStream out = process.getInputStream()) {
+      stdout = new String(out.readAllBytes(), StandardCharsets.UTF_8);
+    } finally {
+      stderrDrain.join();
+    }
+    return new ProcessOutput(
+        stdout, new String(stderrBytes[0], StandardCharsets.UTF_8), process.waitFor());
   }
 
   private static void assertSvgRenderOutput(String stdout) throws IOException {
@@ -1541,15 +1572,6 @@ public final class DistTool {
     okData(rejected.stdout());
   }
 
-  private static Path findAnyLibJar(Path bundle) throws IOException {
-    try (Stream<Path> jars = Files.list(bundle.resolve("lib"))) {
-      return jars.filter(jar -> jar.getFileName().toString().endsWith(".jar"))
-          .sorted()
-          .findFirst()
-          .orElseThrow(() -> new IllegalStateException("bundle lib/ contains no jars"));
-    }
-  }
-
   /**
    * Matches a JVM unified-logging line with the launcher's {@code uptime,level,tags} decorations,
    * e.g. {@code [0.007s][warning][os,container] ...}. Deliberately broader than any single tag: the
@@ -1873,20 +1895,17 @@ public final class DistTool {
     if (stdin != null) {
       builder.redirectInput(stdin.toFile());
     }
-    Process process = builder.start();
-    String stdout = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-    String stderr = new String(process.getErrorStream().readAllBytes(), StandardCharsets.UTF_8);
-    int exit = process.waitFor();
-    if (exit != 0) {
+    ProcessOutput output = drainProcess(builder.start());
+    if (output.exit() != 0) {
       throw new IllegalStateException(
           "command failed with status "
-              + exit
+              + output.exit()
               + ": "
               + command
               + "\nstdout:\n"
-              + stdout
+              + output.stdout()
               + "\nstderr:\n"
-              + stderr);
+              + output.stderr());
     }
   }
 

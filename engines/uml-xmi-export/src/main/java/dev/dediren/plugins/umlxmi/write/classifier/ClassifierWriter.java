@@ -67,7 +67,7 @@ public final class ClassifierWriter {
         .append("\" visibility=\"")
         .append(attr(visibility))
         .append("\">");
-    writeMultiplicityValues(xml, id, bounds);
+    writeMultiplicityValues(xml, ids, id, bounds);
     xml.append("</ownedAttribute>");
   }
 

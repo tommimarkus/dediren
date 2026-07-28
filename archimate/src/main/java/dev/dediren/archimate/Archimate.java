@@ -119,9 +119,12 @@ public final class Archimate {
    * ({@link RelationshipLegality}). The rules express the ArchiMate generic-metamodel relationship
    * semantics (&sect;4&ndash;5) over element categories: any combination they do not recognise as
    * legal is rejected. The check is a sound under-approximation &mdash; it never rejects a valid
-   * combination, but does not compute Appendix B's full derivation closure, so a minority of
-   * invalid combinations pass. {@code Association} is always accepted; relationship-connector
-   * (junction) endpoints are validated separately by {@link
+   * combination except the documented &sect;5-contradicted set it deliberately rejects (dynamic
+   * relationships touching motivation/passive elements; Assignment from passive, motivation, event,
+   * or service sources &mdash; {@code ArchimateRelationshipLegalityConformanceTest} holds the
+   * authoritative carve-out), but does not compute Appendix B's full derivation closure, so a
+   * minority of invalid combinations pass. {@code Association} is always accepted;
+   * relationship-connector (junction) endpoints are validated separately by {@link
    * #validateJunctionRelationshipSemantics}.
    */
   public static void validateRelationshipEndpointTypes(

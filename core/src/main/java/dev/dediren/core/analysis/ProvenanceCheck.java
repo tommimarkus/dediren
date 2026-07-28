@@ -5,6 +5,8 @@ import dev.dediren.contracts.analysis.StatusResult;
 import dev.dediren.contracts.analysis.VerifyResult;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.contracts.source.SourceDocument;
+import dev.dediren.core.io.BoundedReads;
+import dev.dediren.core.source.SourceLimits;
 import dev.dediren.core.source.SourceValidator;
 import java.io.IOException;
 import java.io.InputStream;
@@ -55,11 +57,16 @@ public final class ProvenanceCheck {
     return new VerifyResult(ContractVersions.VERIFY_RESULT_SCHEMA_VERSION, modelSha256, artifacts);
   }
 
-  public static StatusResult status(Path root) {
+  /**
+   * Indexes the workspace under {@code root}. {@code confinementRoot} follows the {@link
+   * SourceValidator} convention: non-null on the MCP trust boundary, where each candidate model's
+   * model-supplied fragment paths are confined to it; null on the unconfined CLI/human lane.
+   */
+  public static StatusResult status(Path root, Path confinementRoot) {
     var models = new ArrayList<StatusResult.ModelEntry>();
     var modelHashes = new TreeSet<String>();
     for (Path candidate : filesWithSuffix(root, ".json")) {
-      modelSha(candidate)
+      modelSha(candidate, confinementRoot)
           .ifPresent(
               sha -> {
                 models.add(new StatusResult.ModelEntry(relative(root, candidate), sha));
@@ -81,9 +88,11 @@ public final class ProvenanceCheck {
    * source load — the same path build takes — so its hash is computed over the identical assembled,
    * validated form the stamps were computed over (fragments included). Files that do not load as
    * valid models are simply not indexed. A bounded head read is a cheap negative filter first, so a
-   * large non-model JSON is never fully read or parsed.
+   * large non-model JSON is never fully read or parsed; the full read is then capped by the shared
+   * input byte ceiling, so an over-limit candidate degrades to not indexed exactly like an
+   * unreadable one.
    */
-  private static Optional<String> modelSha(Path candidate) {
+  private static Optional<String> modelSha(Path candidate, Path confinementRoot) {
     try {
       if (!readHead(candidate, SCAN_HEAD_BYTES).contains("\"model_schema_version\"")) {
         return Optional.empty();
@@ -94,7 +103,8 @@ public final class ProvenanceCheck {
         return Optional.empty();
       }
       SourceDocument document =
-          SourceValidator.loadAndValidateSourceDocument(text, candidate.getParent());
+          SourceValidator.loadAndValidateSourceDocument(
+              text, candidate.getParent(), confinementRoot);
       return Optional.of(CanonicalJson.sha256(JsonSupport.objectMapper().valueToTree(document)));
     } catch (SourceValidator.SourceDiagnosticsException | RuntimeException error) {
       return Optional.empty();
@@ -126,9 +136,15 @@ public final class ProvenanceCheck {
     }
   }
 
+  /**
+   * A quiet full read for hashing, capped by the same input byte ceiling every other input lane
+   * applies. Any failure — an unreadable file or one over the ceiling — degrades to "", which the
+   * caller cannot parse as a model: one bad candidate is skipped, never fatal to the walk and never
+   * an unbounded allocation.
+   */
   private static String readQuietly(Path file) {
     try {
-      return Files.readString(file, StandardCharsets.UTF_8);
+      return BoundedReads.readString(file, SourceLimits.DEFAULT.maxInputFileBytes());
     } catch (IOException error) {
       return "";
     }

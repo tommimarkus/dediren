@@ -406,6 +406,7 @@ final class ElkLayoutEngine {
     LayoutPreferences preferences = request.layoutPreferences();
     Map<String, String> nodePointers = nodeSourcePointers(request);
     List<Diagnostic> warnings = new ArrayList<>();
+    warnPackedIgnoresLayeredOnlyOptions(request, warnings);
     ElkNode root = ElkGraphUtil.createGraph();
     ElkPackedOptions.configureRoot(root, preferences);
     Map<String, LayoutNode> requestNodes = requestNodesById(request);
@@ -441,10 +442,8 @@ final class ElkLayoutEngine {
       elkNode.setIdentifier(node.id());
       setGeneratedDimensions(elkNode, node, null, preferences);
       ElkGraphUtil.createLabel(elkNode).setText(node.label());
-      ElkLayeredOptions.applyNodeHints(elkNode, node);
       elkNodes.put(node.id(), elkNode);
     }
-    ElkLayeredOptions.activatePartitioning(root, list(request.nodes()));
 
     runElkLayout(root, request);
 
@@ -475,6 +474,47 @@ final class ElkLayoutEngine {
         List.of(),
         groups,
         warnings);
+  }
+
+  // Mode dispatch selects the packed (rectpacking) lane before any algorithm gating: the public
+  // schema pins algorithm to "layered", so validateAlgorithmCompatibility never fires, and ELK
+  // Rectangle Packing reads neither the layered phase preferences nor the per-node
+  // partition/layer_constraint hints. Name the ignored content in the envelope instead of dropping
+  // it silently — a warning, not a reject, so released packed requests keep succeeding.
+  private static void warnPackedIgnoresLayeredOnlyOptions(
+      LayoutRequest request, List<Diagnostic> warnings) {
+    List<String> ignored = new ArrayList<>();
+    LayoutPreferences preferences = request.layoutPreferences();
+    addIgnored(ignored, preferences.cycleBreaking() != null, "$.layout_preferences.cycle_breaking");
+    addIgnored(ignored, preferences.layering() != null, "$.layout_preferences.layering");
+    addIgnored(ignored, preferences.crossing() != null, "$.layout_preferences.crossing");
+    addIgnored(ignored, preferences.placement() != null, "$.layout_preferences.placement");
+    addIgnored(ignored, preferences.compaction() != null, "$.layout_preferences.compaction");
+    addIgnored(
+        ignored, preferences.highDegreeNodes() != null, "$.layout_preferences.high_degree_nodes");
+    addIgnored(ignored, preferences.thoroughness() != null, "$.layout_preferences.thoroughness");
+    List<LayoutNode> nodes = list(request.nodes());
+    for (int index = 0; index < nodes.size(); index++) {
+      LayoutNode node = nodes.get(index);
+      addIgnored(ignored, node.partition() != null, "$.nodes[" + index + "].partition");
+      addIgnored(
+          ignored, node.layerConstraint() != null, "$.nodes[" + index + "].layer_constraint");
+    }
+    if (ignored.isEmpty()) {
+      return;
+    }
+    warnings.add(
+        new Diagnostic(
+            DiagnosticCode.ELK_PACKED_OPTION_IGNORED.code(),
+            DiagnosticSeverity.WARNING,
+            "packed layout mode ignores layered-only options: " + String.join(", ", ignored),
+            "$.layout_preferences.mode"));
+  }
+
+  private static void addIgnored(List<String> ignored, boolean present, String path) {
+    if (present) {
+      ignored.add(path);
+    }
   }
 
   private static LayoutResult layoutGrouped(LayoutRequest request) {
