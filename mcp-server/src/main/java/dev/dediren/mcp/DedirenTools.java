@@ -31,7 +31,8 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
- * The three tool handlers.
+ * The tool handlers, one per registered MCP tool: guide, validate, diff, query, verify, status, and
+ * build (model or package mode).
  *
  * <p>Each is a thin shell: confine the model-supplied paths, call the same {@code core} entry point
  * the CLI calls, and hand the resulting envelope JSON back verbatim as the tool result's text. The
@@ -244,7 +245,9 @@ public final class DedirenTools {
       return error(DiagnosticCode.COMMAND_INPUT_INVALID, "'dir' is not a directory: " + dir, dir);
     }
     try {
-      EngineRunOutcome outcome = AnalysisCommands.statusCommand(target);
+      // The walk full-loads every model candidate under 'dir', and each candidate's fragment paths
+      // are model-supplied too: confine them to the same --root the tool arguments are confined to.
+      EngineRunOutcome outcome = AnalysisCommands.statusCommand(target, root);
       return envelope(outcome.stdout(), outcome.exitCode() != 0);
     } catch (UncheckedIOException failure) {
       return ioFailure(failure);
@@ -487,13 +490,6 @@ public final class DedirenTools {
   }
 
   /**
-   * Builds a generic, model-safe read-failure envelope and logs the real {@link IOException} text
-   * to stderr. {@code error.getMessage()} for a failed read on an already-resolved path routinely
-   * carries the resolved absolute path (for example {@code NoSuchFileException}'s message is the
-   * path itself), so it must never reach the model; {@code candidate} is the model's own original
-   * argument and is safe to echo back.
-   */
-  /**
    * Every model-supplied path is read through the input byte ceiling, so an oversized file becomes
    * a clean {@code INPUT_FILE_TOO_LARGE} envelope instead of an allocation the size of the file.
    */
@@ -501,6 +497,13 @@ public final class DedirenTools {
     return BoundedReads.readString(path, SourceLimits.DEFAULT.maxInputFileBytes());
   }
 
+  /**
+   * Builds a generic, model-safe read-failure envelope and logs the real {@link IOException} text
+   * to stderr. {@code error.getMessage()} for a failed read on an already-resolved path routinely
+   * carries the resolved absolute path (for example {@code NoSuchFileException}'s message is the
+   * path itself), so it must never reach the model; {@code candidate} is the model's own original
+   * argument and is safe to echo back.
+   */
   private static CallToolResult readFailure(String label, String candidate, IOException error) {
     System.err.println(
         "dediren mcp: failed to read " + label + " '" + candidate + "': " + error.getMessage());

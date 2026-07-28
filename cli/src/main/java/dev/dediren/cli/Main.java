@@ -321,7 +321,7 @@ public final class Main {
     @Override
     public Integer call() throws Exception {
       try {
-        return writePluginOutcome(spec, AnalysisCommands.statusCommand(root));
+        return writePluginOutcome(spec, AnalysisCommands.statusCommand(root, null));
       } catch (UncheckedIOException error) {
         return printCommandIoFailure(spec, error);
       }
@@ -666,9 +666,9 @@ public final class Main {
       name = "mcp",
       mixinStandardHelpOptions = true,
       description =
-          "Run the Model Context Protocol stdio server, exposing validate, build, and the agent"
-              + " guide as tools. The MCP client spawns and owns this process; stdout carries"
-              + " JSON-RPC only.")
+          "Run the Model Context Protocol stdio server, exposing validate, build, diff, query,"
+              + " verify, status, and the agent guide as tools. The MCP client spawns and owns"
+              + " this process; stdout carries JSON-RPC only.")
   static final class McpCommand implements Callable<Integer> {
     private final Map<String, String> env;
     private final Engines engines;
@@ -682,7 +682,9 @@ public final class Main {
 
     @Option(
         names = "--read-only",
-        description = "Do not register the build tool; serve only validate and the guide.")
+        description =
+            "Do not register the build tool; the read-only tools (validate, diff, query, verify,"
+                + " status) and the guide still serve.")
     private boolean readOnly;
 
     McpCommand(Map<String, String> env, Engines engines) {

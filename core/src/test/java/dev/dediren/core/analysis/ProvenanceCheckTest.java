@@ -61,7 +61,7 @@ class ProvenanceCheckTest {
     // parsed or validated as a model.
     Files.writeString(dir.resolve("data.json"), "{\"x\":\"" + "y".repeat(256 * 1024) + "\"}");
 
-    var result = ProvenanceCheck.status(dir);
+    var result = ProvenanceCheck.status(dir, null);
 
     assertThat(result.models()).isEmpty();
     assertThat(result.artifacts()).isEmpty();

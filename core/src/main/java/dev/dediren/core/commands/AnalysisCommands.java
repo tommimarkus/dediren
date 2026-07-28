@@ -33,8 +33,9 @@ import tools.jackson.databind.JsonNode;
  *
  * <p>The {@code confinementRoot} argument follows the established convention: non-null on the MCP
  * trust boundary (source-fragment paths confined to it, fragment errors sanitized), null on the
- * unconfined CLI/human lane. {@code status} loads no source and takes no such root; its workspace
- * directory is confined by the caller before it arrives here.
+ * unconfined CLI/human lane. {@code status} takes it too: its workspace walk full-loads every model
+ * candidate it finds — fragments included — so those model-supplied fragment paths need the same
+ * confinement. The workspace directory itself is confined by the caller before it arrives here.
  */
 public final class AnalysisCommands {
   /**
@@ -156,12 +157,18 @@ public final class AnalysisCommands {
     return okOutcome(data);
   }
 
-  /** Indexes a workspace's models and stamped artifacts, emitting an {@code ok} envelope. */
-  public static EngineRunOutcome statusCommand(Path root) {
+  /**
+   * Indexes a workspace's models and stamped artifacts, emitting an {@code ok} envelope. Each model
+   * candidate takes the full source load, so {@code confinementRoot} confines its fragment paths
+   * exactly as in {@link #verifyCommand}; a candidate whose fragments escape the root fails
+   * validation and is simply not indexed.
+   */
+  public static EngineRunOutcome statusCommand(Path root, Path confinementRoot) {
     if (!Files.isDirectory(root)) {
       return usageErrorOutcome("--root must name an existing directory: " + root);
     }
-    return okOutcome(JsonSupport.objectMapper().valueToTree(ProvenanceCheck.status(root)));
+    return okOutcome(
+        JsonSupport.objectMapper().valueToTree(ProvenanceCheck.status(root, confinementRoot)));
   }
 
   private static EngineRunOutcome okOutcome(JsonNode data) {

@@ -209,7 +209,7 @@ class AnalysisCommandsTest {
     Path notADir = root.resolve("plain.json");
     Files.writeString(notADir, MODEL);
 
-    EngineRunOutcome outcome = AnalysisCommands.statusCommand(notADir);
+    EngineRunOutcome outcome = AnalysisCommands.statusCommand(notADir, null);
 
     assertThat(outcome.exitCode()).isNotZero();
     assertThat(code(outcome)).isEqualTo("DEDIREN_COMMAND_INPUT_INVALID");
@@ -221,11 +221,88 @@ class AnalysisCommandsTest {
   void statusIndexesTheModelsUnderTheRoot(@TempDir Path root) throws Exception {
     Files.writeString(root.resolve("model.json"), MODEL);
 
-    EngineRunOutcome outcome = AnalysisCommands.statusCommand(root);
+    EngineRunOutcome outcome = AnalysisCommands.statusCommand(root, null);
 
     assertThat(outcome.exitCode()).isZero();
     JsonNode envelope = envelopeOf(outcome);
     assertThat(envelope.path("status").asText()).isEqualTo("ok");
+    assertThat(envelope.path("data").path("models").path(0).path("path").asText())
+        .isEqualTo("model.json");
+  }
+
+  // --- status fragment confinement (the MCP trust boundary; same lane split as
+  // SourceValidatorTest pins for the loader itself) ---------------------------
+
+  private static final String FRAGMENT_NODE =
+      """
+      {
+        "model_schema_version": "model.schema.v1",
+        "nodes": [
+          { "id": "api", "type": "generic.component", "label": "API", "properties": {} }
+        ],
+        "relationships": [],
+        "plugins": { "generic-graph": { "views": [] } }
+      }
+      """;
+
+  private static String modelWithFragment(String fragmentPath) {
+    return """
+        {
+          "model_schema_version": "model.schema.v1",
+          "fragments": ["%s"],
+          "nodes": [],
+          "relationships": [],
+          "plugins": { "generic-graph": { "views": [] } }
+        }
+        """
+        .formatted(fragmentPath);
+  }
+
+  @Test
+  void statusWithAConfinementRootDoesNotIndexAModelWhoseFragmentEscapesIt(@TempDir Path temp)
+      throws Exception {
+    // The escaping target exists one level above the workspace and is a valid fragment: on the
+    // unconfined lane the load would succeed, so an empty index proves confinement — not a read
+    // failure — excluded the candidate, and the outside file was never merged into a hash.
+    Path workspace = Files.createDirectories(temp.resolve("workspace"));
+    Files.writeString(temp.resolve("outside.json"), FRAGMENT_NODE);
+    Files.writeString(workspace.resolve("model.json"), modelWithFragment("../outside.json"));
+
+    EngineRunOutcome outcome = AnalysisCommands.statusCommand(workspace, workspace);
+
+    assertThat(outcome.exitCode()).isZero();
+    JsonNode envelope = envelopeOf(outcome);
+    assertThat(envelope.path("status").asText()).isEqualTo("ok");
+    assertThat(envelope.path("data").path("models").size()).isZero();
+  }
+
+  @Test
+  void statusWithAConfinementRootStillIndexesAModelWithAnInRootFragment(@TempDir Path workspace)
+      throws Exception {
+    Files.writeString(workspace.resolve("piece.json"), FRAGMENT_NODE);
+    Files.writeString(workspace.resolve("model.json"), modelWithFragment("piece.json"));
+
+    EngineRunOutcome outcome = AnalysisCommands.statusCommand(workspace, workspace);
+
+    assertThat(outcome.exitCode()).isZero();
+    JsonNode envelope = envelopeOf(outcome);
+    assertThat(envelope.path("data").path("models").path(0).path("path").asText())
+        .isEqualTo("model.json");
+  }
+
+  @Test
+  void statusOnTheUnconfinedLaneStillIndexesAModelWithATraversalFragment(@TempDir Path temp)
+      throws Exception {
+    // Null confinement root is the CLI/human lane: a '..' fragment is a legitimate cross-project
+    // reference there and must keep resolving — confinement must not leak into the human lane.
+    Path workspace = Files.createDirectories(temp.resolve("workspace"));
+    Files.writeString(temp.resolve("outside.json"), FRAGMENT_NODE);
+    Files.writeString(workspace.resolve("model.json"), modelWithFragment("../outside.json"));
+
+    EngineRunOutcome outcome = AnalysisCommands.statusCommand(workspace, null);
+
+    assertThat(outcome.exitCode()).isZero();
+    JsonNode envelope = envelopeOf(outcome);
     assertThat(envelope.path("data").path("models").path(0).path("path").asText())
         .isEqualTo("model.json");
   }
