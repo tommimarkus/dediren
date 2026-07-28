@@ -20,6 +20,12 @@ import tools.jackson.databind.JsonNode;
  * a one-sided edit was silent: the suite stayed green as long as the fixtures happened to stay
  * inside the intersection, after which a source package could declare preferences the layout
  * command rejects (or the reverse). This test makes the two copies provably equal.
+ *
+ * <p>The same self-containment duplicates two more subtrees between {@code
+ * layout-request.schema.json} and {@code layout-result.schema.json}: the node {@code role} enum and
+ * the group {@code provenance} oneOf, both of which the layout engine copies verbatim from request
+ * to result. They sit inline under {@code node}/{@code group} defs that otherwise differ, so those
+ * twins are compared at their JSON pointers rather than as whole {@code $defs} entries.
  */
 class SchemaCongruenceTest {
 
@@ -47,6 +53,33 @@ class SchemaCongruenceTest {
           .isNotNull()
           .isEqualTo(layoutRequest.get(def));
     }
+  }
+
+  @Test
+  void theNodeRoleEnumIsIdenticalInLayoutRequestAndLayoutResultSchemas() throws Exception {
+    assertRequestResultTwin("/$defs/node/properties/role");
+  }
+
+  @Test
+  void theGroupProvenanceOneOfIsIdenticalInLayoutRequestAndLayoutResultSchemas() throws Exception {
+    assertRequestResultTwin("/$defs/group/properties/provenance");
+  }
+
+  private static void assertRequestResultTwin(String pointer) throws Exception {
+    JsonNode request = schema("schemas/layout-request.schema.json").at(pointer);
+    JsonNode result = schema("schemas/layout-result.schema.json").at(pointer);
+
+    assertThat(request.isMissingNode())
+        .as("%s must exist in layout-request.schema.json", pointer)
+        .isFalse();
+    assertThat(request)
+        .as(
+            "%s must be identical in layout-request.schema.json and layout-result.schema.json —"
+                + " the engine copies the value verbatim from request to result, so a one-sided"
+                + " edit silently desynchronises what the layout command accepts from what it"
+                + " emits",
+            pointer)
+        .isEqualTo(result);
   }
 
   private static JsonNode schema(String path) throws Exception {

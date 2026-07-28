@@ -15,10 +15,6 @@ public final class JsonSupport {
           .changeDefaultPropertyInclusion(
               incl -> incl.withValueInclusion(JsonInclude.Include.NON_NULL))
           .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, true)
-          // Jackson 3 flipped FAIL_ON_NULL_FOR_PRIMITIVES to true by default; pin the
-          // Jackson 2 default (false) so a null JSON value for a primitive field maps to
-          // the type default, preserving the contract fixtures' round-trip behavior.
-          .configure(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES, false)
           .build();
 
   private JsonSupport() {}

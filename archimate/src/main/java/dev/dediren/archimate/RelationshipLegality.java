@@ -21,10 +21,17 @@ import java.util.Set;
  *
  * <p>The check is deliberately a sound under-approximation: it does not compute the full derivation
  * closure of Appendix B, so a minority of invalid endpoint combinations are accepted rather than
- * rejected. It never rejects a valid combination. The {@code Association} relationship &mdash; the
- * language's "unspecified relationship" (&sect;5.2.4) &mdash; is always accepted, so any intended
- * but unusual link always has a legal expression. Grouping and Location, the generic composite
- * connectors, may attach to anything (&sect;5.5, Appendix B.6).
+ * rejected. It never rejects a valid combination, with one documented exception: the small set of
+ * combinations the Appendix-B tables derive as allowed but &sect;5 semantics contradict &mdash;
+ * dynamic relationships (Triggering/Flow, &sect;5.3) touching a motivation or passive element, and
+ * Assignment (&sect;5.1.3) from a passive, motivation, event, or service source &mdash; is
+ * deliberately rejected. The conformance gate ({@code
+ * ArchimateRelationshipLegalityConformanceTest}) asserts zero false negatives against a local
+ * Appendix-B oracle except exactly that carve-out ({@code isSpecContradictedByFive}), which is the
+ * authoritative list. The {@code Association} relationship &mdash; the language's "unspecified
+ * relationship" (&sect;5.2.4) &mdash; is always accepted, so any intended but unusual link always
+ * has a legal expression. Grouping and Location, the generic composite connectors, may attach to
+ * anything (&sect;5.5, Appendix B.6).
  */
 final class RelationshipLegality {
   private RelationshipLegality() {}
