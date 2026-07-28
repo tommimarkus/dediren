@@ -9,7 +9,9 @@ import dev.dediren.contracts.source.GenericGraphPluginData;
 import dev.dediren.contracts.source.GenericGraphSemanticProfile;
 import dev.dediren.contracts.source.GenericGraphView;
 import dev.dediren.contracts.source.GenericGraphViewGroup;
+import dev.dediren.contracts.source.GenericGraphViewGroupRole;
 import dev.dediren.contracts.source.SourceDocument;
+import dev.dediren.contracts.source.SourceNode;
 import dev.dediren.contracts.source.SourceRelationship;
 import dev.dediren.engine.EngineException;
 import dev.dediren.engine.EngineResult;
@@ -32,11 +34,13 @@ import tools.jackson.databind.JsonNode;
  *
  * <p>Every failure is enveloped. Semantic legality failures surface as {@link
  * EngineException#semanticFailure} (exit 3); structural failures — a source without {@code
- * plugins.generic-graph}, an unknown view id — surface as {@link EngineException#structuralFailure}
- * (exit 2, the published INPUT_ERROR observable, now with the envelope on stdout). Post-validation
- * projection invariants ({@link IOException} out of {@link SceneProjection}) still ride {@link
- * UncheckedIOException} and are enveloped by dispatch as {@code DEDIREN_ENGINE_FAILED} — they are
- * engine defects, not input errors.
+ * plugins.generic-graph}, an unknown view id, or a ghost view reference (a view node or
+ * relationship id absent from the source, a group member outside its view, a {@code
+ * semantic_source_id} naming no source node) — surface as {@link EngineException#structuralFailure}
+ * (exit 2, the published INPUT_ERROR observable, with the envelope on stdout). {@link
+ * SceneProjection}'s own {@link IOException} throws stay only as backstops behind that validation;
+ * one escaping would still ride {@link UncheckedIOException} and be enveloped by dispatch as {@code
+ * DEDIREN_ENGINE_FAILED}.
  */
 public final class SemanticsRouterEngine implements SemanticsEngine {
 
@@ -80,11 +84,7 @@ public final class SemanticsRouterEngine implements SemanticsEngine {
       throw profileRequired();
     }
     GenericGraphPluginData pluginData = pluginData(source);
-    GenericGraphValidationError graphError = validateGenericGraphPluginData(source, pluginData);
-    if (graphError != null) {
-      throw EngineException.semanticFailure(
-          graphError.code(), graphError.message(), graphError.path());
-    }
+    validateGenericGraphPluginData(source, pluginData);
 
     GenericGraphSemanticProfile requested = requestedProfile(profile);
     if (requested == null) {
@@ -132,11 +132,7 @@ public final class SemanticsRouterEngine implements SemanticsEngine {
 
   private Projection prepareProjection(SourceDocument source, String view) throws EngineException {
     GenericGraphPluginData pluginData = pluginData(source);
-    GenericGraphValidationError graphError = validateGenericGraphPluginData(source, pluginData);
-    if (graphError != null) {
-      throw EngineException.semanticFailure(
-          graphError.code(), graphError.message(), graphError.path());
-    }
+    validateGenericGraphPluginData(source, pluginData);
     GenericGraphView selectedView =
         pluginData.views().stream()
             .filter(candidate -> candidate.id().equals(view))
@@ -174,20 +170,43 @@ public final class SemanticsRouterEngine implements SemanticsEngine {
     return JsonSupport.objectMapper().treeToValue(pluginValue, GenericGraphPluginData.class);
   }
 
-  private static GenericGraphValidationError validateGenericGraphPluginData(
-      SourceDocument source, GenericGraphPluginData pluginData) {
+  /**
+   * Whole-document base validation of the generic-graph plugin data. The duplicate view id,
+   * endpoint-outside-view, and duplicate group id checks keep their published {@link
+   * EngineException#semanticFailure} envelopes; the four ghost view references — a view node or
+   * relationship id absent from the source, a group member outside its view, a {@code
+   * semantic_source_id} naming no source node — are {@link EngineException#structuralFailure}
+   * envelopes. The ghost checks mirror {@link SceneProjection}'s throw conditions exactly (no
+   * wider, no narrower), so a document this validation passes cannot hit those projection throws.
+   */
+  private static void validateGenericGraphPluginData(
+      SourceDocument source, GenericGraphPluginData pluginData) throws EngineException {
     var relationshipsById = new java.util.LinkedHashMap<String, SourceRelationship>();
     for (SourceRelationship relationship : source.relationships()) {
       relationshipsById.put(relationship.id(), relationship);
+    }
+    var sourceNodeIds = new java.util.TreeSet<String>();
+    for (SourceNode node : source.nodes()) {
+      sourceNodeIds.add(node.id());
     }
     var viewIds = new java.util.TreeSet<String>();
     for (int viewIndex = 0; viewIndex < pluginData.views().size(); viewIndex++) {
       GenericGraphView view = pluginData.views().get(viewIndex);
       if (!viewIds.add(view.id())) {
-        return new GenericGraphValidationError(
+        throw EngineException.semanticFailure(
             DiagnosticCode.GENERIC_GRAPH_DUPLICATE_VIEW_ID.code(),
             "duplicate generic-graph view id '" + view.id() + "'",
             "$.plugins.generic-graph.views[" + viewIndex + "].id");
+      }
+
+      for (int nodeIndex = 0; nodeIndex < view.nodes().size(); nodeIndex++) {
+        String nodeId = view.nodes().get(nodeIndex);
+        if (!sourceNodeIds.contains(nodeId)) {
+          throw EngineException.structuralFailure(
+              DiagnosticCode.GENERIC_GRAPH_VIEW_NODE_UNKNOWN.code(),
+              "view '" + view.id() + "' references missing node '" + nodeId + "'",
+              "$.plugins.generic-graph.views[" + viewIndex + "].nodes[" + nodeIndex + "]");
+        }
       }
 
       var viewNodeIds = new java.util.TreeSet<>(view.nodes());
@@ -196,10 +215,19 @@ public final class SemanticsRouterEngine implements SemanticsEngine {
           relationshipIndex++) {
         String relationshipId = view.relationships().get(relationshipIndex);
         SourceRelationship relationship = relationshipsById.get(relationshipId);
-        if (relationship != null
-            && (!viewNodeIds.contains(relationship.source())
-                || !viewNodeIds.contains(relationship.target()))) {
-          return new GenericGraphValidationError(
+        if (relationship == null) {
+          throw EngineException.structuralFailure(
+              DiagnosticCode.GENERIC_GRAPH_VIEW_RELATIONSHIP_UNKNOWN.code(),
+              "view '" + view.id() + "' references missing relationship '" + relationshipId + "'",
+              "$.plugins.generic-graph.views["
+                  + viewIndex
+                  + "].relationships["
+                  + relationshipIndex
+                  + "]");
+        }
+        if (!viewNodeIds.contains(relationship.source())
+            || !viewNodeIds.contains(relationship.target())) {
+          throw EngineException.semanticFailure(
               DiagnosticCode.GENERIC_GRAPH_RELATIONSHIP_ENDPOINT_OUTSIDE_VIEW.code(),
               "relationship '"
                   + relationshipId
@@ -214,21 +242,61 @@ public final class SemanticsRouterEngine implements SemanticsEngine {
         }
       }
 
+      var viewGroupIds = new java.util.TreeSet<String>();
+      for (GenericGraphViewGroup group : view.groups()) {
+        viewGroupIds.add(group.id());
+      }
       var groupIds = new java.util.TreeSet<String>();
       for (int groupIndex = 0; groupIndex < view.groups().size(); groupIndex++) {
         GenericGraphViewGroup group = view.groups().get(groupIndex);
         if (!groupIds.add(group.id())) {
-          return new GenericGraphValidationError(
+          throw EngineException.semanticFailure(
               DiagnosticCode.GENERIC_GRAPH_DUPLICATE_GROUP_ID.code(),
               "duplicate generic-graph group id '" + group.id() + "' in view '" + view.id() + "'",
               "$.plugins.generic-graph.views[" + viewIndex + "].groups[" + groupIndex + "].id");
         }
+        for (int memberIndex = 0; memberIndex < group.members().size(); memberIndex++) {
+          String member = group.members().get(memberIndex);
+          if (!viewNodeIds.contains(member) && !viewGroupIds.contains(member)) {
+            throw EngineException.structuralFailure(
+                DiagnosticCode.GENERIC_GRAPH_GROUP_MEMBER_OUTSIDE_VIEW.code(),
+                "group '"
+                    + group.id()
+                    + "' in view '"
+                    + view.id()
+                    + "' references member '"
+                    + member
+                    + "' outside the view",
+                "$.plugins.generic-graph.views["
+                    + viewIndex
+                    + "].groups["
+                    + groupIndex
+                    + "].members["
+                    + memberIndex
+                    + "]");
+          }
+        }
+        if (group.role() != GenericGraphViewGroupRole.LAYOUT_ONLY
+            && group.semanticSourceId() != null
+            && !sourceNodeIds.contains(group.semanticSourceId())) {
+          throw EngineException.structuralFailure(
+              DiagnosticCode.GENERIC_GRAPH_GROUP_SEMANTIC_SOURCE_UNKNOWN.code(),
+              "group '"
+                  + group.id()
+                  + "' in view '"
+                  + view.id()
+                  + "' semantic_source_id references missing node '"
+                  + group.semanticSourceId()
+                  + "'",
+              "$.plugins.generic-graph.views["
+                  + viewIndex
+                  + "].groups["
+                  + groupIndex
+                  + "].semantic_source_id");
+        }
       }
     }
-    return null;
   }
-
-  private record GenericGraphValidationError(String code, String message, String path) {}
 
   private record Projection(GenericGraphView view, NotationSemantics notation) {}
 }

@@ -648,12 +648,7 @@ public final class Uml {
           readTextProperty(context.relationshipUmlProperties().get(relationship.id()), "region");
       requireNodeType(region, "Region", context.nodeTypes(), path + ".properties.uml.region");
 
-      String sourceType = context.nodeTypes().get(relationship.source());
       String targetType = context.nodeTypes().get(relationship.target());
-      if ("FinalState".equals(sourceType)) {
-        throw new UmlValidationException(
-            UmlTypeKind.RELATIONSHIP_ENDPOINT, "Transition: FinalState -> " + targetType, path);
-      }
       if ("Pseudostate".equals(targetType)
           && "initial"
               .equals(
