@@ -147,6 +147,19 @@ Baseline (2026-07-24) findings are otherwise out of this plan's scope; their blo
 
 ## Status
 
-- Group 1: executing (this plan's branch `audit-remediation`).
+- Group 1: **landed** (branch `audit-remediation`, 2026-07-28). Full `-Pquality verify` and
+  `-Pdist-smoke` green. Both audit gates ran (quick): the shared high-tier finding (no
+  regression test on the bounded status read) was fixed with a discriminating over-ceiling
+  test (verified to fail against the pre-fix read); the devsecops warn (threat-model rows for
+  package stamps + duplicate-id gate) was fixed, and the package id charset was aligned with
+  the schema family while the lane is unreleased. **Accepted findings (info):** no dedicated
+  DistTool drain test (a reintroduced sequential drain hangs `-Pdist-smoke` loudly — the
+  opposite of silent false confidence); render `label_opacity` test covers the classifier
+  site only (actor/package-tab/stereotype sites unexercised — fold into the Group 2 render
+  wave); DistTool stderr-drain thread swallows non-IOException death (tooling, low). One
+  residual code-choice wrinkle for wave 2/9: a model-scoped uml-xmi export over zero
+  class-family views surfaces as `DEDIREN_ENGINE_FAILED` (pre-existing package-lane
+  pattern) rather than a structured input error.
 - Group 2: deferred — waves 1–9 are fix-ready with approaches above; 10–14 need decisions.
-- Release: cut the next release only after Group 1 lands (first release shipping #63).
+- Release: cut the next release only after Group 1 lands (first release shipping #63) —
+  Group 1 is now landed, so the next release may proceed.
