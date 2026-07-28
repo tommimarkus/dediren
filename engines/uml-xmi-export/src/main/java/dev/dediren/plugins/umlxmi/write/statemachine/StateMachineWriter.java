@@ -53,9 +53,15 @@ public final class StateMachineWriter {
         writeStateMachineVertex(xml, vertex, nodeIds.get(vertex.id()));
       }
     }
+    // Sibling-writer convention (class/use-case/component/deployment): skip a relationship whose
+    // minted id or endpoints are out of scope — XmlText.attr(null) is "", so an unguarded lookup
+    // would ship an empty source=/target= IDREF instead of a skipped transition.
     for (SourceRelationship transition : selectedRelationships) {
       if (transition.type().equals("Transition")
-          && region.id().equals(umlString(transition, "region"))) {
+          && region.id().equals(umlString(transition, "region"))
+          && relationshipIds.containsKey(transition.id())
+          && nodeIds.containsKey(transition.source())
+          && nodeIds.containsKey(transition.target())) {
         writeTransition(xml, ids, transition, relationshipIds.get(transition.id()), nodeIds);
       }
     }

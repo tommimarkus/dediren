@@ -194,7 +194,7 @@ class OefExportEngineTest {
     // Module-level twin of the CLI-level whole-model test: two views ride one document, the
     // policy `views` override wins for the view it names, the other gets the source-derived
     // default (`id-view-<id>` + source label), and a view unknown to the source falls back to
-    // its id as the name. No OEF_VIEWS_OMITTED — nothing is omitted from the aggregate.
+    // its id as the name. No OEF_VIEWS_OMITTED — the supplied views cover every declared view.
     var mapper = JsonSupport.objectMapper();
     var source =
         mapper.treeToValue(
@@ -227,6 +227,79 @@ class OefExportEngineTest {
     assertThat(content)
         .contains("identifier=\"id-second-override\"")
         .contains("<name xml:lang=\"en\">second</name>");
+    assertThat(result.get().diagnostics())
+        .noneMatch(diagnostic -> diagnostic.code().equals("DEDIREN_OEF_VIEWS_OMITTED"));
+  }
+
+  @Test
+  void exportModelWithASubsetOfDeclaredViewsDeclaresTheOmission() throws Exception {
+    // Both build drivers can hand exportModel fewer views than the source declares (cli --views,
+    // and the package lane excludes views whose layout failed), so the aggregate document can carry
+    // fewer diagrams than declared; the omission gets the same info disclosure as the single-view
+    // lane (issue #34) instead of shipping silently.
+    var mapper = JsonSupport.objectMapper();
+    ObjectNode sourceJson = (ObjectNode) fixtureJson("fixtures/source/valid-archimate-oef.json");
+    ((tools.jackson.databind.node.ArrayNode) sourceJson.at("/plugins/generic-graph/views"))
+        .addObject()
+        .put("id", "detail")
+        .put("label", "Detail");
+    var source = mapper.treeToValue(sourceJson, dev.dediren.contracts.source.SourceDocument.class);
+    var layout =
+        mapper.treeToValue(
+            fixtureJson("fixtures/layout-result/archimate-oef-basic.json"),
+            dev.dediren.contracts.layout.LayoutResult.class);
+
+    java.util.Optional<EngineResult<ExportResult>> result =
+        engine.exportModel(
+            new dev.dediren.engine.ModelExportRequest(
+                source,
+                java.util.List.of(
+                    new dev.dediren.engine.ModelExportRequest.ViewLayout("main", layout)),
+                fixtureJson("fixtures/export-policy/default-oef.json")),
+            envWithOefSchemas(),
+            Path.of("").toAbsolutePath());
+
+    assertThat(result).isPresent();
+    assertThat(result.get().diagnostics())
+        .anySatisfy(
+            diagnostic -> {
+              assertThat(diagnostic.code()).isEqualTo("DEDIREN_OEF_VIEWS_OMITTED");
+              assertThat(diagnostic.severity()).isEqualTo(DiagnosticSeverity.INFO);
+              assertThat(diagnostic.path()).isEqualTo("source.plugins.generic-graph.views");
+              assertThat(diagnostic.message())
+                  .contains(
+                      "1 of 2 ArchiMate views",
+                      "omitted: detail",
+                      "supplied laid-out views (main)");
+            });
+  }
+
+  @Test
+  void exportModelSupplyingEveryDeclaredViewEmitsNoViewCoverageDiagnostic() throws Exception {
+    var mapper = JsonSupport.objectMapper();
+    ObjectNode sourceJson = (ObjectNode) fixtureJson("fixtures/source/valid-archimate-oef.json");
+    ((tools.jackson.databind.node.ArrayNode) sourceJson.at("/plugins/generic-graph/views"))
+        .addObject()
+        .put("id", "second")
+        .put("label", "Second");
+    var source = mapper.treeToValue(sourceJson, dev.dediren.contracts.source.SourceDocument.class);
+    var layout =
+        mapper.treeToValue(
+            fixtureJson("fixtures/layout-result/archimate-oef-basic.json"),
+            dev.dediren.contracts.layout.LayoutResult.class);
+
+    java.util.Optional<EngineResult<ExportResult>> result =
+        engine.exportModel(
+            new dev.dediren.engine.ModelExportRequest(
+                source,
+                java.util.List.of(
+                    new dev.dediren.engine.ModelExportRequest.ViewLayout("main", layout),
+                    new dev.dediren.engine.ModelExportRequest.ViewLayout("second", layout)),
+                fixtureJson("fixtures/export-policy/default-oef.json")),
+            envWithOefSchemas(),
+            Path.of("").toAbsolutePath());
+
+    assertThat(result).isPresent();
     assertThat(result.get().diagnostics())
         .noneMatch(diagnostic -> diagnostic.code().equals("DEDIREN_OEF_VIEWS_OMITTED"));
   }

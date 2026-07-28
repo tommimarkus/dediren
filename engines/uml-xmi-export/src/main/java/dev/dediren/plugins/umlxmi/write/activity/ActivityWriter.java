@@ -33,8 +33,12 @@ public final class ActivityWriter {
     for (String partitionName : umlTextArray(activity, "partitions")) {
       partitionMembers.putIfAbsent(partitionName, new ArrayList<>());
     }
+    // Membership in THIS activity, mirrored from the node loop's selection: a node belongs iff it
+    // is in scope and declares properties.uml.activity == this activity's id.
+    var memberNodeIds = new HashSet<String>();
     for (SourceNode node : sourceNodes) {
       if (nodeIds.containsKey(node.id()) && activity.id().equals(umlString(node, "activity"))) {
+        memberNodeIds.add(node.id());
         writeActivityNode(xml, types, node, nodeIds.get(node.id()));
         String partition = umlString(node, "partition");
         if (partition != null) {
@@ -44,7 +48,16 @@ public final class ActivityWriter {
         }
       }
     }
+    // An edge belongs to this Activity only when both endpoint nodes are members; a resolvable
+    // endpoint alone is not membership — every Activity sees the same selectedRelationships, so an
+    // unfiltered loop would repeat a relationship (and its shared minted xmi:id) under every
+    // Activity in scope, and would claim other families' relationships (class nodes declare no
+    // uml.activity) already emitted by their own writers.
     for (SourceRelationship relationship : selectedRelationships) {
+      if (!memberNodeIds.contains(relationship.source())
+          || !memberNodeIds.contains(relationship.target())) {
+        continue;
+      }
       String sourceId = nodeIds.get(relationship.source());
       String targetId = nodeIds.get(relationship.target());
       String relationshipId = relationshipIds.get(relationship.id());

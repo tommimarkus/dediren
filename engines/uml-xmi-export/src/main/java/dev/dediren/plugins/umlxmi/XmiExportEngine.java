@@ -17,6 +17,7 @@ import dev.dediren.contracts.export.ExportResult;
 import dev.dediren.contracts.export.UmlXmiExportPolicy;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.contracts.source.GenericGraphPluginData;
+import dev.dediren.contracts.source.SourceNode;
 import dev.dediren.engine.EngineException;
 import dev.dediren.engine.EngineResult;
 import dev.dediren.engine.ExportEngine;
@@ -30,8 +31,10 @@ import dev.dediren.uml.Uml;
 import dev.dediren.uml.UmlValidationException;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * First-party {@link ExportEngine} that emits a UML/XMI XML artifact from a source model and its
@@ -98,15 +101,17 @@ public final class XmiExportEngine implements ExportEngine {
 
     var result =
         new ExportResult(ContractVersions.EXPORT_RESULT_SCHEMA_VERSION, "uml-xmi+xml", content);
+    ExportScope scope = ExportScope.fromRequest(request);
     Coverage coverage =
         Coverage.compute(
             request.source().nodes(),
             request.source().relationships(),
-            ExportScope.fromRequest(request),
+            scope,
             built.representedNodeIds(),
             built.representedRelationshipIds());
-    var diagnostics =
-        new java.util.ArrayList<>(withIdentityTripwire(policy, coverageDiagnostics(coverage)));
+    var actionable = new ArrayList<>(coverageDiagnostics(coverage));
+    actionable.addAll(typeNameAmbiguityDiagnostics(request.source().nodes(), scope.nodeIds()));
+    var diagnostics = new ArrayList<>(withIdentityTripwire(policy, actionable));
     diagnostics.add(conformance);
     return new EngineResult<>(result, diagnostics);
   }
@@ -159,7 +164,10 @@ public final class XmiExportEngine implements ExportEngine {
 
     var result =
         new ExportResult(ContractVersions.EXPORT_RESULT_SCHEMA_VERSION, "uml-xmi+xml", content);
-    var diagnostics = new ArrayList<Diagnostic>();
+    var diagnostics =
+        new ArrayList<>(
+            typeNameAmbiguityDiagnostics(
+                request.source().nodes(), XmiBuilder.modelScope(request).nodeIds()));
     diagnostics.add(conformance);
     return java.util.Optional.of(new EngineResult<>(result, diagnostics));
   }
@@ -273,6 +281,46 @@ public final class XmiExportEngine implements ExportEngine {
                   + "). "
                   + IN_VIEW_FIDELITY_GAP_MARKER,
               "source.relationships"));
+    }
+    return diagnostics;
+  }
+
+  /**
+   * Attribute, parameter, and object-node type references resolve by classifier NAME (the source
+   * contract carries type names, not ids), and the builder binds each name to the FIRST selected
+   * classifier declaring it — every later same-label classifier is silently shadowed. The
+   * name-based resolution is forced by the contract; this pre-pass removes the silence: one {@code
+   * info} diagnostic per duplicated label names the winning node id and the ignored ones, so a
+   * consumer can rename or accept from stdout JSON alone. Runs over the same selection (document
+   * order) the builder indexes, in both the single-view and whole-model lanes.
+   */
+  private static List<Diagnostic> typeNameAmbiguityDiagnostics(
+      List<SourceNode> sourceNodes, Set<String> selectedNodeIds) {
+    var claimantsByLabel = new LinkedHashMap<String, List<String>>();
+    for (SourceNode node : sourceNodes) {
+      if (selectedNodeIds.contains(node.id()) && XmiBuilder.isClassifier(node)) {
+        claimantsByLabel.computeIfAbsent(node.label(), key -> new ArrayList<>()).add(node.id());
+      }
+    }
+    var diagnostics = new ArrayList<Diagnostic>();
+    for (Map.Entry<String, List<String>> entry : claimantsByLabel.entrySet()) {
+      List<String> claimants = entry.getValue();
+      if (claimants.size() < 2) {
+        continue;
+      }
+      diagnostics.add(
+          new Diagnostic(
+              DiagnosticCode.XMI_TYPE_NAME_AMBIGUOUS.code(),
+              DiagnosticSeverity.INFO,
+              claimants.size()
+                  + " selected classifiers share the label '"
+                  + entry.getKey()
+                  + "'; type references by that name bind to node '"
+                  + claimants.getFirst()
+                  + "' (ignored: "
+                  + String.join(", ", claimants.subList(1, claimants.size()))
+                  + "). Rename the classifiers to make name-based type references unambiguous.",
+              "source.nodes"));
     }
     return diagnostics;
   }
