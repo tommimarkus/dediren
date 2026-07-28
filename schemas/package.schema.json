@@ -27,7 +27,7 @@
       "additionalProperties": false,
       "required": ["id", "source"],
       "properties": {
-        "id": { "type": "string", "minLength": 1 },
+        "id": { "type": "string", "minLength": 1, "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" },
         "source": { "type": "string", "minLength": 1 }
       }
     },
@@ -36,7 +36,7 @@
       "additionalProperties": false,
       "required": ["id", "render_policy", "outputs"],
       "properties": {
-        "id": { "type": "string", "minLength": 1 },
+        "id": { "type": "string", "minLength": 1, "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" },
         "model": { "type": "string", "minLength": 1 },
         "render_policy": { "type": "string", "minLength": 1 },
         "presentation": { "$ref": "#/$defs/presentation" },
@@ -68,7 +68,7 @@
       "required": ["id", "lane", "policy", "output"],
       "oneOf": [{ "required": ["view"] }, { "required": ["model"] }],
       "properties": {
-        "id": { "type": "string", "minLength": 1 },
+        "id": { "type": "string", "minLength": 1, "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" },
         "view": { "type": "string", "minLength": 1 },
         "model": { "type": "string", "minLength": 1 },
         "lane": { "enum": ["archimate-oef", "uml-xmi"] },

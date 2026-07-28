@@ -28,10 +28,17 @@ deterministic regression mode over checked-in seed corpora in CI.
 Build artifacts additionally carry a provenance stamp (wave 2): core injects
 an inert SVG `<metadata>` element / leading XML comment holding
 product-generated JSON (canonical hashes, schema id, tool version, a
-charset-constrained view id) after each engine has validated its own content.
+charset-constrained view id) after each engine has validated its own content —
+on the single-model lane and, since the package model, on every
+`build --package` diagram and export artifact (declared `layout` /
+`render_metadata` JSON outputs stay unstamped, matching the single-model lane).
 Every stamped value is product-generated or constrained and the JSON is
-XML-escaped at injection, so the stamp introduces no untrusted verbatim path
-into any artifact; SVG output remains inert (no script/style).
+XML-escaped at injection: `<`/`>`/`&` in the SVG metadata text, and in the
+XML-comment lane every `--` run is rewritten to `&#45;&#45;` so no id can close
+the comment early — a deliberate one-way escape (`Provenance.stampXml`),
+accepted because no consumer reads `view_id` back out of a stamp. The stamp
+therefore introduces no untrusted verbatim path into any artifact; SVG output
+remains inert (no script/style).
 
 Plan B P5 added a post-parse validation layer on top of that Jackson
 contract: `ir.LayoutIntentCodec.decode` rejects an unrecognized
@@ -141,7 +148,11 @@ Controls:
   the package directory, under MCP to the server `--root`. An escaping path is a
   structured `DEDIREN_COMMAND_INPUT_INVALID` (CLI) / `DEDIREN_MCP_PATH_OUTSIDE_ROOT`
   (MCP) error, never a write, and colliding declared paths are rejected before any
-  build begins. Collision detection is lexical (normalized-path string compare),
+  build begins. Package id spaces (`models[]`/`views[]`/`exports[]`) are
+  schema-constrained to the shared id charset and duplicates are rejected up front
+  (`DEDIREN_PACKAGE_DUPLICATE_ID`), so a hand-authored package cannot alias two
+  build units onto one id to confuse output or export routing.
+  Collision detection is lexical (normalized-path string compare),
   not real-path, so — as with the `ConfinedPaths` symlink residual above — a
   pre-existing symlink alias *inside* the confined tree could let two
   lexically-distinct declared paths resolve to the same file; that needs the same
