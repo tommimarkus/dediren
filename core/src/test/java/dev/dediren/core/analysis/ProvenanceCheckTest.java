@@ -2,8 +2,10 @@ package dev.dediren.core.analysis;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dev.dediren.core.source.SourceLimits;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -65,5 +67,50 @@ class ProvenanceCheckTest {
 
     assertThat(result.models()).isEmpty();
     assertThat(result.artifacts()).isEmpty();
+  }
+
+  @Test
+  void statusDoesNotIndexAValidModelOverTheReadCeiling() throws Exception {
+    // An otherwise-valid model that exceeds the input ceiling: the head scan sees the version
+    // marker, but the full read is refused by BoundedReads, so the candidate degrades to
+    // not-indexed instead of being pulled into memory whole. A small copy of the same shape
+    // is the control proving only the size excludes it.
+    try (var writer = Files.newBufferedWriter(dir.resolve("huge.json"))) {
+      writer.write(modelHead());
+      char[] chunk = new char[1 << 20];
+      Arrays.fill(chunk, 'a');
+      long target = SourceLimits.DEFAULT.maxInputFileBytes() + chunk.length;
+      for (long written = 0; written < target; written += chunk.length) {
+        writer.write(chunk);
+      }
+      writer.write(modelTail());
+    }
+    Files.writeString(dir.resolve("small.json"), modelHead() + "small" + modelTail());
+
+    var result = ProvenanceCheck.status(dir, null);
+
+    assertThat(result.models())
+        .singleElement()
+        .satisfies(model -> assertThat(model.path()).isEqualTo("small.json"));
+  }
+
+  private static String modelHead() {
+    return """
+        {
+          "model_schema_version": "model.schema.v1",
+          "nodes": [
+            { "id": "api", "type": "generic.component", "properties": {}, "label": "\
+        """
+        .stripTrailing();
+  }
+
+  private static String modelTail() {
+    return """
+        " }
+          ],
+          "relationships": [],
+          "plugins": { "generic-graph": { "views": [] } }
+        }
+        """;
   }
 }
