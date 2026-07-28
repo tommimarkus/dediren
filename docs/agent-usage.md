@@ -213,9 +213,11 @@ envelope `status` stays `ok` for omissions alone (an unedited default policy
 adds the `DEDIREN_EXPORT_IDENTITY_PLACEHOLDER` warning, which lifts it to
 `warning` — see `## Export`). For whole-model interchange, `dediren build`
 with `--oef-policy` additionally writes `model.oef.xml` at the `--out` root:
-one document carrying EVERY built view's diagram, listed in the build result
-under `model_artifacts` — nothing omitted, so no omission diagnostic. Each
-view in it carries its own identity: an explicit override from the policy's
+one document carrying every view's diagram the build supplied, listed under
+`model_artifacts`; when the build covers only a subset of the declared views
+(`--views`, or a view that failed to build), the aggregate declares the
+missing diagrams with the same `DEDIREN_OEF_VIEWS_OMITTED` info diagnostic.
+Each view in it carries its own identity: an explicit override from the policy's
 optional `views` map (`"views": {"<view-id>": {"view_identifier"?,
 "view_name"?, "viewpoint"?}}`), else the source-derived default
 (`id-view-<view-id>`, the view's own label, the policy's top-level
@@ -279,8 +281,10 @@ relationship's semantics, so direction matters (for example `ApplicationComponen
 diagnosed). `Association` is always accepted (the unspecified relationship), and
 `Grouping`/`Location` connect to anything. The check is a sound
 under-approximation of ArchiMate Appendix B: it never rejects a valid combination
-but does not compute the full derivation closure, so some invalid pairs still
-pass.
+except a small, deliberately-rejected §5-contradicted set — dynamic
+relationships (Triggering/Flow) touching motivation or passive elements, and
+Assignment from passive, motivation, event, or service sources — and it does
+not compute the full derivation closure, so some invalid pairs still pass.
 
 ```bash
 "$BUNDLE/bin/dediren" validate \
@@ -484,8 +488,13 @@ A `package.json` (schema `package.schema.v1`) declares:
   envelopes.
 - `exports[]` — `{ id, view | model, lane, policy, output }`. Each export targets
   exactly one of a `view` (one focused file) or a whole `model` (the aggregate
-  lane — every one of that model's views in a single file). `lane` is
-  `archimate-oef` or `uml-xmi`.
+  lane — one file). `lane` is `archimate-oef` or `uml-xmi`. A model-scoped
+  `archimate-oef` export covers every supplied view of the model; a model-scoped
+  `uml-xmi` export aggregates only its class-family views (`uml-class`,
+  `uml-data`) — the same gate as single-model build's `model.uml.xml` — so
+  other view kinds keep their view-scoped exports but never join the
+  whole-model UMLDI aggregate, and a model with zero class-family views fails
+  the export (no aggregate to produce).
 
 Unlike single-model `build`, the package build's stdout **is** wrapped in the
 standard command envelope: read `.data` for a `package-build-result` naming every
@@ -493,6 +502,12 @@ artifact at its final declared path, with one `.status` rollup and per-view /
 per-export `status` and `diagnostics`. A cross-reference or declared-path
 collision the package cannot satisfy is a `DEDIREN_PACKAGE_*` error before any
 build begins.
+
+Package-built diagrams and exports carry the same provenance stamps as
+single-model `build` artifacts, so `dediren verify`/`dediren status` classify
+them current or stale rather than unstamped (see `## Provenance & Verify`);
+declared `layout`/`render_metadata` JSON outputs are stage data and stay
+unstamped, like `--emit` envelopes.
 
 ## Diff & Query
 
@@ -1032,6 +1047,9 @@ you can recover from stdout JSON alone.
 - `DEDIREN_GENERIC_GRAPH_DUPLICATE_VIEW_ID` /
   `DEDIREN_GENERIC_GRAPH_DUPLICATE_GROUP_ID`: rename the colliding view id, or
   the colliding group id within its view — group ids are scoped per view.
+- `DEDIREN_PACKAGE_DUPLICATE_ID`: two entries in the named package id space
+  (`models[]`, `views[]`, or `exports[]`) share the quoted id. Rename one so
+  every package id space is duplicate-free.
 - `DEDIREN_DANGLING_ENDPOINT`: repair relationship source/target ids or include
   the missing node.
 - `DEDIREN_INPUT_FILE_TOO_LARGE`: an input file (source model, fragment, or
@@ -1048,6 +1066,18 @@ you can recover from stdout JSON alone.
 - `DEDIREN_GENERIC_GRAPH_VIEW_UNKNOWN`: the requested view id is not declared
   in `plugins.generic-graph.views`. Fix the `--view`/`--views` value or add
   the missing view to the source.
+- `DEDIREN_GENERIC_GRAPH_VIEW_NODE_UNKNOWN`: a `views[].nodes` entry names a
+  node id absent from the source `nodes`. Fix the typo or add the missing
+  node.
+- `DEDIREN_GENERIC_GRAPH_VIEW_RELATIONSHIP_UNKNOWN`: a `views[].relationships`
+  entry names a relationship id absent from the source `relationships`. Fix
+  the typo or add the missing relationship.
+- `DEDIREN_GENERIC_GRAPH_GROUP_MEMBER_OUTSIDE_VIEW`: a group `members` entry
+  is neither one of that view's `nodes` nor another group id in the same view.
+  Add it to the view or remove it from the group.
+- `DEDIREN_GENERIC_GRAPH_GROUP_SEMANTIC_SOURCE_UNKNOWN`: a group's
+  `semantic_source_id` names no source node. Fix the id, add the backing node,
+  or drop `semantic_source_id`.
 - `DEDIREN_COMMAND_TARGET_UNSUPPORTED`: the `project --target` value is
   outside the accepted set — use `layout-request` or `render-metadata`.
 - `DEDIREN_PLUGIN_UNKNOWN`: unknown engine id — the bundled set is
@@ -1056,6 +1086,11 @@ you can recover from stdout JSON alone.
 - `DEDIREN_PLUGIN_UNSUPPORTED_CAPABILITY`: the engine id exists but not for
   this command's capability (for example asking `elk-layout` to render). Fix
   the `--plugin` value for this command.
+- `DEDIREN_ELK_PACKED_OPTION_IGNORED`: a `layout_preferences.mode: "packed"`
+  request carried layered-only options/hints the rectangle-packing algorithm
+  ignores (a `warning`; the layout succeeded). The message lists their JSON
+  pointers — delete those fields, or drop `mode: "packed"` so the layered
+  algorithm honors them.
 - `DEDIREN_EXPORT_SCHEMA_CONFORMANCE`: informational (`info`, rides an `ok`
   envelope) — names exactly which standards schema the export was validated
   against and its provenance (pinned SHA-256-verified download, or the
@@ -1065,6 +1100,10 @@ you can recover from stdout JSON alone.
   otherwise valid). Copy the default policy and replace its identity fields
   (see `## Export`); expected and ignorable when deliberately exporting the
   bundled fixtures.
+- `DEDIREN_XMI_TYPE_NAME_AMBIGUOUS`: several selected classifiers share one
+  label, so name-based attribute/parameter type references bind to the first
+  (`info`; the export succeeded). The message names the winning and ignored
+  node ids; rename the classifiers if the shadowed one was intended.
 - `DEDIREN_ARTIFACT_STALE`: a stamped artifact's provenance no longer matches
   the model's recomputed hash — the model changed after the artifact was
   built. Rebuild the artifact (or check out the matching model revision);
@@ -1074,7 +1113,10 @@ you can recover from stdout JSON alone.
   stamps artifacts; rebuild through `build` if you want it verifiable.
 - `DEDIREN_ENGINE_FAILED`: an unexpected in-memory engine failure. Not an input
   problem — the diagnostic message names the engine; report it with the failing
-  command and input rather than retrying with modified JSON.
+  command and input rather than retrying with modified JSON. Ghost view
+  references (a view or group naming a missing element) no longer surface
+  here — they are the structured `DEDIREN_GENERIC_GRAPH_*` input errors above
+  (exit 2).
 - `DEDIREN_COMMAND_INPUT_INVALID`: the CLI could not read or parse a command
   input file.
 
