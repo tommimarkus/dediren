@@ -1,5 +1,9 @@
 {
   "package_schema_version": "package.schema.v1",
+  "presentation": {
+    "lang": "fi",
+    "dir": "ltr"
+  },
   "models": [
     { "id": "arch", "source": "model.json" },
     { "id": "uml", "source": "model-uml.json" }

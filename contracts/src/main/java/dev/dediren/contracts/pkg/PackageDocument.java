@@ -11,6 +11,7 @@ import java.util.List;
  */
 public record PackageDocument(
     String packageSchemaVersion,
+    PackageDocumentPresentation presentation,
     List<PackageModel> models,
     List<PackageView> views,
     List<PackageExport> exports) {

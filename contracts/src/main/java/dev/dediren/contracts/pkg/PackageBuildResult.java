@@ -16,6 +16,7 @@ import java.util.List;
 public record PackageBuildResult(
     String packageBuildResultSchemaVersion,
     EnvelopeStatus status,
+    @JsonInclude(JsonInclude.Include.NON_NULL) PackageDocumentPresentation presentation,
     List<PackageViewOutcome> views,
     @JsonInclude(JsonInclude.Include.NON_EMPTY) List<PackageExportOutcome> exports,
     @JsonInclude(JsonInclude.Include.NON_EMPTY) List<Diagnostic> diagnostics) {

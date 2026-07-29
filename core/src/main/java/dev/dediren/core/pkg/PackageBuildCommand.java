@@ -14,6 +14,7 @@ import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.contracts.layout.LayoutResult;
 import dev.dediren.contracts.pkg.PackageBuildResult;
 import dev.dediren.contracts.pkg.PackageDocument;
+import dev.dediren.contracts.pkg.PackageDocumentPresentation;
 import dev.dediren.contracts.pkg.PackageExport;
 import dev.dediren.contracts.pkg.PackageExportLane;
 import dev.dediren.contracts.pkg.PackageExportOutcome;
@@ -171,7 +172,7 @@ public final class PackageBuildCommand {
         failureExit = worst(failureExit, CommandExitCode.INPUT_ERROR.code());
         continue;
       }
-      ViewRun run = buildView(request, engines, model, view);
+      ViewRun run = buildView(request, engines, model, view, pkg.presentation());
       viewOutcomes.add(run.outcome());
       if (run.outcome().status() == EnvelopeStatus.ERROR) {
         failureExit = worst(failureExit, run.exitCode());
@@ -208,6 +209,7 @@ public final class PackageBuildCommand {
         new PackageBuildResult(
             ContractVersions.PACKAGE_BUILD_RESULT_SCHEMA_VERSION,
             status,
+            pkg.presentation(),
             viewOutcomes,
             exportOutcomes,
             List.of());
@@ -217,7 +219,11 @@ public final class PackageBuildCommand {
   // --- per-view pipeline ------------------------------------------------------------------------
 
   private static ViewRun buildView(
-      PackageBuildRequest request, Engines engines, ModelLoad model, PackageView view) {
+      PackageBuildRequest request,
+      Engines engines,
+      ModelLoad model,
+      PackageView view,
+      PackageDocumentPresentation packageLevel) {
     SourceDocument source = model.source();
     List<Diagnostic> diagnostics = new ArrayList<>();
     Map<String, String> artifacts = new LinkedHashMap<>();
@@ -292,7 +298,8 @@ public final class PackageBuildCommand {
       diagnostics.add(problem.diagnostic());
       return failedView(view, artifacts, diagnostics, problem.exitCode());
     }
-    JsonNode effectivePolicy = effectiveRenderPolicy(renderPolicy, view.presentation());
+    JsonNode effectivePolicy =
+        effectiveRenderPolicy(renderPolicy, view.presentation(), packageLevel);
 
     InMemoryStage<RenderResult> render =
         runStage(
@@ -600,15 +607,24 @@ public final class PackageBuildCommand {
   }
 
   /**
-   * The render policy with the view's presentation folded in as accessible-name text, when the
-   * policy has not already set it (an explicit policy value wins). The renderer emits {@code
-   * accessibility.title}/{@code .description} as {@code <title>}/{@code <desc>}; this is what gives
-   * each view its own accessible name under a shared policy.
+   * The render policy with the view's presentation folded in as accessible-name text and the
+   * package's language metadata folded in alongside it, each only when the policy has not already
+   * set that key (an explicit policy value always wins). The renderer emits {@code
+   * accessibility.title}/{@code .description} as {@code <title>}/{@code <desc>} and {@code
+   * accessibility.lang}/{@code .dir} as {@code xml:lang}/{@code direction} on the root; together
+   * these give each view its own accessible name, in a declared language, under a shared policy.
+   *
+   * <p>The two sources are scoped differently on purpose: the accessible name varies per view, so
+   * it comes from {@code views[].presentation}; the language and base direction of that prose do
+   * not, so they come from the package once.
    */
-  private static JsonNode effectiveRenderPolicy(JsonNode base, PackagePresentation presentation) {
-    if (presentation == null
-        || (presentation.title() == null && presentation.question() == null)
-        || !base.isObject()) {
+  private static JsonNode effectiveRenderPolicy(
+      JsonNode base, PackagePresentation presentation, PackageDocumentPresentation packageLevel) {
+    boolean hasViewText =
+        presentation != null && (presentation.title() != null || presentation.question() != null);
+    boolean hasPackageLanguage =
+        packageLevel != null && (packageLevel.lang() != null || packageLevel.dir() != null);
+    if ((!hasViewText && !hasPackageLanguage) || !base.isObject()) {
       return base;
     }
     ObjectNode copy = (ObjectNode) base.deepCopy();
@@ -616,11 +632,21 @@ public final class PackageBuildCommand {
         copy.has("accessibility") && copy.get("accessibility").isObject()
             ? (ObjectNode) copy.get("accessibility")
             : copy.putObject("accessibility");
-    if (presentation.title() != null && !accessibility.has("title")) {
-      accessibility.put("title", presentation.title());
+    if (hasViewText) {
+      if (presentation.title() != null && !accessibility.has("title")) {
+        accessibility.put("title", presentation.title());
+      }
+      if (presentation.question() != null && !accessibility.has("description")) {
+        accessibility.put("description", presentation.question());
+      }
     }
-    if (presentation.question() != null && !accessibility.has("description")) {
-      accessibility.put("description", presentation.question());
+    if (hasPackageLanguage) {
+      if (packageLevel.lang() != null && !accessibility.has("lang")) {
+        accessibility.put("lang", packageLevel.lang());
+      }
+      if (packageLevel.dir() != null && !accessibility.has("dir")) {
+        accessibility.put("dir", packageLevel.dir());
+      }
     }
     return copy;
   }
@@ -730,6 +756,7 @@ public final class PackageBuildCommand {
     return new PackageBuildResult(
         ContractVersions.PACKAGE_BUILD_RESULT_SCHEMA_VERSION,
         EnvelopeStatus.ERROR,
+        null,
         List.of(),
         List.of(),
         diagnostics);

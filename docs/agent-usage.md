@@ -154,6 +154,15 @@ an optional `accessibility` block in the render policy, for example
 without it the `<title>` falls back to the layout `view_id`, so shipped
 diagrams should use a policy copy with a real title.
 
+That text is authored prose, so tag its language: `accessibility.lang` (a BCP 47
+tag such as `fi` or `ar-EG`) becomes `xml:lang` on the root, and
+`accessibility.dir` (`ltr` or `rtl`) becomes `direction`, the base writing
+direction every text element below inherits. Both are optional and are omitted
+entirely when unset — nothing is defaulted, so an untagged policy renders exactly
+as before. Set `lang` whenever the diagram is not in the reader's assumed
+language (assistive technology otherwise guesses a pronunciation), and set `dir`
+to `rtl` for right-to-left prose, which is laid out wrongly without it.
+
 ## Fragments
 
 A source model may split across files: `fragments` is an array of relative
@@ -477,6 +486,13 @@ against the package file's directory and is confined there.
 
 A `package.json` (schema `package.schema.v1`) declares:
 
+- `presentation?` — `{ lang?, dir? }`, the language and base writing direction of
+  the prose the package carries, declared once for every view in it. Both reach
+  each view's effective render policy as `accessibility.lang`/`.dir` and from
+  there the emitted SVG root, so a package authored in one language tags all of
+  its diagrams without repeating itself. A view's own render policy always wins.
+  These are the only package-level presentation keys: everything narrower is
+  per-view, and page-level chrome for a surrounding document is the caller's.
 - `models[]` — `{ id, source }` per source model (multi-notation packages list
   several); a view binds to one via `views[].model` (optional when there is one).
 - `views[]` — `{ id, model?, render_policy, presentation?, outputs }`.

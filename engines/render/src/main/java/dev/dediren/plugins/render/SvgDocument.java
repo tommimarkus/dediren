@@ -88,6 +88,7 @@ public final class SvgDocument {
                 bounds.minY(),
                 bounds.width(),
                 bounds.height()));
+    SvgAccessibleName.rootLanguage(w, policy);
     SvgAccessibleName.markup(w, policy, result.viewId());
     w.empty("rect")
         .attr("x", f1(bounds.minX()))
