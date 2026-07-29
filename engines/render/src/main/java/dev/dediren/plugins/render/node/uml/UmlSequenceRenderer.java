@@ -94,6 +94,7 @@ public final class UmlSequenceRenderer {
                 bounds.minY(),
                 bounds.width(),
                 bounds.height()));
+    SvgAccessibleName.rootLanguage(w, policy);
     SvgAccessibleName.markup(w, policy, result.viewId());
     w.empty("rect")
         .attr("x", String.format(Locale.ROOT, "%.1f", bounds.minX()))

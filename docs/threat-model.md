@@ -283,6 +283,16 @@ ill-formed markup. The rendered SVG carries no `<script>` or `<style>` block at
 all — it is inert, fully escaped markup (interactive-svg was retired), so there
 is no CSS/script sink for policy values or model text to reach.
 
+`accessibility.lang`/`.dir` — reaching the root as `xml:lang`/`direction`, either
+from the render policy directly or folded in from a package's `presentation` —
+are authored strings on that same escaped path: both go out through `attrIf()`,
+so the writer-level property above covers them and no new verbatim sink is
+introduced. They are additionally bounded before emission, by the schema rather
+than by the renderer: `dir` is a two-value enum and `lang` a length-capped
+subtag pattern, so neither can carry arbitrary text into an attribute even
+if the escaping argument were set aside. Both are omitted when unset, so an
+untagged policy produces the identical root it did before the keys existed.
+
 The `render` plugin emits SVG as text and no longer bundles Apache Batik /
 XML Graphics. Earlier versions round-tripped the emitted SVG through a Batik
 SVG DOM and PNG transcoder to produce a `png` artifact, re-parsing the

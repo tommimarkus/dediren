@@ -490,6 +490,10 @@ class ContractRoundTripTest {
     assertThat(policy.accessibility().title()).isEqualTo("Payment authorization flow");
     assertThat(policy.accessibility().description())
         .isEqualTo("Checkout service calling the payment gateway");
+    // A policy that declares no language leaves both keys null rather than defaulting them; the
+    // renderer relies on that to keep untagged output untagged.
+    assertThat(policy.accessibility().lang()).isNull();
+    assertThat(policy.accessibility().dir()).isNull();
     assertThat(policy.style().nodeOverrides().get("api").stroke()).isEqualTo("#0891b2");
     assertThat(policy.style().edge().labelPresentation())
         .isEqualTo(SvgEdgeLabelPresentation.BACKGROUND);
@@ -788,6 +792,12 @@ class ContractRoundTripTest {
     assertThat(export.view()).isEqualTo("app-cooperation");
     assertThat(export.model()).isNull();
     assertThat(export.lane()).isEqualTo(PackageExportLane.ARCHIMATE_OEF);
+
+    // Package-level presentation is language metadata only — it feeds the render lane, so it is
+    // deliberately a different shape from the per-view presentation carried alongside it.
+    assertThat(basic.presentation()).isNull();
+    assertThat(mixed.presentation().lang()).isEqualTo("fi");
+    assertThat(mixed.presentation().dir()).isEqualTo("ltr");
 
     // Mixed package: two models, and a model-target export coexisting with a view-target export.
     assertThat(mixed.models()).extracting(PackageModel::id).containsExactly("arch", "uml");

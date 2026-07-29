@@ -400,8 +400,15 @@
       "additionalProperties": false,
       "properties": {
         "title": { "type": "string", "minLength": 1, "maxLength": 200 },
-        "description": { "type": "string", "minLength": 1, "maxLength": 1000 }
+        "description": { "type": "string", "minLength": 1, "maxLength": 1000 },
+        "lang": { "$ref": "#/$defs/languageTag" },
+        "dir": { "enum": ["ltr", "rtl"] }
       }
+    },
+    "languageTag": {
+      "type": "string",
+      "pattern": "^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})*$",
+      "maxLength": 35
     }
   }
 }

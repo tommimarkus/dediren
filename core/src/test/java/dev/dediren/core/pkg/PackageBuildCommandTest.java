@@ -86,6 +86,17 @@ class PackageBuildCommandTest {
       }
       """;
 
+  // A policy that declares its own language, so the package-level value must not overwrite it.
+  private static final String RENDER_POLICY_WITH_LANGUAGE =
+      """
+      {
+        "render_policy_schema_version": "render-policy.schema.v3",
+        "page": { "width": 100, "height": 100 },
+        "margin": { "top": 0, "right": 0, "bottom": 0, "left": 0 },
+        "accessibility": { "lang": "ja", "dir": "ltr" }
+      }
+      """;
+
   // A prior-version policy the SchemaVersionGate rejects as OUTDATED, attaching the composed
   // migration path; the render engine never sees it.
   private static final String STALE_RENDER_POLICY =
@@ -463,6 +474,116 @@ class PackageBuildCommandTest {
   }
 
   @Test
+  void foldsPackageLanguageIntoEveryViewsRenderPolicy(@TempDir Path dir) throws Exception {
+    writeInputs(dir);
+    String pkg =
+        """
+        {
+          "package_schema_version": "package.schema.v1",
+          "presentation": { "lang": "ar-EG", "dir": "rtl" },
+          "models": [ { "id": "arch", "source": "model.json" } ],
+          "views": [
+            { "id": "main", "model": "arch", "render_policy": "render-policy.json",
+              "outputs": { "diagram": "generated/svg/main.svg" } },
+            { "id": "second", "model": "arch", "render_policy": "render-policy.json",
+              "outputs": { "diagram": "generated/svg/second.svg" } }
+          ]
+        }
+        """;
+
+    EngineRunOutcome outcome = run(pkg, dir, List.of(), false);
+
+    assertThat(status(outcome)).isEqualTo("ok");
+    // Declared once on the package, it must reach EVERY view — that is the whole reason the field
+    // is package-scoped rather than per-view.
+    assertThat(Files.readString(dir.resolve("generated/svg/main.svg")))
+        .contains("xml:lang=\"ar-EG\"")
+        .contains("direction=\"rtl\"");
+    assertThat(Files.readString(dir.resolve("generated/svg/second.svg")))
+        .contains("xml:lang=\"ar-EG\"")
+        .contains("direction=\"rtl\"");
+  }
+
+  @Test
+  void policyAccessibilityWinsOverPackageLanguage(@TempDir Path dir) throws Exception {
+    writeInputs(dir);
+    Files.writeString(dir.resolve("render-policy-lang.json"), RENDER_POLICY_WITH_LANGUAGE);
+    String pkg =
+        """
+        {
+          "package_schema_version": "package.schema.v1",
+          "presentation": { "lang": "ar-EG", "dir": "rtl" },
+          "models": [ { "id": "arch", "source": "model.json" } ],
+          "views": [
+            { "id": "main", "model": "arch", "render_policy": "render-policy-lang.json",
+              "outputs": { "diagram": "generated/svg/main.svg" } }
+          ]
+        }
+        """;
+
+    EngineRunOutcome outcome = run(pkg, dir, List.of(), false);
+
+    assertThat(status(outcome)).isEqualTo("ok");
+    // Same precedence rule the per-view presentation already obeys: an explicit policy value wins,
+    // so a view can opt out of the package language without the package having to know.
+    assertThat(Files.readString(dir.resolve("generated/svg/main.svg")))
+        .contains("xml:lang=\"ja\"")
+        .contains("direction=\"ltr\"")
+        .doesNotContain("ar-EG")
+        .doesNotContain("rtl");
+  }
+
+  @Test
+  void aPackageWithoutPresentationInjectsNoLanguage(@TempDir Path dir) throws Exception {
+    writeInputs(dir);
+    String pkg =
+        """
+        {
+          "package_schema_version": "package.schema.v1",
+          "models": [ { "id": "arch", "source": "model.json" } ],
+          "views": [
+            { "id": "main", "model": "arch", "render_policy": "render-policy.json",
+              "outputs": { "diagram": "generated/svg/main.svg" } }
+          ]
+        }
+        """;
+
+    EngineRunOutcome outcome = run(pkg, dir, List.of(), false);
+
+    assertThat(status(outcome)).isEqualTo("ok");
+    // Nothing is defaulted: a package that declares no language must leave the render lane exactly
+    // as it was before these keys existed.
+    assertThat(Files.readString(dir.resolve("generated/svg/main.svg")))
+        .doesNotContain("xml:lang")
+        .doesNotContain("direction");
+    assertThat(data(outcome).path("presentation").isMissingNode()).isTrue();
+  }
+
+  @Test
+  void packageBuildResultEchoesPackagePresentation(@TempDir Path dir) throws Exception {
+    writeInputs(dir);
+    String pkg =
+        """
+        {
+          "package_schema_version": "package.schema.v1",
+          "presentation": { "lang": "fi" },
+          "models": [ { "id": "arch", "source": "model.json" } ],
+          "views": [
+            { "id": "main", "model": "arch", "render_policy": "render-policy.json",
+              "outputs": { "diagram": "generated/svg/main.svg" } }
+          ]
+        }
+        """;
+
+    EngineRunOutcome outcome = run(pkg, dir, List.of(), false);
+
+    assertThat(status(outcome)).isEqualTo("ok");
+    assertThat(data(outcome).at("/presentation/lang").asText()).isEqualTo("fi");
+    // Only what was declared is echoed; an absent key is omitted rather than nulled.
+    assertThat(data(outcome).at("/presentation").has("dir")).isFalse();
+  }
+
+  @Test
   void anEscapingDeclaredOutputPathIsRejectedAndNeverWritten(@TempDir Path dir) throws Exception {
     writeInputs(dir);
     String pkg =
@@ -796,6 +917,11 @@ class PackageBuildCommandTest {
     return JsonSupport.objectMapper().readTree(outcome.stdout()).get("status").asText();
   }
 
+  /** The envelope's {@code data} node — the package-build-result as it reaches an agent. */
+  private static JsonNode data(EngineRunOutcome outcome) {
+    return JsonSupport.objectMapper().readTree(outcome.stdout()).get("data");
+  }
+
   private static PackageBuildResult result(EngineRunOutcome outcome) {
     return JsonSupport.objectMapper()
         .treeToValue(
@@ -892,10 +1018,19 @@ class PackageBuildCommandTest {
             3);
       }
       String title = policy.path("accessibility").path("title").asText("");
+      // Echo the language keys the way the real renderer does — as root attributes — so a test can
+      // tell "the package fed the render lane" apart from "the key merely survived into the
+      // result". Absent keys emit no attribute at all, which is what makes the negative
+      // assertions below meaningful.
+      String lang = policy.path("accessibility").path("lang").asText("");
+      String dir = policy.path("accessibility").path("dir").asText("");
+      String attrs =
+          (lang.isEmpty() ? "" : " xml:lang=\"" + lang + "\"")
+              + (dir.isEmpty() ? "" : " direction=\"" + dir + "\"");
       return new EngineResult<>(
           new RenderResult(
               ContractVersions.RENDER_RESULT_SCHEMA_VERSION,
-              List.of(new RenderArtifact("svg", "<svg>" + title + "</svg>"))),
+              List.of(new RenderArtifact("svg", "<svg" + attrs + ">" + title + "</svg>"))),
           List.of());
     }
   }

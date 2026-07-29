@@ -170,7 +170,7 @@ class PackageValidatorTest {
 
   private static PackageDocument pkg(
       List<PackageModel> models, List<PackageView> views, List<PackageExport> exports) {
-    return new PackageDocument("package.schema.v1", models, views, exports);
+    return new PackageDocument("package.schema.v1", null, models, views, exports);
   }
 
   private static PackageView view(String id, String model, String diagram) {
