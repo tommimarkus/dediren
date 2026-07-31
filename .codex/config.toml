@@ -1,0 +1,16 @@
+# Codex loads this project-scoped configuration only for trusted repositories.
+# Permission profiles require Codex 0.138 or newer.
+default_permissions = "dediren"
+
+[features.network_proxy]
+enabled = true
+
+[permissions.dediren]
+description = "Dediren workspace editing with Maven repository access."
+extends = ":workspace"
+
+[permissions.dediren.network]
+enabled = true
+
+[permissions.dediren.network.domains]
+"repo.maven.apache.org" = "allow"
