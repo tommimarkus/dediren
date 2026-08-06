@@ -119,8 +119,8 @@ changes when installed, and skips with a note otherwise.
 jars, no bundled JRE — Java 21+ is required at runtime):
 
 ```text
-dist/dediren-agent-bundle-2026.07.29/
-dist/dediren-agent-bundle-2026.07.29.tar.xz
+dist/dediren-agent-bundle-2026.08.0/
+dist/dediren-agent-bundle-2026.08.0.tar.xz
 ```
 
 ## First Run
@@ -208,7 +208,7 @@ artifact-writing build tool. See `docs/agent-usage.md`.
 ## Bundle Layout
 
 ```text
-dediren-agent-bundle-2026.07.29/
+dediren-agent-bundle-2026.08.0/
   bin/dediren     the single launcher (hosts all five engines in-process)
   lib/            one shrink-merged classpath jar (no bundled JRE)
   schemas/        public JSON schemas
@@ -251,7 +251,7 @@ release notes and through schema-id changes. The version source is root
 `pom.xml`; set it across all modules with:
 
 ```bash
-./mvnw versions:set -DnewVersion='2026.07.29' -DprocessAllModules=true -DgenerateBackupPoms=false
+./mvnw versions:set -DnewVersion='2026.08.0' -DprocessAllModules=true -DgenerateBackupPoms=false
 ```
 
 Then sync the checked-in version surfaces (source-fixture
@@ -261,7 +261,7 @@ list lives in [`CLAUDE.md` §Versioning](CLAUDE.md). Commit the bump on its own,
 then tag the bump commit:
 
 ```bash
-git tag -a v2026.07.29 -m "Release 2026.07.29"
+git tag -a v2026.08.0 -m "Release 2026.08.0"
 ```
 
 `dist-build` is hermetic and self-verifying — it regenerates each module's
