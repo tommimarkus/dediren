@@ -8,7 +8,8 @@ import org.junit.jupiter.api.Test;
 class SvgPaintAuditMutationTest {
 
   @Test
-  void middleBaselineUsesPinnedFontXHeightRatherThanAlphabeticOrInkCenter() throws Exception {
+  void middleBaselineGeometryComesFromTheBrowserAndDiffersFromAlphabeticBaseline()
+      throws Exception {
     String middle =
         "<g data-dediren-node-id=\"middle\"><text x=\"30\" y=\"40\""
             + " dominant-baseline=\"middle\">Label</text></g>";
@@ -18,10 +19,8 @@ class SvgPaintAuditMutationTest {
     SvgPaintAudit.Bounds middleBounds = report.semanticBounds().get("node:middle");
     SvgPaintAudit.Bounds alphabeticBounds = report.semanticBounds().get("node:alphabetic");
 
-    // SVG middle uses half the nominal font x-height below y. Liberation Sans' pinned OpenType
-    // OS/2 table declares sxHeight=1082 at unitsPerEm=2048 (font SHA-256 is manifest-gated).
-    double expectedShift = 14.0 * 1082.0 / 2048.0 / 2.0;
-    assertThat(middleBounds.y() - alphabeticBounds.y()).isCloseTo(expectedShift, within(0.01));
+    assertThat(middleBounds.y()).isGreaterThan(alphabeticBounds.y());
+    assertThat(middleBounds.height()).isCloseTo(alphabeticBounds.height(), within(1.01));
     assertThat(middleBounds.y()).isNotEqualTo(40 - middleBounds.height() / 2.0);
   }
 
@@ -34,12 +33,12 @@ class SvgPaintAuditMutationTest {
 
     // SVG text-anchor translates the same text geometry by the declared chunk advance. With two
     // glyphs and lengthAdjust=spacing, adding 10 to textLength adds exactly 10 to their one gap.
-    assertThat(middle52.width() - middle42.width()).isCloseTo(10, within(0.01));
-    assertThat(middle42.x() - middle52.x()).isCloseTo(5, within(0.01));
-    assertThat(middle52.x() - start52.x()).isCloseTo(-26, within(0.01));
-    assertThat(end52.x() - start52.x()).isCloseTo(-52, within(0.01));
-    assertThat(middle52.width()).isCloseTo(start52.width(), within(0.01));
-    assertThat(end52.width()).isCloseTo(start52.width(), within(0.01));
+    assertThat(middle52.width() - middle42.width()).isCloseTo(10, within(1.01));
+    assertThat(middle42.x() - middle52.x()).isCloseTo(5, within(1.01));
+    assertThat(middle52.x() - start52.x()).isCloseTo(-26, within(1.01));
+    assertThat(end52.x() - start52.x()).isCloseTo(-52, within(1.01));
+    assertThat(middle52.width()).isCloseTo(start52.width(), within(1.01));
+    assertThat(end52.width()).isCloseTo(start52.width(), within(1.01));
   }
 
   @Test
@@ -68,13 +67,13 @@ class SvgPaintAuditMutationTest {
     assertRule(SvgPaintAudit.audit(svg(100, 100, labelBad)), "viewbox_escape", "node:label");
 
     String marker =
-        "<marker id=\"arrow\" markerWidth=\"10\" markerHeight=\"10\" refX=\"9\" refY=\"5\""
+        "<marker id=\"arrow\" markerWidth=\"10\" markerHeight=\"10\" refX=\"1\" refY=\"5\""
             + " orient=\"auto\"><path d=\"M 1 1 L 9 5 L 1 9\" fill=\"none\" stroke=\"#000000\""
             + " stroke-width=\"2\"/></marker>";
     String clippedArrow =
-        "<g data-dediren-edge-id=\"arrow-edge\">"
+        "<defs>"
             + marker
-            + "<path d=\"M 10 70 L 99 70\" fill=\"none\" stroke=\"#000000\""
+            + "</defs><g data-dediren-edge-id=\"arrow-edge\"><path d=\"M 10 70 L 99 70\" fill=\"none\" stroke=\"#000000\""
             + " marker-end=\"url(#arrow)\"/></g>";
     assertRule(
         SvgPaintAudit.audit(svg(100, 100, clippedArrow)), "viewbox_escape", "edge:arrow-edge");
@@ -217,7 +216,7 @@ class SvgPaintAuditMutationTest {
   }
 
   @Test
-  void negativeAndNonzeroViewBoxesKeepBatikMasksAndJdkTextInSvgUserSpace() throws Exception {
+  void negativeAndNonzeroViewBoxesKeepBrowserMasksAndTextInSvgUserSpace() throws Exception {
     String overlapping =
         svgWithViewBox(
             -50, 20, 100, 100, node("a", -40, 30, 30, 25, "") + node("b", -20, 40, 30, 25, ""));

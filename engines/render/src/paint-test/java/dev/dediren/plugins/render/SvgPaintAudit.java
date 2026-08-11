@@ -1,22 +1,9 @@
 package dev.dediren.plugins.render;
 
-import java.awt.BasicStroke;
-import java.awt.Font;
-import java.awt.Shape;
-import java.awt.font.FontRenderContext;
-import java.awt.font.GlyphVector;
-import java.awt.font.TextLayout;
-import java.awt.geom.AffineTransform;
-import java.awt.geom.Area;
 import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
-import java.io.InputStream;
 import java.io.StringReader;
 import java.io.StringWriter;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -42,11 +29,7 @@ import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.InputSource;
 
-/**
- * Test-local layered SVG paint oracle. Batik owns non-text decorated paint; JDK text layout with
- * the bundled Liberation Sans owns text because Batik 1.19 ignores {@code
- * dominant-baseline=middle}.
- */
+/** Test-local layered SVG paint oracle backed by deterministic Chromium paint and DOM geometry. */
 final class SvgPaintAudit {
 
   enum ThemeOwnership {
@@ -63,9 +46,10 @@ final class SvgPaintAudit {
   private static final double VIEWBOX_TOLERANCE = 0.51;
   private static final double AUDIT_VIEWPORT_PADDING = 64;
   private static final int MASK_ALPHA_THRESHOLD = 16;
-  private static final Pattern TRANSFORM_COMMAND = Pattern.compile("([a-zA-Z]+)\\s*\\(([^)]*)\\)");
   private static final Pattern NUMBER =
       Pattern.compile("[-+]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)(?:[eE][-+]?\\d+)?");
+  private static final Pattern RGB_COLOR =
+      Pattern.compile("rgb\\(\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,\\s*(\\d+)\\s*\\)");
   private static final Set<String> FINITE_ATTRIBUTES =
       Set.of(
           "x",
@@ -86,9 +70,6 @@ final class SvgPaintAudit {
           "textLength");
   private static final Set<String> PAINT_ELEMENTS =
       Set.of("rect", "circle", "ellipse", "path", "line", "polyline", "polygon");
-  private static final FontRenderContext FONT_CONTEXT = new FontRenderContext(null, true, true);
-  private static final Font TEXT_FONT = loadTextFont();
-  private static final double TEXT_X_HEIGHT_EM = loadTextXHeightEm();
 
   private SvgPaintAudit() {}
 
@@ -106,8 +87,8 @@ final class SvgPaintAudit {
     }
 
     expandAuditViewport(document.getDocumentElement(), state.viewBox);
-    try (BatikTestSupport.BuiltSvg built = BatikTestSupport.build(serialize(document))) {
-      state.attachBatik(built);
+    try (BrowserTestSupport.BrowserSvg browser = BrowserTestSupport.build(serialize(document))) {
+      state.attachBrowser(browser);
       state.measurePaint();
       state.auditViewBoxAndPositivePaint();
       state.auditLabelOverflow();
@@ -170,6 +151,12 @@ final class SvgPaintAudit {
               rectangle.getX(), rectangle.getY(), rectangle.getWidth(), rectangle.getHeight());
     }
 
+    static Bounds from(BrowserTestSupport.BrowserBounds rectangle) {
+      return rectangle == null
+          ? null
+          : new Bounds(rectangle.minX(), rectangle.minY(), rectangle.width(), rectangle.height());
+    }
+
     static Bounds union(Collection<Bounds> bounds) {
       Rectangle2D union = null;
       for (Bounds bound : bounds) {
@@ -229,7 +216,8 @@ final class SvgPaintAudit {
     private final Set<String> findingKeys = new LinkedHashSet<>();
     private final Map<SemanticPaint, BufferedImage> masks = new IdentityHashMap<>();
     private final Map<String, BufferedImage> routeMasks = new LinkedHashMap<>();
-    private BatikTestSupport.BuiltSvg built;
+    private final Map<TextPaint, BufferedImage> textMasks = new IdentityHashMap<>();
+    private BrowserTestSupport.BrowserSvg browser;
     private Bounds viewBox;
     private int auditId;
     private boolean nonFiniteGeometry;
@@ -258,6 +246,11 @@ final class SvgPaintAudit {
         }
         String tag = localName(element);
         if ("text".equals(tag)) {
+          ensureAuditId(element);
+          NodeList runs = element.getElementsByTagName("tspan");
+          for (int index = 0; index < runs.getLength(); index++) {
+            ensureAuditId((Element) runs.item(index));
+          }
           owner.textElements.add(element);
         } else if (PAINT_ELEMENTS.contains(tag) && !insideDefinition(element)) {
           String id = element.getAttribute("id");
@@ -284,6 +277,12 @@ final class SvgPaintAudit {
               "authored shape has non-positive geometry",
               "rendered geometry must have positive width and height");
         }
+      }
+    }
+
+    private void ensureAuditId(Element element) {
+      if (element.getAttribute("id").isBlank()) {
+        element.setAttribute("id", "dediren-paint-audit-" + (++auditId));
       }
     }
 
@@ -367,23 +366,24 @@ final class SvgPaintAudit {
       return nonFiniteGeometry;
     }
 
-    private void attachBatik(BatikTestSupport.BuiltSvg built) {
-      this.built = built;
+    private void attachBrowser(BrowserTestSupport.BrowserSvg browser) {
+      this.browser = browser;
     }
 
     private void measurePaint() {
       for (SemanticPaint semantic : semantics) {
         for (String id : semantic.paintIds) {
           try {
-            Bounds bound = Bounds.from(built.transformedNonTextPaintBounds(id));
+            Bounds bound = Bounds.from(browser.paintedBounds(id));
             if (bound != null) {
               semantic.nonTextBounds.add(bound);
+              semantic.paintBoundsById.put(id, bound);
             }
           } catch (IllegalArgumentException noPaint) {
             // The semantic positive-area rule below reports omitted/degenerate paint with context.
           }
           try {
-            Bounds geometry = Bounds.from(built.transformedNonTextPrimitiveBounds(id));
+            Bounds geometry = Bounds.from(browser.geometryBounds(id));
             if (geometry != null) {
               semantic.nonTextGeometryBounds.put(id, geometry);
             }
@@ -392,9 +392,15 @@ final class SvgPaintAudit {
           }
         }
         for (Element text : semantic.textElements) {
-          semantic.textPaint.addAll(measureText(text, semantic.key, advisories, findingKeys));
+          semantic.textPaint.addAll(
+              measureText(text, semantic.key, browser, advisories, findingKeys));
         }
         ArrayList<Bounds> all = new ArrayList<>(semantic.nonTextBounds);
+        Bounds rasterPaint = maskBounds(mask(semantic), browser.viewport());
+        if (rasterPaint != null) {
+          all.add(rasterPaint);
+          semantic.nonTextBounds.add(rasterPaint);
+        }
         semantic.textPaint.stream()
             .filter(TextPaint::measurable)
             .map(TextPaint::bounds)
@@ -508,7 +514,7 @@ final class SvgPaintAudit {
               continue;
             }
             ArrayList<Bounds> paintedOverlaps = new ArrayList<>();
-            paintedOverlaps.add(textMaskIntersection(label, mask(node), built.viewport()));
+            paintedOverlaps.add(textMaskIntersection(label, mask(node)));
             node.textPaint.stream()
                 .filter(TextPaint::measurable)
                 .map(nodeLabel -> textIntersection(label, nodeLabel))
@@ -559,7 +565,7 @@ final class SvgPaintAudit {
                 || label.bounds.intersection(node.bounds) == null) {
               continue;
             }
-            Bounds overlap = textMaskIntersection(label, mask(node), built.viewport());
+            Bounds overlap = textMaskIntersection(label, mask(node));
             if (overlap != null) {
               addViolation(
                   "edge_label_node_collision",
@@ -629,12 +635,12 @@ final class SvgPaintAudit {
     }
 
     private boolean haloText(Element element) {
-      return "none".equals(effective(element, "fill", "black"))
-          && !"none".equals(effective(element, "stroke", "none"));
+      BrowserTestSupport.ComputedStyle style = browser.computedStyle(element.getAttribute("id"));
+      return "none".equals(style.fill()) && !"none".equals(style.stroke());
     }
 
     private boolean foregroundText(Element element) {
-      return !"none".equals(effective(element, "fill", "black"));
+      return !"none".equals(browser.computedStyle(element.getAttribute("id")).fill());
     }
 
     private void auditRoutes() {
@@ -642,7 +648,7 @@ final class SvgPaintAudit {
           semantics.stream().flatMap(semantic -> semantic.textPaint.stream()).toList();
       for (SemanticPaint edge : byKind(SemanticKind.EDGE)) {
         BufferedImage route = routeMask(edge);
-        Bounds routeBounds = Bounds.union(edge.routeBounds(built));
+        Bounds routeBounds = Bounds.union(edge.routeBounds());
         if (routeBounds == null) {
           continue;
         }
@@ -650,12 +656,11 @@ final class SvgPaintAudit {
           if (node.sequenceStructure()
               || node.bounds == null
               || routeBounds.intersection(node.bounds) == null
-              || edge.endpointNode(node)) {
+              || edge.endpointNode(node, browser)) {
             continue;
           }
           Bounds overlap =
-              maskIntersection(
-                  route, mask(node), routeBounds.intersection(node.bounds), built.viewport());
+              maskIntersection(route, mask(node), routeBounds.intersection(node.bounds));
           if (overlap != null && !boundaryContactOnly(overlap, node)) {
             addViolation(
                 "edge_route_node_collision",
@@ -671,7 +676,7 @@ final class SvgPaintAudit {
               || label.semanticKey.equals(edge.key)) {
             continue;
           }
-          Bounds overlap = textMaskIntersection(label, route, built.viewport());
+          Bounds overlap = textMaskIntersection(label, route);
           if (overlap != null) {
             addViolation(
                 "edge_route_label_collision",
@@ -690,7 +695,9 @@ final class SvgPaintAudit {
         if (shape == null) {
           continue;
         }
-        String shapeFill = effective(shape, "fill", "#000000");
+        BrowserTestSupport.ComputedStyle shapeStyle =
+            browser.computedStyle(shape.getAttribute("id"));
+        String shapeFill = shapeStyle.fill();
         double[] shapeColor = parseColor(shapeFill);
         if (shapeColor == null) {
           addAdvisory(
@@ -702,11 +709,10 @@ final class SvgPaintAudit {
           continue;
         }
         double shapeOpacity =
-            effectiveOpacity(shape, "fill-opacity") * effectiveOpacity(shape, "opacity");
+            computedOpacity(shapeStyle.fillOpacity()) * computedOpacity(shapeStyle.opacity());
         double[] background = composite(shapeColor, shapeOpacity, pageBackground);
         for (TextPaint text : node.textPaint) {
-          Element textElement = text.element;
-          String textFill = effective(textElement, "fill", "#000000");
+          String textFill = text.style.fill();
           double[] foreground = parseColor(textFill);
           if (foreground == null) {
             addAdvisory(
@@ -718,8 +724,7 @@ final class SvgPaintAudit {
             continue;
           }
           double textOpacity =
-              effectiveOpacity(textElement, "fill-opacity")
-                  * effectiveOpacity(textElement, "opacity");
+              computedOpacity(text.style.fillOpacity()) * computedOpacity(text.style.opacity());
           double[] compositedForeground = composite(foreground, textOpacity, background);
           double ratio = contrastRatio(compositedForeground, background);
           double minimum = text.largeText ? 3.0 : 4.5;
@@ -739,25 +744,30 @@ final class SvgPaintAudit {
 
     private BufferedImage mask(SemanticPaint semantic) {
       return masks.computeIfAbsent(
-          semantic, ignored -> BatikTestSupport.rasterizeNonTextNodes(built, semantic.paintIds));
+          semantic, ignored -> BrowserTestSupport.rasterizeNodes(browser, semantic.paintIds));
     }
 
     private BufferedImage routeMask(SemanticPaint edge) {
       return routeMasks.computeIfAbsent(
-          edge.key, ignored -> BatikTestSupport.rasterizeNonTextNodes(built, edge.routeIds));
+          edge.key, ignored -> BrowserTestSupport.rasterizeNodes(browser, edge.routeIds));
+    }
+
+    private BufferedImage textMask(TextPaint text) {
+      return textMasks.computeIfAbsent(
+          text, ignored -> BrowserTestSupport.rasterizeNodes(browser, List.of(text.id)));
     }
 
     private Bounds nodePaintIntersection(SemanticPaint left, SemanticPaint right) {
       ArrayList<Bounds> overlaps = new ArrayList<>();
       Bounds candidate = left.bounds.intersection(right.bounds);
-      overlaps.add(maskIntersection(mask(left), mask(right), candidate, built.viewport()));
+      overlaps.add(maskIntersection(mask(left), mask(right), candidate));
       left.textPaint.stream()
           .filter(TextPaint::measurable)
-          .map(text -> textMaskIntersection(text, mask(right), built.viewport()))
+          .map(text -> textMaskIntersection(text, mask(right)))
           .forEach(overlaps::add);
       right.textPaint.stream()
           .filter(TextPaint::measurable)
-          .map(text -> textMaskIntersection(text, mask(left), built.viewport()))
+          .map(text -> textMaskIntersection(text, mask(left)))
           .forEach(overlaps::add);
       for (TextPaint leftText : left.textPaint) {
         if (!leftText.measurable()) {
@@ -769,6 +779,19 @@ final class SvgPaintAudit {
             .forEach(overlaps::add);
       }
       return Bounds.union(overlaps);
+    }
+
+    private Bounds textMaskIntersection(TextPaint text, BufferedImage mask) {
+      return maskIntersection(textMask(text), mask, text.bounds);
+    }
+
+    private Bounds textIntersection(TextPaint left, TextPaint right) {
+      return maskIntersection(
+          textMask(left), textMask(right), left.bounds.intersection(right.bounds));
+    }
+
+    private Bounds maskIntersection(BufferedImage left, BufferedImage right, Bounds candidate) {
+      return SvgPaintAudit.maskIntersection(left, right, candidate, browser.viewport());
     }
 
     private boolean boundaryContactOnly(Bounds overlap, SemanticPaint node) {
@@ -820,6 +843,7 @@ final class SvgPaintAudit {
     private final List<Element> textElements = new ArrayList<>();
     private final List<TextPaint> textPaint = new ArrayList<>();
     private final List<Bounds> nonTextBounds = new ArrayList<>();
+    private final Map<String, Bounds> paintBoundsById = new LinkedHashMap<>();
     private final Map<String, Bounds> nonTextGeometryBounds = new LinkedHashMap<>();
     private Bounds bounds;
 
@@ -865,10 +889,10 @@ final class SvgPaintAudit {
           || "ExecutionSpecification".equals(element.getAttribute("data-dediren-node-type"));
     }
 
-    private List<Bounds> routeBounds(BatikTestSupport.BuiltSvg built) {
+    private List<Bounds> routeBounds() {
       ArrayList<Bounds> bounds = new ArrayList<>();
       for (String id : routeIds) {
-        Bounds bound = Bounds.from(built.transformedNonTextPaintBounds(id));
+        Bounds bound = paintBoundsById.get(id);
         if (bound != null) {
           bounds.add(bound);
         }
@@ -876,12 +900,12 @@ final class SvgPaintAudit {
       return bounds;
     }
 
-    private boolean endpointNode(SemanticPaint node) {
+    private boolean endpointNode(SemanticPaint node, BrowserTestSupport.BrowserSvg browser) {
       if (node.bounds == null || routeElements.isEmpty()) {
         return false;
       }
-      Point start = endpoint(routeElements.getFirst(), true);
-      Point end = endpoint(routeElements.getLast(), false);
+      Point start = endpoint(routeElements.getFirst(), true, browser);
+      Point end = endpoint(routeElements.getLast(), false, browser);
       return (start != null && node.bounds.contains(start.x, start.y, 2.5))
           || (end != null && node.bounds.contains(end.x, end.y, 2.5));
     }
@@ -894,10 +918,11 @@ final class SvgPaintAudit {
   private record TextPaint(
       String semanticKey,
       Element element,
+      String id,
+      BrowserTestSupport.ComputedStyle style,
       String text,
       Bounds bounds,
       Bounds geometryBounds,
-      Shape shape,
       boolean measurable,
       boolean largeText) {
     private Bounds boundsOrZero() {
@@ -908,7 +933,11 @@ final class SvgPaintAudit {
   private record Point(double x, double y) {}
 
   private static List<TextPaint> measureText(
-      Element text, String semanticKey, List<Violation> advisories, Set<String> findingKeys) {
+      Element text,
+      String semanticKey,
+      BrowserTestSupport.BrowserSvg browser,
+      List<Violation> advisories,
+      Set<String> findingKeys) {
     ArrayList<Element> runs = new ArrayList<>();
     NodeList tspans = text.getElementsByTagName("tspan");
     if (tspans.getLength() == 0) {
@@ -933,10 +962,11 @@ final class SvgPaintAudit {
         currentY = number(run, "y", currentY);
       }
       currentY += number(run, "dy", 0);
-      double size = Double.parseDouble(effective(run, "font-size", "14"));
-      int weight = parseWeight(effective(run, "font-weight", "400"));
+      BrowserTestSupport.ComputedStyle style = browser.computedStyle(run.getAttribute("id"));
+      double size = Double.parseDouble(style.fontSize().replace("px", ""));
+      int weight = parseWeight(style.fontWeight());
       boolean large = size >= 24.0 || (size >= 18.66 && weight >= 700);
-      if (!BatikTestSupport.canDisplay(string)) {
+      if (!BrowserTestSupport.canDisplay(string)) {
         String key = "A|font_missing|" + semanticKey;
         if (findingKeys.add(key)) {
           advisories.add(
@@ -947,17 +977,13 @@ final class SvgPaintAudit {
                   "bundled Liberation Sans cannot display all glyphs in '" + string + "'",
                   "text geometry is advisory when the pinned font lacks glyph coverage"));
         }
-        paints.add(new TextPaint(semanticKey, run, string, null, null, null, false, large));
+        paints.add(
+            new TextPaint(
+                semanticKey, run, run.getAttribute("id"), style, string, null, null, false, large));
         continue;
       }
 
-      Font font = TEXT_FONT.deriveFont(weight >= 700 ? Font.BOLD : Font.PLAIN, (float) size);
-      TextLayout layout = new TextLayout(string, font, FONT_CONTEXT);
-      double naturalAdvance = Math.max(layout.getAdvance(), 0.0001);
-      double desiredAdvance = number(run, "textLength", number(text, "textLength", naturalAdvance));
-      Shape outline = adjustedTextOutline(run, text, string, font, layout, desiredAdvance);
-      Shape decoratedOutline = decoratedTextOutline(run, text, outline);
-      String filter = effective(run, "filter", effective(text, "filter", "none"));
+      String filter = style.filter();
       if (!"none".equals(filter)) {
         String key = "A|not_measurable|text-filter|" + semanticKey;
         if (findingKeys.add(key)) {
@@ -970,96 +996,28 @@ final class SvgPaintAudit {
                   "filtered text geometry requires an independent measurable composition"));
         }
       }
-      String anchor = effective(run, "text-anchor", effective(text, "text-anchor", "start"));
-      double horizontal =
-          switch (anchor) {
-            case "middle" -> x - desiredAdvance / 2.0;
-            case "end" -> x - desiredAdvance;
-            default -> x;
-          };
-      String baseline =
-          effective(run, "dominant-baseline", effective(text, "dominant-baseline", "auto"));
-      // SVG's middle baseline is the x-middle baseline, not the visual ink-box center. With the
-      // exact pinned font, the alphabetic baseline therefore sits half an x-height below y.
-      double xHeight = size * TEXT_X_HEIGHT_EM;
-      double vertical = "middle".equals(baseline) ? currentY + xHeight / 2.0 : currentY;
-      AffineTransform positioning = AffineTransform.getTranslateInstance(horizontal, vertical);
-      Shape positionedGeometry = positioning.createTransformedShape(outline);
-      Shape positionedPaint =
-          AffineTransform.getTranslateInstance(horizontal, vertical)
-              .createTransformedShape(decoratedOutline);
-      AffineTransform transform = ancestorTransform(run);
-      Shape transformedGeometry = transform.createTransformedShape(positionedGeometry);
-      Shape transformedPaint = transform.createTransformedShape(positionedPaint);
-      Bounds bounds = Bounds.from(transformedPaint.getBounds2D());
-      Bounds geometryBounds = Bounds.from(transformedGeometry.getBounds2D());
+      Bounds bounds = Bounds.from(browser.paintedBounds(run.getAttribute("id")));
+      Bounds geometryBounds = Bounds.from(browser.geometryBounds(run.getAttribute("id")));
       paints.add(
           new TextPaint(
-              semanticKey, run, string, bounds, geometryBounds, transformedPaint, true, large));
+              semanticKey,
+              run,
+              run.getAttribute("id"),
+              style,
+              string,
+              bounds,
+              geometryBounds,
+              true,
+              large));
     }
     return paints;
-  }
-
-  private static Shape adjustedTextOutline(
-      Element run,
-      Element text,
-      String string,
-      Font font,
-      TextLayout layout,
-      double desiredAdvance) {
-    boolean hasTextLength = run.hasAttribute("textLength") || text.hasAttribute("textLength");
-    if (!hasTextLength) {
-      return layout.getOutline(null);
-    }
-
-    double naturalAdvance = Math.max(layout.getAdvance(), 0.0001);
-    String lengthAdjust =
-        effective(run, "lengthAdjust", effective(text, "lengthAdjust", "spacing"));
-    if ("spacingAndGlyphs".equals(lengthAdjust)) {
-      return AffineTransform.getScaleInstance(desiredAdvance / naturalAdvance, 1)
-          .createTransformedShape(layout.getOutline(null));
-    }
-
-    char[] characters = string.toCharArray();
-    int layoutFlags =
-        "rtl".equals(effective(run, "direction", effective(text, "direction", "ltr")))
-            ? Font.LAYOUT_RIGHT_TO_LEFT
-            : Font.LAYOUT_LEFT_TO_RIGHT;
-    GlyphVector glyphs =
-        font.layoutGlyphVector(FONT_CONTEXT, characters, 0, characters.length, layoutFlags);
-    int glyphCount = glyphs.getNumGlyphs();
-    if (glyphCount < 2) {
-      return glyphs.getOutline();
-    }
-    double glyphAdvance = glyphs.getGlyphPosition(glyphCount).getX();
-    double extraSpacing = (desiredAdvance - glyphAdvance) / (glyphCount - 1);
-    Area adjusted = new Area();
-    for (int index = 0; index < glyphCount; index++) {
-      adjusted.add(new Area(glyphs.getGlyphOutline(index, (float) (index * extraSpacing), 0)));
-    }
-    return adjusted;
-  }
-
-  private static Shape decoratedTextOutline(Element run, Element text, Shape outline) {
-    Area paint = new Area();
-    String fill = effective(run, "fill", effective(text, "fill", "black"));
-    if (!"none".equals(fill) && effectiveOpacity(run, "fill-opacity") > 0) {
-      paint.add(new Area(outline));
-    }
-    String stroke = effective(run, "stroke", effective(text, "stroke", "none"));
-    double strokeWidth =
-        Double.parseDouble(effective(run, "stroke-width", effective(text, "stroke-width", "1")));
-    if (!"none".equals(stroke) && strokeWidth > 0 && effectiveOpacity(run, "stroke-opacity") > 0) {
-      paint.add(new Area(new BasicStroke((float) strokeWidth).createStrokedShape(outline)));
-    }
-    return paint;
   }
 
   private static Bounds maskIntersection(
       BufferedImage left,
       BufferedImage right,
       Bounds candidate,
-      BatikTestSupport.Viewport viewport) {
+      BrowserTestSupport.Viewport viewport) {
     if (candidate == null) {
       return null;
     }
@@ -1092,24 +1050,14 @@ final class SvgPaintAudit {
         : imageBounds(viewport, foundMinX, foundMinY, foundMaxX, foundMaxY);
   }
 
-  private static Bounds textMaskIntersection(
-      TextPaint text, BufferedImage mask, BatikTestSupport.Viewport viewport) {
-    if (!text.measurable || text.bounds == null) {
-      return null;
-    }
-    int minimumX = Math.max(0, (int) Math.floor(viewport.imageX(text.bounds.x)));
-    int minimumY = Math.max(0, (int) Math.floor(viewport.imageY(text.bounds.y)));
-    int maximumX = Math.min(mask.getWidth(), (int) Math.ceil(viewport.imageX(text.bounds.maxX())));
-    int maximumY = Math.min(mask.getHeight(), (int) Math.ceil(viewport.imageY(text.bounds.maxY())));
+  private static Bounds maskBounds(BufferedImage image, BrowserTestSupport.Viewport viewport) {
     int foundMinX = Integer.MAX_VALUE;
     int foundMinY = Integer.MAX_VALUE;
     int foundMaxX = Integer.MIN_VALUE;
     int foundMaxY = Integer.MIN_VALUE;
-    for (int y = minimumY; y < maximumY; y++) {
-      for (int x = minimumX; x < maximumX; x++) {
-        double userX = viewport.userX(x + 0.5);
-        double userY = viewport.userY(y + 0.5);
-        if (alpha(mask, x, y) > MASK_ALPHA_THRESHOLD && text.shape.contains(userX, userY)) {
+    for (int y = 0; y < image.getHeight(); y++) {
+      for (int x = 0; x < image.getWidth(); x++) {
+        if (alpha(image, x, y) > MASK_ALPHA_THRESHOLD) {
           foundMinX = Math.min(foundMinX, x);
           foundMinY = Math.min(foundMinY, y);
           foundMaxX = Math.max(foundMaxX, x);
@@ -1123,26 +1071,22 @@ final class SvgPaintAudit {
   }
 
   private static Bounds imageBounds(
-      BatikTestSupport.Viewport viewport, int minimumX, int minimumY, int maximumX, int maximumY) {
+      BrowserTestSupport.Viewport viewport,
+      int minimumX,
+      int minimumY,
+      int maximumX,
+      int maximumY) {
     double x = viewport.userX(minimumX);
     double y = viewport.userY(minimumY);
     return new Bounds(x, y, viewport.userX(maximumX + 1.0) - x, viewport.userY(maximumY + 1.0) - y);
-  }
-
-  private static Bounds textIntersection(TextPaint left, TextPaint right) {
-    if (left.bounds.intersection(right.bounds) == null) {
-      return null;
-    }
-    Area intersection = new Area(left.shape);
-    intersection.intersect(new Area(right.shape));
-    return intersection.isEmpty() ? null : Bounds.from(intersection.getBounds2D());
   }
 
   private static int alpha(BufferedImage image, int x, int y) {
     return image.getRGB(x, y) >>> 24;
   }
 
-  private static Point endpoint(Element route, boolean first) {
+  private static Point endpoint(
+      Element route, boolean first, BrowserTestSupport.BrowserSvg browser) {
     String tag = localName(route);
     Point point;
     if ("line".equals(tag)) {
@@ -1162,10 +1106,9 @@ final class SvgPaintAudit {
       int index = first ? 0 : values.size() - 2;
       point = new Point(values.get(index), values.get(index + 1));
     }
-    var transformed =
-        ancestorTransform(route)
-            .transform(new java.awt.geom.Point2D.Double(point.x, point.y), null);
-    return new Point(transformed.getX(), transformed.getY());
+    BrowserTestSupport.BrowserPoint transformed =
+        browser.transformPoint(route.getAttribute("id"), point.x, point.y);
+    return new Point(transformed.x(), transformed.y());
   }
 
   private static Document parse(String svg) throws Exception {
@@ -1291,63 +1234,12 @@ final class SvgPaintAudit {
     return fallback;
   }
 
-  private static double effectiveOpacity(Element element, String attribute) {
+  private static double computedOpacity(String value) {
     try {
-      return Math.clamp(Double.parseDouble(effective(element, attribute, "1")), 0, 1);
+      return Math.clamp(Double.parseDouble(value), 0, 1);
     } catch (NumberFormatException invalid) {
       return 1;
     }
-  }
-
-  private static AffineTransform ancestorTransform(Element element) {
-    ArrayList<Element> ancestors = new ArrayList<>();
-    for (Node node = element; node instanceof Element current; node = current.getParentNode()) {
-      ancestors.add(current);
-    }
-    Collections.reverse(ancestors);
-    AffineTransform transform = new AffineTransform();
-    for (Element ancestor : ancestors) {
-      if ("true".equals(ancestor.getAttribute("data-dediren-paint-audit-viewport"))) {
-        continue;
-      }
-      transform.concatenate(parseTransform(ancestor.getAttribute("transform")));
-    }
-    return transform;
-  }
-
-  private static AffineTransform parseTransform(String value) {
-    AffineTransform transform = new AffineTransform();
-    Matcher matcher = TRANSFORM_COMMAND.matcher(value == null ? "" : value);
-    while (matcher.find()) {
-      ArrayList<Double> values = new ArrayList<>();
-      Matcher number = NUMBER.matcher(matcher.group(2));
-      while (number.find()) {
-        values.add(Double.parseDouble(number.group()));
-      }
-      switch (matcher.group(1)) {
-        case "translate" ->
-            transform.translate(values.getFirst(), values.size() > 1 ? values.get(1) : 0);
-        case "scale" ->
-            transform.scale(
-                values.getFirst(), values.size() > 1 ? values.get(1) : values.getFirst());
-        case "matrix" -> {
-          if (values.size() == 6) {
-            transform.concatenate(
-                new AffineTransform(
-                    values.get(0),
-                    values.get(1),
-                    values.get(2),
-                    values.get(3),
-                    values.get(4),
-                    values.get(5)));
-          }
-        }
-        default -> {
-          // Dediren emits no rotate/skew transforms; unsupported test transforms remain unchanged.
-        }
-      }
-    }
-    return transform;
   }
 
   private static String directText(Element element) {
@@ -1374,46 +1266,6 @@ final class SvgPaintAudit {
         }
       }
     };
-  }
-
-  private static Font loadTextFont() {
-    try (InputStream input = Files.newInputStream(BatikTestSupport.FONT_PATH)) {
-      return Font.createFont(Font.TRUETYPE_FONT, input);
-    } catch (Exception failure) {
-      throw new IllegalStateException(
-          "could not load bundled Liberation Sans text oracle", failure);
-    }
-  }
-
-  private static double loadTextXHeightEm() {
-    try {
-      byte[] font = Files.readAllBytes(BatikTestSupport.FONT_PATH);
-      ByteBuffer table = ByteBuffer.wrap(font).order(ByteOrder.BIG_ENDIAN);
-      int tableCount = Short.toUnsignedInt(table.getShort(4));
-      int headOffset = -1;
-      int os2Offset = -1;
-      for (int index = 0; index < tableCount; index++) {
-        int record = 12 + index * 16;
-        String tag = new String(font, record, 4, StandardCharsets.US_ASCII);
-        int offset = table.getInt(record + 8);
-        if ("head".equals(tag)) {
-          headOffset = offset;
-        } else if ("OS/2".equals(tag)) {
-          os2Offset = offset;
-        }
-      }
-      if (headOffset < 0 || os2Offset < 0 || Short.toUnsignedInt(table.getShort(os2Offset)) < 2) {
-        throw new IllegalStateException("bundled font lacks the OpenType x-height metric");
-      }
-      int unitsPerEm = Short.toUnsignedInt(table.getShort(headOffset + 18));
-      int xHeight = table.getShort(os2Offset + 86);
-      if (unitsPerEm <= 0 || xHeight <= 0) {
-        throw new IllegalStateException("bundled font has an invalid OpenType x-height metric");
-      }
-      return (double) xHeight / unitsPerEm;
-    } catch (Exception failure) {
-      throw new IllegalStateException("could not read bundled Liberation Sans x-height", failure);
-    }
   }
 
   private static boolean hasDescendantAttribute(Element element, String attribute, String value) {
@@ -1479,6 +1331,14 @@ final class SvgPaintAudit {
         Integer.parseInt(value.substring(1, 2) + value.substring(1, 2), 16),
         Integer.parseInt(value.substring(2, 3) + value.substring(2, 3), 16),
         Integer.parseInt(value.substring(3, 4) + value.substring(3, 4), 16)
+      };
+    }
+    Matcher rgb = RGB_COLOR.matcher(value);
+    if (rgb.matches()) {
+      return new double[] {
+        Double.parseDouble(rgb.group(1)),
+        Double.parseDouble(rgb.group(2)),
+        Double.parseDouble(rgb.group(3))
       };
     }
     return switch (value.toLowerCase(Locale.ROOT)) {

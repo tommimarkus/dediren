@@ -1,32 +1,48 @@
 {
-  "schema" : "dediren-render-paint-raster-manifest-v1",
+  "schema" : "dediren-render-paint-raster-manifest-v2",
   "purpose" : "Deterministic raster backstop for repository-owned SVG render fixtures",
   "renderer" : {
-    "name" : "Apache Batik GVT + JDK ImageIO",
-    "version" : "1.19",
-    "upstream" : "https://xmlgraphics.apache.org/batik/",
-    "release" : "https://xmlgraphics.apache.org/batik/download.cgi",
-    "license" : "Apache-2.0",
-    "licenseFile" : "https://www.apache.org/licenses/LICENSE-2.0",
-    "maven" : {
-      "artifact" : "org.apache.xmlgraphics:batik-bridge:1.19",
-      "repository" : "Maven Central",
-      "scope" : "test-profile-only"
+    "name" : "Chromium headless shell via Playwright Java",
+    "playwright" : {
+      "version" : "1.61.0",
+      "mavenArtifact" : "com.microsoft.playwright:playwright:1.61.0",
+      "scope" : "render-paint-test-profile-only",
+      "upstream" : "https://playwright.dev/java/",
+      "license" : "Apache-2.0"
     },
-    "shippedWithDediren" : false,
-    "nativeExecutable" : false,
-    "textGeometryAuthority" : "JDK bundled-font oracle, not Batik",
-    "knownLimitation" : "Batik 1.19 ignores dominant-baseline=middle; Batik bounds are never used for text geometry.",
+    "chromium" : {
+      "version" : "149.0.7827.55",
+      "revision" : "1228",
+      "distribution" : "chromium-headless-shell",
+      "cache" : ".cache/playwright",
+      "downloadedBy" : "playwright install --only-shell chromium",
+      "shippedWithDediren" : false,
+      "committed" : false,
+      "nativeExecutable" : true
+    },
+    "container" : {
+      "image" : "mcr.microsoft.com/playwright/java:v1.61.0-noble",
+      "digest" : "sha256:a23837c4bb84165c2156f64411ae79d7e42ef91c9d8f960691d06c5d43a684f4",
+      "reference" : "mcr.microsoft.com/playwright/java:v1.61.0-noble@sha256:a23837c4bb84165c2156f64411ae79d7e42ef91c9d8f960691d06c5d43a684f4",
+      "scope" : "scheduled-and-manual-render-paint-workflow"
+    },
+    "geometryAuthority" : "Chromium SVG DOM geometry, computed styles and transparent pixel masks",
     "rasterEnvironment" : {
       "javaFeatureVersion" : 21,
       "javaDistribution" : "Eclipse Temurin",
       "javaVendor" : "Eclipse Adoptium",
       "javaRuntimeVersion" : "21.0.10+7-LTS",
       "headless" : true,
-      "viewport" : "intrinsic SVG CSS-pixel width and height",
-      "deviceScaleFactorEquivalent" : 1,
-      "outputFormat" : "JDK ImageIO PNG, 8-bit RGBA",
-      "renderingHints" : [ "antialiasing:on", "text-antialiasing:on", "fractional-metrics:on", "render-quality", "stroke:pure" ]
+      "locale" : "en-US",
+      "timezone" : "UTC",
+      "reducedMotion" : "reduce",
+      "viewport" : "intrinsic SVG CSS-pixel dimensions rounded up with 32 transparent CSS pixels on every side and visible root overflow; audit documents additionally add a 64 user-unit safety border on every side",
+      "deviceScaleFactor" : 1,
+      "background" : "transparent",
+      "outputFormat" : "Chromium PNG, 8-bit RGBA",
+      "lifecycle" : "one non-persistent browser, context, and page per BrowserSvg; close() disposes all three",
+      "network" : "offline context, blocked service workers, and catch-all route abort with no external URLs in admitted SVG",
+      "telemetry" : "background networking, component updates, domain reliability, sync, crash reporting, translation, media routing, optimization hints, extensions, and default apps disabled"
     }
   },
   "font" : {
@@ -49,8 +65,9 @@
       "fedoraPackagePage" : "https://packages.fedoraproject.org/pkgs/liberation-fonts/liberation-sans-fonts/",
       "verification" : "The repository font and licence bytes match the named Fedora package files."
     },
-    "systemFallbackDisabled" : true,
-    "resolver" : "A test-local Batik FontFamilyResolver maps all supported text to the exact bundled font and returns no family for unsupported glyphs."
+    "systemFallbackForBlockingChecks" : false,
+    "loading" : "The existing repository font is embedded as a data @font-face; document.fonts.load is forced before document.fonts.ready and document.fonts.check are awaited.",
+    "unsupportedGlyphPolicy" : "Runs containing glyphs absent from the pinned font are advisory font_missing and are not used for blocking geometry or contrast checks."
   },
   "comparator" : {
     "implementation" : "engines/render/src/paint-test/java/dev/dediren/plugins/render/RasterDiff.java",
@@ -63,11 +80,12 @@
   },
   "generation" : {
     "rendererImplementation" : "engines/render/src/main/java/dev/dediren/plugins/render",
-    "ownership" : "The PNG baselines are generated documents produced solely from repository-owned fixtures and renderer code using test-profile Apache Batik, JDK ImageIO and the bundled licensed font.",
+    "ownership" : "The PNG baselines are generated documents produced solely from repository-owned fixtures and renderer code using the test-profile Chromium headless shell and the bundled licensed font.",
     "thirdPartyLogosOrEmbeddedFixtureAssets" : false,
     "regenerationProperty" : "dediren.render.paint.regenerate-goldens",
     "regenerationRequiresPinnedEnvironment" : true,
-    "pinnedEnvironment" : "Eclipse Temurin 21.0.10+7-LTS, Batik 1.19, the manifest font digest and the listed rendering hints; no OS-specific executable is used."
+    "containerDigestEnvironment" : "DEDIREN_RENDER_PAINT_CONTAINER_DIGEST",
+    "pinnedEnvironment" : "The listed Playwright, Chromium, container digest, Eclipse Temurin runtime, DPR, viewport rule and font digest."
   },
   "scenarios" : [ {
     "name" : "pipeline-rich-light",
@@ -77,10 +95,10 @@
     "metadataFixture" : null,
     "baseline" : "engines/render/src/paint-test/resources/raster-golden/pipeline-rich-light.png",
     "dimensions" : {
-      "width" : 1581,
-      "height" : 484
+      "width" : 1645,
+      "height" : 548
     },
-    "sha256" : "f702763fa68fc5bf935c00da39297cd395049ab729d11f2c87c4705396d14b78"
+    "sha256" : "fb25d00053d66adc80882dc7ab2b3f6b50dc4a25b62e61958fb89c510a38cbd4"
   }, {
     "name" : "pipeline-rich-dark",
     "description" : "The same rich standard graph, dark theme",
@@ -89,10 +107,10 @@
     "metadataFixture" : null,
     "baseline" : "engines/render/src/paint-test/resources/raster-golden/pipeline-rich-dark.png",
     "dimensions" : {
-      "width" : 1581,
-      "height" : 484
+      "width" : 1645,
+      "height" : 548
     },
-    "sha256" : "6b8a8bb82b50c16872c36051d43f878cd10961424fb320674e33d2d5df27c911"
+    "sha256" : "f8a16fcf14ebe114f433d9b48454bf32c6af58a56e9989d2e069610f07b3a538"
   }, {
     "name" : "archimate-decorators",
     "description" : "ArchiMate diagram with decorators and markers",
@@ -101,10 +119,10 @@
     "metadataFixture" : "fixtures/render-metadata/archimate-basic.json",
     "baseline" : "engines/render/src/paint-test/resources/raster-golden/archimate-decorators.png",
     "dimensions" : {
-      "width" : 506,
-      "height" : 144
+      "width" : 570,
+      "height" : 208
     },
-    "sha256" : "db8112454f2d699eff1262c3f18c3ed8b4957ce775539df2b122bc1b0a93ddfd"
+    "sha256" : "c2f1f6238a35e213b7f8129e9e1e46b07e3fdef616e572156ab4bc27f0be2f0a"
   }, {
     "name" : "uml-sequence-fragments",
     "description" : "UML sequence diagram with fragment chrome",
@@ -113,9 +131,9 @@
     "metadataFixture" : "fixtures/render-metadata/uml-sequence-fragments.json",
     "baseline" : "engines/render/src/paint-test/resources/raster-golden/uml-sequence-fragments.png",
     "dimensions" : {
-      "width" : 1008,
-      "height" : 1008
+      "width" : 1072,
+      "height" : 1072
     },
-    "sha256" : "184b7e8e7c51f4b4363ba7b3aeddac4229f513623dddef6f3bdf850fa9c54e3c"
+    "sha256" : "c491ba0dedaf8b05fd25fc47a6a4826332eac79f1a6643cbc151c49bc3abd90b"
   } ]
 }

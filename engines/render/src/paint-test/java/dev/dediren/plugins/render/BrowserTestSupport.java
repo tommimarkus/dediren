@@ -16,7 +16,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.StringReader;
 import java.io.StringWriter;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Base64;
@@ -155,11 +154,10 @@ final class BrowserTestSupport {
     try {
       Page page = session.context().newPage();
       attachNetworkGuards(session.context(), page, session.blockedRequests(), session.responses());
-      String encoded =
-          Base64.getEncoder().encodeToString(prepared.svg().getBytes(StandardCharsets.UTF_8));
-      page.setContent(imageDocument(encoded));
+      page.setContent(imageDocument());
       page.evaluate(
-          "async () => { const image = document.querySelector('img'); await image.decode(); }");
+          "async svg => { const image=document.querySelector('img'); const url=URL.createObjectURL(new Blob([svg],{type:'image/svg+xml'})); image.src=url; await image.decode(); await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))); URL.revokeObjectURL(url); }",
+          prepared.svg());
       requireVersion(session.browser());
       return readPng(screenshot(page));
     } finally {
@@ -443,17 +441,15 @@ final class BrowserTestSupport {
   private static String inlineDocument(String svg) {
     return "<!doctype html><html><head><meta charset=\"utf-8\"><style>html,body{margin:0;background:transparent;overflow:hidden}#audit{padding:"
         + PADDING
-        + "px;width:max-content;height:max-content;line-height:0}svg{display:block}</style></head><body><div id=\"audit\">"
+        + "px;width:max-content;height:max-content;line-height:0}svg{display:block;overflow:visible}</style></head><body><div id=\"audit\">"
         + svg
         + "</div></body></html>";
   }
 
-  private static String imageDocument(String encodedSvg) {
+  private static String imageDocument() {
     return "<!doctype html><html><head><meta charset=\"utf-8\"><style>html,body{margin:0;background:transparent;overflow:hidden}#audit{padding:"
         + PADDING
-        + "px;width:max-content;height:max-content;line-height:0}img{display:block}</style></head><body><div id=\"audit\"><img src=\"data:image/svg+xml;base64,"
-        + encodedSvg
-        + "\"></div></body></html>";
+        + "px;width:max-content;height:max-content;line-height:0}img{display:block}</style></head><body><div id=\"audit\"><img></div></body></html>";
   }
 
   private static Element firstDirectChild(Element root, String localName) {
