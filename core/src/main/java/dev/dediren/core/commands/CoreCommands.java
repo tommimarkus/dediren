@@ -268,7 +268,12 @@ public final class CoreCommands {
     }
     LayoutQualityReport report = LayoutQuality.validateLayout(result);
     JsonNode data = JsonSupport.objectMapper().valueToTree(report);
-    List<Diagnostic> qualityWarnings = LayoutQuality.layoutQualityWarnings(report);
+    List<Diagnostic> qualityWarnings = new ArrayList<>(LayoutQuality.layoutQualityWarnings(report));
+    // Structural hygiene (duplicate ids, non-positive extents) joins the warning lane rather than
+    // the hard lane above: such a layout still renders, so failing it here would newly reject input
+    // build and validate-layout accept today. See LayoutQuality#layoutStructureWarnings. These
+    // carry their own codes and have no data.* counterpart, so they are envelope-only.
+    qualityWarnings.addAll(LayoutQuality.layoutStructureWarnings(result));
     // A warning verdict is not a failure, so the exit code stays OK; the envelope status and
     // diagnostics carry the verdict for consumers that read the envelope, not just data.
     CommandEnvelope<JsonNode> envelope =
@@ -352,8 +357,18 @@ public final class CoreCommands {
             : parseCommandData("render", metadataText, RenderMetadata.class);
     RenderEngine renderEngine =
         EngineDispatch.requireEngine(engines, engineId, "render", engines.renderEngine(engineId));
+    // Render is the only lane that takes a layout result from outside and turns it into an
+    // artifact, and it used to check nothing about that geometry at all. Warn-first: the layout
+    // quality and structural findings validate-layout reports as input errors ride this envelope at
+    // warning severity and the render still happens, so an existing caller keeps its artifact and
+    // gains the signal. Narrower than validate-layout on purpose — that lane also runs
+    // SequenceInvariants, which layoutInputWarnings does not restate, so a sequence layout sent
+    // straight to render still gets no invariant signal. Extending it is a product decision.
+    // Merged by EngineDispatch so the ok/warning decision stays in successEnvelope alone.
+    List<Diagnostic> layoutWarnings = LayoutQuality.layoutInputWarnings(layoutResult);
     return EngineDispatch.dispatch(
         engineId,
+        layoutWarnings,
         () -> renderEngine.render(LaidOutSceneMapper.toScene(layoutResult), policy, metadata));
   }
 

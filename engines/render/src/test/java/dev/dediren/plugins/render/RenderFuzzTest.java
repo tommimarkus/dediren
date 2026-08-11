@@ -32,6 +32,21 @@ class RenderFuzzTest {
           "",
           "   ");
 
+  // Ids are drawn from this list, not generated as n0/e0/g0. Ids are not merely text: the renderer
+  // mints SVG identifiers and url(#...) reference targets from them (marker ids per edge, gradient
+  // ids per node/group), so the charset and uniqueness of a layout-result id is load-bearing in a
+  // way a label's is not. layout-result.schema.json constrains neither, so an id like the ones
+  // below is contract-valid input. Chosen deliberately:
+  //   "dup" twice  -- duplicate SVG ids, and an ambiguous url(#...) target
+  //   "a)b"        -- the CSS url token closes at the first ')', so the reference silently misses
+  //   "a b"        -- whitespace ends the url token the same way
+  //   "a\"b"       -- escaped in markup, still a quote inside the url token once unescaped
+  //   "<x>"        -- markup characters, escaped by SvgWriter but never sanitized as an identifier
+  //   ""           -- empty; a degenerate but schema-legal id
+  // Indexed rather than randomly sampled so a given case index always yields the same ids and
+  // edges can reference the node ids they were built against.
+  private static final List<String> IDS = List.of("dup", "dup", "a)b", "a b", "a\"b", "<x>", "");
+
   @Test
   void randomLayoutsAllRenderStructurallySound() throws Exception {
     Random random = new Random(SEED);
@@ -58,7 +73,7 @@ class RenderFuzzTest {
     ArrayNode nodes = layout.putArray("nodes");
     for (int index = 0; index < nodeCount; index++) {
       ObjectNode node = nodes.addObject();
-      String id = "n" + index;
+      String id = id(index);
       node.put("id", id).put("source_id", id).put("projection_id", id);
       node.put("x", random.nextInt(1000)).put("y", random.nextInt(600));
       node.put("width", 60 + random.nextInt(180)).put("height", 40 + random.nextInt(80));
@@ -68,9 +83,9 @@ class RenderFuzzTest {
     ArrayNode edges = layout.putArray("edges");
     int edgeCount = nodeCount < 2 ? 0 : random.nextInt(nodeCount);
     for (int index = 0; index < edgeCount; index++) {
-      String id = "e" + index;
-      String source = "n" + random.nextInt(nodeCount);
-      String target = "n" + random.nextInt(nodeCount);
+      String id = id(index);
+      String source = id(random.nextInt(nodeCount));
+      String target = id(random.nextInt(nodeCount));
       ObjectNode edge = edges.addObject();
       edge.put("id", id).put("source", source).put("target", target);
       edge.put("source_id", id).put("projection_id", id);
@@ -82,13 +97,13 @@ class RenderFuzzTest {
 
     ArrayNode groups = layout.putArray("groups");
     if (nodeCount > 0 && random.nextBoolean()) {
-      String id = "g0";
+      String id = id(nodeCount);
       ObjectNode group = groups.addObject();
       group.put("id", id).put("source_id", id).put("projection_id", id);
       group.put("x", random.nextInt(400)).put("y", random.nextInt(300));
       group.put("width", 200 + random.nextInt(400)).put("height", 150 + random.nextInt(300));
       ArrayNode members = group.putArray("members");
-      members.add("n" + random.nextInt(nodeCount));
+      members.add(id(random.nextInt(nodeCount)));
       group.put("label", label(random));
     }
 
@@ -99,5 +114,10 @@ class RenderFuzzTest {
 
   private static String label(Random random) {
     return LABELS.get(random.nextInt(LABELS.size()));
+  }
+
+  /** Stable id for a slot: same index always yields the same id, so edge endpoints stay valid. */
+  private static String id(int index) {
+    return IDS.get(index % IDS.size());
   }
 }

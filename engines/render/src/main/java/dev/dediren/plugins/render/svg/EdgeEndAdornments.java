@@ -6,6 +6,7 @@ import static dev.dediren.plugins.render.svg.EdgeRenderer.edgeLabelVisibleBox;
 
 import dev.dediren.contracts.layout.LaidOutEdge;
 import dev.dediren.contracts.layout.Point;
+import dev.dediren.contracts.render.RenderMetadata;
 import dev.dediren.contracts.render.RenderMetadataSelector;
 import dev.dediren.plugins.render.style.ResolvedEdgeStyle;
 import java.util.ArrayList;
@@ -43,12 +44,23 @@ public final class EdgeEndAdornments {
   public record Adornment(String kind, String end, EdgeLabel label, String text) {}
 
   /**
-   * Computes the end adornments carried by {@code selector} for {@code edge}, laid out against the
-   * route endpoints. Returns an empty list when there is no metadata, no adornment property, or too
-   * few route points to determine an end direction.
+   * Computes the end adornments carried by {@code metadata} for {@code edge}, laid out against the
+   * route endpoints. Returns an empty list when the metadata is not UML, when the edge carries no
+   * adornment property, or when there are too few route points to determine an end direction.
+   *
+   * <p>Takes the whole metadata rather than the edge's selector so the profile gate below cannot be
+   * bypassed by a caller that resolves the selector itself: association ends are UML notation, and
+   * the property keys read here are UML's. A generic or ArchiMate view whose edges happen to carry
+   * a {@code source_role} property must not acquire UML association adornments from it. The profile
+   * test is the one {@code UmlSequenceRenderer.isSequence} already uses — the metadata's declared
+   * {@code semantic_profile}.
    */
   public static List<Adornment> adornments(
-      LaidOutEdge edge, RenderMetadataSelector selector, double fontSize) {
+      LaidOutEdge edge, RenderMetadata metadata, double fontSize) {
+    if (metadata == null || !"uml".equals(metadata.semanticProfile())) {
+      return List.of();
+    }
+    RenderMetadataSelector selector = metadata.edges().get(edge.id());
     if (selector == null || selector.properties() == null || edge.points().size() < 2) {
       return List.of();
     }

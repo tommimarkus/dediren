@@ -51,6 +51,7 @@ import dev.dediren.plugins.render.svg.LabelBox;
 import dev.dediren.plugins.render.svg.LineJump;
 import dev.dediren.plugins.render.svg.SvgAccessibleName;
 import dev.dediren.plugins.render.svg.SvgBounds;
+import dev.dediren.plugins.render.svg.SvgIds;
 import dev.dediren.plugins.render.svg.SvgWriter;
 import java.util.ArrayList;
 import java.util.List;
@@ -74,6 +75,10 @@ public final class SvgDocument {
     ResolvedStyle base = StyleResolver.baseStyle(policy);
     SvgBounds bounds = svgBounds(result, metadata, policy, base);
     SvgWriter w = new SvgWriter();
+    // One minter per document: every id and every url(#…) in this SVG goes through it, so a
+    // layout id that is duplicated or not a legal identifier can neither collide nor break its
+    // own reference. See SvgIds for why the transform is a no-op on well-formed ids.
+    SvgIds ids = new SvgIds();
     w.start("svg")
         .attr("xmlns", "http://www.w3.org/2000/svg")
         .attr("role", "img")
@@ -112,9 +117,9 @@ public final class SvgDocument {
       }
       ResolvedGroupStyle rectStyle = style;
       if (style.fillGradient() != null) {
-        String gradientId = "group-fill-" + group.id();
+        String gradientId = ids.mint("group-fill-" + group.id());
         gradientElement(w, gradientId, style.fillGradient());
-        rectStyle = style.withFill("url(#" + gradientId + ")");
+        rectStyle = style.withFill(ids.reference(gradientId));
       }
       String groupDashValue = dashArrayValue(style.lineStyle(), style.dashPattern(), "6 4");
       if (groupDashValue.isEmpty() && style.decorator() == SvgNodeDecorator.ARCHIMATE_GROUPING) {
@@ -163,10 +168,10 @@ public final class SvgDocument {
       ResolvedEdgeStyle style = StyleResolver.edgeStyle(policy, metadata, edge.id(), base);
       List<LineJump> lineJumps = lineJumps(edge, renderedEdges);
       w.start("g").attr("data-dediren-edge-id", edge.id());
-      edgeMarker(w, edge, style, "start");
-      edgeMarker(w, edge, style, "end");
+      String startMarkerId = edgeMarker(w, ids, edge, style, "start");
+      String endMarkerId = edgeMarker(w, ids, edge, style, "end");
       lineJumpMasks(w, edge, lineJumps, result, metadata, policy, base);
-      edgePath(w, edge, style, lineJumps);
+      edgePath(w, edge, style, lineJumps, ids.reference(startMarkerId), ids.reference(endMarkerId));
       if (edge.label() != null && !edge.label().isEmpty()) {
         double edgeLabelFontSize = edgeLabelFontSize(base.fontSize());
         EdgeLabel label =
@@ -178,10 +183,8 @@ public final class SvgDocument {
         edgeLabel(w, label, edge.label(), style, base.backgroundFill(), edgeLabelFontSize);
         placedLabelBoxes.add(edgeLabelVisibleBox(label, style.labelPresentation()));
       }
-      RenderMetadataSelector edgeSelector =
-          metadata == null ? null : metadata.edges().get(edge.id());
       List<EdgeEndAdornments.Adornment> endAdornments =
-          EdgeEndAdornments.adornments(edge, edgeSelector, base.fontSize());
+          EdgeEndAdornments.adornments(edge, metadata, base.fontSize());
       if (!endAdornments.isEmpty()) {
         EdgeEndAdornments.markup(w, endAdornments, style, base.backgroundFill(), base.fontSize());
         for (EdgeEndAdornments.Adornment adornment : endAdornments) {
@@ -197,9 +200,9 @@ public final class SvgDocument {
       w.start("g").attr("data-dediren-node-id", node.id());
       ResolvedNodeStyle shapeStyle = style;
       if (style.fillGradient() != null) {
-        String gradientId = "node-fill-" + node.id();
+        String gradientId = ids.mint("node-fill-" + node.id());
         gradientElement(w, gradientId, style.fillGradient());
-        shapeStyle = style.withFill("url(#" + gradientId + ")");
+        shapeStyle = style.withFill(ids.reference(gradientId));
       }
       String wrapDash = dashArrayValue(shapeStyle.lineStyle(), shapeStyle.dashPattern(), "6 4");
       boolean wrap =
@@ -401,9 +404,10 @@ public final class SvgDocument {
         bounds.includeRect(labelBox.minX(), labelBox.minY(), labelBox.width(), labelBox.height());
         placedLabelBoxes.add(labelBox);
       }
-      RenderMetadataSelector selector = metadata == null ? null : metadata.edges().get(edge.id());
+      // Same profile-gated call the emission loop makes, so bounds and markup can never disagree
+      // about whether an edge has end adornments.
       for (EdgeEndAdornments.Adornment adornment :
-          EdgeEndAdornments.adornments(edge, selector, base.fontSize())) {
+          EdgeEndAdornments.adornments(edge, metadata, base.fontSize())) {
         LabelBox box = EdgeEndAdornments.visibleBox(adornment, style);
         bounds.includeRect(box.minX(), box.minY(), box.width(), box.height());
         placedLabelBoxes.add(box);

@@ -122,6 +122,125 @@ public final class LayoutQuality {
     return List.copyOf(diagnostics);
   }
 
+  /**
+   * Structural hygiene of a layout result — duplicate ids and non-positive extents — as {@code
+   * warning}-severity diagnostics.
+   *
+   * <p>These deliberately ride the warning lane rather than {@link #validateLayoutDiagnostics}'s
+   * hard lane. Both conditions describe input that still renders, just not as its author meant: a
+   * duplicate id makes every id lookup ambiguous (findNode/findGroup take the first match and the
+   * rest silently vanish from checks and from any consumer resolving by id), and a non-positive
+   * width or height collapses the shape to nothing. Nothing downstream is unable to proceed, so
+   * promoting them to the hard lane would make {@code build} and {@code validate-layout} start
+   * rejecting layouts they accept today — a tightening no lane asked for. On the warning lane every
+   * lane gains the signal and no lane changes verdict on input it accepts.
+   *
+   * <p>Ids are compared within each id space (nodes, edges, groups) separately, because that is how
+   * they are resolved: {@code findNode} searches nodes and {@code findGroup} searches groups, so a
+   * node and a group sharing an id is unambiguous, while a repeat inside one space is not.
+   */
+  public static List<Diagnostic> layoutStructureWarnings(LayoutResult result) {
+    var diagnostics = new ArrayList<Diagnostic>();
+    addDuplicateIdWarnings(
+        diagnostics, "node", "nodes", result.nodes().stream().map(LaidOutNode::id).toList());
+    addDuplicateIdWarnings(
+        diagnostics, "edge", "edges", result.edges().stream().map(LaidOutEdge::id).toList());
+    addDuplicateIdWarnings(
+        diagnostics, "group", "groups", result.groups().stream().map(LaidOutGroup::id).toList());
+    for (int nodeIndex = 0; nodeIndex < result.nodes().size(); nodeIndex++) {
+      LaidOutNode node = result.nodes().get(nodeIndex);
+      if (isNonPositiveExtent(node.width(), node.height())) {
+        diagnostics.add(
+            structureWarning(
+                DiagnosticCode.LAYOUT_NON_POSITIVE_EXTENT,
+                extentMessage("node", node.id(), node.width(), node.height()),
+                "$.nodes[" + nodeIndex + "]",
+                node.sourcePointer()));
+      }
+    }
+    for (int groupIndex = 0; groupIndex < result.groups().size(); groupIndex++) {
+      LaidOutGroup group = result.groups().get(groupIndex);
+      if (isNonPositiveExtent(group.width(), group.height())) {
+        diagnostics.add(
+            structureWarning(
+                DiagnosticCode.LAYOUT_NON_POSITIVE_EXTENT,
+                extentMessage("group", group.id(), group.width(), group.height()),
+                "$.groups[" + groupIndex + "]",
+                null));
+      }
+    }
+    return List.copyOf(diagnostics);
+  }
+
+  /**
+   * The warn-first verdict on a layout result that arrived from outside the pipeline: every {@link
+   * #validateLayoutDiagnostics} finding restated at {@code warning} severity, plus {@link
+   * #layoutStructureWarnings}.
+   *
+   * <p>Used by the render lane, which is the only lane that takes a caller-supplied layout result
+   * and turns it straight into an artifact — until now with no geometry check at all. The severity
+   * downgrade is the deliberate part: on {@code validate-layout} and {@code build} these findings
+   * are input errors that stop the command, but render's decided posture is to attach the signal
+   * and still produce the artifact, so a caller whose layout is subtly wrong sees why without
+   * losing the output they asked for. Hard rejection on this lane is a separate decision.
+   */
+  public static List<Diagnostic> layoutInputWarnings(LayoutResult result) {
+    var diagnostics = new ArrayList<Diagnostic>();
+    for (Diagnostic diagnostic : validateLayoutDiagnostics(result)) {
+      diagnostics.add(downgradedToWarning(diagnostic));
+    }
+    diagnostics.addAll(layoutStructureWarnings(result));
+    return List.copyOf(diagnostics);
+  }
+
+  /** The same diagnostic — code, message, path, provenance — restated at {@code warning}. */
+  private static Diagnostic downgradedToWarning(Diagnostic diagnostic) {
+    return new Diagnostic(
+        diagnostic.code(),
+        DiagnosticSeverity.WARNING,
+        diagnostic.message(),
+        diagnostic.path(),
+        diagnostic.sourcePointer(),
+        diagnostic.migration());
+  }
+
+  private static void addDuplicateIdWarnings(
+      List<Diagnostic> diagnostics, String element, String space, List<String> ids) {
+    var seen = new HashSet<String>();
+    for (String id : ids) {
+      if (!seen.add(id)) {
+        diagnostics.add(
+            structureWarning(
+                DiagnosticCode.LAYOUT_DUPLICATE_ID,
+                "duplicate " + element + " id '" + id + "'",
+                "$." + space + "[?(@.id=='" + id + "')]",
+                null));
+      }
+    }
+  }
+
+  private static boolean isNonPositiveExtent(double width, double height) {
+    // NaN fails every comparison, so a NaN extent is not reported here; it is already the hard
+    // lane's DEDIREN_LAYOUT_NON_FINITE_GEOMETRY, and reporting it twice would just add noise.
+    return width <= 0.0 || height <= 0.0;
+  }
+
+  private static String extentMessage(String element, String id, double width, double height) {
+    return element
+        + " '"
+        + id
+        + "' has non-positive extent "
+        + width
+        + "x"
+        + height
+        + " and renders as nothing";
+  }
+
+  private static Diagnostic structureWarning(
+      DiagnosticCode code, String message, String path, String sourcePointer) {
+    return new Diagnostic(code.code(), DiagnosticSeverity.WARNING, message, path, sourcePointer);
+  }
+
   private static void addQualityWarning(List<Diagnostic> diagnostics, String field, int count) {
     if (count <= 0) {
       return;

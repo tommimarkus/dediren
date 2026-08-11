@@ -37,20 +37,9 @@ public final class NodeLabels {
     NodeLabelLines label = nodeLabelLinesAndSize(node, style, fontSize);
     NodeLabelPosition position =
         nodeLabelPosition(node, style, label.fontSize(), label.lines().size());
-    // label_align only applies to plain centered labels; junction and UML compact-control labels
-    // sit at their own outside position and keep their middle anchor.
-    boolean plainCentered =
-        !archimateJunctionLabelOutside(style.decorator())
-            && !umlCompactControlNodeLabelOutside(style.decorator());
-    double textX = position.x();
-    String anchor = "middle";
-    if (plainCentered && style.labelAlign() == SvgLabelAlign.START) {
-      anchor = "start";
-      textX = node.x() + LABEL_ALIGN_INSET;
-    } else if (plainCentered && style.labelAlign() == SvgLabelAlign.END) {
-      anchor = "end";
-      textX = node.x() + node.width() - LABEL_ALIGN_INSET;
-    }
+    NodeLabelAnchor labelAnchor = nodeLabelAnchor(node, style, position);
+    double textX = labelAnchor.x();
+    String anchor = labelAnchor.anchor();
     w.start("text")
         .attr("x", f1(textX))
         .attr("y", f1(position.y()))
@@ -230,21 +219,56 @@ public final class NodeLabels {
     NodeLabelLines label = nodeLabelLinesAndSize(node, style, fontSize);
     NodeLabelPosition position =
         nodeLabelPosition(node, style, label.fontSize(), label.lines().size());
+    NodeLabelAnchor labelAnchor = nodeLabelAnchor(node, style, position);
     List<LabelBox> boxes = new ArrayList<>();
     double lineHeight = nodeLabelLineHeight(label.fontSize());
     for (int index = 0; index < label.lines().size(); index++) {
       double y = position.y() + index * lineHeight;
-      boxes.add(nodeLabelBox(position.x(), y, label.lines().get(index), label.fontSize()));
+      boxes.add(
+          nodeLabelBox(
+              labelAnchor.x(),
+              y,
+              label.lines().get(index),
+              label.fontSize(),
+              labelAnchor.anchor()));
     }
     return boxes;
   }
 
-  public static LabelBox nodeLabelBox(double x, double y, String text, double fontSize) {
+  public static LabelBox nodeLabelBox(
+      double x, double y, String text, double fontSize, String anchor) {
     double width = estimateTextWidth(text, fontSize);
-    double minX = x - width / 2.0;
+    double minX =
+        switch (anchor) {
+          case "start" -> x;
+          case "end" -> x - width;
+          default -> x - width / 2.0;
+        };
     double minY = y - fontSize;
     return new LabelBox(minX, minY, minX + width, y + fontSize * 0.25);
   }
+
+  // label_align only applies to plain centered labels; junction and UML compact-control labels
+  // sit at their own outside position and keep a middle anchor. This is the single source of
+  // truth for that anchor/textX choice: nodeLabel (the emitted <text>) and nodeLabelBoxes (the
+  // bounds the SVG viewBox grows to) must both call it, or they silently disagree again — the
+  // bounds path centering while the render path shifts to start/end is exactly the bug this
+  // function exists to prevent. See the label_align bounds-drift fix.
+  private static NodeLabelAnchor nodeLabelAnchor(
+      LaidOutNode node, ResolvedNodeStyle style, NodeLabelPosition position) {
+    boolean plainCentered =
+        !archimateJunctionLabelOutside(style.decorator())
+            && !umlCompactControlNodeLabelOutside(style.decorator());
+    if (plainCentered && style.labelAlign() == SvgLabelAlign.START) {
+      return new NodeLabelAnchor(node.x() + LABEL_ALIGN_INSET, "start");
+    }
+    if (plainCentered && style.labelAlign() == SvgLabelAlign.END) {
+      return new NodeLabelAnchor(node.x() + node.width() - LABEL_ALIGN_INSET, "end");
+    }
+    return new NodeLabelAnchor(position.x(), "middle");
+  }
+
+  private record NodeLabelAnchor(double x, String anchor) {}
 
   private static String enumValue(Enum<?> value) {
     return value == null ? null : value.name().toLowerCase(Locale.ROOT);
