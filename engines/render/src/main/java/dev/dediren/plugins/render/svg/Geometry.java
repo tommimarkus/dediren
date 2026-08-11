@@ -12,8 +12,9 @@ import java.util.List;
 
 /**
  * Pure obstacle/label geometry over laid-out contracts types. Deliberately free of {@code node.*}
- * imports so the svg package stays a leaf: the node-aware document bounds computation lives with
- * its caller, {@code SvgDocument.svgBounds}, one package up.
+ * imports so the svg package stays a leaf: the node-aware placed scene and the document bounds
+ * folded from it live with their caller, {@code PlacedScene} and {@code SvgDocument.measure}, one
+ * package up.
  */
 public final class Geometry {
 

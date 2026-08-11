@@ -78,6 +78,25 @@ public final class Svg {
     return "";
   }
 
+  /**
+   * The one {@code stroke-dasharray} a shape writes on itself, given the dash its resolved style
+   * asked for and the fallback its notation supplies — or {@code null} for "omit the attribute".
+   *
+   * <p>The precedence is SVG's, not this product's: a presentation attribute on the shape overrides
+   * the same property inherited from a wrapper {@code <g>}. A shape that emitted only its notation
+   * fallback would therefore silently outrank the user's dash riding that wrapper, and a shape that
+   * emitted nothing would depend on whether a wrapper happened to be painted at all. So the shape
+   * always states the winner: the user's dash when there is one, the notation's when there is not.
+   * That rule used to be a comment above the one constant that depends on it, restated at each of
+   * the sites that had to honour it.
+   */
+  public static String shapeDash(String resolvedDash, String notationFallback) {
+    if (resolvedDash != null && !resolvedDash.isEmpty()) {
+      return resolvedDash;
+    }
+    return notationFallback == null || notationFallback.isEmpty() ? null : notationFallback;
+  }
+
   /** Floors to one decimal place and formats with a fixed locale (stable across environments). */
   public static String labelNumber(double value) {
     double floored = Math.floor(value * 10.0) / 10.0;

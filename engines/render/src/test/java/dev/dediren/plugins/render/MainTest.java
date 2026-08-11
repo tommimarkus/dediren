@@ -2888,10 +2888,13 @@ class MainTest {
       Document document = svgDocument(okContent(render(input)));
 
       // viewBox = content bounds padded by the render-policy margin (SvgBounds.padded), which
-      // styledInlineInput sets to 16 per side: node (320,240) 120x64 -> 320-16=304, 240-16=224,
-      // width 120+16+16=152, height 64+16+16=96.
+      // styledInlineInput sets to 16 per side. Content bounds are the node's *ink*, not its
+      // geometry: a stroke straddles the edge, so half of it lies outside. Node (320,240) 120x64
+      // with a 1.5 stroke -> 320-0.75-16=303.25, 240-0.75-16=223.25, width 120+1.5+32=153.5,
+      // height 64+1.5+32=97.5, emitted at %.1f. Measuring geometry alone used to shave that half
+      // stroke off the outermost element at small margins (SVG-DRIFT-16).
       assertThat(document.getDocumentElement().getAttribute("viewBox"))
-          .isEqualTo("304.0 224.0 152.0 96.0");
+          .isEqualTo("303.3 223.3 153.5 97.5");
     }
 
     @Test

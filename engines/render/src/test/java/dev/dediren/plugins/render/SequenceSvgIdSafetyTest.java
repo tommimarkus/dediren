@@ -9,13 +9,12 @@ import tools.jackson.databind.node.ObjectNode;
 /**
  * The sequence lane's counterpart to {@link SvgIdSafetyTest}.
  *
- * <p>{@code UmlSequenceRenderer} does not go through {@code SvgDocument}: it owns its own {@code
- * SvgIds} instance and its own marker mint/reference plumbing. It therefore received the same
- * hand-edit as the generic lane but shares none of its code, and every other id-safety test in this
- * module renders a generic graph — {@code SvgIdSafetyTest} and {@code RenderFuzzTest} both build
- * plain node/edge layouts against {@code default-svg.json} and never reach this renderer. Sequence
- * fixtures do get audited by {@code SvgAuditTest}, but only with well-formed golden ids, which
- * exercise nothing but the minter's byte-identity no-op path.
+ * <p>{@code UmlSequenceRenderer} emits an independent document, so it owns its own {@code SvgIds}
+ * instance: a second minter, with a second used-id set, that no generic-lane test can reach. Every
+ * other id-safety test in this module renders a generic graph — {@code SvgIdSafetyTest} and {@code
+ * RenderFuzzTest} both build plain node/edge layouts against {@code default-svg.json} and never
+ * reach this renderer. Sequence fixtures do get audited by {@code SvgAuditTest}, but only with
+ * well-formed golden ids, which exercise nothing but the minter's byte-identity no-op path.
  *
  * <p>So without this test a forgotten {@code ids.reference(...)} in the sequence lane would let two
  * messages sharing an edge id paint one arrowhead twice — precisely the defect the minter exists to

@@ -47,24 +47,82 @@ public final class EdgeRenderer {
     return EdgeMarkers.emit(w, ids, edge.id(), side, marker, style.stroke());
   }
 
-  public static void lineJumpMasks(
-      SvgWriter w,
-      LaidOutEdge edge,
-      List<LineJump> lineJumps,
-      LayoutResult result,
-      RenderMetadata metadata,
-      RenderPolicy policy,
-      ResolvedStyle base) {
+  /**
+   * The boxes this edge's end markers ink, in placement order.
+   *
+   * <p>Empty when the route has no points: {@link #edgePath} then draws no path, and a marker with
+   * no path to sit on paints nothing however its {@code <marker>} element is defined. Ends set to
+   * NONE contribute nothing for the same reason.
+   *
+   * <p>The angles handed to {@link EdgeMarkers#inkBox} are the ones {@code orient="auto"} resolves
+   * to — the direction the route leaves its first vertex and arrives at its last. Corner rounding
+   * and line jumps shorten those segments but never turn them, so the vertex-to-vertex direction is
+   * the drawn one.
+   */
+  public static List<LabelBox> markerInkBoxes(LaidOutEdge edge, ResolvedEdgeStyle style) {
+    List<Point> points = edge.points();
+    if (points.isEmpty()) {
+      return List.of();
+    }
+    List<LabelBox> boxes = new ArrayList<>();
+    Point first = points.getFirst();
+    Point last = points.getLast();
+    LabelBox start =
+        EdgeMarkers.inkBox(
+            "start",
+            style.markerStart(),
+            style.strokeWidth(),
+            first.x(),
+            first.y(),
+            markerAngleRadians(points, true));
+    if (start != null) {
+      boxes.add(start);
+    }
+    LabelBox end =
+        EdgeMarkers.inkBox(
+            "end",
+            style.markerEnd(),
+            style.strokeWidth(),
+            last.x(),
+            last.y(),
+            markerAngleRadians(points, false));
+    if (end != null) {
+      boxes.add(end);
+    }
+    return boxes;
+  }
+
+  // Direction of travel at the route's first or last vertex, taken from the nearest vertex that is
+  // actually somewhere else. A route whose points all coincide has no direction to orient to, and 0
+  // is what a renderer draws for it.
+  private static double markerAngleRadians(List<Point> points, boolean start) {
+    Point vertex = start ? points.getFirst() : points.getLast();
+    int step = start ? 1 : -1;
+    for (int index = start ? 1 : points.size() - 2;
+        index >= 0 && index < points.size();
+        index += step) {
+      Point other = points.get(index);
+      if (nearlyEqual(other.x(), vertex.x()) && nearlyEqual(other.y(), vertex.y())) {
+        continue;
+      }
+      return start
+          ? Math.atan2(other.y() - vertex.y(), other.x() - vertex.x())
+          : Math.atan2(vertex.y() - other.y(), vertex.x() - other.x());
+    }
+    return 0.0;
+  }
+
+  /** Writes the backdrop strokes that clear each jump. The fills arrive already resolved. */
+  public static void lineJumpMasks(SvgWriter w, String edgeId, List<MaskedLineJump> lineJumps) {
     if (lineJumps.isEmpty()) {
       return;
     }
-    w.start("g").attr("data-dediren-line-jump-masks", edge.id());
-    for (LineJump jump : lineJumps) {
-      String maskFill = backdropFillAt(jump.x(), jump.y(), result, metadata, policy, base);
+    w.start("g").attr("data-dediren-line-jump-masks", edgeId);
+    for (MaskedLineJump masked : lineJumps) {
       w.empty("path")
-          .attr("d", jump.maskPath())
+          .attr("d", masked.jump().maskPath())
           .attr("fill", "none")
-          .attr("stroke", maskFill)
+          .attr("stroke", masked.maskFill())
           .attr("stroke-width", "6");
     }
     w.end();

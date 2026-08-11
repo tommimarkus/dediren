@@ -42,6 +42,13 @@ public final class SvgBounds {
     maxY = Math.max(maxY, y);
   }
 
+  /**
+   * Grows the box by the policy margins. {@code policy.margin()} is dereferenced unguarded on
+   * purpose: it is {@code required} in render-policy.schema.json and rejected at runtime by {@code
+   * RenderInputValidator} as {@code DEDIREN_SVG_POLICY_INVALID} before any renderer runs, so a
+   * default here could only be dead code — and the one that existed (a private 16px fallback in the
+   * sequence lane's own box type) made the two lanes disagree about whether the input was an error.
+   */
   public SvgBounds padded(RenderPolicy policy) {
     return new SvgBounds(
         minX - policy.margin().left(),

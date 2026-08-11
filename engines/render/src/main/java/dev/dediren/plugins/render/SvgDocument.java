@@ -1,10 +1,11 @@
 package dev.dediren.plugins.render;
 
 import static dev.dediren.plugins.render.node.NodeLabels.nodeLabel;
-import static dev.dediren.plugins.render.node.NodeLabels.nodeLabelBoxes;
+import static dev.dediren.plugins.render.node.NodeLabels.placeNodeLabel;
 import static dev.dediren.plugins.render.node.NodeShapeSupport.archimateJunctionRadius;
 import static dev.dediren.plugins.render.node.NodeShapeSupport.decoratorName;
 import static dev.dediren.plugins.render.node.NodeShapeSupport.isArchimateCutCornerRectangle;
+import static dev.dediren.plugins.render.node.NodeShapeSupport.isArchimateJunction;
 import static dev.dediren.plugins.render.node.NodeShapeSupport.isArchimateRoundedRectangle;
 import static dev.dediren.plugins.render.node.NodeShapeSupport.isUmlDecorator;
 import static dev.dediren.plugins.render.node.NodeShapeSupport.shouldRenderPlainNodeLabel;
@@ -13,6 +14,7 @@ import static dev.dediren.plugins.render.node.archimate.ArchimateShapes.archimat
 import static dev.dediren.plugins.render.node.generic.GenericShapes.genericNodeShape;
 import static dev.dediren.plugins.render.node.uml.UmlDecorators.umlNodeDecorator;
 import static dev.dediren.plugins.render.node.uml.UmlShapes.umlNodeShape;
+import static dev.dediren.plugins.render.svg.EdgeRenderer.backdropFillAt;
 import static dev.dediren.plugins.render.svg.EdgeRenderer.edgeLabel;
 import static dev.dediren.plugins.render.svg.EdgeRenderer.edgeLabelFontSize;
 import static dev.dediren.plugins.render.svg.EdgeRenderer.edgeLabelVisibleBox;
@@ -20,17 +22,18 @@ import static dev.dediren.plugins.render.svg.EdgeRenderer.edgeMarker;
 import static dev.dediren.plugins.render.svg.EdgeRenderer.edgePath;
 import static dev.dediren.plugins.render.svg.EdgeRenderer.lineJumpMasks;
 import static dev.dediren.plugins.render.svg.EdgeRenderer.lineJumps;
+import static dev.dediren.plugins.render.svg.Geometry.labelBox;
 import static dev.dediren.plugins.render.svg.Geometry.labelObstacleBoxesForEdge;
 import static dev.dediren.plugins.render.svg.Svg.dashArrayValue;
 import static dev.dediren.plugins.render.svg.Svg.f1;
 import static dev.dediren.plugins.render.svg.Svg.opacity;
+import static dev.dediren.plugins.render.svg.Svg.shapeDash;
 import static dev.dediren.plugins.render.svg.Svg.styleNumber;
 
 import dev.dediren.contracts.layout.LaidOutEdge;
 import dev.dediren.contracts.layout.LaidOutGroup;
 import dev.dediren.contracts.layout.LaidOutNode;
 import dev.dediren.contracts.layout.LayoutResult;
-import dev.dediren.contracts.layout.Point;
 import dev.dediren.contracts.render.RenderMetadata;
 import dev.dediren.contracts.render.RenderMetadataSelector;
 import dev.dediren.contracts.render.RenderPolicy;
@@ -39,7 +42,12 @@ import dev.dediren.contracts.render.SvgGradientStop;
 import dev.dediren.contracts.render.SvgGradientType;
 import dev.dediren.contracts.render.SvgLabelAlign;
 import dev.dediren.contracts.render.SvgNodeDecorator;
-import dev.dediren.plugins.render.node.uml.UmlSequenceRenderer;
+import dev.dediren.plugins.render.PlacedScene.PlacedAdornment;
+import dev.dediren.plugins.render.PlacedScene.PlacedEdge;
+import dev.dediren.plugins.render.PlacedScene.PlacedEdgeLabel;
+import dev.dediren.plugins.render.PlacedScene.PlacedGroup;
+import dev.dediren.plugins.render.PlacedScene.PlacedGroupTitle;
+import dev.dediren.plugins.render.PlacedScene.PlacedNode;
 import dev.dediren.plugins.render.style.ResolvedEdgeStyle;
 import dev.dediren.plugins.render.style.ResolvedGroupStyle;
 import dev.dediren.plugins.render.style.ResolvedNodeStyle;
@@ -49,6 +57,7 @@ import dev.dediren.plugins.render.svg.EdgeEndAdornments;
 import dev.dediren.plugins.render.svg.EdgeLabel;
 import dev.dediren.plugins.render.svg.LabelBox;
 import dev.dediren.plugins.render.svg.LineJump;
+import dev.dediren.plugins.render.svg.MaskedLineJump;
 import dev.dediren.plugins.render.svg.SvgAccessibleName;
 import dev.dediren.plugins.render.svg.SvgBounds;
 import dev.dediren.plugins.render.svg.SvgIds;
@@ -59,26 +68,186 @@ import java.util.Locale;
 
 public final class SvgDocument {
 
-  // ArchiMate grouping borders fall back to this fine dash. A user dash (dash_pattern/line_style)
-  // must win in both the group lane and the node lane: a shape's own stroke-dasharray attribute
-  // beats the user dash riding the wrapper <g>, so this fallback may only be emitted when the
-  // resolved style carries no dash of its own.
+  // ArchiMate grouping borders fall back to this fine dash. Which of it and the user's dash reaches
+  // the shape is Svg.shapeDash's decision at both the sites that face it — the group rect, which
+  // has
+  // no wrapper, and the node shape, which sits inside one — rather than a precedence rule restated
+  // at each.
   private static final String ARCHIMATE_GROUPING_DASH = "3 2";
+
+  // Group title placement: how far a start/end-aligned title is inset from the group's own edge,
+  // and how far its baseline sits below the top edge once the label's own size is allowed for.
+  private static final double GROUP_TITLE_INSET = 8.0;
+  private static final double GROUP_TITLE_BASELINE_GAP = 4.0;
 
   private SvgDocument() {}
 
+  /**
+   * Renders one document in three passes: {@link #resolve} decides, {@link #measure} folds those
+   * decisions into the viewBox, {@link #emit} writes them. The split exists because the viewBox
+   * must be known before the root start-tag closes — see {@link PlacedScene} for why measure and
+   * emit must keep consuming the one scene rather than each deriving its own.
+   *
+   * <p>UML sequence views take the second lane. It is a different document — lifelines, interaction
+   * frames, combined fragments and operands are not nodes and edges — but it is the same three
+   * passes over the same {@link PlacedElement} fold and the same {@link #openDocument} skeleton, so
+   * the two can no longer disagree about what a viewBox, a background or an accessible name is.
+   */
   public static String renderSvg(
       LayoutResult result, RenderMetadata metadata, RenderPolicy policy) {
     if (UmlSequenceRenderer.isSequence(metadata)) {
       return new UmlSequenceRenderer(result, metadata, policy).render();
     }
+    PlacedScene scene = resolve(result, metadata, policy);
+    return emit(new SvgWriter(), scene, measure(scene.elements(), policy));
+  }
+
+  /**
+   * Resolves styles and places everything the document draws, once.
+   *
+   * <p>The edge walk is order-dependent and must stay in layout order twice over: {@code lineJumps}
+   * sees only the edges routed before it, and {@code placedLabelBoxes} is the running obstacle set
+   * each edge's label avoids. Both used to be rebuilt identically by the bounds pass, and
+   * "identically" was maintained by inspection.
+   *
+   * <p>Nodes are placed <em>before</em> edges even though they are emitted after them, because a
+   * node label is an obstacle the edge labels have to see. Junction labels sit below the circle and
+   * UML compact-control labels diagonally up-left, both outside the node rect that {@code
+   * Geometry.nodeObstacleBoxes} contributes — so an edge label placed "clear" could be printed on
+   * top of one. Emission order is unchanged: {@code PlacedScene.elements} owns that, not this walk.
+   */
+  static PlacedScene resolve(LayoutResult result, RenderMetadata metadata, RenderPolicy policy) {
     ResolvedStyle base = StyleResolver.baseStyle(policy);
-    SvgBounds bounds = svgBounds(result, metadata, policy, base);
-    SvgWriter w = new SvgWriter();
-    // One minter per document: every id and every url(#…) in this SVG goes through it, so a
-    // layout id that is duplicated or not a legal identifier can neither collide nor break its
-    // own reference. See SvgIds for why the transform is a no-op on well-formed ids.
-    SvgIds ids = new SvgIds();
+    List<PlacedGroup> groups = new ArrayList<>();
+    for (LaidOutGroup group : result.groups()) {
+      ResolvedGroupStyle groupStyle = StyleResolver.groupStyle(policy, metadata, group.id(), base);
+      groups.add(
+          new PlacedGroup(
+              group,
+              groupStyle,
+              metadata == null ? null : metadata.groups().get(group.id()),
+              placeGroupTitle(group, groupStyle)));
+    }
+    List<PlacedNode> nodes = new ArrayList<>();
+    List<LabelBox> placedLabelBoxes = new ArrayList<>();
+    for (LaidOutNode node : result.nodes()) {
+      ResolvedNodeStyle style = StyleResolver.nodeStyle(policy, metadata, node.id(), base);
+      PlacedNode placed =
+          new PlacedNode(
+              node,
+              style,
+              metadata == null ? null : metadata.nodes().get(node.id()),
+              shouldRenderPlainNodeLabel(node, style.decorator())
+                  ? placeNodeLabel(node, style, base.fontSize())
+                  : null,
+              isArchimateJunction(style.decorator()) ? archimateJunctionRadius(node, style) : null);
+      nodes.add(placed);
+      placedLabelBoxes.addAll(placed.labelBoxes());
+    }
+    List<PlacedEdge> edges = new ArrayList<>();
+    List<LaidOutEdge> routedEdges = new ArrayList<>();
+    for (int edgeIndex = 0; edgeIndex < result.edges().size(); edgeIndex++) {
+      LaidOutEdge edge = result.edges().get(edgeIndex);
+      ResolvedEdgeStyle style = StyleResolver.edgeStyle(policy, metadata, edge.id(), base);
+      List<MaskedLineJump> maskedJumps = new ArrayList<>();
+      for (LineJump jump : lineJumps(edge, routedEdges)) {
+        maskedJumps.add(
+            new MaskedLineJump(
+                jump, backdropFillAt(jump.x(), jump.y(), result, metadata, policy, base)));
+      }
+      PlacedEdgeLabel label = null;
+      if (edge.label() != null && !edge.label().isEmpty()) {
+        EdgeLabel placedLabel =
+            edgeLabel(
+                edge,
+                style,
+                labelObstacleBoxesForEdge(result, edgeIndex, placedLabelBoxes),
+                edgeLabelFontSize(base.fontSize()));
+        LabelBox visibleBox = edgeLabelVisibleBox(placedLabel, style.labelPresentation());
+        label = new PlacedEdgeLabel(placedLabel, edge.label(), visibleBox);
+        placedLabelBoxes.add(visibleBox);
+      }
+      // Same profile-gated call the emission pass used to make, so markup and bounds can never
+      // disagree about whether an edge has end adornments — now because there is only one call.
+      List<PlacedAdornment> adornments = new ArrayList<>();
+      for (EdgeEndAdornments.Adornment adornment :
+          EdgeEndAdornments.adornments(edge, metadata, base.fontSize())) {
+        LabelBox visibleBox = EdgeEndAdornments.visibleBox(adornment, style);
+        adornments.add(new PlacedAdornment(adornment, visibleBox));
+        placedLabelBoxes.add(visibleBox);
+      }
+      edges.add(new PlacedEdge(edge, style, maskedJumps, label, adornments));
+      routedEdges.add(edge);
+    }
+    return new PlacedScene(policy, result.viewId(), base, groups, edges, nodes);
+  }
+
+  /**
+   * Places a group's title: the one decision about where that {@code <text>} goes and which anchor
+   * it takes, so the box the viewBox grows to hold and the attributes written for it cannot part
+   * company. A {@code label_size} may be anything up to 96, which is a title wide enough to run a
+   * long way off the right of its own group.
+   */
+  private static PlacedGroupTitle placeGroupTitle(LaidOutGroup group, ResolvedGroupStyle style) {
+    double x = group.x() + GROUP_TITLE_INSET;
+    String anchor = null;
+    if (style.labelAlign() == SvgLabelAlign.MIDDLE) {
+      x = group.x() + group.width() / 2.0;
+      anchor = "middle";
+    } else if (style.labelAlign() == SvgLabelAlign.END) {
+      x = group.x() + group.width() - GROUP_TITLE_INSET;
+      anchor = "end";
+    }
+    double y = group.y() + style.labelSize() + GROUP_TITLE_BASELINE_GAP;
+    String text = group.label();
+    if (text == null || text.isEmpty()) {
+      return new PlacedGroupTitle(x, y, anchor, null);
+    }
+    // Measured against the anchor that is emitted, resolving the null that means "attribute
+    // omitted" to the SVG default it stands for — rather than assuming a centred title, which is
+    // the shape the label_align drift in the node lane took.
+    LabelBox visibleBox =
+        labelBox(x, y, anchor == null ? "start" : anchor, text, style.labelSize());
+    return new PlacedGroupTitle(x, y, anchor, visibleBox);
+  }
+
+  /**
+   * The document bounds: every drawable's own contribution, then the empty-layout page fallback,
+   * then the policy margins. Node-aware, which is why it and {@link PlacedScene} live here with
+   * their caller rather than in the svg package's Geometry — that package stays a leaf with no
+   * {@code node.*} imports.
+   *
+   * <p><strong>{@code policy.page()} and {@code policy.margin()} are non-null here, and that is a
+   * precondition rather than a defaulted value.</strong> Both are {@code required} in
+   * render-policy.schema.json, and {@code RenderInputValidator.validateRenderPolicy} rejects either
+   * as {@code DEDIREN_SVG_POLICY_INVALID} with the offending path before {@link #renderSvg} is
+   * reached — so a fallback here would be unreachable code that only made the crash harder to find.
+   * The sequence lane used to substitute a 16px margin and a 640x360 page of its own instead, which
+   * meant the two lanes disagreed about whether a policy missing {@code margin} was even an error.
+   * There is now one answer: it is, and it is published in the envelope.
+   */
+  static SvgBounds measure(List<PlacedElement> elements, RenderPolicy policy) {
+    SvgBounds bounds = SvgBounds.empty();
+    for (PlacedElement element : elements) {
+      element.contributeBounds(bounds);
+    }
+    if (bounds.isEmpty()) {
+      bounds.includeRect(0.0, 0.0, policy.page().width(), policy.page().height());
+    }
+    return bounds.padded(policy);
+  }
+
+  /**
+   * Opens the document every lane emits: the sized root, the accessible name, the background rect
+   * that fills the whole viewBox, and the {@code <g>} carrying the base typography.
+   *
+   * <p>Shared because the sequence lane had its own copy, and the copies had already drifted — it
+   * dropped the background's {@code fill-opacity} and the base {@code font-weight}/{@code
+   * font-style}, so the same policy produced two different documents depending on which lane read
+   * it. Balanced by {@link #closeDocument}.
+   */
+  static void openDocument(
+      SvgWriter w, RenderPolicy policy, String viewId, ResolvedStyle base, SvgBounds bounds) {
     w.start("svg")
         .attr("xmlns", "http://www.w3.org/2000/svg")
         .attr("role", "img")
@@ -94,7 +263,7 @@ public final class SvgDocument {
                 bounds.width(),
                 bounds.height()));
     SvgAccessibleName.rootLanguage(w, policy);
-    SvgAccessibleName.markup(w, policy, result.viewId());
+    SvgAccessibleName.markup(w, policy, viewId);
     w.empty("rect")
         .attr("x", f1(bounds.minX()))
         .attr("y", f1(bounds.minY()))
@@ -107,10 +276,28 @@ public final class SvgDocument {
         .attr("font-size", styleNumber(base.fontSize()))
         .attrIf("font-weight", enumValue(base.fontWeight()))
         .attrIf("font-style", enumValue(base.fontStyle()));
-    for (LaidOutGroup group : result.groups()) {
-      ResolvedGroupStyle style = StyleResolver.groupStyle(policy, metadata, group.id(), base);
+  }
+
+  /** Closes the typography {@code <g>} and the root {@link #openDocument} opened. */
+  static String closeDocument(SvgWriter w) {
+    w.end();
+    w.end();
+    return w.finish() + "\n";
+  }
+
+  /** Writes the placed scene. No placement decision is left to make here — see {@link #resolve}. */
+  static String emit(SvgWriter w, PlacedScene scene, SvgBounds bounds) {
+    ResolvedStyle base = scene.base();
+    // One minter per document: every id and every url(#…) in this SVG goes through it, so a
+    // layout id that is duplicated or not a legal identifier can neither collide nor break its
+    // own reference. See SvgIds for why the transform is a no-op on well-formed ids.
+    SvgIds ids = new SvgIds();
+    openDocument(w, scene.policy(), scene.viewId(), base, bounds);
+    for (PlacedGroup placed : scene.groups()) {
+      LaidOutGroup group = placed.group();
+      ResolvedGroupStyle style = placed.style();
       w.start("g").attr("data-dediren-group-id", group.id());
-      RenderMetadataSelector selector = metadata == null ? null : metadata.groups().get(group.id());
+      RenderMetadataSelector selector = placed.selector();
       if (selector != null) {
         w.attr("data-dediren-group-type", selector.type())
             .attr("data-dediren-group-source-id", selector.sourceId());
@@ -121,10 +308,12 @@ public final class SvgDocument {
         gradientElement(w, gradientId, style.fillGradient());
         rectStyle = style.withFill(ids.reference(gradientId));
       }
-      String groupDashValue = dashArrayValue(style.lineStyle(), style.dashPattern(), "6 4");
-      if (groupDashValue.isEmpty() && style.decorator() == SvgNodeDecorator.ARCHIMATE_GROUPING) {
-        groupDashValue = ARCHIMATE_GROUPING_DASH;
-      }
+      String groupDashValue =
+          shapeDash(
+              dashArrayValue(style.lineStyle(), style.dashPattern(), "6 4"),
+              style.decorator() == SvgNodeDecorator.ARCHIMATE_GROUPING
+                  ? ARCHIMATE_GROUPING_DASH
+                  : null);
       w.empty("rect")
           .attr("x", f1(group.x()))
           .attr("y", f1(group.y()))
@@ -134,23 +323,15 @@ public final class SvgDocument {
           .attr("fill", rectStyle.fill())
           .attr("stroke", style.stroke())
           .attr("stroke-width", styleNumber(style.strokeWidth()))
-          .attrIf("stroke-dasharray", groupDashValue.isEmpty() ? null : groupDashValue)
+          .attrIf("stroke-dasharray", groupDashValue)
           .attrIf("fill-opacity", opacity(style.fillOpacity()))
           .attrIf("stroke-opacity", opacity(style.strokeOpacity()));
       groupDecorator(w, group, style);
-      double groupLabelX = group.x() + 8.0;
-      String groupLabelAnchor = null;
-      if (style.labelAlign() == SvgLabelAlign.MIDDLE) {
-        groupLabelX = group.x() + group.width() / 2.0;
-        groupLabelAnchor = "middle";
-      } else if (style.labelAlign() == SvgLabelAlign.END) {
-        groupLabelX = group.x() + group.width() - 8.0;
-        groupLabelAnchor = "end";
-      }
+      PlacedGroupTitle title = placed.title();
       w.start("text")
-          .attr("x", f1(groupLabelX))
-          .attr("y", f1(group.y() + style.labelSize() + 4.0))
-          .attrIf("text-anchor", groupLabelAnchor)
+          .attr("x", f1(title.x()))
+          .attr("y", f1(title.y()))
+          .attrIf("text-anchor", title.anchor())
           .attr("fill", style.labelFill())
           .attr("font-size", styleNumber(style.labelSize()))
           .attrIf("font-family", style.fontFamily())
@@ -161,42 +342,40 @@ public final class SvgDocument {
           .end();
       w.end();
     }
-    List<LaidOutEdge> renderedEdges = new ArrayList<>();
-    List<LabelBox> placedLabelBoxes = new ArrayList<>();
-    for (int edgeIndex = 0; edgeIndex < result.edges().size(); edgeIndex++) {
-      LaidOutEdge edge = result.edges().get(edgeIndex);
-      ResolvedEdgeStyle style = StyleResolver.edgeStyle(policy, metadata, edge.id(), base);
-      List<LineJump> lineJumps = lineJumps(edge, renderedEdges);
+    for (PlacedEdge placed : scene.edges()) {
+      LaidOutEdge edge = placed.edge();
+      ResolvedEdgeStyle style = placed.style();
       w.start("g").attr("data-dediren-edge-id", edge.id());
       String startMarkerId = edgeMarker(w, ids, edge, style, "start");
       String endMarkerId = edgeMarker(w, ids, edge, style, "end");
-      lineJumpMasks(w, edge, lineJumps, result, metadata, policy, base);
-      edgePath(w, edge, style, lineJumps, ids.reference(startMarkerId), ids.reference(endMarkerId));
-      if (edge.label() != null && !edge.label().isEmpty()) {
-        double edgeLabelFontSize = edgeLabelFontSize(base.fontSize());
-        EdgeLabel label =
-            edgeLabel(
-                edge,
-                style,
-                labelObstacleBoxesForEdge(result, edgeIndex, placedLabelBoxes),
-                edgeLabelFontSize);
-        edgeLabel(w, label, edge.label(), style, base.backgroundFill(), edgeLabelFontSize);
-        placedLabelBoxes.add(edgeLabelVisibleBox(label, style.labelPresentation()));
+      lineJumpMasks(w, edge.id(), placed.lineJumps());
+      edgePath(
+          w,
+          edge,
+          style,
+          placed.routeJumps(),
+          ids.reference(startMarkerId),
+          ids.reference(endMarkerId));
+      PlacedEdgeLabel label = placed.label();
+      if (label != null) {
+        edgeLabel(
+            w,
+            label.label(),
+            label.text(),
+            style,
+            base.backgroundFill(),
+            edgeLabelFontSize(base.fontSize()));
       }
-      List<EdgeEndAdornments.Adornment> endAdornments =
-          EdgeEndAdornments.adornments(edge, metadata, base.fontSize());
-      if (!endAdornments.isEmpty()) {
-        EdgeEndAdornments.markup(w, endAdornments, style, base.backgroundFill(), base.fontSize());
-        for (EdgeEndAdornments.Adornment adornment : endAdornments) {
-          placedLabelBoxes.add(EdgeEndAdornments.visibleBox(adornment, style));
-        }
+      if (!placed.adornments().isEmpty()) {
+        EdgeEndAdornments.markup(
+            w, placed.routeAdornments(), style, base.backgroundFill(), base.fontSize());
       }
       w.end();
-      renderedEdges.add(edge);
     }
-    for (LaidOutNode node : result.nodes()) {
-      ResolvedNodeStyle style = StyleResolver.nodeStyle(policy, metadata, node.id(), base);
-      RenderMetadataSelector selector = metadata == null ? null : metadata.nodes().get(node.id());
+    for (PlacedNode placed : scene.nodes()) {
+      LaidOutNode node = placed.node();
+      ResolvedNodeStyle style = placed.style();
+      RenderMetadataSelector selector = placed.selector();
       w.start("g").attr("data-dediren-node-id", node.id());
       ResolvedNodeStyle shapeStyle = style;
       if (style.fillGradient() != null) {
@@ -215,19 +394,17 @@ public final class SvgDocument {
             .attrIf("stroke-opacity", opacity(shapeStyle.strokeOpacity()))
             .attrIf("stroke-dasharray", wrapDash.isEmpty() ? null : wrapDash);
       }
-      nodeShape(w, node, shapeStyle, selector);
+      nodeShape(w, node, shapeStyle, selector, placed.junctionRadius());
       if (wrap) {
         w.end();
       }
       nodeDecorator(w, node, style, selector);
-      if (shouldRenderPlainNodeLabel(node, style.decorator())) {
-        nodeLabel(w, node, style, base.fontSize());
+      if (placed.label() != null) {
+        nodeLabel(w, placed.label(), style);
       }
       w.end();
     }
-    w.end();
-    w.end();
-    return w.finish() + "\n";
+    return closeDocument(w);
   }
 
   private static void groupDecorator(SvgWriter w, LaidOutGroup group, ResolvedGroupStyle style) {
@@ -290,12 +467,18 @@ public final class SvgDocument {
     w.end();
   }
 
+  // The junction radius arrives from the placed scene rather than being recomputed here: the
+  // viewBox has to grow around a circle that can be wider than the node box, and a radius derived
+  // twice is a radius that can be measured at one size and drawn at another.
   private static void nodeShape(
-      SvgWriter w, LaidOutNode node, ResolvedNodeStyle style, RenderMetadataSelector selector) {
+      SvgWriter w,
+      LaidOutNode node,
+      ResolvedNodeStyle style,
+      RenderMetadataSelector selector,
+      Double junctionRadius) {
     SvgNodeDecorator decorator = style.decorator();
-    if (decorator == SvgNodeDecorator.ARCHIMATE_AND_JUNCTION
-        || decorator == SvgNodeDecorator.ARCHIMATE_OR_JUNCTION) {
-      double radius = archimateJunctionRadius(node, style);
+    if (junctionRadius != null) {
+      double radius = junctionRadius;
       String fill =
           decorator == SvgNodeDecorator.ARCHIMATE_AND_JUNCTION ? style.stroke() : style.fill();
       w.empty("circle")
@@ -328,8 +511,10 @@ public final class SvgDocument {
       rx = Math.max(1.0, style.rx());
       shapeName = "archimate_rounded_rectangle";
     } else if (decorator == SvgNodeDecorator.ARCHIMATE_GROUPING) {
-      String userDash = dashArrayValue(style.lineStyle(), style.dashPattern(), "6 4");
-      dashArray = userDash.isEmpty() ? ARCHIMATE_GROUPING_DASH : userDash;
+      dashArray =
+          shapeDash(
+              dashArrayValue(style.lineStyle(), style.dashPattern(), "6 4"),
+              ARCHIMATE_GROUPING_DASH);
     }
     w.empty("rect")
         .attr("data-dediren-node-shape", shapeName)
@@ -347,9 +532,7 @@ public final class SvgDocument {
   private static void nodeDecorator(
       SvgWriter w, LaidOutNode node, ResolvedNodeStyle style, RenderMetadataSelector selector) {
     SvgNodeDecorator decorator = style.decorator();
-    if (decorator == null
-        || decorator == SvgNodeDecorator.ARCHIMATE_AND_JUNCTION
-        || decorator == SvgNodeDecorator.ARCHIMATE_OR_JUNCTION) {
+    if (decorator == null || isArchimateJunction(decorator)) {
       return;
     }
     if (isUmlDecorator(decorator)) {
@@ -361,61 +544,5 @@ public final class SvgDocument {
 
   private static String enumValue(Enum<?> value) {
     return value == null ? null : value.name().toLowerCase(Locale.ROOT);
-  }
-
-  /**
-   * The document bounds: every group/edge/node rect plus rendered node labels, edge labels, and end
-   * adornments. Node-aware (it consults the node package's label boxes and decorator rules), which
-   * is why it lives here with its only caller and not in the svg package's Geometry — the svg
-   * package stays a leaf with no node.* imports.
-   */
-  private static SvgBounds svgBounds(
-      LayoutResult result, RenderMetadata metadata, RenderPolicy policy, ResolvedStyle base) {
-    var bounds = SvgBounds.empty();
-    for (LaidOutGroup group : result.groups()) {
-      bounds.includeRect(group.x(), group.y(), group.width(), group.height());
-    }
-    for (LaidOutEdge edge : result.edges()) {
-      for (Point point : edge.points()) {
-        bounds.includePoint(point.x(), point.y());
-      }
-    }
-    for (LaidOutNode node : result.nodes()) {
-      bounds.includeRect(node.x(), node.y(), node.width(), node.height());
-      ResolvedNodeStyle style = StyleResolver.nodeStyle(policy, metadata, node.id(), base);
-      if (shouldRenderPlainNodeLabel(node, style.decorator())) {
-        for (LabelBox labelBox : nodeLabelBoxes(node, style, base.fontSize())) {
-          bounds.includeRect(labelBox.minX(), labelBox.minY(), labelBox.width(), labelBox.height());
-        }
-      }
-    }
-    List<LabelBox> placedLabelBoxes = new ArrayList<>();
-    for (int edgeIndex = 0; edgeIndex < result.edges().size(); edgeIndex++) {
-      LaidOutEdge edge = result.edges().get(edgeIndex);
-      ResolvedEdgeStyle style = StyleResolver.edgeStyle(policy, metadata, edge.id(), base);
-      if (edge.label() != null && !edge.label().isEmpty()) {
-        EdgeLabel label =
-            edgeLabel(
-                edge,
-                style,
-                labelObstacleBoxesForEdge(result, edgeIndex, placedLabelBoxes),
-                edgeLabelFontSize(base.fontSize()));
-        LabelBox labelBox = edgeLabelVisibleBox(label, style.labelPresentation());
-        bounds.includeRect(labelBox.minX(), labelBox.minY(), labelBox.width(), labelBox.height());
-        placedLabelBoxes.add(labelBox);
-      }
-      // Same profile-gated call the emission loop makes, so bounds and markup can never disagree
-      // about whether an edge has end adornments.
-      for (EdgeEndAdornments.Adornment adornment :
-          EdgeEndAdornments.adornments(edge, metadata, base.fontSize())) {
-        LabelBox box = EdgeEndAdornments.visibleBox(adornment, style);
-        bounds.includeRect(box.minX(), box.minY(), box.width(), box.height());
-        placedLabelBoxes.add(box);
-      }
-    }
-    if (bounds.isEmpty()) {
-      bounds.includeRect(0.0, 0.0, policy.page().width(), policy.page().height());
-    }
-    return bounds.padded(policy);
   }
 }
