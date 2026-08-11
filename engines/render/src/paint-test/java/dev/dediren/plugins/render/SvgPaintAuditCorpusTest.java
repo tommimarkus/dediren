@@ -20,6 +20,12 @@ class SvgPaintAuditCorpusTest {
     SvgPaintAudit.Report report = SvgPaintAudit.audit(svg);
 
     assertThat(report.violations()).describedAs("%s: %s", name, report.violations()).isEmpty();
+    // The label rules above are gated on measurable text: a run the oracle cannot measure (an
+    // uncovered glyph in the pinned font, a text filter) is reported as an advisory and silently
+    // stops being checked, so an empty violation list would keep passing while the corpus quietly
+    // lost coverage. Nothing in the shipped corpus is unmeasurable today; assert that, so a
+    // regression that makes something unmeasurable fails here instead of disarming the oracle.
+    assertThat(report.advisories()).describedAs("%s: %s", name, report.advisories()).isEmpty();
   }
 
   @Test
@@ -124,7 +130,10 @@ class SvgPaintAuditCorpusTest {
   }
 
   private static Stream<Arguments> allRenderScenarios() {
-    return RenderScenarios.all();
+    // The dark theme rides the same oracle as every other scenario, so the built-in dark palette's
+    // contrast baselines and label paint are measured on real render output, not only on the
+    // synthetic fixtures in SvgPaintAuditContrastTest and the goldens in RasterGoldenTest.
+    return Stream.concat(RenderScenarios.all(), RenderScenarios.darkTheme());
   }
 
   private static String svg(int width, int height, String body) {

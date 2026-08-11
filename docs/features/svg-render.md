@@ -116,6 +116,18 @@ dediren render --plugin render \
 Render metadata schema:
 [`schemas/render-metadata.schema.json`](../../schemas/render-metadata.schema.json).
 
+The **render policy** must declare the matching `semantic_profile` for that
+notation to be drawn. Metadata alone does not select notation shapes: rendering
+`uml` or `archimate` metadata under a policy that declares no
+`semantic_profile` succeeds but drops every notation shape, decorator, and
+label placement, and warns with
+`DEDIREN_RENDER_METADATA_PROFILE_NOT_APPLIED`. It matters most for the
+notation's fixed-size symbols — a UML `DecisionNode` or `Port` is laid out as a
+~32px glyph whose label belongs outside it, so painted generically its label
+lands over a symbol far too small to hold it. The pairing stays legal (a
+deliberately generic rendering of a notation view is a reasonable thing to
+ask for), so the artifact is still produced.
+
 ## Browserless Render-Paint Verification
 
 The opt-in `render-paint` Maven profile validates behavior that byte-exact SVG

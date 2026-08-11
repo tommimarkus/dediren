@@ -625,6 +625,56 @@ class MainTest {
     }
 
     @Test
+    void warnsWhenNotationMetadataMeetsAPolicyThatDeclaresNoProfile() throws Exception {
+      ObjectNode input = (ObjectNode) umlStyleInput();
+      input.set("policy", fixtureJson("fixtures/render-policy/default-svg.json"));
+
+      JsonNode envelope = JsonSupport.objectMapper().readTree(render(input).stdout());
+
+      assertThat(envelope.at("/status").asText()).isEqualTo("warning");
+      assertThat(envelope.at("/diagnostics/0/code").asText())
+          .isEqualTo("DEDIREN_RENDER_METADATA_PROFILE_NOT_APPLIED");
+      assertThat(envelope.at("/diagnostics/0/severity").asText()).isEqualTo("warning");
+      assertThat(envelope.at("/diagnostics/0/path").asText()).isEqualTo("policy.semantic_profile");
+      assertThat(envelope.at("/diagnostics/0/message").asText()).contains("uml");
+      // The warning never costs the caller its artifact: the SVG is still rendered and returned.
+      assertThat(envelope.at("/data/artifacts/0/content").asText()).startsWith("<svg");
+    }
+
+    @Test
+    void warnsForArchimateMetadataButNotForGenericGraphMetadata() throws Exception {
+      ObjectNode archimate = (ObjectNode) archimateStyleInput();
+      archimate.set("policy", fixtureJson("fixtures/render-policy/default-svg.json"));
+      ObjectNode generic = (ObjectNode) archimateStyleInput();
+      generic.set("policy", fixtureJson("fixtures/render-policy/default-svg.json"));
+      ((ObjectNode) generic.at("/render_metadata")).put("semantic_profile", "generic-graph");
+
+      JsonNode archimateEnvelope = JsonSupport.objectMapper().readTree(render(archimate).stdout());
+      JsonNode genericEnvelope = JsonSupport.objectMapper().readTree(render(generic).stdout());
+
+      assertThat(archimateEnvelope.at("/diagnostics/0/code").asText())
+          .isEqualTo("DEDIREN_RENDER_METADATA_PROFILE_NOT_APPLIED");
+      // generic-graph carries no notation to drop, so a profile-less policy renders it as intended.
+      assertThat(genericEnvelope.at("/status").asText()).isEqualTo("ok");
+      assertThat(genericEnvelope.at("/diagnostics")).isEmpty();
+    }
+
+    @Test
+    void doesNotWarnWhenTheProfileIsDeclaredOrNoMetadataIsSupplied() throws Exception {
+      ObjectNode noMetadata = (ObjectNode) umlStyleInput();
+      noMetadata.remove("render_metadata");
+      noMetadata.set("policy", fixtureJson("fixtures/render-policy/default-svg.json"));
+
+      JsonNode declared = JsonSupport.objectMapper().readTree(render(umlStyleInput()).stdout());
+      JsonNode absent = JsonSupport.objectMapper().readTree(render(noMetadata).stdout());
+
+      assertThat(declared.at("/status").asText()).isEqualTo("ok");
+      assertThat(declared.at("/diagnostics")).isEmpty();
+      assertThat(absent.at("/status").asText()).isEqualTo("ok");
+      assertThat(absent.at("/diagnostics")).isEmpty();
+    }
+
+    @Test
     void rejectsProfileMismatch() throws Exception {
       JsonNode input = archimateStyleInput();
       ((ObjectNode) input.at("/render_metadata")).put("semantic_profile", "bpmn2");

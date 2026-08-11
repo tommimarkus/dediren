@@ -20,6 +20,7 @@ import dev.dediren.ir.LaidOutScene;
 import dev.dediren.ir.LaidOutSceneMapper;
 import dev.dediren.uml.UmlValidationException;
 import java.util.List;
+import java.util.Set;
 import tools.jackson.databind.JsonNode;
 
 /**
@@ -30,6 +31,13 @@ import tools.jackson.databind.JsonNode;
  * deserializes it into the typed {@link RenderPolicy} the same way the process path did at parse.
  */
 public final class SvgRenderEngine implements RenderEngine {
+
+  /**
+   * The metadata profiles that carry notation semantics. {@code generic-graph} is deliberately
+   * absent: it has no notation to drop, so a policy without {@code semantic_profile} renders it
+   * exactly as intended.
+   */
+  private static final Set<String> NOTATION_PROFILES = Set.of("archimate", "uml");
 
   @Override
   public String id() {
@@ -65,7 +73,38 @@ public final class SvgRenderEngine implements RenderEngine {
     String svg = renderSvg(layout, metadataOrNull, renderPolicy);
     List<RenderArtifact> artifacts = List.of(new RenderArtifact("svg", svg));
     return new EngineResult<>(
-        new RenderResult(ContractVersions.RENDER_RESULT_SCHEMA_VERSION, artifacts), List.of());
+        new RenderResult(ContractVersions.RENDER_RESULT_SCHEMA_VERSION, artifacts),
+        notationProfileNotAppliedDiagnostics(metadataOrNull, renderPolicy));
+  }
+
+  /**
+   * Warns when the metadata carries a notation profile the policy never declares. Nothing is
+   * invalid — the render succeeds and the SVG is well formed — but every notation-specific shape,
+   * decorator, and label placement is dropped, while layout already sized the notation's symbol
+   * nodes (a UML {@code DecisionNode} or {@code Port} is a fixed ~32px glyph whose label belongs
+   * outside it). Painted generically, that geometry puts an in-shape label over a symbol far too
+   * small to hold it, so the agent needs to know its profile went unused. A warning rather than an
+   * error: the combination is legal, and for a graph without symbol nodes a generic render of a
+   * notation view is a reasonable thing to ask for.
+   */
+  private static List<Diagnostic> notationProfileNotAppliedDiagnostics(
+      RenderMetadata metadataOrNull, RenderPolicy policy) {
+    if (metadataOrNull == null
+        || policy.semanticProfile() != null
+        || !NOTATION_PROFILES.contains(metadataOrNull.semanticProfile())) {
+      return List.of();
+    }
+    return List.of(
+        new Diagnostic(
+            DiagnosticCode.RENDER_METADATA_PROFILE_NOT_APPLIED.code(),
+            DiagnosticSeverity.WARNING,
+            "render metadata declares semantic_profile "
+                + metadataOrNull.semanticProfile()
+                + " but the render policy declares none, so "
+                + metadataOrNull.semanticProfile()
+                + " shapes, decorators and label placement are not applied; add"
+                + " semantic_profile to the render policy to render the notation",
+            "policy.semantic_profile"));
   }
 
   private static EngineException failure(String code, String message, String path) {
