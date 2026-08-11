@@ -1,4 +1,4 @@
-package dev.dediren.plugins.render.node.uml;
+package dev.dediren.plugins.render;
 
 import dev.dediren.contracts.layout.LaidOutEdge;
 import dev.dediren.contracts.layout.LaidOutNode;
@@ -11,6 +11,17 @@ import java.util.Comparator;
 import java.util.List;
 import tools.jackson.databind.JsonNode;
 
+/**
+ * The sequence view read out of a layout result and its render metadata: which laid-out node is a
+ * lifeline, which edge is a message, and the combined-fragment/operand tree the metadata declares.
+ *
+ * <p>Lives beside {@code SvgDocument} rather than in {@code node.uml} because its only consumer,
+ * {@link UmlSequenceRenderer}, had to move here to place its drawables into the sealed {@link
+ * PlacedElement} hierarchy — {@code sealed} permits only same-package implementations, and that
+ * hierarchy is the one guarantee that a sequence drawable cannot be emitted without also saying how
+ * the viewBox grows to hold it. {@code node.uml} keeps the UML *node* shapes and decorators the
+ * generic lane paints.
+ */
 record UmlSequenceModel(
     List<UmlSequenceModel.SequenceNode> interactions,
     List<UmlSequenceModel.SequenceNode> lifelines,

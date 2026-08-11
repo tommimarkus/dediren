@@ -15,11 +15,14 @@ import tools.jackson.databind.node.ObjectNode;
  * Self-message (source lifeline == target lifeline) hook geometry render check. Tasks 1-2 of the
  * self-message fix gave the {@code m2} edge stem-anchored hook points (fixtures/layout-result/
  * uml-sequence-self-message.json: {@code (455,388) (495,388) (495,412) (455,412)} -- out from the
- * "service" lifeline stem, down, and back to the same stem). This test locks in that {@link
- * dev.dediren.plugins.render.node.uml.UmlSequenceRenderer} actually renders that hook: the emitted
- * {@code d=} path walks all four points with both the first and last x on the lifeline stem's
- * centre-x, and a {@code marker-end} arrowhead is attached so the arrow returns to the stem rather
- * than floating in space.
+ * "service" lifeline stem, down, and back to the same stem). This test locks in that {@code
+ * UmlSequenceRenderer} actually renders that hook: the emitted {@code d=} path walks the hook with
+ * both the first and last x on the lifeline stem's centre-x, and a {@code marker-end} arrowhead is
+ * attached so the arrow returns to the stem rather than floating in space.
+ *
+ * <p>The two interior corners are rounded, because the lane draws through the shared {@code
+ * EdgeRenderer.pathData}. Rounding moves the corner vertices but cannot move the ends, which is the
+ * property this test is actually here to defend.
  */
 class SequenceSelfMessageHookTest {
 
@@ -50,17 +53,27 @@ class SequenceSelfMessageHookTest {
     Element path = pathWithAttribute(svg, "data-dediren-sequence-message", "m2");
 
     // The hook: stem -> stem+40 -> down -> back to the stem (fixtures/layout-result/
-    // uml-sequence-self-message.json's m2 points, verbatim -- edgePath emits raw layout points
-    // with no additional offset).
+    // uml-sequence-self-message.json's m2 points), now drawn through the shared
+    // EdgeRenderer.pathData, so each of the hook's two corners is ROUNDED: the leg stops 8 units
+    // short of the corner and a quadratic curve through it resumes 8 units along the next leg.
+    // The corner vertices (495,388) and (495,412) are therefore no longer path points -- the
+    // tangent points either side of them are.
     //
-    // Also a regression pin rebaselined together with the golden SVG and the layout fixture in
-    // the same pipeline run (commit 3d8d0e0), not an independently derived expectation. The
+    // Still a regression pin rather than an independently derived expectation: it was rebaselined
+    // with the golden SVG when the sequence lane adopted the shared route emitter, as the original
+    // was rebaselined with the layout fixture in the same pipeline run (commit 3d8d0e0). The
     // stemX-derived assertions below (points must start/end on lifelineStemX(svg, "service")) are
-    // the independent invariant oracle: they would still hold even if this literal moved.
+    // the independent invariant oracle: they still hold, unmoved, across that rebaseline.
     assertThat(path.getAttribute("d"))
-        .isEqualTo("M 455.0 388.0 L 495.0 388.0 L 495.0 412.0 L 455.0 412.0");
+        .isEqualTo(
+            "M 455.0 388.0 L 487.0 388.0 Q 495.0 388.0 495.0 396.0"
+                + " L 495.0 404.0 Q 495.0 412.0 487.0 412.0 L 455.0 412.0");
 
     List<double[]> points = pathPoints(path.getAttribute("d"));
+    // Still four line vertices: rounding turns each "L corner" into "L tangent Q corner tangent",
+    // and pathPoints reads the L targets, so the two interior points moved (to 487,388 and
+    // 495,404) without changing how many there are. The first and last did not move at all, which
+    // is what the two assertions below are for.
     assertThat(points).hasSize(4);
     assertThat(points.get(0)[0])
         .as("hook's first point must start on the service lifeline stem")

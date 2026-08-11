@@ -1,5 +1,7 @@
 package dev.dediren.plugins.render;
 
+import static dev.dediren.plugins.render.PlacedElement.includeBox;
+import static dev.dediren.plugins.render.PlacedElement.includeStroked;
 import static dev.dediren.plugins.render.node.NodeLabels.nodeLabelBoxes;
 import static dev.dediren.plugins.render.svg.EdgeRenderer.markerInkBoxes;
 
@@ -37,14 +39,9 @@ import java.util.List;
  * never heard of them. Re-splitting the two, or letting either recompute anything from the layout
  * result, reopens the whole bug class.
  *
- * <p>Every drawable is a {@link PlacedElement}, whose one method is its bounds contribution. A new
- * kind of drawable therefore cannot compile without stating how the viewBox grows to hold it. The
- * guarantee is per drawable kind rather than per attribute, so each kind is responsible for the
- * <em>decoration</em> of its own geometry too: the half of every stroke that lies outside the shape
- * it outlines, the marker viewport an edge's ends carry, the arc a line jump bulges into, and the
- * title a group paints above itself. Each of those was once left out, and each was a shape clipped
- * flat at the viewBox edge under a policy whose {@code margin} — schema minimum 0 — had no padding
- * to absorb it.
+ * <p>Every drawable is a {@link PlacedElement}, whose one method is its bounds contribution — see
+ * there for what each kind owes the fold and why the UML sequence lane's {@link
+ * PlacedSequenceScene} shares it.
  *
  * <p>Lives one package up from {@code svg} because it is node-aware — it holds {@link
  * NodeLabelPlacement} and folds {@code NodeLabels.nodeLabelBoxes}. Putting it in {@code svg} would
@@ -74,22 +71,6 @@ record PlacedScene(
     elements.addAll(edges);
     elements.addAll(nodes);
     return elements;
-  }
-
-  /**
-   * Something the document draws.
-   *
-   * <p>{@link #contributeBounds} grows the accumulator by the ink this element accounts for, using
-   * the same {@link SvgBounds} calls with the same arguments the pass it replaced used — no
-   * rewritten arithmetic, so no new rounding. It writes into the accumulator rather than returning
-   * boxes because that type is already a mutable min/max fold, and because that fold is
-   * order-independent for finite coordinates the measure walk may visit elements in emission order
-   * even though the old pass visited them in another. (The fold is order-independent for infinities
-   * too; only the sign bit of a NaN can depend on order, and every emitted format renders either
-   * NaN as {@code NaN}.)
-   */
-  sealed interface PlacedElement permits PlacedGroup, PlacedEdge, PlacedNode {
-    void contributeBounds(SvgBounds bounds);
   }
 
   /**
@@ -234,20 +215,4 @@ record PlacedScene(
 
   /** A placed UML association-end adornment and the box it inks, carried for the same reason. */
   record PlacedAdornment(EdgeEndAdornments.Adornment adornment, LabelBox visibleBox) {}
-
-  private static void includeBox(SvgBounds bounds, LabelBox box) {
-    bounds.includeRect(box.minX(), box.minY(), box.width(), box.height());
-  }
-
-  /**
-   * Includes a stroked shape's geometry <em>and</em> the outer half of the stroke that outlines it.
-   * SVG centres a stroke on the path, so a shape measured at its geometry is measured half a stroke
-   * short on every side — invisible under a generous margin, and a shaved edge at the {@code
-   * margin: 0} the render-policy schema allows.
-   */
-  private static void includeStroked(
-      SvgBounds bounds, double x, double y, double width, double height, double strokeWidth) {
-    double half = strokeWidth / 2.0;
-    bounds.includeRect(x - half, y - half, width + strokeWidth, height + strokeWidth);
-  }
 }

@@ -27,6 +27,7 @@ import static dev.dediren.plugins.render.svg.Geometry.labelObstacleBoxesForEdge;
 import static dev.dediren.plugins.render.svg.Svg.dashArrayValue;
 import static dev.dediren.plugins.render.svg.Svg.f1;
 import static dev.dediren.plugins.render.svg.Svg.opacity;
+import static dev.dediren.plugins.render.svg.Svg.shapeDash;
 import static dev.dediren.plugins.render.svg.Svg.styleNumber;
 
 import dev.dediren.contracts.layout.LaidOutEdge;
@@ -44,11 +45,9 @@ import dev.dediren.contracts.render.SvgNodeDecorator;
 import dev.dediren.plugins.render.PlacedScene.PlacedAdornment;
 import dev.dediren.plugins.render.PlacedScene.PlacedEdge;
 import dev.dediren.plugins.render.PlacedScene.PlacedEdgeLabel;
-import dev.dediren.plugins.render.PlacedScene.PlacedElement;
 import dev.dediren.plugins.render.PlacedScene.PlacedGroup;
 import dev.dediren.plugins.render.PlacedScene.PlacedGroupTitle;
 import dev.dediren.plugins.render.PlacedScene.PlacedNode;
-import dev.dediren.plugins.render.node.uml.UmlSequenceRenderer;
 import dev.dediren.plugins.render.style.ResolvedEdgeStyle;
 import dev.dediren.plugins.render.style.ResolvedGroupStyle;
 import dev.dediren.plugins.render.style.ResolvedNodeStyle;
@@ -69,10 +68,11 @@ import java.util.Locale;
 
 public final class SvgDocument {
 
-  // ArchiMate grouping borders fall back to this fine dash. A user dash (dash_pattern/line_style)
-  // must win in both the group lane and the node lane: a shape's own stroke-dasharray attribute
-  // beats the user dash riding the wrapper <g>, so this fallback may only be emitted when the
-  // resolved style carries no dash of its own.
+  // ArchiMate grouping borders fall back to this fine dash. Which of it and the user's dash reaches
+  // the shape is Svg.shapeDash's decision at both the sites that face it — the group rect, which
+  // has
+  // no wrapper, and the node shape, which sits inside one — rather than a precedence rule restated
+  // at each.
   private static final String ARCHIMATE_GROUPING_DASH = "3 2";
 
   // Group title placement: how far a start/end-aligned title is inset from the group's own edge,
@@ -87,6 +87,11 @@ public final class SvgDocument {
    * decisions into the viewBox, {@link #emit} writes them. The split exists because the viewBox
    * must be known before the root start-tag closes — see {@link PlacedScene} for why measure and
    * emit must keep consuming the one scene rather than each deriving its own.
+   *
+   * <p>UML sequence views take the second lane. It is a different document — lifelines, interaction
+   * frames, combined fragments and operands are not nodes and edges — but it is the same three
+   * passes over the same {@link PlacedElement} fold and the same {@link #openDocument} skeleton, so
+   * the two can no longer disagree about what a viewBox, a background or an accessible name is.
    */
   public static String renderSvg(
       LayoutResult result, RenderMetadata metadata, RenderPolicy policy) {
@@ -94,7 +99,7 @@ public final class SvgDocument {
       return new UmlSequenceRenderer(result, metadata, policy).render();
     }
     PlacedScene scene = resolve(result, metadata, policy);
-    return emit(new SvgWriter(), scene, measure(scene));
+    return emit(new SvgWriter(), scene, measure(scene.elements(), policy));
   }
 
   /**
@@ -211,25 +216,38 @@ public final class SvgDocument {
    * then the policy margins. Node-aware, which is why it and {@link PlacedScene} live here with
    * their caller rather than in the svg package's Geometry — that package stays a leaf with no
    * {@code node.*} imports.
+   *
+   * <p><strong>{@code policy.page()} and {@code policy.margin()} are non-null here, and that is a
+   * precondition rather than a defaulted value.</strong> Both are {@code required} in
+   * render-policy.schema.json, and {@code RenderInputValidator.validateRenderPolicy} rejects either
+   * as {@code DEDIREN_SVG_POLICY_INVALID} with the offending path before {@link #renderSvg} is
+   * reached — so a fallback here would be unreachable code that only made the crash harder to find.
+   * The sequence lane used to substitute a 16px margin and a 640x360 page of its own instead, which
+   * meant the two lanes disagreed about whether a policy missing {@code margin} was even an error.
+   * There is now one answer: it is, and it is published in the envelope.
    */
-  static SvgBounds measure(PlacedScene scene) {
+  static SvgBounds measure(List<PlacedElement> elements, RenderPolicy policy) {
     SvgBounds bounds = SvgBounds.empty();
-    for (PlacedElement element : scene.elements()) {
+    for (PlacedElement element : elements) {
       element.contributeBounds(bounds);
     }
     if (bounds.isEmpty()) {
-      bounds.includeRect(0.0, 0.0, scene.policy().page().width(), scene.policy().page().height());
+      bounds.includeRect(0.0, 0.0, policy.page().width(), policy.page().height());
     }
-    return bounds.padded(scene.policy());
+    return bounds.padded(policy);
   }
 
-  /** Writes the placed scene. No placement decision is left to make here — see {@link #resolve}. */
-  static String emit(SvgWriter w, PlacedScene scene, SvgBounds bounds) {
-    ResolvedStyle base = scene.base();
-    // One minter per document: every id and every url(#…) in this SVG goes through it, so a
-    // layout id that is duplicated or not a legal identifier can neither collide nor break its
-    // own reference. See SvgIds for why the transform is a no-op on well-formed ids.
-    SvgIds ids = new SvgIds();
+  /**
+   * Opens the document every lane emits: the sized root, the accessible name, the background rect
+   * that fills the whole viewBox, and the {@code <g>} carrying the base typography.
+   *
+   * <p>Shared because the sequence lane had its own copy, and the copies had already drifted — it
+   * dropped the background's {@code fill-opacity} and the base {@code font-weight}/{@code
+   * font-style}, so the same policy produced two different documents depending on which lane read
+   * it. Balanced by {@link #closeDocument}.
+   */
+  static void openDocument(
+      SvgWriter w, RenderPolicy policy, String viewId, ResolvedStyle base, SvgBounds bounds) {
     w.start("svg")
         .attr("xmlns", "http://www.w3.org/2000/svg")
         .attr("role", "img")
@@ -244,8 +262,8 @@ public final class SvgDocument {
                 bounds.minY(),
                 bounds.width(),
                 bounds.height()));
-    SvgAccessibleName.rootLanguage(w, scene.policy());
-    SvgAccessibleName.markup(w, scene.policy(), scene.viewId());
+    SvgAccessibleName.rootLanguage(w, policy);
+    SvgAccessibleName.markup(w, policy, viewId);
     w.empty("rect")
         .attr("x", f1(bounds.minX()))
         .attr("y", f1(bounds.minY()))
@@ -258,6 +276,23 @@ public final class SvgDocument {
         .attr("font-size", styleNumber(base.fontSize()))
         .attrIf("font-weight", enumValue(base.fontWeight()))
         .attrIf("font-style", enumValue(base.fontStyle()));
+  }
+
+  /** Closes the typography {@code <g>} and the root {@link #openDocument} opened. */
+  static String closeDocument(SvgWriter w) {
+    w.end();
+    w.end();
+    return w.finish() + "\n";
+  }
+
+  /** Writes the placed scene. No placement decision is left to make here — see {@link #resolve}. */
+  static String emit(SvgWriter w, PlacedScene scene, SvgBounds bounds) {
+    ResolvedStyle base = scene.base();
+    // One minter per document: every id and every url(#…) in this SVG goes through it, so a
+    // layout id that is duplicated or not a legal identifier can neither collide nor break its
+    // own reference. See SvgIds for why the transform is a no-op on well-formed ids.
+    SvgIds ids = new SvgIds();
+    openDocument(w, scene.policy(), scene.viewId(), base, bounds);
     for (PlacedGroup placed : scene.groups()) {
       LaidOutGroup group = placed.group();
       ResolvedGroupStyle style = placed.style();
@@ -273,10 +308,12 @@ public final class SvgDocument {
         gradientElement(w, gradientId, style.fillGradient());
         rectStyle = style.withFill(ids.reference(gradientId));
       }
-      String groupDashValue = dashArrayValue(style.lineStyle(), style.dashPattern(), "6 4");
-      if (groupDashValue.isEmpty() && style.decorator() == SvgNodeDecorator.ARCHIMATE_GROUPING) {
-        groupDashValue = ARCHIMATE_GROUPING_DASH;
-      }
+      String groupDashValue =
+          shapeDash(
+              dashArrayValue(style.lineStyle(), style.dashPattern(), "6 4"),
+              style.decorator() == SvgNodeDecorator.ARCHIMATE_GROUPING
+                  ? ARCHIMATE_GROUPING_DASH
+                  : null);
       w.empty("rect")
           .attr("x", f1(group.x()))
           .attr("y", f1(group.y()))
@@ -286,7 +323,7 @@ public final class SvgDocument {
           .attr("fill", rectStyle.fill())
           .attr("stroke", style.stroke())
           .attr("stroke-width", styleNumber(style.strokeWidth()))
-          .attrIf("stroke-dasharray", groupDashValue.isEmpty() ? null : groupDashValue)
+          .attrIf("stroke-dasharray", groupDashValue)
           .attrIf("fill-opacity", opacity(style.fillOpacity()))
           .attrIf("stroke-opacity", opacity(style.strokeOpacity()));
       groupDecorator(w, group, style);
@@ -367,9 +404,7 @@ public final class SvgDocument {
       }
       w.end();
     }
-    w.end();
-    w.end();
-    return w.finish() + "\n";
+    return closeDocument(w);
   }
 
   private static void groupDecorator(SvgWriter w, LaidOutGroup group, ResolvedGroupStyle style) {
@@ -476,8 +511,10 @@ public final class SvgDocument {
       rx = Math.max(1.0, style.rx());
       shapeName = "archimate_rounded_rectangle";
     } else if (decorator == SvgNodeDecorator.ARCHIMATE_GROUPING) {
-      String userDash = dashArrayValue(style.lineStyle(), style.dashPattern(), "6 4");
-      dashArray = userDash.isEmpty() ? ARCHIMATE_GROUPING_DASH : userDash;
+      dashArray =
+          shapeDash(
+              dashArrayValue(style.lineStyle(), style.dashPattern(), "6 4"),
+              ARCHIMATE_GROUPING_DASH);
     }
     w.empty("rect")
         .attr("data-dediren-node-shape", shapeName)

@@ -113,9 +113,9 @@
     "metadataFixture" : "fixtures/render-metadata/uml-sequence-fragments.json",
     "baseline" : "engines/render/src/paint-test/resources/raster-golden/uml-sequence-fragments.png",
     "dimensions" : {
-      "width" : 1008,
-      "height" : 1008
+      "width" : 1009,
+      "height" : 1009
     },
-    "sha256" : "184b7e8e7c51f4b4363ba7b3aeddac4229f513623dddef6f3bdf850fa9c54e3c"
+    "sha256" : "22c5c3142e0c91ef23f92491c3437613d2e03801354282c09fa01af94cc18a14"
   } ]
 }

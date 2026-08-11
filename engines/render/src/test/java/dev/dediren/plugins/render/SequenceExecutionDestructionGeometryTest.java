@@ -14,13 +14,11 @@ import tools.jackson.databind.node.ObjectNode;
 /**
  * Locks in that the execution-specification activation bar and the destruction-occurrence marker
  * (added by Task 6's layout fix to {@code fixtures/layout-result/uml-sequence-lifecycle.json}) are
- * actually DRAWN in the right place: {@link
- * dev.dediren.plugins.render.node.uml.UmlSequenceRenderer} already paints executions and
- * destructions straight from {@code node.x/y/width/height} ({@link
- * dev.dediren.plugins.render.node.uml.UmlSequenceModel} routes {@code ExecutionSpecification} to
- * {@code executions} and {@code DestructionOccurrenceSpecification} to {@code destructions}); this
- * test asserts against the real emitted SVG, not the layout-result JSON, so it fails if a future
- * change decouples the two.
+ * actually DRAWN in the right place: {@code UmlSequenceRenderer} already paints executions and
+ * destructions straight from {@code node.x/y/width/height} ({@code UmlSequenceModel} routes {@code
+ * ExecutionSpecification} to {@code executions} and {@code DestructionOccurrenceSpecification} to
+ * {@code destructions}); this test asserts against the real emitted SVG, not the layout-result
+ * JSON, so it fails if a future change decouples the two.
  */
 class SequenceExecutionDestructionGeometryTest {
 
