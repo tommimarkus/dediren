@@ -4,6 +4,20 @@ package dev.dediren.mcp;
 final class ToolSchemas {
   private ToolSchemas() {}
 
+  static final String WORKSPACE_OPEN =
+      """
+      {
+        "type": "object",
+        "properties": {
+          "workspace_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "description": "Optional canonical UUIDv4 of an existing, unexpired MCP workspace to resume. Omit to create one."
+          }
+        }
+      }
+      """;
+
   static final String VALIDATE =
       """
       {
@@ -11,7 +25,7 @@ final class ToolSchemas {
         "properties": {
           "source": {
             "type": "string",
-            "description": "Path to the document to validate (source model or policy JSON), relative to the workspace root."
+            "description": "Path to the document to validate (source model or policy JSON), relative to server --root."
           },
           "profile": {
             "type": "string",
@@ -27,13 +41,18 @@ final class ToolSchemas {
       {
         "type": "object",
         "properties": {
+          "workspace_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "description": "Canonical UUIDv4 returned by dediren_workspace_open."
+          },
           "source": {
             "type": "string",
-            "description": "Path to the source JSON, relative to the workspace root."
+            "description": "Path to the source JSON, relative to server --root."
           },
           "out": {
             "type": "string",
-            "description": "Output directory for the generated artifacts, relative to the workspace root."
+            "description": "Output directory for generated artifacts, relative to the isolated MCP workspace."
           },
           "views": {
             "type": "array",
@@ -50,13 +69,14 @@ final class ToolSchemas {
           },
           "package": {
             "type": "string",
-            "description": "Path to a package.json declaring models, views, and exports, relative to the workspace root. Builds the whole package end to end; mutually exclusive with source/out and the per-lane policies."
+            "description": "Path to a package.json declaring models, views, and exports, relative to server --root. Builds the whole package end to end; mutually exclusive with source/out and the per-lane policies."
           },
           "no_export": {
             "type": "boolean",
             "description": "In package mode, suppress the export lanes."
           }
-        }
+        },
+        "required": ["workspace_id"]
       }
       """;
 
@@ -106,13 +126,18 @@ final class ToolSchemas {
       {
         "type": "object",
         "properties": {
+          "workspace_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "description": "Optional MCP workspace handle. When present, artifacts is relative to that workspace."
+          },
           "source": {
             "type": "string",
             "description": "Path to the source model, relative to the workspace root."
           },
           "artifacts": {
             "type": "string",
-            "description": "Path to the directory of built artifacts to verify, relative to the workspace root."
+            "description": "Artifact directory relative to the selected MCP workspace when workspace_id is present, otherwise relative to server --root."
           }
         },
         "required": ["source", "artifacts"]
@@ -124,9 +149,14 @@ final class ToolSchemas {
       {
         "type": "object",
         "properties": {
+          "workspace_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "description": "Optional MCP workspace handle. When present, dir is relative to that workspace."
+          },
           "dir": {
             "type": "string",
-            "description": "Workspace directory to index, relative to the workspace root. Omit to index the root itself."
+            "description": "Directory relative to the selected MCP workspace when workspace_id is present, otherwise relative to server --root. Omit to index the selected root itself."
           }
         }
       }

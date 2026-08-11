@@ -22,6 +22,7 @@ public final class ContractVersions {
   public static final String BUILD_RESULT_SCHEMA_VERSION = "build-result.schema.v1";
   public static final String PACKAGE_SCHEMA_VERSION = "package.schema.v1";
   public static final String PACKAGE_BUILD_RESULT_SCHEMA_VERSION = "package-build-result.schema.v1";
+  public static final String MCP_WORKSPACE_SCHEMA_VERSION = "mcp-workspace.schema.v1";
 
   private ContractVersions() {}
 }

@@ -1,10 +1,12 @@
 package dev.dediren.mcp;
 
 import dev.dediren.contracts.CommandEnvelope;
+import dev.dediren.contracts.ContractVersions;
 import dev.dediren.contracts.Diagnostic;
 import dev.dediren.contracts.DiagnosticCode;
 import dev.dediren.contracts.DiagnosticSeverity;
 import dev.dediren.contracts.json.JsonSupport;
+import dev.dediren.contracts.mcp.McpWorkspace;
 import dev.dediren.core.ProductRootException;
 import dev.dediren.core.commands.AnalysisCommands;
 import dev.dediren.core.commands.BuildCommand;
@@ -51,11 +53,38 @@ public final class DedirenTools {
   private final Path root;
   private final Engines engines;
   private final Map<String, String> env;
+  private final McpWorkspaceManager workspaces;
 
   public DedirenTools(Path root, Engines engines, Map<String, String> env) {
+    this(
+        root, engines, env, McpWorkspaceManager.writable(root, java.time.Clock.systemUTC(), false));
+  }
+
+  DedirenTools(
+      Path root, Engines engines, Map<String, String> env, McpWorkspaceManager workspaces) {
     this.root = root;
     this.engines = engines;
     this.env = Map.copyOf(env);
+    this.workspaces = workspaces;
+  }
+
+  public CallToolResult workspaceOpen(CallToolRequest request) {
+    String requestedId = stringArg(request, "workspace_id");
+    if (request.arguments().containsKey("workspace_id") && requestedId == null) {
+      return error(
+          DiagnosticCode.COMMAND_INPUT_INVALID, "'workspace_id' must be a canonical UUIDv4", null);
+    }
+    try (McpWorkspaceManager.WorkspaceLease lease = workspaces.open(requestedId)) {
+      McpWorkspace workspace =
+          new McpWorkspace(
+              ContractVersions.MCP_WORKSPACE_SCHEMA_VERSION,
+              lease.workspaceId(),
+              lease.relativeWorkspacePath(),
+              lease.expiresAt().toString());
+      return envelope(serialize(CommandEnvelope.ok(workspace)), false);
+    } catch (McpWorkspaceManager.WorkspaceException failure) {
+      return workspaceFailure(failure);
+    }
   }
 
   public CallToolResult guide(CallToolRequest request) {
@@ -201,11 +230,27 @@ public final class DedirenTools {
     if (artifactsArg == null) {
       return error(DiagnosticCode.COMMAND_INPUT_INVALID, "verify requires 'artifacts'", null);
     }
+    String workspaceId = stringArg(request, "workspace_id");
+    if (request.arguments().containsKey("workspace_id") && workspaceId == null) {
+      return error(
+          DiagnosticCode.COMMAND_INPUT_INVALID, "'workspace_id' must be a canonical UUIDv4", null);
+    }
+    if (workspaceId == null) {
+      return verifyIn(source, artifactsArg, root);
+    }
+    try (McpWorkspaceManager.WorkspaceLease lease = workspaces.acquire(workspaceId)) {
+      return verifyIn(source, artifactsArg, lease.workspacePath());
+    } catch (McpWorkspaceManager.WorkspaceException failure) {
+      return workspaceFailure(failure);
+    }
+  }
+
+  private CallToolResult verifyIn(String source, String artifactsArg, Path artifactsBase) {
     Path sourcePath;
     Path artifactsPath;
     try {
       sourcePath = WorkspacePaths.resolveExisting(root, source);
-      artifactsPath = WorkspacePaths.resolveExisting(root, artifactsArg);
+      artifactsPath = WorkspacePaths.resolveExisting(artifactsBase, artifactsArg);
     } catch (PathOutsideRootException escape) {
       return pathEscape(escape);
     }
@@ -235,9 +280,25 @@ public final class DedirenTools {
 
   public CallToolResult status(CallToolRequest request) {
     String dir = stringArg(request, "dir");
+    String workspaceId = stringArg(request, "workspace_id");
+    if (request.arguments().containsKey("workspace_id") && workspaceId == null) {
+      return error(
+          DiagnosticCode.COMMAND_INPUT_INVALID, "'workspace_id' must be a canonical UUIDv4", null);
+    }
+    if (workspaceId == null) {
+      return statusIn(dir, root);
+    }
+    try (McpWorkspaceManager.WorkspaceLease lease = workspaces.acquire(workspaceId)) {
+      return statusIn(dir, lease.workspacePath());
+    } catch (McpWorkspaceManager.WorkspaceException failure) {
+      return workspaceFailure(failure);
+    }
+  }
+
+  private CallToolResult statusIn(String dir, Path directoryBase) {
     Path target;
     try {
-      target = WorkspacePaths.resolveExisting(root, dir == null ? "." : dir);
+      target = WorkspacePaths.resolveExisting(directoryBase, dir == null ? "." : dir);
     } catch (PathOutsideRootException escape) {
       return pathEscape(escape);
     }
@@ -247,7 +308,7 @@ public final class DedirenTools {
     try {
       // The walk full-loads every model candidate under 'dir', and each candidate's fragment paths
       // are model-supplied too: confine them to the same --root the tool arguments are confined to.
-      EngineRunOutcome outcome = AnalysisCommands.statusCommand(target, root);
+      EngineRunOutcome outcome = AnalysisCommands.statusCommand(target, directoryBase);
       return envelope(outcome.stdout(), outcome.exitCode() != 0);
     } catch (UncheckedIOException failure) {
       return ioFailure(failure);
@@ -255,9 +316,21 @@ public final class DedirenTools {
   }
 
   public CallToolResult build(CallToolRequest request) {
+    String workspaceId = stringArg(request, "workspace_id");
+    if (workspaceId == null) {
+      return error(DiagnosticCode.COMMAND_INPUT_INVALID, "build requires 'workspace_id'", null);
+    }
+    try (McpWorkspaceManager.WorkspaceLease lease = workspaces.acquire(workspaceId)) {
+      return buildIn(request, lease.workspacePath());
+    } catch (McpWorkspaceManager.WorkspaceException failure) {
+      return workspaceFailure(failure);
+    }
+  }
+
+  private CallToolResult buildIn(CallToolRequest request, Path workspacePath) {
     String packageArg = stringArg(request, "package");
     if (packageArg != null) {
-      return buildPackage(request, packageArg);
+      return buildPackage(request, packageArg, workspacePath);
     }
     String source = stringArg(request, "source");
     if (source == null) {
@@ -288,7 +361,7 @@ public final class DedirenTools {
     String xmiPolicy;
     try {
       sourcePath = WorkspacePaths.resolveExisting(root, source);
-      outPath = WorkspacePaths.resolveForWrite(root, out);
+      outPath = WorkspacePaths.resolveForWrite(workspacePath, out);
       renderPolicy = readOptionalPolicy(request, "render_policy");
       oefPolicy = readOptionalPolicy(request, "oef_policy");
       xmiPolicy = readOptionalPolicy(request, "xmi_policy");
@@ -330,7 +403,8 @@ public final class DedirenTools {
     }
   }
 
-  private CallToolResult buildPackage(CallToolRequest request, String packageArg) {
+  private CallToolResult buildPackage(
+      CallToolRequest request, String packageArg, Path workspacePath) {
     if (stringArg(request, "source") != null
         || stringArg(request, "out") != null
         || stringArg(request, "render_policy") != null
@@ -368,7 +442,15 @@ public final class DedirenTools {
     }
 
     PackageBuildRequest packageRequest =
-        new PackageBuildRequest(packageText, packagePath.getParent(), root, env, views, noExport);
+        new PackageBuildRequest(
+            packageText,
+            packagePath.getParent(),
+            root,
+            workspacePath,
+            workspacePath,
+            env,
+            views,
+            noExport);
     try {
       EngineRunOutcome outcome = PackageBuildCommand.run(packageRequest, engines);
       return envelope(outcome.stdout(), outcome.exitCode() != 0);
@@ -535,6 +617,24 @@ public final class DedirenTools {
     System.err.println("dediren mcp: workspace I/O failure: " + failure.getMessage());
     return error(
         DiagnosticCode.COMMAND_IO_FAILED, "an I/O error occurred accessing the workspace", null);
+  }
+
+  private static CallToolResult workspaceFailure(McpWorkspaceManager.WorkspaceException failure) {
+    DiagnosticCode code =
+        switch (failure.kind()) {
+          case INVALID -> DiagnosticCode.COMMAND_INPUT_INVALID;
+          case UNAVAILABLE -> DiagnosticCode.MCP_WORKSPACE_UNAVAILABLE;
+          case BUSY -> DiagnosticCode.MCP_WORKSPACE_BUSY;
+          case IO -> DiagnosticCode.COMMAND_IO_FAILED;
+        };
+    String message = failure.getMessage();
+    if (failure.kind() == McpWorkspaceManager.WorkspaceException.Kind.IO) {
+      System.err.println(
+          "dediren mcp: workspace lifecycle I/O failure: "
+              + (failure.getCause() == null ? failure : failure.getCause()));
+      message = "an I/O error occurred managing the MCP workspace";
+    }
+    return error(code, message, failure.candidate());
   }
 
   private static CallToolResult engineFailure(EngineExecutionException failure) {

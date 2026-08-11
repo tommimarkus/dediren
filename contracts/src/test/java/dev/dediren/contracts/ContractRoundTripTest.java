@@ -31,6 +31,7 @@ import dev.dediren.contracts.layout.LayoutResult;
 import dev.dediren.contracts.layout.LayoutRoutingStyle;
 import dev.dediren.contracts.layout.LayoutThoroughness;
 import dev.dediren.contracts.layout.LayoutWrapping;
+import dev.dediren.contracts.mcp.McpWorkspace;
 import dev.dediren.contracts.pkg.PackageBuildResult;
 import dev.dediren.contracts.pkg.PackageDocument;
 import dev.dediren.contracts.pkg.PackageExport;
@@ -60,6 +61,31 @@ import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 
 class ContractRoundTripTest {
+  @Test
+  void mcpWorkspaceEnvelopeRoundTripsAndConformsToItsSchema() throws Exception {
+    String workspaceId = "8f1de3c2-3552-4f31-91b3-5524ca3bb8c8";
+    McpWorkspace workspace =
+        new McpWorkspace(
+            ContractVersions.MCP_WORKSPACE_SCHEMA_VERSION,
+            workspaceId,
+            ".dediren/mcp/workspaces/" + workspaceId,
+            "2026-08-12T09:00:00Z");
+    CommandEnvelope<McpWorkspace> envelope = CommandEnvelope.ok(workspace);
+
+    String json = JsonSupport.writeValueAsString(envelope);
+    CommandEnvelope<McpWorkspace> reparsed =
+        JsonSupport.readValue(
+            json, new tools.jackson.core.type.TypeReference<CommandEnvelope<McpWorkspace>>() {});
+
+    assertThat(reparsed).isEqualTo(envelope);
+    assertThat(
+            SchemaAssertions.validateFixture(
+                workspaceRoot(),
+                "schemas/mcp-workspace.schema.json",
+                "fixtures/mcp-workspace/valid.json"))
+        .isEmpty();
+  }
+
   @Test
   void sourceDocumentRoundTripsFromFixture() throws Exception {
     SourceDocument source = readFixture("fixtures/source/valid-basic.json", SourceDocument.class);

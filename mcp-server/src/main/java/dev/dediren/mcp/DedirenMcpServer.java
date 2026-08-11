@@ -16,13 +16,13 @@ import java.util.concurrent.CountDownLatch;
 /**
  * Assembles the {@code dediren mcp} stdio server.
  *
- * <p>The server is spawned by an MCP client, which owns its lifetime and reaps it — there is no
- * daemon here: no port, no PID file, no idle timeout, no concurrent-client arbitration. That is why
- * this needs no lifecycle design of its own.
+ * <p>The server is spawned by an MCP client, which owns its process lifetime. MCP build workspaces
+ * have their own application-level handles, cross-process leases, and TTL reaper because they
+ * deliberately survive a single stdio-server process.
  *
- * <p>Under {@code readOnly}, {@code dediren_build} is not registered at all. An absent tool is a
- * better contract than a tool that exists and refuses: the model never sees a capability it cannot
- * use, and it costs nothing in the client's context window.
+ * <p>Under {@code readOnly}, neither {@code dediren_build} nor {@code dediren_workspace_open} is
+ * registered. An absent tool is a better contract than a tool that exists and refuses: the model
+ * never sees a capability it cannot use, and it costs nothing in the client's context window.
  */
 public final class DedirenMcpServer {
   private static final String SERVER_NAME = "dediren";
@@ -42,7 +42,9 @@ public final class DedirenMcpServer {
     // McpJsonMappers so this stays identical to the oracle EofSignalingInputStream uses.
     McpJsonMapper mapper = McpJsonMappers.standard();
     StdioServerTransportProvider transport = new StdioServerTransportProvider(mapper, in, out);
-    DedirenTools tools = new DedirenTools(root, engines, env);
+    McpWorkspaceManager workspaceManager =
+        readOnly ? McpWorkspaceManager.readOnly(root) : McpWorkspaceManager.writable(root);
+    DedirenTools tools = new DedirenTools(root, engines, env, workspaceManager);
 
     var specification =
         McpServer.sync(transport)
@@ -120,20 +122,33 @@ public final class DedirenMcpServer {
 
     if (!readOnly) {
       specification =
-          specification.toolCall(
-              Tool.builder()
-                  .name("dediren_build")
-                  .description(
-                      "Compile a Dediren source model into artifacts (SVG render, ArchiMate OEF,"
-                          + " and/or UML XMI) under an output directory. Select a lane by passing"
-                          + " its policy: render_policy, oef_policy, xmi_policy. Returns the"
-                          + " build-result envelope, which names every artifact written. A"
-                          + " DEDIREN_SCHEMA_VERSION_OUTDATED error means a source or policy file"
-                          + " declares a superseded schema version: call dediren_guide with topic"
-                          + " 'migration' for the upgrade steps.")
-                  .inputSchema(mapper, ToolSchemas.BUILD)
-                  .build(),
-              (exchange, request) -> tools.build(request));
+          specification
+              .toolCall(
+                  Tool.builder()
+                      .name("dediren_workspace_open")
+                      .description(
+                          "Create an isolated MCP build workspace, or resume an unexpired one by"
+                              + " workspace_id. Returns the handle, root-relative workspace path,"
+                              + " and expiry timestamp needed by later build, verify, and status"
+                              + " calls.")
+                      .inputSchema(mapper, ToolSchemas.WORKSPACE_OPEN)
+                      .build(),
+                  (exchange, request) -> tools.workspaceOpen(request))
+              .toolCall(
+                  Tool.builder()
+                      .name("dediren_build")
+                      .description(
+                          "Compile a Dediren source model into artifacts (SVG render, ArchiMate"
+                              + " OEF, and/or UML XMI) inside the isolated workspace named by the"
+                              + " required workspace_id. Select a lane by passing its policy:"
+                              + " render_policy, oef_policy, xmi_policy. Returns the unchanged"
+                              + " build-result envelope, which names every artifact written. A"
+                              + " DEDIREN_SCHEMA_VERSION_OUTDATED error means a source or policy"
+                              + " file declares a superseded schema version: call dediren_guide"
+                              + " with topic 'migration' for the upgrade steps.")
+                      .inputSchema(mapper, ToolSchemas.BUILD)
+                      .build(),
+                  (exchange, request) -> tools.build(request));
     }
     return specification.build();
   }

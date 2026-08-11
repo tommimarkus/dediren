@@ -38,6 +38,7 @@ class FixtureConformanceSweepTest {
           "fixtures/render-metadata", "schemas/render-metadata.schema.json",
           "fixtures/render-policy", "schemas/render-policy.schema.json",
           "fixtures/build-result", "schemas/build-result.schema.json",
+          "fixtures/mcp-workspace", "schemas/mcp-workspace.schema.json",
           "fixtures/package", "schemas/package.schema.json",
           "fixtures/package-build-result", "schemas/package-build-result.schema.json");
 

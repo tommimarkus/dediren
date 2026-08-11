@@ -21,6 +21,20 @@ import tools.jackson.databind.JsonNode;
 class ToolSchemasTest {
 
   @Test
+  void workspaceAwareToolSchemasAdvertiseTheHandleContract() {
+    JsonNode build = JsonSupport.objectMapper().readTree(ToolSchemas.BUILD);
+    JsonNode verify = JsonSupport.objectMapper().readTree(ToolSchemas.VERIFY);
+    JsonNode status = JsonSupport.objectMapper().readTree(ToolSchemas.STATUS);
+    JsonNode open = JsonSupport.objectMapper().readTree(ToolSchemas.WORKSPACE_OPEN);
+
+    assertThat(build.path("required").toString()).contains("\"workspace_id\"");
+    assertThat(build.at("/properties/workspace_id/pattern").asText()).isNotBlank();
+    assertThat(verify.at("/properties/workspace_id/type").asText()).isEqualTo("string");
+    assertThat(status.at("/properties/workspace_id/type").asText()).isEqualTo("string");
+    assertThat(open.path("required").isMissingNode()).isTrue();
+  }
+
+  @Test
   void advertisedEmitEnumMatchesTheVocabularyBuildCommandAccepts() {
     JsonNode advertisedEnum =
         JsonSupport.objectMapper()
