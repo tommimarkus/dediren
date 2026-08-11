@@ -86,7 +86,7 @@ edge set in [`docs/architecture-guidelines.md`](docs/architecture-guidelines.md)
 ./mvnw test                                    # unit + integration
 ./mvnw -Pquality verify                        # google-java-format + SpotBugs gate
 ./mvnw -Pcoverage verify                       # JaCoCo LINE + BRANCH gate
-./scripts/test-render-paint.sh                  # browserless SVG paint + raster goldens
+./scripts/test-render-paint.sh                  # Chromium SVG paint + raster goldens
 ./mvnw -pl dist-tool -am verify -Pdist-build   # build the agent bundle
 ./mvnw -pl dist-tool -am verify -Pdist-smoke   # smoke-test the built bundle
 ```
@@ -98,8 +98,9 @@ CodeQL and render-paint run weekly and on demand, while release tags have their
 own gates. Narrower per-module verification lanes are listed in
 [`CLAUDE.md` §Verification](CLAUDE.md).
 
-The opt-in `render-paint` profile is a browserless check of decorated SVG paint
-and four raster baselines: the rich graph in light and dark themes, ArchiMate
+The opt-in `render-paint` profile uses Playwright Java 1.61.0 with Chromium
+headless shell 149.0.7827.55 (revision 1228) to check decorated SVG paint and
+four raster baselines: the rich graph in light and dark themes, ArchiMate
 decorators, and UML sequence-fragment chrome. Run the full lane with the script
 above, the paint audit alone with
 `./scripts/test-render-paint.sh -Dtest='SvgPaintAudit*Test'`, or the raster lane
@@ -107,28 +108,41 @@ with
 `./scripts/test-render-paint.sh -Dtest='RasterDiffTest,RasterGoldenTest'`.
 Deliberate raster changes require
 `-Ddediren.render.paint.regenerate-goldens=true`; review the tracked PNG and
-manifest diff. Failures write actual, mask, and overlay evidence under
+manifest diff. Regeneration is accepted only when the browser, Playwright,
+container, Java runtime, viewport, DPR, and font match the manifest pins.
+Failures write actual, changed-pixel mask, and overlay evidence under
 `.test-output/render-paint/`.
 
-The Apache Batik 1.19 `batik-bridge` artifact is resolved only by this test profile and
-supplies the independent non-text decorated-paint check; it is not shipped.
-Batik 1.19 officially does not support and ignores the valid SVG
-`dominant-baseline="middle"` x-middle baseline. That baseline is not an
-ink-bounds-centering instruction, so the JDK Java2D oracle with bundled
-Liberation Sans models its x-middle semantics; ImageIO owns raster comparison.
-This test-only lane does not change emitted SVG or other product output. The
-lane never loads system fonts or downloads fallback fonts: an unsupported glyph
-is an advisory `font_missing`, not a fabricated measurement. Repository-owned
-themes are checked against numeric contrast baselines of 4.5:1 for normal text
-and 3:1 for large text;
-these are baselines, not claims of WCAG conformance. User themes never block,
-and gradients or compositions that cannot be measured report advisory
-`not_measurable`.
+Browser DOM geometry, computed styles, marker/filter paint, and transparent
+screenshots are authoritative for this Chromium-only lane; ImageIO still owns
+PNG comparison. The browser runs with network and animation disabled, a fixed
+locale and UTC timezone, reduced motion, DPR 1, and deterministic padding
+around the SVG-derived viewport. Each render gets a disposable, non-persistent
+browser context with service workers blocked; every page request is recorded
+and aborted. Chromium background networking, updates, sync, crash reporting,
+extensions/default apps, first-run/default-browser services, translation,
+media routing, and optimization lookups are disabled. The lane does not change
+emitted SVG or other product output. It exists only under the opt-in profile,
+so the default build and shipped Dediren runtime resolve no Playwright or
+browser component.
 
-Maven state, including the profile-only Batik artifacts, is repo-local under
-`.cache/maven` for sandbox-friendly builds. The scheduled raster lane pins
-Eclipse Temurin 21.0.10+7; the profile itself remains Java-only and has no
-OS-specific executable dependency.
+The existing Liberation Sans test asset is loaded through a data `@font-face`
+and its adjacent OFL-1.1-RFN licence and digest remain recorded in the raster
+manifest. System-font fallback and fallback-font downloads are prohibited for
+blocking text checks; unsupported glyphs are advisory rather than silently
+measured with a host font. Repository-owned themes gate on numeric contrast
+baselines of 4.5:1 for normal text and 3:1 for large text. These are repository
+baselines, not claims of WCAG conformance. User themes never block, and
+gradients or compositions that cannot be resolved report `not_measurable`.
+
+Maven state stays under `.cache/maven`, while the wrapper installs only the
+pinned Chromium headless shell under `.cache/playwright`; neither cache is
+committed or shipped. The scheduled lane uses the digest-pinned Playwright Java
+1.61.0 Noble container and Eclipse Temurin 21.0.10+7. The image name, browser
+name, and version strings are upstream tool identification, not bundled marks
+or product branding. References to the retired paint implementation remain
+only in historical plans/reviews under `docs/superpowers` and in threat-model
+history; those records are retained rather than rewritten as current guidance.
 Supply-chain scanning is layered: **Grype** scans the CycloneDX SBOM and is the
 blocking gate on every pull request and release (High/Critical advisories fail
 the build); **OWASP Dependency-Check** is an on-demand local second opinion

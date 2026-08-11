@@ -128,11 +128,12 @@ lands over a symbol far too small to hold it. The pairing stays legal (a
 deliberately generic rendering of a notation view is a reasonable thing to
 ask for), so the artifact is still produced.
 
-## Browserless Render-Paint Verification
+## Chromium Render-Paint Verification
 
 The opt-in `render-paint` Maven profile validates behavior that byte-exact SVG
-goldens and XML inspection do not cover, without starting or downloading a web
-browser. The repository wrapper runs the whole lane:
+goldens and XML inspection do not cover. The repository wrapper installs only
+Chromium headless shell 149.0.7827.55 (revision 1228) into
+`.cache/playwright`, then runs the Playwright Java 1.61.0 lane:
 
 ```bash
 ./scripts/test-render-paint.sh
@@ -145,22 +146,38 @@ For a narrow rerun, select the decorated-paint audit or raster backstop:
 ./scripts/test-render-paint.sh -Dtest='RasterDiffTest,RasterGoldenTest'
 ```
 
-The profile resolves the Apache Batik 1.19 `batik-bridge` artifact at test scope only. It
-uses the SVG bridge as an independent authority for non-text decorated paint
-such as paths, strokes, markers, and transformed bounds; no Batik artifact
-enters the shipped runtime. Batik 1.19 officially does not support and ignores
-the valid SVG `dominant-baseline="middle"` x-middle baseline, so its text
-placement is not authoritative. That baseline does not request exact
-ink-bounds centering. The JDK Java2D oracle uses the repository's bundled
-Liberation Sans font to model x-middle semantics; ImageIO owns raster
-comparison. This test-only lane does not change emitted SVG or other product
-output.
+The browser DOM supplies transformed geometry, computed styles, text metrics,
+marker/filter paint, and pixel masks; ImageIO owns raster comparison. Before an
+SVG is loaded, the harness rejects scripts, event handlers, external URLs, and
+active animation elements. Each build uses Playwright `browserType.launch()`
+with a temporary profile and one disposable browser, context, and page. The
+context is offline, blocks service workers, and registers a catch-all route
+that records and aborts every page request.
 
-The lane does not load system fonts and does not fetch fallback fonts. When the
-bundled font cannot display a glyph, the result is the advisory code
-`font_missing`; the audit does not invent a bound. That applies particularly to
-unsupported CJK or emoji glyphs while retaining deterministic checks for text
-the font can display.
+The exact additional Chromium arguments are
+`--disable-background-networking`, `--disable-breakpad`,
+`--disable-client-side-phishing-detection`, `--disable-component-update`,
+`--disable-crash-reporter`, `--disable-default-apps`,
+`--disable-domain-reliability`, `--disable-extensions`, `--disable-sync`,
+`--disable-translate`, `--no-default-browser-check`, `--no-first-run`, and
+`--disable-features=MediaRouter,OptimizationHints,Translate`. Together they
+disable background networking, updates, sync, crash telemetry/reporting,
+extensions/default apps, first-run/default-browser services, translation,
+media routing, and optimization lookups. Locale, UTC timezone, reduced motion,
+device scale factor 1, transparent background, and fixed padding around an
+SVG-derived viewport keep the result deterministic. The suite checks inline
+SVG and `<img>` behavior but Chromium is its only blocking browser. Playwright
+and browser components exist only in this opt-in test profile: the default
+reactor and shipped runtime do not resolve or bundle them, and renderer output
+and ELK geometry are unchanged.
+
+The harness loads the repository's existing Liberation Sans test file through
+a data `@font-face` and waits for `document.fonts.ready`. It does not load system
+fonts or fetch fallback fonts for blocking text checks. When the bundled font
+cannot display a glyph, the result is advisory `font_missing`; the audit does
+not invent a bound. The adjacent OFL-1.1-RFN licence, font digest, and
+provenance stay recorded in the raster manifest. No new font is introduced by
+this lane.
 
 Repository-owned built-in themes gate on numeric label-contrast baselines of
 4.5:1 for normal text and 3:1 for large text. These values are contrast
@@ -181,10 +198,20 @@ deliberately opt-in:
 
 Review every tracked PNG and manifest change after regeneration. A failed
 comparison writes the actual image, changed-pixel mask, and overlay under
-`.test-output/render-paint/`. Maven state, including profile-only Batik jars,
-stays in the repository-local `.cache/maven`. The scheduled raster lane pins
-Eclipse Temurin 21.0.10+7; the profile has no OS-specific executable dependency
-and creates no browser or home-directory cache.
+`.test-output/render-paint/`. Equal dimensions are required; RGBA channel
+differences of 8 or less are ignored, and every remaining changed pixel fails.
+The manifest pins Playwright, Chromium, the CI container digest, Eclipse
+Temurin 21.0.10+7, viewport rules, DPR, font digest, scenarios, and comparator
+threshold. Regeneration rejects a mismatched environment.
+
+Maven state stays in `.cache/maven`; the browser shell stays in
+`.cache/playwright`. These repository-local caches are ignored, recoverable,
+and never shipped. The Thursday 06:00 UTC/manual job runs in the digest-pinned
+Playwright Java 1.61.0 Noble image. Its image and browser names are provenance
+for external test tools, not bundled marks or Dediren branding. References to
+the retired paint implementation remain only in historical plans/reviews under
+`docs/superpowers` and in threat-model history so those records remain truthful;
+they are not current implementation guidance.
 
 ## Related Pages
 

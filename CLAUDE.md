@@ -340,7 +340,7 @@ SVG render changes:
 ./mvnw -pl engines/render,cli -am test
 ```
 
-Browserless decorated-paint and raster verification (opt-in):
+Chromium-backed decorated-paint and raster verification (opt-in):
 
 ```bash
 ./scripts/test-render-paint.sh
@@ -348,17 +348,29 @@ Browserless decorated-paint and raster verification (opt-in):
 ./scripts/test-render-paint.sh -Dtest='RasterDiffTest,RasterGoldenTest'
 ```
 
-The wrapper activates `-Prender-paint`; direct Maven callers may use
-`./mvnw -Prender-paint -pl engines/render -am test`. Maven and the profile-only
-Apache Batik 1.19 `batik-bridge` test dependency stay under the repository
-`.cache/maven`. Batik is the non-text decorated-paint oracle only: because it
-officially does not support and ignores the valid SVG
-`dominant-baseline="middle"` x-middle baseline, text geometry is judged by the
-JDK Java2D oracle with bundled Liberation Sans. The oracle models x-middle
-semantics, not exact ink-bounds centering; ImageIO owns raster comparison. This
-test-only lane does not change emitted SVG or other product output. Do not
-enable system-font fallback or download new fonts. Unsupported glyphs produce
-advisory `font_missing` results.
+The wrapper activates `-Prender-paint`, installs only Chromium headless shell
+149.0.7827.55 (revision 1228) under repository `.cache/playwright`, and runs the
+Playwright Java 1.61.0 tests. Direct Maven callers may use
+`./mvnw -Prender-paint -pl engines/render -am test` only after the pinned shell
+is present and `PLAYWRIGHT_BROWSERS_PATH` points to that cache. Maven stays
+under `.cache/maven`. Browser DOM geometry, computed styles, marker/filter
+paint, and padded transparent screenshots are the decorated-paint authority;
+ImageIO owns raster comparison. The opt-in profile does not change emitted SVG,
+the default build, or the shipped platform-neutral Java runtime.
+
+Keep the hardened browser launch synchronized with
+`docs/features/svg-render.md`: use a disposable `browserType.launch()` profile,
+offline context, blocked service workers, and a catch-all route that records
+and aborts every page request. Do not remove the pinned flags that disable
+background networking, update/sync/crash services, extensions/default apps,
+first-run/default-browser services, translation, media routing, and
+optimization lookups.
+
+The lane loads the existing Liberation Sans test asset through a data
+`@font-face`, waits for `document.fonts.ready`, and prohibits system-font
+fallback for blocking text checks. Do not download a new or fallback font.
+Unsupported glyphs produce advisory `font_missing` results. The adjacent
+OFL-1.1-RFN licence and the font digest remain part of the raster manifest.
 
 The raster corpus is the rich graph in light and dark themes, ArchiMate
 decorators, and UML sequence-fragment chrome. A failure writes actual, mask, and
@@ -370,9 +382,16 @@ them as baselines, never WCAG conformance. User themes are non-blocking, while
 gradients and compositions that cannot be resolved report advisory
 `not_measurable`.
 
-The scheduled raster job pins Eclipse Temurin 21.0.10+7. Keep that runtime and
-the raster manifest synchronized when the canonical golden environment changes;
-the profile must remain free of OS-specific executable dependencies.
+The scheduled raster job pins Eclipse Temurin 21.0.10+7 and the digest-pinned
+Playwright Java 1.61.0 Noble image. Chromium is the only blocking browser in
+this lane. Keep the runtime, Playwright and Chromium versions, container digest,
+viewport rules, DPR, font digest, and raster manifest synchronized when the
+canonical golden environment changes. Regeneration must reject a mismatch.
+The browser download and container are test infrastructure only: commit no
+native binary, browser cache, or new font. References to the retired paint
+implementation are allowed only in historical plans/reviews under
+`docs/superpowers` and in threat-model history; do not rewrite those records or
+copy their terminology into active guidance.
 
 OEF export changes:
 

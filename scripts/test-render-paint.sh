@@ -6,7 +6,14 @@ repo_root="$(cd -- "${script_dir}/.." && pwd -P)"
 
 cd "${repo_root}"
 
-paint_test_selector="BatikPaintSmokeTest,RasterDiffTest,RasterGoldenTest,SvgPaintAudit*Test"
+export PLAYWRIGHT_BROWSERS_PATH="${repo_root}/.cache/playwright"
+mkdir -p "${PLAYWRIGHT_BROWSERS_PATH}"
+
+"${repo_root}/mvnw" -pl engines/render -am test -Prender-paint \
+  -Dtest=BrowserInstallerTest \
+  -Dsurefire.failIfNoSpecifiedTests=false
+
+paint_test_selector="BrowserPaintSmokeTest,RasterDiffTest,RasterGoldenTest,SvgPaintAudit*Test"
 for argument in "$@"; do
   if [[ "${argument}" == -Dtest=* ]]; then
     paint_test_selector=""
