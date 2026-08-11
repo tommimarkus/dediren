@@ -39,11 +39,15 @@ agent tools should be pointed here from their own entrypoint files (for example,
   API/app/infra design, and repo-specific operational posture. They are
   complementary: let Superpowers shape how the work proceeds and Sour Old
   Geezer shape what "good" means inside the changed domain.
-- This file initializes `souroldgeezer-policy:git-workflow-policy` under
-  `## Git Hygiene` and `souroldgeezer-policy:release-policy` under
+- This file initializes `souroldgeezer-policy:planning-policy` under
+  `## Planning`, `souroldgeezer-policy:git-workflow-policy` under
+  `## Git Hygiene`, and `souroldgeezer-policy:release-policy` under
   `## Versioning`. The user-facing release runbook lives in `README.md`. Keep
   other policy-skill initialization out of this file unless a section explicitly
   adopts it.
+- `planning-policy` owns the *gate* (is there an approved approach before build
+  work starts); Superpowers owns the *brainstorm* that fills it. They compose —
+  the gate does not replace the brainstorming and planning skills above.
 - Use `souroldgeezer-design:software-design` for module boundaries,
   dependency direction, responsibility ownership, coupling, refactors,
   plugin/core split, Java code shape, or plan-to-code design drift.
@@ -52,6 +56,33 @@ agent tools should be pointed here from their own entrypoint files (for example,
   artifact, release, or process-boundary posture.
 - Use `souroldgeezer-architecture:architecture-design` for ArchiMate/OEF,
   UML, notation semantics, render/export evidence, and cross-notation review.
+
+## Planning
+
+`planning-policy: scope = new feature or build work; exceptions = trivial edits,
+hotfixes, docs-only guidance changes, and work a domain skill owns end to end
+(logged); delegation = subagents-by-default`
+
+The line above initializes `souroldgeezer-policy:planning-policy` for this
+repository. The rules below are its options and exceptions; they are standing
+enforcement authority before new feature or build work begins.
+
+- New feature or build work is preceded by a brief brainstorm in plan mode that
+  converges on an approach approved before implementation. "Plan this" enters
+  plan mode; it is not a request for prose about a plan.
+- Exceptions are exempt from the gate but are always logged in the handoff, never
+  applied silently. Docs-only guidance changes are exempt because they have their
+  own one-line verification lane (`## Verification`), not because they are
+  unimportant.
+- Delegation is `subagents-by-default`: decomposable steps of an approved plan go
+  to subagents, and the parent session keeps decomposition, integration, and
+  verification. A subagent's "verified" covers only its own drafting checks.
+  Parallel agents must not run Maven — use an edit-only wave, then one central
+  build (`## Verification`).
+- Opt out per task with an explicit phrase ("skip planning", "just do it"); it is
+  applied and logged, never assumed.
+- Once the plan is approved, hand the domain judgment to the owning skill per
+  `## Skill Routing` — planning-policy governs the gate, not the design.
 
 ## Architecture Rules
 
