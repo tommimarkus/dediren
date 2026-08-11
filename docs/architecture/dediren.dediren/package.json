@@ -1,0 +1,87 @@
+{
+  "package_schema_version": "package.schema.v1",
+  "models": [
+    { "id": "arch", "source": "model.json" },
+    { "id": "uml", "source": "model-uml.json" },
+    { "id": "seq", "source": "model-sequence.json" },
+    { "id": "deploy", "source": "model-deployment.json" }
+  ],
+  "views": [
+    {
+      "id": "module-architecture",
+      "model": "arch",
+      "render_policy": "render-policy.json",
+      "presentation": {
+        "title": "Dediren module architecture",
+        "question": "Which modules make up the dediren compiler, and how do they depend on each other?",
+        "diagram_kind": "Application Cooperation"
+      },
+      "outputs": {
+        "diagram": "generated/svg/module-architecture.svg",
+        "render_metadata": "generated/render-metadata/module-architecture.json",
+        "layout": "generated/layout/module-architecture.json"
+      }
+    },
+    {
+      "id": "engine-seam",
+      "model": "uml",
+      "render_policy": "render-policy-uml.json",
+      "presentation": {
+        "title": "Engine seam — typed interfaces and realizations",
+        "question": "What typed interfaces does engine-api define, and which engine classes realize them?",
+        "diagram_kind": "UML Class"
+      },
+      "outputs": {
+        "diagram": "generated/svg/engine-seam.svg",
+        "render_metadata": "generated/render-metadata/engine-seam.json",
+        "layout": "generated/layout/engine-seam.json"
+      }
+    },
+    {
+      "id": "build-pipeline",
+      "model": "seq",
+      "render_policy": "render-policy-sequence.json",
+      "presentation": {
+        "title": "Build pipeline — a dediren build call",
+        "question": "How does a dediren build turn a source model into an SVG, and optionally OEF or XMI, through the engine-api seam?",
+        "diagram_kind": "UML Sequence"
+      },
+      "outputs": {
+        "diagram": "generated/svg/build-pipeline.svg",
+        "render_metadata": "generated/render-metadata/build-pipeline.json",
+        "layout": "generated/layout/build-pipeline.json"
+      }
+    },
+    {
+      "id": "distribution",
+      "model": "deploy",
+      "render_policy": "render-policy-deployment.json",
+      "presentation": {
+        "title": "Distribution — one launcher, engines in-process",
+        "question": "How does dediren ship and run — the single bin/dediren launcher and one shrink-merged lib jar hosting the cli and every engine in one process?",
+        "diagram_kind": "UML Deployment"
+      },
+      "outputs": {
+        "diagram": "generated/svg/distribution.svg",
+        "render_metadata": "generated/render-metadata/distribution.json",
+        "layout": "generated/layout/distribution.json"
+      }
+    }
+  ],
+  "exports": [
+    {
+      "id": "arch-oef",
+      "view": "module-architecture",
+      "lane": "archimate-oef",
+      "policy": "export-policy.json",
+      "output": "generated/export/dediren.oef.xml"
+    },
+    {
+      "id": "uml-xmi",
+      "view": "engine-seam",
+      "lane": "uml-xmi",
+      "policy": "export-policy-uml.json",
+      "output": "generated/export/dediren.uml.xmi"
+    }
+  ]
+}
