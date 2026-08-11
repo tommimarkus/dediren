@@ -77,10 +77,10 @@
     "metadataFixture" : null,
     "baseline" : "engines/render/src/paint-test/resources/raster-golden/pipeline-rich-light.png",
     "dimensions" : {
-      "width" : 1581,
-      "height" : 484
+      "width" : 1582,
+      "height" : 485
     },
-    "sha256" : "f702763fa68fc5bf935c00da39297cd395049ab729d11f2c87c4705396d14b78"
+    "sha256" : "9d60792c2d655fe8dd898b086f74203d985517c7d18eb2c7730913c337bbc92f"
   }, {
     "name" : "pipeline-rich-dark",
     "description" : "The same rich standard graph, dark theme",
@@ -89,10 +89,10 @@
     "metadataFixture" : null,
     "baseline" : "engines/render/src/paint-test/resources/raster-golden/pipeline-rich-dark.png",
     "dimensions" : {
-      "width" : 1581,
-      "height" : 484
+      "width" : 1582,
+      "height" : 485
     },
-    "sha256" : "6b8a8bb82b50c16872c36051d43f878cd10961424fb320674e33d2d5df27c911"
+    "sha256" : "97e517862db56810738f96ba0b91b57067cf1719578ccdf3544fe8b26dc3474e"
   }, {
     "name" : "archimate-decorators",
     "description" : "ArchiMate diagram with decorators and markers",
@@ -101,10 +101,10 @@
     "metadataFixture" : "fixtures/render-metadata/archimate-basic.json",
     "baseline" : "engines/render/src/paint-test/resources/raster-golden/archimate-decorators.png",
     "dimensions" : {
-      "width" : 506,
-      "height" : 144
+      "width" : 507,
+      "height" : 145
     },
-    "sha256" : "db8112454f2d699eff1262c3f18c3ed8b4957ce775539df2b122bc1b0a93ddfd"
+    "sha256" : "ce7fcc0ca348c59199ca75f43e7bb2d9e939e5afe62fa15b87449ef554cbf159"
   }, {
     "name" : "uml-sequence-fragments",
     "description" : "UML sequence diagram with fragment chrome",

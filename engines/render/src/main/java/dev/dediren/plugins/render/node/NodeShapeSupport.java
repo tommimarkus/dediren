@@ -20,9 +20,14 @@ public final class NodeShapeSupport {
         || decorator == SvgNodeDecorator.UML_MERGE_NODE;
   }
 
-  public static boolean archimateJunctionLabelOutside(SvgNodeDecorator decorator) {
+  /** True for the two decorators that draw a circle in place of the node's box. */
+  public static boolean isArchimateJunction(SvgNodeDecorator decorator) {
     return decorator == SvgNodeDecorator.ARCHIMATE_AND_JUNCTION
         || decorator == SvgNodeDecorator.ARCHIMATE_OR_JUNCTION;
+  }
+
+  public static boolean archimateJunctionLabelOutside(SvgNodeDecorator decorator) {
+    return isArchimateJunction(decorator);
   }
 
   // Reviewed (ARCH-L-004, won't-fix): final states and pseudostates are intentionally
@@ -49,10 +54,7 @@ public final class NodeShapeSupport {
   }
 
   public static boolean hasArchimateCornerIcon(SvgNodeDecorator decorator) {
-    return decorator != null
-        && !isUmlDecorator(decorator)
-        && decorator != SvgNodeDecorator.ARCHIMATE_AND_JUNCTION
-        && decorator != SvgNodeDecorator.ARCHIMATE_OR_JUNCTION;
+    return decorator != null && !isUmlDecorator(decorator) && !isArchimateJunction(decorator);
   }
 
   public static boolean isArchimateCutCornerRectangle(SvgNodeDecorator decorator) {
@@ -96,6 +98,12 @@ public final class NodeShapeSupport {
   // y origin used in archimateNodeDecorator; it feeds the label's vertical reserve.
   public static final double ARCHIMATE_ICON_TOP_INSET = 9.0;
 
+  /**
+   * The junction circle's radius. The 4.0 floor keeps a junction visible at any node size, which
+   * means that below roughly an 8x8 box the circle is <em>wider than the node it replaces</em> —
+   * whoever measures a junction has to measure the circle, not the box. That is why the radius is
+   * resolved once into the placed scene rather than recomputed by each caller.
+   */
   public static double archimateJunctionRadius(LaidOutNode node, ResolvedNodeStyle style) {
     return Math.max(4.0, Math.min(node.width(), node.height()) / 2.0 - style.strokeWidth());
   }

@@ -5,6 +5,7 @@ import static dev.dediren.plugins.render.node.NodeLabels.placeNodeLabel;
 import static dev.dediren.plugins.render.node.NodeShapeSupport.archimateJunctionRadius;
 import static dev.dediren.plugins.render.node.NodeShapeSupport.decoratorName;
 import static dev.dediren.plugins.render.node.NodeShapeSupport.isArchimateCutCornerRectangle;
+import static dev.dediren.plugins.render.node.NodeShapeSupport.isArchimateJunction;
 import static dev.dediren.plugins.render.node.NodeShapeSupport.isArchimateRoundedRectangle;
 import static dev.dediren.plugins.render.node.NodeShapeSupport.isUmlDecorator;
 import static dev.dediren.plugins.render.node.NodeShapeSupport.shouldRenderPlainNodeLabel;
@@ -21,6 +22,7 @@ import static dev.dediren.plugins.render.svg.EdgeRenderer.edgeMarker;
 import static dev.dediren.plugins.render.svg.EdgeRenderer.edgePath;
 import static dev.dediren.plugins.render.svg.EdgeRenderer.lineJumpMasks;
 import static dev.dediren.plugins.render.svg.EdgeRenderer.lineJumps;
+import static dev.dediren.plugins.render.svg.Geometry.labelBox;
 import static dev.dediren.plugins.render.svg.Geometry.labelObstacleBoxesForEdge;
 import static dev.dediren.plugins.render.svg.Svg.dashArrayValue;
 import static dev.dediren.plugins.render.svg.Svg.f1;
@@ -44,6 +46,7 @@ import dev.dediren.plugins.render.PlacedScene.PlacedEdge;
 import dev.dediren.plugins.render.PlacedScene.PlacedEdgeLabel;
 import dev.dediren.plugins.render.PlacedScene.PlacedElement;
 import dev.dediren.plugins.render.PlacedScene.PlacedGroup;
+import dev.dediren.plugins.render.PlacedScene.PlacedGroupTitle;
 import dev.dediren.plugins.render.PlacedScene.PlacedNode;
 import dev.dediren.plugins.render.node.uml.UmlSequenceRenderer;
 import dev.dediren.plugins.render.style.ResolvedEdgeStyle;
@@ -72,6 +75,11 @@ public final class SvgDocument {
   // resolved style carries no dash of its own.
   private static final String ARCHIMATE_GROUPING_DASH = "3 2";
 
+  // Group title placement: how far a start/end-aligned title is inset from the group's own edge,
+  // and how far its baseline sits below the top edge once the label's own size is allowed for.
+  private static final double GROUP_TITLE_INSET = 8.0;
+  private static final double GROUP_TITLE_BASELINE_GAP = 4.0;
+
   private SvgDocument() {}
 
   /**
@@ -96,20 +104,43 @@ public final class SvgDocument {
    * sees only the edges routed before it, and {@code placedLabelBoxes} is the running obstacle set
    * each edge's label avoids. Both used to be rebuilt identically by the bounds pass, and
    * "identically" was maintained by inspection.
+   *
+   * <p>Nodes are placed <em>before</em> edges even though they are emitted after them, because a
+   * node label is an obstacle the edge labels have to see. Junction labels sit below the circle and
+   * UML compact-control labels diagonally up-left, both outside the node rect that {@code
+   * Geometry.nodeObstacleBoxes} contributes — so an edge label placed "clear" could be printed on
+   * top of one. Emission order is unchanged: {@code PlacedScene.elements} owns that, not this walk.
    */
   static PlacedScene resolve(LayoutResult result, RenderMetadata metadata, RenderPolicy policy) {
     ResolvedStyle base = StyleResolver.baseStyle(policy);
     List<PlacedGroup> groups = new ArrayList<>();
     for (LaidOutGroup group : result.groups()) {
+      ResolvedGroupStyle groupStyle = StyleResolver.groupStyle(policy, metadata, group.id(), base);
       groups.add(
           new PlacedGroup(
               group,
-              StyleResolver.groupStyle(policy, metadata, group.id(), base),
-              metadata == null ? null : metadata.groups().get(group.id())));
+              groupStyle,
+              metadata == null ? null : metadata.groups().get(group.id()),
+              placeGroupTitle(group, groupStyle)));
+    }
+    List<PlacedNode> nodes = new ArrayList<>();
+    List<LabelBox> placedLabelBoxes = new ArrayList<>();
+    for (LaidOutNode node : result.nodes()) {
+      ResolvedNodeStyle style = StyleResolver.nodeStyle(policy, metadata, node.id(), base);
+      PlacedNode placed =
+          new PlacedNode(
+              node,
+              style,
+              metadata == null ? null : metadata.nodes().get(node.id()),
+              shouldRenderPlainNodeLabel(node, style.decorator())
+                  ? placeNodeLabel(node, style, base.fontSize())
+                  : null,
+              isArchimateJunction(style.decorator()) ? archimateJunctionRadius(node, style) : null);
+      nodes.add(placed);
+      placedLabelBoxes.addAll(placed.labelBoxes());
     }
     List<PlacedEdge> edges = new ArrayList<>();
     List<LaidOutEdge> routedEdges = new ArrayList<>();
-    List<LabelBox> placedLabelBoxes = new ArrayList<>();
     for (int edgeIndex = 0; edgeIndex < result.edges().size(); edgeIndex++) {
       LaidOutEdge edge = result.edges().get(edgeIndex);
       ResolvedEdgeStyle style = StyleResolver.edgeStyle(policy, metadata, edge.id(), base);
@@ -143,19 +174,36 @@ public final class SvgDocument {
       edges.add(new PlacedEdge(edge, style, maskedJumps, label, adornments));
       routedEdges.add(edge);
     }
-    List<PlacedNode> nodes = new ArrayList<>();
-    for (LaidOutNode node : result.nodes()) {
-      ResolvedNodeStyle style = StyleResolver.nodeStyle(policy, metadata, node.id(), base);
-      nodes.add(
-          new PlacedNode(
-              node,
-              style,
-              metadata == null ? null : metadata.nodes().get(node.id()),
-              shouldRenderPlainNodeLabel(node, style.decorator())
-                  ? placeNodeLabel(node, style, base.fontSize())
-                  : null));
-    }
     return new PlacedScene(policy, result.viewId(), base, groups, edges, nodes);
+  }
+
+  /**
+   * Places a group's title: the one decision about where that {@code <text>} goes and which anchor
+   * it takes, so the box the viewBox grows to hold and the attributes written for it cannot part
+   * company. A {@code label_size} may be anything up to 96, which is a title wide enough to run a
+   * long way off the right of its own group.
+   */
+  private static PlacedGroupTitle placeGroupTitle(LaidOutGroup group, ResolvedGroupStyle style) {
+    double x = group.x() + GROUP_TITLE_INSET;
+    String anchor = null;
+    if (style.labelAlign() == SvgLabelAlign.MIDDLE) {
+      x = group.x() + group.width() / 2.0;
+      anchor = "middle";
+    } else if (style.labelAlign() == SvgLabelAlign.END) {
+      x = group.x() + group.width() - GROUP_TITLE_INSET;
+      anchor = "end";
+    }
+    double y = group.y() + style.labelSize() + GROUP_TITLE_BASELINE_GAP;
+    String text = group.label();
+    if (text == null || text.isEmpty()) {
+      return new PlacedGroupTitle(x, y, anchor, null);
+    }
+    // Measured against the anchor that is emitted, resolving the null that means "attribute
+    // omitted" to the SVG default it stands for — rather than assuming a centred title, which is
+    // the shape the label_align drift in the node lane took.
+    LabelBox visibleBox =
+        labelBox(x, y, anchor == null ? "start" : anchor, text, style.labelSize());
+    return new PlacedGroupTitle(x, y, anchor, visibleBox);
   }
 
   /**
@@ -242,19 +290,11 @@ public final class SvgDocument {
           .attrIf("fill-opacity", opacity(style.fillOpacity()))
           .attrIf("stroke-opacity", opacity(style.strokeOpacity()));
       groupDecorator(w, group, style);
-      double groupLabelX = group.x() + 8.0;
-      String groupLabelAnchor = null;
-      if (style.labelAlign() == SvgLabelAlign.MIDDLE) {
-        groupLabelX = group.x() + group.width() / 2.0;
-        groupLabelAnchor = "middle";
-      } else if (style.labelAlign() == SvgLabelAlign.END) {
-        groupLabelX = group.x() + group.width() - 8.0;
-        groupLabelAnchor = "end";
-      }
+      PlacedGroupTitle title = placed.title();
       w.start("text")
-          .attr("x", f1(groupLabelX))
-          .attr("y", f1(group.y() + style.labelSize() + 4.0))
-          .attrIf("text-anchor", groupLabelAnchor)
+          .attr("x", f1(title.x()))
+          .attr("y", f1(title.y()))
+          .attrIf("text-anchor", title.anchor())
           .attr("fill", style.labelFill())
           .attr("font-size", styleNumber(style.labelSize()))
           .attrIf("font-family", style.fontFamily())
@@ -317,7 +357,7 @@ public final class SvgDocument {
             .attrIf("stroke-opacity", opacity(shapeStyle.strokeOpacity()))
             .attrIf("stroke-dasharray", wrapDash.isEmpty() ? null : wrapDash);
       }
-      nodeShape(w, node, shapeStyle, selector);
+      nodeShape(w, node, shapeStyle, selector, placed.junctionRadius());
       if (wrap) {
         w.end();
       }
@@ -392,12 +432,18 @@ public final class SvgDocument {
     w.end();
   }
 
+  // The junction radius arrives from the placed scene rather than being recomputed here: the
+  // viewBox has to grow around a circle that can be wider than the node box, and a radius derived
+  // twice is a radius that can be measured at one size and drawn at another.
   private static void nodeShape(
-      SvgWriter w, LaidOutNode node, ResolvedNodeStyle style, RenderMetadataSelector selector) {
+      SvgWriter w,
+      LaidOutNode node,
+      ResolvedNodeStyle style,
+      RenderMetadataSelector selector,
+      Double junctionRadius) {
     SvgNodeDecorator decorator = style.decorator();
-    if (decorator == SvgNodeDecorator.ARCHIMATE_AND_JUNCTION
-        || decorator == SvgNodeDecorator.ARCHIMATE_OR_JUNCTION) {
-      double radius = archimateJunctionRadius(node, style);
+    if (junctionRadius != null) {
+      double radius = junctionRadius;
       String fill =
           decorator == SvgNodeDecorator.ARCHIMATE_AND_JUNCTION ? style.stroke() : style.fill();
       w.empty("circle")
@@ -449,9 +495,7 @@ public final class SvgDocument {
   private static void nodeDecorator(
       SvgWriter w, LaidOutNode node, ResolvedNodeStyle style, RenderMetadataSelector selector) {
     SvgNodeDecorator decorator = style.decorator();
-    if (decorator == null
-        || decorator == SvgNodeDecorator.ARCHIMATE_AND_JUNCTION
-        || decorator == SvgNodeDecorator.ARCHIMATE_OR_JUNCTION) {
+    if (decorator == null || isArchimateJunction(decorator)) {
       return;
     }
     if (isUmlDecorator(decorator)) {

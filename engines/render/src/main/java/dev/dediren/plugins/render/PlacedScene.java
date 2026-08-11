@@ -1,6 +1,7 @@
 package dev.dediren.plugins.render;
 
 import static dev.dediren.plugins.render.node.NodeLabels.nodeLabelBoxes;
+import static dev.dediren.plugins.render.svg.EdgeRenderer.markerInkBoxes;
 
 import dev.dediren.contracts.layout.LaidOutEdge;
 import dev.dediren.contracts.layout.LaidOutGroup;
@@ -38,9 +39,12 @@ import java.util.List;
  *
  * <p>Every drawable is a {@link PlacedElement}, whose one method is its bounds contribution. A new
  * kind of drawable therefore cannot compile without stating how the viewBox grows to hold it. The
- * guarantee is per drawable kind rather than per attribute: ink a drawable knowingly leaves out of
- * its own contribution (group titles, stroke half-widths, marker extents) is still its own
- * business, and today several do.
+ * guarantee is per drawable kind rather than per attribute, so each kind is responsible for the
+ * <em>decoration</em> of its own geometry too: the half of every stroke that lies outside the shape
+ * it outlines, the marker viewport an edge's ends carry, the arc a line jump bulges into, and the
+ * title a group paints above itself. Each of those was once left out, and each was a shape clipped
+ * flat at the viewBox edge under a policy whose {@code margin} — schema minimum 0 — had no padding
+ * to absorb it.
  *
  * <p>Lives one package up from {@code svg} because it is node-aware — it holds {@link
  * NodeLabelPlacement} and folds {@code NodeLabels.nodeLabelBoxes}. Putting it in {@code svg} would
@@ -88,13 +92,24 @@ record PlacedScene(
     void contributeBounds(SvgBounds bounds);
   }
 
-  /** A group rect with its resolved style and the metadata selector its data-attributes carry. */
-  record PlacedGroup(LaidOutGroup group, ResolvedGroupStyle style, RenderMetadataSelector selector)
+  /**
+   * A group rect with its resolved style, the metadata selector its data-attributes carry, and its
+   * placed title.
+   */
+  record PlacedGroup(
+      LaidOutGroup group,
+      ResolvedGroupStyle style,
+      RenderMetadataSelector selector,
+      PlacedGroupTitle title)
       implements PlacedElement {
 
     @Override
     public void contributeBounds(SvgBounds bounds) {
-      bounds.includeRect(group.x(), group.y(), group.width(), group.height());
+      includeStroked(
+          bounds, group.x(), group.y(), group.width(), group.height(), style.strokeWidth());
+      if (title.visibleBox() != null) {
+        includeBox(bounds, title.visibleBox());
+      }
     }
   }
 
@@ -124,8 +139,20 @@ record PlacedScene(
 
     @Override
     public void contributeBounds(SvgBounds bounds) {
+      // Half the stroke lies outside the route on either side, and stroke-linecap="round" puts the
+      // same half beyond each end of it, so one square per vertex covers the whole ribbon.
+      double half = style.strokeWidth() / 2.0;
       for (Point point : edge.points()) {
-        bounds.includePoint(point.x(), point.y());
+        includeStroked(bounds, point.x(), point.y(), 0.0, 0.0, style.strokeWidth());
+      }
+      for (MaskedLineJump masked : lineJumps) {
+        // The jump's arc, not its mask. The mask is a backdrop-coloured stroke, so where a jump is
+        // the outermost ink it is necessarily outside every group and painting the page's own
+        // background colour onto the page background — clipping it changes nothing visible.
+        includeBox(bounds, masked.jump().routeInkBox().expanded(half, half));
+      }
+      for (LabelBox markerBox : markerInkBoxes(edge, style)) {
+        includeBox(bounds, markerBox);
       }
       if (label != null) {
         includeBox(bounds, label.visibleBox());
@@ -137,31 +164,65 @@ record PlacedScene(
   }
 
   /**
-   * A node box with its resolved style, its metadata selector, and its plain label placement —
-   * {@code null} when this node draws no plain label (a glyph-only pseudostate, or a UML decorator
-   * that supplies its own name).
+   * A node box with its resolved style, its metadata selector, its plain label placement — {@code
+   * null} when this node draws no plain label (a glyph-only pseudostate, or a UML decorator that
+   * supplies its own name) — and its junction radius, {@code null} unless this node draws the
+   * ArchiMate junction circle in place of a box shape.
    */
   record PlacedNode(
       LaidOutNode node,
       ResolvedNodeStyle style,
       RenderMetadataSelector selector,
-      NodeLabelPlacement label)
+      NodeLabelPlacement label,
+      Double junctionRadius)
       implements PlacedElement {
+
+    /**
+     * The boxes this node's plain label inks; empty when it draws none.
+     *
+     * <p>Derived rather than stored: unlike the edge boxes below, nothing in the placement pass
+     * needed these, so there is no earlier result to reuse — and the emitter never computes them at
+     * all, so there is no second copy to drift from. Exposed because the edge-label obstacle set
+     * needs the same boxes: a node label placed outside its box (junctions, UML compact controls)
+     * is ink an edge label must route around, and {@code Geometry.nodeObstacleBoxes} only knows
+     * about node rects.
+     */
+    List<LabelBox> labelBoxes() {
+      return label == null ? List.of() : nodeLabelBoxes(label);
+    }
 
     @Override
     public void contributeBounds(SvgBounds bounds) {
-      bounds.includeRect(node.x(), node.y(), node.width(), node.height());
-      if (label == null) {
-        return;
+      includeStroked(bounds, node.x(), node.y(), node.width(), node.height(), style.strokeWidth());
+      if (junctionRadius != null) {
+        // A junction draws a circle instead of the box, and its radius floors at 4.0, so on a small
+        // enough node the circle is the wider of the two. The box stays in the fold anyway: it is
+        // the rectangle every edge routes to, and dropping it would shrink bounds rather than close
+        // the gap this contribution exists to close.
+        double reach = junctionRadius + style.strokeWidth() / 2.0;
+        double centerX = node.x() + node.width() / 2.0;
+        double centerY = node.y() + node.height() / 2.0;
+        bounds.includeRect(centerX - reach, centerY - reach, 2.0 * reach, 2.0 * reach);
       }
-      // Derived here rather than stored: unlike the edge boxes below, nothing in the placement
-      // pass needed these, so there is no earlier result to reuse — and the emitter never
-      // computes them at all, so there is no second copy to drift from.
-      for (LabelBox labelBox : nodeLabelBoxes(label)) {
+      for (LabelBox labelBox : labelBoxes()) {
         includeBox(bounds, labelBox);
       }
     }
   }
+
+  /**
+   * A placed group title: where its {@code <text>} is anchored and the box its glyphs ink.
+   *
+   * <p>{@code anchor} is the {@code text-anchor} attribute value the emitter writes, carried
+   * verbatim including the {@code null} that means "leave the attribute off and take SVG's default
+   * of start". Normalizing it here would put a second opinion about the anchor next to the one that
+   * is emitted, and an anchor the bounds pass guessed at is what {@code label_align} drift was.
+   *
+   * <p>{@code visibleBox} is {@code null} when the title has no glyphs: the (empty) {@code <text>}
+   * element is still emitted, but a title with nothing in it must not grow the viewBox by a line
+   * box's worth of nothing.
+   */
+  record PlacedGroupTitle(double x, double y, String anchor, LabelBox visibleBox) {}
 
   /**
    * A placed edge label: where it sits, the text it carries, and the box it inks.
@@ -176,5 +237,17 @@ record PlacedScene(
 
   private static void includeBox(SvgBounds bounds, LabelBox box) {
     bounds.includeRect(box.minX(), box.minY(), box.width(), box.height());
+  }
+
+  /**
+   * Includes a stroked shape's geometry <em>and</em> the outer half of the stroke that outlines it.
+   * SVG centres a stroke on the path, so a shape measured at its geometry is measured half a stroke
+   * short on every side — invisible under a generous margin, and a shaved edge at the {@code
+   * margin: 0} the render-policy schema allows.
+   */
+  private static void includeStroked(
+      SvgBounds bounds, double x, double y, double width, double height, double strokeWidth) {
+    double half = strokeWidth / 2.0;
+    bounds.includeRect(x - half, y - half, width + strokeWidth, height + strokeWidth);
   }
 }
