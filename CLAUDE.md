@@ -382,13 +382,25 @@ them as baselines, never WCAG conformance. User themes are non-blocking, while
 gradients and compositions that cannot be resolved report advisory
 `not_measurable`.
 
-The scheduled raster job pins Eclipse Temurin 21.0.10+7 and the digest-pinned
-Playwright Java 1.61.0 Noble image. Chromium is the only blocking browser in
-this lane. Keep the runtime, Playwright and Chromium versions, container digest,
-viewport rules, DPR, font digest, and raster manifest synchronized when the
-canonical golden environment changes. Regeneration must reject a mismatch.
-The browser download and container are test infrastructure only: commit no
-native binary, browser cache, or new font. References to the retired paint
+Regeneration is gated on a **calibration probe**, not on the environment's
+identity: before writing any golden, the lane rasterizes the static
+`engines/render/src/paint-test/resources/raster-calibration/calibration.svg` and
+requires it to reproduce the committed `calibration.png` under the same
+comparator the goldens use. An environment that agrees with the calibration
+pixels may mint baselines; one that does not is refused, wherever it runs. The
+calibration SVG is deliberately not produced by the render engine — a rendered
+fixture would move with the renderer and stop probing the environment alone. Keep
+the Playwright and Chromium versions, viewport rules, DPR, font digest,
+calibration pair, and raster manifest synchronized when the canonical golden
+environment changes.
+
+The scheduled raster job runs in the digest-pinned Playwright Java 1.61.0 Noble
+image, which remains a good environment but is no longer *required* to
+regenerate — determinism comes from the repository, not the image: Playwright
+downloads a pinned Chromium and the font is embedded as a data URI, so the host
+supplies neither the browser nor the glyphs. Chromium is the only blocking
+browser in this lane. The browser download and container are test infrastructure
+only: commit no native binary, browser cache, or new font. References to the retired paint
 implementation are allowed only in historical plans/reviews under
 `docs/superpowers` and in threat-model history; do not rewrite those records or
 copy their terminology into active guidance.

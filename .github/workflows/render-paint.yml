@@ -13,7 +13,6 @@ permissions:
   contents: read
 
 env:
-  DEDIREN_RENDER_PAINT_CONTAINER_DIGEST: sha256:a23837c4bb84165c2156f64411ae79d7e42ef91c9d8f960691d06c5d43a684f4
   SEGMENT_DOWNLOAD_TIMEOUT_MINS: "5"
   MAVEN_USER_HOME: ${{ github.workspace }}/.cache/maven/user-home
 

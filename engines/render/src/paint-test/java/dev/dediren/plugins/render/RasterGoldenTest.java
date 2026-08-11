@@ -28,11 +28,30 @@ import tools.jackson.databind.node.ObjectNode;
 class RasterGoldenTest {
 
   private static final String REGENERATE = "dediren.render.paint.regenerate-goldens";
-  private static final String CONTAINER_DIGEST_ENV = "DEDIREN_RENDER_PAINT_CONTAINER_DIGEST";
-  private static final String CANONICAL_JAVA_VENDOR = "Eclipse Adoptium";
-  private static final String CANONICAL_JAVA_RUNTIME_VERSION = "21.0.10+7-LTS";
-  private static final String CANONICAL_CONTAINER_DIGEST =
-      "sha256:a23837c4bb84165c2156f64411ae79d7e42ef91c9d8f960691d06c5d43a684f4";
+
+  /**
+   * The calibration pair: a static SVG this repository owns and the pixels the environment that
+   * minted the baselines produced from it.
+   *
+   * <p>Regeneration used to require a container digest, passed in an environment variable. That was
+   * a <em>proxy</em> for the question that actually matters — does this environment rasterize like
+   * the one that produced the committed goldens — and it answered it badly in both directions: an
+   * environment drifted inside the right image passed, a byte-identical environment outside it
+   * failed, and the variable could simply be set by anyone who wanted past the check. Determinism
+   * here comes from things that travel with the repository anyway: Playwright downloads a pinned
+   * Chromium, and the font is embedded in the page as a data URI, so the host contributes neither
+   * the browser nor the glyphs.
+   *
+   * <p>So the check measures the thing directly instead. The input is deliberately <em>not</em>
+   * produced by the render engine: a rendered fixture would move whenever the renderer changed and
+   * would stop being a probe of the environment alone.
+   */
+  private static final Path CALIBRATION_DIRECTORY =
+      BrowserTestSupport.WORKSPACE_ROOT.resolve(
+          "engines/render/src/paint-test/resources/raster-calibration");
+
+  private static final Path CALIBRATION_SVG = CALIBRATION_DIRECTORY.resolve("calibration.svg");
+  private static final Path CALIBRATION_PNG = CALIBRATION_DIRECTORY.resolve("calibration.png");
   private static final Path GOLDEN_DIRECTORY =
       BrowserTestSupport.WORKSPACE_ROOT.resolve(
           "engines/render/src/paint-test/resources/raster-golden");
@@ -56,12 +75,8 @@ class RasterGoldenTest {
     Path golden = GOLDEN_DIRECTORY.resolve(name + ".png");
 
     if (Boolean.getBoolean(REGENERATE)) {
-      requireCanonicalRegenerationEnvironment(
-          System.getProperty("java.vendor"),
-          System.getProperty("java.runtime.version"),
-          BrowserTestSupport.playwrightVersion(),
-          browserVersion,
-          System.getenv(CONTAINER_DIGEST_ENV));
+      requirePinnedTooling(BrowserTestSupport.playwrightVersion(), browserVersion);
+      requireCalibratedRasterizer(temporaryDirectory);
       Files.createDirectories(golden.getParent());
       Files.copy(actualPath, golden, StandardCopyOption.REPLACE_EXISTING);
       updateManifest(name, actual, golden);
@@ -85,7 +100,7 @@ class RasterGoldenTest {
     JsonNode manifest = JsonSupport.objectMapper().readTree(Files.readString(MANIFEST, UTF_8));
 
     assertThat(manifest.at("/schema").asText())
-        .isEqualTo("dediren-render-paint-raster-manifest-v2");
+        .isEqualTo("dediren-render-paint-raster-manifest-v3");
     assertThat(manifest.at("/renderer/name").asText())
         .isEqualTo("Chromium headless shell via Playwright Java");
     assertThat(manifest.at("/renderer/playwright/version").asText())
@@ -97,14 +112,15 @@ class RasterGoldenTest {
     assertThat(manifest.at("/renderer/chromium/shippedWithDediren").asBoolean()).isFalse();
     assertThat(manifest.at("/renderer/chromium/committed").asBoolean()).isFalse();
     assertThat(manifest.at("/renderer/chromium/nativeExecutable").asBoolean()).isTrue();
-    assertThat(manifest.at("/renderer/container/digest").asText())
-        .isEqualTo(CANONICAL_CONTAINER_DIGEST);
     assertThat(manifest.at("/renderer/geometryAuthority").asText())
         .contains("Chromium SVG DOM geometry", "pixel masks");
-    assertThat(manifest.at("/renderer/rasterEnvironment/javaVendor").asText())
-        .isEqualTo(CANONICAL_JAVA_VENDOR);
-    assertThat(manifest.at("/renderer/rasterEnvironment/javaRuntimeVersion").asText())
-        .isEqualTo(CANONICAL_JAVA_RUNTIME_VERSION);
+    assertThat(manifest.at("/calibration/svg/path").asText())
+        .isEqualTo(BrowserTestSupport.WORKSPACE_ROOT.relativize(CALIBRATION_SVG).toString());
+    assertThat(manifest.at("/calibration/svg/sha256").asText()).isEqualTo(sha256(CALIBRATION_SVG));
+    assertThat(manifest.at("/calibration/baseline/path").asText())
+        .isEqualTo(BrowserTestSupport.WORKSPACE_ROOT.relativize(CALIBRATION_PNG).toString());
+    assertThat(manifest.at("/calibration/baseline/sha256").asText())
+        .isEqualTo(sha256(CALIBRATION_PNG));
     assertThat(manifest.at("/renderer/rasterEnvironment/deviceScaleFactor").asInt()).isEqualTo(1);
     assertThat(manifest.at("/renderer/rasterEnvironment/viewport").asText())
         .contains("intrinsic SVG", "32 transparent CSS pixels", "64 user-unit safety border");
@@ -147,64 +163,53 @@ class RasterGoldenTest {
   }
 
   @Test
-  void regenerationRejectsAnyEnvironmentThatDoesNotMatchEveryPin() {
-    requireCanonicalRegenerationEnvironment(
-        CANONICAL_JAVA_VENDOR,
-        CANONICAL_JAVA_RUNTIME_VERSION,
-        BrowserTestSupport.PINNED_PLAYWRIGHT_VERSION,
-        BrowserTestSupport.PINNED_CHROMIUM_VERSION,
-        CANONICAL_CONTAINER_DIGEST);
+  void regenerationRejectsToolingThatDoesNotMatchThePins() {
+    requirePinnedTooling(
+        BrowserTestSupport.PINNED_PLAYWRIGHT_VERSION, BrowserTestSupport.PINNED_CHROMIUM_VERSION);
 
     assertThatThrownBy(
-            () ->
-                requireCanonicalRegenerationEnvironment(
-                    CANONICAL_JAVA_VENDOR,
-                    "21.0.10+8-LTS",
-                    BrowserTestSupport.PINNED_PLAYWRIGHT_VERSION,
-                    BrowserTestSupport.PINNED_CHROMIUM_VERSION,
-                    CANONICAL_CONTAINER_DIGEST))
-        .isInstanceOf(IllegalStateException.class)
-        .hasMessageContaining(CANONICAL_JAVA_RUNTIME_VERSION);
-    assertThatThrownBy(
-            () ->
-                requireCanonicalRegenerationEnvironment(
-                    "Another Java vendor",
-                    CANONICAL_JAVA_RUNTIME_VERSION,
-                    BrowserTestSupport.PINNED_PLAYWRIGHT_VERSION,
-                    BrowserTestSupport.PINNED_CHROMIUM_VERSION,
-                    CANONICAL_CONTAINER_DIGEST))
-        .isInstanceOf(IllegalStateException.class)
-        .hasMessageContaining(CANONICAL_JAVA_VENDOR);
-    assertThatThrownBy(
-            () ->
-                requireCanonicalRegenerationEnvironment(
-                    CANONICAL_JAVA_VENDOR,
-                    CANONICAL_JAVA_RUNTIME_VERSION,
-                    "1.61.1",
-                    BrowserTestSupport.PINNED_CHROMIUM_VERSION,
-                    CANONICAL_CONTAINER_DIGEST))
+            () -> requirePinnedTooling("1.61.1", BrowserTestSupport.PINNED_CHROMIUM_VERSION))
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining(BrowserTestSupport.PINNED_PLAYWRIGHT_VERSION);
     assertThatThrownBy(
             () ->
-                requireCanonicalRegenerationEnvironment(
-                    CANONICAL_JAVA_VENDOR,
-                    CANONICAL_JAVA_RUNTIME_VERSION,
-                    BrowserTestSupport.PINNED_PLAYWRIGHT_VERSION,
-                    "149.0.7827.56",
-                    CANONICAL_CONTAINER_DIGEST))
+                requirePinnedTooling(BrowserTestSupport.PINNED_PLAYWRIGHT_VERSION, "149.0.7827.56"))
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining(BrowserTestSupport.PINNED_CHROMIUM_VERSION);
-    assertThatThrownBy(
-            () ->
-                requireCanonicalRegenerationEnvironment(
-                    CANONICAL_JAVA_VENDOR,
-                    CANONICAL_JAVA_RUNTIME_VERSION,
-                    BrowserTestSupport.PINNED_PLAYWRIGHT_VERSION,
-                    BrowserTestSupport.PINNED_CHROMIUM_VERSION,
-                    "sha256:wrong"))
-        .isInstanceOf(IllegalStateException.class)
-        .hasMessageContaining(CANONICAL_CONTAINER_DIGEST);
+  }
+
+  @Test
+  void thisEnvironmentReproducesTheCalibrationBaseline(@TempDir Path temporaryDirectory)
+      throws Exception {
+    // The positive half of the regeneration gate, asserted on every paint-lane run rather than
+    // only when regenerating: if this host stops agreeing with the calibration pixels, the goldens
+    // it would mint are already suspect and the lane should say so immediately.
+    requireCalibratedRasterizer(temporaryDirectory);
+  }
+
+  @Test
+  void regenerationIsRefusedWhenTheRasterizerDisagreesWithTheCalibration(
+      @TempDir Path temporaryDirectory) throws Exception {
+    // The negative half. A guard nobody has watched fail is a guard nobody knows works, so this
+    // perturbs the baseline past the comparator's per-channel threshold and requires the refusal.
+    BufferedImage perturbed = readPng(CALIBRATION_PNG);
+    for (int x = 0; x < Math.min(24, perturbed.getWidth()); x++) {
+      for (int y = 0; y < Math.min(24, perturbed.getHeight()); y++) {
+        perturbed.setRGB(x, y, perturbed.getRGB(x, y) ^ 0x00808080);
+      }
+    }
+    Path wrongBaseline = temporaryDirectory.resolve("calibration.png");
+    Files.copy(CALIBRATION_SVG, temporaryDirectory.resolve("calibration.svg"));
+    ImageIO.write(perturbed, "png", wrongBaseline.toFile());
+
+    Path actual = temporaryDirectory.resolve("actual.png");
+    rasterize(Files.readString(CALIBRATION_SVG, UTF_8), actual);
+    RasterDiff.Result result = RasterDiff.compare(readPng(wrongBaseline), readPng(actual));
+
+    assertThat(result.matches())
+        .as("a baseline perturbed past the channel threshold must not compare equal")
+        .isFalse();
+    assertThat(result.describe()).contains("changed");
   }
 
   private static BufferedImage readPng(Path path) throws Exception {
@@ -251,38 +256,49 @@ class RasterGoldenTest {
         .formatHex(MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(path)));
   }
 
-  private static void requireCanonicalRegenerationEnvironment(
-      String vendor,
-      String runtimeVersion,
-      String playwrightVersion,
-      String browserVersion,
-      String containerDigest) {
-    if (!CANONICAL_JAVA_VENDOR.equals(vendor)
-        || !CANONICAL_JAVA_RUNTIME_VERSION.equals(runtimeVersion)
-        || !BrowserTestSupport.PINNED_PLAYWRIGHT_VERSION.equals(playwrightVersion)
-        || !BrowserTestSupport.PINNED_CHROMIUM_VERSION.equals(browserVersion)
-        || !CANONICAL_CONTAINER_DIGEST.equals(containerDigest)) {
+  private static void requirePinnedTooling(String playwrightVersion, String browserVersion) {
+    if (!BrowserTestSupport.PINNED_PLAYWRIGHT_VERSION.equals(playwrightVersion)
+        || !BrowserTestSupport.PINNED_CHROMIUM_VERSION.equals(browserVersion)) {
       throw new IllegalStateException(
-          "Raster-golden regeneration requires java.vendor="
-              + CANONICAL_JAVA_VENDOR
-              + " and java.runtime.version="
-              + CANONICAL_JAVA_RUNTIME_VERSION
-              + "; observed java.vendor="
-              + vendor
-              + " and java.runtime.version="
-              + runtimeVersion
-              + "; required Playwright="
+          "Raster-golden regeneration requires Playwright="
               + BrowserTestSupport.PINNED_PLAYWRIGHT_VERSION
               + ", observed Playwright="
               + playwrightVersion
               + "; required Chromium="
               + BrowserTestSupport.PINNED_CHROMIUM_VERSION
               + ", observed Chromium="
-              + browserVersion
-              + "; required container digest="
-              + CANONICAL_CONTAINER_DIGEST
-              + ", observed container digest="
-              + containerDigest);
+              + browserVersion);
+    }
+  }
+
+  /**
+   * Refuses to regenerate unless this environment reproduces the committed calibration pixels.
+   *
+   * <p>Judged by the same {@link RasterDiff} rules the goldens themselves are judged by, so an
+   * environment allowed to mint baselines is exactly an environment that agrees with the existing
+   * ones. A mismatch means the pixels this run would write are not the pixels the corpus is built
+   * from — regenerating anyway would silently rebase every golden onto an unreproducible machine.
+   */
+  private static void requireCalibratedRasterizer(Path temporaryDirectory) throws Exception {
+    if (!Files.isRegularFile(CALIBRATION_SVG) || !Files.isRegularFile(CALIBRATION_PNG)) {
+      throw new IllegalStateException(
+          "Raster-golden regeneration requires the calibration pair at "
+              + CALIBRATION_DIRECTORY
+              + "; without it there is no evidence this environment renders like the one that"
+              + " produced the committed goldens");
+    }
+    Path actual = temporaryDirectory.resolve("calibration-actual.png");
+    rasterize(Files.readString(CALIBRATION_SVG, UTF_8), actual);
+    RasterDiff.Result result = RasterDiff.compare(readPng(CALIBRATION_PNG), readPng(actual));
+    if (!result.matches()) {
+      throw new IllegalStateException(
+          "Raster-golden regeneration refused: this environment does not reproduce the calibration"
+              + " baseline at "
+              + CALIBRATION_PNG
+              + " ("
+              + result.describe()
+              + "). Regenerating would rebase every golden onto pixels no other environment can"
+              + " reproduce. Investigate the difference before regenerating.");
     }
   }
 
