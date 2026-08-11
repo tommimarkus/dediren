@@ -41,9 +41,27 @@ final class RenderScenarios {
     return Stream.concat(standard(), sequence());
   }
 
+  /**
+   * The built-in dark theme over the notation-free layouts. Every other scenario above pairs a
+   * layout with the policy for its own semantic profile, so the dark policy — which declares no
+   * {@code semantic_profile} — can only be paired with the layouts that need none. Pairing it with
+   * a UML or ArchiMate layout would drop the notation the layout was sized for (see {@code
+   * DEDIREN_RENDER_METADATA_PROFILE_NOT_APPLIED}), which is a different scenario than exercising
+   * the dark palette.
+   */
+  static Stream<Arguments> darkTheme() {
+    return Stream.of(
+        scenario("basic-dark", "basic", "dark-svg", null),
+        scenario("pipeline-rich-dark", "pipeline-rich", "dark-svg", null));
+  }
+
   private static Arguments scenario(String layout, String policy, String metadata) {
+    return scenario(layout, layout, policy, metadata);
+  }
+
+  private static Arguments scenario(String name, String layout, String policy, String metadata) {
     return Arguments.of(
-        layout,
+        name,
         "fixtures/layout-result/" + layout + ".json",
         "fixtures/render-policy/" + policy + ".json",
         metadata == null ? null : "fixtures/render-metadata/" + metadata + ".json");

@@ -1112,6 +1112,15 @@ you can recover from stdout JSON alone.
   ignores (a `warning`; the layout succeeded). The message lists their JSON
   pointers — delete those fields, or drop `mode: "packed"` so the layered
   algorithm honors them.
+- `DEDIREN_RENDER_METADATA_PROFILE_NOT_APPLIED`: the render metadata declares
+  `semantic_profile` `uml` or `archimate` but the render policy declares none,
+  so that notation's shapes, decorators, and label placement were not applied
+  (a `warning`; the SVG was rendered). Layout already sized the notation's
+  symbol nodes — a UML `DecisionNode` or `Port` is a fixed ~32px glyph whose
+  label belongs outside it — so a generic paint of that geometry puts labels
+  over symbols too small to hold them. Add `semantic_profile` to the render
+  policy (see `## Render`), or ignore it if a deliberately generic rendering of
+  a notation view is what you want.
 - `DEDIREN_EXPORT_SCHEMA_CONFORMANCE`: informational (`info`, rides an `ok`
   envelope) — names exactly which standards schema the export was validated
   against and its provenance (pinned SHA-256-verified download, or the

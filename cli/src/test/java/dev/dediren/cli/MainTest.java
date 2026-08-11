@@ -461,6 +461,43 @@ class MainTest {
   }
 
   @Test
+  void buildingANotationModelWithAProfilelessPolicyWarnsThatTheNotationWasNotApplied(
+      @TempDir Path tempDir) throws Exception {
+    // The activity view is the case with teeth: layout sizes a UML DecisionNode as a ~32px symbol
+    // whose label belongs outside it, so a policy that declares no semantic_profile paints that
+    // geometry generically and the label lands over a symbol far too small to hold it.
+    CliResult result =
+        Main.executeForTesting(
+            new String[] {
+              "build",
+              "--input",
+              workspaceRoot().resolve("fixtures/source/valid-uml-basic.json").toString(),
+              "--views",
+              "activity-view",
+              "--out",
+              tempDir.resolve("out").toString(),
+              "--render-policy",
+              workspaceRoot().resolve("fixtures/render-policy/default-svg.json").toString()
+            },
+            "",
+            sequenceWorkflowEnv());
+
+    // A warning, not a failure: the SVG is still written and the exit code stays zero.
+    assertThat(result.exitCode()).isZero();
+    JsonNode buildResult = JsonSupport.objectMapper().readTree(result.stdout());
+    assertThat(buildResult.at("/status").asText()).isEqualTo("warning");
+    assertThat(buildResult.at("/views/0/diagnostics"))
+        .anySatisfy(
+            diagnostic -> {
+              assertThat(diagnostic.at("/code").asText())
+                  .isEqualTo("DEDIREN_RENDER_METADATA_PROFILE_NOT_APPLIED");
+              assertThat(diagnostic.at("/severity").asText()).isEqualTo("warning");
+              assertThat(diagnostic.at("/message").asText()).contains("uml");
+            });
+    assertThat(tempDir.resolve("out/activity-view/diagram.svg")).exists();
+  }
+
+  @Test
   void misconfiguredBundleRootEmitsErrorEnvelopeOnPluginValidate(@TempDir Path tempDir)
       throws Exception {
     CliResult result =

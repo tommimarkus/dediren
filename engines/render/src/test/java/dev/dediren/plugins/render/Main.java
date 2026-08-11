@@ -1,9 +1,13 @@
 package dev.dediren.plugins.render;
 
 import dev.dediren.contracts.CommandEnvelope;
+import dev.dediren.contracts.ContractVersions;
+import dev.dediren.contracts.DiagnosticSeverity;
+import dev.dediren.contracts.EnvelopeStatus;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.contracts.render.RenderResult;
 import dev.dediren.engine.EngineException;
+import dev.dediren.engine.EngineResult;
 import dev.dediren.ir.LaidOutSceneMapper;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -50,14 +54,12 @@ public final class Main {
     SvgRenderEngine engine = new SvgRenderEngine();
     SvgRenderEngine.ParsedInput input = engine.parseInput(stdin.readAllBytes());
     try {
-      RenderResult result =
-          engine
-              .render(
-                  LaidOutSceneMapper.toScene(input.layoutResult()),
-                  input.policy(),
-                  input.renderMetadata())
-              .value();
-      stdout.println(JsonSupport.objectMapper().writeValueAsString(CommandEnvelope.ok(result)));
+      EngineResult<RenderResult> result =
+          engine.render(
+              LaidOutSceneMapper.toScene(input.layoutResult()),
+              input.policy(),
+              input.renderMetadata());
+      stdout.println(JsonSupport.objectMapper().writeValueAsString(successEnvelope(result)));
       return 0;
     } catch (EngineException error) {
       stdout.println(
@@ -65,5 +67,27 @@ public final class Main {
               .writeValueAsString(CommandEnvelope.error(error.diagnostics())));
       return error.exitCode();
     }
+  }
+
+  /**
+   * Mirrors {@code EngineDispatch.successEnvelope}'s ok/warning policy, which is what the CLI and
+   * the in-memory build lane both apply to an engine's success diagnostics. Duplicated rather than
+   * called because {@code core} is not an allowed edge from an engine module — and a harness that
+   * dropped the diagnostics would hide every warning the engine publishes alongside its artifact.
+   */
+  private static CommandEnvelope<RenderResult> successEnvelope(EngineResult<RenderResult> result) {
+    if (result.diagnostics().isEmpty()) {
+      return CommandEnvelope.ok(result.value());
+    }
+    boolean anyWarning =
+        result.diagnostics().stream()
+            .anyMatch(diagnostic -> diagnostic.severity() != DiagnosticSeverity.INFO);
+    return anyWarning
+        ? CommandEnvelope.warning(result.value(), result.diagnostics())
+        : new CommandEnvelope<>(
+            ContractVersions.ENVELOPE_SCHEMA_VERSION,
+            EnvelopeStatus.OK,
+            result.value(),
+            result.diagnostics());
   }
 }
