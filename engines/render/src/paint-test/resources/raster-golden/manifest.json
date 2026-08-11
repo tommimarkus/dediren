@@ -1,0 +1,121 @@
+{
+  "schema" : "dediren-render-paint-raster-manifest-v1",
+  "purpose" : "Deterministic raster backstop for repository-owned SVG render fixtures",
+  "renderer" : {
+    "name" : "Apache Batik GVT + JDK ImageIO",
+    "version" : "1.19",
+    "upstream" : "https://xmlgraphics.apache.org/batik/",
+    "release" : "https://xmlgraphics.apache.org/batik/download.cgi",
+    "license" : "Apache-2.0",
+    "licenseFile" : "https://www.apache.org/licenses/LICENSE-2.0",
+    "maven" : {
+      "artifact" : "org.apache.xmlgraphics:batik-bridge:1.19",
+      "repository" : "Maven Central",
+      "scope" : "test-profile-only"
+    },
+    "shippedWithDediren" : false,
+    "nativeExecutable" : false,
+    "textGeometryAuthority" : "JDK bundled-font oracle, not Batik",
+    "knownLimitation" : "Batik 1.19 ignores dominant-baseline=middle; Batik bounds are never used for text geometry.",
+    "rasterEnvironment" : {
+      "javaFeatureVersion" : 21,
+      "javaDistribution" : "Eclipse Temurin",
+      "javaVendor" : "Eclipse Adoptium",
+      "javaRuntimeVersion" : "21.0.10+7-LTS",
+      "headless" : true,
+      "viewport" : "intrinsic SVG CSS-pixel width and height",
+      "deviceScaleFactorEquivalent" : 1,
+      "outputFormat" : "JDK ImageIO PNG, 8-bit RGBA",
+      "renderingHints" : [ "antialiasing:on", "text-antialiasing:on", "fractional-metrics:on", "render-quality", "stroke:pure" ]
+    }
+  },
+  "font" : {
+    "family" : "Liberation Sans",
+    "file" : {
+      "path" : "engines/render/src/test/resources/fonts/LiberationSans-Regular.ttf",
+      "sha256" : "76d04c18ea243f426b7de1f3ad208e927008f961dc5945e5aad352d0dfde8ee8"
+    },
+    "license" : {
+      "spdxExpression" : "OFL-1.1-RFN",
+      "reservedFontNames" : [ "Arimo", "Tinos", "Cousine", "Liberation" ],
+      "file" : {
+        "path" : "engines/render/src/test/resources/fonts/LiberationSans-Regular.LICENSE.txt",
+        "sha256" : "93fed46019c38bbe566b479d22148e2e8a1e85ada614accb0211c37b2c61c19b"
+      }
+    },
+    "provenance" : {
+      "upstream" : "https://github.com/liberationfonts/liberation-fonts",
+      "fedoraPackage" : "liberation-sans-fonts-2.1.5-15.fc44.noarch",
+      "fedoraPackagePage" : "https://packages.fedoraproject.org/pkgs/liberation-fonts/liberation-sans-fonts/",
+      "verification" : "The repository font and licence bytes match the named Fedora package files."
+    },
+    "systemFallbackDisabled" : true,
+    "resolver" : "A test-local Batik FontFamilyResolver maps all supported text to the exact bundled font and returns no family for unsupported glyphs."
+  },
+  "comparator" : {
+    "implementation" : "engines/render/src/paint-test/java/dev/dediren/plugins/render/RasterDiff.java",
+    "equalDimensionsRequired" : true,
+    "perChannelThreshold" : 8,
+    "thresholdRule" : "Differences of 8 or less in every RGBA channel are ignored; any channel difference above 8 changes the pixel.",
+    "changedPixelTolerance" : 0,
+    "connectedRegionAdjacency" : 4,
+    "failureArtifacts" : [ "actual", "mask", "overlay" ]
+  },
+  "generation" : {
+    "rendererImplementation" : "engines/render/src/main/java/dev/dediren/plugins/render",
+    "ownership" : "The PNG baselines are generated documents produced solely from repository-owned fixtures and renderer code using test-profile Apache Batik, JDK ImageIO and the bundled licensed font.",
+    "thirdPartyLogosOrEmbeddedFixtureAssets" : false,
+    "regenerationProperty" : "dediren.render.paint.regenerate-goldens",
+    "regenerationRequiresPinnedEnvironment" : true,
+    "pinnedEnvironment" : "Eclipse Temurin 21.0.10+7-LTS, Batik 1.19, the manifest font digest and the listed rendering hints; no OS-specific executable is used."
+  },
+  "scenarios" : [ {
+    "name" : "pipeline-rich-light",
+    "description" : "Rich standard graph, light theme",
+    "layoutFixture" : "fixtures/layout-result/pipeline-rich.json",
+    "policyFixture" : "fixtures/render-policy/default-svg.json",
+    "metadataFixture" : null,
+    "baseline" : "engines/render/src/paint-test/resources/raster-golden/pipeline-rich-light.png",
+    "dimensions" : {
+      "width" : 1581,
+      "height" : 484
+    },
+    "sha256" : "f702763fa68fc5bf935c00da39297cd395049ab729d11f2c87c4705396d14b78"
+  }, {
+    "name" : "pipeline-rich-dark",
+    "description" : "The same rich standard graph, dark theme",
+    "layoutFixture" : "fixtures/layout-result/pipeline-rich.json",
+    "policyFixture" : "fixtures/render-policy/dark-svg.json",
+    "metadataFixture" : null,
+    "baseline" : "engines/render/src/paint-test/resources/raster-golden/pipeline-rich-dark.png",
+    "dimensions" : {
+      "width" : 1581,
+      "height" : 484
+    },
+    "sha256" : "6b8a8bb82b50c16872c36051d43f878cd10961424fb320674e33d2d5df27c911"
+  }, {
+    "name" : "archimate-decorators",
+    "description" : "ArchiMate diagram with decorators and markers",
+    "layoutFixture" : "fixtures/layout-result/archimate-oef-basic.json",
+    "policyFixture" : "fixtures/render-policy/archimate-svg.json",
+    "metadataFixture" : "fixtures/render-metadata/archimate-basic.json",
+    "baseline" : "engines/render/src/paint-test/resources/raster-golden/archimate-decorators.png",
+    "dimensions" : {
+      "width" : 506,
+      "height" : 144
+    },
+    "sha256" : "db8112454f2d699eff1262c3f18c3ed8b4957ce775539df2b122bc1b0a93ddfd"
+  }, {
+    "name" : "uml-sequence-fragments",
+    "description" : "UML sequence diagram with fragment chrome",
+    "layoutFixture" : "fixtures/layout-result/uml-sequence-fragments.json",
+    "policyFixture" : "fixtures/render-policy/uml-svg.json",
+    "metadataFixture" : "fixtures/render-metadata/uml-sequence-fragments.json",
+    "baseline" : "engines/render/src/paint-test/resources/raster-golden/uml-sequence-fragments.png",
+    "dimensions" : {
+      "width" : 1008,
+      "height" : 1008
+    },
+    "sha256" : "184b7e8e7c51f4b4363ba7b3aeddac4229f513623dddef6f3bdf850fa9c54e3c"
+  } ]
+}

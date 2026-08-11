@@ -116,6 +116,64 @@ dediren render --plugin render \
 Render metadata schema:
 [`schemas/render-metadata.schema.json`](../../schemas/render-metadata.schema.json).
 
+## Browserless Render-Paint Verification
+
+The opt-in `render-paint` Maven profile validates behavior that byte-exact SVG
+goldens and XML inspection do not cover, without starting or downloading a web
+browser. The repository wrapper runs the whole lane:
+
+```bash
+./scripts/test-render-paint.sh
+```
+
+For a narrow rerun, select the decorated-paint audit or raster backstop:
+
+```bash
+./scripts/test-render-paint.sh -Dtest='SvgPaintAudit*Test'
+./scripts/test-render-paint.sh -Dtest='RasterDiffTest,RasterGoldenTest'
+```
+
+The profile resolves the Apache Batik 1.19 `batik-bridge` artifact at test scope only. It
+uses the SVG bridge as an independent authority for non-text decorated paint
+such as paths, strokes, markers, and transformed bounds; no Batik artifact
+enters the shipped runtime. Batik 1.19 officially does not support and ignores
+the valid SVG `dominant-baseline="middle"` x-middle baseline, so its text
+placement is not authoritative. That baseline does not request exact
+ink-bounds centering. The JDK Java2D oracle uses the repository's bundled
+Liberation Sans font to model x-middle semantics; ImageIO owns raster
+comparison. This test-only lane does not change emitted SVG or other product
+output.
+
+The lane does not load system fonts and does not fetch fallback fonts. When the
+bundled font cannot display a glyph, the result is the advisory code
+`font_missing`; the audit does not invent a bound. That applies particularly to
+unsupported CJK or emoji glyphs while retaining deterministic checks for text
+the font can display.
+
+Repository-owned built-in themes gate on numeric label-contrast baselines of
+4.5:1 for normal text and 3:1 for large text. These values are contrast
+baselines, not claims of WCAG conformance. User-supplied themes remain
+non-blocking. Gradients and other compositions whose effective background
+cannot be established produce an advisory `not_measurable` result rather than
+a fabricated ratio.
+
+Four reviewable PNG goldens provide a small raster backstop: the rich standard
+graph in light and dark themes, an ArchiMate diagram with decorators and
+markers, and a UML sequence diagram with fragment chrome. Regeneration is
+deliberately opt-in:
+
+```bash
+./scripts/test-render-paint.sh \
+  -Ddediren.render.paint.regenerate-goldens=true
+```
+
+Review every tracked PNG and manifest change after regeneration. A failed
+comparison writes the actual image, changed-pixel mask, and overlay under
+`.test-output/render-paint/`. Maven state, including profile-only Batik jars,
+stays in the repository-local `.cache/maven`. The scheduled raster lane pins
+Eclipse Temurin 21.0.10+7; the profile has no OS-specific executable dependency
+and creates no browser or home-directory cache.
+
 ## Related Pages
 
 - [Pipeline & Commands](pipeline-and-commands.md) — the `render` command.

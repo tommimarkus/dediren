@@ -86,17 +86,49 @@ edge set in [`docs/architecture-guidelines.md`](docs/architecture-guidelines.md)
 ./mvnw test                                    # unit + integration
 ./mvnw -Pquality verify                        # google-java-format + SpotBugs gate
 ./mvnw -Pcoverage verify                       # JaCoCo LINE + BRANCH gate
+./scripts/test-render-paint.sh                  # browserless SVG paint + raster goldens
 ./mvnw -pl dist-tool -am verify -Pdist-build   # build the agent bundle
 ./mvnw -pl dist-tool -am verify -Pdist-smoke   # smoke-test the built bundle
 ```
 
 Auto-fix formatting with `./mvnw -Pquality spotless:apply`. The `quality` and
-`coverage` gates fail the build locally; validation is local-first, and CI runs
-only on pull requests (chiefly Dependabot bumps), on demand, and on release
-tags. Narrower per-module verification lanes are listed in
+`coverage` gates fail the build locally; validation is local-first. The main CI
+workflow runs only on pull requests (chiefly Dependabot bumps) and on demand;
+CodeQL and render-paint run weekly and on demand, while release tags have their
+own gates. Narrower per-module verification lanes are listed in
 [`CLAUDE.md` §Verification](CLAUDE.md).
 
-Maven state is repo-local under `.cache/maven` for sandbox-friendly builds.
+The opt-in `render-paint` profile is a browserless check of decorated SVG paint
+and four raster baselines: the rich graph in light and dark themes, ArchiMate
+decorators, and UML sequence-fragment chrome. Run the full lane with the script
+above, the paint audit alone with
+`./scripts/test-render-paint.sh -Dtest='SvgPaintAudit*Test'`, or the raster lane
+with
+`./scripts/test-render-paint.sh -Dtest='RasterDiffTest,RasterGoldenTest'`.
+Deliberate raster changes require
+`-Ddediren.render.paint.regenerate-goldens=true`; review the tracked PNG and
+manifest diff. Failures write actual, mask, and overlay evidence under
+`.test-output/render-paint/`.
+
+The Apache Batik 1.19 `batik-bridge` artifact is resolved only by this test profile and
+supplies the independent non-text decorated-paint check; it is not shipped.
+Batik 1.19 officially does not support and ignores the valid SVG
+`dominant-baseline="middle"` x-middle baseline. That baseline is not an
+ink-bounds-centering instruction, so the JDK Java2D oracle with bundled
+Liberation Sans models its x-middle semantics; ImageIO owns raster comparison.
+This test-only lane does not change emitted SVG or other product output. The
+lane never loads system fonts or downloads fallback fonts: an unsupported glyph
+is an advisory `font_missing`, not a fabricated measurement. Repository-owned
+themes are checked against numeric contrast baselines of 4.5:1 for normal text
+and 3:1 for large text;
+these are baselines, not claims of WCAG conformance. User themes never block,
+and gradients or compositions that cannot be measured report advisory
+`not_measurable`.
+
+Maven state, including the profile-only Batik artifacts, is repo-local under
+`.cache/maven` for sandbox-friendly builds. The scheduled raster lane pins
+Eclipse Temurin 21.0.10+7; the profile itself remains Java-only and has no
+OS-specific executable dependency.
 Supply-chain scanning is layered: **Grype** scans the CycloneDX SBOM and is the
 blocking gate on every pull request and release (High/Critical advisories fail
 the build); **OWASP Dependency-Check** is an on-demand local second opinion

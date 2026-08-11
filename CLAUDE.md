@@ -309,6 +309,40 @@ SVG render changes:
 ./mvnw -pl engines/render,cli -am test
 ```
 
+Browserless decorated-paint and raster verification (opt-in):
+
+```bash
+./scripts/test-render-paint.sh
+./scripts/test-render-paint.sh -Dtest='SvgPaintAudit*Test'
+./scripts/test-render-paint.sh -Dtest='RasterDiffTest,RasterGoldenTest'
+```
+
+The wrapper activates `-Prender-paint`; direct Maven callers may use
+`./mvnw -Prender-paint -pl engines/render -am test`. Maven and the profile-only
+Apache Batik 1.19 `batik-bridge` test dependency stay under the repository
+`.cache/maven`. Batik is the non-text decorated-paint oracle only: because it
+officially does not support and ignores the valid SVG
+`dominant-baseline="middle"` x-middle baseline, text geometry is judged by the
+JDK Java2D oracle with bundled Liberation Sans. The oracle models x-middle
+semantics, not exact ink-bounds centering; ImageIO owns raster comparison. This
+test-only lane does not change emitted SVG or other product output. Do not
+enable system-font fallback or download new fonts. Unsupported glyphs produce
+advisory `font_missing` results.
+
+The raster corpus is the rich graph in light and dark themes, ArchiMate
+decorators, and UML sequence-fragment chrome. A failure writes actual, mask, and
+overlay images under `.test-output/render-paint/`. Regenerate deliberately with
+`./scripts/test-render-paint.sh -Ddediren.render.paint.regenerate-goldens=true`,
+then review every tracked PNG and manifest change. Built-in-theme contrast gates
+use numeric baselines of 4.5:1 for normal text and 3:1 for large text; describe
+them as baselines, never WCAG conformance. User themes are non-blocking, while
+gradients and compositions that cannot be resolved report advisory
+`not_measurable`.
+
+The scheduled raster job pins Eclipse Temurin 21.0.10+7. Keep that runtime and
+the raster manifest synchronized when the canonical golden environment changes;
+the profile must remain free of OS-specific executable dependencies.
+
 OEF export changes:
 
 ```bash

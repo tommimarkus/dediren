@@ -317,10 +317,9 @@ final class SvgAudit {
   }
 
   /**
-   * Every node label must clear a WCAG relative-contrast floor against its own shape fill, or it is
-   * unreadable — the classic failure of a mis-set theme (light text on light fill, or the inverse
-   * in a dark theme). Only hex fills are judged; non-hex/absent fills (e.g. figure shapes) are
-   * skipped.
+   * Every node label must clear the repository contrast baseline against its own shape fill. This
+   * is a rendering regression baseline, not a conformance claim. Only hex fills are judged;
+   * non-hex/absent fills (for example figure shapes) are skipped.
    */
   static void assertNodeLabelContrast(Document document, double minimumRatio) {
     List<String> lowContrast = new ArrayList<>();
@@ -352,7 +351,7 @@ final class SvgAudit {
       }
     }
     assertThat(lowContrast)
-        .as("node labels below WCAG contrast %s against their shape fill", minimumRatio)
+        .as("node labels below contrast baseline %s against their shape fill", minimumRatio)
         .isEmpty();
   }
 

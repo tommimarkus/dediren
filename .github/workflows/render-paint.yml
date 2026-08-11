@@ -1,0 +1,54 @@
+name: Render Paint
+
+# Browserless decorated-paint and raster verification. This intentionally stays
+# outside pull-request, push, and release gates: it runs weekly and on demand.
+
+on:
+  schedule:
+    # Weekly, Thursday 06:00 UTC — offset from Dependabot (Mon) and CodeQL (Tue).
+    - cron: "0 6 * * 4"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  SEGMENT_DOWNLOAD_TIMEOUT_MINS: "5"
+  MAVEN_USER_HOME: ${{ github.workspace }}/.cache/maven/user-home
+
+jobs:
+  verify:
+    name: Verify SVG paint and raster goldens
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Java
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: "21.0.10+7"
+
+      - name: Cache Maven artifacts
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .cache/maven
+          key: maven-${{ runner.os }}-${{ hashFiles('**/pom.xml', '.mvn/wrapper/maven-wrapper.properties') }}
+          restore-keys: |
+            maven-${{ runner.os }}-
+
+      - name: Check browserless SVG paint
+        run: ./scripts/test-render-paint.sh
+
+      - name: Upload paint failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: render-paint-failure-${{ github.run_id }}
+          path: .test-output/render-paint/
+          if-no-files-found: ignore
+          retention-days: 14

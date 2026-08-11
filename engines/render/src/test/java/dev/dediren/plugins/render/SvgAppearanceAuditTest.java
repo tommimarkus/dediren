@@ -41,17 +41,17 @@ class SvgAppearanceAuditTest {
             "<svg viewBox=\"0 0 10 10\"><g data-dediren-node-id=\"n\">"
                 + "<rect data-dediren-node-shape=\"r\" fill=\"#ffffff\"/>"
                 + "<text fill=\"#eeeeee\">x</text></g></svg>");
-    assertThatThrownBy(() -> SvgAudit.assertNodeLabelContrast(document, 3.0))
+    assertThatThrownBy(() -> SvgAudit.assertNodeLabelContrast(document, 4.5))
         .isInstanceOf(AssertionError.class)
         .hasMessageContaining("contrast");
   }
 
   @ParameterizedTest(name = "{0}")
   @MethodSource("dev.dediren.plugins.render.RenderScenarios#standard")
-  void nodeLabelsMeetContrastFloor(String name, String layout, String policy, String metadata)
-      throws Exception {
+  void builtInNodeLabelsMeetNormalTextContrastBaseline(
+      String name, String layout, String policy, String metadata) throws Exception {
     SvgAudit.assertNodeLabelContrast(
-        SvgAudit.parse(RenderTestSupport.renderFixtures(layout, policy, metadata)), 3.0);
+        SvgAudit.parse(RenderTestSupport.renderFixtures(layout, policy, metadata)), 4.5);
   }
 
   @Test
@@ -63,6 +63,6 @@ class SvgAppearanceAuditTest {
             null);
 
     SvgAudit.auditStructure(svg);
-    SvgAudit.assertNodeLabelContrast(SvgAudit.parse(svg), 3.0);
+    SvgAudit.assertNodeLabelContrast(SvgAudit.parse(svg), 4.5);
   }
 }
