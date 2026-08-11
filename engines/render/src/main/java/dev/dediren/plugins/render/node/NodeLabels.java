@@ -32,14 +32,25 @@ public final class NodeLabels {
   private static final double NODE_LABEL_MIN_FONT_SIZE = 9.0;
   private static final double LABEL_ALIGN_INSET = 8.0;
 
-  public static void nodeLabel(
-      SvgWriter w, LaidOutNode node, ResolvedNodeStyle style, double fontSize) {
+  /**
+   * Resolves the lines, the position, and the anchor together — the single place a plain node label
+   * is placed. Callers that emit it and callers that measure it take the result; neither re-derives
+   * it. See {@link NodeLabelPlacement} for why that matters.
+   */
+  public static NodeLabelPlacement placeNodeLabel(
+      LaidOutNode node, ResolvedNodeStyle style, double fontSize) {
     NodeLabelLines label = nodeLabelLinesAndSize(node, style, fontSize);
     NodeLabelPosition position =
         nodeLabelPosition(node, style, label.fontSize(), label.lines().size());
     NodeLabelAnchor labelAnchor = nodeLabelAnchor(node, style, position);
-    double textX = labelAnchor.x();
-    String anchor = labelAnchor.anchor();
+    return new NodeLabelPlacement(label, position, labelAnchor.x(), labelAnchor.anchor());
+  }
+
+  public static void nodeLabel(SvgWriter w, NodeLabelPlacement placed, ResolvedNodeStyle style) {
+    NodeLabelLines label = placed.lines();
+    NodeLabelPosition position = placed.position();
+    double textX = placed.anchorX();
+    String anchor = placed.anchor();
     w.start("text")
         .attr("x", f1(textX))
         .attr("y", f1(position.y()))
@@ -214,23 +225,17 @@ public final class NodeLabels {
         : 0.0;
   }
 
-  public static List<LabelBox> nodeLabelBoxes(
-      LaidOutNode node, ResolvedNodeStyle style, double fontSize) {
-    NodeLabelLines label = nodeLabelLinesAndSize(node, style, fontSize);
-    NodeLabelPosition position =
-        nodeLabelPosition(node, style, label.fontSize(), label.lines().size());
-    NodeLabelAnchor labelAnchor = nodeLabelAnchor(node, style, position);
+  /** The boxes {@link #nodeLabel} will ink, derived from the same placement it writes from. */
+  public static List<LabelBox> nodeLabelBoxes(NodeLabelPlacement placed) {
+    NodeLabelLines label = placed.lines();
+    NodeLabelPosition position = placed.position();
     List<LabelBox> boxes = new ArrayList<>();
     double lineHeight = nodeLabelLineHeight(label.fontSize());
     for (int index = 0; index < label.lines().size(); index++) {
       double y = position.y() + index * lineHeight;
       boxes.add(
           nodeLabelBox(
-              labelAnchor.x(),
-              y,
-              label.lines().get(index),
-              label.fontSize(),
-              labelAnchor.anchor()));
+              placed.anchorX(), y, label.lines().get(index), label.fontSize(), placed.anchor()));
     }
     return boxes;
   }
@@ -250,10 +255,10 @@ public final class NodeLabels {
 
   // label_align only applies to plain centered labels; junction and UML compact-control labels
   // sit at their own outside position and keep a middle anchor. This is the single source of
-  // truth for that anchor/textX choice: nodeLabel (the emitted <text>) and nodeLabelBoxes (the
-  // bounds the SVG viewBox grows to) must both call it, or they silently disagree again — the
-  // bounds path centering while the render path shifts to start/end is exactly the bug this
-  // function exists to prevent. See the label_align bounds-drift fix.
+  // truth for that anchor/textX choice, and placeNodeLabel is now its only caller — the emitted
+  // <text> and the bounds the viewBox grows to read the one NodeLabelPlacement it produced. The
+  // bounds path centering while the render path shifts to start/end is the bug this arrangement
+  // exists to prevent; two call sites is how it got in. See the label_align bounds-drift fix.
   private static NodeLabelAnchor nodeLabelAnchor(
       LaidOutNode node, ResolvedNodeStyle style, NodeLabelPosition position) {
     boolean plainCentered =

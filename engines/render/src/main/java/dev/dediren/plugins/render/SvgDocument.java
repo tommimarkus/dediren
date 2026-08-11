@@ -1,7 +1,7 @@
 package dev.dediren.plugins.render;
 
 import static dev.dediren.plugins.render.node.NodeLabels.nodeLabel;
-import static dev.dediren.plugins.render.node.NodeLabels.nodeLabelBoxes;
+import static dev.dediren.plugins.render.node.NodeLabels.placeNodeLabel;
 import static dev.dediren.plugins.render.node.NodeShapeSupport.archimateJunctionRadius;
 import static dev.dediren.plugins.render.node.NodeShapeSupport.decoratorName;
 import static dev.dediren.plugins.render.node.NodeShapeSupport.isArchimateCutCornerRectangle;
@@ -13,6 +13,7 @@ import static dev.dediren.plugins.render.node.archimate.ArchimateShapes.archimat
 import static dev.dediren.plugins.render.node.generic.GenericShapes.genericNodeShape;
 import static dev.dediren.plugins.render.node.uml.UmlDecorators.umlNodeDecorator;
 import static dev.dediren.plugins.render.node.uml.UmlShapes.umlNodeShape;
+import static dev.dediren.plugins.render.svg.EdgeRenderer.backdropFillAt;
 import static dev.dediren.plugins.render.svg.EdgeRenderer.edgeLabel;
 import static dev.dediren.plugins.render.svg.EdgeRenderer.edgeLabelFontSize;
 import static dev.dediren.plugins.render.svg.EdgeRenderer.edgeLabelVisibleBox;
@@ -30,7 +31,6 @@ import dev.dediren.contracts.layout.LaidOutEdge;
 import dev.dediren.contracts.layout.LaidOutGroup;
 import dev.dediren.contracts.layout.LaidOutNode;
 import dev.dediren.contracts.layout.LayoutResult;
-import dev.dediren.contracts.layout.Point;
 import dev.dediren.contracts.render.RenderMetadata;
 import dev.dediren.contracts.render.RenderMetadataSelector;
 import dev.dediren.contracts.render.RenderPolicy;
@@ -39,6 +39,12 @@ import dev.dediren.contracts.render.SvgGradientStop;
 import dev.dediren.contracts.render.SvgGradientType;
 import dev.dediren.contracts.render.SvgLabelAlign;
 import dev.dediren.contracts.render.SvgNodeDecorator;
+import dev.dediren.plugins.render.PlacedScene.PlacedAdornment;
+import dev.dediren.plugins.render.PlacedScene.PlacedEdge;
+import dev.dediren.plugins.render.PlacedScene.PlacedEdgeLabel;
+import dev.dediren.plugins.render.PlacedScene.PlacedElement;
+import dev.dediren.plugins.render.PlacedScene.PlacedGroup;
+import dev.dediren.plugins.render.PlacedScene.PlacedNode;
 import dev.dediren.plugins.render.node.uml.UmlSequenceRenderer;
 import dev.dediren.plugins.render.style.ResolvedEdgeStyle;
 import dev.dediren.plugins.render.style.ResolvedGroupStyle;
@@ -49,6 +55,7 @@ import dev.dediren.plugins.render.svg.EdgeEndAdornments;
 import dev.dediren.plugins.render.svg.EdgeLabel;
 import dev.dediren.plugins.render.svg.LabelBox;
 import dev.dediren.plugins.render.svg.LineJump;
+import dev.dediren.plugins.render.svg.MaskedLineJump;
 import dev.dediren.plugins.render.svg.SvgAccessibleName;
 import dev.dediren.plugins.render.svg.SvgBounds;
 import dev.dediren.plugins.render.svg.SvgIds;
@@ -67,14 +74,110 @@ public final class SvgDocument {
 
   private SvgDocument() {}
 
+  /**
+   * Renders one document in three passes: {@link #resolve} decides, {@link #measure} folds those
+   * decisions into the viewBox, {@link #emit} writes them. The split exists because the viewBox
+   * must be known before the root start-tag closes — see {@link PlacedScene} for why measure and
+   * emit must keep consuming the one scene rather than each deriving its own.
+   */
   public static String renderSvg(
       LayoutResult result, RenderMetadata metadata, RenderPolicy policy) {
     if (UmlSequenceRenderer.isSequence(metadata)) {
       return new UmlSequenceRenderer(result, metadata, policy).render();
     }
+    PlacedScene scene = resolve(result, metadata, policy);
+    return emit(new SvgWriter(), scene, measure(scene));
+  }
+
+  /**
+   * Resolves styles and places everything the document draws, once.
+   *
+   * <p>The edge walk is order-dependent and must stay in layout order twice over: {@code lineJumps}
+   * sees only the edges routed before it, and {@code placedLabelBoxes} is the running obstacle set
+   * each edge's label avoids. Both used to be rebuilt identically by the bounds pass, and
+   * "identically" was maintained by inspection.
+   */
+  static PlacedScene resolve(LayoutResult result, RenderMetadata metadata, RenderPolicy policy) {
     ResolvedStyle base = StyleResolver.baseStyle(policy);
-    SvgBounds bounds = svgBounds(result, metadata, policy, base);
-    SvgWriter w = new SvgWriter();
+    List<PlacedGroup> groups = new ArrayList<>();
+    for (LaidOutGroup group : result.groups()) {
+      groups.add(
+          new PlacedGroup(
+              group,
+              StyleResolver.groupStyle(policy, metadata, group.id(), base),
+              metadata == null ? null : metadata.groups().get(group.id())));
+    }
+    List<PlacedEdge> edges = new ArrayList<>();
+    List<LaidOutEdge> routedEdges = new ArrayList<>();
+    List<LabelBox> placedLabelBoxes = new ArrayList<>();
+    for (int edgeIndex = 0; edgeIndex < result.edges().size(); edgeIndex++) {
+      LaidOutEdge edge = result.edges().get(edgeIndex);
+      ResolvedEdgeStyle style = StyleResolver.edgeStyle(policy, metadata, edge.id(), base);
+      List<MaskedLineJump> maskedJumps = new ArrayList<>();
+      for (LineJump jump : lineJumps(edge, routedEdges)) {
+        maskedJumps.add(
+            new MaskedLineJump(
+                jump, backdropFillAt(jump.x(), jump.y(), result, metadata, policy, base)));
+      }
+      PlacedEdgeLabel label = null;
+      if (edge.label() != null && !edge.label().isEmpty()) {
+        EdgeLabel placedLabel =
+            edgeLabel(
+                edge,
+                style,
+                labelObstacleBoxesForEdge(result, edgeIndex, placedLabelBoxes),
+                edgeLabelFontSize(base.fontSize()));
+        LabelBox visibleBox = edgeLabelVisibleBox(placedLabel, style.labelPresentation());
+        label = new PlacedEdgeLabel(placedLabel, edge.label(), visibleBox);
+        placedLabelBoxes.add(visibleBox);
+      }
+      // Same profile-gated call the emission pass used to make, so markup and bounds can never
+      // disagree about whether an edge has end adornments — now because there is only one call.
+      List<PlacedAdornment> adornments = new ArrayList<>();
+      for (EdgeEndAdornments.Adornment adornment :
+          EdgeEndAdornments.adornments(edge, metadata, base.fontSize())) {
+        LabelBox visibleBox = EdgeEndAdornments.visibleBox(adornment, style);
+        adornments.add(new PlacedAdornment(adornment, visibleBox));
+        placedLabelBoxes.add(visibleBox);
+      }
+      edges.add(new PlacedEdge(edge, style, maskedJumps, label, adornments));
+      routedEdges.add(edge);
+    }
+    List<PlacedNode> nodes = new ArrayList<>();
+    for (LaidOutNode node : result.nodes()) {
+      ResolvedNodeStyle style = StyleResolver.nodeStyle(policy, metadata, node.id(), base);
+      nodes.add(
+          new PlacedNode(
+              node,
+              style,
+              metadata == null ? null : metadata.nodes().get(node.id()),
+              shouldRenderPlainNodeLabel(node, style.decorator())
+                  ? placeNodeLabel(node, style, base.fontSize())
+                  : null));
+    }
+    return new PlacedScene(policy, result.viewId(), base, groups, edges, nodes);
+  }
+
+  /**
+   * The document bounds: every drawable's own contribution, then the empty-layout page fallback,
+   * then the policy margins. Node-aware, which is why it and {@link PlacedScene} live here with
+   * their caller rather than in the svg package's Geometry — that package stays a leaf with no
+   * {@code node.*} imports.
+   */
+  static SvgBounds measure(PlacedScene scene) {
+    SvgBounds bounds = SvgBounds.empty();
+    for (PlacedElement element : scene.elements()) {
+      element.contributeBounds(bounds);
+    }
+    if (bounds.isEmpty()) {
+      bounds.includeRect(0.0, 0.0, scene.policy().page().width(), scene.policy().page().height());
+    }
+    return bounds.padded(scene.policy());
+  }
+
+  /** Writes the placed scene. No placement decision is left to make here — see {@link #resolve}. */
+  static String emit(SvgWriter w, PlacedScene scene, SvgBounds bounds) {
+    ResolvedStyle base = scene.base();
     // One minter per document: every id and every url(#…) in this SVG goes through it, so a
     // layout id that is duplicated or not a legal identifier can neither collide nor break its
     // own reference. See SvgIds for why the transform is a no-op on well-formed ids.
@@ -93,8 +196,8 @@ public final class SvgDocument {
                 bounds.minY(),
                 bounds.width(),
                 bounds.height()));
-    SvgAccessibleName.rootLanguage(w, policy);
-    SvgAccessibleName.markup(w, policy, result.viewId());
+    SvgAccessibleName.rootLanguage(w, scene.policy());
+    SvgAccessibleName.markup(w, scene.policy(), scene.viewId());
     w.empty("rect")
         .attr("x", f1(bounds.minX()))
         .attr("y", f1(bounds.minY()))
@@ -107,10 +210,11 @@ public final class SvgDocument {
         .attr("font-size", styleNumber(base.fontSize()))
         .attrIf("font-weight", enumValue(base.fontWeight()))
         .attrIf("font-style", enumValue(base.fontStyle()));
-    for (LaidOutGroup group : result.groups()) {
-      ResolvedGroupStyle style = StyleResolver.groupStyle(policy, metadata, group.id(), base);
+    for (PlacedGroup placed : scene.groups()) {
+      LaidOutGroup group = placed.group();
+      ResolvedGroupStyle style = placed.style();
       w.start("g").attr("data-dediren-group-id", group.id());
-      RenderMetadataSelector selector = metadata == null ? null : metadata.groups().get(group.id());
+      RenderMetadataSelector selector = placed.selector();
       if (selector != null) {
         w.attr("data-dediren-group-type", selector.type())
             .attr("data-dediren-group-source-id", selector.sourceId());
@@ -161,42 +265,40 @@ public final class SvgDocument {
           .end();
       w.end();
     }
-    List<LaidOutEdge> renderedEdges = new ArrayList<>();
-    List<LabelBox> placedLabelBoxes = new ArrayList<>();
-    for (int edgeIndex = 0; edgeIndex < result.edges().size(); edgeIndex++) {
-      LaidOutEdge edge = result.edges().get(edgeIndex);
-      ResolvedEdgeStyle style = StyleResolver.edgeStyle(policy, metadata, edge.id(), base);
-      List<LineJump> lineJumps = lineJumps(edge, renderedEdges);
+    for (PlacedEdge placed : scene.edges()) {
+      LaidOutEdge edge = placed.edge();
+      ResolvedEdgeStyle style = placed.style();
       w.start("g").attr("data-dediren-edge-id", edge.id());
       String startMarkerId = edgeMarker(w, ids, edge, style, "start");
       String endMarkerId = edgeMarker(w, ids, edge, style, "end");
-      lineJumpMasks(w, edge, lineJumps, result, metadata, policy, base);
-      edgePath(w, edge, style, lineJumps, ids.reference(startMarkerId), ids.reference(endMarkerId));
-      if (edge.label() != null && !edge.label().isEmpty()) {
-        double edgeLabelFontSize = edgeLabelFontSize(base.fontSize());
-        EdgeLabel label =
-            edgeLabel(
-                edge,
-                style,
-                labelObstacleBoxesForEdge(result, edgeIndex, placedLabelBoxes),
-                edgeLabelFontSize);
-        edgeLabel(w, label, edge.label(), style, base.backgroundFill(), edgeLabelFontSize);
-        placedLabelBoxes.add(edgeLabelVisibleBox(label, style.labelPresentation()));
+      lineJumpMasks(w, edge.id(), placed.lineJumps());
+      edgePath(
+          w,
+          edge,
+          style,
+          placed.routeJumps(),
+          ids.reference(startMarkerId),
+          ids.reference(endMarkerId));
+      PlacedEdgeLabel label = placed.label();
+      if (label != null) {
+        edgeLabel(
+            w,
+            label.label(),
+            label.text(),
+            style,
+            base.backgroundFill(),
+            edgeLabelFontSize(base.fontSize()));
       }
-      List<EdgeEndAdornments.Adornment> endAdornments =
-          EdgeEndAdornments.adornments(edge, metadata, base.fontSize());
-      if (!endAdornments.isEmpty()) {
-        EdgeEndAdornments.markup(w, endAdornments, style, base.backgroundFill(), base.fontSize());
-        for (EdgeEndAdornments.Adornment adornment : endAdornments) {
-          placedLabelBoxes.add(EdgeEndAdornments.visibleBox(adornment, style));
-        }
+      if (!placed.adornments().isEmpty()) {
+        EdgeEndAdornments.markup(
+            w, placed.routeAdornments(), style, base.backgroundFill(), base.fontSize());
       }
       w.end();
-      renderedEdges.add(edge);
     }
-    for (LaidOutNode node : result.nodes()) {
-      ResolvedNodeStyle style = StyleResolver.nodeStyle(policy, metadata, node.id(), base);
-      RenderMetadataSelector selector = metadata == null ? null : metadata.nodes().get(node.id());
+    for (PlacedNode placed : scene.nodes()) {
+      LaidOutNode node = placed.node();
+      ResolvedNodeStyle style = placed.style();
+      RenderMetadataSelector selector = placed.selector();
       w.start("g").attr("data-dediren-node-id", node.id());
       ResolvedNodeStyle shapeStyle = style;
       if (style.fillGradient() != null) {
@@ -220,8 +322,8 @@ public final class SvgDocument {
         w.end();
       }
       nodeDecorator(w, node, style, selector);
-      if (shouldRenderPlainNodeLabel(node, style.decorator())) {
-        nodeLabel(w, node, style, base.fontSize());
+      if (placed.label() != null) {
+        nodeLabel(w, placed.label(), style);
       }
       w.end();
     }
@@ -361,61 +463,5 @@ public final class SvgDocument {
 
   private static String enumValue(Enum<?> value) {
     return value == null ? null : value.name().toLowerCase(Locale.ROOT);
-  }
-
-  /**
-   * The document bounds: every group/edge/node rect plus rendered node labels, edge labels, and end
-   * adornments. Node-aware (it consults the node package's label boxes and decorator rules), which
-   * is why it lives here with its only caller and not in the svg package's Geometry — the svg
-   * package stays a leaf with no node.* imports.
-   */
-  private static SvgBounds svgBounds(
-      LayoutResult result, RenderMetadata metadata, RenderPolicy policy, ResolvedStyle base) {
-    var bounds = SvgBounds.empty();
-    for (LaidOutGroup group : result.groups()) {
-      bounds.includeRect(group.x(), group.y(), group.width(), group.height());
-    }
-    for (LaidOutEdge edge : result.edges()) {
-      for (Point point : edge.points()) {
-        bounds.includePoint(point.x(), point.y());
-      }
-    }
-    for (LaidOutNode node : result.nodes()) {
-      bounds.includeRect(node.x(), node.y(), node.width(), node.height());
-      ResolvedNodeStyle style = StyleResolver.nodeStyle(policy, metadata, node.id(), base);
-      if (shouldRenderPlainNodeLabel(node, style.decorator())) {
-        for (LabelBox labelBox : nodeLabelBoxes(node, style, base.fontSize())) {
-          bounds.includeRect(labelBox.minX(), labelBox.minY(), labelBox.width(), labelBox.height());
-        }
-      }
-    }
-    List<LabelBox> placedLabelBoxes = new ArrayList<>();
-    for (int edgeIndex = 0; edgeIndex < result.edges().size(); edgeIndex++) {
-      LaidOutEdge edge = result.edges().get(edgeIndex);
-      ResolvedEdgeStyle style = StyleResolver.edgeStyle(policy, metadata, edge.id(), base);
-      if (edge.label() != null && !edge.label().isEmpty()) {
-        EdgeLabel label =
-            edgeLabel(
-                edge,
-                style,
-                labelObstacleBoxesForEdge(result, edgeIndex, placedLabelBoxes),
-                edgeLabelFontSize(base.fontSize()));
-        LabelBox labelBox = edgeLabelVisibleBox(label, style.labelPresentation());
-        bounds.includeRect(labelBox.minX(), labelBox.minY(), labelBox.width(), labelBox.height());
-        placedLabelBoxes.add(labelBox);
-      }
-      // Same profile-gated call the emission loop makes, so bounds and markup can never disagree
-      // about whether an edge has end adornments.
-      for (EdgeEndAdornments.Adornment adornment :
-          EdgeEndAdornments.adornments(edge, metadata, base.fontSize())) {
-        LabelBox box = EdgeEndAdornments.visibleBox(adornment, style);
-        bounds.includeRect(box.minX(), box.minY(), box.width(), box.height());
-        placedLabelBoxes.add(box);
-      }
-    }
-    if (bounds.isEmpty()) {
-      bounds.includeRect(0.0, 0.0, policy.page().width(), policy.page().height());
-    }
-    return bounds.padded(policy);
   }
 }

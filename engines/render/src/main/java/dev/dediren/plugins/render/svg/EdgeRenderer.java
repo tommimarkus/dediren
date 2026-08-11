@@ -47,24 +47,17 @@ public final class EdgeRenderer {
     return EdgeMarkers.emit(w, ids, edge.id(), side, marker, style.stroke());
   }
 
-  public static void lineJumpMasks(
-      SvgWriter w,
-      LaidOutEdge edge,
-      List<LineJump> lineJumps,
-      LayoutResult result,
-      RenderMetadata metadata,
-      RenderPolicy policy,
-      ResolvedStyle base) {
+  /** Writes the backdrop strokes that clear each jump. The fills arrive already resolved. */
+  public static void lineJumpMasks(SvgWriter w, String edgeId, List<MaskedLineJump> lineJumps) {
     if (lineJumps.isEmpty()) {
       return;
     }
-    w.start("g").attr("data-dediren-line-jump-masks", edge.id());
-    for (LineJump jump : lineJumps) {
-      String maskFill = backdropFillAt(jump.x(), jump.y(), result, metadata, policy, base);
+    w.start("g").attr("data-dediren-line-jump-masks", edgeId);
+    for (MaskedLineJump masked : lineJumps) {
       w.empty("path")
-          .attr("d", jump.maskPath())
+          .attr("d", masked.jump().maskPath())
           .attr("fill", "none")
-          .attr("stroke", maskFill)
+          .attr("stroke", masked.maskFill())
           .attr("stroke-width", "6");
     }
     w.end();
