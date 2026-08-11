@@ -69,9 +69,9 @@
       </properties>
       <dependencies>
         <dependency>
-          <groupId>org.apache.xmlgraphics</groupId>
-          <artifactId>batik-bridge</artifactId>
-          <version>1.19</version>
+          <groupId>com.microsoft.playwright</groupId>
+          <artifactId>playwright</artifactId>
+          <version>1.61.0</version>
           <scope>test</scope>
         </dependency>
       </dependencies>
@@ -103,6 +103,7 @@
               <systemPropertyVariables>
                 <dediren.render.paint.enabled>${dediren.render.paint.enabled}</dediren.render.paint.enabled>
                 <dediren.workspace.root>${maven.multiModuleProjectDirectory}</dediren.workspace.root>
+                <dediren.render.paint.browser-cache>${maven.multiModuleProjectDirectory}/.cache/playwright</dediren.render.paint.browser-cache>
               </systemPropertyVariables>
             </configuration>
           </plugin>
