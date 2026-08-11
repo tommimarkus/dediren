@@ -2,6 +2,7 @@ package dev.dediren.core.analysis;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dev.dediren.testsupport.Svg2SubsetAssertions;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
@@ -19,6 +20,7 @@ class ProvenanceTest {
   @Test
   void roundTripsAStampThroughXmlAndSvg() {
     String payload = payload("main");
+    Svg2SubsetAssertions.assertConforms(Provenance.stampSvg(SVG, payload));
 
     for (String stamped :
         new String[] {Provenance.stampXml(XML, payload), Provenance.stampSvg(SVG, payload)}) {

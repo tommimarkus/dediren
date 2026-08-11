@@ -54,7 +54,9 @@ emits layout-quality diagnostics (non-finite geometry, duplicate ids, non-positi
 extents) as warnings instead of rejecting, a deliberate warn-first decision with
 hard rejection deferred to a later release-noted change; as a residual, a
 non-finite layout result still renders (e.g. `width="Infinity"`) with a warning
-attached.
+attached. Normal tests separately assert that the supported generated SVG corpus
+conforms to Dediren's SVG 2 subset. That test-only control does not change this
+runtime trust boundary and is not arbitrary-input validation.
 
 Input ceilings bound what this boundary ingests (core `SourceLimits`, enforced
 through `BoundedReads` and `SourceValidator` on the CLI and MCP lanes alike):
@@ -287,9 +289,16 @@ cannot break out of its host element. `LabelInjectionTest` (`engines/render`)
 drives a breakout payload through a full render and asserts both that the
 payload never appears unescaped and that the label round-trips back to the exact
 authored string; `SvgAudit` re-parses the emitted SVG and fails on any
-ill-formed markup. The rendered SVG carries no `<script>` or `<style>` block at
-all — it is inert, fully escaped markup (interactive-svg was retired), so there
-is no CSS/script sink for policy values or model text to reach.
+ill-formed markup or violation of the independently defined SVG 2 subset. The
+same JDK-only assertion runs after provenance stamping and on real package and
+CLI build artifacts. Its XML parser rejects DTDs and external entities and
+permits no external schema access; it performs no network call and introduces
+no shipped dependency or runtime parser surface. The rendered SVG carries no
+`<script>` or `<style>` block at all — it is inert, fully escaped markup
+(interactive-svg was retired), so there is no CSS/script sink for policy values
+or model text to reach. The assertion covers only the supported generation
+corpus; it is not full SVG 2 certification, arbitrary-input proof, or runtime
+validation.
 
 `accessibility.lang`/`.dir` — reaching the root as `xml:lang`/`direction`, either
 from the render policy directly or folded in from a package's `presentation` —

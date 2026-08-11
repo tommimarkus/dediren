@@ -3,6 +3,7 @@ package dev.dediren.cli;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.dediren.contracts.json.JsonSupport;
+import dev.dediren.testsupport.Svg2SubsetAssertions;
 import dev.dediren.testsupport.TestSupport;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -53,9 +54,9 @@ class CliPackageBuildTest {
         .isEqualTo("generated/svg/main.svg");
     // Package-built diagrams carry the same provenance stamp the single-model build lane injects,
     // so `dediren verify`/`status` classify them instead of reporting them unstamped.
-    assertThat(Files.readString(temp.resolve("generated/svg/main.svg")))
-        .contains("<svg")
-        .contains("dediren-provenance");
+    String diagram = Files.readString(temp.resolve("generated/svg/main.svg"));
+    Svg2SubsetAssertions.assertConforms(diagram);
+    assertThat(diagram).contains("<svg").contains("dediren-provenance");
   }
 
   @Test

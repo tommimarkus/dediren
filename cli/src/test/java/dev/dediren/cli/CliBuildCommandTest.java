@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.core.DedirenPaths;
 import dev.dediren.core.schema.SchemaValidator;
+import dev.dediren.testsupport.Svg2SubsetAssertions;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -51,6 +52,7 @@ class CliBuildCommandTest {
     assertThat(buildResult.at("/views/0/artifacts/0/path").asText()).isEqualTo("main/diagram.svg");
 
     String svg = Files.readString(out.resolve("main/diagram.svg"), StandardCharsets.UTF_8);
+    Svg2SubsetAssertions.assertConforms(svg);
     assertThat(svg).contains("<svg", "Web App", "Application Services");
   }
 

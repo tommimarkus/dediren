@@ -128,6 +128,26 @@ lands over a symbol far too small to hold it. The pairing stays legal (a
 deliberately generic rendering of a notation view is a reasonable thing to
 ask for), so the artifact is still produced.
 
+## Generated SVG 2 Subset
+
+Normal tests enforce Dediren's exercised SVG 2 subset across standard and
+sequence render scenarios, every generic shape, group and linear/radial
+gradients, provenance stamping, package builds, and a real wired CLI build. The
+test-only `Svg2SubsetAssertions` checker independently defines the permitted
+namespace, elements and content models, attributes and values, same-document
+references, points, and the emitted `M`/`L`/`H`/`V`/`C`/`Q`/`A`/`Z` path
+grammar. It also accepts valid lowercase `data-*` attributes on SVG elements.
+
+The checker uses secure JDK XML parsing and local grammar checks only. It does
+not download schemas, invoke system tools, or add a validation dependency. The
+guarantee is deliberately narrower than full SVG 2 certification: it covers
+the supported generated-output corpus, not unused SVG features, arbitrary
+inputs, or hand-authored documentation SVGs. Runtime rendering remains
+warn-first for layout-quality problems and does not run this test assertion.
+The subset follows SVG 2's
+[restricted-feature-set conformance model](https://www.w3.org/TR/SVG2/conform.html)
+and [custom data attribute rules](https://www.w3.org/TR/SVG2/struct.html#DataAttributes).
+
 ## Chromium Render-Paint Verification
 
 The opt-in `render-paint` Maven profile validates behavior that byte-exact SVG

@@ -98,6 +98,14 @@ CodeQL and render-paint run weekly and on demand, while release tags have their
 own gates. Narrower per-module verification lanes are listed in
 [`CLAUDE.md` §Verification](CLAUDE.md).
 
+Normal tests enforce Dediren's standards-derived SVG 2 subset across the
+supported generation corpus, including renderer scenarios and provenance-stamped
+package and CLI build artifacts. The assertion uses only the JDK's hardened XML
+parser and local grammar checks; it adds no validator dependency, download,
+network call, or system-tool requirement. This is a bounded generated-output
+contract, not full SVG 2 certification or runtime validation of arbitrary SVG;
+see [SVG Rendering](docs/features/svg-render.md#generated-svg-2-subset).
+
 The opt-in `render-paint` profile uses Playwright Java 1.61.0 with Chromium
 headless shell 149.0.7827.55 (revision 1228) to check decorated SVG paint and
 four raster baselines: the rich graph in light and dark themes, ArchiMate

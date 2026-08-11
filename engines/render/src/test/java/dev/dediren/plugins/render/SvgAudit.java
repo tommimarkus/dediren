@@ -3,6 +3,7 @@ package dev.dediren.plugins.render;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.dediren.plugins.render.svg.Svg;
+import dev.dediren.testsupport.Svg2SubsetAssertions;
 import java.awt.Font;
 import java.awt.FontFormatException;
 import java.awt.font.FontRenderContext;
@@ -111,6 +112,7 @@ final class SvgAudit {
 
   /** Everything deterministic and environment-independent. */
   static void auditStructure(String svg) {
+    Svg2SubsetAssertions.assertConforms(svg);
     Document document = parse(svg);
     assertUniqueIds(document);
     assertReferencesResolve(document);
