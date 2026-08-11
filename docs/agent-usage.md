@@ -60,7 +60,7 @@ Seven tools in writable mode:
   result is a `package-build-result` naming every artifact at its declared path
   (see `## Build`). Source, package, policy, and source-mode `out` paths are
   relative to `--root`; package-declared outputs are relative to the package
-  directory. This removes the 2026.08.1 workspace-handle requirement and
+  directory. This removes the 2026.08.2 workspace-handle requirement and
   restores earlier MCP clients: do not pass `workspace_id`. Existing
   `.dediren/mcp/workspaces/` files are neither migrated nor deleted
   automatically; recover wanted artifacts and remove the residue manually.
@@ -112,7 +112,7 @@ handoff rules in `## Command Handoff` apply unchanged.
 {
   "model_schema_version": "model.schema.v1",
   "required_plugins": [
-    { "id": "generic-graph", "version": "2026.08.1" }
+    { "id": "generic-graph", "version": "2026.08.2" }
   ],
   "nodes": [
     { "id": "client", "type": "generic.actor", "label": "Client", "properties": {} },
@@ -205,8 +205,8 @@ profile and use ArchiMate type names:
 ```json
 {
   "required_plugins": [
-    { "id": "generic-graph", "version": "2026.08.1" },
-    { "id": "archimate-oef", "version": "2026.08.1" }
+    { "id": "generic-graph", "version": "2026.08.2" },
+    { "id": "archimate-oef", "version": "2026.08.2" }
   ],
   "plugins": {
     "generic-graph": {
@@ -905,7 +905,7 @@ deployment slots, and UMLDI.
 ## Runtime Probes
 
 ```bash
-VERSION=2026.08.1
+VERSION=2026.08.2
 BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-${VERSION}
 
 "$BUNDLE/bin/dediren" --version
