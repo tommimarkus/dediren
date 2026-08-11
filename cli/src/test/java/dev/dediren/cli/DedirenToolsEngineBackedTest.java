@@ -9,11 +9,8 @@ import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
 import io.modelcontextprotocol.spec.McpSchema.TextContent;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CountDownLatch;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import tools.jackson.databind.JsonNode;
@@ -50,25 +47,6 @@ class DedirenToolsEngineBackedTest {
     return JsonSupport.objectMapper().readTree(textOf(result));
   }
 
-  private static IsolatedMcp isolatedMcp(Path root) {
-    DedirenTools tools = new DedirenTools(root, EngineWiring.defaults(), Map.of());
-    CallToolResult opened =
-        tools.workspaceOpen(new CallToolRequest("dediren_workspace_open", Map.of()));
-    JsonNode data = envelopeOf(opened).path("data");
-    return new IsolatedMcp(
-        tools,
-        data.path("workspace_id").asText(),
-        root.resolve(data.path("workspace_path").asText()));
-  }
-
-  private static CallToolResult build(IsolatedMcp mcp, Map<String, ?> arguments) {
-    Map<String, Object> isolated = new LinkedHashMap<>(arguments);
-    isolated.put("workspace_id", mcp.id());
-    return mcp.tools().build(new CallToolRequest("dediren_build", isolated));
-  }
-
-  private record IsolatedMcp(DedirenTools tools, String id, Path path) {}
-
   @Test
   void validateWithAProfileReturnsTheSemanticValidationEnvelope(@TempDir Path root)
       throws Exception {
@@ -96,13 +74,21 @@ class DedirenToolsEngineBackedTest {
   void buildRecordsAWriteCollisionAsAPerViewError(@TempDir Path root) throws Exception {
     Files.copy(fixture("valid-basic.json"), root.resolve("model.json"));
     Files.copy(policy("default-svg.json"), root.resolve("policy.json"));
-    IsolatedMcp isolated = isolatedMcp(root);
-    Path out = Files.createDirectories(isolated.path().resolve("out"));
+    Path out = Files.createDirectories(root.resolve("out"));
     Files.writeString(out.resolve("main"), "occupied");
 
     CallToolResult result =
-        build(
-            isolated, Map.of("source", "model.json", "out", "out", "render_policy", "policy.json"));
+        new DedirenTools(root, EngineWiring.defaults(), Map.of())
+            .build(
+                new CallToolRequest(
+                    "dediren_build",
+                    Map.of(
+                        "source",
+                        "model.json",
+                        "out",
+                        out.toString(),
+                        "render_policy",
+                        "policy.json")));
 
     assertThat(result.isError()).isTrue();
     JsonNode buildResult = envelopeOf(result);
@@ -129,17 +115,22 @@ class DedirenToolsEngineBackedTest {
       throws Exception {
     Files.copy(fixture("valid-uml-basic.json"), root.resolve("model.json"));
     Files.copy(policy("uml-svg.json"), root.resolve("policy.json"));
-    IsolatedMcp isolated = isolatedMcp(root);
-    Path out = isolated.path().resolve("out");
+    Path out = root.resolve("out");
 
     CallToolResult result =
-        build(
-            isolated,
-            Map.of(
-                "source", "model.json",
-                "out", "out",
-                "render_policy", "policy.json",
-                "views", List.of("")));
+        new DedirenTools(root, EngineWiring.defaults(), Map.of())
+            .build(
+                new CallToolRequest(
+                    "dediren_build",
+                    Map.of(
+                        "source",
+                        "model.json",
+                        "out",
+                        out.toString(),
+                        "render_policy",
+                        "policy.json",
+                        "views",
+                        List.of(""))));
 
     assertThat(result.isError()).isTrue();
     JsonNode diagnostic = envelopeOf(result).path("diagnostics").path(0);
@@ -150,46 +141,5 @@ class DedirenToolsEngineBackedTest {
     assertThat(Files.exists(out.resolve("class-view"))).isFalse();
     assertThat(Files.exists(out.resolve("data-view"))).isFalse();
     assertThat(Files.exists(out.resolve("activity-view"))).isFalse();
-  }
-
-  @Test
-  void concurrentBuildsWithTheSameOutRemainIsolated(@TempDir Path root) throws Exception {
-    Files.copy(fixture("valid-basic.json"), root.resolve("model.json"));
-    Files.copy(policy("default-svg.json"), root.resolve("policy.json"));
-    IsolatedMcp first = isolatedMcp(root);
-    IsolatedMcp second = isolatedMcp(root);
-    Map<String, Object> arguments =
-        Map.of("source", "model.json", "out", "out", "render_policy", "policy.json");
-    CountDownLatch start = new CountDownLatch(1);
-
-    CompletableFuture<CallToolResult> firstBuild =
-        CompletableFuture.supplyAsync(
-            () -> {
-              await(start);
-              return build(first, arguments);
-            });
-    CompletableFuture<CallToolResult> secondBuild =
-        CompletableFuture.supplyAsync(
-            () -> {
-              await(start);
-              return build(second, arguments);
-            });
-    start.countDown();
-
-    assertThat(firstBuild.join().isError()).isNotEqualTo(Boolean.TRUE);
-    assertThat(secondBuild.join().isError()).isNotEqualTo(Boolean.TRUE);
-    assertThat(first.path().resolve("out/main/diagram.svg")).exists();
-    assertThat(second.path().resolve("out/main/diagram.svg")).exists();
-    assertThat(first.path()).isNotEqualTo(second.path());
-    assertThat(root.resolve("out")).doesNotExist();
-  }
-
-  private static void await(CountDownLatch latch) {
-    try {
-      latch.await();
-    } catch (InterruptedException interrupted) {
-      Thread.currentThread().interrupt();
-      throw new IllegalStateException("interrupted while starting concurrent builds", interrupted);
-    }
   }
 }

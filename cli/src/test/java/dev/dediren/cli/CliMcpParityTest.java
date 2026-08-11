@@ -2,14 +2,12 @@ package dev.dediren.cli;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.mcp.DedirenTools;
 import io.modelcontextprotocol.spec.McpSchema.CallToolRequest;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
 import io.modelcontextprotocol.spec.McpSchema.TextContent;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.LinkedHashMap;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -46,24 +44,10 @@ class CliMcpParityTest {
     return Path.of("..", "fixtures", "export-policy", name).toAbsolutePath().normalize();
   }
 
-  private static IsolatedMcp isolatedMcp(Path root) {
-    DedirenTools tools = new DedirenTools(root, EngineWiring.defaults(), Map.of());
-    CallToolResult opened =
-        tools.workspaceOpen(new CallToolRequest("dediren_workspace_open", Map.of()));
-    var data = JsonSupport.objectMapper().readTree(textOf(opened)).path("data");
-    return new IsolatedMcp(
-        tools,
-        data.path("workspace_id").asText(),
-        root.resolve(data.path("workspace_path").asText()));
+  private static CallToolResult build(Path root, Map<String, Object> arguments) {
+    return new DedirenTools(root, EngineWiring.defaults(), Map.of())
+        .build(new CallToolRequest("dediren_build", arguments));
   }
-
-  private static CallToolResult build(IsolatedMcp mcp, Map<String, ?> arguments) {
-    Map<String, Object> isolated = new LinkedHashMap<>(arguments);
-    isolated.put("workspace_id", mcp.id());
-    return mcp.tools().build(new CallToolRequest("dediren_build", isolated));
-  }
-
-  private record IsolatedMcp(DedirenTools tools, String id, Path path) {}
 
   @Test
   void validateProducesTheSameEnvelopeThroughBothLanes(@TempDir Path root) throws Exception {
@@ -185,12 +169,12 @@ class CliMcpParityTest {
             "",
             Map.of());
 
-    IsolatedMcp isolated = isolatedMcp(root);
-    Path mcpOut = isolated.path().resolve("mcp-out");
+    Path mcpOut = Files.createDirectories(root.resolve("mcp-out"));
     CallToolResult mcp =
         build(
-            isolated,
-            Map.of("source", "model.json", "out", "mcp-out", "render_policy", "policy.json"));
+            root,
+            Map.of(
+                "source", "model.json", "out", mcpOut.toString(), "render_policy", "policy.json"));
 
     assertThat(cli.exitCode()).isZero();
     assertThat(mcp.isError()).isNotEqualTo(Boolean.TRUE);
@@ -238,13 +222,13 @@ class CliMcpParityTest {
             "",
             Map.of());
 
-    IsolatedMcp isolated = isolatedMcp(root);
-    Path mcpOut = Files.createDirectories(isolated.path().resolve("mcp-out"));
+    Path mcpOut = Files.createDirectories(root.resolve("mcp-out"));
     Files.writeString(mcpOut.resolve("main"), "occupied");
     CallToolResult mcp =
         build(
-            isolated,
-            Map.of("source", "model.json", "out", "mcp-out", "render_policy", "policy.json"));
+            root,
+            Map.of(
+                "source", "model.json", "out", mcpOut.toString(), "render_policy", "policy.json"));
 
     assertThat(cli.exitCode()).isNotZero();
     assertThat(mcp.isError()).isEqualTo(cli.exitCode() != 0);
@@ -286,16 +270,19 @@ class CliMcpParityTest {
             "",
             Map.of());
 
-    IsolatedMcp isolated = isolatedMcp(root);
-    Path mcpOut = isolated.path().resolve("mcp-out");
+    Path mcpOut = Files.createDirectories(root.resolve("mcp-out"));
     CallToolResult mcp =
         build(
-            isolated,
+            root,
             Map.of(
-                "source", "model.json",
-                "out", "mcp-out",
-                "render_policy", "policy.json",
-                "emit", java.util.List.of("bogus")));
+                "source",
+                "model.json",
+                "out",
+                mcpOut.toString(),
+                "render_policy",
+                "policy.json",
+                "emit",
+                java.util.List.of("bogus")));
 
     assertThat(cli.exitCode()).isNotZero();
     assertThat(mcp.isError()).isEqualTo(cli.exitCode() != 0);
@@ -327,16 +314,19 @@ class CliMcpParityTest {
             "",
             Map.of());
 
-    IsolatedMcp isolated = isolatedMcp(root);
-    Path mcpOut = isolated.path().resolve("mcp-out");
+    Path mcpOut = Files.createDirectories(root.resolve("mcp-out"));
     CallToolResult mcp =
         build(
-            isolated,
+            root,
             Map.of(
-                "source", "model.json",
-                "out", "mcp-out",
-                "render_policy", "policy.json",
-                "views", java.util.List.of("main", "main")));
+                "source",
+                "model.json",
+                "out",
+                mcpOut.toString(),
+                "render_policy",
+                "policy.json",
+                "views",
+                java.util.List.of("main", "main")));
 
     assertThat(cli.exitCode()).isZero();
     assertThat(mcp.isError()).isNotEqualTo(Boolean.TRUE);
@@ -395,10 +385,11 @@ class CliMcpParityTest {
             "",
             Map.of());
 
-    IsolatedMcp isolated = isolatedMcp(root);
-    Path mcpOut = isolated.path().resolve("mcp-out");
+    Path mcpOut = Files.createDirectories(root.resolve("mcp-out"));
     CallToolResult mcp =
-        build(isolated, Map.of("source", "model.json", "out", "mcp-out", "oef_policy", "oef.json"));
+        build(
+            root,
+            Map.of("source", "model.json", "out", mcpOut.toString(), "oef_policy", "oef.json"));
 
     // Parity is asserted regardless of whether the export itself succeeds. OEF/XMI schema
     // validation needs an XSD -- via DEDIREN_OEF_SCHEMA_DIR / a cache dir, or a network download --
@@ -436,10 +427,11 @@ class CliMcpParityTest {
             "",
             Map.of());
 
-    IsolatedMcp isolated = isolatedMcp(root);
-    Path mcpOut = isolated.path().resolve("mcp-out");
+    Path mcpOut = Files.createDirectories(root.resolve("mcp-out"));
     CallToolResult mcp =
-        build(isolated, Map.of("source", "model.json", "out", "mcp-out", "xmi_policy", "xmi.json"));
+        build(
+            root,
+            Map.of("source", "model.json", "out", mcpOut.toString(), "xmi_policy", "xmi.json"));
 
     // Parity is asserted regardless of whether the export itself succeeds. OEF/XMI schema
     // validation needs an XSD -- via DEDIREN_OEF_SCHEMA_DIR / a cache dir, or a network download --
@@ -480,16 +472,19 @@ class CliMcpParityTest {
             "",
             Map.of());
 
-    IsolatedMcp isolated = isolatedMcp(root);
-    Path mcpOut = isolated.path().resolve("mcp-out");
+    Path mcpOut = Files.createDirectories(root.resolve("mcp-out"));
     CallToolResult mcp =
         build(
-            isolated,
+            root,
             Map.of(
-                "source", "model.json",
-                "out", "mcp-out",
-                "render_policy", "policy.json",
-                "emit", java.util.List.of("layout-request", "layout-result", "render-metadata")));
+                "source",
+                "model.json",
+                "out",
+                mcpOut.toString(),
+                "render_policy",
+                "policy.json",
+                "emit",
+                java.util.List.of("layout-request", "layout-result", "render-metadata")));
 
     assertThat(cli.exitCode()).isZero();
     assertThat(normalizePaths(textOf(mcp), mcpOut)).isEqualTo(normalizePaths(cli.stdout(), cliOut));
@@ -526,16 +521,19 @@ class CliMcpParityTest {
             "",
             Map.of());
 
-    IsolatedMcp isolated = isolatedMcp(root);
-    Path mcpOut = isolated.path().resolve("mcp-out");
+    Path mcpOut = Files.createDirectories(root.resolve("mcp-out"));
     CallToolResult mcp =
         build(
-            isolated,
+            root,
             Map.of(
-                "source", "model.json",
-                "out", "mcp-out",
-                "render_policy", "policy.json",
-                "views", java.util.List.of()));
+                "source",
+                "model.json",
+                "out",
+                mcpOut.toString(),
+                "render_policy",
+                "policy.json",
+                "views",
+                java.util.List.of()));
 
     assertThat(cli.exitCode()).isZero();
     assertThat(mcp.isError()).isNotEqualTo(Boolean.TRUE);

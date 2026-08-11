@@ -15,7 +15,6 @@
 .codex/rules/default.rules
 .mcp.json
 /.idea
-/.dediren/mcp/
 
 # docs/architecture self-model package: commit hand-authored source, the rendered
 # SVGs, the render-metadata (needed to rebuild and drift-check the gallery), the

@@ -1335,10 +1335,7 @@ public final class DistTool {
    */
   private static void assertMcpServesToolsOverStdio(Path bundle, Path temp) throws Exception {
     Path dediren = bundle.resolve("bin/dediren");
-    McpWorkspaceHandle workspace = openMcpWorkspace(dediren, bundle, temp);
     Path requests = temp.resolve("mcp-requests.jsonl");
-    // This is a second server process: the application-level handle must survive the restart.
-    // Inputs remain relative to --root; only output is relative to the isolated workspace.
     Files.writeString(
         requests,
         """
@@ -1346,13 +1343,12 @@ public final class DistTool {
         {"jsonrpc":"2.0","method":"notifications/initialized"}
         {"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}
         {"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"dediren_guide","arguments":{"topic":"source-json"}}}
-        {"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"dediren_build","arguments":{"workspace_id":"%s","source":"fixtures/source/valid-archimate-oef.json","out":"mcp-build-out","render_policy":"fixtures/render-policy/archimate-svg.json"}}}
+        {"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"dediren_build","arguments":{"source":"fixtures/source/valid-archimate-oef.json","out":"mcp-build-out","render_policy":"fixtures/render-policy/archimate-svg.json"}}}
         {"jsonrpc":"2.0","id":5,"method":"resources/list","params":{}}
         {"jsonrpc":"2.0","id":6,"method":"resources/read","params":{"uri":"dediren://schema/model.schema.json"}}
         {"jsonrpc":"2.0","id":7,"method":"resources/read","params":{"uri":"dediren://diagnostics/catalog"}}
         {"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"dediren_query","arguments":{"source":"fixtures/source/valid-archimate-oef.json","kind":"orphans"}}}
-        """
-            .formatted(workspace.id()),
+        """,
         StandardCharsets.UTF_8);
 
     String stdout =
@@ -1362,7 +1358,6 @@ public final class DistTool {
 
     assertContains(stdout, "\"serverInfo\"", "mcp initialize response");
     assertContains(stdout, "dediren_validate", "mcp tools/list response");
-    assertContains(stdout, "dediren_workspace_open", "mcp tools/list response");
     assertContains(stdout, "dediren_build", "mcp tools/list response");
     assertContains(stdout, "dediren_guide", "mcp tools/list response");
     assertContains(stdout, "dediren_diff", "mcp tools/list response");
@@ -1382,42 +1377,11 @@ public final class DistTool {
         DiagnosticCode.GENERIC_GRAPH_PLUGIN_REQUIRED.code(),
         "mcp diagnostics catalog response");
 
-    assertMcpBuildAnswered(bundle, workspace, responses, stdout);
+    assertMcpBuildAnswered(bundle, responses, stdout);
     System.out.println(
-        "mcp stdio smoke passed: 8 tools + resources, restart-resumed real build answered, query answered,"
+        "mcp stdio smoke passed: 7 tools + resources, real build answered, query answered,"
             + " protocol-only stdout");
   }
-
-  private static McpWorkspaceHandle openMcpWorkspace(Path dediren, Path bundle, Path temp)
-      throws Exception {
-    Path requests = temp.resolve("mcp-workspace-open-requests.jsonl");
-    Files.writeString(
-        requests,
-        """
-        {"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"dist-smoke","version":"1"}}}
-        {"jsonrpc":"2.0","method":"notifications/initialized"}
-        {"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"dediren_workspace_open","arguments":{}}}
-        """,
-        StandardCharsets.UTF_8);
-    String stdout =
-        runBundleCommand(dediren, bundle, List.of("mcp", "--root", bundle.toString()), requests);
-    Map<String, JsonNode> responses = assertStdoutIsJsonRpcFramesOnly(stdout, "mcp workspace open");
-    JsonNode response = responses.get("2");
-    if (response == null || response.path("result").path("isError").asBoolean()) {
-      throw new IllegalStateException("mcp workspace open failed: " + stdout);
-    }
-    String envelopeText = response.path("result").path("content").path(0).path("text").asText();
-    JsonNode data = JsonSupport.objectMapper().readTree(envelopeText).path("data");
-    String id = data.path("workspace_id").asText();
-    String path = data.path("workspace_path").asText();
-    if (id.isBlank() || path.isBlank()) {
-      throw new IllegalStateException(
-          "mcp workspace open returned an incomplete handle: " + envelopeText);
-    }
-    return new McpWorkspaceHandle(id, path);
-  }
-
-  private record McpWorkspaceHandle(String id, String path) {}
 
   /**
    * The build response must be <em>present</em>, not merely unerrored. A dropped response is not an
@@ -1426,8 +1390,7 @@ public final class DistTool {
    * claims to have written.
    */
   private static void assertMcpBuildAnswered(
-      Path bundle, McpWorkspaceHandle workspace, Map<String, JsonNode> responses, String stdout)
-      throws IOException {
+      Path bundle, Map<String, JsonNode> responses, String stdout) throws IOException {
     JsonNode build = responses.get("4");
     if (build == null) {
       throw new IllegalStateException(
@@ -1453,11 +1416,7 @@ public final class DistTool {
       throw new IllegalStateException(
           "mcp dediren_build envelope should name the SVG it rendered: " + envelopeText);
     }
-    Path svg =
-        bundle
-            .resolve(workspace.path())
-            .resolve("mcp-build-out")
-            .resolve(artifact.path("path").asText());
+    Path svg = bundle.resolve("mcp-build-out").resolve(artifact.path("path").asText());
     if (!Files.isRegularFile(svg)) {
       throw new IllegalStateException("mcp dediren_build must actually write its render: " + svg);
     }
