@@ -48,7 +48,13 @@ layout-constraint `kind` (or a malformed gap encoding) on the
 former fail-open silent-ignore in the deleted `SequenceLayoutConstraints`;
 and `validate-layout`/`build` now run `ir.quality.SequenceInvariants` against
 an agent-suppliable `LayoutResult`, folding any violation into the hard-error
-lane as `DEDIREN_LAYOUT_SEQUENCE_INVARIANT_VIOLATED`.
+lane as `DEDIREN_LAYOUT_SEQUENCE_INVARIANT_VIOLATED`. The `render` lane accepts
+a `LayoutResult` and turns it into an SVG artifact but does not validate it — it
+emits layout-quality diagnostics (non-finite geometry, duplicate ids, non-positive
+extents) as warnings instead of rejecting, a deliberate warn-first decision with
+hard rejection deferred to a later release-noted change; as a residual, a
+non-finite layout result still renders (e.g. `width="Infinity"`) with a warning
+attached.
 
 Input ceilings bound what this boundary ingests (core `SourceLimits`, enforced
 through `BoundedReads` and `SourceValidator` on the CLI and MCP lanes alike):
@@ -289,11 +295,14 @@ is no CSS/script sink for policy values or model text to reach.
 from the render policy directly or folded in from a package's `presentation` —
 are authored strings on that same escaped path: both go out through `attrIf()`,
 so the writer-level property above covers them and no new verbatim sink is
-introduced. They are additionally bounded before emission, by the schema rather
-than by the renderer: `dir` is a two-value enum and `lang` a length-capped
-subtag pattern, so neither can carry arbitrary text into an attribute even
-if the escaping argument were set aside. Both are omitted when unset, so an
-untagged policy produces the identical root it did before the keys existed.
+introduced. On the package lane, they are additionally bounded before emission
+by the schema: `package.schema.json` constrains `dir` to a two-value enum and
+`lang` to a length-capped subtag pattern (`PackageBuildCommand.java:644-648`).
+On the render and build lanes, the schema validation does not apply
+(`CoreCommands.parsePolicy` runs only a schema-version gate; `RenderInputValidator.validateRenderPolicy`
+never visits `accessibility`), so only escaping guards these values before
+reaching the attributes. Both are omitted when unset, so an untagged policy
+produces the identical root it did before the keys existed.
 
 The `render` plugin emits SVG as text and no longer bundles Apache Batik /
 XML Graphics. Earlier versions round-tripped the emitted SVG through a Batik
@@ -355,7 +364,7 @@ ceiling trips if shrinking or attribute stripping silently degrades.
 | Malicious schema substitution | HTTPS-only curl plus SHA-256 pin verified before use (`SchemaCacheModule`) | `DEDIREN_XMI_SCHEMA_PATH` / `DEDIREN_OEF_SCHEMA_DIR` offline overrides bypass the SHA-256 check by design |
 | Malicious envelope input | Jackson 3 parsing plus fuzz-regression targets pinning the only-`JacksonException`/`XmiValidationException` invariant; hardened DOM factory blocks DOCTYPE/XXE | Fuzz targets run in deterministic regression mode over a fixed seed corpus in CI, not continuous coverage-guided fuzzing |
 | Exhaust the host via pathological model input (CPU/heap) | Input ceilings (core `SourceLimits`, applied via `BoundedReads` and `SourceValidator` on both the CLI and MCP lanes): 64 MiB per model-supplied input file (source, fragment, policy), 1000 fragments, 100000 merged elements — the element check runs inside the fragment-merge loop so a runaway fragment set fails fast. Jackson 3's default nesting-depth cap (500) bounds nested JSON; the MCP transport bounds a single inbound frame at 16 MiB (`FrameSplitter`) | Compute on a legal-size model is unbounded: ELK layout has no timeout or cancellation, SVG output is materialized in memory, MCP tool calls have no per-call timeout (they run concurrently on bounded-elastic workers), and CLI stdin is unbounded (human-piped; the MCP lane never uses it). Accepted: the process runs with the invoking user's own authority and the MCP client owns the server's lifetime, so a wedged or OOM-killed process is recoverable by the user who caused it |
-| Inject markup into a rendered SVG via model labels/ids | `SvgWriter` (StAX) structurally escapes every attribute value and text node at emission, with no verbatim-injection path; `LabelInjectionTest` proves an end-to-end breakout payload stays escaped and round-trips; `SvgAudit` rejects ill-formed output | The SVG is inert markup with no embedded script; a consumer that embeds it must still apply its own context's policy (e.g. CSP) |
+| Inject markup into a rendered SVG via model labels/ids | Labels: `SvgWriter` (StAX) structurally escapes every attribute value and text node at emission, with no verbatim-injection path; `LabelInjectionTest` proves an end-to-end breakout payload stays escaped and round-trips. Ids used as reference targets (via `url(#…)` in marker references and gradient fills): `SvgIds` mints every id and every reference to it from one per-document instance, constraining the alphabet and suffixing collisions, so a reference can never disagree with the id it points at. `SvgAudit` rejects ill-formed output | Escaping guards labels against markup breakout. For ids used as SVG identifiers and reference targets, the control is the id-minting alphabet, not escaping: a duplicate id makes a `url(#…)` reference ambiguous (UA binds to first match), and an id with `)` or space truncates the CSS url token so the reference silently misses and the marker is dropped |
 | Dependency compromise | Blocking Grype/SBOM gate on every pull request and tagged release (`ci.yml`, `release.yml`); weekly grouped Dependabot updates plus event-driven Dependabot alerts (`.github/dependabot.yml`) | Direct pushes to `main` are not CI-scanned (lean-CI decision), so an advisory published between releases surfaces via Dependabot alerts or the next PR/release gate rather than a push-time scan; the scheduled OWASP Dependency-Check cross-check was retired with the same decision (`-Psecurity-sca` remains an on-demand local second opinion) |
 | JVM-argument injection via `DEDIREN_LOG_LEVEL` | The launcher interpolates this env var into `JAVA_OPTS`, so it accepts only the six literals `trace\|debug\|info\|warn\|error\|off`; anything else is dropped with a note on stderr. A `-Pdist-smoke` probe asserts a smuggled `-XshowSettings:properties` neither reaches the JVM nor switches logging on | The guard is a shell `case` in the generated launcher; a caller who can already set arbitrary `JAVA_OPTS` needs no such trick, so this only closes the narrower "can set DEDIREN_* but not JAVA_OPTS" path |
 | A model reads or writes outside the server root via an MCP tool (`dediren mcp`) | Source, package, policy, and source-mode output paths resolve against `--root`; package-declared outputs resolve relative to their package directory. Each is `toRealPath()`-anchored before containment, so an outward symlink is rejected (`WorkspacePaths` / `ConfinedPaths`) with `DEDIREN_MCP_PATH_OUTSIDE_ROOT`. Source `fragments[]` are confined to `--root`; package inputs remain package-relative and root-confined while declared outputs are package-relative and package-confined. `dediren_verify` and `dediren_status` remain server-root-relative. `--read-only` withholds build | Resolve-then-open is not atomic (TOCTOU): a local attacker able to mutate symlinks inside the root during the window can defeat the check. Accepted — the server runs with the spawning user's authority, and the controls contain model-selected paths rather than a hostile local user |

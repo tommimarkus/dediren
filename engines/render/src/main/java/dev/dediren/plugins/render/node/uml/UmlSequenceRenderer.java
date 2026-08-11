@@ -20,6 +20,7 @@ import dev.dediren.plugins.render.style.StyleResolver;
 import dev.dediren.plugins.render.svg.EdgeMarkers;
 import dev.dediren.plugins.render.svg.Svg;
 import dev.dediren.plugins.render.svg.SvgAccessibleName;
+import dev.dediren.plugins.render.svg.SvgIds;
 import dev.dediren.plugins.render.svg.SvgWriter;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -80,6 +81,10 @@ public final class UmlSequenceRenderer {
   public String render() {
     SvgBox bounds = bounds().padded(policy);
     SvgWriter w = new SvgWriter();
+    // Per-document, like SvgDocument's: message-marker ids are minted from layout edge ids, which
+    // the layout contract constrains neither in charset nor in uniqueness. Local to render() so a
+    // second render() of the same renderer starts from an empty document, not a used-id set.
+    SvgIds ids = new SvgIds();
     w.start("svg")
         .attr("xmlns", "http://www.w3.org/2000/svg")
         .attr("role", "img")
@@ -112,7 +117,7 @@ public final class UmlSequenceRenderer {
     renderLifelineStems(w);
     renderExecutions(w);
     renderGates(w);
-    renderMessages(w);
+    renderMessages(w, ids);
     renderDeleteMarkers(w);
 
     w.end();
@@ -347,15 +352,16 @@ public final class UmlSequenceRenderer {
     }
   }
 
-  private void renderMessages(SvgWriter w) {
+  private void renderMessages(SvgWriter w, SvgIds ids) {
     for (UmlSequenceModel.SequenceMessage message : model.messages()) {
       ResolvedEdgeStyle paint = edgePaint(message.edge().id());
       MessageAppearance appearance = MessageAppearance.from(message.messageSort(), paint);
       w.start("g")
           .attr("data-dediren-edge-id", message.edge().id())
           .attr("data-dediren-sequence-message-sort", message.messageSort());
-      edgeMarker(w, message.edge(), appearance.markerEnd(), appearance.stroke(), "end");
-      edgePath(w, message.edge(), appearance);
+      String endMarkerId =
+          edgeMarker(w, ids, message.edge(), appearance.markerEnd(), appearance.stroke(), "end");
+      edgePath(w, message.edge(), appearance, ids.reference(endMarkerId));
       if (message.edge().label() != null && !message.edge().label().isEmpty()) {
         messageLabel(w, message.edge(), appearance);
       }
@@ -438,14 +444,21 @@ public final class UmlSequenceRenderer {
     }
   }
 
-  private void edgeMarker(
-      SvgWriter w, LaidOutEdge edge, SvgEdgeMarkerEnd marker, String stroke, String side) {
+  private String edgeMarker(
+      SvgWriter w,
+      SvgIds ids,
+      LaidOutEdge edge,
+      SvgEdgeMarkerEnd marker,
+      String stroke,
+      String side) {
     // Message endpoints sit on the lifeline stem rather than a node border, but the anchoring rule
     // is the same one EdgeMarkers states once for every edge in the product.
-    EdgeMarkers.emit(w, edge.id(), side, marker, stroke);
+    return EdgeMarkers.emit(w, ids, edge.id(), side, marker, stroke);
   }
 
-  private void edgePath(SvgWriter w, LaidOutEdge edge, MessageAppearance appearance) {
+  /** {@code markerEndReference} is {@link SvgIds#reference} of the emitted marker id, or null. */
+  private void edgePath(
+      SvgWriter w, LaidOutEdge edge, MessageAppearance appearance, String markerEndReference) {
     if (edge.points().isEmpty()) {
       return;
     }
@@ -461,11 +474,7 @@ public final class UmlSequenceRenderer {
         .attrIf(
             "stroke-dasharray",
             appearance.lineStyle() == SvgEdgeLineStyle.DASHED ? DASH_PATTERN : null)
-        .attrIf(
-            "marker-end",
-            appearance.markerEnd() == SvgEdgeMarkerEnd.NONE
-                ? null
-                : "url(#marker-end-" + edge.id() + ")");
+        .attrIf("marker-end", markerEndReference);
   }
 
   private void messageLabel(SvgWriter w, LaidOutEdge edge, MessageAppearance appearance) {

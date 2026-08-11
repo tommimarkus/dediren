@@ -37,15 +37,22 @@ public final class EdgeMarkers {
     return marker.name().toLowerCase(Locale.ROOT);
   }
 
-  /** Emits the marker for {@code side} ("start" or "end") of {@code edgeId}. NONE emits nothing. */
-  public static void emit(
-      SvgWriter w, String edgeId, String side, SvgEdgeMarkerEnd marker, String stroke) {
+  /**
+   * Emits the marker for {@code side} ("start" or "end") of {@code edgeId}. NONE emits nothing.
+   *
+   * <p>Returns the minted element id, or {@code null} for NONE. The caller feeds that value back
+   * through {@link SvgIds#reference} to build the referencing {@code url(#…)}: the edge id alone is
+   * not enough, because {@link SvgIds} may have had to sanitize or suffix it.
+   */
+  public static String emit(
+      SvgWriter w, SvgIds ids, String edgeId, String side, SvgEdgeMarkerEnd marker, String stroke) {
     if (marker == SvgEdgeMarkerEnd.NONE) {
-      return;
+      return null;
     }
+    String id = ids.mint("marker-" + side + "-" + edgeId);
     String fill = fill(marker, stroke);
     w.start("marker")
-        .attr("id", "marker-" + side + "-" + edgeId)
+        .attr("id", id)
         .attr("data-dediren-edge-marker-" + side, markerName(marker))
         .attr("markerWidth", "10")
         .attr("markerHeight", "10")
@@ -81,5 +88,6 @@ public final class EdgeMarkers {
               .attr("stroke-width", "1");
     }
     w.end();
+    return id;
   }
 }

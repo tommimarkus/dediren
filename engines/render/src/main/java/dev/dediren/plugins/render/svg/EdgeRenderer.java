@@ -40,10 +40,11 @@ public final class EdgeRenderer {
   // only run when no on-route placement is clear.
   private static final double MAX_HUG_OFFSET = 56.0;
 
-  public static void edgeMarker(
-      SvgWriter w, LaidOutEdge edge, ResolvedEdgeStyle style, String side) {
+  /** Emits the edge's marker for {@code side} and returns its minted id ({@code null} for NONE). */
+  public static String edgeMarker(
+      SvgWriter w, SvgIds ids, LaidOutEdge edge, ResolvedEdgeStyle style, String side) {
     SvgEdgeMarkerEnd marker = side.equals("start") ? style.markerStart() : style.markerEnd();
-    EdgeMarkers.emit(w, edge.id(), side, marker, style.stroke());
+    return EdgeMarkers.emit(w, ids, edge.id(), side, marker, style.stroke());
   }
 
   public static void lineJumpMasks(
@@ -90,8 +91,19 @@ public final class EdgeRenderer {
     return x >= rectX && x <= rectX + width && y >= rectY && y <= rectY + height;
   }
 
+  /**
+   * Draws the route. The marker references are passed in rather than rebuilt from the edge id: they
+   * are {@link SvgIds#reference} of exactly the ids {@link #edgeMarker} minted, so an attribute can
+   * never point at an id that was sanitized or suffixed away. Each is {@code null} precisely when
+   * that end's marker is NONE and nothing was emitted for it.
+   */
   public static void edgePath(
-      SvgWriter w, LaidOutEdge edge, ResolvedEdgeStyle style, List<LineJump> lineJumps) {
+      SvgWriter w,
+      LaidOutEdge edge,
+      ResolvedEdgeStyle style,
+      List<LineJump> lineJumps,
+      String markerStartReference,
+      String markerEndReference) {
     if (edge.points().isEmpty()) {
       return;
     }
@@ -106,16 +118,8 @@ public final class EdgeRenderer {
         .attr("stroke-linejoin", "round")
         .attrIf("stroke-opacity", opacity(style.strokeOpacity()))
         .attrIf("stroke-dasharray", dash.isEmpty() ? null : dash)
-        .attrIf(
-            "marker-start",
-            style.markerStart() == SvgEdgeMarkerEnd.NONE
-                ? null
-                : "url(#marker-start-" + edge.id() + ")")
-        .attrIf(
-            "marker-end",
-            style.markerEnd() == SvgEdgeMarkerEnd.NONE
-                ? null
-                : "url(#marker-end-" + edge.id() + ")");
+        .attrIf("marker-start", markerStartReference)
+        .attrIf("marker-end", markerEndReference);
   }
 
   private static void emitEdgeLabelBackground(SvgWriter w, EdgeLabel label, String backgroundFill) {

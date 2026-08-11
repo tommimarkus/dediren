@@ -67,6 +67,12 @@ public enum DiagnosticCode {
   LAYOUT_NON_FINITE_GEOMETRY("DEDIREN_LAYOUT_NON_FINITE_GEOMETRY"),
   LAYOUT_SELF_LOOP_DEGENERATE("DEDIREN_LAYOUT_SELF_LOOP_DEGENERATE"),
   LAYOUT_QUALITY_WARNING("DEDIREN_LAYOUT_QUALITY_WARNING"),
+  // Structural hygiene of a layout result, reported on the WARNING lane (LayoutQuality
+  // #layoutStructureWarnings), not the hard lane above: these describe input that renders, just
+  // not as its author meant. A duplicate id makes id lookup ambiguous (the first wins, the rest
+  // are silently dropped); a non-positive width/height collapses the shape it belongs to.
+  LAYOUT_DUPLICATE_ID("DEDIREN_LAYOUT_DUPLICATE_ID"),
+  LAYOUT_NON_POSITIVE_EXTENT("DEDIREN_LAYOUT_NON_POSITIVE_EXTENT"),
 
   // Sequence-diagram geometric invariants over the typed IR (core: CoreCommands, checks owned by
   // ir.quality.SequenceInvariants). Folded into the same hard-error lane as the LAYOUT_* codes

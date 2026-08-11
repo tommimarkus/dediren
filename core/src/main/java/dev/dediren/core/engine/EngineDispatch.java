@@ -14,6 +14,7 @@ import dev.dediren.engine.EngineException;
 import dev.dediren.engine.EngineResult;
 import dev.dediren.engine.Engines;
 import java.io.UncheckedIOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import org.slf4j.Logger;
@@ -136,15 +137,47 @@ public final class EngineDispatch {
 
   public static <T> EngineRunOutcome dispatch(String engineId, EngineInvocation<T> invocation)
       throws EngineExecutionException {
+    return dispatch(engineId, List.of(), invocation);
+  }
+
+  /**
+   * Dispatch for a command that validated its own input before calling the engine: {@code
+   * inputDiagnostics} are merged ahead of the engine's own on success, then handed to the one
+   * {@link #successEnvelope} policy that decides ok/warning/info — so an input warning degrades the
+   * envelope exactly the way an engine warning does, and no caller re-implements that rule. The
+   * render lane uses this to attach its warn-first layout findings (see {@code
+   * LayoutQuality#layoutInputWarnings}).
+   *
+   * <p>A published {@link EngineException} envelope is left verbatim: it already tells the caller
+   * why the command failed, and core's contract is to preserve it rather than fold advisory input
+   * warnings into someone else's error.
+   */
+  public static <T> EngineRunOutcome dispatch(
+      String engineId, List<Diagnostic> inputDiagnostics, EngineInvocation<T> invocation)
+      throws EngineExecutionException {
     return switch (dispatchInMemory(engineId, invocation)) {
       case InMemoryOutcome.Value<T> value ->
           new EngineRunOutcome(
-              envelope(value.result().value(), value.result().diagnostics()),
+              envelope(
+                  value.result().value(), merge(inputDiagnostics, value.result().diagnostics())),
               CommandExitCode.OK.code());
       case InMemoryOutcome.Failure<T> failure ->
           new EngineRunOutcome(
               serialize(CommandEnvelope.error(failure.diagnostics())), failure.exitCode());
     };
+  }
+
+  private static List<Diagnostic> merge(List<Diagnostic> first, List<Diagnostic> second) {
+    if (first.isEmpty()) {
+      return second;
+    }
+    if (second.isEmpty()) {
+      return List.copyOf(first);
+    }
+    var merged = new ArrayList<Diagnostic>(first.size() + second.size());
+    merged.addAll(first);
+    merged.addAll(second);
+    return List.copyOf(merged);
   }
 
   /**
