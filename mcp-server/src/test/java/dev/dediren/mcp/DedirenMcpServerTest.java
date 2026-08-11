@@ -48,6 +48,7 @@ class DedirenMcpServerTest {
       assertThat(names)
           .containsExactlyInAnyOrder(
               "dediren_validate",
+              "dediren_workspace_open",
               "dediren_build",
               "dediren_guide",
               "dediren_diff",
@@ -60,13 +61,13 @@ class DedirenMcpServerTest {
   }
 
   @Test
-  void readOnlyModeOmitsOnlyTheBuildTool(@TempDir Path root) {
+  void readOnlyModeOmitsWorkspaceCreationAndBuild(@TempDir Path root) {
     McpSyncServer server = serverIn(root, true);
     try {
       List<String> names = server.listTools().stream().map(Tool::name).toList();
 
-      // The four analysis tools are read-only, so they stay registered under --read-only; only the
-      // artifact-writing build tool drops out.
+      // The four analysis tools stay registered under --read-only; workspace creation and the
+      // artifact-writing build tool both drop out.
       assertThat(names)
           .containsExactlyInAnyOrder(
               "dediren_validate",
@@ -76,6 +77,8 @@ class DedirenMcpServerTest {
               "dediren_verify",
               "dediren_status");
       assertThat(names).doesNotContain("dediren_build");
+      assertThat(names).doesNotContain("dediren_workspace_open");
+      assertThat(root.resolve(".dediren")).doesNotExist();
     } finally {
       server.close();
     }
@@ -92,6 +95,7 @@ class DedirenMcpServerTest {
     Map<String, List<String>> expectedRequired =
         Map.of(
             "dediren_validate", List.of("source"),
+            "dediren_build", List.of("workspace_id"),
             "dediren_diff", List.of("old", "new"),
             "dediren_query", List.of("source", "kind"),
             "dediren_verify", List.of("source", "artifacts"));
@@ -135,6 +139,7 @@ class DedirenMcpServerTest {
       assertThat(uris)
           .contains(
               "dediren://schema/model.schema.json",
+              "dediren://schema/mcp-workspace.schema.json",
               "dediren://diagnostics/catalog",
               "dediren://guide/source-json");
       assertThat(uris)

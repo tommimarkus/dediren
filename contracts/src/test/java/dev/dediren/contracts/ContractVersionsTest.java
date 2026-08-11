@@ -101,6 +101,11 @@ class ContractVersionsTest {
         new String[] {
           "status_result_schema_version", ContractVersions.STATUS_RESULT_SCHEMA_VERSION
         });
+    versionConstBySchema.put(
+        "schemas/mcp-workspace.schema.json",
+        new String[] {
+          "mcp_workspace_schema_version", ContractVersions.MCP_WORKSPACE_SCHEMA_VERSION
+        });
     for (var entry : versionConstBySchema.entrySet()) {
       String schemaPath = entry.getKey();
       String field = entry.getValue()[0];
@@ -144,5 +149,6 @@ class ContractVersionsTest {
     assertThat(ContractVersions.PACKAGE_SCHEMA_VERSION).isEqualTo("package.schema.v1");
     assertThat(ContractVersions.PACKAGE_BUILD_RESULT_SCHEMA_VERSION)
         .isEqualTo("package-build-result.schema.v1");
+    assertThat(ContractVersions.MCP_WORKSPACE_SCHEMA_VERSION).isEqualTo("mcp-workspace.schema.v1");
   }
 }

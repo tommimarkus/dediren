@@ -197,12 +197,16 @@ Agents can drive Dediren as MCP tools instead of the CLI:
 
     claude mcp add dediren -- "$BUNDLE/bin/dediren" mcp --root /path/to/your/project
 
-This serves seven tools over stdio: `dediren_validate`, `dediren_build`, the
+This serves eight tools over stdio: `dediren_workspace_open`, `dediren_validate`,
+`dediren_build`, the
 read-only analysis pair `dediren_diff` and `dediren_query`, the provenance pair
 `dediren_verify` and `dediren_status`, and `dediren_guide` (the agent guide, one
-section at a time). Tool paths are confined to `--root` — point it at your
-project directory, since a bare `.` resolves to wherever the client spawns the
-server, not necessarily your project. `--read-only` withholds only the
+section at a time). Open a workspace first and pass its `workspace_id` to every
+build; artifacts are isolated under the returned `workspace_path` for 24 hours
+after their last accepted use and survive MCP restarts. Tool inputs remain
+confined to `--root` — point it at your project directory, since a bare `.`
+resolves to wherever the client spawns the server, not necessarily your
+project. `--read-only` withholds both workspace creation and the
 artifact-writing build tool. See `docs/agent-usage.md`.
 
 ## Bundle Layout

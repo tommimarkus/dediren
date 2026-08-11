@@ -28,10 +28,13 @@ instead of shelling out. Register it once:
 
     claude mcp add dediren -- /path/to/bundle/bin/dediren mcp --root /path/to/your/project
 
-Seven tools:
+Eight tools in writable mode:
 
 - `dediren_guide` — this document, one section at a time. Pass `topic`, or omit
   it to list the topics. Start with `topic: "source-json"`.
+- `dediren_workspace_open` — omit `workspace_id` to create a cryptographically
+  random UUIDv4 handle, or pass an existing unexpired handle to resume it. The
+  result includes its root-relative `workspace_path` and `expires_at`.
 - `dediren_validate` — `source` (path to a source model **or a policy
   document**: the schema-version field selects the family, so a render/export
   policy or kept layout-request gets its version gate + JSON Schema check
@@ -44,21 +47,36 @@ Seven tools:
 - `dediren_query` — `source` and `kind` (`dependents` | `orphans` |
   `view-coverage`); `id` is required when `kind` is `dependents`. A fixed query
   vocabulary over one model, not a query language.
-- `dediren_verify` — `source` and `artifacts` (a directory of built artifacts).
+- `dediren_verify` — `source` and `artifacts` (a directory of built artifacts),
+  plus optional `workspace_id`. With a handle, `artifacts` is relative to its
+  isolated workspace; without one, the existing `--root`-relative behavior remains.
   Checks each artifact's provenance stamp against the model's recomputed hash:
   `ok` means all current; a stale artifact is an error, an unstamped one a
   warning.
-- `dediren_status` — optional `dir` (a workspace directory; omit to index the
-  root itself). Indexes the workspace's source models by hash and each stamped
-  artifact's currency against them.
-- `dediren_build` — `source`, `out`, and at least one policy (`render_policy`,
+- `dediren_status` — optional `dir` and optional `workspace_id`. With a handle,
+  `dir` is isolated-workspace-relative; without one it remains `--root`-relative.
+  Omit `dir` to index the selected root itself.
+- `dediren_build` — required `workspace_id`, `source`, `out`, and at least one policy (`render_policy`,
   `oef_policy`, `xmi_policy`); optional `views` (subset of view ids) and `emit`
   (extra stage envelopes to also write, for debugging). Returns the
   build-result envelope, which names every artifact written. To build a whole
   **package** instead, pass `package` (a `package.json` path) — mutually
   exclusive with `source`/`out`/the policies — plus optional `no_export`; the
   result is a `package-build-result` naming every artifact at its declared path
-  (see `## Build`).
+  (see `## Build`). Source, package, and policy paths remain relative to
+  `--root`; `out` and every package-declared output resolve beneath the isolated
+  workspace. This required handle is a breaking change for MCP build callers.
+
+Workspaces live at `.dediren/mcp/workspaces/<workspace-id>/` with lifecycle
+state under `.dediren/mcp/state/`. They survive MCP process restarts and expire
+24 hours after their last accepted writable operation. Dediren reaps expired,
+unlocked workspaces on writable-server startup and hourly thereafter. It never
+deletes them on normal shutdown. Calls using the same workspace are serialized
+by a cross-process lease and fail immediately with
+`DEDIREN_MCP_WORKSPACE_BUSY` on contention; different workspaces can build in
+parallel. Join `workspace_path`, source-mode `out`, and the artifact path in
+the unchanged build result to locate an output. Package result paths are joined
+directly to `workspace_path`.
 
 The server also serves read-only **resources** — the bundle's own bytes, so a
 fetch returns ground truth rather than prose about it:
@@ -80,7 +98,7 @@ config-expansion time, so `${CLAUDE_PROJECT_DIR:-.}` in a hand-written
 automatically, wrap the launch in a script that reads `$CLAUDE_PROJECT_DIR` at
 runtime, as the plugin distribution does. A path that escapes `--root` returns a
 `DEDIREN_MCP_PATH_OUTSIDE_ROOT` error envelope. Launch with `--read-only` to
-withhold the artifact-writing `dediren_build`; the six read-only tools
+withhold `dediren_workspace_open` and the artifact-writing `dediren_build`; the six read-only tools
 (`dediren_guide`, `dediren_validate`, `dediren_diff`, `dediren_query`,
 `dediren_verify`, `dediren_status`) all remain.
 
@@ -1135,6 +1153,16 @@ you can recover from stdout JSON alone.
   (exit 2).
 - `DEDIREN_COMMAND_INPUT_INVALID`: the CLI could not read or parse a command
   input file.
+- `DEDIREN_MCP_WORKSPACE_UNAVAILABLE`: the workspace handle is unknown,
+  incomplete, or expired. Call `dediren_workspace_open` without an id and
+  rebuild; do not retry the unavailable handle.
+- `DEDIREN_MCP_WORKSPACE_BUSY`: another operation holds the workspace lease.
+  Wait for that operation to finish and retry, or open a different workspace
+  for independent work.
+- `DEDIREN_COMMAND_IO_FAILED` from workspace lifecycle management: the server
+  could not safely create, refresh, lock, or reap managed state. Inspect server
+  stderr and filesystem permissions; the tool result intentionally omits host
+  paths and low-level I/O details.
 
 Codes not listed in this guide are internal: `DEDIREN_ELK_*` (layout engine
 internals), `DEDIREN_LAYOUT_*` (layout quality gates), `DEDIREN_GENERIC_GRAPH_*`,
