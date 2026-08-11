@@ -73,6 +73,18 @@ class BrowserPaintSmokeTest {
 
   @Test
   @Timeout(20)
+  void loadsTheBundledFontForTextlessSvg() {
+    String svg =
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"20\" height=\"20\""
+            + " viewBox=\"0 0 20 20\"><rect width=\"20\" height=\"20\"/></svg>";
+
+    try (var built = BrowserTestSupport.build(svg)) {
+      assertThat(built.fontReady()).isTrue();
+    }
+  }
+
+  @Test
+  @Timeout(20)
   void rendersDecoratedStaticPaintWithPinnedBrowserAndBundledFont(@TempDir Path temporaryDirectory)
       throws Exception {
     assertThat(BrowserTestSupport.playwrightVersion())

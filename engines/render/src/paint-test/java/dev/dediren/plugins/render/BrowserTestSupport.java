@@ -114,7 +114,9 @@ final class BrowserTestSupport {
       boolean fontReady =
           Boolean.TRUE.equals(
               page.evaluate(
-                  "async () => { await document.fonts.ready; return document.fonts.check('16px \\\""
+                  "async () => { const faces = await document.fonts.load('16px \\\""
+                      + FONT_FAMILY
+                      + "\\\"', 'Paint tree'); await document.fonts.ready; return faces.length > 0 && document.fonts.check('16px \\\""
                       + FONT_FAMILY
                       + "\\\"', 'Paint tree'); }"));
       if (!fontReady) {
