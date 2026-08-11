@@ -107,8 +107,13 @@ final class UmlSequenceRenderer {
    * Places everything the document draws, once. Nothing below this line reads the layout result or
    * the model again: the viewBox is folded from these objects and then the very same objects are
    * written, so the bounds and the markup cannot part company.
+   *
+   * <p>Package-private rather than private so {@code PlacedSceneCompletenessTest} can fold a real
+   * scene and check that {@link PlacedSequenceScene#elements()} covers every drawable list the
+   * record carries. That enumeration is hand-maintained and the emitter's loop set is a second one;
+   * nothing in the language keeps them in step.
    */
-  private PlacedSequenceScene resolve() {
+  PlacedSequenceScene resolve() {
     List<PlacedInteraction> interactions = new ArrayList<>();
     for (UmlSequenceModel.SequenceNode interaction : model.interactions()) {
       interactions.add(placeInteraction(interaction));

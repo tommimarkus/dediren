@@ -1,6 +1,7 @@
 package dev.dediren.plugins.render;
 
 import static dev.dediren.plugins.render.PlacedElement.includeBox;
+import static dev.dediren.plugins.render.PlacedElement.includeCircleOnNode;
 import static dev.dediren.plugins.render.PlacedElement.includeStroked;
 import static dev.dediren.plugins.render.svg.EdgeRenderer.markerInkBoxes;
 
@@ -196,10 +197,8 @@ record PlacedSequenceScene(
     @Override
     public void contributeBounds(SvgBounds bounds) {
       includeStroked(bounds, node.x(), node.y(), node.width(), node.height(), style.strokeWidth());
-      double reach = radius + style.strokeWidth() / 2.0;
-      double centerX = node.x() + node.width() / 2.0;
-      double centerY = node.y() + node.height() / 2.0;
-      bounds.includeRect(centerX - reach, centerY - reach, 2.0 * reach, 2.0 * reach);
+      includeCircleOnNode(
+          bounds, node.x(), node.y(), node.width(), node.height(), radius, style.strokeWidth());
     }
   }
 

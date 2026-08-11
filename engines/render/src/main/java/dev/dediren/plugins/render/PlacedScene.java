@@ -1,6 +1,7 @@
 package dev.dediren.plugins.render;
 
 import static dev.dediren.plugins.render.PlacedElement.includeBox;
+import static dev.dediren.plugins.render.PlacedElement.includeCircleOnNode;
 import static dev.dediren.plugins.render.PlacedElement.includeStroked;
 import static dev.dediren.plugins.render.node.NodeLabels.nodeLabelBoxes;
 import static dev.dediren.plugins.render.svg.EdgeRenderer.markerInkBoxes;
@@ -180,10 +181,14 @@ record PlacedScene(
         // enough node the circle is the wider of the two. The box stays in the fold anyway: it is
         // the rectangle every edge routes to, and dropping it would shrink bounds rather than close
         // the gap this contribution exists to close.
-        double reach = junctionRadius + style.strokeWidth() / 2.0;
-        double centerX = node.x() + node.width() / 2.0;
-        double centerY = node.y() + node.height() / 2.0;
-        bounds.includeRect(centerX - reach, centerY - reach, 2.0 * reach, 2.0 * reach);
+        includeCircleOnNode(
+            bounds,
+            node.x(),
+            node.y(),
+            node.width(),
+            node.height(),
+            junctionRadius,
+            style.strokeWidth());
       }
       for (LabelBox labelBox : labelBoxes()) {
         includeBox(bounds, labelBox);

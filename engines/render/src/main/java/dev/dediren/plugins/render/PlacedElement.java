@@ -59,4 +59,25 @@ sealed interface PlacedElement
     double half = strokeWidth / 2.0;
     bounds.includeRect(x - half, y - half, width + strokeWidth, height + strokeWidth);
   }
+
+  /**
+   * Includes a stroked circle centred on a node's box. Two kinds draw one — the ArchiMate junction
+   * and the UML sequence gate — and both floor the radius at a minimum that can exceed the node's
+   * own half-extent, so the circle overhangs the box. Shared rather than written twice: the two
+   * copies of this arithmetic were identical, and two identical derivations that must stay
+   * identical is the drift this whole seam exists to remove.
+   */
+  static void includeCircleOnNode(
+      SvgBounds bounds,
+      double nodeX,
+      double nodeY,
+      double nodeWidth,
+      double nodeHeight,
+      double radius,
+      double strokeWidth) {
+    double reach = radius + strokeWidth / 2.0;
+    double centerX = nodeX + nodeWidth / 2.0;
+    double centerY = nodeY + nodeHeight / 2.0;
+    bounds.includeRect(centerX - reach, centerY - reach, 2.0 * reach, 2.0 * reach);
+  }
 }
