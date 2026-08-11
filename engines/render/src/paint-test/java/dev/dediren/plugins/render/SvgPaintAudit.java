@@ -82,7 +82,7 @@ final class SvgPaintAudit {
     AuditState state = new AuditState(document, themeOwnership);
     state.discover();
     state.auditFiniteGeometry();
-    if (state.hasNonFiniteGeometry()) {
+    if (state.hasBlockingStaticGeometry()) {
       return state.report();
     }
 
@@ -221,6 +221,7 @@ final class SvgPaintAudit {
     private Bounds viewBox;
     private int auditId;
     private boolean nonFiniteGeometry;
+    private boolean nonPositiveAuthoredGeometry;
 
     private AuditState(Document document, ThemeOwnership themeOwnership) {
       this.document = document;
@@ -265,6 +266,7 @@ final class SvgPaintAudit {
           }
         }
         if (!insideDefinition(element) && authoredGeometryIsDegenerate(element)) {
+          nonPositiveAuthoredGeometry = true;
           SemanticPaint semantic = closestSemantic(element);
           addViolation(
               "non_positive_paint",
@@ -362,8 +364,8 @@ final class SvgPaintAudit {
           "all rendered geometry must be finite");
     }
 
-    private boolean hasNonFiniteGeometry() {
-      return nonFiniteGeometry;
+    private boolean hasBlockingStaticGeometry() {
+      return nonFiniteGeometry || nonPositiveAuthoredGeometry;
     }
 
     private void attachBrowser(BrowserTestSupport.BrowserSvg browser) {
