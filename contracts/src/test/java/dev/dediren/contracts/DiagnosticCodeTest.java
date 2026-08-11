@@ -42,13 +42,6 @@ class DiagnosticCodeTest {
   }
 
   @Test
-  void mcpWorkspaceDiagnosticsExposeTheirCanonicalWireStrings() {
-    assertThat(DiagnosticCode.MCP_WORKSPACE_UNAVAILABLE.code())
-        .isEqualTo("DEDIREN_MCP_WORKSPACE_UNAVAILABLE");
-    assertThat(DiagnosticCode.MCP_WORKSPACE_BUSY.code()).isEqualTo("DEDIREN_MCP_WORKSPACE_BUSY");
-  }
-
-  @Test
   void wireStringsAreUniqueAndPrefixed() {
     var codes =
         Arrays.stream(DiagnosticCode.values())

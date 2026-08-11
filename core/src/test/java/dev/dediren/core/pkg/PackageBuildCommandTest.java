@@ -171,24 +171,6 @@ class PackageBuildCommandTest {
   }
 
   @Test
-  void readsPackageInputsFromThePackageDirectoryAndWritesOutputsToASeparateRoot(@TempDir Path root)
-      throws Exception {
-    Path inputs = Files.createDirectories(root.resolve("package"));
-    Path outputs = Files.createDirectories(root.resolve("isolated-workspace"));
-    writeInputs(inputs);
-
-    EngineRunOutcome outcome =
-        PackageBuildCommand.run(
-            new PackageBuildRequest(
-                singleViewPackage(), inputs, root, outputs, outputs, Map.of(), List.of(), false),
-            engines(Set.of(), Set.of()));
-
-    assertThat(status(outcome)).describedAs(outcome.stdout()).isEqualTo("ok");
-    assertThat(inputs.resolve("generated/svg/main.svg")).doesNotExist();
-    assertThat(outputs.resolve("generated/svg/main.svg")).isRegularFile();
-  }
-
-  @Test
   void foldsPerViewPresentationIntoTheRenderedDiagram(@TempDir Path dir) throws Exception {
     writeInputs(dir);
     String pkg =

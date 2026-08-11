@@ -10,7 +10,6 @@ import io.modelcontextprotocol.spec.McpSchema.TextContent;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -48,122 +47,6 @@ class DedirenToolsTest {
 
   private DedirenTools toolsIn(Path root) {
     return new DedirenTools(root, noEngines(), Map.of());
-  }
-
-  private CallToolResult buildIn(Path root, Map<String, ?> arguments) {
-    DedirenTools tools = toolsIn(root);
-    Map<String, Object> isolated = new LinkedHashMap<>(arguments);
-    isolated.put(
-        "workspace_id",
-        workspaceId(tools.workspaceOpen(new CallToolRequest("dediren_workspace_open", Map.of()))));
-    return tools.build(new CallToolRequest("dediren_build", isolated));
-  }
-
-  private static String workspaceId(CallToolResult result) {
-    return envelopeOf(result).at("/data/workspace_id").asText();
-  }
-
-  @Test
-  void workspaceOpenCreatesAndResumesAWorkspace(@TempDir Path root) {
-    DedirenTools tools = toolsIn(root);
-
-    CallToolResult created =
-        tools.workspaceOpen(new CallToolRequest("dediren_workspace_open", Map.of()));
-    String id = workspaceId(created);
-    CallToolResult resumed =
-        tools.workspaceOpen(
-            new CallToolRequest("dediren_workspace_open", Map.of("workspace_id", id)));
-
-    assertThat(created.isError()).isNotEqualTo(Boolean.TRUE);
-    assertThat(id).matches("^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$");
-    assertThat(envelopeOf(created).at("/data/mcp_workspace_schema_version").asText())
-        .isEqualTo("mcp-workspace.schema.v1");
-    assertThat(envelopeOf(created).at("/data/workspace_path").asText())
-        .isEqualTo(".dediren/mcp/workspaces/" + id);
-    assertThat(envelopeOf(created).at("/data/expires_at").asText()).isNotBlank();
-    assertThat(workspaceId(resumed)).isEqualTo(id);
-  }
-
-  @Test
-  void workspaceOpenDistinguishesInvalidAndUnavailableHandles(@TempDir Path root) {
-    DedirenTools tools = toolsIn(root);
-
-    CallToolResult malformed =
-        tools.workspaceOpen(
-            new CallToolRequest("dediren_workspace_open", Map.of("workspace_id", "bad")));
-    CallToolResult malformedType =
-        tools.workspaceOpen(
-            new CallToolRequest("dediren_workspace_open", Map.of("workspace_id", 42)));
-    CallToolResult unknown =
-        tools.workspaceOpen(
-            new CallToolRequest(
-                "dediren_workspace_open",
-                Map.of("workspace_id", "8f1de3c2-3552-4f31-91b3-5524ca3bb8c8")));
-
-    assertThat(envelopeOf(malformed).at("/diagnostics/0/code").asText())
-        .isEqualTo("DEDIREN_COMMAND_INPUT_INVALID");
-    assertThat(envelopeOf(malformedType).at("/diagnostics/0/code").asText())
-        .isEqualTo("DEDIREN_COMMAND_INPUT_INVALID");
-    assertThat(envelopeOf(unknown).at("/diagnostics/0/code").asText())
-        .isEqualTo("DEDIREN_MCP_WORKSPACE_UNAVAILABLE");
-  }
-
-  @Test
-  void workspaceLifecycleIoFailureIsSanitized(@TempDir Path root) throws Exception {
-    Files.writeString(root.resolve(".dediren"), "blocks managed directory creation");
-
-    CallToolResult result =
-        toolsIn(root).workspaceOpen(new CallToolRequest("dediren_workspace_open", Map.of()));
-
-    JsonNode diagnostic = envelopeOf(result).at("/diagnostics/0");
-    assertThat(diagnostic.path("code").asText()).isEqualTo("DEDIREN_COMMAND_IO_FAILED");
-    assertThat(diagnostic.path("message").asText()).doesNotContain(root.toString());
-  }
-
-  @Test
-  void workspaceAwareOperationsFailFastWhileTheWorkspaceIsLocked(@TempDir Path root)
-      throws Exception {
-    McpWorkspaceManager manager =
-        McpWorkspaceManager.writable(root, java.time.Clock.systemUTC(), false);
-    DedirenTools tools = new DedirenTools(root, noEngines(), Map.of(), manager);
-    String id;
-    try (McpWorkspaceManager.WorkspaceLease created = manager.open(null)) {
-      id = created.workspaceId();
-    }
-
-    try (McpWorkspaceManager.WorkspaceLease held = manager.acquire(id)) {
-      CallToolResult build =
-          tools.build(
-              new CallToolRequest(
-                  "dediren_build",
-                  Map.of("workspace_id", id, "source", "missing.json", "out", "out")));
-      CallToolResult verify =
-          tools.verify(
-              new CallToolRequest(
-                  "dediren_verify",
-                  Map.of("workspace_id", id, "source", "missing.json", "artifacts", ".")));
-      CallToolResult status =
-          tools.status(
-              new CallToolRequest("dediren_status", Map.of("workspace_id", id, "dir", ".")));
-
-      assertThat(envelopeOf(build).at("/diagnostics/0/code").asText())
-          .isEqualTo("DEDIREN_MCP_WORKSPACE_BUSY");
-      assertThat(envelopeOf(verify).at("/diagnostics/0/code").asText())
-          .isEqualTo("DEDIREN_MCP_WORKSPACE_BUSY");
-      assertThat(envelopeOf(status).at("/diagnostics/0/code").asText())
-          .isEqualTo("DEDIREN_MCP_WORKSPACE_BUSY");
-    }
-  }
-
-  @Test
-  void buildRequiresAWorkspaceHandle(@TempDir Path root) {
-    CallToolResult result =
-        toolsIn(root)
-            .build(
-                new CallToolRequest("dediren_build", Map.of("source", "model.json", "out", "out")));
-
-    assertThat(envelopeOf(result).at("/diagnostics/0/code").asText())
-        .isEqualTo("DEDIREN_COMMAND_INPUT_INVALID");
   }
 
   @Test
@@ -251,7 +134,11 @@ class DedirenToolsTest {
   void buildRejectsAnOutDirOutsideTheRoot(@TempDir Path root) throws Exception {
     Files.copy(fixture("valid-basic.json"), root.resolve("model.json"));
 
-    CallToolResult result = buildIn(root, Map.of("source", "model.json", "out", "../escape"));
+    CallToolResult result =
+        toolsIn(root)
+            .build(
+                new CallToolRequest(
+                    "dediren_build", Map.of("source", "model.json", "out", "../escape")));
 
     assertThat(result.isError()).isTrue();
     JsonNode diagnostic = envelopeOf(result).path("diagnostics").path(0);
@@ -360,7 +247,8 @@ class DedirenToolsTest {
 
   @Test
   void buildRequiresASource(@TempDir Path root) {
-    CallToolResult result = buildIn(root, Map.of("out", "out"));
+    CallToolResult result =
+        toolsIn(root).build(new CallToolRequest("dediren_build", Map.of("out", "out")));
 
     assertThat(result.isError()).isTrue();
     assertThat(envelopeOf(result).path("diagnostics").path(0).path("code").asText())
@@ -372,7 +260,14 @@ class DedirenToolsTest {
     Files.copy(fixture("valid-basic.json"), root.resolve("model.json"));
 
     CallToolResult result =
-        buildIn(root, Map.of("source", "model.json", "out", "out", "views", List.of("../evil")));
+        toolsIn(root)
+            .build(
+                new CallToolRequest(
+                    "dediren_build",
+                    Map.of(
+                        "source", "model.json",
+                        "out", "out",
+                        "views", List.of("../evil"))));
 
     assertThat(result.isError()).isTrue();
     assertThat(envelopeOf(result).path("diagnostics").path(0).path("code").asText())
@@ -402,13 +297,15 @@ class DedirenToolsTest {
     Files.copy(renderPolicyFixture("default-svg.json"), root.resolve("policy.json"));
 
     CallToolResult result =
-        buildIn(
-            root,
-            Map.of(
-                "source", "model.json",
-                "out", "out",
-                "render_policy", "policy.json",
-                "views", List.of("")));
+        toolsIn(root)
+            .build(
+                new CallToolRequest(
+                    "dediren_build",
+                    Map.of(
+                        "source", "model.json",
+                        "out", "out",
+                        "render_policy", "policy.json",
+                        "views", List.of(""))));
 
     assertThat(result.isError()).isTrue();
     JsonNode diagnostic = envelopeOf(result).path("diagnostics").path(0);
@@ -430,13 +327,15 @@ class DedirenToolsTest {
     Files.copy(renderPolicyFixture("default-svg.json"), root.resolve("policy.json"));
 
     CallToolResult result =
-        buildIn(
-            root,
-            Map.of(
-                "source", "model.json",
-                "out", "out",
-                "render_policy", "policy.json",
-                "views", List.of(1)));
+        toolsIn(root)
+            .build(
+                new CallToolRequest(
+                    "dediren_build",
+                    Map.of(
+                        "source", "model.json",
+                        "out", "out",
+                        "render_policy", "policy.json",
+                        "views", List.of(1))));
 
     assertThat(result.isError()).isTrue();
     JsonNode diagnostic = envelopeOf(result).path("diagnostics").path(0);
@@ -456,13 +355,15 @@ class DedirenToolsTest {
     Files.copy(renderPolicyFixture("default-svg.json"), root.resolve("policy.json"));
 
     CallToolResult result =
-        buildIn(
-            root,
-            Map.of(
-                "source", "model.json",
-                "out", "out",
-                "render_policy", "policy.json",
-                "emit", List.of("layout-request", "  ")));
+        toolsIn(root)
+            .build(
+                new CallToolRequest(
+                    "dediren_build",
+                    Map.of(
+                        "source", "model.json",
+                        "out", "out",
+                        "render_policy", "policy.json",
+                        "emit", List.of("layout-request", "  "))));
 
     assertThat(result.isError()).isTrue();
     JsonNode diagnostic = envelopeOf(result).path("diagnostics").path(0);
@@ -481,13 +382,15 @@ class DedirenToolsTest {
     Files.copy(renderPolicyFixture("default-svg.json"), root.resolve("policy.json"));
 
     CallToolResult result =
-        buildIn(
-            root,
-            Map.of(
-                "source", "model.json",
-                "out", "out",
-                "render_policy", "policy.json",
-                "views", "main"));
+        toolsIn(root)
+            .build(
+                new CallToolRequest(
+                    "dediren_build",
+                    Map.of(
+                        "source", "model.json",
+                        "out", "out",
+                        "render_policy", "policy.json",
+                        "views", "main")));
 
     assertThat(result.isError()).isTrue();
     JsonNode diagnostic = envelopeOf(result).path("diagnostics").path(0);
@@ -502,12 +405,14 @@ class DedirenToolsTest {
     Files.createDirectory(root.resolve("oef.json"));
 
     CallToolResult result =
-        buildIn(
-            root,
-            Map.of(
-                "source", "model.json",
-                "out", "out",
-                "oef_policy", "oef.json"));
+        toolsIn(root)
+            .build(
+                new CallToolRequest(
+                    "dediren_build",
+                    Map.of(
+                        "source", "model.json",
+                        "out", "out",
+                        "oef_policy", "oef.json")));
 
     assertThat(result.isError()).isTrue();
     JsonNode diagnostic = envelopeOf(result).path("diagnostics").path(0);

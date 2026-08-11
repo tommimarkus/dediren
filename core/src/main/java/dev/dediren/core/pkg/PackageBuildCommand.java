@@ -560,7 +560,7 @@ public final class PackageBuildCommand {
     try {
       SourceDocument source =
           SourceValidator.loadAndValidateSourceDocument(
-              text, modelPath.getParent(), req.inputConfinementRoot());
+              text, modelPath.getParent(), req.confinementRoot());
       models.put(modelId, ModelLoad.loaded(source));
     } catch (SourceValidator.SourceDiagnosticsException error) {
       models.put(modelId, ModelLoad.failed(error.diagnostics()));
@@ -657,7 +657,7 @@ public final class PackageBuildCommand {
       throws InputProblem {
     try {
       return ConfinedPaths.resolveExisting(
-          request.inputConfinementRoot(), request.inputBaseDir().resolve(relPath));
+          request.confinementRoot(), request.baseDir().resolve(relPath));
     } catch (ConfinedPaths.PathEscapeException error) {
       throw new InputProblem(
           diag(
@@ -673,7 +673,7 @@ public final class PackageBuildCommand {
     try {
       target =
           ConfinedPaths.resolveAnchored(
-              request.outputConfinementRoot(), request.outputBaseDir().resolve(relPath));
+              request.confinementRoot(), request.baseDir().resolve(relPath));
     } catch (ConfinedPaths.PathEscapeException error) {
       throw new InputProblem(
           diag(

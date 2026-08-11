@@ -159,10 +159,6 @@ public enum DiagnosticCode {
   // Emitted by mcp WorkspacePaths for a path-shaped tool argument (source/out/policies) and by core
   // SourceValidator for a source-document fragment path, when a confinement root is in force.
   MCP_PATH_OUTSIDE_ROOT("DEDIREN_MCP_PATH_OUTSIDE_ROOT"),
-  // MCP-managed build-workspace lifecycle. UNAVAILABLE deliberately combines unknown, expired,
-  // and incomplete handles so callers cannot use the tool as a workspace-existence oracle.
-  MCP_WORKSPACE_UNAVAILABLE("DEDIREN_MCP_WORKSPACE_UNAVAILABLE"),
-  MCP_WORKSPACE_BUSY("DEDIREN_MCP_WORKSPACE_BUSY"),
   SEMANTIC_PROFILE_UNSUPPORTED("DEDIREN_SEMANTIC_PROFILE_UNSUPPORTED"),
 
   // UML notation core.
