@@ -678,6 +678,7 @@ final class ElkLayoutEngine {
     for (LayoutEdge edge : list(request.edges())) {
       ElkEdge elkEdge = elkEdges.get(edge.id());
       if (elkEdge != null) {
+        EdgeEndpointMerge endpointMerge = endpointMerges.getOrDefault(edge.id(), NO_ENDPOINT_MERGE);
         List<Point> routePoints = points(elkEdge);
         if (reversedBackEdges.contains(edge.id())) {
           // The edge was handed to ELK reversed to avoid feedback routing; flip the geometry back
@@ -686,7 +687,7 @@ final class ElkLayoutEngine {
         }
         routePoints =
             OrthogonalRouteNormalizer.collapseStairSteps(
-                routePoints, nodes, edge.source(), edge.target());
+                routePoints, nodes, edge.source(), edge.target(), !endpointMerge.sourceEndpoint());
         edges.add(
             new LaidOutEdge(
                 edge.id(),

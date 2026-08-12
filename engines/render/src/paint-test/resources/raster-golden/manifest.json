@@ -109,9 +109,9 @@
       "baseline": "engines/render/src/paint-test/resources/raster-golden/pipeline-rich-light.png",
       "dimensions": {
         "width": 1458,
-        "height": 560
+        "height": 571
       },
-      "sha256": "1a74fbc9e841214dbaa2685b8e629f093f0b4e3a236687dd613e3d0a2e3c492a"
+      "sha256": "18662954fc3bb0f665adf92787a6d0cece122d6d29ec3f90f98c82a2e2d5dd28"
     },
     {
       "name": "pipeline-rich-dark",
@@ -122,9 +122,9 @@
       "baseline": "engines/render/src/paint-test/resources/raster-golden/pipeline-rich-dark.png",
       "dimensions": {
         "width": 1458,
-        "height": 561
+        "height": 572
       },
-      "sha256": "a925cbcaf721b410b4e1b7decb8864b3e03ff22fe0602019c4d162f2fe480881"
+      "sha256": "852a875e801ae27c9e5b5c3cb0a5734787cdafb791be2f4ba1ac964e2d81fdd8"
     },
     {
       "name": "archimate-decorators",

@@ -55,6 +55,10 @@ import org.junit.jupiter.params.provider.MethodSource;
 // docs/architecture-guidelines.md §12 (LA-CODE-DUP-2).
 class ElkLayoutEngineTest {
   private static final double GEOMETRY_EPSILON = 0.001;
+  // A cross-axis leg no longer than half the default 24 px edge/port channel spacing reads as an
+  // accidental stair rather than intentional routing. This is an acceptance metric, not a
+  // production routing threshold.
+  private static final double MICRO_DOGLEG_MAX_LENGTH = 12.0;
   private static final double PORT_SIDE_EPSILON = 1.0;
 
   // Tolerance for calling a route segment axis-aligned. These fixtures use the default ORTHOGONAL
@@ -65,11 +69,10 @@ class ElkLayoutEngineTest {
   // drift and never lets a genuine diagonal through.
   private static final double ORTHOGONAL_TOLERANCE = 0.5;
 
-  // Architectural fitness function for the ELK-first rule (CLAUDE.md): the helper must not
-  // re-implement post-ELK route geometry. Intentionally a source-text guard, not behavioral —
-  // accepted per the 2026-06-07 test-quality audit. The geometry-outcome tests in this class
-  // (route-through-node count, corner counts) prove the rendered result; this guard prevents
-  // the prohibited code from being added in the first place.
+  // Architectural fitness function for the ELK-first rule (CLAUDE.md): the helper must not grow a
+  // general post-ELK router. The one narrow compound-section join simplification is documented in
+  // architecture-guidelines.md §12 and covered by geometry-outcome tests. This source-text guard,
+  // accepted by the 2026-06-07 test-quality audit, keeps the earlier broad routing mechanisms out.
   @Test
   void elkHelperDoesNotOwnPostElkRouteGeometry() throws IOException {
     String source =
@@ -1862,12 +1865,13 @@ class ElkLayoutEngineTest {
   }
 
   @Test
-  void groupedPipelineHasNoAlternatingStairSteps() {
+  void groupedPipelineHasNoVisibleStairing() {
     LayoutResult result = new ElkLayoutEngine().layout(groupedPipelineRequest());
     ElkLayoutRenderArtifacts.write(result);
 
     for (LaidOutEdge edge : result.edges()) {
       assertNoAlternatingStairSteps(edge);
+      assertNoMicroDoglegs(edge);
     }
   }
 
@@ -2830,9 +2834,9 @@ class ElkLayoutEngineTest {
             new LayoutNode("client", "Client", "client", 160.0, 80.0),
             new LayoutNode("web-app", "Web App", "web-app", 160.0, 80.0),
             new LayoutNode("orders-api", "Orders API", "orders-api", 160.0, 80.0),
+            new LayoutNode("database", "PostgreSQL", "database", 160.0, 80.0),
             new LayoutNode("worker", "Fulfillment Worker", "worker", 160.0, 80.0),
-            new LayoutNode("payments", "Payment Authorization Service", "payments", 160.0, 80.0),
-            new LayoutNode("database", "PostgreSQL", "database", 160.0, 80.0)),
+            new LayoutNode("payments", "Payment Authorization Service", "payments", 160.0, 80.0)),
         List.of(
             new LayoutEdge(
                 "client-submits-order",
@@ -2843,17 +2847,17 @@ class ElkLayoutEngineTest {
             new LayoutEdge(
                 "web-app-calls-api", "web-app", "orders-api", "calls API", "web-app-calls-api"),
             new LayoutEdge(
-                "api-authorizes-payment",
-                "orders-api",
-                "payments",
-                "requests payment authorization",
-                "api-authorizes-payment"),
-            new LayoutEdge(
                 "api-writes-database",
                 "orders-api",
                 "database",
                 "writes orders",
                 "api-writes-database"),
+            new LayoutEdge(
+                "api-authorizes-payment",
+                "orders-api",
+                "payments",
+                "requests payment authorization",
+                "api-authorizes-payment"),
             new LayoutEdge(
                 "api-publishes-job",
                 "orders-api",
@@ -3326,6 +3330,32 @@ class ElkLayoutEngineTest {
           "edge "
               + edge.id()
               + " has an alternating five-segment staircase"
+              + " at segment "
+              + index
+              + "; route="
+              + points);
+    }
+  }
+
+  private static void assertNoMicroDoglegs(LaidOutEdge edge) {
+    List<Point> points = edge.points();
+    for (int index = 0; index < points.size() - 3; index++) {
+      RouteOrientation first = routeOrientation(points.get(index), points.get(index + 1));
+      RouteOrientation cross = routeOrientation(points.get(index + 1), points.get(index + 2));
+      RouteOrientation third = routeOrientation(points.get(index + 2), points.get(index + 3));
+      Point crossStart = points.get(index + 1);
+      Point crossEnd = points.get(index + 2);
+      double crossLength =
+          Math.abs(crossStart.x() - crossEnd.x()) + Math.abs(crossStart.y() - crossEnd.y());
+      assertFalse(
+          first != null
+              && cross != null
+              && first == third
+              && first != cross
+              && crossLength <= MICRO_DOGLEG_MAX_LENGTH,
+          "edge "
+              + edge.id()
+              + " has a visually meaningless micro-dogleg"
               + " at segment "
               + index
               + "; route="

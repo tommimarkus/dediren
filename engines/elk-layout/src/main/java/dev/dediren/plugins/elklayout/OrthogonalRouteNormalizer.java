@@ -13,12 +13,32 @@ final class OrthogonalRouteNormalizer {
 
   static List<Point> collapseStairSteps(
       List<Point> input, List<LaidOutNode> nodes, String sourceId, String targetId) {
+    return collapseStairSteps(input, nodes, sourceId, targetId, true);
+  }
+
+  static List<Point> collapseStairSteps(
+      List<Point> input,
+      List<LaidOutNode> nodes,
+      String sourceId,
+      String targetId,
+      boolean allowSourceBoundaryPivot) {
     List<Point> route = new ArrayList<>(input);
+    boolean allowWholeRouteSourcePivot = allowSourceBoundaryPivot && input.size() == 6;
+    if (allowSourceBoundaryPivot && route.size() == 4) {
+      List<Point> replacement = sourceBoundaryDoglegReplacement(route, nodes, sourceId);
+      if (!replacement.isEmpty()
+          && routeLength(replacement) <= routeLength(route) + EPSILON
+          && clearOfUnrelatedNodes(replacement, nodes, sourceId, targetId)) {
+        route = new ArrayList<>(replacement);
+      }
+    }
     boolean changed;
     do {
       changed = false;
       for (int index = 0; index <= route.size() - 6; index++) {
-        for (List<Point> replacement : stairReplacements(route.subList(index, index + 6))) {
+        for (List<Point> replacement :
+            stairReplacements(
+                route.subList(index, index + 6), index == 0 && allowWholeRouteSourcePivot)) {
           if (routeLength(replacement) > routeLength(route.subList(index, index + 6)) + EPSILON
               || !clearOfUnrelatedNodes(replacement, nodes, sourceId, targetId)) {
             continue;
@@ -39,7 +59,46 @@ final class OrthogonalRouteNormalizer {
     return List.copyOf(route);
   }
 
-  private static List<List<Point>> stairReplacements(List<Point> points) {
+  private static List<Point> sourceBoundaryDoglegReplacement(
+      List<Point> points, List<LaidOutNode> nodes, String sourceId) {
+    Orientation first = orientation(points.get(0), points.get(1));
+    Orientation cross = orientation(points.get(1), points.get(2));
+    Orientation third = orientation(points.get(2), points.get(3));
+    if (first == null || cross == null || first == cross || first != third) {
+      return List.of();
+    }
+
+    LaidOutNode source = null;
+    for (LaidOutNode node : nodes) {
+      if (node.id().equals(sourceId)) {
+        source = node;
+        break;
+      }
+    }
+    if (source == null) {
+      return List.of();
+    }
+
+    Point start = points.get(0);
+    Point end = points.get(3);
+    double adjustedCoordinate = first == Orientation.HORIZONTAL ? end.y() : end.x();
+    double sourceMinimum = first == Orientation.HORIZONTAL ? source.y() : source.x();
+    double sourceMaximum =
+        first == Orientation.HORIZONTAL
+            ? source.y() + source.height()
+            : source.x() + source.width();
+    if (adjustedCoordinate < sourceMinimum - EPSILON
+        || adjustedCoordinate > sourceMaximum + EPSILON) {
+      return List.of();
+    }
+
+    return first == Orientation.HORIZONTAL
+        ? compact(List.of(start, new Point(start.x(), end.y()), end))
+        : compact(List.of(start, new Point(end.x(), start.y()), end));
+  }
+
+  private static List<List<Point>> stairReplacements(
+      List<Point> points, boolean startsAtSourceEndpoint) {
     Orientation first = orientation(points.get(0), points.get(1));
     Orientation second = orientation(points.get(1), points.get(2));
     if (first == null
@@ -53,10 +112,15 @@ final class OrthogonalRouteNormalizer {
 
     Point start = points.get(0);
     Point end = points.get(5);
-    List<Double> pivots =
-        first == Orientation.HORIZONTAL
-            ? List.of(points.get(1).x(), points.get(4).x())
-            : List.of(points.get(1).y(), points.get(4).y());
+    List<Double> pivots = new ArrayList<>();
+    if (startsAtSourceEndpoint) {
+      // This is the only equivalent route with one visible corner rather than two: the small
+      // cross-axis adjustment stays at the source boundary, while ELK's exact endpoints and the
+      // target approach direction remain unchanged.
+      pivots.add(first == Orientation.HORIZONTAL ? start.x() : start.y());
+    }
+    pivots.add(first == Orientation.HORIZONTAL ? points.get(1).x() : points.get(1).y());
+    pivots.add(first == Orientation.HORIZONTAL ? points.get(4).x() : points.get(4).y());
     List<List<Point>> candidates = new ArrayList<>();
     for (double pivot : pivots) {
       List<Point> candidate =
