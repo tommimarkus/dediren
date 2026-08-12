@@ -99,8 +99,6 @@ public final class XmiExportEngine implements ExportEngine {
       throw failure(error.code(), error.getMessage(), "content");
     }
 
-    var result =
-        new ExportResult(ContractVersions.EXPORT_RESULT_SCHEMA_VERSION, "uml-xmi+xml", content);
     ExportScope scope = ExportScope.fromRequest(request);
     Coverage coverage =
         Coverage.compute(
@@ -109,6 +107,12 @@ public final class XmiExportEngine implements ExportEngine {
             scope,
             built.representedNodeIds(),
             built.representedRelationshipIds());
+    var result =
+        new ExportResult(
+            ContractVersions.EXPORT_RESULT_SCHEMA_VERSION,
+            "uml-xmi+xml",
+            content,
+            UmlXmiAssurance.forView(request, coverage, env));
     var actionable = new ArrayList<>(coverageDiagnostics(coverage));
     actionable.addAll(typeNameAmbiguityDiagnostics(request.source().nodes(), scope.nodeIds()));
     var diagnostics = new ArrayList<>(withIdentityTripwire(policy, actionable));
@@ -154,7 +158,8 @@ public final class XmiExportEngine implements ExportEngine {
       throw failure(error.code(), error.getMessage(), error.path());
     }
 
-    String content = buildModelXmi(request, policy);
+    XmiBuilder.BuiltModel built = buildModelXmi(request, policy);
+    String content = built.content();
     Diagnostic conformance;
     try {
       conformance = validateXmiToAvailableStandards(content, env, productRoot);
@@ -162,12 +167,22 @@ public final class XmiExportEngine implements ExportEngine {
       throw failure(error.code(), error.getMessage(), "content");
     }
 
+    ExportScope scope = XmiBuilder.modelScope(request);
+    Coverage coverage =
+        Coverage.compute(
+            request.source().nodes(),
+            request.source().relationships(),
+            scope,
+            built.representedNodeIds(),
+            built.representedRelationshipIds());
     var result =
-        new ExportResult(ContractVersions.EXPORT_RESULT_SCHEMA_VERSION, "uml-xmi+xml", content);
+        new ExportResult(
+            ContractVersions.EXPORT_RESULT_SCHEMA_VERSION,
+            "uml-xmi+xml",
+            content,
+            UmlXmiAssurance.forModel(request, coverage, env));
     var diagnostics =
-        new ArrayList<>(
-            typeNameAmbiguityDiagnostics(
-                request.source().nodes(), XmiBuilder.modelScope(request).nodeIds()));
+        new ArrayList<>(typeNameAmbiguityDiagnostics(request.source().nodes(), scope.nodeIds()));
     diagnostics.add(conformance);
     return java.util.Optional.of(new EngineResult<>(result, diagnostics));
   }

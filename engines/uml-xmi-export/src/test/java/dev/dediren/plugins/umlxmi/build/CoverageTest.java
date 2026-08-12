@@ -81,7 +81,8 @@ class CoverageTest {
     assertThat(coverage.representedNodes()).isEqualTo(2);
     assertThat(coverage.representedRelationships()).isEqualTo(1);
     assertThat(coverage.representedNodeTypes()).containsExactly(Map.entry("Class", 2));
-    assertThat(coverage.representedRelationshipTypes()).containsExactly(Map.entry("Composition", 1));
+    assertThat(coverage.representedRelationshipTypes())
+        .containsExactly(Map.entry("Composition", 1));
     assertThat(coverage.unrepresentedInViewNodeTypes()).isEmpty();
     assertThat(coverage.unrepresentedInViewRelationshipTypes()).isEmpty();
   }

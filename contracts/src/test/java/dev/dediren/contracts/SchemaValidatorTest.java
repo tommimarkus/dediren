@@ -245,12 +245,20 @@ class SchemaValidatorTest {
         .isEmpty();
 
     var missingKind = umlXmiAssurance();
-    ((tools.jackson.databind.node.ArrayNode) missingKind.at("/kind_taxonomy"))
-        .remove(7);
+    ((tools.jackson.databind.node.ArrayNode) missingKind.at("/kind_taxonomy")).remove(7);
     assertThat(
             SchemaAssertions.validate(
                 workspaceRoot(), "schemas/uml-xmi-assurance.schema.json", missingKind))
         .describedAs("the public taxonomy is exhaustive, not a per-export subset")
+        .isNotEmpty();
+
+    var scopeOverclaim = umlXmiAssurance();
+    ((tools.jackson.databind.node.ObjectNode) scopeOverclaim.at("/kind_taxonomy/1/scope"))
+        .put("aggregate_model", "included");
+    assertThat(
+            SchemaAssertions.validate(
+                workspaceRoot(), "schemas/uml-xmi-assurance.schema.json", scopeOverclaim))
+        .describedAs("a sequence view must not claim aggregate-model coverage")
         .isNotEmpty();
 
     var overclaimed = umlXmiAssurance();
@@ -376,8 +384,7 @@ class SchemaValidatorTest {
     taxonomy.add(
         kind("uml-class", "standard-uml-diagram-kind", "included", "provisional-aggregate"));
     taxonomy.add(kind("uml-sequence", "standard-uml-diagram-kind", "not-included", "none"));
-    taxonomy.add(
-        kind("uml-state-machine", "standard-uml-diagram-kind", "not-included", "none"));
+    taxonomy.add(kind("uml-state-machine", "standard-uml-diagram-kind", "not-included", "none"));
     taxonomy.add(kind("uml-use-case", "standard-uml-diagram-kind", "not-included", "none"));
     taxonomy.add(kind("uml-component", "standard-uml-diagram-kind", "not-included", "none"));
     taxonomy.add(kind("uml-deployment", "standard-uml-diagram-kind", "not-included", "none"));
@@ -396,7 +403,18 @@ class SchemaValidatorTest {
     validationEvidence.putObject("xmi_schema_evidence").put("status", "validated");
     validationEvidence.putArray("uml_metamodel_evidence");
     validationEvidence.putArray("importer_evidence");
+    var coverage = assurance.putObject("coverage");
+    coveragePartition(coverage.putObject("represented"));
+    coveragePartition(coverage.putObject("omitted"));
+    coveragePartition(coverage.putObject("unrepresented_in_view"));
     return assurance;
+  }
+
+  private static void coveragePartition(tools.jackson.databind.node.ObjectNode partition) {
+    partition.putObject("elements");
+    partition.putObject("relationships");
+    partition.put("element_total", 0);
+    partition.put("relationship_total", 0);
   }
 
   private static tools.jackson.databind.node.ObjectNode kind(

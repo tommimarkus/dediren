@@ -5,8 +5,9 @@
   "additionalProperties": false,
   "required": ["export_result_schema_version", "artifact_kind", "content"],
   "properties": {
-    "export_result_schema_version": { "const": "export-result.schema.v1" },
+    "export_result_schema_version": { "const": "export-result.schema.v2" },
     "artifact_kind": { "type": "string", "pattern": "^[a-z0-9][a-z0-9.-]*\\+(xml|json|text)$" },
-    "content": { "type": "string" }
+    "content": { "type": "string" },
+    "assurance": { "type": ["object", "null"] }
   }
 }

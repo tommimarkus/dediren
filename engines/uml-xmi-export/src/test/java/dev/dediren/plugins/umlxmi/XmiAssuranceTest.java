@@ -8,6 +8,7 @@ import dev.dediren.contracts.layout.LayoutResult;
 import dev.dediren.contracts.source.SourceDocument;
 import dev.dediren.engine.EngineResult;
 import dev.dediren.engine.ModelExportRequest;
+import dev.dediren.testsupport.SchemaAssertions;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -28,14 +29,42 @@ class XmiAssuranceTest {
 
   static Stream<Arguments> supportedKinds() {
     return Stream.of(
-        Arguments.of("uml-class", "valid-uml-basic", "uml-basic", "standard-uml-diagram-kind", true),
-        Arguments.of("uml-sequence", "valid-uml-sequence-basic", "uml-sequence-basic", "standard-uml-diagram-kind", false),
-        Arguments.of("uml-state-machine", "valid-uml-state-machine-basic", "uml-state-machine-basic", "standard-uml-diagram-kind", false),
-        Arguments.of("uml-use-case", "valid-uml-use-case-basic", "uml-use-case-basic", "standard-uml-diagram-kind", false),
-        Arguments.of("uml-component", "valid-uml-component-basic", "uml-component-basic", "standard-uml-diagram-kind", false),
-        Arguments.of("uml-deployment", "valid-uml-deployment-basic", "uml-deployment-basic", "standard-uml-diagram-kind", false),
-        Arguments.of("uml-activity", "valid-uml-basic", "uml-activity", "standard-uml-diagram-kind", false),
-        Arguments.of("uml-data", "valid-uml-basic", "uml-data", "dediren-local-classifier-view", true));
+        Arguments.of(
+            "uml-class", "valid-uml-basic", "uml-basic", "standard-uml-diagram-kind", true),
+        Arguments.of(
+            "uml-sequence",
+            "valid-uml-sequence-basic",
+            "uml-sequence-basic",
+            "standard-uml-diagram-kind",
+            false),
+        Arguments.of(
+            "uml-state-machine",
+            "valid-uml-state-machine-basic",
+            "uml-state-machine-basic",
+            "standard-uml-diagram-kind",
+            false),
+        Arguments.of(
+            "uml-use-case",
+            "valid-uml-use-case-basic",
+            "uml-use-case-basic",
+            "standard-uml-diagram-kind",
+            false),
+        Arguments.of(
+            "uml-component",
+            "valid-uml-component-basic",
+            "uml-component-basic",
+            "standard-uml-diagram-kind",
+            false),
+        Arguments.of(
+            "uml-deployment",
+            "valid-uml-deployment-basic",
+            "uml-deployment-basic",
+            "standard-uml-diagram-kind",
+            false),
+        Arguments.of(
+            "uml-activity", "valid-uml-basic", "uml-activity", "standard-uml-diagram-kind", false),
+        Arguments.of(
+            "uml-data", "valid-uml-basic", "uml-data", "dediren-local-classifier-view", true));
   }
 
   @ParameterizedTest(name = "{0}")
@@ -49,14 +78,18 @@ class XmiAssuranceTest {
       throws Exception {
     JsonNode assurance = exportAssurance(source, layout);
 
+    assertThat(
+            SchemaAssertions.validate(
+                workspaceRoot(), "schemas/uml-xmi-assurance.schema.json", assurance))
+        .describedAs("emitted assurance for %s must satisfy its public schema", kind)
+        .isEmpty();
     assertThat(assurance.at("/assurance_schema_version").asText())
         .isEqualTo("uml-xmi-assurance.schema.v1");
     JsonNode taxonomy = assurance.at("/kind_taxonomy");
     assertThat(taxonomy).hasSize(8);
     JsonNode kindEntry = findKind(taxonomy, kind);
     assertThat(kindEntry.at("/classification").asText()).isEqualTo(classification);
-    assertThat(kindEntry.at("/scope/xmi_abstract_syntax").asText())
-        .isEqualTo("selected-view");
+    assertThat(kindEntry.at("/scope/xmi_abstract_syntax").asText()).isEqualTo("selected-view");
     assertThat(kindEntry.at("/scope/aggregate_model").asText())
         .isEqualTo(aggregateModelEligible ? "included" : "not-included");
     assertThat(kindEntry.at("/scope/uml_di").asText())
@@ -108,8 +141,7 @@ class XmiAssuranceTest {
     JsonNode assurance = exportAssurance("valid-uml-basic", "uml-basic");
     JsonNode coverage = assurance.at("/coverage");
 
-    for (String partition :
-        Stream.of("represented", "omitted", "unrepresented_in_view").toList()) {
+    for (String partition : Stream.of("represented", "omitted", "unrepresented_in_view").toList()) {
       assertThat(coverage.at("/" + partition + "/elements").isObject()).isTrue();
       assertThat(coverage.at("/" + partition + "/relationships").isObject()).isTrue();
       assertThat(coverage.at("/" + partition + "/element_total").canConvertToInt()).isTrue();
@@ -137,6 +169,9 @@ class XmiAssuranceTest {
     JsonNode evidence = assurance.at("/validation_evidence");
     assertThat(evidence.at("/level").asText()).isEqualTo("xmi-envelope-only");
     assertThat(evidence.at("/xmi_schema_evidence/status").asText()).isEqualTo("validated");
+    assertThat(evidence.at("/xmi_schema_evidence/source").asText())
+        .isEqualTo("user-supplied-schema-path");
+    assertThat(evidence.at("/xmi_schema_evidence/standard").isMissingNode()).isTrue();
     assertThat(evidence.at("/uml_metamodel_evidence")).isEmpty();
     assertThat(evidence.at("/importer_evidence")).isEmpty();
   }

@@ -224,6 +224,15 @@ DOM `xmi:id` uniqueness check, and the same in-JVM XMI schema validation, whose
 tolerated no-declaration gap now also covers those DI namespaces (no normative
 OMG DI XSD is published) — no new fetch, subprocess, or parser surface.
 
+Successful UML/XMI envelopes expose a separate machine-readable assurance
+object (`uml-xmi-assurance.schema.v1`). Its current validation level is bounded
+to `xmi-envelope-only`, with empty UML-metamodel and importer evidence, so the
+tolerated no-declaration gap cannot be mistaken for UML-content conformance.
+Schema conditionals require evidence before a stronger future level can be
+claimed. The assurance coverage counts are derived from the source IDs the
+writer actually emitted; they are reporting data, not a new input or trust
+boundary.
+
 Standards-schema validation runs **in-JVM on both export lanes** via the one
 shared validator, `schemacache.InJvmXmlValidator` (engines may not depend on
 each other, so hardening lives once): `javax.xml.validation` with secure
