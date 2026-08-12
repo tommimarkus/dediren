@@ -766,6 +766,14 @@ messages inside a combined fragment's owned sequence span.
 other sort solid. `deleteMessage` draws its destruction cross but keeps the
 ordinary arrowhead rather than the filled one §17.4 shows.
 
+An `ExecutionSpecification` is the activation bar: it names the lifeline it
+`covered`s and the `start` / `finish` **messages** that bound it. The export
+resolves each bound to the occurrence on that lifeline — the receive event when
+the message arrives there, the send event when it leaves — and emits
+`uml:BehaviorExecutionSpecification`. Use
+`fixtures/source/valid-uml-sequence-lifecycle.json` for a template carrying one
+alongside a `createMessage` and a `deleteMessage`.
+
 A `deleteMessage` targets a `DestructionOccurrenceSpecification` node naming the
 `covered` lifeline it destroys, and nothing on that lifeline may follow it —
 §17.12.6.4 makes the destruction the last event on its lifeline, so a later

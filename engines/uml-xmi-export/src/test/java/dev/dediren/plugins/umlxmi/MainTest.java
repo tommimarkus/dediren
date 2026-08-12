@@ -362,6 +362,30 @@ class MainTest {
   }
 
   @Test
+  void exportsTheShippedSequenceLifecycleFixtureWhole() throws Exception {
+    // valid-uml-sequence-lifecycle.json is committed, ships in the bundle, and is reachable as an
+    // MCP resource — the richest sequence template an agent can pick. It validated and rendered and
+    // then died at export, first on its delete message and then on its ExecutionSpecification.
+    JsonNode input =
+        exportInput(
+            fixtureJson("fixtures/source/valid-uml-sequence-lifecycle.json"),
+            fixtureJson("fixtures/layout-result/uml-sequence-lifecycle.json"));
+
+    String xml = exportGoldenXml(input);
+
+    // §17.12.4: an ExecutionSpecification covers the lifeline it runs on and is bounded by two
+    // OccurrenceSpecifications. The execution starts where the service *receives* m1 and ends
+    // where it *sends* the m4 reply, so each bound is the occurrence on the covered lifeline.
+    assertThat(xml)
+        .contains(
+            "<fragment xmi:type=\"uml:BehaviorExecutionSpecification\""
+                + " xmi:id=\"id-exec-service\" name=\"Order Service Activation\""
+                + " covered=\"id-service\" start=\"id-m1-receive-event\""
+                + " finish=\"id-m4-send-event\"/>");
+    assertThat(xml).isEqualTo(fixture("fixtures/export/uml-sequence-lifecycle.xmi"));
+  }
+
+  @Test
   void exportsADeleteMessageEndingInADestructionOccurrenceSpecification() throws Exception {
     // UML-SEM-29: core has always accepted Lifeline -> DestructionOccurrenceSpecification
     // (§17.12.6.3, §17.12.22.3) while the exporter demanded Lifeline -> Lifeline and rejected the
@@ -1101,8 +1125,8 @@ class MainTest {
                 .readTree(
                     """
                 {
-                  "id": "service-execution",
-                  "type": "ExecutionSpecification",
+                  "id": "service-gate",
+                  "type": "Gate",
                   "label": "",
                   "properties": {
                     "uml": {
@@ -1111,18 +1135,19 @@ class MainTest {
                   }
                 }
                 """));
-    // Selection is driven off layout_result node source_ids (see ExportScope.fromRequest); add a
-    // matching laid-out node so this appended ExecutionSpecification is actually in scope and the
-    // test still exercises the unsupported-sequence-node-type rejection it names.
+    // A Gate is the remaining unsupported sequence node: it has no source surface beyond its own
+    // node, so nothing attaches a message to it. (ExecutionSpecification stood here until it
+    // gained an emitter.) Selection is driven off layout_result node source_ids (see
+    // ExportScope.fromRequest), so a matching laid-out node puts it in scope.
     ((tools.jackson.databind.node.ArrayNode) input.at("/layout_result/nodes"))
         .add(
             JsonSupport.objectMapper()
                 .readTree(
                     """
                 {
-                  "id": "service-execution",
-                  "source_id": "service-execution",
-                  "projection_id": "service-execution",
+                  "id": "service-gate",
+                  "source_id": "service-gate",
+                  "projection_id": "service-gate",
                   "x": 434, "y": 146, "width": 16, "height": 78,
                   "label": ""
                 }

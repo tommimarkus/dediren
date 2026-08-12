@@ -84,6 +84,8 @@ public final class InteractionWriter {
         messagesBySourceId,
         nestedCombinedFragmentIds,
         operandOwnedMessageIds);
+    // After the occurrences, so every `start`/`finish` an execution references is already declared.
+    writeExecutionSpecifications(xml, interaction, sourceNodes, nodeIds, messagesBySourceId);
     for (MessageExport message : messages) {
       writeSequenceMessage(xml, message);
     }
@@ -541,8 +543,75 @@ public final class InteractionWriter {
   public static boolean unsupportedSequenceNode(String type) {
     // A DestructionOccurrenceSpecification is not exported as a node of its own: it names the
     // lifeline it destroys, and writeMessageOccurrence already emits the destruction subtype for
-    // the receive event of a deleteMessage.
-    return type.equals("ExecutionSpecification") || type.equals("Gate");
+    // the receive event of a deleteMessage. A Gate has no source surface beyond its own node, so
+    // it has nothing to attach an actual message to.
+    return type.equals("Gate");
+  }
+
+  /**
+   * Emits the {@code uml:BehaviorExecutionSpecification} fragments for one interaction.
+   *
+   * <p>§17.12.4 bounds an ExecutionSpecification by two OccurrenceSpecifications and covers the
+   * Lifeline it runs on. The source model names the two bounds by message, not by occurrence, so
+   * each bound resolves to the occurrence <em>on the covered lifeline</em>: the receive event when
+   * the message arrives there, the send event when it leaves. An execution whose covered lifeline
+   * or either bound is out of scope is skipped rather than emitted with a dangling reference.
+   */
+  private static void writeExecutionSpecifications(
+      StringBuilder xml,
+      SourceNode interaction,
+      List<SourceNode> sourceNodes,
+      Map<String, String> nodeIds,
+      Map<String, MessageExport> messagesBySourceId) {
+    for (SourceNode node : sourceNodes) {
+      if (!node.type().equals("ExecutionSpecification")
+          || !nodeIds.containsKey(node.id())
+          || !interaction.id().equals(umlString(node, "interaction"))
+              && !isCoveredByInteraction(node, interaction, nodeIds, messagesBySourceId)) {
+        continue;
+      }
+      String lifeline = umlString(node, "covered");
+      String lifelineId = lifeline == null ? null : nodeIds.get(lifeline);
+      String start = occurrenceOnLifeline(umlString(node, "start"), lifeline, messagesBySourceId);
+      String finish = occurrenceOnLifeline(umlString(node, "finish"), lifeline, messagesBySourceId);
+      if (lifelineId == null || start == null || finish == null) {
+        continue;
+      }
+      xml.append("<fragment xmi:type=\"uml:BehaviorExecutionSpecification\" xmi:id=\"")
+          .append(attr(nodeIds.get(node.id())))
+          .append("\" name=\"")
+          .append(attr(node.label()))
+          .append("\" covered=\"")
+          .append(attr(lifelineId))
+          .append("\" start=\"")
+          .append(attr(start))
+          .append("\" finish=\"")
+          .append(attr(finish))
+          .append("\"/>");
+    }
+  }
+
+  /** An execution belongs to the interaction whose messages bound it. */
+  private static boolean isCoveredByInteraction(
+      SourceNode node,
+      SourceNode interaction,
+      Map<String, String> nodeIds,
+      Map<String, MessageExport> messagesBySourceId) {
+    MessageExport start = messagesBySourceId.get(umlString(node, "start"));
+    return start != null && interaction.id().equals(umlString(start.relationship(), "interaction"));
+  }
+
+  /** The occurrence of {@code messageId} that sits on {@code lifelineId}, send or receive. */
+  private static String occurrenceOnLifeline(
+      String messageId, String lifelineId, Map<String, MessageExport> messagesBySourceId) {
+    MessageExport message = messageId == null ? null : messagesBySourceId.get(messageId);
+    if (message == null || lifelineId == null) {
+      return null;
+    }
+    if (lifelineId.equals(message.relationship().target())) {
+      return message.receiveEventId();
+    }
+    return lifelineId.equals(message.relationship().source()) ? message.sourceEventId() : null;
   }
 
   private record CombinedFragmentExport(

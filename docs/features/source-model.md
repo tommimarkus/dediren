@@ -133,14 +133,10 @@ The repo ships ready-made source fixtures to copy from:
   `valid-uml-deployment-basic.json` — UML notations.
 - `invalid-*.json` — fixtures that intentionally trip a specific diagnostic.
 
-The `valid-` prefix means the fixture passes `validate`. It does not promise
-every downstream command accepts it: `valid-uml-sequence-lifecycle.json`
-validates and renders, but **cannot be exported to XMI**, because it contains an
-`ExecutionSpecification` and the UML/XMI export does not yet emit
-`uml:BehaviorExecutionSpecification` — the export fails with
-`DEDIREN_UML_XMI_SEQUENCE_NODE_UNSUPPORTED`. Use
-`valid-uml-sequence-fragments.json` as the richest sequence template that
-survives the whole pipeline.
+Every `valid-` fixture passes `validate`, renders, and exports.
+`valid-uml-sequence-lifecycle.json` is the richest sequence template: it carries
+an `ExecutionSpecification` activation bar, a `createMessage`, and a
+`deleteMessage` ending in a `DestructionOccurrenceSpecification`.
 
 ## Related Pages
 
