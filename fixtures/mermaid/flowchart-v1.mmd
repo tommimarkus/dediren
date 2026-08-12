@@ -1,0 +1,7 @@
+%% An intentionally small but representative v1 flowchart.
+flowchart LR
+  subgraph Platform[Platform boundary]
+    API[API 😀]
+    Store[(Store)]
+  end
+  Client -->|calls| API --> Store

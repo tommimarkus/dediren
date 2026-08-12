@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>dev.dediren</groupId>
+    <artifactId>dediren</artifactId>
+    <version>2026.08.2</version>
+    <relativePath>../../pom.xml</relativePath>
+  </parent>
+  <artifactId>mermaid-import</artifactId>
+  <dependencies>
+    <dependency><groupId>dev.dediren</groupId><artifactId>contracts</artifactId><version>${project.version}</version></dependency>
+    <dependency><groupId>dev.dediren</groupId><artifactId>engine-api</artifactId><version>${project.version}</version></dependency>
+    <dependency><groupId>dev.dediren</groupId><artifactId>core</artifactId><version>${project.version}</version><scope>test</scope></dependency>
+    <dependency><groupId>dev.dediren</groupId><artifactId>semantics-graph</artifactId><version>${project.version}</version><scope>test</scope></dependency>
+    <dependency><groupId>dev.dediren</groupId><artifactId>elk-layout</artifactId><version>${project.version}</version><scope>test</scope></dependency>
+    <dependency><groupId>dev.dediren</groupId><artifactId>render</artifactId><version>${project.version}</version><scope>test</scope></dependency>
+    <dependency><groupId>org.assertj</groupId><artifactId>assertj-core</artifactId><scope>test</scope></dependency>
+    <dependency><groupId>org.junit.jupiter</groupId><artifactId>junit-jupiter</artifactId><scope>test</scope></dependency>
+    <dependency><groupId>tools.jackson.core</groupId><artifactId>jackson-databind</artifactId></dependency>
+  </dependencies>
+</project>
