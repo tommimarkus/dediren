@@ -2,6 +2,7 @@ package dev.dediren.cli;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.mcp.DedirenTools;
 import io.modelcontextprotocol.spec.McpSchema.CallToolRequest;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
@@ -44,9 +45,59 @@ class CliMcpParityTest {
     return Path.of("..", "fixtures", "export-policy", name).toAbsolutePath().normalize();
   }
 
+  private static Path mermaidFixture(String name) {
+    return Path.of("..", "fixtures", "mermaid", name).toAbsolutePath().normalize();
+  }
+
   private static CallToolResult build(Path root, Map<String, Object> arguments) {
     return new DedirenTools(root, EngineWiring.defaults(), Map.of())
         .build(new CallToolRequest("dediren_build", arguments));
+  }
+
+  @Test
+  void importProducesTheSameEnvelopeThroughCliAndReadOnlySafeMcp(@TempDir Path root)
+      throws Exception {
+    Files.copy(mermaidFixture("flowchart-v1.mmd"), root.resolve("diagram.mmd"));
+
+    CliResult cli =
+        Main.executeForTesting(
+            new String[] {
+              "import", "--plugin", "mermaid", "--input", root.resolve("diagram.mmd").toString()
+            },
+            "",
+            Map.of());
+    CallToolResult mcp =
+        new DedirenTools(root, EngineWiring.defaults(), Map.of())
+            .importSource(
+                new CallToolRequest(
+                    "dediren_import", Map.of("source", "diagram.mmd", "plugin", "mermaid")));
+
+    assertThat(cli.exitCode()).isZero();
+    assertThat(mcp.isError()).isFalse();
+    assertThat(textOf(mcp).strip()).isEqualTo(cli.stdout().strip());
+  }
+
+  @Test
+  void malformedImportProducesTheSameAtomicErrorThroughCliAndMcp(@TempDir Path root)
+      throws Exception {
+    Path source = root.resolve("invalid.mmd");
+    Files.writeString(source, "flowchart TD\nA -->\n");
+
+    CliResult cli =
+        Main.executeForTesting(
+            new String[] {"import", "--plugin", "mermaid", "--input", source.toString()},
+            "",
+            Map.of());
+    CallToolResult mcp =
+        new DedirenTools(root, EngineWiring.defaults(), Map.of())
+            .importSource(
+                new CallToolRequest(
+                    "dediren_import", Map.of("source", "invalid.mmd", "plugin", "mermaid")));
+
+    assertThat(cli.exitCode()).isEqualTo(2);
+    assertThat(mcp.isError()).isTrue();
+    assertThat(textOf(mcp).strip()).isEqualTo(cli.stdout().strip());
+    assertThat(JsonSupport.objectMapper().readTree(textOf(mcp)).has("data")).isFalse();
   }
 
   @Test

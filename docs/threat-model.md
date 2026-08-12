@@ -67,10 +67,20 @@ elements, each failing as a clean `DEDIREN_INPUT_FILE_TOO_LARGE` /
 wedged layout run. The resource-exhaustion row in the attacker-goals table
 records what deliberately stays unbounded.
 
+Mermaid import adds an attacker-controlled text grammar without adding a
+runtime, network fetch, external resource load, or copied parser. The native
+iterative parser rejects HTML, interactive behavior, URLs/resources,
+unsupported edge semantics, and ambiguous constructs before mapping; failures
+are atomic. It separately caps UTF-8 input at 64 MiB, statements at 200000,
+produced nodes/relationships/groups at 100000, nesting at 256, and tokens or
+labels at 64 KiB. CLI stdin now uses the same bounded streaming read as file
+input. The MCP tool first confines and bounds its source path, is available in
+read-only mode because it writes nothing, then returns the core envelope.
+
 ### Single-JVM engine runtime (no plugin execution surface)
 
 The runtime is a single JVM with no plugin discovery or execution surface:
-the five first-party engines (`generic-graph`, `elk-layout`, `render`,
+the bundled first-party engines (`mermaid`, `generic-graph`, `elk-layout`, `render`,
 `archimate-oef`, `uml-xmi`) are compile-time library modules behind the
 `engine-api` interfaces, constructed explicitly in one named cli class
 (`cli/.../EngineWiring.java`) and dispatched in-process by `core`'s
@@ -146,7 +156,8 @@ Controls:
 - **Read-only mode.** `--read-only` does not register `dediren_build`, so the
   write primitive is absent rather than present-and-refusing. The four analysis
   tools (`dediren_diff`, `dediren_query`, `dediren_verify`, `dediren_status`) are
-  read-only and stay registered in both modes.
+  read-only and stay registered in both modes; `dediren_import` also stays
+  registered because it only reads one confined source and returns data.
 - **Package declared outputs.** `dediren build --package` (and `dediren_build` with
   a `package` argument) add a caller-*declared* write surface: each view and export
   names the path its artifact lands at. Every declared output path — and every
@@ -394,7 +405,7 @@ ceiling trips if shrinking or attribute stripping silently degrades.
 | Shipped `THIRD-PARTY-NOTICES.md` misstates an upstream licence after a dependency bump, or a bump drags in a licence outside the approved set | cli's `license-maven-plugin` execution resolves every runtime dependency's effective-pom licence, normalizes it, and gates it against an approved allowlist; `DistTool` refuses to write notices when its hand-curated attribution map disagrees with that resolved report or the report is stale (`resolved-licence-report`, dist lanes) | Effective-pom licences are upstream-declared metadata, not scanned artifact contents; a pom that misstates its own jar's licence passes (mitigate with an `about.html`/`META-INF` spot-check when adopting a new dependency) |
 | Malicious schema substitution | HTTPS-only curl plus SHA-256 pin verified before use (`SchemaCacheModule`) | `DEDIREN_XMI_SCHEMA_PATH` / `DEDIREN_OEF_SCHEMA_DIR` offline overrides bypass the SHA-256 check by design |
 | Malicious envelope input | Jackson 3 parsing plus fuzz-regression targets pinning the only-`JacksonException`/`XmiValidationException` invariant; hardened DOM factory blocks DOCTYPE/XXE | Fuzz targets run in deterministic regression mode over a fixed seed corpus in CI, not continuous coverage-guided fuzzing |
-| Exhaust the host via pathological model input (CPU/heap) | Input ceilings (core `SourceLimits`, applied via `BoundedReads` and `SourceValidator` on both the CLI and MCP lanes): 64 MiB per model-supplied input file (source, fragment, policy), 1000 fragments, 100000 merged elements — the element check runs inside the fragment-merge loop so a runaway fragment set fails fast. Jackson 3's default nesting-depth cap (500) bounds nested JSON; the MCP transport bounds a single inbound frame at 16 MiB (`FrameSplitter`) | Compute on a legal-size model is unbounded: ELK layout has no timeout or cancellation, SVG output is materialized in memory, MCP tool calls have no per-call timeout (they run concurrently on bounded-elastic workers), and CLI stdin is unbounded (human-piped; the MCP lane never uses it). Accepted: the process runs with the invoking user's own authority and the MCP client owns the server's lifetime, so a wedged or OOM-killed process is recoverable by the user who caused it |
+| Exhaust the host via pathological model input (CPU/heap) | Input ceilings (core `SourceLimits`, applied via `BoundedReads` and `SourceValidator` on both CLI file/stdin and MCP lanes): 64 MiB per model-supplied input file, 1000 fragments, 100000 merged elements. Mermaid additionally caps statements, produced elements/groups, nesting, and token/label bytes inside its iterative parser. Jackson 3's default nesting-depth cap (500) bounds nested JSON; the MCP transport bounds a single inbound frame at 16 MiB (`FrameSplitter`) | Compute on a legal-size model is unbounded: ELK layout has no timeout or cancellation, SVG output is materialized in memory, and MCP tool calls have no per-call timeout. Accepted: the process runs with the invoking user's own authority and the MCP client owns the server's lifetime, so a wedged or OOM-killed process is recoverable by the user who caused it |
 | Inject markup into a rendered SVG via model labels/ids | Labels: `SvgWriter` (StAX) structurally escapes every attribute value and text node at emission, with no verbatim-injection path; `LabelInjectionTest` proves an end-to-end breakout payload stays escaped and round-trips. Ids used as reference targets (via `url(#…)` in marker references and gradient fills): `SvgIds` mints every id and every reference to it from one per-document instance, constraining the alphabet and suffixing collisions, so a reference can never disagree with the id it points at. `SvgAudit` rejects ill-formed output | Escaping guards labels against markup breakout. For ids used as SVG identifiers and reference targets, the control is the id-minting alphabet, not escaping: a duplicate id makes a `url(#…)` reference ambiguous (UA binds to first match), and an id with `)` or space truncates the CSS url token so the reference silently misses and the marker is dropped |
 | Dependency compromise | Known-vulnerability coverage comes from the blocking Grype/SBOM gate on every pull request and tagged release (`ci.yml`, `release.yml`), plus weekly grouped Dependabot updates and event-driven Dependabot alerts (`.github/dependabot.yml`) | Exact pins and hashes establish the selected dependency identity and integrity, but do not prove that an upstream release is benign. A newly malicious or compromised dependency release remains a human trust decision and residual risk. Direct pushes to `main` are not CI-scanned (lean-CI decision), so newly published advisories surface via Dependabot alerts or the next PR/release gate rather than a push-time scan; the scheduled OWASP Dependency-Check cross-check was retired with the same decision (`-Psecurity-sca` remains an on-demand local second opinion) |
 | JVM-argument injection via `DEDIREN_LOG_LEVEL` | The launcher interpolates this env var into `JAVA_OPTS`, so it accepts only the six literals `trace\|debug\|info\|warn\|error\|off`; anything else is dropped with a note on stderr. A `-Pdist-smoke` probe asserts a smuggled `-XshowSettings:properties` neither reaches the JVM nor switches logging on | The guard is a shell `case` in the generated launcher; a caller who can already set arbitrary `JAVA_OPTS` needs no such trick, so this only closes the narrower "can set DEDIREN_* but not JAVA_OPTS" path |

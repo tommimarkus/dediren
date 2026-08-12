@@ -53,6 +53,16 @@ public final class DedirenMcpServer {
             .resources(DedirenResources.specifications())
             .toolCall(
                 Tool.builder()
+                    .name("dediren_import")
+                    .description(
+                        "Import a workspace-confined Mermaid flowchart into model.schema.v1"
+                            + " generic-graph source JSON. Read-only: returns the model in the"
+                            + " standard envelope and writes no files.")
+                    .inputSchema(mapper, ToolSchemas.IMPORT)
+                    .build(),
+                (exchange, request) -> tools.importSource(request))
+            .toolCall(
+                Tool.builder()
                     .name("dediren_validate")
                     .description(
                         "Validate a Dediren source JSON model or a policy document (render/export"

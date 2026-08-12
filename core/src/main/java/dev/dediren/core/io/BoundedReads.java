@@ -1,6 +1,9 @@
 package dev.dediren.core.io;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
@@ -31,5 +34,21 @@ public final class BoundedReads {
       throw new FileTooLargeException(size, maxBytes);
     }
     return Files.readString(path);
+  }
+
+  /** Reads a stream through the same byte ceiling without an unbounded {@code readAllBytes()}. */
+  public static String readString(InputStream input, long maxBytes) throws IOException {
+    ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+    byte[] chunk = new byte[8192];
+    long total = 0;
+    int read;
+    while ((read = input.read(chunk)) != -1) {
+      total += read;
+      if (total > maxBytes) {
+        throw new FileTooLargeException(total, maxBytes);
+      }
+      bytes.write(chunk, 0, read);
+    }
+    return bytes.toString(StandardCharsets.UTF_8);
   }
 }

@@ -26,7 +26,7 @@ them but owns none of their domain logic.
 
 ## First-Party Engines
 
-All five are compile-time library modules. They may depend on `engine-api`,
+All bundled engines are compile-time library modules. They may depend on `engine-api`,
 `contracts`, and the notation cores they need, but must not depend on `core`;
 only the CLI's `EngineWiring` class constructs them. There is no engine
 discovery of any kind — no `PATH` lookup, no manifest directories, no
@@ -35,13 +35,14 @@ the value you pass to `--plugin`.
 
 | Engine id (`--plugin`) | Role |
 | --- | --- |
+| `mermaid` | Native, one-way import of the documented Mermaid 11.16.1 flowchart subset into generic-graph source JSON. |
 | `generic-graph` | Semantic vocabulary, semantic validation, view projection (layout request + render metadata). Owns the `generic`, `archimate`, and `uml` profiles. |
 | `elk-layout` | Layout geometry and edge routing via official Eclipse ELK Java libraries. See [Layout (ELK)](layout.md). |
 | `render` | SVG rendering. See [SVG Rendering](svg-render.md). |
 | `archimate-oef` | ArchiMate Open Exchange Format 3.1 XML, carrying 3.2 vocabulary. See [Exports](exports.md). |
 | `uml-xmi` | UML 2.5.1 XMI XML. See [Exports](exports.md). |
 
-All five are hosted in-process by the single `bin/dediren` launcher; there is
+All are hosted in-process by the single `bin/dediren` launcher; there is
 no per-engine launcher, standalone executable, or `capabilities` probe to run
 against. The retired process-plugin runtime's `plugin-manifest` and
 `runtime-capability` schemas and records were deleted with the wave-0 contract
@@ -54,7 +55,7 @@ Common engine diagnostics (full list and repair guidance in
 
 | Code | Meaning |
 | --- | --- |
-| `DEDIREN_PLUGIN_UNKNOWN` | Unknown engine id; the bundled set is the five ids above. |
+| `DEDIREN_PLUGIN_UNKNOWN` | Unknown engine id; use one of the bundled ids above. |
 | `DEDIREN_PLUGIN_UNSUPPORTED_CAPABILITY` | The engine id exists, but not for the requested stage. |
 | `DEDIREN_ENGINE_FAILED` | Unexpected in-memory engine failure; pipeline stops. |
 | `DEDIREN_COMMAND_INPUT_INVALID` | CLI could not read/parse a command input file. |

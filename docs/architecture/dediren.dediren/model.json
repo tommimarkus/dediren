@@ -84,7 +84,7 @@
         "layer": "Application",
         "viewpoint": "Application Cooperation",
         "tier": "1",
-        "rationale": "The typed engine seam: SemanticsEngine / LayoutEngine / RenderEngine / ExportEngine interfaces. Interfaces only; depends on contracts and ir.",
+        "rationale": "The typed engine seam: SemanticsEngine / LayoutEngine / RenderEngine / ExportEngine / ImportEngine interfaces. Interfaces only; depends on contracts and ir.",
         "evidence": "source-backed",
         "source": "engine-api/pom.xml; docs/architecture-guidelines.md \u00a72\u2013\u00a73"
       }
@@ -100,6 +100,19 @@
         "rationale": "Orchestration and backend-neutral policy: command handlers, the build driver, in-memory engine dispatch, schema/source validation, and layout-quality checks. Drives engines only through engine-api.",
         "evidence": "source-backed",
         "source": "core/pom.xml; docs/architecture-guidelines.md \u00a72\u2013\u00a73"
+      }
+    },
+    {
+      "id": "mermaid-import",
+      "type": "ApplicationComponent",
+      "label": "mermaid-import",
+      "properties": {
+        "layer": "Application",
+        "viewpoint": "Application Cooperation",
+        "tier": "2",
+        "rationale": "Native bounded parser and mapper for the documented Mermaid 11.16.1 flowchart subset. Produces generic-graph SourceDocument records through ImportEngine.",
+        "evidence": "source-backed",
+        "source": "engines/mermaid-import/pom.xml; engine-api/src/main/java/dev/dediren/engine/ImportEngine.java"
       }
     },
     {
@@ -305,6 +318,17 @@
       "type": "Serving",
       "source": "contracts",
       "target": "semantics-uml",
+      "label": "",
+      "properties": {
+        "visible": true,
+        "evidence": "source-backed"
+      }
+    },
+    {
+      "id": "serv-contracts-mermaid-import",
+      "type": "Serving",
+      "source": "contracts",
+      "target": "mermaid-import",
       "label": "",
       "properties": {
         "visible": true,
@@ -576,6 +600,17 @@
       }
     },
     {
+      "id": "serv-engine-api-mermaid-import",
+      "type": "Serving",
+      "source": "engine-api",
+      "target": "mermaid-import",
+      "label": "",
+      "properties": {
+        "visible": true,
+        "evidence": "source-backed"
+      }
+    },
+    {
       "id": "serv-engine-api-semantics-graph",
       "type": "Serving",
       "source": "engine-api",
@@ -730,6 +765,17 @@
       }
     },
     {
+      "id": "serv-mermaid-import-cli",
+      "type": "Serving",
+      "source": "mermaid-import",
+      "target": "cli",
+      "label": "",
+      "properties": {
+        "visible": true,
+        "evidence": "source-backed"
+      }
+    },
+    {
       "id": "serv-elk-layout-cli",
       "type": "Serving",
       "source": "elk-layout",
@@ -811,6 +857,7 @@
             "schema-cache",
             "engine-api",
             "core",
+            "mermaid-import",
             "semantics-graph",
             "semantics-archimate",
             "semantics-uml",
@@ -827,6 +874,7 @@
             "serv-contracts-uml",
             "serv-ir-engine-api",
             "serv-engine-api-core",
+            "serv-engine-api-mermaid-import",
             "serv-engine-api-semantics-graph",
             "serv-engine-api-semantics-archimate",
             "serv-engine-api-semantics-uml",
@@ -874,6 +922,7 @@
               "role": "layout-only",
               "members": [
                 "core",
+                "mermaid-import",
                 "semantics-graph",
                 "semantics-archimate",
                 "semantics-uml",

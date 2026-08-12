@@ -4,6 +4,25 @@ package dev.dediren.mcp;
 final class ToolSchemas {
   private ToolSchemas() {}
 
+  static final String IMPORT =
+      """
+      {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string",
+            "description": "Path to a Mermaid flowchart, relative to the workspace root."
+          },
+          "plugin": {
+            "type": "string",
+            "enum": ["mermaid"],
+            "description": "External notation importer. Version 1 supports Mermaid flowcharts."
+          }
+        },
+        "required": ["source", "plugin"]
+      }
+      """;
+
   static final String VALIDATE =
       """
       {

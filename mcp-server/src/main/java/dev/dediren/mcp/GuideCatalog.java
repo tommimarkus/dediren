@@ -37,6 +37,7 @@ public final class GuideCatalog {
     topics.put("fast-path", "Fast Path");
     topics.put("mcp", "MCP Server");
     topics.put("artifacts", "Artifact Map");
+    topics.put("mermaid-import", "Mermaid Flowchart Import");
     topics.put("source-json", "Minimal Source JSON");
     topics.put("fragments", "Fragments");
     topics.put("profiles", "Semantic Profiles");

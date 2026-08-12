@@ -28,6 +28,17 @@ class EnginesTest {
   }
 
   @Test
+  void nullCapabilityListsAreTreatedAsEmptyForCompatibility() {
+    Engines engines = Engines.of(null, null, null, null, null);
+
+    assertThat(engines.semantics()).isEmpty();
+    assertThat(engines.layouts()).isEmpty();
+    assertThat(engines.renderers()).isEmpty();
+    assertThat(engines.exporters()).isEmpty();
+    assertThat(engines.importers()).isEmpty();
+  }
+
+  @Test
   void duplicateIdWithinCapabilityIsRejected() {
     // Engines.of indexes each capability by id() and rejects a duplicate id within the same
     // capability (documented in the Engines Javadoc), so two engines sharing "fake-layout" fail.
