@@ -779,13 +779,14 @@ A `deleteMessage` targets a `DestructionOccurrenceSpecification` node naming the
 §17.12.6.4 makes the destruction the last event on its lifeline, so a later
 message at either end is rejected. Other lifelines carry on unaffected.
 
-Two rules here are **dediren's, not UML's**, and are enforced as errors: a
-nested fragment's `covered` lifelines must be contained by its parent's, and a
-combined fragment's owned messages must be contiguous in sequence. UML's
-ordering is partial and permits interleavings both rules reject — `critical`
-exists precisely because ordinary fragments are not protected from interleaving.
-They are kept because the sequence layout depends on them; if a legal
-interleaving is rejected, this is why.
+Two rules here are **dediren's, not UML's**, and are reported as `warn`
+`DEDIREN_UML_SEQUENCE_HOUSE_RULE` rather than enforced: a nested fragment's
+`covered` lifelines being contained by its parent's, and a combined fragment's
+owned messages being contiguous in sequence. UML's ordering is partial and
+permits interleavings both rules describe — `critical` exists precisely because
+ordinary fragments are not protected from interleaving — so a model that trips
+either is legal and is exported as authored. The warning says the sequence
+layout assumes otherwise and the diagram may not read as intended.
 
 ```bash
 "$BUNDLE/bin/dediren" validate \
@@ -1351,6 +1352,15 @@ the source JSON. Read them from `.diagnostics[]`; the envelope `status` stays
   cannot represent. The message says which.
 - `DEDIREN_OEF_VIEWS_OMITTED` (`info`) — declared views this export does not
   carry.
+- `DEDIREN_ARCHIMATE_RELATIONSHIP_DEPRECATED` (`info`) — a relationship the
+  standard deprecates but still permits. Today that is
+  `WorkPackage -[Realization]-> Deliverable`, which §12.1 replaces with an
+  access relationship. The model is legal; a future revision may remove the
+  edge.
+- `DEDIREN_UML_SEQUENCE_HOUSE_RULE` (`warn`) — a sequence rule dediren enforces
+  that UML does not. The model is spec-legal and is exported as authored; the
+  warning says the rendered diagram may not read as intended. See the two named
+  in `## UML Sequence Handoff`.
 
 Two losses have **no diagnostic at all**, because they are properties of the
 mapping rather than of any one document: `out`/`inout` parameters export as
