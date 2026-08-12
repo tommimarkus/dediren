@@ -1426,6 +1426,33 @@ class MainTest {
     }
 
     @Test
+    void umlPseudostateKindsEachGetTheirOwnGlyph() throws Exception {
+      // UML-NOT-3/-4 (§14.2.4.6). Four of the ten kinds had no fixture anywhere in the corpus, and
+      // two of them were drawn with a *different* kind's glyph:
+      //   junction  -- a small filled circle -- was drawn as choice's diamond (static as dynamic)
+      //   terminate -- a bare cross         -- was drawn as exitPoint's circled X, which says the
+      //                                        opposite thing: "control leaves here" vs "the state
+      //                                        machine halts".
+      Element junction = umlPseudostateShape("junction");
+      assertThat(junction.getTagName()).isEqualTo("circle");
+      assertThat(junction.getAttribute("fill")).isEqualTo(junction.getAttribute("stroke"));
+
+      Element choice = umlPseudostateShape("choice");
+      assertThat(choice.getTagName()).isEqualTo("path");
+
+      Element terminate = umlPseudostateShape("terminate");
+      assertThat(terminate.getTagName()).isEqualTo("g");
+      assertThat(childElements(terminate, "line")).hasSize(2);
+      assertThat(childElements(terminate, "circle")).isEmpty();
+
+      // exitPoint keeps the circled X it always had: a bare <circle> carrying the shape marker,
+      // with the "X" as a sibling <text>. That enclosing circle is the whole difference from
+      // terminate above.
+      Element exitPoint = umlPseudostateShape("exitPoint");
+      assertThat(exitPoint.getTagName()).isEqualTo("circle");
+    }
+
+    @Test
     void archimateServiceIconIsOnePillSharedByAllThreeServiceTypes() throws Exception {
       // AM-NOT-11 (A.1): the service icon is a pill -- fully rounded ends -- and it is the same
       // glyph in every layer. It was a rounded rectangle (rx = 0.18 * size), and
@@ -2058,9 +2085,13 @@ class MainTest {
           firstChildElement(groupWithAttribute(document, "data-dediren-edge-id", "m3"), "path");
       assertMarkerForStyle(document, asyncSignal, "m3", "end", "open_arrow");
 
+      // UML-NOT-2 (§17.4.4): a createMessage is a DASHED line with an open arrowhead. Rendered
+      // solid it is indistinguishable from an asynchronous message, so object creation reads as a
+      // signal. Note the reply above shares the dash — the open arrowhead is what separates them
+      // from each other, and the arrowhead is what separates both from a synchCall.
       Element createMessage =
           firstChildElement(groupWithAttribute(document, "data-dediren-edge-id", "m4"), "path");
-      assertThat(createMessage.hasAttribute("stroke-dasharray")).isFalse();
+      assertThat(createMessage.getAttribute("stroke-dasharray")).isEqualTo("8 5");
       assertThat(createMessage.getAttribute("d")).contains("L 600.0 96.0");
       assertMarkerForStyle(document, createMessage, "m4", "end", "open_arrow");
 
@@ -3944,6 +3975,52 @@ class MainTest {
     }
 
     assertNoRelationshipTypesRenderIdentically(semanticProfile, signatureByType);
+  }
+
+  /** The shape element a UML {@code Pseudostate} of {@code kind} draws. */
+  private static Element umlPseudostateShape(String kind) throws Exception {
+    ObjectNode layout = JsonSupport.objectMapper().createObjectNode();
+    layout.put("layout_result_schema_version", "layout-result.schema.v2");
+    layout.put("view_id", "main");
+    layout.set(
+        "nodes",
+        JsonSupport.objectMapper()
+            .readTree(
+                """
+                  [{"id":"ps","source_id":"ps","projection_id":"ps",
+                    "x":40,"y":40,"width":32,"height":32,"label":""}]
+                  """));
+    layout.set("edges", JsonSupport.objectMapper().createArrayNode());
+    layout.set("groups", JsonSupport.objectMapper().createArrayNode());
+    layout.set("warnings", JsonSupport.objectMapper().createArrayNode());
+
+    ObjectNode metadata = JsonSupport.objectMapper().createObjectNode();
+    metadata.put("render_metadata_schema_version", "render-metadata.schema.v1");
+    metadata.put("semantic_profile", "uml");
+    metadata.set(
+        "nodes",
+        JsonSupport.objectMapper()
+            .readTree(
+                """
+                  {"ps": {"type":"Pseudostate","source_id":"ps","properties":{"kind":"%s"}}}
+                  """
+                    .formatted(kind)));
+    metadata.set("edges", JsonSupport.objectMapper().createObjectNode());
+
+    ObjectNode input = JsonSupport.objectMapper().createObjectNode();
+    input.set("layout_result", layout);
+    input.set("render_metadata", metadata);
+    input.set("policy", fixtureJson("fixtures/render-policy/uml-svg.json"));
+    Document document = svgDocument(okContent(render(input)));
+    Element node = groupWithAttribute(document, "data-dediren-node-id", "ps");
+    org.w3c.dom.NodeList children = node.getChildNodes();
+    for (int index = 0; index < children.getLength(); index++) {
+      if (children.item(index) instanceof Element child
+          && "uml_pseudostate".equals(child.getAttribute("data-dediren-node-shape"))) {
+        return child;
+      }
+    }
+    throw new AssertionError("no uml_pseudostate shape emitted for kind " + kind);
   }
 
   /** {@code BusinessService} → {@code archimate_business_service}. */

@@ -639,8 +639,14 @@ final class UmlSequenceRenderer {
    * pass through.
    */
   private static ResolvedEdgeStyle messageStyle(String messageSort, ResolvedEdgeStyle paint) {
+    // §17.4.4 dashes both the reply and the createMessage; the open-vs-filled arrowhead is what
+    // separates them from each other and from a synchronous call. Rendered solid, a createMessage
+    // is byte-identical to an asynchronous message and object creation reads as a signal.
     SvgEdgeLineStyle lineStyle =
-        "reply".equals(messageSort) ? SvgEdgeLineStyle.DASHED : SvgEdgeLineStyle.SOLID;
+        switch (messageSort) {
+          case "reply", "createMessage" -> SvgEdgeLineStyle.DASHED;
+          default -> SvgEdgeLineStyle.SOLID;
+        };
     SvgEdgeMarkerEnd markerEnd =
         switch (messageSort) {
           case "asynchCall", "asynchSignal", "reply", "createMessage" ->

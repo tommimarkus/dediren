@@ -272,12 +272,19 @@ public final class UmlShapes {
       String shapeName) {
     String kind = textField(selector == null ? null : selector.properties(), "kind", "initial");
     switch (kind) {
-      case "choice", "junction" -> umlDiamondShape(w, node, style, shapeName);
+      // §14.2.4.6 gives these distinct glyphs. A junction is a static branch point — a small
+      // filled circle, like the initial pseudostate it shares a shape with; a choice is a
+      // dynamic one and is the diamond. A terminate is a bare cross, and an exit point is a
+      // circle with a cross on its border: drawing terminate as an exit point states the
+      // opposite of what it means.
+      case "choice" -> umlDiamondShape(w, node, style, shapeName);
+      case "junction" -> umlFilledCircleShape(w, node, style, shapeName);
       case "fork", "join" -> umlBarShape(w, node, style, shapeName);
       case "deepHistory" -> umlTextCircleShape(w, node, style, shapeName, "H*");
       case "shallowHistory" -> umlTextCircleShape(w, node, style, shapeName, "H");
       case "entryPoint" -> umlTextCircleShape(w, node, style, shapeName, "E");
-      case "exitPoint", "terminate" -> umlTextCircleShape(w, node, style, shapeName, "X");
+      case "exitPoint" -> umlTextCircleShape(w, node, style, shapeName, "X");
+      case "terminate" -> umlCrossShape(w, node, style, shapeName);
       default -> umlFilledCircleShape(w, node, style, shapeName);
     }
   }
@@ -337,6 +344,33 @@ public final class UmlShapes {
         .attr("fill", style.fill())
         .attr("stroke", style.stroke())
         .attr("stroke-width", styleNumber(style.strokeWidth()));
+  }
+
+  /**
+   * The terminate pseudostate: a bare cross (§14.2.4.6), with no enclosing circle — that circle is
+   * what makes an exit point an exit point.
+   */
+  public static void umlCrossShape(
+      SvgWriter w, LaidOutNode node, ResolvedNodeStyle style, String shapeName) {
+    double centerX = node.x() + node.width() / 2.0;
+    double centerY = node.y() + node.height() / 2.0;
+    double arm = Math.max(5.0, Math.min(node.width(), node.height()) / 2.0 - style.strokeWidth());
+    w.start("g").attr("data-dediren-node-shape", shapeName);
+    crossArm(w, centerX - arm, centerY - arm, centerX + arm, centerY + arm, style);
+    crossArm(w, centerX - arm, centerY + arm, centerX + arm, centerY - arm, style);
+    w.end();
+  }
+
+  private static void crossArm(
+      SvgWriter w, double x1, double y1, double x2, double y2, ResolvedNodeStyle style) {
+    w.empty("line")
+        .attr("x1", f1(x1))
+        .attr("y1", f1(y1))
+        .attr("x2", f1(x2))
+        .attr("y2", f1(y2))
+        .attr("stroke", style.stroke())
+        .attr("stroke-width", styleNumber(style.strokeWidth()))
+        .attr("stroke-linecap", "round");
   }
 
   public static void umlTextCircleShape(
