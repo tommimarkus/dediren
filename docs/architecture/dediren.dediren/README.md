@@ -21,6 +21,34 @@ The UML package `engine-api` carries a cross-notation handoff link
 component: the class view *elaborates* the seam the cooperation view shows as a
 single box.
 
+## Artifact gallery
+
+### Dediren module architecture
+
+Which modules make up the dediren compiler, and how do they depend on each other?
+
+[![Dediren module architecture](generated/svg/module-architecture.svg)](generated/svg/module-architecture.svg)
+
+### Engine seam — typed interfaces and realizations
+
+What typed interfaces does `engine-api` define, and which engine classes realize them?
+
+[![Engine seam — typed interfaces and realizations](generated/svg/engine-seam.svg)](generated/svg/engine-seam.svg)
+
+### Build pipeline — a dediren build call
+
+How does a `dediren build` turn a source model into an SVG, and optionally OEF or XMI, through the `engine-api` seam?
+
+[![Build pipeline — a dediren build call](generated/svg/build-pipeline.svg)](generated/svg/build-pipeline.svg)
+
+### Distribution — one launcher, engines in-process
+
+How does dediren ship and run — the single `bin/dediren` launcher and one shrink-merged `lib` jar hosting the cli and every engine in one process?
+
+[![Distribution — one launcher, engines in-process](generated/svg/distribution.svg)](generated/svg/distribution.svg)
+
+Exports: [ArchiMate Open Exchange Format (OEF)](generated/export/dediren.oef.xml) and [UML 2.5.1 XMI](generated/export/dediren.uml.xmi).
+
 ## What is hand-authored vs generated
 
 Hand-authored, checked-in source (edit these):
@@ -30,8 +58,7 @@ Hand-authored, checked-in source (edit these):
 - `package.json` — the dediren-native build manifest (`package.schema.v1`):
   binds models to views and exports, and carries each view's title, question and
   diagram kind. It replaced the retired `project.json` sidecar, so the whole
-  package now builds in one `dediren build --package` call and the gallery
-  builder reads the same manifest the build does.
+  package now builds in one `dediren build --package` call.
 - `render-policy.json` and `render-policy-uml.json` — both in the repo's Amber
   CRT theme (matching the README pipeline diagram); the UML policy accents
   interfaces in emerald and classes in amber.
@@ -39,16 +66,10 @@ Hand-authored, checked-in source (edit these):
 
 Reproducible output (regenerated from the source above):
 
-- `generated/svg/*.svg` — the rendered diagrams (committed; embedded in the root
-  README and inlined into `gallery.html`).
+- `generated/svg/*.svg` — the rendered diagrams (committed and embedded above).
 - `generated/export/dediren.oef.xml` — ArchiMate Open Exchange Format export.
 - `generated/export/dediren.uml.xmi` — UML 2.5.1 XMI export.
-- `gallery.html` — a self-contained, zoomable, notation-grouped viewer over all
-  four SVGs. Rebuild it with the skill's `build-gallery.py <package>` as the next
-  action after any re-render (`--check` drift-checks it); it reads `package.json`
-  and the committed render-metadata.
-- `generated/render-metadata/*.json` — per-view marker metadata (committed; the
-  gallery builder reads it to rebuild and drift-check `gallery.html`).
+- `generated/render-metadata/*.json` — per-view render metadata (committed).
 - `generated/layout/` — intermediate ELK geometry (git-ignored; recreated on
   every build).
 
@@ -72,14 +93,8 @@ can be several geometry changes behind while still satisfying every
 compatibility floor.
 
 The build writes each view's SVG, render-metadata and export directly to its
-declared output — no copying. Each committed SVG then gets the skill's
-`svg-accessible-name.py` post-render step (title = the view's `presentation.title`,
-desc = its `presentation.question`), which adds a `role="img"`/`<title>`/`<desc>`
-accessible name plus a visible title band. Re-running the build strips the band,
-so re-apply it after every regeneration and before rebuilding the gallery. The
-band is height-synced to the expanded `viewBox` (so browsers do not letterbox
-the diagram) and painted with the diagram's own background colour and a
-contrasting title fill, so it stays readable on the dark Amber CRT canvas.
+declared output — no copying or post-render modification. Native SVG output
+includes its package-derived `role="img"`, `<title>`, `<desc>`, and provenance.
 
 ## Modelling decisions (disclosed)
 
