@@ -382,6 +382,38 @@ Filled in as phases land. Destination is either a `docs/architecture-guidelines.
 | 9 | [warn] `UML-XMI-17` — the coverage partition is id-presence only, so a wrong-metaclass export counts as "represented" and all attribute loss is invisible | Likely §12 row | Making Coverage metaclass-aware is an architecture-scale change to a released contract. |
 | 10 | [info] `UML-NOT-14/15/16/17` — classifier names not boldface while edge labels are; `deleteMessage` arrowhead; abstract italics, GeneralizationSets, FlowFinalNode unauthorable; navigability adornments | §12 row | Coverage gaps, not mis-renders; several are optional in spec. |
 | 11 | [info] `UML-XMI-3` — two tolerated prefixes and one matched wording are dead code | Precision fix to §12 row 676 + `agent-usage.md:271-273` | Net outcome identical; only the stated *mechanism* is inaccurate. Cheap, so fold into Phase 6. |
+| 12 | [block] `UML-NOT-1` — six edge kinds (`Usage`, `Dependency`, `Include`, `Extend`, `Manifestation`, `Deployment`) render byte-identically because there is no edge-keyword surface | **Attempted in Phase 2 and reverted.** Compose the keyword *before layout*, not in the renderer — see the note below. | A render-time composition is architecturally misplaced, and the paint oracle proved it rather than the reasoning: see § The UML-NOT-1 reversal. |
+| 13 | [warn] `UML-NOT-12` — hollow markers and the final-state ring hardcode `#ffffff`, so a dark UML policy would read shared aggregation as composition | Do it once, in the 2026-07-28 plan's dark-policy render wave (item 5), which owns the same `EdgeMarkers` line plus two neighbouring sites and the missing dark-policy golden coverage | Latent (no dark UML policy ships), and fixing one of the wave's three sites piecemeal would leave the design half-made. Already bound in § Coordination. |
+
+## The UML-NOT-1 reversal
+
+Worth writing down, because the finding is a genuine `block` and the obvious fix is wrong in a way
+that only emitted pixels reveal.
+
+Deriving the keyword from the relationship type and prefixing it to the edge label works, is cheap,
+and needs no authored vocabulary — the model already says which kind each edge is. All three
+keyworded fixtures rendered their keywords (`«use»`, `«include»`, `«extend»`, `«manifest»`,
+`«deploy»`), with `Dependency` correctly left bare as the unkeyworded base case (§7.7.4).
+
+Then `SvgPaintAuditCorpusTest` failed on `uml-deployment-basic` with an
+`edge_label_node_collision`: the `«manifest» manifests` label painting over the
+`artifact-orders-service` node.
+
+The cause is not the placement algorithm. **Layout had already reserved space for the author's
+`manifests`** — the label is in the layout result — and the renderer then widened it. Every
+keyworded edge that carries an author label is under-reserved by exactly the width of its keyword,
+so this is general, not one crowded fixture. `CLAUDE.md`'s ELK-first rule names the correct
+response: express the intent in the layout graph rather than repairing geometry after the fact.
+
+So the keyword has to be composed **upstream of layout** — in projection, where the render metadata
+is built and the layout request still carries edge labels — so ELK reserves the real width. That is
+a pipeline-seam change (`SceneProjection` → layout request → render), not a renderer change, and it
+belongs in its own slice with layout-fixture regeneration.
+
+Two things this cost nothing to learn and would have been expensive to ship: the paint oracle earns
+its runtime (a golden diff would have looked like a correct keyword appearing), and a finding that
+names a defect still does not name where the fix belongs — the second time this register has shown
+that, after `UML-NOT-7`.
 
 ## Post-plan followups
 
@@ -413,3 +445,17 @@ _Written past-tense as phases land._
   agreed.
   **Accepted (info):** `AM-NOT-12`'s per-layer letter cue stays unimplemented — optional in spec,
   and colour already carries the layer. Deferred to the disposition table: `AM-NOT-8/9/10`.
+- Phase 2: **landed** — `UML-NOT-2/-3/-4/-5/-7/-8`, `UML-VOCAB-1` and the `sd` half of `UML-NOT-9`
+  closed. Render+cli+uml+uml-xmi-export green; full paint lane green. Goldens: four sequence SVGs,
+  one class SVG, one deployment SVG, one raster manifest SHA — each diff read before committing.
+  **Two findings did not land, both deliberately:** `UML-NOT-1` was implemented, proven wrong by the
+  paint oracle, and reverted (§ The UML-NOT-1 reversal); `UML-NOT-12` is bound to the 2026-07-28
+  dark-policy wave, which owns two further sites and the missing golden coverage.
+  **Accepted (info):** `UML-NOT-9`'s `entryPoint` named circle stays unimplemented — the recorded
+  `ARCH-L-004` label won't-fix means a pseudostate name never renders, so a "named circle" cannot be
+  produced without reopening that decision.
+  **Method note.** Where Phase 1's defects were all invisible-to-a-green-suite, Phase 2's were
+  invisible in a second way: two of them had *existing tests asserting the defect*. The deployment
+  test pinned the Artifact dog-ear on a DeploymentSpecification, and the sequence test pinned the
+  absence of a dash on a createMessage. Both had to move with the fix. A test that encodes current
+  behaviour is not evidence that the behaviour is correct — and it reads exactly like one.
