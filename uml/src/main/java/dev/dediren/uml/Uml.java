@@ -23,6 +23,38 @@ import tools.jackson.databind.JsonNode;
 public final class Uml {
   private static final List<String> STRUCTURAL_TYPES =
       List.of("Package", "Class", "Interface", "DataType", "Enumeration", "Component");
+
+  /**
+   * The element types that are Classifiers (&sect;9.2), and so are also Types (&sect;7.3.3).
+   *
+   * <p>Association ends are typed by Type (&sect;11.5.3.1) and Generalization ends by Classifier
+   * (&sect;9.9.7.5); dediren models no Type that is not a Classifier, so one set serves both.
+   * {@code Package} is neither (&sect;12.4.5.3), while Actor, UseCase and the deployment
+   * classifiers all are &mdash; the single six-name structural predicate that used to stand here
+   * was wrong in both directions at once.
+   */
+  private static final Set<String> CLASSIFIER_TYPES =
+      Set.of(
+          "Class",
+          "Interface",
+          "DataType",
+          "Enumeration",
+          "Component",
+          "Actor",
+          "UseCase",
+          "Node",
+          "Device",
+          "ExecutionEnvironment",
+          "Artifact",
+          "DeploymentSpecification");
+
+  /**
+   * §18.2.1.4: an Actor's Associations reach UseCases, Components and Classes, and nothing else.
+   * Wider than the Actor&harr;UseCase pair the rules allowed, and still a real restriction.
+   */
+  private static final Set<String> ACTOR_ASSOCIATION_PARTNERS =
+      Set.of("UseCase", "Component", "Class");
+
   private static final List<String> ACTIVITY_TYPES =
       List.of(
           "Activity",
@@ -402,13 +434,7 @@ public final class Uml {
   }
 
   public static void validateElementType(String value, String path) throws UmlValidationException {
-    if (!isStructuralType(value)
-        && !isActivityType(value)
-        && !isSequenceType(value)
-        && !isStateMachineType(value)
-        && !isUseCaseType(value)
-        && !isComponentType(value)
-        && !isDeploymentType(value)) {
+    if (!isNamedElementType(value)) {
       throw new UmlValidationException(UmlTypeKind.ELEMENT, value, path);
     }
   }
@@ -424,11 +450,20 @@ public final class Uml {
       String relationshipType, String sourceType, String targetType, String path)
       throws UmlValidationException {
     boolean endpointsSupported;
-    if (STRUCTURAL_RELATIONSHIP_TYPES.contains(relationshipType)) {
+    // The structural relationships do not share one type system. Association and its containment
+    // variants take Types, Generalization takes Classifiers, and the dependency-derived ones take
+    // NamedElements — which is nearly everything, Packages included.
+    if ("Association".equals(relationshipType)
+        || "Composition".equals(relationshipType)
+        || "Aggregation".equals(relationshipType)) {
       endpointsSupported =
-          isStructuralType(sourceType) && isStructuralType(targetType)
-              || "Association".equals(relationshipType)
-                  && isActorUseCasePair(sourceType, targetType);
+          isClassifierType(sourceType)
+              && isClassifierType(targetType)
+              && isActorAssociationLegal(sourceType, targetType);
+    } else if ("Generalization".equals(relationshipType)) {
+      endpointsSupported = isClassifierType(sourceType) && isClassifierType(targetType);
+    } else if ("Realization".equals(relationshipType) || "Dependency".equals(relationshipType)) {
+      endpointsSupported = isNamedElementType(sourceType) && isNamedElementType(targetType);
     } else if (ACTIVITY_FLOW_TYPES.contains(relationshipType)) {
       endpointsSupported = isActivityType(sourceType) && isActivityType(targetType);
     } else if ("Message".equals(relationshipType)) {
@@ -440,7 +475,9 @@ public final class Uml {
     } else if ("Include".equals(relationshipType) || "Extend".equals(relationshipType)) {
       endpointsSupported = "UseCase".equals(sourceType) && "UseCase".equals(targetType);
     } else if ("Usage".equals(relationshipType)) {
-      endpointsSupported = isComponentUsageSource(sourceType) && isStructuralType(targetType);
+      // §7.8.23.3 gives Usage no constraint beyond Dependency's, so the canonical «use» from a
+      // Class to an Interface is legal; the Component/Port source restriction had no spec basis.
+      endpointsSupported = isNamedElementType(sourceType) && isNamedElementType(targetType);
     } else if ("Deployment".equals(relationshipType)) {
       endpointsSupported = isDeployedArtifactType(sourceType) && isDeploymentTargetType(targetType);
     } else if ("Manifestation".equals(relationshipType)) {
@@ -849,10 +886,6 @@ public final class Uml {
         || "CommunicationPath".equals(value);
   }
 
-  private static boolean isComponentUsageSource(String value) {
-    return "Component".equals(value) || "Port".equals(value);
-  }
-
   private static boolean isDeployedArtifactType(String value) {
     return "Artifact".equals(value) || "DeploymentSpecification".equals(value);
   }
@@ -865,9 +898,34 @@ public final class Uml {
     return "Node".equals(value) || "Device".equals(value);
   }
 
-  private static boolean isActorUseCasePair(String sourceType, String targetType) {
-    return "Actor".equals(sourceType) && "UseCase".equals(targetType)
-        || "UseCase".equals(sourceType) && "Actor".equals(targetType);
+  private static boolean isClassifierType(String value) {
+    return CLASSIFIER_TYPES.contains(value);
+  }
+
+  /**
+   * Every element type the profile accepts is a NamedElement (&sect;7.8.4.5), which is what a
+   * Dependency's ends are. Also the membership test {@link #validateElementType} applies, so the
+   * two cannot drift apart.
+   */
+  private static boolean isNamedElementType(String value) {
+    return isStructuralType(value)
+        || isActivityType(value)
+        || isSequenceType(value)
+        || isStateMachineType(value)
+        || isUseCaseType(value)
+        || isComponentType(value)
+        || isDeploymentType(value);
+  }
+
+  /** §18.2.1.4: an Actor associates only with UseCases, Components and Classes. */
+  private static boolean isActorAssociationLegal(String sourceType, String targetType) {
+    if ("Actor".equals(sourceType)) {
+      return ACTOR_ASSOCIATION_PARTNERS.contains(targetType);
+    }
+    if ("Actor".equals(targetType)) {
+      return ACTOR_ASSOCIATION_PARTNERS.contains(sourceType);
+    }
+    return true;
   }
 
   private static boolean isUseCaseSubjectClassifier(String value) {

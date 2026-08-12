@@ -117,6 +117,54 @@ class UmlValidationTest {
   }
 
   @Test
+  void associationAndGeneralizationEndsMustBeClassifiersNotJustPackagesAndClasses()
+      throws Exception {
+    // One predicate over six names stood in for three different spec type systems, so it was at
+    // once too wide and too narrow. §12.4.5.3 makes a Package not a Type, and §9.9.7.5 requires
+    // both Generalization ends to be Classifiers — while Actor, UseCase, Artifact and Node all are.
+    assertThat(endpointsAllowed("Association", "Package", "Package")).isFalse();
+    assertThat(endpointsAllowed("Generalization", "Package", "Package")).isFalse();
+    assertThat(endpointsAllowed("Generalization", "Actor", "Actor")).isTrue();
+    assertThat(endpointsAllowed("Generalization", "UseCase", "UseCase")).isTrue();
+    assertThat(endpointsAllowed("Generalization", "Node", "Node")).isTrue();
+    assertThat(endpointsAllowed("Generalization", "Artifact", "Artifact")).isTrue();
+    // A Port is a Property, and a Lifeline is not a Classifier either.
+    assertThat(endpointsAllowed("Generalization", "Port", "Port")).isFalse();
+    assertThat(endpointsAllowed("Association", "Lifeline", "Class")).isFalse();
+  }
+
+  @Test
+  void actorAssociationsFollowTheSpecsOwnList() throws Exception {
+    // §18.2.1.4 constrains an Actor's Associations to UseCases, Components and Classes — which is
+    // both wider than the Actor↔UseCase pair the rules allowed, and still a real restriction.
+    assertThat(endpointsAllowed("Association", "Actor", "Class")).isTrue();
+    assertThat(endpointsAllowed("Association", "Actor", "Component")).isTrue();
+    assertThat(endpointsAllowed("Association", "Actor", "UseCase")).isTrue();
+    assertThat(endpointsAllowed("Association", "Class", "Actor")).isTrue();
+    assertThat(endpointsAllowed("Association", "Actor", "Actor")).isFalse();
+    assertThat(endpointsAllowed("Association", "Actor", "Interface")).isFalse();
+  }
+
+  @Test
+  void dependencyEndsAreNamedElementsSoAPackageIsLegal() throws Exception {
+    // §7.8.4.5 types Dependency's ends as NamedElement, which a Package is. Usage adds no
+    // constraint of its own (§7.8.23.3), so the canonical «use» from a Class to an Interface —
+    // rejected by a source restriction with no basis in the spec — is legal.
+    assertThat(endpointsAllowed("Dependency", "Package", "Package")).isTrue();
+    assertThat(endpointsAllowed("Usage", "Class", "Interface")).isTrue();
+    assertThat(endpointsAllowed("Usage", "Interface", "Interface")).isTrue();
+  }
+
+  private static boolean endpointsAllowed(String relationship, String source, String target) {
+    try {
+      Uml.validateRelationshipEndpointTypes(relationship, source, target, "$.relationship");
+      return true;
+    } catch (UmlValidationException rejected) {
+      return false;
+    }
+  }
+
+  @Test
   void acceptsUmlComponentVocabulary() throws Exception {
     Fixture fixture = loadUmlComponentFixture();
 
@@ -249,17 +297,17 @@ class UmlValidationTest {
   }
 
   @Test
-  void rejectsUsageWithPortTargetEndpoint() throws Exception {
+  void acceptsUsageWithPortTargetEndpoint() throws Exception {
+    // Once asserted as rejected. §7.8.23.3 gives Usage no constraint beyond Dependency's, whose
+    // ends are NamedElements (§7.8.4.5) — a Port is one. The restriction that rejected this was
+    // dediren's own, not the language's.
     Fixture fixture =
         loadMutatedUmlComponentFixture(
             source ->
                 relationshipById(source, "order-api-uses-payment")
                     .put("target", "port-payment-client"));
 
-    UmlValidationException error = assertRejected(fixture);
-
-    assertThat(error.code()).isEqualTo("DEDIREN_UML_RELATIONSHIP_ENDPOINT_UNSUPPORTED");
-    assertThat(error.value()).isEqualTo("Usage: Component -> Port");
+    Uml.validateSource(fixture.source(), fixture.pluginData());
   }
 
   @Test
@@ -1265,17 +1313,17 @@ class UmlValidationTest {
   }
 
   @Test
-  void rejectsUsageWithInterfaceSourceEndpoint() throws Exception {
+  void acceptsUsageWithInterfaceSourceEndpoint() throws Exception {
+    // Also once asserted as rejected, by the same Component/Port source restriction. The canonical
+    // «use» dependency the restriction blocked — a Class or Interface using an Interface — is the
+    // most common Usage there is.
     Fixture fixture =
         loadMutatedUmlComponentFixture(
             source ->
                 relationshipById(source, "order-api-uses-payment")
                     .put("source", "interface-order-api"));
 
-    UmlValidationException error = assertRejected(fixture);
-
-    assertThat(error.code()).isEqualTo("DEDIREN_UML_RELATIONSHIP_ENDPOINT_UNSUPPORTED");
-    assertThat(error.value()).isEqualTo("Usage: Interface -> Interface");
+    Uml.validateSource(fixture.source(), fixture.pluginData());
   }
 
   @Test
