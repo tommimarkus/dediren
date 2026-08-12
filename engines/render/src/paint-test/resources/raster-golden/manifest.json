@@ -1,156 +1,142 @@
 {
-  "schema": "dediren-render-paint-raster-manifest-v3",
-  "purpose": "Deterministic raster backstop for repository-owned SVG render fixtures",
-  "renderer": {
-    "name": "Chromium headless shell via Playwright Java",
-    "playwright": {
-      "version": "1.61.0",
-      "mavenArtifact": "com.microsoft.playwright:playwright:1.61.0",
-      "scope": "render-paint-test-profile-only",
-      "upstream": "https://playwright.dev/java/",
-      "license": "Apache-2.0"
+  "schema" : "dediren-render-paint-raster-manifest-v3",
+  "purpose" : "Deterministic raster backstop for repository-owned SVG render fixtures",
+  "renderer" : {
+    "name" : "Chromium headless shell via Playwright Java",
+    "playwright" : {
+      "version" : "1.61.0",
+      "mavenArtifact" : "com.microsoft.playwright:playwright:1.61.0",
+      "scope" : "render-paint-test-profile-only",
+      "upstream" : "https://playwright.dev/java/",
+      "license" : "Apache-2.0"
     },
-    "chromium": {
-      "version": "149.0.7827.55",
-      "revision": "1228",
-      "distribution": "chromium-headless-shell",
-      "cache": ".cache/playwright",
-      "downloadedBy": "playwright install --only-shell chromium",
-      "shippedWithDediren": false,
-      "committed": false,
-      "nativeExecutable": true
+    "chromium" : {
+      "version" : "149.0.7827.55",
+      "revision" : "1228",
+      "distribution" : "chromium-headless-shell",
+      "cache" : ".cache/playwright",
+      "downloadedBy" : "playwright install --only-shell chromium",
+      "shippedWithDediren" : false,
+      "committed" : false,
+      "nativeExecutable" : true
     },
-    "geometryAuthority": "Chromium SVG DOM geometry, computed styles and transparent pixel masks",
-    "rasterEnvironment": {
-      "headless": true,
-      "locale": "en-US",
-      "timezone": "UTC",
-      "reducedMotion": "reduce",
-      "viewport": "intrinsic SVG CSS-pixel dimensions rounded up with 32 transparent CSS pixels on every side and visible root overflow; audit documents additionally add a 64 user-unit safety border on every side",
-      "deviceScaleFactor": 1,
-      "background": "transparent",
-      "outputFormat": "Chromium PNG, 8-bit RGBA",
-      "lifecycle": "one non-persistent browser, context, and page per BrowserSvg; close() disposes all three",
-      "network": "offline context, blocked service workers, and catch-all route abort with no external URLs in admitted SVG",
-      "telemetry": "background networking, component updates, domain reliability, sync, crash reporting, translation, media routing, optimization hints, extensions, and default apps disabled"
+    "geometryAuthority" : "Chromium SVG DOM geometry, computed styles and transparent pixel masks",
+    "rasterEnvironment" : {
+      "headless" : true,
+      "locale" : "en-US",
+      "timezone" : "UTC",
+      "reducedMotion" : "reduce",
+      "viewport" : "intrinsic SVG CSS-pixel dimensions rounded up with 32 transparent CSS pixels on every side and visible root overflow; audit documents additionally add a 64 user-unit safety border on every side",
+      "deviceScaleFactor" : 1,
+      "background" : "transparent",
+      "outputFormat" : "Chromium PNG, 8-bit RGBA",
+      "lifecycle" : "one non-persistent browser, context, and page per BrowserSvg; close() disposes all three",
+      "network" : "offline context, blocked service workers, and catch-all route abort with no external URLs in admitted SVG",
+      "telemetry" : "background networking, component updates, domain reliability, sync, crash reporting, translation, media routing, optimization hints, extensions, and default apps disabled"
     }
   },
-  "font": {
-    "family": "Liberation Sans",
-    "file": {
-      "path": "engines/render/src/test/resources/fonts/LiberationSans-Regular.ttf",
-      "sha256": "76d04c18ea243f426b7de1f3ad208e927008f961dc5945e5aad352d0dfde8ee8"
+  "font" : {
+    "family" : "Liberation Sans",
+    "file" : {
+      "path" : "engines/render/src/test/resources/fonts/LiberationSans-Regular.ttf",
+      "sha256" : "76d04c18ea243f426b7de1f3ad208e927008f961dc5945e5aad352d0dfde8ee8"
     },
-    "license": {
-      "spdxExpression": "OFL-1.1-RFN",
-      "reservedFontNames": [
-        "Arimo",
-        "Tinos",
-        "Cousine",
-        "Liberation"
-      ],
-      "file": {
-        "path": "engines/render/src/test/resources/fonts/LiberationSans-Regular.LICENSE.txt",
-        "sha256": "93fed46019c38bbe566b479d22148e2e8a1e85ada614accb0211c37b2c61c19b"
+    "license" : {
+      "spdxExpression" : "OFL-1.1-RFN",
+      "reservedFontNames" : [ "Arimo", "Tinos", "Cousine", "Liberation" ],
+      "file" : {
+        "path" : "engines/render/src/test/resources/fonts/LiberationSans-Regular.LICENSE.txt",
+        "sha256" : "93fed46019c38bbe566b479d22148e2e8a1e85ada614accb0211c37b2c61c19b"
       }
     },
-    "provenance": {
-      "upstream": "https://github.com/liberationfonts/liberation-fonts",
-      "fedoraPackage": "liberation-sans-fonts-2.1.5-15.fc44.noarch",
-      "fedoraPackagePage": "https://packages.fedoraproject.org/pkgs/liberation-fonts/liberation-sans-fonts/",
-      "verification": "The repository font and licence bytes match the named Fedora package files."
+    "provenance" : {
+      "upstream" : "https://github.com/liberationfonts/liberation-fonts",
+      "fedoraPackage" : "liberation-sans-fonts-2.1.5-15.fc44.noarch",
+      "fedoraPackagePage" : "https://packages.fedoraproject.org/pkgs/liberation-fonts/liberation-sans-fonts/",
+      "verification" : "The repository font and licence bytes match the named Fedora package files."
     },
-    "systemFallbackForBlockingChecks": false,
-    "loading": "The existing repository font is embedded as a data @font-face; document.fonts.load is forced before document.fonts.ready and document.fonts.check are awaited.",
-    "unsupportedGlyphPolicy": "Runs containing glyphs absent from the pinned font are advisory font_missing and are not used for blocking geometry or contrast checks."
+    "systemFallbackForBlockingChecks" : false,
+    "loading" : "The existing repository font is embedded as a data @font-face; document.fonts.load is forced before document.fonts.ready and document.fonts.check are awaited.",
+    "unsupportedGlyphPolicy" : "Runs containing glyphs absent from the pinned font are advisory font_missing and are not used for blocking geometry or contrast checks."
   },
-  "calibration": {
-    "purpose": "Environment probe gating raster-golden regeneration. Regeneration is refused unless this environment reproduces the baseline pixels below, judged by the same comparator the goldens use.",
-    "rationale": "Replaces a pinned container digest. The digest was a proxy for rasterizer fidelity and answered it badly in both directions; Chromium is Playwright-downloaded at a pinned version and the font is embedded as a data URI, so the host supplies neither the browser nor the glyphs.",
-    "inputOwnership": "Static repository-owned SVG, deliberately not produced by the render engine: a rendered fixture would move with the renderer and stop probing the environment alone.",
-    "svg": {
-      "path": "engines/render/src/paint-test/resources/raster-calibration/calibration.svg",
-      "sha256": "16e7765d316424fcf82f4c19a8cab56ce1a6ad0227ffabf1f1cf33952044a516"
+  "calibration" : {
+    "purpose" : "Environment probe gating raster-golden regeneration. Regeneration is refused unless this environment reproduces the baseline pixels below, judged by the same comparator the goldens use.",
+    "rationale" : "Replaces a pinned container digest. The digest was a proxy for rasterizer fidelity and answered it badly in both directions; Chromium is Playwright-downloaded at a pinned version and the font is embedded as a data URI, so the host supplies neither the browser nor the glyphs.",
+    "inputOwnership" : "Static repository-owned SVG, deliberately not produced by the render engine: a rendered fixture would move with the renderer and stop probing the environment alone.",
+    "svg" : {
+      "path" : "engines/render/src/paint-test/resources/raster-calibration/calibration.svg",
+      "sha256" : "16e7765d316424fcf82f4c19a8cab56ce1a6ad0227ffabf1f1cf33952044a516"
     },
-    "baseline": {
-      "path": "engines/render/src/paint-test/resources/raster-calibration/calibration.png",
-      "sha256": "7c9ee67dd782ff72796aea2da932df9d883043d0561f6d07b4dab35765381989"
+    "baseline" : {
+      "path" : "engines/render/src/paint-test/resources/raster-calibration/calibration.png",
+      "sha256" : "7c9ee67dd782ff72796aea2da932df9d883043d0561f6d07b4dab35765381989"
     }
   },
-  "comparator": {
-    "implementation": "engines/render/src/paint-test/java/dev/dediren/plugins/render/RasterDiff.java",
-    "equalDimensionsRequired": true,
-    "perChannelThreshold": 8,
-    "thresholdRule": "Differences of 8 or less in every RGBA channel are ignored; any channel difference above 8 changes the pixel.",
-    "changedPixelTolerance": 0,
-    "connectedRegionAdjacency": 4,
-    "failureArtifacts": [
-      "actual",
-      "mask",
-      "overlay"
-    ]
+  "comparator" : {
+    "implementation" : "engines/render/src/paint-test/java/dev/dediren/plugins/render/RasterDiff.java",
+    "equalDimensionsRequired" : true,
+    "perChannelThreshold" : 8,
+    "thresholdRule" : "Differences of 8 or less in every RGBA channel are ignored; any channel difference above 8 changes the pixel.",
+    "changedPixelTolerance" : 0,
+    "connectedRegionAdjacency" : 4,
+    "failureArtifacts" : [ "actual", "mask", "overlay" ]
   },
-  "generation": {
-    "rendererImplementation": "engines/render/src/main/java/dev/dediren/plugins/render",
-    "ownership": "The PNG baselines are generated documents produced solely from repository-owned fixtures and renderer code using the test-profile Chromium headless shell and the bundled licensed font.",
-    "thirdPartyLogosOrEmbeddedFixtureAssets": false,
-    "regenerationProperty": "dediren.render.paint.regenerate-goldens",
-    "regenerationRequiresPinnedEnvironment": false,
-    "pinnedEnvironment": "The listed Playwright and Chromium versions, DPR, viewport rule and font digest.",
-    "regenerationGate": "Refused unless this environment reproduces the calibration baseline under the comparator below. Measures rasterizer fidelity directly rather than inferring it from the environment identity, so any environment that agrees with the committed pixels may mint baselines and one that does not may not, wherever it runs."
+  "generation" : {
+    "rendererImplementation" : "engines/render/src/main/java/dev/dediren/plugins/render",
+    "ownership" : "The PNG baselines are generated documents produced solely from repository-owned fixtures and renderer code using the test-profile Chromium headless shell and the bundled licensed font.",
+    "thirdPartyLogosOrEmbeddedFixtureAssets" : false,
+    "regenerationProperty" : "dediren.render.paint.regenerate-goldens",
+    "regenerationRequiresPinnedEnvironment" : false,
+    "pinnedEnvironment" : "The listed Playwright and Chromium versions, DPR, viewport rule and font digest.",
+    "regenerationGate" : "Refused unless this environment reproduces the calibration baseline under the comparator below. Measures rasterizer fidelity directly rather than inferring it from the environment identity, so any environment that agrees with the committed pixels may mint baselines and one that does not may not, wherever it runs."
   },
-  "scenarios": [
-    {
-      "name": "pipeline-rich-light",
-      "description": "Rich standard graph, light theme",
-      "layoutFixture": "fixtures/layout-result/pipeline-rich.json",
-      "policyFixture": "fixtures/render-policy/default-svg.json",
-      "metadataFixture": null,
-      "baseline": "engines/render/src/paint-test/resources/raster-golden/pipeline-rich-light.png",
-      "dimensions": {
-        "width": 1646,
-        "height": 549
-      },
-      "sha256": "8f4940f57ba81b35449df5ac76854b9804d87d388abee1524302c367d9bd5959"
+  "scenarios" : [ {
+    "name" : "pipeline-rich-light",
+    "description" : "Rich standard graph, light theme",
+    "layoutFixture" : "fixtures/layout-result/pipeline-rich.json",
+    "policyFixture" : "fixtures/render-policy/default-svg.json",
+    "metadataFixture" : null,
+    "baseline" : "engines/render/src/paint-test/resources/raster-golden/pipeline-rich-light.png",
+    "dimensions" : {
+      "width" : 1646,
+      "height" : 549
     },
-    {
-      "name": "pipeline-rich-dark",
-      "description": "The same rich standard graph, dark theme",
-      "layoutFixture": "fixtures/layout-result/pipeline-rich.json",
-      "policyFixture": "fixtures/render-policy/dark-svg.json",
-      "metadataFixture": null,
-      "baseline": "engines/render/src/paint-test/resources/raster-golden/pipeline-rich-dark.png",
-      "dimensions": {
-        "width": 1646,
-        "height": 549
-      },
-      "sha256": "860f5a0b9772f60e71fe1e125b373bb56ff2f85f4e81b8b40939267832b795f2"
+    "sha256" : "8f4940f57ba81b35449df5ac76854b9804d87d388abee1524302c367d9bd5959"
+  }, {
+    "name" : "pipeline-rich-dark",
+    "description" : "The same rich standard graph, dark theme",
+    "layoutFixture" : "fixtures/layout-result/pipeline-rich.json",
+    "policyFixture" : "fixtures/render-policy/dark-svg.json",
+    "metadataFixture" : null,
+    "baseline" : "engines/render/src/paint-test/resources/raster-golden/pipeline-rich-dark.png",
+    "dimensions" : {
+      "width" : 1646,
+      "height" : 549
     },
-    {
-      "name": "archimate-decorators",
-      "description": "ArchiMate diagram with decorators and markers",
-      "layoutFixture": "fixtures/layout-result/archimate-oef-basic.json",
-      "policyFixture": "fixtures/render-policy/archimate-svg.json",
-      "metadataFixture": "fixtures/render-metadata/archimate-basic.json",
-      "baseline": "engines/render/src/paint-test/resources/raster-golden/archimate-decorators.png",
-      "dimensions": {
-        "width": 571,
-        "height": 209
-      },
-      "sha256": "3343b99a143d623043d622501b24d1cca067af90e72fbd545d4b3798344ed7b2"
+    "sha256" : "860f5a0b9772f60e71fe1e125b373bb56ff2f85f4e81b8b40939267832b795f2"
+  }, {
+    "name" : "archimate-decorators",
+    "description" : "ArchiMate diagram with decorators and markers",
+    "layoutFixture" : "fixtures/layout-result/archimate-oef-basic.json",
+    "policyFixture" : "fixtures/render-policy/archimate-svg.json",
+    "metadataFixture" : "fixtures/render-metadata/archimate-basic.json",
+    "baseline" : "engines/render/src/paint-test/resources/raster-golden/archimate-decorators.png",
+    "dimensions" : {
+      "width" : 571,
+      "height" : 209
     },
-    {
-      "name": "uml-sequence-fragments",
-      "description": "UML sequence diagram with fragment chrome",
-      "layoutFixture": "fixtures/layout-result/uml-sequence-fragments.json",
-      "policyFixture": "fixtures/render-policy/uml-svg.json",
-      "metadataFixture": "fixtures/render-metadata/uml-sequence-fragments.json",
-      "baseline": "engines/render/src/paint-test/resources/raster-golden/uml-sequence-fragments.png",
-      "dimensions": {
-        "width": 1073,
-        "height": 1073
-      },
-      "sha256": "d3fb53ba71ec7a082f0f7d85d82b9e5ac6545b91835353b20434be27b6c42e29"
-    }
-  ]
+    "sha256" : "443c142f56d0129dad65e5a1a501bebc9f83eddf9eb2df91e04ffb0e2ff9fb50"
+  }, {
+    "name" : "uml-sequence-fragments",
+    "description" : "UML sequence diagram with fragment chrome",
+    "layoutFixture" : "fixtures/layout-result/uml-sequence-fragments.json",
+    "policyFixture" : "fixtures/render-policy/uml-svg.json",
+    "metadataFixture" : "fixtures/render-metadata/uml-sequence-fragments.json",
+    "baseline" : "engines/render/src/paint-test/resources/raster-golden/uml-sequence-fragments.png",
+    "dimensions" : {
+      "width" : 1073,
+      "height" : 1073
+    },
+    "sha256" : "d3fb53ba71ec7a082f0f7d85d82b9e5ac6545b91835353b20434be27b6c42e29"
+  } ]
 }
