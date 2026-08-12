@@ -684,6 +684,9 @@ final class ElkLayoutEngine {
           // so the route runs from the declared source to the declared target.
           Collections.reverse(routePoints);
         }
+        routePoints =
+            OrthogonalRouteNormalizer.collapseStairSteps(
+                routePoints, nodes, edge.source(), edge.target());
         edges.add(
             new LaidOutEdge(
                 edge.id(),
@@ -697,8 +700,9 @@ final class ElkLayoutEngine {
                 edgePointers.get(edge.id())));
       }
     }
-    // Route geometry belongs to ELK Layered. Keep route-quality concerns in
-    // ELK graph construction, ELK options, and validation diagnostics.
+    // ELK Layered owns placement and routing. Compound edges arrive as joined hierarchy sections;
+    // the normalizer only collapses redundant alternating joins when the shorter route remains
+    // orthogonal and clear of every unrelated node.
 
     return new LayoutResult(
         ContractVersions.LAYOUT_RESULT_SCHEMA_VERSION,

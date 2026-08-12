@@ -126,17 +126,11 @@ class ElkLayoutEngineTest {
     assertEquals(24.0, root.getProperty(CoreOptions.SPACING_EDGE_EDGE), GEOMETRY_EPSILON);
     assertEquals(24.0, root.getProperty(CoreOptions.SPACING_PORT_PORT), GEOMETRY_EPSILON);
     assertEquals(
-        40.0,
-        root.getProperty(LayeredOptions.SPACING_NODE_NODE_BETWEEN_LAYERS),
-        GEOMETRY_EPSILON);
+        40.0, root.getProperty(LayeredOptions.SPACING_NODE_NODE_BETWEEN_LAYERS), GEOMETRY_EPSILON);
     assertEquals(
-        24.0,
-        root.getProperty(LayeredOptions.SPACING_EDGE_NODE_BETWEEN_LAYERS),
-        GEOMETRY_EPSILON);
+        24.0, root.getProperty(LayeredOptions.SPACING_EDGE_NODE_BETWEEN_LAYERS), GEOMETRY_EPSILON);
     assertEquals(
-        24.0,
-        root.getProperty(LayeredOptions.SPACING_EDGE_EDGE_BETWEEN_LAYERS),
-        GEOMETRY_EPSILON);
+        24.0, root.getProperty(LayeredOptions.SPACING_EDGE_EDGE_BETWEEN_LAYERS), GEOMETRY_EPSILON);
   }
 
   // Regression: sibling edges leaving one node side must not fan out past the port pitch. ELK
@@ -1868,19 +1862,13 @@ class ElkLayoutEngineTest {
   }
 
   @Test
-  void groupedPipelineBoundsWorstRouteCornerCount() {
+  void groupedPipelineHasNoAlternatingStairSteps() {
     LayoutResult result = new ElkLayoutEngine().layout(groupedPipelineRequest());
-    LaidOutEdge worstEdge =
-        result.edges().stream()
-            .max(java.util.Comparator.comparingInt(edge -> cornerCount(edge.points())))
-            .orElseThrow();
+    ElkLayoutRenderArtifacts.write(result);
 
-    assertTrue(
-        cornerCount(worstEdge.points()) <= 4,
-        "compact grouped pipeline should keep its worst route at four visible corners, edge="
-            + worstEdge.id()
-            + ", points="
-            + worstEdge.points());
+    for (LaidOutEdge edge : result.edges()) {
+      assertNoAlternatingStairSteps(edge);
+    }
   }
 
   @Test
@@ -3313,6 +3301,34 @@ class ElkLayoutEngineTest {
               + " ("
               + current
               + "); route="
+              + points);
+    }
+  }
+
+  // Alternating parallel legs paint as a staircase. A clean two-corner dogleg can legitimately
+  // move across the flow axis once; a second step adds corners without adding routing meaning.
+  private static void assertNoAlternatingStairSteps(LaidOutEdge edge) {
+    assertRouted(edge);
+    List<Point> points = edge.points();
+    for (int index = 0; index < points.size() - 5; index++) {
+      RouteOrientation first = routeOrientation(points.get(index), points.get(index + 1));
+      RouteOrientation second = routeOrientation(points.get(index + 1), points.get(index + 2));
+      RouteOrientation third = routeOrientation(points.get(index + 2), points.get(index + 3));
+      RouteOrientation fourth = routeOrientation(points.get(index + 3), points.get(index + 4));
+      RouteOrientation fifth = routeOrientation(points.get(index + 4), points.get(index + 5));
+      assertFalse(
+          first != null
+              && second != null
+              && first == third
+              && first == fifth
+              && second == fourth
+              && first != second,
+          "edge "
+              + edge.id()
+              + " has an alternating five-segment staircase"
+              + " at segment "
+              + index
+              + "; route="
               + points);
     }
   }

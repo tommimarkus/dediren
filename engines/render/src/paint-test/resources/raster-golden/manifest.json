@@ -111,7 +111,7 @@
         "width": 1458,
         "height": 560
       },
-      "sha256": "b762d295d8a4ad858827b5c93c632064761fcd72799cf10bab6ebf412d24adc7"
+      "sha256": "1a74fbc9e841214dbaa2685b8e629f093f0b4e3a236687dd613e3d0a2e3c492a"
     },
     {
       "name": "pipeline-rich-dark",
@@ -124,7 +124,7 @@
         "width": 1458,
         "height": 561
       },
-      "sha256": "7c4140f2542843254ea5b109663340a05f4a85332e2c48a5284fb23b245a60c7"
+      "sha256": "a925cbcaf721b410b4e1b7decb8864b3e03ff22fe0602019c4d162f2fe480881"
     },
     {
       "name": "archimate-decorators",
