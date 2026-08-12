@@ -23,9 +23,17 @@ public final class UseCaseWriter {
         .append("\" name=\"")
         .append(attr(useCase.label()))
         .append("\"");
-    String subject = umlString(useCase, "subject");
-    if (subject != null && nodeIds.containsKey(subject)) {
-      xml.append(" subject=\"").append(attr(nodeIds.get(subject))).append("\"");
+    // §18.2.5.4 types subject as Classifier [0..*], and XMI carries a multi-valued reference as a
+    // space-separated id list. A single id stays a bare string in source, so accept both shapes.
+    List<String> subjects = umlTextArray(useCase, "subject");
+    if (subjects.isEmpty()) {
+      String subject = umlString(useCase, "subject");
+      subjects = subject == null ? List.of() : List.of(subject);
+    }
+    List<String> subjectIds =
+        subjects.stream().filter(nodeIds::containsKey).map(nodeIds::get).toList();
+    if (!subjectIds.isEmpty()) {
+      xml.append(" subject=\"").append(attr(String.join(" ", subjectIds))).append("\"");
     }
     List<SourceNode> extensionPoints =
         selectedNodes.stream()

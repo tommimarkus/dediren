@@ -17,6 +17,7 @@ import dev.dediren.contracts.source.SourceRelationship;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import tools.jackson.databind.JsonNode;
 
@@ -213,6 +214,7 @@ public final class Uml {
           context);
     }
     validateTransitionRegionConsistency(source.relationships(), context);
+    validateStateVertexConstraints(source.nodes(), context);
     validateUseCaseRelationships(source.relationships(), context);
     UmlSequenceValidation.validateCombinedFragmentNesting(source.nodes(), context);
     UmlSequenceValidation.validateInteractionOperandOwnerSelection(source.nodes(), context);
@@ -626,12 +628,21 @@ public final class Uml {
     if (subject == null) {
       return;
     }
-    if (!subject.isTextual()
-        || !isUseCaseSubjectClassifier(context.nodeTypes().get(subject.asText()))) {
+    // §18.2.5.4 types subject as Classifier [0..*], so a use case may name one subject or several.
+    if (subject.isArray()) {
+      for (int index = 0; index < subject.size(); index++) {
+        validateUseCaseSubject(subject.get(index), context, umlPath + ".subject[" + index + "]");
+      }
+      return;
+    }
+    validateUseCaseSubject(subject, context, umlPath + ".subject");
+  }
+
+  private static void validateUseCaseSubject(
+      JsonNode subject, ValidationContext context, String path) throws UmlValidationException {
+    if (!subject.isTextual() || !isClassifierType(context.nodeTypes().get(subject.asText()))) {
       throw new UmlValidationException(
-          UmlTypeKind.ELEMENT_PROPERTY,
-          propertyValue(subject, "UseCase.subject"),
-          umlPath + ".subject");
+          UmlTypeKind.ELEMENT_PROPERTY, propertyValue(subject, "UseCase.subject"), path);
     }
   }
 
@@ -737,15 +748,115 @@ public final class Uml {
             UmlTypeKind.RELATIONSHIP_ENDPOINT, "Transition target initial Pseudostate", path);
       }
 
+      // §14.5.11.8 constrains a Transition's endpoints to share a containingStateMachine(), not a
+      // Region, and §14.2.3.8.5 leaves Transition ownership unconstrained. Requiring one Region
+      // made the ordinary cross-region transition inexpressible.
+      String stateMachine = stateMachineOfRegion(region, context);
       for (String endpoint : List.of(relationship.source(), relationship.target())) {
         String endpointRegion =
             readTextProperty(context.nodeUmlProperties().get(endpoint), "region");
-        if (!region.equals(endpointRegion)) {
+        if (endpointRegion == null
+            || stateMachine == null
+            || !stateMachine.equals(stateMachineOfRegion(endpointRegion, context))) {
           throw new UmlValidationException(
               UmlTypeKind.RELATIONSHIP_PROPERTY, region, path + ".properties.uml.region");
         }
       }
+
+      validateTransitionKind(relationship, path, context);
     }
+  }
+
+  private static String stateMachineOfRegion(String regionId, ValidationContext context) {
+    return readTextProperty(context.nodeUmlProperties().get(regionId), "state_machine");
+  }
+
+  /**
+   * §14.5.11.8 {@code state_is_internal}: a Transition with kind {@code internal} has a State as
+   * its source, and its source and target are the same vertex.
+   *
+   * <p>The {@code local} and {@code external} constraints in the same clause, and the fork/join
+   * segment guard rules, turn on composite States owning Regions — which this vocabulary cannot
+   * express, since a Region names a StateMachine and never a State. They are recorded as residue
+   * rather than approximated here.
+   */
+  private static void validateTransitionKind(
+      SourceRelationship relationship, String path, ValidationContext context)
+      throws UmlValidationException {
+    String kind =
+        readTextProperty(context.relationshipUmlProperties().get(relationship.id()), "kind");
+    if (!"internal".equals(kind)) {
+      return;
+    }
+    if (!relationship.source().equals(relationship.target())
+        || !"State".equals(context.nodeTypes().get(relationship.source()))) {
+      throw new UmlValidationException(
+          UmlTypeKind.RELATIONSHIP_PROPERTY, kind, path + ".properties.uml.kind");
+    }
+  }
+
+  /**
+   * The Region and Pseudostate constraints of &sect;14.5.8.6 and &sect;14.5.6.7.
+   *
+   * <p>A Region owns at most one initial Vertex and at most one of each history kind
+   * (&sect;14.5.8.6), and each Pseudostate kind carries a transition-degree rule (&sect;14.5.6.7)
+   * &mdash; a fork with one outgoing edge is a junction drawn as a bar, a join with one incoming
+   * edge is the same, and a dangling choice decides nothing. None of these were checked: only that
+   * {@code kind} was one of the ten literals.
+   */
+  private static void validateStateVertexConstraints(
+      List<SourceNode> nodes, ValidationContext context) throws UmlValidationException {
+    var singletonKindsByRegion = new HashSet<String>();
+    for (int nodeIndex = 0; nodeIndex < nodes.size(); nodeIndex++) {
+      SourceNode node = nodes.get(nodeIndex);
+      if (!"Pseudostate".equals(node.type())) {
+        continue;
+      }
+      JsonNode umlProperties = node.properties().get("uml");
+      String kind = readTextProperty(umlProperties, "kind");
+      String region = readTextProperty(umlProperties, "region");
+      String path = "$.nodes[" + nodeIndex + "].properties.uml.kind";
+      if (kind == null || region == null) {
+        continue;
+      }
+      if (REGION_SINGLETON_PSEUDOSTATE_KINDS.contains(kind)
+          && !singletonKindsByRegion.add(region + "/" + kind)) {
+        throw new UmlValidationException(UmlTypeKind.ELEMENT_PROPERTY, kind, path);
+      }
+      long incoming = transitionDegree(node.id(), context, true);
+      long outgoing = transitionDegree(node.id(), context, false);
+      if (!supportsPseudostateDegree(kind, incoming, outgoing)) {
+        throw new UmlValidationException(UmlTypeKind.ELEMENT_PROPERTY, kind, path);
+      }
+    }
+  }
+
+  /** §14.5.8.6: a Region owns at most one of each of these. */
+  private static final Set<String> REGION_SINGLETON_PSEUDOSTATE_KINDS =
+      Set.of("initial", "deepHistory", "shallowHistory");
+
+  private static long transitionDegree(String nodeId, ValidationContext context, boolean incoming) {
+    Map<String, String> ends =
+        incoming ? context.relationshipTargets() : context.relationshipSources();
+    return ends.entrySet().stream()
+        .filter(entry -> nodeId.equals(entry.getValue()))
+        .filter(entry -> "Transition".equals(context.relationshipTypes().get(entry.getKey())))
+        .count();
+  }
+
+  /** §14.5.6.7's per-kind transition-degree rules. */
+  private static boolean supportsPseudostateDegree(String kind, long incoming, long outgoing) {
+    return switch (kind) {
+      case "initial" -> outgoing <= 1;
+      case "deepHistory", "shallowHistory" -> outgoing <= 1;
+      case "fork" -> incoming == 1 && outgoing >= 2;
+      case "join" -> incoming >= 2 && outgoing == 1;
+      case "junction", "choice" -> incoming >= 1 && outgoing >= 1;
+      // entryPoint, exitPoint and terminate carry constraints that turn on the composite State
+      // owning them, which this vocabulary cannot express (a Region names a StateMachine, never a
+      // State). Left unchecked rather than approximated.
+      default -> true;
+    };
   }
 
   private static void validateUseCaseRelationships(
@@ -926,13 +1037,6 @@ public final class Uml {
       return ACTOR_ASSOCIATION_PARTNERS.contains(sourceType);
     }
     return true;
-  }
-
-  private static boolean isUseCaseSubjectClassifier(String value) {
-    return "Class".equals(value)
-        || "Interface".equals(value)
-        || "DataType".equals(value)
-        || "Enumeration".equals(value);
   }
 
   private static boolean isMessageEndpoint(String sourceType, String targetType) {

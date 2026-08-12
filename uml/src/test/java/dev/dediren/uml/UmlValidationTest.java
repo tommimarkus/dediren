@@ -410,15 +410,55 @@ class UmlValidationTest {
   }
 
   @Test
-  void rejectsUseCaseSubjectThatIsNotStructuralClassifier() throws Exception {
+  void rejectsUseCaseSubjectThatIsNotAClassifier() throws Exception {
+    // Narrowed from "not a structural classifier": §18.2.5.4 types subject as Classifier, and an
+    // Actor is one. An ExtensionPoint is not — it is a RedefinableElement owned by a UseCase.
     Fixture fixture =
         loadMutatedUmlUseCaseFixture(
-            source -> nodeUmlProperties(source, "place-order").put("subject", "customer"));
+            source -> nodeUmlProperties(source, "place-order").put("subject", "payment-extension"));
 
     UmlValidationException error = assertRejected(fixture);
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
     assertThat(error.path()).isEqualTo("$.nodes[3].properties.uml.subject");
+  }
+
+  @Test
+  void acceptsAnyClassifierAsAUseCaseSubject() throws Exception {
+    // §18.2.5.4 gives subject : Classifier [0..*], and the spec's own Figure 18.2 draws a
+    // **Component** as the subject boundary — the exact construct the four-name allow-list
+    // rejected.
+    for (String subjectType : new String[] {"Component", "Node", "Actor"}) {
+      Fixture fixture =
+          loadMutatedUmlUseCaseFixture(
+              source -> nodeById(source, "order-service").put("type", subjectType));
+
+      assertThatCode(() -> Uml.validateSource(fixture.source(), fixture.pluginData()))
+          .as("a %s is a Classifier and so a legal UseCase subject", subjectType)
+          .doesNotThrowAnyException();
+    }
+  }
+
+  @Test
+  void acceptsMultipleUseCaseSubjects() throws Exception {
+    // [0..*], not [0..1]: a use case may apply to more than one subject. The second subject is a
+    // Component outside the view, matching how the fixture already keeps its subject classifier
+    // off the use-case diagram itself.
+    Fixture fixture =
+        loadMutatedUmlUseCaseFixture(
+            source -> {
+              ObjectNode billing = ((ArrayNode) source.get("nodes")).addObject();
+              billing.put("id", "billing-service").put("type", "Component").put("label", "Billing");
+              billing.putObject("properties").putObject("uml").put("use_case_subject", true);
+              replaceTextArray(
+                  nodeUmlProperties(source, "place-order"),
+                  "subject",
+                  "order-service",
+                  "billing-service");
+            });
+
+    assertThatCode(() -> Uml.validateSource(fixture.source(), fixture.pluginData()))
+        .doesNotThrowAnyException();
   }
 
   @Test
@@ -448,25 +488,36 @@ class UmlValidationTest {
   }
 
   @Test
-  void rejectsTransitionAcrossRegions() throws Exception {
+  void acceptsTransitionBetweenRegionsOfTheSameStateMachine() throws Exception {
+    // §14.5.11.8 requires a Transition's endpoints to share a containingStateMachine(), not a
+    // Region — and §14.2.3.8.5 says Transition ownership is not explicitly constrained. Demanding
+    // one Region made the ordinary cross-region transition inexpressible; this test previously
+    // asserted the rejection.
     Fixture fixture =
         loadMutatedUmlStateMachineFixture(
             source -> {
-              var nodes = (ArrayNode) source.get("nodes");
-              nodes.add(
-                  jsonObject(
-                      """
-                    {
-                      "id": "other-region",
-                      "type": "Region",
-                      "label": "Other Region",
-                      "properties": {
-                        "uml": {
-                          "state_machine": "order-lifecycle"
-                        }
-                      }
-                    }
-                    """));
+              addRegion(source, "other-region", "order-lifecycle");
+              nodeUmlProperties(source, "fulfilled").put("region", "other-region");
+            });
+
+    assertThatCode(() -> Uml.validateSource(fixture.source(), fixture.pluginData()))
+        .doesNotThrowAnyException();
+  }
+
+  @Test
+  void rejectsTransitionCrossingStateMachines() throws Exception {
+    // The constraint that remains: a Transition cannot leave its state machine.
+    Fixture fixture =
+        loadMutatedUmlStateMachineFixture(
+            source -> {
+              ((ArrayNode) source.get("nodes"))
+                  .addObject()
+                  .put("id", "other-machine")
+                  .put("type", "StateMachine")
+                  .put("label", "Other")
+                  .putObject("properties")
+                  .putObject("uml");
+              addRegion(source, "other-region", "other-machine");
               nodeUmlProperties(source, "fulfilled").put("region", "other-region");
             });
 
@@ -474,6 +525,109 @@ class UmlValidationTest {
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_RELATIONSHIP_PROPERTY_INVALID");
     assertThat(error.path()).contains("properties.uml.region");
+  }
+
+  @Test
+  void rejectsASecondInitialPseudostateInOneRegion() throws Exception {
+    // §14.5.8.6: a Region owns at most one initial Vertex, and at most one of each history kind.
+    assertUmlStateMachineMutationRejected(
+        source -> addPseudostate(source, "second-initial", "main-region", "initial"),
+        "$.nodes[9].properties.uml.kind");
+  }
+
+  @Test
+  void rejectsASecondDeepHistoryInOneRegion() throws Exception {
+    assertUmlStateMachineMutationRejected(
+        source -> {
+          addPseudostate(source, "history-one", "main-region", "deepHistory");
+          addPseudostate(source, "history-two", "main-region", "deepHistory");
+        },
+        "$.nodes[10].properties.uml.kind");
+  }
+
+  @Test
+  void acceptsOneInitialPerRegionAcrossTwoRegions() throws Exception {
+    // The cardinality is per Region, not per state machine.
+    Fixture fixture =
+        loadMutatedUmlStateMachineFixture(
+            source -> {
+              addRegion(source, "other-region", "order-lifecycle");
+              addPseudostate(source, "other-initial", "other-region", "initial");
+            });
+
+    assertThatCode(() -> Uml.validateSource(fixture.source(), fixture.pluginData()))
+        .doesNotThrowAnyException();
+  }
+
+  @Test
+  void rejectsAnInternalTransitionBetweenDifferentVertices() throws Exception {
+    // §14.5.11.8 `state_is_internal`: a Transition with kind internal has a State as its source,
+    // and its source and target are the same. Nothing checked it, so an "internal" transition
+    // between two different states validated and was emitted as one.
+    Fixture fixture =
+        loadMutatedUmlStateMachineFixture(
+            source -> relationshipUmlProperties(source, "t-submit").put("kind", "internal"));
+
+    UmlValidationException error = assertRejected(fixture);
+
+    assertThat(error.code()).isEqualTo("DEDIREN_UML_RELATIONSHIP_PROPERTY_INVALID");
+    assertThat(error.path()).isEqualTo("$.relationships[1].properties.uml.kind");
+  }
+
+  @Test
+  void acceptsASelfInternalTransitionOnAState() throws Exception {
+    Fixture fixture =
+        loadMutatedUmlStateMachineFixture(
+            source -> {
+              ObjectNode transition = (ObjectNode) relationshipById(source, "t-submit");
+              transition.put("source", "draft").put("target", "draft");
+              relationshipUmlProperties(source, "t-submit").put("kind", "internal");
+            });
+
+    assertThatCode(() -> Uml.validateSource(fixture.source(), fixture.pluginData()))
+        .doesNotThrowAnyException();
+  }
+
+  @Test
+  void rejectsAForkWithOneOutgoingTransition() throws Exception {
+    // §14.5.6.7 `fork_vertex`: a fork has exactly one incoming and at least two outgoing
+    // Transitions. A one-way fork is a junction drawn as a bar.
+    assertUmlStateMachineMutationRejected(
+        source -> {
+          removeRelationship(source, "t-reject");
+          nodeUmlProperties(source, "payment-choice").put("kind", "fork");
+        },
+        "$.nodes[5].properties.uml.kind");
+  }
+
+  @Test
+  void rejectsAJoinWithOneIncomingTransition() throws Exception {
+    // §14.5.6.7 `join_vertex`: at least two incoming, exactly one outgoing.
+    assertUmlStateMachineMutationRejected(
+        source -> {
+          removeRelationship(source, "t-reject");
+          nodeUmlProperties(source, "payment-choice").put("kind", "join");
+        },
+        "$.nodes[5].properties.uml.kind");
+  }
+
+  @Test
+  void rejectsAChoiceWithNoOutgoingTransition() throws Exception {
+    // §14.5.6.7 `choice_vertex`: at least one incoming and at least one outgoing.
+    assertUmlStateMachineMutationRejected(
+        source -> {
+          removeRelationship(source, "t-approve");
+          removeRelationship(source, "t-reject");
+        },
+        "$.nodes[5].properties.uml.kind");
+  }
+
+  @Test
+  void rejectsAnInitialWithTwoOutgoingTransitions() throws Exception {
+    // §14.5.6.7 `initial_vertex`: at most one outgoing Transition.
+    assertUmlStateMachineMutationRejected(
+        source -> addTransition(source, "t-create-two", "initial", "submitted", "main-region"),
+        "$.nodes[2].properties.uml.kind");
   }
 
   @Test
@@ -1870,6 +2024,49 @@ class UmlValidationTest {
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
     assertThat(error.path()).isEqualTo(expectedPath);
+  }
+
+  private static void assertUmlStateMachineMutationRejected(
+      Consumer<ObjectNode> mutate, String expectedPath) throws Exception {
+    Fixture fixture = loadMutatedUmlStateMachineFixture(mutate);
+
+    UmlValidationException error = assertRejected(fixture);
+
+    assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
+    assertThat(error.path()).isEqualTo(expectedPath);
+  }
+
+  private static void addRegion(ObjectNode source, String id, String stateMachine) {
+    ObjectNode region = ((ArrayNode) source.get("nodes")).addObject();
+    region.put("id", id).put("type", "Region").put("label", id);
+    region.putObject("properties").putObject("uml").put("state_machine", stateMachine);
+  }
+
+  private static void addPseudostate(ObjectNode source, String id, String region, String kind) {
+    ObjectNode pseudostate = ((ArrayNode) source.get("nodes")).addObject();
+    pseudostate.put("id", id).put("type", "Pseudostate").put("label", id);
+    pseudostate.putObject("properties").putObject("uml").put("region", region).put("kind", kind);
+  }
+
+  private static void addTransition(
+      ObjectNode source, String id, String from, String to, String region) {
+    ObjectNode transition = ((ArrayNode) source.get("relationships")).addObject();
+    transition.put("id", id).put("type", "Transition").put("source", from).put("target", to);
+    transition.put("label", id);
+    transition
+        .putObject("properties")
+        .putObject("uml")
+        .put("region", region)
+        .put("kind", "external");
+  }
+
+  private static void removeRelationship(ObjectNode source, String id) {
+    ArrayNode relationships = (ArrayNode) source.get("relationships");
+    for (int index = relationships.size() - 1; index >= 0; index--) {
+      if (id.equals(relationships.get(index).get("id").asText())) {
+        relationships.remove(index);
+      }
+    }
   }
 
   private static Arguments fragmentRejectionCase(
