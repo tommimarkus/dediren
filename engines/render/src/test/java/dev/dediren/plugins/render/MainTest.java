@@ -1426,6 +1426,26 @@ class MainTest {
     }
 
     @Test
+    void umlPackageNameIsDrawnExactlyOnce() throws Exception {
+      // UML-NOT-7 (§12.2.4). The name was drawn twice: once by the decorator into the tab and
+      // once by the generic node-label path into the body, so a package read as name-plus-
+      // stereotype. The tab copy is the one that goes: its baseline (y + 16.0) falls below a
+      // 14.4px tab, so it spilled onto the body anyway, and §12.2.4 puts the name in the tab only
+      // when the body shows the package's members -- which this renderer never does.
+      Document document =
+          svgDocument(
+              okContent(
+                  render(
+                      renderInput(
+                          "fixtures/layout-result/uml-basic.json",
+                          "fixtures/render-policy/uml-svg.json",
+                          "fixtures/render-metadata/uml-basic.json"))));
+
+      Element pkg = groupWithAttribute(document, "data-dediren-node-id", "pkg-orders");
+      assertThat(textsWithin(pkg)).containsExactly("Orders");
+    }
+
+    @Test
     void umlPseudostateKindsEachGetTheirOwnGlyph() throws Exception {
       // UML-NOT-3/-4 (§14.2.4.6). Four of the ten kinds had no fixture anywhere in the corpus, and
       // two of them were drawn with a *different* kind's glyph:
@@ -3975,6 +3995,16 @@ class MainTest {
     }
 
     assertNoRelationshipTypesRenderIdentically(semanticProfile, signatureByType);
+  }
+
+  /** Every {@code <text>} rendered anywhere inside {@code element}, in document order. */
+  private static List<String> textsWithin(Element element) {
+    List<String> texts = new ArrayList<>();
+    org.w3c.dom.NodeList nodes = element.getElementsByTagName("text");
+    for (int index = 0; index < nodes.getLength(); index++) {
+      texts.add(nodes.item(index).getTextContent());
+    }
+    return texts;
   }
 
   /** The shape element a UML {@code Pseudostate} of {@code kind} draws. */

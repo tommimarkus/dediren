@@ -31,15 +31,12 @@ public final class UmlDecorators {
     // notation — so it is excluded from this classifier branch and handled below.
     if (umlDecoratorSuppliesNodeLabel(decorator) && decorator != SvgNodeDecorator.UML_ACTOR) {
       umlClassifierNotation(w, node, style, decorator, selector);
-    } else if (decorator == SvgNodeDecorator.UML_PACKAGE) {
-      w.start("text")
-          .attr("x", f1(node.x() + 8.0))
-          .attr("y", f1(node.y() + 16.0))
-          .attr("fill", style.labelFill())
-          .attr("font-size", "12")
-          .attrIf("fill-opacity", opacity(style.labelOpacity()))
-          .text(node.label())
-          .end();
+      // A Package draws no label of its own. §12.2.4 puts the name in the tab only when the body
+      // shows the package's members, and in the body otherwise — which is every package this
+      // renderer emits, since it never draws members inside one. The generic node-label path
+      // already draws that body label, so a tab copy here made the name appear twice and read as
+      // name-plus-stereotype. It did not even land in the tab: its baseline (y + 16.0) falls below
+      // a tab that is at most 24px and, at the shipped fixture's size, 14.4px.
     } else if (decorator == SvgNodeDecorator.UML_ACTOR) {
       w.start("text")
           .attr("x", f1(node.x() + node.width() / 2.0))
