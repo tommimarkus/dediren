@@ -458,12 +458,20 @@ that, after `UML-NOT-7`.
 
 ## Post-plan followups
 
-Not register findings — tooling defects surfaced *by* the remediation. Deliberately deferred so they
-do not enlarge a conformance change, and recorded here so they are not lost.
+Work deliberately carried out of this plan and recorded so it is not lost. `F1` is a tooling defect
+surfaced *by* the remediation; the rest are register findings whose fix needs a surface this plan
+does not build, and each names that surface rather than the finding.
+
+The distinction from `## Disposition` below: that table holds findings whose answer is "not this way"
+or "not at all". These are findings whose answer is "yes, but it needs a prerequisite".
 
 | # | Item | Approach | Why deferred |
 |---|---|---|---|
 | F1 | `RasterGoldenTest.updateManifest:247-251` rewrites all 156 lines of the tracked `raster-golden/manifest.json` to change one SHA, because it writes with the repo-standard `writerWithDefaultPrettyPrinter()` while the tracked file was authored in a different style (2-space, `": "`, expanded arrays). A one-value regeneration therefore lands as a whole-file diff, which is exactly the review signal the golden discipline depends on. | Either teach the writer the tracked style (a `DefaultPrettyPrinter` with `Separators` object-field spacing `AFTER` and an indenting array printer), or leave Jackson's output canonical — as of 2026-08-12 the file *is* Jackson-formatted, so the churn is spent and the file is now stable. Decide which is the intended owner; if the answer is "the regenerator owns it", this is closed by the reformat already landed (`1d09b75`). The same `writerWithDefaultPrettyPrinter()` pattern is used by `LayoutFixtureRegenerator:109`, `Bench:28` and `DistTool:1124`, so any style decision should be repo-wide rather than local to this one file. | Cosmetic, one-time, and now spent. Fixing it inside a conformance phase would mix a tooling change into a notation diff. |
+| F2 | **A notation-semantics diagnostic channel.** `NotationSemantics.validate` returns `void` and throws `EngineException`, so a profile can reject a model or accept it, and say nothing in between. Three findings need exactly the middle: `AM-VOCAB-9` (§12.1 deprecates `WorkPackage -[Realization]-> Deliverable`, accepted today in silence) and `UML-SEM-22`/`-23` (two Dediren house rules — nested-fragment coverage containment and operand contiguity — enforced as UML legality, rejecting spec-legal interleavings that UML's *partial*-order model permits; `critical` exists precisely because ordinary fragments are not protected from interleaving). | Give the seam a diagnostic return, then demote the two house rules from errors to warnings and add the deprecation notice. The layout guarantee the house rules protect survives as a warning; the claim that UML requires them does not. | Adding the channel touches `engine-api`, `core` dispatch and `cli` together (`## Files That Move Together`, engine-contract row) — an engine-contract change carrying one `info` and two `warn` findings. Disproportionate inside a notation phase, and the right size as its own slice. |
+| F3 | **The §B.4 domain dimension for ArchiMate legality.** `AM-SEM-3` (composition/aggregation decided on category rather than element type), `AM-SEM-4` (`Product` and `Plateau` share the composite category, so `Product -[Composition]-> BusinessActor` passes) and `AM-SEM-7` (Strategy and Implementation-&-Migration elements are classified structurally, so no rule can see a §B.4 domain crossing) are one finding wearing three faces: the model carries category and no layer. | Classify the 60 elements by layer/domain and add the crossing rules §B.4 names. `AM-SEM-3`'s stated fix — tightening `s == t` to element-type equality — is wrong as written: it would reject a business process composed of business functions, which is legal. | Every one of these narrows what validates, and the only oracle that can prove a narrowing introduces no false rejection is the Appendix-B triples file, which is copyrighted and never committed. Narrowing the model with that gate unavailable is how the class's "never rejects a valid combination" promise gets broken quietly. Run it with `-Ddediren.archimate-oracle` in hand. |
+| F4 | **`AM-SEM-6` — which relationship types may pass through a junction.** Element↔connector edges return early from `validateRelationshipEndpointTypes`, so `BusinessProcess -[Specialization]-> OrJunction -[Specialization]-> BusinessProcess` validates. | Establish from §5 intro and Table 21 which relationship types admit a junction at all, then reject the rest at the connector boundary. | The register's reproduction is not actually an endpoint leak: the junction walk *does* resolve and validate the through-pair, and `BusinessProcess -[Specialization]-> BusinessProcess` is legal. The real claim is about junction-bearing relationship types, which the local corpus does not settle — and guessing a restriction here rejects models that may be fine. |
+| F5 | **`ExecutionSpecification` export, and the `DOC-22` residue it leaves.** With `UML-SEM-29` closed, `valid-uml-sequence-lifecycle.json` still cannot be exported whole: it also carries an `ExecutionSpecification`, which `unsupportedSequenceNode` refuses as a declared MVP limitation. So a `valid-`-prefixed, bundle-shipped fixture — the richest sequence template an agent can reach via `dediren://fixture/source/` — still validates, renders, and dies at export. | Emit `uml:BehaviorExecutionSpecification` with its `start`/`finish` occurrence references and `covered` lifeline; the fixture already carries all three properties. Then add the fixture to `docs/features/source-model.md` and give it an XMI golden. | Not a register finding: the limitation is declared, not a conformance defect, and the emitter does not exist. Until it does, Phase 6 must **state** the limitation where the fixture is advertised — adding the fixture to the examples list, as this plan originally proposed for `DOC-22`, would make the finding worse rather than closing it. |
 
 ## Status
 
@@ -547,3 +555,38 @@ _Written past-tense as phases land._
   a `confidence` of `0.4`. It was not asserting the defect on purpose — it was asserting the *shape*
   of the definitions block and swept the type in with it. A byte-exact assertion pins everything it
   contains, including the parts nobody chose.
+- Phase 5: **landed** — both ArchiMate blocks and nine of the UML findings closed across six
+  commits (`c26d754`, `751dc24`, `5c8f27f`, `0ff1dbd`, `fb15355`, `42f19dd`). Full `./mvnw test`
+  green after each, plus `-Pdist-smoke` and two rounds of end-to-end probes through a rebuilt
+  bundle.
+  **5a — ArchiMate:** `AM-SEM-1/-2/-5/-10/-11/-12`, `AM-VOCAB-5`, and the citation half of
+  `AM-SEM-8`. The `UNIVERSAL` short-circuit turned out to be worse than the register described: it
+  ran before the category lookup, so it also bypassed the engine's *own* §5-contradicted carve-out —
+  the combinations `isSpecContradictedByFive` names as always-rejected were passing. §B.6's
+  universality is conditional, so the rule now asks whether any element could stand in the
+  composite's place, which keeps the class's promise never to reject a valid combination: an edge is
+  refused only when it is impossible in that direction for *every* element there is.
+  **5b — UML:** `UML-SEM-1/-2/-3/-4/-5` (one six-name predicate standing in for three spec type
+  systems, wrong in both directions at once), `-8`, `-13`, `-15`, `-16`, `-17`, `-19`, `-24`, `-29`.
+  **Sizing corrections, continuing the pattern.** `UML-SEM-29` was sized as relaxing two validators
+  with no emitter change, because `writeMessageOccurrence` already emits the destruction subtype. It
+  does — but `covered` was read from the message's *target*, which for a deletion is the marker
+  node, not a lifeline. `AM-SEM-3`'s stated fix (tightening category equality to element-type
+  equality) is wrong as written: it would reject a business process composed of business functions.
+  `AM-SEM-6`'s reproduction is not an endpoint leak at all — the junction walk *does* resolve and
+  validate the through-pair, and the pair in question is legal.
+  **The "existing test asserting the defect" count reached six**, and one of them
+  (`acceptsJunctionAsContainmentSourceInGrouping`) asserted it deliberately, in a comment. Two more
+  contradicted a §5 invariant asserted elsewhere in the same suite.
+  **What was verified rather than reasoned about.** Both ArchiMate leaks and three UML rules were
+  probed through a rebuilt bundle, not just a green suite. The self-model was *not* usable as
+  evidence: it uses visual-only layout bands and contains zero `Grouping` or `Location` nodes, so it
+  exercises none of the changed rules — a reminder that "the dogfood model still validates" can be
+  true and mean nothing.
+  **Deferred, each naming the surface it needs:** `F2` (a notation-semantics diagnostic channel,
+  carrying `AM-VOCAB-9` and the `UML-SEM-22`/`-23` demotion), `F3` (the §B.4 domain dimension,
+  carrying `AM-SEM-3/-4/-7`), `F4` (`AM-SEM-6`), `F5` (`ExecutionSpecification` export and the
+  `DOC-22` residue). **Not approximated:** the `local`/`external` transition kinds, the fork/join
+  segment guard rules and the entry/exit/terminate degree constraints all turn on composite States
+  owning Regions, which the vocabulary cannot express — a Region names a StateMachine, never a
+  State.
