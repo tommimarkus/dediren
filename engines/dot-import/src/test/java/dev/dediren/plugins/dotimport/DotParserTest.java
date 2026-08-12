@@ -204,6 +204,20 @@ class DotParserTest {
   }
 
   /**
+   * The token ceiling counts BYTES, not characters, and DOT identifiers may be non-ASCII (the
+   * quoted-id fixture uses CJK). Every other boundary case here is single-byte ASCII filler, so
+   * without this the multi-byte arithmetic in {@code DotLimits.utf8Length} is exercised but never
+   * bounded — a char-counting regression would pass all of them while accepting a label three times
+   * over the real ceiling.
+   */
+  @Test
+  void countsTheTokenCeilingInBytesNotCharactersForMultiByteLabels() throws Exception {
+    // U+6570 is 3 bytes in UTF-8, so 65_535 bytes is 21_845 code points exactly.
+    assertThat(DotParser.parse(dotWithMultiByteLabel(21_845))).isNotNull();
+    assertLimit(dotWithMultiByteLabel(21_846), "DEDIREN_DOT_TOKEN_LIMIT_EXCEEDED");
+  }
+
+  /**
    * The element ceiling has to bound ONE statement too, not just a document made of many. An edge
    * chain is a single statement whose length the statement ceiling never constrains, so if hops
    * were counted only after the chain was complete, a crafted {@code a->a->a->...} would be bounded
@@ -249,6 +263,11 @@ class DotParserTest {
 
   private static String dotWithLabelBytes(int bytes) {
     return "digraph G{a[label=\"" + "x".repeat(bytes) + "\"];}";
+  }
+
+  /** Label of {@code codePoints} three-byte code points, so bytes are 3x the character count. */
+  private static String dotWithMultiByteLabel(int codePoints) {
+    return "digraph G{a[label=\"" + "数".repeat(codePoints) + "\"];}";
   }
 
   private static String dotAtBytes(int bytes) {

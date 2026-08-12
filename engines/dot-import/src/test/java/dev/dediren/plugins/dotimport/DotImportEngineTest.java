@@ -46,6 +46,24 @@ class DotImportEngineTest {
     assertThat(result.diagnostics().get(0).message()).contains("arrowheads", "marker_end: none");
   }
 
+  /**
+   * Discarded attributes and undirectedness each contribute one half of the single hint message,
+   * and the fixtures only ever exercise one half at a time. This is the fourth branch: both halves
+   * present, joined by "; " into one warning rather than emitted as two diagnostics.
+   */
+  @Test
+  void joinsDiscardedAttributesAndTheUndirectedWarningIntoOneHint() throws Exception {
+    var result = engine.importSource("graph G {\nbgcolor=white;\na -- b;\n}\n");
+
+    assertThat(result.diagnostics())
+        .extracting(d -> d.code())
+        .containsExactly("DEDIREN_DOT_HINT_IGNORED");
+    assertThat(result.diagnostics().get(0).message())
+        .contains("bgcolor (1)")
+        .contains("; ")
+        .contains("marker_end: none");
+  }
+
   @Test
   void mergesRepeatedNodeMentionsWithTheLatestMentionWinningPerKey() throws Exception {
     JsonNode model =
