@@ -1,8 +1,15 @@
 # Exports (OEF & XMI)
 
-Beyond SVG, Dediren exports standards XML: ArchiMate 3.2 Open Exchange Format
+Beyond SVG, Dediren exports standards XML: the ArchiMate Open Exchange Format
 (OEF) and UML 2.5.1 XMI. Export consumes the **source** model and the **layout
 result** together and writes XML to `.data.content`.
+
+The two version numbers here are different things and are easy to conflate. The
+modelling **vocabulary** is ArchiMate 3.2 — that is the element and relationship
+set the `archimate` profile accepts. The **exchange format** is OEF 3.1, which
+is the latest The Open Group publishes; there is no 3.2 OEF XSD to validate
+against. An emitted document therefore carries 3.2 vocabulary inside a 3.1
+envelope, and staging "3.2 OEF XSDs" will find nothing.
 
 [← Back to feature index](README.md)
 

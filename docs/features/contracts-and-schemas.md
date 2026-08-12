@@ -24,6 +24,9 @@ bundle. Shared protocol records and schema-version constants live in the
 | [`render-policy.schema.json`](../../schemas/render-policy.schema.json) | SVG presentation policy. |
 | [`oef-export-policy.schema.json`](../../schemas/oef-export-policy.schema.json) / [`uml-xmi-export-policy.schema.json`](../../schemas/uml-xmi-export-policy.schema.json) | Export policies. |
 | [`semantic-validation-result.schema.json`](../../schemas/semantic-validation-result.schema.json) | Engine semantic-validation result. |
+| [`uml-xmi-assurance.schema.json`](../../schemas/uml-xmi-assurance.schema.json) | The `assurance` block a successful UML/XMI export carries: per-kind scope, what the available schemas actually validated, and element coverage. |
+| [`package.schema.json`](../../schemas/package.schema.json) / [`package-build-result.schema.json`](../../schemas/package-build-result.schema.json) | Declarative package input and its build result. |
+| [`diff-result.schema.json`](../../schemas/diff-result.schema.json) / [`query-result.schema.json`](../../schemas/query-result.schema.json) / [`verify-result.schema.json`](../../schemas/verify-result.schema.json) / [`status-result.schema.json`](../../schemas/status-result.schema.json) | Results of the analysis commands. |
 | [`build-result.schema.json`](../../schemas/build-result.schema.json) | `build` command result: `.status`, `.views[]` (each with `.artifacts[]`/`.diagnostics[]`). Unlike every other command, `build`'s stdout **is** this document directly — it is not wrapped in `envelope.schema.json`'s `.data`. |
 | [`envelope.schema.json`](../../schemas/envelope.schema.json) | The command envelope wrapping every other command's stdout. |
 | [`bundle.schema.json`](../../schemas/bundle.schema.json) | The bundle's `bundle.json` metadata. |

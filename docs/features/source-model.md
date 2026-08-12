@@ -128,9 +128,19 @@ The repo ships ready-made source fixtures to copy from:
 - `valid-archimate-oef.json`, `valid-archimate-junction.json` — ArchiMate/OEF.
 - `valid-uml-basic.json`, `valid-uml-complex.json` — UML structural.
 - `valid-uml-sequence-basic.json`, `valid-uml-sequence-fragments.json`,
-  `valid-uml-state-machine-basic.json`, `valid-uml-use-case-basic.json`,
-  `valid-uml-component-basic.json`, `valid-uml-deployment-basic.json` — UML notations.
+  `valid-uml-sequence-lifecycle.json`, `valid-uml-state-machine-basic.json`,
+  `valid-uml-use-case-basic.json`, `valid-uml-component-basic.json`,
+  `valid-uml-deployment-basic.json` — UML notations.
 - `invalid-*.json` — fixtures that intentionally trip a specific diagnostic.
+
+The `valid-` prefix means the fixture passes `validate`. It does not promise
+every downstream command accepts it: `valid-uml-sequence-lifecycle.json`
+validates and renders, but **cannot be exported to XMI**, because it contains an
+`ExecutionSpecification` and the UML/XMI export does not yet emit
+`uml:BehaviorExecutionSpecification` — the export fails with
+`DEDIREN_UML_XMI_SEQUENCE_NODE_UNSUPPORTED`. Use
+`valid-uml-sequence-fragments.json` as the richest sequence template that
+survives the whole pipeline.
 
 ## Related Pages
 

@@ -67,6 +67,14 @@ With `--plugin generic-graph --profile archimate` or `--profile uml`, it also
 runs the selected plugin's **semantic validation** (relationship legality,
 notation-specific rules).
 
+That check is deliberately a sound under-approximation, not a conformance
+certificate: it never rejects a legal combination, but roughly a quarter of the
+endpoint pairs ArchiMate Appendix B forbids still pass, because the rules are
+expressed over the generic metamodel's element categories rather than by
+reproducing Appendix B's tables. A model that must be legal in Archi or
+Enterprise Architect should be checked there. `docs/agent-usage.md` § ArchiMate
+Handoff names the specific gaps.
+
 ```bash
 dediren validate --input fixtures/source/valid-basic.json
 
