@@ -95,7 +95,8 @@ class RealSchemaConformanceTest {
   @Test
   void groupedViewValidatesAgainstTheRealSchemaSet() throws Exception {
     // The happy-path fixture carries no group, so nothing pinned the emitted grouping shape
-    // against the real Container/Element content model until now.
+    // against the real Container/Element content model until now — and nesting members inside a
+    // grouping's <node> is only legal because Element extends Container, which this asserts.
     ObjectNode input = exportInput();
     ((ArrayNode) input.get("source").get("nodes"))
         .addObject()
@@ -106,7 +107,9 @@ class RealSchemaConformanceTest {
     ((ArrayNode) input.at("/source/plugins/generic-graph/views/0/nodes")).add("customer-domain");
     ((ObjectNode) input.get("layout_result")).set("groups", groupsWithMembers());
 
-    assertThat(exportedContent(input)).contains("id-el-customer-domain");
+    assertThat(exportedContent(input))
+        .contains(
+            "elementRef=\"id-el-customer-domain\" x=\"0\" y=\"0\" w=\"520\" h=\"180\"><node ");
   }
 
   private ArrayNode groupsWithMembers() {

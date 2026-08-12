@@ -97,6 +97,14 @@ relationship. This keeps evidence-classification markers (for example
 `candidate-from-source`, a confidence score, or a source path) attached to the
 exported concept instead of being dropped.
 
+Grouping containment crosses into OEF as structure, not just geometry: the view
+nodes laid out inside a semantic `Grouping` are emitted as nested `<node>`
+children of that grouping's own node, so an importing tool reconstructs the
+containment instead of seeing overlapping sibling boxes. Nesting is recursive
+(a grouping inside a grouping nests), coordinates stay absolute to the diagram,
+and purely visual layout bands — which are not ArchiMate concepts — are not
+emitted, with their members owned by the nearest enclosing semantic grouping.
+
 A standalone OEF export renders exactly the one laid-out view it is handed. When
 the source declares more views than the exported one, the omission is declared
 (not silently dropped) with an `info` diagnostic `DEDIREN_OEF_VIEWS_OMITTED` that

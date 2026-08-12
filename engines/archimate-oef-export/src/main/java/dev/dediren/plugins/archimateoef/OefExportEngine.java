@@ -712,28 +712,9 @@ public final class OefExportEngine implements ExportEngine {
         .append(attr(identity.viewpoint()))
         .append("\">");
     writeTextElement(xml, "name", identity.viewName());
-    for (var indexed : semanticGroups) {
-      LaidOutGroup group = indexed.group();
-      String path = "$.layout_result.groups[" + indexed.index() + "]";
-      xml.append("<node identifier=\"")
-          .append(attr(groupViewNodeIds.get(group.id())))
-          .append("\" xsi:type=\"Element\" elementRef=\"")
-          .append(attr(elementIds.get(semanticGroupSourceId(group))))
-          .append("\"");
-      writeBounds(xml, geometry, group.x(), group.y(), group.width(), group.height(), path);
-      xml.append("/>");
-    }
-    for (int index = 0; index < layout.nodes().size(); index++) {
-      var node = layout.nodes().get(index);
-      String path = "$.layout_result.nodes[" + index + "]";
-      xml.append("<node identifier=\"")
-          .append(attr(viewNodeIds.get(node.id())))
-          .append("\" xsi:type=\"Element\" elementRef=\"")
-          .append(attr(elementIds.get(node.sourceId())))
-          .append("\"");
-      writeBounds(xml, geometry, node.x(), node.y(), node.width(), node.height(), path);
-      xml.append("/>");
-    }
+    new ViewNodeWriter(
+            xml, layout, geometry, elementIds, viewNodeIds, groupViewNodeIds, semanticGroups)
+        .write();
     for (int index = 0; index < layout.edges().size(); index++) {
       var edge = layout.edges().get(index);
       xml.append("<connection identifier=\"")
@@ -754,6 +735,152 @@ public final class OefExportEngine implements ExportEngine {
 
   /** A laid-out group paired with its index in the layout result, for diagnostic paths. */
   private record IndexedGroup(int index, LaidOutGroup group) {}
+
+  /**
+   * Writes a view's node tree, nesting the view nodes a semantic Grouping contains inside that
+   * grouping's own {@code <node>}.
+   *
+   * <p>The exchange schema's {@code Container} declares a nested {@code <node>} child and {@code
+   * LaidOutGroup.members()} carries exactly that membership, so flat siblings would tell a
+   * consuming tool the group and the shapes drawn inside it are unrelated overlapping boxes.
+   * Coordinates stay absolute — {@code LocationGroup} measures from the diagram's top-left corner
+   * whatever the nesting depth — so nesting changes structure only, not geometry.
+   *
+   * <p>A member may name another group rather than a node, and a visual-only group is not an OEF
+   * concept, so ownership resolves to the nearest semantic-grouping ancestor. Every group and node
+   * is written exactly once: {@code emitted} makes the walk terminate on any membership graph a
+   * caller-supplied layout result can declare, including a cycle, and {@link #write()} sweeps up
+   * whatever the walk could not reach rather than dropping it.
+   */
+  private static final class ViewNodeWriter {
+    private final StringBuilder xml;
+    private final LayoutResult layout;
+    private final OefGeometry geometry;
+    private final Map<String, String> elementIds;
+    private final Map<String, String> viewNodeIds;
+    private final Map<String, String> groupViewNodeIds;
+    private final List<IndexedGroup> semanticGroups;
+    private final Map<String, List<IndexedGroup>> childGroups = new LinkedHashMap<>();
+    private final Map<String, List<Integer>> childNodes = new LinkedHashMap<>();
+    private final Set<String> emitted = new HashSet<>();
+
+    ViewNodeWriter(
+        StringBuilder xml,
+        LayoutResult layout,
+        OefGeometry geometry,
+        Map<String, String> elementIds,
+        Map<String, String> viewNodeIds,
+        Map<String, String> groupViewNodeIds,
+        List<IndexedGroup> semanticGroups) {
+      this.xml = xml;
+      this.layout = layout;
+      this.geometry = geometry;
+      this.elementIds = elementIds;
+      this.viewNodeIds = viewNodeIds;
+      this.groupViewNodeIds = groupViewNodeIds;
+      this.semanticGroups = semanticGroups;
+
+      var declaredParent = new HashMap<String, String>();
+      for (LaidOutGroup group : layout.groups()) {
+        for (String member : group.members()) {
+          declaredParent.putIfAbsent(member, group.id());
+        }
+      }
+      var semanticGroupIds = new HashSet<String>();
+      semanticGroups.forEach(indexed -> semanticGroupIds.add(indexed.group().id()));
+      for (IndexedGroup indexed : semanticGroups) {
+        childGroups
+            .computeIfAbsent(
+                owner(indexed.group().id(), declaredParent, semanticGroupIds),
+                key -> new ArrayList<>())
+            .add(indexed);
+      }
+      for (int index = 0; index < layout.nodes().size(); index++) {
+        childNodes
+            .computeIfAbsent(
+                owner(layout.nodes().get(index).id(), declaredParent, semanticGroupIds),
+                key -> new ArrayList<>())
+            .add(index);
+      }
+    }
+
+    /** Walks up the declared membership chain to the nearest semantic Grouping, or the view. */
+    private static String owner(
+        String id, Map<String, String> declaredParent, Set<String> semanticGroupIds) {
+      var seen = new HashSet<String>();
+      String current = declaredParent.get(id);
+      while (current != null && seen.add(current)) {
+        if (semanticGroupIds.contains(current)) {
+          return current;
+        }
+        current = declaredParent.get(current);
+      }
+      return null;
+    }
+
+    void write() {
+      writeChildrenOf(null);
+      for (IndexedGroup indexed : semanticGroups) {
+        if (!emitted.contains(indexed.group().id())) {
+          writeGroup(indexed);
+        }
+      }
+    }
+
+    private void writeChildrenOf(String parentId) {
+      for (IndexedGroup indexed : childGroups.getOrDefault(parentId, List.of())) {
+        if (emitted.contains(indexed.group().id())) {
+          continue;
+        }
+        writeGroup(indexed);
+      }
+      for (int index : childNodes.getOrDefault(parentId, List.of())) {
+        var node = layout.nodes().get(index);
+        xml.append("<node identifier=\"")
+            .append(attr(viewNodeIds.get(node.id())))
+            .append("\" xsi:type=\"Element\" elementRef=\"")
+            .append(attr(elementIds.get(node.sourceId())))
+            .append("\"");
+        writeBounds(
+            xml,
+            geometry,
+            node.x(),
+            node.y(),
+            node.width(),
+            node.height(),
+            "$.layout_result.nodes[" + index + "]");
+        xml.append("/>");
+      }
+    }
+
+    private void writeGroup(IndexedGroup indexed) {
+      LaidOutGroup group = indexed.group();
+      emitted.add(group.id());
+      xml.append("<node identifier=\"")
+          .append(attr(groupViewNodeIds.get(group.id())))
+          .append("\" xsi:type=\"Element\" elementRef=\"")
+          .append(attr(elementIds.get(semanticGroupSourceId(group))))
+          .append("\"");
+      writeBounds(
+          xml,
+          geometry,
+          group.x(),
+          group.y(),
+          group.width(),
+          group.height(),
+          "$.layout_result.groups[" + indexed.index() + "]");
+      // A grouping with nothing laid out inside it keeps the self-closing form it has always had.
+      int before = xml.length();
+      xml.append(">");
+      writeChildrenOf(group.id());
+      if (xml.length() == before + 1) {
+        xml.setLength(before);
+        xml.append("/>");
+        return;
+      }
+      xml.append("</node>");
+    }
+  }
 
   private static void writeBounds(
       StringBuilder xml,
