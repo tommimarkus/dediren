@@ -58,7 +58,7 @@ class WholeModelXmiExportTest {
     // One model section, then a UMLDI diagram with geometry-bearing shapes and edges.
     assertThat(content)
         .contains("<uml:Model")
-        .contains("<umldi:UMLDiagram")
+        .contains("<umldi:UMLClassDiagram")
         .contains("<umldi:UMLShape")
         .contains("<dc:Bounds")
         .contains("<umldi:UMLEdge")
@@ -99,7 +99,9 @@ class WholeModelXmiExportTest {
 
     // The explicit override wins over the source-derived default id-diagram-<viewId>/label.
     assertThat(result.orElseThrow().value().content())
-        .contains("<umldi:UMLDiagram xmi:id=\"id-my-diagram\" name=\"My Class Diagram\"");
+        .contains(
+            "<umldi:UMLClassDiagram xmi:id=\"id-my-diagram\" name=\"My Class Diagram\""
+                + " isFrame=\"false\"");
   }
 
   @Test

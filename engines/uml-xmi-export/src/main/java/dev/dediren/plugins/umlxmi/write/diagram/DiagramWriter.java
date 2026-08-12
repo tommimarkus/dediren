@@ -60,11 +60,18 @@ public final class DiagramWriter {
       }
     }
 
-    xml.append("<umldi:UMLDiagram xmi:id=\"")
+    // UML 2.5.1 Annex B is normative and IS the UMLDI metamodel. umldi:UMLDiagram is an ABSTRACT
+    // class there (B.7.13); a conforming importer cannot instantiate it. UMLClassDiagram is the
+    // concrete kind for the class family, which is the only family this lane emits DI for.
+    //
+    // isFrame defaults to true, and B's no-frame-no-heading invariant then makes a heading:UMLLabel
+    // mandatory -- one is never emitted, so every diagram violated it. Declaring isFrame="false"
+    // satisfies the invariant honestly rather than inventing a heading the model does not have.
+    xml.append("<umldi:UMLClassDiagram xmi:id=\"")
         .append(attr(identity.identifier()))
         .append("\" name=\"")
         .append(attr(identity.name()))
-        .append("\">");
+        .append("\" isFrame=\"false\">");
     for (LaidOutNode node : layout.nodes()) {
       String shapeId = shapeIds.get(node.id());
       String modelElement = elementXmiIds.get(node.sourceId());
@@ -106,7 +113,7 @@ public final class DiagramWriter {
       writeWaypoints(xml, edge.points());
       xml.append("</umldi:UMLEdge>");
     }
-    xml.append("</umldi:UMLDiagram>");
+    xml.append("</umldi:UMLClassDiagram>");
   }
 
   private static void writeWaypoints(StringBuilder xml, List<Point> points) {

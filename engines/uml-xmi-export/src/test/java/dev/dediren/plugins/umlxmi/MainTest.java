@@ -481,8 +481,10 @@ class MainTest {
             "xmi:type=\"uml:Component\"",
             // A bare Port: Port::/provided and /required are DERIVED from the Port's type
             // (UML 2.5.1 §11.8.14), so they are carried at the Component (InterfaceRealization /
-            // Usage), never as unbacked structural attributes on the Port itself.
-            "<ownedAttribute xmi:type=\"uml:Port\" xmi:id=\"id-port-rest-api\" name=\"REST\"/>",
+            // Usage), never as unbacked structural attributes on the Port itself. "Bare" does not
+            // extend to aggregation, which §11.8's port_aggregation requires to be composite.
+            "<ownedAttribute xmi:type=\"uml:Port\" xmi:id=\"id-port-rest-api\" name=\"REST\""
+                + " aggregation=\"composite\"/>",
             // Component→Interface realization is a nested InterfaceRealization (drives /provided).
             "<interfaceRealization xmi:type=\"uml:InterfaceRealization\""
                 + " xmi:id=\"id-order-api-realizes-order-api\" name=\"realizes\""

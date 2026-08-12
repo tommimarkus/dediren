@@ -385,6 +385,32 @@ Filled in as phases land. Destination is either a `docs/architecture-guidelines.
 | 12 | [block] `UML-NOT-1` — six edge kinds (`Usage`, `Dependency`, `Include`, `Extend`, `Manifestation`, `Deployment`) render byte-identically because there is no edge-keyword surface | **Attempted in Phase 2 and reverted.** Compose the keyword *before layout*, not in the renderer — see the note below. | A render-time composition is architecturally misplaced, and the paint oracle proved it rather than the reasoning: see § The UML-NOT-1 reversal. |
 | 13 | [warn] `UML-NOT-12` — hollow markers and the final-state ring hardcode `#ffffff`, so a dark UML policy would read shared aggregation as composition | Do it once, in the 2026-07-28 plan's dark-policy render wave (item 5), which owns the same `EdgeMarkers` line plus two neighbouring sites and the missing dark-policy golden coverage | Latent (no dark UML policy ships), and fixing one of the wave's three sites piecemeal would leave the design half-made. Already bound in § Coordination. |
 
+## UML-XMI-18 is refuted, not deferred
+
+The register calls `xmi:Documentation` "a schema-**valid** slot the engine never fills" and "the
+cheapest high-value fix in the lane and one of the few things the pinned XSD would actually verify".
+The first clause is wrong, and the pinned XSD says so directly.
+
+Emitting `<xmi:Documentation exporter="dediren" …/>` as the first child of `xmi:XMI` fails
+validation:
+
+```
+cvc-complex-type.2.4.a: Invalid content was found starting with element
+'{"http://www.omg.org/spec/XMI/20131001":Documentation}'.
+One of '{WC[##other:"http://www.omg.org/spec/XMI/20131001"]}' is expected.
+```
+
+`xmi:XMI`'s content model is a wildcard that **excludes its own namespace**, so no `xmi:`-namespaced
+child is admissible there — `xmi:Documentation` is a declared element with no valid position under
+the root. The finding's supporting observation stands (the artifact carries no in-band provenance,
+and that is a real loss), but its proposed fix does not validate, and it would have been shipped on
+the strength of "the schema declares the element" alone.
+
+Reverted and reclassified. Anyone picking this up needs to establish **where** XMI 2.5.1 admits
+`Documentation` — the likely answer is under `xmi:Extension`, which is `##other`-compatible — and
+verify it against the pinned XSD before writing an emitter. The one thing already settled: no
+`timestamp`, ever, or every export becomes non-deterministic and all eleven goldens churn per run.
+
 ## The UML-NOT-1 reversal
 
 Worth writing down, because the finding is a genuine `block` and the obvious fix is wrong in a way
