@@ -1,0 +1,10 @@
+// A strict digraph where duplicate edges are automatically de-duplicated.
+strict digraph Pipeline {
+  task1 [label="Task 1"];
+  task2 [label="Task 2"];
+  task3 [label="Task 3"];
+
+  task1 -> task2;
+  task1 -> task2;  // Duplicate edge, will be de-duplicated
+  task2 -> task3;
+}

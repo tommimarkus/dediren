@@ -33,6 +33,11 @@
          assertions). Only dev.dediren.cli.EngineWiring may reference these implementations. -->
     <dependency>
       <groupId>dev.dediren</groupId>
+      <artifactId>dot-import</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>dev.dediren</groupId>
       <artifactId>mermaid-import</artifactId>
       <version>${project.version}</version>
     </dependency>

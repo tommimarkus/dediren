@@ -73,6 +73,7 @@ public final class DistTool {
           "cli",
           "contracts",
           "core",
+          "dot-import",
           "elk-layout",
           "engine-api",
           "ir",

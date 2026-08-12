@@ -1,0 +1,9 @@
+// A simple directed graph with three nodes and two edges.
+digraph SimpleSystem {
+  user [label="User"];
+  service [label="Service"];
+  database [label="Database"];
+
+  user -> service;
+  service -> database;
+}

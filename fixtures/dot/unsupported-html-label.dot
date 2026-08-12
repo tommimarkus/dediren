@@ -1,0 +1,13 @@
+// A graph with HTML-like labels in angle brackets.
+digraph HtmlLabels {
+  table_node [label=<
+    <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0">
+      <TR><TD>Name</TD><TD>Age</TD></TR>
+      <TR><TD>Alice</TD><TD>30</TD></TR>
+    </TABLE>
+  >];
+
+  another [label="Simple"];
+
+  table_node -> another;
+}

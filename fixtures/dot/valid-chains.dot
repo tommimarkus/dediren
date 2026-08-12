@@ -1,0 +1,11 @@
+// An edge chain with a node reappearing in multiple statements.
+digraph DataFlow {
+  producer;
+  processor;
+  consumer;
+  analytics;
+
+  producer -> processor -> consumer;
+  producer -> analytics;
+  consumer -> analytics;
+}

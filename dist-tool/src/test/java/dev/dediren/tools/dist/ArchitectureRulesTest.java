@@ -42,6 +42,7 @@ class ArchitectureRulesTest {
   private static final String ELK_LAYOUT = "dev.dediren.plugins.elklayout..";
   private static final String ARCHIMATE_OEF = "dev.dediren.plugins.archimateoef..";
   private static final String UML_XMI = "dev.dediren.plugins.umlxmi..";
+  private static final String DOT_IMPORT = "dev.dediren.plugins.dotimport..";
   private static final String MERMAID_IMPORT = "dev.dediren.plugins.mermaid..";
 
   // The three semantics-carve modules (Plan B P3): semantics-graph hosts the base projection
@@ -71,6 +72,7 @@ class ArchitectureRulesTest {
     int elkLayoutClasses = 0;
     int archimateOefClasses = 0;
     int umlXmiClasses = 0;
+    int dotImportClasses = 0;
     int mermaidImportClasses = 0;
     int irClasses = 0;
     int semanticsGraphClasses = 0;
@@ -91,6 +93,8 @@ class ArchitectureRulesTest {
         archimateOefClasses++;
       } else if (packageName.startsWith("dev.dediren.plugins.umlxmi")) {
         umlXmiClasses++;
+      } else if (packageName.startsWith("dev.dediren.plugins.dotimport")) {
+        dotImportClasses++;
       } else if (packageName.startsWith("dev.dediren.plugins.mermaid")) {
         mermaidImportClasses++;
       } else if (packageName.startsWith("dev.dediren.ir")) {
@@ -116,6 +120,9 @@ class ArchitectureRulesTest {
         .isPositive();
     assertThat(umlXmiClasses)
         .as("uml-xmi-export engine production classes on the classpath")
+        .isPositive();
+    assertThat(dotImportClasses)
+        .as("dot-import engine production classes on the classpath")
         .isPositive();
     assertThat(mermaidImportClasses)
         .as("mermaid-import engine production classes on the classpath")
@@ -300,6 +307,7 @@ class ArchitectureRulesTest {
         Map.of(
             "render", RENDER,
             "elk-layout", ELK_LAYOUT,
+            "dot-import", DOT_IMPORT,
             "mermaid-import", MERMAID_IMPORT,
             "archimate-oef-export", ARCHIMATE_OEF,
             "uml-xmi-export", UML_XMI);

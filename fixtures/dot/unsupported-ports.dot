@@ -1,0 +1,10 @@
+// A graph using ports and compass points in edges.
+digraph Ports {
+  shape=record;
+
+  device [shape=record, label="{ <f0> Left | Middle | <f1> Right }"];
+  target;
+
+  device:f0:n -> target;
+  device:f1:s -> target;
+}

@@ -73,6 +73,7 @@ class DistHermeticityTest {
         .containsExactly(
             "dep-alpha-1.0.0.jar",
             "cli-module-" + VERSION + ".jar",
+            "dot-import-module-" + VERSION + ".jar",
             "mermaid-import-module-" + VERSION + ".jar",
             "generic-graph-module-" + VERSION + ".jar",
             "elk-layout-module-" + VERSION + ".jar",
@@ -146,6 +147,7 @@ class DistHermeticityTest {
   /** The engine module jars the collapsed cli launcher now carries on its classpath. */
   private static final List<String> ENGINE_MODULE_JARS =
       List.of(
+          "dot-import",
           "mermaid-import",
           "generic-graph",
           "elk-layout",
