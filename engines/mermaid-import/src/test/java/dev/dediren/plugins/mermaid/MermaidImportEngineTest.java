@@ -6,6 +6,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import dev.dediren.engine.EngineException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 
@@ -38,6 +40,22 @@ class MermaidImportEngineTest {
     assertThat(result.diagnostics()).extracting(diagnostic -> diagnostic.code())
         .containsExactly("DEDIREN_MERMAID_HINT_IGNORED");
     assertThat(result.diagnostics().get(0).message()).contains("classDef").contains("style");
+  }
+
+  @Test
+  void preservesLegalIdsReservesThemBeforeNormalizingAndRecordsChangedOriginals()
+      throws Exception {
+    JsonNode model =
+        engine.importSource("flowchart TD\nbad-id --> bad/id\nbad?id --> café\n").value();
+
+    List<String> ids = new ArrayList<>();
+    model.path("nodes").forEach(node -> ids.add(node.path("id").asText()));
+
+    assertThat(ids).containsExactly("bad-id", "bad-id-2", "bad-id-3", "caf-u00e9");
+    assertThat(model.at("/nodes/0/properties/mermaid/original_id").isMissingNode()).isTrue();
+    assertThat(model.at("/nodes/1/properties/mermaid/original_id").asText()).isEqualTo("bad/id");
+    assertThat(model.at("/nodes/2/properties/mermaid/original_id").asText()).isEqualTo("bad?id");
+    assertThat(model.at("/nodes/3/properties/mermaid/original_id").asText()).isEqualTo("café");
   }
 
   @Test
