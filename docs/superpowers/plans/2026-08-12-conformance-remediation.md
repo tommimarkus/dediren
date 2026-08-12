@@ -518,3 +518,32 @@ _Written past-tense as phases land._
   test pinned the Artifact dog-ear on a DeploymentSpecification, and the sequence test pinned the
   absence of a dash on a createMessage. Both had to move with the fix. A test that encodes current
   behaviour is not evidence that the behaviour is correct — and it reads exactly like one.
+- Phase 4: **landed** — `AM-OEF-1/-2/-3/-4/-5/-6/-8/-9/-10/-12`, `AM-VOCAB-4` and `DOC-9` closed,
+  in three commits (`5329be8` clamp-and-guard, `38249c0` containment, `18df646` property types and
+  viewpoints). Full `./mvnw test` green after each.
+  **The XSD check the phase was gated on settled it in one read:** `ModelType` declares both
+  `<elements>` and `<relationships>` `minOccurs="0"`, and only their *children* are mandatory. So
+  `AM-OEF-1/2` were the guard-the-wrapper branch, not the early-reject branch — dediren was
+  emitting an empty container the format never asked for.
+  Geometry is rounded and clamped by a named `OefGeometry` collaborator that owns both the
+  transformation and its disclosure, so a clamp cannot be added without a `warn` naming the value
+  and its `$.layout_result...` path. `OefProperties` does the same for the property lane: it decides
+  each definition's `DataType` from the values the key carries and reports every non-scalar it has
+  to flatten. Containment became a tree walk rather than a single level, because
+  `LaidOutGroup.members()` can name another group and ELK does lay out group hierarchies; ownership
+  resolves to the *nearest semantic* ancestor, so visual-only bands are transparent to it.
+  **The gate that mattered was not the default suite.** The stub XSDs the default lane uses are
+  fully permissive `xs:any` wrappers — they cannot reject anything, so none of the five block
+  findings was expressible there. Each fix is pinned twice: on emitted bytes in the default lane,
+  and against the real pinned Open Group XSD set in `RealSchemaConformanceTest`, which grew from one
+  happy-path fixture to six structural cases. Reverting the emitter under the real lane reproduced
+  the register's own errors verbatim (`cvc-complex-type.2.4.b` on both wrappers,
+  `cvc-minInclusive-valid` on the coordinate), which is what proves the new cases are not vacuous.
+  **Accepted (info):** `AM-OEF-13` — the 3.1 XSD types relationship endpoints as bare `xs:IDREF`,
+  so it is endpoint-blind and can never corroborate ArchiMate legality; nothing to fix in the
+  emitter. **Deferred:** `AM-OEF-11` (own contract slice, carried from Phase 3b).
+  **Method note.** Phase 2's "existing test asserting the defect" recurred once more, in a milder
+  form: `preservesNodeAndRelationshipPropertiesViaOefPropertyDefinitions` pinned `type="string"` for
+  a `confidence` of `0.4`. It was not asserting the defect on purpose — it was asserting the *shape*
+  of the definitions block and swept the type in with it. A byte-exact assertion pins everything it
+  contains, including the parts nobody chose.
