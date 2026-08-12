@@ -46,7 +46,7 @@
     "source_id" : "fulfilled",
     "projection_id" : "fulfilled",
     "x" : 1054.0,
-    "y" : 121.16666666666667,
+    "y" : 122.5,
     "width" : 150.0,
     "height" : 72.0,
     "label" : "Fulfilled",
@@ -56,7 +56,7 @@
     "source_id" : "closed",
     "projection_id" : "closed",
     "x" : 1350.0,
-    "y" : 139.16666666666669,
+    "y" : 140.5,
     "width" : 36.0,
     "height" : 36.0,
     "label" : "",
@@ -66,7 +66,7 @@
     "source_id" : "rejected",
     "projection_id" : "rejected",
     "x" : 1054.0,
-    "y" : 265.1666666666667,
+    "y" : 266.5,
     "width" : 36.0,
     "height" : 36.0,
     "label" : "",
@@ -135,16 +135,16 @@
     "routing_hints" : [ ],
     "points" : [ {
       "x" : 885.0,
-      "y" : 280.83333333333337
+      "y" : 279.5
     }, {
       "x" : 933.0,
-      "y" : 280.83333333333337
+      "y" : 279.5
     }, {
       "x" : 933.0,
-      "y" : 157.16666666666669
+      "y" : 158.5
     }, {
       "x" : 1053.0,
-      "y" : 157.16666666666669
+      "y" : 158.5
     } ],
     "label" : "[paymentAuthorized]",
     "source_pointer" : "/relationships/3"
@@ -157,10 +157,10 @@
     "routing_hints" : [ ],
     "points" : [ {
       "x" : 885.0,
-      "y" : 283.1666666666667
+      "y" : 284.5
     }, {
       "x" : 1053.0,
-      "y" : 283.1666666666667
+      "y" : 284.5
     } ],
     "label" : "[paymentRejected]",
     "source_pointer" : "/relationships/4"
@@ -173,10 +173,10 @@
     "routing_hints" : [ ],
     "points" : [ {
       "x" : 1205.0,
-      "y" : 157.16666666666669
+      "y" : 158.5
     }, {
       "x" : 1349.0,
-      "y" : 157.16666666666669
+      "y" : 158.5
     } ],
     "label" : "deliver",
     "source_pointer" : "/relationships/5"

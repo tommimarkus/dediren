@@ -114,7 +114,29 @@ class ElkLayoutEngineTest {
     assertEquals(
         EdgeStraighteningStrategy.IMPROVE_STRAIGHTNESS,
         root.getProperty(LayeredOptions.NODE_PLACEMENT_BK_EDGE_STRAIGHTENING));
-    assertEquals(true, root.getProperty(LayeredOptions.UNNECESSARY_BENDPOINTS));
+    assertEquals(false, root.getProperty(LayeredOptions.UNNECESSARY_BENDPOINTS));
+  }
+
+  @Test
+  void compactDensityUsesMeasuredSpacingBaseline() {
+    ElkNode root = ElkLayeredOptions.configuredRoot(Direction.RIGHT, null);
+
+    assertEquals(40.0, root.getProperty(CoreOptions.SPACING_NODE_NODE), GEOMETRY_EPSILON);
+    assertEquals(24.0, root.getProperty(CoreOptions.SPACING_EDGE_NODE), GEOMETRY_EPSILON);
+    assertEquals(24.0, root.getProperty(CoreOptions.SPACING_EDGE_EDGE), GEOMETRY_EPSILON);
+    assertEquals(24.0, root.getProperty(CoreOptions.SPACING_PORT_PORT), GEOMETRY_EPSILON);
+    assertEquals(
+        40.0,
+        root.getProperty(LayeredOptions.SPACING_NODE_NODE_BETWEEN_LAYERS),
+        GEOMETRY_EPSILON);
+    assertEquals(
+        24.0,
+        root.getProperty(LayeredOptions.SPACING_EDGE_NODE_BETWEEN_LAYERS),
+        GEOMETRY_EPSILON);
+    assertEquals(
+        24.0,
+        root.getProperty(LayeredOptions.SPACING_EDGE_EDGE_BETWEEN_LAYERS),
+        GEOMETRY_EPSILON);
   }
 
   // Regression: sibling edges leaving one node side must not fan out past the port pitch. ELK
@@ -1100,6 +1122,10 @@ class ElkLayoutEngineTest {
     assertTrue(
         aspect < 4.2,
         "grouped rich pipeline should keep a bounded readable aspect ratio, aspect=" + aspect);
+    assertTrue(
+        maxX - minX < 1400.0,
+        "compact grouped pipeline should avoid excessive horizontal whitespace, width="
+            + (maxX - minX));
   }
 
   @Test
@@ -1830,6 +1856,31 @@ class ElkLayoutEngineTest {
         0,
         excessiveRouteDetourCount(result),
         "grouped cross-boundary routes should not loop around the whole diagram");
+  }
+
+  @Test
+  void groupedPipelineOmitsRedundantCollinearRoutePoints() {
+    LayoutResult result = new ElkLayoutEngine().layout(groupedPipelineRequest());
+
+    for (LaidOutEdge edge : result.edges()) {
+      assertNoRedundantCollinearRoutePoints(edge);
+    }
+  }
+
+  @Test
+  void groupedPipelineBoundsWorstRouteCornerCount() {
+    LayoutResult result = new ElkLayoutEngine().layout(groupedPipelineRequest());
+    LaidOutEdge worstEdge =
+        result.edges().stream()
+            .max(java.util.Comparator.comparingInt(edge -> cornerCount(edge.points())))
+            .orElseThrow();
+
+    assertTrue(
+        cornerCount(worstEdge.points()) <= 4,
+        "compact grouped pipeline should keep its worst route at four visible corners, edge="
+            + worstEdge.id()
+            + ", points="
+            + worstEdge.points());
   }
 
   @Test
@@ -3236,6 +3287,31 @@ class ElkLayoutEngineTest {
               + index
               + " ("
               + start
+              + "); route="
+              + points);
+    }
+  }
+
+  // A route point should describe a visible turn or endpoint. Keeping a point where both adjacent
+  // segments continue in the same direction inflates serialized geometry without changing the
+  // painted connector and makes hierarchy-crossing routes look more complicated than they are.
+  private static void assertNoRedundantCollinearRoutePoints(LaidOutEdge edge) {
+    assertRouted(edge);
+    List<Point> points = edge.points();
+    for (int index = 1; index < points.size() - 1; index++) {
+      Point previous = points.get(index - 1);
+      Point current = points.get(index);
+      Point next = points.get(index + 1);
+      RouteOrientation incoming = routeOrientation(previous, current);
+      RouteOrientation outgoing = routeOrientation(current, next);
+      assertFalse(
+          incoming != null && incoming == outgoing,
+          "edge "
+              + edge.id()
+              + " has a redundant collinear point at index "
+              + index
+              + " ("
+              + current
               + "); route="
               + points);
     }

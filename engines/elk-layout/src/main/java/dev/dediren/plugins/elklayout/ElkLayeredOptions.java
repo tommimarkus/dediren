@@ -41,10 +41,10 @@ final class ElkLayeredOptions {
   static final double DEFAULT_GROUP_PADDING = 24.0;
 
   private static final String LAYERED_ALGORITHM = "org.eclipse.elk.layered";
-  private static final double NODE_SPACING = 60.0;
-  private static final double EDGE_NODE_SPACING = 32.0;
-  private static final double EDGE_EDGE_SPACING = 40.0;
-  private static final double PORT_PORT_SPACING = 32.0;
+  private static final double NODE_SPACING = 40.0;
+  private static final double EDGE_NODE_SPACING = 24.0;
+  private static final double EDGE_EDGE_SPACING = 24.0;
+  private static final double PORT_PORT_SPACING = 24.0;
   private static final double READABLE_NODE_SPACING = 72.0;
   private static final double READABLE_EDGE_NODE_SPACING = 48.0;
   private static final double READABLE_EDGE_EDGE_SPACING = 48.0;
@@ -55,7 +55,7 @@ final class ElkLayeredOptions {
   private static final double SPACIOUS_EDGE_EDGE_SPACING = 64.0;
   private static final double SPACIOUS_PORT_PORT_SPACING = 48.0;
   private static final double SPACIOUS_GROUP_PADDING = 40.0;
-  private static final double PORT_SURROUNDING_SPACING = 16.0;
+  private static final double PORT_SURROUNDING_SPACING = 12.0;
 
   private ElkLayeredOptions() {}
 
@@ -118,7 +118,7 @@ final class ElkLayeredOptions {
     root.setProperty(
         LayeredOptions.NODE_PLACEMENT_BK_EDGE_STRAIGHTENING,
         EdgeStraighteningStrategy.IMPROVE_STRAIGHTNESS);
-    root.setProperty(LayeredOptions.UNNECESSARY_BENDPOINTS, true);
+    root.setProperty(LayeredOptions.UNNECESSARY_BENDPOINTS, false);
     boolean mergeEdges = endpointMergingEnabled(preferences);
     root.setProperty(LayeredOptions.MERGE_EDGES, mergeEdges);
     root.setProperty(LayeredOptions.MERGE_HIERARCHY_EDGES, mergeEdges);

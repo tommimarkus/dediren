@@ -997,6 +997,12 @@ returns no edge routes. The `algorithm` option selects the layout algorithm
 `layout_preferences`; see `schemas/layout-request.schema.json` for the allowed
 values.
 
+The omitted-preference `compact` baseline is calibrated for Dediren's labels
+and ports (40 node–node and 24 edge/port clearances) and omits redundant
+collinear route points. Re-run `layout` to adopt those defaults; do not copy
+coordinates from checked-in layout or render goldens, which are regression
+evidence rather than authoring templates.
+
 ## Export
 
 ArchiMate OEF:

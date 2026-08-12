@@ -26,7 +26,7 @@
     "source_id" : "component-payment-adapter",
     "projection_id" : "component-payment-adapter",
     "x" : 614.0,
-    "y" : 524.0,
+    "y" : 520.0,
     "width" : 180.0,
     "height" : 96.0,
     "label" : "Payment Adapter",
@@ -36,7 +36,7 @@
     "source_id" : "port-payment-client",
     "projection_id" : "port-payment-client",
     "x" : 687.5,
-    "y" : 420.0,
+    "y" : 416.0,
     "width" : 32.0,
     "height" : 32.0,
     "label" : "client",
@@ -46,7 +46,7 @@
     "source_id" : "interface-order-api",
     "projection_id" : "interface-order-api",
     "x" : 84.0,
-    "y" : 112.83333333333331,
+    "y" : 107.5,
     "width" : 280.0,
     "height" : 120.0,
     "label" : "OrderApi",
@@ -56,7 +56,7 @@
     "source_id" : "interface-payment-gateway",
     "projection_id" : "interface-payment-gateway",
     "x" : 44.0,
-    "y" : 496.8333333333333,
+    "y" : 491.5,
     "width" : 320.0,
     "height" : 120.0,
     "label" : "PaymentGateway",
@@ -66,7 +66,7 @@
     "source_id" : "class-order-controller",
     "projection_id" : "class-order-controller",
     "x" : 124.0,
-    "y" : 304.8333333333333,
+    "y" : 299.5,
     "width" : 240.0,
     "height" : 120.0,
     "label" : "OrderController",
@@ -81,25 +81,22 @@
     "routing_hints" : [ ],
     "points" : [ {
       "x" : 709.0,
-      "y" : 211.25
+      "y" : 209.25
     }, {
       "x" : 661.0,
-      "y" : 211.25
+      "y" : 209.25
     }, {
       "x" : 661.0,
-      "y" : 188.0
-    }, {
-      "x" : 557.0,
       "y" : 188.0
     }, {
       "x" : 509.0,
       "y" : 188.0
     }, {
       "x" : 509.0,
-      "y" : 172.83333333333331
+      "y" : 167.5
     }, {
       "x" : 365.0,
-      "y" : 172.83333333333331
+      "y" : 167.5
     } ],
     "label" : "realizes",
     "source_pointer" : "/relationships/0"
@@ -114,17 +111,14 @@
       "x" : 709.0,
       "y" : 228.0
     }, {
-      "x" : 557.0,
-      "y" : 228.0
-    }, {
       "x" : 413.0,
       "y" : 228.0
     }, {
       "x" : 413.0,
-      "y" : 541.6666666666666
+      "y" : 535.0
     }, {
       "x" : 365.0,
-      "y" : 541.6666666666666
+      "y" : 535.0
     } ],
     "label" : "uses",
     "source_pointer" : "/relationships/1"
@@ -137,13 +131,10 @@
     "routing_hints" : [ ],
     "points" : [ {
       "x" : 613.0,
-      "y" : 572.0
-    }, {
-      "x" : 557.0,
-      "y" : 572.0
+      "y" : 568.0
     }, {
       "x" : 365.0,
-      "y" : 572.0
+      "y" : 568.0
     } ],
     "label" : "realizes",
     "source_pointer" : "/relationships/2"
@@ -156,25 +147,22 @@
     "routing_hints" : [ ],
     "points" : [ {
       "x" : 709.0,
-      "y" : 244.75
+      "y" : 246.75
     }, {
       "x" : 661.0,
-      "y" : 244.75
+      "y" : 246.75
     }, {
       "x" : 661.0,
-      "y" : 268.0
-    }, {
-      "x" : 557.0,
       "y" : 268.0
     }, {
       "x" : 509.0,
       "y" : 268.0
     }, {
       "x" : 509.0,
-      "y" : 364.8333333333333
+      "y" : 359.5
     }, {
       "x" : 365.0,
-      "y" : 364.8333333333333
+      "y" : 359.5
     } ],
     "label" : "uses",
     "source_pointer" : "/relationships/3"
@@ -191,7 +179,7 @@
     "x" : 12.0,
     "y" : 12.0,
     "width" : 942.0,
-    "height" : 672.0,
+    "height" : 668.0,
     "members" : [ "order-api-boundary", "payment-adapter-boundary", "interface-order-api", "interface-payment-gateway", "class-order-controller" ],
     "label" : "Orders"
   }, {
@@ -206,7 +194,7 @@
     "x" : 581.0,
     "y" : 44.0,
     "width" : 341.0,
-    "height" : 272.0,
+    "height" : 268.0,
     "members" : [ "component-order-api", "port-rest-api" ],
     "label" : "Order API"
   }, {
@@ -219,7 +207,7 @@
       }
     },
     "x" : 581.0,
-    "y" : 388.0,
+    "y" : 384.0,
     "width" : 245.0,
     "height" : 264.0,
     "members" : [ "component-payment-adapter", "port-payment-client" ],

@@ -108,10 +108,10 @@
       "metadataFixture": null,
       "baseline": "engines/render/src/paint-test/resources/raster-golden/pipeline-rich-light.png",
       "dimensions": {
-        "width": 1646,
-        "height": 549
+        "width": 1458,
+        "height": 560
       },
-      "sha256": "8f4940f57ba81b35449df5ac76854b9804d87d388abee1524302c367d9bd5959"
+      "sha256": "b762d295d8a4ad858827b5c93c632064761fcd72799cf10bab6ebf412d24adc7"
     },
     {
       "name": "pipeline-rich-dark",
@@ -121,10 +121,10 @@
       "metadataFixture": null,
       "baseline": "engines/render/src/paint-test/resources/raster-golden/pipeline-rich-dark.png",
       "dimensions": {
-        "width": 1646,
-        "height": 549
+        "width": 1458,
+        "height": 561
       },
-      "sha256": "860f5a0b9772f60e71fe1e125b373bb56ff2f85f4e81b8b40939267832b795f2"
+      "sha256": "7c4140f2542843254ea5b109663340a05f4a85332e2c48a5284fb23b245a60c7"
     },
     {
       "name": "archimate-decorators",
@@ -134,10 +134,10 @@
       "metadataFixture": "fixtures/render-metadata/archimate-basic.json",
       "baseline": "engines/render/src/paint-test/resources/raster-golden/archimate-decorators.png",
       "dimensions": {
-        "width": 571,
+        "width": 531,
         "height": 209
       },
-      "sha256": "3343b99a143d623043d622501b24d1cca067af90e72fbd545d4b3798344ed7b2"
+      "sha256": "dd90a2c87d5031373b1ba30badfa12593dd085c90f70ac5d868bd03425464037"
     },
     {
       "name": "uml-sequence-fragments",

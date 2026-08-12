@@ -21,6 +21,32 @@ graph structure, ports, hierarchy, and real-render evidence have been tried.
 - Uses Eclipse ELK Java libraries directly (no external layout adapters).
 - Requires Java 21 or newer.
 
+### Default layered baseline
+
+The default `compact` density is a measured Dediren baseline, not a verbatim
+copy of ELK's tighter generic defaults. It leaves enough room for Dediren's
+node, port, and relationship-label vocabulary without preserving the older
+oversized gaps:
+
+| Clearance | Default |
+| --- | ---: |
+| node–node | 40 |
+| edge–node | 24 |
+| edge–edge | 24 |
+| port–port | 24 |
+| around ports | 12 |
+| between layers: node–node / edge–node / edge–edge | 40 / 24 / 24 |
+
+The default route style remains orthogonal with Brandes–Koepf placement and
+straightness improvement. Redundant collinear hierarchy-boundary points are
+disabled: a route point must describe an endpoint or a visible turn. Input and
+port order remain stable where the ordinary layered graph can preserve them.
+
+Checked-in layout fixtures and SVG/raster goldens lock reviewed output after
+this behavior is exercised. They detect change; they do not by themselves
+declare a diagram good. Acceptance also requires the layout-quality checks and
+real rendered evidence described below.
+
 ## Layout Modes
 
 `layout_preferences.mode` in the layout request selects the engine:

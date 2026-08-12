@@ -120,6 +120,10 @@ container, Java runtime, viewport, DPR, and font match the manifest pins.
 Failures write actual, changed-pixel mask, and overlay evidence under
 `.test-output/render-paint/`.
 
+Goldens are regression snapshots of reviewed output, not a standalone quality
+standard. Layout changes must also satisfy `validate-layout` and be inspected
+as rendered diagrams before their fixture, SVG, or raster baselines are moved.
+
 Browser DOM geometry, computed styles, marker/filter paint, and transparent
 screenshots are authoritative for this Chromium-only lane; ImageIO still owns
 PNG comparison. The browser runs with network and animation disabled, a fixed

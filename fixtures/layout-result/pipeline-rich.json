@@ -15,7 +15,7 @@
     "id" : "web-app",
     "source_id" : "web-app",
     "projection_id" : "web-app",
-    "x" : 338.0,
+    "x" : 290.0,
     "y" : 36.0,
     "width" : 160.0,
     "height" : 80.0,
@@ -25,8 +25,8 @@
     "id" : "orders-api",
     "source_id" : "orders-api",
     "projection_id" : "orders-api",
-    "x" : 618.0,
-    "y" : 182.0,
+    "x" : 530.0,
+    "y" : 166.0,
     "width" : 160.0,
     "height" : 80.0,
     "label" : "Orders API",
@@ -35,8 +35,8 @@
     "id" : "database",
     "source_id" : "database",
     "projection_id" : "database",
-    "x" : 1345.0,
-    "y" : 318.5,
+    "x" : 1157.0,
+    "y" : 297.16666666666663,
     "width" : 160.0,
     "height" : 80.0,
     "label" : "PostgreSQL",
@@ -45,8 +45,8 @@
     "id" : "worker",
     "source_id" : "worker",
     "projection_id" : "worker",
-    "x" : 903.0,
-    "y" : 328.0,
+    "x" : 779.0,
+    "y" : 296.0,
     "width" : 160.0,
     "height" : 80.0,
     "label" : "Fulfillment Worker",
@@ -55,8 +55,8 @@
     "id" : "payments",
     "source_id" : "payments",
     "projection_id" : "payments",
-    "x" : 1345.0,
-    "y" : 178.5,
+    "x" : 1157.0,
+    "y" : 177.16666666666666,
     "width" : 160.0,
     "height" : 80.0,
     "label" : "Payment Authorization Service",
@@ -73,10 +73,7 @@
       "x" : 173.0,
       "y" : 76.0
     }, {
-      "x" : 293.0,
-      "y" : 76.0
-    }, {
-      "x" : 337.0,
+      "x" : 289.0,
       "y" : 76.0
     } ],
     "label" : "submits order",
@@ -89,17 +86,17 @@
     "projection_id" : "web-app-calls-api",
     "routing_hints" : [ ],
     "points" : [ {
-      "x" : 418.0,
+      "x" : 370.0,
       "y" : 117.0
     }, {
-      "x" : 418.0,
-      "y" : 149.0
+      "x" : 370.0,
+      "y" : 141.0
     }, {
-      "x" : 698.0,
-      "y" : 149.0
+      "x" : 610.0,
+      "y" : 141.0
     }, {
-      "x" : 698.0,
-      "y" : 181.0
+      "x" : 610.0,
+      "y" : 165.0
     } ],
     "label" : "calls API",
     "source_pointer" : "/relationships/1"
@@ -111,41 +108,23 @@
     "projection_id" : "api-writes-database",
     "routing_hints" : [ ],
     "points" : [ {
-      "x" : 779.0,
-      "y" : 213.5
+      "x" : 691.0,
+      "y" : 196.16666666666666
     }, {
-      "x" : 811.0,
-      "y" : 213.5
+      "x" : 1000.0,
+      "y" : 196.16666666666666
     }, {
-      "x" : 811.0,
-      "y" : 189.5
+      "x" : 1000.0,
+      "y" : 193.16666666666666
     }, {
-      "x" : 843.0,
-      "y" : 189.5
+      "x" : 1132.0,
+      "y" : 193.16666666666666
     }, {
-      "x" : 983.5,
-      "y" : 189.5
+      "x" : 1132.0,
+      "y" : 327.3333333333333
     }, {
-      "x" : 1108.0,
-      "y" : 189.5
-    }, {
-      "x" : 1140.0,
-      "y" : 189.5
-    }, {
-      "x" : 1140.0,
-      "y" : 186.5
-    }, {
-      "x" : 1236.0,
-      "y" : 186.5
-    }, {
-      "x" : 1312.0,
-      "y" : 186.5
-    }, {
-      "x" : 1312.0,
-      "y" : 350.0
-    }, {
-      "x" : 1344.0,
-      "y" : 350.0
+      "x" : 1156.0,
+      "y" : 327.3333333333333
     } ],
     "label" : "writes orders",
     "source_pointer" : "/relationships/2"
@@ -157,29 +136,23 @@
     "projection_id" : "api-authorizes-payment",
     "routing_hints" : [ ],
     "points" : [ {
-      "x" : 779.0,
-      "y" : 230.5
+      "x" : 691.0,
+      "y" : 215.83333333333334
     }, {
-      "x" : 843.0,
-      "y" : 230.5
+      "x" : 715.0,
+      "y" : 215.83333333333334
     }, {
-      "x" : 983.5,
-      "y" : 230.5
+      "x" : 715.0,
+      "y" : 221.16666666666666
     }, {
-      "x" : 1108.0,
-      "y" : 230.5
+      "x" : 1048.0,
+      "y" : 221.16666666666666
     }, {
-      "x" : 1204.0,
-      "y" : 230.5
+      "x" : 1048.0,
+      "y" : 217.16666666666666
     }, {
-      "x" : 1204.0,
-      "y" : 218.5
-    }, {
-      "x" : 1236.0,
-      "y" : 218.5
-    }, {
-      "x" : 1344.0,
-      "y" : 218.5
+      "x" : 1156.0,
+      "y" : 217.16666666666666
     } ],
     "label" : "requests payment authorization",
     "source_pointer" : "/relationships/3"
@@ -191,17 +164,17 @@
     "projection_id" : "api-publishes-job",
     "routing_hints" : [ ],
     "points" : [ {
-      "x" : 698.0,
-      "y" : 263.0
+      "x" : 610.0,
+      "y" : 247.0
     }, {
-      "x" : 698.0,
+      "x" : 610.0,
+      "y" : 271.0
+    }, {
+      "x" : 859.0,
+      "y" : 271.0
+    }, {
+      "x" : 859.0,
       "y" : 295.0
-    }, {
-      "x" : 983.0,
-      "y" : 295.0
-    }, {
-      "x" : 983.0,
-      "y" : 327.0
     } ],
     "label" : "publishes fulfillment",
     "source_pointer" : "/relationships/4"
@@ -213,23 +186,17 @@
     "projection_id" : "worker-reads-database",
     "routing_hints" : [ ],
     "points" : [ {
-      "x" : 1064.0,
-      "y" : 368.0
+      "x" : 940.0,
+      "y" : 336.0
     }, {
-      "x" : 1108.0,
-      "y" : 368.0
+      "x" : 1000.0,
+      "y" : 336.0
     }, {
-      "x" : 1140.0,
-      "y" : 368.0
+      "x" : 1000.0,
+      "y" : 347.0
     }, {
-      "x" : 1140.0,
-      "y" : 367.0
-    }, {
-      "x" : 1236.0,
-      "y" : 367.0
-    }, {
-      "x" : 1344.0,
-      "y" : 367.0
+      "x" : 1156.0,
+      "y" : 347.0
     } ],
     "label" : "loads order",
     "source_pointer" : "/relationships/5"
@@ -243,10 +210,10 @@
         "source_id" : "application-services"
       }
     },
-    "x" : 313.0,
+    "x" : 265.0,
     "y" : 12.0,
-    "width" : 775.0,
-    "height" : 420.0,
+    "width" : 699.0,
+    "height" : 388.0,
     "members" : [ "web-app", "orders-api", "worker" ],
     "label" : "Application Services"
   }, {
@@ -258,10 +225,10 @@
         "source_id" : "external-dependencies"
       }
     },
-    "x" : 1256.0,
-    "y" : 146.5,
-    "width" : 273.0,
-    "height" : 276.0,
+    "x" : 1084.0,
+    "y" : 153.16666666666666,
+    "width" : 257.0,
+    "height" : 248.0,
     "members" : [ "payments", "database" ],
     "label" : "External Dependencies"
   } ],
