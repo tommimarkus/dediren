@@ -157,7 +157,8 @@ public final class OefExportEngine implements ExportEngine {
       throw failure(error.code(), error.getMessage(), error.path());
     }
 
-    String content = buildOef(request, policy);
+    var geometry = new OefGeometry();
+    String content = buildOef(request, policy, geometry);
     Diagnostic conformance;
     try {
       conformance = validateOfficialOefSchema(content, env, productRoot);
@@ -171,7 +172,9 @@ public final class OefExportEngine implements ExportEngine {
     return new EngineResult<>(
         result,
         withConformance(
-            withIdentityTripwire(policy, viewCoverageDiagnostics(request)), conformance));
+            withIdentityTripwire(
+                policy, concat(viewCoverageDiagnostics(request), geometry.diagnostics())),
+            conformance));
   }
 
   /**
@@ -220,7 +223,8 @@ public final class OefExportEngine implements ExportEngine {
       throw failure(error.code(), error.getMessage(), error.path());
     }
 
-    String content = buildModelOef(request, policy);
+    var geometry = new OefGeometry();
+    String content = buildModelOef(request, policy, geometry);
     Diagnostic conformance;
     try {
       conformance = validateOfficialOefSchema(content, env, productRoot);
@@ -234,7 +238,18 @@ public final class OefExportEngine implements ExportEngine {
         new EngineResult<>(
             result,
             withConformance(
-                withIdentityTripwire(policy, viewCoverageDiagnostics(request)), conformance)));
+                withIdentityTripwire(
+                    policy, concat(viewCoverageDiagnostics(request), geometry.diagnostics())),
+                conformance)));
+  }
+
+  private static List<Diagnostic> concat(List<Diagnostic> first, List<Diagnostic> second) {
+    if (second.isEmpty()) {
+      return first;
+    }
+    var combined = new ArrayList<>(first);
+    combined.addAll(second);
+    return combined;
   }
 
   /**
@@ -478,7 +493,8 @@ public final class OefExportEngine implements ExportEngine {
     }
   }
 
-  private static String buildOef(ExportRequest request, OefExportPolicy policy) {
+  private static String buildOef(
+      ExportRequest request, OefExportPolicy policy, OefGeometry geometry) {
     var ids = new IdentifierMap();
     var elementIds = new HashMap<String, String>();
     request.source().nodes().forEach(node -> elementIds.put(node.id(), ids.oefId("el", node.id())));
@@ -507,7 +523,14 @@ public final class OefExportEngine implements ExportEngine {
             : new OefExportPolicy.ViewIdentity(
                 policy.viewIdentifier(), policy.viewName(), policy.viewpoint());
     writeViewBody(
-        xml, request.layoutResult(), identity, ids, elementIds, relationshipIds, sourceNodesById);
+        xml,
+        request.layoutResult(),
+        identity,
+        ids,
+        elementIds,
+        relationshipIds,
+        sourceNodesById,
+        geometry);
     xml.append("</diagrams></views></model>\n");
     return xml.toString();
   }
@@ -524,7 +547,8 @@ public final class OefExportEngine implements ExportEngine {
   }
 
   /** One document carrying every supplied laid-out view; see {@link #exportModel}. */
-  private static String buildModelOef(ModelExportRequest request, OefExportPolicy policy) {
+  private static String buildModelOef(
+      ModelExportRequest request, OefExportPolicy policy, OefGeometry geometry) {
     ExportRequest first =
         new ExportRequest(
             ContractVersions.EXPORT_REQUEST_SCHEMA_VERSION,
@@ -561,7 +585,8 @@ public final class OefExportEngine implements ExportEngine {
           ids,
           elementIds,
           relationshipIds,
-          sourceNodesById);
+          sourceNodesById,
+          geometry);
     }
     xml.append("</diagrams></views></model>\n");
     return xml.toString();
@@ -606,35 +631,44 @@ public final class OefExportEngine implements ExportEngine {
         .append(attr(policy.modelIdentifier()))
         .append("\">");
     writeTextElement(xml, "name", policy.modelName());
-    xml.append("<elements>");
-    for (var node : request.source().nodes()) {
-      xml.append("<element identifier=\"")
-          .append(attr(elementIds.get(node.id())))
-          .append("\" xsi:type=\"")
-          .append(attr(node.type()))
-          .append("\">");
-      writeTextElement(xml, "name", node.label());
-      writePropertyValues(xml, node.properties(), propertyDefinitionIds);
-      xml.append("</element>");
+    // ModelType makes both wrappers optional but ElementsType/RelationshipsType require at least
+    // one child, so an empty wrapper — a contract-valid node-less or relationship-free model —
+    // would be rejected by the exchange schema. Omit the wrapper instead, as
+    // writePropertyDefinitions
+    // already does for its own.
+    if (!request.source().nodes().isEmpty()) {
+      xml.append("<elements>");
+      for (var node : request.source().nodes()) {
+        xml.append("<element identifier=\"")
+            .append(attr(elementIds.get(node.id())))
+            .append("\" xsi:type=\"")
+            .append(attr(node.type()))
+            .append("\">");
+        writeTextElement(xml, "name", node.label());
+        writePropertyValues(xml, node.properties(), propertyDefinitionIds);
+        xml.append("</element>");
+      }
+      xml.append("</elements>");
     }
-    xml.append("</elements>");
 
-    xml.append("<relationships>");
-    for (var relationship : request.source().relationships()) {
-      xml.append("<relationship identifier=\"")
-          .append(attr(relationshipIds.get(relationship.id())))
-          .append("\" source=\"")
-          .append(attr(elementIds.get(relationship.source())))
-          .append("\" target=\"")
-          .append(attr(elementIds.get(relationship.target())))
-          .append("\" xsi:type=\"")
-          .append(attr(relationship.type()))
-          .append("\">");
-      writeTextElement(xml, "name", relationship.label());
-      writePropertyValues(xml, relationship.properties(), propertyDefinitionIds);
-      xml.append("</relationship>");
+    if (!request.source().relationships().isEmpty()) {
+      xml.append("<relationships>");
+      for (var relationship : request.source().relationships()) {
+        xml.append("<relationship identifier=\"")
+            .append(attr(relationshipIds.get(relationship.id())))
+            .append("\" source=\"")
+            .append(attr(elementIds.get(relationship.source())))
+            .append("\" target=\"")
+            .append(attr(elementIds.get(relationship.target())))
+            .append("\" xsi:type=\"")
+            .append(attr(relationship.type()))
+            .append("\">");
+        writeTextElement(xml, "name", relationship.label());
+        writePropertyValues(xml, relationship.properties(), propertyDefinitionIds);
+        xml.append("</relationship>");
+      }
+      xml.append("</relationships>");
     }
-    xml.append("</relationships>");
     writePropertyDefinitions(xml, propertyDefinitionIds);
   }
 
@@ -645,23 +679,26 @@ public final class OefExportEngine implements ExportEngine {
       IdentifierMap ids,
       Map<String, String> elementIds,
       Map<String, String> relationshipIds,
-      Map<String, SourceNode> sourceNodesById) {
-    var semanticGroups =
-        layout.groups().stream()
-            .filter(
-                group -> {
-                  String sourceId = semanticGroupSourceId(group);
-                  SourceNode sourceNode = sourceId == null ? null : sourceNodesById.get(sourceId);
-                  return sourceNode != null && sourceNode.type().equals("Grouping");
-                })
-            .toList();
+      Map<String, SourceNode> sourceNodesById,
+      OefGeometry geometry) {
+    var semanticGroups = new ArrayList<IndexedGroup>();
+    for (int index = 0; index < layout.groups().size(); index++) {
+      LaidOutGroup group = layout.groups().get(index);
+      String sourceId = semanticGroupSourceId(group);
+      SourceNode sourceNode = sourceId == null ? null : sourceNodesById.get(sourceId);
+      if (sourceNode != null && sourceNode.type().equals("Grouping")) {
+        semanticGroups.add(new IndexedGroup(index, group));
+      }
+    }
     var viewNodeIds = new HashMap<String, String>();
     layout
         .nodes()
         .forEach(node -> viewNodeIds.put(node.id(), ids.oefId("vn-" + layout.viewId(), node.id())));
     var groupViewNodeIds = new HashMap<String, String>();
     semanticGroups.forEach(
-        group -> groupViewNodeIds.put(group.id(), ids.oefId("vg-" + layout.viewId(), group.id())));
+        indexed ->
+            groupViewNodeIds.put(
+                indexed.group().id(), ids.oefId("vg-" + layout.viewId(), indexed.group().id())));
     var viewConnectionIds = new HashMap<String, String>();
     layout
         .edges()
@@ -675,38 +712,30 @@ public final class OefExportEngine implements ExportEngine {
         .append(attr(identity.viewpoint()))
         .append("\">");
     writeTextElement(xml, "name", identity.viewName());
-    for (var group : semanticGroups) {
-      String sourceId = semanticGroupSourceId(group);
+    for (var indexed : semanticGroups) {
+      LaidOutGroup group = indexed.group();
+      String path = "$.layout_result.groups[" + indexed.index() + "]";
       xml.append("<node identifier=\"")
           .append(attr(groupViewNodeIds.get(group.id())))
           .append("\" xsi:type=\"Element\" elementRef=\"")
-          .append(attr(elementIds.get(sourceId)))
-          .append("\" x=\"")
-          .append(formatNumber(group.x()))
-          .append("\" y=\"")
-          .append(formatNumber(group.y()))
-          .append("\" w=\"")
-          .append(formatNumber(group.width()))
-          .append("\" h=\"")
-          .append(formatNumber(group.height()))
-          .append("\"/>");
+          .append(attr(elementIds.get(semanticGroupSourceId(group))))
+          .append("\"");
+      writeBounds(xml, geometry, group.x(), group.y(), group.width(), group.height(), path);
+      xml.append("/>");
     }
-    for (var node : layout.nodes()) {
+    for (int index = 0; index < layout.nodes().size(); index++) {
+      var node = layout.nodes().get(index);
+      String path = "$.layout_result.nodes[" + index + "]";
       xml.append("<node identifier=\"")
           .append(attr(viewNodeIds.get(node.id())))
           .append("\" xsi:type=\"Element\" elementRef=\"")
           .append(attr(elementIds.get(node.sourceId())))
-          .append("\" x=\"")
-          .append(formatNumber(node.x()))
-          .append("\" y=\"")
-          .append(formatNumber(node.y()))
-          .append("\" w=\"")
-          .append(formatNumber(node.width()))
-          .append("\" h=\"")
-          .append(formatNumber(node.height()))
-          .append("\"/>");
+          .append("\"");
+      writeBounds(xml, geometry, node.x(), node.y(), node.width(), node.height(), path);
+      xml.append("/>");
     }
-    for (var edge : layout.edges()) {
+    for (int index = 0; index < layout.edges().size(); index++) {
+      var edge = layout.edges().get(index);
       xml.append("<connection identifier=\"")
           .append(attr(viewConnectionIds.get(edge.id())))
           .append("\" xsi:type=\"Relationship\" relationshipRef=\"")
@@ -716,30 +745,60 @@ public final class OefExportEngine implements ExportEngine {
           .append("\" target=\"")
           .append(attr(viewNodeIds.get(edge.target())))
           .append("\">");
-      writeConnectionGeometry(xml, edge.points());
+      writeConnectionGeometry(
+          xml, geometry, edge.points(), "$.layout_result.edges[" + index + "].points");
       xml.append("</connection>");
     }
     xml.append("</view>");
   }
 
-  private static void writeConnectionGeometry(StringBuilder xml, List<Point> points) {
+  /** A laid-out group paired with its index in the layout result, for diagnostic paths. */
+  private record IndexedGroup(int index, LaidOutGroup group) {}
+
+  private static void writeBounds(
+      StringBuilder xml,
+      OefGeometry geometry,
+      double x,
+      double y,
+      double width,
+      double height,
+      String path) {
+    xml.append(" x=\"")
+        .append(geometry.nonNegative(x, path + ".x"))
+        .append("\" y=\"")
+        .append(geometry.nonNegative(y, path + ".y"))
+        .append("\" w=\"")
+        .append(geometry.positive(width, path + ".width"))
+        .append("\" h=\"")
+        .append(geometry.positive(height, path + ".height"))
+        .append("\"");
+  }
+
+  private static void writeConnectionGeometry(
+      StringBuilder xml, OefGeometry geometry, List<Point> points, String path) {
     if (points == null || points.isEmpty()) {
       return;
     }
-    writeLocation(xml, "sourceAttachment", points.get(0));
+    writeLocation(xml, geometry, "sourceAttachment", points.get(0), path + "[0]");
     for (int index = 1; index < points.size() - 1; index++) {
-      writeLocation(xml, "bendpoint", points.get(index));
+      writeLocation(xml, geometry, "bendpoint", points.get(index), path + "[" + index + "]");
     }
-    writeLocation(xml, "targetAttachment", points.get(points.size() - 1));
+    writeLocation(
+        xml,
+        geometry,
+        "targetAttachment",
+        points.get(points.size() - 1),
+        path + "[" + (points.size() - 1) + "]");
   }
 
-  private static void writeLocation(StringBuilder xml, String elementName, Point point) {
+  private static void writeLocation(
+      StringBuilder xml, OefGeometry geometry, String elementName, Point point, String path) {
     xml.append("<")
         .append(elementName)
         .append(" x=\"")
-        .append(formatNumber(point.x()))
+        .append(geometry.nonNegative(point.x(), path + ".x"))
         .append("\" y=\"")
-        .append(formatNumber(point.y()))
+        .append(geometry.nonNegative(point.y(), path + ".y"))
         .append("\"/>");
   }
 
@@ -942,10 +1001,6 @@ public final class OefExportEngine implements ExportEngine {
 
   private static String semanticGroupSourceId(LaidOutGroup group) {
     return LaidOutGroups.semanticSourceId(group);
-  }
-
-  private static String formatNumber(double value) {
-    return Long.toString(Math.round(value));
   }
 
   // In-file shorthands only: escaping and slugging are owned by engine-api's XmlText/XmlIds,

@@ -21,6 +21,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.w3c.dom.Document;
 import org.xml.sax.InputSource;
 import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
@@ -321,6 +322,123 @@ class OefExportEngineTest {
                 envWithOefSchemas(),
                 Path.of("").toAbsolutePath()))
         .isEmpty();
+  }
+
+  @Test
+  void emptyRelationshipsOmitTheWrapperInsteadOfEmittingAnEmptyOne() throws Exception {
+    // AM-OEF-1: the exchange XSD types RelationshipsType with minOccurs="1" on its child but makes
+    // the <relationships> wrapper itself optional in ModelType, so a relationship-free model — a
+    // capability map, a component inventory — must omit the wrapper. model.schema.json sets no
+    // minItems, so this input is valid under dediren's own published contract.
+    JsonNode inputJson = exportInputJson();
+    ((ArrayNode) inputJson.get("source").get("relationships")).removeAll();
+    ((ArrayNode) inputJson.at("/source/plugins/generic-graph/views/0/relationships")).removeAll();
+    ((ArrayNode) inputJson.get("layout_result").get("edges")).removeAll();
+
+    String content = exportContent(inputJson);
+
+    assertThat(content).doesNotContain("<relationships>", "<relationships/>");
+    assertThat(content).contains("<elements>");
+  }
+
+  @Test
+  void emptyElementsOmitTheWrapperInsteadOfEmittingAnEmptyOne() throws Exception {
+    // AM-OEF-2: same for ElementsType. A node-less model is contract-valid and must not be
+    // rejected by the exchange schema on a wrapper dediren chose to emit.
+    JsonNode inputJson = exportInputJson();
+    ((ArrayNode) inputJson.get("source").get("nodes")).removeAll();
+    ((ArrayNode) inputJson.get("source").get("relationships")).removeAll();
+    ((ArrayNode) inputJson.at("/source/plugins/generic-graph/views/0/nodes")).removeAll();
+    ((ArrayNode) inputJson.at("/source/plugins/generic-graph/views/0/relationships")).removeAll();
+    ((ArrayNode) inputJson.get("layout_result").get("nodes")).removeAll();
+    ((ArrayNode) inputJson.get("layout_result").get("edges")).removeAll();
+
+    String content = exportContent(inputJson);
+
+    assertThat(content).doesNotContain("<elements>", "<elements/>", "<relationships>");
+    assertThat(content).contains("<model ");
+  }
+
+  @Test
+  void negativeNodeCoordinatesAreClampedToZeroAndDisclosed() throws Exception {
+    // AM-OEF-3: LocationGroup types x/y as xs:nonNegativeInteger, but layout-result.schema.json
+    // types them as plain numbers with no minimum — and dediren's own ELK layout can produce a
+    // negative coordinate, so this is unrepairable by editing source JSON. Clamp, and say so:
+    // a silent move would be exactly the "declared, not silently dropped" falsehood DOC-9 names.
+    JsonNode inputJson = exportInputJson();
+    ((ObjectNode) inputJson.at("/layout_result/nodes/0")).put("x", -14.0);
+
+    EngineResult<ExportResult> result = exportResult(inputJson);
+
+    assertThat(result.value().content()).contains("x=\"0\"");
+    assertThat(result.diagnostics())
+        .anySatisfy(
+            diagnostic -> {
+              assertThat(diagnostic.code()).isEqualTo("DEDIREN_OEF_GEOMETRY_CLAMPED");
+              assertThat(diagnostic.severity()).isEqualTo(DiagnosticSeverity.WARNING);
+              assertThat(diagnostic.message()).contains("-14");
+              assertThat(diagnostic.path()).isEqualTo("$.layout_result.nodes[0].x");
+            });
+  }
+
+  @Test
+  void subPixelSizesAreClampedToOneAndDisclosed() throws Exception {
+    // AM-OEF-4: SizeGroup types w/h as xs:positiveInteger; layout-result.schema.json allows
+    // exclusiveMinimum 0, so 0.4 is contract-valid and rounds to 0 — one sub-pixel node would
+    // otherwise kill the whole export.
+    JsonNode inputJson = exportInputJson();
+    ((ObjectNode) inputJson.at("/layout_result/nodes/0")).put("width", 0.4);
+
+    EngineResult<ExportResult> result = exportResult(inputJson);
+
+    assertThat(result.value().content()).contains("w=\"1\"");
+    assertThat(result.diagnostics())
+        .anySatisfy(
+            diagnostic -> {
+              assertThat(diagnostic.code()).isEqualTo("DEDIREN_OEF_GEOMETRY_CLAMPED");
+              assertThat(diagnostic.path()).isEqualTo("$.layout_result.nodes[0].width");
+            });
+  }
+
+  @Test
+  void negativeRouteGeometryIsClampedToZeroAndDisclosed() throws Exception {
+    // AM-OEF-5: LocationType reuses LocationGroup, so bendpoints and attachments carry the same
+    // nonNegativeInteger constraint — an edge route leaving the positive quadrant breaks export
+    // even when every node is in range.
+    JsonNode inputJson = exportInputJson();
+    ((ObjectNode) inputJson.at("/layout_result/edges/0/points/0")).put("y", -3.0);
+
+    EngineResult<ExportResult> result = exportResult(inputJson);
+
+    assertThat(result.value().content()).contains("<sourceAttachment x=\"173\" y=\"0\"/>");
+    assertThat(result.diagnostics())
+        .anySatisfy(
+            diagnostic -> {
+              assertThat(diagnostic.code()).isEqualTo("DEDIREN_OEF_GEOMETRY_CLAMPED");
+              assertThat(diagnostic.path()).isEqualTo("$.layout_result.edges[0].points[0].y");
+            });
+  }
+
+  @Test
+  void inRangeGeometryIsNeverReportedAsClamped() throws Exception {
+    // The clamp must stay quiet on the ordinary case, or the disclosure is noise.
+    EngineResult<ExportResult> result = exportResult(exportInputJson());
+
+    assertThat(result.diagnostics())
+        .noneMatch(diagnostic -> diagnostic.code().equals("DEDIREN_OEF_GEOMETRY_CLAMPED"));
+  }
+
+  private EngineResult<ExportResult> exportResult(JsonNode inputJson) throws Exception {
+    ExportRequest request =
+        engine.parseRequest(
+            JsonSupport.objectMapper()
+                .writeValueAsString(inputJson)
+                .getBytes(StandardCharsets.UTF_8));
+    return engine.export(request, envWithOefSchemas(), Path.of("").toAbsolutePath());
+  }
+
+  private String exportContent(JsonNode inputJson) throws Exception {
+    return exportResult(inputJson).value().content();
   }
 
   private static JsonNode engineTree(Object value) {

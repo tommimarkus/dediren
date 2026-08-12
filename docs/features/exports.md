@@ -104,6 +104,16 @@ names the omitted view ids and counts; the envelope `status` stays `ok`. Read
 `.diagnostics[]` to see which diagrams a given OEF does not carry, and export the
 other views to represent them.
 
+The exchange format types diagram coordinates as `xs:nonNegativeInteger` and
+sizes as `xs:positiveInteger`, which is narrower than the plain numbers
+`layout-result.schema.json` permits — and a layout engine can legitimately place
+a node at a negative coordinate. Rather than fail the export on its last stage
+for geometry the caller cannot repair, the exporter rounds to integers and
+clamps whatever falls outside those ranges, declaring each clamp with a `warn`
+diagnostic `DEDIREN_OEF_GEOMETRY_CLAMPED` that names the original value and its
+layout-result path. A clamped export is usable; the affected node or bendpoint
+sits where the exchange schema allows rather than where the layout put it.
+
 For whole-model interchange, `dediren build` with `--oef-policy` also composes
 `model.oef.xml` at the output root — one document carrying every built view's
 diagram, each with its own identity (policy `views` override, else a
