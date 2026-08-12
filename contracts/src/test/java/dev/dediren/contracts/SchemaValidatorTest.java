@@ -254,11 +254,23 @@ class SchemaValidatorTest {
         .isNotEmpty();
 
     var overclaimed = umlXmiAssurance();
-    overclaimed.putObject("validation_evidence").put("level", "uml-metamodel-validated");
+    ((tools.jackson.databind.node.ObjectNode) overclaimed.at("/validation_evidence"))
+        .put("level", "uml-content-schema-validated");
     assertThat(
             SchemaAssertions.validate(
                 workspaceRoot(), "schemas/uml-xmi-assurance.schema.json", overclaimed))
-        .describedAs("the schema may enumerate stronger levels, while engine evidence remains explicit")
+        .describedAs("a stronger UML-content claim requires metamodel evidence")
+        .isNotEmpty();
+
+    ((tools.jackson.databind.node.ArrayNode)
+            overclaimed.at("/validation_evidence/uml_metamodel_evidence"))
+        .addObject()
+        .put("metamodel", "UML 2.5.1")
+        .put("validator", "user-supplied-schema-set");
+    assertThat(
+            SchemaAssertions.validate(
+                workspaceRoot(), "schemas/uml-xmi-assurance.schema.json", overclaimed))
+        .describedAs("a stronger UML-content claim is valid when its evidence is explicit")
         .isEmpty();
   }
 
@@ -361,20 +373,23 @@ class SchemaValidatorTest {
     var assurance = mapper.createObjectNode();
     assurance.put("assurance_schema_version", "uml-xmi-assurance.schema.v1");
     var taxonomy = assurance.putArray("kind_taxonomy");
-    taxonomy.add(kind("uml-class", "standard-uml-diagram-kind", true, "provisional-aggregate"));
-    taxonomy.add(kind("uml-sequence", "standard-uml-diagram-kind", false, "none"));
-    taxonomy.add(kind("uml-state-machine", "standard-uml-diagram-kind", false, "none"));
-    taxonomy.add(kind("uml-use-case", "standard-uml-diagram-kind", false, "none"));
-    taxonomy.add(kind("uml-component", "standard-uml-diagram-kind", false, "none"));
-    taxonomy.add(kind("uml-deployment", "standard-uml-diagram-kind", false, "none"));
-    taxonomy.add(kind("uml-activity", "standard-uml-diagram-kind", false, "none"));
-    var data = kind("uml-data", "dediren-local-classifier-view", true, "provisional-aggregate");
-    data.put("maps_to_uml", "Class");
+    taxonomy.add(
+        kind("uml-class", "standard-uml-diagram-kind", "included", "provisional-aggregate"));
+    taxonomy.add(kind("uml-sequence", "standard-uml-diagram-kind", "not-included", "none"));
+    taxonomy.add(
+        kind("uml-state-machine", "standard-uml-diagram-kind", "not-included", "none"));
+    taxonomy.add(kind("uml-use-case", "standard-uml-diagram-kind", "not-included", "none"));
+    taxonomy.add(kind("uml-component", "standard-uml-diagram-kind", "not-included", "none"));
+    taxonomy.add(kind("uml-deployment", "standard-uml-diagram-kind", "not-included", "none"));
+    taxonomy.add(kind("uml-activity", "standard-uml-diagram-kind", "not-included", "none"));
+    var data =
+        kind("uml-data", "dediren-local-classifier-view", "included", "provisional-aggregate");
+    data.put("maps_to_uml_diagram_kind", "class");
     taxonomy.add(data);
     assurance
         .putObject("artifact_scope")
         .put("scope", "view")
-        .putArray("selected_views")
+        .putArray("selected_view_kinds")
         .add("uml-class");
     var validationEvidence = assurance.putObject("validation_evidence");
     validationEvidence.put("level", "xmi-envelope-only");
@@ -385,14 +400,14 @@ class SchemaValidatorTest {
   }
 
   private static tools.jackson.databind.node.ObjectNode kind(
-      String kind, String classification, boolean aggregateModelEligible, String umlDi) {
+      String kind, String classification, String aggregateModel, String umlDi) {
     var result = dev.dediren.contracts.json.JsonSupport.objectMapper().createObjectNode();
     result.put("kind", kind);
     result.put("classification", classification);
     result
         .putObject("scope")
-        .put("xmi_abstract_syntax", "supported")
-        .put("aggregate_model_eligible", aggregateModelEligible)
+        .put("xmi_abstract_syntax", "selected-view")
+        .put("aggregate_model", aggregateModel)
         .put("uml_di", umlDi);
     return result;
   }

@@ -2,11 +2,18 @@ package dev.dediren.plugins.umlxmi;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dev.dediren.contracts.export.ExportResult;
 import dev.dediren.contracts.json.JsonSupport;
+import dev.dediren.contracts.layout.LayoutResult;
+import dev.dediren.contracts.source.SourceDocument;
+import dev.dediren.engine.EngineResult;
+import dev.dediren.engine.ModelExportRequest;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -48,19 +55,51 @@ class XmiAssuranceTest {
     assertThat(taxonomy).hasSize(8);
     JsonNode kindEntry = findKind(taxonomy, kind);
     assertThat(kindEntry.at("/classification").asText()).isEqualTo(classification);
-    assertThat(kindEntry.at("/scope/xmi_abstract_syntax").asText()).isEqualTo("supported");
-    assertThat(kindEntry.at("/scope/aggregate_model_eligible").asBoolean())
-        .isEqualTo(aggregateModelEligible);
+    assertThat(kindEntry.at("/scope/xmi_abstract_syntax").asText())
+        .isEqualTo("selected-view");
+    assertThat(kindEntry.at("/scope/aggregate_model").asText())
+        .isEqualTo(aggregateModelEligible ? "included" : "not-included");
     assertThat(kindEntry.at("/scope/uml_di").asText())
         .isEqualTo(aggregateModelEligible ? "provisional-aggregate" : "none");
     if ("uml-data".equals(kind)) {
-      assertThat(kindEntry.at("/maps_to_uml").asText()).isEqualTo("Class");
+      assertThat(kindEntry.at("/maps_to_uml_diagram_kind").asText()).isEqualTo("class");
     }
-    assertThat(assurance.at("/artifact_scope/scope").asText())
-        .isEqualTo(aggregateModelEligible ? "model-aggregate" : "view");
-    assertThat(assurance.at("/artifact_scope/selected_views"))
+    assertThat(assurance.at("/artifact_scope/scope").asText()).isEqualTo("view");
+    assertThat(assurance.at("/artifact_scope/selected_view_kinds"))
         .singleElement()
         .satisfies(view -> assertThat(view.asText()).isEqualTo(kind));
+    assertConservativeValidationEvidence(assurance);
+  }
+
+  @Test
+  void modelExportPublishesAggregateScopeForItsSelectedViewKinds() throws Exception {
+    SourceDocument source =
+        JsonSupport.objectMapper()
+            .readValue(
+                Files.readString(workspaceRoot().resolve("fixtures/source/valid-uml-basic.json")),
+                SourceDocument.class);
+    ModelExportRequest request =
+        new ModelExportRequest(
+            source,
+            List.of(
+                new ModelExportRequest.ViewLayout(
+                    "class-view",
+                    fixture("fixtures/layout-result/uml-basic.json", LayoutResult.class)),
+                new ModelExportRequest.ViewLayout(
+                    "data-view",
+                    fixture("fixtures/layout-result/uml-data.json", LayoutResult.class))),
+            fixtureJson("fixtures/export-policy/default-uml-xmi.json"));
+
+    Optional<EngineResult<ExportResult>> result =
+        new XmiExportEngine()
+            .exportModel(request, envWithStubXmiSchema(), Path.of("").toAbsolutePath());
+    JsonNode assurance =
+        JsonSupport.objectMapper().valueToTree(result.orElseThrow().value()).at("/assurance");
+
+    assertThat(assurance.at("/artifact_scope/scope").asText()).isEqualTo("model-aggregate");
+    assertThat(assurance.at("/artifact_scope/selected_view_kinds"))
+        .extracting(JsonNode::asText)
+        .containsExactly("uml-class", "uml-data");
     assertConservativeValidationEvidence(assurance);
   }
 
@@ -137,6 +176,11 @@ class XmiAssuranceTest {
 
   private static JsonNode fixtureJson(String path) throws Exception {
     return JsonSupport.objectMapper().readTree(Files.readString(workspaceRoot().resolve(path)));
+  }
+
+  private static <T> T fixture(String path, Class<T> type) throws Exception {
+    return JsonSupport.objectMapper()
+        .readValue(Files.readString(workspaceRoot().resolve(path)), type);
   }
 
   private static Path workspaceRoot() {
