@@ -252,6 +252,12 @@ public final class Uml {
         validateUmlDeploymentViewProperties(viewIndex, view, context);
       }
     }
+
+    // Last: this reads a destruction occurrence's own properties, so the node-level rules that
+    // check those properties should have their say first — a model that is wrong in both ways
+    // deserves the more specific diagnostic.
+    UmlSequenceValidation.validateNoOccurrencesBelowDestruction(
+        source.relationships(), source.nodes(), context);
   }
 
   private static void validateUmlNodeProperties(

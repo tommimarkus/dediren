@@ -410,6 +410,60 @@ class UmlValidationTest {
   }
 
   @Test
+  void rejectsAMessageArrivingOnADestroyedLifeline() throws Exception {
+    // §17.12.6.4 `no_occurrence_specifications_below`: a DestructionOccurrenceSpecification is
+    // last() among its lifeline's events. Nothing enforced it, so a later message targeting a
+    // destroyed lifeline validated, projected and rendered — the arrow landing below the
+    // destruction cross.
+    Fixture fixture =
+        loadMutatedUmlSequenceLifecycleFixture(
+            source -> addSequenceMessageAfterDestruction(source, "m5", "service", "worker", 5));
+
+    UmlValidationException error = assertRejected(fixture);
+
+    assertThat(error.code()).isEqualTo("DEDIREN_UML_RELATIONSHIP_PROPERTY_INVALID");
+    assertThat(error.path()).isEqualTo("$.relationships[4].properties.uml.sequence");
+  }
+
+  @Test
+  void rejectsAMessageSentFromADestroyedLifeline() throws Exception {
+    // The constraint is about the lifeline's events, not about arrival: a destroyed lifeline
+    // cannot send either.
+    Fixture fixture =
+        loadMutatedUmlSequenceLifecycleFixture(
+            source -> addSequenceMessageAfterDestruction(source, "m5", "worker", "service", 5));
+
+    assertThat(assertRejected(fixture).path())
+        .isEqualTo("$.relationships[4].properties.uml.sequence");
+  }
+
+  @Test
+  void acceptsTrafficOnOtherLifelinesAfterADestruction() throws Exception {
+    // Destroying one lifeline must not freeze the rest of the interaction — the shipped fixture's
+    // own m4 reply already runs after the destruction.
+    Fixture fixture =
+        loadMutatedUmlSequenceLifecycleFixture(
+            source -> addSequenceMessageAfterDestruction(source, "m5", "customer", "service", 5));
+
+    assertThatCode(() -> Uml.validateSource(fixture.source(), fixture.pluginData()))
+        .doesNotThrowAnyException();
+  }
+
+  private static void addSequenceMessageAfterDestruction(
+      ObjectNode source, String id, String from, String to, int sequence) {
+    ObjectNode message = ((ArrayNode) source.get("relationships")).addObject();
+    message.put("id", id).put("type", "Message").put("source", from).put("target", to);
+    message.put("label", id);
+    message
+        .putObject("properties")
+        .putObject("uml")
+        .put("interaction", "interaction-lifecycle")
+        .put("sequence", sequence)
+        .put("message_sort", "synchCall");
+    ((ArrayNode) source.at("/plugins/generic-graph/views/0/relationships")).add(id);
+  }
+
+  @Test
   void rejectsUseCaseSubjectThatIsNotAClassifier() throws Exception {
     // Narrowed from "not a structural classifier": §18.2.5.4 types subject as Classifier, and an
     // Actor is one. An ExtensionPoint is not — it is a RedefinableElement owned by a UseCase.
@@ -1950,6 +2004,23 @@ class UmlValidationTest {
                     Files.readString(
                         workspaceRoot()
                             .resolve("fixtures/source/valid-uml-sequence-fragments.json")));
+    mutate.accept(sourceJson);
+    var source = JsonSupport.objectMapper().treeToValue(sourceJson, SourceDocument.class);
+    var data =
+        JsonSupport.objectMapper()
+            .treeToValue(source.plugins().get("generic-graph"), GenericGraphPluginData.class);
+    return new Fixture(source, data);
+  }
+
+  private static Fixture loadMutatedUmlSequenceLifecycleFixture(Consumer<ObjectNode> mutate)
+      throws Exception {
+    var sourceJson =
+        (ObjectNode)
+            JsonSupport.objectMapper()
+                .readTree(
+                    Files.readString(
+                        workspaceRoot()
+                            .resolve("fixtures/source/valid-uml-sequence-lifecycle.json")));
     mutate.accept(sourceJson);
     var source = JsonSupport.objectMapper().treeToValue(sourceJson, SourceDocument.class);
     var data =

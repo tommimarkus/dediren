@@ -424,6 +424,66 @@ public final class UmlSequenceValidation {
     }
   }
 
+  /**
+   * §17.12.6.4 {@code no_occurrence_specifications_below}: a DestructionOccurrenceSpecification is
+   * {@code last()} among the events of the Lifeline it covers.
+   *
+   * <p>Nothing enforced it, so a message sent to or from a destroyed lifeline validated, projected
+   * and rendered &mdash; the arrow landing below the destruction cross. The constraint is about the
+   * lifeline's events, so it binds a later message at either end, not only an arriving one.
+   */
+  static void validateNoOccurrencesBelowDestruction(
+      List<SourceRelationship> relationships, List<SourceNode> nodes, ValidationContext context)
+      throws UmlValidationException {
+    var destroyedAt = new HashMap<String, BigInteger>();
+    for (SourceNode node : nodes) {
+      if (!"DestructionOccurrenceSpecification".equals(node.type())) {
+        continue;
+      }
+      String lifeline = readTextProperty(node.properties().get("uml"), "covered");
+      if (lifeline == null) {
+        continue;
+      }
+      for (SourceRelationship relationship : relationships) {
+        if (!"Message".equals(relationship.type()) || !node.id().equals(relationship.target())) {
+          continue;
+        }
+        BigInteger sequence = messageSequence(relationship.id(), context);
+        if (sequence != null) {
+          destroyedAt.merge(lifeline, sequence, BigInteger::min);
+        }
+      }
+    }
+    if (destroyedAt.isEmpty()) {
+      return;
+    }
+    for (int index = 0; index < relationships.size(); index++) {
+      SourceRelationship relationship = relationships.get(index);
+      if (!"Message".equals(relationship.type())) {
+        continue;
+      }
+      BigInteger sequence = messageSequence(relationship.id(), context);
+      if (sequence == null) {
+        continue;
+      }
+      for (String endpoint : List.of(relationship.source(), relationship.target())) {
+        // A deletion message names the occurrence, not the lifeline, so resolve through it — the
+        // destruction itself must not count as an event below the destruction.
+        String lifeline =
+            "DestructionOccurrenceSpecification".equals(context.nodeTypes().get(endpoint))
+                ? readTextProperty(context.nodeUmlProperties().get(endpoint), "covered")
+                : endpoint;
+        BigInteger destruction = destroyedAt.get(lifeline);
+        if (destruction != null && sequence.compareTo(destruction) > 0) {
+          throw new UmlValidationException(
+              UmlTypeKind.RELATIONSHIP_PROPERTY,
+              "Message.sequence",
+              "$.relationships[" + index + "].properties.uml.sequence");
+        }
+      }
+    }
+  }
+
   private static InteractionFragmentInterval interactionFragmentInterval(
       String fragmentId, ValidationContext context, Set<String> visitedCombinedFragments) {
     if ("Message".equals(context.relationshipTypes().get(fragmentId))) {
