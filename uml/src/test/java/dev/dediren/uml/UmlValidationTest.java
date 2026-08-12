@@ -739,21 +739,27 @@ class UmlValidationTest {
   }
 
   @Test
-  void rejectsAltFragmentWithOneOperand() throws Exception {
-    assertUmlSequenceFragmentsMutationRejected(
-        source ->
-            replaceTextArray(
-                nodeUmlProperties(source, "cf-availability"), "operands", "op-in-stock"),
-        "$.nodes[5].properties.uml.operands");
-  }
-
-  @Test
-  void rejectsParFragmentWithOneOperand() throws Exception {
-    assertUmlSequenceFragmentsMutationRejected(
-        source ->
-            replaceTextArray(
-                nodeUmlProperties(source, "cf-parallel-closeout"), "operands", "op-charge"),
-        "$.nodes[12].properties.uml.operands");
+  void everyInteractionOperatorAcceptsOneOperand() {
+    // §17.12.3.6 types `operand` as [1..*], and the only arity constraint in clause 17 covers
+    // opt/loop/break/assert/neg. A one-operand guarded `alt` is legal, common, and not the same as
+    // an `opt` — its guard may simply be false with no else-branch to take — yet a two-operand
+    // rule with no basis in the spec rejected it.
+    //
+    // Asserted on the rule rather than through a mutated fixture because dropping an operand from
+    // the fragments fixture also orphans the operand node, which a different rule then rejects;
+    // this is the predicate render's metadata validation shares, so it is the rule itself.
+    assertThat(UmlSequenceValidation.supportsOperandCount("alt", 1)).isTrue();
+    assertThat(UmlSequenceValidation.supportsOperandCount("par", 1)).isTrue();
+    assertThat(UmlSequenceValidation.supportsOperandCount("alt", 2)).isTrue();
+    assertThat(UmlSequenceValidation.supportsOperandCount("par", 5)).isTrue();
+    // The floor is one, not none: an operator with no operand has nothing to guard or interleave.
+    assertThat(UmlSequenceValidation.supportsOperandCount("alt", 0)).isFalse();
+    assertThat(UmlSequenceValidation.supportsOperandCount("par", 0)).isFalse();
+    // opt and loop keep their clause-17 arity constraint of exactly one.
+    assertThat(UmlSequenceValidation.supportsOperandCount("opt", 2)).isFalse();
+    assertThat(UmlSequenceValidation.supportsOperandCount("loop", 2)).isFalse();
+    // The switch is also the operator allow-list, so an unnamed operator has no legal count.
+    assertThat(UmlSequenceValidation.supportsOperandCount("seq", 1)).isFalse();
   }
 
   @ParameterizedTest(name = "{0}")

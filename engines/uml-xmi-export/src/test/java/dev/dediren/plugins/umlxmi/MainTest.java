@@ -362,6 +362,42 @@ class MainTest {
   }
 
   @Test
+  void exportsADeleteMessageEndingInADestructionOccurrenceSpecification() throws Exception {
+    // UML-SEM-29: core has always accepted Lifeline -> DestructionOccurrenceSpecification
+    // (§17.12.6.3, §17.12.22.3) while the exporter demanded Lifeline -> Lifeline and rejected the
+    // node outright, so a deletion message validated, rendered, and then hard-failed at export.
+    //
+    // Driven from the shipped lifecycle fixture with its ExecutionSpecification removed: that node
+    // is a separately declared export limitation, not this defect, and leaving it in would hide
+    // which restriction the assertion is exercising.
+    JsonNode input =
+        exportInput(
+            withoutExecutionSpecification(
+                fixtureJson("fixtures/source/valid-uml-sequence-lifecycle.json")),
+            fixtureJson("fixtures/layout-result/uml-sequence-lifecycle.json"));
+
+    String xml = exportGoldenXml(input);
+
+    // The deletion's receive event is the destruction subtype, and it covers the lifeline being
+    // destroyed — not the DestructionOccurrenceSpecification node that names it.
+    assertThat(xml)
+        .contains(
+            "<fragment xmi:type=\"uml:DestructionOccurrenceSpecification\"",
+            "covered=\"id-worker\"");
+    assertThat(xml).doesNotContain("id-worker-destroyed");
+  }
+
+  private static JsonNode withoutExecutionSpecification(JsonNode source) {
+    ArrayNode nodes = (ArrayNode) source.get("nodes");
+    for (int index = nodes.size() - 1; index >= 0; index--) {
+      if ("ExecutionSpecification".equals(nodes.get(index).get("type").asText())) {
+        nodes.remove(index);
+      }
+    }
+    return source;
+  }
+
+  @Test
   void exportsUmlSequenceCombinedFragments() throws Exception {
     JsonNode input =
         exportInput(
@@ -943,7 +979,10 @@ class MainTest {
   }
 
   @Test
-  void rejectsSelectedSequenceDeleteMessageToDestructionOccurrence() throws Exception {
+  void rejectsSelectedSequenceDeleteMessageWhoseDestructionNamesNoLifeline() throws Exception {
+    // The endpoint itself is legal now (§17.12.22.3), but the occurrence below declares no
+    // `covered` lifeline. Exporting it would emit a `covered` pointing at the marker node rather
+    // than at a lifeline, so the export is refused rather than made wrong.
     JsonNode input = exportSequenceInput();
     ((tools.jackson.databind.node.ArrayNode) input.at("/source/nodes"))
         .add(

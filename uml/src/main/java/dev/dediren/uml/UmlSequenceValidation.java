@@ -744,7 +744,10 @@ public final class UmlSequenceValidation {
   public static boolean supportsOperandCount(String operator, int count) {
     return switch (operator) {
       case "opt", "loop" -> count == 1;
-      case "alt", "par" -> count >= 2;
+      // §17.12.3.6 types operand as [1..*], and the only arity constraint in clause 17 covers
+      // opt/loop/break/assert/neg. A one-operand guarded `alt` is legal and common, and is not the
+      // same as an `opt`: its guard may simply be false with no else-branch to take.
+      case "alt", "par" -> count >= 1;
       default -> false;
     };
   }

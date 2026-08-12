@@ -47,7 +47,8 @@ public final class InteractionWriter {
         .append(attr(interaction.label()))
         .append("\">");
     List<MessageExport> messages =
-        sequenceMessages(ids, interaction, selectedRelationships, nodeIds, relationshipIds);
+        sequenceMessages(
+            ids, interaction, sourceNodes, selectedRelationships, nodeIds, relationshipIds);
     List<CombinedFragmentExport> combinedFragments =
         combinedFragments(interaction, sourceNodes, nodeIds);
     var combinedFragmentsById =
@@ -92,6 +93,7 @@ public final class InteractionWriter {
   public static List<MessageExport> sequenceMessages(
       IdentifierMap ids,
       SourceNode interaction,
+      List<SourceNode> sourceNodes,
       List<SourceRelationship> selectedRelationships,
       Map<String, String> nodeIds,
       Map<String, String> relationshipIds) {
@@ -99,6 +101,7 @@ public final class InteractionWriter {
     for (int index = 0; index < selectedRelationships.size(); index++) {
       sourceOrder.put(selectedRelationships.get(index).id(), index);
     }
+    var destructionLifelines = destructionCoveredLifelines(sourceNodes);
     return selectedRelationships.stream()
         .filter(relationship -> relationship.type().equals("Message"))
         .filter(relationship -> interaction.id().equals(umlString(relationship, "interaction")))
@@ -106,7 +109,12 @@ public final class InteractionWriter {
         .map(
             relationship -> {
               String sourceNodeId = nodeIds.get(relationship.source());
-              String targetNodeId = nodeIds.get(relationship.target());
+              // A deletion message targets a DestructionOccurrenceSpecification, which is not a
+              // lifeline: the occurrence covers the lifeline that node names, and `covered` must
+              // point at that lifeline rather than at the marker itself.
+              String targetId =
+                  destructionLifelines.getOrDefault(relationship.target(), relationship.target());
+              String targetNodeId = nodeIds.get(targetId);
               if (sourceNodeId == null || targetNodeId == null) {
                 return null;
               }
@@ -474,9 +482,20 @@ public final class InteractionWriter {
       }
       SourceNode source = sourceNodesById.get(relationship.source());
       SourceNode target = sourceNodesById.get(relationship.target());
+      // §17.12.6.3 / §17.12.22.3: a deletion message ends in a DestructionOccurrenceSpecification,
+      // which covers the lifeline being destroyed. Core has always accepted that endpoint;
+      // demanding
+      // Lifeline -> Lifeline here made a committed, bundle-shipped fixture validate and render and
+      // then die on its last stage. The occurrence must still name the lifeline it destroys —
+      // otherwise the emitted `covered` would point at the marker node instead of a lifeline.
+      boolean destructionTarget =
+          target != null
+              && target.type().equals("DestructionOccurrenceSpecification")
+              && isLifeline(sourceNodesById.get(umlString(target, "covered")));
       if (source != null
           && target != null
-          && (!source.type().equals("Lifeline") || !target.type().equals("Lifeline"))) {
+          && (!source.type().equals("Lifeline")
+              || !(target.type().equals("Lifeline") || destructionTarget))) {
         throw new XmiExportException(
             UNSUPPORTED_SEQUENCE_MESSAGE_ENDPOINT,
             "UML/XMI sequence export supports selected Message endpoints only between Lifeline nodes in this MVP: "
@@ -500,10 +519,30 @@ public final class InteractionWriter {
     }
   }
 
+  private static boolean isLifeline(SourceNode node) {
+    return node != null && node.type().equals("Lifeline");
+  }
+
+  /** Each DestructionOccurrenceSpecification node id mapped to the lifeline id it covers. */
+  private static Map<String, String> destructionCoveredLifelines(List<SourceNode> sourceNodes) {
+    var covered = new HashMap<String, String>();
+    for (SourceNode node : sourceNodes) {
+      if (!node.type().equals("DestructionOccurrenceSpecification")) {
+        continue;
+      }
+      String lifelineId = umlString(node, "covered");
+      if (lifelineId != null) {
+        covered.put(node.id(), lifelineId);
+      }
+    }
+    return covered;
+  }
+
   public static boolean unsupportedSequenceNode(String type) {
-    return type.equals("ExecutionSpecification")
-        || type.equals("Gate")
-        || type.equals("DestructionOccurrenceSpecification");
+    // A DestructionOccurrenceSpecification is not exported as a node of its own: it names the
+    // lifeline it destroys, and writeMessageOccurrence already emits the destruction subtype for
+    // the receive event of a deleteMessage.
+    return type.equals("ExecutionSpecification") || type.equals("Gate");
   }
 
   private record CombinedFragmentExport(
