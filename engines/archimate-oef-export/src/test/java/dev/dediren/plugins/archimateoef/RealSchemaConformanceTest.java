@@ -112,6 +112,21 @@ class RealSchemaConformanceTest {
             "elementRef=\"id-el-customer-domain\" x=\"0\" y=\"0\" w=\"520\" h=\"180\"><node ");
   }
 
+  @Test
+  void typedAndNonScalarPropertiesValidateAgainstTheRealSchemaSet() throws Exception {
+    // DataType is an NMTOKEN enumeration, so a wrong `type` on a propertyDefinition is a hard
+    // schema failure here — and the happy-path fixture carries no properties at all.
+    ObjectNode input = exportInput();
+    ObjectNode properties = (ObjectNode) input.at("/source/nodes/0/properties");
+    properties.put("critical", true);
+    properties.put("replicas", 3);
+    properties.put("owner", "platform-team");
+    properties.putArray("tags").add("core").add("payments");
+
+    assertThat(exportedContent(input))
+        .contains("type=\"boolean\"", "type=\"number\"", "type=\"string\"");
+  }
+
   private ArrayNode groupsWithMembers() {
     ArrayNode groups = JsonSupport.objectMapper().createArrayNode();
     ObjectNode group = groups.addObject();

@@ -157,23 +157,22 @@ public final class OefExportEngine implements ExportEngine {
       throw failure(error.code(), error.getMessage(), error.path());
     }
 
-    var geometry = new OefGeometry();
-    String content = buildOef(request, policy, geometry);
+    OefDocument document = buildOef(request, policy);
     Diagnostic conformance;
     try {
-      conformance = validateOfficialOefSchema(content, env, productRoot);
+      conformance = validateOfficialOefSchema(document.content(), env, productRoot);
     } catch (OefSchemaValidationException error) {
       throw failure(error.code(), error.getMessage(), "content");
     }
 
     var result =
         new ExportResult(
-            ContractVersions.EXPORT_RESULT_SCHEMA_VERSION, "archimate-oef+xml", content);
+            ContractVersions.EXPORT_RESULT_SCHEMA_VERSION, "archimate-oef+xml", document.content());
     return new EngineResult<>(
         result,
         withConformance(
             withIdentityTripwire(
-                policy, concat(viewCoverageDiagnostics(request), geometry.diagnostics())),
+                policy, concat(viewCoverageDiagnostics(request), document.diagnostics())),
             conformance));
   }
 
@@ -223,23 +222,22 @@ public final class OefExportEngine implements ExportEngine {
       throw failure(error.code(), error.getMessage(), error.path());
     }
 
-    var geometry = new OefGeometry();
-    String content = buildModelOef(request, policy, geometry);
+    OefDocument document = buildModelOef(request, policy);
     Diagnostic conformance;
     try {
-      conformance = validateOfficialOefSchema(content, env, productRoot);
+      conformance = validateOfficialOefSchema(document.content(), env, productRoot);
     } catch (OefSchemaValidationException error) {
       throw failure(error.code(), error.getMessage(), "content");
     }
     var result =
         new ExportResult(
-            ContractVersions.EXPORT_RESULT_SCHEMA_VERSION, "archimate-oef+xml", content);
+            ContractVersions.EXPORT_RESULT_SCHEMA_VERSION, "archimate-oef+xml", document.content());
     return java.util.Optional.of(
         new EngineResult<>(
             result,
             withConformance(
                 withIdentityTripwire(
-                    policy, concat(viewCoverageDiagnostics(request), geometry.diagnostics())),
+                    policy, concat(viewCoverageDiagnostics(request), document.diagnostics())),
                 conformance)));
   }
 
@@ -493,8 +491,12 @@ public final class OefExportEngine implements ExportEngine {
     }
   }
 
-  private static String buildOef(
-      ExportRequest request, OefExportPolicy policy, OefGeometry geometry) {
+  /** An emitted OEF document together with everything its emission had to disclose. */
+  private record OefDocument(String content, List<Diagnostic> diagnostics) {}
+
+  private static OefDocument buildOef(ExportRequest request, OefExportPolicy policy) {
+    var geometry = new OefGeometry();
+    var properties = new OefProperties(request.source());
     var ids = new IdentifierMap();
     var elementIds = new HashMap<String, String>();
     request.source().nodes().forEach(node -> elementIds.put(node.id(), ids.oefId("el", node.id())));
@@ -510,7 +512,7 @@ public final class OefExportEngine implements ExportEngine {
         request.source().nodes().stream().collect(Collectors.toMap(SourceNode::id, node -> node));
 
     StringBuilder xml = new StringBuilder();
-    openModel(xml, request, policy, elementIds, relationshipIds, propertyDefinitionIds);
+    openModel(xml, request, policy, elementIds, relationshipIds, propertyDefinitionIds, properties);
     xml.append("<views><diagrams>");
     // The single-view lane keeps the legacy top-level identity verbatim (unchanged published
     // behavior) UNLESS the policy carries an explicit views[viewId] override for this view, in
@@ -532,7 +534,46 @@ public final class OefExportEngine implements ExportEngine {
         sourceNodesById,
         geometry);
     xml.append("</diagrams></views></model>\n");
-    return xml.toString();
+    var disclosures = new ArrayList<>(geometry.diagnostics());
+    disclosures.addAll(properties.diagnostics());
+    addViewpointDiagnostic(
+        disclosures,
+        identity.viewpoint(),
+        policy.views().containsKey(viewId)
+            ? "policy.views." + viewId + ".viewpoint"
+            : "policy.viewpoint");
+    return new OefDocument(xml.toString(), disclosures);
+  }
+
+  /**
+   * Warns when a view's viewpoint is not one the exchange format names.
+   *
+   * <p>{@code ViewpointTypeType} is a union with {@code xs:string}, so a misspelled viewpoint is
+   * schema-valid and exports clean — it simply imports as an unknown viewpoint, silently. The union
+   * is deliberate (a tool-specific viewpoint is legitimate), so this is a warning, never a
+   * rejection.
+   */
+  private static void addViewpointDiagnostic(
+      List<Diagnostic> diagnostics, String viewpoint, String path) {
+    if (OefViewpoints.isNamedByTheExchangeFormat(viewpoint)) {
+      return;
+    }
+    // Several views can share the policy's top-level viewpoint; report each policy field once.
+    if (diagnostics.stream().anyMatch(existing -> existing.path().equals(path))) {
+      return;
+    }
+    String nearest = OefViewpoints.nearest(viewpoint);
+    diagnostics.add(
+        new Diagnostic(
+            DiagnosticCode.OEF_VIEWPOINT_UNKNOWN.code(),
+            DiagnosticSeverity.WARNING,
+            "viewpoint '"
+                + viewpoint
+                + "' is not one the ArchiMate exchange format names"
+                + (nearest == null ? "" : "; did you mean '" + nearest + "'?")
+                + " The export stays schema-valid because the format accepts any string here, so an"
+                + " importing tool will show it as an unrecognized viewpoint rather than reject it.",
+            path));
   }
 
   /**
@@ -547,8 +588,9 @@ public final class OefExportEngine implements ExportEngine {
   }
 
   /** One document carrying every supplied laid-out view; see {@link #exportModel}. */
-  private static String buildModelOef(
-      ModelExportRequest request, OefExportPolicy policy, OefGeometry geometry) {
+  private static OefDocument buildModelOef(ModelExportRequest request, OefExportPolicy policy) {
+    var geometry = new OefGeometry();
+    var properties = new OefProperties(request.source());
     ExportRequest first =
         new ExportRequest(
             ContractVersions.EXPORT_REQUEST_SCHEMA_VERSION,
@@ -575,21 +617,33 @@ public final class OefExportEngine implements ExportEngine {
     }
 
     StringBuilder xml = new StringBuilder();
-    openModel(xml, first, policy, elementIds, relationshipIds, propertyDefinitionIds);
+    openModel(xml, first, policy, elementIds, relationshipIds, propertyDefinitionIds, properties);
     xml.append("<views><diagrams>");
+    var disclosures = new ArrayList<Diagnostic>();
     for (ModelExportRequest.ViewLayout view : request.views()) {
+      OefExportPolicy.ViewIdentity identity =
+          resolveViewIdentity(policy, view.viewId(), viewLabels.get(view.viewId()));
       writeViewBody(
           xml,
           view.layout(),
-          resolveViewIdentity(policy, view.viewId(), viewLabels.get(view.viewId())),
+          identity,
           ids,
           elementIds,
           relationshipIds,
           sourceNodesById,
           geometry);
+      addViewpointDiagnostic(
+          disclosures,
+          identity.viewpoint(),
+          policy.views().containsKey(view.viewId())
+              ? "policy.views." + view.viewId() + ".viewpoint"
+              : "policy.viewpoint");
     }
     xml.append("</diagrams></views></model>\n");
-    return xml.toString();
+    var combined = new ArrayList<>(geometry.diagnostics());
+    combined.addAll(properties.diagnostics());
+    combined.addAll(disclosures);
+    return new OefDocument(xml.toString(), combined);
   }
 
   /**
@@ -618,7 +672,8 @@ public final class OefExportEngine implements ExportEngine {
       OefExportPolicy policy,
       Map<String, String> elementIds,
       Map<String, String> relationshipIds,
-      Map<String, String> propertyDefinitionIds) {
+      Map<String, String> propertyDefinitionIds,
+      OefProperties properties) {
     xml.append("<model xmlns=\"")
         .append(OEF_NS)
         .append("\" xmlns:xsi=\"")
@@ -634,18 +689,23 @@ public final class OefExportEngine implements ExportEngine {
     // ModelType makes both wrappers optional but ElementsType/RelationshipsType require at least
     // one child, so an empty wrapper — a contract-valid node-less or relationship-free model —
     // would be rejected by the exchange schema. Omit the wrapper instead, as
-    // writePropertyDefinitions
-    // already does for its own.
+    // writePropertyDefinitions already does for its own.
     if (!request.source().nodes().isEmpty()) {
       xml.append("<elements>");
-      for (var node : request.source().nodes()) {
+      for (int index = 0; index < request.source().nodes().size(); index++) {
+        var node = request.source().nodes().get(index);
         xml.append("<element identifier=\"")
             .append(attr(elementIds.get(node.id())))
             .append("\" xsi:type=\"")
             .append(attr(node.type()))
             .append("\">");
         writeTextElement(xml, "name", node.label());
-        writePropertyValues(xml, node.properties(), propertyDefinitionIds);
+        writePropertyValues(
+            xml,
+            node.properties(),
+            propertyDefinitionIds,
+            properties,
+            "$.source.nodes[" + index + "].properties");
         xml.append("</element>");
       }
       xml.append("</elements>");
@@ -653,7 +713,8 @@ public final class OefExportEngine implements ExportEngine {
 
     if (!request.source().relationships().isEmpty()) {
       xml.append("<relationships>");
-      for (var relationship : request.source().relationships()) {
+      for (int index = 0; index < request.source().relationships().size(); index++) {
+        var relationship = request.source().relationships().get(index);
         xml.append("<relationship identifier=\"")
             .append(attr(relationshipIds.get(relationship.id())))
             .append("\" source=\"")
@@ -664,12 +725,17 @@ public final class OefExportEngine implements ExportEngine {
             .append(attr(relationship.type()))
             .append("\">");
         writeTextElement(xml, "name", relationship.label());
-        writePropertyValues(xml, relationship.properties(), propertyDefinitionIds);
+        writePropertyValues(
+            xml,
+            relationship.properties(),
+            propertyDefinitionIds,
+            properties,
+            "$.source.relationships[" + index + "].properties");
         xml.append("</relationship>");
       }
       xml.append("</relationships>");
     }
-    writePropertyDefinitions(xml, propertyDefinitionIds);
+    writePropertyDefinitions(xml, propertyDefinitionIds, properties);
   }
 
   private static void writeViewBody(
@@ -1066,7 +1132,7 @@ public final class OefExportEngine implements ExportEngine {
   }
 
   private static void writePropertyDefinitions(
-      StringBuilder xml, Map<String, String> propertyDefinitionIds) {
+      StringBuilder xml, Map<String, String> propertyDefinitionIds, OefProperties properties) {
     if (propertyDefinitionIds.isEmpty()) {
       return;
     }
@@ -1075,7 +1141,9 @@ public final class OefExportEngine implements ExportEngine {
         (key, definitionId) -> {
           xml.append("<propertyDefinition identifier=\"")
               .append(attr(definitionId))
-              .append("\" type=\"string\">");
+              .append("\" type=\"")
+              .append(attr(properties.dataType(key)))
+              .append("\">");
           writeTextElement(xml, "name", key);
           xml.append("</propertyDefinition>");
         });
@@ -1084,12 +1152,14 @@ public final class OefExportEngine implements ExportEngine {
 
   private static void writePropertyValues(
       StringBuilder xml,
-      Map<String, JsonNode> properties,
-      Map<String, String> propertyDefinitionIds) {
-    if (properties.isEmpty()) {
+      Map<String, JsonNode> values,
+      Map<String, String> propertyDefinitionIds,
+      OefProperties properties,
+      String path) {
+    if (values.isEmpty()) {
       return;
     }
-    var keys = new ArrayList<>(properties.keySet());
+    var keys = new ArrayList<>(values.keySet());
     keys.sort(null);
     var rendered = new StringBuilder();
     for (String key : keys) {
@@ -1101,19 +1171,12 @@ public final class OefExportEngine implements ExportEngine {
           .append("<property propertyDefinitionRef=\"")
           .append(attr(definitionId))
           .append("\">");
-      writeTextElement(rendered, "value", propertyValueText(properties.get(key)));
+      writeTextElement(rendered, "value", properties.valueText(key, values.get(key), path));
       rendered.append("</property>");
     }
     if (rendered.length() > 0) {
       xml.append("<properties>").append(rendered).append("</properties>");
     }
-  }
-
-  private static String propertyValueText(JsonNode value) {
-    if (value == null || value.isNull()) {
-      return "";
-    }
-    return value.isValueNode() ? value.asText() : value.toString();
   }
 
   private static void writeTextElement(StringBuilder xml, String name, String text) {

@@ -587,11 +587,12 @@ class MainTest {
 
     String xml = exportXml(source, fixtureJson("fixtures/layout-result/archimate-oef-basic.json"));
 
-    // Each distinct key becomes one model-level property definition (sorted for determinism).
+    // Each distinct key becomes one model-level property definition (sorted for determinism),
+    // typed by the values it actually carries — `confidence` is a number, not text.
     assertThat(xml)
         .contains(
             "<propertyDefinitions>"
-                + "<propertyDefinition identifier=\"id-prop-confidence\" type=\"string\">"
+                + "<propertyDefinition identifier=\"id-prop-confidence\" type=\"number\">"
                 + "<name xml:lang=\"en\">confidence</name></propertyDefinition>"
                 + "<propertyDefinition identifier=\"id-prop-evidence-classification\""
                 + " type=\"string\">"

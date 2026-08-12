@@ -97,6 +97,32 @@ relationship. This keeps evidence-classification markers (for example
 `candidate-from-source`, a confidence score, or a source path) attached to the
 exported concept instead of being dropped.
 
+Each definition is typed by the values that key actually carries: JSON booleans
+become `boolean`, JSON numbers become `number`, and everything else becomes
+`string`, so a consuming tool can type-filter and sort rather than treating every
+property as text. Definitions are model-level and keyed by name, so one key used
+with different value types across concepts is declared `string` — the only one of
+the format's six data types that represents them all. The remaining three
+(`currency`, `date`, `time`) have no JSON counterpart to detect and are never
+inferred. A `<value>` is text, so an object or array value can only be carried as
+its JSON rendering; that is unrecoverable as structure on import, and each
+occurrence is declared with a `warn` diagnostic
+`DEDIREN_OEF_PROPERTY_FLATTENED` naming the key and its source path.
+
+The `viewpoint` a view declares is copied through verbatim, because the exchange
+format types it as a union that accepts any string — a tool-specific or
+organization-specific viewpoint is legitimate. A name outside the format's own
+viewpoint vocabulary is therefore exported, not rejected, with a `warn`
+diagnostic `DEDIREN_OEF_VIEWPOINT_UNKNOWN` that offers the nearest known name
+when the value looks like a typo.
+
+Render-policy styling deliberately does not cross into OEF. The format's
+`<style>` carries fill, line and font choices, but those are dediren's rendering
+decisions for its own SVG, not properties of the model; emitting them would push
+one tool's presentation into every consumer that imports the file. An OEF export
+therefore carries structure, geometry and identity, and leaves appearance to the
+importing tool.
+
 Grouping containment crosses into OEF as structure, not just geometry: the view
 nodes laid out inside a semantic `Grouping` are emitted as nested `<node>`
 children of that grouping's own node, so an importing tool reconstructs the

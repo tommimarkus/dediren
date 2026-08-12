@@ -428,6 +428,100 @@ class OefExportEngineTest {
         .noneMatch(diagnostic -> diagnostic.code().equals("DEDIREN_OEF_GEOMETRY_CLAMPED"));
   }
 
+  @Test
+  void propertyDefinitionsCarryTheExchangeDataTypeTheValuesActuallyHave() throws Exception {
+    // AM-OEF-9: DataType offers six types and every definition was declared "string", so a boolean
+    // or numeric property round-tripped as text and a consumer could not type-filter or sort it.
+    JsonNode inputJson = exportInputJson();
+    ObjectNode properties = (ObjectNode) inputJson.at("/source/nodes/0/properties");
+    properties.put("critical", true);
+    properties.put("replicas", 3);
+    properties.put("owner", "platform-team");
+
+    String content = exportContent(inputJson);
+
+    assertThat(content)
+        .contains(
+            "type=\"boolean\"><name xml:lang=\"en\">critical</name>",
+            "type=\"number\"><name xml:lang=\"en\">replicas</name>",
+            "type=\"string\"><name xml:lang=\"en\">owner</name>");
+  }
+
+  @Test
+  void aPropertyKeyUsedWithDifferentValueTypesFallsBackToString() throws Exception {
+    // Definitions are model-level and keyed by name alone, so one key carrying a boolean on one
+    // concept and text on another has no single narrow type. String is the widest of the six and
+    // the only one that can represent both.
+    JsonNode inputJson = exportInputJson();
+    ((ObjectNode) inputJson.at("/source/nodes/0/properties")).put("tier", true);
+    ((ObjectNode) inputJson.at("/source/nodes/1/properties")).put("tier", "gold");
+
+    String content = exportContent(inputJson);
+
+    assertThat(content).contains("type=\"string\"><name xml:lang=\"en\">tier</name>");
+    assertThat(content).doesNotContain("type=\"boolean\"");
+  }
+
+  @Test
+  void nonScalarPropertyValuesAreDisclosedRatherThanQuietlyFlattened() throws Exception {
+    // AM-OEF-8: <value> is text, so an object or array can only be carried as its JSON rendering —
+    // well-formed, valid, and unrecoverable on round-trip. The format cannot do better; staying
+    // silent about it is the part that can be fixed.
+    JsonNode inputJson = exportInputJson();
+    ((ObjectNode) inputJson.at("/source/nodes/0/properties"))
+        .putArray("tags")
+        .add("core")
+        .add("payments");
+
+    EngineResult<ExportResult> result = exportResult(inputJson);
+
+    assertThat(result.value().content())
+        .contains("<value xml:lang=\"en\">[\"core\",\"payments\"]</value>");
+    assertThat(result.diagnostics())
+        .anySatisfy(
+            diagnostic -> {
+              assertThat(diagnostic.code()).isEqualTo("DEDIREN_OEF_PROPERTY_FLATTENED");
+              assertThat(diagnostic.severity()).isEqualTo(DiagnosticSeverity.WARNING);
+              assertThat(diagnostic.message()).contains("tags");
+              assertThat(diagnostic.path()).isEqualTo("$.source.nodes[0].properties.tags");
+            });
+  }
+
+  @Test
+  void scalarPropertiesAreNeverReportedAsFlattened() throws Exception {
+    JsonNode inputJson = exportInputJson();
+    ((ObjectNode) inputJson.at("/source/nodes/0/properties")).put("owner", "platform-team");
+
+    assertThat(exportResult(inputJson).diagnostics())
+        .noneMatch(diagnostic -> diagnostic.code().equals("DEDIREN_OEF_PROPERTY_FLATTENED"));
+  }
+
+  @Test
+  void aViewpointOutsideTheExchangeVocabularyIsWarned() throws Exception {
+    // AM-VOCAB-4: ViewpointTypeType is a union with xs:string, so a typo stays schema-valid and
+    // imports as an unknown viewpoint. Warn rather than reject — the union genuinely permits any
+    // string, and a tool-specific viewpoint is a legitimate use.
+    JsonNode inputJson = exportInputJson();
+    ((ObjectNode) inputJson.get("policy")).put("viewpoint", "Layred");
+
+    assertThat(exportResult(inputJson).diagnostics())
+        .anySatisfy(
+            diagnostic -> {
+              assertThat(diagnostic.code()).isEqualTo("DEDIREN_OEF_VIEWPOINT_UNKNOWN");
+              assertThat(diagnostic.severity()).isEqualTo(DiagnosticSeverity.WARNING);
+              assertThat(diagnostic.message()).contains("Layred", "Layered");
+            });
+  }
+
+  @Test
+  void aViewpointInTheExchangeVocabularyIsNotWarned() throws Exception {
+    JsonNode inputJson = exportInputJson();
+    ((ObjectNode) inputJson.get("policy")).put("viewpoint", "Layered");
+
+    assertThat(exportResult(inputJson).diagnostics())
+        .noneMatch(diagnostic -> diagnostic.code().equals("DEDIREN_OEF_VIEWPOINT_UNKNOWN"));
+  }
+
   private EngineResult<ExportResult> exportResult(JsonNode inputJson) throws Exception {
     ExportRequest request =
         engine.parseRequest(
