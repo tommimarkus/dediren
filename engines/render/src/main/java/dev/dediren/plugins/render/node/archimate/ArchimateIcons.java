@@ -112,7 +112,7 @@ public final class ArchimateIcons {
             width,
             "side-cylinder-end");
       }
-      case SERVICE -> archimateServiceIconBody(w, decorator, x, y, size, fill, stroke, width);
+      case SERVICE -> archimateServiceIconBody(w, x, y, size, fill, stroke, width);
       case INTERACTION -> {
         outline(
             w,
@@ -793,24 +793,19 @@ public final class ArchimateIcons {
   }
 
   public static void archimateServiceIconBody(
-      SvgWriter w,
-      SvgNodeDecorator decorator,
-      double x,
-      double y,
-      double size,
-      String fill,
-      String stroke,
-      String width) {
-    double serviceY =
-        decorator == SvgNodeDecorator.ARCHIMATE_APPLICATION_SERVICE ? y : y + size * 0.12;
-    double serviceHeight =
-        decorator == SvgNodeDecorator.ARCHIMATE_APPLICATION_SERVICE ? size * 0.62 : size * 0.5;
+      SvgWriter w, double x, double y, double size, String fill, String stroke, String width) {
+    // A.1 draws the service icon as a pill -- semicircular ends, so rx is half the height -- and
+    // draws the same glyph in every layer. It used to be a rounded rectangle (rx = 0.18 * size),
+    // and ApplicationService carried its own y and height, so the application layer's service did
+    // not match the business and technology ones.
+    double serviceY = y + size * 0.12;
+    double serviceHeight = size * 0.5;
     w.empty("rect")
         .attr("x", f1(x))
         .attr("y", f1(serviceY))
         .attr("width", f1(size))
         .attr("height", f1(serviceHeight))
-        .attr("rx", f1(size * 0.18))
+        .attr("rx", f1(serviceHeight / 2.0))
         .attr("fill", fill)
         .attr("stroke", stroke)
         .attr("stroke-width", width);

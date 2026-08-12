@@ -383,9 +383,33 @@ Filled in as phases land. Destination is either a `docs/architecture-guidelines.
 | 10 | [info] `UML-NOT-14/15/16/17` — classifier names not boldface while edge labels are; `deleteMessage` arrowhead; abstract italics, GeneralizationSets, FlowFinalNode unauthorable; navigability adornments | §12 row | Coverage gaps, not mis-renders; several are optional in spec. |
 | 11 | [info] `UML-XMI-3` — two tolerated prefixes and one matched wording are dead code | Precision fix to §12 row 676 + `agent-usage.md:271-273` | Net outcome identical; only the stated *mechanism* is inaccurate. Cheap, so fold into Phase 6. |
 
+## Post-plan followups
+
+Not register findings — tooling defects surfaced *by* the remediation. Deliberately deferred so they
+do not enlarge a conformance change, and recorded here so they are not lost.
+
+| # | Item | Approach | Why deferred |
+|---|---|---|---|
+| F1 | `RasterGoldenTest.updateManifest:247-251` rewrites all 156 lines of the tracked `raster-golden/manifest.json` to change one SHA, because it writes with the repo-standard `writerWithDefaultPrettyPrinter()` while the tracked file was authored in a different style (2-space, `": "`, expanded arrays). A one-value regeneration therefore lands as a whole-file diff, which is exactly the review signal the golden discipline depends on. | Either teach the writer the tracked style (a `DefaultPrettyPrinter` with `Separators` object-field spacing `AFTER` and an indenting array printer), or leave Jackson's output canonical — as of 2026-08-12 the file *is* Jackson-formatted, so the churn is spent and the file is now stable. Decide which is the intended owner; if the answer is "the regenerator owns it", this is closed by the reformat already landed (`1d09b75`). The same `writerWithDefaultPrettyPrinter()` pattern is used by `LayoutFixtureRegenerator:109`, `Bench:28` and `DistTool:1124`, so any style decision should be repo-wide rather than local to this one file. | Cosmetic, one-time, and now spent. Fixing it inside a conformance phase would mix a tooling change into a notation diff. |
+
 ## Status
 
 _Written past-tense as phases land._
 
 - Phase 0: **landed** — register committed (`d560c55`), worktree `.worktrees/notation-conformance`
   on branch `notation-conformance`, this plan written.
+- Phase 1: **landed** — `AM-NOT-1/-2/-3/-4/-5/-6/-7/-11` closed. Render+cli lane green (1444 tests)
+  and the full paint lane green (`RasterGoldenTest`, `RasterDiffTest`, all three `SvgPaintAudit*`).
+  Both goldens re-baselined once each and read before committing: the SVG golden moved by exactly
+  two things (the Realization dash pattern, and the ApplicationService icon becoming a pill), and
+  the raster manifest by one SHA.
+  **What the RED steps showed, because it is the reusable part:** every one of these defects was
+  invisible to a green suite, and each for a different reason. `AM-NOT-1/-2` — the coverage test read
+  the policy fixture and asserted the SVG matched *that same fixture*, so it could only confirm the
+  fixture agreed with itself, and it had no `dotted` arm at all. `AM-NOT-6` — stripping the policy's
+  edge table failed on **Flow alone**, because the generic house default is already a filled arrow,
+  so Triggering was passing by coincidence. `AM-NOT-11` — no test compared the three service icons
+  to *each other*, so the application layer's differing y and height sat unnoticed beside two that
+  agreed.
+  **Accepted (info):** `AM-NOT-12`'s per-layer letter cue stays unimplemented — optional in spec,
+  and colour already carries the layer. Deferred to the disposition table: `AM-NOT-8/9/10`.

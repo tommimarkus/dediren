@@ -9,6 +9,8 @@ import static dev.dediren.plugins.render.node.NodeShapeSupport.isArchimateJuncti
 import static dev.dediren.plugins.render.node.NodeShapeSupport.isArchimateRoundedRectangle;
 import static dev.dediren.plugins.render.node.NodeShapeSupport.isUmlDecorator;
 import static dev.dediren.plugins.render.node.NodeShapeSupport.shouldRenderPlainNodeLabel;
+import static dev.dediren.plugins.render.node.archimate.ArchimateIcons.archimateIconBody;
+import static dev.dediren.plugins.render.node.archimate.ArchimateIcons.archimateIconKind;
 import static dev.dediren.plugins.render.node.archimate.ArchimateIcons.archimateNodeDecorator;
 import static dev.dediren.plugins.render.node.archimate.ArchimateShapes.archimateCutCornerShape;
 import static dev.dediren.plugins.render.node.generic.GenericShapes.genericNodeShape;
@@ -48,6 +50,7 @@ import dev.dediren.plugins.render.PlacedScene.PlacedEdgeLabel;
 import dev.dediren.plugins.render.PlacedScene.PlacedGroup;
 import dev.dediren.plugins.render.PlacedScene.PlacedGroupTitle;
 import dev.dediren.plugins.render.PlacedScene.PlacedNode;
+import dev.dediren.plugins.render.node.archimate.ArchimateIconKind;
 import dev.dediren.plugins.render.style.ResolvedEdgeStyle;
 import dev.dediren.plugins.render.style.ResolvedGroupStyle;
 import dev.dediren.plugins.render.style.ResolvedNodeStyle;
@@ -319,7 +322,7 @@ public final class SvgDocument {
           .attr("y", f1(group.y()))
           .attr("width", f1(group.width()))
           .attr("height", f1(group.height()))
-          .attr("rx", styleNumber(style.rx()))
+          .attr("rx", styleNumber(groupCornerRadius(style)))
           .attr("fill", rectStyle.fill())
           .attr("stroke", style.stroke())
           .attr("stroke-width", styleNumber(style.strokeWidth()))
@@ -408,7 +411,11 @@ public final class SvgDocument {
   }
 
   private static void groupDecorator(SvgWriter w, LaidOutGroup group, ResolvedGroupStyle style) {
-    if (style.decorator() != SvgNodeDecorator.ARCHIMATE_GROUPING) {
+    SvgNodeDecorator decorator = style.decorator();
+    if (decorator != SvgNodeDecorator.ARCHIMATE_GROUPING) {
+      // A semantic container of any other element type carries that element's icon (S3.8), drawn
+      // by the same icon body the node lane uses so the two can never diverge.
+      archimateContainerDecorator(w, group, style, decorator);
       return;
     }
     double size = 22.0;
@@ -437,6 +444,65 @@ public final class SvgDocument {
         .attr("stroke", style.stroke())
         .attr("stroke-width", styleNumber(style.strokeWidth()));
     w.end();
+  }
+
+  /**
+   * A semantic container follows §3.9's corner convention for its own element type — square for
+   * structure, round for behaviour — the same rule the node lane applies. Containers with no
+   * element decorator (Grouping, or a plain layout boundary) keep the policy's group radius.
+   */
+  private static double groupCornerRadius(ResolvedGroupStyle style) {
+    SvgNodeDecorator decorator = style.decorator();
+    if (decorator == null
+        || decorator == SvgNodeDecorator.ARCHIMATE_GROUPING
+        || isUmlDecorator(decorator)
+        || isArchimateJunction(decorator)) {
+      return style.rx();
+    }
+    return isArchimateRoundedRectangle(decorator) ? Math.max(1.0, style.rx()) : 0.0;
+  }
+
+  /**
+   * Draws a non-Grouping semantic container's element icon in its top-right corner, reusing the
+   * node lane's icon body so a container and a node of the same type can never draw differently.
+   */
+  private static void archimateContainerDecorator(
+      SvgWriter w, LaidOutGroup group, ResolvedGroupStyle style, SvgNodeDecorator decorator) {
+    if (decorator == null || isUmlDecorator(decorator) || isArchimateJunction(decorator)) {
+      return;
+    }
+    ArchimateIconKind kind = archimateIconKind(decorator);
+    double size = 22.0;
+    double x = group.x() + group.width() - size - 6.0;
+    double y = group.y() + 9.0;
+    w.start("g")
+        .attr("data-dediren-group-decorator", enumValue(decorator))
+        .attr("data-dediren-icon-kind", kind.value())
+        .attr("data-dediren-icon-size", "22");
+    archimateIconBody(w, decorator, kind, x, y, size, containerIconStyle(style));
+    w.end();
+  }
+
+  /** The container's own paint, shaped as a node style so the shared icon body can consume it. */
+  private static ResolvedNodeStyle containerIconStyle(ResolvedGroupStyle style) {
+    return new ResolvedNodeStyle(
+        style.fill(),
+        style.stroke(),
+        style.strokeWidth(),
+        0.0,
+        style.labelFill(),
+        style.decorator(),
+        null,
+        style.fillOpacity(),
+        style.strokeOpacity(),
+        style.lineStyle(),
+        style.dashPattern(),
+        style.fontWeight(),
+        style.fontStyle(),
+        style.fontFamily(),
+        style.labelAlign(),
+        style.labelOpacity(),
+        style.fillGradient());
   }
 
   // Inline gradient definition, referenced by fill="url(#id)". SVG gradient ids are

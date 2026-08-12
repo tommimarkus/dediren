@@ -125,7 +125,7 @@
       "width" : 571,
       "height" : 209
     },
-    "sha256" : "443c142f56d0129dad65e5a1a501bebc9f83eddf9eb2df91e04ffb0e2ff9fb50"
+    "sha256" : "ac9e65dc3a7ab7ee92d13eea9b47f39f1a620da29366264371c34da05537555c"
   }, {
     "name" : "uml-sequence-fragments",
     "description" : "UML sequence diagram with fragment chrome",

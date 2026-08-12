@@ -15,6 +15,7 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
@@ -1404,6 +1405,65 @@ class MainTest {
 
       Element group = groupWithAttribute(document, "data-dediren-group-id", "app-domain");
       assertThat(firstChildElement(group, "rect").hasAttribute("stroke-dasharray")).isFalse();
+    }
+
+    @Test
+    void archimateSemanticContainerRendersItsOwnElementNotation() throws Exception {
+      // AM-NOT-7 (S3.8): a semantic container may be any element type, not only Grouping. The
+      // shipped policy declares group notation for Grouping alone, so every other container fell
+      // through to the generic house group palette -- no layer colour, no icon -- and an
+      // ApplicationComponent boundary was indistinguishable from an untyped box.
+      Document document = renderArchimateContainer("ApplicationComponent");
+
+      Element group = groupWithAttribute(document, "data-dediren-group-id", "app-domain");
+      Element rect = firstChildElement(group, "rect");
+      assertThat(rect.getAttribute("fill")).isEqualTo("#e0f2fe");
+      assertThat(rect.getAttribute("stroke")).isEqualTo("#0369a1");
+      Element decorator =
+          childGroupWithAttribute(
+              group, "data-dediren-group-decorator", "archimate_application_component");
+      assertThat(decorator.getAttribute("data-dediren-icon-kind")).isEqualTo("component");
+    }
+
+    @Test
+    void archimateServiceIconIsOnePillSharedByAllThreeServiceTypes() throws Exception {
+      // AM-NOT-11 (A.1): the service icon is a pill -- fully rounded ends -- and it is the same
+      // glyph in every layer. It was a rounded rectangle (rx = 0.18 * size), and
+      // ApplicationService additionally had its own y and height, so the application layer's
+      // service did not match the business and technology ones.
+      Map<String, Element> icons = new LinkedHashMap<>();
+      for (String type : List.of("BusinessService", "ApplicationService", "TechnologyService")) {
+        Document document = renderArchimateNode(type);
+        Element node = groupWithAttribute(document, "data-dediren-node-id", "svc");
+        Element decorator =
+            childGroupWithAttribute(node, "data-dediren-node-decorator", snakeCase(type));
+        assertThat(decorator.getAttribute("data-dediren-icon-kind")).isEqualTo("service");
+        icons.put(type, firstChildElement(decorator, "rect"));
+      }
+
+      icons.forEach(
+          (type, rect) -> {
+            double height = Double.parseDouble(rect.getAttribute("height"));
+            assertThat(Double.parseDouble(rect.getAttribute("rx")))
+                .describedAs("%s icon must be a pill: rx is half its height", type)
+                .isEqualTo(height / 2.0, org.assertj.core.data.Offset.offset(0.05));
+          });
+      assertThat(icons.values().stream().map(rect -> rect.getAttribute("height")).distinct())
+          .describedAs("all three service icons must be the same glyph")
+          .hasSize(1);
+      assertThat(icons.values().stream().map(rect -> rect.getAttribute("y")).distinct()).hasSize(1);
+    }
+
+    @Test
+    void archimateGroupingContainerKeepsItsOwnNotation() throws Exception {
+      // The Grouping container is the one case that already worked; widening the lane must not
+      // disturb it. Grouping is a dashed boundary with no layer colour (S4.5.1).
+      Document document = renderArchimateContainer("Grouping");
+
+      Element group = groupWithAttribute(document, "data-dediren-group-id", "app-domain");
+      assertThat(firstChildElement(group, "rect").getAttribute("stroke-dasharray"))
+          .isEqualTo("3 2");
+      childGroupWithAttribute(group, "data-dediren-group-decorator", "archimate_grouping");
     }
 
     @Test
@@ -3884,6 +3944,83 @@ class MainTest {
     }
 
     assertNoRelationshipTypesRenderIdentically(semanticProfile, signatureByType);
+  }
+
+  /** {@code BusinessService} → {@code archimate_business_service}. */
+  private static String snakeCase(String elementType) {
+    return "archimate_" + elementType.replaceAll("(?<=.)([A-Z])", "_$1").toLowerCase(Locale.ROOT);
+  }
+
+  /** Renders a single ArchiMate node of {@code elementType} under the shipped policy. */
+  private static Document renderArchimateNode(String elementType) throws Exception {
+    String nodes =
+        """
+          [{"id":"svc","source_id":"svc","projection_id":"svc",
+            "x":20,"y":20,"width":180,"height":80,"label":"Svc"}]
+          """;
+    String metadataNodes =
+        """
+          {"svc": {"type": "%s", "source_id": "svc"}}
+          """
+            .formatted(elementType);
+    return svgDocument(
+        okContent(
+            render(
+                archimateRenderInput(
+                    fixtureJson("fixtures/render-policy/archimate-svg.json"),
+                    nodes,
+                    "[]",
+                    metadataNodes,
+                    "{}"))));
+  }
+
+  /**
+   * Renders one semantic-boundary group of {@code elementType} under the shipped ArchiMate policy.
+   */
+  private static Document renderArchimateContainer(String elementType) throws Exception {
+    ObjectNode layout = JsonSupport.objectMapper().createObjectNode();
+    layout.put("layout_result_schema_version", "layout-result.schema.v2");
+    layout.put("view_id", "main");
+    layout.set("nodes", JsonSupport.objectMapper().createArrayNode());
+    layout.set("edges", JsonSupport.objectMapper().createArrayNode());
+    layout.set(
+        "groups",
+        JsonSupport.objectMapper()
+            .readTree(
+                """
+                  [
+                    {
+                      "id": "app-domain",
+                      "source_id": "app-domain",
+                      "projection_id": "app-domain",
+                      "provenance": { "semantic_backed": { "source_id": "app-domain" } },
+                      "x": 20, "y": 20, "width": 240, "height": 140,
+                      "members": [],
+                      "label": "Application Domain"
+                    }
+                  ]
+                  """));
+    layout.set("warnings", JsonSupport.objectMapper().createArrayNode());
+
+    ObjectNode metadata = JsonSupport.objectMapper().createObjectNode();
+    metadata.put("render_metadata_schema_version", "render-metadata.schema.v1");
+    metadata.put("semantic_profile", "archimate");
+    metadata.set("nodes", JsonSupport.objectMapper().createObjectNode());
+    metadata.set("edges", JsonSupport.objectMapper().createObjectNode());
+    metadata.set(
+        "groups",
+        JsonSupport.objectMapper()
+            .readTree(
+                """
+                  {"app-domain": {"type": "%s", "source_id": "app-domain"}}
+                  """
+                    .formatted(elementType)));
+
+    ObjectNode input = JsonSupport.objectMapper().createObjectNode();
+    input.set("layout_result", layout);
+    input.set("render_metadata", metadata);
+    input.set("policy", fixtureJson("fixtures/render-policy/archimate-svg.json"));
+    return svgDocument(okContent(render(input)));
   }
 
   /** The eleven ArchiMate relationship types, in spec order (§5.1–§5.4). */
