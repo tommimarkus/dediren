@@ -384,6 +384,21 @@ Filled in as phases land. Destination is either a `docs/architecture-guidelines.
 | 11 | [info] `UML-XMI-3` — two tolerated prefixes and one matched wording are dead code | Precision fix to §12 row 676 + `agent-usage.md:271-273` | Net outcome identical; only the stated *mechanism* is inaccurate. Cheap, so fold into Phase 6. |
 | 12 | [block] `UML-NOT-1` — six edge kinds (`Usage`, `Dependency`, `Include`, `Extend`, `Manifestation`, `Deployment`) render byte-identically because there is no edge-keyword surface | **Attempted in Phase 2 and reverted.** Compose the keyword *before layout*, not in the renderer — see the note below. | A render-time composition is architecturally misplaced, and the paint oracle proved it rather than the reasoning: see § The UML-NOT-1 reversal. |
 | 13 | [warn] `UML-NOT-12` — hollow markers and the final-state ring hardcode `#ffffff`, so a dark UML policy would read shared aggregation as composition | Do it once, in the 2026-07-28 plan's dark-policy render wave (item 5), which owns the same `EdgeMarkers` line plus two neighbouring sites and the missing dark-policy golden coverage | Latent (no dark UML policy ships), and fixing one of the wave's three sites piecemeal would leave the design half-made. Already bound in § Coordination. |
+| 14 | [warn] `UML-XMI-5` / `UML-VOCAB-7` — a class→interface `Realization` emits `uml:Realization` where §10.5.6 requires `uml:InterfaceRealization`, and component realization likewise never emits `uml:ComponentRealization` | Not the metaclass rename it looks like. §10.5.6 makes an InterfaceRealization a **nested** child of the implementing classifier naming its `contract`, which is exactly what `ComponentWriter` already does — while `ClassRelationshipWriter` emits a flat `packagedElement` with `client`/`supplier`. The class lane appends classifiers to the buffer before it reaches relationships, so nesting requires it to write realizations *while* writing each classifier, as the component lane does. | A writer restructure with golden churn across the class family, not a two-token change. Sizing it as a rename is what the register's "one-line" framing invites. |
+| 15 | [warn] `AM-OEF-11` — OEF has no machine-readable assurance contract while UML/XMI has one, and OEF's claim is the weaker of the two | Mirror the XMI pair: a new `OefAssurance` (~150 LOC) plus `schemas/oef-assurance.schema.json`, a `ContractVersions` bump, envelope plumbing and a `contracts-and-schemas.md` row (also closing `DOC-24`) | A new public schema surface, not a conformance repair. Belongs in its own slice with the contract change reviewed on its own terms rather than folded into a notation phase. |
+
+## UML-XMI-2 is refuted
+
+The finding says the tolerated-gap filter's Xerces wordings are pinned by "no test", so a JDK
+reword "would surface as mass export failure, not a test failure". Measured by corrupting both
+literals in `SchemaValidation` and running the suite: **two tests in `SchemaValidationTest` fail**.
+They validate against strict stub schemas whose `uml:`/`di:` children have no declaration, so they
+traverse the tolerated path by construction, and a wording that no longer matches turns the pass
+into a throw.
+
+The mechanism the finding describes is real — the filter *is* string-matched against Xerces prose —
+but the consequence it predicts is not: the suite catches a reword before any user does. No change
+made; recorded so the next reader does not re-add a redundant pin.
 
 ## UML-XMI-18 is refuted, not deferred
 
@@ -480,6 +495,24 @@ _Written past-tense as phases land._
   **Accepted (info):** `UML-NOT-9`'s `entryPoint` named circle stays unimplemented — the recorded
   `ARCH-L-004` label won't-fix means a pseudostate name never renders, so a "named circle" cannot be
   produced without reopening that decision.
+- Phase 3: **landed** — `UML-XMI-12/-13/-16/-21` and `DOC-25/-26` closed. Full `./mvnw test` green.
+  The assurance now reports what the schema actually said: `SchemaValidation` returns a structured
+  `SchemaOutcome` instead of collapsing three results into one free-text diagnostic, and
+  `status="not-validated"` is emitted on the path where the schema rejected the content and the
+  export rode the no-normative-UML-XSD gap. The schema gained the missing `xmi-envelope-only`
+  guard, so the rung actually in use is no longer the only one carrying no constraint.
+  **Three findings were refuted rather than fixed** — `UML-XMI-2` (its wordings *are* pinned),
+  `UML-XMI-18` (its "schema-valid slot" is not valid there), and the sizing of
+  `UML-XMI-5`/`UML-VOCAB-7` (a writer restructure, not a rename). Each has its own section or
+  disposition row. **Deferred:** `AM-OEF-11` as a contract slice of its own; `UML-XMI-20`'s UMLDI
+  golden and `UML-XMI-4`'s version escape hatch, both of which want the UMLDI dialect settled first
+  and are now cheaper because `-12`/`-13` are fixed.
+  **Method note.** The new `not-validated` branch was initially unasserted: the assurance test
+  drives a *lax* stub schema, which accepts everything and so never reaches the gap path. Adding a
+  strict stub — what the real pinned XSD does — was the missing half, and it was verified to fail
+  against the old constant before being kept. A test can exercise the right code and still miss the
+  branch that matters.
+
   **Method note.** Where Phase 1's defects were all invisible-to-a-green-suite, Phase 2's were
   invisible in a second way: two of them had *existing tests asserting the defect*. The deployment
   test pinned the Artifact dog-ear on a DeploymentSpecification, and the sequence test pinned the

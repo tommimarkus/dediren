@@ -185,6 +185,55 @@ class XmiAssuranceTest {
     throw new AssertionError("Missing taxonomy entry for " + kind);
   }
 
+  @org.junit.jupiter.api.Test
+  void reportsNotValidatedWhenTheSchemaRejectedTheUmlContent() throws Exception {
+    // UML-XMI-16 / DOC-25/-26: on the tolerated-gap path the schema REJECTS the uml: subtree and
+    // the export proceeds anyway. status used to be an unconditional "validated" here, so a
+    // consumer branching on it was reading a constant — and reading it wrong — while the schema's
+    // "not-validated" value was unreachable. The stub above is lax, so it accepts everything; a
+    // STRICT wildcard reproduces what the real pinned XMI.xsd does.
+    Path schemaPath = tempDir.resolve("strict-XMI.xsd");
+    Files.writeString(
+        schemaPath,
+        """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+                    targetNamespace="http://www.omg.org/spec/XMI/20131001"
+                    xmlns="http://www.omg.org/spec/XMI/20131001"
+                    elementFormDefault="qualified">
+          <xsd:element name="XMI">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:any namespace="##other" processContents="strict"
+                         minOccurs="0" maxOccurs="unbounded"/>
+              </xsd:sequence>
+              <xsd:anyAttribute processContents="lax"/>
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:schema>
+        """,
+        StandardCharsets.UTF_8);
+
+    ObjectNode input = JsonSupport.objectMapper().createObjectNode();
+    input.put("export_request_schema_version", "export-request.schema.v1");
+    input.set("source", fixtureJson("fixtures/source/valid-uml-basic.json"));
+    input.set("layout_result", fixtureJson("fixtures/layout-result/uml-basic.json"));
+    input.set("policy", fixtureJson("fixtures/export-policy/default-uml-xmi.json"));
+
+    PluginResult result =
+        Main.executeForTesting(
+            new String[] {"export"},
+            input.toString(),
+            Map.of("DEDIREN_XMI_SCHEMA_PATH", schemaPath.toString()));
+
+    assertThat(result.exitCode()).describedAs(result.stdout()).isZero();
+    JsonNode envelope = JsonSupport.objectMapper().readTree(result.stdout());
+    JsonNode evidence = envelope.at("/data/assurance/validation_evidence");
+    assertThat(evidence.at("/xmi_schema_evidence/status").asText()).isEqualTo("not-validated");
+    // The level is unchanged: the envelope was still checked, and no stronger evidence exists.
+    assertThat(evidence.at("/level").asText()).isEqualTo("xmi-envelope-only");
+  }
+
   private Map<String, String> envWithStubXmiSchema() throws Exception {
     Path schemaPath = tempDir.resolve("XMI.xsd");
     Files.writeString(

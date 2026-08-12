@@ -33,14 +33,20 @@ final class UmlXmiAssurance {
   private UmlXmiAssurance() {}
 
   static JsonNode forView(
-      ExportRequest request, Coverage coverage, Map<String, String> environment) {
+      ExportRequest request,
+      Coverage coverage,
+      Map<String, String> environment,
+      SchemaValidation.SchemaOutcome schemaOutcome) {
     GenericGraphPluginData pluginData = genericGraphPluginData(request);
     String viewKind = viewKind(pluginData, request.layoutResult().viewId());
-    return assurance("view", List.of(viewKind), coverage, environment);
+    return assurance("view", List.of(viewKind), coverage, environment, schemaOutcome);
   }
 
   static JsonNode forModel(
-      ModelExportRequest request, Coverage coverage, Map<String, String> environment) {
+      ModelExportRequest request,
+      Coverage coverage,
+      Map<String, String> environment,
+      SchemaValidation.SchemaOutcome schemaOutcome) {
     ExportRequest representative =
         new ExportRequest(
             ContractVersions.EXPORT_REQUEST_SCHEMA_VERSION,
@@ -52,14 +58,16 @@ final class UmlXmiAssurance {
     for (ModelExportRequest.ViewLayout view : request.views()) {
       selectedKinds.add(viewKind(pluginData, view.viewId()));
     }
-    return assurance("model-aggregate", List.copyOf(selectedKinds), coverage, environment);
+    return assurance(
+        "model-aggregate", List.copyOf(selectedKinds), coverage, environment, schemaOutcome);
   }
 
   private static JsonNode assurance(
       String scope,
       List<String> selectedKinds,
       Coverage coverage,
-      Map<String, String> environment) {
+      Map<String, String> environment,
+      SchemaValidation.SchemaOutcome schemaOutcome) {
     ObjectNode assurance = JsonSupport.objectMapper().createObjectNode();
     assurance.put("assurance_schema_version", ContractVersions.UML_XMI_ASSURANCE_SCHEMA_VERSION);
     var taxonomy = assurance.putArray("kind_taxonomy");
@@ -87,8 +95,14 @@ final class UmlXmiAssurance {
 
     ObjectNode evidence = assurance.putObject("validation_evidence");
     evidence.put("level", "xmi-envelope-only");
+    // Report what the schema actually said. This was an unconditional "validated", including on
+    // the path where the schema REJECTED the content and the export rode the no-normative-UML-XSD
+    // gap — so a consumer branching on status was reading a constant, and reading it wrong. The
+    // schema's "not-validated" value was unreachable.
     ObjectNode xmiSchemaEvidence =
-        evidence.putObject("xmi_schema_evidence").put("status", "validated");
+        evidence
+            .putObject("xmi_schema_evidence")
+            .put("status", schemaOutcome.schemaAcceptedContent() ? "validated" : "not-validated");
     xmiSchemaEvidence.put("validator", "in-jvm-xsd");
     String configuredSchema = environment.get(SchemaValidation.XMI_SCHEMA_PATH_ENV);
     if (configuredSchema != null && !configuredSchema.isBlank()) {
