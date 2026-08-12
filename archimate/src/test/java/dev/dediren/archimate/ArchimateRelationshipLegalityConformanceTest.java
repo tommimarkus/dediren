@@ -355,6 +355,20 @@ class ArchimateRelationshipLegalityConformanceTest {
    * assignment); (2) it still rejects at least {@link #CATCH_RATE_FLOOR} of the combinations the
    * oracle forbids. Skipped when the property is unset.
    */
+
+  /**
+   * The floor for property (2): the share of oracle-forbidden combinations the model must reject.
+   *
+   * <p><b>Provenance.</b> The only rate ever measured was roughly 78%, when the category rules were
+   * first written; 0.75 was chosen as a regression backstop a little below it, not as a target. It
+   * has no other basis, and this note exists because it previously had none recorded anywhere.
+   *
+   * <p>The gap between the two numbers is the constant's weakness: a change that dropped the real
+   * rate from ~78% to 75.1% would still pass. Re-measure when the rule model changes and raise the
+   * floor to just under the measured rate, so erosion cannot hide in the margin. Note also that
+   * this test is {@code assumeTrue}-skipped without a user-supplied oracle file, so in an ordinary
+   * build the constant gates nothing at all — it is a deliberate manual gate, not CI coverage.
+   */
   private static final double CATCH_RATE_FLOOR = 0.75;
 
   @Test

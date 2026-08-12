@@ -268,16 +268,18 @@ the policy's optional `views` map (`"views": {"<view-id>":
 per-view `xmi.xml` (model content only); diagram interchange for them is a later
 slice.
 
-The UMLDI dialect is **provisional, and provisional here means it is known to
-differ from the normative annex, not merely unverified.** UML 2.5.1 Annex B is
-normative and defines the UMLDI metamodel; the emitted diagram element and its
-`isFrame` attribute follow it, but the `di:`/`dc:` namespace major versions and
-the naming of `di:waypoint` / `dc:Bounds` are dediren's reading rather than a
-citation — the OMG DD 1.1 and MOF 2 XMI Mapping specifications settle those and
-were not consulted. Separately, and like the UML namespace, there is no normative
-OMG DI XSD, so this content rides the same tolerated no-declaration gap the
-`uml:` model content does. Treat a UMLDI document as readable by dediren and
-plausible elsewhere, not as interchange-guaranteed.
+The UMLDI dialect is **provisional in one specific sense: no UML tool has been
+observed rendering it.** Its spelling is not in doubt. UML 2.5.1 Annex B is
+normative and defines the UMLDI metamodel, which the emitted diagram element and
+its `isFrame` attribute follow; the `dc:`/`di:` geometry follows the OMG's
+published DD serialization schemas, whose `20100524` namespaces are what every
+deployed DD-based dialect uses. (DD 1.1 exists and stamps its metamodel files
+`20131001`, but that stamp is not an XML namespace — emitting it would produce
+documents no DD-aware tool can read.)
+
+Like the UML namespace, there is no normative OMG DI XSD, so this content rides
+the same tolerated no-declaration gap the `uml:` model content does. Treat a
+UMLDI document as structurally correct and not yet render-verified.
 
 ## ArchiMate Handoff
 

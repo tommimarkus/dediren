@@ -456,6 +456,37 @@ its runtime (a golden diff would have looked like a correct keyword appearing), 
 names a defect still does not name where the fix belongs — the second time this register has shown
 that, after `UML-NOT-7`.
 
+## UML-XMI-14 and UML-XMI-15 are refuted
+
+Group 6's two findings were the only ones the plan said could not be decided locally: the register
+recorded the corpus as *silent, not contradicting*, and asked for the OMG DD 1.1 and MOF 2 XMI
+Mapping specifications. Fetched 2026-08-12 with the user's approval. Both findings are wrong, and
+acting on either would have broken interoperability.
+
+**`UML-XMI-15` — the "mixed convention".** The finding observed that `dc:Bounds` is capitalised like
+a type name while `di:waypoint` is lowercase like a property name, and reasoned that since DD/DI
+serialises properties, at most one can be right. The premise is sound and the conclusion is wrong,
+because the two elements are declared differently: `DC.xsd` declares `<xsd:element name="Bounds"
+type="dc:Bounds"/>` as a **global** element — global elements are conventionally named after their
+type — while `waypoint` is a **local** element inside `DI.xsd`'s `Edge`, typed `dc:Point`, and
+`DI.xsd` sets `elementFormDefault="qualified"`, which is what gives it the `di:` prefix. Both
+spellings are the schemas' own. The lowercase `bounds` the corpus attests is the *metamodel*
+property name, which is a different artifact from the serialization.
+
+**`UML-XMI-14` — the namespace dates.** The finding read `20100524` as a stale DD 1.0 reference,
+with DD 1.1 the current version. DD 1.1 is indeed current and its machine-readable files are stamped
+`20131001` — but that stamp is on the **metamodel XMI**, and never became an XML namespace. The
+DD *serialization* schemas keep `targetNamespace="http://www.omg.org/spec/DD/20100524/DI"` (and
+`.../DC`), and every deployed DD-based dialect — BPMN DI most visibly — serializes into them.
+Changing the constants to `20131001` would emit documents no DD-aware tool can read.
+
+Both are now pinned by `DiagramWriterConformanceTest`, with the reasoning in the test rather than
+only in a comment, because "1.1 looks newer than 1.0" is exactly the inference a future reader will
+make unprompted — this register made it.
+
+What remains genuinely open is unchanged and is a different question: no UML tool has been observed
+*rendering* the dialect. That is the Papyrus/EA import probe already recorded in §12.
+
 ## Post-plan followups
 
 Work deliberately carried out of this plan and recorded so it is not lost. `F1` is a tooling defect
@@ -590,3 +621,26 @@ _Written past-tense as phases land._
   segment guard rules and the entry/exit/terminate degree constraints all turn on composite States
   owning Regions, which the vocabulary cannot express — a Region names a StateMachine, never a
   State.
+- Phase 6: **landed** — `DOC-1`, `-3`, `-4`, `-5`, `-6`, `-7`, `-8`, `-10`, `-11`, `-12`, `-13`,
+  `-14`, `-15`, `-16`, `-17`, `-19`, `-20`, `-21`, `-23`, `-24` closed (`a420f59`). Written last so
+  each claim describes what actually landed. `DOC-9`, `-25` and `-26` were closed by the phases that
+  fixed them.
+  The two structural changes: `visibility` and the whole `attributes[]`/`operations[]` surface had
+  **zero occurrences** across README, agent-usage, features and schemas despite being live authored
+  fields, so a new `## UML Class Handoff` gives them a home; and the UML export contract was filed
+  under `## ArchiMate Handoff`, where `dediren_guide` misdelivered it, so it becomes
+  `## UML Export Contract` with matching `uml-class` / `uml-export` topics.
+  A new `### What a green command can still cost you` collects the diagnostics that report loss
+  rather than something to fix, and names the two losses that have no diagnostic at all.
+  **`DOC-22` is stated, not closed:** the lifecycle fixture is listed with the reason it cannot be
+  exported. Adding it silently — which is what this plan originally proposed — would have made the
+  finding worse.
+- Phase 7: **landed** — `AM-SEM-9` given the provenance it never had (in the test, beside the
+  constant, including that the test is `assumeTrue`-skipped so in an ordinary build it gates
+  nothing); `UML-XMI-14`/`-15` **refuted** against the OMG's published DD schemas, fetched with the
+  user's approval, and pinned so the refutation cannot be undone by a plausible-looking upgrade; and
+  a §12 block recording the seven accepted remainders, each with the condition that reopens it.
+  **The fetch changed the outcome.** Both Group 6 findings looked right and were wrong, and both
+  "fixes" would have emitted documents no DD-aware tool can read. That is the strongest case in this
+  whole remediation for checking a source rather than reasoning from a plausible premise — and it is
+  the sixth register finding to survive as a real observation with a wrong conclusion attached.

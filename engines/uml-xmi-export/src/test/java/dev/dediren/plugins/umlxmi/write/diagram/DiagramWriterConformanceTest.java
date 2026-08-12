@@ -114,6 +114,37 @@ final class DiagramWriterConformanceTest {
   }
 
   @Test
+  void diagramInterchangeNamespacesAreTheDeployedSerializationOnes() {
+    // The DD serialization schemas — the ones BPMN DI and every other deployed DD dialect use —
+    // carry targetNamespace `.../DD/20100524/DC` and `.../DD/20100524/DI`. DD 1.1 exists and
+    // stamps its *metamodel* XMI files 20131001, but that stamp never became an XML namespace, so
+    // "upgrading" these constants would emit documents no DD-aware tool can read.
+    //
+    // Pinned rather than commented because the 1.1-looks-newer reasoning is exactly the mistake a
+    // future reader (or a conformance register) is likely to make: this was raised as UML-XMI-14
+    // and checked against the published schemas before being refuted.
+    assertThat(DiagramWriter.DC_NS).isEqualTo("http://www.omg.org/spec/DD/20100524/DC");
+    assertThat(DiagramWriter.DI_NS).isEqualTo("http://www.omg.org/spec/DD/20100524/DI");
+    assertThat(DiagramWriter.UMLDI_NS).isEqualTo("http://www.omg.org/spec/UML/20161101/UMLDI");
+  }
+
+  @Test
+  void geometryElementsFollowTheDdSchemasOwnNaming() throws Exception {
+    // `Bounds` is a *global* element in DC.xsd named after its type; `waypoint` is a *local*
+    // element inside DI.xsd's Edge, and DI.xsd sets elementFormDefault="qualified" so it carries
+    // the di: prefix. The apparent type-name/property-name mix is the schemas', not dediren's —
+    // raised as UML-XMI-15 and refuted the same way.
+    Document diagram = renderDiagram();
+    assertThat(diagram.getElementsByTagNameNS(DiagramWriter.DC_NS, "Bounds").getLength())
+        .isPositive();
+    assertThat(diagram.getElementsByTagNameNS(DiagramWriter.DI_NS, "waypoint").getLength())
+        .isPositive();
+    // The spellings the register proposed instead, neither of which any DD schema declares.
+    assertThat(diagram.getElementsByTagNameNS(DiagramWriter.DI_NS, "bounds").getLength()).isZero();
+    assertThat(diagram.getElementsByTagNameNS(DiagramWriter.DC_NS, "Point").getLength()).isZero();
+  }
+
+  @Test
   void emitsOneShapePerModelBackedNodeAndSkipsVisualOnly() throws Exception {
     NodeList shapes = renderDiagram().getElementsByTagNameNS(DiagramWriter.UMLDI_NS, "UMLShape");
     Set<String> modelElements = new HashSet<>();
