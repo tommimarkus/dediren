@@ -443,62 +443,12 @@ Chromium-backed decorated-paint and raster verification (opt-in):
 ./scripts/test-render-paint.sh -Dtest='RasterDiffTest,RasterGoldenTest'
 ```
 
-The wrapper activates `-Prender-paint`, installs only Chromium headless shell
-149.0.7827.55 (revision 1228) under repository `.cache/playwright`, and runs the
-Playwright Java 1.61.0 tests. Direct Maven callers may use
-`./mvnw -Prender-paint -pl engines/render -am test` only after the pinned shell
-is present and `PLAYWRIGHT_BROWSERS_PATH` points to that cache. Maven stays
-under `.cache/maven`. Browser DOM geometry, computed styles, marker/filter
-paint, and padded transparent screenshots are the decorated-paint authority;
-ImageIO owns raster comparison. The opt-in profile does not change emitted SVG,
-the default build, or the shipped platform-neutral Java runtime.
-
-Keep the hardened browser launch synchronized with
-`docs/features/svg-render.md`: use a disposable `browserType.launch()` profile,
-offline context, blocked service workers, and a catch-all route that records
-and aborts every page request. Do not remove the pinned flags that disable
-background networking, update/sync/crash services, extensions/default apps,
-first-run/default-browser services, translation, media routing, and
-optimization lookups.
-
-The lane loads the existing Liberation Sans test asset through a data
-`@font-face`, waits for `document.fonts.ready`, and prohibits system-font
-fallback for blocking text checks. Do not download a new or fallback font.
-Unsupported glyphs produce advisory `font_missing` results. The adjacent
-OFL-1.1-RFN licence and the font digest remain part of the raster manifest.
-
-The raster corpus is the rich graph in light and dark themes, ArchiMate
-decorators, and UML sequence-fragment chrome. A failure writes actual, mask, and
-overlay images under `.test-output/render-paint/`. Regenerate deliberately with
-`./scripts/test-render-paint.sh -Ddediren.render.paint.regenerate-goldens=true`,
-then review every tracked PNG and manifest change. Built-in-theme contrast gates
-use numeric baselines of 4.5:1 for normal text and 3:1 for large text; describe
-them as baselines, never WCAG conformance. User themes are non-blocking, while
-gradients and compositions that cannot be resolved report advisory
-`not_measurable`.
-
-Regeneration is gated on a **calibration probe**, not on the environment's
-identity: before writing any golden, the lane rasterizes the static
-`engines/render/src/paint-test/resources/raster-calibration/calibration.svg` and
-requires it to reproduce the committed `calibration.png` under the same
-comparator the goldens use. An environment that agrees with the calibration
-pixels may mint baselines; one that does not is refused, wherever it runs. The
-calibration SVG is deliberately not produced by the render engine — a rendered
-fixture would move with the renderer and stop probing the environment alone. Keep
-the Playwright and Chromium versions, viewport rules, DPR, font digest,
-calibration pair, and raster manifest synchronized when the canonical golden
-environment changes.
-
-The scheduled raster job runs in the digest-pinned Playwright Java 1.61.0 Noble
-image, which remains a good environment but is no longer *required* to
-regenerate — determinism comes from the repository, not the image: Playwright
-downloads a pinned Chromium and the font is embedded as a data URI, so the host
-supplies neither the browser nor the glyphs. Chromium is the only blocking
-browser in this lane. The browser download and container are test infrastructure
-only: commit no native binary, browser cache, or new font. References to the retired paint
-implementation are allowed only in historical plans/reviews under
-`docs/superpowers` and in threat-model history; do not rewrite those records or
-copy their terminology into active guidance.
+The wrapper activates `-Prender-paint`; the opt-in profile does not change
+emitted SVG, the default build, or the shipped platform-neutral Java runtime.
+Every other rule in this lane — pinned versions, direct Maven invocation, launch
+hardening, fonts, goldens, and what may be committed — lives in
+[`docs/features/svg-render.md` § Chromium Render-Paint Verification](docs/features/svg-render.md#chromium-render-paint-verification).
+Change them there, not here.
 
 OEF export changes:
 
