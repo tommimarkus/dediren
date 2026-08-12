@@ -50,8 +50,8 @@ public final class SchemaValidation {
    * env paths against the JVM cwd. The engine path threads an explicit {@code productRoot} through
    * the three-argument form instead.
    */
-  public static Diagnostic validateXmiToAvailableStandards(String content, Map<String, String> env)
-      throws XmiValidationException {
+  public static SchemaOutcome validateXmiToAvailableStandards(
+      String content, Map<String, String> env) throws XmiValidationException {
     return validateXmiToAvailableStandards(content, env, Path.of("").toAbsolutePath());
   }
 
@@ -60,7 +60,7 @@ public final class SchemaValidation {
    * schema the artifact was validated against, its provenance, and whether UML-namespace content
    * rode the known no-normative-UML-XSD gap.
    */
-  public static Diagnostic validateXmiToAvailableStandards(
+  public static SchemaOutcome validateXmiToAvailableStandards(
       String content, Map<String, String> env, Path productRoot) throws XmiValidationException {
     validateXmiDocumentAndIds(content);
     return validateOmgXmiSchema(content, env, productRoot);
@@ -119,7 +119,7 @@ public final class SchemaValidation {
     }
   }
 
-  private static Diagnostic validateOmgXmiSchema(
+  private static SchemaOutcome validateOmgXmiSchema(
       String content, Map<String, String> env, Path productRoot) throws XmiValidationException {
     XmiSchemaSource source = resolveOmgXmiSchemaPath(env, productRoot);
     // In-JVM validation: no xmllint subprocess in the trust path. A driver schema's imports
@@ -137,17 +137,37 @@ public final class SchemaValidation {
           error.getMessage() + " " + error.advice(source.unavailableRemediation()));
     }
     if (outcome.valid()) {
-      return conformance(source.conformanceMessage() + "; the schema set accepted the UML content");
+      return new SchemaOutcome(
+          true,
+          conformance(source.conformanceMessage() + "; the schema set accepted the UML content"));
     }
     if (xmiSchemaErrorsAreOnlyUnavailableUmlSchema(outcome.details())) {
-      return conformance(
-          source.conformanceMessage()
-              + "; UML-namespace content accepted — no normative OMG UML 2.5.1 XSD is published");
+      // The schema REJECTED this content; the export proceeds only because the rejection is
+      // entirely the no-normative-UML-XSD gap. Carrying that distinction out of here is the whole
+      // point: the assurance object used to report "validated" on exactly this path.
+      return new SchemaOutcome(
+          false,
+          conformance(
+              source.conformanceMessage()
+                  + "; UML-namespace content accepted — no normative OMG UML 2.5.1 XSD is"
+                  + " published"));
     }
     throw new XmiValidationException(
         DiagnosticCode.XMI_SCHEMA_INVALID.code(),
         "generated UML/XMI XML does not validate against OMG XMI.xsd: " + outcome.details());
   }
+
+  /**
+   * What the schema actually said, alongside the diagnostic describing it.
+   *
+   * <p>A boolean rather than a parsed message, because the alternative — re-deriving the outcome by
+   * matching on the diagnostic's prose — is the same brittleness the tolerated-gap filter already
+   * carries, and it would be re-introduced at a second site.
+   *
+   * @param schemaAcceptedContent true only when the schema set validated the whole document; false
+   *     when it rejected content and the export rode the no-normative-UML-XSD gap.
+   */
+  public record SchemaOutcome(boolean schemaAcceptedContent, Diagnostic diagnostic) {}
 
   private static Diagnostic conformance(String message) {
     return new Diagnostic(

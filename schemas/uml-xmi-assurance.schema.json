@@ -99,6 +99,16 @@
       },
       "allOf": [
         {
+          "comment": "The weakest rung must not claim more than it has: at xmi-envelope-only no UML metamodel or importer evidence exists, so those arrays stay empty. Without this guard the rung carried no constraint at all, which is how an unconditional status=validated went unnoticed at exactly the level in use.",
+          "if": { "properties": { "level": { "const": "xmi-envelope-only" } } },
+          "then": {
+            "properties": {
+              "uml_metamodel_evidence": { "maxItems": 0 },
+              "importer_evidence": { "maxItems": 0 }
+            }
+          }
+        },
+        {
           "if": { "properties": { "level": { "const": "uml-content-schema-validated" } } },
           "then": { "properties": { "uml_metamodel_evidence": { "minItems": 1 } } }
         },

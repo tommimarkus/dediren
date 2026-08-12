@@ -11,6 +11,9 @@ import static dev.dediren.uml.UmlProperties.requiredTextArrayEntry;
 import static dev.dediren.uml.UmlProperties.requiredTextProperty;
 import static dev.dediren.uml.UmlProperties.textValueSet;
 
+import dev.dediren.contracts.Diagnostic;
+import dev.dediren.contracts.DiagnosticCode;
+import dev.dediren.contracts.DiagnosticSeverity;
 import dev.dediren.contracts.source.GenericGraphView;
 import dev.dediren.contracts.source.SourceNode;
 import dev.dediren.contracts.source.SourceRelationship;
@@ -289,9 +292,10 @@ public final class UmlSequenceValidation {
     }
   }
 
-  static void validateInteractionOperandProperties(
+  static List<Diagnostic> validateInteractionOperandProperties(
       JsonNode umlProperties, String path, ValidationContext context)
       throws UmlValidationException {
+    var diagnostics = new java.util.ArrayList<Diagnostic>();
     String umlPath = path + ".properties.uml";
     String interaction =
         requiredTextProperty(
@@ -321,14 +325,14 @@ public final class UmlSequenceValidation {
         if (!interaction.equals(messageInteraction)) {
           throw new UmlValidationException(UmlTypeKind.ELEMENT_PROPERTY, fragmentId, fragmentPath);
         }
-        validateFragmentCoverage(combinedFragment, fragmentId, fragmentPath, context);
+        validateFragmentCoverage(combinedFragment, fragmentId, fragmentPath, context, diagnostics);
       } else if ("CombinedFragment".equals(context.nodeTypes().get(fragmentId))) {
         String fragmentInteraction =
             readTextProperty(context.nodeUmlProperties().get(fragmentId), "interaction");
         if (!interaction.equals(fragmentInteraction)) {
           throw new UmlValidationException(UmlTypeKind.ELEMENT_PROPERTY, fragmentId, fragmentPath);
         }
-        validateFragmentCoverage(combinedFragment, fragmentId, fragmentPath, context);
+        validateFragmentCoverage(combinedFragment, fragmentId, fragmentPath, context, diagnostics);
       } else {
         throw new UmlValidationException(UmlTypeKind.ELEMENT_PROPERTY, fragmentId, fragmentPath);
       }
@@ -357,10 +361,12 @@ public final class UmlSequenceValidation {
       throw new UmlValidationException(
           UmlTypeKind.ELEMENT_PROPERTY, guard.toString(), umlPath + ".guard");
     }
+    return List.copyOf(diagnostics);
   }
 
-  static void validateCombinedFragmentSequenceContiguity(
-      List<SourceNode> nodes, ValidationContext context) throws UmlValidationException {
+  static List<Diagnostic> validateCombinedFragmentSequenceContiguity(
+      List<SourceNode> nodes, ValidationContext context) {
+    var diagnostics = new java.util.ArrayList<Diagnostic>();
     for (SourceNode node : nodes) {
       if (!"CombinedFragment".equals(context.nodeTypes().get(node.id()))) {
         continue;
@@ -374,13 +380,18 @@ public final class UmlSequenceValidation {
           node.id(),
           interaction,
           context.nodePaths().get(node.id()) + ".properties.uml.operands",
-          context);
+          context,
+          diagnostics);
     }
+    return List.copyOf(diagnostics);
   }
 
   private static void validateCombinedFragmentSequenceContiguity(
-      String nodeId, String interaction, String path, ValidationContext context)
-      throws UmlValidationException {
+      String nodeId,
+      String interaction,
+      String path,
+      ValidationContext context,
+      List<Diagnostic> diagnostics) {
     InteractionFragmentInterval interval =
         interactionFragmentInterval(nodeId, context, new HashSet<>());
     if (interval == null) {
@@ -392,8 +403,29 @@ public final class UmlSequenceValidation {
         interval.lastSequence(),
         interval.messageIds(),
         context)) {
-      throw new UmlValidationException(UmlTypeKind.ELEMENT_PROPERTY, nodeId, path);
+      diagnostics.add(
+          houseRule(
+              "combined fragment '"
+                  + nodeId
+                  + "' does not own every message inside its sequence span. UML's ordering is partial"
+                  + " and permits this interleaving; dediren's sequence layout assumes a contiguous"
+                  + " span, so the rendered diagram may place a message outside the frame that"
+                  + " encloses it",
+              path));
     }
+  }
+
+  /**
+   * A rule dediren enforces that UML does not.
+   *
+   * <p>Both callers describe layout assumptions, not language constraints: §17.1.3 makes an
+   * Interaction's ordering partial, and `critical` exists precisely because ordinary fragments are
+   * not protected from interleaving. Reporting them as errors rejected spec-legal models, so they
+   * are warnings — the author keeps the model and learns the diagram may not read as intended.
+   */
+  private static Diagnostic houseRule(String message, String path) {
+    return new Diagnostic(
+        DiagnosticCode.UML_SEQUENCE_HOUSE_RULE.code(), DiagnosticSeverity.WARNING, message, path);
   }
 
   static void validateMessageSequenceUniqueness(List<SourceRelationship> relationships)
@@ -420,6 +452,66 @@ public final class UmlSequenceValidation {
             UmlTypeKind.RELATIONSHIP_PROPERTY,
             "Message.sequence",
             "$.relationships[" + relationshipIndex + "].properties.uml.sequence");
+      }
+    }
+  }
+
+  /**
+   * §17.12.6.4 {@code no_occurrence_specifications_below}: a DestructionOccurrenceSpecification is
+   * {@code last()} among the events of the Lifeline it covers.
+   *
+   * <p>Nothing enforced it, so a message sent to or from a destroyed lifeline validated, projected
+   * and rendered &mdash; the arrow landing below the destruction cross. The constraint is about the
+   * lifeline's events, so it binds a later message at either end, not only an arriving one.
+   */
+  static void validateNoOccurrencesBelowDestruction(
+      List<SourceRelationship> relationships, List<SourceNode> nodes, ValidationContext context)
+      throws UmlValidationException {
+    var destroyedAt = new HashMap<String, BigInteger>();
+    for (SourceNode node : nodes) {
+      if (!"DestructionOccurrenceSpecification".equals(node.type())) {
+        continue;
+      }
+      String lifeline = readTextProperty(node.properties().get("uml"), "covered");
+      if (lifeline == null) {
+        continue;
+      }
+      for (SourceRelationship relationship : relationships) {
+        if (!"Message".equals(relationship.type()) || !node.id().equals(relationship.target())) {
+          continue;
+        }
+        BigInteger sequence = messageSequence(relationship.id(), context);
+        if (sequence != null) {
+          destroyedAt.merge(lifeline, sequence, BigInteger::min);
+        }
+      }
+    }
+    if (destroyedAt.isEmpty()) {
+      return;
+    }
+    for (int index = 0; index < relationships.size(); index++) {
+      SourceRelationship relationship = relationships.get(index);
+      if (!"Message".equals(relationship.type())) {
+        continue;
+      }
+      BigInteger sequence = messageSequence(relationship.id(), context);
+      if (sequence == null) {
+        continue;
+      }
+      for (String endpoint : List.of(relationship.source(), relationship.target())) {
+        // A deletion message names the occurrence, not the lifeline, so resolve through it — the
+        // destruction itself must not count as an event below the destruction.
+        String lifeline =
+            "DestructionOccurrenceSpecification".equals(context.nodeTypes().get(endpoint))
+                ? readTextProperty(context.nodeUmlProperties().get(endpoint), "covered")
+                : endpoint;
+        BigInteger destruction = destroyedAt.get(lifeline);
+        if (destruction != null && sequence.compareTo(destruction) > 0) {
+          throw new UmlValidationException(
+              UmlTypeKind.RELATIONSHIP_PROPERTY,
+              "Message.sequence",
+              "$.relationships[" + index + "].properties.uml.sequence");
+        }
       }
     }
   }
@@ -564,8 +656,8 @@ public final class UmlSequenceValidation {
       String ownerCombinedFragment,
       String fragmentId,
       String fragmentPath,
-      ValidationContext context)
-      throws UmlValidationException {
+      ValidationContext context,
+      List<Diagnostic> diagnostics) {
     JsonNode ownerCovered =
         optionalProperty(context.nodeUmlProperties().get(ownerCombinedFragment), "covered");
     if (ownerCovered == null || !ownerCovered.isArray()) {
@@ -578,7 +670,7 @@ public final class UmlSequenceValidation {
       String target = context.relationshipTargets().get(fragmentId);
       if (isUncoveredLifeline(source, ownerCoveredIds, context)
           || isUncoveredLifeline(target, ownerCoveredIds, context)) {
-        throw new UmlValidationException(UmlTypeKind.ELEMENT_PROPERTY, fragmentId, fragmentPath);
+        diagnostics.add(coverageHouseRule(fragmentId, ownerCombinedFragment, fragmentPath));
       }
       return;
     }
@@ -590,9 +682,22 @@ public final class UmlSequenceValidation {
     }
     for (JsonNode lifeline : nestedCovered) {
       if (lifeline.isTextual() && !ownerCoveredIds.contains(lifeline.asText())) {
-        throw new UmlValidationException(UmlTypeKind.ELEMENT_PROPERTY, fragmentId, fragmentPath);
+        diagnostics.add(coverageHouseRule(fragmentId, ownerCombinedFragment, fragmentPath));
+        return;
       }
     }
+  }
+
+  private static Diagnostic coverageHouseRule(String fragmentId, String owner, String path) {
+    return houseRule(
+        "fragment '"
+            + fragmentId
+            + "' reaches a lifeline its owning combined fragment '"
+            + owner
+            + "' does not cover. UML types `covered` as a free [0..*] and imposes no containment"
+            + " between a fragment and its owner; dediren's sequence layout draws the owner's frame"
+            + " around the lifelines it covers, so the enclosed fragment may render outside it",
+        path);
   }
 
   private static boolean isUncoveredLifeline(
@@ -744,7 +849,10 @@ public final class UmlSequenceValidation {
   public static boolean supportsOperandCount(String operator, int count) {
     return switch (operator) {
       case "opt", "loop" -> count == 1;
-      case "alt", "par" -> count >= 2;
+      // §17.12.3.6 types operand as [1..*], and the only arity constraint in clause 17 covers
+      // opt/loop/break/assert/neg. A one-operand guarded `alt` is legal and common, and is not the
+      // same as an `opt`: its guard may simply be false with no else-branch to take.
+      case "alt", "par" -> count >= 1;
       default -> false;
     };
   }

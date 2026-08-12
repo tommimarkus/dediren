@@ -132,6 +132,110 @@ class MainTest {
   }
 
   @Test
+  void semanticGroupingNestsItsMembersAsChildNodes() throws Exception {
+    // AM-OEF-6 / DOC-9: the exchange schema's Container declares a nested <node> child and
+    // LaidOutGroup.members() carries exactly the membership, but the emitter dropped it — the
+    // group and the nodes geometrically inside it were emitted as flat siblings, so a consuming
+    // tool imported them as unrelated overlapping boxes with nothing in .diagnostics[] saying so.
+    JsonNode source = fixtureJson("fixtures/source/valid-archimate-oef.json");
+    ((ArrayNode) source.get("nodes"))
+        .addObject()
+        .put("id", "customer-domain")
+        .put("type", "Grouping")
+        .put("label", "Customer Domain")
+        .set("properties", JsonSupport.objectMapper().createObjectNode());
+    JsonNode layout = fixtureJson("fixtures/layout-result/archimate-oef-basic.json");
+    layoutWithGroups(layout, 10.0, 10.0, 520.0, 180.0);
+
+    String xml = exportXml(source, layout);
+
+    assertThat(xml)
+        .contains(
+            "<node identifier=\"id-vg-main-customer-domain-group\" xsi:type=\"Element\""
+                + " elementRef=\"id-el-customer-domain\" x=\"10\" y=\"10\" w=\"520\" h=\"180\">"
+                + "<node identifier=\"id-vn-main-orders-component\" xsi:type=\"Element\""
+                + " elementRef=\"id-el-orders-component\" x=\"12\" y=\"12\" w=\"160\" h=\"80\"/>"
+                + "<node identifier=\"id-vn-main-orders-service\" xsi:type=\"Element\""
+                + " elementRef=\"id-el-orders-service\" x=\"254\" y=\"12\" w=\"160\" h=\"80\"/>"
+                + "</node>");
+    // Nested, not duplicated: each member view node appears exactly once in the document.
+    assertThat(xml.split("id-vn-main-orders-component", -1)).hasSize(3); // node id + edge source
+  }
+
+  @Test
+  void nestedSemanticGroupingsNestInTheEmittedDocument() throws Exception {
+    // LaidOutGroup.members() may name another group, and ELK lays out group hierarchies — so
+    // containment is a tree, not one level. A visual-only group in the middle is not an OEF
+    // concept, so ownership passes through it to the nearest semantic grouping.
+    JsonNode source = fixtureJson("fixtures/source/valid-archimate-oef.json");
+    ArrayNode nodes = (ArrayNode) source.get("nodes");
+    for (String id : new String[] {"customer-domain", "orders-area"}) {
+      nodes
+          .addObject()
+          .put("id", id)
+          .put("type", "Grouping")
+          .put("label", id)
+          .set("properties", JsonSupport.objectMapper().createObjectNode());
+    }
+    JsonNode layout = fixtureJson("fixtures/layout-result/archimate-oef-basic.json");
+    var groups = JsonSupport.objectMapper().createArrayNode();
+    semanticGroup(groups, "customer-domain", 0.0, 0.0, 600.0, 300.0, "visual-band");
+    semanticGroup(groups, "orders-area", 20.0, 20.0, 400.0, 200.0, "orders-component");
+    ObjectNode band =
+        groups
+            .addObject()
+            .put("id", "visual-band")
+            .put("source_id", "visual-band")
+            .put("projection_id", "visual-band")
+            .put("x", 10.0)
+            .put("y", 10.0)
+            .put("width", 500.0)
+            .put("height", 250.0)
+            .put("label", "Band");
+    band.putObject("provenance").put("visual_only", true);
+    band.putArray("members").add("orders-area");
+    ((ObjectNode) layout).set("groups", groups);
+
+    String xml = exportXml(source, layout);
+
+    assertThat(xml)
+        .contains(
+            "elementRef=\"id-el-customer-domain\" x=\"0\" y=\"0\" w=\"600\" h=\"300\">"
+                + "<node identifier=\"id-vg-main-orders-area\" xsi:type=\"Element\""
+                + " elementRef=\"id-el-orders-area\" x=\"20\" y=\"20\" w=\"400\" h=\"200\">"
+                + "<node identifier=\"id-vn-main-orders-component\"");
+  }
+
+  @Test
+  void nodesOutsideAnySemanticGroupingStayAtViewLevel() throws Exception {
+    // A visual-only group is not an OEF concept, so its members must not be nested under
+    // anything — they stay direct children of the view, as they were before containment.
+    JsonNode source = fixtureJson("fixtures/source/valid-archimate-oef.json");
+    JsonNode layout = fixtureJson("fixtures/layout-result/archimate-oef-basic.json");
+    var groups = JsonSupport.objectMapper().createArrayNode();
+    ObjectNode visualOnly = groups.addObject();
+    visualOnly
+        .put("id", "visual-column")
+        .put("source_id", "visual-column")
+        .put("projection_id", "visual-column")
+        .put("x", 0.0)
+        .put("y", 0.0)
+        .put("width", 200.0)
+        .put("height", 120.0)
+        .put("label", "Visual Column");
+    visualOnly.putObject("provenance").put("visual_only", true);
+    visualOnly.putArray("members").add("orders-component");
+    ((ObjectNode) layout).set("groups", groups);
+
+    String xml = exportXml(source, layout);
+
+    assertThat(xml)
+        .contains(
+            "<name xml:lang=\"en\">Main</name>"
+                + "<node identifier=\"id-vn-main-orders-component\"");
+  }
+
+  @Test
   void emitsAttachmentsForRouteEndpointsAndBendpointsOnlyForIntermediatePoints() throws Exception {
     JsonNode source = fixtureJson("fixtures/source/valid-archimate-oef.json");
     ((ArrayNode) source.get("nodes"))
@@ -483,11 +587,12 @@ class MainTest {
 
     String xml = exportXml(source, fixtureJson("fixtures/layout-result/archimate-oef-basic.json"));
 
-    // Each distinct key becomes one model-level property definition (sorted for determinism).
+    // Each distinct key becomes one model-level property definition (sorted for determinism),
+    // typed by the values it actually carries — `confidence` is a number, not text.
     assertThat(xml)
         .contains(
             "<propertyDefinitions>"
-                + "<propertyDefinition identifier=\"id-prop-confidence\" type=\"string\">"
+                + "<propertyDefinition identifier=\"id-prop-confidence\" type=\"number\">"
                 + "<name xml:lang=\"en\">confidence</name></propertyDefinition>"
                 + "<propertyDefinition identifier=\"id-prop-evidence-classification\""
                 + " type=\"string\">"
@@ -690,6 +795,32 @@ class MainTest {
     input.set("layout_result", layout);
     input.set("policy", policy);
     return JsonSupport.objectMapper().writeValueAsString(input);
+  }
+
+  private void semanticGroup(
+      ArrayNode groups,
+      String sourceId,
+      double x,
+      double y,
+      double width,
+      double height,
+      String... members) {
+    ObjectNode group =
+        groups
+            .addObject()
+            .put("id", sourceId)
+            .put("source_id", sourceId)
+            .put("projection_id", sourceId)
+            .put("x", x)
+            .put("y", y)
+            .put("width", width)
+            .put("height", height)
+            .put("label", sourceId);
+    group.putObject("provenance").putObject("semantic_backed").put("source_id", sourceId);
+    ArrayNode memberIds = group.putArray("members");
+    for (String member : members) {
+      memberIds.add(member);
+    }
   }
 
   private void layoutWithGroups(JsonNode layout, double x, double y, double width, double height) {

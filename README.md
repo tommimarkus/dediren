@@ -4,7 +4,7 @@
 
 `dediren` is a contract-first, single-JVM diagram compiler **for agentic
 tools**. It turns semantic JSON into generated layout, rendered SVG,
-ArchiMate® 3.2 OEF XML, or UML® 2.5.1 XMI XML through explicit CLI commands
+ArchiMate® Open Exchange Format 3.1 XML, or UML® 2.5.1 XMI XML through CLI commands
 backed by in-process first-party engines. Every command prints a JSON envelope
 on stdout, so an agent decides success or failure without scraping stderr.
 
@@ -300,12 +300,18 @@ render policy. One source model can drive several notations:
   schema, the latest The Open Group publishes).
 - **UML® 2.5.1** SVG and XMI XML (`uml` profile, `uml-xmi` plugin): class, data,
   activity, sequence, state-machine, use-case, component, and deployment views;
-  successful XMI results include schema-governed per-kind scope, validation,
-  and coverage assurance.
+  successful XMI results include schema-governed per-kind scope, a validation
+  outcome reporting what the available schemas actually checked, and coverage
+  assurance.
 
 [`docs/agent-usage.md`](docs/agent-usage.md) carries the per-notation authoring
 vocabulary, command handoffs, and layout-preference options; the machine
-contract is the JSON in [`schemas/`](schemas/).
+contract is the JSON in [`schemas/`](schemas/). Schema-validity is necessary but
+not always sufficient: the export lanes carry constraints their own JSON schemas
+do not express — the ArchiMate exchange format types diagram coordinates more
+narrowly than a layout result does, for instance — so an export can clamp
+geometry or decline input that validated cleanly. Those cases are declared in
+`.diagnostics[]` rather than left to be discovered from the output.
 
 ## Release
 

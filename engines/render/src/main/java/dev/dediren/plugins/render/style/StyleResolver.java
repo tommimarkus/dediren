@@ -126,23 +126,85 @@ public final class StyleResolver {
   public static ResolvedEdgeStyle edgeStyle(
       RenderPolicy policy, RenderMetadata metadata, String edgeId, ResolvedStyle base) {
     SvgStylePolicy style = policy.style();
-    SvgEdgeStyle typeStyle = null;
-    if (style != null && metadata != null && metadata.edges().containsKey(edgeId)) {
-      typeStyle = style.edgeTypeOverrides().get(metadata.edges().get(edgeId).type());
-    }
-    ResolvedEdgeStyle resolved = mergeEdgeStyle(base.edge(), typeStyle);
+    String relationshipType =
+        metadata != null && metadata.edges().containsKey(edgeId)
+            ? metadata.edges().get(edgeId).type()
+            : null;
+    SvgEdgeStyle typeStyle =
+        style == null || relationshipType == null
+            ? null
+            : style.edgeTypeOverrides().get(relationshipType);
+    // Notation before policy: the profile states what ArchiMate draws, and the policy may then
+    // restyle it. Without this layer a policy that omits a relationship type falls through to the
+    // generic house default and emits a non-ArchiMate glyph -- silently, because each type still
+    // matches whatever the policy did say about it.
+    ResolvedEdgeStyle resolved =
+        mergeEdgeStyle(base.edge(), notationStyle(policy, relationshipType));
+    resolved = mergeEdgeStyle(resolved, typeStyle);
     return mergeEdgeStyle(resolved, style == null ? null : style.edgeOverrides().get(edgeId));
+  }
+
+  private static SvgEdgeStyle notationStyle(RenderPolicy policy, String relationshipType) {
+    return "archimate".equals(policy.semanticProfile())
+        ? ArchimateEdgeNotation.forRelationshipType(relationshipType)
+        : null;
   }
 
   public static ResolvedGroupStyle groupStyle(
       RenderPolicy policy, RenderMetadata metadata, String groupId, ResolvedStyle base) {
     SvgStylePolicy style = policy.style();
-    SvgGroupStyle typeStyle = null;
-    if (style != null && metadata != null && metadata.groups().containsKey(groupId)) {
-      typeStyle = style.groupTypeOverrides().get(metadata.groups().get(groupId).type());
+    String elementType =
+        metadata != null && metadata.groups().containsKey(groupId)
+            ? metadata.groups().get(groupId).type()
+            : null;
+    SvgGroupStyle typeStyle =
+        style == null || elementType == null ? null : style.groupTypeOverrides().get(elementType);
+    if (typeStyle == null) {
+      typeStyle = containerNotationFromNodeType(policy, style, elementType);
     }
     ResolvedGroupStyle resolved = mergeGroupStyle(base.group(), typeStyle);
     return mergeGroupStyle(resolved, style == null ? null : style.groupOverrides().get(groupId));
+  }
+
+  /**
+   * The notation an ArchiMate semantic container borrows from its own element type (§3.8: a
+   * container may be any element, not only a Grouping).
+   *
+   * <p>Policies declare group notation for Grouping alone, so every other container used to fall
+   * through to the generic house group palette and render as an untyped box — no layer colour, no
+   * icon — losing the one thing the nesting notation is for. Rather than duplicate the 62-row
+   * element table on the group side, reuse what the policy already says about that element as a
+   * node; an explicit {@code group_type_overrides} entry still wins.
+   */
+  private static SvgGroupStyle containerNotationFromNodeType(
+      RenderPolicy policy, SvgStylePolicy style, String elementType) {
+    if (style == null || elementType == null || !"archimate".equals(policy.semanticProfile())) {
+      return null;
+    }
+    SvgNodeStyle nodeStyle = style.nodeTypeOverrides().get(elementType);
+    if (nodeStyle == null) {
+      return null;
+    }
+    // rx is deliberately not carried across: corner shape is geometry the group lane derives from
+    // the decorator, exactly as the node lane does. labelSize has no node counterpart.
+    return new SvgGroupStyle(
+        nodeStyle.fill(),
+        nodeStyle.stroke(),
+        nodeStyle.strokeWidth(),
+        null,
+        nodeStyle.labelFill(),
+        null,
+        nodeStyle.decorator(),
+        nodeStyle.fillOpacity(),
+        nodeStyle.strokeOpacity(),
+        nodeStyle.lineStyle(),
+        nodeStyle.dashPattern(),
+        nodeStyle.fontWeight(),
+        nodeStyle.fontStyle(),
+        nodeStyle.fontFamily(),
+        nodeStyle.labelAlign(),
+        nodeStyle.labelOpacity(),
+        nodeStyle.fillGradient());
   }
 
   static ResolvedNodeStyle mergeNodeStyle(ResolvedNodeStyle base, SvgNodeStyle override) {

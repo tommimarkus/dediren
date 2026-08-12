@@ -206,18 +206,35 @@ public final class Archimate {
       if (isRelationshipConnectorType(sourceType) || !isRelationshipConnectorType(targetType)) {
         continue;
       }
-      validateJunctionReachableTargets(
-          relationship.relationshipType(),
-          sourceType,
-          relationship.target(),
-          nodePaths.getOrDefault(relationship.target(), "$"),
-          relationships,
-          nodeTypes,
-          new TreeSet<>());
+      String junctionPath = nodePaths.getOrDefault(relationship.target(), "$");
+      boolean reachedAnElement =
+          validateJunctionReachableTargets(
+              relationship.relationshipType(),
+              sourceType,
+              relationship.target(),
+              junctionPath,
+              relationships,
+              nodeTypes,
+              new TreeSet<>());
+      if (!reachedAnElement) {
+        // Every junction here is already known to have an incoming and an outgoing relationship,
+        // so a walk that reaches no element means the chain loops back on itself. The relationship
+        // the junction stands for then has no endpoint pair, and nothing below ever checked one.
+        throw new ArchimateJunctionValidationException(
+            "DEDIREN_ARCHIMATE_JUNCTION_TARGET_UNREACHABLE",
+            junctionPath,
+            "ArchiMate junction "
+                + relationship.target()
+                + " routes a "
+                + relationship.relationshipType()
+                + " that never reaches an element, so its endpoints are never validated; the"
+                + " junction chain leads back to itself rather than to a target");
+      }
     }
   }
 
-  private static void validateJunctionReachableTargets(
+  /** Whether the walk validated at least one real element endpoint. */
+  private static boolean validateJunctionReachableTargets(
       String relationshipType,
       String sourceType,
       String junctionId,
@@ -227,7 +244,7 @@ public final class Archimate {
       Set<String> visited)
       throws ArchimateJunctionValidationException {
     if (!visited.add(junctionId)) {
-      return;
+      return false;
     }
     var outgoing = new ArrayList<JunctionValidationRelationship>();
     for (JunctionValidationRelationship relationship : relationships) {
@@ -237,20 +254,22 @@ public final class Archimate {
         outgoing.add(relationship);
       }
     }
+    boolean reachedAnElement = false;
     for (JunctionValidationRelationship relationship : outgoing) {
       String targetType = nodeTypes.get(relationship.target());
       if (targetType == null) {
         continue;
       }
       if (isRelationshipConnectorType(targetType)) {
-        validateJunctionReachableTargets(
-            relationshipType,
-            sourceType,
-            relationship.target(),
-            path,
-            relationships,
-            nodeTypes,
-            visited);
+        reachedAnElement |=
+            validateJunctionReachableTargets(
+                relationshipType,
+                sourceType,
+                relationship.target(),
+                path,
+                relationships,
+                nodeTypes,
+                visited);
         continue;
       }
       try {
@@ -258,7 +277,9 @@ public final class Archimate {
       } catch (ArchimateTypeValidationException error) {
         throw new ArchimateJunctionValidationException(error.code(), error.path(), error.message());
       }
+      reachedAnElement = true;
     }
+    return reachedAnElement;
   }
 
   private static boolean isJunctionContainmentRelationship(
@@ -272,8 +293,10 @@ public final class Archimate {
     if (sourceType == null || targetType == null) {
       return false;
     }
-    return (isRelationshipConnectorType(sourceType) && isJunctionContainerType(targetType))
-        || (isRelationshipConnectorType(targetType) && isJunctionContainerType(sourceType));
+    // §5.5.1 allows a junction to be aggregated or composed *in* a plateau, grouping or location:
+    // the container is the source. Drawn the other way round it is not containment, and exempting
+    // it from the junction checks would strip an edge nothing else validates.
+    return isRelationshipConnectorType(targetType) && isJunctionContainerType(sourceType);
   }
 
   private static boolean isJunctionContainerType(String nodeType) {

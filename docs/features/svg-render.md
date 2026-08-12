@@ -42,8 +42,17 @@ per-node / per-type `shape` override. Supported values: `rectangle`,
 `hexagon`, `parallelogram`, `stadium`, `cylinder`, `triangle`. Shapes exist for
 notations that do not fix geometry, so a `shape` is rejected
 (`DEDIREN_SVG_POLICY_INVALID`) when it sits alongside a notation `decorator`, or
-under the `archimate` / `uml` semantic profiles — those keep their
-specification-mandated shapes and icons.
+under the `archimate` / `uml` semantic profiles — those keep the shapes and icons
+their notation fixes, and a policy cannot override them.
+
+**Node** shapes and icons follow the specification. **Edges** do not, everywhere.
+UML edge keywords are not rendered: `Usage`, `Dependency`, `Include`, `Extend`,
+`Manifestation` and `Deployment` all draw as the same dashed open-arrow line,
+because the keyword («use», «include», …) that distinguishes them has no render
+surface. An Include and an Extend between the same two use cases are
+indistinguishable in the SVG, so a diagram cannot always be read back to the
+model it came from. The XMI export carries the distinction correctly; if the
+edge kind matters, that is the artifact to read.
 
 ### Colour & opacity
 

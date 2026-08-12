@@ -254,20 +254,143 @@ class ArchimateRelationshipLegalityConformanceTest {
   }
 
   @Test
-  void groupingAndLocationConnectToAnything() {
-    // §5.5 / Appendix B.6: the generic composite connectors attach to any element.
+  void everyElementTypeIsCategorizedByTheLegalityModelItself() {
+    // The categories above are the test's own reading of the spec, so agreeing with them proves
+    // nothing about the implementation's coverage. An element type added to the language without a
+    // category falls through the model's null-category branch and makes every relationship on it
+    // legal — silently, and with this suite still green. Pin the model's own map instead.
+    assertThat(RelationshipLegality.categorizedTypes())
+        .containsExactlyInAnyOrderElementsOf(elements());
+  }
+
+  @Test
+  void domainCrossingsAreRestrictedToTheRelationshipTypesSectionB4Names() {
+    // §B.4 names four domains — Motivation, Strategy, Core, Implementation & Migration — and
+    // restricts which relationship types may cross between them. A category-only model cannot see
+    // these at all, which is how a business process came to serve a capability.
+    assertThat(allowed("Serving", "BusinessProcess", "Capability")).isFalse(); // Core -> Strategy
+    assertThat(allowed("Assignment", "Node", "Capability")).isFalse(); // Core -> Strategy
+    assertThat(allowed("Serving", "ApplicationService", "WorkPackage")).isFalse(); // Core -> I&M
+    assertThat(allowed("Serving", "Goal", "BusinessProcess")).isFalse(); // Motivation -> Core
+    assertThat(allowed("Triggering", "Capability", "BusinessProcess"))
+        .isFalse(); // Strategy -> Core
+
+    // And the crossings it does name stay legal.
+    assertThat(allowed("Realization", "BusinessProcess", "Capability")).isTrue();
+    assertThat(allowed("Association", "Goal", "BusinessProcess")).isTrue();
+    assertThat(allowed("Influence", "BusinessProcess", "Goal")).isTrue();
+    assertThat(allowed("Realization", "WorkPackage", "Deliverable")).isTrue(); // same domain
+  }
+
+  @Test
+  void containmentFollowsThreeDifferentRules() {
+    // §B.6: grouping, location and plateau contain any concept, across every domain.
+    assertThat(allowed("Composition", "Plateau", "Goal")).isTrue();
+    assertThat(allowed("Aggregation", "Grouping", "Capability")).isTrue();
+
+    // §8.5.1 gives product a closed list — services and passive structure, plus a contract — so it
+    // is not a generic container even though it sits in the same category as one.
+    assertThat(allowed("Composition", "Product", "BusinessService")).isTrue();
+    assertThat(allowed("Aggregation", "Product", "Contract")).isTrue();
+    assertThat(allowed("Composition", "Product", "Product")).isTrue(); // §5.1.1 still applies
+    assertThat(allowed("Composition", "Product", "BusinessActor")).isFalse();
+    assertThat(allowed("Composition", "Product", "ApplicationComponent")).isFalse();
+
+    // §5.1.1 for everything else, at category granularity rather than element type: the tables are
+    // wider than the sentence, and a business process composed of business functions is legal.
+    assertThat(allowed("Composition", "BusinessProcess", "BusinessFunction")).isTrue();
+    // The cost of that granularity, kept deliberately and recorded in §12: same-category
+    // containment across layers is accepted although the tables forbid it. Tightening to element
+    // type would reject the line above, so this needs the layer dimension, not a stricter equality.
+    assertThat(allowed("Composition", "BusinessActor", "ApplicationComponent")).isTrue();
+    // The domain rule does catch it once the layers differ by *domain* rather than by layer.
+    assertThat(allowed("Composition", "BusinessActor", "Resource")).isFalse();
+  }
+
+  @Test
+  void definedCrossTypeSpecializationIsLegalInBothDirections() {
+    // Reads as though it should be directional, and is not. §8.4.2's "a contract is a
+    // specialization of a business object" is a *metamodel* statement — Contract is a subtype of
+    // BusinessObject, and its relationships are inherited — not a rule about which way the arrow
+    // may point. Appendix B.5 derives the pair through that inheritance and allows both
+    // directions, because the edge is really §5.4.2's same-type rule.
+    //
+    // This was asserted as directional on 2026-08-12 and corrected the same day: the Appendix-B
+    // oracle rejected exactly these two triples as false negatives, and nothing else.
+    assertThat(allowed("Specialization", "Contract", "BusinessObject")).isTrue();
+    assertThat(allowed("Specialization", "BusinessObject", "Contract")).isTrue();
+    assertThat(allowed("Specialization", "Constraint", "Requirement")).isTrue();
+    assertThat(allowed("Specialization", "Requirement", "Constraint")).isTrue();
+    // Still not a licence for any cross-type pair.
+    assertThat(allowed("Specialization", "BusinessObject", "Requirement")).isFalse();
+  }
+
+  @Test
+  void genericCompositeUniversalityIsConditionalOnTheOtherEndpoint() {
+    // §B.6 grants a grouping (and, for containment, a location) participation in any relationship
+    // *provided the other endpoint can itself take part in it* — it does not make every edge legal.
+    // So the composite is legal exactly when some element could stand in its place.
     for (String other : elements()) {
+      if (UNIVERSAL.contains(other)) {
+        continue;
+      }
       for (String rel : RELATIONSHIPS) {
         for (String universal : UNIVERSAL) {
           assertThat(allowed(rel, universal, other))
-              .as("%s %s -> %s must be legal", rel, universal, other)
-              .isTrue();
+              .as(
+                  "%s %s -> %s must match whether any element may be its source",
+                  rel, universal, other)
+              .isEqualTo(someElementIsLegal(rel, null, other));
           assertThat(allowed(rel, other, universal))
-              .as("%s %s -> %s must be legal", rel, other, universal)
-              .isTrue();
+              .as(
+                  "%s %s -> %s must match whether any element may be its target",
+                  rel, other, universal)
+              .isEqualTo(someElementIsLegal(rel, other, null));
         }
       }
     }
+  }
+
+  @Test
+  void aGenericCompositeDoesNotLegalizeAnImpossibleRelationship() {
+    // The three combinations the register reproduced as validating clean. Each is impossible for
+    // *every* substitution of the composite, so §B.6 cannot rescue it: Access reaches only passive
+    // structure, and a passive or motivation element is never an Assignment source or a Flow
+    // source.
+    assertThat(allowed("Access", "Grouping", "BusinessProcess")).isFalse();
+    assertThat(allowed("Assignment", "BusinessObject", "Grouping")).isFalse();
+    assertThat(allowed("Flow", "Goal", "Location")).isFalse();
+  }
+
+  @Test
+  void aGenericCompositeStillTakesPartWhereverAnElementCould() {
+    // The other half of §B.6, and the reason this is a narrowing rather than a rejection rule:
+    // wherever some element is a legal counterpart, the composite is legal too.
+    assertThat(allowed("Access", "Grouping", "DataObject")).isTrue();
+    assertThat(allowed("Composition", "Grouping", "BusinessActor")).isTrue();
+    assertThat(allowed("Composition", "BusinessActor", "Grouping")).isTrue();
+    assertThat(allowed("Serving", "Location", "BusinessProcess")).isTrue();
+    assertThat(allowed("Association", "Grouping", "Goal")).isTrue();
+  }
+
+  /**
+   * Whether any non-composite element could occupy the {@code null} end of the pair — the §B.6
+   * condition, evaluated independently of the implementation's own composite handling.
+   */
+  private static boolean someElementIsLegal(String relationship, String source, String target) {
+    for (String substitute : elements()) {
+      if (UNIVERSAL.contains(substitute)) {
+        continue;
+      }
+      boolean legal =
+          source == null
+              ? allowed(relationship, substitute, target)
+              : allowed(relationship, source, substitute);
+      if (legal) {
+        return true;
+      }
+    }
+    return false;
   }
 
   // --- Tier 2: opt-in check against a local ArchiMate relationship-table oracle -----------------
@@ -282,7 +405,26 @@ class ArchimateRelationshipLegalityConformanceTest {
    * assignment); (2) it still rejects at least {@link #CATCH_RATE_FLOOR} of the combinations the
    * oracle forbids. Skipped when the property is unset.
    */
-  private static final double CATCH_RATE_FLOOR = 0.75;
+
+  /**
+   * The floor for property (2): the share of oracle-forbidden combinations the model must reject.
+   *
+   * <p><b>Provenance.</b> Measured 2026-08-12 against an Appendix B.5 extraction of 10,620 allowed
+   * triples. The rules started that day at <b>79.9% caught, zero false negatives</b>; adding the
+   * §B.4 domain dimension and splitting containment into its three rules took it to <b>88.2%</b>,
+   * still with zero false negatives. The floor sits just under the current figure, so erosion fails
+   * the gate instead of hiding in the margin — the original 0.75 left thirteen points of slack
+   * against a rate nobody had recorded. Re-measure and raise it whenever the rule model changes.
+   *
+   * <p>The ~12% the model still accepts is the documented design point, not a backlog: the rules
+   * are expressed over the generic metamodel's element categories rather than by reproducing the
+   * copyrighted B.5 tables, and they compute no derivation closure.
+   *
+   * <p>This gate is {@code assumeTrue}-skipped without a user-supplied oracle, so an ordinary build
+   * does not run it. It is a deliberate manual check, not CI coverage — which is exactly why the
+   * two false negatives it caught on 2026-08-12 had already been committed.
+   */
+  private static final double CATCH_RATE_FLOOR = 0.88;
 
   @Test
   void modelMatchesRelationshipTableOracle() throws IOException {

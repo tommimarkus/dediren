@@ -1,6 +1,7 @@
 package dev.dediren.uml;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.junit.jupiter.api.Named.named;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 
@@ -9,6 +10,7 @@ import dev.dediren.contracts.source.GenericGraphPluginData;
 import dev.dediren.contracts.source.SourceDocument;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
@@ -112,6 +114,54 @@ class UmlValidationTest {
     Uml.validateRelationshipEndpointTypes("Include", "UseCase", "UseCase", "$.relationship");
     Uml.validateRelationshipEndpointTypes("Extend", "UseCase", "UseCase", "$.relationship");
     Uml.validateSource(fixture.source(), fixture.pluginData());
+  }
+
+  @Test
+  void associationAndGeneralizationEndsMustBeClassifiersNotJustPackagesAndClasses()
+      throws Exception {
+    // One predicate over six names stood in for three different spec type systems, so it was at
+    // once too wide and too narrow. §12.4.5.3 makes a Package not a Type, and §9.9.7.5 requires
+    // both Generalization ends to be Classifiers — while Actor, UseCase, Artifact and Node all are.
+    assertThat(endpointsAllowed("Association", "Package", "Package")).isFalse();
+    assertThat(endpointsAllowed("Generalization", "Package", "Package")).isFalse();
+    assertThat(endpointsAllowed("Generalization", "Actor", "Actor")).isTrue();
+    assertThat(endpointsAllowed("Generalization", "UseCase", "UseCase")).isTrue();
+    assertThat(endpointsAllowed("Generalization", "Node", "Node")).isTrue();
+    assertThat(endpointsAllowed("Generalization", "Artifact", "Artifact")).isTrue();
+    // A Port is a Property, and a Lifeline is not a Classifier either.
+    assertThat(endpointsAllowed("Generalization", "Port", "Port")).isFalse();
+    assertThat(endpointsAllowed("Association", "Lifeline", "Class")).isFalse();
+  }
+
+  @Test
+  void actorAssociationsFollowTheSpecsOwnList() throws Exception {
+    // §18.2.1.4 constrains an Actor's Associations to UseCases, Components and Classes — which is
+    // both wider than the Actor↔UseCase pair the rules allowed, and still a real restriction.
+    assertThat(endpointsAllowed("Association", "Actor", "Class")).isTrue();
+    assertThat(endpointsAllowed("Association", "Actor", "Component")).isTrue();
+    assertThat(endpointsAllowed("Association", "Actor", "UseCase")).isTrue();
+    assertThat(endpointsAllowed("Association", "Class", "Actor")).isTrue();
+    assertThat(endpointsAllowed("Association", "Actor", "Actor")).isFalse();
+    assertThat(endpointsAllowed("Association", "Actor", "Interface")).isFalse();
+  }
+
+  @Test
+  void dependencyEndsAreNamedElementsSoAPackageIsLegal() throws Exception {
+    // §7.8.4.5 types Dependency's ends as NamedElement, which a Package is. Usage adds no
+    // constraint of its own (§7.8.23.3), so the canonical «use» from a Class to an Interface —
+    // rejected by a source restriction with no basis in the spec — is legal.
+    assertThat(endpointsAllowed("Dependency", "Package", "Package")).isTrue();
+    assertThat(endpointsAllowed("Usage", "Class", "Interface")).isTrue();
+    assertThat(endpointsAllowed("Usage", "Interface", "Interface")).isTrue();
+  }
+
+  private static boolean endpointsAllowed(String relationship, String source, String target) {
+    try {
+      Uml.validateRelationshipEndpointTypes(relationship, source, target, "$.relationship");
+      return true;
+    } catch (UmlValidationException rejected) {
+      return false;
+    }
   }
 
   @Test
@@ -247,17 +297,17 @@ class UmlValidationTest {
   }
 
   @Test
-  void rejectsUsageWithPortTargetEndpoint() throws Exception {
+  void acceptsUsageWithPortTargetEndpoint() throws Exception {
+    // Once asserted as rejected. §7.8.23.3 gives Usage no constraint beyond Dependency's, whose
+    // ends are NamedElements (§7.8.4.5) — a Port is one. The restriction that rejected this was
+    // dediren's own, not the language's.
     Fixture fixture =
         loadMutatedUmlComponentFixture(
             source ->
                 relationshipById(source, "order-api-uses-payment")
                     .put("target", "port-payment-client"));
 
-    UmlValidationException error = assertRejected(fixture);
-
-    assertThat(error.code()).isEqualTo("DEDIREN_UML_RELATIONSHIP_ENDPOINT_UNSUPPORTED");
-    assertThat(error.value()).isEqualTo("Usage: Component -> Port");
+    Uml.validateSource(fixture.source(), fixture.pluginData());
   }
 
   @Test
@@ -311,15 +361,158 @@ class UmlValidationTest {
   }
 
   @Test
-  void rejectsUseCaseSubjectThatIsNotStructuralClassifier() throws Exception {
+  void rejectsAttributeVisibilityOutsideVisibilityKind() throws Exception {
+    // UML-VOCAB-1 / UML-NOT-5 (§7.8.24.3): visibility is an enumeration of exactly four literals,
+    // and it was unvalidated free text. That let one model produce two artifacts that disagree:
+    // the renderer's symbol switch falls through to "+" for anything it does not recognise, while
+    // the XMI writer copies the string through verbatim -- so "Private" rendered as public and
+    // exported as an invalid enumeration value, with no diagnostic on either side.
+    Fixture fixture =
+        loadMutatedUmlFixture(
+            source ->
+                (ObjectNode) nodeUmlProperties(source, "class-order").get("attributes").get(0),
+            attribute -> attribute.put("visibility", "Private"));
+
+    UmlValidationException error = assertRejected(fixture);
+
+    assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
+    assertThat(error.path()).isEqualTo("$.nodes[1].properties.uml.attributes[0].visibility");
+    assertThat(error.value()).isEqualTo("Private");
+  }
+
+  @Test
+  void rejectsOperationVisibilityOutsideVisibilityKind() throws Exception {
+    Fixture fixture =
+        loadMutatedUmlFixture(
+            source ->
+                (ObjectNode) nodeUmlProperties(source, "class-order").get("operations").get(0),
+            operation -> operation.put("visibility", "protected "));
+
+    UmlValidationException error = assertRejected(fixture);
+
+    assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
+    assertThat(error.path()).isEqualTo("$.nodes[1].properties.uml.operations[0].visibility");
+  }
+
+  @Test
+  void acceptsEveryVisibilityKindLiteral() throws Exception {
+    for (String literal : List.of("public", "private", "protected", "package")) {
+      Fixture fixture =
+          loadMutatedUmlFixture(
+              source ->
+                  (ObjectNode) nodeUmlProperties(source, "class-order").get("attributes").get(0),
+              attribute -> attribute.put("visibility", literal));
+
+      assertThatCode(() -> Uml.validateSource(fixture.source(), fixture.pluginData()))
+          .describedAs("visibility '%s' is a VisibilityKind literal", literal)
+          .doesNotThrowAnyException();
+    }
+  }
+
+  @Test
+  void rejectsAMessageArrivingOnADestroyedLifeline() throws Exception {
+    // §17.12.6.4 `no_occurrence_specifications_below`: a DestructionOccurrenceSpecification is
+    // last() among its lifeline's events. Nothing enforced it, so a later message targeting a
+    // destroyed lifeline validated, projected and rendered — the arrow landing below the
+    // destruction cross.
+    Fixture fixture =
+        loadMutatedUmlSequenceLifecycleFixture(
+            source -> addSequenceMessageAfterDestruction(source, "m5", "service", "worker", 5));
+
+    UmlValidationException error = assertRejected(fixture);
+
+    assertThat(error.code()).isEqualTo("DEDIREN_UML_RELATIONSHIP_PROPERTY_INVALID");
+    assertThat(error.path()).isEqualTo("$.relationships[4].properties.uml.sequence");
+  }
+
+  @Test
+  void rejectsAMessageSentFromADestroyedLifeline() throws Exception {
+    // The constraint is about the lifeline's events, not about arrival: a destroyed lifeline
+    // cannot send either.
+    Fixture fixture =
+        loadMutatedUmlSequenceLifecycleFixture(
+            source -> addSequenceMessageAfterDestruction(source, "m5", "worker", "service", 5));
+
+    assertThat(assertRejected(fixture).path())
+        .isEqualTo("$.relationships[4].properties.uml.sequence");
+  }
+
+  @Test
+  void acceptsTrafficOnOtherLifelinesAfterADestruction() throws Exception {
+    // Destroying one lifeline must not freeze the rest of the interaction — the shipped fixture's
+    // own m4 reply already runs after the destruction.
+    Fixture fixture =
+        loadMutatedUmlSequenceLifecycleFixture(
+            source -> addSequenceMessageAfterDestruction(source, "m5", "customer", "service", 5));
+
+    assertThatCode(() -> Uml.validateSource(fixture.source(), fixture.pluginData()))
+        .doesNotThrowAnyException();
+  }
+
+  private static void addSequenceMessageAfterDestruction(
+      ObjectNode source, String id, String from, String to, int sequence) {
+    ObjectNode message = ((ArrayNode) source.get("relationships")).addObject();
+    message.put("id", id).put("type", "Message").put("source", from).put("target", to);
+    message.put("label", id);
+    message
+        .putObject("properties")
+        .putObject("uml")
+        .put("interaction", "interaction-lifecycle")
+        .put("sequence", sequence)
+        .put("message_sort", "synchCall");
+    ((ArrayNode) source.at("/plugins/generic-graph/views/0/relationships")).add(id);
+  }
+
+  @Test
+  void rejectsUseCaseSubjectThatIsNotAClassifier() throws Exception {
+    // Narrowed from "not a structural classifier": §18.2.5.4 types subject as Classifier, and an
+    // Actor is one. An ExtensionPoint is not — it is a RedefinableElement owned by a UseCase.
     Fixture fixture =
         loadMutatedUmlUseCaseFixture(
-            source -> nodeUmlProperties(source, "place-order").put("subject", "customer"));
+            source -> nodeUmlProperties(source, "place-order").put("subject", "payment-extension"));
 
     UmlValidationException error = assertRejected(fixture);
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
     assertThat(error.path()).isEqualTo("$.nodes[3].properties.uml.subject");
+  }
+
+  @Test
+  void acceptsAnyClassifierAsAUseCaseSubject() throws Exception {
+    // §18.2.5.4 gives subject : Classifier [0..*], and the spec's own Figure 18.2 draws a
+    // **Component** as the subject boundary — the exact construct the four-name allow-list
+    // rejected.
+    for (String subjectType : new String[] {"Component", "Node", "Actor"}) {
+      Fixture fixture =
+          loadMutatedUmlUseCaseFixture(
+              source -> nodeById(source, "order-service").put("type", subjectType));
+
+      assertThatCode(() -> Uml.validateSource(fixture.source(), fixture.pluginData()))
+          .as("a %s is a Classifier and so a legal UseCase subject", subjectType)
+          .doesNotThrowAnyException();
+    }
+  }
+
+  @Test
+  void acceptsMultipleUseCaseSubjects() throws Exception {
+    // [0..*], not [0..1]: a use case may apply to more than one subject. The second subject is a
+    // Component outside the view, matching how the fixture already keeps its subject classifier
+    // off the use-case diagram itself.
+    Fixture fixture =
+        loadMutatedUmlUseCaseFixture(
+            source -> {
+              ObjectNode billing = ((ArrayNode) source.get("nodes")).addObject();
+              billing.put("id", "billing-service").put("type", "Component").put("label", "Billing");
+              billing.putObject("properties").putObject("uml").put("use_case_subject", true);
+              replaceTextArray(
+                  nodeUmlProperties(source, "place-order"),
+                  "subject",
+                  "order-service",
+                  "billing-service");
+            });
+
+    assertThatCode(() -> Uml.validateSource(fixture.source(), fixture.pluginData()))
+        .doesNotThrowAnyException();
   }
 
   @Test
@@ -349,25 +542,36 @@ class UmlValidationTest {
   }
 
   @Test
-  void rejectsTransitionAcrossRegions() throws Exception {
+  void acceptsTransitionBetweenRegionsOfTheSameStateMachine() throws Exception {
+    // §14.5.11.8 requires a Transition's endpoints to share a containingStateMachine(), not a
+    // Region — and §14.2.3.8.5 says Transition ownership is not explicitly constrained. Demanding
+    // one Region made the ordinary cross-region transition inexpressible; this test previously
+    // asserted the rejection.
     Fixture fixture =
         loadMutatedUmlStateMachineFixture(
             source -> {
-              var nodes = (ArrayNode) source.get("nodes");
-              nodes.add(
-                  jsonObject(
-                      """
-                    {
-                      "id": "other-region",
-                      "type": "Region",
-                      "label": "Other Region",
-                      "properties": {
-                        "uml": {
-                          "state_machine": "order-lifecycle"
-                        }
-                      }
-                    }
-                    """));
+              addRegion(source, "other-region", "order-lifecycle");
+              nodeUmlProperties(source, "fulfilled").put("region", "other-region");
+            });
+
+    assertThatCode(() -> Uml.validateSource(fixture.source(), fixture.pluginData()))
+        .doesNotThrowAnyException();
+  }
+
+  @Test
+  void rejectsTransitionCrossingStateMachines() throws Exception {
+    // The constraint that remains: a Transition cannot leave its state machine.
+    Fixture fixture =
+        loadMutatedUmlStateMachineFixture(
+            source -> {
+              ((ArrayNode) source.get("nodes"))
+                  .addObject()
+                  .put("id", "other-machine")
+                  .put("type", "StateMachine")
+                  .put("label", "Other")
+                  .putObject("properties")
+                  .putObject("uml");
+              addRegion(source, "other-region", "other-machine");
               nodeUmlProperties(source, "fulfilled").put("region", "other-region");
             });
 
@@ -375,6 +579,109 @@ class UmlValidationTest {
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_RELATIONSHIP_PROPERTY_INVALID");
     assertThat(error.path()).contains("properties.uml.region");
+  }
+
+  @Test
+  void rejectsASecondInitialPseudostateInOneRegion() throws Exception {
+    // §14.5.8.6: a Region owns at most one initial Vertex, and at most one of each history kind.
+    assertUmlStateMachineMutationRejected(
+        source -> addPseudostate(source, "second-initial", "main-region", "initial"),
+        "$.nodes[9].properties.uml.kind");
+  }
+
+  @Test
+  void rejectsASecondDeepHistoryInOneRegion() throws Exception {
+    assertUmlStateMachineMutationRejected(
+        source -> {
+          addPseudostate(source, "history-one", "main-region", "deepHistory");
+          addPseudostate(source, "history-two", "main-region", "deepHistory");
+        },
+        "$.nodes[10].properties.uml.kind");
+  }
+
+  @Test
+  void acceptsOneInitialPerRegionAcrossTwoRegions() throws Exception {
+    // The cardinality is per Region, not per state machine.
+    Fixture fixture =
+        loadMutatedUmlStateMachineFixture(
+            source -> {
+              addRegion(source, "other-region", "order-lifecycle");
+              addPseudostate(source, "other-initial", "other-region", "initial");
+            });
+
+    assertThatCode(() -> Uml.validateSource(fixture.source(), fixture.pluginData()))
+        .doesNotThrowAnyException();
+  }
+
+  @Test
+  void rejectsAnInternalTransitionBetweenDifferentVertices() throws Exception {
+    // §14.5.11.8 `state_is_internal`: a Transition with kind internal has a State as its source,
+    // and its source and target are the same. Nothing checked it, so an "internal" transition
+    // between two different states validated and was emitted as one.
+    Fixture fixture =
+        loadMutatedUmlStateMachineFixture(
+            source -> relationshipUmlProperties(source, "t-submit").put("kind", "internal"));
+
+    UmlValidationException error = assertRejected(fixture);
+
+    assertThat(error.code()).isEqualTo("DEDIREN_UML_RELATIONSHIP_PROPERTY_INVALID");
+    assertThat(error.path()).isEqualTo("$.relationships[1].properties.uml.kind");
+  }
+
+  @Test
+  void acceptsASelfInternalTransitionOnAState() throws Exception {
+    Fixture fixture =
+        loadMutatedUmlStateMachineFixture(
+            source -> {
+              ObjectNode transition = (ObjectNode) relationshipById(source, "t-submit");
+              transition.put("source", "draft").put("target", "draft");
+              relationshipUmlProperties(source, "t-submit").put("kind", "internal");
+            });
+
+    assertThatCode(() -> Uml.validateSource(fixture.source(), fixture.pluginData()))
+        .doesNotThrowAnyException();
+  }
+
+  @Test
+  void rejectsAForkWithOneOutgoingTransition() throws Exception {
+    // §14.5.6.7 `fork_vertex`: a fork has exactly one incoming and at least two outgoing
+    // Transitions. A one-way fork is a junction drawn as a bar.
+    assertUmlStateMachineMutationRejected(
+        source -> {
+          removeRelationship(source, "t-reject");
+          nodeUmlProperties(source, "payment-choice").put("kind", "fork");
+        },
+        "$.nodes[5].properties.uml.kind");
+  }
+
+  @Test
+  void rejectsAJoinWithOneIncomingTransition() throws Exception {
+    // §14.5.6.7 `join_vertex`: at least two incoming, exactly one outgoing.
+    assertUmlStateMachineMutationRejected(
+        source -> {
+          removeRelationship(source, "t-reject");
+          nodeUmlProperties(source, "payment-choice").put("kind", "join");
+        },
+        "$.nodes[5].properties.uml.kind");
+  }
+
+  @Test
+  void rejectsAChoiceWithNoOutgoingTransition() throws Exception {
+    // §14.5.6.7 `choice_vertex`: at least one incoming and at least one outgoing.
+    assertUmlStateMachineMutationRejected(
+        source -> {
+          removeRelationship(source, "t-approve");
+          removeRelationship(source, "t-reject");
+        },
+        "$.nodes[5].properties.uml.kind");
+  }
+
+  @Test
+  void rejectsAnInitialWithTwoOutgoingTransitions() throws Exception {
+    // §14.5.6.7 `initial_vertex`: at most one outgoing Transition.
+    assertUmlStateMachineMutationRejected(
+        source -> addTransition(source, "t-create-two", "initial", "submitted", "main-region"),
+        "$.nodes[2].properties.uml.kind");
   }
 
   @Test
@@ -640,21 +947,27 @@ class UmlValidationTest {
   }
 
   @Test
-  void rejectsAltFragmentWithOneOperand() throws Exception {
-    assertUmlSequenceFragmentsMutationRejected(
-        source ->
-            replaceTextArray(
-                nodeUmlProperties(source, "cf-availability"), "operands", "op-in-stock"),
-        "$.nodes[5].properties.uml.operands");
-  }
-
-  @Test
-  void rejectsParFragmentWithOneOperand() throws Exception {
-    assertUmlSequenceFragmentsMutationRejected(
-        source ->
-            replaceTextArray(
-                nodeUmlProperties(source, "cf-parallel-closeout"), "operands", "op-charge"),
-        "$.nodes[12].properties.uml.operands");
+  void everyInteractionOperatorAcceptsOneOperand() {
+    // §17.12.3.6 types `operand` as [1..*], and the only arity constraint in clause 17 covers
+    // opt/loop/break/assert/neg. A one-operand guarded `alt` is legal, common, and not the same as
+    // an `opt` — its guard may simply be false with no else-branch to take — yet a two-operand
+    // rule with no basis in the spec rejected it.
+    //
+    // Asserted on the rule rather than through a mutated fixture because dropping an operand from
+    // the fragments fixture also orphans the operand node, which a different rule then rejects;
+    // this is the predicate render's metadata validation shares, so it is the rule itself.
+    assertThat(UmlSequenceValidation.supportsOperandCount("alt", 1)).isTrue();
+    assertThat(UmlSequenceValidation.supportsOperandCount("par", 1)).isTrue();
+    assertThat(UmlSequenceValidation.supportsOperandCount("alt", 2)).isTrue();
+    assertThat(UmlSequenceValidation.supportsOperandCount("par", 5)).isTrue();
+    // The floor is one, not none: an operator with no operand has nothing to guard or interleave.
+    assertThat(UmlSequenceValidation.supportsOperandCount("alt", 0)).isFalse();
+    assertThat(UmlSequenceValidation.supportsOperandCount("par", 0)).isFalse();
+    // opt and loop keep their clause-17 arity constraint of exactly one.
+    assertThat(UmlSequenceValidation.supportsOperandCount("opt", 2)).isFalse();
+    assertThat(UmlSequenceValidation.supportsOperandCount("loop", 2)).isFalse();
+    // The switch is also the operator allow-list, so an unnamed operator has no legal count.
+    assertThat(UmlSequenceValidation.supportsOperandCount("seq", 1)).isFalse();
   }
 
   @ParameterizedTest(name = "{0}")
@@ -982,20 +1295,23 @@ class UmlValidationTest {
   }
 
   @Test
-  void rejectsMessageFragmentEndpointOutsideOwningFragmentCoverage() throws Exception {
+  void warnsMessageFragmentEndpointOutsideOwningFragmentCoverage() throws Exception {
+    // Coverage containment is dediren's rule, not UML's: §17.12.13.5 types `covered` as a free
+    // [0..*] and imposes no containment between a fragment and its owner. Rejecting this rejected
+    // a spec-legal model, so it is reported instead and the layout guarantee survives as a warning.
     Fixture fixture =
         loadMutatedUmlSequenceFragmentsFixture(
             source ->
                 replaceTextArray(nodeUmlProperties(source, "cf-coupon"), "covered", "customer"));
 
-    UmlValidationException error = assertRejected(fixture);
-
-    assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
-    assertThat(error.path()).isEqualTo("$.nodes[9].properties.uml.fragments[0]");
+    assertThat(houseRuleWarnings(fixture))
+        .anySatisfy(
+            warning ->
+                assertThat(warning.path()).isEqualTo("$.nodes[9].properties.uml.fragments[0]"));
   }
 
   @Test
-  void rejectsNestedCombinedFragmentCoverageOutsideOwningFragmentCoverage() throws Exception {
+  void warnsNestedCombinedFragmentCoverageOutsideOwningFragmentCoverage() throws Exception {
     Fixture fixture =
         loadMutatedUmlSequenceFragmentsFixture(
             source -> {
@@ -1003,10 +1319,10 @@ class UmlValidationTest {
               replaceTextArray(nodeUmlProperties(source, "cf-availability"), "covered", "customer");
             });
 
-    UmlValidationException error = assertRejected(fixture);
-
-    assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
-    assertThat(error.path()).isEqualTo("$.nodes[6].properties.uml.fragments[0]");
+    assertThat(houseRuleWarnings(fixture))
+        .anySatisfy(
+            warning ->
+                assertThat(warning.path()).isEqualTo("$.nodes[6].properties.uml.fragments[0]"));
   }
 
   @Test
@@ -1042,13 +1358,19 @@ class UmlValidationTest {
   }
 
   @Test
-  void rejectsCombinedFragmentWithStandaloneSequenceHoleBetweenOperands() throws Exception {
-    assertUmlSequenceFragmentsMutationRejected(
-        source -> {
-          replaceTextArray(nodeUmlProperties(source, "op-in-stock"), "fragments", "m1");
-          replaceTextArray(nodeUmlProperties(source, "op-backorder"), "fragments", "m3");
-        },
-        "$.nodes[5].properties.uml.operands");
+  void warnsCombinedFragmentWithStandaloneSequenceHoleBetweenOperands() throws Exception {
+    // Contiguity is also dediren's: §17.1.3 orders an Interaction partially, and `critical` exists
+    // precisely because ordinary fragments are not protected from interleaving.
+    Fixture fixture =
+        loadMutatedUmlSequenceFragmentsFixture(
+            source -> {
+              replaceTextArray(nodeUmlProperties(source, "op-in-stock"), "fragments", "m1");
+              replaceTextArray(nodeUmlProperties(source, "op-backorder"), "fragments", "m3");
+            });
+
+    assertThat(houseRuleWarnings(fixture))
+        .anySatisfy(
+            warning -> assertThat(warning.path()).isEqualTo("$.nodes[5].properties.uml.operands"));
   }
 
   @Test
@@ -1214,17 +1536,17 @@ class UmlValidationTest {
   }
 
   @Test
-  void rejectsUsageWithInterfaceSourceEndpoint() throws Exception {
+  void acceptsUsageWithInterfaceSourceEndpoint() throws Exception {
+    // Also once asserted as rejected, by the same Component/Port source restriction. The canonical
+    // «use» dependency the restriction blocked — a Class or Interface using an Interface — is the
+    // most common Usage there is.
     Fixture fixture =
         loadMutatedUmlComponentFixture(
             source ->
                 relationshipById(source, "order-api-uses-payment")
                     .put("source", "interface-order-api"));
 
-    UmlValidationException error = assertRejected(fixture);
-
-    assertThat(error.code()).isEqualTo("DEDIREN_UML_RELATIONSHIP_ENDPOINT_UNSUPPORTED");
-    assertThat(error.value()).isEqualTo("Usage: Interface -> Interface");
+    Uml.validateSource(fixture.source(), fixture.pluginData());
   }
 
   @Test
@@ -1594,6 +1916,15 @@ class UmlValidationTest {
     return new Fixture(source, data);
   }
 
+  /**
+   * Mutates a node reached by {@code select} — for members nested under a node's uml properties.
+   */
+  private static Fixture loadMutatedUmlFixture(
+      java.util.function.Function<ObjectNode, ObjectNode> select, Consumer<ObjectNode> mutate)
+      throws Exception {
+    return loadMutatedUmlFixture(source -> mutate.accept(select.apply(source)));
+  }
+
   private static Fixture loadMutatedUmlFixture(Consumer<ObjectNode> mutate) throws Exception {
     ObjectNode source =
         (ObjectNode)
@@ -1690,6 +2021,23 @@ class UmlValidationTest {
     return new Fixture(source, data);
   }
 
+  private static Fixture loadMutatedUmlSequenceLifecycleFixture(Consumer<ObjectNode> mutate)
+      throws Exception {
+    var sourceJson =
+        (ObjectNode)
+            JsonSupport.objectMapper()
+                .readTree(
+                    Files.readString(
+                        workspaceRoot()
+                            .resolve("fixtures/source/valid-uml-sequence-lifecycle.json")));
+    mutate.accept(sourceJson);
+    var source = JsonSupport.objectMapper().treeToValue(sourceJson, SourceDocument.class);
+    var data =
+        JsonSupport.objectMapper()
+            .treeToValue(source.plugins().get("generic-graph"), GenericGraphPluginData.class);
+    return new Fixture(source, data);
+  }
+
   private static Fixture loadMutatedUmlStateMachineFixture(Consumer<ObjectNode> mutate)
       throws Exception {
     ObjectNode source =
@@ -1758,9 +2106,64 @@ class UmlValidationTest {
     assertThat(error.path()).isEqualTo(expectedPath);
   }
 
+  private static void assertUmlStateMachineMutationRejected(
+      Consumer<ObjectNode> mutate, String expectedPath) throws Exception {
+    Fixture fixture = loadMutatedUmlStateMachineFixture(mutate);
+
+    UmlValidationException error = assertRejected(fixture);
+
+    assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
+    assertThat(error.path()).isEqualTo(expectedPath);
+  }
+
+  private static void addRegion(ObjectNode source, String id, String stateMachine) {
+    ObjectNode region = ((ArrayNode) source.get("nodes")).addObject();
+    region.put("id", id).put("type", "Region").put("label", id);
+    region.putObject("properties").putObject("uml").put("state_machine", stateMachine);
+  }
+
+  private static void addPseudostate(ObjectNode source, String id, String region, String kind) {
+    ObjectNode pseudostate = ((ArrayNode) source.get("nodes")).addObject();
+    pseudostate.put("id", id).put("type", "Pseudostate").put("label", id);
+    pseudostate.putObject("properties").putObject("uml").put("region", region).put("kind", kind);
+  }
+
+  private static void addTransition(
+      ObjectNode source, String id, String from, String to, String region) {
+    ObjectNode transition = ((ArrayNode) source.get("relationships")).addObject();
+    transition.put("id", id).put("type", "Transition").put("source", from).put("target", to);
+    transition.put("label", id);
+    transition
+        .putObject("properties")
+        .putObject("uml")
+        .put("region", region)
+        .put("kind", "external");
+  }
+
+  private static void removeRelationship(ObjectNode source, String id) {
+    ArrayNode relationships = (ArrayNode) source.get("relationships");
+    for (int index = relationships.size() - 1; index >= 0; index--) {
+      if (id.equals(relationships.get(index).get("id").asText())) {
+        relationships.remove(index);
+      }
+    }
+  }
+
   private static Arguments fragmentRejectionCase(
       String name, Consumer<ObjectNode> mutation, String expectedPath) {
     return arguments(named(name, mutation), expectedPath);
+  }
+
+  /**
+   * The warnings for dediren's own sequence-layout rules — the two the UML specification does not
+   * impose, which used to be errors and rejected spec-legal interleavings.
+   */
+  private static List<dev.dediren.contracts.Diagnostic> houseRuleWarnings(Fixture fixture)
+      throws Exception {
+    return Uml.validateSource(fixture.source(), fixture.pluginData()).stream()
+        .filter(d -> d.code().equals("DEDIREN_UML_SEQUENCE_HOUSE_RULE"))
+        .filter(d -> d.severity() == dev.dediren.contracts.DiagnosticSeverity.WARNING)
+        .toList();
   }
 
   private static UmlValidationException assertRejected(Fixture fixture) {

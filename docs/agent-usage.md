@@ -266,10 +266,20 @@ the policy's optional `views` map (`"views": {"<view-id>":
 {"diagram_identifier"?, "diagram_name"?}}`), else the source-derived default
 (`id-diagram-<view-id>` and the view's label). Other UML families still get their
 per-view `xmi.xml` (model content only); diagram interchange for them is a later
-slice. The UMLDI dialect is **provisional** — it is not yet verified against a
-real UML tool's importer, and (like the UML namespace) has no normative OMG DI
-XSD, so its `di:`/`dc:`/`umldi:` content rides the same tolerated
-no-declaration gap the `uml:` model content does.
+slice.
+
+The UMLDI dialect is **provisional in one specific sense: no UML tool has been
+observed rendering it.** Its spelling is not in doubt. UML 2.5.1 Annex B is
+normative and defines the UMLDI metamodel, which the emitted diagram element and
+its `isFrame` attribute follow; the `dc:`/`di:` geometry follows the OMG's
+published DD serialization schemas, whose `20100524` namespaces are what every
+deployed DD-based dialect uses. (DD 1.1 exists and stamps its metamodel files
+`20131001`, but that stamp is not an XML namespace — emitting it would produce
+documents no DD-aware tool can read.)
+
+Like the UML namespace, there is no normative OMG DI XSD, so this content rides
+the same tolerated no-declaration gap the `uml:` model content does. Treat a
+UMLDI document as structurally correct and not yet render-verified.
 
 ## ArchiMate Handoff
 
@@ -302,13 +312,57 @@ relationship's semantics, so direction matters (for example `ApplicationComponen
 --Realization--> ApplicationService` is valid but the reverse `ApplicationService
 --Realization--> ApplicationComponent` is diagnosed, and `ApplicationFunction
 --Access--> DataObject` is valid but `Access` to a non-passive target is
-diagnosed). `Association` is always accepted (the unspecified relationship), and
-`Grouping`/`Location` connect to anything. The check is a sound
-under-approximation of ArchiMate Appendix B: it never rejects a valid combination
-except a small, deliberately-rejected §5-contradicted set — dynamic
-relationships (Triggering/Flow) touching motivation or passive elements, and
-Assignment from passive, motivation, event, or service sources — and it does
-not compute the full derivation closure, so some invalid pairs still pass.
+diagnosed). `Association` is always accepted (the unspecified relationship).
+`Grouping` and `Location` are universal in the conditional sense §B.6 states:
+they take part in a relationship whenever the other endpoint could itself take
+part in it, so `Grouping --Access--> DataObject` is accepted while
+`Grouping --Access--> BusinessProcess` is not — no element is a legal `Access`
+target there.
+
+The check is a sound under-approximation of ArchiMate Appendix B: it never
+rejects a valid combination except a small, deliberately-rejected
+§5-contradicted set — dynamic relationships (Triggering/Flow) touching
+motivation or passive elements, and Assignment from passive, motivation, event,
+or service sources.
+
+**A green `validate` is not a conformance certificate.** About one endpoint
+combination in eight that Appendix B forbids is still accepted — measured
+against the specification's own relationship table, the model rejects 88.2% of
+them and falsely rejects none. That is a design point rather than a bug backlog: the rules are expressed over the generic
+metamodel's element categories rather than by reproducing Appendix B's tables,
+and they do not compute the full derivation closure. Three specific gaps are
+worth knowing when a model matters:
+
+- Containment is decided on element *category*, not element type, so a business
+  actor composing an application component passes. Tightening it is not simply a
+  matter of stricter equality — a business process composed of business
+  functions is legal and must stay so.
+- §B.4's domain crossings *are* enforced (Motivation, Strategy, Core,
+  Implementation & Migration), as are `Product`'s closed containment list
+  (§8.5.1) and grouping/location/plateau containment (§B.6). What is not
+  computed is Appendix B's derivation closure, which is where most of the
+  remaining residue lives.
+
+A model that must be legal in Archi or Enterprise Architect should be checked
+there. `dediren validate` catches the bulk of endpoint errors early; it does not
+replace the tool that owns the standard.
+
+**Relationship attributes are not modelled.** `Access` carries no `accessType`
+(read / write / read-write / access), `Influence` no sign or strength, and
+`Association` no directedness — the exchange format defines enumerations for the
+first two, and an export simply omits them. A read-only access and a write
+access are the same edge in both the SVG and the OEF. Relationships also cannot
+be relationship endpoints, so §5.2.4's association-to-a-relationship has no
+expression.
+
+**`viewpoint` is a required free string.** It is copied verbatim into the
+exported view, and the exchange format types it as a union that accepts any
+string, so any value exports cleanly. A name outside the format's own viewpoint
+vocabulary draws a `warn` `DEDIREN_OEF_VIEWPOINT_UNKNOWN` with the nearest
+known name when it looks like a typo. The specification's per-viewpoint content
+restrictions (§13.4 — which element types each viewpoint admits) are not
+enforced at all: declaring `"Layered"` does not constrain what the view may
+contain.
 
 ```bash
 "$BUNDLE/bin/dediren" validate \
@@ -321,15 +375,78 @@ Continue with the Bundle Smoke Workflow commands, using
 `--policy "$BUNDLE/fixtures/render-policy/archimate-svg.json"` for ArchiMate
 SVG notation, and the OEF export under `## Export`.
 
+## UML Class Handoff
+
+The `uml-class` and `uml-data` view kinds carry classifiers and their
+relationships. Author `Package`, `Class`, `Interface`, `DataType`, and
+`Enumeration` nodes; classifiers nest under the `Package` they declare via
+`properties.uml.package`. Use `fixtures/source/valid-uml-basic.json` for the
+class MVP and `valid-uml-complex.json` for a fuller one.
+
+Class members are authored on the node, and are the surface most easily missed
+because they live inside `properties.uml`:
+
+```json
+{
+  "id": "order-service",
+  "type": "Class",
+  "label": "OrderService",
+  "properties": {
+    "uml": {
+      "attributes": [
+        { "name": "id", "type": "String", "visibility": "private",
+          "multiplicity": "1" }
+      ],
+      "operations": [
+        { "name": "placeOrder", "visibility": "public", "return_type": "Order",
+          "parameters": [ { "name": "request", "type": "OrderRequest" } ] }
+      ]
+    }
+  }
+}
+```
+
+`visibility` takes exactly `public`, `private`, `protected` or `package`
+(§7.4.4.3 `VisibilityKind`); any other value is rejected with
+`DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED`. It is case-sensitive and not
+trimmed — `"Private"` and `"protected "` are errors, not synonyms. SVG renders
+it as `+`, `-`, `#` or `~`, and XMI emits it verbatim, so the two agree.
+
+`multiplicity` accepts `*`, a non-negative integer, or a `lower..upper` range
+whose upper bound may be `*`. Both bounds are integers here; the specification
+allows any ValueSpecification, so an expression-valued bound cannot be authored.
+`0..0` is legal and means the property is always empty.
+
+Operation `parameters` carry `name` and `type` only. `ParameterDirectionKind`
+has four values and dediren models the two that need no surface — every
+parameter is emitted `in`, and the return type as `return`. **An `out` or
+`inout` parameter cannot be expressed, and authoring one as an ordinary
+parameter exports it as `in`**, silently changing the signature's meaning. Model
+such an operation's outputs in the return type, or note the direction in the
+name, until a direction surface exists.
+
+This is also the only family that emits UMLDI diagram interchange — see the
+UMLDI paragraph under `## Export`.
+
+## UML Export Contract
+
 A `uml-xmi` export represents the single laid-out view it is handed, not the
-whole source model. It emits conformant UML 2.5.1 abstract syntax for whatever
-view kind is exported: class/data classifiers and their relationships
-(`Association`, `Aggregation`, `Composition`, `Dependency`, `Realization`,
-`Generalization`) with operation signatures; use-case actors, use cases, and
-their associations; activities with partitions and edge guards; state machines
-with transition triggers, guards, and effects; components with typed ports and
-interface realizations; and deployments with nested nodes, deployments, and
-manifestations. Classifiers nest under the `Package` they declare via
+whole source model. It emits UML 2.5.1 abstract syntax for whatever view kind is
+exported: class/data classifiers and their relationships (`Association`,
+`Aggregation`, `Composition`, `Dependency`, `Realization`, `Generalization`)
+with operation signatures; use-case actors, use cases, and their associations;
+activities with partitions and edge guards; state machines with transition
+triggers, guards, and effects; components with typed ports and their
+realizations; and deployments with nested nodes, deployments, and
+manifestations.
+
+**Two known departures from the abstract syntax**, both recorded rather than
+claimed away. A class-to-interface `Realization` emits `uml:Realization`, where
+§10.5.6 defines an `InterfaceRealization` nested under the implementing
+classifier and naming its `contract`; component realization is likewise emitted
+as the generic metaclass. And every `Association` end is emitted non-navigable
+in both directions, which is an assertion rather than an omission — there is no
+source surface for navigability to carry the intent. Classifiers nest under the `Package` they declare via
 `properties.uml.package`. When the source model contains elements or
 relationships outside the exported view — or in-view content the UML/XMI mapping
 could not represent — the export declares them (rather than dropping them
@@ -647,6 +764,32 @@ and `par`. Keep message `sequence` values unique within an interaction, keep
 each operand's `fragments` list in sequence order, and do not leave standalone
 messages inside a combined fragment's owned sequence span.
 
+`message_sort` drives the line: `reply` and `createMessage` draw dashed, every
+other sort solid. `deleteMessage` draws its destruction cross but keeps the
+ordinary arrowhead rather than the filled one §17.4 shows.
+
+An `ExecutionSpecification` is the activation bar: it names the lifeline it
+`covered`s and the `start` / `finish` **messages** that bound it. The export
+resolves each bound to the occurrence on that lifeline — the receive event when
+the message arrives there, the send event when it leaves — and emits
+`uml:BehaviorExecutionSpecification`. Use
+`fixtures/source/valid-uml-sequence-lifecycle.json` for a template carrying one
+alongside a `createMessage` and a `deleteMessage`.
+
+A `deleteMessage` targets a `DestructionOccurrenceSpecification` node naming the
+`covered` lifeline it destroys, and nothing on that lifeline may follow it —
+§17.12.6.4 makes the destruction the last event on its lifeline, so a later
+message at either end is rejected. Other lifelines carry on unaffected.
+
+Two rules here are **dediren's, not UML's**, and are reported as `warn`
+`DEDIREN_UML_SEQUENCE_HOUSE_RULE` rather than enforced: a nested fragment's
+`covered` lifelines being contained by its parent's, and a combined fragment's
+owned messages being contiguous in sequence. UML's ordering is partial and
+permits interleavings both rules describe — `critical` exists precisely because
+ordinary fragments are not protected from interleaving — so a model that trips
+either is legal and is exported as authored. The warning says the sequence
+layout assumes otherwise and the diagram may not read as intended.
+
 ```bash
 "$BUNDLE/bin/dediren" validate \
   --plugin generic-graph \
@@ -746,9 +889,26 @@ Supported vocabulary: `StateMachine`, `Region`, `State`, `FinalState`,
 `Pseudostate`, `Transition`. Pseudostate kinds: `initial`, `deepHistory`,
 `shallowHistory`, `join`, `fork`, `junction`, `choice`, `entryPoint`,
 `exitPoint`, `terminate`. Transition kinds: `internal`, `local`, `external`.
+
+A `Region` names its `state_machine`; a `State` never owns Regions, so
+**composite states are not expressible** and neither is anything defined in terms
+of them. A Transition may connect vertices in different Regions of the same
+StateMachine (§14.5.11.8 constrains `containingStateMachine()`, not the Region),
+but not across StateMachines. Validated: the §14.5.6.7 pseudostate degree rules
+(a `fork` takes one incoming and at least two outgoing, a `join` the reverse, a
+`junction` or `choice` at least one of each, an `initial` or history vertex at
+most one outgoing), §14.5.8.6 region cardinality (at most one `initial` and one
+of each history kind per Region), and §14.5.11.8's `state_is_internal` — an
+`internal` transition must have a `State` source and equal endpoints.
+
+Not validated, because each turns on composite states: the `local` and `external`
+constraints of §14.5.11.8, the fork/join segment guard rules, and the
+`entryPoint`/`exitPoint`/`terminate` degree constraints. Declaring
+`kind: "local"` or `"external"` is accepted without its clause being checked.
+
 Deferred/non-goals: `ConnectionPointReference`, `ProtocolStateMachine`,
-`ProtocolTransition`, submachine states, orthogonal multi-region internals,
-trigger event metaclasses, effects as behavior nodes, and UMLDI.
+`ProtocolTransition`, submachine states, composite and orthogonal multi-region
+states, trigger event metaclasses, effects as behavior nodes, and UMLDI.
 
 ## UML Use Case Handoff
 
@@ -1175,6 +1335,45 @@ internals), `DEDIREN_LAYOUT_*` (layout quality gates), `DEDIREN_GENERIC_GRAPH_*`
 Their `message` and `path` are written to be self-repairing: follow the
 instruction in the message, and report any such code that persists after you
 have done so.
+
+### What a green command can still cost you
+
+Most codes above name something to fix in your input. These do not — they report
+that a stage carried less than it was given, and there is nothing to repair in
+the source JSON. Read them from `.diagnostics[]`; the envelope `status` stays
+`ok` or `warning`, so a caller checking only the status will miss them.
+
+- `DEDIREN_OEF_GEOMETRY_CLAMPED` (`warn`) — the exchange format types diagram
+  coordinates as non-negative integers and sizes as positive integers, which is
+  narrower than a layout result. A value outside that range is rounded and
+  clamped, and the exported node or bendpoint sits where the format allows
+  rather than where the layout put it. **The layout engine can produce such a
+  value itself**, so this is not always avoidable by editing input.
+- `DEDIREN_OEF_PROPERTY_FLATTENED` (`warn`) — an object or array property value
+  rendered as JSON text, because the exchange format carries property values as
+  text. Well-formed and valid; unrecoverable as structure on import.
+- `DEDIREN_OEF_VIEWPOINT_UNKNOWN` (`warn`) — the viewpoint is outside the
+  format's own vocabulary. The export is schema-valid; an importing tool will
+  show it as unrecognized.
+- `DEDIREN_XMI_ELEMENTS_OMITTED` / `DEDIREN_XMI_RELATIONSHIPS_OMITTED` (`info`)
+  — content outside the exported view, or in-view content the UML/XMI mapping
+  cannot represent. The message says which.
+- `DEDIREN_OEF_VIEWS_OMITTED` (`info`) — declared views this export does not
+  carry.
+- `DEDIREN_ARCHIMATE_RELATIONSHIP_DEPRECATED` (`info`) — a relationship the
+  standard deprecates but still permits. Today that is
+  `WorkPackage -[Realization]-> Deliverable`, which §12.1 replaces with an
+  access relationship. The model is legal; a future revision may remove the
+  edge.
+- `DEDIREN_UML_SEQUENCE_HOUSE_RULE` (`warn`) — a sequence rule dediren enforces
+  that UML does not. The model is spec-legal and is exported as authored; the
+  warning says the rendered diagram may not read as intended. See the two named
+  in `## UML Sequence Handoff`.
+
+Two losses have **no diagnostic at all**, because they are properties of the
+mapping rather than of any one document: `out`/`inout` parameters export as
+`in`, and ArchiMate `Access`/`Influence`/`Association` attributes are not
+modelled. Both are described where they are authored, above.
 
 ## Migration
 

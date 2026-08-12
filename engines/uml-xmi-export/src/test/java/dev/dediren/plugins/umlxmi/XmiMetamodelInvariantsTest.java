@@ -146,6 +146,25 @@ class XmiMetamodelInvariantsTest {
     }
   }
 
+  // ---- M-PORT-AGG: a Port's aggregation is composite (§11.8, port_aggregation)
+  // -------------------
+
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("committedGoldens")
+  void everyPortIsComposite(Path golden) throws Exception {
+    for (Element attribute : elementsByTag(parse(golden), "ownedAttribute")) {
+      if (!"uml:Port".equals(attribute.getAttributeNS(XmiHelpers.XMI_NS, "type"))) {
+        continue;
+      }
+      // The neighbouring M-PORT rule checks the DERIVED properties are absent and is silent on this
+      // one, so every emitted Port satisfied that rule while violating this one. §11.8 states it
+      // without qualification: "Port.aggregation must be composite."
+      assertThat(attribute.getAttribute("aggregation"))
+          .describedAs("Port aggregation= in %s", golden)
+          .isEqualTo("composite");
+    }
+  }
+
   // ---- M-PARAMS: an Operation emits one ownedParameter per source parameter + return (§9.6) -----
 
   static Stream<Arguments> operationBearingFixtures() {
@@ -243,6 +262,9 @@ class XmiMetamodelInvariantsTest {
         .isEqualTo("uml:Node"); // not an Artifact → M-DEPLOY would fail
     assertThat(port.hasAttribute("provided")).isTrue(); // → M-PORT would fail
     assertThat(port.hasAttribute("type")).isTrue();
+    // no aggregation= at all → M-PORT-AGG would fail. Costs one line here because the broken
+    // document already omits it — which is exactly how every real golden looked.
+    assertThat(port.hasAttribute("aggregation")).isFalse();
     // parent is uml:Model, not a classifier → M-GEN would fail
     assertThat(((Element) looseGeneralization.getParentNode()).getLocalName()).isEqualTo("Model");
   }

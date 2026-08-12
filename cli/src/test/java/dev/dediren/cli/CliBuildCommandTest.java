@@ -323,7 +323,7 @@ class CliBuildCommandTest {
     String modelUml = Files.readString(out.resolve("model.uml.xml"), StandardCharsets.UTF_8);
     // One model section; one diagram per classifier-family view (class + data), activity excluded.
     assertThat(countOccurrences(modelUml, "<uml:Model ")).isEqualTo(1);
-    assertThat(countOccurrences(modelUml, "<umldi:UMLDiagram ")).isEqualTo(2);
+    assertThat(countOccurrences(modelUml, "<umldi:UMLClassDiagram ")).isEqualTo(2);
     // Default diagram identity is the source-derived id-diagram-<view-id>.
     assertThat(modelUml)
         .contains("dediren-provenance")

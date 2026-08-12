@@ -20,17 +20,49 @@ import java.util.Map;
  * emitted model element's {@code xmi:id}. Mirrors the ArchiMate-OEF {@code writeViewBody} / {@code
  * writeConnectionGeometry} geometry-emission pattern.
  *
- * <p><strong>Provisional dialect.</strong> The OMG DD/DI namespace URIs and element vocabulary
- * below are pinned by spec knowledge, not by real-tool render verification (that probe is deferred;
- * see the UMLDI plan). They are isolated as named constants so a later Eclipse Papyrus / Sparx EA
- * import probe can correct them in one place, and a GMF-notation companion dialect can be added
- * separately. Shape/edge/diagram {@code xmi:id}s are minted from the caller's shared {@link
- * IdentifierMap} so they stay globally unique across the whole {@code xmi:XMI} document.
+ * <p><strong>Provisional dialect — in one sense only.</strong> The namespace URIs and element
+ * vocabulary below are verified against the OMG's published schemas (see the next paragraph); what
+ * is unverified is whether a real UML tool <em>renders</em> the result, which is the deferred
+ * Eclipse Papyrus / Sparx EA import probe. They stay isolated as named constants so that probe can
+ * correct them in one place if it ever contradicts the schemas, and so a GMF-notation companion
+ * dialect can be added separately. Shape/edge/diagram {@code xmi:id}s are minted from the caller's
+ * shared {@link IdentifierMap} so they stay globally unique across the whole {@code xmi:XMI}
+ * document.
+ *
+ * <p><strong>The {@code dc:}/{@code di:} naming and namespace dates are settled and must not be
+ * "modernised".</strong> The 2026-08-12 conformance register raised two hypotheses here ({@code
+ * UML-XMI-14}, {@code UML-XMI-15}); both were checked against the OMG's published schemas and both
+ * are wrong. Recorded because acting on either would break interoperability:
+ *
+ * <ul>
+ *   <li>The apparent mixed convention — {@code dc:Bounds} capitalised like a type, {@code
+ *       di:waypoint} lowercase like a property — is exactly what the DD schemas specify. {@code
+ *       DC.xsd} declares a <em>global</em> element {@code <xsd:element name="Bounds"
+ *       type="dc:Bounds"/>}, named after its type; {@code waypoint} is a <em>local</em> element
+ *       inside {@code Edge}, typed {@code dc:Point}, and {@code DI.xsd} sets {@code
+ *       elementFormDefault="qualified"}, so it carries the {@code di:} prefix. Both spellings are
+ *       correct, for different reasons.
+ *   <li>The {@code 20100524} date is the {@code targetNamespace} of those serialization schemas,
+ *       not a stale DD 1.0 reference. DD 1.1 does exist and stamps its <em>metamodel</em> XMI files
+ *       {@code 20131001}, but that stamp never became an XML namespace: every deployed DD-based
+ *       dialect, BPMN DI included, serializes into {@code .../DD/20100524/}. Changing these
+ *       constants to {@code 20131001} would produce documents no DD-aware tool can read.
+ * </ul>
+ *
+ * <p>What remains genuinely unverified is whether a UML tool <em>renders</em> the result — the
+ * Papyrus / Sparx EA import probe in §12. That is a different question from whether the dialect is
+ * spelled correctly, which it is.
  */
 public final class DiagramWriter {
   private DiagramWriter() {}
 
-  /** OMG Diagram Definition (DD) shared packages plus UML Diagram Interchange. Provisional. */
+  /**
+   * OMG Diagram Definition (DD) shared packages plus UML Diagram Interchange.
+   *
+   * <p>The {@code 20100524} date is deliberate and is pinned by {@code
+   * DiagramWriterConformanceTest} — it is the {@code targetNamespace} of the DD serialization
+   * schemas, not a stale reference to DD 1.0. See the class javadoc before changing it.
+   */
   public static final String UMLDI_NS = "http://www.omg.org/spec/UML/20161101/UMLDI";
 
   public static final String DI_NS = "http://www.omg.org/spec/DD/20100524/DI";
@@ -60,11 +92,18 @@ public final class DiagramWriter {
       }
     }
 
-    xml.append("<umldi:UMLDiagram xmi:id=\"")
+    // UML 2.5.1 Annex B is normative and IS the UMLDI metamodel. umldi:UMLDiagram is an ABSTRACT
+    // class there (B.7.13); a conforming importer cannot instantiate it. UMLClassDiagram is the
+    // concrete kind for the class family, which is the only family this lane emits DI for.
+    //
+    // isFrame defaults to true, and B's no-frame-no-heading invariant then makes a heading:UMLLabel
+    // mandatory -- one is never emitted, so every diagram violated it. Declaring isFrame="false"
+    // satisfies the invariant honestly rather than inventing a heading the model does not have.
+    xml.append("<umldi:UMLClassDiagram xmi:id=\"")
         .append(attr(identity.identifier()))
         .append("\" name=\"")
         .append(attr(identity.name()))
-        .append("\">");
+        .append("\" isFrame=\"false\">");
     for (LaidOutNode node : layout.nodes()) {
       String shapeId = shapeIds.get(node.id());
       String modelElement = elementXmiIds.get(node.sourceId());
@@ -106,7 +145,7 @@ public final class DiagramWriter {
       writeWaypoints(xml, edge.points());
       xml.append("</umldi:UMLEdge>");
     }
-    xml.append("</umldi:UMLDiagram>");
+    xml.append("</umldi:UMLClassDiagram>");
   }
 
   private static void writeWaypoints(StringBuilder xml, List<Point> points) {

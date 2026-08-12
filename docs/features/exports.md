@@ -1,8 +1,15 @@
 # Exports (OEF & XMI)
 
-Beyond SVG, Dediren exports standards XML: ArchiMate 3.2 Open Exchange Format
+Beyond SVG, Dediren exports standards XML: the ArchiMate Open Exchange Format
 (OEF) and UML 2.5.1 XMI. Export consumes the **source** model and the **layout
 result** together and writes XML to `.data.content`.
+
+The two version numbers here are different things and are easy to conflate. The
+modelling **vocabulary** is ArchiMate 3.2 — that is the element and relationship
+set the `archimate` profile accepts. The **exchange format** is OEF 3.1, which
+is the latest The Open Group publishes; there is no 3.2 OEF XSD to validate
+against. An emitted document therefore carries 3.2 vocabulary inside a 3.1
+envelope, and staging "3.2 OEF XSDs" will find nothing.
 
 [← Back to feature index](README.md)
 
@@ -97,12 +104,56 @@ relationship. This keeps evidence-classification markers (for example
 `candidate-from-source`, a confidence score, or a source path) attached to the
 exported concept instead of being dropped.
 
+Each definition is typed by the values that key actually carries: JSON booleans
+become `boolean`, JSON numbers become `number`, and everything else becomes
+`string`, so a consuming tool can type-filter and sort rather than treating every
+property as text. Definitions are model-level and keyed by name, so one key used
+with different value types across concepts is declared `string` — the only one of
+the format's six data types that represents them all. The remaining three
+(`currency`, `date`, `time`) have no JSON counterpart to detect and are never
+inferred. A `<value>` is text, so an object or array value can only be carried as
+its JSON rendering; that is unrecoverable as structure on import, and each
+occurrence is declared with a `warn` diagnostic
+`DEDIREN_OEF_PROPERTY_FLATTENED` naming the key and its source path.
+
+The `viewpoint` a view declares is copied through verbatim, because the exchange
+format types it as a union that accepts any string — a tool-specific or
+organization-specific viewpoint is legitimate. A name outside the format's own
+viewpoint vocabulary is therefore exported, not rejected, with a `warn`
+diagnostic `DEDIREN_OEF_VIEWPOINT_UNKNOWN` that offers the nearest known name
+when the value looks like a typo.
+
+Render-policy styling deliberately does not cross into OEF. The format's
+`<style>` carries fill, line and font choices, but those are dediren's rendering
+decisions for its own SVG, not properties of the model; emitting them would push
+one tool's presentation into every consumer that imports the file. An OEF export
+therefore carries structure, geometry and identity, and leaves appearance to the
+importing tool.
+
+Grouping containment crosses into OEF as structure, not just geometry: the view
+nodes laid out inside a semantic `Grouping` are emitted as nested `<node>`
+children of that grouping's own node, so an importing tool reconstructs the
+containment instead of seeing overlapping sibling boxes. Nesting is recursive
+(a grouping inside a grouping nests), coordinates stay absolute to the diagram,
+and purely visual layout bands — which are not ArchiMate concepts — are not
+emitted, with their members owned by the nearest enclosing semantic grouping.
+
 A standalone OEF export renders exactly the one laid-out view it is handed. When
 the source declares more views than the exported one, the omission is declared
 (not silently dropped) with an `info` diagnostic `DEDIREN_OEF_VIEWS_OMITTED` that
 names the omitted view ids and counts; the envelope `status` stays `ok`. Read
 `.diagnostics[]` to see which diagrams a given OEF does not carry, and export the
 other views to represent them.
+
+The exchange format types diagram coordinates as `xs:nonNegativeInteger` and
+sizes as `xs:positiveInteger`, which is narrower than the plain numbers
+`layout-result.schema.json` permits — and a layout engine can legitimately place
+a node at a negative coordinate. Rather than fail the export on its last stage
+for geometry the caller cannot repair, the exporter rounds to integers and
+clamps whatever falls outside those ranges, declaring each clamp with a `warn`
+diagnostic `DEDIREN_OEF_GEOMETRY_CLAMPED` that names the original value and its
+layout-result path. A clamped export is usable; the affected node or bendpoint
+sits where the exchange schema allows rather than where the layout put it.
 
 For whole-model interchange, `dediren build` with `--oef-policy` also composes
 `model.oef.xml` at the output root — one document carrying every built view's

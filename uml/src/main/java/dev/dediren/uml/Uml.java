@@ -8,6 +8,7 @@ import static dev.dediren.uml.UmlProperties.requireNodeType;
 import static dev.dediren.uml.UmlProperties.requiredTextArrayEntry;
 import static dev.dediren.uml.UmlProperties.requiredTextProperty;
 
+import dev.dediren.contracts.Diagnostic;
 import dev.dediren.contracts.source.GenericGraphPluginData;
 import dev.dediren.contracts.source.GenericGraphView;
 import dev.dediren.contracts.source.GenericGraphViewKind;
@@ -17,12 +18,45 @@ import dev.dediren.contracts.source.SourceRelationship;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import tools.jackson.databind.JsonNode;
 
 public final class Uml {
   private static final List<String> STRUCTURAL_TYPES =
       List.of("Package", "Class", "Interface", "DataType", "Enumeration", "Component");
+
+  /**
+   * The element types that are Classifiers (&sect;9.2), and so are also Types (&sect;7.3.3).
+   *
+   * <p>Association ends are typed by Type (&sect;11.5.3.1) and Generalization ends by Classifier
+   * (&sect;9.9.7.5); dediren models no Type that is not a Classifier, so one set serves both.
+   * {@code Package} is neither (&sect;12.4.5.3), while Actor, UseCase and the deployment
+   * classifiers all are &mdash; the single six-name structural predicate that used to stand here
+   * was wrong in both directions at once.
+   */
+  private static final Set<String> CLASSIFIER_TYPES =
+      Set.of(
+          "Class",
+          "Interface",
+          "DataType",
+          "Enumeration",
+          "Component",
+          "Actor",
+          "UseCase",
+          "Node",
+          "Device",
+          "ExecutionEnvironment",
+          "Artifact",
+          "DeploymentSpecification");
+
+  /**
+   * §18.2.1.4: an Actor's Associations reach UseCases, Components and Classes, and nothing else.
+   * Wider than the Actor&harr;UseCase pair the rules allowed, and still a real restriction.
+   */
+  private static final Set<String> ACTOR_ASSOCIATION_PARTNERS =
+      Set.of("UseCase", "Component", "Class");
+
   private static final List<String> ACTIVITY_TYPES =
       List.of(
           "Activity",
@@ -108,8 +142,9 @@ public final class Uml {
     return COMPACT_ACTIVITY_NODE_TYPES.contains(value);
   }
 
-  public static void validateSource(SourceDocument source, GenericGraphPluginData pluginData)
-      throws UmlValidationException {
+  public static List<Diagnostic> validateSource(
+      SourceDocument source, GenericGraphPluginData pluginData) throws UmlValidationException {
+    var diagnostics = new java.util.ArrayList<Diagnostic>();
     var nodeTypes = new HashMap<String, String>();
     var nodeUmlProperties = new HashMap<String, JsonNode>();
     var nodePaths = new HashMap<String, String>();
@@ -144,6 +179,7 @@ public final class Uml {
       SourceNode node = source.nodes().get(nodeIndex);
       validateElementType(node.type(), "$.nodes[" + nodeIndex + "].type");
       validateNodeMultiplicities(nodeIndex, node.properties().get("uml"));
+      validateNodeVisibilities(nodeIndex, node.properties().get("uml"));
     }
 
     for (int relationshipIndex = 0;
@@ -172,19 +208,22 @@ public final class Uml {
 
     for (int nodeIndex = 0; nodeIndex < source.nodes().size(); nodeIndex++) {
       SourceNode node = source.nodes().get(nodeIndex);
-      validateUmlNodeProperties(
-          node.id(),
-          node.type(),
-          node.properties().get("uml"),
-          "$.nodes[" + nodeIndex + "]",
-          context);
+      diagnostics.addAll(
+          validateUmlNodeProperties(
+              node.id(),
+              node.type(),
+              node.properties().get("uml"),
+              "$.nodes[" + nodeIndex + "]",
+              context));
     }
     validateTransitionRegionConsistency(source.relationships(), context);
+    validateStateVertexConstraints(source.nodes(), context);
     validateUseCaseRelationships(source.relationships(), context);
     UmlSequenceValidation.validateCombinedFragmentNesting(source.nodes(), context);
     UmlSequenceValidation.validateInteractionOperandOwnerSelection(source.nodes(), context);
     UmlSequenceValidation.validateInteractionFragmentOwnership(source.nodes(), context);
-    UmlSequenceValidation.validateCombinedFragmentSequenceContiguity(source.nodes(), context);
+    diagnostics.addAll(
+        UmlSequenceValidation.validateCombinedFragmentSequenceContiguity(source.nodes(), context));
 
     for (int viewIndex = 0; viewIndex < pluginData.views().size(); viewIndex++) {
       var view = pluginData.views().get(viewIndex);
@@ -217,20 +256,29 @@ public final class Uml {
         validateUmlDeploymentViewProperties(viewIndex, view, context);
       }
     }
+
+    // Last: this reads a destruction occurrence's own properties, so the node-level rules that
+    // check those properties should have their say first — a model that is wrong in both ways
+    // deserves the more specific diagnostic.
+    UmlSequenceValidation.validateNoOccurrencesBelowDestruction(
+        source.relationships(), source.nodes(), context);
+    return List.copyOf(diagnostics);
   }
 
-  private static void validateUmlNodeProperties(
+  private static List<Diagnostic> validateUmlNodeProperties(
       String nodeId,
       String nodeType,
       JsonNode umlProperties,
       String path,
       ValidationContext context)
       throws UmlValidationException {
+    var diagnostics = new java.util.ArrayList<Diagnostic>();
     if ("CombinedFragment".equals(nodeType)) {
       UmlSequenceValidation.validateCombinedFragmentProperties(
           nodeId, umlProperties, path, context);
     } else if ("InteractionOperand".equals(nodeType)) {
-      UmlSequenceValidation.validateInteractionOperandProperties(umlProperties, path, context);
+      diagnostics.addAll(
+          UmlSequenceValidation.validateInteractionOperandProperties(umlProperties, path, context));
     } else if ("Region".equals(nodeType)) {
       validateRegionProperties(umlProperties, path, context);
     } else if (isStateVertexType(nodeType)) {
@@ -244,6 +292,7 @@ public final class Uml {
     } else if ("ExecutionEnvironment".equals(nodeType)) {
       validateExecutionEnvironmentProperties(umlProperties, path, context);
     }
+    return diagnostics;
   }
 
   private static void validateUmlSequenceViewProperties(
@@ -401,13 +450,7 @@ public final class Uml {
   }
 
   public static void validateElementType(String value, String path) throws UmlValidationException {
-    if (!isStructuralType(value)
-        && !isActivityType(value)
-        && !isSequenceType(value)
-        && !isStateMachineType(value)
-        && !isUseCaseType(value)
-        && !isComponentType(value)
-        && !isDeploymentType(value)) {
+    if (!isNamedElementType(value)) {
       throw new UmlValidationException(UmlTypeKind.ELEMENT, value, path);
     }
   }
@@ -423,11 +466,20 @@ public final class Uml {
       String relationshipType, String sourceType, String targetType, String path)
       throws UmlValidationException {
     boolean endpointsSupported;
-    if (STRUCTURAL_RELATIONSHIP_TYPES.contains(relationshipType)) {
+    // The structural relationships do not share one type system. Association and its containment
+    // variants take Types, Generalization takes Classifiers, and the dependency-derived ones take
+    // NamedElements — which is nearly everything, Packages included.
+    if ("Association".equals(relationshipType)
+        || "Composition".equals(relationshipType)
+        || "Aggregation".equals(relationshipType)) {
       endpointsSupported =
-          isStructuralType(sourceType) && isStructuralType(targetType)
-              || "Association".equals(relationshipType)
-                  && isActorUseCasePair(sourceType, targetType);
+          isClassifierType(sourceType)
+              && isClassifierType(targetType)
+              && isActorAssociationLegal(sourceType, targetType);
+    } else if ("Generalization".equals(relationshipType)) {
+      endpointsSupported = isClassifierType(sourceType) && isClassifierType(targetType);
+    } else if ("Realization".equals(relationshipType) || "Dependency".equals(relationshipType)) {
+      endpointsSupported = isNamedElementType(sourceType) && isNamedElementType(targetType);
     } else if (ACTIVITY_FLOW_TYPES.contains(relationshipType)) {
       endpointsSupported = isActivityType(sourceType) && isActivityType(targetType);
     } else if ("Message".equals(relationshipType)) {
@@ -439,7 +491,9 @@ public final class Uml {
     } else if ("Include".equals(relationshipType) || "Extend".equals(relationshipType)) {
       endpointsSupported = "UseCase".equals(sourceType) && "UseCase".equals(targetType);
     } else if ("Usage".equals(relationshipType)) {
-      endpointsSupported = isComponentUsageSource(sourceType) && isStructuralType(targetType);
+      // §7.8.23.3 gives Usage no constraint beyond Dependency's, so the canonical «use» from a
+      // Class to an Interface is legal; the Component/Port source restriction had no spec basis.
+      endpointsSupported = isNamedElementType(sourceType) && isNamedElementType(targetType);
     } else if ("Deployment".equals(relationshipType)) {
       endpointsSupported = isDeployedArtifactType(sourceType) && isDeploymentTargetType(targetType);
     } else if ("Manifestation".equals(relationshipType)) {
@@ -469,6 +523,47 @@ public final class Uml {
   public static void validateMultiplicity(String value, String path) throws UmlValidationException {
     if (!isValidMultiplicity(value)) {
       throw new UmlValidationException(UmlTypeKind.MULTIPLICITY, value, path);
+    }
+  }
+
+  /** {@code VisibilityKind}'s four literals (§7.8.24.3). */
+  private static final List<String> VISIBILITY_KINDS =
+      List.of("public", "private", "protected", "package");
+
+  /**
+   * Rejects a {@code visibility} outside {@code VisibilityKind}.
+   *
+   * <p>Unvalidated, this field made one model produce two artifacts that contradict each other: the
+   * renderer's symbol switch falls through to {@code "+"} for anything unrecognised, while the XMI
+   * writer copies the string through verbatim. So {@code "Private"} rendered as public and exported
+   * as an invalid enumeration value, and neither artifact said anything was wrong. The check
+   * belongs here rather than in either consumer, because failing at render would reject a model
+   * that had already validated.
+   */
+  private static void validateNodeVisibilities(int nodeIndex, JsonNode umlProperties)
+      throws UmlValidationException {
+    if (umlProperties == null) {
+      return;
+    }
+    for (String member : List.of("attributes", "operations")) {
+      JsonNode members = umlProperties.get(member);
+      if (members == null || !members.isArray()) {
+        continue;
+      }
+      for (int index = 0; index < members.size(); index++) {
+        JsonNode visibility = members.get(index).get("visibility");
+        if (visibility == null) {
+          continue;
+        }
+        String path =
+            "$.nodes[" + nodeIndex + "].properties.uml." + member + "[" + index + "].visibility";
+        if (!visibility.isTextual() || !VISIBILITY_KINDS.contains(visibility.asText())) {
+          throw new UmlValidationException(
+              UmlTypeKind.ELEMENT_PROPERTY,
+              visibility.isTextual() ? visibility.asText() : visibility.toString(),
+              path);
+        }
+      }
     }
   }
 
@@ -547,12 +642,21 @@ public final class Uml {
     if (subject == null) {
       return;
     }
-    if (!subject.isTextual()
-        || !isUseCaseSubjectClassifier(context.nodeTypes().get(subject.asText()))) {
+    // §18.2.5.4 types subject as Classifier [0..*], so a use case may name one subject or several.
+    if (subject.isArray()) {
+      for (int index = 0; index < subject.size(); index++) {
+        validateUseCaseSubject(subject.get(index), context, umlPath + ".subject[" + index + "]");
+      }
+      return;
+    }
+    validateUseCaseSubject(subject, context, umlPath + ".subject");
+  }
+
+  private static void validateUseCaseSubject(
+      JsonNode subject, ValidationContext context, String path) throws UmlValidationException {
+    if (!subject.isTextual() || !isClassifierType(context.nodeTypes().get(subject.asText()))) {
       throw new UmlValidationException(
-          UmlTypeKind.ELEMENT_PROPERTY,
-          propertyValue(subject, "UseCase.subject"),
-          umlPath + ".subject");
+          UmlTypeKind.ELEMENT_PROPERTY, propertyValue(subject, "UseCase.subject"), path);
     }
   }
 
@@ -658,15 +762,115 @@ public final class Uml {
             UmlTypeKind.RELATIONSHIP_ENDPOINT, "Transition target initial Pseudostate", path);
       }
 
+      // §14.5.11.8 constrains a Transition's endpoints to share a containingStateMachine(), not a
+      // Region, and §14.2.3.8.5 leaves Transition ownership unconstrained. Requiring one Region
+      // made the ordinary cross-region transition inexpressible.
+      String stateMachine = stateMachineOfRegion(region, context);
       for (String endpoint : List.of(relationship.source(), relationship.target())) {
         String endpointRegion =
             readTextProperty(context.nodeUmlProperties().get(endpoint), "region");
-        if (!region.equals(endpointRegion)) {
+        if (endpointRegion == null
+            || stateMachine == null
+            || !stateMachine.equals(stateMachineOfRegion(endpointRegion, context))) {
           throw new UmlValidationException(
               UmlTypeKind.RELATIONSHIP_PROPERTY, region, path + ".properties.uml.region");
         }
       }
+
+      validateTransitionKind(relationship, path, context);
     }
+  }
+
+  private static String stateMachineOfRegion(String regionId, ValidationContext context) {
+    return readTextProperty(context.nodeUmlProperties().get(regionId), "state_machine");
+  }
+
+  /**
+   * §14.5.11.8 {@code state_is_internal}: a Transition with kind {@code internal} has a State as
+   * its source, and its source and target are the same vertex.
+   *
+   * <p>The {@code local} and {@code external} constraints in the same clause, and the fork/join
+   * segment guard rules, turn on composite States owning Regions — which this vocabulary cannot
+   * express, since a Region names a StateMachine and never a State. They are recorded as residue
+   * rather than approximated here.
+   */
+  private static void validateTransitionKind(
+      SourceRelationship relationship, String path, ValidationContext context)
+      throws UmlValidationException {
+    String kind =
+        readTextProperty(context.relationshipUmlProperties().get(relationship.id()), "kind");
+    if (!"internal".equals(kind)) {
+      return;
+    }
+    if (!relationship.source().equals(relationship.target())
+        || !"State".equals(context.nodeTypes().get(relationship.source()))) {
+      throw new UmlValidationException(
+          UmlTypeKind.RELATIONSHIP_PROPERTY, kind, path + ".properties.uml.kind");
+    }
+  }
+
+  /**
+   * The Region and Pseudostate constraints of &sect;14.5.8.6 and &sect;14.5.6.7.
+   *
+   * <p>A Region owns at most one initial Vertex and at most one of each history kind
+   * (&sect;14.5.8.6), and each Pseudostate kind carries a transition-degree rule (&sect;14.5.6.7)
+   * &mdash; a fork with one outgoing edge is a junction drawn as a bar, a join with one incoming
+   * edge is the same, and a dangling choice decides nothing. None of these were checked: only that
+   * {@code kind} was one of the ten literals.
+   */
+  private static void validateStateVertexConstraints(
+      List<SourceNode> nodes, ValidationContext context) throws UmlValidationException {
+    var singletonKindsByRegion = new HashSet<String>();
+    for (int nodeIndex = 0; nodeIndex < nodes.size(); nodeIndex++) {
+      SourceNode node = nodes.get(nodeIndex);
+      if (!"Pseudostate".equals(node.type())) {
+        continue;
+      }
+      JsonNode umlProperties = node.properties().get("uml");
+      String kind = readTextProperty(umlProperties, "kind");
+      String region = readTextProperty(umlProperties, "region");
+      String path = "$.nodes[" + nodeIndex + "].properties.uml.kind";
+      if (kind == null || region == null) {
+        continue;
+      }
+      if (REGION_SINGLETON_PSEUDOSTATE_KINDS.contains(kind)
+          && !singletonKindsByRegion.add(region + "/" + kind)) {
+        throw new UmlValidationException(UmlTypeKind.ELEMENT_PROPERTY, kind, path);
+      }
+      long incoming = transitionDegree(node.id(), context, true);
+      long outgoing = transitionDegree(node.id(), context, false);
+      if (!supportsPseudostateDegree(kind, incoming, outgoing)) {
+        throw new UmlValidationException(UmlTypeKind.ELEMENT_PROPERTY, kind, path);
+      }
+    }
+  }
+
+  /** §14.5.8.6: a Region owns at most one of each of these. */
+  private static final Set<String> REGION_SINGLETON_PSEUDOSTATE_KINDS =
+      Set.of("initial", "deepHistory", "shallowHistory");
+
+  private static long transitionDegree(String nodeId, ValidationContext context, boolean incoming) {
+    Map<String, String> ends =
+        incoming ? context.relationshipTargets() : context.relationshipSources();
+    return ends.entrySet().stream()
+        .filter(entry -> nodeId.equals(entry.getValue()))
+        .filter(entry -> "Transition".equals(context.relationshipTypes().get(entry.getKey())))
+        .count();
+  }
+
+  /** §14.5.6.7's per-kind transition-degree rules. */
+  private static boolean supportsPseudostateDegree(String kind, long incoming, long outgoing) {
+    return switch (kind) {
+      case "initial" -> outgoing <= 1;
+      case "deepHistory", "shallowHistory" -> outgoing <= 1;
+      case "fork" -> incoming == 1 && outgoing >= 2;
+      case "join" -> incoming >= 2 && outgoing == 1;
+      case "junction", "choice" -> incoming >= 1 && outgoing >= 1;
+      // entryPoint, exitPoint and terminate carry constraints that turn on the composite State
+      // owning them, which this vocabulary cannot express (a Region names a StateMachine, never a
+      // State). Left unchecked rather than approximated.
+      default -> true;
+    };
   }
 
   private static void validateUseCaseRelationships(
@@ -807,10 +1011,6 @@ public final class Uml {
         || "CommunicationPath".equals(value);
   }
 
-  private static boolean isComponentUsageSource(String value) {
-    return "Component".equals(value) || "Port".equals(value);
-  }
-
   private static boolean isDeployedArtifactType(String value) {
     return "Artifact".equals(value) || "DeploymentSpecification".equals(value);
   }
@@ -823,16 +1023,34 @@ public final class Uml {
     return "Node".equals(value) || "Device".equals(value);
   }
 
-  private static boolean isActorUseCasePair(String sourceType, String targetType) {
-    return "Actor".equals(sourceType) && "UseCase".equals(targetType)
-        || "UseCase".equals(sourceType) && "Actor".equals(targetType);
+  private static boolean isClassifierType(String value) {
+    return CLASSIFIER_TYPES.contains(value);
   }
 
-  private static boolean isUseCaseSubjectClassifier(String value) {
-    return "Class".equals(value)
-        || "Interface".equals(value)
-        || "DataType".equals(value)
-        || "Enumeration".equals(value);
+  /**
+   * Every element type the profile accepts is a NamedElement (&sect;7.8.4.5), which is what a
+   * Dependency's ends are. Also the membership test {@link #validateElementType} applies, so the
+   * two cannot drift apart.
+   */
+  private static boolean isNamedElementType(String value) {
+    return isStructuralType(value)
+        || isActivityType(value)
+        || isSequenceType(value)
+        || isStateMachineType(value)
+        || isUseCaseType(value)
+        || isComponentType(value)
+        || isDeploymentType(value);
+  }
+
+  /** §18.2.1.4: an Actor associates only with UseCases, Components and Classes. */
+  private static boolean isActorAssociationLegal(String sourceType, String targetType) {
+    if ("Actor".equals(sourceType)) {
+      return ACTOR_ASSOCIATION_PARTNERS.contains(targetType);
+    }
+    if ("Actor".equals(targetType)) {
+      return ACTOR_ASSOCIATION_PARTNERS.contains(sourceType);
+    }
+    return true;
   }
 
   private static boolean isMessageEndpoint(String sourceType, String targetType) {

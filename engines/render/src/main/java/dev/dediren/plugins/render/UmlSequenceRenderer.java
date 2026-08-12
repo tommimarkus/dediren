@@ -257,9 +257,9 @@ final class UmlSequenceRenderer {
     LaidOutNode node = interaction.node();
     SequenceFrame frame = interactionFrame(interaction);
     ResolvedNodeStyle paint = nodePaint(node.id());
+    String title = interactionFrameTitle(node.label());
     double titleWidth =
-        Math.max(
-            96.0, Math.min(frame.width() * 0.5, labelWidth(node.label(), base.fontSize()) + 24.0));
+        Math.max(96.0, Math.min(frame.width() * 0.5, labelWidth(title, base.fontSize()) + 24.0));
     double titleHeight = Math.max(24.0, base.fontSize() + 10.0);
     return new PlacedInteraction(
         node,
@@ -267,7 +267,16 @@ final class UmlSequenceRenderer {
         frame,
         titleWidth,
         titleHeight,
-        placeStartLabel(frame.x() + 10.0, frame.y() + titleHeight - 8.0, node.label()));
+        placeStartLabel(frame.x() + 10.0, frame.y() + titleHeight - 8.0, title));
+  }
+
+  /**
+   * The interaction frame's pentagon carries the kind tag {@code sd} before the interaction name
+   * (§17.2.4.1). Without it the frame is untagged and a reader cannot tell a sequence diagram's
+   * frame from any other framed diagram — the tag is the only thing that names the kind.
+   */
+  private static String interactionFrameTitle(String label) {
+    return label == null || label.isBlank() ? "sd" : "sd " + label;
   }
 
   private void emitInteraction(SvgWriter w, PlacedInteraction placed) {
@@ -314,7 +323,7 @@ final class UmlSequenceRenderer {
         .attr("y", f1(frame.y() + placed.titleHeight() - 8.0))
         .attr("fill", paint.labelFill())
         .attrIf("fill-opacity", opacity(paint.labelOpacity()))
-        .text(node.label())
+        .text(interactionFrameTitle(node.label()))
         .end();
     w.end();
   }
@@ -639,8 +648,14 @@ final class UmlSequenceRenderer {
    * pass through.
    */
   private static ResolvedEdgeStyle messageStyle(String messageSort, ResolvedEdgeStyle paint) {
+    // §17.4.4 dashes both the reply and the createMessage; the open-vs-filled arrowhead is what
+    // separates them from each other and from a synchronous call. Rendered solid, a createMessage
+    // is byte-identical to an asynchronous message and object creation reads as a signal.
     SvgEdgeLineStyle lineStyle =
-        "reply".equals(messageSort) ? SvgEdgeLineStyle.DASHED : SvgEdgeLineStyle.SOLID;
+        switch (messageSort) {
+          case "reply", "createMessage" -> SvgEdgeLineStyle.DASHED;
+          default -> SvgEdgeLineStyle.SOLID;
+        };
     SvgEdgeMarkerEnd markerEnd =
         switch (messageSort) {
           case "asynchCall", "asynchSignal", "reply", "createMessage" ->

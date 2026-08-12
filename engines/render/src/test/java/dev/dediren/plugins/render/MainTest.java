@@ -12,6 +12,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
@@ -340,8 +344,9 @@ class MainTest {
           .extracting(path -> path.getAttribute("data-dediren-artifact-part"))
           .contains("body", "fold");
 
+      // §19.2.4: a classifier rectangle, not the Artifact dog-ear asserted just above.
       Element spec = groupWithAttribute(document, "data-dediren-node-id", "deployment-spec-orders");
-      Element specShape = firstChildElement(spec, "g");
+      Element specShape = firstChildElement(spec, "rect");
       assertThat(specShape.getAttribute("data-dediren-node-shape"))
           .isEqualTo("uml_deployment_specification");
 
@@ -1404,6 +1409,137 @@ class MainTest {
     }
 
     @Test
+    void archimateSemanticContainerRendersItsOwnElementNotation() throws Exception {
+      // AM-NOT-7 (S3.8): a semantic container may be any element type, not only Grouping. The
+      // shipped policy declares group notation for Grouping alone, so every other container fell
+      // through to the generic house group palette -- no layer colour, no icon -- and an
+      // ApplicationComponent boundary was indistinguishable from an untyped box.
+      Document document = renderArchimateContainer("ApplicationComponent");
+
+      Element group = groupWithAttribute(document, "data-dediren-group-id", "app-domain");
+      Element rect = firstChildElement(group, "rect");
+      assertThat(rect.getAttribute("fill")).isEqualTo("#e0f2fe");
+      assertThat(rect.getAttribute("stroke")).isEqualTo("#0369a1");
+      Element decorator =
+          childGroupWithAttribute(
+              group, "data-dediren-group-decorator", "archimate_application_component");
+      assertThat(decorator.getAttribute("data-dediren-icon-kind")).isEqualTo("component");
+    }
+
+    @Test
+    void umlDeploymentSpecificationIsAClassifierRectangleNotAnArtifact() throws Exception {
+      // UML-NOT-8 (§19.2.4): a DeploymentSpecification is a classifier rectangle carrying the
+      // «deploymentSpec» keyword. It was drawn with the Artifact dog-ear, so only the keyword
+      // text distinguished the two — and the dog-ear is what a reader actually scans for.
+      Document document =
+          svgDocument(
+              okContent(
+                  render(
+                      renderInput(
+                          "fixtures/layout-result/uml-deployment-basic.json",
+                          "fixtures/render-policy/uml-svg.json",
+                          "fixtures/render-metadata/uml-deployment-basic.json"))));
+
+      Element spec = groupWithAttribute(document, "data-dediren-node-id", "deployment-spec-orders");
+      Element specShape = firstChildElement(spec, "rect");
+      assertThat(specShape.getAttribute("data-dediren-node-shape"))
+          .isEqualTo("uml_deployment_specification");
+
+      Element artifact =
+          groupWithAttribute(document, "data-dediren-node-id", "artifact-orders-service");
+      assertThat(firstChildElement(artifact, "g").getAttribute("data-dediren-node-shape"))
+          .isEqualTo("uml_artifact");
+    }
+
+    @Test
+    void umlPackageNameIsDrawnExactlyOnce() throws Exception {
+      // UML-NOT-7 (§12.2.4). The name was drawn twice: once by the decorator into the tab and
+      // once by the generic node-label path into the body, so a package read as name-plus-
+      // stereotype. The tab copy is the one that goes: its baseline (y + 16.0) falls below a
+      // 14.4px tab, so it spilled onto the body anyway, and §12.2.4 puts the name in the tab only
+      // when the body shows the package's members -- which this renderer never does.
+      Document document =
+          svgDocument(
+              okContent(
+                  render(
+                      renderInput(
+                          "fixtures/layout-result/uml-basic.json",
+                          "fixtures/render-policy/uml-svg.json",
+                          "fixtures/render-metadata/uml-basic.json"))));
+
+      Element pkg = groupWithAttribute(document, "data-dediren-node-id", "pkg-orders");
+      assertThat(textsWithin(pkg)).containsExactly("Orders");
+    }
+
+    @Test
+    void umlPseudostateKindsEachGetTheirOwnGlyph() throws Exception {
+      // UML-NOT-3/-4 (§14.2.4.6). Four of the ten kinds had no fixture anywhere in the corpus, and
+      // two of them were drawn with a *different* kind's glyph:
+      //   junction  -- a small filled circle -- was drawn as choice's diamond (static as dynamic)
+      //   terminate -- a bare cross         -- was drawn as exitPoint's circled X, which says the
+      //                                        opposite thing: "control leaves here" vs "the state
+      //                                        machine halts".
+      Element junction = umlPseudostateShape("junction");
+      assertThat(junction.getTagName()).isEqualTo("circle");
+      assertThat(junction.getAttribute("fill")).isEqualTo(junction.getAttribute("stroke"));
+
+      Element choice = umlPseudostateShape("choice");
+      assertThat(choice.getTagName()).isEqualTo("path");
+
+      Element terminate = umlPseudostateShape("terminate");
+      assertThat(terminate.getTagName()).isEqualTo("g");
+      assertThat(childElements(terminate, "line")).hasSize(2);
+      assertThat(childElements(terminate, "circle")).isEmpty();
+
+      // exitPoint keeps the circled X it always had: a bare <circle> carrying the shape marker,
+      // with the "X" as a sibling <text>. That enclosing circle is the whole difference from
+      // terminate above.
+      Element exitPoint = umlPseudostateShape("exitPoint");
+      assertThat(exitPoint.getTagName()).isEqualTo("circle");
+    }
+
+    @Test
+    void archimateServiceIconIsOnePillSharedByAllThreeServiceTypes() throws Exception {
+      // AM-NOT-11 (A.1): the service icon is a pill -- fully rounded ends -- and it is the same
+      // glyph in every layer. It was a rounded rectangle (rx = 0.18 * size), and
+      // ApplicationService additionally had its own y and height, so the application layer's
+      // service did not match the business and technology ones.
+      Map<String, Element> icons = new LinkedHashMap<>();
+      for (String type : List.of("BusinessService", "ApplicationService", "TechnologyService")) {
+        Document document = renderArchimateNode(type);
+        Element node = groupWithAttribute(document, "data-dediren-node-id", "svc");
+        Element decorator =
+            childGroupWithAttribute(node, "data-dediren-node-decorator", snakeCase(type));
+        assertThat(decorator.getAttribute("data-dediren-icon-kind")).isEqualTo("service");
+        icons.put(type, firstChildElement(decorator, "rect"));
+      }
+
+      icons.forEach(
+          (type, rect) -> {
+            double height = Double.parseDouble(rect.getAttribute("height"));
+            assertThat(Double.parseDouble(rect.getAttribute("rx")))
+                .describedAs("%s icon must be a pill: rx is half its height", type)
+                .isEqualTo(height / 2.0, org.assertj.core.data.Offset.offset(0.05));
+          });
+      assertThat(icons.values().stream().map(rect -> rect.getAttribute("height")).distinct())
+          .describedAs("all three service icons must be the same glyph")
+          .hasSize(1);
+      assertThat(icons.values().stream().map(rect -> rect.getAttribute("y")).distinct()).hasSize(1);
+    }
+
+    @Test
+    void archimateGroupingContainerKeepsItsOwnNotation() throws Exception {
+      // The Grouping container is the one case that already worked; widening the lane must not
+      // disturb it. Grouping is a dashed boundary with no layer colour (S4.5.1).
+      Document document = renderArchimateContainer("Grouping");
+
+      Element group = groupWithAttribute(document, "data-dediren-group-id", "app-domain");
+      assertThat(firstChildElement(group, "rect").getAttribute("stroke-dasharray"))
+          .isEqualTo("3 2");
+      childGroupWithAttribute(group, "data-dediren-group-decorator", "archimate_grouping");
+    }
+
+    @Test
     void coversEachArchimateNodeTypeFromPolicy() throws Exception {
       JsonNode policy = fixtureJson("fixtures/render-policy/archimate-svg.json");
       ObjectNode nodeStyles = (ObjectNode) policy.at("/style/node_type_overrides");
@@ -1966,7 +2102,9 @@ class MainTest {
       String content = okContent(render(umlSequenceCreateAndDestroyStyleInput()));
       Document document = svgDocument(content);
 
-      assertThat(content).contains(">Place Order<", ">Customer<", ">Order Service<", ">Receipt<");
+      // §17.2.4.1: the interaction frame's pentagon carries the kind tag "sd" before the name.
+      assertThat(content)
+          .contains(">sd Place Order<", ">Customer<", ">Order Service<", ">Receipt<");
 
       Element customerStem =
           elementWithAttribute(document, "line", "data-dediren-sequence-lifeline-stem", "customer");
@@ -1995,9 +2133,13 @@ class MainTest {
           firstChildElement(groupWithAttribute(document, "data-dediren-edge-id", "m3"), "path");
       assertMarkerForStyle(document, asyncSignal, "m3", "end", "open_arrow");
 
+      // UML-NOT-2 (§17.4.4): a createMessage is a DASHED line with an open arrowhead. Rendered
+      // solid it is indistinguishable from an asynchronous message, so object creation reads as a
+      // signal. Note the reply above shares the dash — the open arrowhead is what separates them
+      // from each other, and the arrowhead is what separates both from a synchCall.
       Element createMessage =
           firstChildElement(groupWithAttribute(document, "data-dediren-edge-id", "m4"), "path");
-      assertThat(createMessage.hasAttribute("stroke-dasharray")).isFalse();
+      assertThat(createMessage.getAttribute("stroke-dasharray")).isEqualTo("8 5");
       assertThat(createMessage.getAttribute("d")).contains("L 600.0 96.0");
       assertMarkerForStyle(document, createMessage, "m4", "end", "open_arrow");
 
@@ -2103,6 +2245,31 @@ class MainTest {
     void coversEachRelationshipTypeFromPolicies() throws Exception {
       assertRelationshipPolicyCoverage("archimate", "fixtures/render-policy/archimate-svg.json");
       assertRelationshipPolicyCoverage("uml", "fixtures/render-policy/uml-svg.json");
+    }
+
+    @Test
+    void archimateProfileSuppliesItsOwnNotationWhenThePolicyDeclaresNone() throws Exception {
+      // The shipped fixture is not the notation -- the profile is. A policy that overrides no
+      // edge type at all (the repo's own self-model policy overrides exactly one) must still
+      // emit ArchiMate notation rather than falling through to the generic filled arrow.
+      ObjectNode policy = (ObjectNode) fixtureJson("fixtures/render-policy/archimate-svg.json");
+      ((ObjectNode) policy.at("/style")).remove("edge_type_overrides");
+
+      Map<String, String> signatures = emittedArchimateEdgeSignatures(policy);
+
+      assertThat(signatures)
+          .containsEntry("Triggering", "|none|filled_arrow")
+          .containsEntry("Flow", "8 5|none|filled_arrow")
+          .containsEntry("Serving", "|none|open_arrow")
+          .containsEntry("Access", "1 3|none|open_arrow")
+          .containsEntry("Influence", "8 5|none|open_arrow")
+          .containsEntry("Realization", "1 3|none|hollow_triangle")
+          .containsEntry("Specialization", "|none|hollow_triangle")
+          .containsEntry("Assignment", "|filled_circle|filled_arrow")
+          .containsEntry("Composition", "|filled_diamond|none")
+          .containsEntry("Aggregation", "|hollow_diamond|none")
+          .containsEntry("Association", "|none|none");
+      assertNoRelationshipTypesRenderIdentically("archimate", signatures);
     }
 
     @Test
@@ -3826,6 +3993,7 @@ class MainTest {
     Document document = svgDocument(content);
 
     index = 0;
+    Map<String, String> signatureByType = new LinkedHashMap<>();
     for (var fields = edgeStyles.properties().iterator(); fields.hasNext(); ) {
       var field = fields.next();
       if (isSequenceRelationshipType(semanticProfile, field.getKey())) {
@@ -3840,11 +4008,282 @@ class MainTest {
       assertMarkerForStyle(document, path, id, "start", style.at("/marker_start").asText("none"));
       assertMarkerForStyle(
           document, path, id, "end", style.at("/marker_end").asText("filled_arrow"));
-      if ("dashed".equals(style.at("/line_style").asText())) {
-        assertThat(path.getAttribute("stroke-dasharray")).isEqualTo("8 5");
+      // Every legal lineStyle gets an arm. Leaving one out silently stops asserting that
+      // value: the policy fixture is this test's own input, so an unasserted line style is
+      // an unverified fixture edit, not a covered one.
+      String lineStyle = style.at("/line_style").asText("solid");
+      switch (lineStyle) {
+        case "dashed" -> assertThat(path.getAttribute("stroke-dasharray")).isEqualTo("8 5");
+        case "dotted" -> assertThat(path.getAttribute("stroke-dasharray")).isEqualTo("1 3");
+        case "solid" -> assertThat(path.getAttribute("stroke-dasharray")).isEmpty();
+        default -> throw new AssertionError("unhandled line_style '" + lineStyle + "'");
       }
+      signatureByType.put(field.getKey(), emittedEdgeSignature(document, path, id));
       index++;
     }
+
+    assertNoRelationshipTypesRenderIdentically(semanticProfile, signatureByType);
+  }
+
+  /** Every {@code <text>} rendered anywhere inside {@code element}, in document order. */
+  private static List<String> textsWithin(Element element) {
+    List<String> texts = new ArrayList<>();
+    org.w3c.dom.NodeList nodes = element.getElementsByTagName("text");
+    for (int index = 0; index < nodes.getLength(); index++) {
+      texts.add(nodes.item(index).getTextContent());
+    }
+    return texts;
+  }
+
+  /** The shape element a UML {@code Pseudostate} of {@code kind} draws. */
+  private static Element umlPseudostateShape(String kind) throws Exception {
+    ObjectNode layout = JsonSupport.objectMapper().createObjectNode();
+    layout.put("layout_result_schema_version", "layout-result.schema.v2");
+    layout.put("view_id", "main");
+    layout.set(
+        "nodes",
+        JsonSupport.objectMapper()
+            .readTree(
+                """
+                  [{"id":"ps","source_id":"ps","projection_id":"ps",
+                    "x":40,"y":40,"width":32,"height":32,"label":""}]
+                  """));
+    layout.set("edges", JsonSupport.objectMapper().createArrayNode());
+    layout.set("groups", JsonSupport.objectMapper().createArrayNode());
+    layout.set("warnings", JsonSupport.objectMapper().createArrayNode());
+
+    ObjectNode metadata = JsonSupport.objectMapper().createObjectNode();
+    metadata.put("render_metadata_schema_version", "render-metadata.schema.v1");
+    metadata.put("semantic_profile", "uml");
+    metadata.set(
+        "nodes",
+        JsonSupport.objectMapper()
+            .readTree(
+                """
+                  {"ps": {"type":"Pseudostate","source_id":"ps","properties":{"kind":"%s"}}}
+                  """
+                    .formatted(kind)));
+    metadata.set("edges", JsonSupport.objectMapper().createObjectNode());
+
+    ObjectNode input = JsonSupport.objectMapper().createObjectNode();
+    input.set("layout_result", layout);
+    input.set("render_metadata", metadata);
+    input.set("policy", fixtureJson("fixtures/render-policy/uml-svg.json"));
+    Document document = svgDocument(okContent(render(input)));
+    Element node = groupWithAttribute(document, "data-dediren-node-id", "ps");
+    org.w3c.dom.NodeList children = node.getChildNodes();
+    for (int index = 0; index < children.getLength(); index++) {
+      if (children.item(index) instanceof Element child
+          && "uml_pseudostate".equals(child.getAttribute("data-dediren-node-shape"))) {
+        return child;
+      }
+    }
+    throw new AssertionError("no uml_pseudostate shape emitted for kind " + kind);
+  }
+
+  /** {@code BusinessService} → {@code archimate_business_service}. */
+  private static String snakeCase(String elementType) {
+    return "archimate_" + elementType.replaceAll("(?<=.)([A-Z])", "_$1").toLowerCase(Locale.ROOT);
+  }
+
+  /** Renders a single ArchiMate node of {@code elementType} under the shipped policy. */
+  private static Document renderArchimateNode(String elementType) throws Exception {
+    String nodes =
+        """
+          [{"id":"svc","source_id":"svc","projection_id":"svc",
+            "x":20,"y":20,"width":180,"height":80,"label":"Svc"}]
+          """;
+    String metadataNodes =
+        """
+          {"svc": {"type": "%s", "source_id": "svc"}}
+          """
+            .formatted(elementType);
+    return svgDocument(
+        okContent(
+            render(
+                archimateRenderInput(
+                    fixtureJson("fixtures/render-policy/archimate-svg.json"),
+                    nodes,
+                    "[]",
+                    metadataNodes,
+                    "{}"))));
+  }
+
+  /**
+   * Renders one semantic-boundary group of {@code elementType} under the shipped ArchiMate policy.
+   */
+  private static Document renderArchimateContainer(String elementType) throws Exception {
+    ObjectNode layout = JsonSupport.objectMapper().createObjectNode();
+    layout.put("layout_result_schema_version", "layout-result.schema.v2");
+    layout.put("view_id", "main");
+    layout.set("nodes", JsonSupport.objectMapper().createArrayNode());
+    layout.set("edges", JsonSupport.objectMapper().createArrayNode());
+    layout.set(
+        "groups",
+        JsonSupport.objectMapper()
+            .readTree(
+                """
+                  [
+                    {
+                      "id": "app-domain",
+                      "source_id": "app-domain",
+                      "projection_id": "app-domain",
+                      "provenance": { "semantic_backed": { "source_id": "app-domain" } },
+                      "x": 20, "y": 20, "width": 240, "height": 140,
+                      "members": [],
+                      "label": "Application Domain"
+                    }
+                  ]
+                  """));
+    layout.set("warnings", JsonSupport.objectMapper().createArrayNode());
+
+    ObjectNode metadata = JsonSupport.objectMapper().createObjectNode();
+    metadata.put("render_metadata_schema_version", "render-metadata.schema.v1");
+    metadata.put("semantic_profile", "archimate");
+    metadata.set("nodes", JsonSupport.objectMapper().createObjectNode());
+    metadata.set("edges", JsonSupport.objectMapper().createObjectNode());
+    metadata.set(
+        "groups",
+        JsonSupport.objectMapper()
+            .readTree(
+                """
+                  {"app-domain": {"type": "%s", "source_id": "app-domain"}}
+                  """
+                    .formatted(elementType)));
+
+    ObjectNode input = JsonSupport.objectMapper().createObjectNode();
+    input.set("layout_result", layout);
+    input.set("render_metadata", metadata);
+    input.set("policy", fixtureJson("fixtures/render-policy/archimate-svg.json"));
+    return svgDocument(okContent(render(input)));
+  }
+
+  /** The eleven ArchiMate relationship types, in spec order (§5.1–§5.4). */
+  private static final List<String> ARCHIMATE_RELATIONSHIP_TYPES =
+      List.of(
+          "Composition",
+          "Aggregation",
+          "Assignment",
+          "Realization",
+          "Serving",
+          "Access",
+          "Influence",
+          "Association",
+          "Triggering",
+          "Flow",
+          "Specialization");
+
+  /** Renders one edge per ArchiMate relationship type under {@code policy}; type → signature. */
+  private static Map<String, String> emittedArchimateEdgeSignatures(JsonNode policy)
+      throws Exception {
+    ArrayNode nodes = JsonSupport.objectMapper().createArrayNode();
+    ArrayNode edges = JsonSupport.objectMapper().createArrayNode();
+    ObjectNode metadataEdges = JsonSupport.objectMapper().createObjectNode();
+    for (int index = 0; index < ARCHIMATE_RELATIONSHIP_TYPES.size(); index++) {
+      String relationshipType = ARCHIMATE_RELATIONSHIP_TYPES.get(index);
+      String id = "archimate-default-" + index;
+      int y = 60 + index * 48;
+      for (String end : List.of("source", "target")) {
+        nodes.add(
+            JsonSupport.objectMapper()
+                .readTree(
+                    """
+                      {"id":"%s-%d","source_id":"%s-%d","projection_id":"%s-%d",
+                       "x":%d,"y":%d,"width":80,"height":32,"label":"N"}
+                      """
+                        .formatted(
+                            end,
+                            index,
+                            end,
+                            index,
+                            end,
+                            index,
+                            "source".equals(end) ? 40 : 260,
+                            y - 16)));
+      }
+      edges.add(
+          JsonSupport.objectMapper()
+              .readTree(
+                  """
+                    {"id":"%s","source":"source-%d","target":"target-%d","source_id":"%s",
+                     "projection_id":"%s","points":[{"x":120,"y":%d},{"x":260,"y":%d}],"label":"%s"}
+                    """
+                      .formatted(id, index, index, id, id, y, y, relationshipType)));
+      metadataEdges.set(
+          id,
+          JsonSupport.objectMapper()
+              .readTree(
+                  """
+                    {"type":"%s","source_id":"%s"}
+                    """
+                      .formatted(relationshipType, id)));
+    }
+
+    Document document =
+        svgDocument(
+            okContent(
+                render(
+                    semanticRenderInput(
+                        "archimate",
+                        nodes,
+                        edges,
+                        JsonSupport.objectMapper().createObjectNode(),
+                        metadataEdges,
+                        policy))));
+
+    Map<String, String> signatures = new LinkedHashMap<>();
+    for (int index = 0; index < ARCHIMATE_RELATIONSHIP_TYPES.size(); index++) {
+      String id = "archimate-default-" + index;
+      Element path =
+          firstChildElement(groupWithAttribute(document, "data-dediren-edge-id", id), "path");
+      signatures.put(
+          ARCHIMATE_RELATIONSHIP_TYPES.get(index), emittedEdgeSignature(document, path, id));
+    }
+    return signatures;
+  }
+
+  /**
+   * ArchiMate gives every relationship type its own line style + arrowhead pair (A.3, Table 3), so
+   * two types rendering identically is a notation defect no per-type assertion can catch — each one
+   * passes in isolation. Read from emitted bytes rather than the policy, because the policy is this
+   * test's input.
+   */
+  private static void assertNoRelationshipTypesRenderIdentically(
+      String semanticProfile, Map<String, String> signatureByType) {
+    if (!"archimate".equals(semanticProfile)) {
+      return;
+    }
+    Map<String, List<String>> typesBySignature = new LinkedHashMap<>();
+    signatureByType.forEach(
+        (type, signature) ->
+            typesBySignature.computeIfAbsent(signature, key -> new ArrayList<>()).add(type));
+    List<List<String>> collisions =
+        typesBySignature.values().stream().filter(types -> types.size() > 1).toList();
+    assertThat(collisions)
+        .describedAs(
+            "each ArchiMate relationship type must render distinguishably"
+                + " (line style + arrowheads); these groups are byte-identical: %s",
+            collisions)
+        .isEmpty();
+  }
+
+  /** The visual identity of an emitted edge: dash pattern plus both resolved marker names. */
+  private static String emittedEdgeSignature(Document document, Element path, String edgeId) {
+    return path.getAttribute("stroke-dasharray")
+        + "|"
+        + emittedMarkerName(document, path, edgeId, "start")
+        + "|"
+        + emittedMarkerName(document, path, edgeId, "end");
+  }
+
+  private static String emittedMarkerName(
+      Document document, Element path, String edgeId, String side) {
+    String markerAttribute = "data-dediren-edge-marker-" + side;
+    if (!path.hasAttribute("marker-" + side)) {
+      return "none";
+    }
+    return marker(document, "marker-" + side + "-" + edgeId, markerAttribute)
+        .getAttribute(markerAttribute);
   }
 
   private static boolean isSequenceRelationshipType(

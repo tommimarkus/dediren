@@ -1,5 +1,6 @@
 package dev.dediren.semantics.uml;
 
+import dev.dediren.contracts.Diagnostic;
 import dev.dediren.contracts.layout.LayoutNodeRole;
 import dev.dediren.contracts.source.GenericGraphPluginData;
 import dev.dediren.contracts.source.GenericGraphView;
@@ -31,10 +32,10 @@ import tools.jackson.databind.JsonNode;
 public final class UmlNotationSemantics implements NotationSemantics {
 
   @Override
-  public void validate(SourceDocument source, GenericGraphPluginData pluginData)
+  public List<Diagnostic> validate(SourceDocument source, GenericGraphPluginData pluginData)
       throws EngineException {
     try {
-      Uml.validateSource(source, pluginData);
+      return Uml.validateSource(source, pluginData);
     } catch (UmlValidationException error) {
       throw EngineException.semanticFailure(error.code(), error.message(), error.path());
     }

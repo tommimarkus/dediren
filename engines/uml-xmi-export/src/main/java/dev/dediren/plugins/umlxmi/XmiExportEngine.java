@@ -27,6 +27,7 @@ import dev.dediren.plugins.umlxmi.build.ExportScope;
 import dev.dediren.plugins.umlxmi.build.XmiBuilder;
 import dev.dediren.plugins.umlxmi.build.XmiExportException;
 import dev.dediren.plugins.umlxmi.build.XmiValidationException;
+import dev.dediren.plugins.umlxmi.schema.SchemaValidation;
 import dev.dediren.uml.Uml;
 import dev.dediren.uml.UmlValidationException;
 import java.nio.file.Path;
@@ -92,9 +93,9 @@ public final class XmiExportEngine implements ExportEngine {
 
     XmiBuilder.BuiltModel built = buildXmi(request, policy);
     String content = built.content();
-    Diagnostic conformance;
+    SchemaValidation.SchemaOutcome schemaOutcome;
     try {
-      conformance = validateXmiToAvailableStandards(content, env, productRoot);
+      schemaOutcome = validateXmiToAvailableStandards(content, env, productRoot);
     } catch (XmiValidationException error) {
       throw failure(error.code(), error.getMessage(), "content");
     }
@@ -112,11 +113,11 @@ public final class XmiExportEngine implements ExportEngine {
             ContractVersions.EXPORT_RESULT_SCHEMA_VERSION,
             "uml-xmi+xml",
             content,
-            UmlXmiAssurance.forView(request, coverage, env));
+            UmlXmiAssurance.forView(request, coverage, env, schemaOutcome));
     var actionable = new ArrayList<>(coverageDiagnostics(coverage));
     actionable.addAll(typeNameAmbiguityDiagnostics(request.source().nodes(), scope.nodeIds()));
     var diagnostics = new ArrayList<>(withIdentityTripwire(policy, actionable));
-    diagnostics.add(conformance);
+    diagnostics.add(schemaOutcome.diagnostic());
     return new EngineResult<>(result, diagnostics);
   }
 
@@ -160,9 +161,9 @@ public final class XmiExportEngine implements ExportEngine {
 
     XmiBuilder.BuiltModel built = buildModelXmi(request, policy);
     String content = built.content();
-    Diagnostic conformance;
+    SchemaValidation.SchemaOutcome schemaOutcome;
     try {
-      conformance = validateXmiToAvailableStandards(content, env, productRoot);
+      schemaOutcome = validateXmiToAvailableStandards(content, env, productRoot);
     } catch (XmiValidationException error) {
       throw failure(error.code(), error.getMessage(), "content");
     }
@@ -180,10 +181,10 @@ public final class XmiExportEngine implements ExportEngine {
             ContractVersions.EXPORT_RESULT_SCHEMA_VERSION,
             "uml-xmi+xml",
             content,
-            UmlXmiAssurance.forModel(request, coverage, env));
+            UmlXmiAssurance.forModel(request, coverage, env, schemaOutcome));
     var diagnostics =
         new ArrayList<>(typeNameAmbiguityDiagnostics(request.source().nodes(), scope.nodeIds()));
-    diagnostics.add(conformance);
+    diagnostics.add(schemaOutcome.diagnostic());
     return java.util.Optional.of(new EngineResult<>(result, diagnostics));
   }
 

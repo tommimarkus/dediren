@@ -128,9 +128,15 @@ The repo ships ready-made source fixtures to copy from:
 - `valid-archimate-oef.json`, `valid-archimate-junction.json` — ArchiMate/OEF.
 - `valid-uml-basic.json`, `valid-uml-complex.json` — UML structural.
 - `valid-uml-sequence-basic.json`, `valid-uml-sequence-fragments.json`,
-  `valid-uml-state-machine-basic.json`, `valid-uml-use-case-basic.json`,
-  `valid-uml-component-basic.json`, `valid-uml-deployment-basic.json` — UML notations.
+  `valid-uml-sequence-lifecycle.json`, `valid-uml-state-machine-basic.json`,
+  `valid-uml-use-case-basic.json`, `valid-uml-component-basic.json`,
+  `valid-uml-deployment-basic.json` — UML notations.
 - `invalid-*.json` — fixtures that intentionally trip a specific diagnostic.
+
+Every `valid-` fixture passes `validate`, renders, and exports.
+`valid-uml-sequence-lifecycle.json` is the richest sequence template: it carries
+an `ExecutionSpecification` activation bar, a `createMessage`, and a
+`deleteMessage` ending in a `DestructionOccurrenceSpecification`.
 
 ## Related Pages
 

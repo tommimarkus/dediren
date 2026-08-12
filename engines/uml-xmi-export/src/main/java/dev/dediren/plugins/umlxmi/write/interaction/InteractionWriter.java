@@ -47,7 +47,8 @@ public final class InteractionWriter {
         .append(attr(interaction.label()))
         .append("\">");
     List<MessageExport> messages =
-        sequenceMessages(ids, interaction, selectedRelationships, nodeIds, relationshipIds);
+        sequenceMessages(
+            ids, interaction, sourceNodes, selectedRelationships, nodeIds, relationshipIds);
     List<CombinedFragmentExport> combinedFragments =
         combinedFragments(interaction, sourceNodes, nodeIds);
     var combinedFragmentsById =
@@ -83,6 +84,8 @@ public final class InteractionWriter {
         messagesBySourceId,
         nestedCombinedFragmentIds,
         operandOwnedMessageIds);
+    // After the occurrences, so every `start`/`finish` an execution references is already declared.
+    writeExecutionSpecifications(xml, interaction, sourceNodes, nodeIds, messagesBySourceId);
     for (MessageExport message : messages) {
       writeSequenceMessage(xml, message);
     }
@@ -92,6 +95,7 @@ public final class InteractionWriter {
   public static List<MessageExport> sequenceMessages(
       IdentifierMap ids,
       SourceNode interaction,
+      List<SourceNode> sourceNodes,
       List<SourceRelationship> selectedRelationships,
       Map<String, String> nodeIds,
       Map<String, String> relationshipIds) {
@@ -99,6 +103,7 @@ public final class InteractionWriter {
     for (int index = 0; index < selectedRelationships.size(); index++) {
       sourceOrder.put(selectedRelationships.get(index).id(), index);
     }
+    var destructionLifelines = destructionCoveredLifelines(sourceNodes);
     return selectedRelationships.stream()
         .filter(relationship -> relationship.type().equals("Message"))
         .filter(relationship -> interaction.id().equals(umlString(relationship, "interaction")))
@@ -106,7 +111,12 @@ public final class InteractionWriter {
         .map(
             relationship -> {
               String sourceNodeId = nodeIds.get(relationship.source());
-              String targetNodeId = nodeIds.get(relationship.target());
+              // A deletion message targets a DestructionOccurrenceSpecification, which is not a
+              // lifeline: the occurrence covers the lifeline that node names, and `covered` must
+              // point at that lifeline rather than at the marker itself.
+              String targetId =
+                  destructionLifelines.getOrDefault(relationship.target(), relationship.target());
+              String targetNodeId = nodeIds.get(targetId);
               if (sourceNodeId == null || targetNodeId == null) {
                 return null;
               }
@@ -474,9 +484,20 @@ public final class InteractionWriter {
       }
       SourceNode source = sourceNodesById.get(relationship.source());
       SourceNode target = sourceNodesById.get(relationship.target());
+      // §17.12.6.3 / §17.12.22.3: a deletion message ends in a DestructionOccurrenceSpecification,
+      // which covers the lifeline being destroyed. Core has always accepted that endpoint;
+      // demanding
+      // Lifeline -> Lifeline here made a committed, bundle-shipped fixture validate and render and
+      // then die on its last stage. The occurrence must still name the lifeline it destroys —
+      // otherwise the emitted `covered` would point at the marker node instead of a lifeline.
+      boolean destructionTarget =
+          target != null
+              && target.type().equals("DestructionOccurrenceSpecification")
+              && isLifeline(sourceNodesById.get(umlString(target, "covered")));
       if (source != null
           && target != null
-          && (!source.type().equals("Lifeline") || !target.type().equals("Lifeline"))) {
+          && (!source.type().equals("Lifeline")
+              || !(target.type().equals("Lifeline") || destructionTarget))) {
         throw new XmiExportException(
             UNSUPPORTED_SEQUENCE_MESSAGE_ENDPOINT,
             "UML/XMI sequence export supports selected Message endpoints only between Lifeline nodes in this MVP: "
@@ -500,10 +521,97 @@ public final class InteractionWriter {
     }
   }
 
+  private static boolean isLifeline(SourceNode node) {
+    return node != null && node.type().equals("Lifeline");
+  }
+
+  /** Each DestructionOccurrenceSpecification node id mapped to the lifeline id it covers. */
+  private static Map<String, String> destructionCoveredLifelines(List<SourceNode> sourceNodes) {
+    var covered = new HashMap<String, String>();
+    for (SourceNode node : sourceNodes) {
+      if (!node.type().equals("DestructionOccurrenceSpecification")) {
+        continue;
+      }
+      String lifelineId = umlString(node, "covered");
+      if (lifelineId != null) {
+        covered.put(node.id(), lifelineId);
+      }
+    }
+    return covered;
+  }
+
   public static boolean unsupportedSequenceNode(String type) {
-    return type.equals("ExecutionSpecification")
-        || type.equals("Gate")
-        || type.equals("DestructionOccurrenceSpecification");
+    // A DestructionOccurrenceSpecification is not exported as a node of its own: it names the
+    // lifeline it destroys, and writeMessageOccurrence already emits the destruction subtype for
+    // the receive event of a deleteMessage. A Gate has no source surface beyond its own node, so
+    // it has nothing to attach an actual message to.
+    return type.equals("Gate");
+  }
+
+  /**
+   * Emits the {@code uml:BehaviorExecutionSpecification} fragments for one interaction.
+   *
+   * <p>§17.12.4 bounds an ExecutionSpecification by two OccurrenceSpecifications and covers the
+   * Lifeline it runs on. The source model names the two bounds by message, not by occurrence, so
+   * each bound resolves to the occurrence <em>on the covered lifeline</em>: the receive event when
+   * the message arrives there, the send event when it leaves. An execution whose covered lifeline
+   * or either bound is out of scope is skipped rather than emitted with a dangling reference.
+   */
+  private static void writeExecutionSpecifications(
+      StringBuilder xml,
+      SourceNode interaction,
+      List<SourceNode> sourceNodes,
+      Map<String, String> nodeIds,
+      Map<String, MessageExport> messagesBySourceId) {
+    for (SourceNode node : sourceNodes) {
+      if (!node.type().equals("ExecutionSpecification")
+          || !nodeIds.containsKey(node.id())
+          || !interaction.id().equals(umlString(node, "interaction"))
+              && !isCoveredByInteraction(node, interaction, nodeIds, messagesBySourceId)) {
+        continue;
+      }
+      String lifeline = umlString(node, "covered");
+      String lifelineId = lifeline == null ? null : nodeIds.get(lifeline);
+      String start = occurrenceOnLifeline(umlString(node, "start"), lifeline, messagesBySourceId);
+      String finish = occurrenceOnLifeline(umlString(node, "finish"), lifeline, messagesBySourceId);
+      if (lifelineId == null || start == null || finish == null) {
+        continue;
+      }
+      xml.append("<fragment xmi:type=\"uml:BehaviorExecutionSpecification\" xmi:id=\"")
+          .append(attr(nodeIds.get(node.id())))
+          .append("\" name=\"")
+          .append(attr(node.label()))
+          .append("\" covered=\"")
+          .append(attr(lifelineId))
+          .append("\" start=\"")
+          .append(attr(start))
+          .append("\" finish=\"")
+          .append(attr(finish))
+          .append("\"/>");
+    }
+  }
+
+  /** An execution belongs to the interaction whose messages bound it. */
+  private static boolean isCoveredByInteraction(
+      SourceNode node,
+      SourceNode interaction,
+      Map<String, String> nodeIds,
+      Map<String, MessageExport> messagesBySourceId) {
+    MessageExport start = messagesBySourceId.get(umlString(node, "start"));
+    return start != null && interaction.id().equals(umlString(start.relationship(), "interaction"));
+  }
+
+  /** The occurrence of {@code messageId} that sits on {@code lifelineId}, send or receive. */
+  private static String occurrenceOnLifeline(
+      String messageId, String lifelineId, Map<String, MessageExport> messagesBySourceId) {
+    MessageExport message = messageId == null ? null : messagesBySourceId.get(messageId);
+    if (message == null || lifelineId == null) {
+      return null;
+    }
+    if (lifelineId.equals(message.relationship().target())) {
+      return message.receiveEventId();
+    }
+    return lifelineId.equals(message.relationship().source()) ? message.sourceEventId() : null;
   }
 
   private record CombinedFragmentExport(

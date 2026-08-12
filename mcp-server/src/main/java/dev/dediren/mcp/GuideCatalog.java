@@ -41,6 +41,8 @@ public final class GuideCatalog {
     topics.put("fragments", "Fragments");
     topics.put("profiles", "Semantic Profiles");
     topics.put("archimate", "ArchiMate Handoff");
+    topics.put("uml-class", "UML Class Handoff");
+    topics.put("uml-export", "UML Export Contract");
     topics.put("commands", "Command Handoff");
     topics.put("build", "Build");
     topics.put("diff-query", "Diff & Query");

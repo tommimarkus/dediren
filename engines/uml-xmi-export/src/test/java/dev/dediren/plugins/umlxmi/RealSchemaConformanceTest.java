@@ -106,7 +106,7 @@ class RealSchemaConformanceTest {
 
     assertThat(result.orElseThrow().value().content())
         .contains("<uml:Model")
-        .contains("<umldi:UMLDiagram")
+        .contains("<umldi:UMLClassDiagram")
         .contains("<dc:Bounds");
     assertThat(result.orElseThrow().diagnostics())
         .anySatisfy(

@@ -1,5 +1,6 @@
 package dev.dediren.semantics.graph;
 
+import dev.dediren.contracts.Diagnostic;
 import dev.dediren.contracts.layout.LayoutNodeRole;
 import dev.dediren.contracts.source.GenericGraphPluginData;
 import dev.dediren.contracts.source.GenericGraphView;
@@ -21,8 +22,9 @@ import tools.jackson.databind.JsonNode;
 public final class GraphNotationSemantics implements NotationSemantics {
 
   @Override
-  public void validate(SourceDocument source, GenericGraphPluginData pluginData) {
-    // The plain graph profile imposes no notation legality rules.
+  public List<Diagnostic> validate(SourceDocument source, GenericGraphPluginData pluginData) {
+    // The plain graph profile imposes no notation legality rules, so it has nothing to report.
+    return List.of();
   }
 
   // Preserves the old generic-graph base loop's profile-independent lifeline/interaction role

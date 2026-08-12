@@ -39,6 +39,7 @@ class GoldenExportRegenerator {
             ((ObjectNode) input.at("/source/relationships/0/properties/uml"))
                 .remove("message_sort"));
     write("uml-sequence-fragments", "valid-uml-sequence-fragments", "uml-sequence-fragments", null);
+    write("uml-sequence-lifecycle", "valid-uml-sequence-lifecycle", "uml-sequence-lifecycle", null);
     write(
         "uml-state-machine-basic",
         "valid-uml-state-machine-basic",

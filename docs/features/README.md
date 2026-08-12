@@ -2,7 +2,7 @@
 
 `dediren` is a contract-first diagram pipeline for agentic tools. It turns a
 semantic, plugin-typed JSON model into generated layout geometry, rendered SVG,
-ArchiMate 3.2 OEF XML, or UML 2.5.1 XMI XML through explicit CLI commands
+ArchiMate Open Exchange Format 3.1 XML, or UML 2.5.1 XMI XML through explicit CLI commands
 backed by in-process first-party engines.
 
 This directory is **feature reference documentation**: a capability-by-capability
@@ -45,7 +45,7 @@ or the token-efficient authoring guide in
 | [Engine Runtime](engine-runtime.md) | The engine contract, the five first-party engines, and runtime diagnostics |
 | [Layout (ELK)](layout.md) | The official Java ELK plugin, layout modes (`flow`/`packed`/`auto`), and `validate-layout` quality metrics |
 | [SVG Rendering](svg-render.md) | The render plugin, render policies, and the `artifacts[]` result shape |
-| [Exports (OEF & XMI)](exports.md) | ArchiMate 3.2 OEF and UML 2.5.1 XMI export, plus the supported UML notation coverage |
+| [Exports (OEF & XMI)](exports.md) | ArchiMate Open Exchange Format 3.1 and UML 2.5.1 XMI export, plus the supported UML notation coverage |
 | [Contracts & Schemas](contracts-and-schemas.md) | Public schemas, command envelopes, diagnostics, and version/compatibility signals |
 | [Distribution & Runtime](distribution-and-runtime.md) | The agent bundle, its single launcher, environment variables, supply-chain artifacts, and versioning |
 

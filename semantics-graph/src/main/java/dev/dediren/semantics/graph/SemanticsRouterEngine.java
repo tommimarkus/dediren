@@ -1,6 +1,7 @@
 package dev.dediren.semantics.graph;
 
 import dev.dediren.contracts.ContractVersions;
+import dev.dediren.contracts.Diagnostic;
 import dev.dediren.contracts.DiagnosticCode;
 import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.contracts.layout.SemanticValidationResult;
@@ -93,7 +94,10 @@ public final class SemanticsRouterEngine implements SemanticsEngine {
           "unsupported semantic profile: " + profile,
           "profile");
     }
-    notations.get(requested).validate(source, pluginData);
+    // The notation's own diagnostics ride the envelope: a construct the standard deprecates but
+    // permits, or a house rule this product enforces that the standard does not. Neither is a
+    // rejection, and neither should be silent.
+    List<Diagnostic> notationDiagnostics = notations.get(requested).validate(source, pluginData);
 
     return new EngineResult<>(
         new SemanticValidationResult(
@@ -101,7 +105,7 @@ public final class SemanticsRouterEngine implements SemanticsEngine {
             profile,
             source.nodes().size(),
             source.relationships().size()),
-        List.of());
+        notationDiagnostics);
   }
 
   @Override
