@@ -228,16 +228,28 @@ final class RelationshipLegality {
   }
 
   /**
-   * The two cross-type specializations the specification itself defines, each one-way: a Contract
-   * is a specialization of a Business Object (&sect;8.4.2) and a Constraint is a specialization of
-   * a Requirement (&sect;6, Figure 34).
+   * The two cross-type specializations the specification itself defines: a Contract is a
+   * specialization of a Business Object (&sect;8.4.2) and a Constraint is a specialization of a
+   * Requirement (&sect;6). Accepted in either direction.
    *
-   * <p>Direction matters. &sect;5.4.1 names the roles <em>specializes</em> and <em>specialized
-   * by</em>, so accepting the reverse would assert that a business object is a kind of contract.
+   * <p>Either direction looks wrong and is not. Those are <em>metamodel</em> statements &mdash;
+   * Contract is a subtype of BusinessObject, and "the relationships that apply to a business object
+   * also apply to a contract" (&sect;8.4.2) &mdash; not a restriction on which way a modeller may
+   * draw the arrow. Appendix B.5 derives the pair through that inheritance and allows both
+   * directions, because a specialization between a BusinessObject and a Contract <em>is</em>
+   * &sect;5.4.2's same-type rule: a Contract counts as a Business Object.
+   *
+   * <p>Narrowed to one direction on 2026-08-12 and reverted the same day, when running the
+   * Appendix-B oracle produced exactly two false negatives &mdash; both of them here. Reading the
+   * arrow's direction off the prose was the mistake: legality asks which type pairs may be
+   * connected, which metamodel inheritance makes symmetric, and that is a different question from
+   * what the drawn relationship then asserts.
    */
-  private static boolean isDefinedSpecialization(String specific, String general) {
-    return (specific.equals("Contract") && general.equals("BusinessObject"))
-        || (specific.equals("Constraint") && general.equals("Requirement"));
+  private static boolean isDefinedSpecialization(String a, String b) {
+    return (a.equals("Contract") && b.equals("BusinessObject"))
+        || (a.equals("BusinessObject") && b.equals("Contract"))
+        || (a.equals("Constraint") && b.equals("Requirement"))
+        || (a.equals("Requirement") && b.equals("Constraint"));
   }
 
   /**

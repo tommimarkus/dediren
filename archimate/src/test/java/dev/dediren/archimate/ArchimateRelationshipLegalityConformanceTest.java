@@ -264,15 +264,21 @@ class ArchimateRelationshipLegalityConformanceTest {
   }
 
   @Test
-  void specializationIsDirectional() {
-    // §5.4.1 names the roles `specializes` / `specialized by`, so the relationship is not
-    // symmetric. §8.4.2 states a Contract is a specialization of a Business Object and §6's
-    // Figure 34 draws the arrowhead from Constraint to Requirement, so the defined cross-type
-    // pairs run one way only — the reverse asserts a business object is a kind of contract.
+  void definedCrossTypeSpecializationIsLegalInBothDirections() {
+    // Reads as though it should be directional, and is not. §8.4.2's "a contract is a
+    // specialization of a business object" is a *metamodel* statement — Contract is a subtype of
+    // BusinessObject, and its relationships are inherited — not a rule about which way the arrow
+    // may point. Appendix B.5 derives the pair through that inheritance and allows both
+    // directions, because the edge is really §5.4.2's same-type rule.
+    //
+    // This was asserted as directional on 2026-08-12 and corrected the same day: the Appendix-B
+    // oracle rejected exactly these two triples as false negatives, and nothing else.
     assertThat(allowed("Specialization", "Contract", "BusinessObject")).isTrue();
+    assertThat(allowed("Specialization", "BusinessObject", "Contract")).isTrue();
     assertThat(allowed("Specialization", "Constraint", "Requirement")).isTrue();
-    assertThat(allowed("Specialization", "BusinessObject", "Contract")).isFalse();
-    assertThat(allowed("Specialization", "Requirement", "Constraint")).isFalse();
+    assertThat(allowed("Specialization", "Requirement", "Constraint")).isTrue();
+    // Still not a licence for any cross-type pair.
+    assertThat(allowed("Specialization", "BusinessObject", "Requirement")).isFalse();
   }
 
   @Test
@@ -359,17 +365,21 @@ class ArchimateRelationshipLegalityConformanceTest {
   /**
    * The floor for property (2): the share of oracle-forbidden combinations the model must reject.
    *
-   * <p><b>Provenance.</b> The only rate ever measured was roughly 78%, when the category rules were
-   * first written; 0.75 was chosen as a regression backstop a little below it, not as a target. It
-   * has no other basis, and this note exists because it previously had none recorded anywhere.
+   * <p><b>Provenance.</b> Measured 2026-08-12 against an Appendix B.5 extraction of 10,620 allowed
+   * triples: <b>79.9% caught, zero false negatives</b>. The floor sits just under that, so erosion
+   * fails the gate instead of hiding in the margin — the previous 0.75 left four points of slack
+   * against a rate nobody had recorded, and a change dropping the real figure to 75.1% would have
+   * passed. Re-measure and raise it whenever the rule model changes.
    *
-   * <p>The gap between the two numbers is the constant's weakness: a change that dropped the real
-   * rate from ~78% to 75.1% would still pass. Re-measure when the rule model changes and raise the
-   * floor to just under the measured rate, so erosion cannot hide in the margin. Note also that
-   * this test is {@code assumeTrue}-skipped without a user-supplied oracle file, so in an ordinary
-   * build the constant gates nothing at all — it is a deliberate manual gate, not CI coverage.
+   * <p>The ~20% the model still accepts is the documented design point, not a backlog: the rules
+   * are expressed over the generic metamodel's element categories rather than by reproducing the
+   * copyrighted B.5 tables, and they compute no derivation closure.
+   *
+   * <p>This gate is {@code assumeTrue}-skipped without a user-supplied oracle, so an ordinary build
+   * does not run it. It is a deliberate manual check, not CI coverage — which is exactly why the
+   * two false negatives it caught on 2026-08-12 had already been committed.
    */
-  private static final double CATCH_RATE_FLOOR = 0.75;
+  private static final double CATCH_RATE_FLOOR = 0.79;
 
   @Test
   void modelMatchesRelationshipTableOracle() throws IOException {

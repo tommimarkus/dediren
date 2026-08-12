@@ -325,9 +325,10 @@ rejects a valid combination except a small, deliberately-rejected
 motivation or passive elements, and Assignment from passive, motivation, event,
 or service sources.
 
-**A green `validate` is not a conformance certificate.** Roughly a quarter of
-the endpoint combinations Appendix B forbids are still accepted, and that is a
-design point rather than a bug backlog: the rules are expressed over the generic
+**A green `validate` is not a conformance certificate.** About one endpoint
+combination in five that Appendix B forbids is still accepted — measured against
+the specification's own relationship table, the model rejects 79.9% of them and
+falsely rejects none. That is a design point rather than a bug backlog: the rules are expressed over the generic
 metamodel's element categories rather than by reproducing Appendix B's tables,
 and they do not compute the full derivation closure. Three specific gaps are
 worth knowing when a model matters:
