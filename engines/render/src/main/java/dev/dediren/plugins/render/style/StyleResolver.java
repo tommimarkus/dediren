@@ -126,12 +126,28 @@ public final class StyleResolver {
   public static ResolvedEdgeStyle edgeStyle(
       RenderPolicy policy, RenderMetadata metadata, String edgeId, ResolvedStyle base) {
     SvgStylePolicy style = policy.style();
-    SvgEdgeStyle typeStyle = null;
-    if (style != null && metadata != null && metadata.edges().containsKey(edgeId)) {
-      typeStyle = style.edgeTypeOverrides().get(metadata.edges().get(edgeId).type());
-    }
-    ResolvedEdgeStyle resolved = mergeEdgeStyle(base.edge(), typeStyle);
+    String relationshipType =
+        metadata != null && metadata.edges().containsKey(edgeId)
+            ? metadata.edges().get(edgeId).type()
+            : null;
+    SvgEdgeStyle typeStyle =
+        style == null || relationshipType == null
+            ? null
+            : style.edgeTypeOverrides().get(relationshipType);
+    // Notation before policy: the profile states what ArchiMate draws, and the policy may then
+    // restyle it. Without this layer a policy that omits a relationship type falls through to the
+    // generic house default and emits a non-ArchiMate glyph -- silently, because each type still
+    // matches whatever the policy did say about it.
+    ResolvedEdgeStyle resolved =
+        mergeEdgeStyle(base.edge(), notationStyle(policy, relationshipType));
+    resolved = mergeEdgeStyle(resolved, typeStyle);
     return mergeEdgeStyle(resolved, style == null ? null : style.edgeOverrides().get(edgeId));
+  }
+
+  private static SvgEdgeStyle notationStyle(RenderPolicy policy, String relationshipType) {
+    return "archimate".equals(policy.semanticProfile())
+        ? ArchimateEdgeNotation.forRelationshipType(relationshipType)
+        : null;
   }
 
   public static ResolvedGroupStyle groupStyle(

@@ -2109,6 +2109,31 @@ class MainTest {
     }
 
     @Test
+    void archimateProfileSuppliesItsOwnNotationWhenThePolicyDeclaresNone() throws Exception {
+      // The shipped fixture is not the notation -- the profile is. A policy that overrides no
+      // edge type at all (the repo's own self-model policy overrides exactly one) must still
+      // emit ArchiMate notation rather than falling through to the generic filled arrow.
+      ObjectNode policy = (ObjectNode) fixtureJson("fixtures/render-policy/archimate-svg.json");
+      ((ObjectNode) policy.at("/style")).remove("edge_type_overrides");
+
+      Map<String, String> signatures = emittedArchimateEdgeSignatures(policy);
+
+      assertThat(signatures)
+          .containsEntry("Triggering", "|none|filled_arrow")
+          .containsEntry("Flow", "8 5|none|filled_arrow")
+          .containsEntry("Serving", "|none|open_arrow")
+          .containsEntry("Access", "1 3|none|open_arrow")
+          .containsEntry("Influence", "8 5|none|open_arrow")
+          .containsEntry("Realization", "1 3|none|hollow_triangle")
+          .containsEntry("Specialization", "|none|hollow_triangle")
+          .containsEntry("Assignment", "|filled_circle|filled_arrow")
+          .containsEntry("Composition", "|filled_diamond|none")
+          .containsEntry("Aggregation", "|hollow_diamond|none")
+          .containsEntry("Association", "|none|none");
+      assertNoRelationshipTypesRenderIdentically("archimate", signatures);
+    }
+
+    @Test
     void umlSequenceIsStaticSvg() throws Exception {
       ObjectNode input = (ObjectNode) umlSequenceStyleInput();
 
@@ -3859,6 +3884,90 @@ class MainTest {
     }
 
     assertNoRelationshipTypesRenderIdentically(semanticProfile, signatureByType);
+  }
+
+  /** The eleven ArchiMate relationship types, in spec order (§5.1–§5.4). */
+  private static final List<String> ARCHIMATE_RELATIONSHIP_TYPES =
+      List.of(
+          "Composition",
+          "Aggregation",
+          "Assignment",
+          "Realization",
+          "Serving",
+          "Access",
+          "Influence",
+          "Association",
+          "Triggering",
+          "Flow",
+          "Specialization");
+
+  /** Renders one edge per ArchiMate relationship type under {@code policy}; type → signature. */
+  private static Map<String, String> emittedArchimateEdgeSignatures(JsonNode policy)
+      throws Exception {
+    ArrayNode nodes = JsonSupport.objectMapper().createArrayNode();
+    ArrayNode edges = JsonSupport.objectMapper().createArrayNode();
+    ObjectNode metadataEdges = JsonSupport.objectMapper().createObjectNode();
+    for (int index = 0; index < ARCHIMATE_RELATIONSHIP_TYPES.size(); index++) {
+      String relationshipType = ARCHIMATE_RELATIONSHIP_TYPES.get(index);
+      String id = "archimate-default-" + index;
+      int y = 60 + index * 48;
+      for (String end : List.of("source", "target")) {
+        nodes.add(
+            JsonSupport.objectMapper()
+                .readTree(
+                    """
+                      {"id":"%s-%d","source_id":"%s-%d","projection_id":"%s-%d",
+                       "x":%d,"y":%d,"width":80,"height":32,"label":"N"}
+                      """
+                        .formatted(
+                            end,
+                            index,
+                            end,
+                            index,
+                            end,
+                            index,
+                            "source".equals(end) ? 40 : 260,
+                            y - 16)));
+      }
+      edges.add(
+          JsonSupport.objectMapper()
+              .readTree(
+                  """
+                    {"id":"%s","source":"source-%d","target":"target-%d","source_id":"%s",
+                     "projection_id":"%s","points":[{"x":120,"y":%d},{"x":260,"y":%d}],"label":"%s"}
+                    """
+                      .formatted(id, index, index, id, id, y, y, relationshipType)));
+      metadataEdges.set(
+          id,
+          JsonSupport.objectMapper()
+              .readTree(
+                  """
+                    {"type":"%s","source_id":"%s"}
+                    """
+                      .formatted(relationshipType, id)));
+    }
+
+    Document document =
+        svgDocument(
+            okContent(
+                render(
+                    semanticRenderInput(
+                        "archimate",
+                        nodes,
+                        edges,
+                        JsonSupport.objectMapper().createObjectNode(),
+                        metadataEdges,
+                        policy))));
+
+    Map<String, String> signatures = new LinkedHashMap<>();
+    for (int index = 0; index < ARCHIMATE_RELATIONSHIP_TYPES.size(); index++) {
+      String id = "archimate-default-" + index;
+      Element path =
+          firstChildElement(groupWithAttribute(document, "data-dediren-edge-id", id), "path");
+      signatures.put(
+          ARCHIMATE_RELATIONSHIP_TYPES.get(index), emittedEdgeSignature(document, path, id));
+    }
+    return signatures;
   }
 
   /**
