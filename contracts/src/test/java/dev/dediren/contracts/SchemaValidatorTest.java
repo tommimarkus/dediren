@@ -354,7 +354,7 @@ class SchemaValidatorTest {
         .readTree(java.nio.file.Files.readString(workspaceRoot().resolve(path)));
   }
 
-  private static tools.jackson.databind.JsonNode exportResult(String artifactKind) {
+  private static tools.jackson.databind.node.ObjectNode exportResult(String artifactKind) {
     var document = dev.dediren.contracts.json.JsonSupport.objectMapper().createObjectNode();
     document.put("export_result_schema_version", "export-result.schema.v2");
     document.put("artifact_kind", artifactKind);
