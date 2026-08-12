@@ -28,9 +28,14 @@
       <groupId>info.picocli</groupId>
       <artifactId>picocli</artifactId>
     </dependency>
-    <!-- The five bundled first-party engines are compile-scope: EngineWiring wires them into the
+    <!-- The bundled first-party engines are compile-scope: EngineWiring wires them into the
          in-memory dispatch and the appassembler CLASSPATH carries them (pinned by Task 9's dist
          assertions). Only dev.dediren.cli.EngineWiring may reference these implementations. -->
+    <dependency>
+      <groupId>dev.dediren</groupId>
+      <artifactId>mermaid-import</artifactId>
+      <version>${project.version}</version>
+    </dependency>
     <dependency>
       <groupId>dev.dediren</groupId>
       <artifactId>archimate-oef-export</artifactId>

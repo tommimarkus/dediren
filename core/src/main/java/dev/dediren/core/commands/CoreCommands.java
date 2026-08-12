@@ -28,6 +28,7 @@ import dev.dediren.core.source.ValidationResult;
 import dev.dediren.engine.EngineResult;
 import dev.dediren.engine.Engines;
 import dev.dediren.engine.ExportEngine;
+import dev.dediren.engine.ImportEngine;
 import dev.dediren.engine.LayoutEngine;
 import dev.dediren.engine.RenderEngine;
 import dev.dediren.engine.SemanticsEngine;
@@ -53,6 +54,18 @@ import tools.jackson.databind.JsonNode;
  */
 public final class CoreCommands {
   private CoreCommands() {}
+
+  /** Imports external notation directly into the source-model envelope produced by its engine. */
+  public static EngineRunOutcome importCommand(
+      String engineId, String source, Map<String, String> env, Engines engines)
+      throws EngineExecutionException {
+    ImportEngine importer =
+        EngineDispatch.requireEngine(engines, engineId, "import", engines.importEngine(engineId));
+    // Import validation belongs to the parser. Re-running SourceValidator here would serialize and
+    // reparse an already-typed graph, add no safety, and make importer diagnostics
+    // non-authoritative.
+    return EngineDispatch.dispatch(engineId, () -> importer.importSource(source));
+  }
 
   public static EngineRunOutcome layoutCommand(
       String engineId, String inputText, Map<String, String> env, Engines engines)

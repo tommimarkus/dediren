@@ -31,8 +31,8 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
- * The tool handlers, one per registered MCP tool: guide, validate, diff, query, verify, status, and
- * build (model or package mode).
+ * The tool handlers, one per registered MCP tool: import, guide, validate, diff, query, verify,
+ * status, and build (model or package mode).
  *
  * <p>Each is a thin shell: confine the model-supplied paths, call the same {@code core} entry point
  * the CLI calls, and hand the resulting envelope JSON back verbatim as the tool result's text. The
@@ -56,6 +56,35 @@ public final class DedirenTools {
     this.root = root;
     this.engines = engines;
     this.env = Map.copyOf(env);
+  }
+
+  public CallToolResult importSource(CallToolRequest request) {
+    String source = stringArg(request, "source");
+    if (source == null) {
+      return error(DiagnosticCode.COMMAND_INPUT_INVALID, "import requires 'source'", null);
+    }
+    String plugin = stringArg(request, "plugin");
+    if (plugin == null) {
+      return error(DiagnosticCode.COMMAND_INPUT_INVALID, "import requires 'plugin'", null);
+    }
+    Path sourcePath;
+    try {
+      sourcePath = WorkspacePaths.resolveExisting(root, source);
+    } catch (PathOutsideRootException escape) {
+      return pathEscape(escape);
+    }
+    String text;
+    try {
+      text = readBounded(sourcePath);
+    } catch (IOException error) {
+      return readFailure("source", source, error);
+    }
+    try {
+      EngineRunOutcome outcome = CoreCommands.importCommand(plugin, text, env, engines);
+      return envelope(outcome.stdout(), outcome.exitCode() != 0);
+    } catch (EngineExecutionException failure) {
+      return engineFailure(failure);
+    }
   }
 
   public CallToolResult guide(CallToolRequest request) {

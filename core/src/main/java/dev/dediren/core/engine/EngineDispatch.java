@@ -194,7 +194,8 @@ public final class EngineDispatch {
     return engines.semantics().containsKey(engineId)
         || engines.layouts().containsKey(engineId)
         || engines.renderers().containsKey(engineId)
-        || engines.exporters().containsKey(engineId);
+        || engines.exporters().containsKey(engineId)
+        || engines.importers().containsKey(engineId);
   }
 
   private static <T> CommandEnvelope<T> successEnvelope(T value, List<Diagnostic> diagnostics) {

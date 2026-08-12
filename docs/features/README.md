@@ -40,9 +40,9 @@ or the token-efficient authoring guide in
 
 | Page | Covers |
 | --- | --- |
-| [Pipeline & Commands](pipeline-and-commands.md) | The end-to-end pipeline and every CLI command (`build`, `validate`, `project`, `layout`, `validate-layout`, `render`, `export`, `--version`) |
+| [Pipeline & Commands](pipeline-and-commands.md) | The end-to-end pipeline and every CLI command (`import`, `build`, `validate`, `project`, `layout`, `validate-layout`, `render`, `export`, `--version`) |
 | [Source Model & Views](source-model.md) | The semantic source graph, namespaced properties, views/projection, semantic profiles, and fragments |
-| [Engine Runtime](engine-runtime.md) | The engine contract, the five first-party engines, and runtime diagnostics |
+| [Engine Runtime](engine-runtime.md) | The engine contract, the bundled first-party engines, and runtime diagnostics |
 | [Layout (ELK)](layout.md) | The official Java ELK plugin, layout modes (`flow`/`packed`/`auto`), and `validate-layout` quality metrics |
 | [SVG Rendering](svg-render.md) | The render plugin, render policies, and the `artifacts[]` result shape |
 | [Exports (OEF & XMI)](exports.md) | ArchiMate Open Exchange Format 3.1 and UML 2.5.1 XMI export, plus the supported UML notation coverage |

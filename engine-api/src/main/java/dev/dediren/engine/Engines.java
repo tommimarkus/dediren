@@ -10,20 +10,31 @@ import java.util.function.Function;
 
 /**
  * Immutable in-process registry of the engines available to a build. Lookups are by capability
- * (semantics/layout/render/export) and engine id; a missing id resolves to {@link Optional#empty()}
- * rather than throwing.
+ * (semantics/layout/render/export/import) and engine id; a missing id resolves to {@link
+ * Optional#empty()} rather than throwing.
  */
 public record Engines(
     Map<String, SemanticsEngine> semantics,
     Map<String, LayoutEngine> layouts,
     Map<String, RenderEngine> renderers,
-    Map<String, ExportEngine> exporters) {
+    Map<String, ExportEngine> exporters,
+    Map<String, ImportEngine> importers) {
 
   public Engines {
     semantics = mapOrEmpty(semantics);
     layouts = mapOrEmpty(layouts);
     renderers = mapOrEmpty(renderers);
     exporters = mapOrEmpty(exporters);
+    importers = mapOrEmpty(importers);
+  }
+
+  /** Source-compatible constructor for callers compiled against the original four capabilities. */
+  public Engines(
+      Map<String, SemanticsEngine> semantics,
+      Map<String, LayoutEngine> layouts,
+      Map<String, RenderEngine> renderers,
+      Map<String, ExportEngine> exporters) {
+    this(semantics, layouts, renderers, exporters, Map.of());
   }
 
   /**
@@ -39,7 +50,23 @@ public record Engines(
         indexById(semanticsEngines, SemanticsEngine::id),
         indexById(layoutEngines, LayoutEngine::id),
         indexById(renderEngines, RenderEngine::id),
-        indexById(exportEngines, ExportEngine::id));
+        indexById(exportEngines, ExportEngine::id),
+        Map.of());
+  }
+
+  /** Builds a registry including external-source importers. */
+  public static Engines of(
+      List<? extends SemanticsEngine> semanticsEngines,
+      List<? extends LayoutEngine> layoutEngines,
+      List<? extends RenderEngine> renderEngines,
+      List<? extends ExportEngine> exportEngines,
+      List<? extends ImportEngine> importEngines) {
+    return new Engines(
+        indexById(semanticsEngines, SemanticsEngine::id),
+        indexById(layoutEngines, LayoutEngine::id),
+        indexById(renderEngines, RenderEngine::id),
+        indexById(exportEngines, ExportEngine::id),
+        indexById(importEngines, ImportEngine::id));
   }
 
   public Optional<SemanticsEngine> semanticsEngine(String id) {
@@ -56,6 +83,10 @@ public record Engines(
 
   public Optional<ExportEngine> exportEngine(String id) {
     return Optional.ofNullable(exporters.get(id));
+  }
+
+  public Optional<ImportEngine> importEngine(String id) {
+    return Optional.ofNullable(importers.get(id));
   }
 
   private static <T> Map<String, T> indexById(List<? extends T> engines, Function<T, String> id) {

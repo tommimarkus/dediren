@@ -47,7 +47,7 @@ public final class DistTool {
           "-Dstderr.encoding=UTF-8",
           "-Dfile.encoding=UTF-8");
   // Single-launcher distribution (Cutover B): the five per-plugin appassembler launchers are gone.
-  // The cli launcher hosts the five first-party engines in-process, so its classpath carries the
+  // The cli launcher hosts the bundled first-party engines in-process, so its classpath carries the
   // engine jars (+ transitives) and the packaged lib/ is verified against that one classpath.
   private static final List<Launcher> LAUNCHERS =
       List.of(new Launcher("cli/target/appassembler", "cli", "dediren"));
@@ -76,6 +76,7 @@ public final class DistTool {
           "elk-layout",
           "engine-api",
           "ir",
+          "mermaid-import",
           "mcp-server",
           "render",
           "schema-cache",
@@ -1348,6 +1349,7 @@ public final class DistTool {
         {"jsonrpc":"2.0","id":6,"method":"resources/read","params":{"uri":"dediren://schema/model.schema.json"}}
         {"jsonrpc":"2.0","id":7,"method":"resources/read","params":{"uri":"dediren://diagnostics/catalog"}}
         {"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"dediren_query","arguments":{"source":"fixtures/source/valid-archimate-oef.json","kind":"orphans"}}}
+        {"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"dediren_import","arguments":{"source":"fixtures/mermaid/flowchart-v1.mmd","plugin":"mermaid"}}}
         """,
         StandardCharsets.UTF_8);
 
@@ -1358,6 +1360,7 @@ public final class DistTool {
 
     assertContains(stdout, "\"serverInfo\"", "mcp initialize response");
     assertContains(stdout, "dediren_validate", "mcp tools/list response");
+    assertContains(stdout, "dediren_import", "mcp tools/list response");
     assertContains(stdout, "dediren_build", "mcp tools/list response");
     assertContains(stdout, "dediren_guide", "mcp tools/list response");
     assertContains(stdout, "dediren_diff", "mcp tools/list response");
@@ -1378,9 +1381,28 @@ public final class DistTool {
         "mcp diagnostics catalog response");
 
     assertMcpBuildAnswered(bundle, responses, stdout);
+    assertMcpImportAnswered(responses, stdout);
     System.out.println(
-        "mcp stdio smoke passed: 7 tools + resources, real build answered, query answered,"
+        "mcp stdio smoke passed: 8 tools + resources, import/build/query answered,"
             + " protocol-only stdout");
+  }
+
+  private static void assertMcpImportAnswered(Map<String, JsonNode> responses, String stdout)
+      throws IOException {
+    JsonNode response = responses.get("9");
+    if (response == null) {
+      throw new IllegalStateException("mcp dediren_import response (id 9) is absent: " + stdout);
+    }
+    if (response.path("result").path("isError").asBoolean()) {
+      throw new IllegalStateException("mcp dediren_import reported a tool error: " + response);
+    }
+    JsonNode envelope =
+        JsonSupport.objectMapper()
+            .readTree(response.path("result").path("content").path(0).path("text").asText());
+    if (!"model.schema.v1".equals(envelope.at("/data/model_schema_version").asText())) {
+      throw new IllegalStateException(
+          "mcp dediren_import did not return a source model: " + envelope);
+    }
   }
 
   /**

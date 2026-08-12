@@ -9,6 +9,7 @@ There is no hidden state between commands — every step is a file you can inspe
 ## The Pipeline
 
 ```text
+Mermaid flowchart -> import -> Dediren source model
 validate -> project --target layout-request -> layout -> validate-layout -> render
 validate -> project --target layout-request -> layout -> validate-layout -> export
 ```
@@ -34,6 +35,17 @@ command envelope **or** the raw `.data` artifact JSON from the previous step. So
 you can pipe envelopes straight through without unwrapping them.
 
 ## Commands
+
+### `import`
+
+Converts the documented Mermaid 11.16.1 `flowchart`/`graph` subset into a
+`model.schema.v1` generic-graph source model. It reads `--input` or bounded
+stdin and writes the standard command envelope. This is one-way conversion;
+unsupported or unsafe syntax fails atomically with exit 2.
+
+```bash
+dediren import --plugin mermaid --input diagram.mmd > imported-envelope.json
+```
 
 ### `build`
 

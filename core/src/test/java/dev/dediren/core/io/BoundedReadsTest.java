@@ -3,12 +3,27 @@ package dev.dediren.core.io;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 class BoundedReadsTest {
+
+  @Test
+  void streamReadStopsAtTheFirstByteAboveTheCeiling() throws Exception {
+    byte[] atLimit = "12345".getBytes(StandardCharsets.UTF_8);
+    assertThat(BoundedReads.readString(new ByteArrayInputStream(atLimit), 5)).isEqualTo("12345");
+
+    byte[] aboveLimit = "123456".getBytes(StandardCharsets.UTF_8);
+    assertThatThrownBy(() -> BoundedReads.readString(new ByteArrayInputStream(aboveLimit), 5))
+        .isInstanceOf(BoundedReads.FileTooLargeException.class)
+        .hasMessageContaining("6 bytes")
+        .hasMessageContaining("5 bytes");
+  }
+
   @TempDir Path temp;
 
   @Test

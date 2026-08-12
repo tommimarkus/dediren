@@ -7,6 +7,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import tools.jackson.databind.JsonNode;
 
 class CliImportCommandTest {
   @TempDir Path temp;
@@ -17,21 +18,70 @@ class CliImportCommandTest {
     String mermaid = "flowchart RL\nA[One] --> B[Two]\n";
     Files.writeString(source, mermaid);
 
-    CliResult file = Main.executeForTesting(new String[] {"import", "--plugin", "mermaid", "--input", source.toString()}, "");
-    CliResult stdin = Main.executeForTesting(new String[] {"import", "--plugin", "mermaid"}, mermaid);
+    CliResult file =
+        Main.executeForTesting(
+            new String[] {"import", "--plugin", "mermaid", "--input", source.toString()}, "");
+    CliResult stdin =
+        Main.executeForTesting(new String[] {"import", "--plugin", "mermaid"}, mermaid);
 
     assertThat(file.exitCode()).isZero();
     assertThat(stdin.exitCode()).isZero();
-    assertThat(JsonSupport.objectMapper().readTree(file.stdout()).at("/data/plugins/generic-graph/views/0/layout_preferences/direction").asText()).isEqualTo("left");
+    assertThat(
+            JsonSupport.objectMapper()
+                .readTree(file.stdout())
+                .at("/data/plugins/generic-graph/views/0/layout_preferences/direction")
+                .asText())
+        .isEqualTo("left");
     assertThat(stdin.stdout()).isEqualTo(file.stdout());
   }
 
   @Test
   void importRejectsMalformedInputWithThePublishedExitCodeAndLocation() throws Exception {
-    CliResult result = Main.executeForTesting(new String[] {"import", "--plugin", "mermaid"}, "flowchart TD\nA -->\n");
+    CliResult result =
+        Main.executeForTesting(
+            new String[] {"import", "--plugin", "mermaid"}, "flowchart TD\nA -->\n");
 
     assertThat(result.exitCode()).isEqualTo(2);
-    assertThat(JsonSupport.objectMapper().readTree(result.stdout()).at("/diagnostics/0/code").asText()).isEqualTo("DEDIREN_MERMAID_SYNTAX_INVALID");
-    assertThat(JsonSupport.objectMapper().readTree(result.stdout()).at("/diagnostics/0/path").asText()).isEqualTo("line 2, column 6");
+    assertThat(
+            JsonSupport.objectMapper().readTree(result.stdout()).at("/diagnostics/0/code").asText())
+        .isEqualTo("DEDIREN_MERMAID_SYNTAX_INVALID");
+    assertThat(
+            JsonSupport.objectMapper().readTree(result.stdout()).at("/diagnostics/0/path").asText())
+        .isEqualTo("line 2, column 6");
+    assertThat(JsonSupport.objectMapper().readTree(result.stdout()).has("data")).isFalse();
+  }
+
+  @Test
+  void importedModelValidatesAndRendersThroughTheRealPipeline() throws Exception {
+    Path root = dev.dediren.testsupport.TestSupport.workspaceRoot();
+    CliResult imported =
+        Main.executeForTesting(
+            new String[] {"import", "--plugin", "mermaid"},
+            "flowchart LR\nClient[Client] --> API[API] --> Store[(Store)]\n");
+    JsonNode importedEnvelope = JsonSupport.objectMapper().readTree(imported.stdout());
+    Path model = temp.resolve("imported.json");
+    Files.writeString(
+        model, JsonSupport.objectMapper().writeValueAsString(importedEnvelope.get("data")));
+
+    CliResult validation =
+        Main.executeForTesting(new String[] {"validate", "--input", model.toString()}, "");
+    Path out = temp.resolve("rendered");
+    CliResult build =
+        Main.executeForTesting(
+            new String[] {
+              "build",
+              "--input",
+              model.toString(),
+              "--out",
+              out.toString(),
+              "--render-policy",
+              root.resolve("fixtures/render-policy/default-svg.json").toString()
+            },
+            "");
+
+    assertThat(validation.exitCode()).describedAs(validation.stdout()).isZero();
+    assertThat(build.exitCode()).describedAs(build.stdout()).isZero();
+    assertThat(Files.readString(out.resolve("main/diagram.svg")))
+        .contains("<svg", "Client", "API", "Store");
   }
 }

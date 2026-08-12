@@ -24,7 +24,7 @@ The `dist-build` profile produces an agent-ready archive under `dist/`:
 ```text
 dediren-agent-bundle-<version>/
   bin/
-    dediren       the single launcher (hosts all five engines in-process)
+    dediren       the single launcher (hosts all bundled engines in-process)
   lib/
   schemas/
   fixtures/

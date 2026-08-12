@@ -34,7 +34,7 @@ class ArchitectureRulesTest {
   private static final String PLUGINS = "dev.dediren.plugins..";
   private static final String IR = "dev.dediren.ir..";
 
-  // The four remaining first-party plugins.* engines, keyed by their retained
+  // The first-party plugins.* engines, keyed by their retained
   // dev.dediren.plugins.* package names (§12 debt: the package rename did not follow the
   // engines/ directory move). The fifth former engine, generic-graph, was carved into the
   // three dev.dediren.semantics.* modules below (Plan B P3).
@@ -42,6 +42,7 @@ class ArchitectureRulesTest {
   private static final String ELK_LAYOUT = "dev.dediren.plugins.elklayout..";
   private static final String ARCHIMATE_OEF = "dev.dediren.plugins.archimateoef..";
   private static final String UML_XMI = "dev.dediren.plugins.umlxmi..";
+  private static final String MERMAID_IMPORT = "dev.dediren.plugins.mermaid..";
 
   // The three semantics-carve modules (Plan B P3): semantics-graph hosts the base projection
   // and profile router; semantics-archimate and semantics-uml are the notation front ends.
@@ -70,6 +71,7 @@ class ArchitectureRulesTest {
     int elkLayoutClasses = 0;
     int archimateOefClasses = 0;
     int umlXmiClasses = 0;
+    int mermaidImportClasses = 0;
     int irClasses = 0;
     int semanticsGraphClasses = 0;
     int semanticsArchimateClasses = 0;
@@ -89,6 +91,8 @@ class ArchitectureRulesTest {
         archimateOefClasses++;
       } else if (packageName.startsWith("dev.dediren.plugins.umlxmi")) {
         umlXmiClasses++;
+      } else if (packageName.startsWith("dev.dediren.plugins.mermaid")) {
+        mermaidImportClasses++;
       } else if (packageName.startsWith("dev.dediren.ir")) {
         irClasses++;
       } else if (packageName.startsWith("dev.dediren.semantics.graph")) {
@@ -112,6 +116,9 @@ class ArchitectureRulesTest {
         .isPositive();
     assertThat(umlXmiClasses)
         .as("uml-xmi-export engine production classes on the classpath")
+        .isPositive();
+    assertThat(mermaidImportClasses)
+        .as("mermaid-import engine production classes on the classpath")
         .isPositive();
     assertThat(irClasses).as("ir production classes on the classpath").isPositive();
     assertThat(semanticsGraphClasses)
@@ -283,16 +290,17 @@ class ArchitectureRulesTest {
 
   @Test
   void enginesDoNotDependOnEachOther() {
-    // The four remaining plugins.* engines are independent leaf libraries behind engine-api
+    // The plugins.* engines are independent leaf libraries behind engine-api
     // (§2, §5); shared code between them flows only through contracts, engine-api, archimate,
     // uml, or schema-cache — never a direct engine-to-engine edge. Checked pairwise: for each
-    // engine, no class in its package may depend on any of the other three engine packages.
+    // engine, no class in its package may depend on any of the other engine packages.
     // The former fifth engine, generic-graph, was carved into the semantics-* modules, whose own
     // independence is asserted separately by semanticsModulesAreIndependentAndLeaf.
     Map<String, String> enginePackages =
         Map.of(
             "render", RENDER,
             "elk-layout", ELK_LAYOUT,
+            "mermaid-import", MERMAID_IMPORT,
             "archimate-oef-export", ARCHIMATE_OEF,
             "uml-xmi-export", UML_XMI);
     for (Map.Entry<String, String> engine : enginePackages.entrySet()) {

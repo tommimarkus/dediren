@@ -330,8 +330,8 @@ class DistModuleTest {
 
   @Test
   void launcherInstallDirsCollapseToTheSingleCliLauncher() {
-    // Cutover B: the five per-plugin appassembler launchers are gone; only the cli launcher (which
-    // now carries the five engine jars on its classpath) is staged into the bundle.
+    // Cutover B: the per-plugin appassembler launchers are gone; only the cli launcher (which
+    // carries every bundled engine jar on its classpath) is staged into the bundle.
     assertThat(DistTool.launcherInstallDirs()).containsExactly("cli/target/appassembler");
   }
 

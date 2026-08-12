@@ -78,6 +78,7 @@ Stable Dependencies Principle).
 | `semantics-archimate` (engine) | `engine-api`, `contracts`, `archimate`, `ir` | 2 — leaf engine |
 | `semantics-uml` (engine) | `engine-api`, `contracts`, `uml`, `ir` | 2 — leaf engine |
 | `elk-layout` (engine) | `engine-api`, `contracts`, `ir` | 2 — leaf engine |
+| `mermaid-import` (engine) | `engine-api`, `contracts` | 2 — leaf import engine |
 | `archimate-oef-export` (engine) | `engine-api`, `contracts`, `archimate`, `schema-cache` | 2 — leaf engine |
 | `uml-xmi-export` (engine) | `engine-api`, `contracts`, `uml`, `schema-cache` | 2 — leaf engine |
 | `mcp-server` | `contracts`, `core`, `engine-api` | 3 — protocol adapter |
@@ -97,7 +98,8 @@ Rules that fall out of this table and must be enforced, not just hoped for:
   `LaidOutScene` instead of the `contracts` `LayoutRequest` / `LayoutResult`
   records, adding the new `engine-api → ir` (and downstream `core → ir`,
   `elk-layout → ir`, `render → ir`) compile edges recorded in the table above.
-  `ExportRequest` is the one boundary that did **not** flip: it is a wire
+  `ImportEngine` also remains record-based: it converts external text directly
+  to a typed `SourceDocument`. `ExportRequest` is the downstream boundary that did **not** flip: it is a wire
   contract (`export-request.schema.v1`) built from `contracts.LayoutResult`,
   and a `contracts → ir` edge is a cycle forbidden by ADP and the ArchUnit
   `internalPackagesAreAcyclic` rule, so export keeps consuming
@@ -116,7 +118,7 @@ Rules that fall out of this table and must be enforced, not just hoped for:
   engines only through the `engine-api` interfaces and the `contracts` records.
 - **`cli` confines the engine-implementation edge to one class.** `cli` depends
   on `core`, `contracts`, and `engine-api` for orchestration, and on the
-  engine implementations — the four remaining `dev.dediren.plugins.*` engines
+  engine implementations — the `dev.dediren.plugins.*` engines
   plus the three `semantics-*` carve modules (Plan B P3) — only inside
   `EngineWiring`, which constructs them explicitly (no `ServiceLoader`, no
   `PATH`, no runtime discovery). ArchUnit pins the edge to that single named
@@ -126,7 +128,7 @@ Rules that fall out of this table and must be enforced, not just hoped for:
   an engine implementation, a notation core, or `cli`. ArchUnit pins both
   (`mcpDependsOnNoEngineImplementationAndNoCli`, `mcpDependsOnNoNotationCore`). The
   `cli → mcp-server` edge is the entrypoint wiring its adapter; the reverse would be a cycle.
-- **The four remaining `dev.dediren.plugins.*` engines live under
+- **The `dev.dediren.plugins.*` engines live under
   `engines/<name>`** (directory move landed 2026-07-08); their packages are
   retained debt — see §12. The former fifth engine, `generic-graph`, was
   carved (Plan B P3) into three top-level modules — `semantics-graph` (the
@@ -210,12 +212,13 @@ charter below is the contract for "what changes for this reason lives here."
   — the model shared library *should* look like (*reuse-or-migrate*: "stable,
   boring, owned mechanics").
 
-- **Engines** (`render`, `elk-layout`, `archimate-oef-export`,
+- **Engines** (`mermaid-import`, `render`, `elk-layout`, `archimate-oef-export`,
   `uml-xmi-export`) — leaf library modules behind `engine-api`, each owning one
   backend concern: SVG rendering, ELK layout, ArchiMate OEF export, UML/XMI
   export. Each owns its backend-specific policy and *only* that. Styling lives
   in render; OEF semantics in the OEF engine; XMI semantics in the XMI engine;
-  layout geometry in ELK. (Their former standalone `Main` executables and
+  layout geometry in ELK; Mermaid grammar recognition, normalization, and
+  mapping in `mermaid-import`. (Their former standalone `Main` executables and
   per-engine launchers were retired by the single-launcher distribution
   cutover (Cutover B); each `Main` survives only as an `src/test/java`
   envelope-shaped test harness — no `main()`, no launcher script.)
@@ -613,7 +616,7 @@ Guidelines that are not checked become folklore. The enforceable core:
   monolith cutover moved that enforcement to compile time.
   `ArchitectureRulesTest` (`dist-tool`) is the enforcement: `enginesDoNotDependOnCore`
   and `coreDoesNotDependOnEngineImplementations` pin the core↔engine edge,
-  `enginesDoNotDependOnEachOther` asserts the four remaining
+  `enginesDoNotDependOnEachOther` asserts the `dev.dediren.plugins.*`
   `dev.dediren.plugins.*` engines are pairwise independent and
   `semanticsModulesAreIndependentAndLeaf` asserts the same for the three
   `semantics-*` carve modules, `svgEmitterDoesNotImportElk` and
@@ -622,7 +625,7 @@ Guidelines that are not checked become folklore. The enforceable core:
   emitter"), and `onlyEngineWiringTouchesEngineImplementations` confines the
   cli-to-engine-implementation edge to the single `EngineWiring` class. A
   `reactorProductionClassesWereImported` guard keeps every rule non-vacuous by
-  asserting each constrained package (core, engine-api, each of the four
+  asserting each constrained package (core, engine-api, each
   `plugins.*` engine packages, and each of the three `semantics-*` packages
   individually) actually has classes on the test classpath.
   `EngineDispatchTest` (core) and the cli engine-envelope regression tests back

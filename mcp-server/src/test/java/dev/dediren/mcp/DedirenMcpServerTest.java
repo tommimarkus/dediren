@@ -48,6 +48,7 @@ class DedirenMcpServerTest {
       assertThat(names)
           .containsExactlyInAnyOrder(
               "dediren_validate",
+              "dediren_import",
               "dediren_build",
               "dediren_guide",
               "dediren_diff",
@@ -65,11 +66,12 @@ class DedirenMcpServerTest {
     try {
       List<String> names = server.listTools().stream().map(Tool::name).toList();
 
-      // The four analysis tools are read-only, so they stay registered under --read-only; only the
-      // artifact-writing build tool drops out.
+      // Import and the analysis tools are read-only, so they stay registered under --read-only;
+      // only the artifact-writing build tool drops out.
       assertThat(names)
           .containsExactlyInAnyOrder(
               "dediren_validate",
+              "dediren_import",
               "dediren_guide",
               "dediren_diff",
               "dediren_query",
@@ -91,6 +93,7 @@ class DedirenMcpServerTest {
     // the schema level — DedirenTools enforces the per-lane requirement in its handler.
     Map<String, List<String>> expectedRequired =
         Map.of(
+            "dediren_import", List.of("source", "plugin"),
             "dediren_validate", List.of("source"),
             "dediren_diff", List.of("old", "new"),
             "dediren_query", List.of("source", "kind"),

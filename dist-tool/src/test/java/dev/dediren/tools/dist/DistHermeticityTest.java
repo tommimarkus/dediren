@@ -73,6 +73,7 @@ class DistHermeticityTest {
         .containsExactly(
             "dep-alpha-1.0.0.jar",
             "cli-module-" + VERSION + ".jar",
+            "mermaid-import-module-" + VERSION + ".jar",
             "generic-graph-module-" + VERSION + ".jar",
             "elk-layout-module-" + VERSION + ".jar",
             "render-module-" + VERSION + ".jar",
@@ -144,11 +145,17 @@ class DistHermeticityTest {
 
   /** The engine module jars the collapsed cli launcher now carries on its classpath. */
   private static final List<String> ENGINE_MODULE_JARS =
-      List.of("generic-graph", "elk-layout", "render", "archimate-oef-export", "uml-xmi-export");
+      List.of(
+          "mermaid-import",
+          "generic-graph",
+          "elk-layout",
+          "render",
+          "archimate-oef-export",
+          "uml-xmi-export");
 
   /**
    * Writes the single appassembler-shaped cli launcher whose CLASSPATH declares its own module jar,
-   * a shared dependency jar, and the five engine module jars (the collapsed per-plugin classpaths),
+   * a shared dependency jar, and the six engine module jars (the collapsed per-plugin classpaths),
    * and stages exactly those jars in {@code lib/}. The packaged {@code lib/} must equal this set.
    */
   private static void writeCliLauncher(Path root) throws Exception {

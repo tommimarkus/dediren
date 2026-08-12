@@ -92,6 +92,7 @@ public final class Main {
       InputStream stdin, PrintWriter stdout, PrintWriter stderr, Map<String, String> env) {
     Engines engines = EngineWiring.defaults();
     CommandLine commandLine = new CommandLine(new Main(stdin, env));
+    commandLine.addSubcommand("import", new ImportCommand(stdin, env, engines));
     commandLine.addSubcommand("validate", new ValidateCommand(stdin, env, engines));
     commandLine.addSubcommand("project", new ProjectCommand(stdin, env, engines));
     commandLine.addSubcommand("diff", new DiffCommand());
@@ -107,6 +108,41 @@ public final class Main {
     commandLine.setOut(stdout);
     commandLine.setErr(stderr);
     return commandLine;
+  }
+
+  @Command(name = "import", description = "Import an external diagram into Dediren source JSON")
+  static final class ImportCommand implements Callable<Integer> {
+    private final InputStream stdin;
+    private final Map<String, String> env;
+    private final Engines engines;
+
+    @Option(names = "--plugin", required = true)
+    private String plugin;
+
+    @Option(names = "--input")
+    private Path input;
+
+    @Spec private CommandSpec spec;
+
+    ImportCommand(InputStream stdin, Map<String, String> env, Engines engines) {
+      this.stdin = stdin;
+      this.env = env;
+      this.engines = engines;
+    }
+
+    @Override
+    public Integer call() throws Exception {
+      JsonInputText inputText = readInput("input", input, stdin);
+      if (inputText.error() != null) {
+        return writeEnvelope(spec, inputText.error(), CommandExitCode.INPUT_ERROR);
+      }
+      try {
+        return writePluginOutcome(
+            spec, CoreCommands.importCommand(plugin, inputText.text(), env, engines));
+      } catch (EngineExecutionException error) {
+        return writePluginError(spec, error);
+      }
+    }
   }
 
   @Command(name = "validate", description = "Validate source JSON")
@@ -703,7 +739,7 @@ public final class Main {
     if (input == null) {
       try {
         return new JsonInputText(
-            new String(stdin.readAllBytes(), StandardCharsets.UTF_8), null, null);
+            BoundedReads.readString(stdin, SourceLimits.DEFAULT.maxInputFileBytes()), null, null);
       } catch (IOException error) {
         return new JsonInputText(null, null, commandInputError(label, null, error));
       }

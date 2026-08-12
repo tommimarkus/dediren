@@ -28,4 +28,11 @@ class XmlTextTest {
     assertThat(XmlText.scrub(clean)).isSameAs(clean);
     assertThat(XmlText.scrub(null)).isNull();
   }
+
+  @Test
+  void publicEscapersHandleMarkupAndNullWithoutEmittingXmlSyntax() {
+    assertThat(XmlText.text("A & <B>")).isEqualTo("A &amp; &lt;B&gt;");
+    assertThat(XmlText.attr("say \"A & B\"")).isEqualTo("say &quot;A &amp; B&quot;");
+    assertThat(XmlText.text(null)).isEmpty();
+  }
 }

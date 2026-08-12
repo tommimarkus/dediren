@@ -21,6 +21,43 @@ repair failures.
    stage, inspect an intermediate result, or reuse a cached stage output.
 5. Inspect stdout JSON `.status` and `.diagnostics[]`; do not parse stderr.
 
+If the starting point is a Mermaid flowchart, run
+`dediren import --plugin mermaid --input diagram.mmd` (or pipe the diagram on
+stdin), save the envelope's `.data` as the source model, then continue at step
+3. Import is deliberately one-way; Dediren does not export Mermaid.
+
+## Mermaid Flowchart Import
+
+Dediren implements a native Java subset based on the
+[Mermaid 11.16.1 flowchart grammar](https://github.com/mermaid-js/mermaid/blob/mermaid@11.16.1/packages/mermaid/src/diagrams/flowchart/parser/flow.jison).
+It accepts one `flowchart` or `graph` diagram with root
+directions `TB`/`TD`, `BT`, `LR`, or `RL`; common node shapes and Unicode
+labels; `-->` edges, labels, and chains; `%%` comments; semicolon-separated
+statements; and nested `subgraph` blocks. Output is a `model.schema.v1`
+generic-graph model with `generic.node` / `generic.link`, view `main`, the root
+direction, and layout-only groups for subgraphs.
+
+Presentation-only shapes and `style`, `class`, `classDef`, `linkStyle`, and
+subgraph `direction` hints are discarded and summarized by one
+`DEDIREN_MERMAID_HINT_IGNORED` warning. Interactive `click`/`href`, external
+resources, HTML, image syntax, unsupported diagram families, ambiguous
+subgraphs, and non-solid or bidirectional edges fail atomically with exit 2;
+an error envelope contains no partial model.
+
+IDs already legal under Dediren's
+`^[A-Za-z0-9][A-Za-z0-9._-]*$` contract are preserved and reserved first.
+Other accepted Mermaid IDs are normalized deterministically: runs of ASCII
+punctuation become `-`, each non-ASCII code point becomes `-u` plus lowercase
+hex (at least four digits), leading punctuation is prefixed with `node-`, and
+collisions receive `-2`, `-3`, and so on in source order. A changed node keeps
+its original under `properties.mermaid.original_id`.
+
+Limits are 64 MiB UTF-8 input, 200000 statements, 100000 produced nodes plus
+relationships plus groups, 256 nested groups, and 64 KiB UTF-8 per token or
+label. At the ceiling is accepted; the first value above it is rejected with a
+`DEDIREN_MERMAID_*_LIMIT_EXCEEDED` (or `INPUT_TOO_LARGE`) diagnostic at `$`.
+Syntax and compatibility errors report a 1-based `line N, column N` path.
+
 ## MCP Server
 
 `dediren mcp` runs an MCP stdio server so an agent can drive Dediren as tools
@@ -28,10 +65,14 @@ instead of shelling out. Register it once:
 
     claude mcp add dediren -- /path/to/bundle/bin/dediren mcp --root /path/to/your/project
 
-Seven tools in writable mode:
+Eight tools in writable mode:
 
 - `dediren_guide` — this document, one section at a time. Pass `topic`, or omit
   it to list the topics. Start with `topic: "source-json"`.
+- `dediren_import` — `source` (a Mermaid file path) and `plugin: "mermaid"`.
+  Returns the imported model envelope without writing files. The source path
+  is confined to `--root`, and this tool remains available under
+  `--read-only`.
 - `dediren_validate` — `source` (path to a source model **or a policy
   document**: the schema-version field selects the family, so a render/export
   policy or kept layout-request gets its version gate + JSON Schema check
@@ -85,8 +126,8 @@ config-expansion time, so `${CLAUDE_PROJECT_DIR:-.}` in a hand-written
 automatically, wrap the launch in a script that reads `$CLAUDE_PROJECT_DIR` at
 runtime, as the plugin distribution does. A path that escapes `--root` returns a
 `DEDIREN_MCP_PATH_OUTSIDE_ROOT` error envelope. Launch with `--read-only` to
-withhold the artifact-writing `dediren_build`; the six read-only tools
-(`dediren_guide`, `dediren_validate`, `dediren_diff`, `dediren_query`,
+withhold the artifact-writing `dediren_build`; the seven read-only tools
+(`dediren_import`, `dediren_guide`, `dediren_validate`, `dediren_diff`, `dediren_query`,
 `dediren_verify`, `dediren_status`) all remain.
 
 Tool results carry the same envelope JSON the CLI prints on stdout, so the
@@ -1256,6 +1297,23 @@ you can recover from stdout JSON alone.
   fragments. Consolidate fragments.
 - `DEDIREN_SOURCE_ELEMENT_LIMIT_EXCEEDED`: the merged model exceeds 100000
   nodes plus relationships. Split it into separate models.
+- `DEDIREN_MERMAID_SYNTAX_INVALID`: repair the syntax at the reported 1-based
+  line and column within the supported flowchart subset.
+- `DEDIREN_MERMAID_UNSUPPORTED_DIAGRAM` /
+  `DEDIREN_MERMAID_UNSUPPORTED_CONSTRUCT` /
+  `DEDIREN_MERMAID_UNSUPPORTED_EDGE`: convert the input to one supported
+  `flowchart`/`graph`, remove the unsafe or ambiguous construct, or replace the
+  edge with a solid directed `-->` edge. Import is atomic; no partial data was
+  produced.
+- `DEDIREN_MERMAID_INPUT_TOO_LARGE` /
+  `DEDIREN_MERMAID_STATEMENT_LIMIT_EXCEEDED` /
+  `DEDIREN_MERMAID_ELEMENT_LIMIT_EXCEEDED` /
+  `DEDIREN_MERMAID_NESTING_LIMIT_EXCEEDED` /
+  `DEDIREN_MERMAID_TOKEN_LIMIT_EXCEEDED`: split or simplify the diagram below
+  the ceiling stated in the diagnostic and in `## Mermaid Flowchart Import`.
+- `DEDIREN_MERMAID_HINT_IGNORED`: import succeeded, but the named presentation
+  or subgraph-layout hints were intentionally discarded. Reapply appearance
+  through Dediren render policy if needed.
 - `DEDIREN_GENERIC_GRAPH_PLUGIN_REQUIRED`: the source has no
   `plugins.generic-graph` object. Add it with a `views` array (see
   `## Minimal Source JSON`) — every semantic-validate, project, and build call
@@ -1278,7 +1336,7 @@ you can recover from stdout JSON alone.
 - `DEDIREN_COMMAND_TARGET_UNSUPPORTED`: the `project --target` value is
   outside the accepted set — use `layout-request` or `render-metadata`.
 - `DEDIREN_PLUGIN_UNKNOWN`: unknown engine id — the bundled set is
-  `generic-graph`, `elk-layout`, `render`, `archimate-oef`, `uml-xmi`. Fix the
+  `mermaid`, `generic-graph`, `elk-layout`, `render`, `archimate-oef`, `uml-xmi`. Fix the
   `--plugin` value.
 - `DEDIREN_PLUGIN_UNSUPPORTED_CAPABILITY`: the engine id exists but not for
   this command's capability (for example asking `elk-layout` to render). Fix
