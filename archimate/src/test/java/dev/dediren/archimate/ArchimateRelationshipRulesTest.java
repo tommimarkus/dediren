@@ -105,6 +105,55 @@ class ArchimateRelationshipRulesTest {
   }
 
   @Test
+  void treatsOnlyContainerToJunctionContainmentAsContainment() {
+    // §5.5.1 allows a junction to be aggregated or composed *in* a plateau, grouping or location.
+    // Drawn the other way round it is not containment, so exempting it from the junction checks
+    // stripped an edge nothing else ever validated. The junction below is direction-complete on
+    // its own Flow edges, so the only thing the reversed Composition can do is make it mixed —
+    // which it did not, while the carve-out ran in both directions.
+    ArchimateJunctionValidationException error =
+        org.junit.jupiter.api.Assertions.assertThrows(
+            ArchimateJunctionValidationException.class,
+            () ->
+                Archimate.validateJunctionRelationshipSemantics(
+                    java.util.List.of(
+                        new JunctionValidationNode("api", "ApplicationComponent", "$.nodes[0]"),
+                        new JunctionValidationNode("junction", "AndJunction", "$.nodes[1]"),
+                        new JunctionValidationNode("orders", "ApplicationService", "$.nodes[2]"),
+                        new JunctionValidationNode("group", "Grouping", "$.nodes[3]")),
+                    java.util.List.of(
+                        new JunctionValidationRelationship("Flow", "api", "junction"),
+                        new JunctionValidationRelationship("Flow", "junction", "orders"),
+                        new JunctionValidationRelationship("Composition", "junction", "group"))));
+
+    assertThat(error.code()).isEqualTo("DEDIREN_ARCHIMATE_JUNCTION_RELATIONSHIP_MIXED");
+    assertThat(error.message()).contains("Composition", "Flow");
+  }
+
+  @Test
+  void rejectsAJunctionChainThatNeverReachesAnElement() {
+    // A cycle satisfies both direction requirements at every junction and terminates the
+    // reachable-target walk with zero endpoint pairs checked, so the relationship it stands for is
+    // never validated against anything. Degenerate, but it used to pass in silence.
+    ArchimateJunctionValidationException error =
+        org.junit.jupiter.api.Assertions.assertThrows(
+            ArchimateJunctionValidationException.class,
+            () ->
+                Archimate.validateJunctionRelationshipSemantics(
+                    java.util.List.of(
+                        new JunctionValidationNode("api", "ApplicationComponent", "$.nodes[0]"),
+                        new JunctionValidationNode("j1", "AndJunction", "$.nodes[1]"),
+                        new JunctionValidationNode("j2", "AndJunction", "$.nodes[2]")),
+                    java.util.List.of(
+                        new JunctionValidationRelationship("Flow", "api", "j1"),
+                        new JunctionValidationRelationship("Flow", "j1", "j2"),
+                        new JunctionValidationRelationship("Flow", "j2", "j1"))));
+
+    assertThat(error.code()).isEqualTo("DEDIREN_ARCHIMATE_JUNCTION_TARGET_UNREACHABLE");
+    assertThat(error.message()).contains("j1", "Flow");
+  }
+
+  @Test
   void rejectsJunctionWhoseReachableEndpointTypeIsInvalid() {
     // The junction routes a Realization whose resolved endpoints (ApplicationService ->
     // ApplicationComponent)
@@ -329,21 +378,10 @@ class ArchimateRelationshipRulesTest {
             new JunctionValidationRelationship("Composition", "location", "junction")));
   }
 
-  @Test
-  void acceptsJunctionAsContainmentSourceInGrouping() throws Exception {
-    // The reverse containment orientation — the junction as the composition source into a Grouping
-    // — must also be recognized and skipped.
-    Archimate.validateJunctionRelationshipSemantics(
-        java.util.List.of(
-            new JunctionValidationNode("api", "ApplicationComponent", "$.nodes[0]"),
-            new JunctionValidationNode("junction", "AndJunction", "$.nodes[1]"),
-            new JunctionValidationNode("orders", "ApplicationService", "$.nodes[2]"),
-            new JunctionValidationNode("group", "Grouping", "$.nodes[3]")),
-        java.util.List.of(
-            new JunctionValidationRelationship("Realization", "api", "junction"),
-            new JunctionValidationRelationship("Realization", "junction", "orders"),
-            new JunctionValidationRelationship("Composition", "junction", "group")));
-  }
+  // The reverse containment orientation — the junction as the composition source into a Grouping —
+  // was once asserted here as also recognized and skipped. §5.5.1 gives containment one direction
+  // (the container aggregates or composes the junction), so that case is now the negative in
+  // `treatsOnlyContainerToJunctionContainmentAsContainment` above.
 
   @Test
   void junctionSemanticsIgnoreRelationshipsNotIncidentToTheJunction() throws Exception {
