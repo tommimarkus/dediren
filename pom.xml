@@ -427,6 +427,22 @@
         <artifactId>maven-enforcer-plugin</artifactId>
         <executions>
           <execution>
+            <id>enforce-resources-plugin-version</id>
+            <goals>
+              <goal>enforce</goal>
+            </goals>
+            <configuration>
+              <rules>
+                <requirePluginVersions>
+                  <banMavenDefaults>false</banMavenDefaults>
+                  <additionalPlugins>
+                    <additionalPlugin>org.apache.maven.plugins:maven-resources-plugin</additionalPlugin>
+                  </additionalPlugins>
+                </requirePluginVersions>
+              </rules>
+            </configuration>
+          </execution>
+          <execution>
             <id>enforce-java-21-or-newer</id>
             <goals>
               <goal>enforce</goal>
