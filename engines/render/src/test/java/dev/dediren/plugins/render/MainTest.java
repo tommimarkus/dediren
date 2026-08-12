@@ -344,8 +344,9 @@ class MainTest {
           .extracting(path -> path.getAttribute("data-dediren-artifact-part"))
           .contains("body", "fold");
 
+      // §19.2.4: a classifier rectangle, not the Artifact dog-ear asserted just above.
       Element spec = groupWithAttribute(document, "data-dediren-node-id", "deployment-spec-orders");
-      Element specShape = firstChildElement(spec, "g");
+      Element specShape = firstChildElement(spec, "rect");
       assertThat(specShape.getAttribute("data-dediren-node-shape"))
           .isEqualTo("uml_deployment_specification");
 
@@ -1426,6 +1427,31 @@ class MainTest {
     }
 
     @Test
+    void umlDeploymentSpecificationIsAClassifierRectangleNotAnArtifact() throws Exception {
+      // UML-NOT-8 (§19.2.4): a DeploymentSpecification is a classifier rectangle carrying the
+      // «deploymentSpec» keyword. It was drawn with the Artifact dog-ear, so only the keyword
+      // text distinguished the two — and the dog-ear is what a reader actually scans for.
+      Document document =
+          svgDocument(
+              okContent(
+                  render(
+                      renderInput(
+                          "fixtures/layout-result/uml-deployment-basic.json",
+                          "fixtures/render-policy/uml-svg.json",
+                          "fixtures/render-metadata/uml-deployment-basic.json"))));
+
+      Element spec = groupWithAttribute(document, "data-dediren-node-id", "deployment-spec-orders");
+      Element specShape = firstChildElement(spec, "rect");
+      assertThat(specShape.getAttribute("data-dediren-node-shape"))
+          .isEqualTo("uml_deployment_specification");
+
+      Element artifact =
+          groupWithAttribute(document, "data-dediren-node-id", "artifact-orders-service");
+      assertThat(firstChildElement(artifact, "g").getAttribute("data-dediren-node-shape"))
+          .isEqualTo("uml_artifact");
+    }
+
+    @Test
     void umlPackageNameIsDrawnExactlyOnce() throws Exception {
       // UML-NOT-7 (§12.2.4). The name was drawn twice: once by the decorator into the tab and
       // once by the generic node-label path into the body, so a package read as name-plus-
@@ -2076,7 +2102,9 @@ class MainTest {
       String content = okContent(render(umlSequenceCreateAndDestroyStyleInput()));
       Document document = svgDocument(content);
 
-      assertThat(content).contains(">Place Order<", ">Customer<", ">Order Service<", ">Receipt<");
+      // §17.2.4.1: the interaction frame's pentagon carries the kind tag "sd" before the name.
+      assertThat(content)
+          .contains(">sd Place Order<", ">Customer<", ">Order Service<", ">Receipt<");
 
       Element customerStem =
           elementWithAttribute(document, "line", "data-dediren-sequence-lifeline-stem", "customer");

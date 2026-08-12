@@ -36,8 +36,11 @@ public final class UmlShapes {
       case UML_COMPONENT, UML_PORT -> umlNodeRect(w, node, style, shapeName, style.rx());
       case UML_NODE, UML_DEVICE, UML_EXECUTION_ENVIRONMENT ->
           umlDeploymentTargetShape(w, node, style, shapeName);
-      case UML_ARTIFACT, UML_DEPLOYMENT_SPECIFICATION ->
-          umlArtifactShape(w, node, style, shapeName);
+      case UML_ARTIFACT -> umlArtifactShape(w, node, style, shapeName);
+      // §19.2.4 draws a DeploymentSpecification as a plain classifier rectangle with the
+      // «deploymentSpec» keyword. Sharing the Artifact dog-ear left the keyword text as the
+      // only difference between them, and the dog-ear is what a reader scans for.
+      case UML_DEPLOYMENT_SPECIFICATION -> umlNodeRect(w, node, style, shapeName, style.rx());
       case UML_DECISION_NODE, UML_MERGE_NODE -> umlDiamondShape(w, node, style, shapeName);
       case UML_FORK_NODE, UML_JOIN_NODE -> umlBarShape(w, node, style, shapeName);
       case UML_PACKAGE -> umlPackageShape(w, node, style, shapeName);

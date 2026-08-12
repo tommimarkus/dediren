@@ -1,6 +1,7 @@
 package dev.dediren.uml;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.junit.jupiter.api.Named.named;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 
@@ -9,6 +10,7 @@ import dev.dediren.contracts.source.GenericGraphPluginData;
 import dev.dediren.contracts.source.SourceDocument;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
@@ -308,6 +310,55 @@ class UmlValidationTest {
 
     assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
     assertThat(error.path()).isEqualTo("$.nodes[8].properties.uml.use_case");
+  }
+
+  @Test
+  void rejectsAttributeVisibilityOutsideVisibilityKind() throws Exception {
+    // UML-VOCAB-1 / UML-NOT-5 (§7.8.24.3): visibility is an enumeration of exactly four literals,
+    // and it was unvalidated free text. That let one model produce two artifacts that disagree:
+    // the renderer's symbol switch falls through to "+" for anything it does not recognise, while
+    // the XMI writer copies the string through verbatim -- so "Private" rendered as public and
+    // exported as an invalid enumeration value, with no diagnostic on either side.
+    Fixture fixture =
+        loadMutatedUmlFixture(
+            source ->
+                (ObjectNode) nodeUmlProperties(source, "class-order").get("attributes").get(0),
+            attribute -> attribute.put("visibility", "Private"));
+
+    UmlValidationException error = assertRejected(fixture);
+
+    assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
+    assertThat(error.path()).isEqualTo("$.nodes[1].properties.uml.attributes[0].visibility");
+    assertThat(error.value()).isEqualTo("Private");
+  }
+
+  @Test
+  void rejectsOperationVisibilityOutsideVisibilityKind() throws Exception {
+    Fixture fixture =
+        loadMutatedUmlFixture(
+            source ->
+                (ObjectNode) nodeUmlProperties(source, "class-order").get("operations").get(0),
+            operation -> operation.put("visibility", "protected "));
+
+    UmlValidationException error = assertRejected(fixture);
+
+    assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
+    assertThat(error.path()).isEqualTo("$.nodes[1].properties.uml.operations[0].visibility");
+  }
+
+  @Test
+  void acceptsEveryVisibilityKindLiteral() throws Exception {
+    for (String literal : List.of("public", "private", "protected", "package")) {
+      Fixture fixture =
+          loadMutatedUmlFixture(
+              source ->
+                  (ObjectNode) nodeUmlProperties(source, "class-order").get("attributes").get(0),
+              attribute -> attribute.put("visibility", literal));
+
+      assertThatCode(() -> Uml.validateSource(fixture.source(), fixture.pluginData()))
+          .describedAs("visibility '%s' is a VisibilityKind literal", literal)
+          .doesNotThrowAnyException();
+    }
   }
 
   @Test
@@ -1592,6 +1643,15 @@ class UmlValidationTest {
         JsonSupport.objectMapper()
             .treeToValue(source.plugins().get("generic-graph"), GenericGraphPluginData.class);
     return new Fixture(source, data);
+  }
+
+  /**
+   * Mutates a node reached by {@code select} — for members nested under a node's uml properties.
+   */
+  private static Fixture loadMutatedUmlFixture(
+      java.util.function.Function<ObjectNode, ObjectNode> select, Consumer<ObjectNode> mutate)
+      throws Exception {
+    return loadMutatedUmlFixture(source -> mutate.accept(select.apply(source)));
   }
 
   private static Fixture loadMutatedUmlFixture(Consumer<ObjectNode> mutate) throws Exception {

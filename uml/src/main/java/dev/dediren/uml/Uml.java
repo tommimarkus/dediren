@@ -144,6 +144,7 @@ public final class Uml {
       SourceNode node = source.nodes().get(nodeIndex);
       validateElementType(node.type(), "$.nodes[" + nodeIndex + "].type");
       validateNodeMultiplicities(nodeIndex, node.properties().get("uml"));
+      validateNodeVisibilities(nodeIndex, node.properties().get("uml"));
     }
 
     for (int relationshipIndex = 0;
@@ -469,6 +470,47 @@ public final class Uml {
   public static void validateMultiplicity(String value, String path) throws UmlValidationException {
     if (!isValidMultiplicity(value)) {
       throw new UmlValidationException(UmlTypeKind.MULTIPLICITY, value, path);
+    }
+  }
+
+  /** {@code VisibilityKind}'s four literals (§7.8.24.3). */
+  private static final List<String> VISIBILITY_KINDS =
+      List.of("public", "private", "protected", "package");
+
+  /**
+   * Rejects a {@code visibility} outside {@code VisibilityKind}.
+   *
+   * <p>Unvalidated, this field made one model produce two artifacts that contradict each other: the
+   * renderer's symbol switch falls through to {@code "+"} for anything unrecognised, while the XMI
+   * writer copies the string through verbatim. So {@code "Private"} rendered as public and exported
+   * as an invalid enumeration value, and neither artifact said anything was wrong. The check
+   * belongs here rather than in either consumer, because failing at render would reject a model
+   * that had already validated.
+   */
+  private static void validateNodeVisibilities(int nodeIndex, JsonNode umlProperties)
+      throws UmlValidationException {
+    if (umlProperties == null) {
+      return;
+    }
+    for (String member : List.of("attributes", "operations")) {
+      JsonNode members = umlProperties.get(member);
+      if (members == null || !members.isArray()) {
+        continue;
+      }
+      for (int index = 0; index < members.size(); index++) {
+        JsonNode visibility = members.get(index).get("visibility");
+        if (visibility == null) {
+          continue;
+        }
+        String path =
+            "$.nodes[" + nodeIndex + "].properties.uml." + member + "[" + index + "].visibility";
+        if (!visibility.isTextual() || !VISIBILITY_KINDS.contains(visibility.asText())) {
+          throw new UmlValidationException(
+              UmlTypeKind.ELEMENT_PROPERTY,
+              visibility.isTextual() ? visibility.asText() : visibility.toString(),
+              path);
+        }
+      }
     }
   }
 
