@@ -12,6 +12,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
@@ -3826,6 +3829,7 @@ class MainTest {
     Document document = svgDocument(content);
 
     index = 0;
+    Map<String, String> signatureByType = new LinkedHashMap<>();
     for (var fields = edgeStyles.properties().iterator(); fields.hasNext(); ) {
       var field = fields.next();
       if (isSequenceRelationshipType(semanticProfile, field.getKey())) {
@@ -3840,11 +3844,65 @@ class MainTest {
       assertMarkerForStyle(document, path, id, "start", style.at("/marker_start").asText("none"));
       assertMarkerForStyle(
           document, path, id, "end", style.at("/marker_end").asText("filled_arrow"));
-      if ("dashed".equals(style.at("/line_style").asText())) {
-        assertThat(path.getAttribute("stroke-dasharray")).isEqualTo("8 5");
+      // Every legal lineStyle gets an arm. Leaving one out silently stops asserting that
+      // value: the policy fixture is this test's own input, so an unasserted line style is
+      // an unverified fixture edit, not a covered one.
+      String lineStyle = style.at("/line_style").asText("solid");
+      switch (lineStyle) {
+        case "dashed" -> assertThat(path.getAttribute("stroke-dasharray")).isEqualTo("8 5");
+        case "dotted" -> assertThat(path.getAttribute("stroke-dasharray")).isEqualTo("1 3");
+        case "solid" -> assertThat(path.getAttribute("stroke-dasharray")).isEmpty();
+        default -> throw new AssertionError("unhandled line_style '" + lineStyle + "'");
       }
+      signatureByType.put(field.getKey(), emittedEdgeSignature(document, path, id));
       index++;
     }
+
+    assertNoRelationshipTypesRenderIdentically(semanticProfile, signatureByType);
+  }
+
+  /**
+   * ArchiMate gives every relationship type its own line style + arrowhead pair (A.3, Table 3), so
+   * two types rendering identically is a notation defect no per-type assertion can catch — each one
+   * passes in isolation. Read from emitted bytes rather than the policy, because the policy is this
+   * test's input.
+   */
+  private static void assertNoRelationshipTypesRenderIdentically(
+      String semanticProfile, Map<String, String> signatureByType) {
+    if (!"archimate".equals(semanticProfile)) {
+      return;
+    }
+    Map<String, List<String>> typesBySignature = new LinkedHashMap<>();
+    signatureByType.forEach(
+        (type, signature) ->
+            typesBySignature.computeIfAbsent(signature, key -> new ArrayList<>()).add(type));
+    List<List<String>> collisions =
+        typesBySignature.values().stream().filter(types -> types.size() > 1).toList();
+    assertThat(collisions)
+        .describedAs(
+            "each ArchiMate relationship type must render distinguishably"
+                + " (line style + arrowheads); these groups are byte-identical: %s",
+            collisions)
+        .isEmpty();
+  }
+
+  /** The visual identity of an emitted edge: dash pattern plus both resolved marker names. */
+  private static String emittedEdgeSignature(Document document, Element path, String edgeId) {
+    return path.getAttribute("stroke-dasharray")
+        + "|"
+        + emittedMarkerName(document, path, edgeId, "start")
+        + "|"
+        + emittedMarkerName(document, path, edgeId, "end");
+  }
+
+  private static String emittedMarkerName(
+      Document document, Element path, String edgeId, String side) {
+    String markerAttribute = "data-dediren-edge-marker-" + side;
+    if (!path.hasAttribute("marker-" + side)) {
+      return "none";
+    }
+    return marker(document, "marker-" + side + "-" + edgeId, markerAttribute)
+        .getAttribute(markerAttribute);
   }
 
   private static boolean isSequenceRelationshipType(
