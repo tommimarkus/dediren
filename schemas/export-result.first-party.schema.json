@@ -5,8 +5,18 @@
   "additionalProperties": false,
   "required": ["export_result_schema_version", "artifact_kind", "content"],
   "properties": {
-    "export_result_schema_version": { "const": "export-result.schema.v1" },
+    "export_result_schema_version": { "const": "export-result.schema.v2" },
     "artifact_kind": { "enum": ["archimate-oef+xml", "uml-xmi+xml"] },
-    "content": { "type": "string" }
-  }
+    "content": { "type": "string" },
+    "assurance": { "type": ["object", "null"] }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "artifact_kind": { "const": "uml-xmi+xml" } } },
+      "then": {
+        "required": ["assurance"],
+        "properties": { "assurance": { "type": "object" } }
+      }
+    }
+  ]
 }

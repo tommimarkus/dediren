@@ -44,6 +44,7 @@ class CoverageTest {
     assertThat(coverage.hasOmissions()).isTrue();
     assertThat(coverage.hasUnrepresentedInView()).isFalse();
     assertThat(coverage.representedNodes()).isEqualTo(1);
+    assertThat(coverage.representedNodeTypes()).containsExactly(Map.entry("Class", 1));
     assertThat(coverage.omittedNodes()).isEqualTo(5);
     assertThat(coverage.omittedNodeTypes())
         .containsEntry("Interaction", 1)
@@ -55,6 +56,9 @@ class CoverageTest {
     assertThat(coverage.omittedRelationshipTypes())
         .containsEntry("Message", 2)
         .containsEntry("Deployment", 1);
+    assertThat(coverage.representedRelationshipTypes()).isEmpty();
+    assertThat(coverage.unrepresentedInViewNodeTypes()).isEmpty();
+    assertThat(coverage.unrepresentedInViewRelationshipTypes()).isEmpty();
     // Deterministic, machine-friendly histogram rendering, sorted by type.
     assertThat(Coverage.describe(coverage.omittedRelationshipTypes()))
         .isEqualTo("Deployment=1, Message=2");
@@ -76,6 +80,11 @@ class CoverageTest {
     assertThat(coverage.omittedRelationships()).isZero();
     assertThat(coverage.representedNodes()).isEqualTo(2);
     assertThat(coverage.representedRelationships()).isEqualTo(1);
+    assertThat(coverage.representedNodeTypes()).containsExactly(Map.entry("Class", 2));
+    assertThat(coverage.representedRelationshipTypes())
+        .containsExactly(Map.entry("Composition", 1));
+    assertThat(coverage.unrepresentedInViewNodeTypes()).isEmpty();
+    assertThat(coverage.unrepresentedInViewRelationshipTypes()).isEmpty();
   }
 
   @Test
@@ -95,5 +104,8 @@ class CoverageTest {
     assertThat(coverage.unrepresentedInViewRelationships()).isEqualTo(1);
     assertThat(coverage.unrepresentedInViewRelationshipTypes()).containsEntry("Generalization", 1);
     assertThat(coverage.representedNodes()).isEqualTo(2);
+    assertThat(coverage.representedNodeTypes()).containsExactly(Map.entry("Class", 2));
+    assertThat(coverage.representedRelationshipTypes()).isEmpty();
+    assertThat(coverage.unrepresentedInViewNodeTypes()).isEmpty();
   }
 }

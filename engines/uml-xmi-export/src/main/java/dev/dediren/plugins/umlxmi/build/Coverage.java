@@ -24,16 +24,20 @@ import java.util.stream.Collectors;
  */
 public record Coverage(
     int representedNodes,
+    Map<String, Integer> representedNodeTypes,
     int omittedNodes,
     Map<String, Integer> omittedNodeTypes,
     int representedRelationships,
+    Map<String, Integer> representedRelationshipTypes,
     int omittedRelationships,
     Map<String, Integer> omittedRelationshipTypes,
     Map<String, Integer> unrepresentedInViewNodeTypes,
     Map<String, Integer> unrepresentedInViewRelationshipTypes) {
 
   public Coverage {
+    representedNodeTypes = Map.copyOf(representedNodeTypes);
     omittedNodeTypes = Map.copyOf(omittedNodeTypes);
+    representedRelationshipTypes = Map.copyOf(representedRelationshipTypes);
     omittedRelationshipTypes = Map.copyOf(omittedRelationshipTypes);
     unrepresentedInViewNodeTypes = Map.copyOf(unrepresentedInViewNodeTypes);
     unrepresentedInViewRelationshipTypes = Map.copyOf(unrepresentedInViewRelationshipTypes);
@@ -62,12 +66,14 @@ public record Coverage(
       Set<String> representedNodeIds,
       Set<String> representedRelationshipIds) {
     int representedNodes = 0;
+    var representedNodeTypes = new TreeMap<String, Integer>();
     var omittedNodeTypes = new TreeMap<String, Integer>();
     var unrepresentedInViewNodeTypes = new TreeMap<String, Integer>();
     for (SourceNode node : nodes) {
       if (scope.nodeIds().contains(node.id())) {
         if (representedNodeIds.contains(node.id())) {
           representedNodes++;
+          representedNodeTypes.merge(node.type(), 1, Integer::sum);
         } else {
           unrepresentedInViewNodeTypes.merge(node.type(), 1, Integer::sum);
         }
@@ -76,12 +82,14 @@ public record Coverage(
       }
     }
     int representedRelationships = 0;
+    var representedRelationshipTypes = new TreeMap<String, Integer>();
     var omittedRelationshipTypes = new TreeMap<String, Integer>();
     var unrepresentedInViewRelationshipTypes = new TreeMap<String, Integer>();
     for (SourceRelationship relationship : relationships) {
       if (scope.relationshipIds().contains(relationship.id())) {
         if (representedRelationshipIds.contains(relationship.id())) {
           representedRelationships++;
+          representedRelationshipTypes.merge(relationship.type(), 1, Integer::sum);
         } else {
           unrepresentedInViewRelationshipTypes.merge(relationship.type(), 1, Integer::sum);
         }
@@ -91,9 +99,11 @@ public record Coverage(
     }
     return new Coverage(
         representedNodes,
+        representedNodeTypes,
         count(omittedNodeTypes),
         omittedNodeTypes,
         representedRelationships,
+        representedRelationshipTypes,
         count(omittedRelationshipTypes),
         omittedRelationshipTypes,
         unrepresentedInViewNodeTypes,

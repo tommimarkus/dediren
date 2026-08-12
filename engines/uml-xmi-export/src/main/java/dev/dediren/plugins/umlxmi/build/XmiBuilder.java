@@ -97,7 +97,7 @@ public final class XmiBuilder {
    * includes every source element so a per-view diagram can reference any of them; each diagram
    * serializes only its own view's geometry. The single-view {@link #buildXmi} stays model-only.
    */
-  public static String buildModelXmi(ModelExportRequest request, UmlXmiExportPolicy policy) {
+  public static BuiltModel buildModelXmi(ModelExportRequest request, UmlXmiExportPolicy policy) {
     ExportRequest representative =
         new ExportRequest(
             ContractVersions.EXPORT_REQUEST_SCHEMA_VERSION,
@@ -134,7 +134,18 @@ public final class XmiBuilder {
           model.relationshipIds());
     }
     xml.append("</xmi:XMI>\n");
-    return xml.toString();
+    String content = xml.toString();
+    Set<String> representedNodeIds =
+        selectedNodes.stream()
+            .map(SourceNode::id)
+            .filter(id -> isRepresented(content, model.nodeIds().get(id)))
+            .collect(Collectors.toSet());
+    Set<String> representedRelationshipIds =
+        selectedRelationships.stream()
+            .map(SourceRelationship::id)
+            .filter(id -> isRepresented(content, model.relationshipIds().get(id)))
+            .collect(Collectors.toSet());
+    return new BuiltModel(content, representedNodeIds, representedRelationshipIds);
   }
 
   /**

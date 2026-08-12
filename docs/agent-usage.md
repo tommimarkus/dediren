@@ -104,6 +104,7 @@ handoff rules in `## Command Handoff` apply unchanged.
 | Render metadata | Usually generated | `schemas/render-metadata.schema.json` | `fixtures/render-metadata/archimate-basic.json` |
 | Layout result | No | `schemas/layout-result.schema.json` | `fixtures/layout-result/basic.json` |
 | Render/export result | No | `schemas/render-result.schema.json`, `schemas/export-result.schema.json` | command stdout |
+| UML/XMI assurance | No | `schemas/uml-xmi-assurance.schema.json` | `.data.assurance` in UML/XMI export stdout |
 | Build result | No | `schemas/build-result.schema.json` | command stdout (`build`) |
 
 ## Minimal Source JSON
@@ -246,6 +247,15 @@ For UML® SVG notation or XMI export, use `semantic_profile: "uml"` and the
 `uml-xmi` plugin. Supported UML view kinds are `uml-class`, `uml-data`,
 `uml-activity`, `uml-sequence`, `uml-state-machine`, `uml-use-case`,
 `uml-component`, and `uml-deployment`.
+
+On a successful UML/XMI export, inspect `.data.assurance` instead of inferring
+support from the artifact filename or diagnostic prose. Its exhaustive
+`kind_taxonomy` distinguishes standard UML diagram kinds from the local
+`uml-data` classifier view, `artifact_scope` distinguishes a per-view artifact
+from the model aggregate, and `coverage` reports represented, omitted, and
+in-view-unrepresented source counts by type. Treat
+`validation_evidence.level: "xmi-envelope-only"` literally: empty UML
+metamodel/importer evidence means no such stronger validation was performed.
 
 For whole-model interchange, `dediren build` with `--xmi-policy` additionally
 writes `model.uml.xml` at the `--out` root: one `<uml:Model>` plus one OMG UMLDI

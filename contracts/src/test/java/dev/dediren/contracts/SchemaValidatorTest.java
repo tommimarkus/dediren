@@ -23,6 +23,7 @@ class SchemaValidatorTest {
           "schemas/export-request.schema.json",
           "schemas/export-result.schema.json",
           "schemas/export-result.first-party.schema.json",
+          "schemas/uml-xmi-assurance.schema.json",
           "schemas/oef-export-policy.schema.json",
           "schemas/uml-xmi-export-policy.schema.json",
           "schemas/diff-result.schema.json",
@@ -169,6 +170,25 @@ class SchemaValidatorTest {
         .isNotEmpty();
   }
 
+  @Test
+  void exportResultV2KeepsAssurancePluginOwnedAndNullable() {
+    var withObjectAssurance = exportResult("ticket-stats+json");
+    withObjectAssurance.putObject("assurance").put("third_party_assurance", "v1");
+    assertThat(
+            SchemaAssertions.validate(
+                workspaceRoot(), "schemas/export-result.schema.json", withObjectAssurance))
+        .describedAs("generic plugins may own an object-shaped assurance payload")
+        .isEmpty();
+
+    var withNullAssurance = exportResult("ticket-stats+json");
+    withNullAssurance.putNull("assurance");
+    assertThat(
+            SchemaAssertions.validate(
+                workspaceRoot(), "schemas/export-result.schema.json", withNullAssurance))
+        .describedAs("the generic assurance seam is nullable")
+        .isEmpty();
+  }
+
   @ParameterizedTest
   @ValueSource(
       strings = {
@@ -200,14 +220,66 @@ class SchemaValidatorTest {
             SchemaAssertions.validate(
                 workspaceRoot(),
                 "schemas/export-result.first-party.schema.json",
-                exportResult("uml-xmi+xml")))
+                umlXmiExportResult()))
         .isEmpty();
+    assertThat(
+            SchemaAssertions.validate(
+                workspaceRoot(),
+                "schemas/export-result.first-party.schema.json",
+                exportResult("uml-xmi+xml")))
+        .describedAs("first-party UML/XMI results must carry an assurance object")
+        .isNotEmpty();
     assertThat(
             SchemaAssertions.validate(
                 workspaceRoot(),
                 "schemas/export-result.first-party.schema.json",
                 exportResult("ticket-stats+json")))
         .isNotEmpty();
+  }
+
+  @Test
+  void umlXmiAssuranceSchemaRequiresAllEightSupportedKindsAndHonestEvidence() {
+    assertThat(
+            SchemaAssertions.validate(
+                workspaceRoot(), "schemas/uml-xmi-assurance.schema.json", umlXmiAssurance()))
+        .isEmpty();
+
+    var missingKind = umlXmiAssurance();
+    ((tools.jackson.databind.node.ArrayNode) missingKind.at("/kind_taxonomy")).remove(7);
+    assertThat(
+            SchemaAssertions.validate(
+                workspaceRoot(), "schemas/uml-xmi-assurance.schema.json", missingKind))
+        .describedAs("the public taxonomy is exhaustive, not a per-export subset")
+        .isNotEmpty();
+
+    var scopeOverclaim = umlXmiAssurance();
+    ((tools.jackson.databind.node.ObjectNode) scopeOverclaim.at("/kind_taxonomy/1/scope"))
+        .put("aggregate_model", "included");
+    assertThat(
+            SchemaAssertions.validate(
+                workspaceRoot(), "schemas/uml-xmi-assurance.schema.json", scopeOverclaim))
+        .describedAs("a sequence view must not claim aggregate-model coverage")
+        .isNotEmpty();
+
+    var overclaimed = umlXmiAssurance();
+    ((tools.jackson.databind.node.ObjectNode) overclaimed.at("/validation_evidence"))
+        .put("level", "uml-content-schema-validated");
+    assertThat(
+            SchemaAssertions.validate(
+                workspaceRoot(), "schemas/uml-xmi-assurance.schema.json", overclaimed))
+        .describedAs("a stronger UML-content claim requires metamodel evidence")
+        .isNotEmpty();
+
+    ((tools.jackson.databind.node.ArrayNode)
+            overclaimed.at("/validation_evidence/uml_metamodel_evidence"))
+        .addObject()
+        .put("metamodel", "UML 2.5.1")
+        .put("validator", "user-supplied-schema-set");
+    assertThat(
+            SchemaAssertions.validate(
+                workspaceRoot(), "schemas/uml-xmi-assurance.schema.json", overclaimed))
+        .describedAs("a stronger UML-content claim is valid when its evidence is explicit")
+        .isEmpty();
   }
 
   @Test
@@ -290,12 +362,72 @@ class SchemaValidatorTest {
         .readTree(java.nio.file.Files.readString(workspaceRoot().resolve(path)));
   }
 
-  private static tools.jackson.databind.JsonNode exportResult(String artifactKind) {
+  private static tools.jackson.databind.node.ObjectNode exportResult(String artifactKind) {
     var document = dev.dediren.contracts.json.JsonSupport.objectMapper().createObjectNode();
-    document.put("export_result_schema_version", "export-result.schema.v1");
+    document.put("export_result_schema_version", "export-result.schema.v2");
     document.put("artifact_kind", artifactKind);
     document.put("content", "{}");
     return document;
+  }
+
+  private static tools.jackson.databind.node.ObjectNode umlXmiExportResult() {
+    var result = (tools.jackson.databind.node.ObjectNode) exportResult("uml-xmi+xml");
+    result.set("assurance", umlXmiAssurance());
+    return result;
+  }
+
+  private static tools.jackson.databind.node.ObjectNode umlXmiAssurance() {
+    var mapper = dev.dediren.contracts.json.JsonSupport.objectMapper();
+    var assurance = mapper.createObjectNode();
+    assurance.put("assurance_schema_version", "uml-xmi-assurance.schema.v1");
+    var taxonomy = assurance.putArray("kind_taxonomy");
+    taxonomy.add(
+        kind("uml-class", "standard-uml-diagram-kind", "included", "provisional-aggregate"));
+    taxonomy.add(kind("uml-sequence", "standard-uml-diagram-kind", "not-included", "none"));
+    taxonomy.add(kind("uml-state-machine", "standard-uml-diagram-kind", "not-included", "none"));
+    taxonomy.add(kind("uml-use-case", "standard-uml-diagram-kind", "not-included", "none"));
+    taxonomy.add(kind("uml-component", "standard-uml-diagram-kind", "not-included", "none"));
+    taxonomy.add(kind("uml-deployment", "standard-uml-diagram-kind", "not-included", "none"));
+    taxonomy.add(kind("uml-activity", "standard-uml-diagram-kind", "not-included", "none"));
+    var data =
+        kind("uml-data", "dediren-local-classifier-view", "included", "provisional-aggregate");
+    data.put("maps_to_uml_diagram_kind", "class");
+    taxonomy.add(data);
+    assurance
+        .putObject("artifact_scope")
+        .put("scope", "view")
+        .putArray("selected_view_kinds")
+        .add("uml-class");
+    var validationEvidence = assurance.putObject("validation_evidence");
+    validationEvidence.put("level", "xmi-envelope-only");
+    validationEvidence.putObject("xmi_schema_evidence").put("status", "validated");
+    validationEvidence.putArray("uml_metamodel_evidence");
+    validationEvidence.putArray("importer_evidence");
+    var coverage = assurance.putObject("coverage");
+    coveragePartition(coverage.putObject("represented"));
+    coveragePartition(coverage.putObject("omitted"));
+    coveragePartition(coverage.putObject("unrepresented_in_view"));
+    return assurance;
+  }
+
+  private static void coveragePartition(tools.jackson.databind.node.ObjectNode partition) {
+    partition.putObject("elements");
+    partition.putObject("relationships");
+    partition.put("element_total", 0);
+    partition.put("relationship_total", 0);
+  }
+
+  private static tools.jackson.databind.node.ObjectNode kind(
+      String kind, String classification, String aggregateModel, String umlDi) {
+    var result = dev.dediren.contracts.json.JsonSupport.objectMapper().createObjectNode();
+    result.put("kind", kind);
+    result.put("classification", classification);
+    result
+        .putObject("scope")
+        .put("xmi_abstract_syntax", "selected-view")
+        .put("aggregate_model", aggregateModel)
+        .put("uml_di", umlDi);
+    return result;
   }
 
   @Test

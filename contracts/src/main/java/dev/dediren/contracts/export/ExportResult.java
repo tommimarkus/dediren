@@ -1,3 +1,10 @@
 package dev.dediren.contracts.export;
 
-public record ExportResult(String exportResultSchemaVersion, String artifactKind, String content) {}
+import tools.jackson.databind.JsonNode;
+
+public record ExportResult(
+    String exportResultSchemaVersion, String artifactKind, String content, JsonNode assurance) {
+  public ExportResult(String exportResultSchemaVersion, String artifactKind, String content) {
+    this(exportResultSchemaVersion, artifactKind, content, null);
+  }
+}

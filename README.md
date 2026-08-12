@@ -295,7 +295,9 @@ render policy. One source model can drive several notations:
   plugin; the emitted model validates against the ArchiMate 3.1 OEF exchange
   schema, the latest The Open Group publishes).
 - **UML® 2.5.1** SVG and XMI XML (`uml` profile, `uml-xmi` plugin): class, data,
-  activity, sequence, state-machine, use-case, component, and deployment views.
+  activity, sequence, state-machine, use-case, component, and deployment views;
+  successful XMI results include schema-governed per-kind scope, validation,
+  and coverage assurance.
 
 [`docs/agent-usage.md`](docs/agent-usage.md) carries the per-notation authoring
 vocabulary, command handoffs, and layout-preference options; the machine

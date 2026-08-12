@@ -31,12 +31,16 @@ Policy schemas:
 [`uml-xmi-export-policy.schema.json`](../../schemas/uml-xmi-export-policy.schema.json).
 Result schema:
 [`export-result.schema.json`](../../schemas/export-result.schema.json).
-The base schema keeps an open `artifact_kind` pattern
+`export-result.schema.v2` adds a nullable, plugin-owned `.data.assurance`
+object; exporters that do not publish assurance may omit it. The base schema
+keeps an open `artifact_kind` pattern
 (`^[a-z0-9][a-z0-9.-]*\+(xml|json|text)$`) rather than a closed list, by
 design, for a future non-bundled export engine; the two bundled first-party
 export engines (`archimate-oef`, `uml-xmi`) are additionally held to the
 closed first-party enum in
 [`export-result.first-party.schema.json`](../../schemas/export-result.first-party.schema.json).
+First-party UML/XMI results must carry an assurance object governed by
+[`uml-xmi-assurance.schema.json`](../../schemas/uml-xmi-assurance.schema.json).
 
 ## Standards Validation
 
@@ -46,8 +50,9 @@ imports (the W3C `xml.xsd` the ArchiMate XSDs reference, or a UML XSD beside
 an XMI driver schema) resolve local-only from the schema file's own directory.
 Every successful export carries a `DEDIREN_EXPORT_SCHEMA_CONFORMANCE` `info`
 diagnostic naming exactly which schema was validated against and its
-provenance (pinned SHA-256-verified download vs user-supplied path), so
-stub-vs-real assurance is decidable from stdout JSON alone. Schema sources:
+provenance (pinned SHA-256-verified download vs user-supplied path). UML/XMI
+also publishes the stable machine contract in `.data.assurance`; diagnostics
+remain the human-readable provenance companion. Schema sources:
 
 - **Online:** `curl` fetches schemas into a cache; set
   `DEDIREN_SCHEMA_CACHE_DIR` for a stable cache location. Behind a proxy, set
@@ -112,6 +117,22 @@ Use `semantic_profile: "uml"` and the `uml-xmi` plugin. View kinds: `uml-class`,
 `uml-component`, `uml-deployment`. For SVG of the notation diagrams below, also
 generate render
 metadata (see [SVG Rendering](svg-render.md#notation-rendering--render-metadata)).
+
+Each successful UML/XMI result declares all eight supported kinds under
+`.data.assurance.kind_taxonomy`. Seven are standard UML diagram kinds;
+`uml-data` is explicitly a Dediren-local classifier view that maps to the UML
+class-diagram family. `artifact_scope` says whether the artifact is a single
+view or a model aggregate and lists the selected view kinds. `coverage`
+partitions source elements and relationships into represented, out-of-view
+omitted, and in-view-but-unrepresented counts by source type.
+
+The current `validation_evidence.level` is deliberately
+`xmi-envelope-only`: Dediren validates the XMI envelope/schema and structural
+IDs, but does not claim UML metamodel or importer validation. The schema
+requires explicit non-empty metamodel/importer evidence before a future engine
+may publish either stronger level. UMLDI is `provisional-aggregate` only for
+the classifier family (`uml-class`, `uml-data`); the remaining families state
+`uml_di: none`.
 
 For whole-model interchange, `dediren build` with `--xmi-policy` also composes
 `model.uml.xml` at the output root — one `<uml:Model>` plus one OMG UMLDI diagram
