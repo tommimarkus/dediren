@@ -63,6 +63,11 @@ class ContractVersionsTest {
           "export_result_schema_version", ContractVersions.EXPORT_RESULT_SCHEMA_VERSION
         });
     versionConstBySchema.put(
+        "schemas/uml-xmi-assurance.schema.json",
+        new String[] {
+          "assurance_schema_version", ContractVersions.UML_XMI_ASSURANCE_SCHEMA_VERSION
+        });
+    versionConstBySchema.put(
         "schemas/oef-export-policy.schema.json",
         new String[] {
           "oef_export_policy_schema_version", ContractVersions.OEF_EXPORT_POLICY_SCHEMA_VERSION
@@ -135,7 +140,9 @@ class ContractVersionsTest {
         .isEqualTo("render-metadata.schema.v1");
     assertThat(ContractVersions.EXPORT_REQUEST_SCHEMA_VERSION)
         .isEqualTo("export-request.schema.v1");
-    assertThat(ContractVersions.EXPORT_RESULT_SCHEMA_VERSION).isEqualTo("export-result.schema.v1");
+    assertThat(ContractVersions.EXPORT_RESULT_SCHEMA_VERSION).isEqualTo("export-result.schema.v2");
+    assertThat(ContractVersions.UML_XMI_ASSURANCE_SCHEMA_VERSION)
+        .isEqualTo("uml-xmi-assurance.schema.v1");
     assertThat(ContractVersions.OEF_EXPORT_POLICY_SCHEMA_VERSION)
         .isEqualTo("oef-export-policy.schema.v1");
     assertThat(ContractVersions.UML_XMI_EXPORT_POLICY_SCHEMA_VERSION)
