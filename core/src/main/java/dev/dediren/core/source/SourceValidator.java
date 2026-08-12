@@ -84,6 +84,47 @@ public final class SourceValidator {
     return document;
   }
 
+  /**
+   * The trust gate for a {@link SourceDocument} an import engine constructed from untrusted foreign
+   * text. Import is the one lane that mints a source model without any of it ever passing the model
+   * schema or the input ceilings: the engine hands core typed objects, not bytes. So the document
+   * re-enters the same parse the hand-authored lane takes — schema version, JSON Schema, and the
+   * {@link SourceLimits} ceilings — and nothing else.
+   *
+   * <p>Deliberately narrower than {@link #loadAndValidateSourceDocument}: it runs neither {@link
+   * #validateSourceDocument} (duplicate ids, dangling endpoints) nor fragment resolution. Those are
+   * statements about model coherence that the importer, which alone knows the foreign text's own
+   * identity rules, stays authoritative for; this method is only core refusing to publish a
+   * document that is not in the published contract or is unbounded. The cost is one
+   * serialize/reparse per import, accepted for that guarantee.
+   *
+   * <p>Returns the reparsed document rather than the argument, so what the caller publishes is
+   * exactly what was validated instead of an object merely inspected alongside it.
+   */
+  public static SourceDocument gateImportedDocument(SourceDocument document)
+      throws SourceDiagnosticsException {
+    return gateImportedDocument(document, SourceLimits.DEFAULT);
+  }
+
+  /** Ceiling-injecting overload; production callers take the defaults, tests use tiny limits. */
+  public static SourceDocument gateImportedDocument(SourceDocument document, SourceLimits limits)
+      throws SourceDiagnosticsException {
+    String text;
+    try {
+      text = JsonSupport.objectMapper().writeValueAsString(document);
+    } catch (RuntimeException error) {
+      // A document that cannot even be serialized could never be published either; report it in
+      // the same shape as a document that serializes to something the schema rejects.
+      throw new SourceDiagnosticsException(List.of(schemaError(error.getMessage())));
+    }
+    SourceDocument gated = parseSourceDocument(text);
+    // No fragment resolution here (there is no base directory an imported document is relative
+    // to), but the fragment ceiling still applies to what the importer declared.
+    checkFragmentCeiling(gated.fragments().size(), limits);
+    checkElementCeiling(gated.nodes().size(), gated.relationships().size(), limits);
+    return gated;
+  }
+
   private static SourceDocument loadSourceDocument(
       String text, Path baseDir, Path confinementRoot, SourceLimits limits)
       throws SourceDiagnosticsException {
@@ -92,17 +133,7 @@ public final class SourceValidator {
       checkElementCeiling(root.nodes().size(), root.relationships().size(), limits);
       return root;
     }
-    if (root.fragments().size() > limits.maxFragments()) {
-      throw new SourceDiagnosticsException(
-          List.of(
-              error(
-                  DiagnosticCode.SOURCE_FRAGMENT_LIMIT_EXCEEDED,
-                  "source declares "
-                      + root.fragments().size()
-                      + " fragments; the fragment ceiling is "
-                      + limits.maxFragments(),
-                  "$.fragments")));
-    }
+    checkFragmentCeiling(root.fragments().size(), limits);
     if (baseDir == null) {
       throw new SourceDiagnosticsException(
           List.of(
@@ -173,6 +204,21 @@ public final class SourceValidator {
     }
     return new SourceDocument(
         root.modelSchemaVersion(), List.of(), requiredPlugins, nodes, relationships, plugins);
+  }
+
+  private static void checkFragmentCeiling(int fragmentCount, SourceLimits limits)
+      throws SourceDiagnosticsException {
+    if (fragmentCount > limits.maxFragments()) {
+      throw new SourceDiagnosticsException(
+          List.of(
+              error(
+                  DiagnosticCode.SOURCE_FRAGMENT_LIMIT_EXCEEDED,
+                  "source declares "
+                      + fragmentCount
+                      + " fragments; the fragment ceiling is "
+                      + limits.maxFragments(),
+                  "$.fragments")));
+    }
   }
 
   private static void checkElementCeiling(int nodeCount, int relationshipCount, SourceLimits limits)

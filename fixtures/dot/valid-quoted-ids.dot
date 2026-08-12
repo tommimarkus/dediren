@@ -1,0 +1,15 @@
+/* A graph with quoted identifiers including spaces and punctuation,
+   non-ASCII characters, and various comment styles. */
+digraph QuotedIdentifiers {
+  // Node with spaces in quoted label
+  "Client Application" [label="Client Application"];
+
+# Preprocessor-style line, only a comment when # starts the line
+  "API-Gateway/v2" [label="API Gateway"];
+
+  /* Node with non-ASCII identifier */
+  "数据库";  // Data: Chinese characters
+
+  "Client Application" -> "API-Gateway/v2";
+  "API-Gateway/v2" -> "数据库";
+}

@@ -1,0 +1,23 @@
+// A graph with subgraphs including cluster_ prefixed subgraphs.
+digraph ServiceMesh {
+  frontend;
+  router;
+
+  subgraph cluster_backend {
+    label="Backend";
+    api;
+    cache;
+
+    subgraph cluster_data {
+      label="Data Layer";
+      primary;
+      replica;
+    }
+  }
+
+  frontend -> router;
+  router -> api;
+  api -> cache;
+  cache -> primary;
+  primary -> replica;
+}

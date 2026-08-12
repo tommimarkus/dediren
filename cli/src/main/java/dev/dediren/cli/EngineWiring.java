@@ -4,6 +4,7 @@ import dev.dediren.contracts.source.GenericGraphSemanticProfile;
 import dev.dediren.engine.Engines;
 import dev.dediren.engine.NotationSemantics;
 import dev.dediren.plugins.archimateoef.OefExportEngine;
+import dev.dediren.plugins.dotimport.DotImportEngine;
 import dev.dediren.plugins.elklayout.ElkEngine;
 import dev.dediren.plugins.mermaid.MermaidImportEngine;
 import dev.dediren.plugins.render.SvgRenderEngine;
@@ -40,6 +41,6 @@ public final class EngineWiring {
         List.of(new ElkEngine()),
         List.of(new SvgRenderEngine()),
         List.of(new OefExportEngine(), new XmiExportEngine()),
-        List.of(new MermaidImportEngine()));
+        List.of(new DotImportEngine(), new MermaidImportEngine()));
   }
 }

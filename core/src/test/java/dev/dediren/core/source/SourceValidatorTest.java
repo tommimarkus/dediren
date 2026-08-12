@@ -5,10 +5,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import dev.dediren.contracts.CommandExitCode;
 import dev.dediren.contracts.Diagnostic;
+import dev.dediren.contracts.source.SourceDocument;
+import dev.dediren.contracts.source.SourceNode;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.api.parallel.Isolated;
@@ -610,6 +614,73 @@ class SourceValidatorTest {
             thrown ->
                 assertThat(thrown.diagnostics().get(0).code())
                     .isEqualTo("DEDIREN_SOURCE_ELEMENT_LIMIT_EXCEEDED"));
+  }
+
+  @Test
+  void anImportedDocumentOverTheElementCeilingIsRejectedByTheSameCeilingHandAuthoredInputMeets() {
+    // The import lane never reads a file, so BoundedReads' byte ceiling cannot apply there; the
+    // element ceiling is what stands between pathological foreign text and an unbounded model.
+    SourceDocument document =
+        new SourceDocument(
+            "model.schema.v1",
+            List.of(),
+            List.of(),
+            List.of(node("n0"), node("n1"), node("n2")),
+            List.of(),
+            Map.of());
+
+    assertThatThrownBy(
+            () ->
+                SourceValidator.gateImportedDocument(
+                    document, new SourceLimits(1_000_000, 1_000, 2)))
+        .isInstanceOfSatisfying(
+            SourceValidator.SourceDiagnosticsException.class,
+            thrown -> {
+              Diagnostic diagnostic = thrown.diagnostics().get(0);
+              assertThat(diagnostic.code()).isEqualTo("DEDIREN_SOURCE_ELEMENT_LIMIT_EXCEEDED");
+              assertThat(diagnostic.path()).isEqualTo("$");
+              assertThat(diagnostic.message()).contains("3 nodes and 0 relationships");
+            });
+  }
+
+  @Test
+  void anImportedDocumentWithinTheCeilingsIsReturnedAsItsRevalidatedProjection() throws Exception {
+    SourceDocument document =
+        new SourceDocument(
+            "model.schema.v1",
+            List.of(),
+            List.of(),
+            List.of(node("n0"), node("n1")),
+            List.of(),
+            Map.of());
+
+    SourceDocument gated =
+        SourceValidator.gateImportedDocument(document, new SourceLimits(1_000_000, 1_000, 2));
+
+    // The returned document is the one that was checked -- the reparse of the serialized form,
+    // not the engine-held object that was merely inspected.
+    assertThat(gated).isNotSameAs(document);
+    assertThat(gated).isEqualTo(document);
+  }
+
+  @Test
+  void anImportedDocumentIsNotSubjectedToTheDocumentChecksTheImporterOwns() throws Exception {
+    // Duplicate ids and dangling endpoints stay the importer's to report: the re-gate is the
+    // schema and the ceilings only, so this document -- rejected by validateSourceJson -- passes.
+    SourceDocument document =
+        new SourceDocument(
+            "model.schema.v1",
+            List.of(),
+            List.of(),
+            List.of(node("dup"), node("dup")),
+            List.of(),
+            Map.of());
+
+    assertThat(SourceValidator.gateImportedDocument(document).nodes()).hasSize(2);
+  }
+
+  private static SourceNode node(String id) {
+    return new SourceNode(id, "ApplicationComponent", id.toUpperCase(Locale.ROOT), Map.of());
   }
 
   private static String modelWithNodes(int count) {

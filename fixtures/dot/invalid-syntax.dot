@@ -1,0 +1,6 @@
+// A graph with an intentional syntax error: unclosed brace.
+digraph SyntaxError {
+  nodeA;
+  nodeB;
+  nodeA -> nodeB;
+// Missing closing brace }

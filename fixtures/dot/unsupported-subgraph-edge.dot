@@ -1,0 +1,14 @@
+// A graph using subgraph-shorthand edges, which expand combinatorially.
+digraph SubgraphShorthand {
+  subgraph cluster_left {
+    leftOne;
+    leftTwo;
+  }
+
+  subgraph cluster_right {
+    rightOne;
+    rightTwo;
+  }
+
+  { leftOne leftTwo } -> { rightOne rightTwo };
+}

@@ -1,0 +1,13 @@
+// A digraph with left-to-right layout direction.
+digraph LeftToRight {
+  rankdir=LR;
+
+  source;
+  stage1;
+  stage2;
+  destination;
+
+  source -> stage1;
+  stage1 -> stage2;
+  stage2 -> destination;
+}

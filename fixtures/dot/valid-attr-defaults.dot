@@ -1,0 +1,21 @@
+// Graph with attribute defaults and subgraph-scoped defaults.
+digraph AttributeScope {
+  graph [fontname="Arial"];
+  node [shape=box, color=blue];
+  edge [color=green];
+
+  startNode;
+
+  subgraph cluster_middle {
+    label="Middle Section";
+    node [color=red];  // Override default node color in this subgraph
+    midNode;
+  }
+
+  // Top-level default changes again; only nodes declared after this see it.
+  node [shape=ellipse];
+  endNode;
+
+  startNode -> midNode;
+  midNode -> endNode;
+}

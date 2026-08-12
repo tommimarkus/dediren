@@ -1,0 +1,10 @@
+// An undirected graph with peer nodes.
+graph PeerNetwork {
+  nodeA [label="Peer A"];
+  nodeB [label="Peer B"];
+  nodeC [label="Peer C"];
+
+  nodeA -- nodeB;
+  nodeB -- nodeC;
+  nodeA -- nodeC;
+}
