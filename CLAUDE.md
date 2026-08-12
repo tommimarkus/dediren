@@ -76,6 +76,12 @@ enforcement authority before new feature or build work begins.
 
 - "Plan this" enters plan mode; it is not a request for prose about a plan.
   "Just do it" is an accepted opt-out phrase alongside "skip planning".
+- A prose plan is not a dispatchable plan. Once the approach is agreed and the
+  work has two or more delegated steps, groom it into the `planning-policy` plan
+  contract — one leaf per step carrying `portable_tier`, `read_set`/`write_set`,
+  `settled_decisions`, and one `acceptance_command` — and run its
+  `validate_plan_contract.py` before `ExitPlanMode`. The host plan-mode workflow
+  produces prose and will not do this on its own; invoke the skill.
 - Docs-only guidance changes are exempt because they have their own one-line
   verification lane (`## Verification`), not because they are unimportant.
 - Parallel agents must not run Maven — use an edit-only wave, then one central
