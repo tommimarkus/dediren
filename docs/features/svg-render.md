@@ -159,6 +159,10 @@ Chromium headless shell 149.0.7827.55 (revision 1228) into
 ./scripts/test-render-paint.sh
 ```
 
+Direct Maven callers may use `./mvnw -Prender-paint -pl engines/render -am test`
+only after the pinned shell is present and `PLAYWRIGHT_BROWSERS_PATH` points to
+that cache.
+
 For a narrow rerun, select the decorated-paint audit or raster backstop:
 
 ```bash
@@ -208,30 +212,42 @@ a fabricated ratio.
 
 Four reviewable PNG goldens provide a small raster backstop: the rich standard
 graph in light and dark themes, an ArchiMate diagram with decorators and
-markers, and a UML sequence diagram with fragment chrome. Regeneration is
-deliberately opt-in:
-
-```bash
-./scripts/test-render-paint.sh \
-  -Ddediren.render.paint.regenerate-goldens=true
-```
-
-Review every tracked PNG and manifest change after regeneration. A failed
+markers, and a UML sequence diagram with fragment chrome. Regenerate
+deliberately with
+`./scripts/test-render-paint.sh -Ddediren.render.paint.regenerate-goldens=true`,
+then review every tracked PNG and manifest change. A failed
 comparison writes the actual image, changed-pixel mask, and overlay under
 `.test-output/render-paint/`. Equal dimensions are required; RGBA channel
 differences of 8 or less are ignored, and every remaining changed pixel fails.
 The manifest pins Playwright, Chromium, the CI container digest, Eclipse
 Temurin 21.0.10+7, viewport rules, DPR, font digest, scenarios, and comparator
-threshold. Regeneration rejects a mismatched environment.
+threshold.
+
+Regeneration is gated on a **calibration probe**, not on the environment's
+identity: before writing any golden, the lane rasterizes the static
+`engines/render/src/paint-test/resources/raster-calibration/calibration.svg` and
+requires it to reproduce the committed `calibration.png` under the same
+comparator the goldens use. An environment that agrees with the calibration
+pixels may mint baselines; one that does not is refused, wherever it runs. The
+calibration SVG is deliberately not produced by the render engine — a rendered
+fixture would move with the renderer and stop probing the environment alone.
+Keep the Playwright and Chromium versions, viewport rules, DPR, font digest,
+calibration pair, and raster manifest synchronized when the canonical golden
+environment changes.
 
 Maven state stays in `.cache/maven`; the browser shell stays in
 `.cache/playwright`. These repository-local caches are ignored, recoverable,
-and never shipped. The Thursday 06:00 UTC/manual job runs in the digest-pinned
-Playwright Java 1.61.0 Noble image. Its image and browser names are provenance
-for external test tools, not bundled marks or Dediren branding. References to
-the retired paint implementation remain only in historical plans/reviews under
-`docs/superpowers` and in threat-model history so those records remain truthful;
-they are not current implementation guidance.
+and never shipped; commit no native binary, browser cache, or new font. The
+Thursday 06:00 UTC/manual job runs in the digest-pinned Playwright Java 1.61.0
+Noble image, which remains a good environment but is no longer *required* to
+regenerate — determinism comes from the repository, not the image: Playwright
+downloads a pinned Chromium and the font is embedded as a data URI, so the host
+supplies neither the browser nor the glyphs. Its image and browser names are
+provenance for external test tools, not bundled marks or Dediren branding.
+References to the retired paint implementation are allowed only in historical
+plans/reviews under `docs/superpowers` and in threat-model history so those
+records remain truthful; they are not current implementation guidance. Do not
+rewrite those records or copy their terminology into active guidance.
 
 ## Related Pages
 
