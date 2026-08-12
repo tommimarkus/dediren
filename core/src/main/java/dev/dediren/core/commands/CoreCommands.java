@@ -55,16 +55,59 @@ import tools.jackson.databind.JsonNode;
 public final class CoreCommands {
   private CoreCommands() {}
 
-  /** Imports external notation directly into the source-model envelope produced by its engine. */
+  /**
+   * Imports external notation into the source-model envelope produced by its engine, re-gated by
+   * core before it is published.
+   *
+   * <p>Import is the one lane that turns untrusted foreign text into a {@link SourceDocument}
+   * without those bytes ever meeting the model schema or the input ceilings — the engine hands core
+   * typed objects, not a file the load lanes validate. So the emitted document re-enters {@link
+   * SourceValidator#gateImportedDocument}: schema version, JSON Schema, and {@link
+   * dev.dediren.core.source.SourceLimits} ceilings only.
+   *
+   * <p>The importer stays authoritative for its own parse and construct diagnostics. A published
+   * {@link dev.dediren.engine.EngineException} envelope is republished verbatim — its diagnostics
+   * (including a parse diagnostic's {@code "line 2, column 6"} path, which core cannot reconstruct
+   * and must not overwrite) and its exit code — and on the success lane the importer's diagnostics
+   * ride the envelope whether the re-gate passes or rejects. That need for the typed document
+   * between the engine call and the envelope is why this dispatches through {@link
+   * EngineDispatch#dispatchInMemory} rather than {@link EngineDispatch#dispatch}; both failure
+   * branches keep the shapes that dispatch would have produced.
+   */
   public static EngineRunOutcome importCommand(
       String engineId, String source, Map<String, String> env, Engines engines)
       throws EngineExecutionException {
     ImportEngine importer =
         EngineDispatch.requireEngine(engines, engineId, "import", engines.importEngine(engineId));
-    // Import validation belongs to the parser. Re-running SourceValidator here would serialize and
-    // reparse an already-typed graph, add no safety, and make importer diagnostics
-    // non-authoritative.
-    return EngineDispatch.dispatch(engineId, () -> importer.importSource(source));
+    EngineDispatch.InMemoryOutcome<SourceDocument> outcome =
+        EngineDispatch.dispatchInMemory(engineId, () -> importer.importSource(source));
+    return switch (outcome) {
+      case EngineDispatch.InMemoryOutcome.Value<SourceDocument> value ->
+          gatedImportOutcome(value.result());
+      case EngineDispatch.InMemoryOutcome.Failure<SourceDocument> failure ->
+          errorOutcome(failure.diagnostics(), failure.exitCode());
+    };
+  }
+
+  private static EngineRunOutcome gatedImportOutcome(EngineResult<SourceDocument> result) {
+    SourceDocument gated;
+    try {
+      gated = SourceValidator.gateImportedDocument(result.value());
+    } catch (SourceValidator.SourceDiagnosticsException error) {
+      // PLUGIN_ERROR, whose contract is exactly "produced invalid output". Not INPUT_ERROR: an
+      // importer enforces its own ceilings and rejects pathological text itself at exit 2, so by
+      // the time a document reaches this gate the caller's input already parsed. Every rejection
+      // here is therefore an engine that emitted an out-of-contract document, and telling the
+      // caller to fix input that parsed cleanly would be false advice. The importer's diagnostics
+      // still lead — they are the only account of the text this document came from.
+      var diagnostics = new ArrayList<>(result.diagnostics());
+      diagnostics.addAll(error.diagnostics());
+      return errorOutcome(diagnostics, CommandExitCode.PLUGIN_ERROR.code());
+    }
+    // The gated (reparsed) document is what gets published, so the emitted data is exactly what
+    // was validated. envelope(...) applies the one ok/warning/info policy every stage shares.
+    return new EngineRunOutcome(
+        EngineDispatch.envelope(gated, result.diagnostics()), CommandExitCode.OK.code());
   }
 
   public static EngineRunOutcome layoutCommand(
@@ -422,10 +465,20 @@ public final class CoreCommands {
   }
 
   static EngineRunOutcome errorOutcome(List<Diagnostic> diagnostics) {
+    return errorOutcome(diagnostics, CommandExitCode.INPUT_ERROR.code());
+  }
+
+  /**
+   * The exit-code-carrying form, for the one caller that must republish an engine's own error
+   * envelope: {@link #importCommand} folds the engine result itself, so it cannot let {@link
+   * EngineDispatch#dispatch} serialize the failure branch and has to reproduce it here — verbatim
+   * diagnostics at the exception's exit code.
+   */
+  static EngineRunOutcome errorOutcome(List<Diagnostic> diagnostics, int exitCode) {
     try {
       return new EngineRunOutcome(
           JsonSupport.objectMapper().writeValueAsString(CommandEnvelope.error(diagnostics)),
-          CommandExitCode.INPUT_ERROR.code());
+          exitCode);
     } catch (RuntimeException error) {
       throw new IllegalStateException("error envelope should serialize", error);
     }
