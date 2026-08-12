@@ -26,6 +26,11 @@ If the starting point is a Mermaid flowchart, run
 stdin), save the envelope's `.data` as the source model, then continue at step
 3. Import is deliberately one-way; Dediren does not export Mermaid.
 
+If the starting point is a Graphviz DOT file, run
+`dediren import --plugin dot --input diagram.dot` (or pipe it on stdin)
+instead, then continue at step 3 the same way — see `## DOT Graph Import`.
+Import is one-way for DOT too; Dediren does not export it.
+
 ## Mermaid Flowchart Import
 
 Dediren implements a native Java subset based on the
@@ -57,6 +62,53 @@ relationships plus groups, 256 nested groups, and 64 KiB UTF-8 per token or
 label. At the ceiling is accepted; the first value above it is rejected with a
 `DEDIREN_MERMAID_*_LIMIT_EXCEEDED` (or `INPUT_TOO_LARGE`) diagnostic at `$`.
 Syntax and compatibility errors report a 1-based `line N, column N` path.
+
+## DOT Graph Import
+
+Dediren implements a native Java subset of the Graphviz DOT language (run with
+`dediren import --plugin dot`). It accepts `graph` or `digraph`, the `strict`
+keyword, node and edge statements, edge chains, quoted identifiers, `subgraph`
+blocks (including `cluster_`-prefixed ones), `graph`/`node`/`edge`
+default-attribute statements scoped to the subgraph that declares them, and
+`/* */`, `//`, and `#` comments. Output is a `model.schema.v1` generic-graph
+model.
+
+Nodes become `generic.node`. Edges from a `digraph` become `generic.link`;
+edges from an undirected `graph` become `generic.edge`. An element's `label`
+attribute becomes its Dediren label, falling back to its original DOT id when
+no `label` is set. `subgraph`/`cluster_` blocks become view groups with role
+`layout-only`. A graph-level `rankdir` of `TB`/`LR`/`RL`/`BT` becomes
+`layout_preferences.direction` `down`/`right`/`left`/`up`. Every other
+attribute Dediren does not otherwise consume is kept under
+`properties.dot.attributes` rather than dropped.
+
+HTML-like labels, ports and compass points (`node:port`), subgraph-shorthand
+edges (`{a b} -> {c d}`), and the anonymous brace-only subgraph shorthand are
+not part of the supported subset. They are never silently dropped: each fails
+the import atomically with `DEDIREN_DOT_UNSUPPORTED_CONSTRUCT` so you can
+rewrite the input without them; no partial model is produced.
+
+IDs already legal under Dediren's `^[A-Za-z0-9][A-Za-z0-9._-]*$` contract are
+preserved. Other ids are normalized to that charset, and a collision after
+normalization gets a `-2`, `-3`, ... suffix in source order. A node or edge
+whose id changed keeps the original under `properties.dot.original_id`; ids
+that did not change do not get that property at all.
+
+Two limitations are worth knowing about before you rely on the output:
+
+- No shipped render policy styles `generic.edge`, so an imported undirected
+  graph currently renders with arrowheads on every edge until you add a
+  `marker_end: none` entry under `edge_type_overrides` in your render policy.
+- Nested clusters are flattened: each cluster becomes its own top-level view
+  group, and the nesting relationship between an outer and inner cluster is
+  not preserved in the imported model.
+
+Limits match the Mermaid importer's ceilings: 64 MiB UTF-8 input, 200000
+statements, 100000 produced nodes plus relationships plus groups, 256 nested
+subgraphs, and 64 KiB UTF-8 per token. At the ceiling is accepted; the first
+value above it is rejected with a `DEDIREN_DOT_*_LIMIT_EXCEEDED` (or
+`INPUT_TOO_LARGE`) diagnostic at `$`. Syntax errors report a 1-based
+`line N, column N` path.
 
 ## MCP Server
 
@@ -1314,6 +1366,20 @@ you can recover from stdout JSON alone.
 - `DEDIREN_MERMAID_HINT_IGNORED`: import succeeded, but the named presentation
   or subgraph-layout hints were intentionally discarded. Reapply appearance
   through Dediren render policy if needed.
+- `DEDIREN_DOT_SYNTAX_INVALID`: repair the syntax at the reported 1-based line
+  and column within the input.
+- `DEDIREN_DOT_UNSUPPORTED_CONSTRUCT`: HTML-like labels, ports and compass
+  points, and subgraph-shorthand edges are not supported; rewrite the input
+  without them.
+- `DEDIREN_DOT_INPUT_TOO_LARGE` /
+  `DEDIREN_DOT_STATEMENT_LIMIT_EXCEEDED` /
+  `DEDIREN_DOT_ELEMENT_LIMIT_EXCEEDED` /
+  `DEDIREN_DOT_NESTING_LIMIT_EXCEEDED` /
+  `DEDIREN_DOT_TOKEN_LIMIT_EXCEEDED`: split or simplify the diagram below
+  the ceiling stated in the diagnostic and in `## DOT Graph Import`.
+- `DEDIREN_DOT_HINT_IGNORED`: import succeeded, but the named presentation
+  attributes were intentionally discarded. Reapply appearance through Dediren
+  render policy if needed.
 - `DEDIREN_GENERIC_GRAPH_PLUGIN_REQUIRED`: the source has no
   `plugins.generic-graph` object. Add it with a `views` array (see
   `## Minimal Source JSON`) — every semantic-validate, project, and build call
