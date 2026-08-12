@@ -322,15 +322,16 @@ Batik XML-parsing surface. PNG output is now produced out of process by a
 user-chosen external converter (`rsvg-convert`, `resvg`, ImageMagick, or
 Inkscape) that runs outside the dediren trust boundary.
 
-### Build & release chain
+### Build, documentation publication & release chain
 
-`.github/workflows/release.yml` and `ci.yml` pin every GitHub Action to a
-commit SHA; the Maven Wrapper is SHA-256-pinned in
+`.github/workflows/release.yml`, `ci.yml`, and `pages.yml` pin every GitHub
+Action to a commit SHA; the Maven Wrapper is SHA-256-pinned in
 `.mvn/wrapper/maven-wrapper.properties`. Every pull request and tagged release
 runs a blocking Grype/SBOM scan (`anchore/scan-action`, `fail-build: true`,
 `severity-cutoff: high`); direct pushes to `main` carry no CI (lean-CI
-decision) — they rely on the local verification lanes and are re-gated at the
-next pull request or release. The release `build` job generates
+decision) — except that relevant self-model documentation changes run the Pages
+build — and rely on the local verification lanes before the next pull request
+or release gate. The release `build` job generates
 one provenance attestation covering the archive, both CycloneDX SBOM
 serializations, **and** the `SHA256SUMS` checksum file
 (`attest-build-provenance`), so the SBOM and checksums are bound to the attested
@@ -350,6 +351,17 @@ recorded repository-admin bypass preserving the solo direct-push workflow. The
 absence of required review on `main` remains a documented accepted risk — see
 `SECURITY.md`.
 
+The Pages workflow is a separate documentation-publication boundary for only
+the checked-in `docs/architecture/dediren.dediren/` self-model package. Its
+build runs for relevant pull requests, but pull-request runs never deploy. Only
+push-to-`main` and manual non-pull-request runs deploy through the
+`github-pages` environment, using the Pages deployment token (`pages: write`)
+and OIDC (`id-token: write`). The build job has only `contents: read`; checkout
+does not persist credentials, and neither job uses a PAT or receives
+`contents: write`. The source SVG is inert/escaped, while GitHub Pages, Jekyll,
+and the SHA-pinned official GitHub Actions remain trusted build and deployment
+services for this boundary.
+
 The bundle `lib/` jar is produced by a shrink ProGuard pass over the staged
 launcher classpath (`dist-tool`, keep rules checked in at
 `dist-tool/src/main/resources/dev/dediren/tools/dist/bundle-shrink.pro`); the
@@ -367,6 +379,7 @@ ceiling trips if shrinking or attribute stripping silently degrades.
 | Attacker goal | Primary control | Residual risk |
 | --- | --- | --- |
 | Poison a release artifact | SHA-pinned Actions, blocking Grype/SBOM gate, attestation generated and verified before publish | Single-maintainer `main` has no required review (accepted risk, `SECURITY.md`) |
+| Publish a malicious self-model documentation site | Pages builds relevant pull requests without deployment; only push/manual non-PR runs deploy through `github-pages` with scoped `pages: write` and OIDC, no persisted checkout credentials, PAT, or contents write | GitHub Pages, Jekyll, and the SHA-pinned official actions are trusted services; a malicious change merged to `main` can publish the self-model package |
 | Tamper `main` or `v*` tags | Rulesets block force-pushes/deletion of `main` and moving/deleting `v*` tags (`.github/rulesets/`); `test` + `vulnerability-scan` are required checks on `main` (admin bypass, recorded); release immutability freezes released tags; `release.yml` cross-checks the tag version against `pom.xml`; attestation binds the published archive to its build | No required review on `main`, and the maintainer's admin bypass skips the required checks on direct pushes (each bypass is recorded); a bad commit is caught by tests/scans, not review |
 | Tampered SBOM / SHA256SUMS after build | The archive, both CycloneDX SBOM serializations, and `SHA256SUMS` are subjects of one build-provenance attestation, each verified before publish; the publish job additionally checks the staged assets against the attested `SHA256SUMS` (`sha256sum -c`); repository release immutability (enabled) freezes the published asset set | Immutability covers only releases published after it was enabled (2026-07-22); earlier releases remain mutable and rest on their attestations alone |
 | Shipped `THIRD-PARTY-NOTICES.md` misstates an upstream licence after a dependency bump, or a bump drags in a licence outside the approved set | cli's `license-maven-plugin` execution resolves every runtime dependency's effective-pom licence, normalizes it, and gates it against an approved allowlist; `DistTool` refuses to write notices when its hand-curated attribution map disagrees with that resolved report or the report is stale (`resolved-licence-report`, dist lanes) | Effective-pom licences are upstream-declared metadata, not scanned artifact contents; a pom that misstates its own jar's licence passes (mitigate with an `about.html`/`META-INF` spot-check when adopting a new dependency) |

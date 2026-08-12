@@ -62,14 +62,13 @@ interfaces; and a **deployment** view of how Dediren ships — the single
 `bin/dediren` launcher hosting every engine in-process.
 
 All four views, plus the ArchiMate OEF and UML XMI exports Dediren produced from
-them, live in
-[`docs/architecture/dediren.dediren/`](docs/architecture/dediren.dediren/); open
-[`gallery.html`](docs/architecture/dediren.dediren/gallery.html) for a zoomable,
-notation-grouped viewer. The `Serving` arrows run from a module to the modules
-that depend on it, so the bands — not the arrowheads — carry the layering; the
-hero view shows the architecturally significant compile edges, with the full
-edge set in [`docs/architecture-guidelines.md`](docs/architecture-guidelines.md)
-§2.
+them, are published as the [self-model documentation site](https://tommimarkus.github.io/dediren/)
+and remain available in the checked-in
+[`docs/architecture/dediren.dediren/`](docs/architecture/dediren.dediren/)
+package. The `Serving` arrows run from a module to the modules that depend on
+it, so the bands — not the arrowheads — carry the layering; the hero view shows
+the architecturally significant compile edges, with the full edge set in
+[`docs/architecture-guidelines.md`](docs/architecture-guidelines.md) §2.
 
 ## Requirements
 
