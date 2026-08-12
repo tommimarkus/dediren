@@ -39,15 +39,20 @@ agent tools should be pointed here from their own entrypoint files (for example,
   API/app/infra design, and repo-specific operational posture. They are
   complementary: let Superpowers shape how the work proceeds and Sour Old
   Geezer shape what "good" means inside the changed domain.
-- This file initializes `souroldgeezer-policy:planning-policy` under
-  `## Planning`, `souroldgeezer-policy:git-workflow-policy` under
-  `## Git Hygiene`, and `souroldgeezer-policy:release-policy` under
-  `## Versioning`. The user-facing release runbook lives in `README.md`. Keep
-  other policy-skill initialization out of this file unless a section explicitly
-  adopts it.
+- This file initializes all five `souroldgeezer-policy` skills:
+  `planning-policy` under `## Planning`, `scope-policy` under `## Scope`,
+  `tdd-policy` under `## Test-First`, `release-policy` under `## Versioning`,
+  and `git-workflow-policy` under `## Git Hygiene`. The user-facing release
+  runbook lives in `README.md`. Keep other policy-skill initialization out of
+  this file unless a section explicitly adopts it.
 - `planning-policy` owns the *gate* (is there an approved approach before build
   work starts); Superpowers owns the *brainstorm* that fills it. They compose —
   the gate does not replace the brainstorming and planning skills above.
+- The policies divide cleanly and do not substitute for one another:
+  `planning-policy` bounds *when* work may start, `scope-policy` bounds *how
+  wide* it may reach, `tdd-policy` bounds *what order* code and tests land in,
+  and `software-design` still owns how minimal the solution inside that
+  footprint is.
 - Use `souroldgeezer-design:software-design` for module boundaries,
   dependency direction, responsibility ownership, coupling, refactors,
   plugin/core split, Java code shape, or plan-to-code design drift.
@@ -59,9 +64,11 @@ agent tools should be pointed here from their own entrypoint files (for example,
 
 ## Planning
 
-`planning-policy: scope = new feature or build work; exceptions = trivial edits,
-hotfixes, docs-only guidance changes, and work a domain skill owns end to end
-(logged); delegation = subagents-by-default`
+`planning-policy: brainstorm in the host plan lane, converge on an approach, and
+obtain user approval before implementation; scope = new feature or build work;
+exceptions = trivial edits, hotfixes, docs-only guidance changes, and work a
+domain skill owns end to end (logged); delegation = subagents-by-default; opt out
+per task by saying "skip planning" (logged)`
 
 The line above initializes `souroldgeezer-policy:planning-policy` for this
 repository. The rules below are its options and exceptions; they are standing
@@ -83,6 +90,49 @@ enforcement authority before new feature or build work begins.
   applied and logged, never assumed.
 - Once the plan is approved, hand the domain judgment to the owning skill per
   `## Skill Routing` — planning-policy governs the gate, not the design.
+- An approved plan is groomed into leaves a fresh agent could finish: each names
+  its reads/writes, settled decisions, and `missing_load_bearing_information`,
+  and carries one portable tier (`mechanical`, `standard`, `analytical`, or
+  `deep`) selected once. Validate the plan contract before dispatch. With two or
+  more delegated steps the parent alone keeps the ledger under
+  `<git-common-dir>/planning-policy/ledgers/<plan-id>/`, closing each leaf
+  `completed` → `integrated` → `cleaned` before dependent worktrees branch from
+  the current parent tip.
+
+## Scope
+
+`scope-policy: balanced — change only within that level's footprint (the minimum
+edit plus refactoring confined to the touched functions/files); record wider
+findings instead of doing them. Escalate one rung only when the level is
+insurmountable; escalation auto. Opt out per task by saying "open scope"
+(logged)`
+
+The line above initializes `souroldgeezer-policy:scope-policy` for this
+repository. The rules below are its options and exceptions; they are standing
+enforcement authority for how wide a change may reach.
+
+- `balanced` permits the minimum edit that satisfies the task, plus local
+  extraction, renaming, duplication removal, and tests **inside the code the
+  change already enters**. Out of level: signature changes with external callers,
+  cross-cutting sweeps, module boundary moves, dependency swaps, and new
+  architecture.
+- Out-of-level work is recorded, not done: capture what the edit would have been
+  and why it falls outside the level, and route it to `issue-ops`. This repo
+  already has the destinations — `docs/architecture-guidelines.md §12` for known
+  debt, a plan under `docs/superpowers/plans/` for deferred remediation.
+- Escalation is `auto`: when `balanced` genuinely blocks correct completion —
+  not merely a more elegant result — move one rung to `open`, announce the rung
+  change with evidence (what was attempted, the blocking constraint, the
+  smallest wider footprint that resolves it), and continue. Never skip a rung.
+- `open` is terminal. A task that cannot be completed even at `open` is
+  task-exceeds-request: stop and report rather than widening further.
+- Escalation is per-task and monotonic within it; it is never inherited by the
+  next task.
+- Under an approved plan, a leaf returns bounded `blocked` evidence instead of
+  widening its own boundary; the parent re-cuts and redispatches it. Level bounds
+  footprint, tier bounds reasoning depth — neither substitutes for the other.
+- Scope level says nothing about how minimal the solution is inside its
+  footprint; that judgment stays with `souroldgeezer-design:software-design`.
 
 ## Architecture Rules
 
@@ -183,7 +233,9 @@ enforcement authority before new feature or build work begins.
 ## Versioning
 
 `release-policy: calver YYYY.0M.MICRO, annotated v<version> git tags, version
-bump in its own commit`
+bump in its own commit; local bump and tag creation are authorized after
+verification, but pushing the tag publishes and needs explicit per-release
+authority`
 
 The line above initializes `souroldgeezer-policy:release-policy` for this
 repository. The rules below are its options and exceptions; they are standing
@@ -216,6 +268,13 @@ enforcement authority for matching version, tag, and release actions.
   already-integrated changes.
 - Every product/plugin version bump must create the matching annotated git tag
   `v<version>` on the version-bump commit before pushing.
+- Authority gate: the version bump, its commit, and the annotated tag are
+  authorized locally once the documented verification for the change is green.
+  **Pushing the tag is publication** — it triggers `.github/workflows/release.yml`,
+  which runs `gh release create` and un-drafts the GitHub Release — so the push
+  needs explicit per-release authority. Mutating or deleting a tag, re-pointing a
+  release, and yanking artifacts always need explicit authority and are never
+  routine corrections.
 - Source fixture `required_plugins[].version` entries, README bundle examples,
   `docs/agent-usage.md` examples, distribution metadata, and tests that assert
   version strings must match the product version.
@@ -282,6 +341,42 @@ enforcement authority for matching version, tag, and release actions.
 - SpotBugs suppressions live in `spotbugs-exclude.xml` and must be recorded as
   known debt in `docs/architecture-guidelines.md §12` — never suppress silently.
 - Security scanning is CodeQL's job (CI), not SpotBugs; do not add FindSecBugs.
+
+## Test-First
+
+`tdd-policy: test-first — a failing test precedes implementation;
+RED→GREEN→REFACTOR; shipped behavior stays covered by a test that fails on
+regression. Scope: */src/main/java/**, schemas/**, fixtures/**,
+dist-tool/src/main/**, bundle-shrink.pro, **/pom.xml. Exceptions: spikes,
+prototypes, throwaway probes, generated code (logged). Enforcement: model. Opt
+out per task by saying "skip TDD" (logged)`
+
+The line above initializes `souroldgeezer-policy:tdd-policy` for this repository.
+The rules below are its options and exceptions; they are standing enforcement
+authority before implementation code changes.
+
+- `test-first` is strict RED→GREEN→REFACTOR: write the failing test, run the
+  narrow lane from `## Verification` and watch it fail, implement minimally, then
+  refactor. Watching it fail is the point — it proves the test can fail.
+- Scope covers production Java in every module plus the contract surfaces that
+  behave like production code here: a schema or fixture change lands behind a
+  failing contract/round-trip test, and packaging changes (`dist-tool`,
+  `bundle-shrink.pro`, poms) behind a failing check, because `-Pdist-smoke`
+  otherwise catches a miss late. Test sources, generated output, and docs are
+  outside scope.
+- Exceptions are exempt from the failing-test-first gate but are always logged in
+  the handoff, never applied silently.
+- `test-after` is not a variant. Landing implementation before its test is an
+  opt-out downgrade that relaxes the invariant, and is logged as such.
+- Enforcement is `model`: an enforced-by-default posture, not a mechanical
+  guarantee. No PreToolUse gate is installed, consistent with `lean CI,
+  local-first validation`.
+- Parallel agents must not run Maven (`## Planning`), so a delegated leaf writes
+  its failing test and states the lane; the parent runs the central build that
+  turns RED into GREEN.
+- Test adequacy, brittleness, and suite strategy stay with
+  `souroldgeezer-audit:test-quality-audit` (`## Audit Gates`) — tdd-policy owns
+  ordering only.
 
 ## Verification
 
@@ -472,7 +567,9 @@ handoff, then rerun affected checks.
 ## Git Hygiene
 
 `git-workflow-policy: direct main allowed (branches optional), integration at
-author discretion, clean worktree, explicit-path staging`
+author discretion, approved multi-step plans run in a worktree removed at a
+verified closeout, clean worktree, explicit-path staging, stop before destructive
+git actions`
 
 The line above initializes `souroldgeezer-policy:git-workflow-policy` for this
 repository, overriding the skill's `no direct main` / `feature branches`
@@ -486,6 +583,13 @@ integration actions.
 - Integration is at author discretion: land a branch into `main` with a local
   `--no-ff` merge or a GitHub Pull Request, chosen per change. Delegate PR
   lifecycle writes to `pr-ops`.
+- Approved multi-step plans (`## Planning`) are implemented in a worktree under
+  repository `.worktrees/<name>`, not the primary checkout. Closeout is part of
+  the same task, not a follow-up: verify the merge (`git branch --merged`), then
+  `git worktree remove <path>`, `git worktree prune`, and `git branch -d` —
+  never `-D`. Do not leave integrated worktrees or branches behind. Subagents do
+  not reliably inherit a worktree cwd, so a delegated fleet either receives
+  absolute paths or runs in the primary checkout.
 - Version-edit placement: version files may change on any branch, including
   `main`. `## Versioning` (`release-policy`) governs the version source, the
   separate-commit rule, tagging, and release execution.
