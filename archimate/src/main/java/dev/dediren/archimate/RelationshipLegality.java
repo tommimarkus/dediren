@@ -76,7 +76,33 @@ final class RelationshipLegality {
    */
   private static final Set<String> GENERIC_COMPOSITE = Set.of("Grouping", "Location");
 
+  /**
+   * The three §B.6 names whose aggregation or composition reaches any concept: grouping and
+   * location by that section's first bullet, plateau by the same section's scope. Wider than {@link
+   * #GENERIC_COMPOSITE}, which is about taking part in <em>any</em> relationship conditionally.
+   */
+  private static final Set<String> CONTAINMENT_COMPOSITE =
+      Set.of("Grouping", "Location", "Plateau");
+
   private static final Map<String, Category> CATEGORY = buildCategories();
+
+  /**
+   * The four domains Appendix B.4 names, which cut across the element categories above.
+   *
+   * <p>Category answers "what kind of thing is this" (active structure, behavior, passive
+   * structure…); domain answers "which part of the language does it belong to". B.4 restricts which
+   * relationship types may cross between them, and those restrictions are invisible to a
+   * category-only model &mdash; which is why a business process could serve a capability here.
+   */
+  private enum Domain {
+    MOTIVATION,
+    STRATEGY,
+    /** Business, Application, Technology and Physical, plus location and grouping (&sect;B.4). */
+    CORE,
+    IMPLEMENTATION_MIGRATION
+  }
+
+  private static final Map<String, Domain> DOMAIN = buildDomains();
 
   /**
    * Assignment's allowed target categories per source category.
@@ -207,12 +233,15 @@ final class RelationshipLegality {
       // so an element type added without a category fails the build rather than arriving here.
       return true;
     }
+    if (!allowsDomainCrossing(
+        relationshipType, sourceType, DOMAIN.get(sourceType), DOMAIN.get(targetType))) {
+      return false;
+    }
     return switch (relationshipType) {
       case "Association" -> true;
       case "Specialization" ->
           sourceType.equals(targetType) || isDefinedSpecialization(sourceType, targetType);
-      case "Composition", "Aggregation" ->
-          s == t || s == Category.COMP || (s == Category.AS_INT && t == Category.AS_IFACE);
+      case "Composition", "Aggregation" -> allowsContainment(sourceType, targetType, s, t);
       case "Assignment" -> ASSIGNMENT_TARGETS.getOrDefault(s, Set.of()).contains(t);
       case "Realization" -> REALIZATION_TARGETS.getOrDefault(s, Set.of()).contains(t);
       case "Serving" ->
@@ -259,6 +288,112 @@ final class RelationshipLegality {
    */
   static Set<String> categorizedTypes() {
     return CATEGORY.keySet();
+  }
+
+  /**
+   * &sect;B.4's domain crossing restrictions, stated as the section states them: a crossing is
+   * refused unless the relationship type is one the section names for that direction.
+   *
+   * <p>The section frames these as restrictions on <em>derivation</em>, which is why they are
+   * applied here only to crossings and not to its passive-structure clauses &mdash; those would
+   * reject directly-modelled edges §5.1 permits, such as a business object composed of business
+   * objects. The crossings are safe to enforce directly because the relationship tables they
+   * produce agree: a core element serving a strategy element is absent from them.
+   */
+  private static boolean allowsDomainCrossing(
+      String relationshipType, String sourceType, Domain a, Domain b) {
+    if (a == null || b == null || a == b) {
+      return true;
+    }
+    // §B.6: grouping, location and plateau may aggregate or compose any concept, which is a
+    // containment statement rather than a relationship between domains — a plateau collects the
+    // goals and outcomes a state of the architecture reaches, across every domain there is.
+    if (CONTAINMENT_COMPOSITE.contains(sourceType)
+        && ("Composition".equals(relationshipType) || "Aggregation".equals(relationshipType))) {
+      return true;
+    }
+    if (b == Domain.MOTIVATION) {
+      return switch (relationshipType) {
+        case "Assignment", "Realization", "Influence", "Association" -> true;
+        default -> false;
+      };
+    }
+    if (a == Domain.MOTIVATION) {
+      return "Association".equals(relationshipType);
+    }
+    if (b == Domain.STRATEGY) {
+      return "Realization".equals(relationshipType) || "Association".equals(relationshipType);
+    }
+    if (a == Domain.STRATEGY) {
+      return "Association".equals(relationshipType);
+    }
+    if (a == Domain.IMPLEMENTATION_MIGRATION) {
+      return "Realization".equals(relationshipType) || "Association".equals(relationshipType);
+    }
+    return "Assignment".equals(relationshipType) || "Association".equals(relationshipType);
+  }
+
+  /**
+   * Which containments &sect;5.1.1, &sect;8.5.1 and &sect;B.6 allow.
+   *
+   * <p>Three different rules wear the same relationship. A grouping, location or plateau contains
+   * any concept (&sect;B.6). A product has a <em>closed</em> list &mdash; business, application and
+   * technology services, business and data objects, artifacts and material, and a contract
+   * (&sect;8.5.1) &mdash; which in category terms is services and passive structure, and is why it
+   * cannot be treated as a generic container. Everything else follows &sect;5.1.1: between
+   * instances of the same element type, modelled here at category granularity because the tables
+   * are wider than the sentence (a business process composed of business functions is legal).
+   */
+  private static boolean allowsContainment(
+      String sourceType, String targetType, Category s, Category t) {
+    if (CONTAINMENT_COMPOSITE.contains(sourceType)) {
+      return true;
+    }
+    if ("Product".equals(sourceType)) {
+      // §8.5.1's list is in addition to §5.1.1's same-type rule, not instead of it.
+      return t == Category.SVC || t == Category.PAS || "Product".equals(targetType);
+    }
+    return s == t || (s == Category.AS_INT && t == Category.AS_IFACE);
+  }
+
+  private static Map<String, Domain> buildDomains() {
+    Map<String, Domain> map = new java.util.HashMap<>();
+    // Chapter 6.
+    put(
+        map,
+        Domain.MOTIVATION,
+        "Stakeholder",
+        "Driver",
+        "Assessment",
+        "Goal",
+        "Outcome",
+        "Value",
+        "Meaning",
+        "Constraint",
+        "Requirement",
+        "Principle");
+    // Chapter 7.
+    put(map, Domain.STRATEGY, "Resource", "Capability", "CourseOfAction", "ValueStream");
+    // Chapter 12.
+    put(
+        map,
+        Domain.IMPLEMENTATION_MIGRATION,
+        "WorkPackage",
+        "Deliverable",
+        "ImplementationEvent",
+        "Plateau",
+        "Gap");
+    // Everything else is Core: chapters 8-11 plus location and grouping, named by §B.4 itself.
+    for (String type : CATEGORY.keySet()) {
+      map.putIfAbsent(type, Domain.CORE);
+    }
+    return Map.copyOf(map);
+  }
+
+  private static void put(Map<String, Domain> map, Domain domain, String... types) {
+    for (String type : types) {
+      map.put(type, domain);
+    }
   }
 
   private static Map<String, Category> buildCategories() {

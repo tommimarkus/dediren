@@ -326,21 +326,22 @@ motivation or passive elements, and Assignment from passive, motivation, event,
 or service sources.
 
 **A green `validate` is not a conformance certificate.** About one endpoint
-combination in five that Appendix B forbids is still accepted — measured against
-the specification's own relationship table, the model rejects 79.9% of them and
-falsely rejects none. That is a design point rather than a bug backlog: the rules are expressed over the generic
+combination in eight that Appendix B forbids is still accepted — measured
+against the specification's own relationship table, the model rejects 88.2% of
+them and falsely rejects none. That is a design point rather than a bug backlog: the rules are expressed over the generic
 metamodel's element categories rather than by reproducing Appendix B's tables,
 and they do not compute the full derivation closure. Three specific gaps are
 worth knowing when a model matters:
 
-- Composition and aggregation are decided on element *category*, not element
-  type, and `Product` and `Plateau` share the composite category — so some
-  cross-layer containment passes.
-- §B.4's four domains are not modelled, so no rule can see a domain crossing;
-  Strategy and Implementation-&-Migration elements are classified structurally.
-- Junctions are checked for consistent relationship type, direction, and
-  reachable endpoints, but not for which relationship types may carry a junction
-  at all.
+- Containment is decided on element *category*, not element type, so a business
+  actor composing an application component passes. Tightening it is not simply a
+  matter of stricter equality — a business process composed of business
+  functions is legal and must stay so.
+- §B.4's domain crossings *are* enforced (Motivation, Strategy, Core,
+  Implementation & Migration), as are `Product`'s closed containment list
+  (§8.5.1) and grouping/location/plateau containment (§B.6). What is not
+  computed is Appendix B's derivation closure, which is where most of the
+  remaining residue lives.
 
 A model that must be legal in Archi or Enterprise Architect should be checked
 there. `dediren validate` catches the bulk of endpoint errors early; it does not

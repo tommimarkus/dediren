@@ -1030,3 +1030,47 @@ TOC containing no `<name> [Class]` title for any of them.
 
 
 
+
+## Status — remediated 2026-08-12
+
+This register is diagnose-only; the execution record is
+`2026-08-12-conformance-remediation.md` beside it. Summary of the outcome, so a reader arriving here
+does not have to reconstruct it from the plan.
+
+**Fixed.** Every `block` finding in Groups 1–6 except where noted below, plus most `warn`s:
+`AM-NOT-1..7,-11`, `AM-OEF-1..6,-8,-9,-10,-12`, `AM-SEM-2,-5,-10,-11,-12`, `AM-VOCAB-4,-5,-9`,
+`UML-NOT-2..5,-7,-8`, part of `-9`, `UML-SEM-1..5,-8,-13,-15,-16,-17,-19,-22,-23,-24,-29`,
+`UML-VOCAB-1`, `UML-XMI-12,-13,-16,-21`, and every `DOC-` finding.
+
+**Six findings were real observations with wrong conclusions attached**, which is the register's own
+most reusable result and the reason each fix was re-derived rather than applied:
+
+- `UML-NOT-7` — the proposed fix would have kept the overflowing tab copy and deleted the correct
+  body label.
+- `UML-NOT-1` — composing the keyword at render time is on the wrong side of layout; the paint
+  oracle caught it and the change was reverted.
+- `UML-XMI-18` — the "schema-valid slot" is not valid there; the pinned XSD's content model excludes
+  its own namespace.
+- `UML-XMI-2` — "no test pins the wording" is false; corrupting both literals fails two tests.
+- `UML-XMI-5`/`UML-VOCAB-7` — sized as a metaclass rename; §10.5.6 needs a nested
+  `InterfaceRealization`, so it is a writer restructure.
+- `UML-XMI-14`/`-15` — both refuted against the OMG's published DD schemas. `dc:Bounds` is a global
+  element named after its type and `di:waypoint` a local element in a qualified schema, so the
+  "mixed convention" is the schemas' own; and `20100524` is those schemas' `targetNamespace`, not a
+  stale DD 1.0 reference. Acting on either would emit documents no DD-aware tool can read.
+
+**And one conclusion this remediation got wrong.** `AM-SEM-1` was implemented as written — cross-type
+specialization narrowed to one direction — and reverted the same day when the Appendix-B oracle
+produced exactly two false negatives, both of them there. §8.4.2's "a contract is a specialization of
+a business object" is a metamodel statement, and B.5 derives the pair through that inheritance in
+both directions. The unordered `Set.of(s, t)` assertion this register flagged as "permitting but not
+requiring the bug" was correct, and deliberately so.
+
+**Measured, once the specification was available locally:** the ArchiMate legality model rejects
+**79.9%** of the combinations Appendix B forbids, with **zero false negatives**, over 10,620 allowed
+triples. `AM-SEM-9`'s undocumented `CATCH_RATE_FLOOR` now has that provenance and sits at 0.79.
+
+**Accepted or carried forward.** Seven remainders are recorded in `docs/architecture-guidelines.md`
+§12, each with the condition that reopens it. One followup stays open: the §B.4 domain dimension
+(`AM-SEM-3/-4/-7`), whose findings the oracle confirms are real and whose fix is now verifiable
+against it — that verification was the thing missing when the work was deferred.

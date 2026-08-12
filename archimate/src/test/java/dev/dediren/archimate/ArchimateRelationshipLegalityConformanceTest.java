@@ -264,6 +264,50 @@ class ArchimateRelationshipLegalityConformanceTest {
   }
 
   @Test
+  void domainCrossingsAreRestrictedToTheRelationshipTypesSectionB4Names() {
+    // §B.4 names four domains — Motivation, Strategy, Core, Implementation & Migration — and
+    // restricts which relationship types may cross between them. A category-only model cannot see
+    // these at all, which is how a business process came to serve a capability.
+    assertThat(allowed("Serving", "BusinessProcess", "Capability")).isFalse(); // Core -> Strategy
+    assertThat(allowed("Assignment", "Node", "Capability")).isFalse(); // Core -> Strategy
+    assertThat(allowed("Serving", "ApplicationService", "WorkPackage")).isFalse(); // Core -> I&M
+    assertThat(allowed("Serving", "Goal", "BusinessProcess")).isFalse(); // Motivation -> Core
+    assertThat(allowed("Triggering", "Capability", "BusinessProcess"))
+        .isFalse(); // Strategy -> Core
+
+    // And the crossings it does name stay legal.
+    assertThat(allowed("Realization", "BusinessProcess", "Capability")).isTrue();
+    assertThat(allowed("Association", "Goal", "BusinessProcess")).isTrue();
+    assertThat(allowed("Influence", "BusinessProcess", "Goal")).isTrue();
+    assertThat(allowed("Realization", "WorkPackage", "Deliverable")).isTrue(); // same domain
+  }
+
+  @Test
+  void containmentFollowsThreeDifferentRules() {
+    // §B.6: grouping, location and plateau contain any concept, across every domain.
+    assertThat(allowed("Composition", "Plateau", "Goal")).isTrue();
+    assertThat(allowed("Aggregation", "Grouping", "Capability")).isTrue();
+
+    // §8.5.1 gives product a closed list — services and passive structure, plus a contract — so it
+    // is not a generic container even though it sits in the same category as one.
+    assertThat(allowed("Composition", "Product", "BusinessService")).isTrue();
+    assertThat(allowed("Aggregation", "Product", "Contract")).isTrue();
+    assertThat(allowed("Composition", "Product", "Product")).isTrue(); // §5.1.1 still applies
+    assertThat(allowed("Composition", "Product", "BusinessActor")).isFalse();
+    assertThat(allowed("Composition", "Product", "ApplicationComponent")).isFalse();
+
+    // §5.1.1 for everything else, at category granularity rather than element type: the tables are
+    // wider than the sentence, and a business process composed of business functions is legal.
+    assertThat(allowed("Composition", "BusinessProcess", "BusinessFunction")).isTrue();
+    // The cost of that granularity, kept deliberately and recorded in §12: same-category
+    // containment across layers is accepted although the tables forbid it. Tightening to element
+    // type would reject the line above, so this needs the layer dimension, not a stricter equality.
+    assertThat(allowed("Composition", "BusinessActor", "ApplicationComponent")).isTrue();
+    // The domain rule does catch it once the layers differ by *domain* rather than by layer.
+    assertThat(allowed("Composition", "BusinessActor", "Resource")).isFalse();
+  }
+
+  @Test
   void definedCrossTypeSpecializationIsLegalInBothDirections() {
     // Reads as though it should be directional, and is not. §8.4.2's "a contract is a
     // specialization of a business object" is a *metamodel* statement — Contract is a subtype of
@@ -366,12 +410,13 @@ class ArchimateRelationshipLegalityConformanceTest {
    * The floor for property (2): the share of oracle-forbidden combinations the model must reject.
    *
    * <p><b>Provenance.</b> Measured 2026-08-12 against an Appendix B.5 extraction of 10,620 allowed
-   * triples: <b>79.9% caught, zero false negatives</b>. The floor sits just under that, so erosion
-   * fails the gate instead of hiding in the margin — the previous 0.75 left four points of slack
-   * against a rate nobody had recorded, and a change dropping the real figure to 75.1% would have
-   * passed. Re-measure and raise it whenever the rule model changes.
+   * triples. The rules started that day at <b>79.9% caught, zero false negatives</b>; adding the
+   * §B.4 domain dimension and splitting containment into its three rules took it to <b>88.2%</b>,
+   * still with zero false negatives. The floor sits just under the current figure, so erosion fails
+   * the gate instead of hiding in the margin — the original 0.75 left thirteen points of slack
+   * against a rate nobody had recorded. Re-measure and raise it whenever the rule model changes.
    *
-   * <p>The ~20% the model still accepts is the documented design point, not a backlog: the rules
+   * <p>The ~12% the model still accepts is the documented design point, not a backlog: the rules
    * are expressed over the generic metamodel's element categories rather than by reproducing the
    * copyrighted B.5 tables, and they compute no derivation closure.
    *
@@ -379,7 +424,7 @@ class ArchimateRelationshipLegalityConformanceTest {
    * does not run it. It is a deliberate manual check, not CI coverage — which is exactly why the
    * two false negatives it caught on 2026-08-12 had already been committed.
    */
-  private static final double CATCH_RATE_FLOOR = 0.79;
+  private static final double CATCH_RATE_FLOOR = 0.88;
 
   @Test
   void modelMatchesRelationshipTableOracle() throws IOException {
