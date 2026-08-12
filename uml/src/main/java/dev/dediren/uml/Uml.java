@@ -8,6 +8,7 @@ import static dev.dediren.uml.UmlProperties.requireNodeType;
 import static dev.dediren.uml.UmlProperties.requiredTextArrayEntry;
 import static dev.dediren.uml.UmlProperties.requiredTextProperty;
 
+import dev.dediren.contracts.Diagnostic;
 import dev.dediren.contracts.source.GenericGraphPluginData;
 import dev.dediren.contracts.source.GenericGraphView;
 import dev.dediren.contracts.source.GenericGraphViewKind;
@@ -141,8 +142,9 @@ public final class Uml {
     return COMPACT_ACTIVITY_NODE_TYPES.contains(value);
   }
 
-  public static void validateSource(SourceDocument source, GenericGraphPluginData pluginData)
-      throws UmlValidationException {
+  public static List<Diagnostic> validateSource(
+      SourceDocument source, GenericGraphPluginData pluginData) throws UmlValidationException {
+    var diagnostics = new java.util.ArrayList<Diagnostic>();
     var nodeTypes = new HashMap<String, String>();
     var nodeUmlProperties = new HashMap<String, JsonNode>();
     var nodePaths = new HashMap<String, String>();
@@ -206,12 +208,13 @@ public final class Uml {
 
     for (int nodeIndex = 0; nodeIndex < source.nodes().size(); nodeIndex++) {
       SourceNode node = source.nodes().get(nodeIndex);
-      validateUmlNodeProperties(
-          node.id(),
-          node.type(),
-          node.properties().get("uml"),
-          "$.nodes[" + nodeIndex + "]",
-          context);
+      diagnostics.addAll(
+          validateUmlNodeProperties(
+              node.id(),
+              node.type(),
+              node.properties().get("uml"),
+              "$.nodes[" + nodeIndex + "]",
+              context));
     }
     validateTransitionRegionConsistency(source.relationships(), context);
     validateStateVertexConstraints(source.nodes(), context);
@@ -219,7 +222,8 @@ public final class Uml {
     UmlSequenceValidation.validateCombinedFragmentNesting(source.nodes(), context);
     UmlSequenceValidation.validateInteractionOperandOwnerSelection(source.nodes(), context);
     UmlSequenceValidation.validateInteractionFragmentOwnership(source.nodes(), context);
-    UmlSequenceValidation.validateCombinedFragmentSequenceContiguity(source.nodes(), context);
+    diagnostics.addAll(
+        UmlSequenceValidation.validateCombinedFragmentSequenceContiguity(source.nodes(), context));
 
     for (int viewIndex = 0; viewIndex < pluginData.views().size(); viewIndex++) {
       var view = pluginData.views().get(viewIndex);
@@ -258,20 +262,23 @@ public final class Uml {
     // deserves the more specific diagnostic.
     UmlSequenceValidation.validateNoOccurrencesBelowDestruction(
         source.relationships(), source.nodes(), context);
+    return List.copyOf(diagnostics);
   }
 
-  private static void validateUmlNodeProperties(
+  private static List<Diagnostic> validateUmlNodeProperties(
       String nodeId,
       String nodeType,
       JsonNode umlProperties,
       String path,
       ValidationContext context)
       throws UmlValidationException {
+    var diagnostics = new java.util.ArrayList<Diagnostic>();
     if ("CombinedFragment".equals(nodeType)) {
       UmlSequenceValidation.validateCombinedFragmentProperties(
           nodeId, umlProperties, path, context);
     } else if ("InteractionOperand".equals(nodeType)) {
-      UmlSequenceValidation.validateInteractionOperandProperties(umlProperties, path, context);
+      diagnostics.addAll(
+          UmlSequenceValidation.validateInteractionOperandProperties(umlProperties, path, context));
     } else if ("Region".equals(nodeType)) {
       validateRegionProperties(umlProperties, path, context);
     } else if (isStateVertexType(nodeType)) {
@@ -285,6 +292,7 @@ public final class Uml {
     } else if ("ExecutionEnvironment".equals(nodeType)) {
       validateExecutionEnvironmentProperties(umlProperties, path, context);
     }
+    return diagnostics;
   }
 
   private static void validateUmlSequenceViewProperties(

@@ -55,6 +55,41 @@ class ArchimateNotationSemanticsTest {
   }
 
   @Test
+  void reportsTheDeprecatedWorkPackageRealizationWithoutRejectingIt() throws Exception {
+    // §12.1 deprecates WorkPackage -[Realization]-> Deliverable in favour of access, but it is
+    // still legal — so this is the case the seam had no way to express: not an error, not silence.
+    SourceDocument source =
+        new SourceDocument(
+            "model.schema.v1",
+            List.of(),
+            List.of(),
+            List.of(
+                new SourceNode("wp", "WorkPackage", "Migrate", Map.of()),
+                new SourceNode("d", "Deliverable", "Report", Map.of())),
+            List.of(new SourceRelationship("r", "Realization", "wp", "d", "", Map.of())),
+            Map.of());
+
+    List<dev.dediren.contracts.Diagnostic> diagnostics = notation.validate(source, null);
+
+    assertThat(diagnostics)
+        .singleElement()
+        .satisfies(
+            diagnostic -> {
+              assertThat(diagnostic.code()).isEqualTo("DEDIREN_ARCHIMATE_RELATIONSHIP_DEPRECATED");
+              assertThat(diagnostic.severity())
+                  .isEqualTo(dev.dediren.contracts.DiagnosticSeverity.INFO);
+              assertThat(diagnostic.message()).contains("WorkPackage", "Deliverable");
+              assertThat(diagnostic.path()).isEqualTo("$.relationships[0]");
+            });
+  }
+
+  @Test
+  void reportsNothingForAnOrdinaryModel() throws Exception {
+    assertThat(notation.validate(fixture("fixtures/source/valid-archimate-oef.json"), null))
+        .isEmpty();
+  }
+
+  @Test
   void projectsJunctionRoleOntoArchimateNodes() throws Exception {
     SourceDocument source = fixture("fixtures/source/valid-archimate-junction.json");
 

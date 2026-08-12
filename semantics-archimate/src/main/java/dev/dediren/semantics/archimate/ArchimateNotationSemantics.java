@@ -5,6 +5,9 @@ import dev.dediren.archimate.ArchimateJunctionValidationException;
 import dev.dediren.archimate.ArchimateTypeValidationException;
 import dev.dediren.archimate.JunctionValidationNode;
 import dev.dediren.archimate.JunctionValidationRelationship;
+import dev.dediren.contracts.Diagnostic;
+import dev.dediren.contracts.DiagnosticCode;
+import dev.dediren.contracts.DiagnosticSeverity;
 import dev.dediren.contracts.layout.LayoutNodeRole;
 import dev.dediren.contracts.source.GenericGraphPluginData;
 import dev.dediren.contracts.source.GenericGraphView;
@@ -31,12 +34,42 @@ import tools.jackson.databind.JsonNode;
  */
 public final class ArchimateNotationSemantics implements NotationSemantics {
 
+  /**
+   * §12.1 deprecates {@code WorkPackage -[Realization]-> Deliverable} in favour of access, while
+   * leaving it legal. Reporting it is the whole reason this method returns diagnostics: rejecting
+   * it would be wrong, and saying nothing means a model gets authored on an edge a future revision
+   * may remove.
+   */
+  private static List<Diagnostic> deprecatedRelationshipDiagnostics(SourceDocument source) {
+    var nodeTypes = new java.util.HashMap<String, String>();
+    source.nodes().forEach(node -> nodeTypes.put(node.id(), node.type()));
+    var diagnostics = new java.util.ArrayList<Diagnostic>();
+    for (int index = 0; index < source.relationships().size(); index++) {
+      SourceRelationship relationship = source.relationships().get(index);
+      if (!"Realization".equals(relationship.type())
+          || !"WorkPackage".equals(nodeTypes.get(relationship.source()))
+          || !"Deliverable".equals(nodeTypes.get(relationship.target()))) {
+        continue;
+      }
+      diagnostics.add(
+          new Diagnostic(
+              DiagnosticCode.ARCHIMATE_RELATIONSHIP_DEPRECATED.code(),
+              DiagnosticSeverity.INFO,
+              "WorkPackage -[Realization]-> Deliverable is deprecated by ArchiMate §12.1 in favour"
+                  + " of an access relationship; it stays legal here, but a future revision of the"
+                  + " standard may remove it",
+              "$.relationships[" + index + "]"));
+    }
+    return List.copyOf(diagnostics);
+  }
+
   @Override
-  public void validate(SourceDocument source, GenericGraphPluginData pluginData)
+  public List<Diagnostic> validate(SourceDocument source, GenericGraphPluginData pluginData)
       throws EngineException {
     try {
       validateArchimateSourceTypes(source);
       validateArchimateJunctionSemantics(source);
+      return deprecatedRelationshipDiagnostics(source);
     } catch (ArchimateTypeValidationException error) {
       throw EngineException.semanticFailure(error.code(), error.message(), error.path());
     } catch (ArchimateJunctionValidationException error) {

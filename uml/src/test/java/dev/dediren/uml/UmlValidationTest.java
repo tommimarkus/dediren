@@ -1295,20 +1295,23 @@ class UmlValidationTest {
   }
 
   @Test
-  void rejectsMessageFragmentEndpointOutsideOwningFragmentCoverage() throws Exception {
+  void warnsMessageFragmentEndpointOutsideOwningFragmentCoverage() throws Exception {
+    // Coverage containment is dediren's rule, not UML's: §17.12.13.5 types `covered` as a free
+    // [0..*] and imposes no containment between a fragment and its owner. Rejecting this rejected
+    // a spec-legal model, so it is reported instead and the layout guarantee survives as a warning.
     Fixture fixture =
         loadMutatedUmlSequenceFragmentsFixture(
             source ->
                 replaceTextArray(nodeUmlProperties(source, "cf-coupon"), "covered", "customer"));
 
-    UmlValidationException error = assertRejected(fixture);
-
-    assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
-    assertThat(error.path()).isEqualTo("$.nodes[9].properties.uml.fragments[0]");
+    assertThat(houseRuleWarnings(fixture))
+        .anySatisfy(
+            warning ->
+                assertThat(warning.path()).isEqualTo("$.nodes[9].properties.uml.fragments[0]"));
   }
 
   @Test
-  void rejectsNestedCombinedFragmentCoverageOutsideOwningFragmentCoverage() throws Exception {
+  void warnsNestedCombinedFragmentCoverageOutsideOwningFragmentCoverage() throws Exception {
     Fixture fixture =
         loadMutatedUmlSequenceFragmentsFixture(
             source -> {
@@ -1316,10 +1319,10 @@ class UmlValidationTest {
               replaceTextArray(nodeUmlProperties(source, "cf-availability"), "covered", "customer");
             });
 
-    UmlValidationException error = assertRejected(fixture);
-
-    assertThat(error.code()).isEqualTo("DEDIREN_UML_ELEMENT_PROPERTY_UNSUPPORTED");
-    assertThat(error.path()).isEqualTo("$.nodes[6].properties.uml.fragments[0]");
+    assertThat(houseRuleWarnings(fixture))
+        .anySatisfy(
+            warning ->
+                assertThat(warning.path()).isEqualTo("$.nodes[6].properties.uml.fragments[0]"));
   }
 
   @Test
@@ -1355,13 +1358,19 @@ class UmlValidationTest {
   }
 
   @Test
-  void rejectsCombinedFragmentWithStandaloneSequenceHoleBetweenOperands() throws Exception {
-    assertUmlSequenceFragmentsMutationRejected(
-        source -> {
-          replaceTextArray(nodeUmlProperties(source, "op-in-stock"), "fragments", "m1");
-          replaceTextArray(nodeUmlProperties(source, "op-backorder"), "fragments", "m3");
-        },
-        "$.nodes[5].properties.uml.operands");
+  void warnsCombinedFragmentWithStandaloneSequenceHoleBetweenOperands() throws Exception {
+    // Contiguity is also dediren's: §17.1.3 orders an Interaction partially, and `critical` exists
+    // precisely because ordinary fragments are not protected from interleaving.
+    Fixture fixture =
+        loadMutatedUmlSequenceFragmentsFixture(
+            source -> {
+              replaceTextArray(nodeUmlProperties(source, "op-in-stock"), "fragments", "m1");
+              replaceTextArray(nodeUmlProperties(source, "op-backorder"), "fragments", "m3");
+            });
+
+    assertThat(houseRuleWarnings(fixture))
+        .anySatisfy(
+            warning -> assertThat(warning.path()).isEqualTo("$.nodes[5].properties.uml.operands"));
   }
 
   @Test
@@ -2143,6 +2152,18 @@ class UmlValidationTest {
   private static Arguments fragmentRejectionCase(
       String name, Consumer<ObjectNode> mutation, String expectedPath) {
     return arguments(named(name, mutation), expectedPath);
+  }
+
+  /**
+   * The warnings for dediren's own sequence-layout rules — the two the UML specification does not
+   * impose, which used to be errors and rejected spec-legal interleavings.
+   */
+  private static List<dev.dediren.contracts.Diagnostic> houseRuleWarnings(Fixture fixture)
+      throws Exception {
+    return Uml.validateSource(fixture.source(), fixture.pluginData()).stream()
+        .filter(d -> d.code().equals("DEDIREN_UML_SEQUENCE_HOUSE_RULE"))
+        .filter(d -> d.severity() == dev.dediren.contracts.DiagnosticSeverity.WARNING)
+        .toList();
   }
 
   private static UmlValidationException assertRejected(Fixture fixture) {

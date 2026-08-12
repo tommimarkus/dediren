@@ -1,5 +1,6 @@
 package dev.dediren.engine;
 
+import dev.dediren.contracts.Diagnostic;
 import dev.dediren.contracts.source.GenericGraphPluginData;
 import dev.dediren.contracts.source.GenericGraphView;
 import dev.dediren.contracts.source.SourceDocument;
@@ -22,8 +23,15 @@ public interface NotationSemantics {
   /**
    * Notation legality; throws {@link EngineException} on the first violation, carrying the exact
    * diagnostic code / exit code the notation core raises. A no-op for the plain graph profile.
+   *
+   * <p>Returns the diagnostics the model earned without being rejected — a construct the standard
+   * deprecates but still permits, or a house rule the notation enforces that the standard does not.
+   * Returning {@code List.of()} is the ordinary case. This exists because reject-or-say-nothing is
+   * not enough: a notation that can only throw has to choose between failing a legal model and
+   * staying silent about something the author should know.
    */
-  void validate(SourceDocument source, GenericGraphPluginData pluginData) throws EngineException;
+  List<Diagnostic> validate(SourceDocument source, GenericGraphPluginData pluginData)
+      throws EngineException;
 
   /**
    * Layout role for a source node type, or {@code null} for none. The value must be one of the five
