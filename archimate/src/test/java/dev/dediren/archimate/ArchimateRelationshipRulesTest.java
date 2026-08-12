@@ -190,10 +190,24 @@ class ArchimateRelationshipRulesTest {
   }
 
   @Test
-  void acceptsGroupingAndLocationAsUniversalConnectors() throws Exception {
-    // Grouping/Location connect to anything, even where the bare category rule would reject.
-    assertAllowed("Serving", "Grouping", "DataObject");
-    assertAllowed("Access", "DataObject", "Location");
+  void acceptsGroupingAndLocationWhereverAnElementCouldStandInTheirPlace() throws Exception {
+    // §B.6 grants the generic composites participation in any relationship whose *other* endpoint
+    // can take part in it — so they reach anywhere an element reaches, including where the bare
+    // category rule would reject the composite's own category.
+    assertAllowed("Access", "Grouping", "DataObject");
+    assertAllowed("Serving", "Location", "ApplicationService");
+    assertAllowed("Composition", "BusinessActor", "Grouping");
+    assertAllowed("Influence", "Grouping", "Goal");
+  }
+
+  @Test
+  void rejectsGroupingAndLocationWhereNoElementCouldStandInTheirPlace() {
+    // The other half of §B.6, and the reason it is a condition rather than a blanket: a composite
+    // cannot legalize a direction the language has no legal instance of. Serving never reaches
+    // passive structure (§5.2.1) and a passive element never accesses anything (§5.2.2), so no
+    // substitution rescues either edge — the previous blanket rule accepted both.
+    assertRejected("Serving", "Grouping", "DataObject");
+    assertRejected("Access", "DataObject", "Location");
   }
 
   @Test
