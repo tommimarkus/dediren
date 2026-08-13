@@ -3,10 +3,10 @@ package dev.dediren.schemacache;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
-import java.net.URI;
 import java.net.InetSocketAddress;
 import java.net.Proxy;
 import java.net.ProxySelector;
+import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -44,8 +44,8 @@ public final class SchemaCacheModule {
    * each appends its own offline-placement tail (schema dir vs schema path).
    */
   public static final String PROXY_REMEDIATION =
-      "To download through an HTTP proxy, expose HTTP_PROXY, HTTPS_PROXY, and NO_PROXY (or their"
-          + " lowercase forms) to this process.";
+      "To download through a proxy, expose HTTPS_PROXY, HTTP_PROXY as its documented fallback,"
+          + " ALL_PROXY, and NO_PROXY (or their lowercase forms) to this process.";
 
   private SchemaCacheModule() {}
 
