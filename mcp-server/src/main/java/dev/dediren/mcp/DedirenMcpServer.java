@@ -37,12 +37,24 @@ public final class DedirenMcpServer {
       boolean readOnly,
       InputStream in,
       OutputStream out) {
+    return createWithRasterizer(
+        root, engines, env, readOnly, in, out, ResvgRasterizer.resolve("resvg", env));
+  }
+
+  private static McpSyncServer createWithRasterizer(
+      Path root,
+      Engines engines,
+      Map<String, String> env,
+      boolean readOnly,
+      InputStream in,
+      OutputStream out,
+      ResvgRasterizer rasterizer) {
     // The protocol mapper serializes MCP frames, not Dediren envelopes: envelopes are produced by
     // core and passed through as text, so this mapper never touches the product contract. Built by
     // McpJsonMappers so this stays identical to the oracle EofSignalingInputStream uses.
     McpJsonMapper mapper = McpJsonMappers.standard();
     StdioServerTransportProvider transport = new StdioServerTransportProvider(mapper, in, out);
-    DedirenTools tools = new DedirenTools(root, engines, env);
+    DedirenTools tools = new DedirenTools(root, engines, env, rasterizer);
 
     var specification =
         McpServer.sync(transport)
@@ -57,8 +69,9 @@ public final class DedirenMcpServer {
                     .description(
                         "Import workspace-confined or inline Mermaid/DOT notation into"
                             + " model.schema.v1 generic-graph source JSON. output 'data'"
-                            + " returns the standard envelope; output 'svg' also renders main"
-                            + " as image/svg+xml. Read-only and writes no files.")
+                            + " returns the standard envelope; output 'svg' forces SVG while"
+                            + " output 'image' negotiates optional SVG or PNG media. Read-only"
+                            + " and writes no files.")
                     .inputSchema(mapper, ToolSchemas.IMPORT)
                     .build(),
                 (exchange, request) -> tools.importSource(request))
@@ -136,8 +149,8 @@ public final class DedirenMcpServer {
                   .name("dediren_build")
                   .description(
                       "Compile a Dediren source model into artifacts (SVG render, ArchiMate OEF,"
-                          + " and/or UML XMI) under an output directory. output 'svg' also"
-                          + " returns successful rendered SVG artifacts as image/svg+xml. Select"
+                          + " and/or UML XMI) under an output directory. output 'svg' forces SVG"
+                          + " attachments; output 'image' negotiates optional SVG or PNG media. Select"
                           + " a lane by passing"
                           + " its policy: render_policy, oef_policy, xmi_policy. Returns the"
                           + " build-result envelope, which names every artifact written. A"
@@ -154,8 +167,20 @@ public final class DedirenMcpServer {
   /** Runs the server on the process's real stdio, blocking until the client closes stdin. */
   public static void serve(Path root, Engines engines, Map<String, String> env, boolean readOnly)
       throws InterruptedException {
+    serve(root, engines, env, readOnly, "resvg");
+  }
+
+  /** Runs the server with one startup-resolved optional resvg executable selection. */
+  public static void serve(
+      Path root,
+      Engines engines,
+      Map<String, String> env,
+      boolean readOnly,
+      String resvgCommand)
+      throws InterruptedException {
     OutputStream protocolChannel = StdoutIntegrity.claimStdout();
-    serveOn(root, engines, env, readOnly, System.in, protocolChannel);
+    ResvgRasterizer rasterizer = ResvgRasterizer.resolve(resvgCommand, env);
+    serveOn(root, engines, env, readOnly, System.in, protocolChannel, rasterizer);
   }
 
   /** Builds an MCP server over the transport streams it is handed. */
@@ -173,11 +198,24 @@ public final class DedirenMcpServer {
       InputStream in,
       OutputStream out)
       throws InterruptedException {
+    serveOn(root, engines, env, readOnly, in, out, ResvgRasterizer.resolve("resvg", env));
+  }
+
+  private static void serveOn(
+      Path root,
+      Engines engines,
+      Map<String, String> env,
+      boolean readOnly,
+      InputStream in,
+      OutputStream out,
+      ResvgRasterizer rasterizer)
+      throws InterruptedException {
     serveOn(
         in,
         out,
         (decoratedIn, decoratedOut) ->
-            create(root, engines, env, readOnly, decoratedIn, decoratedOut));
+            createWithRasterizer(
+                root, engines, env, readOnly, decoratedIn, decoratedOut, rasterizer));
   }
 
   /**

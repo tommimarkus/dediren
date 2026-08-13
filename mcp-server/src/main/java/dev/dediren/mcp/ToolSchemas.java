@@ -24,9 +24,15 @@ final class ToolSchemas {
           },
           "output": {
             "type": "string",
-            "enum": ["data", "svg"],
+            "enum": ["data", "svg", "image"],
             "default": "data",
-            "description": "data returns the imported model envelope only; svg also renders main as image/svg+xml."
+            "description": "data returns the imported model envelope only; svg forces image/svg+xml; image negotiates an optional image attachment."
+          },
+          "accepted_image_types": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {"type": "string", "enum": ["image/svg+xml", "image/png"]},
+            "description": "Image MIME types accepted by the client when output is image. SVG has fixed priority over PNG."
           },
           "render_policy": {
             "type": "string",
@@ -34,7 +40,8 @@ final class ToolSchemas {
           }
         },
         "required": ["plugin"],
-        "oneOf": [{"required": ["source"]}, {"required": ["content"]}]
+        "oneOf": [{"required": ["source"]}, {"required": ["content"]}],
+        "allOf": [{"if":{"required":["accepted_image_types"]},"then":{"properties":{"output":{"const":"image"}}}}]
       }
       """;
 
@@ -71,9 +78,15 @@ final class ToolSchemas {
           },
           "output": {
             "type": "string",
-            "enum": ["data", "svg"],
+            "enum": ["data", "svg", "image"],
             "default": "data",
-            "description": "data returns the existing build result only; svg also returns each successful SVG as image/svg+xml."
+            "description": "data returns the build result only; svg forces SVG attachments; image negotiates optional SVG or PNG attachments."
+          },
+          "accepted_image_types": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {"type": "string", "enum": ["image/svg+xml", "image/png"]},
+            "description": "Image MIME types accepted by the client when output is image. SVG has fixed priority over PNG."
           },
           "views": {
             "type": "array",
@@ -96,7 +109,8 @@ final class ToolSchemas {
             "type": "boolean",
             "description": "In package mode, suppress the export lanes."
           }
-        }
+        },
+        "allOf": [{"if":{"required":["accepted_image_types"]},"then":{"properties":{"output":{"const":"image"}}}}]
       }
       """;
 

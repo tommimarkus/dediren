@@ -723,6 +723,14 @@ public final class Main {
                 + " status) and the guide still serve.")
     private boolean readOnly;
 
+    @Option(
+        names = "--resvg-command",
+        defaultValue = "resvg",
+        description =
+            "Optional resvg executable for negotiated MCP PNG images. Use a bare PATH name or an"
+                + " absolute executable path; command arguments are not accepted.")
+    private String resvgCommand;
+
     McpCommand(Map<String, String> env, Engines engines) {
       this.env = env;
       this.engines = engines;
@@ -730,7 +738,7 @@ public final class Main {
 
     @Override
     public Integer call() throws Exception {
-      dev.dediren.mcp.DedirenMcpServer.serve(root, engines, env, readOnly);
+      dev.dediren.mcp.DedirenMcpServer.serve(root, engines, env, readOnly, resvgCommand);
       return CommandExitCode.OK.code();
     }
   }
