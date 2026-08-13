@@ -295,14 +295,27 @@ public final class SchemaCacheModule {
 
   private static HttpTransport httpTransport(HttpClient client) {
     return url -> {
-      requireHttps(url);
       long deadlineNanos = deadlineAfter(HTTP_REQUEST_TIMEOUT);
-      HttpRequest request = HttpRequest.newBuilder(url).GET().timeout(HTTP_REQUEST_TIMEOUT).build();
+      HttpRequest request = schemaRequest(url);
       HttpResponse<InputStream> response =
           client.send(request, HttpResponse.BodyHandlers.ofInputStream());
-      requireHttps(response.uri());
+      try {
+        requireHttps(response.uri());
+      } catch (SchemaCacheException downgrade) {
+        try {
+          response.body().close();
+        } catch (IOException closeFailure) {
+          downgrade.addSuppressed(closeFailure);
+        }
+        throw downgrade;
+      }
       return new HttpTransport.Response(response.statusCode(), response.body(), deadlineNanos);
     };
+  }
+
+  static HttpRequest schemaRequest(URI url) throws SchemaCacheException {
+    requireHttps(url);
+    return HttpRequest.newBuilder(url).GET().timeout(HTTP_REQUEST_TIMEOUT).build();
   }
 
   private static long deadlineAfter(java.time.Duration timeout) {
