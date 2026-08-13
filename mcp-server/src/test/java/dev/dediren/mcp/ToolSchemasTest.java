@@ -65,12 +65,17 @@ class ToolSchemasTest {
   }
 
   @Test
-  void buildAdvertisesStableDataOutputAndOptInInlineSvgOutput() {
-    JsonNode output =
-        JsonSupport.objectMapper().readTree(ToolSchemas.BUILD).path("properties").path("output");
+  void importAndBuildAdvertiseTheExactOptionalImageContract() {
+    JsonNode build = JsonSupport.objectMapper().readTree(ToolSchemas.BUILD).path("properties");
+    JsonNode imported = JsonSupport.objectMapper().readTree(ToolSchemas.IMPORT).path("properties");
 
-    assertThat(textValues(output.path("enum"))).containsExactly("data", "svg");
-    assertThat(output.path("default").asText()).isEqualTo("data");
+    for (JsonNode properties : List.of(imported, build)) {
+      JsonNode output = properties.path("output");
+      assertThat(textValues(output.path("enum"))).containsExactly("data", "svg", "image");
+      assertThat(output.path("default").asText()).isEqualTo("data");
+      assertThat(textValues(properties.path("accepted_image_types").path("items").path("enum")))
+          .containsExactly("image/svg+xml", "image/png");
+    }
   }
 
   private static List<String> textValues(JsonNode array) {
