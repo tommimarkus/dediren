@@ -1338,6 +1338,7 @@ public final class DistTool {
    */
   private static void assertMcpServesToolsOverStdio(Path bundle, Path temp) throws Exception {
     Path dediren = bundle.resolve("bin/dediren");
+    Path resvg = writeFakeResvg(temp.resolve("resvg-smoke"));
     Path requests = temp.resolve("mcp-requests.jsonl");
     Files.writeString(
         requests,
@@ -1352,11 +1353,16 @@ public final class DistTool {
         {"jsonrpc":"2.0","id":7,"method":"resources/read","params":{"uri":"dediren://diagnostics/catalog"}}
         {"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"dediren_query","arguments":{"source":"fixtures/source/valid-archimate-oef.json","kind":"orphans"}}}
         {"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"dediren_import","arguments":{"source":"fixtures/mermaid/flowchart-v1.mmd","plugin":"mermaid"}}}
+        {"jsonrpc":"2.0","id":10,"method":"tools/call","params":{"name":"dediren_build","arguments":{"source":"fixtures/source/valid-pipeline-rich.json","out":"mcp-png-build-out","render_policy":"fixtures/render-policy/rich-svg.json","output":"image","accepted_image_types":["image/png"]}}}
         """,
         StandardCharsets.UTF_8);
 
     String stdout =
-        runBundleCommand(dediren, bundle, List.of("mcp", "--root", bundle.toString()), requests);
+        runBundleCommand(
+            dediren,
+            bundle,
+            List.of("mcp", "--root", bundle.toString(), "--resvg-command", resvg.toString()),
+            requests);
 
     Map<String, JsonNode> responses = assertStdoutIsJsonRpcFramesOnly(stdout, "mcp");
 
@@ -1383,10 +1389,38 @@ public final class DistTool {
         "mcp diagnostics catalog response");
 
     assertMcpBuildAnswered(bundle, responses, stdout);
+    assertMcpPngBuildAnswered(responses, stdout);
     assertMcpImportAnswered(responses, stdout);
     System.out.println(
         "mcp stdio smoke passed: 8 tools + resources, import/build/query answered,"
             + " protocol-only stdout");
+  }
+
+  /**
+   * A self-contained converter oracle: the production launcher must execute this exact absolute
+   * path with fixed arguments, then validate and attach the emitted PNG.
+   */
+  private static Path writeFakeResvg(Path executable) throws IOException {
+    Files.writeString(
+        executable,
+        """
+        #!/bin/sh
+        for output in "$@"; do :; done
+        printf '\\211\\120\\116\\107\\015\\012\\032\\012\\000\\000\\000\\015\\111\\110\\104\\122\\000\\000\\000\\001\\000\\000\\000\\001\\010\\006\\000\\000\\000\\037\\025\\304\\211\\000\\000\\000\\014\\111\\104\\101\\124\\170\\332\\143\\144\\370\\317\\360\\037\\000\\005\\376\\002\\376\\202\\256\\256\\125\\000\\000\\000\\000\\111\\105\\116\\104\\256\\102\\140\\202' > "$output"
+        """,
+        StandardCharsets.UTF_8);
+    try {
+      Files.setPosixFilePermissions(
+          executable,
+          Set.of(
+              PosixFilePermission.OWNER_READ,
+              PosixFilePermission.OWNER_WRITE,
+              PosixFilePermission.OWNER_EXECUTE));
+    } catch (UnsupportedOperationException unsupported) {
+      throw new IOException(
+          "the packaged MCP smoke requires a POSIX executable fixture", unsupported);
+    }
+    return executable.toAbsolutePath();
   }
 
   private static void assertMcpImportAnswered(Map<String, JsonNode> responses, String stdout)
@@ -1455,6 +1489,47 @@ public final class DistTool {
     if (!decoded.stripLeading().startsWith("<svg")) {
       throw new IllegalStateException(
           "mcp dediren_build image content must decode to SVG: " + image);
+    }
+  }
+
+  private static void assertMcpPngBuildAnswered(Map<String, JsonNode> responses, String stdout)
+      throws IOException {
+    JsonNode build = responses.get("10");
+    if (build == null || build.path("result").path("isError").asBoolean()) {
+      throw new IllegalStateException("mcp PNG build must answer successfully: " + stdout);
+    }
+    JsonNode image = build.path("result").path("content").path(1);
+    if (!"image".equals(image.path("type").asText())
+        || !"image/png".equals(image.path("mimeType").asText())) {
+      throw new IllegalStateException("mcp PNG build must negotiate image/png: " + build);
+    }
+    byte[] bytes = Base64.getDecoder().decode(image.path("data").asText());
+    byte[] expectedHeader = {
+      (byte) 0x89,
+      0x50,
+      0x4e,
+      0x47,
+      0x0d,
+      0x0a,
+      0x1a,
+      0x0a,
+      0,
+      0,
+      0,
+      0x0d,
+      0x49,
+      0x48,
+      0x44,
+      0x52,
+      0, 0, 0, 1, 0, 0, 0, 1
+    };
+    if (bytes.length < expectedHeader.length) {
+      throw new IllegalStateException("mcp PNG attachment is shorter than its signature and IHDR");
+    }
+    for (int index = 0; index < expectedHeader.length; index++) {
+      if (bytes[index] != expectedHeader[index]) {
+        throw new IllegalStateException("mcp PNG attachment has an invalid signature or 1x1 IHDR");
+      }
     }
   }
 
