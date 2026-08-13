@@ -107,8 +107,12 @@ class HttpSchemaFetcherTest {
   }
 
   @Test
-  void schemaRequestsHaveASixtySecondTimeout() {
-    assertThat(SchemaCacheModule.HTTP_REQUEST_TIMEOUT).isEqualTo(Duration.ofSeconds(60));
+  void schemaRequestsHaveASixtySecondTimeout() throws Exception {
+    assertThat(
+            SchemaCacheModule.schemaRequest(
+                    URI.create("https://schemas.example.test/schema.xsd"))
+                .timeout())
+        .contains(Duration.ofSeconds(60));
   }
 
   @Test
