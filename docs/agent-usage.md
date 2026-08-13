@@ -140,8 +140,8 @@ Eight tools in writable mode:
 - `dediren_import` — pass exactly one of `source` (a confined file path) or
   inline `content`, with `plugin: "mermaid"` or `"dot"`. Select
   `output: "data"` (default) or `"svg"`; SVG falls back to the bundled
-  `fixtures/render-policy/default-svg.json` unless `render_policy` is given,
-  while source SVG requires an explicit policy. Prompt-first examples are
+  `fixtures/render-policy/default-svg.json` unless `render_policy` is given.
+  Prompt-first examples are
   `content: "flowchart LR\n  a --> b"` and `content: "digraph { a -> b }"`.
   Returns the envelope without writing files and remains available under
   `--read-only`; inline input has the same 64 MiB and parser ceilings above.

@@ -126,7 +126,7 @@ schema validation itself runs in-JVM on both lanes with no subprocess.
 the outbound fetch.
 
 Prompt-supplied Mermaid/DOT `content` is attacker-controlled text and uses the
-same bounded reads and parser ceilings as file input. Inline SVG responses are
+same byte and parser ceilings as file input. Inline SVG responses are
 base64-expanded in memory and share a cumulative 64 MiB decoded-image limit;
 invalid input, policy, layout, or render failures remain JSON-only. Clients may
 not support displaying `image/svg+xml`, so inline display is not guaranteed.
