@@ -14,6 +14,7 @@ import java.util.Base64;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import tools.jackson.databind.JsonNode;
 
 /**
  * The MCP surface must not drift from the CLI. Same inputs, same envelope — byte for byte.
