@@ -170,9 +170,11 @@ Eight tools in writable mode:
   build-result envelope, which names every artifact written. To build a whole
   **package** instead, pass `package` (a `package.json` path) — mutually
   exclusive with `source`/`out`/the policies — plus optional `no_export`; the
+  package uses its declared render policies and output paths.
   Both source and package builds accept `output: "data"` (default) or
   `output: "svg"`; source SVG requires `render_policy`, while package SVG
-  uses its declared policies. The result is a `package-build-result` naming every artifact at its declared path
+  uses its declared policies. The result is a `package-build-result` naming
+  every artifact at its declared path
   (see `## Build`). Source, package, policy, and source-mode `out` paths are
   relative to `--root`; package-declared outputs are relative to the package
   directory. This removes the 2026.08.3 workspace-handle requirement and

@@ -93,7 +93,7 @@ class DedirenMcpServerTest {
     // the schema level — DedirenTools enforces the per-lane requirement in its handler.
     Map<String, List<String>> expectedRequired =
         Map.of(
-            "dediren_import", List.of("source", "plugin"),
+            "dediren_import", List.of("plugin"),
             "dediren_validate", List.of("source"),
             "dediren_diff", List.of("old", "new"),
             "dediren_query", List.of("source", "kind"),

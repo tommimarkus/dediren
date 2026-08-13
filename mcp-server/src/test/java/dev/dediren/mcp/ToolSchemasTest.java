@@ -67,10 +67,7 @@ class ToolSchemasTest {
   @Test
   void buildAdvertisesStableDataOutputAndOptInInlineSvgOutput() {
     JsonNode output =
-        JsonSupport.objectMapper()
-            .readTree(ToolSchemas.BUILD)
-            .path("properties")
-            .path("output");
+        JsonSupport.objectMapper().readTree(ToolSchemas.BUILD).path("properties").path("output");
 
     assertThat(textValues(output.path("enum"))).containsExactly("data", "svg");
     assertThat(output.path("default").asText()).isEqualTo("data");

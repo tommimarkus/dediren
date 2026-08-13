@@ -98,9 +98,7 @@ public final class CoreCommands {
           gatedImportResult(value.result());
       case EngineDispatch.InMemoryOutcome.Failure<SourceDocument> failure ->
           new ImportedSourceResult(
-              null,
-              failure.diagnostics(),
-              errorOutcome(failure.diagnostics(), failure.exitCode()));
+              null, failure.diagnostics(), errorOutcome(failure.diagnostics(), failure.exitCode()));
     };
   }
 
@@ -118,9 +116,7 @@ public final class CoreCommands {
       var diagnostics = new ArrayList<>(result.diagnostics());
       diagnostics.addAll(error.diagnostics());
       return new ImportedSourceResult(
-          null,
-          diagnostics,
-          errorOutcome(diagnostics, CommandExitCode.PLUGIN_ERROR.code()));
+          null, diagnostics, errorOutcome(diagnostics, CommandExitCode.PLUGIN_ERROR.code()));
     }
     // The gated (reparsed) document is what gets published, so the emitted data is exactly what
     // was validated. envelope(...) applies the one ok/warning/info policy every stage shares.
@@ -170,7 +166,8 @@ public final class CoreCommands {
           EngineDispatch.requireEngine(
               engines, "elk-layout", "layout", engines.layoutEngine("elk-layout"));
       EngineDispatch.InMemoryOutcome<LaidOutScene> layout =
-          EngineDispatch.dispatchInMemory("elk-layout", () -> layoutEngine.layout(projected.value()));
+          EngineDispatch.dispatchInMemory(
+              "elk-layout", () -> layoutEngine.layout(projected.value()));
       EngineResult<LaidOutScene> laid;
       switch (layout) {
         case EngineDispatch.InMemoryOutcome.Value<LaidOutScene> value -> laid = value.result();
@@ -192,7 +189,8 @@ public final class CoreCommands {
               BuildCommand.SEMANTICS_ENGINE, () -> semantics.projectRenderMetadata(source, "main"));
       EngineResult<RenderMetadata> renderMetadata;
       switch (metadata) {
-        case EngineDispatch.InMemoryOutcome.Value<RenderMetadata> value -> renderMetadata = value.result();
+        case EngineDispatch.InMemoryOutcome.Value<RenderMetadata> value ->
+            renderMetadata = value.result();
         case EngineDispatch.InMemoryOutcome.Failure<RenderMetadata> failure -> {
           diagnostics.addAll(failure.diagnostics());
           return failedImportedRender(diagnostics, failure.exitCode());
@@ -225,7 +223,8 @@ public final class CoreCommands {
     }
   }
 
-  private static ImportedRenderResult failedImportedRender(List<Diagnostic> diagnostics, int exitCode) {
+  private static ImportedRenderResult failedImportedRender(
+      List<Diagnostic> diagnostics, int exitCode) {
     return new ImportedRenderResult(null, diagnostics, errorOutcome(diagnostics, exitCode));
   }
 

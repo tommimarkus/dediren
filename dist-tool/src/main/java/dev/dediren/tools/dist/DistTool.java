@@ -1447,13 +1447,14 @@ public final class DistTool {
     JsonNode image = build.path("result").path("content").path(1);
     if (!"image".equals(image.path("type").asText())
         || !"image/svg+xml".equals(image.path("mimeType").asText())) {
-      throw new IllegalStateException("mcp dediren_build must return SVG as image content: " + build);
+      throw new IllegalStateException(
+          "mcp dediren_build must return SVG as image content: " + build);
     }
     String decoded =
-        new String(
-            Base64.getDecoder().decode(image.path("data").asText()), StandardCharsets.UTF_8);
-    if (!decoded.stripLeading().contains("<svg")) {
-      throw new IllegalStateException("mcp dediren_build image content must decode to SVG: " + image);
+        new String(Base64.getDecoder().decode(image.path("data").asText()), StandardCharsets.UTF_8);
+    if (!decoded.stripLeading().startsWith("<svg")) {
+      throw new IllegalStateException(
+          "mcp dediren_build image content must decode to SVG: " + image);
     }
   }
 

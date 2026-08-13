@@ -79,9 +79,7 @@ public final class DedirenTools {
     }
     if (!"mermaid".equals(plugin) && !"dot".equals(plugin)) {
       return error(
-          DiagnosticCode.COMMAND_INPUT_INVALID,
-          "'plugin' must be 'mermaid' or 'dot'",
-          "plugin");
+          DiagnosticCode.COMMAND_INPUT_INVALID, "'plugin' must be 'mermaid' or 'dot'", "plugin");
     }
     String text;
     if (source != null) {
@@ -124,11 +122,20 @@ public final class DedirenTools {
       if (!rendered.succeeded()) {
         return envelope(rendered.outcome().stdout(), true);
       }
-      if (rendered.render().artifacts().isEmpty()) {
+      String svg =
+          rendered.render().artifacts().stream()
+              .filter(artifact -> "svg".equals(artifact.artifactKind()))
+              .map(artifact -> artifact.content())
+              .findFirst()
+              .orElse(null);
+      if (svg == null) {
         return error(
             DiagnosticCode.COMMAND_IO_FAILED, "render did not produce an SVG artifact", null);
       }
-      String svg = rendered.render().artifacts().getFirst().content();
+      if (utf8Bytes(svg) > SourceLimits.DEFAULT.maxInputFileBytes()) {
+        return error(
+            DiagnosticCode.INPUT_FILE_TOO_LARGE, "decoded SVG artifacts exceed 64 MiB", null);
+      }
       if (!hasSvgRoot(svg)) {
         return error(
             DiagnosticCode.COMMAND_IO_FAILED, "render did not produce an SVG artifact", null);
@@ -536,7 +543,7 @@ public final class DedirenTools {
     }
   }
 
-  private static List<ImageContent> buildSvgImages(
+  static List<ImageContent> buildSvgImages(
       String outcomeJson, Path artifactRoot, boolean packageBuild) throws InlineArtifactException {
     if (utf8Bytes(outcomeJson) > SourceLimits.DEFAULT.maxInputFileBytes()) {
       throw new InlineArtifactException("result exceeds the bounded JSON ceiling");
@@ -549,7 +556,8 @@ public final class DedirenTools {
     }
     JsonNode data = packageBuild ? result.path("data") : result;
     if (packageBuild
-        ? !"package-build-result.schema.v1".equals(data.path("package_build_result_schema_version").asText())
+        ? !"package-build-result.schema.v1"
+            .equals(data.path("package_build_result_schema_version").asText())
         : !"build-result.schema.v1".equals(data.path("build_result_schema_version").asText())) {
       throw new InlineArtifactException("result has an unexpected build schema");
     }
@@ -613,11 +621,10 @@ public final class DedirenTools {
 
   private static boolean hasSvgRoot(String content) {
     String trimmed = content.stripLeading();
-    int root = trimmed.indexOf("<svg");
-    return root >= 0
-        && (root + 4 == trimmed.length()
-            || Character.isWhitespace(trimmed.charAt(root + 4))
-            || trimmed.charAt(root + 4) == '>');
+    return trimmed.startsWith("<svg")
+        && (trimmed.length() == 4
+            || Character.isWhitespace(trimmed.charAt(4))
+            || trimmed.charAt(4) == '>');
   }
 
   private static long utf8Bytes(String text) {
@@ -653,7 +660,7 @@ public final class DedirenTools {
         : null;
   }
 
-  private static final class InlineArtifactException extends Exception {
+  static final class InlineArtifactException extends Exception {
     private static final long serialVersionUID = 1L;
 
     InlineArtifactException(String message) {

@@ -163,8 +163,7 @@ class DedirenToolsEngineBackedTest {
                 "dediren_import", Map.of("source", "diagram.mmd", "plugin", "mermaid")));
     CallToolResult fromContent =
         tools.importSource(
-            new CallToolRequest(
-                "dediren_import", Map.of("content", mermaid, "plugin", "mermaid")));
+            new CallToolRequest("dediren_import", Map.of("content", mermaid, "plugin", "mermaid")));
 
     assertThat(fromFile.isError()).isNotEqualTo(Boolean.TRUE);
     assertThat(fromContent.isError()).isNotEqualTo(Boolean.TRUE);
@@ -191,7 +190,24 @@ class DedirenToolsEngineBackedTest {
     assertThat(result.isError()).isNotEqualTo(Boolean.TRUE);
     assertThat(result.content()).hasSize(2);
     assertThat(result.content().getFirst()).isInstanceOf(TextContent.class);
-    assertThat(decodedSvg(result.content().get(1))).contains("<svg", "\"view_id\":\"main\"");
+    assertThat(decodedSvg(result.content().get(1))).contains("<svg", "<title>main</title>");
+  }
+
+  @Test
+  void confinedMermaidFileCanProduceInlineSvg(@TempDir Path root) throws Exception {
+    Files.writeString(root.resolve("diagram.mmd"), "flowchart TD\nstart --> finish\n");
+
+    CallToolResult result =
+        new DedirenTools(root, EngineWiring.defaults(), Map.of())
+            .importSource(
+                new CallToolRequest(
+                    "dediren_import",
+                    Map.of("source", "diagram.mmd", "plugin", "mermaid", "output", "svg")));
+
+    assertThat(result.isError()).isNotEqualTo(Boolean.TRUE);
+    assertThat(result.content()).hasSize(2);
+    assertThat(result.content().getFirst()).isInstanceOf(TextContent.class);
+    assertThat(decodedSvg(result.content().get(1))).startsWith("<svg");
   }
 
   @Test
@@ -219,6 +235,70 @@ class DedirenToolsEngineBackedTest {
   }
 
   @Test
+  void inlineImportSvgRejectsAnImageAboveTheDecodedCeiling(@TempDir Path root) {
+    String oversizedSvg = "<svg>" + "x".repeat(64 * 1024 * 1024) + "</svg>";
+
+    CallToolResult result =
+        new DedirenTools(root, enginesWithRenderArtifact("svg", oversizedSvg), Map.of())
+            .importSource(
+                new CallToolRequest(
+                    "dediren_import",
+                    Map.of(
+                        "content",
+                        "flowchart TD\nstart --> finish\n",
+                        "plugin",
+                        "mermaid",
+                        "output",
+                        "svg")));
+
+    assertThat(result.isError()).isTrue();
+    assertThat(result.content()).hasSize(1);
+    assertThat(result.content().getFirst()).isInstanceOf(TextContent.class);
+    assertThat(envelopeOf(result).path("status").asText()).isEqualTo("error");
+  }
+
+  @Test
+  void inlineImportSvgRejectsANestedSvgFragmentInsteadOfAnSvgDocument(@TempDir Path root) {
+    CallToolResult result =
+        new DedirenTools(
+                root,
+                enginesWithRenderArtifact("svg", "<html><body><svg></svg></body></html>"),
+                Map.of())
+            .importSource(
+                new CallToolRequest(
+                    "dediren_import",
+                    Map.of(
+                        "content",
+                        "digraph G { start -> finish; }\n",
+                        "plugin",
+                        "dot",
+                        "output",
+                        "svg")));
+
+    assertThat(result.isError()).isTrue();
+    assertThat(result.content()).hasSize(1);
+  }
+
+  @Test
+  void inlineImportSvgRejectsANonSvgRenderArtifact(@TempDir Path root) {
+    CallToolResult result =
+        new DedirenTools(root, enginesWithRenderArtifact("html", "<svg></svg>"), Map.of())
+            .importSource(
+                new CallToolRequest(
+                    "dediren_import",
+                    Map.of(
+                        "content",
+                        "digraph G { start -> finish; }\n",
+                        "plugin",
+                        "dot",
+                        "output",
+                        "svg")));
+
+    assertThat(result.isError()).isTrue();
+    assertThat(result.content()).hasSize(1);
+  }
+
+  @Test
   void sourceBuildSvgOutputRequiresARenderPolicyAndReturnsNoImage(@TempDir Path root)
       throws Exception {
     Files.copy(fixture("valid-basic.json"), root.resolve("model.json"));
@@ -233,8 +313,7 @@ class DedirenToolsEngineBackedTest {
     assertThat(result.isError()).isTrue();
     assertThat(result.content()).hasSize(1);
     assertThat(result.content().getFirst()).isInstanceOf(TextContent.class);
-    assertThat(envelopeOf(result).at("/diagnostics/0/message").asText())
-        .contains("render_policy");
+    assertThat(envelopeOf(result).at("/diagnostics/0/message").asText()).contains("render_policy");
   }
 
   @Test
@@ -242,33 +321,8 @@ class DedirenToolsEngineBackedTest {
       throws Exception {
     Files.copy(fixture("valid-basic.json"), root.resolve("model.json"));
     Files.copy(policy("default-svg.json"), root.resolve("policy.json"));
-    Engines defaults = EngineWiring.defaults();
     String oversizedSvg = "<svg>" + "x".repeat(64 * 1024 * 1024) + "</svg>";
-    RenderEngine oversizedRenderer =
-        new RenderEngine() {
-          @Override
-          public String id() {
-            return "render";
-          }
-
-          @Override
-          public EngineResult<RenderResult> render(
-              dev.dediren.ir.LaidOutScene layout,
-              JsonNode renderPolicy,
-              dev.dediren.contracts.render.RenderMetadata metadata) {
-            return new EngineResult<>(
-                new RenderResult(
-                    "render-result.schema.v5", List.of(new RenderArtifact("svg", oversizedSvg))),
-                List.of());
-          }
-        };
-    Engines engines =
-        new Engines(
-            defaults.semantics(),
-            defaults.layouts(),
-            Map.of("render", oversizedRenderer),
-            defaults.exporters(),
-            defaults.importers());
+    Engines engines = enginesWithRenderArtifact("svg", oversizedSvg);
 
     CallToolResult result =
         new DedirenTools(root, engines, Map.of())
@@ -289,6 +343,34 @@ class DedirenToolsEngineBackedTest {
     assertThat(result.content()).hasSize(1);
     assertThat(result.content().getFirst()).isInstanceOf(TextContent.class);
     assertThat(envelopeOf(result).path("status").asText()).isEqualTo("error");
+  }
+
+  private static Engines enginesWithRenderArtifact(String artifactKind, String content) {
+    Engines defaults = EngineWiring.defaults();
+    RenderEngine renderer =
+        new RenderEngine() {
+          @Override
+          public String id() {
+            return "render";
+          }
+
+          @Override
+          public EngineResult<RenderResult> render(
+              dev.dediren.ir.LaidOutScene layout,
+              JsonNode renderPolicy,
+              dev.dediren.contracts.render.RenderMetadata metadata) {
+            return new EngineResult<>(
+                new RenderResult(
+                    "render-result.schema.v5", List.of(new RenderArtifact(artifactKind, content))),
+                List.of());
+          }
+        };
+    return new Engines(
+        defaults.semantics(),
+        defaults.layouts(),
+        Map.of("render", renderer),
+        defaults.exporters(),
+        defaults.importers());
   }
 
   @Test
@@ -322,8 +404,8 @@ class DedirenToolsEngineBackedTest {
   }
 
   @Test
-  void failedSvgBuildRetainsEarlierSvgImagesButNeverAttachesOneForTheFailedView(
-      @TempDir Path root) throws Exception {
+  void failedSvgBuildRetainsEarlierSvgImagesButNeverAttachesOneForTheFailedView(@TempDir Path root)
+      throws Exception {
     Files.copy(fixture("valid-uml-basic.json"), root.resolve("model.json"));
     Files.copy(policy("uml-svg.json"), root.resolve("policy.json"));
     Path out = Files.createDirectories(root.resolve("out"));
@@ -353,8 +435,8 @@ class DedirenToolsEngineBackedTest {
   }
 
   @Test
-  void packageBuildUsesItsDeclaredPolicyAndCanReturnItsDiagramAsAnInlineSvg(
-      @TempDir Path root) throws Exception {
+  void packageBuildUsesItsDeclaredPolicyAndCanReturnItsDiagramAsAnInlineSvg(@TempDir Path root)
+      throws Exception {
     Files.copy(fixture("valid-pipeline-rich.json"), root.resolve("model.json"));
     Files.copy(policy("rich-svg.json"), root.resolve("render-policy.json"));
     Files.writeString(
