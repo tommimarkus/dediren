@@ -13,6 +13,7 @@ import dev.dediren.contracts.layout.LaidOutEdge;
 import dev.dediren.contracts.layout.LaidOutNode;
 import dev.dediren.contracts.layout.LayoutResult;
 import dev.dediren.contracts.render.RenderMetadata;
+import dev.dediren.contracts.render.RenderResult;
 import dev.dediren.contracts.source.SourceDocument;
 import dev.dediren.core.DedirenPaths;
 import dev.dediren.core.engine.EngineDispatch;
@@ -77,19 +78,33 @@ public final class CoreCommands {
   public static EngineRunOutcome importCommand(
       String engineId, String source, Map<String, String> env, Engines engines)
       throws EngineExecutionException {
+    return importSource(engineId, source, env, engines).outcome();
+  }
+
+  /**
+   * Imports external notation into a re-gated source document without serializing it at the engine
+   * seam. The returned outcome is the exact import-command envelope, so adapters that need the
+   * typed document do not have to recreate either importer or core diagnostics.
+   */
+  public static ImportedSourceResult importSource(
+      String engineId, String source, Map<String, String> env, Engines engines)
+      throws EngineExecutionException {
     ImportEngine importer =
         EngineDispatch.requireEngine(engines, engineId, "import", engines.importEngine(engineId));
     EngineDispatch.InMemoryOutcome<SourceDocument> outcome =
         EngineDispatch.dispatchInMemory(engineId, () -> importer.importSource(source));
     return switch (outcome) {
       case EngineDispatch.InMemoryOutcome.Value<SourceDocument> value ->
-          gatedImportOutcome(value.result());
+          gatedImportResult(value.result());
       case EngineDispatch.InMemoryOutcome.Failure<SourceDocument> failure ->
-          errorOutcome(failure.diagnostics(), failure.exitCode());
+          new ImportedSourceResult(
+              null,
+              failure.diagnostics(),
+              errorOutcome(failure.diagnostics(), failure.exitCode()));
     };
   }
 
-  private static EngineRunOutcome gatedImportOutcome(EngineResult<SourceDocument> result) {
+  private static ImportedSourceResult gatedImportResult(EngineResult<SourceDocument> result) {
     SourceDocument gated;
     try {
       gated = SourceValidator.gateImportedDocument(result.value());
@@ -102,12 +117,140 @@ public final class CoreCommands {
       // still lead — they are the only account of the text this document came from.
       var diagnostics = new ArrayList<>(result.diagnostics());
       diagnostics.addAll(error.diagnostics());
-      return errorOutcome(diagnostics, CommandExitCode.PLUGIN_ERROR.code());
+      return new ImportedSourceResult(
+          null,
+          diagnostics,
+          errorOutcome(diagnostics, CommandExitCode.PLUGIN_ERROR.code()));
     }
     // The gated (reparsed) document is what gets published, so the emitted data is exactly what
     // was validated. envelope(...) applies the one ok/warning/info policy every stage shares.
-    return new EngineRunOutcome(
-        EngineDispatch.envelope(gated, result.diagnostics()), CommandExitCode.OK.code());
+    return new ImportedSourceResult(
+        gated,
+        result.diagnostics(),
+        new EngineRunOutcome(
+            EngineDispatch.envelope(gated, result.diagnostics()), CommandExitCode.OK.code()));
+  }
+
+  /**
+   * Renders the imported model's required {@code main} view in memory. This is deliberately not a
+   * build command: no artifact path is accepted and no filesystem write is possible.
+   */
+  public static ImportedRenderResult renderImportedMain(
+      SourceDocument source, String renderPolicyText, Map<String, String> env, Engines engines) {
+    JsonNode policy;
+    try {
+      policy = parsePolicy("render", renderPolicyText, KnownSchemaVersions.RENDER_POLICY);
+    } catch (PolicyVersionException error) {
+      return failedImportedRender(List.of(error.diagnostic()), CommandExitCode.INPUT_ERROR.code());
+    } catch (EngineExecutionException error) {
+      return failedImportedRender(List.of(error.diagnostic()), CommandExitCode.PLUGIN_ERROR.code());
+    }
+
+    var diagnostics = new ArrayList<Diagnostic>();
+    try {
+      SemanticsEngine semantics =
+          EngineDispatch.requireEngine(
+              engines,
+              BuildCommand.SEMANTICS_ENGINE,
+              "projection",
+              engines.semanticsEngine(BuildCommand.SEMANTICS_ENGINE));
+      EngineDispatch.InMemoryOutcome<SceneGraph> projection =
+          EngineDispatch.dispatchInMemory(
+              BuildCommand.SEMANTICS_ENGINE, () -> semantics.projectScene(source, "main"));
+      EngineResult<SceneGraph> projected;
+      switch (projection) {
+        case EngineDispatch.InMemoryOutcome.Value<SceneGraph> value -> projected = value.result();
+        case EngineDispatch.InMemoryOutcome.Failure<SceneGraph> failure -> {
+          return failedImportedRender(failure.diagnostics(), failure.exitCode());
+        }
+      }
+      diagnostics.addAll(projected.diagnostics());
+
+      LayoutEngine layoutEngine =
+          EngineDispatch.requireEngine(
+              engines, "elk-layout", "layout", engines.layoutEngine("elk-layout"));
+      EngineDispatch.InMemoryOutcome<LaidOutScene> layout =
+          EngineDispatch.dispatchInMemory("elk-layout", () -> layoutEngine.layout(projected.value()));
+      EngineResult<LaidOutScene> laid;
+      switch (layout) {
+        case EngineDispatch.InMemoryOutcome.Value<LaidOutScene> value -> laid = value.result();
+        case EngineDispatch.InMemoryOutcome.Failure<LaidOutScene> failure -> {
+          diagnostics.addAll(failure.diagnostics());
+          return failedImportedRender(diagnostics, failure.exitCode());
+        }
+      }
+      diagnostics.addAll(laid.diagnostics());
+      LayoutResult layoutResult = LaidOutSceneMapper.toResult(laid.value());
+      ValidationResult quality = validateLayout(laid.value(), layoutResult);
+      diagnostics.addAll(quality.envelope().diagnostics());
+      if (quality.exitCode() != CommandExitCode.OK.code()) {
+        return failedImportedRender(diagnostics, quality.exitCode());
+      }
+
+      EngineDispatch.InMemoryOutcome<RenderMetadata> metadata =
+          EngineDispatch.dispatchInMemory(
+              BuildCommand.SEMANTICS_ENGINE, () -> semantics.projectRenderMetadata(source, "main"));
+      EngineResult<RenderMetadata> renderMetadata;
+      switch (metadata) {
+        case EngineDispatch.InMemoryOutcome.Value<RenderMetadata> value -> renderMetadata = value.result();
+        case EngineDispatch.InMemoryOutcome.Failure<RenderMetadata> failure -> {
+          diagnostics.addAll(failure.diagnostics());
+          return failedImportedRender(diagnostics, failure.exitCode());
+        }
+      }
+      diagnostics.addAll(renderMetadata.diagnostics());
+
+      RenderEngine renderEngine =
+          EngineDispatch.requireEngine(engines, "render", "render", engines.renderEngine("render"));
+      EngineDispatch.InMemoryOutcome<RenderResult> render =
+          EngineDispatch.dispatchInMemory(
+              "render", () -> renderEngine.render(laid.value(), policy, renderMetadata.value()));
+      EngineResult<RenderResult> rendered;
+      switch (render) {
+        case EngineDispatch.InMemoryOutcome.Value<RenderResult> value -> rendered = value.result();
+        case EngineDispatch.InMemoryOutcome.Failure<RenderResult> failure -> {
+          diagnostics.addAll(failure.diagnostics());
+          return failedImportedRender(diagnostics, failure.exitCode());
+        }
+      }
+      diagnostics.addAll(rendered.diagnostics());
+      return new ImportedRenderResult(
+          rendered.value(),
+          diagnostics,
+          new EngineRunOutcome(
+              EngineDispatch.envelope(rendered.value(), diagnostics), CommandExitCode.OK.code()));
+    } catch (EngineExecutionException error) {
+      diagnostics.add(error.diagnostic());
+      return failedImportedRender(diagnostics, CommandExitCode.PLUGIN_ERROR.code());
+    }
+  }
+
+  private static ImportedRenderResult failedImportedRender(List<Diagnostic> diagnostics, int exitCode) {
+    return new ImportedRenderResult(null, diagnostics, errorOutcome(diagnostics, exitCode));
+  }
+
+  /** Typed import result plus the unchanged command envelope for transport adapters. */
+  public record ImportedSourceResult(
+      SourceDocument source, List<Diagnostic> diagnostics, EngineRunOutcome outcome) {
+    public ImportedSourceResult {
+      diagnostics = List.copyOf(diagnostics);
+    }
+
+    public boolean succeeded() {
+      return source != null;
+    }
+  }
+
+  /** Typed in-memory render result plus the accumulated stage diagnostics and envelope. */
+  public record ImportedRenderResult(
+      RenderResult render, List<Diagnostic> diagnostics, EngineRunOutcome outcome) {
+    public ImportedRenderResult {
+      diagnostics = List.copyOf(diagnostics);
+    }
+
+    public boolean succeeded() {
+      return render != null;
+    }
   }
 
   public static EngineRunOutcome layoutCommand(
