@@ -76,7 +76,6 @@ class MermaidImportEngineTest {
   void rejectsNonFlowchartAndUnsafeOrAmbiguousInputAtomicallyWithLocation() {
     assertRejected("unsupported-sequence.mmd", "DEDIREN_MERMAID_UNSUPPORTED_DIAGRAM", 1, 1);
     assertRejected("invalid-interaction.mmd", "DEDIREN_MERMAID_UNSUPPORTED_CONSTRUCT", 3, 3);
-    assertRejectedText("flowchart TD\nA --- B\n", "DEDIREN_MERMAID_UNSUPPORTED_EDGE", 2, 3);
     assertRejectedText(
         "flowchart TD\nA[<b>HTML</b>]\n", "DEDIREN_MERMAID_UNSUPPORTED_CONSTRUCT", 2, 3);
     assertRejectedText("flowchart TD\nA -->\n", "DEDIREN_MERMAID_SYNTAX_INVALID", 2, 6);
@@ -135,6 +134,88 @@ class MermaidImportEngineTest {
   }
 
   @Test
+  void assemblesLogicalStatementsAcrossPhysicalLinesWithoutChangingTheirOrigin() throws Exception {
+    JsonNode model =
+        model(
+            "flowchart TD\r\n"
+                + "A\r\n"
+                + "  --> B\r\n"
+                + "  --> C; D --> E %% comment\r\n"
+                + "F[\"balanced\r\n"
+                + "quoted label\"] --> G\r\n");
+
+    assertThat(model.path("relationships")).hasSize(4);
+    assertThat(model.at("/nodes/5/label").asText()).isEqualTo("balanced\nquoted label");
+    assertRejectedText("flowchart TD\nA\n -->\n", "DEDIREN_MERMAID_SYNTAX_INVALID", 3, 5);
+  }
+
+  @Test
+  void normalizesOnlySafeBrTagsInsideLabelsAndRejectsOtherMarkupAtomically() throws Exception {
+    JsonNode model =
+        model(
+            "flowchart TD\n"
+                + "A[one<br>two] --> B[three<br/>four] --> C[five<BR />six]\n"
+                + "D -- label<br/>next --> E\n");
+
+    assertThat(model.at("/nodes/0/label").asText()).isEqualTo("one\ntwo");
+    assertThat(model.at("/nodes/1/label").asText()).isEqualTo("three\nfour");
+    assertThat(model.at("/nodes/2/label").asText()).isEqualTo("five\nsix");
+    assertThat(model.at("/relationships/2/label").asText()).isEqualTo("label\nnext");
+    assertRejectedText(
+        "flowchart TD\nA[one<br><script>bad</script>] --> B\n",
+        "DEDIREN_MERMAID_UNSUPPORTED_CONSTRUCT",
+        2,
+        3);
+    assertRejectedText(
+        "flowchart TD\nA[one<br class=unsafe>] --> B\n",
+        "DEDIREN_MERMAID_UNSUPPORTED_CONSTRUCT",
+        2,
+        3);
+    assertRejectedText(
+        "flowchart TD\nA[one<br >unsafe] --> B\n", "DEDIREN_MERMAID_UNSUPPORTED_CONSTRUCT", 2, 3);
+    assertRejectedText(
+        "flowchart TD\nA<br> --> B\n", "DEDIREN_MERMAID_UNSUPPORTED_CONSTRUCT", 2, 2);
+  }
+
+  @Test
+  void preservesCommentsAndPhysicalLocationsInsideMultilineQuotedLabels() throws Exception {
+    JsonNode model = model("flowchart TD\nA[\"one\n%% still label\ntwo\"] --> B\n");
+
+    assertThat(model.at("/nodes/0/label").asText()).isEqualTo("one\n%% still label\ntwo");
+    assertRejectedText(
+        "flowchart TD\nA[\"one\n<script>unsafe</script>\"] --> B\n",
+        "DEDIREN_MERMAID_UNSUPPORTED_CONSTRUCT",
+        3,
+        1);
+  }
+
+  @Test
+  void importsSolidUndirectedEdgesWithKindsLabelsOrderingAndOneCaveatWarning() throws Exception {
+    var result =
+        engine.importSource("flowchart TD\nA --- B -- solid label --- C -->|directed| D\n");
+
+    assertThat(result.value().relationships())
+        .extracting(relationship -> relationship.type())
+        .containsExactly("generic.edge", "generic.edge", "generic.link");
+    assertThat(result.value().relationships())
+        .extracting(relationship -> relationship.label())
+        .containsExactly("", "solid label", "directed");
+    assertThat(result.diagnostics())
+        .extracting(diagnostic -> diagnostic.code())
+        .containsExactly("DEDIREN_MERMAID_HINT_IGNORED");
+    assertThat(result.diagnostics().get(0).message())
+        .contains("default-arrowhead", "marker_end: none");
+  }
+
+  @Test
+  void rejectsBareStructuralKeywordsAsNodeIdentifiersButPermitsThemInLabels() throws Exception {
+    assertRejectedText("flowchart TD\nstyle\n", "DEDIREN_MERMAID_UNSUPPORTED_CONSTRUCT", 2, 1);
+    assertRejectedText(
+        "flowchart TD\nstyle[false accept]\n", "DEDIREN_MERMAID_UNSUPPORTED_CONSTRUCT", 2, 1);
+    assertThat(model("flowchart TD\nA[style] --> B[direction]\n").path("nodes")).hasSize(2);
+  }
+
+  @Test
   void nestedSubgraphsBecomeLayoutOnlyGroupsWithDescendantMembership() throws Exception {
     JsonNode model =
         model(
@@ -160,7 +241,6 @@ class MermaidImportEngineTest {
     assertRejectedText("flowchart TD\nA -.-> B\n", "DEDIREN_MERMAID_UNSUPPORTED_EDGE", 2, 3);
     assertRejectedText("flowchart TD\nA ==> B\n", "DEDIREN_MERMAID_UNSUPPORTED_EDGE", 2, 3);
     assertRejectedText("flowchart TD\nA <--> B\n", "DEDIREN_MERMAID_UNSUPPORTED_EDGE", 2, 3);
-    assertRejectedText("flowchart TD\nA --- B\n", "DEDIREN_MERMAID_UNSUPPORTED_EDGE", 2, 3);
     assertRejectedText("flowchart TD\nA ~~~ B\n", "DEDIREN_MERMAID_UNSUPPORTED_EDGE", 2, 3);
     assertRejectedText("flowchart TD\nA --x B\n", "DEDIREN_MERMAID_UNSUPPORTED_EDGE", 2, 3);
     assertRejectedText("flowchart TD\nA --o B\n", "DEDIREN_MERMAID_UNSUPPORTED_EDGE", 2, 3);

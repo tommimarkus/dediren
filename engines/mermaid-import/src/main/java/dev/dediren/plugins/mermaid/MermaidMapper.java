@@ -55,7 +55,7 @@ final class MermaidMapper {
       relationships.add(
           new SourceRelationship(
               id,
-              "generic.link",
+              edge.kind() == EdgeKind.UNDIRECTED ? "generic.edge" : "generic.link",
               nodeIds.get(edge.source()),
               nodeIds.get(edge.target()),
               edge.label() == null ? "" : edge.label(),

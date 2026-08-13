@@ -13,6 +13,11 @@ record ParsedDiagram(
 
 record ParsedNode(String id, String label) {}
 
-record ParsedEdge(String source, String target, String label) {}
+record ParsedEdge(String source, String target, String label, EdgeKind kind) {}
+
+enum EdgeKind {
+  DIRECTED,
+  UNDIRECTED
+}
 
 record ParsedGroup(String id, String label, List<String> members) {}

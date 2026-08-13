@@ -12,6 +12,8 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.regex.Pattern;
 
 /** Iterative parser for Dediren's deliberately bounded Mermaid flowchart subset. */
 final class MermaidParser {
@@ -26,6 +28,24 @@ final class MermaidParser {
   private final List<MutableGroup> groups = new ArrayList<>();
   private final Deque<MutableGroup> openGroups = new ArrayDeque<>();
   private final Map<String, Integer> hints = new LinkedHashMap<>();
+  private static final Pattern SAFE_BR = Pattern.compile("(?i)<br(?:/| /)?>");
+  private static final Set<String> STRUCTURAL_KEYWORDS =
+      Set.of(
+          "flowchart",
+          "graph",
+          "subgraph",
+          "end",
+          "direction",
+          "style",
+          "default",
+          "interpolate",
+          "class",
+          "classdef",
+          "linkstyle",
+          "click",
+          "href",
+          "acctitle",
+          "accdescr");
   private LayoutDirection direction;
   private boolean headerSeen;
   private int statements;
@@ -42,16 +62,48 @@ final class MermaidParser {
 
     int line = 1;
     int start = 0;
+    PendingStatement pending = null;
     while (start <= source.length()) {
       int newline = source.indexOf('\n', start);
       int end = newline < 0 ? source.length() : newline;
       int contentEnd = end > start && source.charAt(end - 1) == '\r' ? end - 1 : end;
-      parseLine(source.substring(start, contentEnd), line);
+      String rawLine = source.substring(start, contentEnd);
+      String lineText =
+          pending != null && pending.needsContinuation() ? rawLine : withoutComment(rawLine);
+      for (Segment segment : segments(lineText)) {
+        if (segment.text().isBlank()) {
+          continue;
+        }
+        String text = segment.text().strip();
+        int column = segment.column() + leadingWhitespace(segment.text());
+        if (pending == null) {
+          pending = new PendingStatement(text, line, column);
+        } else if (pending.needsContinuation() || beginsEdge(text)) {
+          pending.append(text);
+        } else {
+          parseStatement(pending.text.toString(), pending.line, pending.column);
+          pending = new PendingStatement(text, line, column);
+        }
+        if (segment.terminated()) {
+          parseStatement(pending.text.toString(), pending.line, pending.column);
+          pending = null;
+        }
+      }
       if (newline < 0) {
         break;
       }
       start = newline + 1;
       line++;
+    }
+    if (pending != null) {
+      if (PendingStatement.unbalanced(pending.text)) {
+        int opening = PendingStatement.unclosedStart(pending.text);
+        throw syntax(
+            "unterminated quoted label",
+            logicalLine(pending.text.toString(), pending.line, opening),
+            logicalColumn(pending.text.toString(), pending.column, opening));
+      }
+      parseStatement(pending.text.toString(), pending.line, pending.column);
     }
     if (!headerSeen) {
       throw failure(
@@ -81,15 +133,14 @@ final class MermaidParser {
         Collections.unmodifiableMap(new LinkedHashMap<>(hints)));
   }
 
-  private void parseLine(String rawLine, int line) throws EngineException {
-    int comment = commentStart(rawLine);
-    String lineText = comment < 0 ? rawLine : rawLine.substring(0, comment);
+  private static List<Segment> segments(String lineText) {
+    List<Segment> result = new ArrayList<>();
     int segmentStart = 0;
     int nesting = 0;
     boolean quoted = false;
     int quoteStart = -1;
-    for (int index = 0; index <= lineText.length(); index++) {
-      char current = index == lineText.length() ? ';' : lineText.charAt(index);
+    for (int index = 0; index < lineText.length(); index++) {
+      char current = lineText.charAt(index);
       if (current == '"') {
         quoted = !quoted;
         quoteStart = quoted ? index : -1;
@@ -99,26 +150,12 @@ final class MermaidParser {
         nesting = Math.max(0, nesting - 1);
       }
       if (current == ';' && !quoted && nesting == 0) {
-        String segment = lineText.substring(segmentStart, index);
-        int leading = leadingWhitespace(segment);
-        if (leading < segment.length()) {
-          parseStatement(
-              segment.substring(leading).stripTrailing(), line, segmentStart + leading + 1);
-        }
+        result.add(new Segment(lineText.substring(segmentStart, index), segmentStart + 1, true));
         segmentStart = index + 1;
       }
     }
-    if (quoted) {
-      throw syntax("unterminated quoted label", line, quoteStart + 1);
-    }
-    if (nesting != 0) {
-      String segment = lineText.substring(segmentStart);
-      int leading = leadingWhitespace(segment);
-      if (leading < segment.length()) {
-        parseStatement(
-            segment.substring(leading).stripTrailing(), line, segmentStart + leading + 1);
-      }
-    }
+    result.add(new Segment(lineText.substring(segmentStart), segmentStart + 1, false));
+    return result;
   }
 
   private void parseStatement(String statement, int line, int column) throws EngineException {
@@ -161,6 +198,7 @@ final class MermaidParser {
       hint(hint);
       return;
     }
+    rejectStructuralNodeId(statement, line, column);
     int unsupportedEdge = unsupportedEdgeIndex(statement);
     if (unsupportedEdge >= 0) {
       throw failure(
@@ -237,7 +275,9 @@ final class MermaidParser {
     String previous = first.id;
     while (position < statement.length()) {
       String label = null;
+      EdgeKind kind;
       if (statement.startsWith("-->", position)) {
+        kind = EdgeKind.DIRECTED;
         position += 3;
         position = skipWhitespace(statement, position);
         if (position < statement.length() && statement.charAt(position) == '|') {
@@ -246,29 +286,53 @@ final class MermaidParser {
             throw syntax("unterminated edge label", line, column + position);
           }
           label = statement.substring(position + 1, close);
-          checkToken(label, line, column + position + 1);
+          checkLabel(label, line, column + position + 1);
           position = skipWhitespace(statement, close + 1);
         }
-      } else if (statement.startsWith("--", position)) {
-        int arrow = statement.indexOf("-->", position + 2);
-        if (arrow < 0) {
-          throw syntax("expected --> after edge label", line, column + position);
+      } else if (statement.startsWith("---", position)) {
+        kind = EdgeKind.UNDIRECTED;
+        position += 3;
+        position = skipWhitespace(statement, position);
+        if (position < statement.length() && statement.charAt(position) == '|') {
+          int close = statement.indexOf('|', position + 1);
+          if (close < 0) {
+            throw syntax("unterminated edge label", line, column + position);
+          }
+          label = statement.substring(position + 1, close);
+          checkLabel(label, line, column + position + 1);
+          position = skipWhitespace(statement, close + 1);
         }
+        hint("undirected relationship (default-arrowhead / marker_end: none)");
+      } else if (statement.startsWith("--", position)) {
+        int directed = statement.indexOf("-->", position + 2);
+        int undirected = statement.indexOf("---", position + 2);
+        int arrow = earliest(directed, undirected);
+        if (arrow < 0) {
+          throw syntax("expected a supported edge after edge label", line, column + position);
+        }
+        kind = arrow == undirected ? EdgeKind.UNDIRECTED : EdgeKind.DIRECTED;
         label = statement.substring(position + 2, arrow).strip();
         if (label.isEmpty()) {
           throw syntax("edge label is empty", line, column + position + 2);
         }
-        checkToken(label, line, column + position + 2);
+        checkLabel(label, line, column + position + 2);
         position = skipWhitespace(statement, arrow + 3);
+        if (kind == EdgeKind.UNDIRECTED) {
+          hint("undirected relationship (default-arrowhead / marker_end: none)");
+        }
       } else {
         throw syntax("expected a directed edge", line, column + position);
       }
       if (position >= statement.length()) {
-        throw syntax("expected a node after -->", line, column + position);
+        throw syntax(
+            "expected a node after -->",
+            logicalLine(statement, line, position),
+            logicalColumn(statement, column, position)
+                + (statement.lastIndexOf('\n', Math.max(0, position - 1)) < 0 ? 0 : 1));
       }
       NodeToken next = parseNodeToken(statement, position, line, column);
       remember(next);
-      edges.add(new ParsedEdge(previous, next.id, label));
+      edges.add(new ParsedEdge(previous, next.id, normalizeLabel(label), kind));
       checkElementLimit();
       previous = next.id;
       position = skipWhitespace(statement, next.next);
@@ -295,6 +359,13 @@ final class MermaidParser {
       throw syntax("expected a node identifier", line, baseColumn + position);
     }
     String id = text.substring(idStart, position);
+    if (STRUCTURAL_KEYWORDS.contains(id.toLowerCase(Locale.ROOT))) {
+      throw failure(
+          DiagnosticCode.MERMAID_UNSUPPORTED_CONSTRUCT,
+          "Mermaid structural keywords cannot be node identifiers",
+          line,
+          baseColumn + idStart);
+    }
     checkToken(id, line, baseColumn + idStart);
     String label = id;
     if (position < text.length() && !Character.isWhitespace(text.charAt(position))) {
@@ -310,7 +381,8 @@ final class MermaidParser {
       if (label.length() >= 2 && label.startsWith("\"") && label.endsWith("\"")) {
         label = label.substring(1, label.length() - 1);
       }
-      checkToken(label, line, baseColumn + position + shape.prefix.length());
+      checkLabel(label, line, baseColumn + position + shape.prefix.length());
+      label = normalizeLabel(label);
       hint("node shape");
       position = close + shape.suffix.length();
     }
@@ -354,7 +426,7 @@ final class MermaidParser {
             column);
       }
     }
-    String[] markers = {"@{", "<", "`", "http://", "https://", "file:", "data:"};
+    String[] markers = {"@{", "`", "http://", "https://", "file:", "data:"};
     for (String marker : markers) {
       int at = lower.indexOf(marker);
       if (at >= 0) {
@@ -365,10 +437,25 @@ final class MermaidParser {
             column + at);
       }
     }
+    for (int start = lower.indexOf('<'); start >= 0; start = lower.indexOf('<', start + 1)) {
+      int end = lower.indexOf('>', start + 1);
+      boolean safeBr = end >= 0 && SAFE_BR.matcher(lower.substring(start, end + 1)).matches();
+      boolean labelContext =
+          statement.lastIndexOf('[', start) >= 0 || statement.lastIndexOf("--", start) >= 0;
+      if (!safeBr || !labelContext) {
+        int bracket = statement.lastIndexOf('[', start);
+        int location = bracket >= 0 && statement.indexOf("\n", bracket) < 0 ? bracket + 1 : start;
+        throw failure(
+            DiagnosticCode.MERMAID_UNSUPPORTED_CONSTRUCT,
+            "HTML, interactive behavior, and external resources are unsupported",
+            logicalLine(statement, line, location),
+            logicalColumn(statement, column, location));
+      }
+    }
   }
 
   private static int unsupportedEdgeIndex(String statement) {
-    String[] markers = {"<--", "-.", "==", "~~~", "---", "--x", "--o", "x--", "o--"};
+    String[] markers = {"<--", "-.", "==", "~~~", "--x", "--o", "x--", "o--"};
     int first = -1;
     for (String marker : markers) {
       int found = statement.indexOf(marker);
@@ -437,6 +524,11 @@ final class MermaidParser {
     return -1;
   }
 
+  private static String withoutComment(String line) {
+    int comment = commentStart(line);
+    return comment < 0 ? line : line.substring(0, comment);
+  }
+
   private static int leadingWhitespace(String text) {
     return skipWhitespace(text, 0);
   }
@@ -447,6 +539,63 @@ final class MermaidParser {
       position++;
     }
     return position;
+  }
+
+  private static boolean beginsEdge(String text) {
+    return text.startsWith("-->") || text.startsWith("---") || text.startsWith("--");
+  }
+
+  private static int earliest(int first, int second) {
+    if (first < 0) {
+      return second;
+    }
+    if (second < 0) {
+      return first;
+    }
+    return Math.min(first, second);
+  }
+
+  private static String normalizeLabel(String label) {
+    return label == null ? null : SAFE_BR.matcher(label).replaceAll("\n");
+  }
+
+  private static void checkLabel(String label, int line, int column) throws EngineException {
+    checkToken(label.replace('\n', ' '), line, column);
+  }
+
+  private static int logicalLine(String statement, int line, int position) {
+    int result = line;
+    for (int index = 0; index < position; index++) {
+      if (statement.charAt(index) == '\n') {
+        result++;
+      }
+    }
+    return result;
+  }
+
+  private static int logicalColumn(String statement, int column, int position) {
+    int newline = statement.lastIndexOf('\n', Math.max(0, position - 1));
+    return newline < 0 ? column + position : position - newline;
+  }
+
+  private static void rejectStructuralNodeId(String statement, int line, int column)
+      throws EngineException {
+    int end = 0;
+    while (end < statement.length()
+        && !Character.isWhitespace(statement.charAt(end))
+        && statement.charAt(end) != '['
+        && statement.charAt(end) != '('
+        && statement.charAt(end) != '{') {
+      end++;
+    }
+    if (end > 0
+        && STRUCTURAL_KEYWORDS.contains(statement.substring(0, end).toLowerCase(Locale.ROOT))) {
+      throw failure(
+          DiagnosticCode.MERMAID_UNSUPPORTED_CONSTRUCT,
+          "Mermaid structural keywords cannot be node identifiers",
+          line,
+          column);
+    }
   }
 
   private static long utf8Length(String value) {
@@ -474,6 +623,68 @@ final class MermaidParser {
   }
 
   private record NodeToken(String id, String label, int next) {}
+
+  private record Segment(String text, int column, boolean terminated) {}
+
+  private static final class PendingStatement {
+    private final StringBuilder text;
+    private final int line;
+    private final int column;
+
+    private PendingStatement(String text, int line, int column) {
+      this.text = new StringBuilder(text);
+      this.line = line;
+      this.column = column;
+    }
+
+    private void append(String next) {
+      text.append('\n').append(next);
+    }
+
+    private boolean needsContinuation() {
+      return unbalanced(text)
+          || text.toString().stripTrailing().endsWith("-->")
+          || text.toString().stripTrailing().endsWith("---");
+    }
+
+    private static boolean unbalanced(CharSequence source) {
+      int nesting = 0;
+      boolean quoted = false;
+      for (int index = 0; index < source.length(); index++) {
+        char current = source.charAt(index);
+        if (current == '"') {
+          quoted = !quoted;
+        } else if (!quoted && (current == '[' || current == '(' || current == '{')) {
+          nesting++;
+        } else if (!quoted && (current == ']' || current == ')' || current == '}')) {
+          nesting--;
+        }
+      }
+      return quoted || nesting > 0;
+    }
+
+    private static int unclosedStart(CharSequence source) {
+      int nesting = 0;
+      int opening = source.length();
+      boolean quoted = false;
+      for (int index = 0; index < source.length(); index++) {
+        char current = source.charAt(index);
+        if (current == '"') {
+          quoted = !quoted;
+          if (quoted) {
+            opening = index;
+          }
+        } else if (!quoted && (current == '[' || current == '(' || current == '{')) {
+          if (nesting++ == 0) {
+            opening = index;
+          }
+        } else if (!quoted && (current == ']' || current == ')' || current == '}')) {
+          nesting--;
+        }
+      }
+      return opening;
+    }
+  }
 
   private record Shape(String prefix, String suffix) {}
 
