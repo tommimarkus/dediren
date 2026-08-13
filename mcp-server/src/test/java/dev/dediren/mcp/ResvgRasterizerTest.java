@@ -109,6 +109,11 @@ class ResvgRasterizerTest {
             new ResvgRasterizer(oversized, Duration.ofSeconds(1), PNG.length - 1)
                 .rasterize("<svg/>".getBytes(StandardCharsets.UTF_8), PNG.length - 1))
         .isEmpty();
+    assertThat(
+            new ResvgRasterizer(oversized, Duration.ofSeconds(1), PNG.length + 1)
+                .rasterize("<svg/>".getBytes(StandardCharsets.UTF_8), PNG.length - 1))
+        .as("the caller's remaining cumulative attachment budget is a separate ceiling")
+        .isEmpty();
 
     Path overdimensioned =
         executable(
@@ -123,23 +128,29 @@ class ResvgRasterizerTest {
 
   @Test
   void timeoutTerminatesTheConverterAndLeavesNoAttachment(@TempDir Path temp) throws Exception {
-    Path executable = executable(temp, "resvg-hang", "#!/bin/sh\nwhile :; do :; done\n");
+    Path pidFile = temp.resolve("timeout.pid");
+    Path executable =
+        executable(
+            temp,
+            "resvg-hang",
+            "#!/bin/sh\nprintf '%s' \"$$\" > '" + pidFile + "'\nwhile :; do :; done\n");
 
     assertThat(
             new ResvgRasterizer(executable, Duration.ofMillis(25), PNG.length + 1)
                 .rasterize("<svg/>".getBytes(StandardCharsets.UTF_8), PNG.length))
         .isEmpty();
+    assertProcessDead(pidFile);
   }
 
   @Test
   void interruptionCancelsTheConverterAndRestoresTheCallerInterrupt(@TempDir Path temp)
       throws Exception {
-    Path marker = temp.resolve("started");
+    Path pidFile = temp.resolve("interrupted.pid");
     Path executable =
         executable(
             temp,
             "resvg-cancel",
-            "#!/bin/sh\nprintf started > '" + marker + "'\nwhile :; do :; done\n");
+            "#!/bin/sh\nprintf '%s' \"$$\" > '" + pidFile + "'\nwhile :; do :; done\n");
     AtomicReference<Optional<byte[]>> result = new AtomicReference<>();
     AtomicBoolean interrupted = new AtomicBoolean();
     Thread caller =
@@ -153,16 +164,23 @@ class ResvgRasterizerTest {
                 });
 
     long deadline = System.nanoTime() + Duration.ofSeconds(2).toNanos();
-    while (!Files.exists(marker) && System.nanoTime() < deadline) {
+    while (!Files.exists(pidFile) && System.nanoTime() < deadline) {
       Thread.onSpinWait();
     }
-    assertThat(marker).exists();
+    assertThat(pidFile).exists();
     caller.interrupt();
     caller.join(Duration.ofSeconds(2));
 
     assertThat(caller.isAlive()).isFalse();
     assertThat(result.get()).isEmpty();
     assertThat(interrupted).isTrue();
+    assertProcessDead(pidFile);
+  }
+
+  private static void assertProcessDead(Path pidFile) throws Exception {
+    assertThat(pidFile).exists();
+    long pid = Long.parseLong(Files.readString(pidFile, StandardCharsets.UTF_8).trim());
+    assertThat(ProcessHandle.of(pid).map(ProcessHandle::isAlive).orElse(false)).isFalse();
   }
 
   private static Path executable(Path directory, String name, String script) throws Exception {

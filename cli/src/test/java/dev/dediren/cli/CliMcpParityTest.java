@@ -10,6 +10,7 @@ import io.modelcontextprotocol.spec.McpSchema.ImageContent;
 import io.modelcontextprotocol.spec.McpSchema.TextContent;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Base64;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -240,6 +241,17 @@ class CliMcpParityTest {
     Files.copy(fixture("valid-pipeline-rich.json"), root.resolve("model.json"));
     Files.copy(policy("rich-svg.json"), root.resolve("render-policy.json"));
 
+    Map<String, Object> dataArguments =
+        Map.of(
+            "source",
+            "model.json",
+            "out",
+            "out",
+            "render_policy",
+            "render-policy.json",
+            "output",
+            "data");
+    CallToolResult data = build(root, dataArguments);
     CallToolResult result =
         build(
             root,
@@ -259,7 +271,7 @@ class CliMcpParityTest {
     assertThat(result.content().get(0)).isInstanceOf(TextContent.class);
     assertThat(result.content().get(1)).isInstanceOf(ImageContent.class);
     assertThat(((ImageContent) result.content().get(1)).mimeType()).isEqualTo("image/svg+xml");
-    assertThat(textOf(result)).contains("build-result.schema.v1");
+    assertThat(textOf(result)).isEqualTo(textOf(data));
   }
 
   @Test
@@ -297,7 +309,21 @@ class CliMcpParityTest {
     assertThat(data.content()).hasSize(1);
     assertThat(svg.isError()).isFalse();
     assertThat(svg.content()).hasSizeGreaterThan(1);
-    assertThat(((ImageContent) svg.content().get(1)).mimeType()).isEqualTo("image/svg+xml");
+    ImageContent attached = (ImageContent) svg.content().get(1);
+    assertThat(attached.mimeType()).isEqualTo("image/svg+xml");
+    assertThat(Base64.getDecoder().decode(attached.data()))
+        .isEqualTo(Files.readAllBytes(root.resolve("svg-out").resolve(svgArtifactPath(svg))));
+  }
+
+  private static String svgArtifactPath(CallToolResult result) {
+    JsonNode artifacts =
+        JsonSupport.objectMapper().readTree(textOf(result)).at("/views/0/artifacts");
+    for (JsonNode artifact : artifacts) {
+      if ("svg".equals(artifact.path("artifact_kind").asText())) {
+        return artifact.path("path").asText();
+      }
+    }
+    throw new AssertionError("build result did not declare an SVG artifact");
   }
 
   @Test
