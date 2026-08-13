@@ -1398,15 +1398,17 @@ public final class DistTool {
 
   /**
    * A self-contained converter oracle: the production launcher must execute this exact absolute
-   * path with fixed arguments, then validate and attach the emitted PNG.
+   * path with fixed arguments, feeds it SVG on stdin, and validates the PNG it emits on stdout.
    */
   private static Path writeFakeResvg(Path executable) throws IOException {
     Files.writeString(
         executable,
         """
         #!/bin/sh
-        for output in "$@"; do :; done
-        printf '\\211\\120\\116\\107\\015\\012\\032\\012\\000\\000\\000\\015\\111\\110\\104\\122\\000\\000\\000\\001\\000\\000\\000\\001\\010\\006\\000\\000\\000\\037\\025\\304\\211\\000\\000\\000\\014\\111\\104\\101\\124\\170\\332\\143\\144\\370\\317\\360\\037\\000\\005\\376\\002\\376\\202\\256\\256\\125\\000\\000\\000\\000\\111\\105\\116\\104\\256\\102\\140\\202' > "$output"
+        [ "$#" = 3 ] && [ "$1" = --quiet ] && [ "$2" = - ] && [ "$3" = -c ] || exit 64
+        IFS= read -r svg || exit 65
+        case "$svg" in '<svg'*) ;; *) exit 66 ;; esac
+        printf '\\211\\120\\116\\107\\015\\012\\032\\012\\000\\000\\000\\015\\111\\110\\104\\122\\000\\000\\000\\001\\000\\000\\000\\001\\010\\006\\000\\000\\000\\037\\025\\304\\211\\000\\000\\000\\014\\111\\104\\101\\124\\170\\332\\143\\144\\370\\317\\360\\037\\000\\005\\376\\002\\376\\202\\256\\256\\125\\000\\000\\000\\000\\111\\105\\116\\104\\256\\102\\140\\202'
         """,
         StandardCharsets.UTF_8);
     try {

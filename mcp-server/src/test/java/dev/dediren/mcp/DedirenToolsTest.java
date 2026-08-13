@@ -202,6 +202,56 @@ class DedirenToolsTest {
     assertThat(unknownType.isError()).isTrue();
   }
 
+  @Test
+  void imageOutputWithoutCapabilitiesRemainsJsonOnlyAndSourceBuildNeedsItsPolicy(@TempDir Path root)
+      throws Exception {
+    Files.writeString(root.resolve("diagram.mmd"), "flowchart TD\\nA --> B\\n");
+    Files.copy(fixture("valid-basic.json"), root.resolve("model.json"));
+
+    CallToolResult omittedTypes =
+        toolsIn(root)
+            .importSource(
+                new CallToolRequest(
+                    "dediren_import",
+                    Map.of("source", "diagram.mmd", "plugin", "mermaid", "output", "image")));
+    CallToolResult emptyTypes =
+        toolsIn(root)
+            .importSource(
+                new CallToolRequest(
+                    "dediren_import",
+                    Map.of(
+                        "source",
+                        "diagram.mmd",
+                        "plugin",
+                        "mermaid",
+                        "output",
+                        "image",
+                        "accepted_image_types",
+                        List.of())));
+    CallToolResult missingBuildPolicy =
+        toolsIn(root)
+            .build(
+                new CallToolRequest(
+                    "dediren_build",
+                    Map.of(
+                        "source",
+                        "model.json",
+                        "out",
+                        "out",
+                        "output",
+                        "image",
+                        "accepted_image_types",
+                        List.of("image/svg+xml"))));
+
+    assertThat(omittedTypes.isError()).isFalse();
+    assertThat(omittedTypes.content()).hasSize(1);
+    assertThat(emptyTypes.isError()).isFalse();
+    assertThat(emptyTypes.content()).hasSize(1);
+    assertThat(envelopeOf(emptyTypes).path("status").asText()).isEqualTo("ok");
+    assertThat(missingBuildPolicy.isError()).isTrue();
+    assertThat(textOf(missingBuildPolicy)).contains("render_policy");
+  }
+
   // A source is model-supplied, so its fragments[] paths are model-supplied too. They must be
   // confined to --root exactly like the tool's own path arguments, and their errors sanitized. No
   // fixture carries a fragment shape, so these mirror CliValidateTest's inline fragment models.
