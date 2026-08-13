@@ -169,6 +169,70 @@ class DedirenToolsEngineBackedTest {
   }
 
   @Test
+  void inlineDotSvgUsesTheBundledDefaultPolicyWhenNoOverrideIsSupplied(@TempDir Path root) {
+    CallToolResult result =
+        new DedirenTools(root, EngineWiring.defaults(), Map.of())
+            .importSource(
+                new CallToolRequest(
+                    "dediren_import",
+                    Map.of(
+                        "content",
+                        "digraph G { start -> finish; }\n",
+                        "plugin",
+                        "dot",
+                        "output",
+                        "svg")));
+
+    assertThat(result.isError()).isNotEqualTo(Boolean.TRUE);
+    assertThat(result.content()).hasSize(2);
+    assertThat(result.content().getFirst()).isInstanceOf(TextContent.class);
+    assertThat(decodedSvg(result.content().get(1))).contains("<svg", "\"view_id\":\"main\"");
+  }
+
+  @Test
+  void inlineMermaidSvgUsesAConfinedRenderPolicyOverride(@TempDir Path root) throws Exception {
+    Files.copy(policy("dark-svg.json"), root.resolve("dark.json"));
+
+    CallToolResult result =
+        new DedirenTools(root, EngineWiring.defaults(), Map.of())
+            .importSource(
+                new CallToolRequest(
+                    "dediren_import",
+                    Map.of(
+                        "content",
+                        "flowchart TD\nstart[Start] --> finish[Finish]\n",
+                        "plugin",
+                        "mermaid",
+                        "render_policy",
+                        "dark.json",
+                        "output",
+                        "svg")));
+
+    assertThat(result.isError()).isNotEqualTo(Boolean.TRUE);
+    assertThat(result.content()).hasSize(2);
+    assertThat(decodedSvg(result.content().get(1))).contains("#0b1220");
+  }
+
+  @Test
+  void sourceBuildSvgOutputRequiresARenderPolicyAndReturnsNoImage(@TempDir Path root)
+      throws Exception {
+    Files.copy(fixture("valid-basic.json"), root.resolve("model.json"));
+
+    CallToolResult result =
+        new DedirenTools(root, EngineWiring.defaults(), Map.of())
+            .build(
+                new CallToolRequest(
+                    "dediren_build",
+                    Map.of("source", "model.json", "out", "out", "output", "svg")));
+
+    assertThat(result.isError()).isTrue();
+    assertThat(result.content()).hasSize(1);
+    assertThat(result.content().getFirst()).isInstanceOf(TextContent.class);
+    assertThat(envelopeOf(result).at("/diagnostics/0/message").asText())
+        .contains("render_policy");
+  }
+
+  @Test
   void svgOutputReturnsDecodedImagesAfterTheDataEnvelopeInRequestedViewOrder(@TempDir Path root)
       throws Exception {
     Files.copy(fixture("valid-uml-basic.json"), root.resolve("model.json"));
@@ -260,11 +324,15 @@ class DedirenToolsEngineBackedTest {
   }
 
   private static void assertDecodedSvgImage(Object content, String expectedView) {
+    String svg = decodedSvg(content);
+    assertThat(svg).contains("<svg", "\"view_id\":\"" + expectedView + "\"");
+  }
+
+  private static String decodedSvg(Object content) {
     JsonNode image = JsonSupport.objectMapper().valueToTree(content);
     assertThat(image.path("type").asText()).isEqualTo("image");
     assertThat(image.path("mimeType").asText()).isEqualTo("image/svg+xml");
-    String svg =
-        new String(Base64.getDecoder().decode(image.path("data").asText()), StandardCharsets.UTF_8);
-    assertThat(svg).contains("<svg", "\"view_id\":\"" + expectedView + "\"");
+    return new String(
+        Base64.getDecoder().decode(image.path("data").asText()), StandardCharsets.UTF_8);
   }
 }
