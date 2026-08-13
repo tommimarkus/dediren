@@ -288,8 +288,7 @@ public final class SchemaCacheModule {
   private static HttpTransport httpTransport(HttpClient client) {
     return url -> {
       requireHttps(url);
-      HttpRequest request =
-          HttpRequest.newBuilder(url).GET().timeout(HTTP_REQUEST_TIMEOUT).build();
+      HttpRequest request = HttpRequest.newBuilder(url).GET().timeout(HTTP_REQUEST_TIMEOUT).build();
       HttpResponse<InputStream> response =
           client.send(request, HttpResponse.BodyHandlers.ofInputStream());
       requireHttps(response.uri());

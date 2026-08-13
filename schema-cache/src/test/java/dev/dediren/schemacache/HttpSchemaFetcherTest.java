@@ -122,7 +122,9 @@ class HttpSchemaFetcherTest {
     SchemaFetchResult result =
         SchemaCacheModule.httpFetcher(
                 url -> new HttpTransport.Response(503, InputStream.nullInputStream()))
-            .fetch(URI.create("https://schemas.example.test/schema.xsd"), tempDir.resolve("schema.xsd"));
+            .fetch(
+                URI.create("https://schemas.example.test/schema.xsd"),
+                tempDir.resolve("schema.xsd"));
 
     assertThat(result.succeeded()).isFalse();
     assertThat(result.exitCode()).isEqualTo(503);
@@ -164,8 +166,7 @@ class HttpSchemaFetcherTest {
         .isEqualTo("http.example.test:8080");
     assertThat(
             proxyAddress(
-                SchemaCacheModule.proxySelector(
-                        Map.of("ALL_PROXY", "http://all.example.test:1080"))
+                SchemaCacheModule.proxySelector(Map.of("ALL_PROXY", "http://all.example.test:1080"))
                     .select(URI.create("https://schemas.example.test/schema.xsd"))))
         .isEqualTo("all.example.test:1080");
   }
