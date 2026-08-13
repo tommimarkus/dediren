@@ -128,8 +128,7 @@ class HttpSchemaFetcherTest {
         };
     SchemaFetcher fetcher =
         SchemaCacheModule.httpFetcher(
-            url ->
-                new HttpTransport.Response(200, stalledBody, Duration.ofMillis(25)));
+            url -> new HttpTransport.Response(200, stalledBody, Duration.ofMillis(25)));
 
     assertThatThrownBy(
             () ->

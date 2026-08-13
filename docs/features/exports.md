@@ -68,8 +68,9 @@ remain the human-readable provenance companion. Schema sources:
   replaces a cache entry. Behind a proxy, precedence is `HTTPS_PROXY`, then
   `HTTP_PROXY`, then `ALL_PROXY`; lowercase wins within each name, and
   `NO_PROXY` supports exact hosts, leading-dot suffixes, and `*`. A selected
-  proxy URI must use `http` or `https`, include a host, and contain no
-  path/query/fragment; invalid configuration fails closed rather than silently
+  proxy URI must be a credential-free `http` URI, include a host, and contain
+  no path/query/fragment; secure proxy transport and proxy-URI credentials are
+  unsupported. Invalid configuration fails closed rather than silently
   downloading directly.
 - **Offline:** provide local schema files with `DEDIREN_OEF_SCHEMA_DIR` (OEF
   directory) and `DEDIREN_XMI_SCHEMA_PATH` (XMI schema file).

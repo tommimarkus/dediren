@@ -238,8 +238,11 @@ class SchemaCacheModuleTest {
   void oversizedCachedSchemaIsRejectedAndReplacedWithinTheNetworkCeiling() throws Exception {
     Path schema = tempDir.resolve("nested").resolve("schema.xsd");
     Files.createDirectories(schema.getParent());
-    try (var channel = Files.newByteChannel(schema, java.nio.file.StandardOpenOption.CREATE_NEW,
-        java.nio.file.StandardOpenOption.WRITE)) {
+    try (var channel =
+        Files.newByteChannel(
+            schema,
+            java.nio.file.StandardOpenOption.CREATE_NEW,
+            java.nio.file.StandardOpenOption.WRITE)) {
       channel.position(8L * 1024 * 1024);
       channel.write(java.nio.ByteBuffer.wrap(new byte[] {1}));
     }
