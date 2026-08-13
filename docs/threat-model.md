@@ -257,8 +257,9 @@ endpoint in the fetch set; the in-JVM validator resolves the import from the
 local copy, never from the network).
 The explicit proxy selector checks `HTTPS_PROXY`, `HTTP_PROXY`, then
 `ALL_PROXY`, with lowercase taking precedence within each name. `NO_PROXY`
-supports exact hosts, leading-dot suffixes, and `*`. A selected proxy must be an
-`http`/`https` URI with a host and no path/query/fragment; invalid configuration
+supports exact hosts, leading-dot suffixes, and `*`. A selected proxy must be a
+credential-free `http` URI with a host and no path/query/fragment; secure proxy
+transport and proxy-URI credentials are not supported. Invalid configuration
 fails closed with a credential-free error rather than silently connecting
 directly.
 The offline overrides `DEDIREN_XMI_SCHEMA_PATH` / `DEDIREN_OEF_SCHEMA_DIR` bypass the

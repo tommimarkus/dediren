@@ -112,6 +112,34 @@ class HttpSchemaFetcherTest {
   }
 
   @Test
+  void streamedBodyConsumptionIsBoundedAfterResponseHeadersArrive() {
+    InputStream stalledBody =
+        new InputStream() {
+          @Override
+          public int read() throws java.io.IOException {
+            try {
+              Thread.sleep(Duration.ofSeconds(10));
+              return -1;
+            } catch (InterruptedException interrupted) {
+              Thread.currentThread().interrupt();
+              throw new java.io.IOException("body read cancelled", interrupted);
+            }
+          }
+        };
+    SchemaFetcher fetcher =
+        SchemaCacheModule.httpFetcher(
+            url -> new HttpTransport.Response(200, stalledBody, Duration.ofMillis(25)));
+
+    assertThatThrownBy(
+            () ->
+                fetcher.fetch(
+                    URI.create("https://schemas.example.test/schema.xsd"),
+                    tempDir.resolve("schema.xsd")))
+        .isInstanceOf(SchemaCacheException.class)
+        .hasMessageContaining("timed out");
+  }
+
+  @Test
   void httpClientUsesNormalRedirectsToRejectHttpsDowngrades() {
     assertThat(SchemaCacheModule.httpClient(Map.of()).followRedirects())
         .isEqualTo(java.net.http.HttpClient.Redirect.NORMAL);
@@ -186,6 +214,27 @@ class HttpSchemaFetcherTest {
 
     assertThat(failure).isInstanceOf(SchemaCacheException.class);
     assertThat(failure.getMessage()).doesNotMatch(".*://[^/\\s]+@.*");
+  }
+
+  @Test
+  void unsupportedSecureOrCredentialBearingProxyUrisFailClosed() {
+    URI schema = URI.create("https://schemas.example.test/schema.xsd");
+
+    assertThatThrownBy(
+            () ->
+                SchemaCacheModule.proxySelector(
+                        Map.of("HTTPS_PROXY", "https://proxy.example.test:8443"))
+                    .select(schema))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("invalid configured schema proxy");
+    assertThatThrownBy(
+            () ->
+                SchemaCacheModule.proxySelector(
+                        Map.of("HTTPS_PROXY", "http://user:secret@proxy.example.test:8080"))
+                    .select(schema))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("invalid configured schema proxy")
+        .hasMessageNotContaining("secret");
   }
 
   private static final java.nio.charset.Charset UTF_8 = StandardCharsets.UTF_8;

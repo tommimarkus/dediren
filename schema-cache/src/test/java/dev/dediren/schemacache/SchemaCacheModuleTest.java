@@ -10,6 +10,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -231,6 +232,35 @@ class SchemaCacheModuleTest {
 
     assertThat(schema).hasContent(SCHEMA_XML);
     assertThat(leftoverTempFiles(schema.getParent())).isEmpty();
+  }
+
+  @Test
+  void oversizedCachedSchemaIsRejectedAndReplacedWithinTheNetworkCeiling() throws Exception {
+    Path schema = tempDir.resolve("nested").resolve("schema.xsd");
+    Files.createDirectories(schema.getParent());
+    try (var channel =
+        Files.newByteChannel(
+            schema,
+            java.nio.file.StandardOpenOption.CREATE_NEW,
+            java.nio.file.StandardOpenOption.WRITE)) {
+      channel.position(8L * 1024 * 1024);
+      channel.write(java.nio.ByteBuffer.wrap(new byte[] {1}));
+    }
+    AtomicBoolean fetched = new AtomicBoolean();
+
+    SchemaCacheModule.ensureCachedSchemaFile(
+        schema,
+        URI.create("https://example.test/schema.xsd"),
+        "test schema",
+        SCHEMA_SHA256,
+        (url, destination) -> {
+          fetched.set(true);
+          Files.writeString(destination, SCHEMA_XML, StandardCharsets.UTF_8);
+          return SchemaFetchResult.success();
+        });
+
+    assertThat(fetched).isTrue();
+    assertThat(schema).hasContent(SCHEMA_XML);
   }
 
   @Test

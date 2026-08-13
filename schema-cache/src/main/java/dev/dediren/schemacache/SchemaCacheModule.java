@@ -20,6 +20,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -171,6 +175,10 @@ public final class SchemaCacheModule {
             SchemaCacheException.Kind.FETCH,
             "downloaded " + description + " from " + url + " was empty");
       }
+      if (Files.size(tempFile) > MAX_SCHEMA_BYTES) {
+        throw new SchemaCacheException(
+            SchemaCacheException.Kind.FETCH, "downloaded schema exceeds the 8 MiB limit");
+      }
       String actualSha256 = sha256Hex(tempFile);
       if (!actualSha256.equalsIgnoreCase(expectedSha256)) {
         throw new SchemaCacheException(
@@ -235,7 +243,7 @@ public final class SchemaCacheModule {
               new byte[0],
               ("HTTP status " + response.statusCode()).getBytes(StandardCharsets.UTF_8));
         }
-        copyBounded(body, destination);
+        copyBounded(body, destination, response.deadlineNanos());
         return SchemaFetchResult.success();
       }
     };
@@ -259,9 +267,9 @@ public final class SchemaCacheModule {
     }
     try {
       URI proxyUri = URI.create(proxy);
-      if (!("http".equalsIgnoreCase(proxyUri.getScheme())
-              || "https".equalsIgnoreCase(proxyUri.getScheme()))
+      if (!"http".equalsIgnoreCase(proxyUri.getScheme())
           || proxyUri.getHost() == null
+          || proxyUri.getRawUserInfo() != null
           || proxyUri.getPort() < -1
           || proxyUri.getRawPath() != null && !proxyUri.getRawPath().isEmpty()
           || proxyUri.getRawQuery() != null
@@ -270,7 +278,7 @@ public final class SchemaCacheModule {
       }
       int port = proxyUri.getPort();
       if (port == -1) {
-        port = "https".equalsIgnoreCase(proxyUri.getScheme()) ? 443 : 80;
+        port = 80;
       }
       return new ConfiguredProxySelector(
           new Proxy(Proxy.Type.HTTP, InetSocketAddress.createUnresolved(proxyUri.getHost(), port)),
@@ -288,18 +296,82 @@ public final class SchemaCacheModule {
   private static HttpTransport httpTransport(HttpClient client) {
     return url -> {
       requireHttps(url);
+      long deadlineNanos = deadlineAfter(HTTP_REQUEST_TIMEOUT);
       HttpRequest request = HttpRequest.newBuilder(url).GET().timeout(HTTP_REQUEST_TIMEOUT).build();
       HttpResponse<InputStream> response =
           client.send(request, HttpResponse.BodyHandlers.ofInputStream());
       requireHttps(response.uri());
-      return new HttpTransport.Response(response.statusCode(), response.body());
+      return new HttpTransport.Response(response.statusCode(), response.body(), deadlineNanos);
     };
+  }
+
+  private static long deadlineAfter(java.time.Duration timeout) {
+    long now = System.nanoTime();
+    long delay = timeout.toNanos();
+    return delay > Long.MAX_VALUE - now ? Long.MAX_VALUE : now + delay;
   }
 
   private static void requireHttps(URI url) throws SchemaCacheException {
     if (!"https".equalsIgnoreCase(url.getScheme())) {
       throw new SchemaCacheException(
           SchemaCacheException.Kind.FETCH, "schema downloads and redirects must use https");
+    }
+  }
+
+  private static void copyBounded(InputStream input, Path destination, long deadlineNanos)
+      throws IOException, SchemaCacheException {
+    if (deadlineNanos == Long.MAX_VALUE) {
+      copyBounded(input, destination);
+      return;
+    }
+
+    FutureTask<Void> transfer =
+        new FutureTask<>(
+            () -> {
+              copyBounded(input, destination);
+              return null;
+            });
+    Thread worker = Thread.ofVirtual().name("dediren-schema-body").start(transfer);
+    try {
+      long remainingNanos = deadlineNanos - System.nanoTime();
+      if (remainingNanos <= 0) {
+        throw new TimeoutException();
+      }
+      transfer.get(remainingNanos, TimeUnit.NANOSECONDS);
+    } catch (TimeoutException error) {
+      cancelBodyRead(input, transfer, worker);
+      throw new SchemaCacheException(
+          SchemaCacheException.Kind.FETCH,
+          "schema response body timed out after " + HTTP_REQUEST_TIMEOUT.toSeconds() + " seconds",
+          error);
+    } catch (InterruptedException error) {
+      cancelBodyRead(input, transfer, worker);
+      Thread.currentThread().interrupt();
+      throw new SchemaCacheException(
+          SchemaCacheException.Kind.FETCH, "schema response body read was interrupted", error);
+    } catch (ExecutionException error) {
+      Throwable cause = error.getCause();
+      if (cause instanceof SchemaCacheException schemaError) {
+        throw schemaError;
+      }
+      if (cause instanceof IOException ioError) {
+        throw ioError;
+      }
+      throw new IOException("failed to read schema response body", cause);
+    }
+  }
+
+  private static void cancelBodyRead(InputStream input, FutureTask<Void> transfer, Thread worker) {
+    transfer.cancel(true);
+    try {
+      input.close();
+    } catch (IOException ignored) {
+      // Cancellation is best-effort; the original timeout/interruption remains authoritative.
+    }
+    try {
+      worker.join(1000);
+    } catch (InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
     }
   }
 
@@ -380,7 +452,10 @@ public final class SchemaCacheModule {
 
   private static boolean fileMatchesSha256(Path path, String expectedSha256) {
     try {
-      return sha256Hex(path).equalsIgnoreCase(expectedSha256);
+      long size = Files.size(path);
+      return size > 0
+          && size <= MAX_SCHEMA_BYTES
+          && sha256Hex(path).equalsIgnoreCase(expectedSha256);
     } catch (IOException error) {
       return false;
     }
@@ -393,7 +468,13 @@ public final class SchemaCacheModule {
     } catch (NoSuchAlgorithmException error) {
       throw new IllegalStateException("SHA-256 message digest is required but unavailable", error);
     }
-    byte[] hash = digest.digest(Files.readAllBytes(path));
+    try (InputStream input = Files.newInputStream(path)) {
+      byte[] buffer = new byte[8192];
+      for (int count; (count = input.read(buffer)) != -1; ) {
+        digest.update(buffer, 0, count);
+      }
+    }
+    byte[] hash = digest.digest();
     StringBuilder hex = new StringBuilder(hash.length * 2);
     for (byte b : hash) {
       hex.append(Character.forDigit((b >> 4) & 0xF, 16));

@@ -1404,8 +1404,9 @@ or `ALL_PROXY`, plus optional `NO_PROXY` (lowercase forms are also accepted).
 For an HTTPS schema URL, precedence is `HTTPS_PROXY`, then `HTTP_PROXY`, then
 `ALL_PROXY`; within each name the lowercase value wins when both cases exist.
 `NO_PROXY` accepts comma-separated exact hosts, leading-dot domain suffixes,
-or `*`. Proxy URIs must use `http` or `https`, include a host, and contain no
-path, query, or fragment. Any selected invalid proxy fails closed with a
+or `*`. Proxy URIs must be credential-free `http` URIs, include a host, and
+contain no path, query, or fragment; secure proxy transport and proxy-URI
+credentials are not supported. Any selected invalid proxy fails closed with a
 credential-free schema-fetch error instead of attempting a direct connection.
 If a download still fails, the
 `DEDIREN_OEF_SCHEMA_UNAVAILABLE` / `DEDIREN_XMI_SCHEMA_UNAVAILABLE` diagnostic
