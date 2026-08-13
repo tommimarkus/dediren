@@ -37,17 +37,26 @@ Dediren implements a native Java subset based on the
 [Mermaid 11.16.1 flowchart grammar](https://github.com/mermaid-js/mermaid/blob/mermaid@11.16.1/packages/mermaid/src/diagrams/flowchart/parser/flow.jison).
 It accepts one `flowchart` or `graph` diagram with root
 directions `TB`/`TD`, `BT`, `LR`, or `RL`; common node shapes and Unicode
-labels; `-->` edges, labels, and chains; `%%` comments; semicolon-separated
-statements; and nested `subgraph` blocks. Output is a `model.schema.v1`
-generic-graph model with `generic.node` / `generic.link`, view `main`, the root
-direction, and layout-only groups for subgraphs.
+labels; solid directed `-->` and undirected `---` edges, labels, and chains;
+`%%` comments; semicolon-separated statements; and nested `subgraph` blocks.
+A node or edge chain may continue across physical lines, and a balanced quoted
+label may span lines; diagnostics still identify the original physical line
+and column. Inside node and edge labels only, case-insensitive `<br>`, `<br/>`,
+and `<br />` become newline characters. Output is a `model.schema.v1`
+generic-graph model with `generic.node`, `generic.link` for directed edges,
+`generic.edge` for undirected edges, view `main`, the root direction, and
+layout-only groups for subgraphs.
 
 Presentation-only shapes and `style`, `class`, `classDef`, `linkStyle`, and
 subgraph `direction` hints are discarded and summarized by one
 `DEDIREN_MERMAID_HINT_IGNORED` warning. Interactive `click`/`href`, external
-resources, HTML, image syntax, unsupported diagram families, ambiguous
-subgraphs, and non-solid or bidirectional edges fail atomically with exit 2;
-an error envelope contains no partial model.
+resources, every other HTML tag or tag spelling, image syntax, unsupported
+diagram families, ambiguous subgraphs, and non-solid or bidirectional edges
+fail atomically with exit 2; an error envelope contains no partial model. Bare
+structural or directive keywords are not node IDs; labels may still contain
+those words. Undirected edges also contribute one aggregated
+`DEDIREN_MERMAID_HINT_IGNORED` warning because the default shipped render
+policy does not suppress their arrowheads.
 
 IDs already legal under Dediren's
 `^[A-Za-z0-9][A-Za-z0-9._-]*$` contract are preserved and reserved first.
@@ -69,9 +78,11 @@ Dediren implements a native Java subset of the Graphviz DOT language (run with
 `dediren import --plugin dot`). It accepts `graph` or `digraph`, the `strict`
 keyword, node and edge statements, edge chains, quoted identifiers, `subgraph`
 blocks (including `cluster_`-prefixed ones), `graph`/`node`/`edge`
-default-attribute statements scoped to the subgraph that declares them, and
-`/* */`, `//`, and `#` comments. Output is a `model.schema.v1` generic-graph
-model.
+default-attribute statements scoped to the subgraph that declares them,
+comma-separated node declarations such as `a, b [shape=diamond]`, and `/* */`,
+`//`, and `#` comments. Active node defaults and explicit declaration
+attributes apply to every node in the list. Output is a `model.schema.v1`
+generic-graph model.
 
 Nodes become `generic.node`. Edges from a `digraph` become `generic.link`;
 edges from an undirected `graph` become `generic.edge`. An element's `label`
@@ -87,6 +98,11 @@ edges (`{a b} -> {c d}`), and the anonymous brace-only subgraph shorthand are
 not part of the supported subset. They are never silently dropped: each fails
 the import atomically with `DEDIREN_DOT_UNSUPPORTED_CONSTRUCT` so you can
 rewrite the input without them; no partial model is produced.
+
+The unquoted words `strict`, `graph`, `digraph`, `subgraph`, `node`, and `edge`
+are reserved wherever DOT requires an identifier, including graph/subgraph
+names, node and endpoint IDs, and attribute keys or values. Quote one of those
+words when it is intended as an ID; quoted forms are ordinary identifiers.
 
 IDs already legal under Dediren's `^[A-Za-z0-9][A-Za-z0-9._-]*$` contract are
 preserved. Other ids are normalized to that charset, and a collision after

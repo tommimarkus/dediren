@@ -144,4 +144,45 @@ class CliImportCommandTest {
     assertThat(Files.readString(out.resolve("main/diagram.svg")))
         .contains("<svg", "Client", "API", "Store");
   }
+
+  @Test
+  void compatibilityImportsPreserveSemanticsAndValidateThroughTheComposedCli() throws Exception {
+    CliResult mermaid =
+        Main.executeForTesting(
+            new String[] {"import", "--plugin", "mermaid"},
+            "flowchart LR\nA[\"one<br>two\"]\n --> B\nB ---|peer<br/>edge| C\n");
+    JsonNode mermaidEnvelope = JsonSupport.objectMapper().readTree(mermaid.stdout());
+
+    assertThat(mermaid.exitCode()).describedAs(mermaid.stdout()).isZero();
+    assertThat(mermaidEnvelope.at("/status").asText()).isEqualTo("warning");
+    assertThat(mermaidEnvelope.at("/data/nodes/0/label").asText()).isEqualTo("one\ntwo");
+    assertThat(mermaidEnvelope.at("/data/relationships/0/type").asText()).isEqualTo("generic.link");
+    assertThat(mermaidEnvelope.at("/data/relationships/1/type").asText()).isEqualTo("generic.edge");
+    assertThat(mermaidEnvelope.at("/data/relationships/1/label").asText()).isEqualTo("peer\nedge");
+    assertImportedDataValidates(mermaidEnvelope.get("data"), "compatibility-mermaid.json");
+
+    CliResult dot =
+        Main.executeForTesting(
+            new String[] {"import", "--plugin", "dot"},
+            "digraph G { rankdir=TB; node [color=red]; a, b [shape=diamond]; a -> b; }");
+    JsonNode dotEnvelope = JsonSupport.objectMapper().readTree(dot.stdout());
+
+    assertThat(dot.exitCode()).describedAs(dot.stdout()).isZero();
+    assertThat(dotEnvelope.at("/data/nodes")).hasSize(2);
+    assertThat(dotEnvelope.at("/data/nodes/0/properties/dot/attributes/color").asText())
+        .isEqualTo("red");
+    assertThat(dotEnvelope.at("/data/nodes/1/properties/dot/attributes/shape").asText())
+        .isEqualTo("diamond");
+    assertThat(dotEnvelope.at("/data/relationships/0/source").asText()).isEqualTo("a");
+    assertThat(dotEnvelope.at("/data/relationships/0/target").asText()).isEqualTo("b");
+    assertImportedDataValidates(dotEnvelope.get("data"), "compatibility-dot.json");
+  }
+
+  private void assertImportedDataValidates(JsonNode data, String fileName) throws Exception {
+    Path model = temp.resolve(fileName);
+    Files.writeString(model, JsonSupport.objectMapper().writeValueAsString(data));
+    CliResult validation =
+        Main.executeForTesting(new String[] {"validate", "--input", model.toString()}, "");
+    assertThat(validation.exitCode()).describedAs(validation.stdout()).isZero();
+  }
 }
