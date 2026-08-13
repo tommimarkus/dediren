@@ -271,8 +271,7 @@ class DedirenToolsEngineBackedTest {
 
     assertThat(bundledDefault.isError()).isNotEqualTo(Boolean.TRUE);
     assertThat(bundledDefault.content()).hasSize(2);
-    assertThat(decodedSvg(bundledDefault.content().get(1)))
-        .contains("<svg", "<title>main</title>");
+    assertThat(decodedSvg(bundledDefault.content().get(1))).contains("<svg", "<title>main</title>");
     assertThat(override.isError()).isNotEqualTo(Boolean.TRUE);
     assertThat(override.content()).hasSize(2);
     assertThat(decodedSvg(override.content().get(1))).contains("#0b1220");

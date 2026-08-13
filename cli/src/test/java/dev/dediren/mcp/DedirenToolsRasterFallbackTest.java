@@ -20,8 +20,8 @@ class DedirenToolsRasterFallbackTest {
   private static final String MERMAID = "flowchart TD\nstart[Start] --> finish[Finish]\n";
 
   @Test
-  void explicitPngFallsBackToTheExactJsonEnvelopeWhenConverterIsMissingOrFails(
-      @TempDir Path root) throws Exception {
+  void explicitPngFallsBackToTheExactJsonEnvelopeWhenConverterIsMissingOrFails(@TempDir Path root)
+      throws Exception {
     ResvgRasterizer missing =
         ResvgRasterizer.resolve("missing-resvg", Map.of("PATH", root.toString()));
     Path failingExecutable = executable(root.resolve("failing-resvg"), "#!/bin/sh\nexit 3\n");
