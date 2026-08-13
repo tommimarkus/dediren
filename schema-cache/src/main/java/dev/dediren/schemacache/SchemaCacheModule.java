@@ -1,19 +1,25 @@
 package dev.dediren.schemacache;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
 import java.net.URI;
+import java.net.InetSocketAddress;
+import java.net.Proxy;
+import java.net.ProxySelector;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,8 +35,9 @@ public final class SchemaCacheModule {
    */
   public static final String SCHEMA_CACHE_DIR_ENV = "DEDIREN_SCHEMA_CACHE_DIR";
 
-  /** The fetcher command both export lanes hand to {@link #curlFetcher}. */
-  public static final String SCHEMA_FETCHER = "curl";
+  private static final long MAX_SCHEMA_BYTES = 8L * 1024 * 1024;
+  static final java.time.Duration HTTP_CONNECT_TIMEOUT = java.time.Duration.ofSeconds(20);
+  static final java.time.Duration HTTP_REQUEST_TIMEOUT = java.time.Duration.ofSeconds(60);
 
   /**
    * The proxy half of the download remediation (issue #35), shared verbatim by both export engines;
@@ -204,63 +211,172 @@ public final class SchemaCacheModule {
     }
   }
 
-  static List<String> curlArgs(URI url, Path destination) {
-    return List.of(
-        // Forbid protocol downgrade when following redirects: only https is allowed for
-        // the initial request and every redirect hop (audit finding F2).
-        "--proto",
-        "=https",
-        "--location",
-        "--fail",
-        "--silent",
-        "--show-error",
-        // Bound the whole transfer like InJvmXmlValidator bounds its worker: a stalled
-        // download must degrade to a structured fetch failure, not hang the export lane.
-        "--max-time",
-        "60",
-        url.toString(),
-        "--output",
-        destination.toString());
+  public static SchemaFetcher httpFetcher(Map<String, String> env) {
+    String invalidProxyConfiguration = invalidProxyConfiguration(env);
+    if (invalidProxyConfiguration != null) {
+      return (url, destination) -> {
+        throw new SchemaCacheException(SchemaCacheException.Kind.FETCH, invalidProxyConfiguration);
+      };
+    }
+    return httpFetcher(httpTransport(httpClient(env)));
   }
 
-  public static SchemaFetcher curlFetcher(String command) {
+  static SchemaFetcher httpFetcher(HttpTransport transport) {
     return (url, destination) -> {
-      List<String> fullCommand = new ArrayList<>();
-      fullCommand.add(command);
-      fullCommand.addAll(curlArgs(url, destination));
-      Process process = new ProcessBuilder(fullCommand).start();
-      // Both pipes are drained concurrently: a verbose fetch failure that fills the ~64 KiB stderr
-      // pipe would otherwise block the child in write(2) forever while this thread waited on a
-      // stdout EOF that can never arrive.
-      StreamDrain stdout = StreamDrain.start(process.getInputStream());
-      StreamDrain stderr = StreamDrain.start(process.getErrorStream());
-      // The child owns the transfer budget (--max-time 60); this bounded wait is the Java-side
-      // backstop for a fetcher binary that ignores or lacks that flag, so a hung child degrades to
-      // a structured fetch failure instead of blocking the export lane forever. On interrupt the
-      // child is killed and the flag restored, so cancellation propagates instead of being wrapped
-      // away as a download failure with a still-running child.
-      boolean finished;
-      try {
-        finished = process.waitFor(75, TimeUnit.SECONDS);
-      } catch (InterruptedException interrupted) {
-        process.destroyForcibly();
-        Thread.currentThread().interrupt();
-        throw interrupted;
+      requireHttps(url);
+      HttpTransport.Response response = transport.fetch(url);
+      try (InputStream body = response.body()) {
+        if (response.statusCode() < HttpURLConnection.HTTP_OK
+            || response.statusCode() >= HttpURLConnection.HTTP_MULT_CHOICE) {
+          return new SchemaFetchResult(
+              false,
+              "HTTP",
+              response.statusCode(),
+              new byte[0],
+              ("HTTP status " + response.statusCode()).getBytes(StandardCharsets.UTF_8));
+        }
+        copyBounded(body, destination);
+        return SchemaFetchResult.success();
       }
-      if (!finished) {
-        process.destroyForcibly();
-        return new SchemaFetchResult(
-            false,
-            command,
-            -1,
-            stdout.await(),
-            "download did not complete within 75s; the fetcher process was killed"
-                .getBytes(StandardCharsets.UTF_8));
-      }
-      int exitCode = process.exitValue();
-      return new SchemaFetchResult(
-          exitCode == 0, command, exitCode, stdout.await(), stderr.await());
     };
+  }
+
+  static HttpClient httpClient(Map<String, String> env) {
+    return HttpClient.newBuilder()
+        .connectTimeout(HTTP_CONNECT_TIMEOUT)
+        // NORMAL refuses HTTPS-to-HTTP redirects. The response URI is checked again below so a
+        // transport implementation cannot turn a redirect chain into a downgrade.
+        .followRedirects(HttpClient.Redirect.NORMAL)
+        .proxy(proxySelector(env))
+        .build();
+  }
+
+  static ProxySelector proxySelector(Map<String, String> env) {
+    String noProxy = proxyEnvironmentValue(env, "NO_PROXY");
+    String proxy = firstProxyValue(env);
+    if (proxy == null || proxy.isEmpty()) {
+      return new ConfiguredProxySelector(null, noProxy, null);
+    }
+    try {
+      URI proxyUri = URI.create(proxy);
+      if (!("http".equalsIgnoreCase(proxyUri.getScheme())
+              || "https".equalsIgnoreCase(proxyUri.getScheme()))
+          || proxyUri.getHost() == null
+          || proxyUri.getPort() < -1
+          || proxyUri.getRawPath() != null && !proxyUri.getRawPath().isEmpty()
+          || proxyUri.getRawQuery() != null
+          || proxyUri.getRawFragment() != null) {
+        throw new IllegalArgumentException();
+      }
+      int port = proxyUri.getPort();
+      if (port == -1) {
+        port = "https".equalsIgnoreCase(proxyUri.getScheme()) ? 443 : 80;
+      }
+      return new ConfiguredProxySelector(
+          new Proxy(Proxy.Type.HTTP, InetSocketAddress.createUnresolved(proxyUri.getHost(), port)),
+          noProxy,
+          null);
+    } catch (IllegalArgumentException error) {
+      return new ConfiguredProxySelector(null, noProxy, "invalid configured schema proxy");
+    }
+  }
+
+  private static String invalidProxyConfiguration(Map<String, String> env) {
+    return ((ConfiguredProxySelector) proxySelector(env)).invalidConfiguration;
+  }
+
+  private static HttpTransport httpTransport(HttpClient client) {
+    return url -> {
+      requireHttps(url);
+      HttpRequest request =
+          HttpRequest.newBuilder(url).GET().timeout(HTTP_REQUEST_TIMEOUT).build();
+      HttpResponse<InputStream> response =
+          client.send(request, HttpResponse.BodyHandlers.ofInputStream());
+      requireHttps(response.uri());
+      return new HttpTransport.Response(response.statusCode(), response.body());
+    };
+  }
+
+  private static void requireHttps(URI url) throws SchemaCacheException {
+    if (!"https".equalsIgnoreCase(url.getScheme())) {
+      throw new SchemaCacheException(
+          SchemaCacheException.Kind.FETCH, "schema downloads and redirects must use https");
+    }
+  }
+
+  private static void copyBounded(InputStream input, Path destination)
+      throws IOException, SchemaCacheException {
+    long total = 0;
+    byte[] buffer = new byte[8192];
+    try (var output = Files.newOutputStream(destination)) {
+      for (int count; (count = input.read(buffer)) != -1; ) {
+        total += count;
+        if (total > MAX_SCHEMA_BYTES) {
+          throw new SchemaCacheException(
+              SchemaCacheException.Kind.FETCH, "downloaded schema exceeds the 8 MiB limit");
+        }
+        output.write(buffer, 0, count);
+      }
+    }
+  }
+
+  private static String firstProxyValue(Map<String, String> env) {
+    for (String name : List.of("HTTPS_PROXY", "HTTP_PROXY", "ALL_PROXY")) {
+      String value = proxyEnvironmentValue(env, name);
+      if (value != null && !value.isEmpty()) {
+        return value;
+      }
+    }
+    return null;
+  }
+
+  private static String proxyEnvironmentValue(Map<String, String> env, String uppercaseName) {
+    String lowercaseName = uppercaseName.toLowerCase(java.util.Locale.ROOT);
+    return env.containsKey(lowercaseName) ? env.get(lowercaseName) : env.get(uppercaseName);
+  }
+
+  private static final class ConfiguredProxySelector extends ProxySelector {
+    private final Proxy proxy;
+    private final List<String> noProxyHosts;
+    private final String invalidConfiguration;
+
+    ConfiguredProxySelector(Proxy proxy, String noProxy, String invalidConfiguration) {
+      this.proxy = proxy;
+      this.noProxyHosts =
+          noProxy == null || noProxy.isEmpty() ? List.of() : List.of(noProxy.split(","));
+      this.invalidConfiguration = invalidConfiguration;
+    }
+
+    @Override
+    public List<Proxy> select(URI uri) {
+      if (invalidConfiguration != null) {
+        throw new IllegalArgumentException(invalidConfiguration);
+      }
+      if (proxy == null || bypassesProxy(uri.getHost())) {
+        return List.of(Proxy.NO_PROXY);
+      }
+      return List.of(proxy);
+    }
+
+    @Override
+    public void connectFailed(URI uri, java.net.SocketAddress address, IOException failure) {
+      // Schema cache proxy failures are represented by the export's structured fetch diagnostic.
+    }
+
+    private boolean bypassesProxy(String host) {
+      if (host == null) {
+        return false;
+      }
+      String normalizedHost = host.toLowerCase(java.util.Locale.ROOT);
+      return noProxyHosts.stream()
+          .map(String::trim)
+          .anyMatch(
+              entry ->
+                  "*".equals(entry)
+                      || normalizedHost.equalsIgnoreCase(entry)
+                      || (entry.startsWith(".")
+                          && normalizedHost.endsWith(entry.toLowerCase(java.util.Locale.ROOT))));
+    }
   }
 
   private static boolean fileMatchesSha256(Path path, String expectedSha256) {

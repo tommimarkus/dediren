@@ -103,7 +103,30 @@ class HttpSchemaFetcherTest {
   @Test
   void httpClientHasTwentySecondConnectTimeout() {
     assertThat(SchemaCacheModule.httpClient(Map.of()).connectTimeout())
-        .contains(Duration.ofSeconds(20));
+        .contains(SchemaCacheModule.HTTP_CONNECT_TIMEOUT);
+  }
+
+  @Test
+  void schemaRequestsHaveASixtySecondTimeout() {
+    assertThat(SchemaCacheModule.HTTP_REQUEST_TIMEOUT).isEqualTo(Duration.ofSeconds(60));
+  }
+
+  @Test
+  void httpClientUsesNormalRedirectsToRejectHttpsDowngrades() {
+    assertThat(SchemaCacheModule.httpClient(Map.of()).followRedirects())
+        .isEqualTo(java.net.http.HttpClient.Redirect.NORMAL);
+  }
+
+  @Test
+  void nonSuccessfulHttpStatusBecomesAStructuredFetchFailure() throws Exception {
+    SchemaFetchResult result =
+        SchemaCacheModule.httpFetcher(
+                url -> new HttpTransport.Response(503, InputStream.nullInputStream()))
+            .fetch(URI.create("https://schemas.example.test/schema.xsd"), tempDir.resolve("schema.xsd"));
+
+    assertThat(result.succeeded()).isFalse();
+    assertThat(result.exitCode()).isEqualTo(503);
+    assertThat(new String(result.stderr(), UTF_8)).isEqualTo("HTTP status 503");
   }
 
   @Test
