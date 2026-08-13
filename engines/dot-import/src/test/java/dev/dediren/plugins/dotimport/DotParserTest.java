@@ -181,6 +181,86 @@ class DotParserTest {
   }
 
   @Test
+  void rejectsUnquotedReservedWordsCaseInsensitivelyInEveryIdentifierPosition() {
+    for (String reserved : List.of("strict", "graph", "digraph", "subgraph", "node", "edge")) {
+      String mixedCase = reserved.substring(0, 1).toUpperCase() + reserved.substring(1);
+      assertRejectedCode("digraph " + mixedCase + " { a; }", "DEDIREN_DOT_SYNTAX_INVALID");
+      assertRejectedCode("digraph G { " + mixedCase + "; }", "DEDIREN_DOT_SYNTAX_INVALID");
+      assertRejectedCode("digraph G { a -> " + mixedCase + "; }", "DEDIREN_DOT_SYNTAX_INVALID");
+      assertRejectedCode(
+          "digraph G { a [" + mixedCase + "=value]; }", "DEDIREN_DOT_SYNTAX_INVALID");
+      assertRejectedCode("digraph G { a [key=" + mixedCase + "]; }", "DEDIREN_DOT_SYNTAX_INVALID");
+      assertRejectedCode("digraph G { " + mixedCase + "=value; }", "DEDIREN_DOT_SYNTAX_INVALID");
+      assertRejectedCode("digraph G { key=" + mixedCase + "; }", "DEDIREN_DOT_SYNTAX_INVALID");
+      assertRejectedCode(
+          "digraph G { subgraph " + mixedCase + " { a; } }", "DEDIREN_DOT_SYNTAX_INVALID");
+    }
+  }
+
+  @Test
+  void acceptsQuotedReservedWordsInEveryIdentifierPosition() throws Exception {
+    DotDocument document =
+        DotParser.parse(
+            "digraph \"graph\" { \"node\", \"edge\" [\"subgraph\"=\"strict\"]; "
+                + "\"node\" -> \"digraph\"; \"node\"=\"edge\"; "
+                + "subgraph \"graph\" { \"edge\"; } }");
+
+    assertThat(document.id()).isEqualTo("graph");
+    assertThat(nodeStatements(document.statements()))
+        .extracting(DotNodeStatement::id)
+        .containsExactly("node", "edge");
+    assertThat(nodeStatements(document.statements()).get(0).attributes())
+        .containsEntry("subgraph", "strict");
+    assertThat(edgeStatements(document.statements()).get(0).endpoints())
+        .containsExactly("node", "digraph");
+    assertThat(document.attributes()).containsEntry("node", "edge");
+    assertThat(subgraphStatements(document.statements()).get(0).id()).isEqualTo("graph");
+  }
+
+  @Test
+  void expandsCommaSeparatedNodeDeclarationsInOrderWithDefaultsAndExplicitAttributes()
+      throws Exception {
+    DotDocument document =
+        DotParser.parse("digraph G { node [color=blue]; a, b [shape=diamond]; c, d; }");
+
+    List<DotNodeStatement> nodes = nodeStatements(document.statements());
+    assertThat(nodes).extracting(DotNodeStatement::id).containsExactly("a", "b", "c", "d");
+    assertThat(nodes.get(0).attributes())
+        .containsEntry("color", "blue")
+        .containsEntry("shape", "diamond");
+    assertThat(nodes.get(1).attributes())
+        .containsEntry("color", "blue")
+        .containsEntry("shape", "diamond");
+    assertThat(nodes.get(2).attributes()).containsEntry("color", "blue").doesNotContainKey("shape");
+    assertThat(nodes.get(3).attributes()).containsEntry("color", "blue").doesNotContainKey("shape");
+  }
+
+  @Test
+  void commaSeparatedNodesRemainDirectMembersOfTheirContainingSubgraph() throws Exception {
+    DotDocument document =
+        DotParser.parse("digraph G { subgraph cluster_x { a, b [shape=box]; } }");
+
+    assertThat(nodeStatements(subgraphStatements(document.statements()).get(0).statements()))
+        .extracting(DotNodeStatement::id)
+        .containsExactly("a", "b");
+  }
+
+  @Test
+  void reportsHtmlLikeLabelsAfterSphinxStyleCommaDeclarationsAtTheHtmlValue() {
+    assertRejectedText(
+        "digraph G { a, b [label=<TABLE><TR><TD>x</TD></TR></TABLE>]; }",
+        "DEDIREN_DOT_UNSUPPORTED_CONSTRUCT",
+        1,
+        25);
+  }
+
+  @Test
+  void countsEveryNodeInACommaSeparatedDeclarationAgainstTheElementCeiling() throws Exception {
+    assertThat(DotParser.parse(dotWithCommaSeparatedNodes(100_000))).isNotNull();
+    assertLimit(dotWithCommaSeparatedNodes(100_001), "DEDIREN_DOT_ELEMENT_LIMIT_EXCEEDED");
+  }
+
+  @Test
   void acceptsBoundaryLimitsAndRejectsTheFirstValueAboveEachLimit() throws Exception {
     assertThat(DotParser.parse(dotWithStatements(199_999))).isNotNull();
     assertThat(DotParser.parse(dotWithStatements(200_000))).isNotNull();
@@ -250,6 +330,17 @@ class DotParserTest {
 
   private static String dotWithEdges(int count) {
     return "digraph G{" + "a->b;".repeat(count) + "}";
+  }
+
+  private static String dotWithCommaSeparatedNodes(int count) {
+    StringBuilder source = new StringBuilder("digraph G{");
+    for (int index = 0; index < count; index++) {
+      if (index > 0) {
+        source.append(',');
+      }
+      source.append('n').append(index);
+    }
+    return source.append(";}").toString();
   }
 
   /** One statement, {@code hops} edges, and only two distinct node ids. */

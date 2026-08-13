@@ -82,6 +82,24 @@ class DotImportEngineTest {
   }
 
   @Test
+  void mapsCommaSeparatedNodesInDeclarationOrderAndMergesLaterMentions() throws Exception {
+    JsonNode model =
+        model(
+            "digraph { node [color=red]; a, b [shape=diamond]; "
+                + "a [color=blue]; subgraph cluster_group { c, d; } }");
+
+    List<String> ids = new ArrayList<>();
+    model.path("nodes").forEach(node -> ids.add(node.path("id").asText()));
+    assertThat(ids).containsExactly("a", "b", "c", "d");
+    assertThat(model.at("/nodes/0/properties/dot/attributes/color").asText()).isEqualTo("blue");
+    assertThat(model.at("/nodes/0/properties/dot/attributes/shape").asText()).isEqualTo("diamond");
+    assertThat(model.at("/nodes/1/properties/dot/attributes/color").asText()).isEqualTo("red");
+    assertThat(model.at("/nodes/1/properties/dot/attributes/shape").asText()).isEqualTo("diamond");
+    assertThat(textValues(model.at("/plugins/generic-graph/views/0/groups/0/members")))
+        .containsExactly("c", "d");
+  }
+
+  @Test
   void mapsRankdirToLayoutPreferencesDirection() throws Exception {
     assertThat(
             model(fixture("valid-rankdir.dot"))

@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.code_intelligence.jazzer.junit.FuzzTest;
 import dev.dediren.engine.EngineException;
 import java.nio.charset.StandardCharsets;
+import org.junit.jupiter.api.Test;
 
 /**
  * Fuzz-regression target: whatever bytes the lexer/parser see, they either produce a document or
@@ -33,6 +34,19 @@ class DotParserFuzzTest {
       assertThat(rejected.exitCode()).isEqualTo(2);
       assertThat(rejected.diagnostics()).hasSize(1);
       assertThat(rejected.diagnostics().get(0).code()).startsWith("DEDIREN_DOT_");
+    }
+  }
+
+  @Test
+  void compatibilityRegressionSeedsEitherParseOrFailAtomically() throws Exception {
+    for (String source :
+        new String[] {
+          "digraph G { a, b [shape=diamond]; }",
+          "digraph G { a, b [label=<TABLE><TR><TD>x</TD></TR></TABLE>]; }",
+          "digraph G { a, subgraph; }",
+          "digraph \"graph\" { \"node\", \"edge\"; }"
+        }) {
+      arbitraryBoundedBytesEitherParseOrFailAtomically(source.getBytes(StandardCharsets.UTF_8));
     }
   }
 }

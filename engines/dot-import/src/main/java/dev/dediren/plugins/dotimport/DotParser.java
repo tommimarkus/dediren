@@ -66,7 +66,7 @@ final class DotParser {
 
     String graphId = null;
     if (peek().type() == DotTokenType.ID) {
-      graphId = advance().text();
+      graphId = expectId("expected a graph identifier").text();
     }
 
     expect(DotTokenType.LBRACE, "expected '{'");
@@ -122,8 +122,29 @@ final class DotParser {
       return;
     }
 
-    String nodeId = idToken.text();
+    List<DotToken> nodeIds = new ArrayList<>();
+    nodeIds.add(idToken);
     rejectPort();
+    while (peek().type() == DotTokenType.COMMA) {
+      advance();
+      DotToken nodeId = expectId("expected a node identifier after ','");
+      nodeIds.add(nodeId);
+      rejectPort();
+    }
+
+    if (nodeIds.size() > 1) {
+      Map<String, String> explicit =
+          peek().type() == DotTokenType.LBRACKET ? parseAttrList() : Map.of();
+      Map<String, String> resolved = merge(scope.nodeDefaults, explicit);
+      for (DotToken nodeId : nodeIds) {
+        out.add(new DotNodeStatement(nodeId.text(), resolved, nodeId.location()));
+        countStatement();
+        countNodeIfNew(nodeId.text());
+      }
+      return;
+    }
+
+    String nodeId = idToken.text();
 
     if (peek().type() == DotTokenType.LBRACKET) {
       Map<String, String> explicit = parseAttrList();
@@ -158,7 +179,8 @@ final class DotParser {
               endpointToken.line(),
               endpointToken.column());
         }
-        if (endpointToken.isKeyword("subgraph")) {
+        if (endpointToken.isKeyword("subgraph")
+            && (peekAt(1).type() == DotTokenType.ID || peekAt(1).type() == DotTokenType.LBRACE)) {
           throw DotLimits.unsupported(
               "a subgraph as an edge endpoint is not supported",
               endpointToken.line(),
@@ -199,7 +221,7 @@ final class DotParser {
     DotToken keyword = advance(); // 'subgraph'
     String id = null;
     if (peek().type() == DotTokenType.ID) {
-      id = advance().text();
+      id = expectId("expected a subgraph identifier").text();
     }
     if (depth >= DotLimits.MAX_NESTING) {
       throw DotLimits.limit(
@@ -272,7 +294,22 @@ final class DotParser {
     if (token.type() != DotTokenType.ID) {
       throw DotLimits.syntax(message, token.line(), token.column());
     }
+    if (isReservedIdentifier(token)) {
+      throw DotLimits.syntax(
+          "reserved word '" + token.text() + "' cannot be used as an identifier",
+          token.line(),
+          token.column());
+    }
     return advance();
+  }
+
+  private static boolean isReservedIdentifier(DotToken token) {
+    return token.isKeyword("strict")
+        || token.isKeyword("graph")
+        || token.isKeyword("digraph")
+        || token.isKeyword("subgraph")
+        || token.isKeyword("node")
+        || token.isKeyword("edge");
   }
 
   private void expect(DotTokenType type, String message) throws EngineException {
