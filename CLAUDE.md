@@ -124,9 +124,12 @@ enforcement authority for how wide a change may reach.
 - First-party engines are library modules behind `engine-api`. Engines never
   depend on `core`; `core` never depends on engine implementations; only the
   `cli` `EngineWiring` class constructs them.
-- `mcp-server` adapts the CLI's command surface to MCP stdio (`dediren mcp`).
-  Its allowed edges are `contracts`, `core`, `engine-api` only (ArchUnit-pinned);
-  tool results carry the same envelopes the CLI prints.
+- `mcp-server` adapts the CLI's command surface to MCP stdio (`dediren mcp`) and
+  owns protocol-specific media adaptation, including optional bounded SVG-to-PNG
+  response attachments. Its allowed edges are `contracts`, `core`, `engine-api`
+  only (ArchUnit-pinned); tool results keep the same envelopes the CLI prints as
+  their primary text content. Core retains orchestration and does not negotiate
+  MCP media or rasterize output.
 - Do not duplicate layout or routing features already provided by ELK. Express
   layout intent through ELK graph structure, ports, hierarchy, and options,
   then let ELK compute geometry and routes.
@@ -276,14 +279,16 @@ enforcement authority for matching version, tag, and release actions.
   `DEDIREN_PLUGIN_UNKNOWN`; an id bound only under another capability yields
   `DEDIREN_PLUGIN_UNSUPPORTED_CAPABILITY`. An unexpected in-memory engine
   failure is `DEDIREN_ENGINE_FAILED`.
-- A missing runtime dependency is reported by the engine that owns the
-  dependency, as a structured error envelope core preserves (for example an
+- An engine-side resource failure is reported by the engine that owns the
+  resource, as a structured error envelope core preserves (for example an
   export engine emits `DEDIREN_OEF_SCHEMA_UNAVAILABLE` /
-  `DEDIREN_XMI_SCHEMA_UNAVAILABLE` when its schema must be fetched and `curl`
-  is absent; both export lanes validate in-JVM with no external validator).
+  `DEDIREN_XMI_SCHEMA_UNAVAILABLE` when its pinned schema cannot be fetched or
+  loaded; both export lanes fetch with the Java HTTP client and validate in-JVM
+  with no external fetcher or validator).
 - There is no engine discovery of any kind: no `PATH` lookup, no manifest
   directories, no executable overrides. The bundled set is constructed
-  explicitly in `cli` `EngineWiring`.
+  explicitly in `cli` `EngineWiring`. The optional `mcp-server` `resvg`
+  executable is protocol media adaptation, not an engine or render dependency.
 - Keep stderr for human debugging only.
 - Log through SLF4J at `debug`/`trace` only. `Logger.info`/`warn`/`error` are
   banned in first-party code and `ArchitectureRulesTest` fails the build on

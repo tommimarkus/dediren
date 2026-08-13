@@ -61,11 +61,16 @@ provenance (pinned SHA-256-verified download vs user-supplied path). UML/XMI
 also publishes the stable machine contract in `.data.assurance`; diagnostics
 remain the human-readable provenance companion. Schema sources:
 
-- **Online:** `curl` fetches schemas into a cache; set
-  `DEDIREN_SCHEMA_CACHE_DIR` for a stable cache location. Behind a proxy, set
-  `HTTP_PROXY`, `HTTPS_PROXY`, and `NO_PROXY` (or their lowercase forms) before
-  invoking `dediren`: `curl` runs as a subprocess of the CLI process and
-  inherits them directly, no plugin-specific forwarding involved.
+- **Online:** Java's `HttpClient` fetches schemas into a cache; set
+  `DEDIREN_SCHEMA_CACHE_DIR` for a stable cache location. Requests require
+  HTTPS before and after redirects, use a 20-second connect timeout and
+  60-second request timeout, and reject a response body above 8 MiB before it
+  replaces a cache entry. Behind a proxy, precedence is `HTTPS_PROXY`, then
+  `HTTP_PROXY`, then `ALL_PROXY`; lowercase wins within each name, and
+  `NO_PROXY` supports exact hosts, leading-dot suffixes, and `*`. A selected
+  proxy URI must use `http` or `https`, include a host, and contain no
+  path/query/fragment; invalid configuration fails closed rather than silently
+  downloading directly.
 - **Offline:** provide local schema files with `DEDIREN_OEF_SCHEMA_DIR` (OEF
   directory) and `DEDIREN_XMI_SCHEMA_PATH` (XMI schema file).
 
