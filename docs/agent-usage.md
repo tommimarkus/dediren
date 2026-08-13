@@ -137,10 +137,14 @@ Eight tools in writable mode:
 
 - `dediren_guide` — this document, one section at a time. Pass `topic`, or omit
   it to list the topics. Start with `topic: "source-json"`.
-- `dediren_import` — `source` (a Mermaid file path) and `plugin: "mermaid"`.
-  Returns the imported model envelope without writing files. The source path
-  is confined to `--root`, and this tool remains available under
-  `--read-only`.
+- `dediren_import` — pass exactly one of `source` (a confined file path) or
+  inline `content`, with `plugin: "mermaid"` or `"dot"`. Select
+  `output: "data"` (default) or `"svg"`; SVG falls back to the bundled
+  `fixtures/render-policy/default-svg.json` unless `render_policy` is given,
+  while source SVG requires an explicit policy. Prompt-first examples are
+  `content: "flowchart LR\n  a --> b"` and `content: "digraph { a -> b }"`.
+  Returns the envelope without writing files and remains available under
+  `--read-only`; inline input has the same 64 MiB and parser ceilings above.
 - `dediren_validate` — `source` (path to a source model **or a policy
   document**: the schema-version field selects the family, so a render/export
   policy or kept layout-request gets its version gate + JSON Schema check
@@ -166,7 +170,9 @@ Eight tools in writable mode:
   build-result envelope, which names every artifact written. To build a whole
   **package** instead, pass `package` (a `package.json` path) — mutually
   exclusive with `source`/`out`/the policies — plus optional `no_export`; the
-  result is a `package-build-result` naming every artifact at its declared path
+  Both source and package builds accept `output: "data"` (default) or
+  `output: "svg"`; source SVG requires `render_policy`, while package SVG
+  uses its declared policies. The result is a `package-build-result` naming every artifact at its declared path
   (see `## Build`). Source, package, policy, and source-mode `out` paths are
   relative to `--root`; package-declared outputs are relative to the package
   directory. This removes the 2026.08.3 workspace-handle requirement and
@@ -200,6 +206,12 @@ withhold the artifact-writing `dediren_build`; the seven read-only tools
 
 Tool results carry the same envelope JSON the CLI prints on stdout, so the
 handoff rules in `## Command Handoff` apply unchanged.
+
+For inline SVG, JSON `TextContent` is always first, followed by base64
+`image/svg+xml` images in selected-view order. Partial builds may include
+successful images while retaining `isError`; invalid input, policy, layout, or
+render failures return JSON only. Decoded inline images share a cumulative
+64 MiB limit. Actual inline display depends on MCP client support.
 
 ## Artifact Map
 

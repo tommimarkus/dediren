@@ -125,6 +125,12 @@ schema validation itself runs in-JVM on both lanes with no subprocess.
 `DEDIREN_OEF_SCHEMA_DIR` / `DEDIREN_XMI_SCHEMA_PATH` offline overrides remove
 the outbound fetch.
 
+Prompt-supplied Mermaid/DOT `content` is attacker-controlled text and uses the
+same bounded reads and parser ceilings as file input. Inline SVG responses are
+base64-expanded in memory and share a cumulative 64 MiB decoded-image limit;
+invalid input, policy, layout, or render failures remain JSON-only. Clients may
+not support displaying `image/svg+xml`, so inline display is not guaranteed.
+
 Controls:
 
 - **Server-root confinement.** Every tool path argument is resolved against the
@@ -141,6 +147,9 @@ Controls:
   exist, the nearest existing ancestor is resolved instead (the walk does not
   follow symlinks). An escaping path yields a
   `DEDIREN_MCP_PATH_OUTSIDE_ROOT` error envelope. Pinned by `WorkspacePathsTest`.
+  Core-reported artifact paths are treated as untrusted data and re-confined to
+  the server root (or package root for package outputs) before follow-up reads
+  or image encoding; bounded reads still apply.
   The confinement also covers the *second* class of model-supplied paths: a source
   document's `fragments[]` entries. The MCP handlers pass `--root` as an optional
   confinement root into core's source loader (`SourceValidator`), which applies the
