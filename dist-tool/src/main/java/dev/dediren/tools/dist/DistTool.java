@@ -14,6 +14,7 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.PosixFilePermission;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -1345,7 +1346,7 @@ public final class DistTool {
         {"jsonrpc":"2.0","method":"notifications/initialized"}
         {"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}
         {"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"dediren_guide","arguments":{"topic":"source-json"}}}
-        {"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"dediren_build","arguments":{"source":"fixtures/source/valid-archimate-oef.json","out":"mcp-build-out","render_policy":"fixtures/render-policy/archimate-svg.json"}}}
+        {"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"dediren_build","arguments":{"source":"fixtures/source/valid-archimate-oef.json","out":"mcp-build-out","render_policy":"fixtures/render-policy/archimate-svg.json","output":"svg"}}}
         {"jsonrpc":"2.0","id":5,"method":"resources/list","params":{}}
         {"jsonrpc":"2.0","id":6,"method":"resources/read","params":{"uri":"dediren://schema/model.schema.json"}}
         {"jsonrpc":"2.0","id":7,"method":"resources/read","params":{"uri":"dediren://diagnostics/catalog"}}
@@ -1442,6 +1443,17 @@ public final class DistTool {
     Path svg = bundle.resolve("mcp-build-out").resolve(artifact.path("path").asText());
     if (!Files.isRegularFile(svg)) {
       throw new IllegalStateException("mcp dediren_build must actually write its render: " + svg);
+    }
+    JsonNode image = build.path("result").path("content").path(1);
+    if (!"image".equals(image.path("type").asText())
+        || !"image/svg+xml".equals(image.path("mimeType").asText())) {
+      throw new IllegalStateException("mcp dediren_build must return SVG as image content: " + build);
+    }
+    String decoded =
+        new String(
+            Base64.getDecoder().decode(image.path("data").asText()), StandardCharsets.UTF_8);
+    if (!decoded.stripLeading().contains("<svg")) {
+      throw new IllegalStateException("mcp dediren_build image content must decode to SVG: " + image);
     }
   }
 

@@ -11,15 +11,30 @@ final class ToolSchemas {
         "properties": {
           "source": {
             "type": "string",
-            "description": "Path to a Mermaid flowchart, relative to the workspace root."
+            "description": "Path to external notation, relative to the workspace root. Mutually exclusive with content."
+          },
+          "content": {
+            "type": "string",
+            "description": "Inline external notation. Mutually exclusive with source; maximum UTF-8 size is 64 MiB."
           },
           "plugin": {
             "type": "string",
-            "enum": ["mermaid"],
-            "description": "External notation importer. Version 1 supports Mermaid flowcharts."
+            "enum": ["mermaid", "dot"],
+            "description": "External notation importer."
+          },
+          "output": {
+            "type": "string",
+            "enum": ["data", "svg"],
+            "default": "data",
+            "description": "data returns the imported model envelope only; svg also renders main as image/svg+xml."
+          },
+          "render_policy": {
+            "type": "string",
+            "description": "Optional workspace-confined render policy for output svg. Omit to use the bundled default SVG policy."
           }
         },
-        "required": ["source", "plugin"]
+        "required": ["plugin"],
+        "oneOf": [{"required": ["source"]}, {"required": ["content"]}]
       }
       """;
 
@@ -53,6 +68,12 @@ final class ToolSchemas {
           "out": {
             "type": "string",
             "description": "Output directory for the generated artifacts, relative to the workspace root."
+          },
+          "output": {
+            "type": "string",
+            "enum": ["data", "svg"],
+            "default": "data",
+            "description": "data returns the existing build result only; svg also returns each successful SVG as image/svg+xml."
           },
           "views": {
             "type": "array",

@@ -55,9 +55,10 @@ public final class DedirenMcpServer {
                 Tool.builder()
                     .name("dediren_import")
                     .description(
-                        "Import a workspace-confined Mermaid flowchart into model.schema.v1"
-                            + " generic-graph source JSON. Read-only: returns the model in the"
-                            + " standard envelope and writes no files.")
+                        "Import workspace-confined or inline Mermaid/DOT notation into"
+                            + " model.schema.v1 generic-graph source JSON. output 'data'"
+                            + " returns the standard envelope; output 'svg' also renders main"
+                            + " as image/svg+xml. Read-only and writes no files.")
                     .inputSchema(mapper, ToolSchemas.IMPORT)
                     .build(),
                 (exchange, request) -> tools.importSource(request))
@@ -135,7 +136,9 @@ public final class DedirenMcpServer {
                   .name("dediren_build")
                   .description(
                       "Compile a Dediren source model into artifacts (SVG render, ArchiMate OEF,"
-                          + " and/or UML XMI) under an output directory. Select a lane by passing"
+                          + " and/or UML XMI) under an output directory. output 'svg' also"
+                          + " returns successful rendered SVG artifacts as image/svg+xml. Select"
+                          + " a lane by passing"
                           + " its policy: render_policy, oef_policy, xmi_policy. Returns the"
                           + " build-result envelope, which names every artifact written. A"
                           + " DEDIREN_SCHEMA_VERSION_OUTDATED error means a source or policy file"

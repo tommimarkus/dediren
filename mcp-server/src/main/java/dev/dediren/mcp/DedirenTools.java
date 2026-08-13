@@ -5,6 +5,7 @@ import dev.dediren.contracts.Diagnostic;
 import dev.dediren.contracts.DiagnosticCode;
 import dev.dediren.contracts.DiagnosticSeverity;
 import dev.dediren.contracts.json.JsonSupport;
+import dev.dediren.core.DedirenPaths;
 import dev.dediren.core.ProductRootException;
 import dev.dediren.core.commands.AnalysisCommands;
 import dev.dediren.core.commands.BuildCommand;
@@ -13,22 +14,27 @@ import dev.dediren.core.commands.CoreCommands;
 import dev.dediren.core.engine.EngineExecutionException;
 import dev.dediren.core.engine.EngineRunOutcome;
 import dev.dediren.core.io.BoundedReads;
+import dev.dediren.core.io.ConfinedPaths;
 import dev.dediren.core.pkg.PackageBuildCommand;
 import dev.dediren.core.pkg.PackageBuildRequest;
 import dev.dediren.core.source.SourceLimits;
 import dev.dediren.engine.Engines;
 import io.modelcontextprotocol.spec.McpSchema.CallToolRequest;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
+import io.modelcontextprotocol.spec.McpSchema.ImageContent;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
+import tools.jackson.databind.JsonNode;
 
 /**
  * The tool handlers, one per registered MCP tool: import, guide, validate, diff, query, verify,
@@ -60,30 +66,90 @@ public final class DedirenTools {
 
   public CallToolResult importSource(CallToolRequest request) {
     String source = stringArg(request, "source");
-    if (source == null) {
-      return error(DiagnosticCode.COMMAND_INPUT_INVALID, "import requires 'source'", null);
+    String content = stringArg(request, "content");
+    if ((source == null) == (content == null)) {
+      return error(
+          DiagnosticCode.COMMAND_INPUT_INVALID,
+          "import requires exactly one of 'source' or 'content'",
+          null);
     }
     String plugin = stringArg(request, "plugin");
     if (plugin == null) {
       return error(DiagnosticCode.COMMAND_INPUT_INVALID, "import requires 'plugin'", null);
     }
-    Path sourcePath;
-    try {
-      sourcePath = WorkspacePaths.resolveExisting(root, source);
-    } catch (PathOutsideRootException escape) {
-      return pathEscape(escape);
+    if (!"mermaid".equals(plugin) && !"dot".equals(plugin)) {
+      return error(
+          DiagnosticCode.COMMAND_INPUT_INVALID,
+          "'plugin' must be 'mermaid' or 'dot'",
+          "plugin");
     }
     String text;
-    try {
-      text = readBounded(sourcePath);
-    } catch (IOException error) {
-      return readFailure("source", source, error);
+    if (source != null) {
+      Path sourcePath;
+      try {
+        sourcePath = WorkspacePaths.resolveExisting(root, source);
+      } catch (PathOutsideRootException escape) {
+        return pathEscape(escape);
+      }
+      try {
+        text = readBounded(sourcePath);
+      } catch (IOException error) {
+        return readFailure("source", source, error);
+      }
+    } else {
+      if (utf8Bytes(content) > SourceLimits.DEFAULT.maxInputFileBytes()) {
+        return error(
+            DiagnosticCode.INPUT_FILE_TOO_LARGE,
+            "inline content exceeds the input ceiling of "
+                + SourceLimits.DEFAULT.maxInputFileBytes()
+                + " bytes",
+            "content");
+      }
+      text = content;
+    }
+    String output = outputArg(request);
+    if (output == null) {
+      return error(
+          DiagnosticCode.COMMAND_INPUT_INVALID, "'output' must be 'data' or 'svg'", "output");
     }
     try {
-      EngineRunOutcome outcome = CoreCommands.importCommand(plugin, text, env, engines);
-      return envelope(outcome.stdout(), outcome.exitCode() != 0);
+      CoreCommands.ImportedSourceResult imported =
+          CoreCommands.importSource(plugin, text, env, engines);
+      if (!"svg".equals(output) || !imported.succeeded()) {
+        return envelope(imported.outcome().stdout(), imported.outcome().exitCode() != 0);
+      }
+      String policy = readImportRenderPolicy(request);
+      CoreCommands.ImportedRenderResult rendered =
+          CoreCommands.renderImportedMain(imported.source(), policy, env, engines);
+      if (!rendered.succeeded()) {
+        return envelope(rendered.outcome().stdout(), true);
+      }
+      if (rendered.render().artifacts().isEmpty()) {
+        return error(
+            DiagnosticCode.COMMAND_IO_FAILED, "render did not produce an SVG artifact", null);
+      }
+      String svg = rendered.render().artifacts().getFirst().content();
+      if (!hasSvgRoot(svg)) {
+        return error(
+            DiagnosticCode.COMMAND_IO_FAILED, "render did not produce an SVG artifact", null);
+      }
+      return CallToolResult.builder()
+          .addTextContent(imported.outcome().stdout())
+          .addContent(
+              new ImageContent(
+                  null,
+                  Base64.getEncoder().encodeToString(svg.getBytes(StandardCharsets.UTF_8)),
+                  "image/svg+xml"))
+          .isError(false)
+          .build();
     } catch (EngineExecutionException failure) {
       return engineFailure(failure);
+    } catch (ProductRootException failure) {
+      return error(DiagnosticCode.PRODUCT_ROOT_UNRESOLVED, failure.getMessage(), null);
+    } catch (PathOutsideRootException escape) {
+      return pathEscape(escape);
+    } catch (PolicyReadException failure) {
+      return readFailure(failure.argument(), failure.candidate(), failure.ioCause());
     }
   }
 
@@ -284,9 +350,14 @@ public final class DedirenTools {
   }
 
   public CallToolResult build(CallToolRequest request) {
+    String output = outputArg(request);
+    if (output == null) {
+      return error(
+          DiagnosticCode.COMMAND_INPUT_INVALID, "'output' must be 'data' or 'svg'", "output");
+    }
     String packageArg = stringArg(request, "package");
     if (packageArg != null) {
-      return buildPackage(request, packageArg);
+      return buildPackage(request, packageArg, output);
     }
     String source = stringArg(request, "source");
     if (source == null) {
@@ -295,6 +366,12 @@ public final class DedirenTools {
     String out = stringArg(request, "out");
     if (out == null) {
       return error(DiagnosticCode.COMMAND_INPUT_INVALID, "build requires 'out'", null);
+    }
+    if ("svg".equals(output) && stringArg(request, "render_policy") == null) {
+      return error(
+          DiagnosticCode.COMMAND_INPUT_INVALID,
+          "build output 'svg' requires 'render_policy' for a source build",
+          "render_policy");
     }
     List<String> views;
     List<String> emit;
@@ -349,7 +426,7 @@ public final class DedirenTools {
             env);
     try {
       EngineRunOutcome outcome = BuildCommand.run(buildRequest, engines);
-      return envelope(outcome.stdout(), outcome.exitCode() != 0);
+      return withBuildImages(outcome, output, outPath, false);
     } catch (EngineExecutionException failure) {
       return engineFailure(failure);
     } catch (ProductRootException failure) {
@@ -359,7 +436,7 @@ public final class DedirenTools {
     }
   }
 
-  private CallToolResult buildPackage(CallToolRequest request, String packageArg) {
+  private CallToolResult buildPackage(CallToolRequest request, String packageArg, String output) {
     if (stringArg(request, "source") != null
         || stringArg(request, "out") != null
         || stringArg(request, "render_policy") != null
@@ -400,7 +477,7 @@ public final class DedirenTools {
         new PackageBuildRequest(packageText, packagePath.getParent(), root, env, views, noExport);
     try {
       EngineRunOutcome outcome = PackageBuildCommand.run(packageRequest, engines);
-      return envelope(outcome.stdout(), outcome.exitCode() != 0);
+      return withBuildImages(outcome, output, packagePath.getParent(), true);
     } catch (EngineExecutionException failure) {
       return engineFailure(failure);
     } catch (ProductRootException failure) {
@@ -423,6 +500,168 @@ public final class DedirenTools {
       // Carry the argument name out: three policy arguments share one catch in build(), and an
       // agent repairing from the envelope has to know which one to fix.
       throw new PolicyReadException(argument, value, error);
+    }
+  }
+
+  private String readImportRenderPolicy(CallToolRequest request)
+      throws PathOutsideRootException, PolicyReadException {
+    String selected = readOptionalPolicy(request, "render_policy");
+    if (selected != null) {
+      return selected;
+    }
+    Path bundled = DedirenPaths.productRoot().resolve("fixtures/render-policy/default-svg.json");
+    try {
+      return readBounded(bundled);
+    } catch (IOException error) {
+      throw new PolicyReadException("render_policy", "bundled default SVG policy", error);
+    }
+  }
+
+  private CallToolResult withBuildImages(
+      EngineRunOutcome outcome, String output, Path artifactRoot, boolean packageBuild) {
+    if (!"svg".equals(output)) {
+      return envelope(outcome.stdout(), outcome.exitCode() != 0);
+    }
+    try {
+      List<ImageContent> images = buildSvgImages(outcome.stdout(), artifactRoot, packageBuild);
+      CallToolResult.Builder result =
+          CallToolResult.builder()
+              .addTextContent(outcome.stdout())
+              .isError(outcome.exitCode() != 0);
+      images.forEach(result::addContent);
+      return result.build();
+    } catch (InlineArtifactException failure) {
+      System.err.println("dediren mcp: inline SVG artifact failure: " + failure.getMessage());
+      return error(DiagnosticCode.COMMAND_IO_FAILED, "could not read generated SVG artifact", null);
+    }
+  }
+
+  private static List<ImageContent> buildSvgImages(
+      String outcomeJson, Path artifactRoot, boolean packageBuild) throws InlineArtifactException {
+    if (utf8Bytes(outcomeJson) > SourceLimits.DEFAULT.maxInputFileBytes()) {
+      throw new InlineArtifactException("result exceeds the bounded JSON ceiling");
+    }
+    JsonNode result;
+    try {
+      result = JsonSupport.objectMapper().readTree(outcomeJson);
+    } catch (RuntimeException parseFailure) {
+      throw new InlineArtifactException("result is not JSON", parseFailure);
+    }
+    JsonNode data = packageBuild ? result.path("data") : result;
+    if (packageBuild
+        ? !"package-build-result.schema.v1".equals(data.path("package_build_result_schema_version").asText())
+        : !"build-result.schema.v1".equals(data.path("build_result_schema_version").asText())) {
+      throw new InlineArtifactException("result has an unexpected build schema");
+    }
+    JsonNode views = data.path("views");
+    if (!views.isArray()) {
+      throw new InlineArtifactException("result does not declare views");
+    }
+    List<String> paths = new ArrayList<>();
+    for (JsonNode view : views) {
+      if (packageBuild) {
+        JsonNode diagram = view.path("artifacts").path("diagram");
+        if (diagram.isTextual()) {
+          paths.add(diagram.asText());
+        }
+      } else {
+        JsonNode artifacts = view.path("artifacts");
+        if (!artifacts.isArray()) {
+          throw new InlineArtifactException("view does not declare artifacts");
+        }
+        for (JsonNode artifact : artifacts) {
+          if ("svg".equals(artifact.path("artifact_kind").asText())
+              && artifact.path("path").isTextual()) {
+            paths.add(artifact.path("path").asText());
+          }
+        }
+      }
+    }
+    List<ImageContent> images = new ArrayList<>();
+    long total = 0;
+    for (String path : paths) {
+      Path svg;
+      try {
+        svg = ConfinedPaths.resolveExisting(artifactRoot, artifactRoot.resolve(path));
+      } catch (ConfinedPaths.PathEscapeException escape) {
+        throw new InlineArtifactException("reported artifact escapes its output root", escape);
+      }
+      try {
+        if (!Files.isRegularFile(svg)) {
+          throw new InlineArtifactException("reported artifact is not a regular file");
+        }
+        long size = Files.size(svg);
+        if (size > SourceLimits.DEFAULT.maxInputFileBytes() - total) {
+          throw new InlineArtifactException("decoded SVG artifacts exceed 64 MiB");
+        }
+        String content = BoundedReads.readString(svg, SourceLimits.DEFAULT.maxInputFileBytes());
+        if (!hasSvgRoot(content)) {
+          throw new InlineArtifactException("reported SVG artifact has no SVG root");
+        }
+        total += size;
+        images.add(
+            new ImageContent(
+                null,
+                Base64.getEncoder().encodeToString(content.getBytes(StandardCharsets.UTF_8)),
+                "image/svg+xml"));
+      } catch (IOException error) {
+        throw new InlineArtifactException("could not read reported artifact", error);
+      }
+    }
+    return List.copyOf(images);
+  }
+
+  private static boolean hasSvgRoot(String content) {
+    String trimmed = content.stripLeading();
+    int root = trimmed.indexOf("<svg");
+    return root >= 0
+        && (root + 4 == trimmed.length()
+            || Character.isWhitespace(trimmed.charAt(root + 4))
+            || trimmed.charAt(root + 4) == '>');
+  }
+
+  private static long utf8Bytes(String text) {
+    long bytes = 0;
+    for (int index = 0; index < text.length(); index++) {
+      char unit = text.charAt(index);
+      if (unit <= 0x7f) {
+        bytes++;
+      } else if (unit <= 0x7ff) {
+        bytes += 2;
+      } else if (Character.isHighSurrogate(unit)
+          && index + 1 < text.length()
+          && Character.isLowSurrogate(text.charAt(index + 1))) {
+        bytes += 4;
+        index++;
+      } else if (Character.isSurrogate(unit)) {
+        // Standard UTF-8 encoding replaces an unpaired surrogate with one ASCII replacement byte.
+        bytes++;
+      } else {
+        bytes += 3;
+      }
+    }
+    return bytes;
+  }
+
+  private static String outputArg(CallToolRequest request) {
+    Object value = request.arguments().get("output");
+    if (value == null) {
+      return "data";
+    }
+    return value instanceof String output && ("data".equals(output) || "svg".equals(output))
+        ? output
+        : null;
+  }
+
+  private static final class InlineArtifactException extends Exception {
+    private static final long serialVersionUID = 1L;
+
+    InlineArtifactException(String message) {
+      super(message);
+    }
+
+    InlineArtifactException(String message, Throwable cause) {
+      super(message, cause);
     }
   }
 
