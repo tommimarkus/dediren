@@ -63,4 +63,22 @@ class ToolSchemasTest {
 
     assertThat(advertised).containsExactlyInAnyOrderElementsOf(AnalysisCommands.QUERY_KINDS);
   }
+
+  @Test
+  void buildAdvertisesStableDataOutputAndOptInInlineSvgOutput() {
+    JsonNode output =
+        JsonSupport.objectMapper()
+            .readTree(ToolSchemas.BUILD)
+            .path("properties")
+            .path("output");
+
+    assertThat(textValues(output.path("enum"))).containsExactly("data", "svg");
+    assertThat(output.path("default").asText()).isEqualTo("data");
+  }
+
+  private static List<String> textValues(JsonNode array) {
+    List<String> values = new ArrayList<>();
+    array.forEach(value -> values.add(value.asText()));
+    return values;
+  }
 }

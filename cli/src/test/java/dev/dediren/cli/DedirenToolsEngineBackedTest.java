@@ -7,8 +7,10 @@ import dev.dediren.mcp.DedirenTools;
 import io.modelcontextprotocol.spec.McpSchema.CallToolRequest;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
 import io.modelcontextprotocol.spec.McpSchema.TextContent;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -141,5 +143,128 @@ class DedirenToolsEngineBackedTest {
     assertThat(Files.exists(out.resolve("class-view"))).isFalse();
     assertThat(Files.exists(out.resolve("data-view"))).isFalse();
     assertThat(Files.exists(out.resolve("activity-view"))).isFalse();
+  }
+
+  @Test
+  void inlineMermaidContentProducesTheSameDataEnvelopeAsTheConfinedFile(@TempDir Path root)
+      throws Exception {
+    String mermaid = "flowchart TD\nstart[Start] --> finish[Finish]\n";
+    Files.writeString(root.resolve("diagram.mmd"), mermaid);
+    DedirenTools tools = new DedirenTools(root, EngineWiring.defaults(), Map.of());
+
+    CallToolResult fromFile =
+        tools.importSource(
+            new CallToolRequest(
+                "dediren_import", Map.of("source", "diagram.mmd", "plugin", "mermaid")));
+    CallToolResult fromContent =
+        tools.importSource(
+            new CallToolRequest(
+                "dediren_import", Map.of("content", mermaid, "plugin", "mermaid")));
+
+    assertThat(fromFile.isError()).isNotEqualTo(Boolean.TRUE);
+    assertThat(fromContent.isError()).isNotEqualTo(Boolean.TRUE);
+    assertThat(textOf(fromContent)).isEqualTo(textOf(fromFile));
+    assertThat(fromContent.content()).hasSize(1);
+    assertThat(fromContent.content().getFirst()).isInstanceOf(TextContent.class);
+  }
+
+  @Test
+  void svgOutputReturnsDecodedImagesAfterTheDataEnvelopeInRequestedViewOrder(@TempDir Path root)
+      throws Exception {
+    Files.copy(fixture("valid-uml-basic.json"), root.resolve("model.json"));
+    Files.copy(policy("uml-svg.json"), root.resolve("policy.json"));
+
+    CallToolResult result =
+        new DedirenTools(root, EngineWiring.defaults(), Map.of())
+            .build(
+                new CallToolRequest(
+                    "dediren_build",
+                    Map.of(
+                        "source",
+                        "model.json",
+                        "out",
+                        "out",
+                        "render_policy",
+                        "policy.json",
+                        "views",
+                        List.of("activity-view", "class-view"),
+                        "output",
+                        "svg")));
+
+    assertThat(result.isError()).isNotEqualTo(Boolean.TRUE);
+    assertThat(result.content()).hasSize(3);
+    assertThat(result.content().getFirst()).isInstanceOf(TextContent.class);
+    assertDecodedSvgImage(result.content().get(1), "activity-view");
+    assertDecodedSvgImage(result.content().get(2), "class-view");
+  }
+
+  @Test
+  void failedSvgBuildRetainsEarlierSvgImagesButNeverAttachesOneForTheFailedView(
+      @TempDir Path root) throws Exception {
+    Files.copy(fixture("valid-uml-basic.json"), root.resolve("model.json"));
+    Files.copy(policy("uml-svg.json"), root.resolve("policy.json"));
+    Path out = Files.createDirectories(root.resolve("out"));
+    Files.writeString(out.resolve("activity-view"), "occupied");
+
+    CallToolResult result =
+        new DedirenTools(root, EngineWiring.defaults(), Map.of())
+            .build(
+                new CallToolRequest(
+                    "dediren_build",
+                    Map.of(
+                        "source",
+                        "model.json",
+                        "out",
+                        "out",
+                        "render_policy",
+                        "policy.json",
+                        "views",
+                        List.of("class-view", "activity-view"),
+                        "output",
+                        "svg")));
+
+    assertThat(result.isError()).isTrue();
+    assertThat(envelopeOf(result).path("status").asText()).isEqualTo("error");
+    assertThat(result.content()).hasSize(2);
+    assertDecodedSvgImage(result.content().get(1), "class-view");
+  }
+
+  @Test
+  void packageBuildUsesItsDeclaredPolicyAndCanReturnItsDiagramAsAnInlineSvg(
+      @TempDir Path root) throws Exception {
+    Files.copy(fixture("valid-pipeline-rich.json"), root.resolve("model.json"));
+    Files.copy(policy("rich-svg.json"), root.resolve("render-policy.json"));
+    Files.writeString(
+        root.resolve("package.json"),
+        """
+        {
+          "package_schema_version": "package.schema.v1",
+          "models": [ { "id": "model", "source": "model.json" } ],
+          "views": [
+            { "id": "main", "model": "model", "render_policy": "render-policy.json",
+              "outputs": { "diagram": "generated/main.svg" } }
+          ]
+        }
+        """);
+
+    CallToolResult result =
+        new DedirenTools(root, EngineWiring.defaults(), Map.of())
+            .build(
+                new CallToolRequest(
+                    "dediren_build", Map.of("package", "package.json", "output", "svg")));
+
+    assertThat(result.isError()).isNotEqualTo(Boolean.TRUE);
+    assertThat(result.content()).hasSize(2);
+    assertThat(result.content().getFirst()).isInstanceOf(TextContent.class);
+    assertDecodedSvgImage(result.content().get(1), "main");
+  }
+
+  private static void assertDecodedSvgImage(Object content, String expectedView) {
+    JsonNode image = JsonSupport.objectMapper().valueToTree(content);
+    assertThat(image.path("type").asText()).isEqualTo("image");
+    assertThat(image.path("mimeType").asText()).isEqualTo("image/svg+xml");
+    String svg =
+        new String(Base64.getDecoder().decode(image.path("data").asText()), StandardCharsets.UTF_8);
+    assertThat(svg).contains("<svg", "\"view_id\":\"" + expectedView + "\"");
   }
 }

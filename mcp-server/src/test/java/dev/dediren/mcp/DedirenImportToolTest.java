@@ -96,8 +96,64 @@ class DedirenImportToolTest {
   void importToolSchemaRequiresAConfinedSourceAndTheMermaidPlugin() {
     JsonNode schema = JsonSupport.objectMapper().readTree(ToolSchemas.IMPORT);
 
-    assertThat(textValues(schema.path("required"))).containsExactly("source", "plugin");
-    assertThat(textValues(schema.at("/properties/plugin/enum"))).containsExactly("mermaid");
+    assertThat(textValues(schema.path("required"))).containsExactly("plugin");
+    assertThat(textValues(schema.at("/properties/plugin/enum"))).containsExactly("mermaid", "dot");
+    assertThat(schema.path("oneOf")).hasSize(2);
+    assertThat(schema.at("/properties/content/type").asText()).isEqualTo("string");
+  }
+
+  @Test
+  void inlineContentUsesTheSelectedImporterWithoutRequiringAWorkspaceFile(@TempDir Path root)
+      throws Exception {
+    var importer = new RecordingMermaidImporter();
+    DedirenTools tools =
+        new DedirenTools(
+            root,
+            Engines.of(List.of(), List.of(), List.of(), List.of(), List.of(importer)),
+            Map.of());
+
+    var result =
+        tools.importSource(
+            new CallToolRequest(
+                "dediren_import",
+                Map.of("content", "flowchart TD\nA[Start] --> B[End]\n", "plugin", "mermaid")));
+
+    assertThat(result.isError()).isNotEqualTo(Boolean.TRUE);
+    assertThat(importer.received()).isEqualTo("flowchart TD\nA[Start] --> B[End]\n");
+    assertThat(
+            JsonSupport.objectMapper()
+                .readTree(((TextContent) result.content().getFirst()).text())
+                .at("/data/model_schema_version")
+                .asText())
+        .isEqualTo("model.schema.v1");
+  }
+
+  @Test
+  void importRejectsSourceAndContentTogetherBeforeReadingEither(@TempDir Path root)
+      throws Exception {
+    Files.writeString(root.resolve("diagram.mmd"), "flowchart TD\nA --> B\n");
+    DedirenTools tools =
+        new DedirenTools(
+            root,
+            Engines.of(
+                List.of(), List.of(), List.of(), List.of(), List.of(new StubMermaidImporter())),
+            Map.of());
+
+    var result =
+        tools.importSource(
+            new CallToolRequest(
+                "dediren_import",
+                Map.of(
+                    "source", "diagram.mmd",
+                    "content", "flowchart TD\nA --> B\n",
+                    "plugin", "mermaid")));
+
+    assertThat(result.isError()).isTrue();
+    JsonNode envelope =
+        JsonSupport.objectMapper().readTree(((TextContent) result.content().getFirst()).text());
+    assertThat(envelope.at("/diagnostics/0/code").asText())
+        .isEqualTo("DEDIREN_COMMAND_INPUT_INVALID");
+    assertThat(envelope.has("data")).isFalse();
   }
 
   @Test
@@ -131,5 +187,27 @@ class DedirenImportToolTest {
     List<String> values = new ArrayList<>();
     array.forEach(value -> values.add(value.asText()));
     return values;
+  }
+
+  private static final class RecordingMermaidImporter implements ImportEngine {
+    private String received;
+
+    @Override
+    public String id() {
+      return "mermaid";
+    }
+
+    @Override
+    public EngineResult<SourceDocument> importSource(String source) {
+      received = source;
+      return new EngineResult<>(
+          new SourceDocument(
+              "model.schema.v1", List.of(), List.of(), List.of(), List.of(), Map.of()),
+          List.of());
+    }
+
+    String received() {
+      return received;
+    }
   }
 }

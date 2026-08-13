@@ -184,6 +184,43 @@ class ImportCommandTest {
     assertThat(envelope.at("/data/nodes/0/id").asText()).isEqualTo("start");
   }
 
+  /**
+   * The MCP inline-content adapter must hand foreign notation to this transport-neutral command
+   * verbatim. In particular, DOT's significant quoting and trailing newline are not a file-format
+   * concern core may trim or normalize while choosing its importer.
+   */
+  @Test
+  void importCommandDispatchesInlineDotTextVerbatim() throws Exception {
+    String dot = "digraph G { a -> b [label=\"needs review\"]; }\n";
+    var received = new java.util.concurrent.atomic.AtomicReference<String>();
+    ImportEngine dotImporter =
+        new ImportEngine() {
+          @Override
+          public String id() {
+            return "dot";
+          }
+
+          @Override
+          public EngineResult<SourceDocument> importSource(String source) {
+            received.set(source);
+            return new EngineResult<>(
+                new SourceDocument(
+                    "model.schema.v1", List.of(), List.of(), List.of(), List.of(), Map.of()),
+                List.of());
+          }
+        };
+
+    var outcome =
+        CoreCommands.importCommand(
+            "dot",
+            dot,
+            Map.of(),
+            Engines.of(List.of(), List.of(), List.of(), List.of(), List.of(dotImporter)));
+
+    assertThat(outcome.exitCode()).isZero();
+    assertThat(received.get()).isEqualTo(dot);
+  }
+
   private static ImportEngine stub(SourceDocument document, List<Diagnostic> diagnostics) {
     return new ImportEngine() {
       @Override
