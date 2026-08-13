@@ -23,23 +23,29 @@ class ResvgRasterizerTest {
               "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADElEQVR42mNk+M/wHwAF/gL+gq6uVQAAAABJRU5ErkJggg==");
 
   @Test
-  void resolutionUsesOnlyAnAbsolutePathOrOneSuppliedPathLookup(@TempDir Path temp) throws Exception {
+  void resolutionUsesOnlyAnAbsolutePathOrOneSuppliedPathLookup(@TempDir Path temp)
+      throws Exception {
     Path executable = executable(temp, "resvg", pngScript());
 
-    assertThat(ResvgRasterizer.resolve("missing-resvg", Map.of("PATH", temp.toString()))
-            .rasterize("<svg/>".getBytes(StandardCharsets.UTF_8), 1024))
+    assertThat(
+            ResvgRasterizer.resolve("missing-resvg", Map.of("PATH", temp.toString()))
+                .rasterize("<svg/>".getBytes(StandardCharsets.UTF_8), 1024))
         .isEmpty();
-    assertThat(ResvgRasterizer.resolve("resvg", Map.of("PATH", temp.toString()))
-            .rasterize("<svg/>".getBytes(StandardCharsets.UTF_8), 1024))
+    assertThat(
+            ResvgRasterizer.resolve("resvg", Map.of("PATH", temp.toString()))
+                .rasterize("<svg/>".getBytes(StandardCharsets.UTF_8), 1024))
         .contains(PNG);
-    assertThat(ResvgRasterizer.resolve(executable.toString(), Map.of())
-            .rasterize("<svg/>".getBytes(StandardCharsets.UTF_8), 1024))
+    assertThat(
+            ResvgRasterizer.resolve(executable.toString(), Map.of())
+                .rasterize("<svg/>".getBytes(StandardCharsets.UTF_8), 1024))
         .contains(PNG);
-    assertThat(ResvgRasterizer.resolve("tools/resvg", Map.of("PATH", temp.toString()))
-            .rasterize("<svg/>".getBytes(StandardCharsets.UTF_8), 1024))
+    assertThat(
+            ResvgRasterizer.resolve("tools/resvg", Map.of("PATH", temp.toString()))
+                .rasterize("<svg/>".getBytes(StandardCharsets.UTF_8), 1024))
         .isEmpty();
-    assertThat(ResvgRasterizer.resolve("\0", Map.of("PATH", temp.toString()))
-            .rasterize("<svg/>".getBytes(StandardCharsets.UTF_8), 1024))
+    assertThat(
+            ResvgRasterizer.resolve("\0", Map.of("PATH", temp.toString()))
+                .rasterize("<svg/>".getBytes(StandardCharsets.UTF_8), 1024))
         .isEmpty();
   }
 
@@ -61,7 +67,8 @@ class ResvgRasterizerTest {
 
     Optional<byte[]> raster =
         new ResvgRasterizer(executable, Duration.ofSeconds(1), PNG.length + 1)
-            .rasterize("<svg width=\"10\" height=\"20\"/>".getBytes(StandardCharsets.UTF_8), PNG.length);
+            .rasterize(
+                "<svg width=\"10\" height=\"20\"/>".getBytes(StandardCharsets.UTF_8), PNG.length);
 
     assertThat(raster).contains(PNG);
   }
@@ -141,8 +148,7 @@ class ResvgRasterizerTest {
                 () -> {
                   result.set(
                       new ResvgRasterizer(executable, Duration.ofSeconds(10), PNG.length + 1)
-                          .rasterize(
-                              "<svg/>".getBytes(StandardCharsets.UTF_8), PNG.length + 1));
+                          .rasterize("<svg/>".getBytes(StandardCharsets.UTF_8), PNG.length + 1));
                   interrupted.set(Thread.currentThread().isInterrupted());
                 });
 

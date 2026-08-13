@@ -53,6 +53,7 @@ public final class DedirenTools {
    * validated against an actual model view id first.
    */
   private static final Pattern VIEW_ID_PATTERN = Pattern.compile("^[A-Za-z0-9][A-Za-z0-9._-]*$");
+
   private static final long INLINE_BYTES = SourceLimits.DEFAULT.maxInputFileBytes();
 
   private final Path root;
@@ -64,8 +65,7 @@ public final class DedirenTools {
     this(root, engines, env, ResvgRasterizer.resolve("resvg", env));
   }
 
-  DedirenTools(
-      Path root, Engines engines, Map<String, String> env, ResvgRasterizer rasterizer) {
+  DedirenTools(Path root, Engines engines, Map<String, String> env, ResvgRasterizer rasterizer) {
     this.root = root;
     this.engines = engines;
     this.env = Map.copyOf(env);
@@ -470,10 +470,7 @@ public final class DedirenTools {
   }
 
   private CallToolResult buildPackage(
-      CallToolRequest request,
-      String packageArg,
-      String output,
-      ImageSelection selection) {
+      CallToolRequest request, String packageArg, String output, ImageSelection selection) {
     if (stringArg(request, "source") != null
         || stringArg(request, "out") != null
         || stringArg(request, "render_policy") != null
@@ -690,16 +687,12 @@ public final class DedirenTools {
       if (svgBytes.length > remainingAttachmentBytes) {
         return null;
       }
-      return new ImageContent(
-          null, Base64.getEncoder().encodeToString(svgBytes), "image/svg+xml");
+      return new ImageContent(null, Base64.getEncoder().encodeToString(svgBytes), "image/svg+xml");
     }
     if (selection == ImageSelection.PNG) {
       return rasterizer
           .rasterize(svgBytes, remainingAttachmentBytes)
-          .map(
-              png ->
-                  new ImageContent(
-                      null, Base64.getEncoder().encodeToString(png), "image/png"))
+          .map(png -> new ImageContent(null, Base64.getEncoder().encodeToString(png), "image/png"))
           .orElse(null);
     }
     return null;

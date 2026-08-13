@@ -172,11 +172,7 @@ public final class DedirenMcpServer {
 
   /** Runs the server with one startup-resolved optional resvg executable selection. */
   public static void serve(
-      Path root,
-      Engines engines,
-      Map<String, String> env,
-      boolean readOnly,
-      String resvgCommand)
+      Path root, Engines engines, Map<String, String> env, boolean readOnly, String resvgCommand)
       throws InterruptedException {
     OutputStream protocolChannel = StdoutIntegrity.claimStdout();
     ResvgRasterizer rasterizer = ResvgRasterizer.resolve(resvgCommand, env);

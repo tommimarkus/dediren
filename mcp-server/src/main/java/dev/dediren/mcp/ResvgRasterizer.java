@@ -19,8 +19,9 @@ import java.util.regex.Pattern;
 
 /** Optional MCP-owned adapter from generated SVG bytes to a validated PNG attachment. */
 final class ResvgRasterizer {
-  private static final byte[] PNG_SIGNATURE =
-      {(byte) 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a};
+  private static final byte[] PNG_SIGNATURE = {
+    (byte) 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a
+  };
   private static final long MAX_ATTACHED_IMAGE_BYTES = 64L * 1024 * 1024;
   private static final int MAX_DIMENSION = 4096;
   private static final int MAX_STDERR_BYTES = 64 * 1024;
@@ -149,7 +150,8 @@ final class ResvgRasterizer {
   }
 
   private static Optional<List<String>> scaleArgument(byte[] svg) {
-    String prefix = new String(svg, 0, Math.min(svg.length, 4096), java.nio.charset.StandardCharsets.UTF_8);
+    String prefix =
+        new String(svg, 0, Math.min(svg.length, 4096), java.nio.charset.StandardCharsets.UTF_8);
     double width = -1;
     double height = -1;
     Matcher matcher = DIMENSION.matcher(prefix);
