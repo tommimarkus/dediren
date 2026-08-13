@@ -188,8 +188,8 @@ changes when installed, and skips with a note otherwise.
 jars, no bundled JRE — Java 21+ is required at runtime):
 
 ```text
-dist/dediren-agent-bundle-2026.08.2/
-dist/dediren-agent-bundle-2026.08.2.tar.xz
+dist/dediren-agent-bundle-2026.08.3/
+dist/dediren-agent-bundle-2026.08.3.tar.xz
 ```
 
 ## First Run
@@ -274,7 +274,7 @@ to `--root`; package outputs are at the paths declared relative to their
 package directory. Point `--root` at your project directory, since a bare
 `.` resolves to wherever the client spawns the server, not necessarily your
 project. `--read-only` withholds only the artifact-writing build tool. This is
-breaking for new 2026.08.2 workspace-handle clients but restorative for earlier
+breaking for new 2026.08.3 workspace-handle clients but restorative for earlier
 clients: do not pass `workspace_id`. Existing `.dediren/mcp/workspaces/`
 files are neither migrated nor deleted automatically; recover wanted artifacts
 and remove the residue manually. See `docs/agent-usage.md`.
@@ -282,7 +282,7 @@ and remove the residue manually. See `docs/agent-usage.md`.
 ## Bundle Layout
 
 ```text
-dediren-agent-bundle-2026.08.2/
+dediren-agent-bundle-2026.08.3/
   bin/dediren     the single launcher (hosts all bundled engines in-process)
   lib/            one shrink-merged classpath jar (no bundled JRE)
   schemas/        public JSON schemas
@@ -333,7 +333,7 @@ release notes and through schema-id changes. The version source is root
 `pom.xml`; set it across all modules with:
 
 ```bash
-./mvnw versions:set -DnewVersion='2026.08.2' -DprocessAllModules=true -DgenerateBackupPoms=false
+./mvnw versions:set -DnewVersion='2026.08.3' -DprocessAllModules=true -DgenerateBackupPoms=false
 ```
 
 Then sync the checked-in version surfaces (source-fixture
@@ -343,7 +343,7 @@ list lives in [`CLAUDE.md` §Versioning](CLAUDE.md). Commit the bump on its own,
 then tag the bump commit:
 
 ```bash
-git tag -a v2026.08.2 -m "Release 2026.08.2"
+git tag -a v2026.08.3 -m "Release 2026.08.3"
 ```
 
 `dist-build` is hermetic and self-verifying — it regenerates each module's
