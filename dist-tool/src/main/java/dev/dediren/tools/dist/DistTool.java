@@ -1523,7 +1523,14 @@ public final class DistTool {
       0x48,
       0x44,
       0x52,
-      0, 0, 0, 1, 0, 0, 0, 1
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      1
     };
     if (bytes.length < expectedHeader.length) {
       throw new IllegalStateException("mcp PNG attachment is shorter than its signature and IHDR");
