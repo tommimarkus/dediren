@@ -98,10 +98,10 @@ the bundled first-party engines (`mermaid`, `generic-graph`, `elk-layout`, `rend
 an executable, spawns a child process, or reads a plugin path/trust
 environment variable; an unknown engine id is answered from the in-memory
 registry (`DEDIREN_PLUGIN_UNKNOWN`), not from any filesystem lookup. The
-former manifest env allowlist is gone because no child processes exist —
-the export engines receive the CLI's env map explicitly (schema-path and
-validator-override variables) and read nothing else, pinned by the engines'
-no-`getenv` guard tests (Task 4).
+former manifest env allowlist is gone because engines spawn no child processes —
+the export engines receive the CLI's env map explicitly (schema-path/cache and
+HTTP-proxy variables) and do not call `System.getenv()` themselves, pinned by
+the engines' no-`getenv` guard tests (Task 4).
 
 ### MCP stdio server (`dediren mcp`)
 
@@ -119,17 +119,21 @@ its lifetime, so there is no daemon lifecycle to supervise. That is inbound-only
 though: a `dediren_build` call whose policy selects the OEF or XMI export lane
 reaches the same outbound-HTTPS boundary as the CLI's `build` and
 `export` commands (see "Schema cache + runtime download" and "XML parsing &
-schema validation" below) — absent a cached or offline schema, a `curl` fetch;
+schema validation" below) — absent a cached or offline schema, an in-JVM Java
+HTTP fetch;
 schema validation itself runs in-JVM on both lanes with no subprocess.
 `--read-only` withholds `dediren_build` entirely. Short of that, the
 `DEDIREN_OEF_SCHEMA_DIR` / `DEDIREN_XMI_SCHEMA_PATH` offline overrides remove
 the outbound fetch.
 
 Prompt-supplied Mermaid/DOT `content` is attacker-controlled text and uses the
-same byte and parser ceilings as file input. Inline SVG responses are
-base64-expanded in memory and share a cumulative 64 MiB decoded-image limit;
-invalid input, policy, layout, or render failures remain JSON-only. Clients may
-not support displaying `image/svg+xml`, so inline display is not guaranteed.
+same byte and parser ceilings as file input. Image responses are JSON-first:
+the unchanged envelope is primary text and optional SVG/PNG attachments follow.
+`output: "image"` negotiates only the declared `accepted_image_types`, with SVG
+fixed ahead of PNG; no accepted type, unavailable/failed conversion, and invalid
+input, policy, layout, or render paths remain JSON-only. Decoded attachments
+share a cumulative 64 MiB limit. Clients may not support displaying either
+media type, so inline display is not guaranteed.
 
 Controls:
 
@@ -177,6 +181,19 @@ Controls:
   tools (`dediren_diff`, `dediren_query`, `dediren_verify`, `dediren_status`) are
   read-only and stay registered in both modes; `dediren_import` also stays
   registered because it only reads one confined source and returns data.
+- **Optional PNG conversion.** PNG is MCP-owned response adaptation over a
+  core-produced SVG, not a render-engine artifact. `--resvg-command` accepts
+  only a bare `PATH` name or an absolute executable path and resolves it once at
+  server startup; it accepts no command arguments and no shell is involved.
+  The child inherits no environment values (`PATH` and `HOME` are set empty),
+  receives SVG on stdin, and returns PNG on stdout. A conversion is bounded to
+  15 seconds, 4096 by 4096 pixels, 64 KiB captured stderr, and the remaining
+  share of the 64 MiB decoded-attachment ceiling. The adapter checks the PNG
+  signature, IHDR shape, and dimensions before attachment. Timeout, process
+  failure, malformed/oversized output, or no resolved executable degrades to
+  the successful command's JSON envelope only. The executable is operator
+  supplied, not bundled or listed in `THIRD-PARTY-NOTICES.md`; upstream `resvg`
+  is licensed MIT OR Apache-2.0.
 - **Package declared outputs.** `dediren build --package` (and `dediren_build` with
   a `package` argument) add a caller-*declared* write surface: each view and export
   names the path its artifact lands at. Every declared output path — and every
@@ -224,14 +241,13 @@ a *model* writing outside the workspace, not to contain a hostile local user.
 ### Schema cache + runtime download
 
 Runtime schema fetches go through
-`schema-cache/src/main/java/dev/dediren/schemacache/SchemaCacheModule.java`'s `curlFetcher`,
-which forces `--proto '=https'` (no protocol downgrade on redirect), bounds the whole
-transfer at 60 seconds to prevent stalled downloads from blocking the export lane
-indefinitely — backed by a Java-side 75-second `waitFor` that `destroyForcibly`-kills a
-fetcher binary that ignores or lacks the `--max-time` flag, so a hung child degrades to a
-structured fetch failure instead of blocking the export thread forever (an interrupt during
-the wait also kills the child and re-sets the flag, so cancellation propagates) — and
-verifies the download's SHA-256 against a pinned value before trusting it:
+`schema-cache/src/main/java/dev/dediren/schemacache/SchemaCacheModule.java`'s
+Java `HttpClient`. The initial request and final response URI must both use
+HTTPS; `Redirect.NORMAL` follows safe redirects but refuses an HTTPS-to-HTTP
+downgrade. Connects are bounded at 20 seconds, each request at 60 seconds, and
+streaming response bodies at 8 MiB. A non-2xx status or limit failure becomes a
+structured fetch failure, and a temporary download never replaces the old
+cache entry until its SHA-256 matches the pinned value:
 the single `OMG_XMI_SCHEMA_SHA256` constant
 (`engines/uml-xmi-export/.../schema/SchemaValidation.java`) and the per-file
 `PINNED_OEF_SCHEMA_SET` table (`engines/archimate-oef-export/.../OefExportEngine.java`),
@@ -239,6 +255,12 @@ which pins the three Open Group OEF XSDs (opengroup.org) plus the W3C
 `xml.xsd` they import (www.w3.org — the one non-standards-body-of-origin
 endpoint in the fetch set; the in-JVM validator resolves the import from the
 local copy, never from the network).
+The explicit proxy selector checks `HTTPS_PROXY`, `HTTP_PROXY`, then
+`ALL_PROXY`, with lowercase taking precedence within each name. `NO_PROXY`
+supports exact hosts, leading-dot suffixes, and `*`. A selected proxy must be an
+`http`/`https` URI with a host and no path/query/fragment; invalid configuration
+fails closed with a credential-free error rather than silently connecting
+directly.
 The offline overrides `DEDIREN_XMI_SCHEMA_PATH` / `DEDIREN_OEF_SCHEMA_DIR` bypass the
 SHA-256 check by design — they only require the supplied file to be non-empty.
 
@@ -309,9 +331,9 @@ successful export declares what it was validated against via the
 `DEDIREN_EXPORT_SCHEMA_CONFORMANCE` info diagnostic. `InJvmXmlValidatorTest`
 pins the seam: local-only resolution and traversal confinement, the
 unavailable-vs-invalid split, single-recording of fatal errors, dependency-aware
-memoization, the bounded-run timeout, and the saturation fail-fast. The only subprocess left in the product is the
-schema-cache `curl` fetch (previous section), which keeps its own concurrent
-drain, 60-second transfer bound, and Java-side 75-second kill backstop.
+memoization, the bounded-run timeout, and the saturation fail-fast. Schema
+fetching now stays in-JVM; the only optional product child process is the MCP
+adapter's bounded `resvg` conversion described above.
 
 ### SVG output escaping
 
@@ -357,9 +379,11 @@ XML Graphics. Earlier versions round-tripped the emitted SVG through a Batik
 SVG DOM and PNG transcoder to produce a `png` artifact, re-parsing the
 rendered markup (and its CSS/font references) a second time inside the plugin.
 That path is removed: the plugin never re-parses its own output and carries no
-Batik XML-parsing surface. PNG output is now produced out of process by a
-user-chosen external converter (`rsvg-convert`, `resvg`, ImageMagick, or
-Inkscape) that runs outside the dediren trust boundary.
+Batik XML-parsing surface. The ordinary CLI still requires a user-chosen
+external converter for a PNG artifact. Separately, the MCP protocol adapter may
+invoke only its startup-resolved, bounded `resvg` executable to adapt a valid
+SVG into an optional response attachment; core and the render engine remain
+unaware of PNG.
 
 ### Build, documentation publication & release chain
 
@@ -422,7 +446,8 @@ ceiling trips if shrinking or attribute stripping silently degrades.
 | Tamper `main` or `v*` tags | Rulesets block force-pushes/deletion of `main` and moving/deleting `v*` tags (`.github/rulesets/`); `test` + `vulnerability-scan` are required checks on `main` (admin bypass, recorded); release immutability freezes released tags; `release.yml` cross-checks the tag version against `pom.xml`; attestation binds the published archive to its build | No required review on `main`, and the maintainer's admin bypass skips the required checks on direct pushes (each bypass is recorded); a bad commit is caught by tests/scans, not review |
 | Tampered SBOM / SHA256SUMS after build | The archive, both CycloneDX SBOM serializations, and `SHA256SUMS` are subjects of one build-provenance attestation, each verified before publish; the publish job additionally checks the staged assets against the attested `SHA256SUMS` (`sha256sum -c`); repository release immutability (enabled) freezes the published asset set | Immutability covers only releases published after it was enabled (2026-07-22); earlier releases remain mutable and rest on their attestations alone |
 | Shipped `THIRD-PARTY-NOTICES.md` misstates an upstream licence after a dependency bump, or a bump drags in a licence outside the approved set | cli's `license-maven-plugin` execution resolves every runtime dependency's effective-pom licence, normalizes it, and gates it against an approved allowlist; `DistTool` refuses to write notices when its hand-curated attribution map disagrees with that resolved report or the report is stale (`resolved-licence-report`, dist lanes) | Effective-pom licences are upstream-declared metadata, not scanned artifact contents; a pom that misstates its own jar's licence passes (mitigate with an `about.html`/`META-INF` spot-check when adopting a new dependency) |
-| Malicious schema substitution | HTTPS-only curl plus SHA-256 pin verified before use (`SchemaCacheModule`) | `DEDIREN_XMI_SCHEMA_PATH` / `DEDIREN_OEF_SCHEMA_DIR` offline overrides bypass the SHA-256 check by design |
+| Malicious schema substitution | Java `HttpClient` requires HTTPS before and after redirects, bounds time/bytes, rejects invalid proxy configuration, and verifies a pinned SHA-256 before use (`SchemaCacheModule`) | `DEDIREN_XMI_SCHEMA_PATH` / `DEDIREN_OEF_SCHEMA_DIR` offline overrides bypass the SHA-256 check by design |
+| Abuse a configured MCP PNG converter | `--resvg-command` resolves one bare-name or absolute executable at startup; no shell/arguments, cleared environment, stdin/stdout-only conversion, 15-second process bound, 4096-pixel dimensions, 64 MiB aggregate output, and PNG signature/IHDR validation; all failures fall back to JSON only | The operator explicitly selects and trusts the executable, which runs with the spawning user's authority; a malicious executable can still act with that user's OS permissions |
 | Malicious envelope input | Jackson 3 parsing plus fuzz-regression targets pinning the only-`JacksonException`/`XmiValidationException` invariant; hardened DOM factory blocks DOCTYPE/XXE | Fuzz targets run in deterministic regression mode over a fixed seed corpus in CI, not continuous coverage-guided fuzzing |
 | Exhaust the host via pathological model input (CPU/heap) | Input ceilings (core `SourceLimits`, applied via `BoundedReads` and `SourceValidator` on both CLI file/stdin and MCP lanes): 64 MiB per model-supplied input file, 1000 fragments, 100000 merged elements. Mermaid and DOT additionally cap statements, produced elements/groups, nesting, and token bytes inside their native parsers; Mermaid also caps label bytes, and comma-expanded DOT nodes count individually against the produced-element ceiling. Jackson 3's default nesting-depth cap (500) bounds nested JSON; the MCP transport bounds a single inbound frame at 16 MiB (`FrameSplitter`) | Compute on a legal-size model is unbounded: ELK layout has no timeout or cancellation, SVG output is materialized in memory, and MCP tool calls have no per-call timeout. Accepted: the process runs with the invoking user's own authority and the MCP client owns the server's lifetime, so a wedged or OOM-killed process is recoverable by the user who caused it |
 | Smuggle a source model past the model contract by way of foreign-text import | An import engine hands `core` a typed `SourceDocument`, not bytes, so an imported model would otherwise reach consumers without the gates every hand-authored model meets. `CoreCommands.importCommand` therefore re-enters the emitted document into `SourceValidator.gateImportedDocument`: schema version, `schemas/model.schema.json`, and the same `SourceLimits` ceilings, for every importer rather than a named one. A rejection is a `DEDIREN_SCHEMA_*` / `DEDIREN_SOURCE_*_LIMIT_EXCEEDED` error envelope at the plugin-error exit (3) — a rejection here means an engine emitted an out-of-contract document, not that the caller mistyped input, which the importer's own ceilings already reject at exit 2 — carrying the importer's own diagnostics ahead of core's; the engine's atomic parse failures are still republished verbatim, path and exit code untouched | The re-gate is the schema and the ceilings only. Model-coherence claims (duplicate ids, dangling endpoints) stay the importer's, so a defective importer can still emit a schema-legal but incoherent model — caught later by `validate`/`build`, not at import. It costs one serialize/reparse per import, and bounds contract conformance and model size, not the import's own CPU: the parser's internal caps are what bound that (resource-exhaustion row above) |

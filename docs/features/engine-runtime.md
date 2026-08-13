@@ -17,11 +17,11 @@ them but owns none of their domain logic.
   `DEDIREN_PLUGIN_UNKNOWN`; an id bound only under another capability yields
   `DEDIREN_PLUGIN_UNSUPPORTED_CAPABILITY`; an unexpected in-memory engine
   failure is normalized to `DEDIREN_ENGINE_FAILED`.
-- A **missing runtime dependency** is reported by the engine that owns it, as a
-  structured error envelope core preserves (an export engine emits
+- An unavailable engine-side resource is reported by the engine that owns it,
+  as a structured error envelope core preserves (an export engine emits
   `DEDIREN_OEF_SCHEMA_UNAVAILABLE` / `DEDIREN_XMI_SCHEMA_UNAVAILABLE` when its
-  standards schema must be fetched and `curl` is absent; both export lanes
-  validate in-JVM with no external validator).
+  pinned standards schema cannot be fetched or loaded; fetching uses Java's
+  HTTP client and both export lanes validate in-JVM).
 - **stderr is for human debugging only.**
 
 ## First-Party Engines
@@ -31,7 +31,9 @@ All bundled engines are compile-time library modules. They may depend on `engine
 only the CLI's `EngineWiring` class constructs them. There is no engine
 discovery of any kind — no `PATH` lookup, no manifest directories, no
 executable overrides, and no per-engine launcher. The **engine id** is simply
-the value you pass to `--plugin`.
+the value you pass to `--plugin`. The MCP adapter's optional
+`--resvg-command` is protocol-specific response media adaptation, not an engine
+or render-plugin dependency.
 
 | Engine id (`--plugin`) | Role |
 | --- | --- |

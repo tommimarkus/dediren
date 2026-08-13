@@ -2,8 +2,11 @@
 
 The `render` plugin turns a layout result into a deterministic SVG artifact. All
 SVG styling lives in the render policy and the plugin — never in source JSON.
-dediren emits no PNG; convert the SVG with an external tool (`rsvg-convert`,
-`resvg`, ImageMagick, or Inkscape).
+The plugin and ordinary CLI emit no PNG; convert the SVG with an external tool
+(`rsvg-convert`, `resvg`, ImageMagick, or Inkscape) when a raster artifact is
+required. The MCP adapter can separately negotiate an optional PNG response
+attachment from the SVG; that protocol adaptation does not widen the render
+policy or result schema.
 
 [← Back to feature index](README.md)
 
@@ -20,6 +23,14 @@ Result schema: [`schemas/render-result.schema.json`](../../schemas/render-result
 jq -r '.data.artifacts[] | select(.artifact_kind=="svg") | .content' \
   render-result.json > diagram.svg
 ```
+
+For `dediren_import` and `dediren_build` over MCP, `output: "image"` plus
+`accepted_image_types` negotiates a response attachment while preserving this
+SVG-only artifact contract. The JSON envelope stays first; `image/svg+xml` has
+fixed priority over `image/png`, and PNG is attempted only through the optional
+startup-resolved `--resvg-command`. Any unavailable or failed conversion falls
+back to JSON only. See the
+[MCP Server](../agent-usage.md#mcp-server) contract for validation and limits.
 
 ## Render Policies
 
