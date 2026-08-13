@@ -3,6 +3,11 @@ package dev.dediren.cli;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.dediren.contracts.json.JsonSupport;
+import dev.dediren.contracts.render.RenderArtifact;
+import dev.dediren.contracts.render.RenderResult;
+import dev.dediren.engine.EngineResult;
+import dev.dediren.engine.Engines;
+import dev.dediren.engine.RenderEngine;
 import dev.dediren.mcp.DedirenTools;
 import io.modelcontextprotocol.spec.McpSchema.CallToolRequest;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
@@ -230,6 +235,60 @@ class DedirenToolsEngineBackedTest {
     assertThat(result.content().getFirst()).isInstanceOf(TextContent.class);
     assertThat(envelopeOf(result).at("/diagnostics/0/message").asText())
         .contains("render_policy");
+  }
+
+  @Test
+  void inlineSvgOutputRejectsAnImageAboveTheCumulativeDecodedCeiling(@TempDir Path root)
+      throws Exception {
+    Files.copy(fixture("valid-basic.json"), root.resolve("model.json"));
+    Files.copy(policy("default-svg.json"), root.resolve("policy.json"));
+    Engines defaults = EngineWiring.defaults();
+    String oversizedSvg = "<svg>" + "x".repeat(64 * 1024 * 1024) + "</svg>";
+    RenderEngine oversizedRenderer =
+        new RenderEngine() {
+          @Override
+          public String id() {
+            return "render";
+          }
+
+          @Override
+          public EngineResult<RenderResult> render(
+              dev.dediren.ir.LaidOutScene layout,
+              JsonNode renderPolicy,
+              dev.dediren.contracts.render.RenderMetadata metadata) {
+            return new EngineResult<>(
+                new RenderResult(
+                    "render-result.schema.v5", List.of(new RenderArtifact("svg", oversizedSvg))),
+                List.of());
+          }
+        };
+    Engines engines =
+        new Engines(
+            defaults.semantics(),
+            defaults.layouts(),
+            Map.of("render", oversizedRenderer),
+            defaults.exporters(),
+            defaults.importers());
+
+    CallToolResult result =
+        new DedirenTools(root, engines, Map.of())
+            .build(
+                new CallToolRequest(
+                    "dediren_build",
+                    Map.of(
+                        "source",
+                        "model.json",
+                        "out",
+                        "out",
+                        "render_policy",
+                        "policy.json",
+                        "output",
+                        "svg")));
+
+    assertThat(result.isError()).isTrue();
+    assertThat(result.content()).hasSize(1);
+    assertThat(result.content().getFirst()).isInstanceOf(TextContent.class);
+    assertThat(envelopeOf(result).path("status").asText()).isEqualTo("error");
   }
 
   @Test
