@@ -11,6 +11,8 @@ import java.util.Base64;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -34,6 +36,9 @@ class ResvgRasterizerTest {
             .rasterize("<svg/>".getBytes(StandardCharsets.UTF_8), 1024))
         .contains(PNG);
     assertThat(ResvgRasterizer.resolve("tools/resvg", Map.of("PATH", temp.toString()))
+            .rasterize("<svg/>".getBytes(StandardCharsets.UTF_8), 1024))
+        .isEmpty();
+    assertThat(ResvgRasterizer.resolve("\0", Map.of("PATH", temp.toString()))
             .rasterize("<svg/>".getBytes(StandardCharsets.UTF_8), 1024))
         .isEmpty();
   }
@@ -62,20 +67,51 @@ class ResvgRasterizerTest {
   }
 
   @Test
+  void constrainsTheLongerSvgDimensionTo4096Pixels(@TempDir Path temp) throws Exception {
+    Path executable =
+        executable(
+            temp,
+            "resvg-scale",
+            """
+            #!/bin/sh
+            [ "$#" = 5 ] && [ "$1" = --width ] && [ "$2" = 4096 ] || exit 9
+            [ "$3" = --quiet ] && [ "$4" = - ] && [ "$5" = -c ] || exit 8
+            """
+                + pngScriptBody());
+
+    assertThat(
+            new ResvgRasterizer(executable, Duration.ofSeconds(1), PNG.length + 1)
+                .rasterize(
+                    "<svg width=\"5000\" height=\"2500\"/>".getBytes(StandardCharsets.UTF_8),
+                    PNG.length))
+        .contains(PNG);
+  }
+
+  @Test
   void omitsInvalidOrOverBudgetConverterOutputWithoutThrowing(@TempDir Path temp) throws Exception {
-    for (String script :
-        new String[] {
-          "#!/bin/sh\nexit 3\n",
-          "#!/bin/sh\nprintf not-a-png\n",
-          "#!/bin/sh\nprintf 123456789\n",
-          "#!/bin/sh\nprintf '\\211PNG\\r\\n\\032\\n\\000\\000\\000\\rIHDR\\000\\000\\020\\001\\000\\000\\000\\001'\n"
-        }) {
+    for (String script : new String[] {"#!/bin/sh\nexit 3\n", "#!/bin/sh\nprintf not-a-png\n"}) {
       Path executable = executable(temp, "resvg-" + script.hashCode(), script);
       assertThat(
-              new ResvgRasterizer(executable, Duration.ofSeconds(1), 8)
-                  .rasterize("<svg/>".getBytes(StandardCharsets.UTF_8), 8))
+              new ResvgRasterizer(executable, Duration.ofSeconds(1), PNG.length + 1)
+                  .rasterize("<svg/>".getBytes(StandardCharsets.UTF_8), PNG.length + 1))
           .isEmpty();
     }
+
+    Path oversized = executable(temp, "resvg-oversized", pngScript());
+    assertThat(
+            new ResvgRasterizer(oversized, Duration.ofSeconds(1), PNG.length - 1)
+                .rasterize("<svg/>".getBytes(StandardCharsets.UTF_8), PNG.length - 1))
+        .isEmpty();
+
+    Path overdimensioned =
+        executable(
+            temp,
+            "resvg-overdimensioned",
+            "#!/bin/sh\nprintf '\\211PNG\\r\\n\\032\\n\\000\\000\\000\\rIHDR\\000\\000\\020\\001\\000\\000\\000\\001'\n");
+    assertThat(
+            new ResvgRasterizer(overdimensioned, Duration.ofSeconds(1), 1024)
+                .rasterize("<svg/>".getBytes(StandardCharsets.UTF_8), 1024))
+        .isEmpty();
   }
 
   @Test
@@ -86,6 +122,41 @@ class ResvgRasterizerTest {
             new ResvgRasterizer(executable, Duration.ofMillis(25), PNG.length + 1)
                 .rasterize("<svg/>".getBytes(StandardCharsets.UTF_8), PNG.length))
         .isEmpty();
+  }
+
+  @Test
+  void interruptionCancelsTheConverterAndRestoresTheCallerInterrupt(@TempDir Path temp)
+      throws Exception {
+    Path marker = temp.resolve("started");
+    Path executable =
+        executable(
+            temp,
+            "resvg-cancel",
+            "#!/bin/sh\nprintf started > '" + marker + "'\nwhile :; do :; done\n");
+    AtomicReference<Optional<byte[]>> result = new AtomicReference<>();
+    AtomicBoolean interrupted = new AtomicBoolean();
+    Thread caller =
+        Thread.ofPlatform()
+            .start(
+                () -> {
+                  result.set(
+                      new ResvgRasterizer(executable, Duration.ofSeconds(10), PNG.length + 1)
+                          .rasterize(
+                              "<svg/>".getBytes(StandardCharsets.UTF_8), PNG.length + 1));
+                  interrupted.set(Thread.currentThread().isInterrupted());
+                });
+
+    long deadline = System.nanoTime() + Duration.ofSeconds(2).toNanos();
+    while (!Files.exists(marker) && System.nanoTime() < deadline) {
+      Thread.onSpinWait();
+    }
+    assertThat(marker).exists();
+    caller.interrupt();
+    caller.join(Duration.ofSeconds(2));
+
+    assertThat(caller.isAlive()).isFalse();
+    assertThat(result.get()).isEmpty();
+    assertThat(interrupted).isTrue();
   }
 
   private static Path executable(Path directory, String name, String script) throws Exception {

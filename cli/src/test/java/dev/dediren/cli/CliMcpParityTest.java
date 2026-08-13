@@ -269,7 +269,17 @@ class CliMcpParityTest {
     Files.copy(policy("default-svg.json"), root.resolve("render-policy.json"));
 
     CallToolResult data =
-        build(root, Map.of("source", "model.json", "out", "data-out", "output", "data"));
+        build(
+            root,
+            Map.of(
+                "source",
+                "model.json",
+                "out",
+                "data-out",
+                "render_policy",
+                "render-policy.json",
+                "output",
+                "data"));
     CallToolResult svg =
         build(
             root,
@@ -288,6 +298,35 @@ class CliMcpParityTest {
     assertThat(svg.isError()).isFalse();
     assertThat(svg.content()).hasSizeGreaterThan(1);
     assertThat(((ImageContent) svg.content().get(1)).mimeType()).isEqualTo("image/svg+xml");
+  }
+
+  @Test
+  void imageOutputWithMissingOrEmptyCapabilitiesReturnsJsonOnly(@TempDir Path root)
+      throws Exception {
+    Files.copy(fixture("valid-basic.json"), root.resolve("model.json"));
+    Files.copy(policy("default-svg.json"), root.resolve("render-policy.json"));
+    Map<String, Object> base =
+        Map.of(
+            "source", "model.json",
+            "out", "omitted-out",
+            "render_policy", "render-policy.json",
+            "output", "image");
+
+    CallToolResult omitted = build(root, base);
+    CallToolResult empty =
+        build(
+            root,
+            Map.of(
+                "source", "model.json",
+                "out", "empty-out",
+                "render_policy", "render-policy.json",
+                "output", "image",
+                "accepted_image_types", java.util.List.of()));
+
+    assertThat(omitted.isError()).isFalse();
+    assertThat(omitted.content()).hasSize(1);
+    assertThat(empty.isError()).isFalse();
+    assertThat(empty.content()).hasSize(1);
   }
 
   @Test
