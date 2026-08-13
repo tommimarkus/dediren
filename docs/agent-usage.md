@@ -183,7 +183,7 @@ Eight tools in writable mode:
   its declared path
   (see `## Build`). Source, package, policy, and source-mode `out` paths are
   relative to `--root`; package-declared outputs are relative to the package
-  directory. This removes the 2026.08.3 workspace-handle requirement and
+  directory. This removes the former workspace-handle requirement and
   restores earlier MCP clients: do not pass `workspace_id`. Existing
   `.dediren/mcp/workspaces/` files are neither migrated nor deleted
   automatically; recover wanted artifacts and remove the residue manually.
@@ -273,7 +273,7 @@ not a Dediren runtime dependency and has no Dediren
 {
   "model_schema_version": "model.schema.v1",
   "required_plugins": [
-    { "id": "generic-graph", "version": "2026.08.3" }
+    { "id": "generic-graph", "version": "2026.08.4" }
   ],
   "nodes": [
     { "id": "client", "type": "generic.actor", "label": "Client", "properties": {} },
@@ -366,8 +366,8 @@ profile and use ArchiMate type names:
 ```json
 {
   "required_plugins": [
-    { "id": "generic-graph", "version": "2026.08.3" },
-    { "id": "archimate-oef", "version": "2026.08.3" }
+    { "id": "generic-graph", "version": "2026.08.4" },
+    { "id": "archimate-oef", "version": "2026.08.4" }
   ],
   "plugins": {
     "generic-graph": {
@@ -1242,7 +1242,7 @@ deployment slots, and UMLDI.
 ## Runtime Probes
 
 ```bash
-VERSION=2026.08.3
+VERSION=2026.08.4
 BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-${VERSION}
 
 "$BUNDLE/bin/dediren" --version
