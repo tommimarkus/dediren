@@ -148,6 +148,83 @@ class DedirenToolsTest {
     assertThat(diagnostic.path("message").asText()).doesNotContain(root.toRealPath().toString());
   }
 
+  @Test
+  void buildValidatesImageTypeNegotiationSeparatelyFromOutputSelection(@TempDir Path root)
+      throws Exception {
+    Files.copy(fixture("valid-basic.json"), root.resolve("model.json"));
+
+    CallToolResult nonImageOutput =
+        toolsIn(root)
+            .build(
+                new CallToolRequest(
+                    "dediren_build",
+                    Map.of(
+                        "source",
+                        "model.json",
+                        "out",
+                        "out",
+                        "accepted_image_types",
+                        List.of("image/png"))));
+    CallToolResult duplicateType =
+        toolsIn(root)
+            .build(
+                new CallToolRequest(
+                    "dediren_build",
+                    Map.of(
+                        "source",
+                        "model.json",
+                        "out",
+                        "out",
+                        "output",
+                        "image",
+                        "accepted_image_types",
+                        List.of("image/png", "image/png"))));
+    CallToolResult unknownType =
+        toolsIn(root)
+            .build(
+                new CallToolRequest(
+                    "dediren_build",
+                    Map.of(
+                        "source",
+                        "model.json",
+                        "out",
+                        "out",
+                        "output",
+                        "image",
+                        "accepted_image_types",
+                        List.of("image/jpeg"))));
+
+    assertThat(textOf(nonImageOutput)).contains("accepted_image_types", "output");
+    assertThat(textOf(duplicateType)).contains("accepted_image_types", "unique");
+    assertThat(textOf(unknownType)).contains("accepted_image_types", "image/svg+xml", "image/png");
+    assertThat(nonImageOutput.isError()).isTrue();
+    assertThat(duplicateType.isError()).isTrue();
+    assertThat(unknownType.isError()).isTrue();
+  }
+
+  @Test
+  void sourceBuildNeedsItsPolicyForNegotiatedImageMedia(@TempDir Path root) throws Exception {
+    Files.copy(fixture("valid-basic.json"), root.resolve("model.json"));
+
+    CallToolResult missingBuildPolicy =
+        toolsIn(root)
+            .build(
+                new CallToolRequest(
+                    "dediren_build",
+                    Map.of(
+                        "source",
+                        "model.json",
+                        "out",
+                        "out",
+                        "output",
+                        "image",
+                        "accepted_image_types",
+                        List.of("image/svg+xml"))));
+
+    assertThat(missingBuildPolicy.isError()).isTrue();
+    assertThat(textOf(missingBuildPolicy)).contains("render_policy");
+  }
+
   // A source is model-supplied, so its fragments[] paths are model-supplied too. They must be
   // confined to --root exactly like the tool's own path arguments, and their errors sanitized. No
   // fixture carries a fragment shape, so these mirror CliValidateTest's inline fragment models.

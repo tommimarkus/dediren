@@ -54,14 +54,22 @@ public final class DedirenTools {
    */
   private static final Pattern VIEW_ID_PATTERN = Pattern.compile("^[A-Za-z0-9][A-Za-z0-9._-]*$");
 
+  private static final long INLINE_BYTES = SourceLimits.DEFAULT.maxInputFileBytes();
+
   private final Path root;
   private final Engines engines;
   private final Map<String, String> env;
+  private final ResvgRasterizer rasterizer;
 
   public DedirenTools(Path root, Engines engines, Map<String, String> env) {
+    this(root, engines, env, ResvgRasterizer.resolve("resvg", env));
+  }
+
+  DedirenTools(Path root, Engines engines, Map<String, String> env, ResvgRasterizer rasterizer) {
     this.root = root;
     this.engines = engines;
     this.env = Map.copyOf(env);
+    this.rasterizer = rasterizer;
   }
 
   public CallToolResult importSource(CallToolRequest request) {
@@ -108,12 +116,20 @@ public final class DedirenTools {
     String output = outputArg(request);
     if (output == null) {
       return error(
-          DiagnosticCode.COMMAND_INPUT_INVALID, "'output' must be 'data' or 'svg'", "output");
+          DiagnosticCode.COMMAND_INPUT_INVALID,
+          "'output' must be 'data', 'svg', or 'image'",
+          "output");
+    }
+    ImageSelection selection;
+    try {
+      selection = imageSelection(request, output);
+    } catch (InvalidListArgumentException invalid) {
+      return error(DiagnosticCode.COMMAND_INPUT_INVALID, invalid.getMessage(), invalid.argument());
     }
     try {
       CoreCommands.ImportedSourceResult imported =
           CoreCommands.importSource(plugin, text, env, engines);
-      if (!"svg".equals(output) || !imported.succeeded()) {
+      if (("data".equals(output) || selection == ImageSelection.NONE) || !imported.succeeded()) {
         return envelope(imported.outcome().stdout(), imported.outcome().exitCode() != 0);
       }
       String policy = readImportRenderPolicy(request);
@@ -132,7 +148,11 @@ public final class DedirenTools {
         return error(
             DiagnosticCode.COMMAND_IO_FAILED, "render did not produce an SVG artifact", null);
       }
-      if (utf8Bytes(svg) > SourceLimits.DEFAULT.maxInputFileBytes()) {
+      byte[] svgBytes = svg.getBytes(StandardCharsets.UTF_8);
+      if (svgBytes.length > INLINE_BYTES) {
+        if ("image".equals(output)) {
+          return envelope(imported.outcome().stdout(), false);
+        }
         return error(
             DiagnosticCode.INPUT_FILE_TOO_LARGE, "decoded SVG artifacts exceed 64 MiB", null);
       }
@@ -140,15 +160,13 @@ public final class DedirenTools {
         return error(
             DiagnosticCode.COMMAND_IO_FAILED, "render did not produce an SVG artifact", null);
       }
-      return CallToolResult.builder()
-          .addTextContent(imported.outcome().stdout())
-          .addContent(
-              new ImageContent(
-                  null,
-                  Base64.getEncoder().encodeToString(svg.getBytes(StandardCharsets.UTF_8)),
-                  "image/svg+xml"))
-          .isError(false)
-          .build();
+      ImageContent image = imageContent(svgBytes, selection, INLINE_BYTES);
+      CallToolResult.Builder result =
+          CallToolResult.builder().addTextContent(imported.outcome().stdout()).isError(false);
+      if (image != null) {
+        result.addContent(image);
+      }
+      return result.build();
     } catch (EngineExecutionException failure) {
       return engineFailure(failure);
     } catch (ProductRootException failure) {
@@ -360,11 +378,19 @@ public final class DedirenTools {
     String output = outputArg(request);
     if (output == null) {
       return error(
-          DiagnosticCode.COMMAND_INPUT_INVALID, "'output' must be 'data' or 'svg'", "output");
+          DiagnosticCode.COMMAND_INPUT_INVALID,
+          "'output' must be 'data', 'svg', or 'image'",
+          "output");
+    }
+    ImageSelection selection;
+    try {
+      selection = imageSelection(request, output);
+    } catch (InvalidListArgumentException invalid) {
+      return error(DiagnosticCode.COMMAND_INPUT_INVALID, invalid.getMessage(), invalid.argument());
     }
     String packageArg = stringArg(request, "package");
     if (packageArg != null) {
-      return buildPackage(request, packageArg, output);
+      return buildPackage(request, packageArg, output, selection);
     }
     String source = stringArg(request, "source");
     if (source == null) {
@@ -374,10 +400,10 @@ public final class DedirenTools {
     if (out == null) {
       return error(DiagnosticCode.COMMAND_INPUT_INVALID, "build requires 'out'", null);
     }
-    if ("svg".equals(output) && stringArg(request, "render_policy") == null) {
+    if (selection != ImageSelection.NONE && stringArg(request, "render_policy") == null) {
       return error(
           DiagnosticCode.COMMAND_INPUT_INVALID,
-          "build output 'svg' requires 'render_policy' for a source build",
+          "build image output requires 'render_policy' for a source build",
           "render_policy");
     }
     List<String> views;
@@ -433,7 +459,7 @@ public final class DedirenTools {
             env);
     try {
       EngineRunOutcome outcome = BuildCommand.run(buildRequest, engines);
-      return withBuildImages(outcome, output, outPath, false);
+      return withBuildImages(outcome, output, selection, outPath, false);
     } catch (EngineExecutionException failure) {
       return engineFailure(failure);
     } catch (ProductRootException failure) {
@@ -443,7 +469,8 @@ public final class DedirenTools {
     }
   }
 
-  private CallToolResult buildPackage(CallToolRequest request, String packageArg, String output) {
+  private CallToolResult buildPackage(
+      CallToolRequest request, String packageArg, String output, ImageSelection selection) {
     if (stringArg(request, "source") != null
         || stringArg(request, "out") != null
         || stringArg(request, "render_policy") != null
@@ -484,7 +511,7 @@ public final class DedirenTools {
         new PackageBuildRequest(packageText, packagePath.getParent(), root, env, views, noExport);
     try {
       EngineRunOutcome outcome = PackageBuildCommand.run(packageRequest, engines);
-      return withBuildImages(outcome, output, packagePath.getParent(), true);
+      return withBuildImages(outcome, output, selection, packagePath.getParent(), true);
     } catch (EngineExecutionException failure) {
       return engineFailure(failure);
     } catch (ProductRootException failure) {
@@ -525,12 +552,19 @@ public final class DedirenTools {
   }
 
   private CallToolResult withBuildImages(
-      EngineRunOutcome outcome, String output, Path artifactRoot, boolean packageBuild) {
-    if (!"svg".equals(output)) {
+      EngineRunOutcome outcome,
+      String output,
+      ImageSelection selection,
+      Path artifactRoot,
+      boolean packageBuild) {
+    if (selection == ImageSelection.NONE) {
       return envelope(outcome.stdout(), outcome.exitCode() != 0);
     }
     try {
-      List<ImageContent> images = buildSvgImages(outcome.stdout(), artifactRoot, packageBuild);
+      List<ImageContent> images =
+          selection == ImageSelection.SVG
+              ? buildSvgImages(outcome.stdout(), artifactRoot, packageBuild)
+              : buildPngImages(outcome.stdout(), artifactRoot, packageBuild);
       CallToolResult.Builder result =
           CallToolResult.builder()
               .addTextContent(outcome.stdout())
@@ -538,9 +572,29 @@ public final class DedirenTools {
       images.forEach(result::addContent);
       return result.build();
     } catch (InlineArtifactException failure) {
+      if ("image".equals(output)) {
+        return envelope(outcome.stdout(), outcome.exitCode() != 0);
+      }
       System.err.println("dediren mcp: inline SVG artifact failure: " + failure.getMessage());
       return error(DiagnosticCode.COMMAND_IO_FAILED, "could not read generated SVG artifact", null);
     }
+  }
+
+  private List<ImageContent> buildPngImages(
+      String outcomeJson, Path artifactRoot, boolean packageBuild) throws InlineArtifactException {
+    List<ImageContent> svgImages = buildSvgImages(outcomeJson, artifactRoot, packageBuild);
+    List<ImageContent> pngImages = new ArrayList<>();
+    long attached = 0;
+    for (ImageContent svg : svgImages) {
+      byte[] svgBytes = Base64.getDecoder().decode(svg.data());
+      ImageContent png = imageContent(svgBytes, ImageSelection.PNG, INLINE_BYTES - attached);
+      if (png != null) {
+        long size = Base64.getDecoder().decode(png.data()).length;
+        attached += size;
+        pngImages.add(png);
+      }
+    }
+    return List.copyOf(pngImages);
   }
 
   static List<ImageContent> buildSvgImages(
@@ -627,6 +681,66 @@ public final class DedirenTools {
             || trimmed.charAt(4) == '>');
   }
 
+  private ImageContent imageContent(
+      byte[] svgBytes, ImageSelection selection, long remainingAttachmentBytes) {
+    if (selection == ImageSelection.SVG) {
+      if (svgBytes.length > remainingAttachmentBytes) {
+        return null;
+      }
+      return new ImageContent(null, Base64.getEncoder().encodeToString(svgBytes), "image/svg+xml");
+    }
+    if (selection == ImageSelection.PNG) {
+      return rasterizer
+          .rasterize(svgBytes, remainingAttachmentBytes)
+          .map(png -> new ImageContent(null, Base64.getEncoder().encodeToString(png), "image/png"))
+          .orElse(null);
+    }
+    return null;
+  }
+
+  private static ImageSelection imageSelection(CallToolRequest request, String output)
+      throws InvalidListArgumentException {
+    Object value = request.arguments().get("accepted_image_types");
+    if (!"image".equals(output)) {
+      if (value != null) {
+        throw new InvalidListArgumentException(
+            "accepted_image_types", "'accepted_image_types' is permitted only with output 'image'");
+      }
+      return "svg".equals(output) ? ImageSelection.SVG : ImageSelection.NONE;
+    }
+    if (value == null) {
+      return ImageSelection.NONE;
+    }
+    if (!(value instanceof List<?> raw)) {
+      throw new InvalidListArgumentException(
+          "accepted_image_types", "'accepted_image_types' must be an array of strings");
+    }
+    Set<String> unique = new LinkedHashSet<>();
+    for (int index = 0; index < raw.size(); index++) {
+      Object item = raw.get(index);
+      if (!(item instanceof String type)
+          || !("image/svg+xml".equals(type) || "image/png".equals(type))) {
+        throw new InvalidListArgumentException(
+            "accepted_image_types",
+            "'accepted_image_types' may contain only 'image/svg+xml' or 'image/png'");
+      }
+      if (!unique.add(type)) {
+        throw new InvalidListArgumentException(
+            "accepted_image_types", "'accepted_image_types' values must be unique");
+      }
+    }
+    if (unique.contains("image/svg+xml")) {
+      return ImageSelection.SVG;
+    }
+    return unique.contains("image/png") ? ImageSelection.PNG : ImageSelection.NONE;
+  }
+
+  private enum ImageSelection {
+    NONE,
+    SVG,
+    PNG
+  }
+
   private static long utf8Bytes(String text) {
     long bytes = 0;
     for (int index = 0; index < text.length(); index++) {
@@ -655,7 +769,8 @@ public final class DedirenTools {
     if (value == null) {
       return "data";
     }
-    return value instanceof String output && ("data".equals(output) || "svg".equals(output))
+    return value instanceof String output
+            && ("data".equals(output) || "svg".equals(output) || "image".equals(output))
         ? output
         : null;
   }

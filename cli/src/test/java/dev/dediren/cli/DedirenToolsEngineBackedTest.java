@@ -235,6 +235,49 @@ class DedirenToolsEngineBackedTest {
   }
 
   @Test
+  void negotiatedImportImageUsesTheBundledDefaultOrAConfinedOverride(@TempDir Path root)
+      throws Exception {
+    Files.copy(policy("dark-svg.json"), root.resolve("dark.json"));
+    DedirenTools tools = new DedirenTools(root, EngineWiring.defaults(), Map.of());
+
+    CallToolResult bundledDefault =
+        tools.importSource(
+            new CallToolRequest(
+                "dediren_import",
+                Map.of(
+                    "content",
+                    "digraph G { start -> finish; }\n",
+                    "plugin",
+                    "dot",
+                    "output",
+                    "image",
+                    "accepted_image_types",
+                    List.of("image/svg+xml"))));
+    CallToolResult override =
+        tools.importSource(
+            new CallToolRequest(
+                "dediren_import",
+                Map.of(
+                    "content",
+                    "flowchart TD\nstart[Start] --> finish[Finish]\n",
+                    "plugin",
+                    "mermaid",
+                    "render_policy",
+                    "dark.json",
+                    "output",
+                    "image",
+                    "accepted_image_types",
+                    List.of("image/svg+xml"))));
+
+    assertThat(bundledDefault.isError()).isNotEqualTo(Boolean.TRUE);
+    assertThat(bundledDefault.content()).hasSize(2);
+    assertThat(decodedSvg(bundledDefault.content().get(1))).contains("<svg", "<title>main</title>");
+    assertThat(override.isError()).isNotEqualTo(Boolean.TRUE);
+    assertThat(override.content()).hasSize(2);
+    assertThat(decodedSvg(override.content().get(1))).contains("#0b1220");
+  }
+
+  @Test
   void inlineImportSvgRejectsAnImageAboveTheDecodedCeiling(@TempDir Path root) {
     String oversizedSvg = "<svg>" + "x".repeat(64 * 1024 * 1024) + "</svg>";
 
@@ -374,7 +417,7 @@ class DedirenToolsEngineBackedTest {
   }
 
   @Test
-  void svgOutputReturnsDecodedImagesAfterTheDataEnvelopeInRequestedViewOrder(@TempDir Path root)
+  void negotiatedSvgImagesFollowTheDataEnvelopeInRequestedViewOrder(@TempDir Path root)
       throws Exception {
     Files.copy(fixture("valid-uml-basic.json"), root.resolve("model.json"));
     Files.copy(policy("uml-svg.json"), root.resolve("policy.json"));
@@ -394,7 +437,9 @@ class DedirenToolsEngineBackedTest {
                         "views",
                         List.of("activity-view", "class-view"),
                         "output",
-                        "svg")));
+                        "image",
+                        "accepted_image_types",
+                        List.of("image/svg+xml"))));
 
     assertThat(result.isError()).isNotEqualTo(Boolean.TRUE);
     assertThat(result.content()).hasSize(3);
@@ -404,7 +449,7 @@ class DedirenToolsEngineBackedTest {
   }
 
   @Test
-  void failedSvgBuildRetainsEarlierSvgImagesButNeverAttachesOneForTheFailedView(@TempDir Path root)
+  void partialNegotiatedBuildIsErrorAndRetainsOnlySuccessfulAttachments(@TempDir Path root)
       throws Exception {
     Files.copy(fixture("valid-uml-basic.json"), root.resolve("model.json"));
     Files.copy(policy("uml-svg.json"), root.resolve("policy.json"));
@@ -426,7 +471,9 @@ class DedirenToolsEngineBackedTest {
                         "views",
                         List.of("class-view", "activity-view"),
                         "output",
-                        "svg")));
+                        "image",
+                        "accepted_image_types",
+                        List.of("image/svg+xml"))));
 
     assertThat(result.isError()).isTrue();
     assertThat(envelopeOf(result).path("status").asText()).isEqualTo("error");

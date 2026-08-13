@@ -71,7 +71,7 @@
         "layer": "Application",
         "viewpoint": "Application Cooperation",
         "tier": "1",
-        "rationale": "Small utility core that fetches and caches external standards schemas for export validation.",
+        "rationale": "Small utility core that fetches pinned external standards schemas over the bounded Java HTTP client, verifies them, and caches them for in-JVM export validation.",
         "evidence": "source-backed",
         "source": "schema-cache/pom.xml; docs/architecture-guidelines.md \u00a72\u2013\u00a73"
       }
@@ -97,7 +97,7 @@
         "layer": "Application",
         "viewpoint": "Application Cooperation",
         "tier": "2",
-        "rationale": "Orchestration and backend-neutral policy: command handlers, the build driver, in-memory engine dispatch, schema/source validation, and layout-quality checks. Drives engines only through engine-api.",
+        "rationale": "Orchestration and backend-neutral policy: command handlers, the build driver, in-memory engine dispatch, schema/source validation, and layout-quality checks. Drives engines only through engine-api; it produces SVG artifacts but remains unaware of MCP media negotiation and raster adaptation.",
         "evidence": "source-backed",
         "source": "core/pom.xml; docs/architecture-guidelines.md \u00a72\u2013\u00a73"
       }
@@ -214,7 +214,7 @@
         "layer": "Application",
         "viewpoint": "Application Cooperation",
         "tier": "3",
-        "rationale": "MCP stdio protocol adapter: marshals tool calls into core commands and returns the same envelopes verbatim. Owns no orchestration or engine construction.",
+        "rationale": "MCP stdio protocol and media adapter: marshals tool calls into core commands, keeps their envelopes as primary text content, negotiates SVG or PNG response attachments, and owns the optional bounded resvg process. Owns no orchestration, render semantics, or engine construction.",
         "evidence": "source-backed",
         "source": "mcp-server/pom.xml; docs/architecture-guidelines.md \u00a72\u2013\u00a73"
       }

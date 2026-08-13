@@ -15,11 +15,12 @@ class McpCommandTest {
   }
 
   @Test
-  void mcpHelpDocumentsRootAndReadOnly() {
+  void mcpHelpDocumentsRootReadOnlyAndAnAbsoluteResvgCommand() {
     CliResult result = Main.executeForTesting(new String[] {"mcp", "--help"}, "");
 
     assertThat(result.exitCode()).isZero();
     assertThat(result.stdout()).contains("--root");
     assertThat(result.stdout()).contains("--read-only");
+    assertThat(result.stdout()).contains("--resvg-command");
   }
 }

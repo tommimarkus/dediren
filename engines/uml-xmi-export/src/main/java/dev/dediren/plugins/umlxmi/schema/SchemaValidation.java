@@ -221,7 +221,7 @@ public final class SchemaValidation {
           URI.create(OMG_XMI_SCHEMA_URL),
           "OMG XMI schema",
           OMG_XMI_SCHEMA_SHA256,
-          SchemaCacheModule.curlFetcher(SchemaCacheModule.SCHEMA_FETCHER));
+          SchemaCacheModule.httpFetcher(schemaEnv));
     } catch (SchemaCacheException error) {
       throw new XmiValidationException(
           DiagnosticCode.XMI_SCHEMA_UNAVAILABLE.code(),

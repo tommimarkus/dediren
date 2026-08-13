@@ -1075,7 +1075,7 @@ public final class OefExportEngine implements ExportEngine {
             URI.create(pinned.url()),
             pinned.label(),
             pinned.sha256(),
-            SchemaCacheModule.curlFetcher(SchemaCacheModule.SCHEMA_FETCHER));
+            SchemaCacheModule.httpFetcher(schemaEnv));
       }
     } catch (SchemaCacheException error) {
       throw new OefSchemaValidationException(

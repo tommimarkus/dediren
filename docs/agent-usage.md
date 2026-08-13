@@ -139,8 +139,11 @@ Eight tools in writable mode:
   it to list the topics. Start with `topic: "source-json"`.
 - `dediren_import` — pass exactly one of `source` (a confined file path) or
   inline `content`, with `plugin: "mermaid"` or `"dot"`. Select
-  `output: "data"` (default) or `"svg"`; SVG falls back to the bundled
-  `fixtures/render-policy/default-svg.json` unless `render_policy` is given.
+  `output: "data"` (default), `"svg"`, or `"image"`. `"svg"` strictly forces
+  an `image/svg+xml` attachment; `"image"` negotiates against
+  `accepted_image_types`. When either mode selects an attachment, import falls
+  back to the bundled `fixtures/render-policy/default-svg.json` unless
+  `render_policy` is given.
   Prompt-first examples are
   `content: "flowchart LR\n  a --> b"` and `content: "digraph { a -> b }"`.
   Returns the envelope without writing files and remains available under
@@ -171,10 +174,13 @@ Eight tools in writable mode:
   **package** instead, pass `package` (a `package.json` path) — mutually
   exclusive with `source`/`out`/the policies — plus optional `no_export`; the
   package uses its declared render policies and output paths.
-  Both source and package builds accept `output: "data"` (default) or
-  `output: "svg"`; source SVG requires `render_policy`, while package SVG
-  uses its declared policies. The result is a `package-build-result` naming
-  every artifact at its declared path
+  Both source and package builds accept `output: "data"` (default),
+  `output: "svg"`, or `output: "image"`; a source build requires
+  `render_policy` when SVG is forced or an image type is negotiated, while a
+  package build uses its declared policies.
+  `output: "image"` uses `accepted_image_types` to negotiate an optional
+  attachment. The result is a `package-build-result` naming every artifact at
+  its declared path
   (see `## Build`). Source, package, policy, and source-mode `out` paths are
   relative to `--root`; package-declared outputs are relative to the package
   directory. This removes the 2026.08.3 workspace-handle requirement and
@@ -209,11 +215,42 @@ withhold the artifact-writing `dediren_build`; the seven read-only tools
 Tool results carry the same envelope JSON the CLI prints on stdout, so the
 handoff rules in `## Command Handoff` apply unchanged.
 
-For inline SVG, JSON `TextContent` is always first, followed by base64
-`image/svg+xml` images in selected-view order. Partial builds may include
-successful images while retaining `isError`; invalid input, policy, layout, or
-render failures return JSON only. Decoded inline images share a cumulative
-64 MiB limit. Actual inline display depends on MCP client support.
+Image responses are JSON-first: the unchanged command envelope is always the
+first `TextContent`, followed by any base64 image attachments in selected-view
+order. The selectors are:
+
+- `output: "data"` (or omitted) returns only the envelope.
+- `output: "svg"` is the compatibility force-SVG mode. It attaches
+  `image/svg+xml` and treats an unreadable, malformed, or over-limit generated
+  SVG as a tool error.
+- `output: "image"` is negotiation. Supply `accepted_image_types` as a unique
+  array containing `image/svg+xml`, `image/png`, or both. SVG has fixed
+  priority regardless of array order. If the field is omitted or empty, no
+  type matches and the result is JSON only. The field is invalid with another
+  output mode, as are duplicate or unknown MIME types.
+
+PNG is response adaptation owned by the MCP layer, not a new render artifact:
+the render policy and core build still produce SVG. PNG is attempted only when
+`image/png` is accepted and SVG is not. Start the server with
+`--resvg-command resvg` (the default bare `PATH` lookup) or an absolute
+executable path. Command arguments and relative paths containing separators are
+not accepted; resolution happens once at server startup. If `resvg` is absent,
+times out, exits unsuccessfully, emits an invalid/oversized PNG, or otherwise
+cannot convert a valid SVG, `output: "image"` falls back to the unchanged JSON
+envelope rather than failing the successful import/build. Partial builds may
+still attach successful selected-view images while retaining `isError`.
+
+The adapter invokes the resolved executable directly without a shell, with no
+inherited environment values (`PATH` and `HOME` are set empty), writes SVG on
+stdin, and captures PNG on stdout. Each conversion has a 15-second timeout;
+output dimensions are capped at 4096 by 4096, the PNG signature/IHDR/dimensions
+are checked, stderr capture is capped at 64 KiB, and decoded attachments share
+a cumulative 64 MiB limit. Actual inline display depends on MCP client support.
+
+`resvg` is optional and not bundled with Dediren. Its upstream licence is
+MIT OR Apache-2.0; because operators supply the executable separately, it is
+not a Dediren runtime dependency and has no Dediren
+`THIRD-PARTY-NOTICES.md` entry.
 
 ## Artifact Map
 
@@ -618,7 +655,14 @@ or the previous command envelope:
 jq -r '.data.artifacts[] | select(.artifact_kind=="svg") | .content' render-result.json > diagram.svg
 ```
 
-The `render` plugin emits only an `svg` artifact; it does not produce PNG. To get a raster image, convert the emitted SVG with an external tool — for example `rsvg-convert diagram.svg -o diagram.png`, `resvg diagram.svg diagram.png`, ImageMagick (`magick convert diagram.svg diagram.png`), or Inkscape (`inkscape diagram.svg --export-type=png`).
+The `render` plugin and ordinary CLI emit only an `svg` artifact; they do not
+produce PNG. To get a raster artifact, convert the emitted SVG with an external
+tool — for example `rsvg-convert diagram.svg -o diagram.png`,
+`resvg diagram.svg diagram.png`, ImageMagick
+(`magick convert diagram.svg diagram.png`), or Inkscape
+(`inkscape diagram.svg --export-type=png`). MCP `output: "image"` can instead
+return an optional PNG attachment as described in `## MCP Server`; it does not
+add a PNG artifact to the envelope or output directory.
 
 ### Layout constraints in a hand-written layout-request
 
@@ -1350,9 +1394,21 @@ reusable offline cache (subtrees `opengroup/archimate/3.1/` and
 paths as absolute: plugins run from the bundle's product root, so a relative
 value resolves against that root rather than your current directory.
 
-When schema downloads must go through a proxy, set `HTTP_PROXY`, `HTTPS_PROXY`,
-and `NO_PROXY` (or their lowercase forms) before invoking `dediren`; the export
-plugins forward them to `curl`. If a download still fails, the
+Online schema downloads use Java's HTTP client: HTTPS is required before and
+after redirects, the connect timeout is 20 seconds, each request timeout is 60
+seconds, and a response body above 8 MiB is rejected before it can replace a
+cached file. Redirect handling refuses HTTPS-to-HTTP downgrade.
+
+When schema downloads must go through a proxy, set `HTTPS_PROXY`, `HTTP_PROXY`,
+or `ALL_PROXY`, plus optional `NO_PROXY` (lowercase forms are also accepted).
+For an HTTPS schema URL, precedence is `HTTPS_PROXY`, then `HTTP_PROXY`, then
+`ALL_PROXY`; within each name the lowercase value wins when both cases exist.
+`NO_PROXY` accepts comma-separated exact hosts, leading-dot domain suffixes,
+or `*`. Proxy URIs must be credential-free `http` URIs, include a host, and
+contain no path, query, or fragment; secure proxy transport and proxy-URI
+credentials are not supported. Any selected invalid proxy fails closed with a
+credential-free schema-fetch error instead of attempting a direct connection.
+If a download still fails, the
 `DEDIREN_OEF_SCHEMA_UNAVAILABLE` / `DEDIREN_XMI_SCHEMA_UNAVAILABLE` diagnostic
 message names both the proxy variables and the offline schema-path fallback, so
 you can recover from stdout JSON alone.
@@ -1596,8 +1652,10 @@ variables below and read nothing else. Important explicit variables:
   resolve local-only from the driver's own directory). Both export lanes
   validate in-JVM — no external validator binary or override variable exists.
 - `DEDIREN_SCHEMA_CACHE_DIR`: cache directory for schema downloads.
-- `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY` (and their lowercase forms): forwarded
-  to `curl` so it can download standards schemas through a proxy.
+- `HTTPS_PROXY`, `HTTP_PROXY`, `ALL_PROXY`, `NO_PROXY` (and their lowercase
+  forms): consumed by the Java HTTP schema fetcher. For HTTPS downloads the
+  proxy precedence is HTTPS, HTTP, then ALL; lowercase wins within a name, and
+  an invalid selected proxy fails closed rather than bypassing it.
 - `DEDIREN_LOG_LEVEL`: `trace`, `debug`, `info`, `warn`, `error`, or `off`
   (default `off`). Turns on human-readable debug logging on **stderr** for one
   run. Any other value is ignored with a note on stderr.

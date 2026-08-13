@@ -14,8 +14,10 @@ To run a bundle (building from source is covered in
 
 - **Java 21 or newer** on `PATH` as `java`.
 - No external XML validator: both export lanes validate standards XML in-JVM.
-- `curl` on `PATH` only when export validation must download a standards schema
-  (offline runs supply schemas via env vars instead).
+- No external schema fetcher: the Java HTTP client downloads pinned standards
+  schemas (offline runs supply schemas via env vars instead).
+- Optional `resvg` only for MCP clients that negotiate `image/png` response
+  attachments. It is not bundled and does not alter ordinary CLI/render output.
 
 ## Bundle Layout
 
@@ -43,13 +45,15 @@ The single `bin/dediren` launcher sets `DEDIREN_BUNDLE_ROOT` from its
 installation root, so commands locate bundled `schemas/`, `fixtures/`, and
 `bin/` regardless of the caller's working directory. It runs every engine
 in-process; there is no per-engine launcher, standalone executable, or
-`capabilities` probe, and nothing is ever looked up from `PATH`.
+`capabilities` probe, and no engine is looked up from `PATH`. The distinct
+`dediren mcp --resvg-command` option may resolve one optional bare executable
+name from `PATH` at server startup for PNG response adaptation.
 
 ## Environment Variables
 
 The engines run inside the CLI process; the export engines receive the CLI's
-environment explicitly for the schema-path variables below and read nothing
-else.
+environment explicitly for the schema-path/cache and HTTP-proxy variables
+below and do not call `System.getenv()` themselves.
 
 | Variable | Purpose |
 | --- | --- |
@@ -57,6 +61,7 @@ else.
 | `DEDIREN_OEF_SCHEMA_DIR` | Local OEF schema directory (offline export validation). |
 | `DEDIREN_XMI_SCHEMA_PATH` | Local XMI schema file (offline export validation). |
 | `DEDIREN_SCHEMA_CACHE_DIR` | Cache directory for schema downloads. |
+| `HTTPS_PROXY`, `HTTP_PROXY`, `ALL_PROXY`, `NO_PROXY` (and lowercase forms) | Java HTTP schema-download proxy selection; HTTPS takes precedence over HTTP then ALL, lowercase wins within each name, and invalid selected proxy configuration fails closed. |
 | `DEDIREN_LOG_LEVEL` | Debug logging on stderr for one run: `trace`/`debug`/`info`/`warn`/`error`/`off` (default `off`). Values outside that set are rejected — the launcher interpolates this into `JAVA_OPTS`, so an allowlist is what stops JVM-argument injection. |
 
 ## Startup Optimization

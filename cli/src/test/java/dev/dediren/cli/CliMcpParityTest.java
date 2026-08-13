@@ -6,12 +6,15 @@ import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.mcp.DedirenTools;
 import io.modelcontextprotocol.spec.McpSchema.CallToolRequest;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
+import io.modelcontextprotocol.spec.McpSchema.ImageContent;
 import io.modelcontextprotocol.spec.McpSchema.TextContent;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Base64;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import tools.jackson.databind.JsonNode;
 
 /**
  * The MCP surface must not drift from the CLI. Same inputs, same envelope — byte for byte.
@@ -231,6 +234,160 @@ class CliMcpParityTest {
     assertThat(mcp.isError()).isNotEqualTo(Boolean.TRUE);
     assertThat(normalizePaths(textOf(mcp), mcpOut)).isEqualTo(normalizePaths(cli.stdout(), cliOut));
     assertThat(mcpOut.resolve("main")).isDirectory();
+  }
+
+  @Test
+  void imageOutputPrefersSvgAndKeepsTheUnmodifiedEnvelopeFirst(@TempDir Path root)
+      throws Exception {
+    Files.copy(fixture("valid-pipeline-rich.json"), root.resolve("model.json"));
+    Files.copy(policy("rich-svg.json"), root.resolve("render-policy.json"));
+
+    Map<String, Object> dataArguments =
+        Map.of(
+            "source",
+            "model.json",
+            "out",
+            "out",
+            "render_policy",
+            "render-policy.json",
+            "output",
+            "data");
+    CallToolResult data = build(root, dataArguments);
+    CallToolResult result =
+        build(
+            root,
+            Map.of(
+                "source",
+                "model.json",
+                "out",
+                "out",
+                "render_policy",
+                "render-policy.json",
+                "output",
+                "image",
+                "accepted_image_types",
+                java.util.List.of("image/png", "image/svg+xml")));
+
+    assertThat(result.isError()).isFalse();
+    assertThat(result.content().get(0)).isInstanceOf(TextContent.class);
+    assertThat(result.content().get(1)).isInstanceOf(ImageContent.class);
+    assertThat(((ImageContent) result.content().get(1)).mimeType()).isEqualTo("image/svg+xml");
+    assertThat(textOf(result)).isEqualTo(textOf(data));
+  }
+
+  @Test
+  void dataAndForcedSvgRemainTheExistingContractWhenImageNegotiationIsAbsent(@TempDir Path root)
+      throws Exception {
+    Files.copy(fixture("valid-basic.json"), root.resolve("model.json"));
+    Files.copy(policy("default-svg.json"), root.resolve("render-policy.json"));
+
+    CallToolResult data =
+        build(
+            root,
+            Map.of(
+                "source",
+                "model.json",
+                "out",
+                "data-out",
+                "render_policy",
+                "render-policy.json",
+                "output",
+                "data"));
+    CallToolResult svg =
+        build(
+            root,
+            Map.of(
+                "source",
+                "model.json",
+                "out",
+                "svg-out",
+                "render_policy",
+                "render-policy.json",
+                "output",
+                "svg"));
+
+    assertThat(data.isError()).isFalse();
+    assertThat(data.content()).hasSize(1);
+    assertThat(svg.isError()).isFalse();
+    assertThat(svg.content()).hasSizeGreaterThan(1);
+    ImageContent attached = (ImageContent) svg.content().get(1);
+    assertThat(attached.mimeType()).isEqualTo("image/svg+xml");
+    assertThat(Base64.getDecoder().decode(attached.data()))
+        .isEqualTo(Files.readAllBytes(root.resolve("svg-out").resolve(svgArtifactPath(svg))));
+  }
+
+  private static String svgArtifactPath(CallToolResult result) {
+    JsonNode artifacts =
+        JsonSupport.objectMapper().readTree(textOf(result)).at("/views/0/artifacts");
+    for (JsonNode artifact : artifacts) {
+      if ("svg".equals(artifact.path("artifact_kind").asText())) {
+        return artifact.path("path").asText();
+      }
+    }
+    throw new AssertionError("build result did not declare an SVG artifact");
+  }
+
+  @Test
+  void imageOutputWithMissingOrEmptyCapabilitiesReturnsJsonOnly(@TempDir Path root)
+      throws Exception {
+    Files.copy(fixture("valid-basic.json"), root.resolve("model.json"));
+    Files.copy(policy("default-svg.json"), root.resolve("render-policy.json"));
+    Map<String, Object> base =
+        Map.of(
+            "source", "model.json",
+            "out", "omitted-out",
+            "render_policy", "render-policy.json",
+            "output", "image");
+
+    CallToolResult omitted = build(root, base);
+    CallToolResult empty =
+        build(
+            root,
+            Map.of(
+                "source", "model.json",
+                "out", "empty-out",
+                "render_policy", "render-policy.json",
+                "output", "image",
+                "accepted_image_types", java.util.List.of()));
+
+    assertThat(omitted.isError()).isFalse();
+    assertThat(omitted.content()).hasSize(1);
+    assertThat(empty.isError()).isFalse();
+    assertThat(empty.content()).hasSize(1);
+  }
+
+  @Test
+  void packageDeclaredRenderPolicyAlsoSuppliesNegotiatedSvgInDeclaredViewOrder(@TempDir Path root)
+      throws Exception {
+    Files.copy(fixture("valid-pipeline-rich.json"), root.resolve("model.json"));
+    Files.copy(policy("rich-svg.json"), root.resolve("render-policy.json"));
+    Files.writeString(
+        root.resolve("package.json"),
+        """
+        {
+          "package_schema_version": "package.schema.v1",
+          "models": [{"id":"model","source":"model.json"}],
+          "views": [
+            {"id":"main","model":"model","render_policy":"render-policy.json","outputs":{"diagram":"out/main.svg"}}
+          ]
+        }
+        """);
+
+    CallToolResult result =
+        build(
+            root,
+            Map.of(
+                "package",
+                "package.json",
+                "output",
+                "image",
+                "accepted_image_types",
+                java.util.List.of("image/svg+xml")));
+
+    assertThat(result.isError()).isFalse();
+    assertThat(result.content().get(0)).isInstanceOf(TextContent.class);
+    assertThat(((ImageContent) result.content().get(1)).mimeType()).isEqualTo("image/svg+xml");
+    assertThat(textOf(result)).contains("package-build-result.schema.v1", "out/main.svg");
   }
 
   /**

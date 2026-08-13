@@ -10,9 +10,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.EnabledOnOs;
-import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
 
 class SchemaCacheModuleTest {
@@ -24,41 +23,6 @@ class SchemaCacheModuleTest {
       "65a8fcf0cf2a47e9dd2136cdbaee048f965cbb3830443622ff866637b7c8ed0d";
   private static final String WRONG_SHA256 =
       "0000000000000000000000000000000000000000000000000000000000000000";
-
-  @Test
-  void aFetcherFloodingStderrDoesNotDeadlock() throws Exception {
-    // Same defect class as the schema validator: curlFetcher drained stdout to EOF before reading
-    // stderr, so a fetcher that fills the ~64 KiB stderr pipe blocks in write(2) and never exits.
-    // A verbose curl failure (redirect chain, TLS diagnostics) reaches that volume.
-    org.junit.jupiter.api.Assumptions.assumeTrue(
-        Files.isExecutable(Path.of("/bin/sh")), "a POSIX shell is required for the fake fetcher");
-    Path fetcher = tempDir.resolve("noisy-curl");
-    Files.writeString(
-        fetcher,
-        "#!/bin/sh\n"
-            + "i=0\n"
-            + "while [ $i -lt 4000 ]; do\n"
-            + "  echo \"line $i: curl could not resolve host\" >&2\n"
-            + "  i=$((i+1))\n"
-            + "done\n"
-            + "exit 6\n",
-        StandardCharsets.UTF_8);
-    java.util.Set<java.nio.file.attribute.PosixFilePermission> permissions =
-        new java.util.HashSet<>(Files.getPosixFilePermissions(fetcher));
-    permissions.add(java.nio.file.attribute.PosixFilePermission.OWNER_EXECUTE);
-    Files.setPosixFilePermissions(fetcher, permissions);
-
-    SchemaFetchResult result =
-        org.junit.jupiter.api.Assertions.assertTimeoutPreemptively(
-            java.time.Duration.ofSeconds(20),
-            () ->
-                SchemaCacheModule.curlFetcher(fetcher.toString())
-                    .fetch(URI.create("https://example.invalid/x.xsd"), tempDir.resolve("out")));
-
-    assertThat(result.succeeded()).isFalse();
-    assertThat(result.exitCode()).isEqualTo(6);
-    assertThat(new String(result.stderr(), StandardCharsets.UTF_8)).contains("line 3999");
-  }
 
   @Test
   void aRelativeSchemaPathResolvesAgainstTheProductRootNotTheJvmCwd() {
@@ -271,6 +235,35 @@ class SchemaCacheModuleTest {
   }
 
   @Test
+  void oversizedCachedSchemaIsRejectedAndReplacedWithinTheNetworkCeiling() throws Exception {
+    Path schema = tempDir.resolve("nested").resolve("schema.xsd");
+    Files.createDirectories(schema.getParent());
+    try (var channel =
+        Files.newByteChannel(
+            schema,
+            java.nio.file.StandardOpenOption.CREATE_NEW,
+            java.nio.file.StandardOpenOption.WRITE)) {
+      channel.position(8L * 1024 * 1024);
+      channel.write(java.nio.ByteBuffer.wrap(new byte[] {1}));
+    }
+    AtomicBoolean fetched = new AtomicBoolean();
+
+    SchemaCacheModule.ensureCachedSchemaFile(
+        schema,
+        URI.create("https://example.test/schema.xsd"),
+        "test schema",
+        SCHEMA_SHA256,
+        (url, destination) -> {
+          fetched.set(true);
+          Files.writeString(destination, SCHEMA_XML, StandardCharsets.UTF_8);
+          return SchemaFetchResult.success();
+        });
+
+    assertThat(fetched).isTrue();
+    assertThat(schema).hasContent(SCHEMA_XML);
+  }
+
+  @Test
   void rejectsCorruptCachedSchemaWhenReFetchStillMismatches() throws Exception {
     Path schema = tempDir.resolve("nested").resolve("schema.xsd");
     Files.createDirectories(schema.getParent());
@@ -297,70 +290,6 @@ class SchemaCacheModuleTest {
   }
 
   @Test
-  void curlArgsBoundTransferTimeAndForbidProtocolDowngrade() {
-    List<String> args =
-        SchemaCacheModule.curlArgs(URI.create("https://example.org/x.xsd"), Path.of("/tmp/x"));
-    assertThat(args).containsSequence("--proto", "=https");
-    assertThat(args).containsSequence("--max-time", "60");
-  }
-
-  @Test
-  @EnabledOnOs({OS.LINUX, OS.MAC})
-  void curlFetcherUsesExpectedDownloadArguments() throws Exception {
-    Path fakeCurl = tempDir.resolve("fake-curl.sh");
-    Files.writeString(
-        fakeCurl,
-        """
-                #!/usr/bin/env sh
-                args_text=""
-                output=""
-                while [ "$#" -gt 0 ]; do
-                  args_text="${args_text}${1}
-                "
-                  if [ "$1" = "--output" ]; then
-                    shift
-                    args_text="${args_text}${1}
-                "
-                    output="$1"
-                  fi
-                  shift
-                done
-                printf '<schema/>' > "$output"
-                printf '%s' "$args_text" > "$output.args"
-                """,
-        StandardCharsets.UTF_8);
-    assertThat(fakeCurl.toFile().setExecutable(true)).isTrue();
-    Path schema = tempDir.resolve("curl").resolve("schema.xsd");
-
-    SchemaCacheModule.ensureCachedSchemaFile(
-        schema,
-        URI.create("https://example.test/schema.xsd"),
-        "test schema",
-        SCHEMA_SHA256,
-        SchemaCacheModule.curlFetcher(fakeCurl.toString()));
-
-    assertThat(schema).hasContent(SCHEMA_XML);
-    Path argsFile =
-        Files.list(schema.getParent())
-            .filter(path -> path.getFileName().toString().endsWith(".args"))
-            .findFirst()
-            .orElseThrow();
-    assertThat(argsFile)
-        .content()
-        .contains(
-            "--proto",
-            "=https",
-            "--location",
-            "--fail",
-            "--silent",
-            "--show-error",
-            "--max-time",
-            "60",
-            "https://example.test/schema.xsd",
-            "--output");
-  }
-
-  @Test
   void reportsDownloadFailuresWithCommandOutputDetails() {
     Path schema = tempDir.resolve("schema.xsd");
 
@@ -374,7 +303,7 @@ class SchemaCacheModuleTest {
                     (url, destination) ->
                         new SchemaFetchResult(
                             false,
-                            "curl",
+                            "HTTP",
                             22,
                             "body error\n".getBytes(StandardCharsets.UTF_8),
                             "http 404\n".getBytes(StandardCharsets.UTF_8))))
@@ -417,12 +346,12 @@ class SchemaCacheModuleTest {
   void formatsCommandOutputDetails() {
     assertThat(
             SchemaCacheModule.commandOutputDetails(
-                "curl",
+                "HTTP",
                 22,
                 "body\n".getBytes(StandardCharsets.UTF_8),
                 "error\n".getBytes(StandardCharsets.UTF_8)))
         .isEqualTo("error\nbody");
-    assertThat(SchemaCacheModule.commandOutputDetails("curl", 7, new byte[0], new byte[0]))
-        .isEqualTo("curl exited with status 7");
+    assertThat(SchemaCacheModule.commandOutputDetails("HTTP", 7, new byte[0], new byte[0]))
+        .isEqualTo("HTTP exited with status 7");
   }
 }
