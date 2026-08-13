@@ -136,7 +136,7 @@ class ResvgRasterizerTest {
             "#!/bin/sh\nprintf '%s' \"$$\" > '" + pidFile + "'\nwhile :; do :; done\n");
 
     assertThat(
-            new ResvgRasterizer(executable, Duration.ofMillis(25), PNG.length + 1)
+            new ResvgRasterizer(executable, Duration.ofSeconds(1), PNG.length + 1)
                 .rasterize("<svg/>".getBytes(StandardCharsets.UTF_8), PNG.length))
         .isEmpty();
     assertProcessDead(pidFile);
