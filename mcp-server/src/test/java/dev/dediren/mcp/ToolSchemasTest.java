@@ -80,8 +80,7 @@ class ToolSchemasTest {
           .containsExactly("image/svg+xml", "image/png");
       assertThat(textValues(schema.at("/allOf/0/if/required")))
           .containsExactly("accepted_image_types");
-      assertThat(schema.at("/allOf/0/then/properties/output/const").asText())
-          .isEqualTo("image");
+      assertThat(schema.at("/allOf/0/then/properties/output/const").asText()).isEqualTo("image");
     }
   }
 
