@@ -356,15 +356,14 @@ final class PortPlan {
    * runs backwards precisely when the later-declared group is its source — which is what {@code
    * isCrossGroupBackEdge} tested.
    *
-   * <p>A node no group claims takes its bucket from the graph instead (see {@link
-   * #bucketByNode}), which is what keeps that same guarantee at the group boundary: it shares a
-   * bucket with the group that reaches it, so the crossing edge is settled by the depth-first
-   * order inside the bucket — as a member-to-member edge is — never by a bucket difference.
-   * The old predicate could not see such an edge at all (it required both owners non-null) and
-   * never
-   * reversed one; neither does this, unless the depth-first order says it closes a cycle. That is
-   * the one thing the old predicate got wrong, and the reason a cycle running through an unclaimed
-   * node used to route through both endpoint bodies.
+   * <p>A node no group claims takes its bucket from the graph instead (see {@link #bucketByNode}),
+   * which is what keeps that same guarantee at the group boundary: it shares a bucket with the
+   * group that reaches it, so the crossing edge is settled by the depth-first order inside the
+   * bucket — as a member-to-member edge is — never by a bucket difference. The old predicate could
+   * not see such an edge at all (it required both owners non-null) and never reversed one; neither
+   * does this, unless the depth-first order says it closes a cycle. That is the one thing the old
+   * predicate got wrong, and the reason a cycle running through an unclaimed node used to route
+   * through both endpoint bodies.
    *
    * <p>Reverse postorder is used inside a bucket because every edge that is not a depth-first back
    * edge runs forwards in it, so the reversal set below is a small feedback-arc set rather than an
@@ -407,15 +406,14 @@ final class PortPlan {
   }
 
   /**
-   * The bucket each node is ranked in. A node a group claims takes that group's declaration
-   * index. A node no group claims has no index of its own, so it takes the latest one reaching it.
+   * The bucket each node is ranked in. A node a group claims takes that group's declaration index.
+   * A node no group claims has no index of its own, so it takes the latest one reaching it.
    *
-   * <p>This is the whole of the group-boundary fix. Ranking an unclaimed node ahead of every
-   * group — the obvious "it belongs to no group, so put it first" reading — makes every edge from
-   * inside a group out to it run backwards, and the reversal that follows swaps the group and its
-   * external targets in ELK's layer order. The published self-model showed it: {@code art-lib ->
-   * comp-cli} and {@code art-lib -> comp-engines} both reversed, and {@code distribution}
-   * mirrored.
+   * <p>This is the whole of the group-boundary fix. Ranking an unclaimed node ahead of every group
+   * — the obvious "it belongs to no group, so put it first" reading — makes every edge from inside
+   * a group out to it run backwards, and the reversal that follows swaps the group and its external
+   * targets in ELK's layer order. The published self-model showed it: {@code art-lib -> comp-cli}
+   * and {@code art-lib -> comp-engines} both reversed, and {@code distribution} mirrored.
    * Inheriting the bucket instead means an unclaimed node never sorts ahead of something that feeds
    * it, so a crossing edge is left to the depth-first order inside the bucket and comes out
    * forwards unless it genuinely closes a cycle.

@@ -176,10 +176,10 @@ class PortPlanTest {
 
   /**
    * A group's members reaching out to nodes no group claims. The old predicate required both owners
-   * non-null, so it never reversed one of these, and neither may this: reversing it makes ELK
-   * layer the external target ahead of the group, which mirrors the drawing — the group and its
-   * targets swap sides and the dependency arrows read backwards. The arrowheads stay on the
-   * right elements, so no geometric metric in the suite objects; only this does.
+   * non-null, so it never reversed one of these, and neither may this: reversing it makes ELK layer
+   * the external target ahead of the group, which mirrors the drawing — the group and its targets
+   * swap sides and the dependency arrows read backwards. The arrowheads stay on the right elements,
+   * so no geometric metric in the suite objects; only this does.
    *
    * <p>The shape is the published self-model's {@code distribution} view verbatim (see {@code
    * docs/architecture/dediren.dediren/model-deployment.json}), because that is the drawing that
@@ -189,7 +189,10 @@ class PortPlanTest {
   void anEdgeReachingOutOfAGroupToAnUnclaimedNodeIsNotReversed() {
     List<LayoutNode> nodes =
         List.of(
-            node("ee-jvm"), node("art-launcher"), node("art-lib"), node("comp-cli"),
+            node("ee-jvm"),
+            node("art-launcher"),
+            node("art-lib"),
+            node("comp-cli"),
             node("comp-engines"));
     List<LayoutEdge> edges =
         List.of(
