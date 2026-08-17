@@ -817,6 +817,95 @@ class ElkLayoutEngineTest {
   }
 
   @Test
+  void flatTargetPortsFollowIncomingSourceOrder() {
+    // No groups, default direction (RIGHT): several sources fan into one target on its WEST side.
+    // ELK owns port order (PortConstraints.FIXED_SIDE), so whatever vertical order it settles the
+    // sources into must be the vertical order it assigns the incoming ports, or the routes cross.
+    LayoutRequest request =
+        new LayoutRequest(
+            ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION,
+            "main",
+            List.of(
+                new LayoutNode("source-a", "Source A", "source-a", 160.0, 80.0),
+                new LayoutNode("source-b", "Source B", "source-b", 160.0, 80.0),
+                new LayoutNode("source-c", "Source C", "source-c", 160.0, 80.0),
+                new LayoutNode("target", "Target", "target", 160.0, 80.0)),
+            List.of(
+                new LayoutEdge("a-target", "source-a", "target", "uses", "a-target"),
+                new LayoutEdge("b-target", "source-b", "target", "uses", "b-target"),
+                new LayoutEdge("c-target", "source-c", "target", "uses", "c-target")),
+            List.of(),
+            List.of(),
+            null);
+
+    LayoutResult result = new ElkLayoutEngine().layout(request);
+    ElkLayoutRenderArtifacts.write(result);
+    LaidOutNode sourceA = nodeById(result, "source-a");
+    LaidOutNode sourceB = nodeById(result, "source-b");
+    LaidOutNode sourceC = nodeById(result, "source-c");
+    LaidOutEdge edgeA = edgeById(result, "a-target");
+    LaidOutEdge edgeB = edgeById(result, "b-target");
+    LaidOutEdge edgeC = edgeById(result, "c-target");
+
+    assertTrue(
+        sameVerticalOrder(
+            centerY(sourceA), centerY(sourceB), targetPortY(edgeA), targetPortY(edgeB)),
+        "target ports should follow incoming source order, a=" + edgeA.points() + ", b=" + edgeB.points());
+    assertTrue(
+        sameVerticalOrder(
+            centerY(sourceB), centerY(sourceC), targetPortY(edgeB), targetPortY(edgeC)),
+        "target ports should follow incoming source order, b=" + edgeB.points() + ", c=" + edgeC.points());
+    assertTrue(
+        sameVerticalOrder(
+            centerY(sourceA), centerY(sourceC), targetPortY(edgeA), targetPortY(edgeC)),
+        "target ports should follow incoming source order, a=" + edgeA.points() + ", c=" + edgeC.points());
+  }
+
+  @Test
+  void flatTargetPortsFollowIncomingSourceOrderWhenDirectionIsDown() {
+    // Same fan-in shape under Direction.DOWN: sources fan into the target's NORTH side, so the
+    // property becomes horizontal instead of vertical.
+    LayoutRequest request =
+        new LayoutRequest(
+            ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION,
+            "main",
+            List.of(
+                new LayoutNode("source-a", "Source A", "source-a", 160.0, 80.0),
+                new LayoutNode("source-b", "Source B", "source-b", 160.0, 80.0),
+                new LayoutNode("source-c", "Source C", "source-c", 160.0, 80.0),
+                new LayoutNode("target", "Target", "target", 160.0, 80.0)),
+            List.of(
+                new LayoutEdge("a-target", "source-a", "target", "uses", "a-target"),
+                new LayoutEdge("b-target", "source-b", "target", "uses", "b-target"),
+                new LayoutEdge("c-target", "source-c", "target", "uses", "c-target")),
+            List.of(),
+            List.of(),
+            new LayoutPreferences(LayoutDirection.DOWN, null, null, null));
+
+    LayoutResult result = new ElkLayoutEngine().layout(request);
+    ElkLayoutRenderArtifacts.write(result);
+    LaidOutNode sourceA = nodeById(result, "source-a");
+    LaidOutNode sourceB = nodeById(result, "source-b");
+    LaidOutNode sourceC = nodeById(result, "source-c");
+    LaidOutEdge edgeA = edgeById(result, "a-target");
+    LaidOutEdge edgeB = edgeById(result, "b-target");
+    LaidOutEdge edgeC = edgeById(result, "c-target");
+
+    assertTrue(
+        sameHorizontalOrder(
+            centerX(sourceA), centerX(sourceB), targetPortX(edgeA), targetPortX(edgeB)),
+        "target ports should follow incoming source order, a=" + edgeA.points() + ", b=" + edgeB.points());
+    assertTrue(
+        sameHorizontalOrder(
+            centerX(sourceB), centerX(sourceC), targetPortX(edgeB), targetPortX(edgeC)),
+        "target ports should follow incoming source order, b=" + edgeB.points() + ", c=" + edgeC.points());
+    assertTrue(
+        sameHorizontalOrder(
+            centerX(sourceA), centerX(sourceC), targetPortX(edgeA), targetPortX(edgeC)),
+        "target ports should follow incoming source order, a=" + edgeA.points() + ", c=" + edgeC.points());
+  }
+
+  @Test
   void compactDecisionFanOutUsesSeparateSourceCorners() {
     LayoutRequest request =
         new LayoutRequest(
@@ -1647,12 +1736,18 @@ class ElkLayoutEngineTest {
     LayoutResult result = new ElkLayoutEngine().layout(request);
     ElkLayoutRenderArtifacts.write(result);
     LaidOutNode source = nodeById(result, "pricing-service");
+    LaidOutNode productDb = nodeById(result, "product-db");
+    LaidOutNode sessionCache = nodeById(result, "session-cache");
     LaidOutEdge readsEdge = edgeById(result, "pricing-reads-products");
     LaidOutEdge cacheEdge = edgeById(result, "pricing-caches-quotes");
 
     assertTrue(
-        sourcePortY(readsEdge) < sourcePortY(cacheEdge),
-        "source ports should keep lower data-channel routes below upper source channels, reads="
+        sameVerticalOrder(
+            sourcePortY(readsEdge),
+            sourcePortY(cacheEdge),
+            centerY(productDb),
+            centerY(sessionCache)),
+        "same-source ports should follow outgoing target order to avoid crossings, reads="
             + readsEdge.points()
             + ", cache="
             + cacheEdge.points());
@@ -3105,6 +3200,24 @@ class ElkLayoutEngineTest {
 
   private static double centerY(LaidOutNode node) {
     return node.y() + node.height() / 2.0;
+  }
+
+  private static double centerX(LaidOutNode node) {
+    return node.x() + node.width() / 2.0;
+  }
+
+  private static double targetPortX(LaidOutEdge edge) {
+    return edge.points().get(edge.points().size() - 1).x();
+  }
+
+  // Horizontal analogue of sameVerticalOrder for Direction.DOWN fan-in, where the ordered axis
+  // across the target's NORTH ports is x instead of y.
+  private static boolean sameHorizontalOrder(
+      double firstSourceX, double secondSourceX, double firstTargetX, double secondTargetX) {
+    if (sameCoordinate(firstSourceX, secondSourceX) || sameCoordinate(firstTargetX, secondTargetX)) {
+      return true;
+    }
+    return Double.compare(firstSourceX, secondSourceX) == Double.compare(firstTargetX, secondTargetX);
   }
 
   private static void assertGroupContainsMembers(LayoutResult result, LaidOutGroup group) {
