@@ -82,12 +82,12 @@ final class PortPlan {
     /**
      * {@code layoutFlatBanded}: one ELK partition per group fixes which band a node lands in, but
      * the members are still root-level nodes, so — as in {@link #UNCONSTRAINED} — a feedback edge
-     * still has the whole outside of the drawing to route through. The plan therefore
-     * contributes no reversals here either. This is a measured claim, not an assumption: a forced
-     * banded sweep of 1500 generated cyclic graphs (2..8 nodes, every direction, density, endpoint
-     * merging and grouping split, including partly ungrouped ones) produced zero route-geometry
-     * violations, and so did the same sweep with no groups at all. The constant is named separately
-     * from {@link #UNCONSTRAINED} because the lanes differ in what they fix, and this is where a
+     * still has the whole outside of the drawing to route through. The plan therefore contributes
+     * no reversals here either. This is a measured claim, not an assumption: a forced banded sweep
+     * of 1500 generated cyclic graphs (2..8 nodes, every direction, density, endpoint merging and
+     * grouping split, including partly ungrouped ones) produced zero route-geometry violations, and
+     * so did the same sweep with no groups at all. The constant is named separately from {@link
+     * #UNCONSTRAINED} because the lanes differ in what they fix, and this is where a
      * partition-derived reversal set would go if evidence ever demanded one.
      */
     PARTITIONED,
@@ -259,10 +259,9 @@ final class PortPlan {
    * direction and a nested compound node's own {@code DIRECTION} never moves a layer. A
    * perpendicular group axis is therefore still measurably wrong — a 3-node chain in a {@code DOWN}
    * group under a {@code RIGHT} root comes out as a diagonal staircase, and a member edge that
-   * skips a layer can
-   * still reach its target's face from the wrong side (28 interior crossings in 600 generated
-   * <em>acyclic</em> grouped graphs). Retiring it is a separate decision that has to move that
-   * test, so it is recorded rather than taken here.
+   * skips a layer can still reach its target's face from the wrong side (28 interior crossings in
+   * 600 generated <em>acyclic</em> grouped graphs). Retiring it is a separate decision that has to
+   * move that test, so it is recorded rather than taken here.
    */
   static PortPlan grouped(
       List<LayoutEdge> edges,

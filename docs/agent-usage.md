@@ -1288,7 +1288,10 @@ so commands can run from any current working directory.
   > render-result.json
 ```
 
-`validate-layout` quality fields: `overlap_count`, `connector_through_node_count`,
+`validate-layout` quality fields: `overlap_count`, `connector_through_node_count`
+(counts a segment crossing any node's interior past a 1.5px inset, including its
+own source/target node — self-loops and UML lifelines are excluded, since a
+Message legitimately anchors to the lifeline axis inside the head box),
 `invalid_route_count`, `route_detour_count`, `route_close_parallel_count`,
 `group_boundary_issue_count`, `group_label_band_issue_count`,
 `label_space_issue_count`, `edge_label_dissociation_count`,

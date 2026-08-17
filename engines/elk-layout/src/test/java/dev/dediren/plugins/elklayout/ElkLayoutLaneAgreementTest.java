@@ -29,17 +29,19 @@ import org.junit.jupiter.params.provider.MethodSource;
 /**
  * Lane-agreement coverage for {@link ElkLayoutEngine}.
  *
- * <p>{@code ElkLayoutEngine#layout} dispatches to one of four lanes, but there are only two
- * port-planning families and only one of them decides back-edges. A lane that imposes a layer order
- * ELK's cycle breaker cannot undo — a partition band, or a compound-node group whose direction is
- * fixed per group — must decide which edges are back-edges before it pins port sides. Today that
- * decision lives in whichever copy the lane happens to call, so the lanes disagree.
+ * <p>{@code ElkLayoutEngine#layout} dispatches to one of four lanes, and every lane's port-side and
+ * back-edge decisions now route through the single {@link PortPlan} type. {@link PortPlan.Ordering}
+ * names how much layer order each lane has already fixed by the time ports are planned, and only
+ * {@link PortPlan.Ordering#GROUPED} decides back-edges: a lane that pins port sides against an
+ * order it has itself already fixed must also choose which edges run against that order, because
+ * ELK's cycle breaker can no longer make that decision consistently with the pinned sides.
  *
  * <p>These tests drive the public engine surface with <em>one</em> logical cyclic graph,
  * re-expressed only through its {@code groups} list so the dispatch picks a different lane each
  * time, and assert the same lane-independent geometric invariant every time: no routed segment
- * crosses any node's interior. That invariant is what makes a fifth lane — or a fifth copy of port
- * planning — fail loudly instead of diverging silently.
+ * crosses any node's interior. That invariant holds in every order-constraining lane today, and it
+ * is what makes a fifth lane — or a fifth decision point outside {@link PortPlan} — fail loudly
+ * instead of diverging silently.
  *
  * <p>Lives in its own class rather than in {@code ElkLayoutEngineTest} (already ~3.9k lines)
  * because the subject here is the agreement <em>between</em> lanes, not any one lane's behaviour.
@@ -80,9 +82,11 @@ class ElkLayoutLaneAgreementTest {
         Arguments.of(
             "banded", cyclicRequest(List.of(visualOnlyPipeline(), visualOnlyGovernance()))),
         // A semantic-backed group is not bandable, so layout() takes layoutGrouped: members nest in
-        // ELK compound nodes and the grouped* port family fixes each edge's endpoint sides from
-        // edgeDirection(). Its isCrossGroupBackEdge() predicate requires the two endpoints to have
-        // different owners, so a cycle closing inside a single group is never reversed.
+        // ELK compound nodes and PortPlan.grouped() fixes each edge's endpoint sides from its
+        // endpointAxis(), then reverses every edge whose source outranks its target in the total
+        // order groupedNodeRank() derives (nodes bucketed by group declaration index, ordered
+        // within a bucket by reverse postorder). That rank covers a cycle closing inside a single
+        // group exactly as it covers one crossing groups, so both are reversed correctly.
         Arguments.of("grouped", cyclicRequest(List.of(semanticPipeline(), semanticGovernance()))));
   }
 
@@ -146,10 +150,13 @@ class ElkLayoutLaneAgreementTest {
    * changes.
    *
    * <p>{@code ingest → transform → publish → ingest} closes inside the first group, and {@code
-   * publish → audit → ingest} closes across the two groups. One cycle per failure mechanism: the
-   * cross-group closure is the one a partition order cannot undo (the banded lane), the intra-group
-   * closure is the one {@code isCrossGroupBackEdge} refuses to reverse (the grouped lane). With no
-   * groups both are ordinary back-edges for ELK's cycle breaker.
+   * publish → audit → ingest} closes across the two groups. One cycle per lane mechanism: the
+   * cross-group closure is the one a partition order cannot undo (the banded lane), and the
+   * intra-group closure is the one whose reversal used to depend on which port-planning copy a lane
+   * called — {@link PortPlan.Ordering#GROUPED}'s node ranking now reverses both alike, since it
+   * buckets nodes by group declaration index and ranks nodes within a bucket independently, so a
+   * cycle closing entirely inside one group is still a strictly-increasing walk that has to be
+   * broken. With no groups both are ordinary back-edges for ELK's cycle breaker.
    */
   private static LayoutRequest cyclicRequest(List<LayoutGroup> groups) {
     return new LayoutRequest(

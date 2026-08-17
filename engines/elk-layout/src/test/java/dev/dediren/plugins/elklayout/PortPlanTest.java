@@ -84,11 +84,7 @@ class PortPlanTest {
   void aGroupAxisPointingBackAlongTheRootAxisIsCorrected() {
     LayoutRequest request =
         request(
-            List.of(
-                connectorNode("entry"),
-                node("sink"),
-                connectorNode("gate"),
-                node("store")),
+            List.of(connectorNode("entry"), node("sink"), connectorNode("gate"), node("store")),
             List.of(
                 new LayoutEdge("entry-to-gate", "entry", "gate", "flow", "r1"),
                 new LayoutEdge("gate-to-store", "gate", "store", "flow", "r2"),
@@ -114,8 +110,8 @@ class PortPlanTest {
 
   /**
    * The property everything else rests on: once the plan's reversal set is applied, the digraph
-   * handed to ELK has no cycle left, so ELK's cycle breaker finds nothing to break and cannot
-   * pick a feedback arc that disagrees with the port sides pinned from the same ranking.
+   * handed to ELK has no cycle left, so ELK's cycle breaker finds nothing to break and cannot pick
+   * a feedback arc that disagrees with the port sides pinned from the same ranking.
    *
    * <p>Asserted on the arcs directly rather than through geometry, because geometry can only ever
    * show that some particular drawing came out well.
@@ -134,8 +130,7 @@ class PortPlanTest {
             // and one through a node no group claims
             new LayoutEdge("d-loose", "d", "loose", "flow", "e6"),
             new LayoutEdge("loose-b", "loose", "b", "flow", "e7"));
-    List<LayoutNode> nodes =
-        List.of(node("a"), node("b"), node("c"), node("d"), node("loose"));
+    List<LayoutNode> nodes = List.of(node("a"), node("b"), node("c"), node("d"), node("loose"));
     List<LayoutGroup> groups =
         List.of(
             new LayoutGroup(
@@ -298,8 +293,7 @@ class PortPlanTest {
               && Math.min(start.x(), end.x()) < right
               && Math.max(start.y(), end.y()) > top
               && Math.min(start.y(), end.y()) < bottom) {
-            crossings.add(
-                "edge " + edge.id() + " segment " + index + " crosses node " + node.id());
+            crossings.add("edge " + edge.id() + " segment " + index + " crosses node " + node.id());
           }
         }
       }

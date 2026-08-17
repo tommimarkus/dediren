@@ -713,7 +713,6 @@ final class ElkLayoutEngine {
     return false;
   }
 
-
   private static ElkEdge createRoutedEdge(
       ElkNode source,
       ElkNode target,
