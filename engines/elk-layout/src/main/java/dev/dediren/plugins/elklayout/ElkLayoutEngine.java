@@ -26,7 +26,6 @@ import dev.dediren.ir.LayoutIntent;
 import dev.dediren.ir.LayoutIntentCodec;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
@@ -53,15 +52,8 @@ final class ElkLayoutEngine {
   // envelope's diagnostics[], never on stderr. See ArchitectureRulesTest.
   private static final Logger LOG = LoggerFactory.getLogger(ElkLayoutEngine.class);
 
-  private static final double DEFAULT_WIDTH = 160.0;
-  private static final double DEFAULT_HEIGHT = 80.0;
-  private static final double CONNECTOR_SOURCE_MAX_WIDTH = 48.0;
-  private static final double CONNECTOR_SOURCE_MAX_HEIGHT = 48.0;
   private static final int DEFAULT_SHORT_SIDE_PORT_CAPACITY = 3;
   private static final int MERGEABLE_ENDPOINT_EDGE_COUNT = 3;
-  private static final String SHARED_SOURCE_JUNCTION_HINT = "shared_source_junction";
-  private static final String SHARED_TARGET_JUNCTION_HINT = "shared_target_junction";
-  private static final EdgeEndpointMerge NO_ENDPOINT_MERGE = new EdgeEndpointMerge(false, false);
 
   LayoutResult layout(LayoutRequest request) {
     validate(request);
@@ -75,7 +67,7 @@ final class ElkLayoutEngine {
       return layoutGrouped(request);
     }
 
-    return layoutFlat(request);
+    return layoutFlat(request, PortPlan.Ordering.UNCONSTRAINED);
   }
 
   /**
@@ -103,7 +95,14 @@ final class ElkLayoutEngine {
     return preferences == null || preferences.mode() == null ? LayoutMode.AUTO : preferences.mode();
   }
 
-  private static LayoutResult layoutFlat(LayoutRequest request) {
+  /**
+   * @param ordering what the calling lane has already fixed about the layer order. {@code
+   *     layoutFlatBanded} reaches this method with {@link PortPlan.Ordering#PARTITIONED} after
+   *     deriving its bands; a plain flat request arrives {@link PortPlan.Ordering#UNCONSTRAINED}.
+   *     Neither contributes reversals today — see {@link PortPlan.Ordering} for the measurement
+   *     behind that — but the lane's ordering is what the plan is built from, not the lane's name.
+   */
+  private static LayoutResult layoutFlat(LayoutRequest request, PortPlan.Ordering ordering) {
     LayoutPreferences preferences = request.layoutPreferences();
     Map<String, String> nodePointers = nodeSourcePointers(request);
     Map<String, String> edgePointers = edgeSourcePointers(request);
@@ -121,21 +120,15 @@ final class ElkLayoutEngine {
     List<LayoutEdge> originalRequestEdges = list(request.edges());
     Map<LayoutEdge, Integer> originalEdgeIndexes = originalEdgeIndexes(originalRequestEdges);
     List<LayoutEdge> requestEdges = sequenceConstraints.orderedEdges(originalRequestEdges);
-    Map<String, EdgeEndpointMerge> endpointMerges =
+    PortPlan portPlan =
         sequenceMode
-            ? emptyEndpointMerges(requestEdges)
-            : flatEdgeEndpointMerges(requestEdges, requestNodes, preferences);
-    Map<String, EdgeEndpointSides> endpointSides =
-        sequenceMode
-            ? sequenceEdgeEndpointSides(requestEdges, requestNodes, sequenceConstraints)
-            : flatEdgeEndpointSides(requestEdges, requestNodes, endpointMerges, layoutDirection);
-    Map<String, EnumMap<PortSide, Integer>> portCounts =
-        flatPortCounts(requestEdges, requestNodes, endpointMerges, endpointSides);
+            ? PortPlan.sequence(requestEdges, requestNodes, sequenceConstraints)
+            : PortPlan.flat(ordering, requestEdges, requestNodes, preferences, layoutDirection);
     Map<String, ElkNode> elkNodes = new HashMap<>();
     for (LayoutNode node : sequenceConstraints.orderedNodes(requestNodeList)) {
       ElkNode elkNode = ElkGraphUtil.createNode(root);
       elkNode.setIdentifier(node.id());
-      setGeneratedDimensions(elkNode, node, portCounts.get(node.id()), preferences);
+      setGeneratedDimensions(elkNode, node, portPlan.portCounts(node.id()), preferences);
       ElkGraphUtil.createLabel(elkNode).setText(node.label());
       ElkLayeredOptions.applyNodeHints(elkNode, node);
       elkNodes.put(node.id(), elkNode);
@@ -168,18 +161,15 @@ final class ElkLayoutEngine {
         // normalize.
         continue;
       }
-      EdgeEndpointMerge endpointMerge = endpointMerges.getOrDefault(edge.id(), NO_ENDPOINT_MERGE);
-      EdgeEndpointSides sides =
-          endpointSides.getOrDefault(edge.id(), defaultEndpointSides(layoutDirection));
       ElkEdge elkEdge =
           createRoutedEdge(
               source,
               target,
               edge,
-              sides.sourceSide(),
-              sides.targetSide(),
-              endpointMerge.sourceEndpoint(),
-              endpointMerge.targetEndpoint());
+              portPlan.sourceSide(edge.id()),
+              portPlan.targetSide(edge.id()),
+              portPlan.mergesSourceEndpoint(edge.id()),
+              portPlan.mergesTargetEndpoint(edge.id()));
       elkEdges.put(edge.id(), elkEdge);
       ElkLayeredOptions.applyEdgeHints(elkEdge, edge);
     }
@@ -216,7 +206,7 @@ final class ElkLayoutEngine {
                 edge.target(),
                 edge.sourceId(),
                 edge.id(),
-                routingHints(edge.id(), endpointMerges),
+                portPlan.routingHints(edge.id()),
                 points(elkEdge),
                 edge.label(),
                 edgePointers.get(edge.id())));
@@ -234,7 +224,7 @@ final class ElkLayoutEngine {
                 edge.target(),
                 edge.sourceId(),
                 edge.id(),
-                routingHints(edge.id(), endpointMerges),
+                portPlan.routingHints(edge.id()),
                 selfLoopPlaceholderRoute(elkNodes.get(edge.source())),
                 edge.label(),
                 edgePointers.get(edge.id())));
@@ -293,6 +283,8 @@ final class ElkLayoutEngine {
 
     // Reuse the flat path verbatim (routing, endpoint merging, ports). Stripping the groups makes
     // it run the plain-flat layout; the derived partitions align each band without a compound node.
+    // The one thing the flat path is told is which ordering it is serving: the partitions fix each
+    // band's layer, so the lane declares PARTITIONED rather than letting "flat" stand for both.
     LayoutRequest flatRequest =
         new LayoutRequest(
             request.layoutRequestSchemaVersion(),
@@ -302,7 +294,7 @@ final class ElkLayoutEngine {
             List.of(),
             request.constraints(),
             request.layoutPreferences());
-    LayoutResult flat = layoutFlat(flatRequest);
+    LayoutResult flat = layoutFlat(flatRequest, PortPlan.Ordering.PARTITIONED);
 
     List<Diagnostic> warnings = new ArrayList<>(flat.warnings());
     List<LaidOutGroup> bands =
@@ -548,24 +540,16 @@ final class ElkLayoutEngine {
           new HashSet<>());
     }
 
-    Map<String, EdgeEndpointMerge> endpointMerges =
-        groupedEdgeEndpointMerges(
+    PortPlan portPlan =
+        PortPlan.grouped(
             requestEdges,
+            list(request.nodes()),
             requestNodes,
             ownerByNode,
             groupDirectionById,
             groupOrderById,
             rootDirection,
             preferences);
-    Map<String, EnumMap<PortSide, Integer>> portCounts =
-        groupedPortCounts(
-            requestEdges,
-            requestNodes,
-            ownerByNode,
-            groupDirectionById,
-            groupOrderById,
-            rootDirection,
-            endpointMerges);
     Map<String, ElkNode> elkNodes = new HashMap<>();
     for (LayoutNode node : list(request.nodes())) {
       ElkNode parent =
@@ -575,7 +559,7 @@ final class ElkLayoutEngine {
       }
       ElkNode elkNode = ElkGraphUtil.createNode(parent);
       elkNode.setIdentifier(node.id());
-      setGeneratedDimensions(elkNode, node, portCounts.get(node.id()), preferences);
+      setGeneratedDimensions(elkNode, node, portPlan.portCounts(node.id()), preferences);
       ElkGraphUtil.createLabel(elkNode).setText(node.label());
       ElkLayeredOptions.applyNodeHints(elkNode, node);
       elkNodes.put(node.id(), elkNode);
@@ -583,7 +567,6 @@ final class ElkLayoutEngine {
     ElkLayeredOptions.activatePartitioning(root, list(request.nodes()));
 
     Map<String, ElkEdge> elkEdges = new HashMap<>();
-    Set<String> reversedBackEdges = new HashSet<>();
     for (int index = 0; index < requestEdges.size(); index++) {
       LayoutEdge edge = requestEdges.get(index);
       ElkNode source = elkNodes.get(edge.source());
@@ -597,37 +580,33 @@ final class ElkLayoutEngine {
                 "$.edges[" + index + "]"));
         continue;
       }
-      Direction edgeDirection =
-          edgeDirection(
-              edge, requestNodes, ownerByNode, groupDirectionById, groupOrderById, rootDirection);
-      EdgeEndpointMerge endpointMerge = endpointMerges.getOrDefault(edge.id(), NO_ENDPOINT_MERGE);
       ElkEdge elkEdge;
-      if (isCrossGroupBackEdge(edge, ownerByNode, groupOrderById)) {
-        // A cross-group back-edge points against the root flow. Presented to ELK as-is it is a
-        // feedback edge, which ELK routes the long way around the whole drawing. Handing ELK the
-        // reversed edge instead makes it an ordinary forward edge that routes straight through the
-        // return channel; we reverse its route points below so the rendered edge keeps its declared
-        // source-to-target orientation and port sides.
+      if (portPlan.reversed(edge.id())) {
+        // A back-edge points against the order this lane has already fixed. Presented to ELK as-is
+        // it is a feedback edge, and inside a compound node there is no room to route one: the
+        // group's own bounds are the only space available, so the route doubles back across the
+        // endpoint bodies. Handing ELK the reversed edge instead makes it an ordinary forward edge
+        // through the return channel; we reverse its route points below so the rendered edge keeps
+        // its declared source-to-target orientation and port sides.
         elkEdge =
             createRoutedEdge(
                 target,
                 source,
                 edge,
-                sourcePortSide(rootDirection),
-                targetPortSide(rootDirection),
-                endpointMerge.targetEndpoint(),
-                endpointMerge.sourceEndpoint());
-        reversedBackEdges.add(edge.id());
+                portPlan.sourceSide(edge.id()),
+                portPlan.targetSide(edge.id()),
+                portPlan.mergesTargetEndpoint(edge.id()),
+                portPlan.mergesSourceEndpoint(edge.id()));
       } else {
         elkEdge =
             createRoutedEdge(
                 source,
                 target,
                 edge,
-                sourcePortSide(edgeDirection),
-                targetPortSide(edgeDirection),
-                endpointMerge.sourceEndpoint(),
-                endpointMerge.targetEndpoint());
+                portPlan.sourceSide(edge.id()),
+                portPlan.targetSide(edge.id()),
+                portPlan.mergesSourceEndpoint(edge.id()),
+                portPlan.mergesTargetEndpoint(edge.id()));
       }
       ElkGraphUtil.updateContainment(elkEdge);
       elkEdges.put(edge.id(), elkEdge);
@@ -660,16 +639,19 @@ final class ElkLayoutEngine {
     for (LayoutEdge edge : list(request.edges())) {
       ElkEdge elkEdge = elkEdges.get(edge.id());
       if (elkEdge != null) {
-        EdgeEndpointMerge endpointMerge = endpointMerges.getOrDefault(edge.id(), NO_ENDPOINT_MERGE);
         List<Point> routePoints = points(elkEdge);
-        if (reversedBackEdges.contains(edge.id())) {
+        if (portPlan.reversed(edge.id())) {
           // The edge was handed to ELK reversed to avoid feedback routing; flip the geometry back
           // so the route runs from the declared source to the declared target.
           Collections.reverse(routePoints);
         }
         routePoints =
             OrthogonalRouteNormalizer.collapseStairSteps(
-                routePoints, nodes, edge.source(), edge.target(), !endpointMerge.sourceEndpoint());
+                routePoints,
+                nodes,
+                edge.source(),
+                edge.target(),
+                !portPlan.mergesSourceEndpoint(edge.id()));
         edges.add(
             new LaidOutEdge(
                 edge.id(),
@@ -677,7 +659,7 @@ final class ElkLayoutEngine {
                 edge.target(),
                 edge.sourceId(),
                 edge.id(),
-                routingHints(edge.id(), endpointMerges),
+                portPlan.routingHints(edge.id()),
                 routePoints,
                 edge.label(),
                 edgePointers.get(edge.id())));
@@ -696,14 +678,6 @@ final class ElkLayoutEngine {
         warnings);
   }
 
-  private static Map<String, EdgeEndpointMerge> emptyEndpointMerges(List<LayoutEdge> edges) {
-    Map<String, EdgeEndpointMerge> endpointMerges = new HashMap<>();
-    for (LayoutEdge edge : edges) {
-      endpointMerges.put(edge.id(), NO_ENDPOINT_MERGE);
-    }
-    return endpointMerges;
-  }
-
   private static Map<LayoutEdge, Integer> originalEdgeIndexes(List<LayoutEdge> edges) {
     Map<LayoutEdge, Integer> indexes = new IdentityHashMap<>();
     for (int index = 0; index < edges.size(); index++) {
@@ -716,7 +690,7 @@ final class ElkLayoutEngine {
     if (nodes.size() < 3) {
       return Direction.RIGHT;
     }
-    if (nodes.stream().anyMatch(ElkLayoutEngine::isConnectorSizedRequestNode)) {
+    if (nodes.stream().anyMatch(PortPlan::isConnectorSized)) {
       return Direction.DOWN;
     }
     // A same-source service fan-out reads as a left-to-right call flow.
@@ -739,144 +713,6 @@ final class ElkLayoutEngine {
     return false;
   }
 
-  private static boolean isCrossGroupBackEdge(
-      LayoutEdge edge, Map<String, String> ownerByNode, Map<String, Integer> groupOrderById) {
-    String sourceOwner = ownerByNode.get(edge.source());
-    String targetOwner = ownerByNode.get(edge.target());
-    return sourceOwner != null
-        && targetOwner != null
-        && !sourceOwner.equals(targetOwner)
-        && groupOrderById.getOrDefault(sourceOwner, 0)
-            > groupOrderById.getOrDefault(targetOwner, 0);
-  }
-
-  private static Direction edgeDirection(
-      LayoutEdge edge,
-      Map<String, LayoutNode> nodes,
-      Map<String, String> ownerByNode,
-      Map<String, Direction> groupDirectionById,
-      Map<String, Integer> groupOrderById,
-      Direction rootDirection) {
-    String sourceOwner = ownerByNode.get(edge.source());
-    String targetOwner = ownerByNode.get(edge.target());
-    if (sourceOwner != null && sourceOwner.equals(targetOwner)) {
-      if (isConnectorSizedRequestNode(nodes.get(edge.source()))
-          || isConnectorSizedRequestNode(nodes.get(edge.target()))) {
-        return Direction.RIGHT;
-      }
-      return groupDirectionById.getOrDefault(sourceOwner, Direction.RIGHT);
-    }
-    if (sourceOwner != null && targetOwner != null) {
-      int sourceOrder = groupOrderById.getOrDefault(sourceOwner, 0);
-      int targetOrder = groupOrderById.getOrDefault(targetOwner, 0);
-      if (sourceOrder > targetOrder) {
-        return oppositeDirection(rootDirection);
-      }
-    }
-    return rootDirection;
-  }
-
-  private static Direction oppositeDirection(Direction direction) {
-    return switch (direction) {
-      case LEFT -> Direction.RIGHT;
-      case UP -> Direction.DOWN;
-      case DOWN -> Direction.UP;
-      default -> Direction.LEFT;
-    };
-  }
-
-  private static boolean isConnectorSizedRequestNode(LayoutNode node) {
-    if (node == null) {
-      return false;
-    }
-    double width = node.widthHint() == null ? DEFAULT_WIDTH : node.widthHint();
-    double height = node.heightHint() == null ? DEFAULT_HEIGHT : node.heightHint();
-    return width <= CONNECTOR_SOURCE_MAX_WIDTH && height <= CONNECTOR_SOURCE_MAX_HEIGHT;
-  }
-
-  private static Map<String, EdgeEndpointSides> flatEdgeEndpointSides(
-      List<LayoutEdge> edges,
-      Map<String, LayoutNode> nodes,
-      Map<String, EdgeEndpointMerge> endpointMerges,
-      Direction direction) {
-    Map<String, Integer> outgoingCounts = new HashMap<>();
-    Map<String, Integer> incomingCounts = new HashMap<>();
-    for (LayoutEdge edge : edges) {
-      if (!nodes.containsKey(edge.source()) || !nodes.containsKey(edge.target())) {
-        continue;
-      }
-      outgoingCounts.merge(edge.source(), 1, Integer::sum);
-      incomingCounts.merge(edge.target(), 1, Integer::sum);
-    }
-
-    Map<String, Integer> outgoingIndexes = new HashMap<>();
-    Map<String, Integer> incomingIndexes = new HashMap<>();
-    Map<String, EdgeEndpointSides> sidesByEdge = new HashMap<>();
-    EdgeEndpointSides defaultSides = defaultEndpointSides(direction);
-    for (LayoutEdge edge : edges) {
-      if (!nodes.containsKey(edge.source()) || !nodes.containsKey(edge.target())) {
-        continue;
-      }
-      EdgeEndpointMerge endpointMerge = endpointMerges.getOrDefault(edge.id(), NO_ENDPOINT_MERGE);
-      int outgoingIndex = nextEndpointIndex(outgoingIndexes, edge.source());
-      int incomingIndex = nextEndpointIndex(incomingIndexes, edge.target());
-      PortSide sourceSide = defaultSides.sourceSide();
-      PortSide targetSide = defaultSides.targetSide();
-      if (!endpointMerge.sourceEndpoint()
-          && outgoingCounts.getOrDefault(edge.source(), 0) > 1
-          && isConnectorSizedRequestNode(nodes.get(edge.source()))) {
-        sourceSide = connectorBranchSide(direction, true, outgoingIndex);
-      }
-      if (!endpointMerge.targetEndpoint()
-          && incomingCounts.getOrDefault(edge.target(), 0) > 1
-          && isConnectorSizedRequestNode(nodes.get(edge.target()))) {
-        targetSide = connectorBranchSide(direction, false, incomingIndex);
-      }
-      sidesByEdge.put(edge.id(), new EdgeEndpointSides(sourceSide, targetSide));
-    }
-    return sidesByEdge;
-  }
-
-  private static Map<String, EdgeEndpointSides> sequenceEdgeEndpointSides(
-      List<LayoutEdge> edges,
-      Map<String, LayoutNode> nodes,
-      LayoutIntentNormalizer sequenceConstraints) {
-    Map<String, EdgeEndpointSides> sidesByEdge = new HashMap<>();
-    EdgeEndpointSides defaultSides = defaultEndpointSides(Direction.RIGHT);
-    for (LayoutEdge edge : edges) {
-      if (!nodes.containsKey(edge.source()) || !nodes.containsKey(edge.target())) {
-        continue;
-      }
-      sidesByEdge.put(
-          edge.id(),
-          new EdgeEndpointSides(
-              sequenceConstraints.sourcePortSide(edge, defaultSides.sourceSide()),
-              sequenceConstraints.targetPortSide(edge, defaultSides.targetSide())));
-    }
-    return sidesByEdge;
-  }
-
-  private static int nextEndpointIndex(Map<String, Integer> indexes, String nodeId) {
-    int index = indexes.getOrDefault(nodeId, 0);
-    indexes.put(nodeId, index + 1);
-    return index;
-  }
-
-  private static EdgeEndpointSides defaultEndpointSides(Direction direction) {
-    return new EdgeEndpointSides(sourcePortSide(direction), targetPortSide(direction));
-  }
-
-  private static PortSide connectorBranchSide(
-      Direction direction, boolean sourceEndpoint, int index) {
-    PortSide primary = sourceEndpoint ? sourcePortSide(direction) : targetPortSide(direction);
-    PortSide[] alternates =
-        switch (primary) {
-          case EAST, WEST -> new PortSide[] {primary, PortSide.NORTH, PortSide.SOUTH};
-          case NORTH, SOUTH -> new PortSide[] {primary, PortSide.EAST, PortSide.WEST};
-          default -> new PortSide[] {primary};
-        };
-    return alternates[Math.min(index, alternates.length - 1)];
-  }
 
   private static ElkEdge createRoutedEdge(
       ElkNode source,
@@ -886,7 +722,7 @@ final class ElkLayoutEngine {
       PortSide targetSide,
       boolean mergeSourceEndpoint,
       boolean mergeTargetEndpoint) {
-    String relationshipType = relationshipType(edge);
+    String relationshipType = PortPlan.relationshipType(edge);
     ElkConnectableShape sourceShape =
         mergeSourceEndpoint
             ? sharedMergePort(source, sourceSide, true, relationshipType)
@@ -930,182 +766,6 @@ final class ElkLayoutEngine {
     return Integer.toHexString(relationshipType.hashCode());
   }
 
-  private static String relationshipType(LayoutEdge edge) {
-    String relationshipType = edge.relationshipType();
-    if (relationshipType == null || relationshipType.isBlank()) {
-      return null;
-    }
-    return relationshipType;
-  }
-
-  // Endpoint merging is Dediren graph shaping, not route geometry. ELK's
-  // MERGE_EDGES and MERGE_HIERARCHY_EDGES are broad booleans; Dediren keeps
-  // relationship-type scoped shared ports so intentional fan-in/fan-out
-  // junctions remain readable without globally merging unrelated edges.
-  private static Map<String, EdgeEndpointMerge> flatEdgeEndpointMerges(
-      List<LayoutEdge> edges, Map<String, LayoutNode> nodes, LayoutPreferences preferences) {
-    if (!ElkLayeredOptions.endpointMergingEnabled(preferences)) {
-      return emptyEndpointMerges(edges);
-    }
-
-    Direction direction = ElkLayeredOptions.preferredDirection(preferences);
-    Map<EdgeEndpointKey, Integer> endpointCounts = new HashMap<>();
-    for (LayoutEdge edge : edges) {
-      String relationshipType = relationshipType(edge);
-      if (!nodes.containsKey(edge.source())
-          || !nodes.containsKey(edge.target())
-          || edge.source().equals(edge.target())
-          || relationshipType == null) {
-        continue;
-      }
-      endpointCounts.merge(
-          new EdgeEndpointKey(edge.source(), sourcePortSide(direction), true, relationshipType),
-          1,
-          Integer::sum);
-      endpointCounts.merge(
-          new EdgeEndpointKey(edge.target(), targetPortSide(direction), false, relationshipType),
-          1,
-          Integer::sum);
-    }
-
-    Map<String, EdgeEndpointMerge> endpointMerges = new HashMap<>();
-    for (LayoutEdge edge : edges) {
-      String relationshipType = relationshipType(edge);
-      if (!nodes.containsKey(edge.source()) || !nodes.containsKey(edge.target())) {
-        continue;
-      }
-      endpointMerges.put(
-          edge.id(),
-          new EdgeEndpointMerge(
-              relationshipType != null
-                  && endpointCounts.getOrDefault(
-                          new EdgeEndpointKey(
-                              edge.source(), sourcePortSide(direction), true, relationshipType),
-                          0)
-                      >= MERGEABLE_ENDPOINT_EDGE_COUNT,
-              relationshipType != null
-                  && endpointCounts.getOrDefault(
-                          new EdgeEndpointKey(
-                              edge.target(), targetPortSide(direction), false, relationshipType),
-                          0)
-                      >= MERGEABLE_ENDPOINT_EDGE_COUNT));
-    }
-    return endpointMerges;
-  }
-
-  private static Map<String, EdgeEndpointMerge> groupedEdgeEndpointMerges(
-      List<LayoutEdge> edges,
-      Map<String, LayoutNode> nodes,
-      Map<String, String> ownerByNode,
-      Map<String, Direction> groupDirectionById,
-      Map<String, Integer> groupOrderById,
-      Direction rootDirection,
-      LayoutPreferences preferences) {
-    if (!ElkLayeredOptions.endpointMergingEnabled(preferences)) {
-      return emptyEndpointMerges(edges);
-    }
-
-    Set<String> sourceOnlyGroups = sourceOnlyGroups(edges, ownerByNode);
-    Map<EdgeEndpointKey, Integer> endpointCounts = new HashMap<>();
-    for (LayoutEdge edge : edges) {
-      String relationshipType = relationshipType(edge);
-      if (!nodes.containsKey(edge.source())
-          || !nodes.containsKey(edge.target())
-          || edge.source().equals(edge.target())
-          || sameOwnerInternalEdge(edge, ownerByNode)
-          || relationshipType == null) {
-        continue;
-      }
-      Direction direction =
-          edgeDirection(
-              edge, nodes, ownerByNode, groupDirectionById, groupOrderById, rootDirection);
-      endpointCounts.merge(
-          new EdgeEndpointKey(edge.source(), sourcePortSide(direction), true, relationshipType),
-          1,
-          Integer::sum);
-      endpointCounts.merge(
-          new EdgeEndpointKey(edge.target(), targetPortSide(direction), false, relationshipType),
-          1,
-          Integer::sum);
-    }
-
-    Map<String, EdgeEndpointMerge> endpointMerges = new HashMap<>();
-    for (LayoutEdge edge : edges) {
-      String relationshipType = relationshipType(edge);
-      if (!nodes.containsKey(edge.source()) || !nodes.containsKey(edge.target())) {
-        continue;
-      }
-      boolean mergeableEndpoint =
-          relationshipType != null && !sameOwnerInternalEdge(edge, ownerByNode);
-      // Actor/source-only groups often have only two equivalent entry
-      // edges into a platform node. Merge that target pair so ELK owns a
-      // single shared endpoint instead of forcing an arbitrary port order.
-      boolean sourceOnlyGroupTargetEndpoint =
-          sourceOnlyGroups.contains(ownerByNode.get(edge.source()));
-      Direction direction =
-          edgeDirection(
-              edge, nodes, ownerByNode, groupDirectionById, groupOrderById, rootDirection);
-      endpointMerges.put(
-          edge.id(),
-          new EdgeEndpointMerge(
-              mergeableEndpoint
-                  && endpointCounts.getOrDefault(
-                          new EdgeEndpointKey(
-                              edge.source(), sourcePortSide(direction), true, relationshipType),
-                          0)
-                      >= MERGEABLE_ENDPOINT_EDGE_COUNT,
-              mergeableEndpoint
-                  && endpointCounts.getOrDefault(
-                          new EdgeEndpointKey(
-                              edge.target(), targetPortSide(direction), false, relationshipType),
-                          0)
-                      >= (sourceOnlyGroupTargetEndpoint ? 2 : MERGEABLE_ENDPOINT_EDGE_COUNT)));
-    }
-    return endpointMerges;
-  }
-
-  private static Set<String> sourceOnlyGroups(
-      List<LayoutEdge> edges, Map<String, String> ownerByNode) {
-    Set<String> groups = new HashSet<>(ownerByNode.values());
-    Set<String> nonSourceOnlyGroups = new HashSet<>();
-    Set<String> groupsWithOutgoingEdges = new HashSet<>();
-    for (LayoutEdge edge : edges) {
-      String sourceOwner = ownerByNode.get(edge.source());
-      String targetOwner = ownerByNode.get(edge.target());
-      if (sourceOwner != null && sourceOwner.equals(targetOwner)) {
-        nonSourceOnlyGroups.add(sourceOwner);
-        continue;
-      }
-      if (sourceOwner != null) {
-        groupsWithOutgoingEdges.add(sourceOwner);
-      }
-      if (targetOwner != null) {
-        nonSourceOnlyGroups.add(targetOwner);
-      }
-    }
-    groups.retainAll(groupsWithOutgoingEdges);
-    groups.removeAll(nonSourceOnlyGroups);
-    return groups;
-  }
-
-  private static boolean sameOwnerInternalEdge(LayoutEdge edge, Map<String, String> ownerByNode) {
-    String sourceOwner = ownerByNode.get(edge.source());
-    return sourceOwner != null && sourceOwner.equals(ownerByNode.get(edge.target()));
-  }
-
-  private static List<String> routingHints(
-      String edgeId, Map<String, EdgeEndpointMerge> endpointMerges) {
-    EdgeEndpointMerge endpointMerge = endpointMerges.getOrDefault(edgeId, NO_ENDPOINT_MERGE);
-    List<String> hints = new ArrayList<>();
-    if (endpointMerge.sourceEndpoint()) {
-      hints.add(SHARED_SOURCE_JUNCTION_HINT);
-    }
-    if (endpointMerge.targetEndpoint()) {
-      hints.add(SHARED_TARGET_JUNCTION_HINT);
-    }
-    return hints;
-  }
-
   // Two distinct points on a withheld self-loop's lifeline head. The sequence normalizer replaces
   // them with the real stem-anchored hook; they exist only so the self-message keeps its slot in
   // the message-row lattice, which drops edges with fewer than two route points.
@@ -1115,87 +775,13 @@ final class ElkLayoutEngine {
     return List.of(new Point(stemX, headBottom), new Point(stemX, headBottom + 1.0));
   }
 
-  private static Map<String, EnumMap<PortSide, Integer>> flatPortCounts(
-      List<LayoutEdge> edges,
-      Map<String, LayoutNode> nodes,
-      Map<String, EdgeEndpointMerge> endpointMerges,
-      Map<String, EdgeEndpointSides> endpointSides) {
-    Map<String, EnumMap<PortSide, Integer>> portCounts = new HashMap<>();
-    Set<EdgeEndpointKey> countedMergePorts = new HashSet<>();
-    for (LayoutEdge edge : edges) {
-      if (!nodes.containsKey(edge.source()) || !nodes.containsKey(edge.target())) {
-        continue;
-      }
-      EdgeEndpointMerge endpointMerge = endpointMerges.getOrDefault(edge.id(), NO_ENDPOINT_MERGE);
-      EdgeEndpointSides sides = endpointSides.get(edge.id());
-      countPort(
-          portCounts,
-          countedMergePorts,
-          edge.source(),
-          sides.sourceSide(),
-          true,
-          relationshipType(edge),
-          endpointMerge.sourceEndpoint());
-      countPort(
-          portCounts,
-          countedMergePorts,
-          edge.target(),
-          sides.targetSide(),
-          false,
-          relationshipType(edge),
-          endpointMerge.targetEndpoint());
-    }
-    return portCounts;
-  }
-
-  private static Map<String, EnumMap<PortSide, Integer>> groupedPortCounts(
-      List<LayoutEdge> edges,
-      Map<String, LayoutNode> nodes,
-      Map<String, String> ownerByNode,
-      Map<String, Direction> groupDirectionById,
-      Map<String, Integer> groupOrderById,
-      Direction rootDirection,
-      Map<String, EdgeEndpointMerge> endpointMerges) {
-    Map<String, EnumMap<PortSide, Integer>> portCounts = new HashMap<>();
-    Set<EdgeEndpointKey> countedMergePorts = new HashSet<>();
-    for (LayoutEdge edge : edges) {
-      if (!nodes.containsKey(edge.source()) || !nodes.containsKey(edge.target())) {
-        continue;
-      }
-      Direction direction =
-          edgeDirection(
-              edge, nodes, ownerByNode, groupDirectionById, groupOrderById, rootDirection);
-      EdgeEndpointMerge endpointMerge = endpointMerges.getOrDefault(edge.id(), NO_ENDPOINT_MERGE);
-      countPort(
-          portCounts,
-          countedMergePorts,
-          edge.source(),
-          sourcePortSide(direction),
-          true,
-          relationshipType(edge),
-          endpointMerge.sourceEndpoint());
-      countPort(
-          portCounts,
-          countedMergePorts,
-          edge.target(),
-          targetPortSide(direction),
-          false,
-          relationshipType(edge),
-          endpointMerge.targetEndpoint());
-    }
-    return portCounts;
-  }
-
-  // ELK accounts for the generated ports, but Dediren still increases the
-  // minimum node side length when many ports would otherwise be packed onto
-  // the same side. This is size intent, not route geometry.
   private static void setGeneratedDimensions(
       ElkNode elkNode,
       LayoutNode node,
       Map<PortSide, Integer> portCounts,
       LayoutPreferences preferences) {
-    double width = positiveOrDefault(node.widthHint(), DEFAULT_WIDTH);
-    double height = positiveOrDefault(node.heightHint(), DEFAULT_HEIGHT);
+    double width = positiveOrDefault(node.widthHint(), PortPlan.DEFAULT_WIDTH);
+    double height = positiveOrDefault(node.heightHint(), PortPlan.DEFAULT_HEIGHT);
     if (portCounts != null) {
       double portSpacing = ElkLayeredOptions.portPortSpacing(preferences);
       width =
@@ -1224,56 +810,6 @@ final class ElkLayoutEngine {
       Map<PortSide, Integer> portCounts, PortSide first, PortSide second) {
     return Math.max(portCounts.getOrDefault(first, 0), portCounts.getOrDefault(second, 0));
   }
-
-  private static void countPort(
-      Map<String, EnumMap<PortSide, Integer>> portCounts, String nodeId, PortSide side) {
-    EnumMap<PortSide, Integer> bySide =
-        portCounts.computeIfAbsent(nodeId, ignored -> new EnumMap<>(PortSide.class));
-    bySide.merge(side, 1, Integer::sum);
-  }
-
-  private static void countPort(
-      Map<String, EnumMap<PortSide, Integer>> portCounts,
-      Set<EdgeEndpointKey> countedMergePorts,
-      String nodeId,
-      PortSide side,
-      boolean sourceEndpoint,
-      String relationshipType,
-      boolean mergeEndpoint) {
-    if (!mergeEndpoint) {
-      countPort(portCounts, nodeId, side);
-      return;
-    }
-    if (countedMergePorts.add(
-        new EdgeEndpointKey(nodeId, side, sourceEndpoint, relationshipType))) {
-      countPort(portCounts, nodeId, side);
-    }
-  }
-
-  private static PortSide sourcePortSide(Direction direction) {
-    return switch (direction) {
-      case DOWN -> PortSide.SOUTH;
-      case LEFT -> PortSide.WEST;
-      case UP -> PortSide.NORTH;
-      default -> PortSide.EAST;
-    };
-  }
-
-  private static PortSide targetPortSide(Direction direction) {
-    return switch (direction) {
-      case DOWN -> PortSide.NORTH;
-      case LEFT -> PortSide.EAST;
-      case UP -> PortSide.SOUTH;
-      default -> PortSide.WEST;
-    };
-  }
-
-  private record EdgeEndpointSides(PortSide sourceSide, PortSide targetSide) {}
-
-  private record EdgeEndpointMerge(boolean sourceEndpoint, boolean targetEndpoint) {}
-
-  private record EdgeEndpointKey(
-      String nodeId, PortSide side, boolean sourceEndpoint, String relationshipType) {}
 
   private interface ElkGroupConfigurator {
     void configure(ElkNode group, Direction direction);
