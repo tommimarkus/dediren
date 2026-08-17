@@ -5,7 +5,7 @@
     "id" : "device-prod-node",
     "source_id" : "device-prod-node",
     "projection_id" : "device-prod-node",
-    "x" : 213.5,
+    "x" : 12.5,
     "y" : 12.0,
     "width" : 200.0,
     "height" : 120.0,
@@ -15,8 +15,8 @@
     "id" : "ee-orders-runtime",
     "source_id" : "ee-orders-runtime",
     "projection_id" : "ee-orders-runtime",
-    "x" : 378.0,
-    "y" : 713.0,
+    "x" : 748.0,
+    "y" : 454.0,
     "width" : 180.0,
     "height" : 96.0,
     "label" : "Orders Runtime",
@@ -25,8 +25,8 @@
     "id" : "node-payment-network",
     "source_id" : "node-payment-network",
     "projection_id" : "node-payment-network",
-    "x" : 760.0,
-    "y" : 701.0,
+    "x" : 12.0,
+    "y" : 442.0,
     "width" : 200.0,
     "height" : 120.0,
     "label" : "Payment Network",
@@ -35,8 +35,8 @@
     "id" : "artifact-orders-service",
     "source_id" : "artifact-orders-service",
     "projection_id" : "artifact-orders-service",
-    "x" : 83.0,
-    "y" : 378.0,
+    "x" : 414.0,
+    "y" : 217.0,
     "width" : 150.0,
     "height" : 70.0,
     "label" : "orders-service.jar",
@@ -45,8 +45,8 @@
     "id" : "artifact-migration-job",
     "source_id" : "artifact-migration-job",
     "projection_id" : "artifact-migration-job",
-    "x" : 64.0,
-    "y" : 236.0,
+    "x" : 433.0,
+    "y" : 384.0,
     "width" : 150.0,
     "height" : 70.0,
     "label" : "migration-job.jar",
@@ -55,8 +55,8 @@
     "id" : "deployment-spec-orders",
     "source_id" : "deployment-spec-orders",
     "projection_id" : "deployment-spec-orders",
-    "x" : 44.0,
-    "y" : 545.0,
+    "x" : 413.0,
+    "y" : 50.0,
     "width" : 190.0,
     "height" : 70.0,
     "label" : "orders-deployment.yaml",
@@ -65,8 +65,8 @@
     "id" : "component-order-api",
     "source_id" : "component-order-api",
     "projection_id" : "component-order-api",
-    "x" : 760.0,
-    "y" : 365.0,
+    "x" : 32.0,
+    "y" : 204.0,
     "width" : 180.0,
     "height" : 96.0,
     "label" : "Order API",
@@ -80,17 +80,17 @@
     "projection_id" : "deploy-orders-service",
     "routing_hints" : [ ],
     "points" : [ {
-      "x" : 158.0,
-      "y" : 449.0
+      "x" : 489.0,
+      "y" : 288.0
     }, {
-      "x" : 158.0,
-      "y" : 497.0
+      "x" : 489.0,
+      "y" : 336.0
     }, {
-      "x" : 494.1666666666667,
-      "y" : 497.0
+      "x" : 864.1666666666667,
+      "y" : 336.0
     }, {
-      "x" : 494.1666666666667,
-      "y" : 712.0
+      "x" : 864.1666666666667,
+      "y" : 453.0
     } ],
     "label" : "deploy",
     "source_pointer" : "/relationships/0"
@@ -102,17 +102,17 @@
     "projection_id" : "deploy-orders-spec",
     "routing_hints" : [ ],
     "points" : [ {
-      "x" : 139.0,
-      "y" : 616.0
+      "x" : 508.0,
+      "y" : 121.0
     }, {
-      "x" : 139.0,
-      "y" : 664.0
+      "x" : 508.0,
+      "y" : 169.0
     }, {
-      "x" : 441.8333333333333,
-      "y" : 664.0
+      "x" : 811.8333333333333,
+      "y" : 169.0
     }, {
-      "x" : 441.8333333333333,
-      "y" : 712.0
+      "x" : 811.8333333333333,
+      "y" : 453.0
     } ],
     "label" : "applies",
     "source_pointer" : "/relationships/1"
@@ -124,11 +124,11 @@
     "projection_id" : "artifact-manifests-order-api",
     "routing_hints" : [ ],
     "points" : [ {
-      "x" : 234.0,
-      "y" : 413.0
+      "x" : 413.0,
+      "y" : 252.0
     }, {
-      "x" : 759.0,
-      "y" : 413.0
+      "x" : 213.0,
+      "y" : 252.0
     } ],
     "label" : "manifests",
     "source_pointer" : "/relationships/2"
@@ -140,11 +140,11 @@
     "projection_id" : "orders-runtime-payment-path",
     "routing_hints" : [ ],
     "points" : [ {
-      "x" : 559.0,
-      "y" : 761.0
+      "x" : 747.0,
+      "y" : 502.0
     }, {
-      "x" : 759.0,
-      "y" : 761.0
+      "x" : 213.0,
+      "y" : 502.0
     } ],
     "label" : "HTTPS",
     "source_pointer" : "/relationships/3"
@@ -158,10 +158,10 @@
         "source_id" : "device-prod-node"
       }
     },
-    "x" : 12.0,
-    "y" : 204.0,
+    "x" : 381.0,
+    "y" : 18.0,
     "width" : 579.0,
-    "height" : 637.0,
+    "height" : 564.0,
     "members" : [ "ee-orders-runtime", "artifact-orders-service", "artifact-migration-job", "deployment-spec-orders" ],
     "label" : "Production Node"
   } ],

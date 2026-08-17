@@ -5,8 +5,8 @@
     "id" : "preparing",
     "source_id" : "preparing",
     "projection_id" : "preparing",
-    "x" : 152.0,
-    "y" : 827.0,
+    "x" : 108.25,
+    "y" : 76.0,
     "width" : 150.0,
     "height" : 72.0,
     "label" : "Preparing",
@@ -15,8 +15,8 @@
     "id" : "running",
     "source_id" : "running",
     "projection_id" : "running",
-    "x" : 173.5,
-    "y" : 367.0,
+    "x" : 86.75,
+    "y" : 318.0,
     "width" : 150.0,
     "height" : 72.0,
     "label" : "Running",
@@ -25,8 +25,8 @@
     "id" : "paused",
     "source_id" : "paused",
     "projection_id" : "paused",
-    "x" : 195.0,
-    "y" : 125.0,
+    "x" : 76.0,
+    "y" : 624.0,
     "width" : 150.0,
     "height" : 72.0,
     "label" : "Paused",
@@ -35,8 +35,8 @@
     "id" : "reviewing",
     "source_id" : "reviewing",
     "projection_id" : "reviewing",
-    "x" : 152.0,
-    "y" : 609.0,
+    "x" : 298.0,
+    "y" : 624.0,
     "width" : 150.0,
     "height" : 72.0,
     "label" : "Reviewing",
@@ -50,23 +50,11 @@
     "projection_id" : "t-start",
     "routing_hints" : [ ],
     "points" : [ {
-      "x" : 227.0,
-      "y" : 900.0
+      "x" : 161.75,
+      "y" : 149.0
     }, {
-      "x" : 227.0,
-      "y" : 948.0
-    }, {
-      "x" : 79.0,
-      "y" : 948.0
-    }, {
-      "x" : 79.0,
-      "y" : 318.0
-    }, {
-      "x" : 227.0,
-      "y" : 318.0
-    }, {
-      "x" : 227.0,
-      "y" : 366.0
+      "x" : 161.75,
+      "y" : 317.0
     } ],
     "label" : "start",
     "source_pointer" : "/relationships/2"
@@ -78,11 +66,14 @@
     "projection_id" : "t-pause",
     "routing_hints" : [ ],
     "points" : [ {
-      "x" : 270.0,
-      "y" : 440.0
+      "x" : 161.75,
+      "y" : 391.0
     }, {
-      "x" : 270.0,
-      "y" : 124.0
+      "x" : 172.5,
+      "y" : 391.0
+    }, {
+      "x" : 172.5,
+      "y" : 623.0
     } ],
     "label" : "pause",
     "source_pointer" : "/relationships/3"
@@ -94,11 +85,11 @@
     "projection_id" : "t-resume",
     "routing_hints" : [ ],
     "points" : [ {
-      "x" : 270.0,
-      "y" : 198.0
+      "x" : 129.5,
+      "y" : 623.0
     }, {
-      "x" : 270.0,
-      "y" : 366.0
+      "x" : 129.5,
+      "y" : 391.0
     } ],
     "label" : "resume",
     "source_pointer" : "/relationships/4"
@@ -110,11 +101,17 @@
     "projection_id" : "t-review",
     "routing_hints" : [ ],
     "points" : [ {
-      "x" : 227.0,
-      "y" : 440.0
+      "x" : 194.0,
+      "y" : 391.0
     }, {
-      "x" : 227.0,
-      "y" : 608.0
+      "x" : 194.0,
+      "y" : 439.0
+    }, {
+      "x" : 351.5,
+      "y" : 439.0
+    }, {
+      "x" : 351.5,
+      "y" : 623.0
     } ],
     "label" : "review",
     "source_pointer" : "/relationships/5"
@@ -126,11 +123,17 @@
     "projection_id" : "t-rework",
     "routing_hints" : [ ],
     "points" : [ {
-      "x" : 227.0,
-      "y" : 682.0
+      "x" : 394.5,
+      "y" : 623.0
     }, {
-      "x" : 227.0,
-      "y" : 826.0
+      "x" : 394.5,
+      "y" : 197.0
+    }, {
+      "x" : 204.75,
+      "y" : 197.0
+    }, {
+      "x" : 204.75,
+      "y" : 149.0
     } ],
     "label" : "rework",
     "source_pointer" : "/relationships/6"
@@ -146,8 +149,8 @@
     },
     "x" : 12.0,
     "y" : 12.0,
-    "width" : 449.0,
-    "height" : 1000.0,
+    "width" : 500.0,
+    "height" : 748.0,
     "members" : [ "multi-cycle-region-frame" ],
     "label" : "Session Lifecycle"
   }, {
@@ -161,8 +164,8 @@
     },
     "x" : 44.0,
     "y" : 44.0,
-    "width" : 385.0,
-    "height" : 936.0,
+    "width" : 436.0,
+    "height" : 684.0,
     "members" : [ "preparing", "running", "paused", "reviewing" ],
     "label" : "Session Region"
   } ],
