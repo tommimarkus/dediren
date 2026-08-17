@@ -116,6 +116,19 @@
       }
     },
     {
+      "id": "dot-import",
+      "type": "ApplicationComponent",
+      "label": "dot-import",
+      "properties": {
+        "layer": "Application",
+        "viewpoint": "Application Cooperation",
+        "tier": "2",
+        "rationale": "Native bounded lexer, parser and mapper for the Graphviz DOT language. Produces generic-graph SourceDocument records through ImportEngine.",
+        "evidence": "source-backed",
+        "source": "engines/dot-import/pom.xml; engine-api/src/main/java/dev/dediren/engine/ImportEngine.java"
+      }
+    },
+    {
       "id": "semantics-graph",
       "type": "ApplicationComponent",
       "label": "semantics-graph",
@@ -329,6 +342,17 @@
       "type": "Serving",
       "source": "contracts",
       "target": "mermaid-import",
+      "label": "",
+      "properties": {
+        "visible": true,
+        "evidence": "source-backed"
+      }
+    },
+    {
+      "id": "serv-contracts-dot-import",
+      "type": "Serving",
+      "source": "contracts",
+      "target": "dot-import",
       "label": "",
       "properties": {
         "visible": true,
@@ -611,6 +635,17 @@
       }
     },
     {
+      "id": "serv-engine-api-dot-import",
+      "type": "Serving",
+      "source": "engine-api",
+      "target": "dot-import",
+      "label": "",
+      "properties": {
+        "visible": true,
+        "evidence": "source-backed"
+      }
+    },
+    {
       "id": "serv-engine-api-semantics-graph",
       "type": "Serving",
       "source": "engine-api",
@@ -776,6 +811,17 @@
       }
     },
     {
+      "id": "serv-dot-import-cli",
+      "type": "Serving",
+      "source": "dot-import",
+      "target": "cli",
+      "label": "",
+      "properties": {
+        "visible": true,
+        "evidence": "source-backed"
+      }
+    },
+    {
       "id": "serv-elk-layout-cli",
       "type": "Serving",
       "source": "elk-layout",
@@ -858,6 +904,7 @@
             "engine-api",
             "core",
             "mermaid-import",
+            "dot-import",
             "semantics-graph",
             "semantics-archimate",
             "semantics-uml",
@@ -875,6 +922,7 @@
             "serv-ir-engine-api",
             "serv-engine-api-core",
             "serv-engine-api-mermaid-import",
+            "serv-engine-api-dot-import",
             "serv-engine-api-semantics-graph",
             "serv-engine-api-semantics-archimate",
             "serv-engine-api-semantics-uml",
@@ -923,6 +971,7 @@
               "members": [
                 "core",
                 "mermaid-import",
+                "dot-import",
                 "semantics-graph",
                 "semantics-archimate",
                 "semantics-uml",

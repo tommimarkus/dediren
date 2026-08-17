@@ -23,7 +23,7 @@
       "label": "engine implementations",
       "properties": {
         "uml": { "kind": "package" },
-        "rationale": "The concrete engines wired in cli.EngineWiring, drawn from mermaid-import, elk-layout, render, archimate-oef-export, uml-xmi-export, semantics-graph, semantics-archimate, and semantics-uml."
+        "rationale": "The concrete engines wired in cli.EngineWiring, drawn from mermaid-import, dot-import, elk-layout, render, archimate-oef-export, uml-xmi-export, semantics-graph, semantics-archimate, and semantics-uml."
       }
     },
 
@@ -97,6 +97,15 @@
       ] }, "rationale": "mermaid-import module: bounded native flowchart parser and generic-graph mapper." }
     },
     {
+      "id": "cls-dot-import",
+      "type": "Class",
+      "label": "DotImportEngine",
+      "properties": { "uml": { "package": "pkg-engines", "attributes": [], "operations": [
+        { "name": "id", "visibility": "public", "parameters": [], "return_type": "String" },
+        { "name": "importSource", "visibility": "public", "parameters": [ { "name": "source", "type": "String" } ], "return_type": "EngineResult<SourceDocument>" }
+      ] }, "rationale": "dot-import module: bounded native Graphviz DOT lexer, parser and generic-graph mapper." }
+    },
+    {
       "id": "cls-semantics-router",
       "type": "Class",
       "label": "SemanticsRouterEngine",
@@ -162,6 +171,7 @@
   ],
   "relationships": [
     { "id": "real-mermaid-import", "type": "Realization", "source": "cls-mermaid-import", "target": "if-import-engine", "label": "realizes", "properties": {} },
+    { "id": "real-dot-import", "type": "Realization", "source": "cls-dot-import", "target": "if-import-engine", "label": "realizes", "properties": {} },
     { "id": "real-router-semantics", "type": "Realization", "source": "cls-semantics-router", "target": "if-semantics-engine", "label": "realizes", "properties": {} },
     { "id": "real-elk-layout", "type": "Realization", "source": "cls-elk-engine", "target": "if-layout-engine", "label": "realizes", "properties": {} },
     { "id": "real-svg-render", "type": "Realization", "source": "cls-svg-render", "target": "if-render-engine", "label": "realizes", "properties": {} },
@@ -182,17 +192,17 @@
           "kind": "uml-class",
           "nodes": [
             "if-semantics-engine", "if-layout-engine", "if-render-engine", "if-export-engine", "if-import-engine", "if-notation-semantics",
-            "cls-mermaid-import",
+            "cls-mermaid-import", "cls-dot-import",
             "cls-semantics-router", "cls-graph-notation", "cls-archimate-notation", "cls-uml-notation",
             "cls-elk-engine", "cls-svg-render", "cls-oef-export", "cls-xmi-export"
           ],
           "relationships": [
-            "real-mermaid-import", "real-router-semantics", "real-elk-layout", "real-svg-render", "real-oef-export", "real-xmi-export",
+            "real-mermaid-import", "real-dot-import", "real-router-semantics", "real-elk-layout", "real-svg-render", "real-oef-export", "real-xmi-export",
             "real-graph-notation", "real-archimate-notation", "real-uml-notation", "dep-router-notation"
           ],
           "groups": [
             { "id": "engine-api-boundary", "label": "engine-api", "role": "semantic-boundary", "semantic_source_id": "pkg-engine-api", "members": [ "if-semantics-engine", "if-layout-engine", "if-render-engine", "if-export-engine", "if-import-engine", "if-notation-semantics" ] },
-            { "id": "engines-boundary", "label": "engine implementations", "role": "semantic-boundary", "semantic_source_id": "pkg-engines", "members": [ "cls-mermaid-import", "cls-semantics-router", "cls-graph-notation", "cls-archimate-notation", "cls-uml-notation", "cls-elk-engine", "cls-svg-render", "cls-oef-export", "cls-xmi-export" ] }
+            { "id": "engines-boundary", "label": "engine implementations", "role": "semantic-boundary", "semantic_source_id": "pkg-engines", "members": [ "cls-mermaid-import", "cls-dot-import", "cls-semantics-router", "cls-graph-notation", "cls-archimate-notation", "cls-uml-notation", "cls-elk-engine", "cls-svg-render", "cls-oef-export", "cls-xmi-export" ] }
           ],
           "layout_preferences": {
             "algorithm": "layered",
