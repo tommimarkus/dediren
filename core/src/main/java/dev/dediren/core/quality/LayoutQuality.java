@@ -40,6 +40,14 @@ public final class LayoutQuality {
   // A self-loop must poke out beyond its node by at least this much to read as a visible loop;
   // a route staying within the box renders hidden behind the (later-painted, opaque) node.
   private static final double SELF_LOOP_MIN_ESCAPE = 4.0;
+  // A route touching (or briefly overshooting) its own endpoint's perimeter is normal contact,
+  // not a through-node defect; ELK places port anchors up to ~1px outside the outline, plus
+  // rounding, so the inset must clear that band before a segment counts as entering the node's
+  // interior rather than just meeting it.
+  private static final double OWN_ENDPOINT_INTERIOR_INSET = 1.5;
+  // Once inside the inset interior, the segment must still travel a non-trivial distance through
+  // it along its own axis; a hairline graze at the inset boundary should not register.
+  private static final double OWN_ENDPOINT_MIN_OVERLAP = 2.0;
   // Edge-label dissociation band (issue #31). LABEL_BAND_GAP spans ELK Layered's compact/readable
   // edge-edge spacing (40-48px) so genuinely adjacent parallel labeled runs qualify, while spacious
   // spacing (64px) and roomy layouts stay clear. LABEL_BAND_MIN_OVERLAP is the parallel run length
@@ -522,6 +530,11 @@ public final class LayoutQuality {
   private static int countConnectorThroughNodes(LayoutResult result) {
     int count = 0;
     for (LaidOutEdge edge : result.edges()) {
+      // Self-loops are excluded from the own-endpoint widening below: they already have a
+      // dedicated degenerate-loop check (LAYOUT_SELF_LOOP_DEGENERATE / selfLoopEscapesNode), and
+      // every ordinary escaping self-loop legitimately re-enters its own node's interior on the
+      // way back out, so widening this metric to them would just create a false-positive class.
+      boolean selfLoop = edge.source().equals(edge.target());
       for (int i = 0; i + 1 < edge.points().size(); i++) {
         Point start = edge.points().get(i);
         Point end = edge.points().get(i + 1);
@@ -529,10 +542,16 @@ public final class LayoutQuality {
           if (isSequenceChrome(node)) {
             continue;
           }
-          if (!node.id().equals(edge.source())
-              && !node.id().equals(edge.target())
-              && segmentIntersectsRect(
-                  start, end, node.x(), node.y(), node.width(), node.height())) {
+          boolean ownEndpoint =
+              node.id().equals(edge.source()) || node.id().equals(edge.target());
+          if (ownEndpoint) {
+            if (!selfLoop && segmentPiercesOwnEndpointInterior(start, end, node)) {
+              count++;
+              break;
+            }
+            continue;
+          }
+          if (segmentIntersectsRect(start, end, node.x(), node.y(), node.width(), node.height())) {
             count++;
             break;
           }
@@ -540,6 +559,42 @@ public final class LayoutQuality {
       }
     }
     return count;
+  }
+
+  // Widens the through-node check to an edge's own endpoint node: unlike an unrelated node
+  // (bounding-box overlap is enough), legitimate contact at the endpoint's perimeter is normal,
+  // so only a route that actually crosses the inset interior counts. Segments are orthogonal in
+  // practice (see routeSegment), so orientation is used to separate "sits inside the perpendicular
+  // band" from "travels far enough along its own axis"; a non-orthogonal segment falls back to
+  // requiring the minimum overlap on both axes.
+  private static boolean segmentPiercesOwnEndpointInterior(Point start, Point end, LaidOutNode node) {
+    double left = node.x() + OWN_ENDPOINT_INTERIOR_INSET;
+    double right = node.x() + node.width() - OWN_ENDPOINT_INTERIOR_INSET;
+    double top = node.y() + OWN_ENDPOINT_INTERIOR_INSET;
+    double bottom = node.y() + node.height() - OWN_ENDPOINT_INTERIOR_INSET;
+    if (right <= left || bottom <= top) {
+      // The node is too small for an inset interior to exist at all.
+      return false;
+    }
+    double minX = Math.min(start.x(), end.x());
+    double maxX = Math.max(start.x(), end.x());
+    double minY = Math.min(start.y(), end.y());
+    double maxY = Math.max(start.y(), end.y());
+    if (sameCoordinate(start.y(), end.y())) {
+      double y = start.y();
+      return y > top
+          && y < bottom
+          && Math.min(maxX, right) - Math.max(minX, left) >= OWN_ENDPOINT_MIN_OVERLAP;
+    }
+    if (sameCoordinate(start.x(), end.x())) {
+      double x = start.x();
+      return x > left
+          && x < right
+          && Math.min(maxY, bottom) - Math.max(minY, top) >= OWN_ENDPOINT_MIN_OVERLAP;
+    }
+    double overlapX = Math.min(maxX, right) - Math.max(minX, left);
+    double overlapY = Math.min(maxY, bottom) - Math.max(minY, top);
+    return overlapX >= OWN_ENDPOINT_MIN_OVERLAP && overlapY >= OWN_ENDPOINT_MIN_OVERLAP;
   }
 
   private static int countGroupBoundaryIssues(LayoutResult result) {

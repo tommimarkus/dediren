@@ -464,6 +464,70 @@ class LayoutQualityTest {
   }
 
   @Test
+  void routeThroughItsOwnSourceNodeInteriorIsCounted() {
+    // A back-transition whose route runs straight through its own source node body (not merely
+    // touching the perimeter it departs from) is the widened defect: the segment starts on a's
+    // right edge (x=100) and travels deep into a's interior (x=10), well past the inset band.
+    var nodes = List.of(node("a", 0.0, 0.0), node("b", 300.0, 0.0)); // both 100 x 80
+    var edges =
+        List.of(edge("back", "a", "b", List.of(new Point(100.0, 40.0), new Point(10.0, 40.0))));
+
+    LayoutQualityReport report =
+        LayoutQuality.validateLayout(layoutResult(nodes, edges, List.of()));
+
+    assertThat(report.connectorThroughNodeCount()).isEqualTo(1);
+  }
+
+  @Test
+  void routeThroughItsOwnTargetNodeInteriorIsCounted() {
+    // Mirror of the source case: the route reaches target b's left perimeter (x=300) and keeps
+    // going deep into b's interior (x=390) instead of stopping at the edge.
+    var nodes = List.of(node("a", 0.0, 0.0), node("b", 300.0, 0.0)); // both 100 x 80
+    var edges =
+        List.of(edge("into-target", "a", "b", List.of(new Point(100.0, 40.0), new Point(390.0, 40.0))));
+
+    LayoutQualityReport report =
+        LayoutQuality.validateLayout(layoutResult(nodes, edges, List.of()));
+
+    assertThat(report.connectorThroughNodeCount()).isEqualTo(1);
+  }
+
+  @Test
+  void ownEndpointPerimeterContactAndNearOutlineStubsAreNotCounted() {
+    // A route that only touches its own node's perimeter, or grazes just inside it (the ~1px ELK
+    // port inset plus rounding OWN_ENDPOINT_INTERIOR_INSET covers), must not count: this is
+    // legitimate contact, not a through-node defect.
+    var nodes = List.of(node("a", 0.0, 0.0), node("b", 300.0, 0.0)); // both 100 x 80
+    var edges =
+        List.of(
+            // Exactly on a's right perimeter (x=100).
+            edge("on-perimeter", "a", "b", List.of(new Point(100.0, 0.0), new Point(100.0, 80.0))),
+            // Just inside the perimeter (x=99), within the interior inset tolerance.
+            edge("near-perimeter", "a", "b", List.of(new Point(99.0, 10.0), new Point(99.0, 70.0))),
+            // Just outside the outline entirely (x=101).
+            edge("outside-stub", "a", "b", List.of(new Point(101.0, 10.0), new Point(101.0, 70.0))));
+
+    LayoutQualityReport report =
+        LayoutQuality.validateLayout(layoutResult(nodes, edges, List.of()));
+
+    assertThat(report.connectorThroughNodeCount()).isZero();
+  }
+
+  @Test
+  void selfLoopIsNotCountedAsConnectorThroughNode() {
+    // Self-loops have a dedicated degenerate-loop check (LAYOUT_SELF_LOOP_DEGENERATE); widening
+    // connector-through-node to them would double-count the same defect via a second metric.
+    var nodes = List.of(node("a", 0.0, 0.0)); // 100 x 80
+    var edges =
+        List.of(edge("loop", "a", "a", List.of(new Point(0.0, 40.0), new Point(100.0, 40.0))));
+
+    LayoutQualityReport report =
+        LayoutQuality.validateLayout(layoutResult(nodes, edges, List.of()));
+
+    assertThat(report.connectorThroughNodeCount()).isZero();
+  }
+
+  @Test
   void nestedGroupMembersAreCountedAsGroupBoundaryMembers() {
     var nodes = List.of(node("source", 0.0, 30.0), node("target", 200.0, 30.0));
     var edges =
