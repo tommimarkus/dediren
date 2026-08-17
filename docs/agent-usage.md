@@ -273,7 +273,7 @@ not a Dediren runtime dependency and has no Dediren
 {
   "model_schema_version": "model.schema.v1",
   "required_plugins": [
-    { "id": "generic-graph", "version": "2026.08.5" }
+    { "id": "generic-graph", "version": "2026.08.6" }
   ],
   "nodes": [
     { "id": "client", "type": "generic.actor", "label": "Client", "properties": {} },
@@ -366,8 +366,8 @@ profile and use ArchiMate type names:
 ```json
 {
   "required_plugins": [
-    { "id": "generic-graph", "version": "2026.08.5" },
-    { "id": "archimate-oef", "version": "2026.08.5" }
+    { "id": "generic-graph", "version": "2026.08.6" },
+    { "id": "archimate-oef", "version": "2026.08.6" }
   ],
   "plugins": {
     "generic-graph": {
@@ -1242,7 +1242,7 @@ deployment slots, and UMLDI.
 ## Runtime Probes
 
 ```bash
-VERSION=2026.08.5
+VERSION=2026.08.6
 BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-${VERSION}
 
 "$BUNDLE/bin/dediren" --version
