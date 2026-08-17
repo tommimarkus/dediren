@@ -8,7 +8,7 @@
     "x" : 521.0,
     "y" : 12.0,
     "width" : 848.0,
-    "height" : 856.0,
+    "height" : 760.0,
     "label" : "Place Order",
     "role" : "interaction",
     "source_pointer" : "/nodes/0"
@@ -19,7 +19,7 @@
     "x" : 521.0,
     "y" : 12.0,
     "width" : 140.0,
-    "height" : 88.0,
+    "height" : 64.0,
     "label" : "Customer",
     "role" : "lifeline",
     "source_pointer" : "/nodes/1"
@@ -30,7 +30,7 @@
     "x" : 757.0,
     "y" : 12.0,
     "width" : 140.0,
-    "height" : 248.0,
+    "height" : 64.0,
     "label" : "Order Service",
     "role" : "lifeline",
     "source_pointer" : "/nodes/2"
@@ -41,7 +41,7 @@
     "x" : 993.0,
     "y" : 12.0,
     "width" : 140.0,
-    "height" : 88.0,
+    "height" : 64.0,
     "label" : "Inventory",
     "role" : "lifeline",
     "source_pointer" : "/nodes/3"
@@ -52,7 +52,7 @@
     "x" : 1229.0,
     "y" : 12.0,
     "width" : 140.0,
-    "height" : 88.0,
+    "height" : 64.0,
     "label" : "Payment",
     "role" : "lifeline",
     "source_pointer" : "/nodes/4"
@@ -66,10 +66,10 @@
     "routing_hints" : [ ],
     "points" : [ {
       "x" : 827.0,
-      "y" : 330.0
+      "y" : 146.0
     }, {
       "x" : 1063.0,
-      "y" : 330.0
+      "y" : 146.0
     } ],
     "label" : "checkAvailability",
     "source_pointer" : "/relationships/0"
@@ -82,10 +82,10 @@
     "routing_hints" : [ ],
     "points" : [ {
       "x" : 1063.0,
-      "y" : 354.0
+      "y" : 178.0
     }, {
       "x" : 827.0,
-      "y" : 354.0
+      "y" : 178.0
     } ],
     "label" : "inStock",
     "source_pointer" : "/relationships/1"
@@ -98,10 +98,10 @@
     "routing_hints" : [ ],
     "points" : [ {
       "x" : 827.0,
-      "y" : 446.0
+      "y" : 278.0
     }, {
       "x" : 1063.0,
-      "y" : 446.0
+      "y" : 278.0
     } ],
     "label" : "requestBackorder",
     "source_pointer" : "/relationships/2"
@@ -114,10 +114,10 @@
     "routing_hints" : [ ],
     "points" : [ {
       "x" : 1063.0,
-      "y" : 470.0
+      "y" : 310.0
     }, {
       "x" : 827.0,
-      "y" : 470.0
+      "y" : 310.0
     } ],
     "label" : "backorderAccepted",
     "source_pointer" : "/relationships/3"
@@ -130,10 +130,10 @@
     "routing_hints" : [ ],
     "points" : [ {
       "x" : 591.0,
-      "y" : 540.0
+      "y" : 388.0
     }, {
       "x" : 827.0,
-      "y" : 540.0
+      "y" : 388.0
     } ],
     "label" : "applyCoupon",
     "source_pointer" : "/relationships/4"
@@ -146,10 +146,10 @@
     "routing_hints" : [ ],
     "points" : [ {
       "x" : 827.0,
-      "y" : 564.0
+      "y" : 420.0
     }, {
       "x" : 591.0,
-      "y" : 564.0
+      "y" : 420.0
     } ],
     "label" : "couponAccepted",
     "source_pointer" : "/relationships/5"
@@ -162,10 +162,10 @@
     "routing_hints" : [ ],
     "points" : [ {
       "x" : 827.0,
-      "y" : 634.0
+      "y" : 498.0
     }, {
       "x" : 1299.0,
-      "y" : 634.0
+      "y" : 498.0
     } ],
     "label" : "authorizePayment",
     "source_pointer" : "/relationships/6"
@@ -178,10 +178,10 @@
     "routing_hints" : [ ],
     "points" : [ {
       "x" : 1299.0,
-      "y" : 658.0
+      "y" : 530.0
     }, {
       "x" : 827.0,
-      "y" : 658.0
+      "y" : 530.0
     } ],
     "label" : "retryNeeded",
     "source_pointer" : "/relationships/7"
@@ -194,10 +194,10 @@
     "routing_hints" : [ ],
     "points" : [ {
       "x" : 827.0,
-      "y" : 728.0
+      "y" : 608.0
     }, {
       "x" : 1299.0,
-      "y" : 728.0
+      "y" : 608.0
     } ],
     "label" : "capturePayment",
     "source_pointer" : "/relationships/8"
@@ -210,10 +210,10 @@
     "routing_hints" : [ ],
     "points" : [ {
       "x" : 1299.0,
-      "y" : 752.0
+      "y" : 640.0
     }, {
       "x" : 827.0,
-      "y" : 752.0
+      "y" : 640.0
     } ],
     "label" : "charged",
     "source_pointer" : "/relationships/9"
@@ -226,10 +226,10 @@
     "routing_hints" : [ ],
     "points" : [ {
       "x" : 827.0,
-      "y" : 844.0
+      "y" : 740.0
     }, {
       "x" : 591.0,
-      "y" : 844.0
+      "y" : 740.0
     } ],
     "label" : "sendConfirmation",
     "source_pointer" : "/relationships/10"
@@ -242,10 +242,10 @@
     "routing_hints" : [ ],
     "points" : [ {
       "x" : 591.0,
-      "y" : 868.0
+      "y" : 772.0
     }, {
       "x" : 827.0,
-      "y" : 868.0
+      "y" : 772.0
     } ],
     "label" : "confirmReceipt",
     "source_pointer" : "/relationships/11"

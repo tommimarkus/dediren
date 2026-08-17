@@ -136,14 +136,14 @@ class LayoutIntentNormalizerTest {
             .normalize(selfMessageResult());
 
     // m2 is b->b; stemX(b) = 236 + 140/2 = 306.0
-    // slot y for m2 = headBottom(48) + MESSAGE_HEAD_GAP(24) + MESSAGE_Y_STEP(24) = 96.0
+    // slot y for m2 = headBottom(48) + MESSAGE_HEAD_GAP(24) + MESSAGE_Y_STEP(32) = 104.0
     List<Point> hook = edge(normalized, "m2").points();
     assertThat(hook)
         .containsExactly(
-            new Point(306.0, 96.0),
-            new Point(346.0, 96.0),
-            new Point(346.0, 120.0),
-            new Point(306.0, 120.0));
+            new Point(306.0, 104.0),
+            new Point(346.0, 104.0),
+            new Point(346.0, 128.0),
+            new Point(306.0, 128.0));
     // both endpoints sit on the stem -> satisfies the lifeline-axis invariant
     assertThat(hook.get(0).x()).isEqualTo(306.0);
     assertThat(hook.get(hook.size() - 1).x()).isEqualTo(306.0);
@@ -155,11 +155,11 @@ class LayoutIntentNormalizerTest {
         LayoutIntentNormalizer.from(selfMessageIntents(), Map.of(), Map.of())
             .normalize(selfMessageResult());
 
-    double m2Top = edge(normalized, "m2").points().get(0).y(); // 96.0
+    double m2Top = edge(normalized, "m2").points().get(0).y(); // 104.0
     double m3Y = edge(normalized, "m3").points().get(0).y();
-    // m3 must clear the hook's lower leg (m2Top + LOOP_HEIGHT = 120.0), not just MESSAGE_Y_STEP:
-    // m3 = m2Top + MESSAGE_Y_STEP(24) + SELF_MESSAGE_LOOP_HEIGHT(24) = 144.0
-    assertThat(m3Y).isEqualTo(144.0);
+    // m3 must clear the hook's lower leg (m2Top + LOOP_HEIGHT = 128.0), not just MESSAGE_Y_STEP:
+    // m3 = m2Top + MESSAGE_Y_STEP(32) + SELF_MESSAGE_LOOP_HEIGHT(24) = 160.0
+    assertThat(m3Y).isEqualTo(160.0);
     assertThat(m3Y).isGreaterThanOrEqualTo(m2Top + 24.0);
   }
 
@@ -184,10 +184,10 @@ class LayoutIntentNormalizerTest {
     double m3SlotY = m3Points.get(0).y();
 
     assertThat(m1SlotY).isEqualTo(y0);
-    // m2 must clear m1's hook: Y0 + MESSAGE_Y_STEP(24) + SELF_MESSAGE_LOOP_HEIGHT(24) = Y0 + 48
-    assertThat(m2SlotY).isEqualTo(y0 + 48.0);
-    // m3 must clear m2's hook too: Y0 + 48 + MESSAGE_Y_STEP(24) + SELF_MESSAGE_LOOP_HEIGHT(24)
-    assertThat(m3SlotY).isEqualTo(y0 + 96.0);
+    // m2 must clear m1's hook: Y0 + MESSAGE_Y_STEP(32) + SELF_MESSAGE_LOOP_HEIGHT(24) = Y0 + 56
+    assertThat(m2SlotY).isEqualTo(y0 + 56.0);
+    // m3 must clear m2's hook too: Y0 + 56 + MESSAGE_Y_STEP(32) + SELF_MESSAGE_LOOP_HEIGHT(24)
+    assertThat(m3SlotY).isEqualTo(y0 + 112.0);
 
     // Non-collision: each self-message's hook lower leg (slotY + 24) sits strictly above the next
     // message's slot y, so the compounding reservation genuinely keeps the geometry apart.
@@ -202,11 +202,11 @@ class LayoutIntentNormalizerTest {
             new Point(306.0, y0 + 24.0));
     assertThat(m2Hook)
         .containsExactly(
-            new Point(306.0, y0 + 48.0),
-            new Point(346.0, y0 + 48.0),
-            new Point(346.0, y0 + 72.0),
-            new Point(306.0, y0 + 72.0));
-    assertThat(m3Points).containsExactly(new Point(306.0, y0 + 96.0), new Point(70.0, y0 + 96.0));
+            new Point(306.0, y0 + 56.0),
+            new Point(346.0, y0 + 56.0),
+            new Point(346.0, y0 + 80.0),
+            new Point(306.0, y0 + 80.0));
+    assertThat(m3Points).containsExactly(new Point(306.0, y0 + 112.0), new Point(70.0, y0 + 112.0));
   }
 
   private static List<LayoutIntent> selfMessageIntents() {
@@ -319,7 +319,7 @@ class LayoutIntentNormalizerTest {
     LaidOutNode exec = node(out, "exec-b");
     assertThat(exec.x()).isEqualTo(306.0 - 16.0 / 2); // centred on b's stem (306)
     assertThat(exec.y()).isEqualTo(72.0); // m1's row
-    assertThat(exec.height()).isEqualTo(24.0); // m2(96) - m1(72)
+    assertThat(exec.height()).isEqualTo(32.0); // m2(104) - m1(72)
   }
 
   @Test
@@ -330,7 +330,7 @@ class LayoutIntentNormalizerTest {
 
     LaidOutNode x = node(out, "destroy-b");
     assertThat(x.x()).isEqualTo(306.0 - 24.0 / 2); // centred on b's stem
-    assertThat(x.y()).isEqualTo(120.0 - 24.0 / 2); // centred on m3's row
+    assertThat(x.y()).isEqualTo(136.0 - 24.0 / 2); // centred on m3's row
   }
 
   @Test
@@ -342,8 +342,8 @@ class LayoutIntentNormalizerTest {
     List<Point> pts = edge(out, "m3").points();
     assertThat(pts)
         .containsExactly(
-            new Point(70.0, 120.0), // a's stem
-            new Point(306.0 - 24.0 / 2, 120.0)); // the destruction's LEFT EDGE (perimeter)
+            new Point(70.0, 136.0), // a's stem
+            new Point(306.0 - 24.0 / 2, 136.0)); // the destruction's LEFT EDGE (perimeter)
   }
 
   @Test
@@ -408,22 +408,22 @@ class LayoutIntentNormalizerTest {
       assertThat(chrome.x() + chrome.width()).isLessThanOrEqualTo(frame.x() + frame.width());
       assertThat(chrome.y() + chrome.height()).isLessThanOrEqualTo(frame.y() + frame.height());
     }
-    // the destruction (bottom 132) sits below the last message row (120), so it must have pushed
+    // the destruction (bottom 148) sits below the last message row (136), so it must have pushed
     // the frame's bottom edge down past the route-derived bound
-    assertThat(frame.y() + frame.height()).isEqualTo(132.0);
+    assertThat(frame.y() + frame.height()).isEqualTo(148.0);
   }
 
   @Test
   void orphanDestructionSitsOneStepBelowTheLastMessageRow() {
     // The empty from/to convention: no message targets the destruction, so it anchors one
-    // MESSAGE_Y_STEP (24) below the last message row (m2 = 96) -> centred on y=120.
+    // MESSAGE_Y_STEP (32) below the last message row (m2 = 104) -> centred on y=136.
     LayoutResult out =
         LayoutIntentNormalizer.from(orphanDestructionIntents(), Map.of(), Map.of())
             .normalize(orphanDestructionResult());
 
     LaidOutNode x = node(out, "destroy-b");
     assertThat(x.x()).isEqualTo(306.0 - 24.0 / 2);
-    assertThat(x.y()).isEqualTo(96.0 + 24.0 - 24.0 / 2);
+    assertThat(x.y()).isEqualTo(104.0 + 32.0 - 24.0 / 2);
   }
 
   private static List<LayoutIntent> lifecycleIntents() {

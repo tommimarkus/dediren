@@ -101,7 +101,7 @@ public final class UmlLayoutSizing {
   private static Double umlSequenceHeightHint(String nodeType) {
     return switch (nodeType) {
       case "Interaction" -> 260.0;
-      case "Lifeline" -> 48.0;
+      case "Lifeline" -> 64.0;
       case "ExecutionSpecification" -> 72.0;
       case "Gate", "DestructionOccurrenceSpecification" -> 24.0;
       default -> null;

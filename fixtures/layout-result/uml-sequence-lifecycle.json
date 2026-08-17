@@ -8,7 +8,7 @@
     "x" : 101.0,
     "y" : 292.0,
     "width" : 612.0,
-    "height" : 144.0,
+    "height" : 184.0,
     "label" : "Worker Lifecycle",
     "role" : "interaction",
     "source_pointer" : "/nodes/0"
@@ -19,7 +19,7 @@
     "x" : 101.0,
     "y" : 292.0,
     "width" : 140.0,
-    "height" : 48.0,
+    "height" : 64.0,
     "label" : "Customer",
     "role" : "lifeline",
     "source_pointer" : "/nodes/1"
@@ -30,7 +30,7 @@
     "x" : 337.0,
     "y" : 292.0,
     "width" : 140.0,
-    "height" : 48.0,
+    "height" : 64.0,
     "label" : "Order Service",
     "role" : "lifeline",
     "source_pointer" : "/nodes/2"
@@ -41,7 +41,7 @@
     "x" : 573.0,
     "y" : 292.0,
     "width" : 140.0,
-    "height" : 48.0,
+    "height" : 64.0,
     "label" : "Worker",
     "role" : "lifeline",
     "source_pointer" : "/nodes/3"
@@ -50,9 +50,9 @@
     "source_id" : "exec-service",
     "projection_id" : "exec-service",
     "x" : 399.0,
-    "y" : 364.0,
+    "y" : 380.0,
     "width" : 16.0,
-    "height" : 72.0,
+    "height" : 96.0,
     "label" : "Order Service Activation",
     "role" : "execution",
     "source_pointer" : "/nodes/4"
@@ -61,7 +61,7 @@
     "source_id" : "worker-destroyed",
     "projection_id" : "worker-destroyed",
     "x" : 631.0,
-    "y" : 400.0,
+    "y" : 432.0,
     "width" : 24.0,
     "height" : 24.0,
     "label" : "Worker Destroyed",
@@ -77,10 +77,10 @@
     "routing_hints" : [ ],
     "points" : [ {
       "x" : 171.0,
-      "y" : 364.0
+      "y" : 380.0
     }, {
       "x" : 407.0,
-      "y" : 364.0
+      "y" : 380.0
     } ],
     "label" : "placeOrder",
     "source_pointer" : "/relationships/0"
@@ -93,10 +93,10 @@
     "routing_hints" : [ ],
     "points" : [ {
       "x" : 407.0,
-      "y" : 388.0
+      "y" : 412.0
     }, {
       "x" : 643.0,
-      "y" : 388.0
+      "y" : 412.0
     } ],
     "label" : "createWorker",
     "source_pointer" : "/relationships/1"
@@ -109,10 +109,10 @@
     "routing_hints" : [ ],
     "points" : [ {
       "x" : 407.0,
-      "y" : 412.0
+      "y" : 444.0
     }, {
       "x" : 631.0,
-      "y" : 412.0
+      "y" : 444.0
     } ],
     "label" : "destroyWorker",
     "source_pointer" : "/relationships/2"
@@ -125,10 +125,10 @@
     "routing_hints" : [ ],
     "points" : [ {
       "x" : 407.0,
-      "y" : 436.0
+      "y" : 476.0
     }, {
       "x" : 171.0,
-      "y" : 436.0
+      "y" : 476.0
     } ],
     "label" : "orderComplete",
     "source_pointer" : "/relationships/3"

@@ -107,9 +107,10 @@ final class ElkLayoutEngine {
     LayoutPreferences preferences = request.layoutPreferences();
     Map<String, String> nodePointers = nodeSourcePointers(request);
     Map<String, String> edgePointers = edgeSourcePointers(request);
+    List<LayoutNode> requestNodeList = list(request.nodes());
     List<LayoutIntent> intents = LayoutIntentCodec.decode(request.constraints());
     LayoutIntentNormalizer sequenceConstraints =
-        LayoutIntentNormalizer.from(intents, nodePointers, edgePointers);
+        LayoutIntentNormalizer.from(intents, requestNodeList, nodePointers, edgePointers);
     boolean sequenceMode = sequenceConstraints.active();
     Direction layoutDirection =
         sequenceMode ? Direction.RIGHT : ElkLayeredOptions.preferredDirection(preferences);
@@ -131,7 +132,7 @@ final class ElkLayoutEngine {
     Map<String, EnumMap<PortSide, Integer>> portCounts =
         flatPortCounts(requestEdges, requestNodes, endpointMerges, endpointSides);
     Map<String, ElkNode> elkNodes = new HashMap<>();
-    for (LayoutNode node : sequenceConstraints.orderedNodes(list(request.nodes()))) {
+    for (LayoutNode node : sequenceConstraints.orderedNodes(requestNodeList)) {
       ElkNode elkNode = ElkGraphUtil.createNode(root);
       elkNode.setIdentifier(node.id());
       setGeneratedDimensions(elkNode, node, portCounts.get(node.id()), preferences);

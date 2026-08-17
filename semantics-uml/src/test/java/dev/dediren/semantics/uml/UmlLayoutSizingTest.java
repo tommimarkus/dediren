@@ -51,7 +51,7 @@ class UmlLayoutSizingTest {
   @Test
   void sequenceDiagramNodesUseFixedGeometry() {
     assertSize(node("Interaction"), 360.0, 260.0);
-    assertSize(node("Lifeline"), 140.0, 48.0);
+    assertSize(node("Lifeline"), 140.0, 64.0);
     assertSize(node("ExecutionSpecification"), 16.0, 72.0);
     assertSize(node("Gate"), 24.0, 24.0);
     assertSize(node("DestructionOccurrenceSpecification"), 24.0, 24.0);

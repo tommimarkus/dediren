@@ -27,6 +27,7 @@ import dev.dediren.plugins.render.PlacedSequenceScene.PlacedMessage;
 import dev.dediren.plugins.render.PlacedSequenceScene.PlacedMessageLabel;
 import dev.dediren.plugins.render.PlacedSequenceScene.PlacedOperandGuard;
 import dev.dediren.plugins.render.PlacedSequenceScene.PlacedOperandSeparator;
+import dev.dediren.plugins.render.node.NodeLabels;
 import dev.dediren.plugins.render.style.ResolvedEdgeStyle;
 import dev.dediren.plugins.render.style.ResolvedNodeStyle;
 import dev.dediren.plugins.render.style.ResolvedStyle;
@@ -132,10 +133,7 @@ final class UmlSequenceRenderer {
               node,
               paint,
               Math.max(paint.rx(), 2.0),
-              placeCentredLabel(
-                  node.x() + node.width() / 2.0,
-                  node.y() + node.height() / 2.0 + base.fontSize() / 3.0,
-                  node.label())));
+              NodeLabels.placeNodeLabel(node, paint, base.fontSize())));
       stems.add(
           new PlacedLifelineStem(
               node.id(),
@@ -500,14 +498,7 @@ final class UmlSequenceRenderer {
       w.end();
     }
     w.start("g").attr("data-dediren-node-decorator", "uml_lifeline").end();
-    w.start("text")
-        .attr("x", f1(node.x() + node.width() / 2.0))
-        .attr("y", f1(node.y() + node.height() / 2.0 + base.fontSize() / 3.0))
-        .attr("text-anchor", "middle")
-        .attr("fill", paint.labelFill())
-        .attrIf("fill-opacity", opacity(paint.labelOpacity()))
-        .text(node.label())
-        .end();
+    NodeLabels.nodeLabel(w, placed.label(), paint);
     w.end();
   }
 
@@ -695,11 +686,6 @@ final class UmlSequenceRenderer {
   /** The glyph box of a start-anchored label, or null when there are no glyphs to grow around. */
   private LabelBox placeStartLabel(double x, double y, String text) {
     return text == null || text.isEmpty() ? null : labelBox(x, y, "start", text, base.fontSize());
-  }
-
-  /** The glyph box of a middle-anchored label, or null when there are no glyphs. */
-  private LabelBox placeCentredLabel(double x, double y, String text) {
-    return text == null || text.isEmpty() ? null : labelBox(x, y, "middle", text, base.fontSize());
   }
 
   private LabelPoint labelPoint(LaidOutEdge edge) {

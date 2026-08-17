@@ -357,6 +357,18 @@ class ElkLayoutEngineTest {
             + edgeById(result, "m2").points()
             + ", m3="
             + edgeById(result, "m3").points());
+    assertTrue(
+        secondMessageY - firstMessageY >= 32.0,
+        "adjacent sequence rows need readable label clearance, first="
+            + firstMessageY
+            + ", second="
+            + secondMessageY);
+    assertTrue(
+        thirdMessageY - secondMessageY >= 32.0,
+        "adjacent sequence rows need readable label clearance, second="
+            + secondMessageY
+            + ", third="
+            + thirdMessageY);
     assertSequenceMessageEndpointAtStemCenter(result, "m1", "customer", true);
     assertSequenceMessageEndpointAtStemCenter(result, "m1", "service", false);
     assertSequenceMessageEndpointAtStemCenter(result, "m2", "service", true);
@@ -497,6 +509,26 @@ class ElkLayoutEngineTest {
     assertTrue(
         m2.points().getFirst().x() < m2.points().getLast().x(),
         "forward sequence message should span its columns left-to-right, m2=" + m2.points());
+  }
+
+  @Test
+  void sequenceLifelineHeadDimensionsIgnoreGeneratedElkPortCount() {
+    List<String> order = List.of("user", "storefront", "orderservice", "payment", "inventory");
+    LayoutResult result = new ElkLayoutEngine().layout(fiveLifelineSequenceRequest(order));
+
+    for (String id : order) {
+      LaidOutNode lifeline = nodeById(result, id);
+      assertEquals(
+          140.0,
+          lifeline.width(),
+          GEOMETRY_EPSILON,
+          "sequence lifeline head width should keep its requested presentation size, " + lifeline);
+      assertEquals(
+          48.0,
+          lifeline.height(),
+          GEOMETRY_EPSILON,
+          "sequence lifeline head height should not stretch to distribute ELK ports, " + lifeline);
+    }
   }
 
   @Test

@@ -8,7 +8,7 @@
     "x" : 141.0,
     "y" : 292.0,
     "width" : 424.0,
-    "height" : 120.0,
+    "height" : 152.0,
     "label" : "Place Order",
     "role" : "interaction",
     "source_pointer" : "/nodes/0"
@@ -19,7 +19,7 @@
     "x" : 141.0,
     "y" : 292.0,
     "width" : 140.0,
-    "height" : 48.0,
+    "height" : 64.0,
     "label" : "Customer",
     "role" : "lifeline",
     "source_pointer" : "/nodes/1"
@@ -30,7 +30,7 @@
     "x" : 425.0,
     "y" : 292.0,
     "width" : 140.0,
-    "height" : 48.0,
+    "height" : 64.0,
     "label" : "Order Service",
     "role" : "lifeline",
     "source_pointer" : "/nodes/2"
@@ -44,10 +44,10 @@
     "routing_hints" : [ ],
     "points" : [ {
       "x" : 211.0,
-      "y" : 364.0
+      "y" : 380.0
     }, {
       "x" : 495.0,
-      "y" : 364.0
+      "y" : 380.0
     } ],
     "label" : "placeOrder",
     "source_pointer" : "/relationships/0"
@@ -60,10 +60,10 @@
     "routing_hints" : [ ],
     "points" : [ {
       "x" : 495.0,
-      "y" : 388.0
+      "y" : 412.0
     }, {
       "x" : 211.0,
-      "y" : 388.0
+      "y" : 412.0
     } ],
     "label" : "accepted",
     "source_pointer" : "/relationships/1"
@@ -76,10 +76,10 @@
     "routing_hints" : [ ],
     "points" : [ {
       "x" : 495.0,
-      "y" : 412.0
+      "y" : 444.0
     }, {
       "x" : 211.0,
-      "y" : 412.0
+      "y" : 444.0
     } ],
     "label" : "receiptReady",
     "source_pointer" : "/relationships/2"

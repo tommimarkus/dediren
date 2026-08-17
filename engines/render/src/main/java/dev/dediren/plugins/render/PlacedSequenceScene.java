@@ -9,6 +9,8 @@ import dev.dediren.contracts.layout.LaidOutEdge;
 import dev.dediren.contracts.layout.LaidOutNode;
 import dev.dediren.contracts.layout.Point;
 import dev.dediren.contracts.render.RenderPolicy;
+import dev.dediren.plugins.render.node.NodeLabelPlacement;
+import dev.dediren.plugins.render.node.NodeLabels;
 import dev.dediren.plugins.render.style.ResolvedEdgeStyle;
 import dev.dediren.plugins.render.style.ResolvedNodeStyle;
 import dev.dediren.plugins.render.style.ResolvedStyle;
@@ -149,15 +151,16 @@ record PlacedSequenceScene(
   record PlacedOperandGuard(
       String operandId, String guard, String text, double x, double y, LabelBox box) {}
 
-  /** A lifeline's head box and its centred name. */
-  record PlacedLifelineHead(LaidOutNode node, ResolvedNodeStyle style, double rx, LabelBox labelBox)
+  /** A lifeline's head box and its wrapped, centred name. */
+  record PlacedLifelineHead(
+      LaidOutNode node, ResolvedNodeStyle style, double rx, NodeLabelPlacement label)
       implements PlacedElement {
 
     @Override
     public void contributeBounds(SvgBounds bounds) {
       includeStroked(bounds, node.x(), node.y(), node.width(), node.height(), style.strokeWidth());
-      if (labelBox != null) {
-        includeBox(bounds, labelBox);
+      for (LabelBox box : NodeLabels.nodeLabelBoxes(label)) {
+        includeBox(bounds, box);
       }
     }
   }

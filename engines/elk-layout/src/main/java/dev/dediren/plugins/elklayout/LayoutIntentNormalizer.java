@@ -33,7 +33,7 @@ import org.eclipse.elk.core.options.PortSide;
 final class LayoutIntentNormalizer {
   private static final double MINIMUM_MESSAGE_Y_STEP = 1.0;
   private static final double MESSAGE_HEAD_GAP = 24.0;
-  private static final double MESSAGE_Y_STEP = 24.0;
+  private static final double MESSAGE_Y_STEP = 32.0;
   private static final double LIFELINE_COLUMN_GAP = 96.0;
 
   // A self-message hooks off the lifeline stem and returns to it (the conventional UML self-call).
@@ -57,6 +57,7 @@ final class LayoutIntentNormalizer {
   // the column of the band member it is anchored to, which is what gives it a port side and a
   // stem to route from.
   private final Map<String, String> anchorBandMemberByNodeId;
+  private final Map<String, LayoutNode> requestedNodesById;
   private final Map<String, String> nodePointers;
   private final Map<String, String> edgePointers;
 
@@ -64,6 +65,7 @@ final class LayoutIntentNormalizer {
       List<BandMember> lifelineMembers,
       List<BandMember> messageMembers,
       List<StemSpan> stemSpans,
+      List<LayoutNode> requestedNodes,
       Map<String, String> nodePointers,
       Map<String, String> edgePointers) {
     this.lifelineOrder = memberIds(lifelineMembers);
@@ -73,6 +75,10 @@ final class LayoutIntentNormalizer {
     this.messageLeadingGapById = leadingGapById(messageMembers);
     this.stemSpanByNodeId = new LinkedHashMap<>();
     this.anchorBandMemberByNodeId = new HashMap<>();
+    this.requestedNodesById = new HashMap<>();
+    for (LayoutNode node : requestedNodes) {
+      this.requestedNodesById.putIfAbsent(node.id(), node);
+    }
     for (StemSpan span : stemSpans) {
       if (this.stemSpanByNodeId.putIfAbsent(span.nodeId(), span) == null) {
         this.anchorBandMemberByNodeId.put(span.nodeId(), span.bandMemberId());
@@ -86,6 +92,14 @@ final class LayoutIntentNormalizer {
 
   static LayoutIntentNormalizer from(
       List<LayoutIntent> intents,
+      Map<String, String> nodePointers,
+      Map<String, String> edgePointers) {
+    return from(intents, List.of(), nodePointers, edgePointers);
+  }
+
+  static LayoutIntentNormalizer from(
+      List<LayoutIntent> intents,
+      List<LayoutNode> requestedNodes,
       Map<String, String> nodePointers,
       Map<String, String> edgePointers) {
     List<BandMember> lifelineMembers = List.of();
@@ -103,7 +117,7 @@ final class LayoutIntentNormalizer {
       }
     }
     return new LayoutIntentNormalizer(
-        lifelineMembers, messageMembers, stemSpans, nodePointers, edgePointers);
+        lifelineMembers, messageMembers, stemSpans, requestedNodes, nodePointers, edgePointers);
   }
 
   // Mirrors the old SequenceLayoutConstraints#active(): the parsed lifeline-order AND
@@ -270,7 +284,7 @@ final class LayoutIntentNormalizer {
     for (String id : lifelineOrder) {
       LaidOutNode node = nodesById.get(id);
       if (node != null) {
-        orderedLifelines.add(node);
+        orderedLifelines.add(withRequestedSize(node));
       }
     }
     if (orderedLifelines.isEmpty()) {
@@ -280,8 +294,11 @@ final class LayoutIntentNormalizer {
     List<Double> xSlots = distinctColumnXSlots(orderedLifelines);
     double bandY = orderedLifelines.stream().mapToDouble(LaidOutNode::y).min().orElse(0.0);
     Map<String, Double> normalizedXById = new HashMap<>();
+    Map<String, LaidOutNode> normalizedLifelineById = new HashMap<>();
     for (int index = 0; index < orderedLifelines.size(); index++) {
-      normalizedXById.put(orderedLifelines.get(index).id(), xSlots.get(index));
+      LaidOutNode lifeline = orderedLifelines.get(index);
+      normalizedXById.put(lifeline.id(), xSlots.get(index));
+      normalizedLifelineById.put(lifeline.id(), lifeline);
     }
 
     List<LaidOutNode> normalized = new ArrayList<>();
@@ -291,6 +308,7 @@ final class LayoutIntentNormalizer {
         normalized.add(node);
         continue;
       }
+      LaidOutNode lifeline = normalizedLifelineById.get(node.id());
       normalized.add(
           new LaidOutNode(
               node.id(),
@@ -298,13 +316,37 @@ final class LayoutIntentNormalizer {
               node.projectionId(),
               x,
               bandY,
-              node.width(),
-              node.height(),
+              lifeline.width(),
+              lifeline.height(),
               node.label(),
               node.role(),
               nodePointers.get(node.id())));
     }
     return normalized;
+  }
+
+  // Fixed-order edge ports are useful input to ELK routing, but ELK may enlarge a participant box
+  // vertically to distribute those ports. A sequence lifeline's ports ultimately move onto its
+  // stem, so that enlargement is routing scaffolding rather than presentation geometry. Restore
+  // the requested head size before rebuilding columns and message rows.
+  private LaidOutNode withRequestedSize(LaidOutNode node) {
+    LayoutNode requested = requestedNodesById.get(node.id());
+    if (requested == null) {
+      return node;
+    }
+    double width = requested.widthHint() == null ? node.width() : requested.widthHint();
+    double height = requested.heightHint() == null ? node.height() : requested.heightHint();
+    return new LaidOutNode(
+        node.id(),
+        node.sourceId(),
+        node.projectionId(),
+        node.x(),
+        node.y(),
+        width,
+        height,
+        node.label(),
+        node.role(),
+        nodePointers.get(node.id()));
   }
 
   // ELK's RIGHT-direction layered pass can place two lifelines in the same layer, giving them an
