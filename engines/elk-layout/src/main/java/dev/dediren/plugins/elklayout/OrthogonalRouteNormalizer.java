@@ -9,6 +9,19 @@ import java.util.List;
 final class OrthogonalRouteNormalizer {
   private static final double EPSILON = 0.001;
 
+  // A source-boundary pivot replacement is rejected as "riding its own source's face" once it has
+  // a segment within this proximity of, and overlapping by at least FACE_RIDE_MIN_OVERLAP, that
+  // node's outline. Measured across this module's own test suite (100-case seeded fuzz sweep plus
+  // the hand-written engine scenarios): of 60 total source-boundary-pivot firings (12 from the
+  // 4-point dogleg replacement, 48 from the 6-point stairReplacements startsAtSourceEndpoint
+  // pivot), 57 rode the source's own face and only 3 did not, so this is a guard, not a deletion --
+  // the "ANY clean firings" branch of the pre-approved decision. The dogleg replacement's own
+  // admission condition (adjustedCoordinate inside the source's span) rides by construction on
+  // every one of its 12 firings, so this guard also suppresses it in practice without deleting the
+  // rule outright.
+  private static final double FACE_RIDE_PROXIMITY = 8.0;
+  private static final double FACE_RIDE_MIN_OVERLAP = 2.0;
+
   private OrthogonalRouteNormalizer() {}
 
   static List<Point> collapseStairSteps(
@@ -28,7 +41,8 @@ final class OrthogonalRouteNormalizer {
       List<Point> replacement = sourceBoundaryDoglegReplacement(route, nodes, sourceId);
       if (!replacement.isEmpty()
           && routeLength(replacement) <= routeLength(route) + EPSILON
-          && clearOfUnrelatedNodes(replacement, nodes, sourceId, targetId)) {
+          && clearOfUnrelatedNodes(replacement, nodes, sourceId, targetId)
+          && !ridesOwnFace(replacement, nodes, sourceId)) {
         route = new ArrayList<>(replacement);
       }
     }
@@ -36,11 +50,18 @@ final class OrthogonalRouteNormalizer {
     do {
       changed = false;
       for (int index = 0; index <= route.size() - 6; index++) {
-        for (List<Point> replacement :
-            stairReplacements(
-                route.subList(index, index + 6), index == 0 && allowWholeRouteSourcePivot)) {
+        boolean sourcePivotEligible = index == 0 && allowWholeRouteSourcePivot;
+        List<List<Point>> candidates =
+            stairReplacements(route.subList(index, index + 6), sourcePivotEligible);
+        for (int candidateIndex = 0; candidateIndex < candidates.size(); candidateIndex++) {
+          List<Point> replacement = candidates.get(candidateIndex);
+          // The source-pivot candidate is always candidates.get(0) when sourcePivotEligible (see
+          // stairReplacements): only that one can ride the source's own face by construction, so
+          // the guard is scoped to it rather than every candidate.
+          boolean isSourcePivotCandidate = sourcePivotEligible && candidateIndex == 0;
           if (routeLength(replacement) > routeLength(route.subList(index, index + 6)) + EPSILON
-              || !clearOfUnrelatedNodes(replacement, nodes, sourceId, targetId)) {
+              || !clearOfUnrelatedNodes(replacement, nodes, sourceId, targetId)
+              || (isSourcePivotCandidate && ridesOwnFace(replacement, nodes, sourceId))) {
             continue;
           }
           List<Point> collapsed = new ArrayList<>(route.size() - 2);
@@ -59,6 +80,58 @@ final class OrthogonalRouteNormalizer {
     return List.copyOf(route);
   }
 
+  /**
+   * True when the replacement route has a segment that overlaps its own source node's outline by at
+   * least {@link #FACE_RIDE_MIN_OVERLAP} within {@link #FACE_RIDE_PROXIMITY} of that face -- the
+   * "doubled border" defect both source-boundary pivots can produce.
+   */
+  private static boolean ridesOwnFace(List<Point> route, List<LaidOutNode> nodes, String sourceId) {
+    LaidOutNode source = findNode(nodes, sourceId);
+    if (source == null) {
+      return false;
+    }
+    for (int index = 0; index < route.size() - 1; index++) {
+      if (ownFaceOverlap(route.get(index), route.get(index + 1), source) >= FACE_RIDE_MIN_OVERLAP) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private static double ownFaceOverlap(Point start, Point end, LaidOutNode node) {
+    double left = node.x();
+    double right = node.x() + node.width();
+    double top = node.y();
+    double bottom = node.y() + node.height();
+    if (same(start.y(), end.y())
+        && (Math.abs(start.y() - top) <= FACE_RIDE_PROXIMITY
+            || Math.abs(start.y() - bottom) <= FACE_RIDE_PROXIMITY)) {
+      return overlapLength(start.x(), end.x(), left, right);
+    }
+    if (same(start.x(), end.x())
+        && (Math.abs(start.x() - left) <= FACE_RIDE_PROXIMITY
+            || Math.abs(start.x() - right) <= FACE_RIDE_PROXIMITY)) {
+      return overlapLength(start.y(), end.y(), top, bottom);
+    }
+    return 0.0;
+  }
+
+  private static double overlapLength(
+      double firstStart, double firstEnd, double secondStart, double secondEnd) {
+    double firstMin = Math.min(firstStart, firstEnd);
+    double firstMax = Math.max(firstStart, firstEnd);
+    return Math.max(0.0, Math.min(firstMax, secondEnd) - Math.max(firstMin, secondStart));
+  }
+
+  private static LaidOutNode findNode(List<LaidOutNode> nodes, String id) {
+    for (LaidOutNode node : nodes) {
+      if (node.id().equals(id)) {
+        return node;
+      }
+    }
+    return null;
+  }
+
   private static List<Point> sourceBoundaryDoglegReplacement(
       List<Point> points, List<LaidOutNode> nodes, String sourceId) {
     Orientation first = orientation(points.get(0), points.get(1));
@@ -68,13 +141,7 @@ final class OrthogonalRouteNormalizer {
       return List.of();
     }
 
-    LaidOutNode source = null;
-    for (LaidOutNode node : nodes) {
-      if (node.id().equals(sourceId)) {
-        source = node;
-        break;
-      }
-    }
+    LaidOutNode source = findNode(nodes, sourceId);
     if (source == null) {
       return List.of();
     }

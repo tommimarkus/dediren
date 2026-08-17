@@ -80,31 +80,30 @@ class ElkLayoutInvariantFuzzTest {
   // never sub-pixel endpoint contact.
   private static final double MAX_OUTLINE_RIDE = 8.0;
 
-  // Invariant 2 (outline rides) is a KNOWN, PRE-EXISTING, UNFIXED ELK defect, not the one this test
-  // class was written to catch. ELK's hierarchy-crossing routing inside a compound node emits
-  // segments ~1px off a member's face -- ignoring the configured 24px SPACING_EDGE_NODE -- and it
-  // reproduces byte-identically on a strictly acyclic grouped graph and on the unmodified baseline
-  // engine, so nothing in this module's port-planning code causes or fixes it. This constant is a
-  // CEILING, not a target: it exists only so this defect cannot silently get worse while it stays
-  // unfixed, and a future reader must not read it as "this many failures is fine". Follows the
-  // pinned-map precedent in core's LayoutQualityFixtureSweepTest#EXPECTED_EDGE_CROSSING_COUNTS,
-  // adapted to one count because a fuzz sweep has no stable per-fixture key to pin against.
+  // Invariant 2 (outline rides) previously carried a KNOWN, PRE-EXISTING, UNFIXED ELK defect
+  // ceiling
+  // here, distinct from the one this test class was written to catch: ELK's hierarchy-crossing
+  // routing inside a compound node emitting segments ~1px off a member's face. This constant is a
+  // CEILING, not a target: it exists only so a ride defect cannot silently get worse, and a future
+  // reader must not read it as "this many failures is fine". Follows the pinned-map precedent in
+  // core's LayoutQualityFixtureSweepTest#EXPECTED_EDGE_CROSSING_COUNTS, adapted to one count
+  // because
+  // a fuzz sweep has no stable per-fixture key to pin against.
   //
-  // Measured at 15 of the 100 seeded cases (26 individual ride violations across those 15 cases) on
-  // seed SEED above, the same run that confirmed body crossings (invariant 1) are now zero across
-  // the whole corpus. A DROP in this count is good news -- re-pin it lower, do not leave the old
-  // ceiling in place. A RISE means either a regression or a newly-generated case exposing more of
-  // the same defect; either way it needs a human decision, which is why the sweep fails outright
-  // rather than silently tolerating drift.
-  //
-  // RE-PINNED 15 -> 16 on 2026-08-17, and the reason matters: the engine did not get worse, the
-  // CORPUS CHANGED. Adding the unclaimed-node coin flip to the generator consumes one more draw
-  // from each case's seeded stream, so every case downstream of it is a different graph and the
-  // 100-case sample is not the sample that measured 15. The engine change on this branch was
-  // separately confirmed not to move this number: after the boundary-reversal fix the sweep was
-  // identical to before it, down to the failing case indices. Re-pinning a ceiling is only ever
-  // legitimate with that kind of evidence for what moved.
-  private static final int MAX_OUTLINE_RIDE_FAILING_CASES = 16;
+  // RE-PINNED 16 -> 0 on 2026-08-17 (pivot-measure-and-fix): OrthogonalRouteNormalizer's
+  // source-boundary pivot ("start IS the port, 1px outside the source's own face") was the actual
+  // producer of every ride in this seeded corpus, not the ELK hierarchy defect the old comment
+  // attributed it to -- that ELK defect may still exist on other corpora, but it was never what
+  // this
+  // particular 100-case sweep measured. A guard added to OrthogonalRouteNormalizer now rejects a
+  // pivot replacement whose emitted segment would ride its own source/target node's face (measured
+  // 57 of 60 firings rode it across this module's own test suite before the guard). With the guard
+  // in place, this sweep measures 0 outline-ride failing cases. A DROP is good news -- re-pinning
+  // it
+  // here, not left at the old ceiling. A RISE needs a human decision before re-pinning, not a
+  // silent
+  // bump.
+  private static final int MAX_OUTLINE_RIDE_FAILING_CASES = 0;
 
   // CEILING for invariant 1 (body-interior crossings), scoped to BOUNDARY-CROSSING edges only -- an
   // edge with exactly one endpoint claimed by a group and the other unclaimed by any group. This is

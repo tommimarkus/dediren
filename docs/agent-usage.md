@@ -1501,6 +1501,12 @@ you can recover from stdout JSON alone.
   ignores (a `warning`; the layout succeeded). The message lists their JSON
   pointers — delete those fields, or drop `mode: "packed"` so the layered
   algorithm honors them.
+- `DEDIREN_RENDER_EDGE_LABEL_OCCLUDED`: an edge label's placed box still
+  overlaps a node rect after placement (a `warning`; the SVG was rendered).
+  SVG paint order is group, then edge, then node, so a label left overlapping
+  a node is painted underneath it and disappears from view. There is no
+  automatic fix — widen the layout, shorten the label text, or reposition the
+  offending node(s) so the label has clear space.
 - `DEDIREN_RENDER_METADATA_PROFILE_NOT_APPLIED`: the render metadata declares
   `semantic_profile` `uml` or `archimate` but the render policy declares none,
   so that notation's shapes, decorators, and label placement were not applied

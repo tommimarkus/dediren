@@ -18,12 +18,36 @@ final class RenderTestSupport {
 
   /** Runs the render command on {@code input} and returns the first artifact's SVG content. */
   static String render(JsonNode input) throws Exception {
+    return render(input, false);
+  }
+
+  /**
+   * Same as {@link #render(JsonNode)} but tolerates a {@code warning} envelope status.
+   *
+   * <p>Only the fuzz lane needs this. Random layouts genuinely produce degenerate geometry — an
+   * edge label with no clear placement anywhere, for instance — which the render engine reports as
+   * a warning diagnostic rather than a failure. That is the diagnostic working, not a defect, so
+   * asserting {@code ok} there would gate structural-soundness on the absence of a warning it is
+   * specifically designed to raise. Every other caller keeps the strict {@code ok} assertion: a
+   * warning on a checked-in fixture is a regression and must still fail.
+   */
+  static String renderAllowingWarnings(JsonNode input) throws Exception {
+    return render(input, true);
+  }
+
+  private static String render(JsonNode input, boolean allowWarning) throws Exception {
     PluginResult result =
         Main.executeForTesting(
             new String[] {"render"}, JsonSupport.objectMapper().writeValueAsString(input));
     JsonNode envelope = JsonSupport.objectMapper().readTree(result.stdout());
     assertThat(result.exitCode()).describedAs(result.stderr()).isZero();
-    assertThat(envelope.at("/status").asText()).describedAs(result.stdout()).isEqualTo("ok");
+    if (allowWarning) {
+      assertThat(envelope.at("/status").asText())
+          .describedAs(result.stdout())
+          .isIn("ok", "warning");
+    } else {
+      assertThat(envelope.at("/status").asText()).describedAs(result.stdout()).isEqualTo("ok");
+    }
     return envelope.at("/data/artifacts/0/content").asText();
   }
 

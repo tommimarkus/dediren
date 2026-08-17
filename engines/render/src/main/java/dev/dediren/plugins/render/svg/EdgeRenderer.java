@@ -531,8 +531,19 @@ public final class EdgeRenderer {
       if (displaced.isPresent()) {
         return displaced.get();
       }
-      return edgeLabelCandidate(
-          preferredX, segment.start().y() + baseOffset, "middle", edge.label(), fontSize);
+      // No candidate from any of the three strategies cleared the obstacle set. Rather than return
+      // an arbitrary point blind to the obstacles, pick the least-bad candidate already generated
+      // by
+      // the cascade above: the one with the smallest overlap area against what's actually there.
+      List<EdgeLabel> horizontalCandidates = new ArrayList<>();
+      for (double offset : labelOffsetCandidates(baseOffset)) {
+        for (double x : xCandidates) {
+          horizontalCandidates.add(
+              edgeLabelCandidate(
+                  x, segment.start().y() + offset, "middle", edge.label(), fontSize));
+        }
+      }
+      return leastOverlapLabel(horizontalCandidates, occupiedBoxes, style.labelPresentation());
     }
     List<EdgeLabel> candidates = verticalLabelCandidates(edge, style, fontSize);
     if (!candidates.isEmpty()) {
@@ -542,11 +553,50 @@ public final class EdgeRenderer {
           return candidate;
         }
       }
-      return candidates.get(0);
+      return leastOverlapLabel(candidates, occupiedBoxes, style.labelPresentation());
     }
-    Point point =
-        edge.points().isEmpty() ? new Point(0.0, 0.0) : edge.points().get(edge.points().size() / 2);
-    return edgeLabelCandidate(point.x(), point.y() - 6.0, "middle", edge.label(), fontSize);
+    List<Point> routePoints =
+        edge.points().isEmpty() ? List.of(new Point(0.0, 0.0)) : edge.points();
+    List<EdgeLabel> routeCandidates = new ArrayList<>();
+    for (Point routePoint : routePoints) {
+      routeCandidates.add(
+          edgeLabelCandidate(
+              routePoint.x(), routePoint.y() - 6.0, "middle", edge.label(), fontSize));
+    }
+    return leastOverlapLabel(routeCandidates, occupiedBoxes, style.labelPresentation());
+  }
+
+  /**
+   * Among already-generated candidates, the one with the smallest total overlap area against the
+   * obstacle set. Used only once every placement strategy above has exhausted its clear candidates;
+   * it never runs ahead of them and never widens the obstacle set they already check against.
+   */
+  private static EdgeLabel leastOverlapLabel(
+      List<EdgeLabel> candidates,
+      List<LabelBox> occupiedBoxes,
+      SvgEdgeLabelPresentation presentation) {
+    EdgeLabel best = candidates.get(0);
+    double bestOverlapArea = Double.POSITIVE_INFINITY;
+    for (EdgeLabel candidate : candidates) {
+      LabelBox candidateBox = edgeLabelVisibleBox(candidate, presentation);
+      double overlapArea = 0.0;
+      for (LabelBox obstacle : occupiedBoxes) {
+        if (candidateBox.overlaps(obstacle)) {
+          double overlapWidth =
+              Math.min(candidateBox.maxX(), obstacle.maxX())
+                  - Math.max(candidateBox.minX(), obstacle.minX());
+          double overlapHeight =
+              Math.min(candidateBox.maxY(), obstacle.maxY())
+                  - Math.max(candidateBox.minY(), obstacle.minY());
+          overlapArea += overlapWidth * overlapHeight;
+        }
+      }
+      if (overlapArea < bestOverlapArea) {
+        bestOverlapArea = overlapArea;
+        best = candidate;
+      }
+    }
+    return best;
   }
 
   private static Optional<EdgeLabel> firstClearHorizontalLabel(

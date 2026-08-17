@@ -101,7 +101,7 @@
       "width" : 1458,
       "height" : 517
     },
-    "sha256" : "767c647c678d249b2faeaa31bafb650840a301d45b3ec99ee01a20e5020f42cc"
+    "sha256" : "3755de1ac78abd775c37daab743febba51a1d12c24d6552e366b25367062646c"
   }, {
     "name" : "pipeline-rich-dark",
     "description" : "The same rich standard graph, dark theme",
@@ -113,7 +113,7 @@
       "width" : 1458,
       "height" : 517
     },
-    "sha256" : "2df9833304b2bba0308e475ec3a5de5b107e604325605afb120346efb7bdcf96"
+    "sha256" : "e7da53237657aea17eecc25fddad58856b2ef2b9fdf514e2d1fcf560e7528df1"
   }, {
     "name" : "archimate-decorators",
     "description" : "ArchiMate diagram with decorators and markers",
