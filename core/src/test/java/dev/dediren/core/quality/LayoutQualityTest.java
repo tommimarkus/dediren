@@ -484,7 +484,8 @@ class LayoutQualityTest {
     // going deep into b's interior (x=390) instead of stopping at the edge.
     var nodes = List.of(node("a", 0.0, 0.0), node("b", 300.0, 0.0)); // both 100 x 80
     var edges =
-        List.of(edge("into-target", "a", "b", List.of(new Point(100.0, 40.0), new Point(390.0, 40.0))));
+        List.of(
+            edge("into-target", "a", "b", List.of(new Point(100.0, 40.0), new Point(390.0, 40.0))));
 
     LayoutQualityReport report =
         LayoutQuality.validateLayout(layoutResult(nodes, edges, List.of()));
@@ -505,7 +506,8 @@ class LayoutQualityTest {
             // Just inside the perimeter (x=99), within the interior inset tolerance.
             edge("near-perimeter", "a", "b", List.of(new Point(99.0, 10.0), new Point(99.0, 70.0))),
             // Just outside the outline entirely (x=101).
-            edge("outside-stub", "a", "b", List.of(new Point(101.0, 10.0), new Point(101.0, 70.0))));
+            edge(
+                "outside-stub", "a", "b", List.of(new Point(101.0, 10.0), new Point(101.0, 70.0))));
 
     LayoutQualityReport report =
         LayoutQuality.validateLayout(layoutResult(nodes, edges, List.of()));

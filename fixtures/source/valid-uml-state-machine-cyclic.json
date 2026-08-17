@@ -1,0 +1,258 @@
+{
+  "model_schema_version": "model.schema.v1",
+  "required_plugins": [
+    {
+      "id": "generic-graph",
+      "version": "2026.08.4"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "session-machine",
+      "type": "StateMachine",
+      "label": "Session Lifecycle",
+      "properties": {
+        "uml": {}
+      }
+    },
+    {
+      "id": "session-region",
+      "type": "Region",
+      "label": "Session Region",
+      "properties": {
+        "uml": {
+          "state_machine": "session-machine"
+        }
+      }
+    },
+    {
+      "id": "idle",
+      "type": "State",
+      "label": "Idle",
+      "properties": {
+        "uml": {
+          "region": "session-region"
+        }
+      }
+    },
+    {
+      "id": "engaged",
+      "type": "State",
+      "label": "Engaged",
+      "properties": {
+        "uml": {
+          "region": "session-region"
+        }
+      }
+    },
+    {
+      "id": "preparing",
+      "type": "State",
+      "label": "Preparing",
+      "properties": {
+        "uml": {
+          "region": "session-region"
+        }
+      }
+    },
+    {
+      "id": "running",
+      "type": "State",
+      "label": "Running",
+      "properties": {
+        "uml": {
+          "region": "session-region"
+        }
+      }
+    },
+    {
+      "id": "paused",
+      "type": "State",
+      "label": "Paused",
+      "properties": {
+        "uml": {
+          "region": "session-region"
+        }
+      }
+    },
+    {
+      "id": "reviewing",
+      "type": "State",
+      "label": "Reviewing",
+      "properties": {
+        "uml": {
+          "region": "session-region"
+        }
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "id": "t-engage",
+      "type": "Transition",
+      "source": "idle",
+      "target": "engaged",
+      "label": "engage",
+      "properties": {
+        "uml": {
+          "region": "session-region",
+          "kind": "external",
+          "trigger": "engage"
+        }
+      }
+    },
+    {
+      "id": "t-disengage",
+      "type": "Transition",
+      "source": "engaged",
+      "target": "idle",
+      "label": "disengage",
+      "properties": {
+        "uml": {
+          "region": "session-region",
+          "kind": "external",
+          "trigger": "disengage"
+        }
+      }
+    },
+    {
+      "id": "t-start",
+      "type": "Transition",
+      "source": "preparing",
+      "target": "running",
+      "label": "start",
+      "properties": {
+        "uml": {
+          "region": "session-region",
+          "kind": "external",
+          "trigger": "start"
+        }
+      }
+    },
+    {
+      "id": "t-pause",
+      "type": "Transition",
+      "source": "running",
+      "target": "paused",
+      "label": "pause",
+      "properties": {
+        "uml": {
+          "region": "session-region",
+          "kind": "external",
+          "trigger": "pause"
+        }
+      }
+    },
+    {
+      "id": "t-resume",
+      "type": "Transition",
+      "source": "paused",
+      "target": "running",
+      "label": "resume",
+      "properties": {
+        "uml": {
+          "region": "session-region",
+          "kind": "external",
+          "trigger": "resume"
+        }
+      }
+    },
+    {
+      "id": "t-review",
+      "type": "Transition",
+      "source": "running",
+      "target": "reviewing",
+      "label": "review",
+      "properties": {
+        "uml": {
+          "region": "session-region",
+          "kind": "external",
+          "trigger": "review"
+        }
+      }
+    },
+    {
+      "id": "t-rework",
+      "type": "Transition",
+      "source": "reviewing",
+      "target": "preparing",
+      "label": "rework",
+      "properties": {
+        "uml": {
+          "region": "session-region",
+          "kind": "external",
+          "trigger": "rework"
+        }
+      }
+    }
+  ],
+  "plugins": {
+    "generic-graph": {
+      "semantic_profile": "uml",
+      "views": [
+        {
+          "id": "state-machine-two-node-cycle-view",
+          "label": "Minimal Two-State Cycle",
+          "kind": "uml-state-machine",
+          "nodes": ["idle", "engaged"],
+          "relationships": ["t-engage", "t-disengage"],
+          "layout_preferences": {
+            "direction": "down",
+            "density": "readable",
+            "routing": {
+              "style": "orthogonal",
+              "endpoint_merging": "off"
+            }
+          },
+          "groups": [
+            {
+              "id": "two-node-machine-frame",
+              "label": "Session Lifecycle",
+              "role": "semantic-boundary",
+              "semantic_source_id": "session-machine",
+              "members": ["two-node-region-frame"]
+            },
+            {
+              "id": "two-node-region-frame",
+              "label": "Session Region",
+              "role": "semantic-boundary",
+              "semantic_source_id": "session-region",
+              "members": ["idle", "engaged"]
+            }
+          ]
+        },
+        {
+          "id": "state-machine-multi-cycle-view",
+          "label": "Multi-State Cycle",
+          "kind": "uml-state-machine",
+          "nodes": ["preparing", "running", "paused", "reviewing"],
+          "relationships": ["t-start", "t-pause", "t-resume", "t-review", "t-rework"],
+          "layout_preferences": {
+            "direction": "down",
+            "density": "readable",
+            "routing": {
+              "style": "orthogonal",
+              "endpoint_merging": "off"
+            }
+          },
+          "groups": [
+            {
+              "id": "multi-cycle-machine-frame",
+              "label": "Session Lifecycle",
+              "role": "semantic-boundary",
+              "semantic_source_id": "session-machine",
+              "members": ["multi-cycle-region-frame"]
+            },
+            {
+              "id": "multi-cycle-region-frame",
+              "label": "Session Region",
+              "role": "semantic-boundary",
+              "semantic_source_id": "session-region",
+              "members": ["preparing", "running", "paused", "reviewing"]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

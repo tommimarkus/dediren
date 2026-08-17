@@ -80,6 +80,20 @@ class LayoutFixtureRegenerator {
               "uml-state-machine-basic.json",
               "valid-uml-state-machine-basic.json",
               "state-machine-view"),
+          // Two cyclic behavior-diagram views, deliberately kept as a pair. A back-transition's
+          // broken geometry depends on node size: with four tall states the return edge runs
+          // vertically through two node bodies, while with two small states ELK places them side
+          // by side and the return edge runs flat through its own target's full width. A single
+          // fixture samples only one of those, so a fix validated against it can still ship the
+          // other broken.
+          new FixtureMapping(
+              "uml-state-machine-two-node-cycle.json",
+              "valid-uml-state-machine-cyclic.json",
+              "state-machine-two-node-cycle-view"),
+          new FixtureMapping(
+              "uml-state-machine-multi-cycle.json",
+              "valid-uml-state-machine-cyclic.json",
+              "state-machine-multi-cycle-view"),
           new FixtureMapping(
               "uml-use-case-basic.json", "valid-uml-use-case-basic.json", "use-case-view"));
 

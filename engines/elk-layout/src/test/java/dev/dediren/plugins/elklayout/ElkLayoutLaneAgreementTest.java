@@ -83,8 +83,7 @@ class ElkLayoutLaneAgreementTest {
         // ELK compound nodes and the grouped* port family fixes each edge's endpoint sides from
         // edgeDirection(). Its isCrossGroupBackEdge() predicate requires the two endpoints to have
         // different owners, so a cycle closing inside a single group is never reversed.
-        Arguments.of(
-            "grouped", cyclicRequest(List.of(semanticPipeline(), semanticGovernance()))));
+        Arguments.of("grouped", cyclicRequest(List.of(semanticPipeline(), semanticGovernance()))));
   }
 
   /**
@@ -207,9 +206,9 @@ class ElkLayoutLaneAgreementTest {
    * bounds, described well enough to debug from the failure message alone.
    *
    * <p>Unlike {@code ElkLayoutEngineTest#connectorThroughNodeCount}, this deliberately does
-   * <em>not</em> exempt the segment's own source and target: doubling back across your own
-   * endpoint is precisely the shape a lane produces when it pins a port side against an order it
-   * also pinned.
+   * <em>not</em> exempt the segment's own source and target: doubling back across your own endpoint
+   * is precisely the shape a lane produces when it pins a port side against an order it also
+   * pinned.
    */
   private static List<String> nodeBodyCrossings(LayoutResult result) {
     List<String> crossings = new ArrayList<>();
@@ -254,8 +253,7 @@ class ElkLayoutLaneAgreementTest {
   /**
    * Length of the part of segment {@code start -> end} that lies inside {@code box}, by
    * Liang-Barsky parametric clipping. Exact for any segment orientation — no bounding-box
-   * approximation, so a
-   * route that merely passes beside a node is never counted.
+   * approximation, so a route that merely passes beside a node is never counted.
    */
   private static double intrusionLength(Point start, Point end, Box box) {
     if (box.maxX() <= box.minX() || box.maxY() <= box.minY()) {

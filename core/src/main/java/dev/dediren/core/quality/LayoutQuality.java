@@ -542,10 +542,18 @@ public final class LayoutQuality {
           if (isSequenceChrome(node)) {
             continue;
           }
-          boolean ownEndpoint =
-              node.id().equals(edge.source()) || node.id().equals(edge.target());
+          boolean ownEndpoint = node.id().equals(edge.source()) || node.id().equals(edge.target());
           if (ownEndpoint) {
-            if (!selfLoop && segmentPiercesOwnEndpointInterior(start, end, node)) {
+            // A lifeline is exempt from the own-endpoint widening for the same reason
+            // endpointAccepted/onLifelineAxis exists: a Message anchors to the lifeline *axis*
+            // (the head-box centre x, extended downward), which lies inside the head-box
+            // rectangle. Terminating there is correct sequence geometry, not a route driven
+            // through a node body, so the interior test would report every destroying or
+            // head-adjacent message. A message crossing some *other* lifeline is still counted
+            // by the unrelated-node path below.
+            if (!selfLoop
+                && !LayoutNodeRole.isLifeline(node.role())
+                && segmentPiercesOwnEndpointInterior(start, end, node)) {
               count++;
               break;
             }
@@ -567,7 +575,8 @@ public final class LayoutQuality {
   // practice (see routeSegment), so orientation is used to separate "sits inside the perpendicular
   // band" from "travels far enough along its own axis"; a non-orthogonal segment falls back to
   // requiring the minimum overlap on both axes.
-  private static boolean segmentPiercesOwnEndpointInterior(Point start, Point end, LaidOutNode node) {
+  private static boolean segmentPiercesOwnEndpointInterior(
+      Point start, Point end, LaidOutNode node) {
     double left = node.x() + OWN_ENDPOINT_INTERIOR_INSET;
     double right = node.x() + node.width() - OWN_ENDPOINT_INTERIOR_INSET;
     double top = node.y() + OWN_ENDPOINT_INTERIOR_INSET;
