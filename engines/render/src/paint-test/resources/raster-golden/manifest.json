@@ -99,9 +99,9 @@
     "baseline" : "engines/render/src/paint-test/resources/raster-golden/pipeline-rich-light.png",
     "dimensions" : {
       "width" : 1458,
-      "height" : 571
+      "height" : 517
     },
-    "sha256" : "18662954fc3bb0f665adf92787a6d0cece122d6d29ec3f90f98c82a2e2d5dd28"
+    "sha256" : "767c647c678d249b2faeaa31bafb650840a301d45b3ec99ee01a20e5020f42cc"
   }, {
     "name" : "pipeline-rich-dark",
     "description" : "The same rich standard graph, dark theme",
@@ -111,9 +111,9 @@
     "baseline" : "engines/render/src/paint-test/resources/raster-golden/pipeline-rich-dark.png",
     "dimensions" : {
       "width" : 1458,
-      "height" : 548
+      "height" : 517
     },
-    "sha256" : "ee65c770c8787a641e23d7da814d2e99315e88b311f777fc8e765c8d7d009786"
+    "sha256" : "2df9833304b2bba0308e475ec3a5de5b107e604325605afb120346efb7bdcf96"
   }, {
     "name" : "archimate-decorators",
     "description" : "ArchiMate diagram with decorators and markers",

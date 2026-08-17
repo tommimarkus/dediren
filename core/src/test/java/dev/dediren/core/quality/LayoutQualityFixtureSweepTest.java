@@ -28,8 +28,12 @@ class LayoutQualityFixtureSweepTest {
   // Every fixture defaults to zero crossings; only fixtures with a real, expected nonzero count
   // are listed here. A fixture regeneration that shifts this count is a legitimate layout change
   // to review and re-pin, not a silent pass.
-  private static final Map<String, Integer> EXPECTED_EDGE_CROSSING_COUNTS =
-      Map.of("uml-complex-class.json", 2);
+  //
+  // The map is empty, and that is a result rather than an omission: uml-complex-class.json carried
+  // the last pinned crossings (2) until edge ports moved from PortConstraints.FIXED_ORDER with
+  // hand-assigned indices to FIXED_SIDE, which lets ELK order each side itself. Re-pin here if a
+  // future fixture genuinely cannot be laid out planar.
+  private static final Map<String, Integer> EXPECTED_EDGE_CROSSING_COUNTS = Map.of();
 
   @ParameterizedTest
   @MethodSource("layoutResultFixtures")

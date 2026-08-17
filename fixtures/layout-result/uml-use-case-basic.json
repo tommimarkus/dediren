@@ -6,7 +6,7 @@
     "source_id" : "customer",
     "projection_id" : "customer",
     "x" : 12.0,
-    "y" : 206.5,
+    "y" : 205.5,
     "width" : 80.0,
     "height" : 120.0,
     "label" : "Customer",
@@ -16,7 +16,7 @@
     "source_id" : "support-agent",
     "projection_id" : "support-agent",
     "x" : 12.0,
-    "y" : 531.0,
+    "y" : 470.0,
     "width" : 80.0,
     "height" : 120.0,
     "label" : "Support Agent",
@@ -26,7 +26,7 @@
     "source_id" : "place-order",
     "projection_id" : "place-order",
     "x" : 551.0,
-    "y" : 214.0,
+    "y" : 297.0,
     "width" : 160.0,
     "height" : 72.0,
     "label" : "Place Order",
@@ -36,7 +36,7 @@
     "source_id" : "track-order",
     "projection_id" : "track-order",
     "x" : 246.0,
-    "y" : 299.0,
+    "y" : 213.0,
     "width" : 160.0,
     "height" : 72.0,
     "label" : "Track Order",
@@ -46,7 +46,7 @@
     "source_id" : "authenticate-customer",
     "projection_id" : "authenticate-customer",
     "x" : 855.0,
-    "y" : 384.0,
+    "y" : 467.0,
     "width" : 160.0,
     "height" : 72.0,
     "label" : "Authenticate Customer",
@@ -66,7 +66,7 @@
     "source_id" : "cancel-order",
     "projection_id" : "cancel-order",
     "x" : 246.0,
-    "y" : 555.0,
+    "y" : 494.0,
     "width" : 160.0,
     "height" : 72.0,
     "label" : "Cancel Order",
@@ -76,7 +76,7 @@
     "source_id" : "payment-extension",
     "projection_id" : "payment-extension",
     "x" : 255.5,
-    "y" : 443.0,
+    "y" : 382.0,
     "width" : 140.0,
     "height" : 40.0,
     "label" : "payment authorized",
@@ -91,10 +91,16 @@
     "routing_hints" : [ ],
     "points" : [ {
       "x" : 93.0,
-      "y" : 250.0
+      "y" : 282.0
+    }, {
+      "x" : 141.0,
+      "y" : 282.0
+    }, {
+      "x" : 141.0,
+      "y" : 333.0
     }, {
       "x" : 550.0,
-      "y" : 250.0
+      "y" : 333.0
     } ],
     "label" : "",
     "source_pointer" : "/relationships/0"
@@ -107,16 +113,10 @@
     "routing_hints" : [ ],
     "points" : [ {
       "x" : 93.0,
-      "y" : 283.0
-    }, {
-      "x" : 141.0,
-      "y" : 283.0
-    }, {
-      "x" : 141.0,
-      "y" : 335.0
+      "y" : 249.0
     }, {
       "x" : 245.0,
-      "y" : 335.0
+      "y" : 249.0
     } ],
     "label" : "",
     "source_pointer" : "/relationships/1"
@@ -129,10 +129,10 @@
     "routing_hints" : [ ],
     "points" : [ {
       "x" : 93.0,
-      "y" : 591.0
+      "y" : 530.0
     }, {
       "x" : 245.0,
-      "y" : 591.0
+      "y" : 530.0
     } ],
     "label" : "",
     "source_pointer" : "/relationships/2"
@@ -145,16 +145,16 @@
     "routing_hints" : [ ],
     "points" : [ {
       "x" : 631.0,
-      "y" : 287.0
+      "y" : 370.0
     }, {
       "x" : 631.0,
-      "y" : 335.0
+      "y" : 418.0
     }, {
       "x" : 935.0,
-      "y" : 335.0
+      "y" : 418.0
     }, {
       "x" : 935.0,
-      "y" : 383.0
+      "y" : 466.0
     } ],
     "label" : "include",
     "source_pointer" : "/relationships/3"
@@ -176,7 +176,7 @@
       "y" : 165.0
     }, {
       "x" : 631.0,
-      "y" : 213.0
+      "y" : 296.0
     } ],
     "label" : "extend",
     "source_pointer" : "/relationships/4"
@@ -193,7 +193,7 @@
     "x" : 213.0,
     "y" : 12.0,
     "width" : 834.0,
-    "height" : 647.0,
+    "height" : 586.0,
     "members" : [ "place-order", "track-order", "authenticate-customer", "apply-discount", "cancel-order", "payment-extension" ],
     "label" : "Order Service"
   } ],

@@ -36,7 +36,7 @@
     "source_id" : "database",
     "projection_id" : "database",
     "x" : 1157.0,
-    "y" : 297.16666666666663,
+    "y" : 194.0,
     "width" : 160.0,
     "height" : 80.0,
     "label" : "PostgreSQL",
@@ -56,7 +56,7 @@
     "source_id" : "payments",
     "projection_id" : "payments",
     "x" : 1157.0,
-    "y" : 177.16666666666666,
+    "y" : 74.0,
     "width" : 160.0,
     "height" : 80.0,
     "label" : "Payment Authorization Service",
@@ -109,16 +109,13 @@
     "routing_hints" : [ ],
     "points" : [ {
       "x" : 691.0,
-      "y" : 196.16666666666666
+      "y" : 215.83333333333334
     }, {
-      "x" : 1000.0,
-      "y" : 196.16666666666666
-    }, {
-      "x" : 1000.0,
-      "y" : 327.3333333333333
+      "x" : 691.0,
+      "y" : 224.16666666666666
     }, {
       "x" : 1156.0,
-      "y" : 327.3333333333333
+      "y" : 224.16666666666666
     } ],
     "label" : "writes orders",
     "source_pointer" : "/relationships/2"
@@ -131,13 +128,16 @@
     "routing_hints" : [ ],
     "points" : [ {
       "x" : 691.0,
-      "y" : 215.83333333333334
+      "y" : 196.16666666666666
     }, {
-      "x" : 691.0,
-      "y" : 217.16666666666666
+      "x" : 1048.0,
+      "y" : 196.16666666666666
+    }, {
+      "x" : 1048.0,
+      "y" : 114.0
     }, {
       "x" : 1156.0,
-      "y" : 217.16666666666666
+      "y" : 114.0
     } ],
     "label" : "requests payment authorization",
     "source_pointer" : "/relationships/3"
@@ -175,10 +175,10 @@
       "y" : 336.0
     }, {
       "x" : 940.0,
-      "y" : 347.0
+      "y" : 243.83333333333334
     }, {
       "x" : 1156.0,
-      "y" : 347.0
+      "y" : 243.83333333333334
     } ],
     "label" : "loads order",
     "source_pointer" : "/relationships/5"
@@ -208,7 +208,7 @@
       }
     },
     "x" : 1084.0,
-    "y" : 153.16666666666666,
+    "y" : 50.0,
     "width" : 257.0,
     "height" : 248.0,
     "members" : [ "payments", "database" ],
