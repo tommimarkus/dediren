@@ -1,0 +1,99 @@
+{
+  "layout_result_schema_version" : "layout-result.schema.v2",
+  "view_id" : "state-machine-two-node-cycle-view",
+  "nodes" : [ {
+    "id" : "idle",
+    "source_id" : "idle",
+    "projection_id" : "idle",
+    "x" : 128.0,
+    "y" : 316.0,
+    "width" : 150.0,
+    "height" : 72.0,
+    "label" : "Idle",
+    "source_pointer" : "/nodes/2"
+  }, {
+    "id" : "engaged",
+    "source_id" : "engaged",
+    "projection_id" : "engaged",
+    "x" : 376.0,
+    "y" : 76.0,
+    "width" : 150.0,
+    "height" : 72.0,
+    "label" : "Engaged",
+    "source_pointer" : "/nodes/3"
+  } ],
+  "edges" : [ {
+    "id" : "t-engage",
+    "source" : "idle",
+    "target" : "engaged",
+    "source_id" : "t-engage",
+    "projection_id" : "t-engage",
+    "routing_hints" : [ ],
+    "points" : [ {
+      "x" : 279.0,
+      "y" : 352.0
+    }, {
+      "x" : 327.0,
+      "y" : 352.0
+    }, {
+      "x" : 327.0,
+      "y" : 112.0
+    }, {
+      "x" : 375.0,
+      "y" : 112.0
+    } ],
+    "label" : "engage",
+    "source_pointer" : "/relationships/0"
+  }, {
+    "id" : "t-disengage",
+    "source" : "engaged",
+    "target" : "idle",
+    "source_id" : "t-disengage",
+    "projection_id" : "t-disengage",
+    "routing_hints" : [ ],
+    "points" : [ {
+      "x" : 527.0,
+      "y" : 112.0
+    }, {
+      "x" : 527.0,
+      "y" : 352.0
+    }, {
+      "x" : 127.0,
+      "y" : 352.0
+    } ],
+    "label" : "disengage",
+    "source_pointer" : "/relationships/1"
+  } ],
+  "groups" : [ {
+    "id" : "two-node-machine-frame",
+    "source_id" : "session-machine",
+    "projection_id" : "two-node-machine-frame",
+    "provenance" : {
+      "semantic_backed" : {
+        "source_id" : "session-machine"
+      }
+    },
+    "x" : 12.0,
+    "y" : 12.0,
+    "width" : 627.0,
+    "height" : 440.0,
+    "members" : [ "two-node-region-frame" ],
+    "label" : "Session Lifecycle"
+  }, {
+    "id" : "two-node-region-frame",
+    "source_id" : "session-region",
+    "projection_id" : "two-node-region-frame",
+    "provenance" : {
+      "semantic_backed" : {
+        "source_id" : "session-region"
+      }
+    },
+    "x" : 44.0,
+    "y" : 44.0,
+    "width" : 563.0,
+    "height" : 376.0,
+    "members" : [ "idle", "engaged" ],
+    "label" : "Session Region"
+  } ],
+  "warnings" : [ ]
+}

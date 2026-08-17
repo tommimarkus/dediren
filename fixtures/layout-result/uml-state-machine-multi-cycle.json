@@ -1,0 +1,170 @@
+{
+  "layout_result_schema_version" : "layout-result.schema.v2",
+  "view_id" : "state-machine-multi-cycle-view",
+  "nodes" : [ {
+    "id" : "preparing",
+    "source_id" : "preparing",
+    "projection_id" : "preparing",
+    "x" : 152.0,
+    "y" : 827.0,
+    "width" : 150.0,
+    "height" : 72.0,
+    "label" : "Preparing",
+    "source_pointer" : "/nodes/4"
+  }, {
+    "id" : "running",
+    "source_id" : "running",
+    "projection_id" : "running",
+    "x" : 173.5,
+    "y" : 367.0,
+    "width" : 150.0,
+    "height" : 72.0,
+    "label" : "Running",
+    "source_pointer" : "/nodes/5"
+  }, {
+    "id" : "paused",
+    "source_id" : "paused",
+    "projection_id" : "paused",
+    "x" : 195.0,
+    "y" : 125.0,
+    "width" : 150.0,
+    "height" : 72.0,
+    "label" : "Paused",
+    "source_pointer" : "/nodes/6"
+  }, {
+    "id" : "reviewing",
+    "source_id" : "reviewing",
+    "projection_id" : "reviewing",
+    "x" : 152.0,
+    "y" : 609.0,
+    "width" : 150.0,
+    "height" : 72.0,
+    "label" : "Reviewing",
+    "source_pointer" : "/nodes/7"
+  } ],
+  "edges" : [ {
+    "id" : "t-start",
+    "source" : "preparing",
+    "target" : "running",
+    "source_id" : "t-start",
+    "projection_id" : "t-start",
+    "routing_hints" : [ ],
+    "points" : [ {
+      "x" : 227.0,
+      "y" : 900.0
+    }, {
+      "x" : 227.0,
+      "y" : 948.0
+    }, {
+      "x" : 79.0,
+      "y" : 948.0
+    }, {
+      "x" : 79.0,
+      "y" : 318.0
+    }, {
+      "x" : 227.0,
+      "y" : 318.0
+    }, {
+      "x" : 227.0,
+      "y" : 366.0
+    } ],
+    "label" : "start",
+    "source_pointer" : "/relationships/2"
+  }, {
+    "id" : "t-pause",
+    "source" : "running",
+    "target" : "paused",
+    "source_id" : "t-pause",
+    "projection_id" : "t-pause",
+    "routing_hints" : [ ],
+    "points" : [ {
+      "x" : 270.0,
+      "y" : 440.0
+    }, {
+      "x" : 270.0,
+      "y" : 124.0
+    } ],
+    "label" : "pause",
+    "source_pointer" : "/relationships/3"
+  }, {
+    "id" : "t-resume",
+    "source" : "paused",
+    "target" : "running",
+    "source_id" : "t-resume",
+    "projection_id" : "t-resume",
+    "routing_hints" : [ ],
+    "points" : [ {
+      "x" : 270.0,
+      "y" : 198.0
+    }, {
+      "x" : 270.0,
+      "y" : 366.0
+    } ],
+    "label" : "resume",
+    "source_pointer" : "/relationships/4"
+  }, {
+    "id" : "t-review",
+    "source" : "running",
+    "target" : "reviewing",
+    "source_id" : "t-review",
+    "projection_id" : "t-review",
+    "routing_hints" : [ ],
+    "points" : [ {
+      "x" : 227.0,
+      "y" : 440.0
+    }, {
+      "x" : 227.0,
+      "y" : 608.0
+    } ],
+    "label" : "review",
+    "source_pointer" : "/relationships/5"
+  }, {
+    "id" : "t-rework",
+    "source" : "reviewing",
+    "target" : "preparing",
+    "source_id" : "t-rework",
+    "projection_id" : "t-rework",
+    "routing_hints" : [ ],
+    "points" : [ {
+      "x" : 227.0,
+      "y" : 682.0
+    }, {
+      "x" : 227.0,
+      "y" : 826.0
+    } ],
+    "label" : "rework",
+    "source_pointer" : "/relationships/6"
+  } ],
+  "groups" : [ {
+    "id" : "multi-cycle-machine-frame",
+    "source_id" : "session-machine",
+    "projection_id" : "multi-cycle-machine-frame",
+    "provenance" : {
+      "semantic_backed" : {
+        "source_id" : "session-machine"
+      }
+    },
+    "x" : 12.0,
+    "y" : 12.0,
+    "width" : 449.0,
+    "height" : 1000.0,
+    "members" : [ "multi-cycle-region-frame" ],
+    "label" : "Session Lifecycle"
+  }, {
+    "id" : "multi-cycle-region-frame",
+    "source_id" : "session-region",
+    "projection_id" : "multi-cycle-region-frame",
+    "provenance" : {
+      "semantic_backed" : {
+        "source_id" : "session-region"
+      }
+    },
+    "x" : 44.0,
+    "y" : 44.0,
+    "width" : 385.0,
+    "height" : 936.0,
+    "members" : [ "preparing", "running", "paused", "reviewing" ],
+    "label" : "Session Region"
+  } ],
+  "warnings" : [ ]
+}
