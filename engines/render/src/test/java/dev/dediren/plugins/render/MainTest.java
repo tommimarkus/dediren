@@ -2747,7 +2747,7 @@ class MainTest {
     }
 
     @Test
-    void paintsEdgeLabelOnReadableBackgroundWhenOptedIn() throws Exception {
+    void paintsEdgeLabelOnReadableBackgroundClearOfItsRouteWhenOptedIn() throws Exception {
       JsonNode input =
           styledInlineInput(
               "[]",
@@ -2772,6 +2772,7 @@ class MainTest {
       Document document = svgDocument(okContent(render(input)));
 
       Element edge = groupWithAttribute(document, "data-dediren-edge-id", "labeled-edge");
+      Element route = firstChildElement(edge, "path");
       Element background = firstElementWithAttribute(edge, "data-dediren-edge-label-background");
       Element label = firstChildElement(edge, "text");
 
@@ -2780,6 +2781,9 @@ class MainTest {
       assertThat(background.getAttribute("rx")).isEqualTo("3");
       assertThat(Double.parseDouble(background.getAttribute("x")))
           .isLessThan(Double.parseDouble(label.getAttribute("x")));
+      assertThat(Double.parseDouble(background.getAttribute("y")))
+          .as("the below-route background must clear the route's painted stroke")
+          .isGreaterThan(100.0 + Double.parseDouble(route.getAttribute("stroke-width")) / 2.0);
       assertThat(label.getAttribute("paint-order")).isEmpty();
       assertThat(label.getAttribute("stroke")).isEmpty();
       assertThat(label.getAttribute("font-size")).isEqualTo("15.4");

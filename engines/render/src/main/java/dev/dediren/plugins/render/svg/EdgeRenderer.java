@@ -33,6 +33,7 @@ public final class EdgeRenderer {
   private static final double EDGE_LABEL_FONT_SIZE_SCALE = 1.1;
   private static final int EDGE_LABEL_FONT_WEIGHT = 600;
   private static final double EDGE_LABEL_OUTLINE_WIDTH = 2.0;
+  private static final double EDGE_LABEL_ROUTE_PADDING = 2.0;
 
   // Perpendicular reach (px from the segment) within which a horizontal-side label still counts as
   // "hugging" its own route. Offsets up to this are tried before falling back to an on-route
@@ -494,11 +495,15 @@ public final class EdgeRenderer {
       double nearStartX = segment.start().x() + direction * 18.0;
       double nearEndX = segment.end().x() - direction * 18.0;
       double baseOffset =
-          switch (style.labelHorizontalSide()) {
-            case ABOVE -> -10.0;
-            case BELOW -> 18.0;
-            case AUTO -> autoHorizontalLabelOffset(edge, segment.index());
-          };
+          clearHorizontalLabelOffset(
+              switch (style.labelHorizontalSide()) {
+                case ABOVE -> -10.0;
+                case BELOW -> 18.0;
+                case AUTO -> autoHorizontalLabelOffset(edge, segment.index());
+              },
+              edge.label(),
+              style,
+              fontSize);
       List<Double> xCandidates = orderedValues(preferredX, centerX, nearStartX, nearEndX);
       List<Double> hugOffsets = new ArrayList<>();
       List<Double> farOffsets = new ArrayList<>();
@@ -596,6 +601,23 @@ public final class EdgeRenderer {
         baseOffset - 112.0,
         baseOffset + 140.0,
         baseOffset - 140.0);
+  }
+
+  private static double clearHorizontalLabelOffset(
+      double offset, String text, ResolvedEdgeStyle style, double fontSize) {
+    if (style.labelPresentation() != SvgEdgeLabelPresentation.BACKGROUND) {
+      return offset;
+    }
+    EdgeLabel candidate = edgeLabelCandidate(0.0, offset, "middle", text, fontSize);
+    LabelBox visibleBox = edgeLabelVisibleBox(candidate, style.labelPresentation());
+    double clearance = style.strokeWidth() / 2.0 + EDGE_LABEL_ROUTE_PADDING;
+    if (offset < 0.0 && visibleBox.maxY() > -clearance) {
+      return offset - (visibleBox.maxY() + clearance);
+    }
+    if (offset >= 0.0 && visibleBox.minY() < clearance) {
+      return offset + clearance - visibleBox.minY();
+    }
+    return offset;
   }
 
   public static Optional<EdgeLabel> firstClearVerticalLabel(

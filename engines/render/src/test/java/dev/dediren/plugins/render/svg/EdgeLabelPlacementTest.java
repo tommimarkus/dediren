@@ -18,6 +18,8 @@ import dev.dediren.plugins.render.style.ResolvedEdgeStyle;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 /**
  * Placement invariants for {@link EdgeRenderer#edgeLabel}: a routed edge's label must stay attached
@@ -86,6 +88,82 @@ class EdgeLabelPlacementTest {
           .as("edge %s label x must stay beside its route [%.1f, %.1f]", edge.id(), minX, maxX)
           .isBetween(minX - ATTACHED_MARGIN, maxX + ATTACHED_MARGIN);
     }
+  }
+
+  @ParameterizedTest(name = "{0} background clears route")
+  @CsvSource({"ABOVE, true", "BELOW, false"})
+  void backgroundLabelsClearHorizontalRoutesOnTheRequestedSide(
+      SvgEdgeLabelHorizontalSide side, boolean expectedAbove) {
+    LaidOutEdge edge =
+        edge(
+            "horizontal-label",
+            "target",
+            List.of(new Point(0.0, 100.0), new Point(200.0, 100.0)),
+            "label");
+    double fontSize = EdgeRenderer.edgeLabelFontSize(BASE_FONT_SIZE);
+
+    ResolvedEdgeStyle style = backgroundStyle(side);
+    EdgeLabel label = EdgeRenderer.edgeLabel(edge, style, List.of(), fontSize);
+
+    assertThat(label.y() < 100.0)
+        .as("the unobstructed label must remain on the requested %s side", side)
+        .isEqualTo(expectedAbove);
+    assertClearsHorizontalRoute(label, style, 100.0);
+  }
+
+  @ParameterizedTest(name = "blocked {0} background falls back clear")
+  @CsvSource({"ABOVE, -1000.0, 100.0, false", "BELOW, 100.0, 1000.0, true"})
+  void backgroundLabelFallbackClearsHorizontalRouteOnTheOppositeSide(
+      SvgEdgeLabelHorizontalSide preferredSide,
+      double blockerMinY,
+      double blockerMaxY,
+      boolean expectedAbove) {
+    LaidOutEdge edge =
+        edge(
+            "blocked-horizontal-label",
+            "target",
+            List.of(new Point(0.0, 100.0), new Point(200.0, 100.0)),
+            "blocked label");
+    double fontSize = EdgeRenderer.edgeLabelFontSize(BASE_FONT_SIZE);
+
+    ResolvedEdgeStyle style = backgroundStyle(preferredSide);
+    LabelBox preferredSideBlocker = new LabelBox(-1000.0, blockerMinY, 1000.0, blockerMaxY);
+
+    EdgeLabel label = EdgeRenderer.edgeLabel(edge, style, List.of(preferredSideBlocker), fontSize);
+
+    assertThat(label.y() < 100.0)
+        .as("a blocked %s label must fall back to the opposite side", preferredSide)
+        .isEqualTo(expectedAbove);
+    assertClearsHorizontalRoute(label, style, 100.0);
+  }
+
+  private static ResolvedEdgeStyle backgroundStyle(SvgEdgeLabelHorizontalSide side) {
+    return new ResolvedEdgeStyle(
+        "#64748b",
+        2.0,
+        "#374151",
+        SvgEdgeLineStyle.SOLID,
+        SvgEdgeMarkerEnd.NONE,
+        SvgEdgeMarkerEnd.FILLED_ARROW,
+        SvgEdgeLabelHorizontalPosition.CENTER,
+        side,
+        SvgEdgeLabelVerticalPosition.CENTER,
+        SvgEdgeLabelVerticalSide.LEFT,
+        SvgEdgeLabelPresentation.BACKGROUND,
+        null,
+        null,
+        null);
+  }
+
+  private static void assertClearsHorizontalRoute(
+      EdgeLabel label, ResolvedEdgeStyle style, double routeY) {
+    LabelBox visibleBox = EdgeRenderer.edgeLabelVisibleBox(label, style.labelPresentation());
+    double routeHalfWidth = style.strokeWidth() / 2.0;
+    double visibleGap = Math.max(routeY - visibleBox.maxY(), visibleBox.minY() - routeY);
+
+    assertThat(visibleGap)
+        .as("the visible label box must not overlap the route's painted stroke")
+        .isGreaterThan(routeHalfWidth);
   }
 
   private static LayoutResult groupedInternalFanOut() {

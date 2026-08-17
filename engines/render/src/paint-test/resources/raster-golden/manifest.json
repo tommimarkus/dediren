@@ -111,9 +111,9 @@
     "baseline" : "engines/render/src/paint-test/resources/raster-golden/pipeline-rich-dark.png",
     "dimensions" : {
       "width" : 1458,
-      "height" : 572
+      "height" : 548
     },
-    "sha256" : "852a875e801ae27c9e5b5c3cb0a5734787cdafb791be2f4ba1ac964e2d81fdd8"
+    "sha256" : "ee65c770c8787a641e23d7da814d2e99315e88b311f777fc8e765c8d7d009786"
   }, {
     "name" : "archimate-decorators",
     "description" : "ArchiMate diagram with decorators and markers",
