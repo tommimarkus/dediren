@@ -174,6 +174,78 @@ class PortPlanTest {
     assertThat(plan.reversed("forward")).isFalse();
   }
 
+  /**
+   * A group's members reaching out to nodes no group claims. The old predicate required both owners
+   * non-null, so it never reversed one of these, and neither may this: reversing it makes ELK
+   * layer the external target ahead of the group, which mirrors the drawing — the group and its
+   * targets swap sides and the dependency arrows read backwards. The arrowheads stay on the
+   * right elements, so no geometric metric in the suite objects; only this does.
+   *
+   * <p>The shape is the published self-model's {@code distribution} view verbatim (see {@code
+   * docs/architecture/dediren.dediren/model-deployment.json}), because that is the drawing that
+   * regressed: it is the README hero and the Pages site, and nothing else pins it.
+   */
+  @Test
+  void anEdgeReachingOutOfAGroupToAnUnclaimedNodeIsNotReversed() {
+    List<LayoutNode> nodes =
+        List.of(
+            node("ee-jvm"), node("art-launcher"), node("art-lib"), node("comp-cli"),
+            node("comp-engines"));
+    List<LayoutEdge> edges =
+        List.of(
+            new LayoutEdge("dep-launcher", "art-launcher", "ee-jvm", "runs on", "d1"),
+            new LayoutEdge("dep-lib", "art-lib", "ee-jvm", "hosted by", "d2"),
+            new LayoutEdge("man-cli", "art-lib", "comp-cli", "manifests", "m1"),
+            new LayoutEdge("man-engines", "art-lib", "comp-engines", "manifests", "m2"));
+    List<LayoutGroup> groups =
+        List.of(
+            new LayoutGroup(
+                "grp-host",
+                "Host",
+                List.of("ee-jvm", "art-launcher", "art-lib"),
+                GroupProvenance.semanticBacked("host")));
+
+    PortPlan plan = groupedPlan(nodes, edges, groups);
+
+    assertThat(List.of("man-cli", "man-engines").stream().filter(plan::reversed).toList())
+        .as("an edge from a grouped node out to an unclaimed one must keep its declared direction")
+        .isEmpty();
+    assertThat(edges.stream().map(LayoutEdge::id).filter(plan::reversed).toList())
+        .as("this view is acyclic, so nothing in it should be reversed at all")
+        .isEmpty();
+  }
+
+  /**
+   * The other half of the same rule: an unclaimed node is not pinned ahead of the groups, so a
+   * cycle that runs out of a group and back into it is still broken — by the depth-first order
+   * inside the shared bucket, on the edge that actually closes the cycle rather than on the one
+   * carrying the declared flow.
+   */
+  @Test
+  void aCycleOutOfAGroupAndBackIsBrokenOnTheClosingEdge() {
+    List<LayoutNode> nodes = List.of(node("inside"), node("outside"));
+    List<LayoutEdge> edges =
+        List.of(
+            new LayoutEdge("out", "inside", "outside", "flow", "out"),
+            new LayoutEdge("back", "outside", "inside", "flow", "back"));
+    List<LayoutGroup> groups =
+        List.of(
+            new LayoutGroup(
+                "boundary",
+                "Boundary",
+                List.of("inside"),
+                GroupProvenance.semanticBacked("boundary")));
+
+    PortPlan plan = groupedPlan(nodes, edges, groups);
+
+    assertThat(plan.reversed("out"))
+        .as("the edge carrying the declared flow out of the group keeps its direction")
+        .isFalse();
+    assertThat(plan.reversed("back"))
+        .as("the edge closing the cycle back into the group is the one that gets reversed")
+        .isTrue();
+  }
+
   /** The flat family declares its ordering and contributes no reversals under either of them. */
   @Test
   void theFlatFamilyDecidesNoBackEdges() {

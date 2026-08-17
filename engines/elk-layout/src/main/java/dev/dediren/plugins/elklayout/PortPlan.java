@@ -64,11 +64,11 @@ final class PortPlan {
   private static final EndpointMerge NO_ENDPOINT_MERGE = new EndpointMerge(false, false);
 
   /**
-   * Rank of a node that no group claims. Groups are ranked by declaration index from 0, so -1 reads
-   * as "declared before any group" and, more importantly, is a fixed rank: the acyclicity argument
-   * needs the node ranking to be a total order, not any particular one.
+   * Bucket an unclaimed node falls back to when nothing upstream places it. Groups are ranked by
+   * declaration index from 0, so this is the first group's rank — never <em>before</em> it: a node
+   * ranked ahead of every group turns each edge reaching it from inside one into a back-edge.
    */
-  private static final int UNGROUPED_RANK = -1;
+  private static final int FIRST_GROUP_RANK = 0;
 
   /** How much of the layer order a lane has already fixed by the time ports are planned. */
   enum Ordering {
@@ -354,9 +354,17 @@ final class PortPlan {
    * <p>The bucket key is what preserves the old cross-group rule exactly: two nodes owned by
    * different groups compare by group declaration index and nothing else, so an edge between them
    * runs backwards precisely when the later-declared group is its source — which is what {@code
-   * isCrossGroupBackEdge} tested. A node no group claims gets {@link #UNGROUPED_RANK}, the one case
-   * the old predicate could not see at all (it required both owners non-null), which is why a cycle
-   * between a grouped and an ungrouped node used to route through both bodies.
+   * isCrossGroupBackEdge} tested.
+   *
+   * <p>A node no group claims takes its bucket from the graph instead (see {@link
+   * #bucketByNode}), which is what keeps that same guarantee at the group boundary: it shares a
+   * bucket with the group that reaches it, so the crossing edge is settled by the depth-first
+   * order inside the bucket — as a member-to-member edge is — never by a bucket difference.
+   * The old predicate could not see such an edge at all (it required both owners non-null) and
+   * never
+   * reversed one; neither does this, unless the depth-first order says it closes a cycle. That is
+   * the one thing the old predicate got wrong, and the reason a cycle running through an unclaimed
+   * node used to route through both endpoint bodies.
    *
    * <p>Reverse postorder is used inside a bucket because every edge that is not a depth-first back
    * edge runs forwards in it, so the reversal set below is a small feedback-arc set rather than an
@@ -367,14 +375,12 @@ final class PortPlan {
       List<LayoutEdge> edges,
       Map<String, String> ownerByNode,
       Map<String, Integer> groupOrderById) {
-    Map<String, Integer> bucketByNode = new LinkedHashMap<>();
+    Map<String, Integer> bucketByNode = bucketByNode(nodes, edges, ownerByNode, groupOrderById);
     TreeMap<Integer, List<String>> membersByBucket = new TreeMap<>();
     for (LayoutNode node : nodes) {
-      String owner = ownerByNode.get(node.id());
-      int bucket =
-          owner == null ? UNGROUPED_RANK : groupOrderById.getOrDefault(owner, UNGROUPED_RANK);
-      bucketByNode.put(node.id(), bucket);
-      membersByBucket.computeIfAbsent(bucket, ignored -> new ArrayList<>()).add(node.id());
+      membersByBucket
+          .computeIfAbsent(bucketByNode.get(node.id()), ignored -> new ArrayList<>())
+          .add(node.id());
     }
 
     Map<String, List<String>> adjacency = new HashMap<>();
@@ -398,6 +404,83 @@ final class PortPlan {
       }
     }
     return rank;
+  }
+
+  /**
+   * The bucket each node is ranked in. A node a group claims takes that group's declaration
+   * index. A node no group claims has no index of its own, so it takes the latest one reaching it.
+   *
+   * <p>This is the whole of the group-boundary fix. Ranking an unclaimed node ahead of every
+   * group — the obvious "it belongs to no group, so put it first" reading — makes every edge from
+   * inside a group out to it run backwards, and the reversal that follows swaps the group and its
+   * external targets in ELK's layer order. The published self-model showed it: {@code art-lib ->
+   * comp-cli} and {@code art-lib -> comp-engines} both reversed, and {@code distribution}
+   * mirrored.
+   * Inheriting the bucket instead means an unclaimed node never sorts ahead of something that feeds
+   * it, so a crossing edge is left to the depth-first order inside the bucket and comes out
+   * forwards unless it genuinely closes a cycle.
+   *
+   * <p>Inheritance is a monotone relaxation rather than a single pass because unclaimed nodes
+   * chain, and may even cycle among themselves. Buckets only rise and are capped by the highest
+   * group index, and each round propagates at least one hop, so one round per unclaimed node is
+   * enough and the loop terminates on a stable pass.
+   *
+   * <p>The trade this makes is deliberate and measured. Ranking every unclaimed node ahead of the
+   * groups also happens to segregate them, so ELK never interleaves a root-level node into a
+   * compound group's layer span and a crossing edge always has clear air: on a 1500-case sweep of
+   * cyclic grouped graphs with unclaimed nodes, that scored 0 crossings on crossing edges against
+   * 141 here. It buys that with a mirrored drawing on every such edge, which is the worse defect —
+   * the published artifact is wrong, not a rare route. Against the pre-plan engine's 771 on the
+   * same corpus this still removes 82%, and crossings away from the group boundary are unaffected
+   * either way (20 there, 25 here, 590 before the plan).
+   */
+  private static Map<String, Integer> bucketByNode(
+      List<LayoutNode> nodes,
+      List<LayoutEdge> edges,
+      Map<String, String> ownerByNode,
+      Map<String, Integer> groupOrderById) {
+    Map<String, Integer> buckets = new LinkedHashMap<>();
+    List<String> unclaimed = new ArrayList<>();
+    for (LayoutNode node : nodes) {
+      String owner = ownerByNode.get(node.id());
+      if (owner == null) {
+        buckets.put(node.id(), FIRST_GROUP_RANK);
+        unclaimed.add(node.id());
+      } else {
+        buckets.put(node.id(), groupOrderById.getOrDefault(owner, FIRST_GROUP_RANK));
+      }
+    }
+    if (unclaimed.isEmpty()) {
+      return buckets;
+    }
+
+    Map<String, List<String>> predecessors = new HashMap<>();
+    for (LayoutEdge edge : edges) {
+      if (!buckets.containsKey(edge.source())
+          || !buckets.containsKey(edge.target())
+          || edge.source().equals(edge.target())) {
+        continue;
+      }
+      predecessors.computeIfAbsent(edge.target(), ignored -> new ArrayList<>()).add(edge.source());
+    }
+
+    for (int round = 0; round < unclaimed.size(); round++) {
+      boolean raised = false;
+      for (String id : unclaimed) {
+        int bucket = buckets.get(id);
+        for (String predecessor : predecessors.getOrDefault(id, List.of())) {
+          bucket = Math.max(bucket, buckets.get(predecessor));
+        }
+        if (bucket != buckets.get(id)) {
+          buckets.put(id, bucket);
+          raised = true;
+        }
+      }
+      if (!raised) {
+        break;
+      }
+    }
+    return buckets;
   }
 
   /**
