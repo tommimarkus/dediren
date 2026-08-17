@@ -172,6 +172,28 @@ enforcement authority for how wide a change may reach.
   `## Repair Rules` entry or an internal-families extension.
 - ELK layout changes: update `engines/elk-layout`, CLI/distribution
   smoke coverage, and README/agent runtime notes together.
+- Anything that moves laid-out geometry ripples through four checked-in
+  artifact stages, and they must be regenerated **in this order** — each stage
+  is rendered from the previous one, so regenerating out of order bakes in
+  stale input:
+  1. `fixtures/layout-result/*.json` — `scripts/regen-layout-fixtures.sh`
+     (`LayoutFixtureFreshnessTest` is the always-on gate).
+  2. `engines/render/src/test/resources/golden/*.svg` —
+     `scripts/regen-render-goldens.sh`. Rendered *from* stage 1
+     (`RenderScenarios`), and `RenderGoldenTest` is the repo's only geometry
+     oracle, so read the diff rather than re-baselining blind.
+  3. `engines/render/src/paint-test/resources/raster-golden/` (PNGs +
+     `manifest.json`) — the opt-in `-Prender-paint` lane with
+     `-Ddediren.render.paint.regenerate-goldens=true`.
+  4. `docs/architecture/dediren.dediren/generated/` — the four published
+     self-model views and both exports, rebuilt with
+     `"$BUNDLE/bin/dediren" build --package docs/architecture/dediren.dediren/package.json`
+     from a bundle built from the working tree. **No test pins stage 4**, so it
+     goes stale silently while the README hero and the Pages site keep serving
+     it; check it explicitly rather than trusting a green build.
+  Pinned geometry literals in tests move with stage 1 too — `SequenceSelfMessageHookTest`
+  carries a `d=` path, and `LayoutQualityFixtureSweepTest` pins per-fixture
+  crossing counts.
 - Render policy changes: update `schemas/render-policy.schema.json`,
   `contracts`, render fixtures, `engines/render`, CLI render tests, and
   README examples together.
