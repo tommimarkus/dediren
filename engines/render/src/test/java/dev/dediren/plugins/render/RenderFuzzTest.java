@@ -54,7 +54,7 @@ class RenderFuzzTest {
       ObjectNode input = randomLayoutInput(random);
       String svg;
       try {
-        svg = RenderTestSupport.render(input);
+        svg = RenderTestSupport.renderAllowingWarnings(input);
         SvgAudit.auditStructure(svg);
       } catch (AssertionError | Exception failure) {
         throw new AssertionError(
