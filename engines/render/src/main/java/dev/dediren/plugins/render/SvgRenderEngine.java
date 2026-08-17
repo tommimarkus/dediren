@@ -18,7 +18,10 @@ import dev.dediren.engine.EngineResult;
 import dev.dediren.engine.RenderEngine;
 import dev.dediren.ir.LaidOutScene;
 import dev.dediren.ir.LaidOutSceneMapper;
+import dev.dediren.plugins.render.svg.Geometry;
+import dev.dediren.plugins.render.svg.LabelBox;
 import dev.dediren.uml.UmlValidationException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import tools.jackson.databind.JsonNode;
@@ -72,9 +75,11 @@ public final class SvgRenderEngine implements RenderEngine {
 
     String svg = renderSvg(layout, metadataOrNull, renderPolicy);
     List<RenderArtifact> artifacts = List.of(new RenderArtifact("svg", svg));
+    List<Diagnostic> diagnostics = new ArrayList<>();
+    diagnostics.addAll(notationProfileNotAppliedDiagnostics(metadataOrNull, renderPolicy));
+    diagnostics.addAll(edgeLabelOccludedDiagnostics(layout, metadataOrNull, renderPolicy));
     return new EngineResult<>(
-        new RenderResult(ContractVersions.RENDER_RESULT_SCHEMA_VERSION, artifacts),
-        notationProfileNotAppliedDiagnostics(metadataOrNull, renderPolicy));
+        new RenderResult(ContractVersions.RENDER_RESULT_SCHEMA_VERSION, artifacts), diagnostics);
   }
 
   /**
@@ -105,6 +110,47 @@ public final class SvgRenderEngine implements RenderEngine {
                 + " shapes, decorators and label placement are not applied; add"
                 + " semantic_profile to the render policy to render the notation",
             "policy.semantic_profile"));
+  }
+
+  /**
+   * Warns when a placed edge label's visible box still overlaps a node rect after placement. SVG
+   * paint order is group, then edge, then node, so a label left in that state is painted underneath
+   * the node and disappears — the sibling fallback in {@code EdgeRenderer} already picks the
+   * least-overlapping candidate it can find, but a crowded view can leave every candidate
+   * overlapping something. A warning rather than an error: the render still succeeds and produces
+   * well-formed SVG, but the agent needs to know a label is effectively invisible.
+   *
+   * <p>Reuses {@code SvgDocument.resolve} and {@code Geometry.nodeObstacleBoxes} rather than
+   * recomputing placement — see {@link PlacedScene} for why a second, independent geometry pass is
+   * the bug class this package guards against. UML sequence views take a different rendering lane
+   * ({@code UmlSequenceRenderer}) with no {@link PlacedScene} to inspect, so they are skipped here.
+   */
+  private static List<Diagnostic> edgeLabelOccludedDiagnostics(
+      LayoutResult layout, RenderMetadata metadataOrNull, RenderPolicy policy) {
+    if (UmlSequenceRenderer.isSequence(metadataOrNull)) {
+      return List.of();
+    }
+    PlacedScene scene = SvgDocument.resolve(layout, metadataOrNull, policy);
+    List<LabelBox> nodeBoxes = Geometry.nodeObstacleBoxes(layout);
+    List<Diagnostic> diagnostics = new ArrayList<>();
+    for (PlacedScene.PlacedEdge placedEdge : scene.edges()) {
+      PlacedScene.PlacedEdgeLabel label = placedEdge.label();
+      if (label == null || nodeBoxes.stream().noneMatch(label.visibleBox()::overlaps)) {
+        continue;
+      }
+      diagnostics.add(
+          new Diagnostic(
+              DiagnosticCode.RENDER_EDGE_LABEL_OCCLUDED.code(),
+              DiagnosticSeverity.WARNING,
+              "edge label \""
+                  + label.text()
+                  + "\" on edge "
+                  + placedEdge.edge().id()
+                  + " still overlaps a node after placement and may be painted underneath it,"
+                  + " making the label invisible",
+              "edges[" + placedEdge.edge().id() + "].label"));
+    }
+    return diagnostics;
   }
 
   private static EngineException failure(String code, String message, String path) {

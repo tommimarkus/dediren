@@ -72,6 +72,42 @@ class SvgRenderEngineTest {
   }
 
   @Test
+  void renderWarnsWhenAnEdgeLabelStillOverlapsANodeAfterPlacement() throws Exception {
+    byte[] input =
+        renderInputWithLayout(overlappingLabelLayout(), "fixtures/render-policy/default-svg.json");
+    SvgRenderEngine.ParsedInput parsed = engine.parseInput(input);
+
+    EngineResult<?> result =
+        engine.render(
+            LaidOutSceneMapper.toScene(parsed.layoutResult()),
+            parsed.policy(),
+            parsed.renderMetadata());
+
+    assertThat(result.diagnostics())
+        .anySatisfy(
+            diagnostic -> {
+              assertThat(diagnostic.code()).isEqualTo("DEDIREN_RENDER_EDGE_LABEL_OCCLUDED");
+              assertThat(diagnostic.severity().toString()).isEqualTo("WARNING");
+            });
+  }
+
+  @Test
+  void renderPublishesNoLabelOcclusionDiagnosticForAClearView() throws Exception {
+    byte[] input =
+        renderInput("fixtures/layout-result/basic.json", "fixtures/render-policy/default-svg.json");
+    SvgRenderEngine.ParsedInput parsed = engine.parseInput(input);
+
+    EngineResult<?> result =
+        engine.render(
+            LaidOutSceneMapper.toScene(parsed.layoutResult()),
+            parsed.policy(),
+            parsed.renderMetadata());
+
+    assertThat(result.diagnostics())
+        .noneMatch(diagnostic -> diagnostic.code().equals("DEDIREN_RENDER_EDGE_LABEL_OCCLUDED"));
+  }
+
+  @Test
   void renderRejectsInvalidPolicyWithPolicyInvalidCode() throws Exception {
     byte[] input =
         invalidPolicyInput(
@@ -116,6 +152,59 @@ class SvgRenderEngineTest {
     input.set("layout_result", fixtureJson(layoutPath));
     input.set("policy", fixtureJson(policyPath));
     return JsonSupport.objectMapper().writeValueAsString(input).getBytes(StandardCharsets.UTF_8);
+  }
+
+  private static byte[] renderInputWithLayout(JsonNode layout, String policyPath) throws Exception {
+    ObjectNode input = JsonSupport.objectMapper().createObjectNode();
+    input.set("layout_result", layout);
+    input.set("policy", fixtureJson(policyPath));
+    return JsonSupport.objectMapper().writeValueAsString(input).getBytes(StandardCharsets.UTF_8);
+  }
+
+  /**
+   * A two-node view whose edge label has nowhere clear to land: a third node's box spans the whole
+   * area around the edge's midpoint, so every placement candidate the least-overlap fallback tries
+   * still overlaps it. Deliberately not a checked-in fixture — this shape exists only to exercise
+   * the occlusion diagnostic, not to pin geometry.
+   */
+  private static JsonNode overlappingLabelLayout() throws Exception {
+    String json =
+        """
+        {
+          "layout_result_schema_version": "layout-result.schema.v2",
+          "view_id": "main",
+          "nodes": [
+            {
+              "id": "client", "source_id": "client", "projection_id": "client",
+              "x": 12.0, "y": 12.0, "width": 160.0, "height": 80.0, "label": "Client",
+              "source_pointer": "/nodes/0"
+            },
+            {
+              "id": "api", "source_id": "api", "projection_id": "api",
+              "x": 254.0, "y": 12.0, "width": 160.0, "height": 80.0, "label": "API",
+              "source_pointer": "/nodes/1"
+            },
+            {
+              "id": "blocker", "source_id": "blocker", "projection_id": "blocker",
+              "x": 0.0, "y": -200.0, "width": 600.0, "height": 500.0, "label": "Blocker",
+              "source_pointer": "/nodes/2"
+            }
+          ],
+          "edges": [
+            {
+              "id": "client-calls-api", "source": "client", "target": "api",
+              "source_id": "client-calls-api", "projection_id": "client-calls-api",
+              "routing_hints": [],
+              "points": [ { "x": 172.0, "y": 52.0 }, { "x": 254.0, "y": 52.0 } ],
+              "label": "calls",
+              "source_pointer": "/relationships/0"
+            }
+          ],
+          "groups": [],
+          "warnings": []
+        }
+        """;
+    return JsonSupport.objectMapper().readTree(json);
   }
 
   private static byte[] invalidPolicyInput(String layoutPath, String policyPath) throws Exception {
