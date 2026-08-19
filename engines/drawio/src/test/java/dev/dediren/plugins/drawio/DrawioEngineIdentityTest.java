@@ -6,10 +6,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import org.junit.jupiter.api.Test;
 
 /**
- * Both draw.io engines are skeletons in this step: the engine id and the exporter's artifact kind
- * are already the published contract, but neither body is implemented yet, so a call refuses
- * outright. It refuses as an {@link UnsupportedOperationException} rather than a diagnostic code,
- * so the scaffold adds no dead entry to the published {@code DEDIREN_DRAWIO_*} vocabulary.
+ * The published identity of the draw.io lane: one engine id under two capabilities, and the
+ * exporter's artifact kind. The exporter's own behaviour is covered by {@code
+ * DrawioExportEngineTest}; the importer is still a skeleton and refuses as an {@link
+ * UnsupportedOperationException} rather than a diagnostic code, so the scaffold adds no dead entry
+ * to the published {@code DEDIREN_DRAWIO_*} vocabulary.
  */
 class DrawioEngineIdentityTest {
   private final DrawioExportEngine exportEngine = new DrawioExportEngine();
@@ -24,12 +25,6 @@ class DrawioEngineIdentityTest {
   @Test
   void theExporterPublishesTheDrawioXmlArtifactKind() {
     assertThat(DrawioExportEngine.ARTIFACT_KIND).isEqualTo("drawio+xml");
-  }
-
-  @Test
-  void theExporterSkeletonRefusesInsteadOfReturningAnEmptyArtifact() {
-    assertThatThrownBy(() -> exportEngine.export(null, null, null))
-        .isInstanceOf(UnsupportedOperationException.class);
   }
 
   @Test

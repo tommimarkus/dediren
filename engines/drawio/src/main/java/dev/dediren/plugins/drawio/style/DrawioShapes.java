@@ -50,6 +50,18 @@ public final class DrawioShapes {
     return TABLE.getOrDefault(elementType, FALLBACK);
   }
 
+  /**
+   * Whether the table covers {@code elementType} at all.
+   *
+   * <p>Separate from {@link #shapeFor} because the fallback is a real, usable shape and not an
+   * error signal: the exporter still draws the element, and only needs to know whether to say so.
+   * Comparing a returned shape against the fallback would work today and stop working the moment a
+   * table entry happened to be a plain rounded box.
+   */
+  public static boolean isMapped(String elementType) {
+    return TABLE.containsKey(elementType);
+  }
+
   private static Map<String, DrawioShape> buildTable() {
     var table = new LinkedHashMap<String, DrawioShape>();
 

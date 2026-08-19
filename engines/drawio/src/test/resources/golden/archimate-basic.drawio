@@ -1,0 +1,30 @@
+<mxfile host="dediren">
+  <diagram id="main" name="Main">
+    <mxGraphModel>
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <object dedirenType="dediren.view" dedirenViewId="main" dedirenViewKind="archimate" dedirenSemanticProfile="archimate" dedirenModelSchemaVersion="model.schema.v1" id="dediren-view">
+          <mxCell style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;" vertex="1" parent="1" visible="0">
+            <mxGeometry as="geometry"/>
+          </mxCell>
+        </object>
+        <object label="Orders Component" dedirenId="orders-component" dedirenType="ApplicationComponent" dedirenSemanticSourceId="orders-component" id="orders-component">
+          <mxCell style="html=1;outlineConnect=0;whiteSpace=wrap;shape=mxgraph.archimate3.application;appType=comp;archiType=square;fillColor=#e0f2fe;strokeColor=#0369a1;fontColor=#0c4a6e;" vertex="1" parent="1">
+            <mxGeometry x="12" y="12" width="160" height="80" as="geometry"/>
+          </mxCell>
+        </object>
+        <object label="Orders Service" dedirenId="orders-service" dedirenType="ApplicationService" dedirenSemanticSourceId="orders-service" id="orders-service">
+          <mxCell style="html=1;outlineConnect=0;whiteSpace=wrap;shape=mxgraph.archimate3.application;appType=serv;archiType=rounded;fillColor=#e0f2fe;strokeColor=#0369a1;fontColor=#0c4a6e;" vertex="1" parent="1">
+            <mxGeometry x="254" y="12" width="160" height="80" as="geometry"/>
+          </mxCell>
+        </object>
+        <object label="realizes" dedirenId="orders-realizes-service" dedirenType="Realization" dedirenSemanticSourceId="orders-realizes-service" dedirenSource="orders-component" dedirenTarget="orders-service" id="orders-realizes-service">
+          <mxCell style="edgeStyle=none;rounded=0;html=1;" edge="1" parent="1" source="orders-component" target="orders-service">
+            <mxGeometry relative="1" as="geometry"/>
+          </mxCell>
+        </object>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
