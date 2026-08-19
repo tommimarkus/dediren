@@ -67,8 +67,8 @@ public final class DedirenMcpServer {
                 Tool.builder()
                     .name("dediren_import")
                     .description(
-                        "Import workspace-confined or inline Mermaid/DOT notation into"
-                            + " model.schema.v1 generic-graph source JSON. output 'data'"
+                        "Import workspace-confined or inline Mermaid/DOT/draw.io® notation"
+                            + " into model.schema.v1 generic-graph source JSON. output 'data'"
                             + " returns the standard envelope; output 'svg' forces SVG while"
                             + " output 'image' negotiates optional SVG or PNG media. Read-only"
                             + " and writes no files.")

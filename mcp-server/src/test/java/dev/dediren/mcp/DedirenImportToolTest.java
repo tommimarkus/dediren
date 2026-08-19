@@ -97,9 +97,38 @@ class DedirenImportToolTest {
     JsonNode schema = JsonSupport.objectMapper().readTree(ToolSchemas.IMPORT);
 
     assertThat(textValues(schema.path("required"))).containsExactly("plugin");
-    assertThat(textValues(schema.at("/properties/plugin/enum"))).containsExactly("mermaid", "dot");
+    assertThat(textValues(schema.at("/properties/plugin/enum")))
+        .containsExactly("mermaid", "dot", "drawio");
     assertThat(schema.path("oneOf")).hasSize(2);
     assertThat(schema.at("/properties/content/type").asText()).isEqualTo("string");
+  }
+
+  @Test
+  void importRejectsAnUnknownPluginWithAMessageThatAgreesWithTheSchemaEnum(@TempDir Path root) {
+    JsonNode schema = JsonSupport.objectMapper().readTree(ToolSchemas.IMPORT);
+    List<String> advertisedPlugins = textValues(schema.at("/properties/plugin/enum"));
+
+    DedirenTools tools =
+        new DedirenTools(
+            root,
+            Engines.of(
+                List.of(), List.of(), List.of(), List.of(), List.of(new StubMermaidImporter())),
+            Map.of());
+
+    var result =
+        tools.importSource(
+            new CallToolRequest(
+                "dediren_import", Map.of("content", "flowchart TD\nA --> B\n", "plugin", "bogus")));
+
+    assertThat(result.isError()).isTrue();
+    JsonNode envelope =
+        JsonSupport.objectMapper().readTree(((TextContent) result.content().getFirst()).text());
+    assertThat(envelope.at("/diagnostics/0/code").asText())
+        .isEqualTo("DEDIREN_COMMAND_INPUT_INVALID");
+    String message = envelope.at("/diagnostics/0/message").asText();
+    for (String plugin : advertisedPlugins) {
+      assertThat(message).as("rejection message must name '%s'", plugin).contains(plugin);
+    }
   }
 
   @Test
