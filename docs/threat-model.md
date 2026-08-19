@@ -196,6 +196,14 @@ style key, and on an `imageBackground` URL (every one of which is a resource
 load); on an embedded `shape=stencil(...)` definition, which is a second nested
 compressed payload Dediren refuses to decode at all; and on label HTML beyond the
 exact `<br>`, `<br/>`, `<br />` family, identical to the Mermaid importer's rule.
+One boundary of that list is worth stating rather than leaving implied: it enumerates
+**cell-level** content. `<diagram>` and `<mxGraphModel>` attributes — where a page
+background image or URL would live — are counted against the byte ceiling but never
+extracted into the reader's model at all, so they cannot reach the produced document
+and cannot reach the refusal scan either. Inert by omission rather than by refusal;
+a future draw.io attribute at that level with resource-loading semantics would pass
+unexamined and would need its own entry.
+
 Geometry, styling and routing are discarded outright — `schemas/model.schema.json`'s
 `sourceNode` is `additionalProperties: false` with no coordinates, and every import
 lane re-lays the page out with ELK — so no attacker-supplied number or style string

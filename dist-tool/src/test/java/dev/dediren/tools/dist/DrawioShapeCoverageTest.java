@@ -75,10 +75,17 @@ class DrawioShapeCoverageTest {
     return matchAll(declaration, "\"([A-Z][A-Za-z]+)\"");
   }
 
-  /** The {@code table.put("Type", ...)} keys in {@code file}, in the order they are written. */
+  /**
+   * The {@code table.put("Type", ...)} keys in {@code file}, in the order they are written.
+   *
+   * <p>The {@code \s*} after {@code put(} is load-bearing: google-java-format wraps a long {@code
+   * put(} call onto the following line, and a pattern anchored on {@code put("} would then see only
+   * the entries that happen to fit on one line and silently read a short table. The sibling {@code
+   * DrawioNotationCoverageTest} hit exactly that and carries the same tolerance.
+   */
   private static List<String> tablePutKeysInOrder(Path file) throws IOException {
     String source = Files.readString(repoRoot().resolve(file), StandardCharsets.UTF_8);
-    return matchAll(source, "table\\.put\\(\"([A-Z][A-Za-z]+)\"");
+    return matchAll(source, "table\\.put\\(\\s*\"([A-Z][A-Za-z]+)\"");
   }
 
   /** The element-type keys of the shipped policy's {@code node_type_overrides} object. */

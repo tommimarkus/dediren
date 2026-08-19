@@ -482,6 +482,11 @@ public final class DrawioSourceMapper {
         throw roundTripInvalid(
             ATTR_LAYOUT_PREFERENCES
                 + " is not a readable layout_preferences object: "
+                // Jackson's message is echoed where MxReader deliberately withholds the JDK's XML
+                // one:
+                // the XML parser quotes the document including any system identifier, whereas a
+                // Jackson parse message carries no path or identifier — only the attacker's own
+                // bytes, already bounded by echo()'s 80-character truncation.
                 + echo(unreadable.getOriginalMessage()),
             scan,
             scan.metadata);
@@ -509,6 +514,11 @@ public final class DrawioSourceMapper {
       throw roundTripInvalid(
           ATTR_ELEMENT_PROPERTIES
               + " is not readable JSON: "
+              // Jackson's message is echoed where MxReader deliberately withholds the JDK's XML
+              // one:
+              // the XML parser quotes the document including any system identifier, whereas a
+              // Jackson parse message carries no path or identifier — only the attacker's own
+              // bytes, already bounded by echo()'s 80-character truncation.
               + echo(unreadable.getOriginalMessage()),
           scan,
           scan.metadata);

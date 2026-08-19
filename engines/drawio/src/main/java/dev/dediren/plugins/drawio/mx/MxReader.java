@@ -212,7 +212,17 @@ public final class MxReader {
 
   // ---------------------------------------------------------------- one page's cells
 
-  /** Reads one {@code <mxGraphModel>} body; the reader is positioned on its start tag. */
+  /**
+   * Reads one {@code <mxGraphModel>} body; the reader is positioned on its start tag.
+   *
+   * <p>Its attributes are counted against the byte ceiling but deliberately **not** extracted —
+   * nothing downstream models a page-level property, so a page background image or URL set through
+   * File ▸ Page Setup never reaches {@code MxDiagram} and therefore cannot reach the produced
+   * document. That is inert by omission rather than by refusal, which is worth stating because
+   * every other discard in this lane is refused or diagnosed explicitly: if draw.io ever gives a
+   * {@code <diagram>} or {@code <mxGraphModel>} attribute resource-loading semantics, it would pass
+   * unexamined here instead of tripping the cell-level unsupported-construct scan.
+   */
   private List<MxCell> readGraphModel(XMLStreamReader reader) throws EngineException {
     checkAttributeBytes(reader);
     List<MxCell> pageCells = new ArrayList<>();
