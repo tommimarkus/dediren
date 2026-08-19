@@ -102,7 +102,11 @@ import tools.jackson.databind.JsonNode;
 public final class DrawioDocumentBuilder {
 
   /** The built document and everything the build has to disclose about it. */
-  public record Document(MxFile file, List<Diagnostic> diagnostics) {}
+  public record Document(MxFile file, List<Diagnostic> diagnostics) {
+    public Document {
+      diagnostics = diagnostics == null ? List.of() : List.copyOf(diagnostics);
+    }
+  }
 
   /** mxGraph's two structural cells: every page opens with a root and a default layer. */
   private static final String ROOT_CELL_ID = "0";

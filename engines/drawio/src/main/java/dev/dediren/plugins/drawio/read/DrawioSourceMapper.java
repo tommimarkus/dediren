@@ -141,7 +141,11 @@ public final class DrawioSourceMapper {
   private static final int LIST_LIMIT = 24;
 
   /** The mapper's product: the document, plus the diagnostics that ride the success envelope. */
-  public record MappingResult(SourceDocument document, List<Diagnostic> diagnostics) {}
+  public record MappingResult(SourceDocument document, List<Diagnostic> diagnostics) {
+    public MappingResult {
+      diagnostics = diagnostics == null ? List.of() : List.copyOf(diagnostics);
+    }
+  }
 
   private final int maxElements;
   private final Map<String, SourceNode> nodes = new LinkedHashMap<>();

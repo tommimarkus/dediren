@@ -43,6 +43,7 @@
       <Class name="dev.dediren.contracts.analysis.StatusResult"/>
       <Class name="dev.dediren.contracts.export.OefExportPolicy"/>
       <Class name="dev.dediren.contracts.export.UmlXmiExportPolicy"/>
+      <Class name="dev.dediren.contracts.export.DrawioExportPolicy"/>
       <Class name="dev.dediren.contracts.render.RenderMetadata"/>
       <Class name="dev.dediren.contracts.render.RenderResult"/>
       <Class name="dev.dediren.contracts.render.SvgStylePolicy"/>
@@ -71,6 +72,20 @@
       <Bug pattern="EI_EXPOSE_REP"/>
       <Bug pattern="EI_EXPOSE_REP2"/>
     </Or>
+  </Match>
+
+  <!-- EI_EXPOSE_REP on MxObject.attributes only. The other draw.io records inline
+       List.copyOf, which SpotBugs models, so they need no entry here. This one
+       cannot: the writer emits mxGraph attributes in iteration order and the
+       round-trip test asserts byte equality between d1 and d2, so the map must
+       preserve insertion order. Map.copyOf does not — its iteration order is
+       salted per JVM, which already caused a real cross-JVM byte-equality defect
+       in this lane. Collections.unmodifiableMap(new LinkedHashMap<>(..)) is
+       therefore the only correct construction, and SpotBugs does not model it as
+       a copy. The exposed map is genuinely immutable. -->
+  <Match>
+    <Class name="dev.dediren.plugins.drawio.mx.MxObject"/>
+    <Bug pattern="EI_EXPOSE_REP"/>
   </Match>
 
   <!-- EI_EXPOSE_REP / EI_EXPOSE_REP2: the engine-api value types follow the

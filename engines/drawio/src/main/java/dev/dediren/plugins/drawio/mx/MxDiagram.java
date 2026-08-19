@@ -1,6 +1,5 @@
 package dev.dediren.plugins.drawio.mx;
 
-import dev.dediren.contracts.util.ContractCollections;
 import java.util.List;
 
 /**
@@ -17,6 +16,9 @@ import java.util.List;
 public record MxDiagram(String id, String name, boolean compressed, List<MxCell> cells) {
 
   public MxDiagram {
-    cells = ContractCollections.listOrEmpty(cells);
+    // List.copyOf inline rather than ContractCollections.listOrEmpty (which is exactly this):
+    // SpotBugs models the JDK factory and not the helper, so inlining removes an EI_EXPOSE_REP
+    // suppression instead of adding one.
+    cells = cells == null ? List.of() : List.copyOf(cells);
   }
 }

@@ -1,6 +1,7 @@
 package dev.dediren.plugins.drawio.mx;
 
-import dev.dediren.contracts.util.ContractCollections;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 
@@ -27,6 +28,12 @@ public record MxObject(String elementName, Map<String, String> attributes) {
 
   public MxObject {
     Objects.requireNonNull(elementName, "elementName");
-    attributes = ContractCollections.mapOrEmpty(attributes);
+    // Insertion order is load-bearing — the writer emits attributes in iteration order and the
+    // round trip asserts byte equality, so Map.copyOf (JVM-salted iteration) must not be used
+    // here even though SpotBugs would model it.
+    attributes =
+        attributes == null
+            ? Map.of()
+            : Collections.unmodifiableMap(new LinkedHashMap<>(attributes));
   }
 }
