@@ -405,14 +405,27 @@ that map and fails when one starts passing, so the list can only shrink
 deliberately — an exclusion that has quietly started working is a lie the suite
 refuses to keep. Read the map, not a number copied out of it.
 
-The residual behind those exclusions has one root cause: mxGraph has nowhere of
-its own to keep an element's `properties`. It shows up two ways — a model missing
-a *required* UML ownership property (`Port.component`, `ExtensionPoint.use_case`,
-`Transition.region`, `ExecutionSpecification.covered`) is rejected by `project`
-before a second export can happen, while a model that stays valid but loses
-`uml.attributes` / `uml.operations` / `uml.covered` comes back as the same graph
-drawn at different coordinates, because those are what size a Class box and shape
-a sequence fragment's layout intents.
+Two distinct residual classes turn up in that map, and they need different
+remedies. The first is that mxGraph has nowhere of its own to keep an element's
+`properties`, which bites twice: a model missing a *required* UML ownership
+property (`Port.component`, `ExtensionPoint.use_case`, `Transition.region`,
+`ExecutionSpecification.covered`) is rejected by `project` before a second export
+can happen, and a model that stays valid but loses `uml.attributes` /
+`uml.operations` comes back as the same graph drawn at different coordinates,
+because those are what size a Class box. That whole class is carried by a
+per-element property map on the page's hidden metadata cell — hidden rather than
+on each element's own wrapper, because draw.io's Edit Data dialog would otherwise
+show raw model JSON to whoever right-clicks a shape.
+
+The second class no property channel can reach. A `.drawio` is a picture of a
+*layout result*, so a view member the layout gives no geometry has no cell, and
+an element with no cell is not in the file at all — its properties included.
+`CombinedFragment` and `InteractionOperand` are the live example: the notation
+layer consumes them to size the interaction frame and emits no box of their own,
+so the re-imported view declares fewer nodes than the original and the frame
+comes back shorter. Closing that means either inventing geometry the exporter
+deliberately never invents, or adding a second identity channel for view members
+no page draws — a separate decision, not taken.
 
 A **foreign** file — one Dediren never produced — carries none of that
 vocabulary, so only structure survives: it imports as the `generic-graph` profile
