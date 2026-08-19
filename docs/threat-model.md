@@ -67,8 +67,11 @@ elements, each failing as a clean `DEDIREN_INPUT_FILE_TOO_LARGE` /
 wedged layout run. The resource-exhaustion row in the attacker-goals table
 records what deliberately stays unbounded.
 
-Mermaid and DOT import add attacker-controlled text grammars without adding a
-runtime, network fetch, external resource load, or copied parser. The native
+Mermaid and DOT import add attacker-controlled *text* grammars without adding a
+runtime, network fetch, external resource load, or copied parser. (draw.io
+import keeps those four properties but is not a text grammar: it adds an
+attacker-controlled XML grammar and an attacker-controlled compressed payload,
+so it has its own trust-boundary section below.) The native
 iterative Mermaid parser assembles only bounded logical statements and treats
 exact, label-only `<br>`, `<br/>`, and `<br />` spellings as newline data; every
 other tag, attribute, URL/resource, interactive directive, unsupported edge
@@ -87,11 +90,134 @@ model schema plus the `SourceLimits` ceilings — before publishing it; the
 importer remains authoritative for its own parse diagnostics. See the
 import row in the attacker-goals table.
 
+### draw.io import (attacker-controlled XML + compressed page payloads)
+
+`dediren import --plugin drawio`, and the `drawio` plugin on the MCP
+`dediren_import` tool, is the only lane that takes attacker-supplied **XML as
+diagram input** (the schema-path env overrides in the schema-cache boundary
+below are operator configuration, not input). It adds no runtime, no network
+fetch, no external resource load, and
+no copied parser — the reader is first-party
+(`engines/drawio/.../mx/MxReader.java`) over the JDK's StAX API — but a single
+`.drawio` file presents *two* attacker-controlled documents, and one of them
+arrives compressed.
+
+**What the hardening actually does** (`engine-api/.../SecureXml.java`, one
+implementation because engines may not depend on each other and a drifted XML
+reader is an XXE, not a cosmetic inconsistency). Every call returns a fresh
+`XMLInputFactory`, which is mutable and not documented as thread-safe, so a
+shared instance could be reconfigured — including un-hardened — by any holder.
+
+- `SUPPORT_DTD = false` does **not** reject a document carrying a `DOCTYPE`. On
+  the JDK StAX implementation the declaration is parsed and reported as an inert
+  `DTD` event: nothing external is fetched and no entity is declared. Refusal
+  happens one step later, when the document *references* an entity the DTD would
+  have declared — the parse then fails outright rather than being bounded the way
+  the JDK's 64000-expansion limit bounds it. A document with an external DTD and
+  no entity reference therefore parses cleanly. That is a recorded decision, not
+  an oversight: `MxReaderTest.acceptsADoctypeThatReferencesNothing` documents that
+  a DTD-event check was tried and reverted, because refusing the declaration up
+  front means the parse never reaches the entity reference — the only observable
+  that distinguishes a hardened inner factory from a default one — and would leave
+  the "default factory on the inner parse only" mutant alive. Changing this posture
+  changes that test and this page together.
+- `FEATURE_SECURE_PROCESSING` is **not an active control here**. The JDK's own
+  `XMLInputFactoryImpl` does not support it on `XMLInputFactory` and throws
+  `IllegalArgumentException`, so it is set only behind an `isPropertySupported`
+  guard and is a no-op on the shipped runtime. It is kept solely because
+  `XMLInputFactory.newFactory()` performs a `ServiceLoader` lookup, so a
+  third-party StAX provider on the classpath would be hardened too.
+- The throwing `XMLResolver` is **not decoration**. It never fires in the shipped
+  configuration, but mutation testing shows that with `SUPPORT_DTD` re-enabled it
+  is what refuses the external DTD subset and external parameter entities. It is
+  the real second line. `IS_SUPPORTING_EXTERNAL_ENTITIES` and
+  `IS_REPLACING_ENTITY_REFERENCES` are the weakest members of the set —
+  `SUPPORT_DTD = false` masks both, so no payload can tell whether they are set —
+  and are layered defence only. `IS_COALESCING` is a functional requirement (a
+  compressed page body must arrive as one `CHARACTERS` event), not a defensive one.
+- No hardened `DocumentBuilderFactory` lives in `SecureXml`: nothing on a
+  production path DOM-parses untrusted input, and an unused factory would be an
+  untested attack surface.
+
+**The decompressed payload is a second, fully independent document.** It gets its
+own `SecureXml.inputFactory()`; parsing it with a default factory would switch off
+every control the outer parse applies, for the half of the format a reviewer cannot
+read. `MxReaderTest` pins that with a mutation proof — the same payload is shown to
+be *accepted* by a default `XMLInputFactory` and refused by the hardened one, so the
+refusal is demonstrably caused by the inner factory — plus a real exfiltration test
+that writes a secret to disk, references it through an entity inside a compressed
+page, and asserts the secret appears in neither the diagnostic message nor its path.
+
+**Decompression is bounded during the inflate, not after it.** draw.io writes a
+page as percent-encoded UTF-8 XML → raw DEFLATE → base64. `MxDeflate` raw-inflates
+through a running byte counter and aborts inside the loop the moment the budget is
+exhausted (`DEDIREN_DRAWIO_DECOMPRESSED_TOO_LARGE`), so at most one 64 KiB chunk
+beyond the ceiling is ever held; inflating into an unbounded buffer and measuring
+afterwards is the bomb going off before the alarm. The budget equals the 64 MiB
+input ceiling and is a **running total across every page of the document**, not a
+per-page allowance — compressed input therefore buys an attacker no more budget
+than an uncompressed file, where a per-page cap of that size would admit 256 ×
+64 MiB. Base64 text over the input ceiling is refused *before* being decoded into a
+byte array (`DEDIREN_DRAWIO_INPUT_TOO_LARGE`). **There is deliberately no
+compression-ratio cap**: raw DEFLATE tops out near 1032:1, so the absolute byte
+ceiling already bounds the worst case, and a ratio cap would add a second tunable
+and a second diagnostic code without bounding anything the byte ceiling does not.
+Percent-decoding is hand-rolled `decodeURIComponent` semantics (`URLDecoder` maps
+`+` to a space and would corrupt labels) and can only shrink the payload, so it
+needs no budget of its own. Bad base64, a malformed DEFLATE stream, a truncated
+stream, and a malformed percent escape are all `DEDIREN_DRAWIO_DECOMPRESSION_FAILED`.
+
+**Which ceilings abort mid-parse, and which do not.** Pages (256), cells (200000,
+counted across the whole document rather than per page for the same reason the
+decompression budget is) and per-attribute bytes (64 KiB) are counted as the
+streaming walk proceeds and abort it in place — which is why the reader streams
+rather than materializing a tree first. `MxReaderTest` proves that for the page
+ceiling by putting a syntax error after the 257th page and asserting the
+page-limit code, which is only reachable if the count aborts before the reader
+gets there. The attribute check also runs on elements the reader skips, because a
+ceiling that depends on where in the tree an attacker puts the payload is not a
+ceiling. **Nesting is the exception, and knowingly so**: containment in this
+format is the `parent` attribute and a parent may be declared *after* its child,
+so a cell's depth is not knowable at the moment the cell is read. Depth is
+resolved in one memoized pass at the end of each page, over a cell set the cell
+ceiling has already bounded — bounded, therefore, but not mid-parse; the same
+pass refuses a cycle on the step that closes it and a parent no cell on the page
+declares. Produced elements (100000) are the mapper's post-parse ceiling, held at
+or below `SourceLimits.maxElements()` on purpose so an over-large document is
+refused by the importer's own exit-2 `DEDIREN_DRAWIO_ELEMENT_LIMIT_EXCEEDED`
+rather than misreported by core's exit-3 re-gate. Failures are atomic: the caller
+receives a complete document or an exception, never a prefix.
+
+**Content refusals are what keep "no external resource load" true** rather than
+merely usually true. The mapper fails the whole import with
+`DEDIREN_DRAWIO_UNSUPPORTED_CONSTRUCT` on a `link` or `linkTarget` attribute (the
+format's one way of reaching outside the file); on `shape=image` or any `image`
+style key, and on an `imageBackground` URL (every one of which is a resource
+load); on an embedded `shape=stencil(...)` definition, which is a second nested
+compressed payload Dediren refuses to decode at all; and on label HTML beyond the
+exact `<br>`, `<br/>`, `<br />` family, identical to the Mermaid importer's rule.
+Geometry, styling and routing are discarded outright — `schemas/model.schema.json`'s
+`sourceNode` is `additionalProperties: false` with no coordinates, and every import
+lane re-lays the page out with ELK — so no attacker-supplied number or style string
+reaches layout or render.
+
+**Diagnostics and regression cover.** Attacker-supplied fragments echoed into a
+published diagnostic are truncated to 80 characters, and the JDK's own XML error
+text is never echoed because it quotes the document including any system
+identifier. `DrawioImportFuzzTest` (Jazzer, deterministic regression over a
+checked-in corpus that includes malformed XML, a DOCTYPE, a deeply-nested parent
+chain, a compressed page, a truncated base64 payload and a cyclic parent chain)
+pins the seam invariant: arbitrary bytes either yield a valid `SourceDocument` or
+fail atomically at exit 2 with exactly one `DEDIREN_DRAWIO_*` diagnostic.
+`SourceValidator.gateImportedDocument` re-gates this importer's output exactly as
+it does the other two.
+
 ### Single-JVM engine runtime (no plugin execution surface)
 
 The runtime is a single JVM with no plugin discovery or execution surface:
-the bundled first-party engines (`mermaid`, `generic-graph`, `elk-layout`, `render`,
-`archimate-oef`, `uml-xmi`) are compile-time library modules behind the
+the bundled first-party engines (`mermaid`, `dot`, `drawio`, `generic-graph`,
+`elk-layout`, `render`, `archimate-oef`, `uml-xmi`) are compile-time library
+modules behind the
 `engine-api` interfaces, constructed explicitly in one named cli class
 (`cli/.../EngineWiring.java`) and dispatched in-process by `core`'s
 `EngineDispatch` (`core/.../engine/EngineDispatch.java`). Core never resolves
@@ -266,6 +392,12 @@ The offline overrides `DEDIREN_XMI_SCHEMA_PATH` / `DEDIREN_OEF_SCHEMA_DIR` bypas
 SHA-256 check by design — they only require the supplied file to be non-empty.
 
 ### XML parsing & schema validation
+
+This section covers XML the product **generated itself** and then re-reads to
+validate. Attacker-supplied XML arriving as *input* is a different trust context
+with a different factory — see the draw.io import boundary above, whose reader
+uses the hardened StAX `SecureXml.inputFactory()`; the DOM factory below is never
+pointed at untrusted input.
 
 Generated UML/XMI XML is parsed with a hardened `DocumentBuilderFactory`
 (`SchemaValidation.secureXmiDocumentBuilderFactory()`): DOCTYPE declarations
@@ -449,8 +581,9 @@ ceiling trips if shrinking or attribute stripping silently degrades.
 | Shipped `THIRD-PARTY-NOTICES.md` misstates an upstream licence after a dependency bump, or a bump drags in a licence outside the approved set | cli's `license-maven-plugin` execution resolves every runtime dependency's effective-pom licence, normalizes it, and gates it against an approved allowlist; `DistTool` refuses to write notices when its hand-curated attribution map disagrees with that resolved report or the report is stale (`resolved-licence-report`, dist lanes) | Effective-pom licences are upstream-declared metadata, not scanned artifact contents; a pom that misstates its own jar's licence passes (mitigate with an `about.html`/`META-INF` spot-check when adopting a new dependency) |
 | Malicious schema substitution | Java `HttpClient` requires HTTPS before and after redirects, bounds time/bytes, rejects invalid proxy configuration, and verifies a pinned SHA-256 before use (`SchemaCacheModule`) | `DEDIREN_XMI_SCHEMA_PATH` / `DEDIREN_OEF_SCHEMA_DIR` offline overrides bypass the SHA-256 check by design |
 | Abuse a configured MCP PNG converter | `--resvg-command` resolves one bare-name or absolute executable at startup; no shell/arguments, cleared environment, stdin/stdout-only conversion, 15-second process bound, 4096-pixel dimensions, 64 MiB aggregate output, and PNG signature/IHDR validation; all failures fall back to JSON only | The operator explicitly selects and trusts the executable, which runs with the spawning user's authority; a malicious executable can still act with that user's OS permissions |
-| Malicious envelope input | Jackson 3 parsing plus fuzz-regression targets pinning the only-`JacksonException`/`XmiValidationException` invariant; hardened DOM factory blocks DOCTYPE/XXE | Fuzz targets run in deterministic regression mode over a fixed seed corpus in CI, not continuous coverage-guided fuzzing |
-| Exhaust the host via pathological model input (CPU/heap) | Input ceilings (core `SourceLimits`, applied via `BoundedReads` and `SourceValidator` on both CLI file/stdin and MCP lanes): 64 MiB per model-supplied input file, 1000 fragments, 100000 merged elements. Mermaid and DOT additionally cap statements, produced elements/groups, nesting, and token bytes inside their native parsers; Mermaid also caps label bytes, and comma-expanded DOT nodes count individually against the produced-element ceiling. Jackson 3's default nesting-depth cap (500) bounds nested JSON; the MCP transport bounds a single inbound frame at 16 MiB (`FrameSplitter`) | Compute on a legal-size model is unbounded: ELK layout has no timeout or cancellation, SVG output is materialized in memory, and MCP tool calls have no per-call timeout. Accepted: the process runs with the invoking user's own authority and the MCP client owns the server's lifetime, so a wedged or OOM-killed process is recoverable by the user who caused it |
+| Malicious envelope input | Jackson 3 parsing plus fuzz-regression targets pinning the only-`JacksonException`/`XmiValidationException` invariant. Two different XML factories guard two different trust contexts and neither is used for the other's: the hardened DOM factory (`SchemaValidation.secureXmiDocumentBuilderFactory()`) disallows DOCTYPE outright and is pointed only at XML the product generated; the hardened StAX factory (`SecureXml.inputFactory()`) is what reads attacker-supplied `.drawio` input | Fuzz targets run in deterministic regression mode over a fixed seed corpus in CI, not continuous coverage-guided fuzzing. The StAX configuration deliberately does *not* reject a `DOCTYPE` declaration — it renders it inert and refuses the entity *reference* — so a hostile file carrying a bare, unreferenced declaration parses cleanly (recorded decision, draw.io import boundary) |
+| Read a local file or reach the network from a hostile `.drawio` | Entity resolution is closed twice over: `SUPPORT_DTD = false` makes a `DOCTYPE` inert and fails the parse the moment an entity it would have declared is referenced, and a throwing `XMLResolver` refuses the external DTD subset and external parameter entities if DTD support is ever re-enabled. Both the outer file and each decompressed `<diagram>` payload get their own hardened factory, with a mutation proof that a default factory on the inner parse would be observable and an exfiltration test asserting a real on-disk secret reaches neither the diagnostic message nor its path. Every non-entity route out of the file is refused by content: `link`/`linkTarget`, `shape=image`, any `image` or `imageBackground` style key, embedded `shape=stencil(...)`, and label HTML beyond the `<br>` family | `FEATURE_SECURE_PROCESSING` contributes nothing on the shipped runtime (`XMLInputFactory` does not support it and throws), so the guarded set-attempt is a no-op kept only for a third-party StAX provider arriving via `ServiceLoader`; and the `XMLResolver` never fires in the shipped configuration, so its correctness rests on mutation evidence rather than on a production path. The refusal list is an enumeration of known outward constructs — a future draw.io style key that loads a resource would need a matching entry |
+| Exhaust the host via pathological model input (CPU/heap) | Input ceilings (core `SourceLimits`, applied via `BoundedReads` and `SourceValidator` on both CLI file/stdin and MCP lanes): 64 MiB per model-supplied input file, 1000 fragments, 100000 merged elements. Mermaid and DOT additionally cap statements, produced elements/groups, nesting, and token bytes inside their native parsers; Mermaid also caps label bytes, and comma-expanded DOT nodes count individually against the produced-element ceiling. draw.io caps the same input/element/nesting/token quantities and adds two the text importers have no analogue for: pages at 256, and a decompression budget equal to the 64 MiB input ceiling that is a running total across every page, enforced *during* the streamed inflate so a decompression bomb aborts with at most one 64 KiB chunk beyond the ceiling held. Its cells (200000, whole-document) and per-attribute bytes abort the streaming parse in place; nesting is resolved at page end instead, bounded by the cell ceiling rather than mid-parse. Jackson 3's default nesting-depth cap (500) bounds nested JSON; the MCP transport bounds a single inbound frame at 16 MiB (`FrameSplitter`) | Compute on a legal-size model is unbounded: ELK layout has no timeout or cancellation, SVG output is materialized in memory, and MCP tool calls have no per-call timeout. Accepted: the process runs with the invoking user's own authority and the MCP client owns the server's lifetime, so a wedged or OOM-killed process is recoverable by the user who caused it. draw.io import carries no compression-ratio cap, deliberately: raw DEFLATE tops out near 1032:1, so the absolute byte budget already bounds the worst case and a ratio cap would add a tunable and a diagnostic code without bounding anything new — do not "fix" it by adding one |
 | Smuggle a source model past the model contract by way of foreign-text import | An import engine hands `core` a typed `SourceDocument`, not bytes, so an imported model would otherwise reach consumers without the gates every hand-authored model meets. `CoreCommands.importCommand` therefore re-enters the emitted document into `SourceValidator.gateImportedDocument`: schema version, `schemas/model.schema.json`, and the same `SourceLimits` ceilings, for every importer rather than a named one. A rejection is a `DEDIREN_SCHEMA_*` / `DEDIREN_SOURCE_*_LIMIT_EXCEEDED` error envelope at the plugin-error exit (3) — a rejection here means an engine emitted an out-of-contract document, not that the caller mistyped input, which the importer's own ceilings already reject at exit 2 — carrying the importer's own diagnostics ahead of core's; the engine's atomic parse failures are still republished verbatim, path and exit code untouched | The re-gate is the schema and the ceilings only. Model-coherence claims (duplicate ids, dangling endpoints) stay the importer's, so a defective importer can still emit a schema-legal but incoherent model — caught later by `validate`/`build`, not at import. It costs one serialize/reparse per import, and bounds contract conformance and model size, not the import's own CPU: the parser's internal caps are what bound that (resource-exhaustion row above) |
 | Inject markup into a rendered SVG via model labels/ids | Labels: `SvgWriter` (StAX) structurally escapes every attribute value and text node at emission, with no verbatim-injection path; `LabelInjectionTest` proves an end-to-end breakout payload stays escaped and round-trips. Ids used as reference targets (via `url(#…)` in marker references and gradient fills): `SvgIds` mints every id and every reference to it from one per-document instance, constraining the alphabet and suffixing collisions, so a reference can never disagree with the id it points at. `SvgAudit` rejects ill-formed output | Escaping guards labels against markup breakout. For ids used as SVG identifiers and reference targets, the control is the id-minting alphabet, not escaping: a duplicate id makes a `url(#…)` reference ambiguous (UA binds to first match), and an id with `)` or space truncates the CSS url token so the reference silently misses and the marker is dropped |
 | Dependency compromise | Known-vulnerability coverage comes from the blocking Grype/SBOM gate on every pull request and tagged release (`ci.yml`, `release.yml`), plus weekly grouped Dependabot updates and event-driven Dependabot alerts (`.github/dependabot.yml`) | Exact pins and hashes establish the selected dependency identity and integrity, but do not prove that an upstream release is benign. A newly malicious or compromised dependency release remains a human trust decision and residual risk. Direct pushes to `main` are not CI-scanned (lean-CI decision), so newly published advisories surface via Dependabot alerts or the next PR/release gate rather than a push-time scan; the scheduled OWASP Dependency-Check cross-check was retired with the same decision (`-Psecurity-sca` remains an on-demand local second opinion) |
