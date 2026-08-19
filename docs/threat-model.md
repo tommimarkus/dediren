@@ -201,6 +201,24 @@ Geometry, styling and routing are discarded outright — `schemas/model.schema.j
 lane re-lays the page out with ELK — so no attacker-supplied number or style string
 reaches layout or render.
 
+**The round-trip property channel widens what an import can carry.** Dediren's own
+export writes each page's element properties as JSON on a hidden `dediren.view`
+metadata cell, so a re-import restores them and the pair reaches a byte-identical
+fixed point. The cost is that a hostile `.drawio` can now inject arbitrary JSON
+under **any** property namespace, where before an import could only produce
+`drawio.*` keys and a `uml.sequence` ordering. Two bounds apply and both are
+tested: `MxReader`'s 64 KiB per-attribute ceiling caps the blob, and Jackson's
+500-level nesting guard caps its depth; a blob that is unparseable, over-deep, or
+not an object fails the whole import atomically with
+`DEDIREN_DRAWIO_ROUND_TRIP_INVALID`. What the channel does *not* do is grant the
+imported properties any authority — they land in `SourceDocument` properties like
+any other input and are re-gated by `SourceValidator.gateImportedDocument` and then
+by the notation semantics, which reject a property they do not recognise. The
+export side guards the same ceiling in the other direction: a page whose property
+map or layout-preferences block would exceed it is written without that block and
+reported with `DEDIREN_DRAWIO_PROPERTIES_DROPPED`, rather than producing a file
+this build's own importer would refuse.
+
 **Diagnostics and regression cover.** Attacker-supplied fragments echoed into a
 published diagnostic are truncated to 80 characters, and the JDK's own XML error
 text is never echoed because it quotes the document including any system

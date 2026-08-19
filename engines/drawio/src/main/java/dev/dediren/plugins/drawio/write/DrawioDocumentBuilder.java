@@ -198,6 +198,8 @@ public final class DrawioDocumentBuilder {
    */
   private boolean elementPropertiesDropped;
 
+  private boolean layoutPreferencesDropped;
+
   private DrawioDocumentBuilder(
       SourceDocument source,
       LayoutResult layout,
@@ -795,6 +797,17 @@ public final class DrawioDocumentBuilder {
    * bury every other diagnostic in the envelope.
    */
   private void reportDroppedProperties() {
+    if (layoutPreferencesDropped) {
+      diagnostics.add(
+          new Diagnostic(
+              DiagnosticCode.DRAWIO_PROPERTIES_DROPPED.code(),
+              DiagnosticSeverity.WARNING,
+              "the view's layout preferences exceed the "
+                  + DrawioLimits.MAX_TOKEN_BYTES
+                  + "-byte attribute ceiling and were not carried; re-importing this file yields a"
+                  + " view that lays out with default preferences",
+              "$"));
+    }
     if (!elementPropertiesDropped) {
       return;
     }
@@ -1045,7 +1058,16 @@ public final class DrawioDocumentBuilder {
     if (view == null || view.layoutPreferences() == null) {
       return null;
     }
-    return JsonSupport.objectMapper().writeValueAsString(view.layoutPreferences());
+    String json = JsonSupport.objectMapper().writeValueAsString(view.layoutPreferences());
+    if (DrawioLimits.utf8Length(json) > DrawioLimits.MAX_TOKEN_BYTES) {
+      // Same reasoning as elementPropertiesJson: writing it anyway produces a file this build's own
+      // importer refuses. No realistic preferences block approaches the ceiling — this is here so
+      // the two JSON channels on the metadata cell cannot diverge in behaviour, since the one that
+      // is easy to reach was guarded and the one that is hard to reach was not.
+      layoutPreferencesDropped = true;
+      return null;
+    }
+    return json;
   }
 
   /**
