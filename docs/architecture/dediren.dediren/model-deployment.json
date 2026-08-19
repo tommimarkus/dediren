@@ -36,7 +36,7 @@
       "id": "comp-engines",
       "type": "Component",
       "label": "engines (in-process)",
-      "properties": { "uml": {}, "rationale": "mermaid-import, dot-import, elk-layout, render, the two export engines and the semantics front ends, all loaded into the launcher process." }
+      "properties": { "uml": {}, "rationale": "mermaid-import, dot-import, drawio, elk-layout, render, the three export engines and the semantics front ends, all loaded into the launcher process." }
     }
   ],
   "relationships": [

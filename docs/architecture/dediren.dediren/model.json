@@ -129,6 +129,19 @@
       }
     },
     {
+      "id": "drawio",
+      "type": "ApplicationComponent",
+      "label": "drawio",
+      "properties": {
+        "layer": "Application",
+        "viewpoint": "Application Cooperation",
+        "tier": "2",
+        "rationale": "Native draw.io (diagrams.net) mxfile export and import engine. Uniquely hosts two engines, DrawioExportEngine and DrawioImportEngine, both under engine id drawio, because read and write are two operations over one secret: how Dediren speaks the mxfile format.",
+        "evidence": "source-backed",
+        "source": "engines/drawio/pom.xml; engine-api/src/main/java/dev/dediren/engine/ExportEngine.java; engine-api/src/main/java/dev/dediren/engine/ImportEngine.java"
+      }
+    },
+    {
       "id": "semantics-graph",
       "type": "ApplicationComponent",
       "label": "semantics-graph",
@@ -353,6 +366,17 @@
       "type": "Serving",
       "source": "contracts",
       "target": "dot-import",
+      "label": "",
+      "properties": {
+        "visible": true,
+        "evidence": "source-backed"
+      }
+    },
+    {
+      "id": "serv-contracts-drawio",
+      "type": "Serving",
+      "source": "contracts",
+      "target": "drawio",
       "label": "",
       "properties": {
         "visible": true,
@@ -646,6 +670,17 @@
       }
     },
     {
+      "id": "serv-engine-api-drawio",
+      "type": "Serving",
+      "source": "engine-api",
+      "target": "drawio",
+      "label": "",
+      "properties": {
+        "visible": true,
+        "evidence": "source-backed"
+      }
+    },
+    {
       "id": "serv-engine-api-semantics-graph",
       "type": "Serving",
       "source": "engine-api",
@@ -822,6 +857,17 @@
       }
     },
     {
+      "id": "serv-drawio-cli",
+      "type": "Serving",
+      "source": "drawio",
+      "target": "cli",
+      "label": "",
+      "properties": {
+        "visible": true,
+        "evidence": "source-backed"
+      }
+    },
+    {
       "id": "serv-elk-layout-cli",
       "type": "Serving",
       "source": "elk-layout",
@@ -905,6 +951,7 @@
             "core",
             "mermaid-import",
             "dot-import",
+            "drawio",
             "semantics-graph",
             "semantics-archimate",
             "semantics-uml",
@@ -923,6 +970,7 @@
             "serv-engine-api-core",
             "serv-engine-api-mermaid-import",
             "serv-engine-api-dot-import",
+            "serv-engine-api-drawio",
             "serv-engine-api-semantics-graph",
             "serv-engine-api-semantics-archimate",
             "serv-engine-api-semantics-uml",
@@ -972,6 +1020,7 @@
                 "core",
                 "mermaid-import",
                 "dot-import",
+                "drawio",
                 "semantics-graph",
                 "semantics-archimate",
                 "semantics-uml",
