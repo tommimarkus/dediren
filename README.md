@@ -4,8 +4,9 @@
 
 `dediren` is a contract-first, single-JVM diagram compiler **for agentic
 tools**. It turns semantic JSON into generated layout, rendered SVG,
-ArchiMate® Open Exchange Format 3.1 XML, or UML® 2.5.1 XMI XML through CLI commands
-backed by in-process first-party engines. Every command prints a JSON envelope
+ArchiMate® Open Exchange Format 3.1 XML, UML® 2.5.1 XMI XML, or draw.io® mxGraph
+XML through CLI commands backed by in-process first-party engines. Every
+command prints a JSON envelope
 on stdout, so an agent decides success or failure without scraping stderr.
 
 > [!TIP]
@@ -19,9 +20,9 @@ on stdout, so an agent decides success or failure without scraping stderr.
 ![Dediren pipeline: a source model becomes a layout request via project, a layout result via layout, then either SVG via render or ArchiMate OEF / UML XMI XML via export](docs/assets/pipeline.svg)
 
 ```text
-Mermaid flowchart / Graphviz DOT file → import → Dediren source model
+Mermaid flowchart / Graphviz DOT / draw.io file → import → Dediren source model
 validate → project → layout → validate-layout → render   (SVG)
-validate → project → layout → validate-layout → export   (ArchiMate OEF / UML XMI)
+validate → project → layout → validate-layout → export   (ArchiMate OEF / UML XMI / draw.io)
 ```
 
 `dediren build` runs the decomposed flow above as one command per view,
@@ -48,10 +49,18 @@ graphs, digraphs, comma-separated node declarations, edges, subgraphs and
 clusters — with unsupported constructs reported, not silently dropped; see
 `docs/agent-usage.md` for the exact mapping and its known limitations.
 
+`dediren import --plugin drawio [--input <path>]` reads a `.drawio` (mxGraph)
+document, plain or compressed, and turns each page into a view. Unlike the two
+text lanes it is not one-way: `dediren export --plugin drawio` writes draw.io
+XML back out, using the identity attributes on each `<object>` wrapper so
+Dediren can re-import its own file. Links, image shapes and URLs, embedded
+stencil definitions, and label markup beyond `<br>` are refused rather than
+dropped.
+
 For MCP clients, prefer prompt-first inline import when the diagram is already
-in the conversation: pass exactly one `content` string, `plugin: "mermaid"` or
-`"dot"`, and use `output: "image"` with `accepted_image_types` when an image is
-useful (`"data"` is the default). Examples are
+in the conversation: pass exactly one `content` string, `plugin: "mermaid"`,
+`"dot"`, or `"drawio"`, and use `output: "image"` with `accepted_image_types`
+when an image is useful (`"data"` is the default). Examples are
 `flowchart LR\n  client --> api` and `digraph { client -> api }`. The JSON
 envelope remains the first result content; Dediren then prefers
 `image/svg+xml` over `image/png` regardless of list order. PNG is an optional
@@ -75,11 +84,11 @@ diagram below is that module architecture **modelled by Dediren from itself** �
 an ArchiMate® Application Cooperation view compiled through the same
 `project → layout → render` pipeline shown above.
 
-![Dediren module architecture: eighteen Maven modules in four stability-tier bands — contracts and the IR spine at the foundation; the ArchiMate and UML notation cores, the schema-cache utility, and the engine-api seam; the orchestration core and eight engines; and the cli entrypoint with its MCP adapter and dist-tool — connected by Serving relationships that run from each module to the modules depending on it.](docs/architecture/dediren.dediren/generated/svg/module-architecture.svg)
+![Dediren module architecture: twenty Maven modules in four stability-tier bands — contracts and the IR spine at the foundation; the ArchiMate and UML notation cores, the schema-cache utility, and the engine-api seam; the orchestration core and ten engines; and the cli entrypoint with its MCP adapter and dist-tool — connected by Serving relationships that run from each module to the modules depending on it.](docs/architecture/dediren.dediren/generated/svg/module-architecture.svg)
 
 Four stability-tier bands read left to right: the `contracts` kernel (in
 emerald) and the `ir` spine, then the notation/utility cores and the
-`engine-api` seam, then orchestration `core` and the eight engines behind the
+`engine-api` seam, then orchestration `core` and the ten engines behind the
 seam, and finally the thin `cli` entrypoint with its `mcp-server` adapter and
 `dist-tool`. Three companion **UML®** views zoom in: a **class** view of the
 `engine-api` seam — the typed `SemanticsEngine` / `LayoutEngine` /
@@ -343,6 +352,13 @@ render policy. One source model can drive several notations:
   successful XMI results include schema-governed per-kind scope, a validation
   outcome reporting what the available schemas actually checked, and coverage
   assurance.
+
+Alongside those, the `drawio` plugin both imports and exports draw.io mxGraph
+XML. It is an editable-picture format rather than a notation of its own: the
+export draws whichever notation the view declares, picking ArchiMate or UML
+shapes from the view kind, and a type no draw.io shape covers falls back to a
+neutral one with a warning. See
+[Exports](docs/features/exports.md#drawio).
 
 [`docs/agent-usage.md`](docs/agent-usage.md) carries the per-notation authoring
 vocabulary, command handoffs, and layout-preference options; the machine

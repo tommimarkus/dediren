@@ -79,6 +79,12 @@ class ContractVersionsTest {
           ContractVersions.UML_XMI_EXPORT_POLICY_SCHEMA_VERSION
         });
     versionConstBySchema.put(
+        "schemas/drawio-export-policy.schema.json",
+        new String[] {
+          "drawio_export_policy_schema_version",
+          ContractVersions.DRAWIO_EXPORT_POLICY_SCHEMA_VERSION
+        });
+    versionConstBySchema.put(
         "schemas/build-result.schema.json",
         new String[] {"build_result_schema_version", ContractVersions.BUILD_RESULT_SCHEMA_VERSION});
     versionConstBySchema.put(
@@ -147,6 +153,8 @@ class ContractVersionsTest {
         .isEqualTo("oef-export-policy.schema.v1");
     assertThat(ContractVersions.UML_XMI_EXPORT_POLICY_SCHEMA_VERSION)
         .isEqualTo("uml-xmi-export-policy.schema.v1");
+    assertThat(ContractVersions.DRAWIO_EXPORT_POLICY_SCHEMA_VERSION)
+        .isEqualTo("drawio-export-policy.schema.v1");
     assertThat(ContractVersions.BUILD_RESULT_SCHEMA_VERSION).isEqualTo("build-result.schema.v1");
     assertThat(ContractVersions.PACKAGE_SCHEMA_VERSION).isEqualTo("package.schema.v1");
     assertThat(ContractVersions.PACKAGE_BUILD_RESULT_SCHEMA_VERSION)

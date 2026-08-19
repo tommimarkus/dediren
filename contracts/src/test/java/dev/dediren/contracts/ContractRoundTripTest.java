@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import dev.dediren.contracts.build.BuildArtifact;
 import dev.dediren.contracts.build.BuildResult;
 import dev.dediren.contracts.build.BuildViewOutcome;
+import dev.dediren.contracts.export.DrawioExportPolicy;
 import dev.dediren.contracts.export.ExportRequest;
 import dev.dediren.contracts.export.UmlXmiExportPolicy;
 import dev.dediren.contracts.json.JsonSupport;
@@ -581,6 +582,32 @@ class ContractRoundTripTest {
     assertThat(request.exportRequestSchemaVersion())
         .isEqualTo(ContractVersions.EXPORT_REQUEST_SCHEMA_VERSION);
     assertThat(request.policy().get("kind").asText()).isEqualTo("opaque");
+  }
+
+  @Test
+  void drawioExportPolicyRoundTripsSnakeCaseFields() throws Exception {
+    DrawioExportPolicy policy =
+        readFixture("fixtures/export-policy/default-drawio.json", DrawioExportPolicy.class);
+
+    assertThat(policy.drawioExportPolicySchemaVersion())
+        .isEqualTo(ContractVersions.DRAWIO_EXPORT_POLICY_SCHEMA_VERSION);
+    assertThat(policy.diagramName()).isEqualTo("Main");
+    assertThat(policy.views()).isEmpty();
+
+    DrawioExportPolicy withViews =
+        JsonSupport.readValue(
+            """
+                {
+                  "drawio_export_policy_schema_version": "drawio-export-policy.schema.v1",
+                  "diagram_name": "Main",
+                  "views": {
+                    "class-view": { "diagram_name": "Classes" }
+                  }
+                }
+                """,
+            DrawioExportPolicy.class);
+
+    assertThat(withViews.views().get("class-view").diagramName()).isEqualTo("Classes");
   }
 
   @Test

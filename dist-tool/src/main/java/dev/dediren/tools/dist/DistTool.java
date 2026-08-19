@@ -75,6 +75,7 @@ public final class DistTool {
           "contracts",
           "core",
           "dot-import",
+          "drawio",
           "elk-layout",
           "engine-api",
           "ir",

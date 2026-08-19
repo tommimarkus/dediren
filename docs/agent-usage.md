@@ -126,6 +126,58 @@ value above it is rejected with a `DEDIREN_DOT_*_LIMIT_EXCEEDED` (or
 `INPUT_TOO_LARGE`) diagnostic at `$`. Syntax errors report a 1-based
 `line N, column N` path.
 
+## draw.io Import
+
+Dediren implements a native Java reader for the draw.io® file format (run
+with `dediren import --plugin drawio --input diagram.drawio`, or pipe it on
+stdin). It reads `.drawio`/mxfile documents, each page's `<diagram>` content
+either as plain XML or as base64-encoded, raw-DEFLATE-compressed data, and
+converts `mxCell` vertices and edges from every page. Output is always a
+`model.schema.v1` generic-graph model with `semantic_profile: generic-graph`
+— import never promotes to `archimate` or `uml`, because draw.io encodes
+relationship semantics only as arrowhead decoration (for example
+`endArrow=block;dashed=1`), which cannot be reliably reversed. A recognized
+shape stencil is still recorded under `properties.drawio.stencil` with a
+suggested Dediren type; see `DEDIREN_DRAWIO_KIND_INFERRED` below to promote
+the profile by hand once you have reviewed the suggestion.
+
+Import carries **no geometry**: Dediren re-lays out every page with ELK
+rather than trusting draw.io's placement, the same as every other import
+lane. A page's layers are z-order only, not containment, so every layer's
+cells flatten into one page; hidden cells are skipped. Each page becomes one
+view, and the first page always becomes view `main`. A dangling edge (an
+endpoint naming a missing cell) is dropped with a warning rather than failing
+the import.
+
+An image shape, an image or background URL, label HTML other than `<br>`,
+`<br/>`, and `<br />`, a link or other interactive attribute, an embedded
+`shape=stencil(...)` payload, and a shape parented to a connector are not part
+of the supported subset. They are never
+silently dropped: each fails the import atomically with
+`DEDIREN_DRAWIO_UNSUPPORTED_CONSTRUCT` so you can rewrite the input without
+them; no partial model is produced.
+
+A `.drawio` Dediren exported carries a `dediren*` identity vocabulary on each
+cell's `<object>` wrapper, so re-importing it recovers element ids, types,
+labels, edge endpoints, group roles, and the element a semantic boundary
+stands for — including a package or region the view draws only as its
+boundary. One hidden metadata cell per page carries the view id, kind,
+semantic profile, model schema version, and the view's `layout_preferences`,
+so a re-import lays the page out the way the export did. The same hidden cell
+carries every element's `properties`, keyed by element id, so a required
+property such as `Port.component`, `Transition.region` or a UML `Message`'s
+`uml.sequence` survives the trip; a view whose property map would exceed the
+64 KiB ceiling on one attribute loses it, and the export says so in a
+`DEDIREN_DRAWIO_PROPERTIES_DROPPED` warning. Geometry never survives — every
+import lane re-lays the page out. Treat the source model, not the `.drawio`,
+as the record of truth.
+
+Limits are 64 MiB input, 64 MiB decompressed content summed across every
+page, 256 pages, 200000 cells, 100000 produced elements, 256 nesting levels,
+and 64 KiB per label or attribute. At the ceiling is accepted; the first
+value above it is rejected with a `DEDIREN_DRAWIO_*_LIMIT_EXCEEDED` (or
+`INPUT_TOO_LARGE`) diagnostic.
+
 ## MCP Server
 
 `dediren mcp` runs an MCP stdio server so an agent can drive Dediren as tools
@@ -1469,6 +1521,96 @@ you can recover from stdout JSON alone.
 - `DEDIREN_DOT_HINT_IGNORED`: import succeeded, but the named presentation
   attributes were intentionally discarded. Reapply appearance through Dediren
   render policy if needed.
+- `DEDIREN_DRAWIO_SYNTAX_INVALID`: repair the XML at the reported path — the
+  page's content is not well-formed mxfile XML, or its `parent` chain cycles or
+  names no cell. A path reading `(decompressed)` has line and column numbers
+  inside the decoded payload, not the file on disk.
+- `DEDIREN_DRAWIO_UNSUPPORTED_DOCUMENT`: the input is not a `.drawio`/mxfile
+  document Dediren recognizes (for example the root element is not
+  `<mxfile>` or `<mxGraphModel>`). Re-export the file from draw.io, or point
+  Dediren at the actual `.drawio` file.
+- `DEDIREN_DRAWIO_UNSUPPORTED_CONSTRUCT`: an image shape, an image or
+  background URL, label HTML other than `<br>`/`<br/>`/`<br />`, a link or
+  other interactive attribute, an embedded `shape=stencil(...)` payload, or a
+  shape parented to a connector is not part of the supported subset; rewrite
+  the input without it. Import is atomic; no partial model is produced. A
+  cyclic or dangling `parent` chain is a malformed graph rather than an
+  unsupported feature and reports `DEDIREN_DRAWIO_SYNTAX_INVALID` instead.
+- `DEDIREN_DRAWIO_DECOMPRESSION_FAILED`: a page's `<diagram>` content is
+  marked base64+deflate but does not decode and inflate. Re-export the page
+  from draw.io, or supply the plain-XML form instead.
+- `DEDIREN_DRAWIO_DECOMPRESSED_TOO_LARGE`: one page's decompressed content,
+  or the sum across every page, exceeds the 64 MiB ceiling. Split the diagram
+  across smaller pages or files.
+- `DEDIREN_DRAWIO_INPUT_TOO_LARGE` / `DEDIREN_DRAWIO_PAGE_LIMIT_EXCEEDED` /
+  `DEDIREN_DRAWIO_CELL_LIMIT_EXCEEDED` /
+  `DEDIREN_DRAWIO_ELEMENT_LIMIT_EXCEEDED` /
+  `DEDIREN_DRAWIO_NESTING_LIMIT_EXCEEDED` /
+  `DEDIREN_DRAWIO_TOKEN_LIMIT_EXCEEDED`: split or simplify the diagram below
+  the ceiling stated in the diagnostic and in `## draw.io Import`.
+- `DEDIREN_DRAWIO_ROUND_TRIP_INVALID`: two different causes, both fixable in
+  draw.io rather than by editing JSON. On export, an artifact this build wrote
+  failed Dediren's own re-import check before being written — not an input
+  problem; report it with the failing command and the model. On import of a
+  file carrying Dediren's round-trip metadata, the same code instead names a
+  concrete authoring mistake in the `.drawio` file itself: a duplicate
+  `dedirenId`, a type or label that disagrees across pages, an edge endpoint
+  naming no `dedirenId`, a `dedirenSemanticSourceId` on a boundary that names
+  no node and carries no `dedirenSemanticSourceType` of its own, a
+  `dedirenLayoutPreferences` block that is not a readable `layout_preferences`
+  object, or an unrecognized semantic profile or view kind.
+  Fix the named cell or page in draw.io and re-import.
+- `DEDIREN_DRAWIO_HINT_IGNORED`: import succeeded, but the named
+  presentation hint was intentionally discarded. Reapply appearance through
+  Dediren render policy if needed. Scoped to cells Dediren did not author: a
+  cell carrying a `dedirenId` on a round-tripped page keeps no style of its
+  own — the exporter computes it from the model and will compute it again — so
+  only a hand-drawn cell's appearance, and any unrecognized custom attribute,
+  is reported.
+- `DEDIREN_DRAWIO_PROPERTIES_DROPPED`: export succeeded, but this view's
+  element `properties` do not fit the 64 KiB ceiling on one draw.io attribute,
+  so the named property paths are not in the exported file and will not come
+  back if it is re-imported. Properties normally ride the page's hidden
+  metadata cell keyed by element id and survive a round trip, so this warning
+  now means only "too large", not "unsupported": split the view, or keep the
+  source model as the record of truth and re-import the `.drawio` for
+  structure and identity alone. A re-imported model missing a *required*
+  property (for example `Port.component`, `Transition.region`,
+  `ExecutionSpecification.covered`) will be rejected by the next `validate` or
+  `project` call with a `DEDIREN_UML_*` code — this warning names it first.
+- `DEDIREN_DRAWIO_CELLS_SKIPPED`: import succeeded, but some cells were left
+  out. The message says which of two reasons: a cell hidden in draw.io was
+  skipped rather than imported (unhide it and re-export), or an edge whose
+  endpoint resolves to no imported node was dropped (reconnect it in draw.io
+  and re-export).
+- `DEDIREN_DRAWIO_LAYERS_FLATTENED`: import succeeded — draw.io layers are
+  z-order, not containment, so every layer's cells landed in one flat page.
+  Recreate the layering as Dediren view groups after import if you need it as
+  structure.
+- `DEDIREN_DRAWIO_KIND_INFERRED`: informational (`info`; import succeeded) —
+  the semantic profile stays `generic-graph` because draw.io only encodes
+  relationship semantics as arrowhead decoration, which cannot be reliably
+  reversed. The message names the recognized stencil and its suggested type
+  under `properties.drawio.stencil`; promote `semantic_profile` and the
+  affected element `type` fields by hand if the suggestion is right.
+- `DEDIREN_DRAWIO_POLICY_INVALID`: the `drawio-export-policy.schema.json`
+  document is invalid — validate it against the schema; a common cause is a
+  `views` entry naming a view the model does not declare, or reusing one
+  `diagram_name` for two views on the whole-model export lane.
+- `DEDIREN_DRAWIO_SHAPE_UNMAPPED`: the exported element has no native
+  draw.io shape mapping, so it was written as a generic box. The box's
+  `object dedirenType` attribute still records the exact Dediren type, so
+  re-import is lossless regardless — act on it only if the picture itself
+  needs to look different in draw.io.
+- `DEDIREN_DRAWIO_LAYOUT_REFERENCE_MISSING`: the export request's layout
+  result is missing geometry for a node or edge the view declares. Rerun
+  `layout` for that view and export against the resulting layout result
+  rather than a stale one.
+- `DEDIREN_DRAWIO_ORNAMENT_OMITTED`: a decorator or ornament (for example a
+  UML®/ArchiMate® marker) has no draw.io shape equivalent and was omitted
+  from the exported page; the underlying element and its `dedirenType`
+  attribute are still exported. No action needed unless the visual marker
+  matters in draw.io.
 - `DEDIREN_GENERIC_GRAPH_PLUGIN_REQUIRED`: the source has no
   `plugins.generic-graph` object. Add it with a `views` array (see
   `## Minimal Source JSON`) — every semantic-validate, project, and build call
@@ -1491,8 +1633,8 @@ you can recover from stdout JSON alone.
 - `DEDIREN_COMMAND_TARGET_UNSUPPORTED`: the `project --target` value is
   outside the accepted set — use `layout-request` or `render-metadata`.
 - `DEDIREN_PLUGIN_UNKNOWN`: unknown engine id — the bundled set is
-  `mermaid`, `generic-graph`, `elk-layout`, `render`, `archimate-oef`, `uml-xmi`. Fix the
-  `--plugin` value.
+  `mermaid`, `dot`, `drawio`, `generic-graph`, `elk-layout`, `render`,
+  `archimate-oef`, `uml-xmi`. Fix the `--plugin` value.
 - `DEDIREN_PLUGIN_UNSUPPORTED_CAPABILITY`: the engine id exists but not for
   this command's capability (for example asking `elk-layout` to render). Fix
   the `--plugin` value for this command.

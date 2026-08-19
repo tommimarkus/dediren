@@ -78,7 +78,9 @@ Stable Dependencies Principle).
 | `semantics-archimate` (engine) | `engine-api`, `contracts`, `archimate`, `ir` | 2 — leaf engine |
 | `semantics-uml` (engine) | `engine-api`, `contracts`, `uml`, `ir` | 2 — leaf engine |
 | `elk-layout` (engine) | `engine-api`, `contracts`, `ir` | 2 — leaf engine |
+| `dot-import` (engine) | `engine-api`, `contracts` | 2 — leaf import engine |
 | `mermaid-import` (engine) | `engine-api`, `contracts` | 2 — leaf import engine |
+| `drawio` (engine) | `engine-api`, `contracts` | 2 — leaf engine |
 | `archimate-oef-export` (engine) | `engine-api`, `contracts`, `archimate`, `schema-cache` | 2 — leaf engine |
 | `uml-xmi-export` (engine) | `engine-api`, `contracts`, `uml`, `schema-cache` | 2 — leaf engine |
 | `mcp-server` | `contracts`, `core`, `engine-api` | 3 — protocol adapter |
@@ -212,13 +214,16 @@ charter below is the contract for "what changes for this reason lives here."
   — the model shared library *should* look like (*reuse-or-migrate*: "stable,
   boring, owned mechanics").
 
-- **Engines** (`mermaid-import`, `render`, `elk-layout`, `archimate-oef-export`,
-  `uml-xmi-export`) — leaf library modules behind `engine-api`, each owning one
-  backend concern: SVG rendering, ELK layout, ArchiMate OEF export, UML/XMI
-  export. Each owns its backend-specific policy and *only* that. Styling lives
-  in render; OEF semantics in the OEF engine; XMI semantics in the XMI engine;
-  layout geometry in ELK; Mermaid grammar recognition, normalization, and
-  mapping in `mermaid-import`. (Their former standalone `Main` executables and
+- **Engines** (`dot-import`, `mermaid-import`, `drawio`, `render`,
+  `elk-layout`, `archimate-oef-export`, `uml-xmi-export`) — leaf library
+  modules behind `engine-api`, each owning one backend concern: SVG rendering,
+  ELK layout, ArchiMate OEF export, UML/XMI export. Each owns its
+  backend-specific policy and *only* that. Styling lives in render; OEF
+  semantics in the OEF engine; XMI semantics in the XMI engine; layout
+  geometry in ELK; DOT grammar recognition, normalization, and mapping in
+  `dot-import`; Mermaid grammar recognition, normalization, and mapping in
+  `mermaid-import`; draw.io (mxGraph) mapping, in both directions, in
+  `drawio`. (Their former standalone `Main` executables and
   per-engine launchers were retired by the single-launcher distribution
   cutover (Cutover B); each `Main` survives only as an `src/test/java`
   envelope-shaped test harness — no `main()`, no launcher script.)
@@ -662,7 +667,8 @@ speculatively):
 | SpotBugs `EI_EXPOSE_REP`/`EI_EXPOSE_REP2` suppressed on the `ir` pre-layout and post-layout scene records (`ir.SceneGraph`, `ir.SceneGroup`, `ir.LaidOutScene`, `ir.PlacedGroup`, `ir.RoutedEdge`, `ir.LayoutIntent$OrderedBand`) | `spotbugs-exclude.xml` | §6 contract surface | deferred: same case as the other `contracts`-style records — wrap their List components via `ContractCollections.listOrEmpty` (`List.copyOf`), so sharing the reference is genuinely immutable; suppressed rather than defensive-copied for consistency with the existing `contracts` records (`ir.SceneGraph`/`ir.SceneGroup` from Plan B P1; `ir.LaidOutScene`/`ir.PlacedGroup`/`ir.RoutedEdge` from Plan B P2; `ir.LayoutIntent$OrderedBand` from Plan B P5 Task 1; `ir.BandMember` holds no List/Map component and is not flagged) |
 | SpotBugs `EI_EXPOSE_REP`/`EI_EXPOSE_REP2` suppressed on the `contracts.build` record classes (`BuildArtifact`, `BuildResult`, `BuildViewOutcome`) | `spotbugs-exclude.xml` | §6 contract surface | deferred: same case as the other `contracts` records — wrap List/Map components via `ContractCollections.listOrEmpty`/`mapOrEmpty` (`List.copyOf`/`Map.copyOf`), so sharing the reference is genuinely immutable; suppressed rather than defensive-copied for consistency with the existing `contracts` records |
 | SpotBugs `EI_EXPOSE_REP`/`EI_EXPOSE_REP2` suppressed on the `contracts.pkg` package-model records (`PackageDocument`, `PackageBuildResult`, `PackageViewOutcome`, `PackageExportOutcome`) | `spotbugs-exclude.xml` | §6 contract surface | deferred: same case as the other `contracts` records — wrap their List/Map components via `ContractCollections.listOrEmpty`/`mapOrEmpty` (`List.copyOf`/`Map.copyOf`), so sharing the reference is genuinely immutable; suppressed rather than defensive-copied for consistency with the existing `contracts` records (package model, #63) |
-| SpotBugs `EI_EXPOSE_REP`/`EI_EXPOSE_REP2` suppressed on the `contracts.analysis` record classes (`DiffResult${EntityChanges,ChangedEntity,ChangedView,ViewChanges}`, `QueryResult${Dependents,Orphans,ViewCoverage}`, `VerifyResult`, `StatusResult`, plus the export policies' per-view `views` maps: `export.OefExportPolicy`'s wave-3 map and `export.UmlXmiExportPolicy`'s UMLDI diagram-identity map) | `spotbugs-exclude.xml` | §6 contract surface | deferred: same case as the other `contracts` records — wrap List components via `ContractCollections.listOrEmpty` (`List.copyOf`), so sharing the reference is genuinely immutable; suppressed rather than defensive-copied for consistency (wave-2 diff/query/verify/status results; the sibling `MigrationPath` uses a direct `List.copyOf`, which SpotBugs models, so it is not flagged) |
+| SpotBugs `EI_EXPOSE_REP` suppressed on `plugins.drawio.mx.MxObject.attributes` (one class, one pattern) | `spotbugs-exclude.xml` | §6 contract surface | deferred: **not** the same case as the `contracts` records. The sibling draw.io records inline `List.copyOf`, which SpotBugs models, so they carry no suppression at all. `MxObject` cannot follow them: the writer emits mxGraph attributes in iteration order and the draw.io round trip asserts byte equality, so the map must preserve insertion order — and `Map.copyOf` does not, its iteration order being salted per JVM (a defect this lane already hit and fixed). `Collections.unmodifiableMap(new LinkedHashMap<>(..))` is the only correct construction and SpotBugs does not model it as a copy. Removing the suppression requires SpotBugs to learn that idiom, not a code change |
+| SpotBugs `EI_EXPOSE_REP`/`EI_EXPOSE_REP2` suppressed on the `contracts.analysis` record classes (`DiffResult${EntityChanges,ChangedEntity,ChangedView,ViewChanges}`, `QueryResult${Dependents,Orphans,ViewCoverage}`, `VerifyResult`, `StatusResult`, plus the export policies' per-view `views` maps: `export.OefExportPolicy`'s wave-3 map, `export.UmlXmiExportPolicy`'s UMLDI diagram-identity map, and `export.DrawioExportPolicy`'s per-page diagram-name map) | `spotbugs-exclude.xml` | §6 contract surface | deferred: same case as the other `contracts` records — wrap List components via `ContractCollections.listOrEmpty` (`List.copyOf`), so sharing the reference is genuinely immutable; suppressed rather than defensive-copied for consistency (wave-2 diff/query/verify/status results; the sibling `MigrationPath` uses a direct `List.copyOf`, which SpotBugs models, so it is not flagged) |
 | SpotBugs `EI_EXPOSE_REP`/`EI_EXPOSE_REP2` suppressed on the `engine-api` value types (`engine.EngineResult`, `engine.EngineException`, `engine.Engines`, `engine.ModelExportRequest`) | `spotbugs-exclude.xml` | §2 dependency spine | deferred: same case as the `contracts` records — `EngineResult`/`EngineException` wrap their `List<Diagnostic>` component via `ContractCollections.listOrEmpty` (`List.copyOf`) and `Engines` wraps its capability maps via `mapOrEmpty`/`Map.copyOf`, so sharing the reference is genuinely immutable; suppressed rather than defensive-copied for consistency with the `contracts` records |
 | SpotBugs `EI_EXPOSE_REP`/`EI_EXPOSE_REP2` suppressed on `core.engine.EngineDispatch$InMemoryOutcome$Failure` | `spotbugs-exclude.xml` | §2 dependency spine | deferred: same case as the `engine-api`/`contracts` records — the in-memory dispatch failure outcome (Plan B P4) wraps its `List<Diagnostic>` component via `ContractCollections.listOrEmpty` (`List.copyOf`), so sharing the reference is genuinely immutable; suppressed rather than defensive-copied for consistency with the `contracts`/`engine-api` records |
 | SpotBugs `EI_EXPOSE_REP`/`EI_EXPOSE_REP2` suppressed on `render/node/NodeLabelLines` and `umlxmi/build/ExportScope` | `spotbugs-exclude.xml` | §8 thinness/cohesion | deferred: plugin-internal value records extracted from the former Main god-files; hold List/Set consumed read-only within the engine, not part of the public contract surface; suppressed rather than defensive-copied for consistency with the `contracts` records |

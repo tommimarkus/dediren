@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dediren.dev/schemas/drawio-export-policy.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["drawio_export_policy_schema_version", "diagram_name"],
+  "properties": {
+    "views": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "diagram_name": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "drawio_export_policy_schema_version": { "const": "drawio-export-policy.schema.v1" },
+    "diagram_name": { "type": "string", "minLength": 1 }
+  }
+}

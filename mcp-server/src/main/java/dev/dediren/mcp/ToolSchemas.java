@@ -19,7 +19,7 @@ final class ToolSchemas {
           },
           "plugin": {
             "type": "string",
-            "enum": ["mermaid", "dot"],
+            "enum": ["mermaid", "dot", "drawio"],
             "description": "External notation importer."
           },
           "output": {

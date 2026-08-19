@@ -1,0 +1,17 @@
+<mxfile host="app.diagrams.net">
+  <diagram id="p-architecture" name="Architecture">
+    <mxGraphModel><root>
+      <mxCell id="0"/>
+      <mxCell id="1" parent="0"/>
+      <mxCell id="a" value="Alpha" style="rounded=1;" vertex="1" parent="1">
+        <mxGeometry x="12" y="12" width="160" height="80" as="geometry"/>
+      </mxCell>
+      <mxCell id="b" value="Beta" style="rounded=1;" vertex="1" parent="1">
+        <mxGeometry x="254" y="12" width="160" height="80" as="geometry"/>
+      </mxCell>
+      <mxCell id="e" value="calls" style="html=1;" edge="1" parent="1" source="a" target="b">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+    </root></mxGraphModel>
+  </diagram>
+</mxfile>

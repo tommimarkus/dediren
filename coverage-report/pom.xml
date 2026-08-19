@@ -50,6 +50,12 @@
         </dependency>
         <dependency>
           <groupId>dev.dediren</groupId>
+          <artifactId>drawio</artifactId>
+          <version>${project.version}</version>
+          <scope>runtime</scope>
+        </dependency>
+        <dependency>
+          <groupId>dev.dediren</groupId>
           <artifactId>contracts</artifactId>
           <version>${project.version}</version>
           <scope>runtime</scope>

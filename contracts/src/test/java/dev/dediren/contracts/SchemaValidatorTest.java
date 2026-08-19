@@ -26,6 +26,7 @@ class SchemaValidatorTest {
           "schemas/uml-xmi-assurance.schema.json",
           "schemas/oef-export-policy.schema.json",
           "schemas/uml-xmi-export-policy.schema.json",
+          "schemas/drawio-export-policy.schema.json",
           "schemas/diff-result.schema.json",
           "schemas/query-result.schema.json",
           "schemas/verify-result.schema.json",
@@ -229,6 +230,13 @@ class SchemaValidatorTest {
                 exportResult("uml-xmi+xml")))
         .describedAs("first-party UML/XMI results must carry an assurance object")
         .isNotEmpty();
+    assertThat(
+            SchemaAssertions.validate(
+                workspaceRoot(),
+                "schemas/export-result.first-party.schema.json",
+                exportResult("drawio+xml")))
+        .describedAs("first-party draw.io results need no assurance object")
+        .isEmpty();
     assertThat(
             SchemaAssertions.validate(
                 workspaceRoot(),

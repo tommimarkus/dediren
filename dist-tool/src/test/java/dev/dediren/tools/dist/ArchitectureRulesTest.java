@@ -44,6 +44,7 @@ class ArchitectureRulesTest {
   private static final String UML_XMI = "dev.dediren.plugins.umlxmi..";
   private static final String DOT_IMPORT = "dev.dediren.plugins.dotimport..";
   private static final String MERMAID_IMPORT = "dev.dediren.plugins.mermaid..";
+  private static final String DRAWIO = "dev.dediren.plugins.drawio..";
 
   // The three semantics-carve modules (Plan B P3): semantics-graph hosts the base projection
   // and profile router; semantics-archimate and semantics-uml are the notation front ends.
@@ -74,6 +75,7 @@ class ArchitectureRulesTest {
     int umlXmiClasses = 0;
     int dotImportClasses = 0;
     int mermaidImportClasses = 0;
+    int drawioClasses = 0;
     int irClasses = 0;
     int semanticsGraphClasses = 0;
     int semanticsArchimateClasses = 0;
@@ -97,6 +99,8 @@ class ArchitectureRulesTest {
         dotImportClasses++;
       } else if (packageName.startsWith("dev.dediren.plugins.mermaid")) {
         mermaidImportClasses++;
+      } else if (packageName.startsWith("dev.dediren.plugins.drawio")) {
+        drawioClasses++;
       } else if (packageName.startsWith("dev.dediren.ir")) {
         irClasses++;
       } else if (packageName.startsWith("dev.dediren.semantics.graph")) {
@@ -127,6 +131,7 @@ class ArchitectureRulesTest {
     assertThat(mermaidImportClasses)
         .as("mermaid-import engine production classes on the classpath")
         .isPositive();
+    assertThat(drawioClasses).as("drawio engine production classes on the classpath").isPositive();
     assertThat(irClasses).as("ir production classes on the classpath").isPositive();
     assertThat(semanticsGraphClasses)
         .as("semantics-graph production classes on the classpath")
@@ -309,6 +314,7 @@ class ArchitectureRulesTest {
             "elk-layout", ELK_LAYOUT,
             "dot-import", DOT_IMPORT,
             "mermaid-import", MERMAID_IMPORT,
+            "drawio", DRAWIO,
             "archimate-oef-export", ARCHIMATE_OEF,
             "uml-xmi-export", UML_XMI);
     for (Map.Entry<String, String> engine : enginePackages.entrySet()) {
@@ -404,32 +410,32 @@ class ArchitectureRulesTest {
   }
 
   @Test
-  void exportersDoNotImportSvgEmitter() {
+  void formatEnginesDoNotImportSvgEmitter() {
     noClasses()
         .that()
-        .resideInAnyPackage(ARCHIMATE_OEF, UML_XMI)
+        .resideInAnyPackage(ARCHIMATE_OEF, UML_XMI, DRAWIO)
         .should()
         .dependOnClassesThat()
         .resideInAPackage(RENDER)
         .because(
-            "the OEF and XMI export engines map source models to their export formats; SVG"
-                + " styling is render's sole concern and must not leak into export mapping"
-                + " (§2, §5)")
+            "the OEF, XMI, and drawio format engines map source models to their export/import"
+                + " formats; SVG styling is render's sole concern and must not leak into that"
+                + " mapping (§2, §5)")
         .check(PRODUCTION_CLASSES);
   }
 
   @Test
-  void exportersDoNotImportIr() {
+  void formatEnginesDoNotImportIr() {
     noClasses()
         .that()
-        .resideInAnyPackage(ARCHIMATE_OEF, UML_XMI)
+        .resideInAnyPackage(ARCHIMATE_OEF, UML_XMI, DRAWIO)
         .should()
         .dependOnClassesThat()
         .resideInAPackage(IR)
         .because(
-            "the export engines consume the record-based ExportRequest wire contract, not the"
-                + " in-memory IR; §2's edge table allows them no ir edge even though transitive"
-                + " compilation leaves it reachable (P4 forced deviation, §5)")
+            "the OEF, XMI, and drawio format engines consume the record-based ExportRequest wire"
+                + " contract, not the in-memory IR; §2's edge table allows them no ir edge even"
+                + " though transitive compilation leaves it reachable (P4 forced deviation, §5)")
         .check(PRODUCTION_CLASSES);
   }
 

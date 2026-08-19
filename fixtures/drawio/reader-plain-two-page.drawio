@@ -1,0 +1,50 @@
+<mxfile host="app.diagrams.net" agent="hand-authored dediren reader fixture" version="24.7.17">
+  <diagram id="page-architecture" name="Architecture">
+    <mxGraphModel dx="1102" dy="822" grid="1" gridSize="10" page="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="zone" value="Trusted zone" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;" vertex="1" parent="1">
+          <mxGeometry x="40" y="40" width="440" height="260" as="geometry" />
+        </mxCell>
+        <mxCell id="gateway" value="API gateway" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="zone">
+          <mxGeometry x="40" y="60" width="160" height="60" as="geometry" />
+        </mxCell>
+        <object id="ledger" label="Ledger service" dedirenType="application-component" dedirenId="svc.ledger" tooltip="Owns the balance of record">
+          <mxCell style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;" vertex="1" parent="zone">
+            <mxGeometry x="240" y="60" width="160" height="60" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="calls" value="posts entries" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;" edge="1" parent="zone" source="gateway" target="ledger">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="90" />
+              <mxPoint x="220" y="150" />
+              <mxPoint x="330" y="150" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="floating" value="unattached" style="endArrow=none;html=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="80" y="360" as="sourcePoint" />
+            <mxPoint x="300" y="360" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="hidden-note" value="draft" style="text;html=1;" vertex="1" parent="1" visible="0">
+          <mxGeometry x="40" y="400" width="120" height="30" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="page-notes" name="Notes">
+    <mxGraphModel dx="1102" dy="822" grid="0" page="1" pageWidth="850" pageHeight="1100">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="caption" value="Balance &amp; settlement &lt;br&gt;second line" style="text;html=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="40" width="240" height="40" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

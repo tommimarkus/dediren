@@ -29,11 +29,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import tools.jackson.databind.JsonNode;
 
 /**
@@ -55,6 +57,20 @@ public final class DedirenTools {
   private static final Pattern VIEW_ID_PATTERN = Pattern.compile("^[A-Za-z0-9][A-Za-z0-9._-]*$");
 
   private static final long INLINE_BYTES = SourceLimits.DEFAULT.maxInputFileBytes();
+
+  /**
+   * The bundled importer ids, in the same order {@link ToolSchemas#IMPORT} advertises them. Both
+   * the validation below and its error message derive from this one set so a newly added importer
+   * cannot update the schema enum without also updating the rejection text (or vice versa).
+   */
+  private static final Set<String> SUPPORTED_IMPORT_PLUGINS =
+      Collections.unmodifiableSet(new LinkedHashSet<>(List.of("mermaid", "dot", "drawio")));
+
+  private static final String SUPPORTED_IMPORT_PLUGINS_MESSAGE =
+      "'plugin' must be one of: "
+          + SUPPORTED_IMPORT_PLUGINS.stream()
+              .map(plugin -> "'" + plugin + "'")
+              .collect(Collectors.joining(", "));
 
   private final Path root;
   private final Engines engines;
@@ -85,9 +101,9 @@ public final class DedirenTools {
     if (plugin == null) {
       return error(DiagnosticCode.COMMAND_INPUT_INVALID, "import requires 'plugin'", null);
     }
-    if (!"mermaid".equals(plugin) && !"dot".equals(plugin)) {
+    if (!SUPPORTED_IMPORT_PLUGINS.contains(plugin)) {
       return error(
-          DiagnosticCode.COMMAND_INPUT_INVALID, "'plugin' must be 'mermaid' or 'dot'", "plugin");
+          DiagnosticCode.COMMAND_INPUT_INVALID, SUPPORTED_IMPORT_PLUGINS_MESSAGE, "plugin");
     }
     String text;
     if (source != null) {
