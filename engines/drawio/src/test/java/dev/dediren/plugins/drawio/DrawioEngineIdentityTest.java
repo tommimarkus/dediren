@@ -3,13 +3,13 @@ package dev.dediren.plugins.drawio;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import dev.dediren.engine.EngineException;
 import org.junit.jupiter.api.Test;
 
 /**
- * Both draw.io engines are skeletons in this step: {@link #id()} and the exporter's artifact kind
- * are already the published contract, but neither engine body is implemented yet, so a call
- * surfaces a structured {@link EngineException} rather than an unstructured runtime failure.
+ * Both draw.io engines are skeletons in this step: the engine id and the exporter's artifact kind
+ * are already the published contract, but neither body is implemented yet, so a call refuses
+ * outright. It refuses as an {@link UnsupportedOperationException} rather than a diagnostic code,
+ * so the scaffold adds no dead entry to the published {@code DEDIREN_DRAWIO_*} vocabulary.
  */
 class DrawioEngineIdentityTest {
   private final DrawioExportEngine exportEngine = new DrawioExportEngine();
@@ -27,18 +27,14 @@ class DrawioEngineIdentityTest {
   }
 
   @Test
-  void theExporterSkeletonSurfacesAStructuralEngineException() {
+  void theExporterSkeletonRefusesInsteadOfReturningAnEmptyArtifact() {
     assertThatThrownBy(() -> exportEngine.export(null, null, null))
-        .isInstanceOf(EngineException.class)
-        .extracting(exception -> ((EngineException) exception).exitCode())
-        .isEqualTo(2);
+        .isInstanceOf(UnsupportedOperationException.class);
   }
 
   @Test
-  void theImporterSkeletonSurfacesAStructuralEngineException() {
+  void theImporterSkeletonRefusesInsteadOfReturningAnEmptyDocument() {
     assertThatThrownBy(() -> importEngine.importSource("anything"))
-        .isInstanceOf(EngineException.class)
-        .extracting(exception -> ((EngineException) exception).exitCode())
-        .isEqualTo(2);
+        .isInstanceOf(UnsupportedOperationException.class);
   }
 }
