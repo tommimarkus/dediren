@@ -151,8 +151,8 @@ the import.
 
 An image shape, an image or background URL, label HTML other than `<br>`,
 `<br/>`, and `<br />`, a link or other interactive attribute, an embedded
-`shape=stencil(...)` payload, a shape parented to a connector, and a cyclic or
-dangling `parent` chain are not part of the supported subset. They are never
+`shape=stencil(...)` payload, and a shape parented to a connector are not part
+of the supported subset. They are never
 silently dropped: each fails the import atomically with
 `DEDIREN_DRAWIO_UNSUPPORTED_CONSTRUCT` so you can rewrite the input without
 them; no partial model is produced.
@@ -1507,17 +1507,20 @@ you can recover from stdout JSON alone.
   attributes were intentionally discarded. Reapply appearance through Dediren
   render policy if needed.
 - `DEDIREN_DRAWIO_SYNTAX_INVALID`: repair the XML at the reported path — the
-  page's decompressed `<diagram>` content is not well-formed mxfile XML.
+  page's content is not well-formed mxfile XML, or its `parent` chain cycles or
+  names no cell. A path reading `(decompressed)` has line and column numbers
+  inside the decoded payload, not the file on disk.
 - `DEDIREN_DRAWIO_UNSUPPORTED_DOCUMENT`: the input is not a `.drawio`/mxfile
   document Dediren recognizes (for example the root element is not
   `<mxfile>` or `<mxGraphModel>`). Re-export the file from draw.io, or point
   Dediren at the actual `.drawio` file.
 - `DEDIREN_DRAWIO_UNSUPPORTED_CONSTRUCT`: an image shape, an image or
   background URL, label HTML other than `<br>`/`<br/>`/`<br />`, a link or
-  other interactive attribute, an embedded `shape=stencil(...)` payload, a
-  shape parented to a connector, or a cyclic/dangling `parent` chain is not
-  part of the supported subset; rewrite the input without it. Import is
-  atomic; no partial model is produced.
+  other interactive attribute, an embedded `shape=stencil(...)` payload, or a
+  shape parented to a connector is not part of the supported subset; rewrite
+  the input without it. Import is atomic; no partial model is produced. A
+  cyclic or dangling `parent` chain is a malformed graph rather than an
+  unsupported feature and reports `DEDIREN_DRAWIO_SYNTAX_INVALID` instead.
 - `DEDIREN_DRAWIO_DECOMPRESSION_FAILED`: a page's `<diagram>` content is
   marked base64+deflate but does not decode and inflate. Re-export the page
   from draw.io, or supply the plain-XML form instead.
