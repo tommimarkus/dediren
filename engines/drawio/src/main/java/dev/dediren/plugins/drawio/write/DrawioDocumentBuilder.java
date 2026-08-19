@@ -20,6 +20,7 @@ import dev.dediren.contracts.source.SourceDocument;
 import dev.dediren.contracts.source.SourceNode;
 import dev.dediren.contracts.source.SourceRelationship;
 import dev.dediren.engine.XmlIds;
+import dev.dediren.plugins.drawio.DrawioLimits;
 import dev.dediren.plugins.drawio.mx.MxCell;
 import dev.dediren.plugins.drawio.mx.MxDiagram;
 import dev.dediren.plugins.drawio.mx.MxFile;
@@ -158,6 +159,22 @@ public final class DrawioDocumentBuilder {
   private final LayoutResult layout;
   private final DrawioExportPolicy policy;
 
+  /**
+   * Page ids and page names already claimed by an earlier page of the same document. Empty and
+   * unshared on the single-view lane, where there is only ever one page to name.
+   */
+  private final Set<String> claimedPageIds;
+
+  private final Set<String> claimedPageNames;
+
+  /**
+   * True on the whole-model lane. It decides one thing: where a page's name comes from. A
+   * single-page document is named by the policy's {@code diagram_name}, which is that policy field's
+   * whole job; a multi-page one cannot be, because every page would then share one name, so a view's
+   * own label names its page and {@code diagram_name} is the fallback.
+   */
+  private final boolean multiPage;
+
   private final List<Diagnostic> diagnostics = new ArrayList<>();
   private final List<MxCell> cells = new ArrayList<>();
 
@@ -175,11 +192,25 @@ public final class DrawioDocumentBuilder {
   /** Resolved once on first use; see {@link #notation()}. */
   private Notation resolvedNotation;
 
+  /**
+   * Set when this page's element-property map exceeded {@link DrawioLimits#MAX_TOKEN_BYTES} and was
+   * left out; the only remaining case {@link #reportDroppedProperties()} has anything to say about.
+   */
+  private boolean elementPropertiesDropped;
+
   private DrawioDocumentBuilder(
-      SourceDocument source, LayoutResult layout, DrawioExportPolicy policy) {
+      SourceDocument source,
+      LayoutResult layout,
+      DrawioExportPolicy policy,
+      Set<String> claimedPageIds,
+      Set<String> claimedPageNames,
+      boolean multiPage) {
     this.source = source;
     this.layout = layout;
     this.policy = policy;
+    this.claimedPageIds = claimedPageIds;
+    this.claimedPageNames = claimedPageNames;
+    this.multiPage = multiPage;
   }
 
   /** Builds the one-page draw.io document for {@code layout}'s view. */
@@ -188,7 +219,45 @@ public final class DrawioDocumentBuilder {
     Objects.requireNonNull(source, "source");
     Objects.requireNonNull(layout, "layout");
     Objects.requireNonNull(policy, "policy");
-    return new DrawioDocumentBuilder(source, layout, policy).build();
+    return new DrawioDocumentBuilder(
+            source, layout, policy, new LinkedHashSet<>(), new LinkedHashSet<>(), false)
+        .build();
+  }
+
+  /**
+   * The whole-model document: one {@code <diagram>} page per supplied laid-out view, in the order
+   * they were supplied.
+   *
+   * <p>Composition is page concatenation and nothing more, which is the reason this notation opts
+   * in to the whole-model lane at all. A draw.io page owns its own mxCell id space — every page
+   * opens with its own {@code "0"} root, {@code "1"} layer, and hidden metadata cell — so two views
+   * cannot collide the way they do in a single-document notation, and no view has to be excluded to
+   * keep the aggregate valid.
+   *
+   * <p><strong>Diagnostics are deduplicated across pages, never within one.</strong> A warning about
+   * the source model rather than about this page — a property map that would not fit, an element
+   * type no shape covers — is raised by every page that meets it, and repeating it once per view is
+   * how a large aggregate buries every other diagnostic in the envelope. Two pages that raise the
+   * literally identical diagnostic are saying one thing once. Anything page-specific names its
+   * element and stays distinct on its own.
+   */
+  public static Document buildModel(
+      SourceDocument source, List<LayoutResult> layouts, DrawioExportPolicy policy) {
+    Objects.requireNonNull(source, "source");
+    Objects.requireNonNull(layouts, "layouts");
+    Objects.requireNonNull(policy, "policy");
+    var pageIds = new LinkedHashSet<String>();
+    var pageNames = new LinkedHashSet<String>();
+    var pages = new ArrayList<MxDiagram>();
+    var diagnostics = new LinkedHashSet<Diagnostic>();
+    for (LayoutResult layout : layouts) {
+      Objects.requireNonNull(layout, "layout");
+      Document page =
+          new DrawioDocumentBuilder(source, layout, policy, pageIds, pageNames, true).build();
+      pages.addAll(page.file().diagrams());
+      diagnostics.addAll(page.diagnostics());
+    }
+    return new Document(new MxFile(List.copyOf(pages)), List.copyOf(diagnostics));
   }
 
   private Document build() {
@@ -344,6 +413,7 @@ public final class DrawioDocumentBuilder {
                     : pluginData.semanticProfile()));
     putIfPresent(attributes, DrawioIdentity.MODEL_SCHEMA_VERSION, source.modelSchemaVersion());
     putIfPresent(attributes, DrawioIdentity.LAYOUT_PREFERENCES, layoutPreferencesJson(pluginData));
+    putIfPresent(attributes, DrawioIdentity.ELEMENT_PROPERTIES, elementPropertiesJson());
     attributes.put("id", METADATA_CELL_ID);
 
     return new MxCell(
@@ -710,20 +780,24 @@ public final class DrawioDocumentBuilder {
   }
 
   /**
-   * Names every {@code properties} entry this export cannot carry.
+   * Names every {@code properties} entry this export cannot carry — which, since the page carries a
+   * property map on its hidden metadata cell, is now only the case when that map would not fit.
    *
-   * <p>mxGraph has one extension point — the {@code <object>} wrapper's attribute set — and putting
-   * a model's whole property tree through it would show a user opaque JSON in draw.io's Edit Data
-   * dialog. Exactly one property is carried instead ({@link DrawioIdentity#UML_SEQUENCE}), because
-   * a Message without it is not a valid model at all; the rest are declared lost here. Silence was
-   * the worse half of that defect: the artifact re-imported green and the next command rejected the
-   * model with nothing to connect the two.
+   * <p>The warning used to fire on every export with a property anywhere in the model, because
+   * exactly one property was carried and the rest were declared lost. It has to stop saying that:
+   * a diagnostic that fires on the ordinary case is one a reader learns to skip, and it would now
+   * be false as well. What remains is the real residual — {@link DrawioLimits#MAX_TOKEN_BYTES}
+   * bounds one attribute value, so a model whose page needs a larger map than that keeps the
+   * picture and loses the properties, exactly as every page did before.
    *
    * <p>One diagnostic per view, counting property paths rather than elements, for the same reason
    * {@link #reportOmittedOrnaments()} aggregates: a fifty-message sequence diagram would otherwise
    * bury every other diagnostic in the envelope.
    */
   private void reportDroppedProperties() {
+    if (!elementPropertiesDropped) {
+      return;
+    }
     var dropped = new TreeMap<String, Integer>();
     for (LaidOutNode node : layout.nodes()) {
       collectDroppedProperties(sourceNodeById().get(node.sourceId()), null, dropped);
@@ -742,8 +816,10 @@ public final class DrawioDocumentBuilder {
         new Diagnostic(
             DiagnosticCode.DRAWIO_PROPERTIES_DROPPED.code(),
             DiagnosticSeverity.WARNING,
-            "draw.io has nowhere to keep element properties, so these are not in the exported"
-                + " file and will not come back if it is re-imported: "
+            "this view's element properties do not fit the "
+                + DrawioLimits.MAX_TOKEN_BYTES
+                + " byte ceiling on one draw.io attribute, so they are not in the exported file and"
+                + " will not come back if it is re-imported: "
                 + dropped.entrySet().stream()
                     .map(entry -> entry.getKey() + " (" + entry.getValue() + ")")
                     .collect(Collectors.joining(", "))
@@ -890,18 +966,44 @@ public final class DrawioDocumentBuilder {
 
   // ---------------------------------------------------------------- page identity
 
+  /**
+   * The page's own id, slugged from the view id and made unique against the pages already written.
+   *
+   * <p>Uniquifying rather than numbering is what keeps a model's first view addressable as itself:
+   * {@code DrawioSourceMapper} materializes the view id {@code main} for a page one that declares
+   * none, and {@code CoreCommands.renderImportedMain} projects exactly that id, so a page one whose
+   * view is {@code main} has to stay {@code main}.
+   */
   private String pageId() {
-    return layout.viewId() == null ? "page-1" : XmlIds.slug(layout.viewId());
+    return XmlIds.unique(
+        claimedPageIds,
+        layout.viewId() == null ? "page-" + (claimedPageIds.size() + 1) : XmlIds.slug(layout.viewId()));
   }
 
-  /** The per-view override where the policy carries one, otherwise the policy's page name. */
+  /**
+   * The per-view override where the policy carries one; on the whole-model lane the view's own
+   * label next, because one {@code diagram_name} cannot name every page; the policy's page name
+   * otherwise. Deduplicated against the pages already written — two views may carry the same label,
+   * and two identically named draw.io pages are legal but unnavigable, and collapse into one view
+   * label on re-import.
+   */
   private String pageName() {
+    return XmlIds.unique(claimedPageNames, preferredPageName());
+  }
+
+  private String preferredPageName() {
     if (layout.viewId() == null) {
       return policy.diagramName();
     }
     DrawioExportPolicy.ViewIdentity override = policy.views().get(layout.viewId());
     if (override != null && override.diagramName() != null && !override.diagramName().isBlank()) {
       return override.diagramName();
+    }
+    if (multiPage) {
+      GenericGraphView view = exportedView(genericGraphData());
+      if (view != null && view.label() != null && !view.label().isBlank()) {
+        return view.label();
+      }
     }
     return policy.diagramName();
   }
@@ -942,6 +1044,73 @@ public final class DrawioDocumentBuilder {
       return null;
     }
     return JsonSupport.objectMapper().writeValueAsString(view.layoutPreferences());
+  }
+
+  /**
+   * The page's element properties as compact JSON, or {@code null} when this page carries none.
+   *
+   * <p><strong>Every property, not the subset the notation layer happens to read today.</strong> A
+   * subset is a second contract nobody would remember to extend: the day a notation starts sizing a
+   * shape from a new property, an export written against the old subset stops being idempotent and
+   * says nothing about it. The cell competes with nothing for space and is bounded by {@link
+   * DrawioLimits#MAX_TOKEN_BYTES}, which the repository's largest fixture uses about six percent of,
+   * so there is no size argument to trade the completeness against.
+   *
+   * <p><strong>Only this page's elements.</strong> The whole model on every page would repeat one
+   * blob per view and grow the file with the product of views and elements, for no gain — the pages
+   * of an aggregate are re-imported into one document, so an element drawn on another page is
+   * present regardless of which page's map declared it.
+   *
+   * <p>Keyed by the id the <em>importer</em> will give the element, which is the laid-out id rather
+   * than the source id: {@link DrawioIdentity#ID} is what a re-import restores identity from. For a
+   * semantic boundary, whose element is a document node no page draws a box for, that is the
+   * semantic source id the container names.
+   */
+  private String elementPropertiesJson() {
+    var carried = new TreeMap<String, Map<String, JsonNode>>();
+    for (LaidOutNode node : layout.nodes()) {
+      putProperties(carried, node.id(), sourceNodeById().get(node.sourceId()));
+    }
+    for (LaidOutGroup group : layout.groups()) {
+      String semanticSourceId = LaidOutGroups.semanticSourceId(group);
+      if (semanticSourceId != null) {
+        putProperties(carried, semanticSourceId, sourceNodeById().get(semanticSourceId));
+      }
+    }
+    for (LaidOutEdge edge : layout.edges()) {
+      SourceRelationship relationship = sourceRelationshipById().get(edge.sourceId());
+      if (relationship != null) {
+        putProperties(carried, edge.id(), relationship.properties());
+      }
+    }
+    if (carried.isEmpty()) {
+      return null;
+    }
+    String json = JsonSupport.objectMapper().writeValueAsString(carried);
+    if (DrawioLimits.utf8Length(json) > DrawioLimits.MAX_TOKEN_BYTES) {
+      // Writing it anyway would produce a file this build's own importer refuses with
+      // DEDIREN_DRAWIO_TOKEN_LIMIT_EXCEEDED. Degrade to the pre-channel behaviour instead: the
+      // picture still opens, and reportDroppedProperties says exactly what did not come with it.
+      elementPropertiesDropped = true;
+      return null;
+    }
+    return json;
+  }
+
+  private void putProperties(
+      Map<String, Map<String, JsonNode>> carried, String elementId, SourceNode node) {
+    if (node != null) {
+      putProperties(carried, elementId, node.properties());
+    }
+  }
+
+  private static void putProperties(
+      Map<String, Map<String, JsonNode>> carried,
+      String elementId,
+      Map<String, JsonNode> properties) {
+    if (elementId != null && properties != null && !properties.isEmpty()) {
+      carried.putIfAbsent(elementId, properties);
+    }
   }
 
   /** The source view this layout result belongs to, or {@code null} when it names none. */

@@ -319,9 +319,11 @@ one part of the file that does not survive a real editing session. The names are
 camelCase because draw.io's Edit Data dialog shows them to a human verbatim.
 
 One hidden, unlabelled metadata cell per page (`dedirenType="dediren.view"`)
-carries what belongs to the view rather than to any element: semantic profile,
-view id, view kind, model schema version, and the layout preferences. The
-importer consumes it as metadata and never emits it as a node.
+carries what does not belong on an element's own visible wrapper: semantic
+profile, view id, view kind, model schema version, the layout preferences, and
+`dedirenElementProperties` — the page's element `properties`, keyed by element
+id (see [Round trip](#round-trip) below for why they ride
+here). The importer consumes the cell as metadata and never emits it as a node.
 
 Shapes are chosen by the view's declared kind: the eight `uml-*` kinds read the
 UML table, everything else reads ArchiMate, and a type the primary table does not

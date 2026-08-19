@@ -163,11 +163,14 @@ labels, edge endpoints, group roles, and the element a semantic boundary
 stands for — including a package or region the view draws only as its
 boundary. One hidden metadata cell per page carries the view id, kind,
 semantic profile, model schema version, and the view's `layout_preferences`,
-so a re-import lays the page out the way the export did. Element `properties`
-are the one thing that does not survive: mxGraph has nowhere to keep them, and
-the export names every dropped path in a `DEDIREN_DRAWIO_PROPERTIES_DROPPED`
-warning (only a UML `Message`'s `uml.sequence` is carried). Treat the source
-model, not the `.drawio`, as the record of truth.
+so a re-import lays the page out the way the export did. The same hidden cell
+carries every element's `properties`, keyed by element id, so a required
+property such as `Port.component`, `Transition.region` or a UML `Message`'s
+`uml.sequence` survives the trip; a view whose property map would exceed the
+64 KiB ceiling on one attribute loses it, and the export says so in a
+`DEDIREN_DRAWIO_PROPERTIES_DROPPED` warning. Geometry never survives — every
+import lane re-lays the page out. Treat the source model, not the `.drawio`,
+as the record of truth.
 
 Limits are 64 MiB input, 64 MiB decompressed content summed across every
 page, 256 pages, 200000 cells, 100000 produced elements, 256 nesting levels,
@@ -1564,14 +1567,15 @@ you can recover from stdout JSON alone.
   own — the exporter computes it from the model and will compute it again — so
   only a hand-drawn cell's appearance, and any unrecognized custom attribute,
   is reported.
-- `DEDIREN_DRAWIO_PROPERTIES_DROPPED`: export succeeded, but mxGraph has
-  nowhere to keep element `properties`, so the named property paths are not in
-  the exported file and will not come back if it is re-imported. Only a UML
-  `Message`'s `uml.sequence` is carried (on the edge's `<object>` wrapper),
-  because a Message is invalid without it. Keep the source model as the record
-  of truth; re-import the `.drawio` to recover structure, geometry and
-  identity, not properties. A re-imported model missing a *required* property
-  (for example `Port.component`, `Transition.region`,
+- `DEDIREN_DRAWIO_PROPERTIES_DROPPED`: export succeeded, but this view's
+  element `properties` do not fit the 64 KiB ceiling on one draw.io attribute,
+  so the named property paths are not in the exported file and will not come
+  back if it is re-imported. Properties normally ride the page's hidden
+  metadata cell keyed by element id and survive a round trip, so this warning
+  now means only "too large", not "unsupported": split the view, or keep the
+  source model as the record of truth and re-import the `.drawio` for
+  structure and identity alone. A re-imported model missing a *required*
+  property (for example `Port.component`, `Transition.region`,
   `ExecutionSpecification.covered`) will be rejected by the next `validate` or
   `project` call with a `DEDIREN_UML_*` code — this warning names it first.
 - `DEDIREN_DRAWIO_CELLS_SKIPPED`: import succeeded, but some cells were left

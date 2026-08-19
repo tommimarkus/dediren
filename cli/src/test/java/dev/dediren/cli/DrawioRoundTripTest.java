@@ -5,6 +5,10 @@ import static org.assertj.core.groups.Tuple.tuple;
 
 import dev.dediren.contracts.DiagnosticCode;
 import dev.dediren.contracts.json.JsonSupport;
+import dev.dediren.contracts.layout.LayoutResult;
+import dev.dediren.contracts.source.SourceDocument;
+import dev.dediren.engine.ModelExportRequest;
+import dev.dediren.plugins.drawio.DrawioExportEngine;
 import dev.dediren.testsupport.TestSupport;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -58,15 +62,9 @@ class DrawioRoundTripTest {
    *
    * <p>Sweeping all seventeen checked-in (source, layout) pairs through the whole pipeline is what
    * chose the other seeds used below, and the sweep is worth recording because it is the only
-   * measurement of what the lane can actually re-import. Eleven of the seventeen now complete
-   * {@code export → import → project}. The six that do not — {@code uml-component-basic}, {@code
-   * uml-use-case-basic}, {@code uml-sequence-lifecycle} and the three state-machine fixtures — all
-   * stop at the same place and for one reason: a required UML ownership property ({@code
-   * Port.component}, {@code ExtensionPoint.use_case}, {@code Transition.region}, {@code
-   * ExecutionSpecification.covered}) that mxGraph has nowhere to keep. The export now names each
-   * one in a {@code DEDIREN_DRAWIO_PROPERTIES_DROPPED} warning as it writes the file, and {@link
-   * #dedirenAuthoredNestedBoundariesRoundTripWithTheirUnlaidPackage} pins that residual so it stays
-   * visible rather than latent.
+   * measurement of what the lane can actually re-import. All seventeen now complete {@code export →
+   * import → project}, and sixteen reach a byte-identical fixed point; the one that does not is
+   * {@link #NOT_YET_A_FIXED_POINT}, and its cause is not a property this export drops.
    */
   private static final String SOURCE_FIXTURE = "fixtures/source/valid-uml-basic.json";
 
@@ -216,10 +214,11 @@ class DrawioRoundTripTest {
    * {@code component-view} nests two component boundaries inside a package boundary and the package
    * is laid out by nothing, which is both halves of the defect at once.
    *
-   * <p>The trailing assertion is the honest part: this model still cannot complete the pipeline,
-   * because {@code Port.component} is required and mxGraph has nowhere to keep it. That is
-   * disclosed on export rather than discovered later, and pinned here so it stays a known residual
-   * instead of a latent one.
+   * <p>The trailing assertion used to be the honest part: this model could not complete the
+   * pipeline, because {@code Port.component} is required and mxGraph had nowhere to keep it. It has
+   * somewhere now — the hidden metadata cell's element-property map — so the assertion is the
+   * closure of that residual rather than its record, and it fails if the property stops making the
+   * crossing.
    */
   @Test
   void dedirenAuthoredNestedBoundariesRoundTripWithTheirUnlaidPackage() throws Exception {
@@ -261,12 +260,16 @@ class DrawioRoundTripTest {
             },
             "");
     assertThat(projected.exitCode())
-        .describedAs("the known residual: a required UML ownership property has nowhere to ride")
-        .isEqualTo(3);
-    assertThat(projected.stdout()).contains("Port.component");
+        .describedAs(
+            "Port.component rode the metadata cell and the model is valid again: %s",
+            projected.stdout())
+        .isZero();
+    assertThat(model.at("/nodes").toString())
+        .describedAs("and it came back as the model's own property, not as a reconstruction")
+        .contains("\"component\":\"component-order-api\"");
     assertThat(exportCodes(path(NESTED_SOURCE_FIXTURE), path(NESTED_LAYOUT_FIXTURE)))
-        .describedAs("and the export said so, at the moment it wrote the file")
-        .contains(DiagnosticCode.DRAWIO_PROPERTIES_DROPPED.code());
+        .describedAs("so the export has nothing left to declare lost")
+        .doesNotContain(DiagnosticCode.DRAWIO_PROPERTIES_DROPPED.code());
   }
 
   /**
@@ -323,10 +326,10 @@ class DrawioRoundTripTest {
     assertThat(messageSequences(trip.model()))
         .describedAs("every Message comes back with the ordering it was exported with")
         .containsExactly(1, 2, 3);
-    // The other half of the same defect: everything else under properties is still dropped, and
-    // the export now says which, instead of leaving it to be discovered a command later.
+    // The other half of the same defect: everything else under properties used to be dropped, and
+    // rides the hidden metadata cell now, so there is nothing left for the export to declare lost.
     assertThat(exportCodes(path(SEQUENCE_SOURCE_FIXTURE), path(SEQUENCE_LAYOUT_FIXTURE)))
-        .contains(DiagnosticCode.DRAWIO_PROPERTIES_DROPPED.code());
+        .doesNotContain(DiagnosticCode.DRAWIO_PROPERTIES_DROPPED.code());
   }
 
   // ---------------------------------------------------------------- round trip 2: foreign
@@ -473,42 +476,42 @@ class DrawioRoundTripTest {
 
   /** How a fixture that cannot reach the fixed point fails, so the exclusion can be re-checked. */
   private enum Residual {
-    /** {@code project} rejects the re-imported model, so there is no second export at all. */
-    PROJECT_REJECTS_THE_REIMPORTED_MODEL,
     /** The second export succeeds and draws the same graph at different coordinates. */
     LAYS_OUT_DIFFERENTLY
   }
 
   /**
-   * The fixtures that do not reach the fixed point, and every one of them for the same reason.
+   * The one fixture that does not reach the fixed point, and why it is not a property this export
+   * drops.
    *
-   * <p><strong>One root cause, two symptoms.</strong> mxGraph has nowhere to keep an element's
-   * {@code properties}, and this export carries exactly one of them ({@code uml.sequence}, on the
-   * edge wrapper, because a Message is invalid without it). Everything else is dropped, which shows
-   * up in two ways. Six models become invalid: a required UML ownership property — {@code
-   * Port.component}, {@code ExtensionPoint.use_case}, {@code Transition.region}, {@code
-   * ExecutionSpecification.covered} — is gone, so {@code project} rejects the re-imported model
-   * before a second export can happen. Two more stay valid and move: {@code UmlNotationSemantics}
-   * sizes a Class box from {@code uml.attributes}/{@code uml.operations} and builds a sequence
-   * fragment's layout intents from {@code uml.covered}, so without them ELK draws the same graph at
-   * different coordinates ({@code class-customer} 300×190 → 220×120; {@code m1@46.0} → {@code m1}).
+   * <p><strong>What used to be here.</strong> Eight fixtures failed, all for one reason: mxGraph had
+   * nowhere to keep an element's {@code properties}. Six became invalid on re-import — a required
+   * UML ownership property ({@code Port.component}, {@code ExtensionPoint.use_case}, {@code
+   * Transition.region}, {@code ExecutionSpecification.covered}) was gone, so {@code project}
+   * rejected the model before a second export could happen — and two stayed valid and moved,
+   * because {@code UmlNotationSemantics} sizes a Class box from {@code uml.attributes}/{@code
+   * uml.operations}. All eight are closed by {@link
+   * dev.dediren.plugins.drawio.write.DrawioIdentity#ELEMENT_PROPERTIES}, a per-element property map
+   * on the hidden metadata cell.
    *
-   * <p>Excluding them here is not a weakening of the assertion — {@link
-   * #everyFixtureStillExcludedFromTheFixedPointStillNeedsToBe} re-measures every entry and fails
-   * when one starts passing, so the list can only shrink deliberately. The general remedy is a
-   * property channel on the {@code <object>} wrapper, which is a product decision (it puts model
-   * JSON in front of a user in draw.io's Edit Data dialog) and is not taken here.
+   * <p><strong>What is left, and why it is a different defect.</strong> {@code
+   * uml-sequence-fragments} declares ten {@code CombinedFragment}/{@code InteractionOperand}
+   * elements in {@code views[].nodes}, and the layout result lays out none of them: the notation
+   * layer consumes them to size the interaction frame and emits no box. A {@code .drawio} is a
+   * picture of a layout result, so an element with no geometry has no cell, and an element with no
+   * cell is not in the file at all — its properties included. The re-imported view therefore
+   * declares five nodes where the original declared fifteen, and the frame comes back 848×440
+   * instead of 848×760. Carrying more properties cannot reach it; what is missing is the element,
+   * not its properties, and supplying one would mean either inventing geometry the exporter
+   * deliberately never invents or adding a second identity channel for view members no page draws.
+   * That is a separate decision and is not taken here.
+   *
+   * <p>Excluding it is not a weakening of the assertion — {@link
+   * #everyFixtureStillExcludedFromTheFixedPointStillNeedsToBe} re-measures the entry and fails when
+   * it starts passing, so the list can only shrink deliberately.
    */
   private static final Map<String, Residual> NOT_YET_A_FIXED_POINT =
-      Map.of(
-          "uml-component-basic.json", Residual.PROJECT_REJECTS_THE_REIMPORTED_MODEL,
-          "uml-use-case-basic.json", Residual.PROJECT_REJECTS_THE_REIMPORTED_MODEL,
-          "uml-sequence-lifecycle.json", Residual.PROJECT_REJECTS_THE_REIMPORTED_MODEL,
-          "uml-state-machine-basic.json", Residual.PROJECT_REJECTS_THE_REIMPORTED_MODEL,
-          "uml-state-machine-two-node-cycle.json", Residual.PROJECT_REJECTS_THE_REIMPORTED_MODEL,
-          "uml-state-machine-multi-cycle.json", Residual.PROJECT_REJECTS_THE_REIMPORTED_MODEL,
-          "uml-complex-class.json", Residual.LAYS_OUT_DIFFERENTLY,
-          "uml-sequence-fragments.json", Residual.LAYS_OUT_DIFFERENTLY);
+      Map.of("uml-sequence-fragments.json", Residual.LAYS_OUT_DIFFERENTLY);
 
   static List<Arguments> fixtureCorpus() {
     return corpus(mapping -> !NOT_YET_A_FIXED_POINT.containsKey(mapping.fixtureName()));
@@ -540,7 +543,11 @@ class DrawioRoundTripTest {
   @MethodSource("excludedCorpus")
   void everyFixtureStillExcludedFromTheFixedPointStillNeedsToBe(
       String name, String sourceFile, String viewId) throws Exception {
-    Residual residual = NOT_YET_A_FIXED_POINT.get(name + ".json");
+    assertThat(NOT_YET_A_FIXED_POINT.get(name + ".json"))
+        .describedAs(
+            "one residual mode is recorded and re-measured below; a second mode needs its own"
+                + " measurement rather than this one")
+        .isEqualTo(Residual.LAYS_OUT_DIFFERENTLY);
     Path source = path("fixtures/source/" + sourceFile);
     String first = pipeline(source, viewId, name + "-x1");
 
@@ -564,15 +571,6 @@ class DrawioRoundTripTest {
               reimported.toString()
             },
             "");
-    if (residual == Residual.PROJECT_REJECTS_THE_REIMPORTED_MODEL) {
-      assertThat(projected.exitCode())
-          .describedAs(
-              "%s now projects cleanly, so it no longer belongs in NOT_YET_A_FIXED_POINT: %s",
-              name, projected.stdout())
-          .isNotZero();
-      return;
-    }
-
     assertThat(projected.exitCode())
         .describedAs("%s is recorded as laying out differently, not as failing to project", name)
         .isZero();
@@ -645,6 +643,81 @@ class DrawioRoundTripTest {
     assertThat(second.out()).isEqualTo(first.out());
     assertThat(DrawioEquivalence.withTypedIdentity(second.out()))
         .isEqualTo(DrawioEquivalence.withTypedIdentity(first.out()));
+  }
+
+  /**
+   * The whole-model aggregate's own fixed point, through the same real ELK the per-view lane uses.
+   *
+   * <p>Three views of one model become one three-page {@code .drawio}; that file re-imports as a
+   * three-view model; laying those three views out and composing them again must produce the same
+   * bytes. The aggregate can fail in ways no single page can — a page id or page name that collides
+   * with an earlier page's, a view whose id is not restored so page one silently becomes {@code
+   * main}, an element drawn on two pages whose properties are read from whichever page happened to
+   * be scanned first — and every one of them shows up here as drifting bytes.
+   *
+   * <p>{@link dev.dediren.plugins.drawio.DrawioExportEngine#exportModel} is called directly rather
+   * than through a command, because no command drives a whole-model draw.io export yet: {@code
+   * BuildCommand} composes aggregates for the OEF and UML/XMI lanes only. The engine's opt-in is
+   * implemented and covered; wiring a driver to it is a separate change.
+   */
+  @Test
+  void theWholeModelAggregateReachesAByteIdenticalFixedPoint() throws Exception {
+    List<String> views = List.of("class-view", "data-view", "activity-view");
+    String first = aggregate(path(SOURCE_FIXTURE), views, "agg1");
+
+    Path model =
+        writeJson(
+            "agg-model.json",
+            stage("import", "--plugin", "drawio", "--input", write("agg.drawio", first).toString())
+                .get("data"));
+    List<String> restored = new ArrayList<>();
+    JsonSupport.readTree(Files.readString(model, StandardCharsets.UTF_8))
+        .at("/plugins/generic-graph/views")
+        .forEach(view -> restored.add(view.path("id").asString()));
+    assertThat(restored)
+        .describedAs("one page per view, each keeping its own id, in build order")
+        .isEqualTo(views);
+
+    assertThat(aggregate(model, restored, "agg2")).isEqualTo(first);
+  }
+
+  /** One whole-model export of {@code views}, each laid out by the real ELK first. */
+  private String aggregate(Path model, List<String> views, String label) throws Exception {
+    var laidOut = new ArrayList<ModelExportRequest.ViewLayout>();
+    for (String view : views) {
+      JsonNode request =
+          stage(
+              "project",
+              "--plugin",
+              "generic-graph",
+              "--target",
+              "layout-request",
+              "--view",
+              view,
+              "--input",
+              model.toString());
+      Path requestFile = writeJson(label + "-" + view + "-request.json", request.get("data"));
+      JsonNode result =
+          stage("layout", "--plugin", "elk-layout", "--input", requestFile.toString());
+      laidOut.add(
+          new ModelExportRequest.ViewLayout(
+              view,
+              JsonSupport.objectMapper().treeToValue(result.get("data"), LayoutResult.class)));
+    }
+    return new DrawioExportEngine()
+        .exportModel(
+            new ModelExportRequest(
+                JsonSupport.objectMapper()
+                    .readValue(
+                        Files.readString(model, StandardCharsets.UTF_8), SourceDocument.class),
+                laidOut,
+                JsonSupport.readTree(
+                    Files.readString(path(EXPORT_POLICY), StandardCharsets.UTF_8))),
+            Map.of(),
+            Path.of("").toAbsolutePath())
+        .orElseThrow(() -> new AssertionError("the draw.io lane opts in to exportModel"))
+        .value()
+        .content();
   }
 
   // ---------------------------------------------------------------- the pipeline

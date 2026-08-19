@@ -411,12 +411,17 @@ class DrawioDocumentBuilderTest {
   }
 
   /**
-   * The other half of the same defect, and the worse one: everything else under {@code properties}
-   * is dropped, and it used to be dropped in silence. A file that will not re-import as a valid
-   * model has to say so at the moment it is written.
+   * The other half of the same defect, and the worse one: everything under {@code properties} used
+   * to be dropped, in silence at first and then with a warning. It is carried now — on the hidden
+   * metadata cell, keyed by element id, in one attribute rather than one per element — and the
+   * warning that named the losses has nothing left to name.
+   *
+   * <p>Keys are sorted, and that is load-bearing rather than tidy: it is what makes the attribute a
+   * function of the model's content instead of the order a layout result happened to list its
+   * elements in, and therefore what makes {@code export → import → export} byte-identical.
    */
   @Test
-  void namesTheModelPropertiesTheFormatCannotCarry() {
+  void carriesTheModelPropertiesMxGraphHasNoPlaceForOnTheMetadataCell() {
     var document =
         DrawioDocumentBuilder.build(
             umlSequenceSource(),
@@ -435,15 +440,17 @@ class DrawioDocumentBuilderTest {
                 List.of()),
             POLICY);
 
-    Diagnostic dropped =
-        diagnostic(document, DiagnosticCode.DRAWIO_PROPERTIES_DROPPED)
-            .orElseThrow(() -> new AssertionError("no properties-dropped diagnostic"));
-    assertThat(dropped.severity()).isEqualTo(DiagnosticSeverity.WARNING);
-    assertThat(dropped.message())
-        .contains("uml.interaction")
-        .contains("uml.message_sort")
-        .describedAs("the one property this export does carry is not reported as lost")
-        .doesNotContain("uml.sequence");
+    String carried =
+        metadataCell(document).object().attributes().get(DrawioIdentity.ELEMENT_PROPERTIES);
+    assertThat(carried).contains("interaction").contains("message_sort");
+    var keys = new java.util.ArrayList<String>();
+    JsonSupport.readTree(carried).propertyNames().forEach(keys::add);
+    assertThat(keys)
+        .describedAs("sorted, so the attribute does not depend on layout-result ordering")
+        .isSorted();
+    assertThat(diagnostic(document, DiagnosticCode.DRAWIO_PROPERTIES_DROPPED))
+        .describedAs("and nothing is left to declare lost")
+        .isEmpty();
   }
 
   /** A model with no element properties says nothing, so the warning keeps its signal. */

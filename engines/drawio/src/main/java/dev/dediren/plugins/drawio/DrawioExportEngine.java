@@ -9,6 +9,7 @@ import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.engine.EngineException;
 import dev.dediren.engine.EngineResult;
 import dev.dediren.engine.ExportEngine;
+import dev.dediren.engine.ModelExportRequest;
 import dev.dediren.plugins.drawio.mx.MxWriter;
 import dev.dediren.plugins.drawio.write.DrawioDocumentBuilder;
 import java.nio.file.Path;
@@ -63,6 +64,45 @@ public final class DrawioExportEngine implements ExportEngine {
     return new EngineResult<>(
         new ExportResult(ContractVersions.EXPORT_RESULT_SCHEMA_VERSION, ARTIFACT_KIND, content),
         document.diagnostics());
+  }
+
+  /**
+   * The whole-model export: one {@code .drawio} carrying every supplied laid-out view, one {@code
+   * <diagram>} page per view, in the order the driver supplied them.
+   *
+   * <p><strong>Why this notation opts in where UML/XMI trails.</strong> {@code exportModel} is an
+   * opt-in because a notation needs somewhere to put a second view without the two interfering.
+   * draw.io is natively multi-page and a page owns its own mxCell id space, so the aggregate is
+   * page concatenation: nothing is merged, nothing collides, and — unlike the XMI lane, which has to
+   * restrict itself to the class family to keep {@code xmi:id}s apart — no view has to be left out.
+   * Every page keeps its own hidden {@code dediren.view} metadata cell, so the aggregate re-imports
+   * as the multi-view document it was exported from.
+   *
+   * <p>Empty in, empty out: a driver that supplies no view gets no artifact rather than an empty
+   * one, matching the OEF lane. Policy validation is the single-view lane's, unchanged — a policy
+   * this engine cannot read is still the one thing that stops a draw.io export.
+   */
+  @Override
+  public java.util.Optional<EngineResult<ExportResult>> exportModel(
+      ModelExportRequest request, Map<String, String> env, Path productRoot)
+      throws EngineException {
+    Objects.requireNonNull(request, "request");
+    if (request.views().isEmpty()) {
+      return java.util.Optional.empty();
+    }
+    DrawioExportPolicy policy = readPolicy(request.policy());
+
+    DrawioDocumentBuilder.Document document =
+        DrawioDocumentBuilder.buildModel(
+            request.source(),
+            request.views().stream().map(ModelExportRequest.ViewLayout::layout).toList(),
+            policy);
+    String content = MxWriter.write(document.file());
+
+    return java.util.Optional.of(
+        new EngineResult<>(
+            new ExportResult(ContractVersions.EXPORT_RESULT_SCHEMA_VERSION, ARTIFACT_KIND, content),
+            document.diagnostics()));
   }
 
   private static DrawioExportPolicy readPolicy(JsonNode policy) throws EngineException {

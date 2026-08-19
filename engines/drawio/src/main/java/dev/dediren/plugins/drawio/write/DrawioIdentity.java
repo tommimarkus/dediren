@@ -95,6 +95,34 @@ public final class DrawioIdentity {
    */
   public static final String LAYOUT_PREFERENCES = "dedirenLayoutPreferences";
 
+  /**
+   * On the per-page metadata cell: the {@code properties} of every element the page carries, as a
+   * JSON object keyed by element id.
+   *
+   * <p><strong>Why here and not on the element's own wrapper.</strong> A general {@code
+   * dedirenProperties} attribute beside {@link #ID} was the obvious shape and is the wrong one:
+   * draw.io's Edit Data dialog shows a wrapper's attributes to whoever right-clicks the shape, so
+   * it would put raw model JSON in front of an ordinary user. This cell is hidden and has no
+   * editing surface, which is the same reason {@link #LAYOUT_PREFERENCES} rides it.
+   *
+   * <p><strong>Why it has to exist at all.</strong> mxGraph has nowhere else to keep element
+   * properties, and losing them is not cosmetic: a required UML ownership property ({@code
+   * Port.component}, {@code ExtensionPoint.use_case}, {@code Transition.region}, {@code
+   * ExecutionSpecification.covered}) makes the re-imported model invalid, and {@code
+   * uml.attributes}/{@code uml.operations} decide how large a Class is drawn, so a model that
+   * survives without them still comes back as a different picture.
+   *
+   * <p>Keys are sorted, so the attribute is a function of the model's content and not of the order
+   * a layout result happened to list its elements in — which is what makes {@code export → import →
+   * export} byte-identical. Values keep the model's own key order, because they are the model's own
+   * JSON round-tripped rather than re-spelled.
+   *
+   * <p>Element ids are unique across nodes <em>and</em> relationships ({@code
+   * SourceValidator.validateSourceDocument} checks both against one set), so one flat map needs no
+   * node/relationship split to stay unambiguous.
+   */
+  public static final String ELEMENT_PROPERTIES = "dedirenElementProperties";
+
   /** {@link #TYPE} of the one hidden metadata cell each page carries. */
   public static final String VIEW_TYPE = "dediren.view";
 

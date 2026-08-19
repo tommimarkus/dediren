@@ -111,6 +111,7 @@ public final class DrawioSourceMapper {
   private static final String ATTR_PROFILE = DrawioIdentity.SEMANTIC_PROFILE;
   private static final String ATTR_MODEL_VERSION = DrawioIdentity.MODEL_SCHEMA_VERSION;
   private static final String ATTR_LAYOUT_PREFERENCES = DrawioIdentity.LAYOUT_PREFERENCES;
+  private static final String ATTR_ELEMENT_PROPERTIES = DrawioIdentity.ELEMENT_PROPERTIES;
 
   /** Wrapper attributes the mapper consumes; anything else on a wrapper is a discarded hint. */
   private static final Set<String> CONSUMED_ATTRIBUTES =
@@ -130,7 +131,8 @@ public final class DrawioSourceMapper {
           ATTR_VIEW_KIND,
           ATTR_PROFILE,
           ATTR_MODEL_VERSION,
-          ATTR_LAYOUT_PREFERENCES);
+          ATTR_LAYOUT_PREFERENCES,
+          ATTR_ELEMENT_PROPERTIES);
 
   /** Longest attacker-supplied fragment echoed into a published diagnostic. */
   private static final int ECHO_LIMIT = 80;
@@ -157,6 +159,17 @@ public final class DrawioSourceMapper {
    * only a boundary that carried a type can produce one.
    */
   private final Map<String, CarriedElement> carriedSemanticSources = new LinkedHashMap<>();
+
+  /**
+   * The element {@code properties} the pages carry on their hidden metadata cells, keyed by element
+   * id and merged across every page before any element is built.
+   *
+   * <p>Document-scoped rather than page-scoped because the element a semantic boundary stands for
+   * is rebuilt after every page has been read, and because an element drawn on two pages is built
+   * once. First page to declare an id wins, which is the rule {@link #addNode} already applies to
+   * that element's type and label.
+   */
+  private final Map<String, Map<String, JsonNode>> carriedProperties = new LinkedHashMap<>();
 
   /** The dediren ids of cells that map to nodes — the only ids a semantic boundary may name. */
   private final Set<String> nodeDedirenIds = new LinkedHashSet<>();
@@ -450,6 +463,8 @@ public final class DrawioSourceMapper {
       scan.viewId = declaredViewId;
     }
 
+    readElementProperties(scan, attributes.get(ATTR_ELEMENT_PROPERTIES));
+
     String declaredPreferences = attributes.get(ATTR_LAYOUT_PREFERENCES);
     if (declaredPreferences != null && !declaredPreferences.isBlank()) {
       // MxReader already refused any attribute value over DrawioLimits.MAX_TOKEN_BYTES, so the
@@ -468,6 +483,62 @@ public final class DrawioSourceMapper {
             scan.metadata);
       }
     }
+  }
+
+  /**
+   * Restores the element {@code properties} the page carries on its metadata cell.
+   *
+   * <p>Bounded and typed rather than best-effort, exactly as {@code layout_preferences} is: {@code
+   * MxReader} has already refused any attribute value over {@link DrawioLimits#MAX_TOKEN_BYTES}, so
+   * the string is bounded before it is parsed, and an unreadable one is refused rather than skipped
+   * — silently importing a model with the properties missing is precisely the green-import,
+   * rejected-next-command failure this channel exists to close.
+   */
+  private void readElementProperties(PageScan scan, String declared) throws EngineException {
+    if (declared == null || declared.isBlank()) {
+      return;
+    }
+    JsonNode parsed;
+    try {
+      parsed = JsonSupport.objectMapper().readTree(declared);
+    } catch (JacksonException unreadable) {
+      throw roundTripInvalid(
+          ATTR_ELEMENT_PROPERTIES
+              + " is not readable JSON: "
+              + echo(unreadable.getOriginalMessage()),
+          scan,
+          scan.metadata);
+    }
+    if (!parsed.isObject()) {
+      throw roundTripInvalid(
+          ATTR_ELEMENT_PROPERTIES + " is not an object keyed by element id", scan, scan.metadata);
+    }
+    for (String elementId : parsed.propertyNames()) {
+      JsonNode properties = parsed.get(elementId);
+      if (!properties.isObject()) {
+        throw roundTripInvalid(
+            ATTR_ELEMENT_PROPERTIES
+                + " entry '"
+                + echo(elementId)
+                + "' is not a properties object",
+            scan,
+            scan.metadata);
+      }
+      var namespaces = new LinkedHashMap<String, JsonNode>();
+      for (String namespace : properties.propertyNames()) {
+        namespaces.put(namespace, properties.get(namespace));
+      }
+      carriedProperties.putIfAbsent(elementId, namespaces);
+    }
+  }
+
+  /**
+   * The carried {@code properties} for one element, or an empty map. Copied per element because the
+   * caller may add a {@code drawio} namespace of its own on top.
+   */
+  private Map<String, JsonNode> carriedPropertiesOf(String elementId) {
+    Map<String, JsonNode> carried = carriedProperties.get(elementId);
+    return carried == null ? new LinkedHashMap<>() : new LinkedHashMap<>(carried);
   }
 
   // ---------------------------------------------------------------- declined constructs
@@ -752,7 +823,11 @@ public final class DrawioSourceMapper {
     }
     nodes.put(
         semanticSourceId,
-        new SourceNode(semanticSourceId, carried.type(), carried.label(), Map.of()));
+        new SourceNode(
+            semanticSourceId,
+            carried.type(),
+            carried.label(),
+            carriedPropertiesOf(semanticSourceId)));
   }
 
   private void addNode(PageScan scan, MxCell cell, String elementId, boolean identified)
@@ -808,19 +883,27 @@ public final class DrawioSourceMapper {
       }
       return;
     }
-    Map<String, JsonNode> properties = new LinkedHashMap<>();
+    Map<String, JsonNode> properties = carriedPropertiesOf(elementId);
     if (!identified && !elementId.equals(cell.id())) {
       properties.put(PROPERTY_KEY, originalId(cell.id()));
     }
     JsonNode sequence = messageSequence(cell);
     if (sequence != null) {
-      ObjectNode uml = JsonSupport.objectMapper().createObjectNode();
+      // The edge wrapper's dedirenUmlSequence outranks the hidden map's uml.sequence: it is the
+      // one of the two a human can see and edit in draw.io's Edit Data dialog, and silently
+      // overruling what someone typed there is the worst surprise this lane could hold. They
+      // agree unless a human changed one.
+      JsonNode existingUml = properties.get("uml");
+      ObjectNode uml =
+          existingUml != null && existingUml.isObject()
+              ? ((ObjectNode) existingUml).deepCopy()
+              : JsonSupport.objectMapper().createObjectNode();
       uml.set("sequence", sequence);
       properties.put("uml", uml);
     }
     relationships.put(
         elementId,
-        new SourceRelationship(elementId, type, source, target, label, Map.copyOf(properties)));
+        new SourceRelationship(elementId, type, source, target, label, properties));
   }
 
   /**
@@ -873,6 +956,7 @@ public final class DrawioSourceMapper {
   }
 
   private Map<String, JsonNode> nodeProperties(MxCell cell, String elementId, boolean identified) {
+    Map<String, JsonNode> properties = carriedPropertiesOf(elementId);
     ObjectNode drawio = JsonSupport.objectMapper().createObjectNode();
     if (!identified && !elementId.equals(cell.id())) {
       drawio.put("original_id", cell.id());
@@ -890,7 +974,13 @@ public final class DrawioSourceMapper {
         suggestedStencils++;
       }
     }
-    return drawio.isEmpty() ? Map.of() : Map.of(PROPERTY_KEY, drawio);
+    if (!drawio.isEmpty()) {
+      properties.put(PROPERTY_KEY, drawio);
+    }
+    // Insertion-ordered, never Map.copyOf: an immutable map's iteration order is unspecified and
+    // JVM-salted, and this map is re-serialised into the model, so copying it here would make the
+    // exported artifact differ between two runs over the same input.
+    return properties;
   }
 
   /**
