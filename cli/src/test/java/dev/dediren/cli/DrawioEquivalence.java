@@ -20,11 +20,11 @@ import org.xml.sax.InputSource;
  * <h2>Why a relation rather than a comparison</h2>
  *
  * <p>A draw.io import is deliberately lossy, so {@code drawio_in.equals(drawio_out)} is not a
- * stricter version of the right assertion — it is a different, wrong one that can only be made
- * to pass by weakening it until it says nothing. This class instead names the facts that are
- * <em>contractually required</em> to survive, so a round-trip test asserts all of them at once and a
- * reader can audit the list. Everything absent from {@link Structure} is excluded on purpose, with
- * its reason recorded below.
+ * stricter version of the right assertion — it is a different, wrong one that can only be made to
+ * pass by weakening it until it says nothing. This class instead names the facts that are
+ * <em>contractually required</em> to survive, so a round-trip test asserts all of them at once and
+ * a reader can audit the list. Everything absent from {@link Structure} is excluded on purpose,
+ * with its reason recorded below.
  *
  * <h2>What survives, and is therefore compared</h2>
  *
@@ -36,10 +36,10 @@ import org.xml.sax.InputSource;
  *       element id, plus each edge's label. Endpoints are read from {@code dedirenSource}/{@code
  *       dedirenTarget} when present and from the mxCell {@code source}/{@code target} references
  *       otherwise, which is the importer's own precedence.
- *   <li><strong>Group membership and nesting.</strong> Every element records its <em>container</em>,
- *       and a group is itself an element with a container. Comparing containers rather than member
- *       lists is what makes a group inside a group a compared fact: losing one level of
- *       nesting moves its members' container and fails the comparison.
+ *   <li><strong>Group membership and nesting.</strong> Every element records its
+ *       <em>container</em>, and a group is itself an element with a container. Comparing containers
+ *       rather than member lists is what makes a group inside a group a compared fact: losing one
+ *       level of nesting moves its members' container and fails the comparison.
  *   <li><strong>Element type and group role</strong>, as {@code dedirenType} / {@code
  *       dedirenGroupRole} / {@code dedirenSemanticSourceId}. These exist only when the input was
  *       itself exported by Dediren, so they are compared through {@link #withTypedIdentity} on the
@@ -50,28 +50,28 @@ import org.xml.sax.InputSource;
  * <h2>What is excluded, and why each exclusion is not a fudge</h2>
  *
  * <ul>
- *   <li><strong>Geometry</strong> ({@code mxGeometry} x/y/width/height and edge waypoints).
- *       {@code schemas/model.schema.json} {@code $defs.sourceNode} is {@code additionalProperties:
- *       false} and declares no coordinates, so an imported model cannot carry them and every import
- *       lane re-lays the page out with ELK. Different coordinates in {@code drawio_out} are the
- *       contract working, not a defect.
+ *   <li><strong>Geometry</strong> ({@code mxGeometry} x/y/width/height and edge waypoints). {@code
+ *       schemas/model.schema.json} {@code $defs.sourceNode} is {@code additionalProperties: false}
+ *       and declares no coordinates, so an imported model cannot carry them and every import lane
+ *       re-lays the page out with ELK. Different coordinates in {@code drawio_out} are the contract
+ *       working, not a defect.
  *   <li><strong>Presentation style</strong> (the mxCell {@code style} string). Discarded on import
  *       and reported as {@code DEDIREN_DRAWIO_HINT_IGNORED}; the styles in {@code drawio_out} are
  *       the exporter's own, computed from the model, and owe the input nothing.
- *   <li><strong>mxCell ids.</strong> draw.io reassigns them freely while a user edits, which is
- *       the stated reason the identity contract rides {@code dedirenId}. They serve as identity only on
+ *   <li><strong>mxCell ids.</strong> draw.io reassigns them freely while a user edits, which is the
+ *       stated reason the identity contract rides {@code dedirenId}. They serve as identity only on
  *       the foreign path, where nothing better exists.
  *   <li><strong>Layers.</strong> Flattened on import by design — a layer is z-order, not
- *       containment. The container is therefore the nearest <em>vertex</em> ancestor, and structural
- *       cells are walked through here exactly as the importer walks them.
- *   <li><strong>Hidden cells.</strong> Skipped on import by design, so they cannot come back.
- *       The per-page {@code dediren.view} metadata cell is hidden for the same reason and is metadata,
+ *       containment. The container is therefore the nearest <em>vertex</em> ancestor, and
+ *       structural cells are walked through here exactly as the importer walks them.
+ *   <li><strong>Hidden cells.</strong> Skipped on import by design, so they cannot come back. The
+ *       per-page {@code dediren.view} metadata cell is hidden for the same reason and is metadata,
  *       not an element.
  *   <li><strong>Dangling edges.</strong> Dropped with a warning by design, so an input carrying one
  *       is not a round-trip input at all.
  *   <li><strong>Page name and view label.</strong> The export policy's {@code diagram_name} names
- *       the emitted page, so a foreign page name is replaced rather than preserved (verified: a page
- *       named {@code Platform} returns as the policy's {@code Main}).
+ *       the emitted page, so a foreign page name is replaced rather than preserved (verified: a
+ *       page named {@code Platform} returns as the policy's {@code Main}).
  *   <li><strong>Document order.</strong> Compared as sets and maps: the exporter writes groups
  *       before nodes so a parent precedes its children, and ELK chooses its own ordering.
  * </ul>
@@ -126,7 +126,9 @@ final class DrawioEquivalence {
     }
   }
 
-  /** Projects one {@code .drawio} document onto the compared facts, identity vocabulary included. */
+  /**
+   * Projects one {@code .drawio} document onto the compared facts, identity vocabulary included.
+   */
   static Structure withTypedIdentity(String drawio) throws Exception {
     Document document = parse(drawio);
 
@@ -226,7 +228,8 @@ final class DrawioEquivalence {
     onlyLeft.forEach(edge -> found.add("edge only in the first document: " + edge));
     onlyRight.forEach(edge -> found.add("edge only in the second document: " + edge));
     if (!found.isEmpty()) {
-      return "structural difference: " + String.join("; ", found.subList(0, Math.min(4, found.size())));
+      return "structural difference: "
+          + String.join("; ", found.subList(0, Math.min(4, found.size())));
     }
     return "structurally equal, so the difference is one the relation excludes (geometry, style,"
         + " or document order): "
@@ -234,7 +237,9 @@ final class DrawioEquivalence {
   }
 
   private static void describeVertices(
-      String kind, Map<String, VertexFacts> left, Map<String, VertexFacts> right,
+      String kind,
+      Map<String, VertexFacts> left,
+      Map<String, VertexFacts> right,
       List<String> found) {
     left.forEach(
         (id, facts) -> {

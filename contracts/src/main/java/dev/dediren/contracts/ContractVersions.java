@@ -17,8 +17,7 @@ public final class ContractVersions {
   public static final String EXPORT_REQUEST_SCHEMA_VERSION = "export-request.schema.v1";
   public static final String EXPORT_RESULT_SCHEMA_VERSION = "export-result.schema.v2";
   public static final String OEF_EXPORT_POLICY_SCHEMA_VERSION = "oef-export-policy.schema.v1";
-  public static final String DRAWIO_EXPORT_POLICY_SCHEMA_VERSION =
-      "drawio-export-policy.schema.v1";
+  public static final String DRAWIO_EXPORT_POLICY_SCHEMA_VERSION = "drawio-export-policy.schema.v1";
   public static final String UML_XMI_EXPORT_POLICY_SCHEMA_VERSION =
       "uml-xmi-export-policy.schema.v1";
   public static final String UML_XMI_ASSURANCE_SCHEMA_VERSION = "uml-xmi-assurance.schema.v1";

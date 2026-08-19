@@ -39,10 +39,10 @@ public final class DrawioIdentity {
    * The {@link #SEMANTIC_SOURCE_ID} element's own type, written on a semantic-boundary container.
    *
    * <p>A boundary stands for an element that frequently has no box of its own — a UML package drawn
-   * only as its boundary is the standard shape, and its {@code semantic_source_id} is contract-legal
-   * precisely because {@code SemanticsRouterEngine} resolves it against the document's nodes rather
-   * than the view's. Without this pair the export names an id nothing in the file declares, and
-   * Dediren cannot re-import its own artifact.
+   * only as its boundary is the standard shape, and its {@code semantic_source_id} is
+   * contract-legal precisely because {@code SemanticsRouterEngine} resolves it against the
+   * document's nodes rather than the view's. Without this pair the export names an id nothing in
+   * the file declares, and Dediren cannot re-import its own artifact.
    */
   public static final String SEMANTIC_SOURCE_TYPE = "dedirenSemanticSourceType";
 

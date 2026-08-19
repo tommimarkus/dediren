@@ -27,10 +27,10 @@ import tools.jackson.databind.JsonNode;
  * <h2>Why this lives in {@code cli} and not in {@code engines/drawio}</h2>
  *
  * <p>A round trip is not two engine calls: it is {@code import → project → layout → export}, and
- * layout is ELK. Engines are pairwise independent, so {@code engines/drawio} cannot depend
- * on {@code engines/elk-layout}; an in-module version would have to fake the layout stage and would prove
- * nothing about the composed path. {@code cli} test scope is the only place every engine is on the
- * classpath at once.
+ * layout is ELK. Engines are pairwise independent, so {@code engines/drawio} cannot depend on
+ * {@code engines/elk-layout}; an in-module version would have to fake the layout stage and would
+ * prove nothing about the composed path. {@code cli} test scope is the only place every engine is
+ * on the classpath at once.
  *
  * <h2>The equivalence relation</h2>
  *
@@ -140,24 +140,25 @@ class DrawioRoundTripTest {
         .describedAs("group membership is carried by each member's container")
         .isEqualTo("orders-package-boundary");
     assertThat(structure.edges())
-        .extracting(DrawioEquivalence.EdgeFacts::id, DrawioEquivalence.EdgeFacts::source,
-            DrawioEquivalence.EdgeFacts::target, DrawioEquivalence.EdgeFacts::type)
+        .extracting(
+            DrawioEquivalence.EdgeFacts::id,
+            DrawioEquivalence.EdgeFacts::source,
+            DrawioEquivalence.EdgeFacts::target,
+            DrawioEquivalence.EdgeFacts::type)
         .containsExactlyInAnyOrder(
-            tuple(
-                "order-has-lines", "class-order", "class-order-line", "Composition"),
-            tuple(
-                "order-status-dependency", "class-order", "enum-order-status", "Dependency"));
+            tuple("order-has-lines", "class-order", "class-order-line", "Composition"),
+            tuple("order-status-dependency", "class-order", "enum-order-status", "Dependency"));
   }
 
   /**
    * Importing Dediren's own export discloses nothing, and that is the assertion.
    *
-   * <p>{@code DEDIREN_DRAWIO_HINT_IGNORED} used to fire here. The keys it named were the
-   * exporter's own — geometry it took from this layout result and a style it computed from this
-   * model — so nothing was lost and there was nothing for a reader to do. A warning that fires on
-   * every single import, Dediren's own artifact included, carries no signal and trains its reader
-   * past the ones that do. The foreign trip below still gets it, which is what keeps this
-   * assertion from being a hole rather than a fix.
+   * <p>{@code DEDIREN_DRAWIO_HINT_IGNORED} used to fire here. The keys it named were the exporter's
+   * own — geometry it took from this layout result and a style it computed from this model — so
+   * nothing was lost and there was nothing for a reader to do. A warning that fires on every single
+   * import, Dediren's own artifact included, carries no signal and trains its reader past the ones
+   * that do. The foreign trip below still gets it, which is what keeps this assertion from being a
+   * hole rather than a fix.
    */
   @Test
   void dedirenAuthoredImportDisclosesNothingBecauseNothingIsLost() throws Exception {
@@ -177,11 +178,11 @@ class DrawioRoundTripTest {
    * A semantic boundary standing for an element nothing lays out.
    *
    * <p>This is the shape that used to make Dediren's own export unusable: {@code
-   * complex-class-view} declares two package boundaries whose packages are model nodes but not
-   * view nodes, which is legal — {@code SemanticsRouterEngine} and {@code SceneProjection} both
-   * resolve {@code semantic_source_id} against {@code source.nodes()} — and the export wrote the id
-   * without the element, so re-import failed with {@code DEDIREN_DRAWIO_ROUND_TRIP_INVALID}. The
-   * export carries the element now, and the whole pipeline runs.
+   * complex-class-view} declares two package boundaries whose packages are model nodes but not view
+   * nodes, which is legal — {@code SemanticsRouterEngine} and {@code SceneProjection} both resolve
+   * {@code semantic_source_id} against {@code source.nodes()} — and the export wrote the id without
+   * the element, so re-import failed with {@code DEDIREN_DRAWIO_ROUND_TRIP_INVALID}. The export
+   * carries the element now, and the whole pipeline runs.
    */
   @Test
   void dedirenAuthoredBoundaryCarriesAPackageNothingLaysOut() throws Exception {
@@ -212,8 +213,8 @@ class DrawioRoundTripTest {
    *
    * <p>Nesting used to be provable only on the foreign fixture, whose containers are layout-only,
    * so the path that carries a group role and a semantic source through two levels was untested.
-   * {@code component-view} nests two component boundaries inside a package boundary and the
-   * package is laid out by nothing, which is both halves of the defect at once.
+   * {@code component-view} nests two component boundaries inside a package boundary and the package
+   * is laid out by nothing, which is both halves of the defect at once.
    *
    * <p>The trailing assertion is the honest part: this model still cannot complete the pipeline,
    * because {@code Port.component} is required and mxGraph has nowhere to keep it. That is
@@ -239,16 +240,24 @@ class DrawioRoundTripTest {
         .isEqualTo("component-order-api");
     assertThat(structure.nodes().get("port-rest-api").container()).isEqualTo("order-api-boundary");
 
-    assertThat(groupIds(model)).containsExactly(
-        "orders-package-boundary", "order-api-boundary", "payment-adapter-boundary");
+    assertThat(groupIds(model))
+        .containsExactly(
+            "orders-package-boundary", "order-api-boundary", "payment-adapter-boundary");
     assertThat(nodeType(model, "pkg-orders")).isEqualTo("Package");
 
     Path modelFile = writeJson("nested-model.json", model);
     CliResult projected =
         Main.executeForTesting(
             new String[] {
-              "project", "--plugin", "generic-graph", "--target", "layout-request",
-              "--view", "component-view", "--input", modelFile.toString()
+              "project",
+              "--plugin",
+              "generic-graph",
+              "--target",
+              "layout-request",
+              "--view",
+              "component-view",
+              "--input",
+              modelFile.toString()
             },
             "");
     assertThat(projected.exitCode())
@@ -289,7 +298,8 @@ class DrawioRoundTripTest {
     JsonNode declaredSource =
         trip.model().at("/plugins/generic-graph/views/0/groups/0/semantic_source_id");
     assertThat(declaredSource.isMissingNode() || declaredSource.isNull())
-        .describedAs("the imported model must not carry a self-reference either: %s", declaredSource)
+        .describedAs(
+            "the imported model must not carry a self-reference either: %s", declaredSource)
         .isTrue();
   }
 
@@ -332,8 +342,8 @@ class DrawioRoundTripTest {
     RoundTrip trip = roundTrip(in, "foreign");
 
     assertThat(DrawioEquivalence.structureOnly(trip.out()))
-        .describedAs("structure must survive a foreign round trip\nin:\n%s\nout:\n%s", in,
-            trip.out())
+        .describedAs(
+            "structure must survive a foreign round trip\nin:\n%s\nout:\n%s", in, trip.out())
         .isEqualTo(DrawioEquivalence.structureOnly(in));
 
     var structure = DrawioEquivalence.withTypedIdentity(trip.out());
@@ -390,8 +400,7 @@ class DrawioRoundTripTest {
     String in = Files.readString(path(FOREIGN_FIXTURE), StandardCharsets.UTF_8);
 
     JsonNode envelope =
-        stage(
-            "import", "--plugin", "drawio", "--input", write("foreign.drawio", in).toString());
+        stage("import", "--plugin", "drawio", "--input", write("foreign.drawio", in).toString());
 
     assertThat(codes(envelope))
         .contains(DiagnosticCode.DRAWIO_HINT_IGNORED.code())
@@ -452,8 +461,7 @@ class DrawioRoundTripTest {
     JsonNode imported =
         stage("import", "--plugin", "drawio", "--input", write(name + ".drawio", first).toString());
     Path reimported = writeJson(name + "-model.json", imported.get("data"));
-    String reimportedView =
-        imported.at("/data/plugins/generic-graph/views/0/id").asString();
+    String reimportedView = imported.at("/data/plugins/generic-graph/views/0/id").asString();
     String second = pipeline(reimported, reimportedView, name + "-2");
 
     assertThat(second)
@@ -476,15 +484,14 @@ class DrawioRoundTripTest {
    *
    * <p><strong>One root cause, two symptoms.</strong> mxGraph has nowhere to keep an element's
    * {@code properties}, and this export carries exactly one of them ({@code uml.sequence}, on the
-   * edge wrapper, because a Message is invalid without it). Everything else is dropped, which
-   * shows up in two ways. Six models become invalid: a required UML ownership property — {@code
+   * edge wrapper, because a Message is invalid without it). Everything else is dropped, which shows
+   * up in two ways. Six models become invalid: a required UML ownership property — {@code
    * Port.component}, {@code ExtensionPoint.use_case}, {@code Transition.region}, {@code
    * ExecutionSpecification.covered} — is gone, so {@code project} rejects the re-imported model
-   * before a second export can happen. Two more stay valid and move: {@code
-   * UmlNotationSemantics} sizes a Class box from {@code uml.attributes}/{@code uml.operations} and
-   * builds a sequence fragment's layout intents from {@code uml.covered}, so without them ELK
-   * draws the same graph at different coordinates ({@code class-customer} 300×190 → 220×120;
-   * {@code m1@46.0} → {@code m1}).
+   * before a second export can happen. Two more stay valid and move: {@code UmlNotationSemantics}
+   * sizes a Class box from {@code uml.attributes}/{@code uml.operations} and builds a sequence
+   * fragment's layout intents from {@code uml.covered}, so without them ELK draws the same graph at
+   * different coordinates ({@code class-customer} 300×190 → 220×120; {@code m1@46.0} → {@code m1}).
    *
    * <p>Excluding them here is not a weakening of the assertion — {@link
    * #everyFixtureStillExcludedFromTheFixedPointStillNeedsToBe} re-measures every entry and fails
@@ -546,8 +553,15 @@ class DrawioRoundTripTest {
     CliResult projected =
         Main.executeForTesting(
             new String[] {
-              "project", "--plugin", "generic-graph", "--target", "layout-request",
-              "--view", reimportedView, "--input", reimported.toString()
+              "project",
+              "--plugin",
+              "generic-graph",
+              "--target",
+              "layout-request",
+              "--view",
+              reimportedView,
+              "--input",
+              reimported.toString()
             },
             "");
     if (residual == Residual.PROJECT_REJECTS_THE_REIMPORTED_MODEL) {
@@ -564,11 +578,14 @@ class DrawioRoundTripTest {
         .isZero();
     String second = pipeline(reimported, reimportedView, name + "-x2");
     assertThat(second)
-        .describedAs("%s now reaches the fixed point, so remove it from NOT_YET_A_FIXED_POINT", name)
+        .describedAs(
+            "%s now reaches the fixed point, so remove it from NOT_YET_A_FIXED_POINT", name)
         .isNotEqualTo(first);
   }
 
-  /** {@code project → layout → export} for one model and view, entirely through the live engines. */
+  /**
+   * {@code project → layout → export} for one model and view, entirely through the live engines.
+   */
   private String pipeline(Path model, String viewId, String tag) throws Exception {
     JsonNode request =
         stage(
@@ -655,8 +672,7 @@ class DrawioRoundTripTest {
             modelFile.toString());
     Path requestFile = writeJson(label + "-layout-request.json", request.get("data"));
 
-    JsonNode laidOut =
-        stage("layout", "--plugin", "elk-layout", "--input", requestFile.toString());
+    JsonNode laidOut = stage("layout", "--plugin", "elk-layout", "--input", requestFile.toString());
     Path layoutFile = writeJson(label + "-layout-result.json", laidOut.get("data"));
 
     JsonNode exported =

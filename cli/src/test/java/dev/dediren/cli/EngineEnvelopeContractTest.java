@@ -294,7 +294,8 @@ class EngineEnvelopeContractTest {
     assertDiagnostic(outcome, 2, "DEDIREN_DRAWIO_SYNTAX_INVALID");
   }
 
-  // --- drawio export ------------------------------------------------------------------------------
+  // --- drawio export
+  // ------------------------------------------------------------------------------
 
   @Test
   void exportDrawioEmitsOkEnvelope() throws Exception {

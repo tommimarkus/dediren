@@ -111,7 +111,9 @@ public final class DrawioDocumentBuilder {
   /** The mxCell id of the hidden metadata cell, claimed before any element can take it. */
   private static final String METADATA_CELL_ID = "dediren-view";
 
-  /** The one model property path this export carries, spelled once so writer and disclosure agree. */
+  /**
+   * The one model property path this export carries, spelled once so writer and disclosure agree.
+   */
   private static final String UML_SEQUENCE_PATH = "uml.sequence";
 
   /**
@@ -341,8 +343,7 @@ public final class DrawioDocumentBuilder {
                     ? GenericGraphSemanticProfile.GENERIC_GRAPH
                     : pluginData.semanticProfile()));
     putIfPresent(attributes, DrawioIdentity.MODEL_SCHEMA_VERSION, source.modelSchemaVersion());
-    putIfPresent(
-        attributes, DrawioIdentity.LAYOUT_PREFERENCES, layoutPreferencesJson(pluginData));
+    putIfPresent(attributes, DrawioIdentity.LAYOUT_PREFERENCES, layoutPreferencesJson(pluginData));
     attributes.put("id", METADATA_CELL_ID);
 
     return new MxCell(
@@ -380,8 +381,7 @@ public final class DrawioDocumentBuilder {
   private MxCell groupCell(LaidOutGroup group) {
     String cellId = cellIdFor(group.id());
     String semanticSourceId = LaidOutGroups.semanticSourceId(group);
-    SourceNode backing =
-        semanticSourceId == null ? null : sourceNodeById().get(semanticSourceId);
+    SourceNode backing = semanticSourceId == null ? null : sourceNodeById().get(semanticSourceId);
     if (semanticSourceId != null && backing == null && !semanticSourceId.equals(group.id())) {
       // Silent for the self-naming fallback above, which is ordinary; loud for a boundary that
       // names some other element, which is a stale layout result against a changed model.
@@ -716,8 +716,8 @@ public final class DrawioDocumentBuilder {
    * a model's whole property tree through it would show a user opaque JSON in draw.io's Edit Data
    * dialog. Exactly one property is carried instead ({@link DrawioIdentity#UML_SEQUENCE}), because
    * a Message without it is not a valid model at all; the rest are declared lost here. Silence was
-   * the worse half of that defect: the artifact re-imported green and the next command rejected
-   * the model with nothing to connect the two.
+   * the worse half of that defect: the artifact re-imported green and the next command rejected the
+   * model with nothing to connect the two.
    *
    * <p>One diagnostic per view, counting property paths rather than elements, for the same reason
    * {@link #reportOmittedOrnaments()} aggregates: a fifty-message sequence diagram would otherwise
@@ -793,7 +793,9 @@ public final class DrawioDocumentBuilder {
       return null;
     }
     JsonNode sequence = uml.get("sequence");
-    return sequence != null && sequence.isIntegralNumber() && sequence.bigIntegerValue().signum() > 0
+    return sequence != null
+            && sequence.isIntegralNumber()
+            && sequence.bigIntegerValue().signum() > 0
         ? sequence.bigIntegerValue().toString()
         : null;
   }
@@ -805,9 +807,8 @@ public final class DrawioDocumentBuilder {
    * <p>A raw newline does not even reach the renderer. XML attribute-value normalization (XML 1.0
    * §3.3.3) replaces a literal {@code #xA} in an attribute with a space before any parser hands the
    * value on, so writing the newline through lost the break from the model too — a re-import read
-   * back {@code "Ingest Gateway"}. {@link
-   * dev.dediren.plugins.drawio.read.DrawioSourceMapper} decodes the three {@code <br>} spellings on
-   * the way in; this is the other half of that pair.
+   * back {@code "Ingest Gateway"}. {@link dev.dediren.plugins.drawio.read.DrawioSourceMapper}
+   * decodes the three {@code <br>} spellings on the way in; this is the other half of that pair.
    */
   private static String htmlLabel(String label) {
     return label == null ? null : label.replace("\r\n", "<br>").replace("\n", "<br>");

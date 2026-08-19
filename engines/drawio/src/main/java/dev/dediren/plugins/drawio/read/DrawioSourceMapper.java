@@ -160,6 +160,7 @@ public final class DrawioSourceMapper {
 
   /** The dediren ids of cells that map to nodes — the only ids a semantic boundary may name. */
   private final Set<String> nodeDedirenIds = new LinkedHashSet<>();
+
   private final Map<String, Integer> discardedKeys = new LinkedHashMap<>();
   private final Map<String, Integer> stencilTokens = new LinkedHashMap<>();
   private final List<String> hiddenCells = new ArrayList<>();
@@ -594,10 +595,7 @@ public final class DrawioSourceMapper {
     }
     if (!valid(semanticSource)) {
       throw roundTripInvalid(
-          ATTR_SEMANTIC_SOURCE
-              + " '"
-              + echo(semanticSource)
-              + "' is not a valid Dediren id",
+          ATTR_SEMANTIC_SOURCE + " '" + echo(semanticSource) + "' is not a valid Dediren id",
           scan,
           cell);
     }

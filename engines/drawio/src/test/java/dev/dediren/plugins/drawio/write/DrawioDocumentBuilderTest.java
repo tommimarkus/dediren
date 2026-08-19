@@ -395,7 +395,13 @@ class DrawioDocumentBuilderTest {
                 List.of(laidOut("customer", 0, 0, 10, 10), laidOut("service", 60, 0, 10, 10)),
                 List.of(
                     new LaidOutEdge(
-                        "m1", "customer", "service", "m1", null, List.of(), List.of(),
+                        "m1",
+                        "customer",
+                        "service",
+                        "m1",
+                        null,
+                        List.of(),
+                        List.of(),
                         "placeOrder")),
                 List.of()),
             POLICY);
@@ -418,7 +424,13 @@ class DrawioDocumentBuilderTest {
                 List.of(laidOut("customer", 0, 0, 10, 10), laidOut("service", 60, 0, 10, 10)),
                 List.of(
                     new LaidOutEdge(
-                        "m1", "customer", "service", "m1", null, List.of(), List.of(),
+                        "m1",
+                        "customer",
+                        "service",
+                        "m1",
+                        null,
+                        List.of(),
+                        List.of(),
                         "placeOrder")),
                 List.of()),
             POLICY);
@@ -449,9 +461,9 @@ class DrawioDocumentBuilderTest {
   // ---------------------------------------------------------------- view metadata
 
   /**
-   * Layout preferences decide the geometry, so a view that loses them comes back drawn
-   * differently: same graph, different picture, and no structural comparison can see it. They ride
-   * the hidden metadata cell as the model's own JSON.
+   * Layout preferences decide the geometry, so a view that loses them comes back drawn differently:
+   * same graph, different picture, and no structural comparison can see it. They ride the hidden
+   * metadata cell as the model's own JSON.
    */
   @Test
   void carriesTheViewsLayoutPreferencesOnTheMetadataCell() {
@@ -534,11 +546,12 @@ class DrawioDocumentBuilderTest {
   void encodesALineBreakInALabelAsMarkupDrawioActuallyRenders() {
     var document =
         DrawioDocumentBuilder.build(
-            source(List.of(new SourceNode("ingest", "ApplicationComponent", "Ingest\nGateway",
-                Map.of())), List.of()),
-            layout(
+            source(
                 List.of(
-                    new LaidOutNode("ingest", "ingest", null, 0, 0, 10, 10, "Ingest\nGateway")),
+                    new SourceNode("ingest", "ApplicationComponent", "Ingest\nGateway", Map.of())),
+                List.of()),
+            layout(
+                List.of(new LaidOutNode("ingest", "ingest", null, 0, 0, 10, 10, "Ingest\nGateway")),
                 List.of(),
                 List.of()),
             POLICY);

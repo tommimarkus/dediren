@@ -909,16 +909,17 @@ class DrawioSourceMapperTest {
   /**
    * The guard this class's javadoc promises: a green import that produces a model the next command
    * rejects is the failure it exists to prevent, so a group naming itself — which {@code
-   * SceneProjection}'s own fallback produces whenever a semantic-boundary group declares no source —
-   * must not resolve. Only a node can back a boundary.
+   * SceneProjection}'s own fallback produces whenever a semantic-boundary group declares no source
+   * — must not resolve. Only a node can back a boundary.
    */
   @Test
   void aSemanticSourceNamingAGroupRatherThanANodeIsRefused() {
     assertThatThrownBy(
             () ->
-                map(page(
-                    "Services",
-                    """
+                map(
+                    page(
+                        "Services",
+                        """
                     <mxCell id="0" />
                     <mxCell id="1" parent="0" />
                     <object id="meta" dedirenType="dediren.view" dedirenViewId="main" dedirenViewKind="archimate" dedirenSemanticProfile="archimate" dedirenModelSchemaVersion="model.schema.v1">
@@ -947,9 +948,10 @@ class DrawioSourceMapperTest {
   void aSemanticSourceWithNoCarriedTypeIsStillRefused() {
     assertThatThrownBy(
             () ->
-                map(page(
-                    "Components",
-                    """
+                map(
+                    page(
+                        "Components",
+                        """
                     <mxCell id="0" />
                     <mxCell id="1" parent="0" />
                     <object id="meta" dedirenType="dediren.view" dedirenViewId="component-view" dedirenViewKind="uml-component" dedirenSemanticProfile="uml" dedirenModelSchemaVersion="model.schema.v1">
@@ -1041,9 +1043,10 @@ class DrawioSourceMapperTest {
   @Test
   void onARoundTrippedPageOnlyAHandDrawnCellsAppearanceIsAnIgnoredHint() throws Exception {
     DrawioSourceMapper.MappingResult result =
-        map(page(
-            "Mixed",
-            """
+        map(
+            page(
+                "Mixed",
+                """
             <mxCell id="0" />
             <mxCell id="1" parent="0" />
             <object id="meta" dedirenType="dediren.view" dedirenViewId="main" dedirenViewKind="archimate" dedirenSemanticProfile="archimate" dedirenModelSchemaVersion="model.schema.v1">
@@ -1093,9 +1096,10 @@ class DrawioSourceMapperTest {
   void anUnreadableLayoutPreferencesBlockIsRefused() {
     assertThatThrownBy(
             () ->
-                map(page(
-                    "Main",
-                    """
+                map(
+                    page(
+                        "Main",
+                        """
                     <mxCell id="0" />
                     <mxCell id="1" parent="0" />
                     <object id="meta" dedirenType="dediren.view" dedirenViewId="main" dedirenViewKind="archimate" dedirenSemanticProfile="archimate" dedirenModelSchemaVersion="model.schema.v1" dedirenLayoutPreferences="{&quot;direction&quot;:&quot;sideways&quot;}">
