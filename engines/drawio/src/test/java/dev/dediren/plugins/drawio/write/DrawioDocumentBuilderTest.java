@@ -37,6 +37,11 @@ class DrawioDocumentBuilderTest {
 
   private static SourceDocument source(
       List<SourceNode> nodes, List<SourceRelationship> relationships) {
+    return source(nodes, relationships, "archimate");
+  }
+
+  private static SourceDocument source(
+      List<SourceNode> nodes, List<SourceRelationship> relationships, String viewKind) {
     return new SourceDocument(
         "model.schema.v1",
         List.of(),
@@ -49,9 +54,10 @@ class DrawioDocumentBuilderTest {
                 """
                 {
                   "semantic_profile": "archimate",
-                  "views": [{ "id": "main", "label": "Main", "kind": "archimate" }]
+                  "views": [{ "id": "main", "label": "Main", "kind": "%s" }]
                 }
-                """)));
+                """
+                    .formatted(viewKind))));
   }
 
   private static LayoutResult layout(
@@ -356,21 +362,42 @@ class DrawioDocumentBuilderTest {
 
   @Test
   void warnsAndFallsBackWhenNoDrawioShapeCoversTheElementType() {
+    // A type name neither vocabulary declares. This used to be spelled "Class", which stopped
+    // being an unmapped type the moment the UML shape table landed — the warning now fires only
+    // for a type that is genuinely in neither table, which is what it was always meant to mean.
     var document =
         DrawioDocumentBuilder.build(
-            source(List.of(node("order", "Class")), List.of()),
+            source(List.of(node("order", "NotARealElementType")), List.of()),
             layout(List.of(laidOut("order", 0, 0, 220, 120)), List.of(), List.of()),
             POLICY);
 
     MxCell cell = cellCarrying(document, "order");
     assertThat(cell.style()).contains("whiteSpace=wrap").doesNotContain("mxgraph.archimate3");
     // dedirenType still records the exact type, so a re-import is lossless regardless.
-    assertThat(cell.object().attributes()).containsEntry(DrawioIdentity.TYPE, "Class");
+    assertThat(cell.object().attributes())
+        .containsEntry(DrawioIdentity.TYPE, "NotARealElementType");
 
     Diagnostic warning =
         diagnostic(document, DiagnosticCode.DRAWIO_SHAPE_UNMAPPED).orElseThrow();
     assertThat(warning.severity()).isEqualTo(DiagnosticSeverity.WARNING);
-    assertThat(warning.message()).contains("Class").contains(DrawioIdentity.TYPE);
+    assertThat(warning.message())
+        .contains("NotARealElementType")
+        .contains(DrawioIdentity.TYPE);
+  }
+
+  @Test
+  void staysSilentAboutShapesForAUmlTypeTheUmlTableNowCovers() {
+    // The counterpart to the test above: a Class is drawn deliberately, not fallen back to, so it
+    // must not warn. Without this, mapping UML could regress to a silent fallback unnoticed.
+    var document =
+        DrawioDocumentBuilder.build(
+            source(List.of(node("order", "Class")), List.of(), "uml-class"),
+            layout(List.of(laidOut("order", 0, 0, 220, 120)), List.of(), List.of()),
+            POLICY);
+
+    assertThat(diagnostic(document, DiagnosticCode.DRAWIO_SHAPE_UNMAPPED)).isEmpty();
+    assertThat(cellCarrying(document, "order").object().attributes())
+        .containsEntry(DrawioIdentity.TYPE, "Class");
   }
 
   @Test
@@ -454,7 +481,174 @@ class DrawioDocumentBuilderTest {
         .contains("fillColor=");
   }
 
+  // ---------------------------------------------------------------- notation selection
+
+  @Test
+  void drawsAUmlViewFromTheUmlShapeTableAndWithoutTheArchimateLayerPalette() {
+    var document =
+        DrawioDocumentBuilder.build(
+            source(
+                List.of(node("who", "Actor"), node("uc", "UseCase")),
+                List.of(),
+                "uml-use-case"),
+            layout(
+                List.of(laidOut("who", 0, 0, 30, 60), laidOut("uc", 60, 0, 140, 70)),
+                List.of(),
+                List.of()),
+            POLICY);
+
+    assertThat(cellCarrying(document, "who").style()).isEqualTo(umlShapeStyle("Actor"));
+    assertThat(cellCarrying(document, "uc").style()).isEqualTo(umlShapeStyle("UseCase"));
+    // The palette is the ArchiMate layer palette; a UML cell has no layer to colour by.
+    assertThat(cellCarrying(document, "who").style()).doesNotContain("fillColor=");
+  }
+
+  @Test
+  void resolvesTheThreeSharedTypeNamesByTheViewsDeclaredKind() {
+    // Node is declared by both vocabularies. Nothing about the element itself says which is meant,
+    // so the view kind is the whole of the evidence — and getting it wrong draws a deployment node
+    // as an ArchiMate technology node.
+    var technology =
+        DrawioDocumentBuilder.build(
+            source(List.of(node("host", "Node")), List.of(), "archimate"),
+            layout(List.of(laidOut("host", 0, 0, 150, 75)), List.of(), List.of()),
+            POLICY);
+    assertThat(cellCarrying(technology, "host").style())
+        .startsWith(shapeStyle("Node"))
+        .contains("mxgraph.archimate3");
+
+    var deployment =
+        DrawioDocumentBuilder.build(
+            source(List.of(node("host", "Node")), List.of(), "uml-deployment"),
+            layout(List.of(laidOut("host", 0, 0, 140, 80)), List.of(), List.of()),
+            POLICY);
+    assertThat(cellCarrying(deployment, "host").style())
+        .isEqualTo(umlShapeStyle("Node"))
+        .contains("shape=cube;");
+  }
+
+  @Test
+  void drawsATypeOnlyTheOtherVocabularyCoversRatherThanFallingBack() {
+    // A generic view carrying UML content still gets UML shapes: only the three shared names need
+    // the view kind to disambiguate them.
+    var document =
+        DrawioDocumentBuilder.build(
+            source(List.of(node("who", "Actor")), List.of(), "generic"),
+            layout(List.of(laidOut("who", 0, 0, 30, 60)), List.of(), List.of()),
+            POLICY);
+
+    assertThat(cellCarrying(document, "who").style()).isEqualTo(umlShapeStyle("Actor"));
+    assertThat(diagnostic(document, DiagnosticCode.DRAWIO_SHAPE_UNMAPPED)).isEmpty();
+  }
+
+  // ---------------------------------------------------------------- relationship notation
+
+  @Test
+  void drawsEachRelationshipTypeInItsOwnNotation() {
+    var document =
+        DrawioDocumentBuilder.build(
+            source(
+                List.of(node("a", "ApplicationComponent"), node("b", "ApplicationComponent")),
+                List.of(
+                    new SourceRelationship("owns", "Composition", "a", "b", null, Map.of()),
+                    new SourceRelationship("serves", "Serving", "a", "b", null, Map.of()))),
+            layout(
+                List.of(laidOut("a", 0, 0, 150, 75), laidOut("b", 300, 0, 150, 75)),
+                List.of(
+                    new LaidOutEdge(
+                        "owns", "a", "b", "owns", null, List.of(), List.of(), null),
+                    new LaidOutEdge(
+                        "serves", "a", "b", "serves", null, List.of(), List.of(), null)),
+                List.of()),
+            POLICY);
+
+    // The composition diamond belongs at the source end; at the target it states containment the
+    // other way round.
+    assertThat(cellCarrying(document, "owns").style())
+        .contains("startArrow=diamondThin;")
+        .contains("startFill=1;")
+        .contains("endArrow=none;");
+    assertThat(cellCarrying(document, "serves").style()).contains("endArrow=open;");
+    // Whatever the notation, the route stays the one the layout computed.
+    assertThat(cellCarrying(document, "owns").style()).startsWith("edgeStyle=none;");
+  }
+
+  @Test
+  void readsRelationshipNotationAgainstTheViewsOwnVocabulary() {
+    var document =
+        DrawioDocumentBuilder.build(
+            source(
+                List.of(node("base", "Class"), node("derived", "Class")),
+                List.of(
+                    new SourceRelationship(
+                        "isa", "Generalization", "derived", "base", null, Map.of())),
+                "uml-class"),
+            layout(
+                List.of(laidOut("base", 0, 0, 160, 80), laidOut("derived", 300, 0, 160, 80)),
+                List.of(new LaidOutEdge(
+                        "isa", "derived", "base", "isa", null, List.of(), List.of(), null)),
+                List.of()),
+            POLICY);
+
+    assertThat(cellCarrying(document, "isa").style())
+        .contains("endArrow=block;")
+        .contains("endFill=0;");
+    assertThat(diagnostic(document, DiagnosticCode.DRAWIO_SHAPE_UNMAPPED)).isEmpty();
+  }
+
+  @Test
+  void declaresARelationshipTypeItHasNoNotationFor() {
+    var document =
+        DrawioDocumentBuilder.build(
+            source(
+                List.of(node("a", "ApplicationComponent"), node("b", "ApplicationComponent")),
+                List.of(
+                    new SourceRelationship("odd", "Generalization", "a", "b", null, Map.of()))),
+            layout(
+                List.of(laidOut("a", 0, 0, 150, 75), laidOut("b", 300, 0, 150, 75)),
+                List.of(new LaidOutEdge(
+                        "odd", "a", "b", "odd", null, List.of(), List.of(), null)),
+                List.of()),
+            POLICY);
+
+    // Generalization is a UML relationship; an ArchiMate view has no notation for it.
+    Diagnostic warning = diagnostic(document, DiagnosticCode.DRAWIO_SHAPE_UNMAPPED).orElseThrow();
+    assertThat(warning.severity()).isEqualTo(DiagnosticSeverity.WARNING);
+    assertThat(warning.message()).contains("Generalization").contains("odd");
+    assertThat(warning.message())
+        .as("the message has to say the round trip survives, or it reads as data loss")
+        .contains(DrawioIdentity.TYPE)
+        .contains("lossless");
+    // Degrading, not failing: the edge is still drawn, as a plain directed line.
+    assertThat(cellCarrying(document, "odd").style()).contains("endArrow=block;");
+  }
+
+  @Test
+  void staysSilentAboutOrnamentsForAViewWhoseOnlyBehaviourNodeIsTheInteractionFrame() {
+    // The interaction frame is drawn, so a view with nothing else behavioural in it has no
+    // ornament to declare. It used to report missing combined-fragment frames on every sequence
+    // export, including models with no combined fragment anywhere.
+    var document =
+        DrawioDocumentBuilder.build(
+            source(List.of(node("seq", "Interaction")), List.of(), "uml-sequence"),
+            layout(
+                List.of(
+                    new LaidOutNode(
+                        "seq", "seq", null, 0, 0, 400, 300, "Place Order",
+                        LayoutNodeRole.INTERACTION)),
+                List.of(),
+                List.of()),
+            POLICY);
+
+    assertThat(diagnostic(document, DiagnosticCode.DRAWIO_ORNAMENT_OMITTED)).isEmpty();
+    assertThat(cellCarrying(document, "seq").style()).contains("shape=umlFrame;");
+  }
+
   private static String shapeStyle(String elementType) {
     return dev.dediren.plugins.drawio.style.DrawioShapes.shapeFor(elementType).style();
+  }
+
+  private static String umlShapeStyle(String elementType) {
+    return dev.dediren.plugins.drawio.style.DrawioUmlShapes.shapeFor(elementType).style();
   }
 }

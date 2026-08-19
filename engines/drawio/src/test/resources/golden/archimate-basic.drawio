@@ -20,7 +20,7 @@
           </mxCell>
         </object>
         <object label="realizes" dedirenId="orders-realizes-service" dedirenType="Realization" dedirenSemanticSourceId="orders-realizes-service" dedirenSource="orders-component" dedirenTarget="orders-service" id="orders-realizes-service">
-          <mxCell style="edgeStyle=none;rounded=0;html=1;" edge="1" parent="1" source="orders-component" target="orders-service">
+          <mxCell style="edgeStyle=none;rounded=0;html=1;endArrow=block;endFill=0;endSize=12;dashed=1;dashPattern=1 3;" edge="1" parent="1" source="orders-component" target="orders-service">
             <mxGeometry relative="1" as="geometry"/>
           </mxCell>
         </object>

@@ -14,6 +14,7 @@ import dev.dediren.contracts.layout.LayoutResult;
 import dev.dediren.contracts.layout.Point;
 import dev.dediren.contracts.source.GenericGraphPluginData;
 import dev.dediren.contracts.source.GenericGraphView;
+import dev.dediren.contracts.source.GenericGraphViewKind;
 import dev.dediren.contracts.source.SourceDocument;
 import dev.dediren.contracts.source.SourceNode;
 import dev.dediren.contracts.source.SourceRelationship;
@@ -24,8 +25,11 @@ import dev.dediren.plugins.drawio.mx.MxFile;
 import dev.dediren.plugins.drawio.mx.MxGeometry;
 import dev.dediren.plugins.drawio.mx.MxObject;
 import dev.dediren.plugins.drawio.mx.MxPoint;
+import dev.dediren.plugins.drawio.style.DrawioEdgeStyles;
+import dev.dediren.plugins.drawio.style.DrawioEdgeStyles.Notation;
 import dev.dediren.plugins.drawio.style.DrawioPalette;
 import dev.dediren.plugins.drawio.style.DrawioShapes;
+import dev.dediren.plugins.drawio.style.DrawioUmlShapes;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -75,13 +79,21 @@ import tools.jackson.databind.JsonNode;
  * exporter, whose equivalent reference check is a hard failure: a {@code .drawio} is an editable
  * picture, and a picture missing one box is more useful than no picture.
  *
+ * <h2>Which notation a cell is drawn in</h2>
+ *
+ * <p>{@code Node}, {@code Device} and {@code Artifact} are declared by both the ArchiMate and the
+ * UML vocabularies, so a type name alone does not identify a shape. The view's declared kind picks
+ * the primary table — the eight {@code uml-*} kinds read UML, everything else reads ArchiMate — and
+ * a type the primary table does not cover is looked up in the other one before falling back. That
+ * ordering is what makes the three shared names resolve by declared kind rather than by table
+ * order, while a view kind of {@code generic} still draws whatever it actually contains.
+ *
  * <h2>What this export does not carry</h2>
  *
- * <p>Relationship notation — ArchiMate's and UML's type-specific arrowheads and line styles — is
- * not expressed in the emitted edge style; every relationship exports as a directed orthogonal
- * line, with its exact type on {@link DrawioIdentity#TYPE}. The shape and palette tables this
- * package draws on cover elements only, and a relationship style table is a separate piece of work
- * with its own provenance obligations.
+ * <p>Compartment content: a Class exports as its box, without the attribute and operation
+ * compartments its source properties describe. Stereotype keywords likewise — the cell label is the
+ * element's own. Both survive the round trip regardless, on {@link DrawioIdentity#TYPE} and in the
+ * source model.
  */
 public final class DrawioDocumentBuilder {
 
@@ -111,13 +123,6 @@ public final class DrawioDocumentBuilder {
       "rounded=0;whiteSpace=wrap;html=1;fillColor=none;dashed=1;verticalAlign=top;";
 
   /**
-   * {@code edgeStyle=none} makes draw.io draw the polyline through the supplied waypoints literally
-   * instead of recomputing an orthogonal route around them, which is what keeps the exported route
-   * the one ELK produced.
-   */
-  private static final String EDGE_STYLE = "edgeStyle=none;rounded=0;html=1;";
-
-  /**
    * The three element types whose colour is semantic rather than palette-driven, per {@code
    * DrawioPalette}'s own contract: fill is the only thing distinguishing the two junctions, and a
    * Grouping is always unfilled. Both are already encoded in the shape table, and appending the
@@ -126,13 +131,20 @@ public final class DrawioDocumentBuilder {
   private static final Set<String> PALETTE_EXEMPT_TYPES =
       Set.of("AndJunction", "OrJunction", "Grouping");
 
-  /** The UML behaviour roles this export places and labels but does not ornament. */
+  /**
+   * The UML behaviour roles this export places and labels but does not ornament.
+   *
+   * <p>{@link LayoutNodeRole#INTERACTION} is deliberately absent. It marks the interaction frame,
+   * which this export now draws with draw.io's own {@code umlFrame} shape — and the entry it used
+   * to carry named combined-fragment frames, which is a different thing altogether. Since a
+   * sequence view always has an interaction frame, that entry fired on every sequence export
+   * including the ones with no combined fragment anywhere in the model.
+   */
   private static final Map<String, String> OMITTED_ORNAMENTS =
       Map.of(
           LayoutNodeRole.LIFELINE, "lifeline tails (dashed lifeline lines)",
           LayoutNodeRole.EXECUTION, "execution occurrences (activation bars)",
-          LayoutNodeRole.DESTRUCTION, "destruction occurrences (the lifeline cross)",
-          LayoutNodeRole.INTERACTION, "combined-fragment frames (the operator pentagon)");
+          LayoutNodeRole.DESTRUCTION, "destruction occurrences (the lifeline cross)");
 
   private final SourceDocument source;
   private final LayoutResult layout;
@@ -151,6 +163,9 @@ public final class DrawioDocumentBuilder {
   private final Map<String, String> containerOf = new LinkedHashMap<>();
 
   private final Map<String, LaidOutGroup> groupsById = new LinkedHashMap<>();
+
+  /** Resolved once on first use; see {@link #notation()}. */
+  private Notation resolvedNotation;
 
   private DrawioDocumentBuilder(
       SourceDocument source, LayoutResult layout, DrawioExportPolicy policy) {
@@ -442,7 +457,7 @@ public final class DrawioDocumentBuilder {
         // points below are absolute.
         LAYER_CELL_ID,
         edge.label(),
-        EDGE_STYLE,
+        edgeStyle(edge, relationship == null ? null : relationship.type()),
         false,
         true,
         sourceCellId,
@@ -512,7 +527,9 @@ public final class DrawioDocumentBuilder {
       // nothing a repair could act on.
       return DrawioShapes.shapeFor(null).style();
     }
-    if (!DrawioShapes.isMapped(type)) {
+    boolean archimate = DrawioShapes.isMapped(type);
+    boolean uml = DrawioUmlShapes.isMapped(type);
+    if (!archimate && !uml) {
       diagnostics.add(
           new Diagnostic(
               DiagnosticCode.DRAWIO_SHAPE_UNMAPPED.code(),
@@ -526,7 +543,18 @@ public final class DrawioDocumentBuilder {
                   + " still records the exact type, so re-importing this file is lossless"
                   + " regardless of the shape it was drawn with.",
               "layout_result.nodes"));
+      return DrawioShapes.shapeFor(type).style();
     }
+
+    // The declared view kind decides the three names both vocabularies claim; anything only one
+    // table covers is drawn from that table whatever the view kind says.
+    boolean drawAsUml = uml && (notation() == Notation.UML || !archimate);
+    if (drawAsUml) {
+      // No palette append: DrawioPalette is the ArchiMate layer palette, and UML carries no layer
+      // to colour by. The UML table supplies its own semantic fills where a fill means something.
+      return DrawioUmlShapes.shapeFor(type).style();
+    }
+
     String style = DrawioShapes.shapeFor(type).style();
     if (PALETTE_EXEMPT_TYPES.contains(type)) {
       return style;
@@ -540,6 +568,55 @@ public final class DrawioDocumentBuilder {
         + ";fontColor="
         + colors.labelFill()
         + ";";
+  }
+
+  /**
+   * The notation-specific edge style for one relationship, declaring the notation if it has none.
+   *
+   * <p>Reuses {@code DEDIREN_DRAWIO_SHAPE_UNMAPPED} rather than minting an edge-specific code: the
+   * situation and the repair are the same one the node message describes, and a relationship type
+   * absent from the table is exactly as re-importable as an element type absent from the shape
+   * table.
+   */
+  private String edgeStyle(LaidOutEdge edge, String relationshipType) {
+    if (relationshipType == null) {
+      // The missing source relationship was already declared.
+      return DrawioEdgeStyles.styleFor(notation(), null);
+    }
+    if (!DrawioEdgeStyles.isMapped(notation(), relationshipType)) {
+      diagnostics.add(
+          new Diagnostic(
+              DiagnosticCode.DRAWIO_SHAPE_UNMAPPED.code(),
+              DiagnosticSeverity.WARNING,
+              "no draw.io relationship notation covers type '"
+                  + relationshipType
+                  + "' (edge '"
+                  + edge.id()
+                  + "'); it is exported as a plain directed line. "
+                  + DrawioIdentity.TYPE
+                  + " still records the exact type, so re-importing this file is lossless"
+                  + " regardless of the notation it was drawn with.",
+              "layout_result.edges"));
+    }
+    return DrawioEdgeStyles.styleFor(notation(), relationshipType);
+  }
+
+  /**
+   * Which vocabulary this view's type names are read against, resolved once from the view's
+   * declared kind.
+   *
+   * <p>The kind is the only place the distinction exists: a source model carries no notation marker
+   * on an individual element, and the three names both vocabularies declare are otherwise
+   * indistinguishable. A view with no declared kind, or a kind of {@code generic} or {@code
+   * archimate}, reads ArchiMate — which is what this exporter did before it drew UML at all.
+   */
+  private Notation notation() {
+    if (resolvedNotation == null) {
+      GenericGraphViewKind kind = declaredViewKindEnum(genericGraphData());
+      resolvedNotation =
+          kind != null && kind.name().startsWith("UML_") ? Notation.UML : Notation.ARCHIMATE;
+    }
+    return resolvedNotation;
   }
 
   // ---------------------------------------------------------------- disclosure
@@ -684,12 +761,18 @@ public final class DrawioDocumentBuilder {
   }
 
   private String declaredViewKind(GenericGraphPluginData pluginData) {
+    GenericGraphViewKind kind = declaredViewKindEnum(pluginData);
+    return kind == null ? null : jsonName(kind);
+  }
+
+  /** The kind this layout's view declares, or {@code null} if it declares none. */
+  private GenericGraphViewKind declaredViewKindEnum(GenericGraphPluginData pluginData) {
     if (pluginData == null || layout.viewId() == null) {
       return null;
     }
     for (GenericGraphView view : pluginData.views()) {
       if (layout.viewId().equals(view.id()) && view.kind() != null) {
-        return jsonName(view.kind());
+        return view.kind();
       }
     }
     return null;
