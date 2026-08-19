@@ -18,6 +18,8 @@ class KnownSchemaVersionsTest {
         .isEqualTo(ContractVersions.OEF_EXPORT_POLICY_SCHEMA_VERSION);
     assertThat(KnownSchemaVersions.UML_XMI_EXPORT_POLICY.currentVersion())
         .isEqualTo(ContractVersions.UML_XMI_EXPORT_POLICY_SCHEMA_VERSION);
+    assertThat(KnownSchemaVersions.DRAWIO_EXPORT_POLICY.currentVersion())
+        .isEqualTo(ContractVersions.DRAWIO_EXPORT_POLICY_SCHEMA_VERSION);
     assertThat(KnownSchemaVersions.PACKAGE.currentVersion())
         .isEqualTo(ContractVersions.PACKAGE_SCHEMA_VERSION);
   }
@@ -42,6 +44,7 @@ class KnownSchemaVersionsTest {
     assertThat(KnownSchemaVersions.MODEL.priorVersions()).isEmpty();
     assertThat(KnownSchemaVersions.OEF_EXPORT_POLICY.priorVersions()).isEmpty();
     assertThat(KnownSchemaVersions.UML_XMI_EXPORT_POLICY.priorVersions()).isEmpty();
+    assertThat(KnownSchemaVersions.DRAWIO_EXPORT_POLICY.priorVersions()).isEmpty();
     assertThat(KnownSchemaVersions.PACKAGE.priorVersions()).isEmpty();
   }
 
@@ -53,6 +56,7 @@ class KnownSchemaVersionsTest {
             KnownSchemaVersions.RENDER_POLICY,
             KnownSchemaVersions.OEF_EXPORT_POLICY,
             KnownSchemaVersions.UML_XMI_EXPORT_POLICY,
+            KnownSchemaVersions.DRAWIO_EXPORT_POLICY,
             KnownSchemaVersions.LAYOUT_REQUEST,
             KnownSchemaVersions.PACKAGE);
   }

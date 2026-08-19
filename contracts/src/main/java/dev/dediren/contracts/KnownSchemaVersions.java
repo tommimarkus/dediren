@@ -138,6 +138,14 @@ public final class KnownSchemaVersions {
           List.of(ContractVersions.UML_XMI_EXPORT_POLICY_SCHEMA_VERSION),
           List.of());
 
+  // A brand-new single-version family: no prior versions, no migration steps, no ## Migration doc.
+  public static final Family DRAWIO_EXPORT_POLICY =
+      new Family(
+          "drawio-export-policy",
+          List.of("drawio_export_policy_schema_version"),
+          List.of(ContractVersions.DRAWIO_EXPORT_POLICY_SCHEMA_VERSION),
+          List.of());
+
   // layout-request is machine-emitted by `project` but documented as hand-authorable
   // (agent-usage "Layout constraints in a hand-written layout-request"), and it genuinely
   // shipped a v1 before the typed-IR v2 (291921d). Registering it gives a kept v1 file the
@@ -166,7 +174,13 @@ public final class KnownSchemaVersions {
 
   public static final List<Family> ALL =
       List.of(
-          MODEL, RENDER_POLICY, OEF_EXPORT_POLICY, UML_XMI_EXPORT_POLICY, LAYOUT_REQUEST, PACKAGE);
+          MODEL,
+          RENDER_POLICY,
+          OEF_EXPORT_POLICY,
+          UML_XMI_EXPORT_POLICY,
+          DRAWIO_EXPORT_POLICY,
+          LAYOUT_REQUEST,
+          PACKAGE);
 
   private KnownSchemaVersions() {}
 }

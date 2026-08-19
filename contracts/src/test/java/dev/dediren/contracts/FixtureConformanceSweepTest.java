@@ -46,7 +46,9 @@ class FixtureConformanceSweepTest {
       Map.of(
           "fixtures/export-policy/default-oef.json", "schemas/oef-export-policy.schema.json",
           "fixtures/export-policy/default-uml-xmi.json",
-              "schemas/uml-xmi-export-policy.schema.json");
+              "schemas/uml-xmi-export-policy.schema.json",
+          "fixtures/export-policy/default-drawio.json",
+              "schemas/drawio-export-policy.schema.json");
 
   /**
    * Negative fixtures that exist precisely to be rejected by their schema. They are asserted
