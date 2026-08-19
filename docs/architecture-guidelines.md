@@ -78,7 +78,9 @@ Stable Dependencies Principle).
 | `semantics-archimate` (engine) | `engine-api`, `contracts`, `archimate`, `ir` | 2 — leaf engine |
 | `semantics-uml` (engine) | `engine-api`, `contracts`, `uml`, `ir` | 2 — leaf engine |
 | `elk-layout` (engine) | `engine-api`, `contracts`, `ir` | 2 — leaf engine |
+| `dot-import` (engine) | `engine-api`, `contracts` | 2 — leaf import engine |
 | `mermaid-import` (engine) | `engine-api`, `contracts` | 2 — leaf import engine |
+| `drawio` (engine) | `engine-api`, `contracts` | 2 — leaf engine |
 | `archimate-oef-export` (engine) | `engine-api`, `contracts`, `archimate`, `schema-cache` | 2 — leaf engine |
 | `uml-xmi-export` (engine) | `engine-api`, `contracts`, `uml`, `schema-cache` | 2 — leaf engine |
 | `mcp-server` | `contracts`, `core`, `engine-api` | 3 — protocol adapter |
@@ -212,13 +214,16 @@ charter below is the contract for "what changes for this reason lives here."
   — the model shared library *should* look like (*reuse-or-migrate*: "stable,
   boring, owned mechanics").
 
-- **Engines** (`mermaid-import`, `render`, `elk-layout`, `archimate-oef-export`,
-  `uml-xmi-export`) — leaf library modules behind `engine-api`, each owning one
-  backend concern: SVG rendering, ELK layout, ArchiMate OEF export, UML/XMI
-  export. Each owns its backend-specific policy and *only* that. Styling lives
-  in render; OEF semantics in the OEF engine; XMI semantics in the XMI engine;
-  layout geometry in ELK; Mermaid grammar recognition, normalization, and
-  mapping in `mermaid-import`. (Their former standalone `Main` executables and
+- **Engines** (`dot-import`, `mermaid-import`, `drawio`, `render`,
+  `elk-layout`, `archimate-oef-export`, `uml-xmi-export`) — leaf library
+  modules behind `engine-api`, each owning one backend concern: SVG rendering,
+  ELK layout, ArchiMate OEF export, UML/XMI export. Each owns its
+  backend-specific policy and *only* that. Styling lives in render; OEF
+  semantics in the OEF engine; XMI semantics in the XMI engine; layout
+  geometry in ELK; DOT grammar recognition, normalization, and mapping in
+  `dot-import`; Mermaid grammar recognition, normalization, and mapping in
+  `mermaid-import`; draw.io (mxGraph) mapping, in both directions, in
+  `drawio`. (Their former standalone `Main` executables and
   per-engine launchers were retired by the single-launcher distribution
   cutover (Cutover B); each `Main` survives only as an `src/test/java`
   envelope-shaped test harness — no `main()`, no launcher script.)

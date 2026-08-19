@@ -456,6 +456,12 @@ UML/XMI export changes:
 ./mvnw -pl engines/uml-xmi-export,cli -am test
 ```
 
+draw.io lane changes:
+
+```bash
+./mvnw -pl engines/drawio,cli -am test
+```
+
 Real-standards conformance (opt-in; first run fetches the pinned real
 schemas, so it needs network or a warm `~/.cache/dediren-real-schemas`):
 
@@ -488,6 +494,7 @@ Distribution/release changes:
 
 ```bash
 ./mvnw test
+./mvnw -pl dist-tool -am test
 ./mvnw -pl dist-tool -am verify -Pdist-smoke
 git diff --check
 ```
