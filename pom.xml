@@ -55,7 +55,15 @@
          JUnit @TempDir / Files.createTemp*). JaCoCo overwrites `argLine` in the coverage profile,
          so that profile's argLine (below) repeats this placeholder. -->
     <dediren.test.tmpdir.arg></dediren.test.tmpdir.arg>
-    <argLine>-Dfile.encoding=UTF-8 -Djava.awt.headless=true ${dediren.test.tmpdir.arg}</argLine>
+    <!-- Shared test-JVM flags. Referenced by the base `argLine` below and repeated in the coverage
+         profile, which cannot inherit it (JaCoCo overwrites `argLine`; see that profile's note).
+         C1-only JIT suits this suite: 214 test classes averaging ~0.1s over 22 forked JVMs never
+         reach C2's break-even, so tiered compilation spends CPU it cannot amortize. Serially that
+         is worth ~1.5s (29.1s -> 27.6s), but under the parallel build in .mvn/maven.config it is
+         worth far more (16.8s -> 13.5s) because C2's compiler threads otherwise contend with the
+         concurrent module forks for cores. -->
+    <dediren.test.jvmArgs>-Dfile.encoding=UTF-8 -Djava.awt.headless=true -XX:TieredStopAtLevel=1</dediren.test.jvmArgs>
+    <argLine>${dediren.test.jvmArgs} ${dediren.test.tmpdir.arg}</argLine>
     <!-- Force UTF-8 on the single packaged dediren launcher's JVM streams. If the ambient locale
          drives native.encoding to US-ASCII, an unset stdout.encoding would mangle all non-ASCII
          output to '?' (issue #47), so the launcher pins UTF-8 for stdout/stderr and file I/O. -->
@@ -622,13 +630,13 @@
             <!-- Re-add the base test JVM flags here because JaCoCo's
                  prepare-agent sets the same `argLine` property the base build
                  uses; @{argLine} late-binds JaCoCo's agent and the flags below
-                 restore encoding/headless. This override lives only in the
-                 coverage profile, so the default build is untouched. -->
+                 restore encoding/headless and the JIT tier. This override lives
+                 only in the coverage profile, so the default build is untouched. -->
             <plugin>
               <groupId>org.apache.maven.plugins</groupId>
               <artifactId>maven-surefire-plugin</artifactId>
               <configuration>
-                <argLine>@{argLine} -Dfile.encoding=UTF-8 -Djava.awt.headless=true ${dediren.test.tmpdir.arg}</argLine>
+                <argLine>@{argLine} ${dediren.test.jvmArgs} ${dediren.test.tmpdir.arg}</argLine>
               </configuration>
             </plugin>
             <plugin>

@@ -377,6 +377,13 @@ authority before implementation code changes.
 Start with the narrow lane for the files touched, then run broader checks when
 the change crosses contracts, plugins, CLI behavior, or public docs.
 
+Every lane below runs parallel by default: `.mvn/maven.config` pins `-T 0.4C`
+(6 threads on a 16-core host, scaling down on smaller machines), and the root
+pom's `dediren.test.jvmArgs` runs test JVMs C1-only. Together they halve
+`./mvnw test` (29.1s -> 13.6s). That file takes no comments, so change the
+thread count here and there together. This is build-level parallelism only — it
+does not license parallel agents to run Maven (`## Planning`).
+
 Docs-only guidance changes:
 
 ```bash
