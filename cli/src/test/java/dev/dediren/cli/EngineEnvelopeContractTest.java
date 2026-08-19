@@ -262,6 +262,72 @@ class EngineEnvelopeContractTest {
     assertDiagnostic(outcome, 3, "DEDIREN_UML_XMI_POLICY_INVALID");
   }
 
+  // --- drawio import -----------------------------------------------------------------------------
+
+  @Test
+  void importDrawioEmitsOkEnvelope() throws Exception {
+    // No style, geometry, or recognizable stencil: fixtures/drawio's own fixtures carry a hidden
+    // cell and a dangling edge (they exercise DEDIREN_DRAWIO_CELLS_SKIPPED elsewhere), and any
+    // mxGeometry or presentation style key trips DEDIREN_DRAWIO_HINT_IGNORED — both warning
+    // envelopes, not this test's clean ok row. This is the minimal foreign-path document that
+    // imports without tripping either.
+    String source =
+        "<mxfile host=\"app.diagrams.net\">"
+            + "<diagram id=\"p-architecture\" name=\"Architecture\"><mxGraphModel><root>"
+            + "<mxCell id=\"0\"/><mxCell id=\"1\" parent=\"0\"/>"
+            + "<mxCell id=\"a\" value=\"Alpha\" vertex=\"1\" parent=\"1\"/>"
+            + "<mxCell id=\"b\" value=\"Beta\" vertex=\"1\" parent=\"1\"/>"
+            + "<mxCell id=\"e\" value=\"calls\" edge=\"1\" parent=\"1\" source=\"a\" target=\"b\"/>"
+            + "</root></mxGraphModel></diagram></mxfile>";
+
+    EngineRunOutcome outcome = CoreCommands.importCommand("drawio", source, Map.of(), engines());
+
+    assertOk(outcome);
+  }
+
+  @Test
+  void importDrawioMalformedXmlKeepsPublishedErrorRow() throws Exception {
+    EngineRunOutcome outcome =
+        CoreCommands.importCommand(
+            "drawio", "<mxfile><diagram><mxGraphModel>", Map.of(), engines());
+
+    assertDiagnostic(outcome, 2, "DEDIREN_DRAWIO_SYNTAX_INVALID");
+  }
+
+  // --- drawio export ------------------------------------------------------------------------------
+
+  @Test
+  void exportDrawioEmitsOkEnvelope() throws Exception {
+    // ArchiMate types, not the generic-graph fixture used for the other export rows above: a
+    // generic.node/generic.link source clears cleanly but is not in DrawioShapes' table, which
+    // trips DEDIREN_DRAWIO_SHAPE_UNMAPPED (a warning envelope, not this test's clean ok row).
+    String policy = read("fixtures/export-policy/default-drawio.json");
+    String source = read("fixtures/source/valid-archimate-oef.json");
+    Path base = path("fixtures/source");
+    String layout = read("fixtures/layout-result/archimate-oef-basic.json");
+
+    EngineRunOutcome outcome =
+        CoreCommands.exportCommand("drawio", policy, source, base, layout, Map.of(), engines());
+
+    assertOk(outcome);
+  }
+
+  @Test
+  void exportDrawioInvalidPolicyKeepsPublishedErrorRow() throws Exception {
+    // Same rationale as the OEF/UML-XMI policy-invalid rows: a current-version but incomplete
+    // policy (missing diagram_name) clears the schema-version gate and still fails the engine's
+    // own policy-schema validation.
+    String policy = "{\"drawio_export_policy_schema_version\":\"drawio-export-policy.schema.v1\"}";
+    String source = read("fixtures/source/valid-archimate-oef.json");
+    Path base = path("fixtures/source");
+    String layout = read("fixtures/layout-result/archimate-oef-basic.json");
+
+    EngineRunOutcome outcome =
+        CoreCommands.exportCommand("drawio", policy, source, base, layout, Map.of(), engines());
+
+    assertDiagnostic(outcome, 3, "DEDIREN_DRAWIO_POLICY_INVALID");
+  }
+
   // --- registry diagnostics through the CLI ----------------------------------------------------
 
   @Test

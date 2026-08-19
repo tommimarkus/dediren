@@ -1,16 +1,13 @@
 package dev.dediren.plugins.drawio;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import org.junit.jupiter.api.Test;
 
 /**
  * The published identity of the draw.io lane: one engine id under two capabilities, and the
- * exporter's artifact kind. The exporter's own behaviour is covered by {@code
- * DrawioExportEngineTest}; the importer is still a skeleton and refuses as an {@link
- * UnsupportedOperationException} rather than a diagnostic code, so the scaffold adds no dead entry
- * to the published {@code DEDIREN_DRAWIO_*} vocabulary.
+ * exporter's artifact kind. Both engines' own behaviour is covered by {@code
+ * DrawioExportEngineTest} and {@code DrawioImportEngineTest} / {@code DrawioImportFuzzTest}.
  */
 class DrawioEngineIdentityTest {
   private final DrawioExportEngine exportEngine = new DrawioExportEngine();
@@ -25,11 +22,5 @@ class DrawioEngineIdentityTest {
   @Test
   void theExporterPublishesTheDrawioXmlArtifactKind() {
     assertThat(DrawioExportEngine.ARTIFACT_KIND).isEqualTo("drawio+xml");
-  }
-
-  @Test
-  void theImporterSkeletonRefusesInsteadOfReturningAnEmptyDocument() {
-    assertThatThrownBy(() -> importEngine.importSource("anything"))
-        .isInstanceOf(UnsupportedOperationException.class);
   }
 }

