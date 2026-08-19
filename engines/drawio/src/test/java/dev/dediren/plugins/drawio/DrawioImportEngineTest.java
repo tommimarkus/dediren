@@ -12,11 +12,11 @@ import dev.dediren.plugins.drawio.read.DrawioSourceMapper;
 import org.junit.jupiter.api.Test;
 
 /**
- * The importer's own seam: {@link MxReader}/{@link DrawioSourceMapper} composition, the
- * pre-parse byte ceiling, and that a rejection surfaces as the mapper's or reader's own published
- * {@code EngineException} rather than something the seam invents. The mapper's own behaviour
- * (both identity paths, declines, warnings) is {@code DrawioSourceMapperTest}'s job; this pins only
- * that {@link DrawioImportEngine#importSource} wires it up.
+ * The importer's own seam: {@link MxReader}/{@link DrawioSourceMapper} composition, the pre-parse
+ * byte ceiling, and that a rejection surfaces as the mapper's or reader's own published {@code
+ * EngineException} rather than something the seam invents. The mapper's own behaviour (both
+ * identity paths, declines, warnings) is {@code DrawioSourceMapperTest}'s job; this pins only that
+ * {@link DrawioImportEngine#importSource} wires it up.
  */
 class DrawioImportEngineTest {
 

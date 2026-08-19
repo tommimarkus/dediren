@@ -23,7 +23,9 @@ import javax.xml.stream.XMLStreamReader;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-/** Behaviour of the hardened mxfile reader: what it accepts, what it refuses, and how it says so. */
+/**
+ * Behaviour of the hardened mxfile reader: what it accepts, what it refuses, and how it says so.
+ */
 class MxReaderTest {
 
   // ---------------------------------------------------------------- happy paths
@@ -99,7 +101,8 @@ class MxReaderTest {
   void detectsCompressionStructurallyAndIgnoresTheCompressedAttribute() throws Exception {
     // Recent draw.io omits `compressed=` entirely, and nothing stops a file from carrying a wrong
     // one. Both pages below lie about their own encoding; both must still read correctly.
-    String packed = MxCompression.encode("<mxGraphModel><root><mxCell id=\"0\"/></root></mxGraphModel>");
+    String packed =
+        MxCompression.encode("<mxGraphModel><root><mxCell id=\"0\"/></root></mxGraphModel>");
     MxFile file =
         MxReader.read(
             "<mxfile>"
@@ -117,7 +120,8 @@ class MxReaderTest {
 
   @Test
   void readsMultiplePagesInDocumentOrderMixingBothEncodings() throws Exception {
-    String packed = MxCompression.encode("<mxGraphModel><root><mxCell id=\"0\"/></root></mxGraphModel>");
+    String packed =
+        MxCompression.encode("<mxGraphModel><root><mxCell id=\"0\"/></root></mxGraphModel>");
     MxFile file =
         MxReader.read(
             "<mxfile>"
@@ -128,7 +132,9 @@ class MxReaderTest {
                 + "<diagram id=\"c\" name=\"Third\"><mxGraphModel><root><mxCell id=\"0\"/></root></mxGraphModel></diagram>"
                 + "</mxfile>");
 
-    assertThat(file.diagrams()).extracting(MxDiagram::name).containsExactly("First", "Second", "Third");
+    assertThat(file.diagrams())
+        .extracting(MxDiagram::name)
+        .containsExactly("First", "Second", "Third");
   }
 
   @Test
@@ -245,8 +251,7 @@ class MxReaderTest {
     assertThat(edge.geometry().relative()).isTrue();
     assertThat(edge.geometry().sourcePoint()).isEqualTo(new MxPoint(5, 6));
     assertThat(edge.geometry().targetPoint()).isEqualTo(new MxPoint(7, 8));
-    assertThat(edge.geometry().points())
-        .containsExactly(new MxPoint(10, 20), new MxPoint(30, 40));
+    assertThat(edge.geometry().points()).containsExactly(new MxPoint(10, 20), new MxPoint(30, 40));
   }
 
   @Test
@@ -281,7 +286,9 @@ class MxReaderTest {
   void readsTheHandAuthoredTwoPageFixture() throws Exception {
     MxFile file = MxReader.read(fixture("fixtures/drawio/reader-plain-two-page.drawio"));
 
-    assertThat(file.diagrams()).extracting(MxDiagram::name).containsExactly("Architecture", "Notes");
+    assertThat(file.diagrams())
+        .extracting(MxDiagram::name)
+        .containsExactly("Architecture", "Notes");
 
     MxDiagram architecture = file.diagrams().get(0);
     assertThat(architecture.cells())
@@ -334,7 +341,9 @@ class MxReaderTest {
     String packed = MxCompression.encode("<svg><g/></svg>");
     Diagnostic refusal =
         refusalOf(
-            () -> MxReader.read("<mxfile><diagram id=\"p\" name=\"P\">" + packed + "</diagram></mxfile>"));
+            () ->
+                MxReader.read(
+                    "<mxfile><diagram id=\"p\" name=\"P\">" + packed + "</diagram></mxfile>"));
 
     assertThat(refusal.code()).isEqualTo(DiagnosticCode.DRAWIO_SYNTAX_INVALID.code());
     assertThat(refusal.path()).startsWith("page 1 (P, decompressed), ");
@@ -392,7 +401,10 @@ class MxReaderTest {
   @Test
   void omitsTheNameFromThePathWhenThePageHasNone() {
     Diagnostic refusal =
-        refusalOf(() -> MxReader.read("<mxfile><diagram id=\"p\"><mxGraphModel><root <</root></mxGraphModel></diagram></mxfile>"));
+        refusalOf(
+            () ->
+                MxReader.read(
+                    "<mxfile><diagram id=\"p\"><mxGraphModel><root <</root></mxGraphModel></diagram></mxfile>"));
 
     assertThat(refusal.path()).matches("page 1, line \\d+, column \\d+");
   }
@@ -583,7 +595,9 @@ class MxReaderTest {
 
     MxFile file =
         MxReader.read(
-            "<mxGraphModel><root><mxCell id=\"0\" value=\"" + atCeiling + "\"/></root></mxGraphModel>");
+            "<mxGraphModel><root><mxCell id=\"0\" value=\""
+                + atCeiling
+                + "\"/></root></mxGraphModel>");
 
     assertThat(file.diagrams().get(0).cells().get(0).value()).hasSize(DrawioLimits.MAX_TOKEN_BYTES);
   }
@@ -595,7 +609,9 @@ class MxReaderTest {
     assertRefused(
         () ->
             MxReader.read(
-                "<mxGraphModel><root><mxCell id=\"0\" value=\"" + overCeiling + "\"/></root></mxGraphModel>"),
+                "<mxGraphModel><root><mxCell id=\"0\" value=\""
+                    + overCeiling
+                    + "\"/></root></mxGraphModel>"),
         DiagnosticCode.DRAWIO_TOKEN_LIMIT_EXCEEDED);
   }
 
@@ -607,7 +623,9 @@ class MxReaderTest {
     assertRefused(
         () ->
             MxReader.read(
-                "<mxGraphModel><root><mxCell id=\"0\" style=\"" + overCeiling + "\"/></root></mxGraphModel>"),
+                "<mxGraphModel><root><mxCell id=\"0\" style=\""
+                    + overCeiling
+                    + "\"/></root></mxGraphModel>"),
         DiagnosticCode.DRAWIO_TOKEN_LIMIT_EXCEEDED);
   }
 
@@ -658,7 +676,9 @@ class MxReaderTest {
     assertRefused(
         () ->
             MxReader.read(
-                "<mxGraphModel><root><mxCell id=\"0\" value=\"" + overCeiling + "\"/></root></mxGraphModel>"),
+                "<mxGraphModel><root><mxCell id=\"0\" value=\""
+                    + overCeiling
+                    + "\"/></root></mxGraphModel>"),
         DiagnosticCode.DRAWIO_TOKEN_LIMIT_EXCEEDED);
   }
 
@@ -773,12 +793,15 @@ class MxReaderTest {
       document
           .append("<diagram id=\"p")
           .append(page)
-          .append("\" name=\"P\"><mxGraphModel><root><mxCell id=\"0\"/></root></mxGraphModel></diagram>");
+          .append(
+              "\" name=\"P\"><mxGraphModel><root><mxCell id=\"0\"/></root></mxGraphModel></diagram>");
     }
     return document.append(trailing).append("</mxfile>").toString();
   }
 
-  /** One page holding {@code count} sibling cells, with {@code trailing} before the closing tags. */
+  /**
+   * One page holding {@code count} sibling cells, with {@code trailing} before the closing tags.
+   */
   private static String cells(int count, String trailing) {
     StringBuilder document = new StringBuilder("<mxGraphModel><root>");
     for (int cell = 0; cell < count; cell++) {
@@ -801,7 +824,9 @@ class MxReaderTest {
     return document.append("</root></mxGraphModel>").toString();
   }
 
-  /** All element text a factory yields for a document, so the mutation proof can see the payload. */
+  /**
+   * All element text a factory yields for a document, so the mutation proof can see the payload.
+   */
   private static String textOf(XMLInputFactory factory, String xml) throws XMLStreamException {
     XMLStreamReader reader = factory.createXMLStreamReader(new StringReader(xml));
     StringBuilder text = new StringBuilder();

@@ -28,8 +28,7 @@ final class MxCompression {
 
   /** {@code encodeURIComponent}: everything outside its unreserved set is %XX per UTF-8 byte. */
   private static String encodeUriComponent(String text) {
-    String unreserved =
-        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_.!~*'()";
+    String unreserved = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_.!~*'()";
     StringBuilder out = new StringBuilder();
     for (byte raw : text.getBytes(UTF_8)) {
       int value = raw & 0xff;

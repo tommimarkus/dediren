@@ -40,30 +40,30 @@ import tools.jackson.databind.node.ObjectNode;
  * <p><strong>Round trip.</strong> A cell wrapped in {@code <object dedirenId=…>} recovers its id,
  * type, group role, and — for an edge — its endpoints verbatim. Endpoints are keyed by {@code
  * dedirenId} rather than by {@code mxCell} id because draw.io reassigns cell ids freely as a user
- * edits, so cell ids are the one part of the file that does not survive a real editing session.
- * One hidden metadata cell per page ({@code dedirenType="dediren.view"}) carries the semantic
- * profile, view id, view kind, and model schema version; it is consumed as metadata and never
- * emitted as a node.
+ * edits, so cell ids are the one part of the file that does not survive a real editing session. One
+ * hidden metadata cell per page ({@code dedirenType="dediren.view"}) carries the semantic profile,
+ * view id, view kind, and model schema version; it is consumed as metadata and never emitted as a
+ * node.
  *
  * <p><strong>Foreign.</strong> Hand-authored draw.io always produces {@code semantic_profile:
  * generic-graph} with {@code generic.node}/{@code generic.link}, exactly like the DOT and Mermaid
  * importers. A recognized stencil is recorded under {@code properties.drawio.stencil} with a
- * suggested type and summarized in one {@link DiagnosticCode#DRAWIO_KIND_INFERRED} info
- * diagnostic, but is <em>never</em> promoted: draw.io encodes relationship semantics only as
- * arrowhead decoration, which cannot be reversed; a wrongly promoted ArchiMate model would fail
- * {@code validate --profile} after a green import, which is the worst possible diagnostic
- * ordering; and a third importer that sometimes emits a different profile would make "what does
- * import produce" unanswerable.
+ * suggested type and summarized in one {@link DiagnosticCode#DRAWIO_KIND_INFERRED} info diagnostic,
+ * but is <em>never</em> promoted: draw.io encodes relationship semantics only as arrowhead
+ * decoration, which cannot be reversed; a wrongly promoted ArchiMate model would fail {@code
+ * validate --profile} after a green import, which is the worst possible diagnostic ordering; and a
+ * third importer that sometimes emits a different profile would make "what does import produce"
+ * unanswerable.
  *
  * <h2>What is dropped, and what is refused</h2>
  *
- * <p>A dangling edge is dropped with a warning rather than failing the import: a floating
- * connector is the commonest condition in a hand-drawn file and carries nothing to recover, and
- * {@code DEDIREN_ELK_DANGLING_EDGE} is the in-repo precedent. Emitting it instead would pass
- * import — {@code SourceValidator.gateImportedDocument} checks schema and ceilings only — and then
- * fail {@code dediren validate} with {@code DEDIREN_DANGLING_ENDPOINT}, i.e. a green import
- * producing an unusable model. Constructs Dediren cannot represent at all fail the whole import
- * atomically instead, so no partial model is ever produced.
+ * <p>A dangling edge is dropped with a warning rather than failing the import: a floating connector
+ * is the commonest condition in a hand-drawn file and carries nothing to recover, and {@code
+ * DEDIREN_ELK_DANGLING_EDGE} is the in-repo precedent. Emitting it instead would pass import —
+ * {@code SourceValidator.gateImportedDocument} checks schema and ceilings only — and then fail
+ * {@code dediren validate} with {@code DEDIREN_DANGLING_ENDPOINT}, i.e. a green import producing an
+ * unusable model. Constructs Dediren cannot represent at all fail the whole import atomically
+ * instead, so no partial model is ever produced.
  *
  * <p>Geometry is discarded because {@code schemas/model.schema.json} {@code $defs.sourceNode} is
  * {@code additionalProperties: false} with no x/y/width/height. That is contractual, not a
@@ -375,7 +375,10 @@ public final class DrawioSourceMapper {
       }
       if (profileDeclared && parsed != profile) {
         throw roundTripInvalid(
-            "page " + scan.number + " declares semantic profile '" + echo(declaredProfile)
+            "page "
+                + scan.number
+                + " declares semantic profile '"
+                + echo(declaredProfile)
                 + "', which conflicts with an earlier page",
             scan,
             scan.metadata);
@@ -395,8 +398,7 @@ public final class DrawioSourceMapper {
     }
 
     String declaredVersion = attributes.get(ATTR_MODEL_VERSION);
-    if (declaredVersion != null
-        && !ContractVersions.MODEL_SCHEMA_VERSION.equals(declaredVersion)) {
+    if (declaredVersion != null && !ContractVersions.MODEL_SCHEMA_VERSION.equals(declaredVersion)) {
       throw roundTripInvalid(
           "the page declares model schema version '"
               + echo(declaredVersion)
@@ -416,9 +418,7 @@ public final class DrawioSourceMapper {
       }
       if (!reservedViewIds.add(declaredViewId)) {
         throw roundTripInvalid(
-            "view id '" + echo(declaredViewId) + "' is declared on two pages",
-            scan,
-            scan.metadata);
+            "view id '" + echo(declaredViewId) + "' is declared on two pages", scan, scan.metadata);
       }
       scan.viewId = declaredViewId;
     }
@@ -438,7 +438,9 @@ public final class DrawioSourceMapper {
       for (String interactive : List.of("link", "linkTarget")) {
         if (attributes.containsKey(interactive)) {
           throw unsupported(
-              "the '" + interactive + "' attribute is an interactive draw.io feature Dediren does"
+              "the '"
+                  + interactive
+                  + "' attribute is an interactive draw.io feature Dediren does"
                   + " not import; remove it",
               scan,
               cell);
@@ -511,8 +513,7 @@ public final class DrawioSourceMapper {
       if (cell.vertex() && !scan.edgeLabelIds.contains(cell.id())) {
         dedirenIndex.put(
             declared,
-            new Endpoint(
-                declared, scan.isGroup(cell), attribute(cell, ATTR_SEMANTIC_SOURCE)));
+            new Endpoint(declared, scan.isGroup(cell), attribute(cell, ATTR_SEMANTIC_SOURCE)));
       }
     }
   }
@@ -534,7 +535,9 @@ public final class DrawioSourceMapper {
       String semanticSource = attribute(cell, ATTR_SEMANTIC_SOURCE);
       if (semanticSource != null && !dedirenIndex.containsKey(semanticSource)) {
         throw roundTripInvalid(
-            "dedirenSemanticSourceId '" + echo(semanticSource) + "' names no dedirenId in the"
+            "dedirenSemanticSourceId '"
+                + echo(semanticSource)
+                + "' names no dedirenId in the"
                 + " document",
             scan,
             cell);
@@ -568,8 +571,7 @@ public final class DrawioSourceMapper {
       String declared = attribute(cell, ATTR_ID);
       String elementId = declared != null ? declared : claim(cell.id());
       boolean group = scan.isGroup(cell);
-      local.put(
-          cell.id(), new Endpoint(elementId, group, attribute(cell, ATTR_SEMANTIC_SOURCE)));
+      local.put(cell.id(), new Endpoint(elementId, group, attribute(cell, ATTR_SEMANTIC_SOURCE)));
       if (group) {
         groupCells.add(cell);
         continue;
@@ -688,15 +690,14 @@ public final class DrawioSourceMapper {
             ? Map.of()
             : Map.of(PROPERTY_KEY, originalId(cell.id()));
     relationships.put(
-        elementId,
-        new SourceRelationship(elementId, type, source, target, label, properties));
+        elementId, new SourceRelationship(elementId, type, source, target, label, properties));
   }
 
   /**
    * Resolves one edge end. A round-tripped edge names a {@code dedirenId}, which must exist —
-   * silently dropping it would lose a relationship the exporter knew was real. A foreign edge
-   * names a cell, and every way that can fail (no attribute, no such cell, a hidden cell, an
-   * edge, a container that became a group) drops the edge instead.
+   * silently dropping it would lose a relationship the exporter knew was real. A foreign edge names
+   * a cell, and every way that can fail (no attribute, no such cell, a hidden cell, an edge, a
+   * container that became a group) drops the edge instead.
    */
   private String resolveEndpoint(
       PageScan scan,
@@ -741,8 +742,7 @@ public final class DrawioSourceMapper {
     return declared;
   }
 
-  private Map<String, JsonNode> nodeProperties(
-      MxCell cell, String elementId, boolean identified) {
+  private Map<String, JsonNode> nodeProperties(MxCell cell, String elementId, boolean identified) {
     ObjectNode drawio = JsonSupport.objectMapper().createObjectNode();
     if (!identified && !elementId.equals(cell.id())) {
       drawio.put("original_id", cell.id());
@@ -929,8 +929,7 @@ public final class DrawioSourceMapper {
   }
 
   private static String list(List<String> items) {
-    String joined =
-        items.stream().limit(LIST_LIMIT).collect(Collectors.joining(", "));
+    String joined = items.stream().limit(LIST_LIMIT).collect(Collectors.joining(", "));
     return items.size() > LIST_LIMIT ? joined + ", … (" + items.size() + " total)" : joined;
   }
 
@@ -956,8 +955,8 @@ public final class DrawioSourceMapper {
   }
 
   /**
-   * Splits a draw.io style string into its {@code key=value} pairs. A bare token (a style name
-   * such as {@code text} or {@code edgeLabel}) becomes a key with an empty value, which is how the
+   * Splits a draw.io style string into its {@code key=value} pairs. A bare token (a style name such
+   * as {@code text} or {@code edgeLabel}) becomes a key with an empty value, which is how the
    * format itself reads it.
    */
   private static Map<String, String> parseStyle(String style) {

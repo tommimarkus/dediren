@@ -44,10 +44,11 @@ import javax.xml.stream.XMLStreamReader;
  * demonstrates a default factory accepting the same payload.
  *
  * <p>Diagnostic paths carry the page, and say when coordinates are inside a decoded payload —
- * {@code "page 3 (Architecture, decompressed), line 12, column 5"}. The distinction is not cosmetic:
- * the two line numbers count lines in different documents, and a user sent to the wrong one is
- * looking at a line that has nothing to do with the fault. Coordinates are the JDK StAX reader's,
- * which reports the position it had reached — the end of the offending token, not its start.
+ * {@code "page 3 (Architecture, decompressed), line 12, column 5"}. The distinction is not
+ * cosmetic: the two line numbers count lines in different documents, and a user sent to the wrong
+ * one is looking at a line that has nothing to do with the fault. Coordinates are the JDK StAX
+ * reader's, which reports the position it had reached — the end of the offending token, not its
+ * start.
  *
  * <h2>Ceilings</h2>
  *
@@ -167,8 +168,8 @@ public final class MxReader {
         }
         // Not token-checked: a compressed body is legitimately megabytes, and MxDeflate is what
         // bounds it.
-        case XMLStreamConstants.CHARACTERS, XMLStreamConstants.CDATA -> body.append(
-            reader.getText());
+        case XMLStreamConstants.CHARACTERS, XMLStreamConstants.CDATA ->
+            body.append(reader.getText());
         case XMLStreamConstants.END_ELEMENT, XMLStreamConstants.END_DOCUMENT -> open = false;
         default -> {
           // A comment inside the body splits the character data; IS_COALESCING does not bridge it,
@@ -262,8 +263,7 @@ public final class MxReader {
             continue;
           }
           if (byId.putIfAbsent(cell.id(), cell) != null) {
-            throw syntax(
-                "cell id '" + echo(cell.id()) + "' appears twice on this page", location);
+            throw syntax("cell id '" + echo(cell.id()) + "' appears twice on this page", location);
           }
           locations.put(cell.id(), location);
           pageCells.add(cell);
@@ -556,9 +556,9 @@ public final class MxReader {
    *
    * <p>The skipped element's own attributes are counted first. Probing showed why that line has to
    * be here rather than at each call site: with the check only on entry to the elements the reader
-   * recognizes, an over-ceiling attribute on an unknown child of {@code <mxCell>} was accepted while
-   * the same attribute on an unknown child of {@code <mxfile>} was refused. A ceiling that depends
-   * on where in the tree the attacker puts the payload is not a ceiling.
+   * recognizes, an over-ceiling attribute on an unknown child of {@code <mxCell>} was accepted
+   * while the same attribute on an unknown child of {@code <mxfile>} was refused. A ceiling that
+   * depends on where in the tree the attacker puts the payload is not a ceiling.
    */
   private void skipElement(XMLStreamReader reader) throws EngineException {
     checkAttributeBytes(reader);
@@ -636,9 +636,7 @@ public final class MxReader {
    */
   private String path(int[] location) {
     String lineAndColumn =
-        location == null
-            ? NO_LOCATION_LINE_COLUMN
-            : location[0] + ", column " + location[1];
+        location == null ? NO_LOCATION_LINE_COLUMN : location[0] + ", column " + location[1];
     if (currentPage <= 0) {
       return "line " + lineAndColumn;
     }

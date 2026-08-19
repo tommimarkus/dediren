@@ -28,13 +28,13 @@ import org.junit.jupiter.api.Test;
  *
  * <h2>Why the UML element vocabulary needs a rule the ArchiMate one does not</h2>
  *
- * <p>{@code Archimate.java} declares one ordered {@code ELEMENT_TYPES} list. {@code Uml.java} has no
- * such constant: its element vocabulary is the union {@code isNamedElementType} forms over seven
+ * <p>{@code Archimate.java} declares one ordered {@code ELEMENT_TYPES} list. {@code Uml.java} has
+ * no such constant: its element vocabulary is the union {@code isNamedElementType} forms over seven
  * separate constants, three of which are unordered {@link Set}s. Textual declaration order is
  * therefore the only well-defined sequence, and "which constants count" is a decision that could
- * silently change — so {@link #umlElementVocabularyIsStillTheUnionOfExactlySevenPredicates} pins the
- * predicate list itself. Adding an eighth kind of element to {@code Uml} fails that test rather than
- * quietly leaving the new types undrawn.
+ * silently change — so {@link #umlElementVocabularyIsStillTheUnionOfExactlySevenPredicates} pins
+ * the predicate list itself. Adding an eighth kind of element to {@code Uml} fails that test rather
+ * than quietly leaving the new types undrawn.
  */
 class DrawioNotationCoverageTest {
 
@@ -44,7 +44,8 @@ class DrawioNotationCoverageTest {
   private static final Path DRAWIO_UML_SHAPES =
       Path.of("engines/drawio/src/main/java/dev/dediren/plugins/drawio/style/DrawioUmlShapes.java");
   private static final Path DRAWIO_EDGE_STYLES =
-      Path.of("engines/drawio/src/main/java/dev/dediren/plugins/drawio/style/DrawioEdgeStyles.java");
+      Path.of(
+          "engines/drawio/src/main/java/dev/dediren/plugins/drawio/style/DrawioEdgeStyles.java");
   private static final Path SHIPPED_ARCHIMATE_POLICY =
       Path.of("fixtures/render-policy/archimate-svg.json");
   private static final Path SHIPPED_UML_POLICY = Path.of("fixtures/render-policy/uml-svg.json");
@@ -159,8 +160,7 @@ class DrawioNotationCoverageTest {
         .isEqualTo(edgeTypeOverrideKeys(SHIPPED_ARCHIMATE_POLICY));
 
     Set<String> umlPolicyKeys = edgeTypeOverrideKeys(SHIPPED_UML_POLICY);
-    Set<String> umlTableKeys =
-        new LinkedHashSet<>(tablePutKeysInOrder(DRAWIO_EDGE_STYLES, "uml"));
+    Set<String> umlTableKeys = new LinkedHashSet<>(tablePutKeysInOrder(DRAWIO_EDGE_STYLES, "uml"));
     assertThat(umlTableKeys)
         .as(
             "the UML render policy does not override Message — the sequence renderer styles it per"

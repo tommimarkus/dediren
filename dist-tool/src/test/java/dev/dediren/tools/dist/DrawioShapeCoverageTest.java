@@ -33,11 +33,9 @@ class DrawioShapeCoverageTest {
   private static final Path VOCABULARY =
       Path.of("archimate/src/main/java/dev/dediren/archimate/Archimate.java");
   private static final Path DRAWIO_SHAPES =
-      Path.of(
-          "engines/drawio/src/main/java/dev/dediren/plugins/drawio/style/DrawioShapes.java");
+      Path.of("engines/drawio/src/main/java/dev/dediren/plugins/drawio/style/DrawioShapes.java");
   private static final Path DRAWIO_PALETTE =
-      Path.of(
-          "engines/drawio/src/main/java/dev/dediren/plugins/drawio/style/DrawioPalette.java");
+      Path.of("engines/drawio/src/main/java/dev/dediren/plugins/drawio/style/DrawioPalette.java");
   private static final Path SHIPPED_POLICY = Path.of("fixtures/render-policy/archimate-svg.json");
 
   @Test

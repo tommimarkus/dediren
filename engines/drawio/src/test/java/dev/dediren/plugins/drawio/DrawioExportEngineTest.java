@@ -51,7 +51,8 @@ class DrawioExportEngineTest {
         List.of(),
         List.of(),
         List.of(
-            new SourceNode("orders-component", "ApplicationComponent", "Orders Component", Map.of()),
+            new SourceNode(
+                "orders-component", "ApplicationComponent", "Orders Component", Map.of()),
             new SourceNode("orders-service", "ApplicationService", "Orders Service", Map.of())),
         List.of(
             new SourceRelationship(
@@ -86,14 +87,7 @@ class DrawioExportEngineTest {
         "main",
         List.of(
             new LaidOutNode(
-                "orders-component",
-                "orders-component",
-                null,
-                12,
-                12,
-                160,
-                80,
-                "Orders Component"),
+                "orders-component", "orders-component", null, 12, 12, 160, 80, "Orders Component"),
             new LaidOutNode(
                 "orders-service", "orders-service", null, 254, 12, 160, 80, "Orders Service")),
         List.of(
@@ -151,7 +145,8 @@ class DrawioExportEngineTest {
   void emitsAnArtifactTheMxfileReaderAccepts() throws Exception {
     // The cheapest available proxy for "draw.io can open this", and the seam the round-trip test
     // builds on. Nothing in this build can launch the editor.
-    MxFile reread = MxReader.read(engine.export(request(validPolicy()), Map.of(), null).value().content());
+    MxFile reread =
+        MxReader.read(engine.export(request(validPolicy()), Map.of(), null).value().content());
 
     assertThat(reread.diagrams()).hasSize(1);
     assertThat(reread.diagrams().get(0).name()).isEqualTo("Main");
@@ -185,7 +180,8 @@ class DrawioExportEngineTest {
             }
             """);
 
-    MxFile reread = MxReader.read(engine.export(request(withOverride), Map.of(), null).value().content());
+    MxFile reread =
+        MxReader.read(engine.export(request(withOverride), Map.of(), null).value().content());
 
     assertThat(reread.diagrams().get(0).name()).isEqualTo("Orders");
   }

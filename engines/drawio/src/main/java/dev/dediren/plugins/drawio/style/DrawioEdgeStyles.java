@@ -14,14 +14,15 @@ import java.util.Map;
  * each table's key sequence matches exactly. Neither is reordered to match a third-party palette's
  * grouping.
  *
- * <p><strong>Where the notation comes from.</strong> Not from draw.io's shape libraries, which carry
- * no ArchiMate relationship styles at all, but from dediren's own shipped render policies ({@code
- * fixtures/render-policy/archimate-svg.json} and {@code uml-svg.json}) — the same marker and
- * line-style decisions its SVG renderer already draws. The draw.io tokens below are the functional
- * spelling of those decisions: {@code block}/{@code endFill=0} for a hollow triangle, {@code
- * diamondThin} for a whole-part diamond, {@code open} for an open arrowhead, {@code oval} for a
- * ball, {@code dashPattern=1 3} for a dotted line. Sourcing both exports from one policy is what
- * keeps a `.drawio` file and the SVG dediren renders from the same model saying the same thing.
+ * <p><strong>Where the notation comes from.</strong> Not from draw.io's shape libraries, which
+ * carry no ArchiMate relationship styles at all, but from dediren's own shipped render policies
+ * ({@code fixtures/render-policy/archimate-svg.json} and {@code uml-svg.json}) — the same marker
+ * and line-style decisions its SVG renderer already draws. The draw.io tokens below are the
+ * functional spelling of those decisions: {@code block}/{@code endFill=0} for a hollow triangle,
+ * {@code diamondThin} for a whole-part diamond, {@code open} for an open arrowhead, {@code oval}
+ * for a ball, {@code dashPattern=1 3} for a dotted line. Sourcing both exports from one policy is
+ * what keeps a `.drawio` file and the SVG dediren renders from the same model saying the same
+ * thing.
  *
  * <p><strong>Direction is meaning, not decoration.</strong> Composition and aggregation are drawn
  * from the <em>source</em> end in both notations ({@code startArrow=}), because dediren models the

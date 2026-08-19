@@ -163,7 +163,9 @@ public final class MxWriter {
   private void writeGeometry(MxGeometry geometry) {
     boolean boxed = geometry.width() != 0 || geometry.height() != 0;
     boolean hasChildren =
-        geometry.sourcePoint() != null || geometry.targetPoint() != null || !geometry.points().isEmpty();
+        geometry.sourcePoint() != null
+            || geometry.targetPoint() != null
+            || !geometry.points().isEmpty();
     if (hasChildren) {
       start("mxGeometry");
     } else {

@@ -32,8 +32,7 @@ public final class DrawioLimits {
   public static final long MAX_INPUT_BYTES = 64L * 1024 * 1024;
 
   /**
-   * An {@code mxCell} is the draw.io analogue of a DOT statement: {@code
-   * DotLimits.MAX_STATEMENTS}.
+   * An {@code mxCell} is the draw.io analogue of a DOT statement: {@code DotLimits.MAX_STATEMENTS}.
    */
   public static final int MAX_CELLS = 200_000;
 

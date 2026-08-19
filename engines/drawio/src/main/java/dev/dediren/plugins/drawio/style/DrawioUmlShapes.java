@@ -5,8 +5,8 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * UML element type name (dediren's own vocabulary, the union {@code Uml.isNamedElementType} forms) →
- * draw.io shape.
+ * UML element type name (dediren's own vocabulary, the union {@code Uml.isNamedElementType} forms)
+ * → draw.io shape.
  *
  * <p><strong>Ordering rule.</strong> The table below is built as a {@link LinkedHashMap} in {@code
  * Uml.java} declaration order — the seven element constants in the order {@code isNamedElementType}
@@ -39,8 +39,8 @@ import java.util.Map;
  * <p><strong>No palette colours.</strong> {@link DrawioPalette} is the ArchiMate layer palette,
  * pinned to the shipped ArchiMate render policy; UML has no layer semantics to colour by and is
  * conventionally monochrome, so UML cells carry only the semantic fills below — solid for the
- * control nodes whose meaning <em>is</em> their fill, {@code none} for the frames that must not hide
- * what they enclose.
+ * control nodes whose meaning <em>is</em> their fill, {@code none} for the frames that must not
+ * hide what they enclose.
  */
 public final class DrawioUmlShapes {
 

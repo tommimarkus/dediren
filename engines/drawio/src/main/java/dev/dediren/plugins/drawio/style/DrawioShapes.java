@@ -9,11 +9,11 @@ import java.util.Map;
  * draw.io {@code mxgraph.archimate3.application} shape.
  *
  * <p><strong>Ordering rule.</strong> The table below is built as a {@link LinkedHashMap} in {@code
- * Archimate.ELEMENT_TYPES} declaration order, and that order is load-bearing, not cosmetic:
- * {@code dist-tool}'s {@code DrawioShapeCoverageTest} reads {@code Archimate.java} as text and
- * asserts this table's key sequence matches it exactly, so the table is never reordered to match
- * draw.io's own shape-library layout or any other third-party palette. It is keyed and sequenced
- * by dediren's vocabulary alone.
+ * Archimate.ELEMENT_TYPES} declaration order, and that order is load-bearing, not cosmetic: {@code
+ * dist-tool}'s {@code DrawioShapeCoverageTest} reads {@code Archimate.java} as text and asserts
+ * this table's key sequence matches it exactly, so the table is never reordered to match draw.io's
+ * own shape-library layout or any other third-party palette. It is keyed and sequenced by dediren's
+ * vocabulary alone.
  *
  * <p><strong>No reverse (style → type) index.</strong> The style string is not a unique key: layer
  * is carried only by fill colour (owned by {@link DrawioPalette}, not this table), so twenty-three
@@ -21,8 +21,8 @@ import java.util.Map;
  * share one, and {@code interface}/{@code collab}/{@code proc}/{@code func}/{@code interaction}/
  * {@code serv} each repeat across the business, application, and technology layers, as do the two
  * passive-structure types ({@code BusinessObject}, {@code DataObject}). Building a style → type map
- * would silently mis-resolve on import. Import instead resolves the element type from the
- * {@code dedirenType} cell attribute, never from the style string.
+ * would silently mis-resolve on import. Import instead resolves the element type from the {@code
+ * dedirenType} cell attribute, never from the style string.
  */
 public final class DrawioShapes {
 

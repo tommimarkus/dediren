@@ -12,12 +12,12 @@ import java.util.Objects;
  * because it is the mapper's only evidence of shape and, for ArchiMate stencils, layer.
  *
  * <p><strong>{@code id} and {@code value} are the effective values, not the raw ones.</strong> When
- * a cell is wrapped, the format moves its identity to the wrapper: the inner {@code <mxCell>} has no
- * {@code id} at all and its label is the wrapper's {@code @label}, not {@code @value}. The reader
- * resolves that here so no consumer has to, because a consumer that forgets is the classic draw.io
- * import bug — wrapped cells silently losing their labels and their edges losing their endpoints.
- * Nothing is lost by doing so: {@link MxObject#attributes()} still carries the wrapper's own {@code
- * id} and {@code label} unfiltered.
+ * a cell is wrapped, the format moves its identity to the wrapper: the inner {@code <mxCell>} has
+ * no {@code id} at all and its label is the wrapper's {@code @label}, not {@code @value}. The
+ * reader resolves that here so no consumer has to, because a consumer that forgets is the classic
+ * draw.io import bug — wrapped cells silently losing their labels and their edges losing their
+ * endpoints. Nothing is lost by doing so: {@link MxObject#attributes()} still carries the wrapper's
+ * own {@code id} and {@code label} unfiltered.
  *
  * <p>{@code parent}, {@code style}, {@code source}, {@code target}, {@code geometry}, and {@code
  * object} are null when the attribute or child element is absent. {@code value} is null for a cell

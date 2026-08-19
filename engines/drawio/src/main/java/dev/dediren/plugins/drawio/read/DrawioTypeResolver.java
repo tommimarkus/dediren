@@ -17,17 +17,16 @@ import java.util.Map;
  * <p><strong>Why the table is deliberately partial, and not the reverse of {@code
  * DrawioShapes}.</strong> A draw.io style string is not a unique key for an ArchiMate type: the
  * layer rides only in {@code fillColor}, so twenty-three of the element types {@code DrawioShapes}
- * exports collapse into eight
- * shared style strings. The eight collapsed {@code appType} tokens — {@code event}, {@code
- * interface}, {@code collab}, {@code proc}, {@code serv}, {@code func}, {@code interaction}, {@code
- * passive} — are therefore absent below and get no suggestion at all, because any suggestion for
- * them would be a coin flip between layers. Only {@code role} is disambiguated, and only because
- * its two types differ in {@code archiType} rather than in colour.
+ * exports collapse into eight shared style strings. The eight collapsed {@code appType} tokens —
+ * {@code event}, {@code interface}, {@code collab}, {@code proc}, {@code serv}, {@code func},
+ * {@code interaction}, {@code passive} — are therefore absent below and get no suggestion at all,
+ * because any suggestion for them would be a coin flip between layers. Only {@code role} is
+ * disambiguated, and only because its two types differ in {@code archiType} rather than in colour.
  *
  * <p>Being partial also means this table may drift from {@code DrawioShapes} without anything
- * breaking: a stencil missing here is simply recorded with no suggestion, which is the same
- * outcome an ambiguous one gets. That is the point of keeping it separate rather than inverting the
- * export table — an inverted index would silently claim a resolution it cannot make.
+ * breaking: a stencil missing here is simply recorded with no suggestion, which is the same outcome
+ * an ambiguous one gets. That is the point of keeping it separate rather than inverting the export
+ * table — an inverted index would silently claim a resolution it cannot make.
  */
 final class DrawioTypeResolver {
 

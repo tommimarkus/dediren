@@ -7,9 +7,11 @@ import org.junit.jupiter.api.Test;
 
 class DrawioShapesTest {
 
-  /** {@code Archimate.ELEMENT_TYPES}, mirrored here so coverage can be asserted without a module
+  /**
+   * {@code Archimate.ELEMENT_TYPES}, mirrored here so coverage can be asserted without a module
    * edge onto {@code archimate} — see {@code DrawioShapes}' javadoc and the dist-tool coverage
-   * test, which pins this list against the real vocabulary as text. */
+   * test, which pins this list against the real vocabulary as text.
+   */
   private static final List<String> ELEMENT_TYPES =
       List.of(
           "Plateau",
@@ -129,8 +131,10 @@ class DrawioShapesTest {
     for (String elementType : ELEMENT_TYPES) {
       String style = DrawioShapes.shapeFor(elementType).style();
       assertThat(style)
-          .as("style for %s must end with ';' or a following key silently swallows the previous"
-              + " one, as it does in draw.io's own shape library", elementType)
+          .as(
+              "style for %s must end with ';' or a following key silently swallows the previous"
+                  + " one, as it does in draw.io's own shape library",
+              elementType)
           .endsWith(";");
     }
     assertThat(DrawioShapes.shapeFor("NotARealArchimateType").style()).endsWith(";");

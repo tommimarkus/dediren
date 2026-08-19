@@ -115,7 +115,8 @@ class DrawioDocumentBuilderTest {
         DrawioDocumentBuilder.build(
             source(
                 List.of(node("a", "ApplicationComponent"), node("b", "ApplicationService")),
-                List.of(new SourceRelationship("a-serves-b", "Serving", "a", "b", "calls", Map.of()))),
+                List.of(
+                    new SourceRelationship("a-serves-b", "Serving", "a", "b", "calls", Map.of()))),
             layout(
                 List.of(laidOut("a", 12, 12, 160, 80), laidOut("b", 530, 166, 160, 80)),
                 List.of(
@@ -278,7 +279,8 @@ class DrawioDocumentBuilderTest {
     var document =
         DrawioDocumentBuilder.build(
             source(
-                List.of(node("A node", "ApplicationComponent"), node("B node", "ApplicationService")),
+                List.of(
+                    node("A node", "ApplicationComponent"), node("B node", "ApplicationService")),
                 List.of(
                     new SourceRelationship("r 1", "Serving", "A node", "B node", null, Map.of()))),
             layout(
@@ -349,13 +351,12 @@ class DrawioDocumentBuilderTest {
   void emitsTheMetadataCellEvenForAViewTheSourceDeclaresNothingAbout() {
     var document =
         DrawioDocumentBuilder.build(
-            new SourceDocument("model.schema.v1", List.of(), List.of(), List.of(), List.of(), Map.of()),
+            new SourceDocument(
+                "model.schema.v1", List.of(), List.of(), List.of(), List.of(), Map.of()),
             layout(List.of(), List.of(), List.of()),
             POLICY);
 
-    assertThat(page(document).cells())
-        .filteredOn(cell -> cell.object() != null)
-        .hasSize(1);
+    assertThat(page(document).cells()).filteredOn(cell -> cell.object() != null).hasSize(1);
   }
 
   // ---------------------------------------------------------------- disclosure
@@ -377,12 +378,9 @@ class DrawioDocumentBuilderTest {
     assertThat(cell.object().attributes())
         .containsEntry(DrawioIdentity.TYPE, "NotARealElementType");
 
-    Diagnostic warning =
-        diagnostic(document, DiagnosticCode.DRAWIO_SHAPE_UNMAPPED).orElseThrow();
+    Diagnostic warning = diagnostic(document, DiagnosticCode.DRAWIO_SHAPE_UNMAPPED).orElseThrow();
     assertThat(warning.severity()).isEqualTo(DiagnosticSeverity.WARNING);
-    assertThat(warning.message())
-        .contains("NotARealElementType")
-        .contains(DrawioIdentity.TYPE);
+    assertThat(warning.message()).contains("NotARealElementType").contains(DrawioIdentity.TYPE);
   }
 
   @Test
@@ -431,8 +429,7 @@ class DrawioDocumentBuilderTest {
                 List.of()),
             POLICY);
 
-    Diagnostic omitted =
-        diagnostic(document, DiagnosticCode.DRAWIO_ORNAMENT_OMITTED).orElseThrow();
+    Diagnostic omitted = diagnostic(document, DiagnosticCode.DRAWIO_ORNAMENT_OMITTED).orElseThrow();
     assertThat(omitted.severity()).isEqualTo(DiagnosticSeverity.INFO);
     assertThat(omitted.message()).contains("lifeline").contains("execution");
   }
@@ -487,10 +484,7 @@ class DrawioDocumentBuilderTest {
   void drawsAUmlViewFromTheUmlShapeTableAndWithoutTheArchimateLayerPalette() {
     var document =
         DrawioDocumentBuilder.build(
-            source(
-                List.of(node("who", "Actor"), node("uc", "UseCase")),
-                List.of(),
-                "uml-use-case"),
+            source(List.of(node("who", "Actor"), node("uc", "UseCase")), List.of(), "uml-use-case"),
             layout(
                 List.of(laidOut("who", 0, 0, 30, 60), laidOut("uc", 60, 0, 140, 70)),
                 List.of(),
@@ -555,8 +549,7 @@ class DrawioDocumentBuilderTest {
             layout(
                 List.of(laidOut("a", 0, 0, 150, 75), laidOut("b", 300, 0, 150, 75)),
                 List.of(
-                    new LaidOutEdge(
-                        "owns", "a", "b", "owns", null, List.of(), List.of(), null),
+                    new LaidOutEdge("owns", "a", "b", "owns", null, List.of(), List.of(), null),
                     new LaidOutEdge(
                         "serves", "a", "b", "serves", null, List.of(), List.of(), null)),
                 List.of()),
@@ -585,7 +578,8 @@ class DrawioDocumentBuilderTest {
                 "uml-class"),
             layout(
                 List.of(laidOut("base", 0, 0, 160, 80), laidOut("derived", 300, 0, 160, 80)),
-                List.of(new LaidOutEdge(
+                List.of(
+                    new LaidOutEdge(
                         "isa", "derived", "base", "isa", null, List.of(), List.of(), null)),
                 List.of()),
             POLICY);
@@ -602,12 +596,10 @@ class DrawioDocumentBuilderTest {
         DrawioDocumentBuilder.build(
             source(
                 List.of(node("a", "ApplicationComponent"), node("b", "ApplicationComponent")),
-                List.of(
-                    new SourceRelationship("odd", "Generalization", "a", "b", null, Map.of()))),
+                List.of(new SourceRelationship("odd", "Generalization", "a", "b", null, Map.of()))),
             layout(
                 List.of(laidOut("a", 0, 0, 150, 75), laidOut("b", 300, 0, 150, 75)),
-                List.of(new LaidOutEdge(
-                        "odd", "a", "b", "odd", null, List.of(), List.of(), null)),
+                List.of(new LaidOutEdge("odd", "a", "b", "odd", null, List.of(), List.of(), null)),
                 List.of()),
             POLICY);
 
@@ -634,7 +626,14 @@ class DrawioDocumentBuilderTest {
             layout(
                 List.of(
                     new LaidOutNode(
-                        "seq", "seq", null, 0, 0, 400, 300, "Place Order",
+                        "seq",
+                        "seq",
+                        null,
+                        0,
+                        0,
+                        400,
+                        300,
+                        "Place Order",
                         LayoutNodeRole.INTERACTION)),
                 List.of(),
                 List.of()),

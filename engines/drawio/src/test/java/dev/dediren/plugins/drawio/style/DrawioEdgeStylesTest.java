@@ -150,7 +150,12 @@ class DrawioEdgeStylesTest {
     // UML: Realization is dashed rather than dotted, and the whole dependency family with it.
     for (String type :
         List.of(
-            "Realization", "Dependency", "Usage", "Include", "Extend", "Deployment",
+            "Realization",
+            "Dependency",
+            "Usage",
+            "Include",
+            "Extend",
+            "Deployment",
             "Manifestation")) {
       assertThat(DrawioEdgeStyles.styleFor(Notation.UML, type))
           .as("UML relationship %s", type)

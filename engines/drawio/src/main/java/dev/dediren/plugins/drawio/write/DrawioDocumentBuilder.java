@@ -281,7 +281,9 @@ public final class DrawioDocumentBuilder {
   /** The mxCell id this element hangs under: its container's cell, or the default layer. */
   private String parentCellId(String dedirenId) {
     String container = containerOf.get(dedirenId);
-    return container == null ? LAYER_CELL_ID : cellIdByDedirenId.getOrDefault(container, LAYER_CELL_ID);
+    return container == null
+        ? LAYER_CELL_ID
+        : cellIdByDedirenId.getOrDefault(container, LAYER_CELL_ID);
   }
 
   /**

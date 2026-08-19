@@ -37,8 +37,7 @@ class DrawioSourceMapperTest {
   @Test
   void foreignDocumentAlwaysProducesTheGenericGraphProfile() throws Exception {
     SourceDocument document =
-        map(
-            page(
+        map(page(
                 "Architecture",
                 """
                 <mxCell id="0" />
@@ -71,27 +70,30 @@ class DrawioSourceMapperTest {
   @Test
   void firstPageIsAlwaysMainAndNoLaterPageMayTakeIt() throws Exception {
     SourceDocument document =
-        map(
-            document(
+        map(document(
                 page("main", "<mxCell id=\"0\"/><mxCell id=\"1\" parent=\"0\"/>"),
                 page("main", "<mxCell id=\"0\"/><mxCell id=\"1\" parent=\"0\"/>"),
                 page(null, "<mxCell id=\"0\"/><mxCell id=\"1\" parent=\"0\"/>")))
             .document();
 
-    assertThat(views(document)).extracting(GenericGraphView::id).containsExactly("main", "main-2",
-        "page-3");
+    assertThat(views(document))
+        .extracting(GenericGraphView::id)
+        .containsExactly("main", "main-2", "page-3");
   }
 
   @Test
   void cellIdsAreNormalisedAndStayUniqueAcrossPages() throws Exception {
     SourceDocument document =
-        map(
-            document(
-                page("One", "<mxCell id=\"0\"/><mxCell id=\"1\" parent=\"0\"/>"
-                    + "<mxCell id=\"shared\" value=\"A\" vertex=\"1\" parent=\"1\"/>"),
-                page("Two", "<mxCell id=\"0\"/><mxCell id=\"1\" parent=\"0\"/>"
-                    + "<mxCell id=\"shared\" value=\"B\" vertex=\"1\" parent=\"1\"/>"
-                    + "<mxCell id=\"bad id\" value=\"C\" vertex=\"1\" parent=\"1\"/>")))
+        map(document(
+                page(
+                    "One",
+                    "<mxCell id=\"0\"/><mxCell id=\"1\" parent=\"0\"/>"
+                        + "<mxCell id=\"shared\" value=\"A\" vertex=\"1\" parent=\"1\"/>"),
+                page(
+                    "Two",
+                    "<mxCell id=\"0\"/><mxCell id=\"1\" parent=\"0\"/>"
+                        + "<mxCell id=\"shared\" value=\"B\" vertex=\"1\" parent=\"1\"/>"
+                        + "<mxCell id=\"bad id\" value=\"C\" vertex=\"1\" parent=\"1\"/>")))
             .document();
 
     assertThat(document.nodes())
@@ -104,8 +106,7 @@ class DrawioSourceMapperTest {
   @Test
   void aStrayDedirenTypeInAForeignFileSuppliesAnIdButNotAType() throws Exception {
     SourceDocument document =
-        map(
-            page(
+        map(page(
                 "Foreign",
                 "<mxCell id=\"0\"/><mxCell id=\"1\" parent=\"0\"/>"
                     + "<object id=\"c1\" label=\"Ledger\" dedirenId=\"svc.ledger\""
@@ -127,8 +128,7 @@ class DrawioSourceMapperTest {
   @Test
   void nestedContainersBecomeNestedGroupsRatherThanBeingFlattened() throws Exception {
     SourceDocument document =
-        map(
-            page(
+        map(page(
                 "Nested",
                 """
                 <mxCell id="0" />
@@ -154,8 +154,7 @@ class DrawioSourceMapperTest {
   @Test
   void aSwimlaneIsAContainerBecauseOfItsChildrenNotItsStyle() throws Exception {
     SourceDocument document =
-        map(
-            page(
+        map(page(
                 "Pools",
                 """
                 <mxCell id="0" />
@@ -198,8 +197,11 @@ class DrawioSourceMapperTest {
   @Test
   void aSingleDefaultLayerIsNotReportedAsFlattening() throws Exception {
     DrawioSourceMapper.MappingResult result =
-        map(page("Plain", "<mxCell id=\"0\"/><mxCell id=\"1\" parent=\"0\"/>"
-            + "<mxCell id=\"a\" value=\"A\" vertex=\"1\" parent=\"1\"/>"));
+        map(
+            page(
+                "Plain",
+                "<mxCell id=\"0\"/><mxCell id=\"1\" parent=\"0\"/>"
+                    + "<mxCell id=\"a\" value=\"A\" vertex=\"1\" parent=\"1\"/>"));
 
     assertThat(codes(result)).doesNotContain(DiagnosticCode.DRAWIO_LAYERS_FLATTENED.code());
   }
@@ -232,8 +234,7 @@ class DrawioSourceMapperTest {
   @Test
   void aContainerWhoseChildrenAreAllHiddenBecomesANodeNotAnEmptyGroup() throws Exception {
     SourceDocument document =
-        map(
-            page(
+        map(page(
                 "Emptied",
                 """
                 <mxCell id="0" />
@@ -252,8 +253,7 @@ class DrawioSourceMapperTest {
   @Test
   void everyBrSpellingBecomesANewlineAndNothingElseDoes() throws Exception {
     SourceDocument document =
-        map(
-            page(
+        map(page(
                 "Labels",
                 """
                 <mxCell id="0" />
@@ -271,8 +271,7 @@ class DrawioSourceMapperTest {
   @Test
   void anEdgeLabelChildSuppliesTheLabelOnlyWhenTheEdgeHasNone() throws Exception {
     SourceDocument document =
-        map(
-            page(
+        map(page(
                 "Edges",
                 """
                 <mxCell id="0" />
@@ -391,8 +390,7 @@ class DrawioSourceMapperTest {
   void aHiddenCellIsNotInspectedForDeclinedConstructs() throws Exception {
     // A hidden cell is not in the model at all, so there is nothing in it to refuse.
     SourceDocument document =
-        map(
-            page(
+        map(page(
                 "HiddenImage",
                 """
                 <mxCell id="0" />
@@ -447,8 +445,11 @@ class DrawioSourceMapperTest {
   @Test
   void aDocumentWithNothingToDiscardCarriesNoHintDiagnostic() throws Exception {
     DrawioSourceMapper.MappingResult result =
-        map(page("Clean", "<mxCell id=\"0\"/><mxCell id=\"1\" parent=\"0\"/>"
-            + "<mxCell id=\"a\" value=\"A\" vertex=\"1\" parent=\"1\"/>"));
+        map(
+            page(
+                "Clean",
+                "<mxCell id=\"0\"/><mxCell id=\"1\" parent=\"0\"/>"
+                    + "<mxCell id=\"a\" value=\"A\" vertex=\"1\" parent=\"1\"/>"));
 
     assertThat(codes(result)).doesNotContain(DiagnosticCode.DRAWIO_HINT_IGNORED.code());
   }
@@ -463,9 +464,7 @@ class DrawioSourceMapperTest {
     // The profile stays generic-graph and every element keeps a generic type.
     assertThat(plugin(result.document()).semanticProfile())
         .isEqualTo(GenericGraphSemanticProfile.GENERIC_GRAPH);
-    assertThat(result.document().nodes())
-        .extracting(SourceNode::type)
-        .containsOnly("generic.node");
+    assertThat(result.document().nodes()).extracting(SourceNode::type).containsOnly("generic.node");
 
     SourceNode goal =
         result.document().nodes().stream()
@@ -485,8 +484,7 @@ class DrawioSourceMapperTest {
   @Test
   void anAmbiguousStencilIsRecordedWithoutASuggestion() throws Exception {
     SourceDocument document =
-        map(
-            page(
+        map(page(
                 "Ambiguous",
                 """
                 <mxCell id="0" />
@@ -506,8 +504,11 @@ class DrawioSourceMapperTest {
   @Test
   void aDocumentWithNoRecognisedStencilCarriesNoKindDiagnostic() throws Exception {
     DrawioSourceMapper.MappingResult result =
-        map(page("Plain", "<mxCell id=\"0\"/><mxCell id=\"1\" parent=\"0\"/>"
-            + "<mxCell id=\"a\" value=\"A\" style=\"rounded=1;\" vertex=\"1\" parent=\"1\"/>"));
+        map(
+            page(
+                "Plain",
+                "<mxCell id=\"0\"/><mxCell id=\"1\" parent=\"0\"/>"
+                    + "<mxCell id=\"a\" value=\"A\" style=\"rounded=1;\" vertex=\"1\" parent=\"1\"/>"));
 
     assertThat(codes(result)).doesNotContain(DiagnosticCode.DRAWIO_KIND_INFERRED.code());
   }
@@ -564,10 +565,7 @@ class DrawioSourceMapperTest {
             GenericGraphViewGroup::role,
             GenericGraphViewGroup::semanticSourceId)
         .containsExactly(
-            tuple(
-                "zone.trusted",
-                GenericGraphViewGroupRole.SEMANTIC_BOUNDARY,
-                "svc.ledger"));
+            tuple("zone.trusted", GenericGraphViewGroupRole.SEMANTIC_BOUNDARY, "svc.ledger"));
     // The hidden metadata cell is consumed, never emitted, and never counted as a skipped cell.
     assertThat(codes(result)).doesNotContain(DiagnosticCode.DRAWIO_CELLS_SKIPPED.code());
   }
@@ -594,21 +592,18 @@ class DrawioSourceMapperTest {
             SourceRelationship::source,
             SourceRelationship::target)
         .containsExactly(
-            tuple(
-                "orders-realizes-service", "Realization", "orders-component", "orders-service"));
+            tuple("orders-realizes-service", "Realization", "orders-component", "orders-service"));
     assertThat(views(document))
         .extracting(GenericGraphView::id, GenericGraphView::kind)
         .containsExactly(tuple("main", GenericGraphViewKind.ARCHIMATE));
     // Nothing was skipped or dropped: a round trip loses only appearance.
-    assertThat(codes(result))
-        .containsExactly(DiagnosticCode.DRAWIO_HINT_IGNORED.code());
+    assertThat(codes(result)).containsExactly(DiagnosticCode.DRAWIO_HINT_IGNORED.code());
   }
 
   @Test
   void anEndpointNamingASemanticBoundaryGroupRetargetsToItsSourceNode() throws Exception {
     SourceDocument document =
-        map(
-            page(
+        map(page(
                 "Boundary",
                 """
                 <mxCell id="0" />
@@ -639,8 +634,7 @@ class DrawioSourceMapperTest {
   @Test
   void oneElementOnTwoRoundTrippedPagesBecomesOneNodeInTwoViews() throws Exception {
     SourceDocument document =
-        map(
-            document(
+        map(document(
                 roundTripPage("One", "one", "generic", "svc.ledger", "Ledger"),
                 roundTripPage("Two", "two", "generic", "svc.ledger", "Ledger")))
             .document();
@@ -655,8 +649,7 @@ class DrawioSourceMapperTest {
   void aRoundTrippedContainerThatLostItsChildrenDoesNotInheritTheGroupMarkerAsAType()
       throws Exception {
     SourceDocument document =
-        map(
-            page(
+        map(page(
                 "Emptied",
                 "<mxCell id=\"0\"/><mxCell id=\"1\" parent=\"0\"/>"
                     + metadataCell("main", "generic", "generic-graph")
@@ -679,8 +672,7 @@ class DrawioSourceMapperTest {
   @Test
   void rejectsARoundTripIdThatViolatesThePublishedIdPattern() {
     assertRoundTripInvalid(
-        roundTripCell("c1", "not a valid id", "ApplicationComponent", "Ledger"),
-        "not a valid id");
+        roundTripCell("c1", "not a valid id", "ApplicationComponent", "Ledger"), "not a valid id");
   }
 
   @Test
@@ -701,8 +693,10 @@ class DrawioSourceMapperTest {
 
     assertThatThrownBy(() -> DrawioSourceMapper.map(MxReader.read(source)))
         .isInstanceOf(EngineException.class)
-        .satisfies(error -> assertThat(code((EngineException) error))
-            .isEqualTo(DiagnosticCode.DRAWIO_ROUND_TRIP_INVALID.code()));
+        .satisfies(
+            error ->
+                assertThat(code((EngineException) error))
+                    .isEqualTo(DiagnosticCode.DRAWIO_ROUND_TRIP_INVALID.code()));
   }
 
   @Test
@@ -726,8 +720,10 @@ class DrawioSourceMapperTest {
                             "<mxCell id=\"0\"/><mxCell id=\"1\" parent=\"0\"/>"
                                 + metadataCell("main", "generic", "sysml")))))
         .isInstanceOf(EngineException.class)
-        .satisfies(error -> assertThat(code((EngineException) error))
-            .isEqualTo(DiagnosticCode.DRAWIO_ROUND_TRIP_INVALID.code()));
+        .satisfies(
+            error ->
+                assertThat(code((EngineException) error))
+                    .isEqualTo(DiagnosticCode.DRAWIO_ROUND_TRIP_INVALID.code()));
   }
 
   @Test
@@ -741,15 +737,16 @@ class DrawioSourceMapperTest {
                             "<mxCell id=\"0\"/><mxCell id=\"1\" parent=\"0\"/>"
                                 + metadataCell("main", "uml-fishbone", "uml")))))
         .isInstanceOf(EngineException.class)
-        .satisfies(error -> assertThat(code((EngineException) error))
-            .isEqualTo(DiagnosticCode.DRAWIO_ROUND_TRIP_INVALID.code()));
+        .satisfies(
+            error ->
+                assertThat(code((EngineException) error))
+                    .isEqualTo(DiagnosticCode.DRAWIO_ROUND_TRIP_INVALID.code()));
   }
 
   @Test
   void aHandAddedCellOnARoundTrippedPageStillImportsWithASynthesisedId() throws Exception {
     SourceDocument document =
-        map(
-            page(
+        map(page(
                 "Mixed",
                 "<mxCell id=\"0\"/><mxCell id=\"1\" parent=\"0\"/>"
                     + metadataCell("main", "generic", "generic-graph")
@@ -779,8 +776,10 @@ class DrawioSourceMapperTest {
     assertThat(DrawioSourceMapper.map(file, 4).document().nodes()).hasSize(4);
     assertThatThrownBy(() -> DrawioSourceMapper.map(file, 3))
         .isInstanceOf(EngineException.class)
-        .satisfies(error -> assertThat(code((EngineException) error))
-            .isEqualTo(DiagnosticCode.DRAWIO_ELEMENT_LIMIT_EXCEEDED.code()));
+        .satisfies(
+            error ->
+                assertThat(code((EngineException) error))
+                    .isEqualTo(DiagnosticCode.DRAWIO_ELEMENT_LIMIT_EXCEEDED.code()));
   }
 
   @Test
@@ -796,8 +795,10 @@ class DrawioSourceMapperTest {
     // One node plus one group is two produced elements, not one.
     assertThatThrownBy(() -> DrawioSourceMapper.map(file, 1))
         .isInstanceOf(EngineException.class)
-        .satisfies(error -> assertThat(code((EngineException) error))
-            .isEqualTo(DiagnosticCode.DRAWIO_ELEMENT_LIMIT_EXCEEDED.code()));
+        .satisfies(
+            error ->
+                assertThat(code((EngineException) error))
+                    .isEqualTo(DiagnosticCode.DRAWIO_ELEMENT_LIMIT_EXCEEDED.code()));
   }
 
   // ---------------------------------------------------------------- helpers
@@ -812,8 +813,7 @@ class DrawioSourceMapperTest {
   }
 
   private static void assertDeclined(String cells, String messageFragment) {
-    String source =
-        page("Refused", "<mxCell id=\"0\"/><mxCell id=\"1\" parent=\"0\"/>" + cells);
+    String source = page("Refused", "<mxCell id=\"0\"/><mxCell id=\"1\" parent=\"0\"/>" + cells);
     assertThatThrownBy(() -> DrawioSourceMapper.map(MxReader.read(source)))
         .isInstanceOf(EngineException.class)
         .satisfies(
@@ -859,8 +859,7 @@ class DrawioSourceMapperTest {
         + "<mxCell style=\"text;html=1;\" vertex=\"1\" parent=\"1\" visible=\"0\"/></object>";
   }
 
-  private static String roundTripCell(
-      String cellId, String dedirenId, String type, String label) {
+  private static String roundTripCell(String cellId, String dedirenId, String type, String label) {
     return "<object id=\""
         + cellId
         + "\" label=\""

@@ -18,10 +18,10 @@ import java.util.Objects;
  * label came from {@code @label} and only the first must be re-emitted as a wrapper.
  *
  * <p>{@code attributes} is the wrapper's <em>complete, unfiltered</em> attribute map in document
- * order, {@code id} and {@code label} included, so nothing the reader normalized onto {@link MxCell}
- * is lost. {@code elementName} is {@code "object"} or {@code "UserObject"} verbatim: draw.io writes
- * both for the same construct, and an exporter that re-emits the wrong one produces a file draw.io
- * reads differently.
+ * order, {@code id} and {@code label} included, so nothing the reader normalized onto {@link
+ * MxCell} is lost. {@code elementName} is {@code "object"} or {@code "UserObject"} verbatim:
+ * draw.io writes both for the same construct, and an exporter that re-emits the wrong one produces
+ * a file draw.io reads differently.
  */
 public record MxObject(String elementName, Map<String, String> attributes) {
 
